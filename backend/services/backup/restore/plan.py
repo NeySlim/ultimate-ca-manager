@@ -48,12 +48,17 @@ class RestorePlan:
         # that declares one, and walking the archive again each time would
         # make a restore quadratic in what it carries.
         self._archived_by_identity: Dict[str, Dict[Tuple, Dict[str, Any]]] = {}
+        # Source row numbers mean something here only on the same database.
+        self.same_installation = False
 
     # -- building ---------------------------------------------------------
 
     @classmethod
     def build(cls, backup_data: Dict[str, Any]) -> 'RestorePlan':
+        from ..installation import same_installation
+
         plan = cls()
+        plan.same_installation = same_installation(backup_data)
         plan._validate_shape(backup_data)
         plan._index_target_rows(backup_data)
         return plan
@@ -213,11 +218,53 @@ class RestorePlan:
             # with two configurations and used whichever the query returned.
             return next(iter(index.values()), None)
 
-        found = index.get(_identity_key(row, section.identity,
-                                        _temporal_identity(section_name)))
-        if found is None and _identified_by_a_reference(section):
-            found = index.get(self._identity_here(section_name, row))
+        if not _identified_by_a_reference(section):
+            return index.get(_identity_key(row, section.identity,
+                                           _temporal_identity(section_name)))
+        # By what the references name first; the source's numbers only when
+        # they are this database's own and still name the same rows.
+        found = index.get(self._identity_here(section_name, row))
+        if found is None and self.source_numbers_hold(section_name, row):
+            found = index.get(_identity_key(row, section.identity,
+                                            _temporal_identity(section_name)))
         return found
+
+    def source_numbers_hold(self, section_name: str, row: Dict[str, Any]) -> bool:
+        """Whether the numbers in this row's identity name, here, the rows it carries.
+
+        Only for an archive of this very database, and only when each number
+        points at a row with the identity the archive wrote beside it.
+        """
+        if not self.same_installation or not isinstance(row, dict):
+            return False
+        section = SECTIONS.get(section_name)
+        if section is None:
+            return False
+        from models import db
+
+        for field_name in section.identity:
+            target_name = section.references.get(field_name)
+            if target_name is None:
+                continue
+            number = row.get(field_name)
+            identity = row.get(f'{field_name}{REFERENCE_SUFFIX}')
+            if number is None or not isinstance(identity, dict) or not identity:
+                return False
+            target = SECTIONS.get(target_name)
+            if target is None:
+                return False
+            try:
+                with db.session.no_autoflush:
+                    here = db.session.get(load_model(target), number)
+            except Exception:
+                return False
+            temporal = _temporal_identity(target_name)
+            if here is None or tuple(
+                    _normalise(getattr(here, name, None), name in temporal)
+                    for name in target.identity) != _identity_key(
+                        identity, target.identity, temporal):
+                return False
+        return True
 
     def _id_of(self, section_name: str, identity: Dict[str, Any], *,
                translate: bool) -> Optional[Any]:
@@ -226,12 +273,15 @@ class RestorePlan:
         if section is None:
             return None
         index = self.target_ids.get(section_name, {})
-        found = index.get(_identity_key(identity, section.identity,
-                                        _temporal_identity(section_name)))
-        if found is None and translate and _identified_by_a_reference(section):
-            archived = self._archived_row(section_name, identity)
-            if archived is not None:
-                found = index.get(self._identity_here(section_name, archived))
+        raw = _identity_key(identity, section.identity, _temporal_identity(section_name))
+        if not _identified_by_a_reference(section):
+            return index.get(raw)
+        archived = self._archived_row(section_name, identity)
+        found = None
+        if translate and archived is not None:
+            found = index.get(self._identity_here(section_name, archived))
+        if found is None and self.source_numbers_hold(section_name, archived):
+            found = index.get(raw)
         return found
 
     def _identity_here(self, section_name: str,

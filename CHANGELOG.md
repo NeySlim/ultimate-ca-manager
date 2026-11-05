@@ -13,6 +13,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Restore: two DNS providers, ACME CA accounts or webhooks of the same name were merged into one row, and one credential was lost. A clashing row is now restored as `name (2)`, and the restore result lists it; an account is matched by its account URL and a webhook by its URL first.
 - DNS providers, ACME CA accounts and webhooks: the API accepted a name already in use. It now answers 409, on creation and on rename.
+- Restore: a membership, deployment binding, CRL binding, template pin or role permission was matched by the source's row numbers first, and could overwrite another row here. Rows are now matched by what they name; an archive records the database it comes from, and its numbers count only there and only when they still name the same rows.
 
 ### Upgrade notes
 

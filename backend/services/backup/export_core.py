@@ -23,6 +23,7 @@ from models.policy import CertificatePolicy
 from config.settings import Config
 from utils.datetime_utils import utc_now, utc_isoformat
 
+from . import installation
 from .key_material import (
     as_pem, decrypt_stored_key, decrypt_stored_secret, key_matches_certificate,
 )
@@ -44,6 +45,7 @@ class ExportCoreMixin:
             'created_at': utc_now().isoformat() + 'Z',
             'hostname': os.environ.get('FQDN', 'unknown'),
             'backup_type': backup_type,
+            installation.METADATA_KEY: installation.installation_id(create=True),
         }
 
     def _export_configuration(self, include: bool) -> Dict[str, Any]:
@@ -57,6 +59,8 @@ class ExportCoreMixin:
         # Get all system config entries
         system_configs = SystemConfig.query.all()
         for sc in system_configs:
+            if sc.key == installation.CONFIG_KEY:
+                continue    # the database's own, carried in the metadata
             val = sc.value
             # A setting is secret either because the row says so or because
             # its value is ciphertext (the scheduled-backup password is stored

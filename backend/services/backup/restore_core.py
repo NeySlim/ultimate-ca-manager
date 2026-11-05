@@ -17,6 +17,7 @@ from models.acme_models import AcmeAccount
 from config.settings import Config
 from services.file_regen_service import mirror_private_key
 
+from . import installation
 from .errors import BackupSchemaError
 from .restore import RestorePlan, single_transaction
 from .restore.files import StagedFiles
@@ -870,6 +871,8 @@ class RestoreCoreMixin:
             config_data = configuration.get('settings', {})
         from utils import admin_allowlist
         for key, value in config_data.items():
+            if key == installation.CONFIG_KEY:
+                continue    # this database's own, never the source's
             if key == admin_allowlist.CONFIG_KEY and admin_allowlist.restored_value_locks_out(value):
                 if admin_allowlist.disabled_by_env():
                     logger.warning(

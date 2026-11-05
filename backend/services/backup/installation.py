@@ -1,0 +1,50 @@
+"""Which database an archive was taken from, so its row numbers are compared only there.
+
+A random id in `system_config`, never exported as a setting nor overwritten by a restore.
+"""
+import logging
+import uuid
+from typing import Any, Dict, Optional
+
+from sqlalchemy.exc import IntegrityError
+
+from models import db
+
+logger = logging.getLogger(__name__)
+
+CONFIG_KEY = 'backup_installation_id'
+METADATA_KEY = 'installation_id'
+
+
+def installation_id(create: bool = False) -> Optional[str]:
+    """This database's id; created on first use when `create` is set."""
+    from models import SystemConfig
+
+    row = SystemConfig.query.filter_by(key=CONFIG_KEY).first()
+    if row is not None and row.value:
+        return row.value
+    if not create:
+        return None
+    value = uuid.uuid4().hex
+    try:
+        if row is None:
+            db.session.add(SystemConfig(key=CONFIG_KEY, value=value,
+                                        description='Identifies this database in its backups'))
+        else:
+            row.value = value
+        db.session.commit()
+    except IntegrityError:
+        # Another export created it first: that one is the id
+        db.session.rollback()
+        row = SystemConfig.query.filter_by(key=CONFIG_KEY).first()
+        return row.value if row is not None else None
+    return value
+
+
+def same_installation(backup_data: Dict[str, Any]) -> bool:
+    """Whether the archive was taken from this very database."""
+    metadata = backup_data.get('metadata')
+    carried = metadata.get(METADATA_KEY) if isinstance(metadata, dict) else None
+    if not isinstance(carried, str) or not carried:
+        return False
+    return carried == installation_id()
