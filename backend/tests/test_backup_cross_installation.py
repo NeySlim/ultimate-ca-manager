@@ -1040,6 +1040,14 @@ class TestEveryReferenceLandsOnTheRowTheArchiveNames:
         with restored_on_postgresql.open(app):
             _assert_every_reference_landed(restored_on_postgresql)
 
+    def test_a_hybrid_partner_is_the_certificate_the_archive_paired(self, app, restored_on_sqlite):
+        """Checked by name: an undeclared link is not one the loop above looks at."""
+        from models import Certificate
+        with restored_on_sqlite.open(app):
+            restored = Certificate.query.filter_by(refid='xinst-cert-a').one()
+            partner = db.session.get(Certificate, restored.related_certificate_id)
+            assert partner is not None and partner.refid == 'xinst-cert-b'
+
     def test_a_binding_pinned_to_a_cross_certificate_follows_it_on_sqlite(
             self, app, restored_on_sqlite):
         _assert_binding_follows_its_cross_certificate(app, restored_on_sqlite)

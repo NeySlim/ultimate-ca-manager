@@ -112,6 +112,10 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
         message += _clause('Rows the archive does not carry lost their link to a removed row: '
                            + _listing([f'{name} ({count})' for name, count in sorted(unlinked.items())]))
 
+    warnings = (results or {}).get('warnings') or []
+    if warnings:
+        message += _clause('The archive also warned: ' + _listing(warnings))
+
     left_out = (results or {}).get('left_out') or []
     if left_out:
         rows, were = ('row', 'was') if len(left_out) == 1 else ('rows', 'were')

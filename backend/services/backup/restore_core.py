@@ -325,6 +325,7 @@ class RestoreCoreMixin:
         plan = RestorePlan.build(backup_data)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
+        built_with = len(plan.warnings)
 
         # Files are written to a staging directory during the transaction and
         # published once it has committed, so the database and the files on
@@ -353,6 +354,10 @@ class RestoreCoreMixin:
                 if replacement is not None:
                     results.update(remove_after_writes(replacement).report())
                 results['left_out'] = list(plan.left_out)
+                # What applying the rows had to warn about reaches the log and the result
+                for warning in dict.fromkeys(plan.warnings[built_with:]):
+                    logger.warning("Restore: %s", warning)
+                results['warnings'] = list(dict.fromkeys(plan.warnings))
                 results['dropped_secrets'] = list(plan.dropped_fields)
 
                 # Published inside the transaction, so a file that cannot be

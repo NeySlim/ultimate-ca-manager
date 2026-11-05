@@ -496,6 +496,57 @@ def test_a_request_on_a_certificate_gone_before_the_export_does_not_hold_the_res
     assert KeyRecoveryRequest.query.one().status == 'rejected'
 
 
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_an_archive_written_before_the_partner_identity_keeps_the_pair(target, mode):
+    """2.248 and 2.249 archives carry the partner's number alone: a pair here is not undone."""
+    from models import Certificate
+    from tests.test_backup_hostile_corpus import _reseal
+
+    _user('replace-admin')
+    issuer = _authority_row('replace-old-pair-ca')
+    classical = _certificate_row('replace-old-pair-a', issuer)
+    pq = _certificate_row('replace-old-pair-b', issuer)
+    classical.related_certificate_id, pq.related_certificate_id = pq.id, classical.id
+    blob = _snapshot()
+    _key, data = _service()._decrypt_framed(blob, PASSWORD)
+    for row in data['certificates']:
+        row.pop('related_certificate_id_ref')
+    blob = _reseal(blob, data)
+
+    _restore(blob, mode=mode)
+
+    restored = Certificate.query.filter_by(refid='replace-old-pair-a').one()
+    assert db.session.get(Certificate, restored.related_certificate_id).refid == 'replace-old-pair-b'
+    restored = Certificate.query.filter_by(refid='replace-old-pair-b').one()
+    assert db.session.get(Certificate, restored.related_certificate_id).refid == 'replace-old-pair-a'
+
+
+def test_a_new_row_of_such_an_archive_loses_the_link_and_says_so(target):
+    from models import Certificate
+    from services.backup.restore_report import with_restore_warnings
+    from tests.test_backup_hostile_corpus import _reseal
+
+    _user('replace-admin')
+    issuer = _authority_row('replace-new-pair-ca')
+    classical = _certificate_row('replace-new-pair-a', issuer)
+    pq = _certificate_row('replace-new-pair-b', issuer)
+    classical.related_certificate_id = pq.id
+    blob = _snapshot()
+    _key, data = _service()._decrypt_framed(blob, PASSWORD)
+    for row in data['certificates']:
+        row.pop('related_certificate_id_ref')
+    blob = _reseal(blob, data)
+    db.session.delete(classical)
+    db.session.commit()
+
+    results = _restore(blob, mode='merge')
+
+    assert Certificate.query.filter_by(
+        refid='replace-new-pair-a').one().related_certificate_id is None
+    assert any('related_certificate_id' in line for line in results['warnings'])
+    assert 'related_certificate_id' in with_restore_warnings('Restored', results)
+
+
 def test_a_hybrid_partner_is_found_by_refid_not_by_number(target):
     from models import Certificate
 

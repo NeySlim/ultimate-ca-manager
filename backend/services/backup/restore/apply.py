@@ -88,7 +88,7 @@ def _apply_or_leave_out(section_name, section, instance, row, columns, attribute
     state = sa_inspect(instance)
     new = state.transient or state.pending
     try:
-        _apply_row(section_name, section, instance, row, columns, attribute_of, plan)
+        _apply_row(section_name, section, instance, row, columns, attribute_of, plan, new)
     except UnplaceableLegacyRow as left_out:
         if new and state.persistent:
             db.session.delete(instance)
@@ -215,7 +215,7 @@ def _legacy_intune_app(row) -> dict:
     return {'intune_app_id': app.id, **cleared}
 
 
-def _apply_row(section_name, section, instance, row, columns, attribute_of, plan):
+def _apply_row(section_name, section, instance, row, columns, attribute_of, plan, new=True):
     for name, value in row.items():
         if name.startswith('_') or name.endswith(REFERENCE_SUFFIX):
             continue          # internal marker, or the identity of a reference
@@ -228,6 +228,8 @@ def _apply_row(section_name, section, instance, row, columns, attribute_of, plan
             continue          # a column this version does not have
 
         if name in section.references:
+            if not new and f'{name}{REFERENCE_SUFFIX}' not in row:
+                continue      # written before this link carried an identity: the row keeps its own
             resolved = plan.resolve(section_name, row, name)
             if resolved is None and row.get(name) is not None:
                 if _unplaceable_reference(section_name, section, name, row, column,
@@ -455,8 +457,8 @@ def relink_references(backup_data: Dict[str, Any], plan: RestorePlan) -> Dict[st
             if instance is None:
                 continue
             for column in section.references:
-                if column not in row:
-                    continue
+                if column not in row or f'{column}{REFERENCE_SUFFIX}' not in row:
+                    continue      # no identity to resolve: the first pass decided
                 resolved = plan.resolve(section_name, row, column)
                 attribute = attribute_of.get(column, column)
                 if resolved is None and column in columns and not columns[column].nullable:
