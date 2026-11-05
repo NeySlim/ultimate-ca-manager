@@ -60,6 +60,10 @@ def _restore_revocation_state(cert_id, previous):
         logger.error(f"Certificate {cert_id}: previous revocation state not restored: {e}")
 
 
+REVOKED_THEN_DELETED = ('Certificate {id} was revoked, then deleted: automatic renewal is off. '
+                        'Turn it back on to obtain a new certificate for these names.')
+
+
 class LifecycleMixin:
 
     @staticmethod
@@ -573,8 +577,12 @@ class LifecycleMixin:
 
         # PostgreSQL refuses the delete while an ACME order points at the row
         try:
+            unlinked = {AcmeClientOrder.certificate_id: None}
+            if certificate.revoked:  # revoked then deleted: never issued again unasked
+                unlinked.update({AcmeClientOrder.renewal_enabled: False,
+                                 AcmeClientOrder.error_message: REVOKED_THEN_DELETED.format(id=cert_id)})
             AcmeClientOrder.query.filter(AcmeClientOrder.certificate_id == cert_id).update(
-                {AcmeClientOrder.certificate_id: None}, synchronize_session='fetch')
+                unlinked, synchronize_session='fetch')
             AcmeClientOrder.query.filter(AcmeClientOrder.source_certificate_id == cert_id).update(
                 {AcmeClientOrder.source_certificate_id: None}, synchronize_session='fetch')
             AcmeOrder.query.filter(AcmeOrder.certificate_id == cert_id).update(

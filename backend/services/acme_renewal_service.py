@@ -43,6 +43,10 @@ DAILY_RETRY = timedelta(days=1)
 HTTP01_RENEWAL_WAIT = 10
 
 
+REUSE_SOURCE_GONE = ('The certificate holding the key this order reuses was deleted: request a new '
+                     'certificate for these names, with a new key or the key of another certificate')
+
+
 class RenewalBlocked(Exception):
     """Renewal stopped before reaching the CA; the message is meant for the operator."""
 
@@ -484,12 +488,23 @@ def _renew_with_new_order(acme_client, order, account_id, old_certificate, lease
             raise RenewalBlocked(
                 'No automatic DNS provider on this DNS-01 order: a manual DNS order cannot renew automatically'
             )
+        if not dns_provider_model.enabled:
+            raise RenewalBlocked(f'The DNS provider "{dns_provider_model.name}" of this order is disabled: '
+                                 'enable it to renew')
         credentials = json.loads(dns_provider_model.credentials) if dns_provider_model.credentials else {}
         dns_provider = dns_providers.create_provider(
             dns_provider_model.provider_type,
             credentials,
         )
     
+    reuse_src = None
+    if (order.key_source or 'generate') == 'reuse':
+        # The certificate this order issued, else the source of its first key
+        held = [cid for cid in (order.certificate_id, order.source_certificate_id) if cid]
+        reuse_src = next((cid for cid in held if db.session.get(Certificate, cid) is not None), None)
+        if reuse_src is None:
+            raise RenewalBlocked(REUSE_SOURCE_GONE)
+
     # Create new order for same domains
     domains = order.domains_list
     
@@ -538,17 +553,8 @@ def _renew_with_new_order(acme_client, order, account_id, old_certificate, lease
     new_order.key_type = order.key_type
     if order.csr_pem:
         new_order.csr_pem = order.csr_pem
-    if (order.key_source or 'generate') == 'reuse':
-        # Prefer the cert issued by this order; fall back to the original
-        # source so the key-reuse chain survives an order whose import failed.
-        reuse_src = order.certificate_id or order.source_certificate_id
-        if reuse_src:
-            new_order.source_certificate_id = reuse_src
-        else:
-            logger.warning(
-                f"Order {order.id} has key_source=reuse but no linked "
-                f"certificate; a new key will be generated on finalize"
-            )
+    if reuse_src:
+        new_order.source_certificate_id = reuse_src
     if not commit_or_rollback(logger, "Could not persist key source on renewal order"):
         logger.warning("Renewal will continue with the in-memory key source settings")
     

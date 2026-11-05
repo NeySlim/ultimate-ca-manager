@@ -25,6 +25,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: a restart during the automatic validation left the order `processing` for good. At startup such an order goes back to `pending`, with a message, ready for Verify.
 - ACME client: the order list stopped at the 100 newest orders, so an older issued order disappeared from the page. The API now pages (`page`, `per_page`) and the page loads every order.
 - ACME client: the TXT records of a DNS-01 order whose automatic validation failed stayed in the zone. They are now removed once the order is invalid or its finalization failed; an order left pending keeps them for Verify.
+- ACME client: deleting a certificate after revoking it did not stop its order, and the next pass issued a new one. The order's automatic renewal is now turned off, with a message saying so.
+- ACME client: a renewal used a DNS provider that had been disabled, and an order reusing the key of a deleted certificate silently got a new key. Both now stop before the CA with a message.
 
 ### Upgrade notes
 

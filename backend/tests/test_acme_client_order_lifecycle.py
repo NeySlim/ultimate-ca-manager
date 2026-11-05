@@ -365,3 +365,58 @@ def test_a_failed_auto_finalization_removes_its_txt(app, bench, monkeypatch):
     with patch('services.acme.acme_client_service.AcmeClientService.cleanup_dns_challenge') as cleanup:
         result = orders_module._auto_poll_and_finalize(bench.client, order)
     assert result['error'] == 'refused' and cleanup.called
+
+
+# ---- what the renewal no longer does on its own -------------------------------------------
+
+from services.cert.mixins.lifecycle import REVOKED_THEN_DELETED  # noqa: E402
+
+
+def test_a_certificate_revoked_then_deleted_turns_its_renewal_off(bench):
+    CertificateService.revoke_certificate(bench.cert_id, reason='keyCompromise', username='admin')
+    assert CertificateService.delete_certificate(bench.cert_id, username='admin')
+    db.session.expire_all()
+    parent = bench.parent()
+    assert parent.renewal_enabled is False and parent.certificate_id is None
+    assert parent.error_message == REVOKED_THEN_DELETED.format(id=bench.cert_id)
+    with patch.object(renew_mod, 'renew_certificate') as renewed, \
+            patch.object(renew_mod, '_order_is_due', return_value=True):
+        renew_mod.scheduled_acme_renewal()
+    assert bench.parent_id not in [c.args[0].id for c in renewed.call_args_list]
+
+
+def test_an_expired_certificate_deleted_keeps_its_renewal(bench):
+    row = bench.row()
+    row.valid_to = utc_now() - timedelta(days=1)  # deletable without a revocation
+    db.session.commit()
+    assert CertificateService.delete_certificate(bench.cert_id, username='admin')
+    db.session.expire_all()
+    assert bench.parent().renewal_enabled is True and bench.parent().error_message is None
+
+
+def test_a_disabled_dns_provider_blocks_the_renewal_before_the_ca(bench):
+    bench.provider.enabled = False
+    db.session.commit()
+    with pytest.raises(renew_mod.RenewalBlocked, match='is disabled'):
+        bench.renew()
+    bench.client.create_order.assert_not_called()
+
+
+@pytest.mark.parametrize('source', ['none', 'dangling'])
+def test_a_reuse_whose_key_holder_is_gone_is_blocked_not_given_a_new_key(bench, source):
+    parent = bench.parent()
+    parent.key_source = 'reuse'
+    parent.certificate_id = None if source == 'none' else 987654321
+    parent.source_certificate_id = None
+    db.session.commit()
+    with pytest.raises(renew_mod.RenewalBlocked, match='reuses was deleted'):
+        bench.renew()
+    bench.client.create_order.assert_not_called()
+
+
+def test_a_reuse_falls_back_on_its_first_source(bench):
+    parent = bench.parent()
+    parent.key_source, parent.source_certificate_id, parent.certificate_id = 'reuse', bench.cert_id, 987654321
+    db.session.commit()
+    ok, _message = bench.renew()
+    assert ok
