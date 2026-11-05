@@ -836,6 +836,8 @@ class CSROperationsMixin:
             ExtensionOID.SUBJECT_KEY_IDENTIFIER,
             ExtensionOID.AUTHORITY_KEY_IDENTIFIER,
         }
+        # The operator's custom extensions win over the CSR's (sub-CA copy)
+        skip_from_csr |= {x509.ObjectIdentifier(e['oid']) for e in custom_extensions or ()}
         for extension in csr_exts:
             if extension.oid in skip_from_csr:
                 continue

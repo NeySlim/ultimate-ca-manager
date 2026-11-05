@@ -786,7 +786,7 @@ key type answers `400`, and so does a policy that requires approval. The respons
 GET /api/v2/certificates/{cert_id}
 ```
 
-`extensions.other_extensions` lists the extensions without a section of their own, custom ones included: `[{oid, name, critical, value_hex}]`, `name` being null for an OID UCM cannot name. `GET /api/v2/cas/{ca_id}` returns the same under `extensions`, and `GET /api/v2/csrs/{csr_id}` the extensions a request asks for under `other_extensions`.
+`extensions.other_extensions` lists the extensions without a section of their own, custom ones included: `[{oid, name, critical, value_hex}]`, `name` being null for an OID UCM cannot name. `GET /api/v2/cas/{ca_id}` returns the same under `extensions`, and `GET /api/v2/csrs/{csr_id}` lists under `other_extensions` the extensions of the request outside basic constraints, key usage, extended key usage, names, key identifiers, CRL distribution points, authority information access, certificate policies, name constraints and SCT.
 
 ### Export Certificate
 ```http
@@ -1324,10 +1324,10 @@ ML-DSA key under an RSA or EC CA, and an ML-DSA CA ignores it.
 ]
 ```
 
-- `value` is the DER encoding of the extension value (the content of `extnValue`) in hex; colons and spaces are ignored. `value_base64` may be given instead. UCM copies the bytes as they are and never parses them. Stored and returned as lowercase hex in `value`.
+- `value` is the DER encoding of the extension value (the content of `extnValue`) in hex; colons and spaces are ignored. `value_base64` may be given instead. It must be a single DER element (tag, minimal definite length, content of that length); UCM checks nothing more and copies the bytes as they are. Stored and returned as lowercase hex in `value`.
 - `critical` defaults to `false`. A client that does not recognise a critical extension must reject the certificate (RFC 5280, section 4.2): mark one critical only when every relying party understands it.
-- `400` for an OID that is not dotted (`1.2.840...`), an empty value, a value above 4096 bytes, more than 20 entries, the same OID twice, or an extension UCM sets itself or parses (basic constraints, key usage, extended key usage, names, key identifiers, CRL distribution points, authority and subject information access, certificate policies, name constraints, TLS feature, OCSP no-check, SCT, qcStatements, relatedCertificate, the Microsoft template and SID extensions...): those keep their dedicated settings.
-- `[]` clears the list. Duplicate, export, import and backups carry it.
+- `400` for an OID that is not dotted (`1.2.840...`), an empty value, a value above 4096 bytes, more than 20 entries, the same OID twice, or an extension UCM sets itself or parses (basic constraints, key usage, extended key usage, names, key identifiers, CRL distribution points, authority and subject information access, certificate policies, name constraints, TLS feature, OCSP no-check, SCT, qcStatements, relatedCertificate, the Microsoft template and SID extensions...): those keep their dedicated settings. The rule is "set by UCM or parsed by the X.509 library": any other OID is accepted, an unparsed `2.5.29.x` included.
+- `[]` clears the list. Duplicate, export, import and backups carry it. A stored list that no longer validates (a restored or hand-edited row) is reported in `custom_extensions_error`, and issuance from the template is refused until it is fixed: `400` with the reason for an operator, `serverInternal` without the template's name for an ACME client, `badRequest` for SCEP (RFC 8894 has no server-side failInfo).
 - Certificates issued from the template carry the list: issue form, Sign CSR (single and bulk, end-entity certificates only), ACME profiles bound to the template, SCEP profiles, WSTEP (the matched template) and approvals. EST and mTLS enrollment use no template and add none.
 
 ### Get Template

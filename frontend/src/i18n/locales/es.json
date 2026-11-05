@@ -5879,6 +5879,7 @@
     "invalidHex": "El valor debe tener un número par de dígitos hexadecimales",
     "emptyValue": "El valor está vacío",
     "duplicateOid": "Este OID ya figura en la lista",
-    "fixErrors": "Corrija primero las extensiones personalizadas"
+    "fixErrors": "Corrija primero las extensiones personalizadas",
+    "storedInvalid": "Las extensiones personalizadas guardadas no son válidas: la emisión desde esta plantilla se rechaza hasta que se corrijan o se vacíen."
   }
 }

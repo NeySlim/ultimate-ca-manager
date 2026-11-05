@@ -5881,6 +5881,7 @@
     "invalidHex": "The value must be an even number of hex digits",
     "emptyValue": "The value is empty",
     "duplicateOid": "This OID is already listed",
-    "fixErrors": "Fix the custom extensions first"
+    "fixErrors": "Fix the custom extensions first",
+    "storedInvalid": "The stored custom extensions are invalid: issuance from this template is refused until they are fixed or cleared."
   }
 }

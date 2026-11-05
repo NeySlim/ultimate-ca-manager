@@ -209,3 +209,92 @@ class TestRenewal:
         assert _value(cert, OID_A) == ('0500', True)
         assert _value(cert, OID_B) == (DER_B, False)
         assert _value(cert, '1.3.6.1.4.1.55555.1.3') == (DER_B, False)
+
+
+# ── a template whose stored list no longer validates ───────────────────────
+
+BAD = [{'oid': '2.5.29.19', 'value': '3000'}]
+
+
+class TestMisconfiguredTemplate:
+    def test_acme_is_a_server_failure_without_the_template_name(self, app, create_ca, make_template):
+        from services.acme import AcmeService
+        ca = create_ca(cn=f'Custom ext CA {next(_SEQ)}')
+        tpl_id = make_template(BAD)
+        with app.app_context():
+            name = db.session.get(CertificateTemplate, tpl_id).name
+        _install_profiles(app, {'broken': {'validity_days': 30, 'template_id': tpl_id}})
+        try:
+            pem = _csr('custom-acme-bad.example.test').public_bytes(serialization.Encoding.PEM).decode()
+            with app.app_context():
+                service = AcmeService(base_url='http://localhost')
+                order = types.SimpleNamespace(order_id='custom-ext-bad-order', profile='broken')
+                ok, cert_id, err = service._sign_certificate_with_ca(
+                    order, pem, db.session.get(CA, ca['id']).refid)
+                assert not ok and cert_id is None
+                assert name not in err and 'misconfigured on the server' in err
+                # serverInternal: the order stays retryable instead of going invalid as badCSR
+                assert service._is_request_failure(service._last_signing_exception) is False
+        finally:
+            _clear_profiles(app)
+
+    def test_sign_csr_names_the_template_to_the_operator(self, app, auth_client, create_ca, make_template):
+        ca = create_ca(cn=f'Custom ext CA {next(_SEQ)}')
+        tpl_id = make_template(BAD)
+        csr_id = _upload(auth_client, _csr('custom-sign-badtpl.example.test'))
+        r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={
+            'ca_id': ca['id'], 'validity_days': 30, 'template_id': tpl_id})
+        assert r.status_code == 400 and 'invalid custom extensions' in r.get_json()['message']
+        r = auth_client.post('/api/v2/csrs/bulk/sign', json={
+            'ids': [csr_id], 'ca_id': ca['id'], 'validity_days': 30, 'template_id': tpl_id})
+        assert 'invalid custom extensions' in r.get_json()['data']['failed'][0]['error']
+
+    def test_scep_refuses(self, app, create_ca, make_template):
+        import pytest
+        from tests.test_scep_defaults_and_template_ekus import _csr as scep_csr, _issue
+        from utils.custom_extensions import TemplateConfigError
+        ca = create_ca(cn=f'Custom ext CA {next(_SEQ)}')
+        with app.app_context():
+            tpl = db.session.get(CertificateTemplate, make_template(BAD))
+            with pytest.raises(TemplateConfigError):
+                _issue(app, ca['id'], scep_csr('custom-scep-bad.example.test'), template=tpl,
+                       txn='scep-custom-ext-bad')
+            db.session.rollback()
+
+
+class TestSignCsrOverrides:
+    def test_a_sub_ca_request_value_wins_over_the_csr(self, app, auth_client, create_ca):
+        ca = create_ca(cn=f'Custom ext CA {next(_SEQ)}')
+        key = ec.generate_private_key(ec.SECP256R1())
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'Custom Sub {next(_SEQ)}')]))
+               .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+               .add_extension(x509.UnrecognizedExtension(x509.ObjectIdentifier(OID_B), bytes.fromhex('0500')),
+                              critical=False)
+               .sign(key, hashes.SHA256()))
+        r = auth_client.post(f'/api/v2/csrs/{_upload(auth_client, csr)}/sign', json={
+            'ca_id': ca['id'], 'validity_days': 30, 'cert_type': 'intermediate_ca',
+            'custom_extensions': [{'oid': OID_B, 'critical': True, 'value': DER_B}]})
+        assert r.status_code == 200, r.get_json()
+        with app.app_context():
+            cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(CA, r.get_json()['data']['id']).crt))
+        assert _value(cert, OID_B) == (DER_B, True)
+
+    def test_an_approved_signature_carries_them(self, app, auth_client, create_ca, create_user):
+        from tests.test_approval_on_sign_and_renew import (_csr_row, _drop_policy, _drop_rows, _json,
+                                                           _operator, _policy)
+        ca = create_ca(cn=f'Custom ext CA {next(_SEQ)}')
+        pid = _policy(app, ca['id'], 'custom-ext-approval')
+        csr_id = _csr_row(app, 'custom-approval-csr.example.test')
+        operator = _operator(app, create_user)
+        try:
+            r = _json(operator, 'post', f'/api/v2/csrs/{csr_id}/sign', {
+                'ca_id': ca['id'], 'validity_days': 30,
+                'custom_extensions': [{'oid': OID_B, 'critical': True, 'value': DER_B}]})
+            approval_id = r.get_json()['data']['approval_id']
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {'comment': 'ok'})
+            assert r.get_json()['data']['certificate_issued'] is True, r.get_json()
+            assert _value(_cert(app, csr_id), OID_B) == (DER_B, True)
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)

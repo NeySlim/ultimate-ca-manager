@@ -535,10 +535,10 @@ def _template_custom_extensions(template_id):
     if not template_id:
         return []
     from models.certificate_template import CertificateTemplate
-    from utils.custom_extensions import template_custom_extensions
+    from utils.custom_extensions import TemplateConfigError, template_custom_extensions
     try:
         return template_custom_extensions(db.session.get(CertificateTemplate, template_id))
-    except ValueError as e:
+    except TemplateConfigError as e:
         raise RenewalError(str(e), 400) from e
 
 

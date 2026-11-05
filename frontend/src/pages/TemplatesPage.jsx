@@ -557,9 +557,10 @@ export default function TemplatesPage() {
         </CompactSection>
       )}
 
-      {selectedTemplate.custom_extensions?.length > 0 && (
+      {(selectedTemplate.custom_extensions?.length > 0 || selectedTemplate.custom_extensions_error) && (
         <CompactSection title={t('customExtensions.title')} icon={ShieldCheck} collapsible defaultOpen={false}>
           <div className="space-y-1">
+            <StoredExtensionsError error={selectedTemplate.custom_extensions_error} />
             {selectedTemplate.custom_extensions.map(e => (
               <div key={e.oid} className="flex flex-wrap items-center gap-2 text-2xs font-mono text-text-secondary">
                 <span>{e.oid}</span>
@@ -839,6 +840,18 @@ function buildInitialState(template) {
     policy_oids: Array.isArray(ext.certificate_policies) ? ext.certificate_policies.join('\n') : '',
     custom_extensions: rowsFromStored(template.custom_extensions)
   }
+}
+
+function StoredExtensionsError({ error }) {
+  const { t } = useTranslation()
+  if (!error) return null
+  return (
+    <div className="p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-xs text-text-secondary" role="alert"
+      data-testid="custom-extensions-stored-error">
+      <div>{t('customExtensions.storedInvalid')}</div>
+      <div className="font-mono mt-1 break-all">{error}</div>
+    </div>
+  )
 }
 
 export function TemplateForm({ template, onSubmit, onCancel }) {
@@ -1202,6 +1215,7 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
       {/* Custom extensions (#437) */}
       <div className="border-t border-border pt-4 space-y-2">
         <h4 className={sectionTitle}>{t('customExtensions.title')}</h4>
+        <StoredExtensionsError error={template?.custom_extensions_error} />
         <CustomExtensionsEditor rows={formData.custom_extensions} onChange={(rows) => set('custom_extensions', rows)} />
       </div>
 

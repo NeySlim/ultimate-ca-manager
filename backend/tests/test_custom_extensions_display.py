@@ -62,6 +62,27 @@ class TestDisplay:
         assert detail['other_extensions'] == [
             {'oid': OID_B, 'name': None, 'critical': False, 'value_hex': DER_B}]
 
+    def test_csr_detail_with_a_duplicated_extension(self, app, auth_client):
+        import asn1crypto.csr
+        import base64
+        from models import Certificate, db
+        key = ec.generate_private_key(ec.SECP256R1())
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'custom-dup.example.test')]))
+               .add_extension(x509.UnrecognizedExtension(x509.ObjectIdentifier(OID_B), bytes.fromhex(DER_B)),
+                              critical=False)
+               .sign(key, hashes.SHA256()))
+        csr_id = _upload(auth_client, csr)
+        req = asn1crypto.csr.CertificationRequest.load(csr.public_bytes(serialization.Encoding.DER))
+        extensions = req['certification_request_info']['attributes'][0]['values'][0]
+        extensions.append(extensions[0].copy())
+        pem = x509.load_der_x509_csr(req.dump(force=True)).public_bytes(serialization.Encoding.PEM)
+        with app.app_context():
+            db.session.get(Certificate, csr_id).csr = base64.b64encode(pem).decode()
+            db.session.commit()
+        r = auth_client.get(f'/api/v2/csrs/{csr_id}')
+        assert r.status_code == 200 and r.get_json()['data']['other_extensions'] == []
+
     def test_ca_detail(self, auth_client, create_ca):
         ca = create_ca(cn=f'Custom ext CA {next(_SEQ)}')
         key = ec.generate_private_key(ec.SECP256R1())

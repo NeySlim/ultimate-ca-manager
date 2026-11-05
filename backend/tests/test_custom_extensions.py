@@ -91,6 +91,7 @@ class TestValidation:
         ('1.3.6.1.5.5.7.1.24', 'TLSFeature'), ('1.3.6.1.5.5.7.48.1.5', 'OCSPNoCheck'),
         ('1.3.6.1.5.5.7.1.36', 'relatedCertificate'), ('1.3.6.1.4.1.311.21.7', 'msCertificateTemplate'),
         ('1.3.6.1.4.1.311.25.2', 'ntdsCaSecurityExt'), ('1.3.6.1.5.5.7.1.3', 'qcStatements'),
+        ('1.3.6.1.5.5.7.1.31', 'acmeIdentifier'),
     ])
     def test_extensions_ucm_sets_are_refused_by_name(self, oid, name):
         entries, err = validate_custom_extensions([{'oid': oid, 'value': DER_B}])
@@ -104,12 +105,28 @@ class TestValidation:
         assert entries is None and 'OID' in err
 
     def test_size_cap(self):
-        at_cap = [{'oid': OID_A, 'value': '00' * MAX_VALUE_BYTES}]
+        # OCTET STRING with a two-byte length: 4 header bytes plus the content
+        at_cap = [{'oid': OID_A, 'value': '04820ffc' + '00' * (MAX_VALUE_BYTES - 4)}]
         assert validate_custom_extensions(at_cap)[1] is None
-        entries, err = validate_custom_extensions([{'oid': OID_A, 'value': '00' * (MAX_VALUE_BYTES + 1)}])
+        over = '04820ffd' + '00' * (MAX_VALUE_BYTES - 3)
+        entries, err = validate_custom_extensions([{'oid': OID_A, 'value': over}])
         assert entries is None and f'{MAX_VALUE_BYTES} bytes' in err
-        b64 = base64.b64encode(b'\0' * (MAX_VALUE_BYTES + 1)).decode()
+        b64 = base64.b64encode(bytes.fromhex(over)).decode()
         assert validate_custom_extensions([{'oid': OID_A, 'value_base64': b64}])[0] is None
+
+    @pytest.mark.parametrize('value', ['0500', '020101', '3000', '0481' + '80' + '00' * 128, '1f2100',
+                                       '30060c0461626364'])
+    def test_one_der_element(self, value):
+        assert validate_custom_extensions([{'oid': OID_A, 'value': value}])[1] is None
+
+    @pytest.mark.parametrize('value', ['00', '05', '0201', '02010101', '05000500', '3080', '04810100',
+                                       '048200' + '80' + '00' * 128, '1f', '1f81'])
+    def test_not_one_der_element(self, value):
+        entries, err = validate_custom_extensions([{'oid': OID_A, 'value': value}])
+        assert entries is None and 'not a single DER element' in err
+
+    def test_an_unmodelled_id_ce_oid_is_accepted(self):
+        assert validate_custom_extensions([{'oid': '2.5.29.999', 'value': '0500'}])[1] is None
 
     @pytest.mark.parametrize('entry,needle', [
         ({'oid': OID_A, 'value': ''}, 'empty'),
@@ -213,6 +230,18 @@ class TestTemplateApi:
             assert 'keyUsage extension' in r.get_json()['data']['skipped_items'][0]
         finally:
             _drop_template(app, clone['id'])
+
+    @pytest.mark.parametrize('stored,needle', [('[{"oid": "2.5.29.19", "value": "3000"}]', 'basicConstraints'),
+                                               ('not json', 'not valid JSON')])
+    def test_an_invalid_stored_list_is_reported(self, app, auth_client, make_template, stored, needle):
+        tpl_id = make_template()
+        with app.app_context():
+            db.session.get(CertificateTemplate, tpl_id).custom_extensions = stored
+            db.session.commit()
+        data = auth_client.get(f'/api/v2/templates/{tpl_id}').get_json()['data']
+        assert needle in data['custom_extensions_error']
+        assert auth_client.get(f'/api/v2/templates/{make_template()}').get_json()['data'][
+            'custom_extensions_error'] is None
 
     def test_backup_carries_the_column(self, app, make_template):
         from services.backup.export_generic import IdentityIndex, export_section

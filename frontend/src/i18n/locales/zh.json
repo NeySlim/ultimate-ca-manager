@@ -5878,6 +5878,7 @@
     "invalidHex": "值必须是偶数个十六进制数字",
     "emptyValue": "值为空",
     "duplicateOid": "该 OID 已在列表中",
-    "fixErrors": "请先修正自定义扩展"
+    "fixErrors": "请先修正自定义扩展",
+    "storedInvalid": "已保存的自定义扩展无效: 在修正或清空之前, 将拒绝使用此模板签发证书。"
   }
 }

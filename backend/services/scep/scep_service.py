@@ -638,7 +638,7 @@ class SCEPService:
                             self.intune_client.send_failure_notification(
                                 transaction_id, csr_data,
                                 hresult=0x80004005,  # E_FAIL — no finer-grained mapping available
-                                description=str(e)[:255],
+                                description=getattr(e, 'public_message', str(e))[:255],
                             )
                         except Exception as notify_err:
                             logger.error(

@@ -5878,6 +5878,7 @@
     "invalidHex": "Der Wert muss aus einer geraden Anzahl Hex-Ziffern bestehen",
     "emptyValue": "Der Wert ist leer",
     "duplicateOid": "Diese OID ist bereits aufgeführt",
-    "fixErrors": "Korrigieren Sie zuerst die benutzerdefinierten Erweiterungen"
+    "fixErrors": "Korrigieren Sie zuerst die benutzerdefinierten Erweiterungen",
+    "storedInvalid": "Die gespeicherten benutzerdefinierten Erweiterungen sind ungültig: Ausstellungen aus dieser Vorlage werden abgelehnt, bis sie korrigiert oder geleert sind."
   }
 }

@@ -1,8 +1,9 @@
 """Custom X.509 extensions (#437): an OID and the DER bytes of its value.
 
-The value is copied into the extension as given and never parsed. OIDs UCM
-sets itself, or that the X.509 parser models, are refused: a malformed value
-under one of those would make the certificate unreadable.
+The value must be one DER element (tag, length, content) and is otherwise
+never parsed. OIDs UCM sets itself, or that the X.509 parser models, are
+refused: a malformed value under one of those would make the certificate
+unreadable. Any other OID, an unmodelled 2.5.29.x included, is accepted.
 """
 import base64
 import binascii
@@ -47,6 +48,39 @@ _KNOWN_NAMES = {
 }
 
 
+class TemplateConfigError(Exception):
+    """A template's stored configuration cannot be applied: the server's fault, not the request's."""
+    public_message = 'The certificate template is misconfigured on the server'
+
+    def __init__(self, template_name, detail):
+        super().__init__(f"Template '{template_name}' holds invalid custom extensions: {detail}")
+        self.template_name = template_name
+
+
+def _is_der_element(value: bytes) -> bool:
+    """One DER TLV spanning *value*: tag, minimal definite length, content."""
+    i = 1
+    if value[0] & 0x1f == 0x1f:  # high tag number
+        while i < len(value) and value[i] & 0x80:
+            i += 1
+        i += 1
+    if i >= len(value):
+        return False
+    first = value[i]
+    i += 1
+    if first < 0x80:
+        length = first
+    else:
+        count = first & 0x7f
+        if count == 0 or count > 4 or i + count > len(value) or value[i] == 0:
+            return False
+        length = int.from_bytes(value[i:i + count], 'big')
+        if length < 0x80:
+            return False
+        i += count
+    return i + length == len(value)
+
+
 def _value_bytes(entry, where) -> Tuple[Optional[bytes], Optional[str]]:
     has_hex, has_b64 = 'value' in entry, 'value_base64' in entry
     if has_hex == has_b64:
@@ -68,6 +102,8 @@ def _value_bytes(entry, where) -> Tuple[Optional[bytes], Optional[str]]:
         return None, f'{where}: the value is empty'
     if len(value) > MAX_VALUE_BYTES:
         return None, f'{where}: the value exceeds {MAX_VALUE_BYTES} bytes'
+    if not _is_der_element(value):
+        return None, f'{where}: the value is not a single DER element (tag, length, content)'
     return value, None
 
 
@@ -127,11 +163,11 @@ def merge_custom_extensions(*lists) -> list:
 
 
 def template_custom_extensions(template) -> list:
-    """The template's validated entries; raises ValueError when the stored list is invalid."""
+    """The template's validated entries; raises TemplateConfigError when the stored list is invalid."""
     raw = getattr(template, 'custom_extensions', None) if template is not None else None
     entries, err = validate_custom_extensions(raw)
     if err:
-        raise ValueError(f"Template '{template.name}' holds invalid custom extensions: {err}")
+        raise TemplateConfigError(template.name, err)
     return entries
 
 
@@ -154,16 +190,6 @@ def add_custom_extensions(builder: x509.CertificateBuilder, entries) -> x509.Cer
             critical=entry['critical'])
         present.add(entry['oid'])
     return builder
-
-
-def carried_custom_extensions(certificate) -> list:
-    """Entries for the extensions of *certificate* a custom list could hold."""
-    out = []
-    for ext in certificate.extensions:
-        if isinstance(ext.value, x509.UnrecognizedExtension) and ext.oid.dotted_string not in RESERVED_OIDS:
-            out.append({'oid': ext.oid.dotted_string, 'critical': ext.critical,
-                        'value': ext.value.value.hex()})
-    return out
 
 
 def extension_name(oid: x509.ObjectIdentifier) -> Optional[str]:

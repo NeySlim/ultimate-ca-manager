@@ -1308,10 +1308,13 @@ def approve_request(request_id):
                          exc_info=True)
             from services.policy_service import PolicyViolation
             from services.cert.renewal import RenewalError
+            from utils.custom_extensions import TemplateConfigError
             if isinstance(e, PolicyViolation):
                 issue_error = f'Policy violation: {e}'
             elif isinstance(e, RenewalError):
                 issue_error = e.message
+            elif isinstance(e, TemplateConfigError):
+                issue_error = str(e)
             elif isinstance(e, RuntimeError) and 'already issued' in str(e):
                 issue_error = 'A certificate was already issued for this request by another approver; reload it'
             elif isinstance(e, ValueError) and not any(

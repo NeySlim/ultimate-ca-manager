@@ -49,4 +49,17 @@ describe('TemplateForm custom extensions', () => {
     await waitFor(() => expect(onSubmit).toHaveBeenCalled())
     expect(onSubmit.mock.calls[0][0].custom_extensions).toEqual([])
   })
+
+  it('says when the stored list cannot be applied', () => {
+    render(<TemplateForm template={{ ...template, custom_extensions: [], custom_extensions_error: 'custom_extensions is not valid JSON' }}
+      onSubmit={() => {}} onCancel={() => {}} />)
+    const banner = screen.getByTestId('custom-extensions-stored-error')
+    expect(banner.textContent).toContain('customExtensions.storedInvalid')
+    expect(banner.textContent).toContain('custom_extensions is not valid JSON')
+  })
+
+  it('shows no such warning for a valid list', () => {
+    render(<TemplateForm template={template} onSubmit={() => {}} onCancel={() => {}} />)
+    expect(screen.queryByTestId('custom-extensions-stored-error')).toBeNull()
+  })
 })

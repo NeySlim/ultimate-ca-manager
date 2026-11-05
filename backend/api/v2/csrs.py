@@ -24,6 +24,7 @@ from services.cert.mixins.csr import RelatedSignerError
 from services.deletion_blockers import parse_bulk_ids
 from services.policy_service import PolicyViolation
 from utils.csr_extensions import csr_extensions
+from utils.custom_extensions import TemplateConfigError
 from fips_mode import FipsRestricted
 from utils.key_type import unsignable_csr_key
 from utils.san_parse import (general_names_from_buckets, parse_extra_san_payload,
@@ -321,13 +322,13 @@ def get_csr(csr_id):
 
 
 def _csr_other_extensions(stored):
-    """The extensions a request asks for that are not names, usages or constraints."""
+    """The extensions of a request outside those the certificate details show in a section."""
     from utils.cert_extensions import SHOWN_EXTENSION_OIDS
     from utils.custom_extensions import describe_other_extensions
     try:
         pem = stored.encode() if stored.startswith('-----BEGIN') else base64.b64decode(stored)
         return describe_other_extensions(csr_extensions(x509.load_pem_x509_csr(pem)), SHOWN_EXTENSION_OIDS)
-    except (ValueError, TypeError):
+    except (ValueError, TypeError, x509.DuplicateExtension):
         return []
 
 @bp.route('/api/v2/csrs', methods=['POST'])
@@ -1161,6 +1162,8 @@ def sign_csr(csr_id):
         raise
     except PolicyViolation as e:
         return error_response(f'Policy violation: {e}', 400)
+    except TemplateConfigError as e:
+        return error_response(str(e), 400)
     except ValueError as e:
         if 'another request' in str(e):
             return error_response('CSR was signed by another request; reload it', 409)
@@ -1272,9 +1275,10 @@ def bulk_sign_csrs():
             signed_notices += [f'CSR {csr_id}: {n}' for n in item_notices if n]
         except PolicyViolation as e:
             results['failed'].append({'id': csr_id, 'error': f'Policy violation: {e}'})
-        except FipsRestricted as e:
+        except (FipsRestricted, TemplateConfigError) as e:
             results['failed'].append({'id': csr_id, 'error': str(e)})
         except Exception as e:
+            logger.error(f"Bulk sign: CSR {csr_id} failed (template {data.get('template_id')}): {e}", exc_info=True)
             results['failed'].append({'id': csr_id, 'error': 'Signing failed'})
 
     AuditService.log_action(

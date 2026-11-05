@@ -5881,6 +5881,7 @@
     "invalidHex": "La valeur doit compter un nombre pair de chiffres hexadécimaux",
     "emptyValue": "La valeur est vide",
     "duplicateOid": "Cet OID figure déjà dans la liste",
-    "fixErrors": "Corrigez d'abord les extensions personnalisées"
+    "fixErrors": "Corrigez d'abord les extensions personnalisées",
+    "storedInvalid": "Les extensions personnalisées enregistrées sont invalides : l'émission depuis ce modèle est refusée tant qu'elles ne sont pas corrigées ou vidées."
   }
 }

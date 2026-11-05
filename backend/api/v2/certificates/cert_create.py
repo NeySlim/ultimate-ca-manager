@@ -32,7 +32,7 @@ from security.encryption import encrypt_private_key
 from utils.db_transaction import safe_commit
 from . import bp
 from utils.qc_statements import add_certificate_policies, add_qc_statements, template_policy_oids
-from utils.custom_extensions import (add_custom_extensions, merge_custom_extensions,
+from utils.custom_extensions import (TemplateConfigError, add_custom_extensions, merge_custom_extensions,
                                      template_custom_extensions, validate_custom_extensions)
 from utils import key_algorithms
 from utils.key_codec import private_key_to_pem
@@ -131,7 +131,7 @@ def create_certificate():
     data['custom_extensions'] = requested_ext
     try:
         custom_ext = merge_custom_extensions(template_custom_extensions(template), requested_ext)
-    except ValueError as e:
+    except TemplateConfigError as e:
         return error_response(str(e), 400)
 
     if not ca.has_private_key:

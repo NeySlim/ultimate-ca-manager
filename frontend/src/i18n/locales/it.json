@@ -5878,6 +5878,7 @@
     "invalidHex": "Il valore deve avere un numero pari di cifre esadecimali",
     "emptyValue": "Il valore è vuoto",
     "duplicateOid": "Questo OID è già presente nell'elenco",
-    "fixErrors": "Correggi prima le estensioni personalizzate"
+    "fixErrors": "Correggi prima le estensioni personalizzate",
+    "storedInvalid": "Le estensioni personalizzate salvate non sono valide: l'emissione da questo modello è rifiutata finché non vengono corrette o svuotate."
   }
 }

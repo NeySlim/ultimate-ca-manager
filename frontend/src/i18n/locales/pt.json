@@ -5878,6 +5878,7 @@
     "invalidHex": "O valor tem de ter um número par de dígitos hexadecimais",
     "emptyValue": "O valor está vazio",
     "duplicateOid": "Este OID já está na lista",
-    "fixErrors": "Corrija primeiro as extensões personalizadas"
+    "fixErrors": "Corrija primeiro as extensões personalizadas",
+    "storedInvalid": "As extensões personalizadas guardadas são inválidas: a emissão a partir deste modelo é recusada até serem corrigidas ou esvaziadas."
   }
 }

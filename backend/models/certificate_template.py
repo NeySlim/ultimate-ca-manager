@@ -100,6 +100,11 @@ class CertificateTemplate(db.Model):
             return []
         return value if isinstance(value, list) else []
 
+    def custom_extensions_error(self):
+        """Why the stored list cannot be applied (issuance refuses it), else None."""
+        from utils.custom_extensions import validate_custom_extensions
+        return validate_custom_extensions(self.custom_extensions)[1]
+
     def to_dict(self):
         """Convert to dictionary"""
         import json
@@ -121,6 +126,7 @@ class CertificateTemplate(db.Model):
             "allowed_ad_group": self.allowed_ad_group,
             "pinned_subject_fields": json.loads(self.pinned_subject_fields) if self.pinned_subject_fields else {},
             "custom_extensions": self.custom_extensions_list(),
+            "custom_extensions_error": self.custom_extensions_error(),
             "created_at": utc_isoformat(self.created_at),
             "created_by": self.created_by,
             "updated_at": utc_isoformat(self.updated_at),
