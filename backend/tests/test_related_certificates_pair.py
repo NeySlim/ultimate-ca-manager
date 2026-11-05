@@ -524,14 +524,16 @@ def test_acme_supersede_leaves_the_new_partner_valid(app, auth_client, create_ca
 
 def test_acme_client_renewal_revokes_the_replaced_member_only(app, auth_client, create_ca):
     from unittest import mock
-    from services.acme_renewal_service import _revoke_replaced_certificate
+    from services.acme_renewal_service import _replaced_snapshot, _revoke_replaced_certificate
     a, b = _pair(auth_client, create_ca, 'pair-client-renew.example.com')
     previous = _set_config(app, 'acme.revoke_on_renewal', 'true')
     try:
         client = mock.Mock()
         client.revoke_certificate.return_value = mock.Mock(status_code=200)
         with app.app_context():
-            _revoke_replaced_certificate(client, db.session.get(Certificate, a['id']))
+            # A replaced row of its own (renewed into a new row): revoked alone
+            _revoke_replaced_certificate(client, _replaced_snapshot(db.session.get(Certificate, a['id'])),
+                                         in_place=False)
         assert _revoked(app, a['id'], b['id']) == [True, False]
     finally:
         _restore_config(app, 'acme.revoke_on_renewal', previous)

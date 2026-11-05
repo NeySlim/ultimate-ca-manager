@@ -2,16 +2,23 @@
 ACME Auto-Renewal Service
 Automatically renews Let's Encrypt certificates before expiry.
 """
+import base64
 import json
 import logging
 from datetime import timedelta
+from types import SimpleNamespace
 
-from models import Certificate, DnsProvider, SystemConfig, db
+from sqlalchemy import or_
+
+from models import CA, Certificate, DnsProvider, RevokedSerial, SystemConfig, db
 from models.acme_models import AcmeClientOrder
 from services.acme import dns_providers
 from services.acme.acme_client_service import AcmeClientService
 from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challenges
 from services.acme.http01 import wait_for_http01
+from services.acme import client_certificates
+from services.acme.client_certificates import KEY_MISMATCH
+from services.acme.order_lease import BUSY, LEASE_LOST, OrderLease, RenewalInProgress
 from services.audit.staging import stage_audit_entry
 from services.cert_service import CertificateService
 from utils.acme_debug import acme_log
@@ -98,6 +105,8 @@ def _pending_http01_order(order, account_id):
         AcmeClientOrder.status == 'pending',
         AcmeClientOrder.acme_client_account_id == account_id,
         AcmeClientOrder.environment == order.environment,
+        # Never the order another order's renewal opened
+        or_(AcmeClientOrder.renewal_of_order_id.is_(None), AcmeClientOrder.renewal_of_order_id == order.id),
     ).order_by(AcmeClientOrder.created_at.desc()).all()
     for candidate in candidates:
         if candidate.is_proxy_order or (candidate.expires_at and candidate.expires_at <= now):
@@ -111,8 +120,38 @@ def _pending_http01_order(order, account_id):
     return None
 
 
-def _revoke_replaced_certificate(acme_client, certificate):
-    """Best-effort local and upstream revocation after successful renewal."""
+def _replaced_snapshot(certificate):
+    """What revoking the replaced certificate needs, read before a renewal overwrites its row."""
+    if certificate is None or not certificate.crt:
+        return None
+    return SimpleNamespace(id=certificate.id, pem=base64.b64decode(certificate.crt),
+                           serial=certificate.serial_number, valid_to=certificate.valid_to,
+                           caref=certificate.caref, revoked=bool(certificate.revoked))
+
+
+def _record_replaced_serial(replaced):
+    """Revocation record of the replaced serial, when its issuer is a CA held here."""
+    ca = CA.query.filter_by(refid=replaced.caref).first() if replaced.caref else None
+    if ca is None:
+        return  # an external CA publishes its own revocations
+    now = utc_now()
+    row = RevokedSerial.query.filter_by(caref=ca.refid, serial_number=replaced.serial).first()
+    if row is None:
+        row = RevokedSerial(caref=ca.refid, serial_number=replaced.serial)
+        db.session.add(row)
+    row.revoked_at = now
+    row.revoke_reason = 'superseded'
+    row.valid_to = replaced.valid_to or now + timedelta(days=365)
+    row.certificate_id = replaced.id
+    commit_or_rollback(logger, f"Revocation record of serial {replaced.serial} not saved")
+
+
+def _revoke_replaced_certificate(acme_client, replaced, in_place):
+    """Best-effort local and upstream revocation after successful renewal.
+
+    Renewed in place, the row holds the new certificate: only the old serial is recorded,
+    and the CA is sent the old certificate as it was before the renewal.
+    """
     try:
         revoke_setting = SystemConfig.query.filter_by(
             key='acme.revoke_on_renewal'
@@ -124,32 +163,36 @@ def _revoke_replaced_certificate(acme_client, certificate):
         return
 
     try:
-        CertificateService.revoke_certificate(
-            cert_id=certificate.id,
-            reason='superseded',
-            username='system',
-            revoke_related=False,
-        )
-        logger.info(f"Revoked superseded certificate {certificate.id}")
+        if in_place:
+            _record_replaced_serial(replaced)
+            logger.info(f"Revoked superseded certificate {replaced.id} (serial {replaced.serial})")
+        elif not replaced.revoked:  # a revoked row keeps the revocation it has
+            CertificateService.revoke_certificate(
+                cert_id=replaced.id,
+                reason='superseded',
+                username='system',
+                revoke_related=False,
+            )
+            logger.info(f"Revoked superseded certificate {replaced.id} (serial {replaced.serial})")
     except Exception as exc:
         logger.warning(
             "Failed to revoke old certificate %s locally: %s",
-            certificate.id,
+            replaced.id,
             exc,
         )
 
     try:
-        upstream = acme_client.revoke_certificate(certificate, reason=4)
+        upstream = acme_client.revoke_certificate(replaced.pem, reason=4)
         if not 200 <= upstream.status_code < 300:
             logger.warning(
                 "Upstream revocation of certificate %s failed with HTTP %s",
-                certificate.id,
+                replaced.id,
                 upstream.status_code,
             )
     except Exception as exc:
         logger.warning(
             "Upstream revocation of certificate %s failed: %s",
-            certificate.id,
+            replaced.id,
             exc,
         )
 
@@ -203,25 +246,34 @@ def scheduled_acme_renewal():
         logger.info(f"Found {len(orders_to_renew)} certificate(s) to renew")
         
         for order in orders_to_renew:
+            order_id = order.id
+            lease = OrderLease.take(order_id)
+            if lease is None:
+                logger.info("Order %s skipped: another renewal of it is running", order_id)
+                continue
             try:
-                renew_certificate(order)
+                renew_certificate(order, lease=lease)
+            except RenewalInProgress as e:
+                logger.info("Order %s left to another renewal: %s", order_id, e)
             except Exception as e:
-                logger.error(f"Failed to renew order {order.id}: {e}")
+                logger.error(f"Failed to renew order {order_id}: {e}")
                 order.renewal_failures += 1
                 order.last_error_at = utc_now()
                 order.error_message = str(e)
                 stage_audit_entry(
                     action='acme_order.auto_renewal_failed',
                     resource_type='acme_order',
-                    resource_id=str(order.id),
+                    resource_id=str(order_id),
                     resource_name=order.primary_domain,
                     details=f'Auto-renewal failed: {e}',
                     success=False,
                 )
                 commit_or_rollback(
                     logger,
-                    f"Failed to persist renewal failure for order {order.id}",
+                    f"Failed to persist renewal failure for order {order_id}",
                 )
+            finally:
+                lease.release()
         
         logger.info("ACME auto-renewal check completed")
         
@@ -229,16 +281,25 @@ def scheduled_acme_renewal():
         logger.error(f"ACME auto-renewal task failed: {e}")
 
 
-def renew_certificate(order) -> tuple:
+def renew_certificate(order, lease=None) -> tuple:
+    """Renew one order into the certificate row it names: ``(success, message)``.
+
+    ``lease`` is the caller's lease on the order; without one the renewal takes its own,
+    and raises RenewalInProgress while another renewal or finalization holds the order.
     """
-    Renew a single certificate order.
-    
-    Args:
-        order: AcmeClientOrder to renew
-        
-    Returns:
-        Tuple of (success: bool, message: str)
-    """
+    own_lease = lease is None
+    if own_lease:
+        lease = OrderLease.take(order.id)
+        if lease is None:
+            raise RenewalInProgress(BUSY)
+    try:
+        return _renew(order, lease)
+    finally:
+        if own_lease:
+            lease.release()
+
+
+def _renew(order, lease) -> tuple:
     logger.info(f"Renewing certificate for {order.primary_domain} (order {order.id})")
     
     # Save the old certificate for RFC 9773 `replaces` and optional revocation.
@@ -247,7 +308,99 @@ def renew_certificate(order) -> tuple:
         db.session.get(Certificate, old_certificate_id)
         if old_certificate_id else None
     )
-    
+    # Read before the renewal writes the new certificate into the same row
+    replaced = _replaced_snapshot(old_certificate)
+    if (order.key_source == 'csr' and order.csr_pem and old_certificate is not None
+            and old_certificate.crt and not old_certificate.revoked):
+        # Refused before the CA is asked: each attempt would cost a certificate
+        refusal = client_certificates.csr_key_refusal(old_certificate, order.csr_pem)
+        if refusal:
+            raise RenewalBlocked(refusal)
+
+    # Initialize ACME client for the same CA that issued the original order
+    acme_client = AcmeClientService.for_order(order)
+    # The resolved account, not the old order's column: legacy rows have none.
+    account_id = getattr(acme_client.account, 'id', None)
+
+    cert_id = _resume_kept_order(acme_client, order, account_id, lease)
+    if cert_id is None:
+        cert_id = _renew_with_new_order(acme_client, order, account_id, old_certificate, lease)
+
+    logger.info(
+        f"Successfully renewed certificate for {order.primary_domain} (certificate ID: {cert_id})"
+    )
+    # The row keeps its id: the window cached for the replaced certificate must go
+    _ARI_CACHE.pop((order.acme_client_account_id, old_certificate_id), None)
+
+    # Revoke the replaced certificate locally and upstream when enabled.
+    if replaced is not None:
+        _revoke_replaced_certificate(acme_client, replaced, in_place=cert_id == old_certificate_id)
+
+    return True, f"Successfully renewed (certificate ID: {cert_id})"
+
+
+# Statuses of a renewal order that may hold a finalization: kept for the next renewal.
+_RESUMABLE = ('validating', 'ready', 'processing', 'valid', 'error')
+
+
+def _kept_renewal_order(order, account_id):
+    """The newest resumable order whose ``renewal_of_order_id`` names ``order``, or None.
+    Those opened under another account than ``account_id`` cannot be finished: removed."""
+    linked = AcmeClientOrder.query.filter(
+        AcmeClientOrder.renewal_of_order_id == order.id,
+        AcmeClientOrder.status.in_(_RESUMABLE),
+    ).order_by(AcmeClientOrder.id.desc()).all()
+    usable = next((c for c in linked if c.acme_client_account_id == account_id), None)
+    for other in [c for c in linked if c.acme_client_account_id != account_id]:
+        logger.warning("Renewal of order %s drops order %s: it was opened under another CA account",
+                       order.id, other.id)
+        _drop_kept_order(other)
+    return usable
+
+
+def renewal_parent(order):
+    """The order ``order.renewal_of_order_id`` names while ``order`` is unfinished, else None."""
+    if order.renewal_of_order_id is None or order.status == 'issued':
+        return None
+    return db.session.get(AcmeClientOrder, order.renewal_of_order_id)
+
+
+def _drop_kept_order(kept):
+    db.session.delete(kept)
+    if not commit_or_rollback(logger, f"Could not remove the stale renewal order {kept.id}"):
+        raise RuntimeError(f"Could not remove the stale renewal order {kept.id}")
+
+
+def _resume_kept_order(acme_client, order, account_id, lease):
+    """Finish the order an interrupted renewal left at the CA: the certificate id, or None
+    when there is none to finish (one the CA no longer completes is removed)."""
+    kept = _kept_renewal_order(order, account_id)
+    if kept is None:
+        return None
+    state = acme_client.fetch_order_state(kept)
+    _key, key_error = acme_client.held_finalize_key(kept)
+    if state == 'ready' or (state in ('processing', 'valid') and key_error is None):
+        logger.info("Renewal of order %s resumes order %s (%s at the CA)", order.id, kept.id, state)
+        ok, message, cert_id = acme_client.finalize_order(kept, renews=order, lease=lease)
+        if message == LEASE_LOST:
+            raise RenewalInProgress(LEASE_LOST)
+        if not ok and message == KEY_MISMATCH:
+            # Retrying cannot change what the CA issued: a new order replaces this one
+            logger.warning("Renewal of order %s drops order %s: the certificate the CA issued "
+                           "for it does not match the key kept for it; a new order is opened",
+                           order.id, kept.id)
+            _drop_kept_order(kept)
+            return None
+        if not ok:
+            raise Exception(f"Order finalization failed: {message}")
+        return cert_id
+    logger.info("Renewal of order %s drops order %s (%s at the CA)", order.id, kept.id, state)
+    _drop_kept_order(kept)
+    return None
+
+
+def _renew_with_new_order(acme_client, order, account_id, old_certificate, lease):
+    """A renewal through an order of its own (or a pending HTTP-01 one): the certificate id."""
     challenge_type = order.challenge_type or 'dns-01'
     # HTTP-01 and TLS-ALPN-01 proofs are served by UCM itself; only DNS-01 needs a provider.
     dns_provider = None
@@ -265,9 +418,6 @@ def renew_certificate(order) -> tuple:
             dns_provider_model.provider_type,
             credentials,
         )
-    
-    # Initialize ACME client for the same CA that issued the original order
-    acme_client = AcmeClientService.for_order(order)
     
     # Create new order for same domains
     domains = order.domains_list
@@ -292,12 +442,12 @@ def renew_certificate(order) -> tuple:
             exc,
         )
 
-    # The resolved account, not the old order's column: legacy rows have none.
-    account_id = getattr(acme_client.account, 'id', None)
     new_order = _pending_http01_order(order, account_id) if challenge_type == 'http-01' else None
     reused_order = new_order is not None  # maybe the operator's own: never removed here
     if reused_order:
         logger.info("Renewal of order %s reuses pending order %s", order.id, new_order.id)
+        if new_order.renewal_of_order_id is None:
+            new_order.renewal_of_order_id = order.id
     else:
         success, message, new_order = acme_client.create_order(
             domains=domains,
@@ -308,6 +458,9 @@ def renew_certificate(order) -> tuple:
         )
         if not success:
             raise Exception(f"Order creation failed: {message}")
+        # This renewal's order: never renewed itself, resumed by the next renewal of ``order``
+        new_order.renewal_enabled = False
+        new_order.renewal_of_order_id = order.id
     
     # Preserve key source across renewals (#161)
     new_order.key_source = order.key_source or 'generate'
@@ -328,7 +481,6 @@ def renew_certificate(order) -> tuple:
     if not commit_or_rollback(logger, "Could not persist key source on renewal order"):
         logger.warning("Renewal will continue with the in-memory key source settings")
     
-    new_order_url = new_order.order_url
     challenges = new_order.challenges_dict
     dns_txt_created = False
 
@@ -409,6 +561,12 @@ def renew_certificate(order) -> tuple:
             # Before the CA is called: a pending write would hold the database's write lock
             commit_or_rollback(logger, "Could not clear the HTTP-01 self-check failure")
 
+        # The propagation wait may be long: still this renewal's order before the CA is asked
+        if not lease.refresh():
+            if not reused_order:
+                _discard_failed_renewal_order(new_order)  # pending: no other renewal resumes it
+            raise RenewalInProgress(LEASE_LOST)
+
         # Submit challenges for validation
         for domain in challenges.keys():
             success_ch, msg = acme_client.verify_challenge(new_order, domain)
@@ -425,53 +583,20 @@ def renew_certificate(order) -> tuple:
         if status != 'ready':
             raise Exception(f"Order not ready after polling (status: {status})")
 
-        # Finalize order — finalize_order handles CSR generation, cert download, and import
-        success_fin, message_fin, cert_id = acme_client.finalize_order(new_order)
+        # Writes the certificate into the renewed row and folds new_order into ``order``
+        success_fin, message_fin, cert_id = acme_client.finalize_order(new_order, renews=order, lease=lease)
 
+        if message_fin == LEASE_LOST:
+            raise RenewalInProgress(LEASE_LOST)
         if not success_fin:
             raise Exception(f"Order finalization failed: {message_fin}")
 
         if not cert_id:
             raise Exception("Certificate import failed during finalization")
 
-        # Update original order with new certificate reference
-        order.certificate_id = cert_id
-        order.order_url = new_order_url
-        order.certificate_url = new_order.certificate_url
-        # This order carries on, whatever status it was renewed from. The one that fetched
-        # the certificate has nothing left of its own: kept, it would renew these names again
-        order.status = 'issued'
-        db.session.delete(new_order)
-        order.last_renewal_at = utc_now()
-        order.renewal_failures = 0
-        order.error_message = None
-        order.last_error_at = None
-
-        # Update expiry from new certificate
-        new_cert = db.session.get(Certificate, cert_id)
-        if new_cert and new_cert.valid_to:
-            order.expires_at = new_cert.valid_to
-
-        if not commit_or_rollback(logger, "Failed to persist renewed certificate"):
-            raise RuntimeError("Failed to persist renewed certificate")
-
-        logger.info(
-            f"Successfully renewed certificate for {order.primary_domain} (new cert ID: {cert_id})"
-        )
-
-        if old_certificate is not None:
-            _ARI_CACHE.pop(
-                (order.acme_client_account_id, old_certificate.id),
-                None,
-            )
-
-        # Revoke the replaced certificate locally and upstream when enabled.
-        if old_certificate and old_certificate_id != cert_id:
-            _revoke_replaced_certificate(acme_client, old_certificate)
-
-        return True, f"Successfully renewed (new certificate ID: {cert_id})"
-    except RenewalBlocked:
-        raise  # a blocked HTTP-01 order stays pending: the next attempt reuses it
+        return cert_id
+    except (RenewalBlocked, RenewalInProgress):
+        raise  # a blocked HTTP-01 order stays pending; a taken-over one is its new holder's
     except Exception:
         if not reused_order:
             _discard_failed_renewal_order(new_order)

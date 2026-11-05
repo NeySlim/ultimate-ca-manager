@@ -33,6 +33,8 @@ DOMAIN = os.environ.get('BENCH_DOMAIN', 'bench.example.com')
 RETRY_AFTER = int(os.environ.get('PEBBLE_RETRY_AFTER_ORDER', '40'))
 HOOK = '/usr/local/bin/python3 /bench/acme_pebble_hook.py'
 DB_PATH = '/opt/ucm/data/ucm.db'
+# What a stopped process leaves on an order it was finalizing or renewing
+LEASE_SECONDS = 600
 
 INSECURE = ssl.create_default_context()
 INSECURE.check_hostname = False
@@ -236,6 +238,39 @@ def set_ari_due(pem):
     return pebble_mgmt('POST', '/set-renewal-info/', {'certificate': pem, 'ariResponse': json.dumps(window)})
 
 
+def key_matches(cert_id):
+    """Whether the key UCM stores for a certificate row is the certificate's."""
+    return in_ucm(f'''
+import base64, sqlite3
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+c = sqlite3.connect("{DB_PATH}")
+crt, prv = c.execute("SELECT crt, prv FROM certificates WHERE id = {int(cert_id)}").fetchone()
+cert = x509.load_pem_x509_certificate(base64.b64decode(crt))
+from utils.key_codec import load_pem_bytes
+key = serialization.load_pem_private_key(load_pem_bytes(prv, context="bench"), None)
+pub = lambda k: k.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+print("key matches certificate:", pub(key.public_key()) == pub(cert.public_key()))
+''').strip()
+
+
+def lease_expiry(order_id):
+    """When the lease left on an order runs out (UTC), None without one."""
+    row = db('SELECT renewal_claimed_at FROM acme_client_orders WHERE id = ?', order_id)
+    stamp = row[0]['renewal_claimed_at'] if row else None
+    if not stamp:
+        return None
+    taken = dt.datetime.fromisoformat(stamp).replace(tzinfo=dt.timezone.utc)
+    return taken + dt.timedelta(seconds=LEASE_SECONDS)
+
+
+def wait_lease(order_id, ev):
+    expiry = lease_expiry(order_id)
+    ev.append(f'lease on order {order_id} runs out at {expiry}')
+    while expiry and now_utc() < expiry + dt.timedelta(seconds=3):
+        time.sleep(5)
+
+
 # ── setup ───────────────────────────────────────────────────────────────────
 
 def setup():
@@ -306,7 +341,7 @@ key = serialization.load_pem_private_key(load_pem_bytes(prv, context="bench"), N
 pub = lambda k: k.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
 print("key matches certificate:", pub(key.public_key()) == pub(cert.public_key()))
 ''')
-    CTX['s1'].update(cert=cert['id'], pem=pem)
+    CTX['s1'].update(cert=cert['id'], pem=pem, serial=serial)
     ok = st == 200 and 'key matches certificate: True' in key_check and domain in leaf_info(pem)
     record('S1 issuance', 'PASS' if ok else 'FAIL',
            f'order {oid} statuses {seen}, certificate_id={row["certificate_id"]}',
@@ -388,28 +423,68 @@ print(AcmeClientService.certificate_identifier(open("/dev/stdin").read() if Fals
     ev.append(f'acme_auto_renewal run: {secs} s, status={task.get("last_status")} error={task.get("last_error")}')
     ev.append(f'orders before {[(o["id"], o["status"], o["certificate_id"]) for o in before_orders]} '
               f'after {[(o["id"], o["status"], o["certificate_id"]) for o in after_orders]}')
-    ev.append(f'certificates before {[c["id"] for c in before_certs]} after {[c["id"] for c in after_certs]}')
-    new = [c for c in after_certs if c['id'] not in {b['id'] for b in before_certs}]
+    ev.append(f'certificates before {[(c["id"], c["serial_number"]) for c in before_certs]} '
+              f'after {[(c["id"], c["serial_number"]) for c in after_certs]}')
     replaces = pebble_log(since, r'(?i)replac')
     ev.append('Pebble on replaces: ' + (' / '.join(replaces) or 'nothing logged'))
     others = db("SELECT id, domains, status FROM acme_client_orders WHERE id NOT IN (%s)" %
                 ','.join(str(o['id']) for o in after_orders))
     ev.append(f'other orders after the run: {others}')
-    renewed = (len(after_orders) == 1 and len(new) == 1 and after_orders[0]['status'] == 'issued'
-               and after_orders[0]['certificate_id'] == new[0]['id'])
+    # Renewed in place: the same row, a new serial Pebble issued, the stored key the certificate's
+    same_row = [c['id'] for c in after_certs] == [old_cert]
+    new_serial = after_certs[0]['serial_number'] if same_row else None
+    st, _body = pebble_cert_status(new_serial) if new_serial else (None, '')
+    ev.append(f'row {old_cert}: serial {s1["serial"]} -> {new_serial}, Pebble /cert-status-by-serial: HTTP {st}; '
+              + key_matches(old_cert))
+    renewed = (same_row and new_serial != s1['serial'] and st == 200 and len(after_orders) == 1
+               and after_orders[0]['status'] == 'issued' and after_orders[0]['certificate_id'] == old_cert
+               and 'key matches certificate: True' in key_matches(old_cert))
     # A second pass must not renew again
     task2, secs2 = run_task()
     again_orders, again_certs = orders_for(domain), certs_for(domain)
-    ev.append(f'second run: {secs2} s, certificates {[c["id"] for c in again_certs]}, '
+    ev.append(f'second run: {secs2} s, certificates {[(c["id"], c["serial_number"]) for c in again_certs]}, '
               f'orders {[(o["id"], o["status"]) for o in again_orders]}')
-    stable = len(again_certs) == len(after_certs) and len(again_orders) == 1
-    CTX['s2'] = {'new_cert': new[0]['id'] if new else None, 'certid': certid}
+    stable = again_certs == after_certs and len(again_orders) == 1
+    CTX['s2'] = {'certid': certid}
     record('S2 scheduled renewal', 'PASS' if renewed and stable else 'FAIL', *ev,
            *ucm_log(since, r'(?i)renew|replaces|ERROR')[-12:])
     s6_replaces = bool(replaces) and renewed
     record('S6 ARI', 'PASS' if s6_ok and s6_replaces else 'FAIL',
            f'renewalInfo with UCM CertID: {ari}',
            f'newOrder with replaces accepted: {s6_replaces} ({" / ".join(replaces) or "no Pebble log"})')
+
+
+def s8_binding_follows_renewal():
+    """A deployment bound to the certificate: the renewal queues its delivery for the same row."""
+    domain = f's8.{DOMAIN}'
+    oid = request_order(domain, CTX['providers']['challtest'], CTX['accounts']['pebble-main'])
+    row, _ = wait_order(oid)
+    certs0 = certs_for(domain)
+    if row.get('status') != 'issued' or len(certs0) != 1:
+        return record('S8 binding follows the renewal', 'ERROR', f'setup issuance failed: {row}')
+    cert_id = certs0[0]['id']
+    target = UCM.ok('POST', '/api/v2/deploy/targets',
+                    {'name': 'bench-s8', 'host': '192.0.2.10', 'username': 'bench'})
+    binding = UCM.ok('POST', '/api/v2/deploy/bindings',
+                     {'target_id': target['id'], 'certificate_id': cert_id, 'cert_path': '/srv/bench/s8.pem'})
+    set_ari_due(cert_pem(cert_id))
+    since = now_utc()
+    task, secs = run_task()
+    certs1 = certs_for(domain)
+    order1 = db('SELECT status, certificate_id FROM acme_client_orders WHERE id = ?', oid)[0]
+    bound = db('SELECT certificate_id FROM deploy_bindings WHERE id = ?', binding['id'])[0]['certificate_id']
+    deliveries = db('SELECT id, event_type, status, created_at FROM deploy_deliveries WHERE binding_id = ?',
+                    binding['id'])
+    ok = ([c['id'] for c in certs1] == [cert_id] and certs1[0]['serial_number'] != certs0[0]['serial_number']
+          and order1['certificate_id'] == cert_id and bound == cert_id
+          and any(d['event_type'] == 'certificate.renewed' for d in deliveries))
+    record('S8 binding follows the renewal', 'PASS' if ok else 'FAIL',
+           f'binding {binding["id"]} on certificate {cert_id}; renewal run {secs} s status={task.get("last_status")}',
+           f'certificate {cert_id}: serial {certs0[0]["serial_number"]} -> '
+           f'{certs1[0]["serial_number"] if certs1 else None}; order {oid} -> certificate {order1["certificate_id"]}; '
+           f'binding -> certificate {bound}',
+           f'deploy_deliveries of the binding: {deliveries}',
+           *ucm_log(since, r'(?i)Deploy: queued|renewed|ERROR')[-6:])
 
 
 def s4_invalid():
@@ -460,38 +535,67 @@ def s4_invalid():
 
 
 def s5_crash_after_finalize():
+    """UCM killed between the finalize request and the download, on a first issuance."""
     ev = []
     domain = f's5.{DOMAIN}'
-    certs_before = db('SELECT COUNT(*) AS n FROM certificates')[0]['n']
     since = now_utc()
     oid = request_order(domain, CTX['providers']['challtest'], CTX['accounts']['pebble-main'])
-    deadline = time.monotonic() + 180
-    hit = None
-    while time.monotonic() < deadline and not hit:
-        hit = next((l for l in pebble_log(since) if 'finalize' in l.lower()), None)
-        if not hit:
-            time.sleep(0.3)
+    hit = _kill_after_finalize(since)
     if not hit:
-        return record('S5 crash after finalize', 'FAIL', 'finalize never reached Pebble',
+        return record('S5 crash after finalize', 'ERROR', 'finalize never reached Pebble',
                       *ucm_log(since, r'ERROR|WARNING')[-10:])
-    sh('docker', 'kill', UCM_C)
     ev.append(f'Pebble saw: {hit.strip()} -> docker kill {UCM_C} (SIGKILL, inside the Retry-After sleep)')
-    ev += pebble_log(since, r'(?i)issu')[-2:]
+    time.sleep(1)
+    issued = pebble_log(since, r'Issued certificate serial')
+    ev += issued
     sh('docker', 'start', UCM_C)
     UCM.login()
-    row = db('SELECT status, error_message, certificate_id, order_url FROM acme_client_orders WHERE id = ?', oid)[0]
-    ev.append(f'after restart: order {oid} status={row["status"]} certificate_id={row["certificate_id"]}')
-    time.sleep(5)
+    row = db('SELECT status, certificate_id, pending_key IS NOT NULL AS has_pending_key, renewal_claimed_at '
+             'FROM acme_client_orders WHERE id = ?', oid)[0]
+    ev.append(f'after restart: order {oid} {row}')
     status, body = UCM.call('POST', f'/api/v2/acme/client/orders/{oid}/finalize')
-    ev.append(f'POST /orders/{oid}/finalize -> HTTP {status} {body.get("message") or body.get("error") or body}')
-    status2, body2 = UCM.call('GET', f'/api/v2/acme/client/orders/{oid}/status')
-    order2 = (body2.get('data') or {}).get('order') or body2.get('data') or {}
-    ev.append(f'GET /orders/{oid}/status -> HTTP {status2} status={order2.get("status")}')
+    ev.append(f'POST /orders/{oid}/finalize at once -> HTTP {status} {body.get("message") or body}')
+    CTX['s5'] = {'order': oid, 'since': since, 'issued': issued}
+    ok = bool(row['has_pending_key']) and row['certificate_id'] is None and status == 409 and len(issued) == 1
+    record('S5 crash after finalize (P1-3)', 'PASS' if ok else 'FAIL', *ev)
+
+
+def s5_resume():
+    """Once the dead process's lease runs out, a status check imports what Pebble issued."""
+    s5 = CTX.get('s5')
+    if not s5:
+        return record('S5 resume', 'ERROR', 's5 did not run')
+    ev, oid = [], s5['order']
+    wait_lease(oid, ev)
+    since = now_utc()
+    deadline = time.monotonic() + 120
+    answer = None
+    while time.monotonic() < deadline:
+        _st, body = UCM.call('GET', f'/api/v2/acme/client/orders/{oid}/status')
+        answer = (body.get('data') or {}).get('status')
+        if answer == 'issued':
+            break
+        time.sleep(10)
+    row = db('SELECT status, certificate_id, pending_key IS NOT NULL AS has_pending_key, renewal_claimed_at '
+             'FROM acme_client_orders WHERE id = ?', oid)[0]
+    ev.append(f'GET /orders/{oid}/status -> {answer}; order {row}')
     certs_after = db('SELECT COUNT(*) AS n FROM certificates')[0]['n']
-    ev.append(f'certificates in UCM before {certs_before}, after {certs_after}: the issued one was never imported '
-              f'and its private key existed only in the killed process')
-    reproduced = status == 400 and 'status: valid' in json.dumps(body) and certs_after == certs_before
-    record('S5 crash after finalize (P1-3)', 'REPRODUCED' if reproduced else 'NOT REPRODUCED', *ev)
+    cert = db('SELECT id, serial_number FROM certificates WHERE id = ?', row['certificate_id'] or 0)
+    serial_hex = f'{int(cert[0]["serial_number"]):x}' if cert else None
+    pebble_serial = re.search(r'serial ([0-9a-f]+)', s5['issued'][0]).group(1) if s5['issued'] else None
+    ev.append(f'imported certificate {cert}, serial {serial_hex}; Pebble issued {pebble_serial} before the kill')
+    # s5b runs in between: only this scenario's names and order count
+    domain = f's5.{DOMAIN}'
+    s5_certs, s5_orders = certs_for(domain), orders_for(domain)
+    ev.append(f'certificates for {domain}: {[(c["id"], c["serial_number"]) for c in s5_certs]}, '
+              f'orders {[(o["id"], o["status"]) for o in s5_orders]} (all certificates: {certs_after})')
+    match = key_matches(row['certificate_id']) if cert else ''
+    ev.append(match)
+    ok = (answer == 'issued' and row['status'] == 'issued' and not row['has_pending_key']
+          and serial_hex == pebble_serial and [c['id'] for c in s5_certs] == [row['certificate_id']]
+          and [o['id'] for o in s5_orders] == [oid] and 'key matches certificate: True' in match)
+    record('S5 resume after the crash', 'PASS' if ok else 'FAIL', *ev,
+           *ucm_log(since, r'(?i)resum|finaliz|ERROR')[-6:])
 
 
 def _kill_after_finalize(since, timeout=180):
@@ -507,7 +611,7 @@ def _kill_after_finalize(since, timeout=180):
 
 
 def s5b_crash_during_renewal():
-    """The P1-3 window on the scheduled path, then the next renewal meets alreadyReplaced."""
+    """The same cut on the scheduled path: the renewal's order keeps the key, the lease holds."""
     import threading
     ev = []
     domain = f's5b.{DOMAIN}'
@@ -516,8 +620,7 @@ def s5b_crash_during_renewal():
     certs0 = certs_for(domain)
     if row.get('status') != 'issued' or len(certs0) != 1:
         return record('S5b crash during renewal', 'ERROR', f'setup issuance failed: {row}')
-    st, _ = set_ari_due(cert_pem(certs0[0]['id']))
-    ucm_certs0 = db('SELECT COUNT(*) AS n FROM certificates')[0]['n']
+    set_ari_due(cert_pem(certs0[0]['id']))
     since = now_utc()
     worker = threading.Thread(target=lambda: UCM.call('POST', '/api/v2/system/scheduler/acme_auto_renewal/run'),
                               daemon=True)
@@ -526,41 +629,67 @@ def s5b_crash_during_renewal():
     if not hit:
         return record('S5b crash during renewal', 'ERROR', 'no finalize seen')
     ev.append(f'scheduled renewal running; Pebble saw {hit.strip()} -> docker kill')
-    sh('docker', 'start', UCM_C)
-    UCM.login()
+    time.sleep(1)
     issued = pebble_log(since, r'Issued certificate serial|marked as replaced')
     ev += issued
-    orders1, certs1 = orders_for(domain), certs_for(domain)
-    ev.append(f'after restart: orders {[(o["id"], o["status"], o["certificate_id"]) for o in orders1]}, '
-              f'certificates {[c["id"] for c in certs1]}')
-    # The scheduler's own first pass after a start renews the due order: wait for it rather
-    # than trigger one, two concurrent renewals would blur the evidence.
-    since2 = since
+    sh('docker', 'start', UCM_C)
+    UCM.login()
+    # The scheduler's own first pass after a start meets the dead renewal's lease
     deadline = time.monotonic() + 300
     done = []
     while time.monotonic() < deadline and not done:
         done = ucm_log(since, r"Task 'acme_auto_renewal' (completed|failed)")
         time.sleep(2)
-    orders2, certs2 = orders_for(domain), certs_for(domain)
-    ev.append(f'first scheduler pass after the restart: {done[-1][:120] if done else "not seen"}; orders '
-              f'{[(o["id"], o["status"], o["certificate_id"]) for o in orders2]}, certificates {[c["id"] for c in certs2]}')
-    fallback = ucm_log(since2, r'replaces rejected|alreadyReplaced')
-    ev += fallback
-    ev += pebble_log(since2, r'Issued certificate serial|replace')
-    issued_total = len(pebble_log(since, r'Issued certificate serial'))
-    imported = db('SELECT COUNT(*) AS n FROM certificates')[0]['n'] - ucm_certs0
-    ev.append(f'since the renewal started: Pebble issued {issued_total} certificates, UCM imported {imported}')
-    lost = issued_total > imported
-    orphan = [o for o in orders2 if o['id'] != oid]
-    ev.append(f'orders left besides the original: {[(o["id"], o["status"]) for o in orphan]}')
-    verdict = ('REPRODUCED' if lost else 'NOT REPRODUCED') + (', fallback without replaces OK' if fallback
-                                                               and len(certs2) == len(certs0) + 1 else ', fallback FAILED')
-    record('S5b crash during renewal (P1-3) + alreadyReplaced', verdict, *ev)
+    skipped = ucm_log(since, rf'Order {oid} skipped')
+    orders1 = db('SELECT id, status, certificate_id, renewal_enabled, pending_key IS NOT NULL AS has_pending_key '
+                 'FROM acme_client_orders WHERE domains LIKE ? ORDER BY id', f'%"{domain}"%')
+    certs1 = certs_for(domain)
+    ev.append(f'after restart: orders {orders1}, certificates {[(c["id"], c["serial_number"]) for c in certs1]}')
+    ev.append(f'first scheduler pass: {done[-1][:120] if done else "not seen"}; {skipped[-1] if skipped else "no skip"}')
+    kept = [o for o in orders1 if o['id'] != oid]
+    CTX['s5b'] = {'order': oid, 'since': since, 'cert': certs0[0]['id'], 'serial0': certs0[0]['serial_number'],
+                  'kept': kept[0]['id'] if kept else None,
+                  'issued': [l for l in issued if 'Issued certificate serial' in l]}
+    ok = (len(kept) == 1 and kept[0]['has_pending_key'] and not kept[0]['renewal_enabled']
+          and kept[0]['status'] in ('processing', 'valid') and bool(skipped)
+          and [c['id'] for c in certs1] == [certs0[0]['id']])
+    record('S5b crash during renewal (P1-3)', 'PASS' if ok else 'FAIL', *ev)
+
+
+def s5b_resume():
+    """Once the lease runs out, the next renewal imports what Pebble issued, into the same row."""
+    s5b = CTX.get('s5b')
+    if not s5b:
+        return record('S5b resume', 'ERROR', 's5b did not run')
+    ev, oid = [], s5b['order']
+    domain = f's5b.{DOMAIN}'
+    wait_lease(oid, ev)
+    since = now_utc()
+    task, secs = run_task()
+    orders2 = orders_for(domain)
+    certs2 = certs_for(domain)
+    ev.append(f'renewal run {secs} s status={task.get("last_status")}: orders '
+              f'{[(o["id"], o["status"], o["certificate_id"]) for o in orders2]}, certificates '
+              f'{[(c["id"], c["serial_number"]) for c in certs2]}')
+    serial_hex = f'{int(certs2[0]["serial_number"]):x}' if certs2 else None
+    pebble_serial = re.search(r'serial ([0-9a-f]+)', s5b['issued'][0]).group(1) if s5b['issued'] else None
+    ev.append(f'row {s5b["cert"]} serial now {serial_hex}; Pebble issued {pebble_serial} before the kill')
+    issued_total = pebble_log(s5b['since'], r'Issued certificate serial')
+    ev.append(f'certificates Pebble issued since the renewal started: {len(issued_total)}')
+    ev += ucm_log(since, r'(?i)resumes order|replaces rejected|alreadyReplaced')
+    match = key_matches(s5b['cert'])
+    ev.append(match)
+    ok = ([c['id'] for c in certs2] == [s5b['cert']] and serial_hex == pebble_serial
+          and [o['id'] for o in orders2] == [oid] and orders2[0]['status'] == 'issued'
+          and len(issued_total) == 1 and 'key matches certificate: True' in match
+          and not ucm_log(since, r'replaces rejected'))
+    record('S5b resume after the crash', 'PASS' if ok else 'FAIL', *ev)
 
 
 SCENARIOS = {'s1': s1_issuance, 's3': s3_retry_after, 's7': s7_long_cn,
-             's2': s2_s6_scheduled_renewal, 's4': s4_invalid, 's5': s5_crash_after_finalize,
-             's5b': s5b_crash_during_renewal}
+             's2': s2_s6_scheduled_renewal, 's8': s8_binding_follows_renewal, 's4': s4_invalid,
+             's5': s5_crash_after_finalize, 's5b': s5b_crash_during_renewal,
+             's5r': s5_resume, 's5br': s5b_resume}
 
 
 def main():
@@ -582,7 +711,7 @@ def main():
     if args.report:
         with open(args.report, 'w') as fh:
             json.dump(RESULTS, fh, indent=2, default=str)
-    return 0 if all(r['verdict'].split(',')[0] in ('PASS', 'REPRODUCED') for r in RESULTS.values()) else 1
+    return 0 if all(r['verdict'] == 'PASS' for r in RESULTS.values()) else 1
 
 
 if __name__ == '__main__':

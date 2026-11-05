@@ -282,7 +282,12 @@ SECTIONS: Dict[str, Section] = {
     'acme_client_orders': Section(
         model='models.acme_models:AcmeClientOrder',
         identity=('order_url',),
-        exclude={**_SURROGATE},
+        exclude={
+            **_SURROGATE,
+            'pending_key': 'key of a finalization in progress, resumed on the source only',
+            'renewal_claimed_at': 'lease of a renewal running on the source, meaningless elsewhere',
+            'renewal_of_order_id': 'link of a renewal in progress, resumed on the source only',
+        },
         # `account_id` names the local ACME account by its account id, the
         # string the protocol itself uses, and is deliberately not a
         # reference: see the note above `references`.

@@ -5,10 +5,13 @@ Automatic Certificate Management Environment
 from datetime import datetime, timedelta
 from . import db
 import ipaddress
+import logging
 import re
 import secrets
 import json
 from utils.datetime_utils import utc_now, utc_isoformat
+
+logger = logging.getLogger(__name__)
 
 
 class AcmeAccount(db.Model):
@@ -396,6 +399,14 @@ class AcmeClientOrder(db.Model):
     # Error tracking
     error_message = db.Column(db.Text)
     last_error_at = db.Column(db.DateTime)
+
+    # Key sent in a finalize request, kept until its certificate is imported (``pending_key``)
+    _pending_key = db.Column('pending_key', db.Text)
+    # Lease of the renewal or finalization running on this order (services/acme/order_lease.py)
+    renewal_claimed_at = db.Column(db.DateTime)
+    # On the order a renewal opens: the order it renews
+    renewal_of_order_id = db.Column(
+        db.Integer, db.ForeignKey('acme_client_orders.id', ondelete='SET NULL'), nullable=True, index=True)
     
     # Proxy order fields
     is_proxy_order = db.Column(db.Boolean, default=False)
@@ -423,6 +434,27 @@ class AcmeClientOrder(db.Model):
         'AcmeClientAccount', foreign_keys=[acme_client_account_id]
     )
     
+    @property
+    def pending_key(self):
+        """PEM private key awaiting its certificate; None when there is none.
+        Stored like ``Certificate.prv``, under the master key when it is enabled."""
+        if not self._pending_key:
+            return None
+        from utils.key_codec import load_pem_bytes
+        try:
+            return load_pem_bytes(self._pending_key, context=f'ACME order {self.id}').decode()
+        except ValueError as exc:  # under another master key, or damaged: no usable key
+            logger.warning("Pending key of ACME order %s not readable: %s", self.id, exc)
+            return None
+
+    @pending_key.setter
+    def pending_key(self, value):
+        if value:
+            from utils.key_codec import store_pem_bytes
+            self._pending_key = store_pem_bytes(value.encode())
+        else:
+            self._pending_key = None
+
     @property
     def domains_list(self):
         """Parse domains JSON to list"""

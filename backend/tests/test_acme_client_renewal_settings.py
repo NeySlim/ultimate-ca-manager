@@ -71,7 +71,7 @@ def _renewed(app, oid):
     renewed = []
     with app.app_context():
         # No certificate: the fixed threshold decides, not ARI.
-        with patch.object(renew_mod, 'renew_certificate', side_effect=lambda o: renewed.append(o.id)):
+        with patch.object(renew_mod, 'renew_certificate', side_effect=lambda o, **_kw: renewed.append(o.id)):
             renew_mod.scheduled_acme_renewal()
     return oid in renewed
 

@@ -239,3 +239,36 @@ class TestEveryForeignKeyIsDecidedAbout:
                             f'{target!r} and its foreign key names {named!r}')
             assert not wrong, wrong
 
+
+
+def test_an_acme_order_leaves_its_pending_key_its_lease_and_its_link_behind(app):
+    import uuid
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from models.acme_models import AcmeClientOrder
+    from services.backup.export_generic import IdentityIndex, export_section
+    from utils.datetime_utils import utc_now
+
+    pem = ec.generate_private_key(ec.SECP256R1()).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption()).decode()
+    url = f'https://ca.example/order/{uuid.uuid4().hex}'
+    with app.app_context():
+        parent = AcmeClientOrder(domains='["m.example"]', status='issued',
+                                 order_url=f'{url}-parent')
+        db.session.add(parent)
+        db.session.flush()
+        child = AcmeClientOrder(domains='["m.example"]', status='valid', order_url=url,
+                                renewal_claimed_at=utc_now(), renewal_of_order_id=parent.id)
+        child.pending_key = pem
+        db.session.add(child)
+        db.session.commit()
+        try:
+            row = next(r for r in export_section('acme_client_orders', IdentityIndex())
+                       if r['order_url'] == url)
+            left = {'pending_key', '_pending_key', 'renewal_claimed_at', 'renewal_of_order_id'} & set(row)
+            assert not left
+        finally:
+            db.session.delete(child)
+            db.session.delete(parent)
+            db.session.commit()
