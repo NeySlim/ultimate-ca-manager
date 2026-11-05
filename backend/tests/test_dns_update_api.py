@@ -51,7 +51,7 @@ def env(app):
         e.app = app
 
         def make_account(slug=None, enabled=True):
-            a = AcmeClientAccount(directory_url='https://u.example/dir', label='t',
+            a = AcmeClientAccount(directory_url='https://u.example/dir', label=f't-{uuid.uuid4().hex[:8]}',
                                   email='t@example.com', proxy_enabled=enabled,
                                   proxy_slug=slug)
             db.session.add(a)

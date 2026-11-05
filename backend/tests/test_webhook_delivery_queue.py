@@ -1,5 +1,6 @@
 """Tests for the durable, async webhook delivery queue and the event bus."""
 import json
+import uuid
 from datetime import timedelta
 import pytest
 
@@ -19,7 +20,7 @@ def endpoint(app):
         db.session.rollback()
         WebhookDelivery.query.delete()
         db.session.commit()
-        ep = WebhookEndpoint(name='sink', url='https://example.invalid/h',
+        ep = WebhookEndpoint(name=f'sink-{uuid.uuid4().hex[:8]}', url='https://example.invalid/h',
                              events=json.dumps(['*']), enabled=True)
         db.session.add(ep)
         db.session.commit()
@@ -63,11 +64,11 @@ class TestEnqueue:
             _ = held.name  # ensure loaded
             WebhookService.enqueue_deliveries('certificate.issued', {'id': 1})
             assert not inspect(held).expired  # still usable, no refresh needed
-            assert held.name == 'sink'
+            assert held.name.startswith('sink-')
 
     def test_ca_filter_excludes_non_matching(self, app):
         with app.app_context():
-            ep = WebhookEndpoint(name='ca-scoped', url='https://x.invalid/h',
+            ep = WebhookEndpoint(name=f'ca-scoped-{uuid.uuid4().hex[:8]}', url='https://x.invalid/h',
                                  events=json.dumps(['*']), enabled=True, ca_filter='ca-AAA')
             db.session.add(ep)
             db.session.commit()

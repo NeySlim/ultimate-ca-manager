@@ -12,6 +12,11 @@ from one page or the other, said different things about itself.
 from typing import Any, Dict
 
 
+# What a renamed row is, in the restore message.
+_RENAMED_KIND = {'dns_providers': 'DNS provider', 'acme_client_accounts': 'ACME account',
+                 'webhook_endpoints': 'webhook'}
+
+
 def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
     """`message`, followed by what the archive had to warn about.
 
@@ -73,6 +78,17 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
         message += _clause(
             f'{len(fallbacks)} deploy {bindings} pinned to a cross-certificate '
             f'absent from this installation {were} reset to the automatic chain')
+
+    renamed = (results or {}).get('renamed') or []
+    if renamed:
+        shown = [f"{_RENAMED_KIND.get(entry['section'], entry['section'])} "
+                 f"{entry['from']} as {entry['to']}" for entry in renamed[:5]]
+        listing = ', '.join(shown)
+        if len(renamed) > len(shown):
+            listing += f' and {len(renamed) - len(shown)} more'
+        rows, were = ('row', 'was') if len(renamed) == 1 else ('rows', 'were')
+        message += _clause(f'{len(renamed)} {rows} {were} restored under another '
+                           f'name: {listing}')
 
     if (results or {}).get('admin_allowlist_cleared'):
         message += _clause('The admin access allowlist from the archive would '

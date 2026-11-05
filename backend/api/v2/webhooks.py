@@ -239,6 +239,14 @@ def get_webhook(endpoint_id):
     return success_response(data=endpoint.to_dict())
 
 
+def _name_taken(name, except_id=None):
+    """Names are unique (migration 124): a restore tells endpoints apart by name."""
+    query = WebhookEndpoint.query.filter(WebhookEndpoint.name == name)
+    if except_id is not None:
+        query = query.filter(WebhookEndpoint.id != except_id)
+    return db.session.query(query.exists()).scalar()
+
+
 @bp.route('/api/v2/webhooks', methods=['POST'])
 @require_auth(['write:settings'])
 @require_json_body
@@ -250,6 +258,9 @@ def create_webhook():
         return error_response("Webhook name is required", 400)
     if not data.get('url'):
         return error_response("Webhook URL is required", 400)
+
+    if _name_taken(data['name']):
+        return error_response(f"A webhook named {data['name']!r} already exists", 409)
 
     url = data['url']
     if not url.startswith(('http://', 'https://')):
@@ -317,6 +328,8 @@ def update_webhook(endpoint_id):
     """Update webhook endpoint"""
     endpoint = db.get_or_404(WebhookEndpoint, endpoint_id)
     data = g.json_data
+    if 'name' in data and _name_taken(data['name'], endpoint_id):
+        return error_response(f"A webhook named {data['name']!r} already exists", 409)
 
     # The auth token and custom headers are sent; the HMAC secret only signs.
     # Switching authentication off clears the token.
