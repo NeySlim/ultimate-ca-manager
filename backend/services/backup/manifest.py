@@ -231,7 +231,6 @@ SECTIONS: Dict[str, Section] = {
         exclude={**_SURROGATE},
         references={'certificate_id': 'certificates', 'policy_id': 'certificate_policies',
                     'requester_id': 'users'},
-        optional=True,
     ),
     'dns_providers': Section(
         model='models.acme_models:DnsProvider',
@@ -282,26 +281,23 @@ SECTIONS: Dict[str, Section] = {
     ),
     'acme_client_orders': Section(
         model='models.acme_models:AcmeClientOrder',
-        identity=('order_url',),
+        # What never changes on an order: a renewal hands the parent its
+        # child's `order_url`, and two rows left by the renewal doubling share one.
+        identity=('environment', 'domains', 'created_at'),
         exclude={
             **_SURROGATE,
-            'pending_key': 'key of a finalization in progress, resumed on the source only',
             'renewal_claimed_at': 'lease of a renewal running on the source, meaningless elsewhere',
-            'renewal_of_order_id': 'link of a renewal in progress, resumed on the source only',
         },
+        # Property `pending_key`: exported as a PEM, the setter re-encrypts it on restore.
+        secrets=('pending_key',),
         # `account_id` names the local ACME account by its account id, the
         # string the protocol itself uses, and is deliberately not a
         # reference: see the note above `references`.
-        #
-        # `acme_client_account_id` is a number, and names the account at the
-        # external CA the order was placed with. Exported as it stood, the
-        # source's number landed here on whichever account happened to hold
-        # it: a renewal placed against a different CA, or against nothing.
         references={'dns_provider_id': 'dns_providers',
                     'acme_client_account_id': 'acme_client_accounts',
                     'certificate_id': 'certificates',
-                    'source_certificate_id': 'certificates'},
-        optional=True,
+                    'source_certificate_id': 'certificates',
+                    'renewal_of_order_id': 'acme_client_orders'},
     ),
     'acme_dns_update_keys': Section(
         model='models.acme_dns_update:AcmeDnsUpdateKey',
@@ -466,8 +462,8 @@ SECTIONS: Dict[str, Section] = {
         model='models.key_recovery:KeyRecoveryRequest',
         identity=('cert_refid', 'requested_at'),
         exclude={**_SURROGATE},
-        references={'cert_id': 'certificates'},
-        optional=True,
+        # `cert_id` is no reference: the restorer points it at the certificate
+        # of `cert_refid` here, and cancels an open request whose certificate is not.
     ),
     'audit_logs': Section(
         model='models.audit_log:AuditLog',

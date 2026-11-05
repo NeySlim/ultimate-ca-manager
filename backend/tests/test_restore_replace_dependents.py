@@ -104,6 +104,15 @@ def _snapshot(*sections):
     return _service().create_backup(PASSWORD)
 
 
+# Carried by default since 2.250: an archive without them is an older one, or an include map
+NOT_CARRIED_BEFORE_2250 = ('acme_client_orders', 'approval_requests', 'key_recovery_requests')
+
+
+def _snapshot_without(*sections):
+    db.session.commit()
+    return _service().create_backup(PASSWORD, include={name: False for name in sections})
+
+
 def _orphans():
     """Every row whose foreign key names a row that does not exist.
 
@@ -116,9 +125,11 @@ def _orphans():
             if (dependent.name, column.name, referred) in seen:
                 continue
             seen.add((dependent.name, column.name, referred))
+            # Aliased, or a link into its own table is compared with its own row
+            target = named.table.alias().c[named.name]
             query = select(column).where(
                 column.isnot(None), link_scope(dependent, column, named),
-                ~exists().where(named == column))
+                ~exists().where(target == column))
             for row in db.session.execute(query).all():
                 found.append(f'{dependent.name}.{column.name}={row[0]}')
     return found
@@ -143,7 +154,7 @@ def test_what_points_at_a_removed_row_is_cleared_or_unlinked_never_orphaned(targ
 
     _user('replace-admin')
     kept = _authority_row('replace-kept-ca')
-    blob = _snapshot()
+    blob = _snapshot_without(*NOT_CARRIED_BEFORE_2250)
 
     # Added after the snapshot: the restore takes them away
     gone_ca, _key, _cert = _authority_row('replace-gone-ca')
@@ -443,7 +454,7 @@ def test_a_reused_certificate_number_reaches_no_request(target):
     issuer = _authority_row('replace-kr-ca')
     first = _certificate_row('replace-kr-a', issuer)
     second = _certificate_row('replace-kr-b', issuer)
-    blob = _snapshot()
+    blob = _snapshot_without('key_recovery_requests')
 
     number = second.id
     db.session.delete(second)
@@ -677,7 +688,7 @@ def test_only_the_open_requests_on_a_removed_certificate_are_cancelled(target):
     _user('replace-admin')
     issuer = _authority_row('replace-krk-ca')
     kept = _certificate_row('replace-krk-kept', issuer)
-    blob = _snapshot()
+    blob = _snapshot_without('key_recovery_requests')
     gone = _certificate_row('replace-krk-gone', issuer)
 
     def request(cert, status):

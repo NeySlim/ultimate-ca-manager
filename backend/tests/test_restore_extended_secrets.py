@@ -252,7 +252,17 @@ def _seed():
     db.session.add(client_account)
     db.session.flush()
 
+    # Two orders a renewal could belong to; the seeded one renews the second
+    parents = [AcmeClientOrder(
+        order_url=f'https://acme.example.test/{MARK}/parent-{suffix}',
+        domains=f'["{MARK}-order.example.test"]', environment='production',
+        status='issued', created_at=datetime(2026, 1, 1, 0, 0, index))
+        for index, suffix in enumerate('ab')]
+    db.session.add_all(parents)
+    db.session.flush()
+
     db.session.add(AcmeClientOrder(
+        renewal_of_order_id=parents[1].id,
         order_url=IDENTITIES['acme_client_orders']['order_url'],
         domains=f'["{MARK}-order.example.test"]', challenge_type='dns-01',
         environment='production', key_source='generate', status='valid',

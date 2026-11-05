@@ -25,6 +25,7 @@ from .restore.files import StagedFiles
 from .manifest import SECTIONS
 from .restore.apply import apply_columns, apply_section, relink_references
 from .restore.names import rename_clashing_rows
+from .restore.repairs import replay_order_repairs
 from .restore.conflict import conflict_from_integrity_error
 from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
 from .restore.settings import restore_encrypted_settings
@@ -85,7 +86,6 @@ GENERIC_SECTIONS = (
     # After its proxy account, EAB credential and creator (users and
     # acme_eab_credentials have their own restorers, run before these).
     'acme_dns_update_keys',
-    'key_recovery_requests',
     # The history an archive carries only when it is asked for. They were
     # listed as restored and no code path ever wrote them: the export
     # collected them, the restore counted them as applied, and they went
@@ -349,6 +349,8 @@ class RestoreCoreMixin:
                 # row exists: this is where an authority finds the HSM key the
                 # same restore has just created.
                 results['relinked'] = relink_references(backup_data, plan)
+                if backup_data.get('acme_client_orders'):
+                    results['acme_client_orders_repaired'] = replay_order_repairs()
                 results['chain_variant_fallbacks'] = list(plan.chain_variant_fallbacks)
 
                 if replacement is not None:
@@ -502,6 +504,7 @@ class RestoreCoreMixin:
         self._restore_hsm_keys(backup_data, results, plan)
         self._restore_approval_requests(backup_data, results, plan)
         self._restore_acme_client_orders(backup_data, results, plan)
+        self._restore_key_recovery_requests(backup_data, results, plan)
         self._restore_https_files(backup_data, results, staged)
 
         # Sections the manifest carries and the hand-written restorers never

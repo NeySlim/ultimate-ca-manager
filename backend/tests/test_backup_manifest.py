@@ -241,7 +241,7 @@ class TestEveryForeignKeyIsDecidedAbout:
 
 
 
-def test_an_acme_order_leaves_its_pending_key_its_lease_and_its_link_behind(app):
+def test_an_acme_order_carries_its_pending_key_and_link_not_its_lease(app):
     import uuid
     from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import ec
@@ -266,8 +266,11 @@ def test_an_acme_order_leaves_its_pending_key_its_lease_and_its_link_behind(app)
         try:
             row = next(r for r in export_section('acme_client_orders', IdentityIndex())
                        if r['order_url'] == url)
-            left = {'pending_key', '_pending_key', 'renewal_claimed_at', 'renewal_of_order_id'} & set(row)
-            assert not left
+            assert 'renewal_claimed_at' not in row and '_pending_key' not in row
+            assert row['pending_key'] == pem
+            assert row['renewal_of_order_id_ref'] == {
+                'environment': parent.environment, 'domains': '["m.example"]',
+                'created_at': parent.created_at.isoformat()}
         finally:
             db.session.delete(child)
             db.session.delete(parent)

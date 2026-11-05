@@ -16,7 +16,7 @@ from typing import Any, Dict, List
 from sqlalchemy import inspect as sa_inspect
 
 from .errors import BackupExportError
-from .key_material import decrypt_stored_fields, decrypt_stored_secret
+from .key_material import as_pem, decrypt_stored_fields, decrypt_stored_key, decrypt_stored_secret
 from .manifest import SECTIONS, Section
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,12 @@ logger = logging.getLogger(__name__)
 # Suffix carrying the stable identity of a referenced row, next to the
 # numeric foreign key the source happened to use.
 REFERENCE_SUFFIX = '_ref'
+
+
+def _key_material_columns():
+    """(model, attribute) of the columns holding base64 key material under the master key."""
+    from security.encryption import MASTER_KEY_COLUMNS
+    return {(name, attribute) for _module, name, attribute, fmt in MASTER_KEY_COLUMNS if fmt == 'b64'}
 
 
 def load_model(section: Section):
@@ -110,8 +116,13 @@ def export_section(section_name: str, index: IdentityIndex) -> List[Dict[str, An
                 raise BackupExportError(
                     f"Section '{section_name}' declares a secret {secret!r} the "
                     "model does not hold")
+            stored = getattr(row, stored_attr)
+            if (model.__name__, stored_attr) in _key_material_columns():
+                # Base64 key material under the master key: carried as the PEM itself
+                data[secret] = as_pem(decrypt_stored_key(stored, label=label), label=label) if stored else None
+                continue
             decrypt = decrypt_stored_fields if section.stored.get(secret) == 'fields' else decrypt_stored_secret
-            data[secret] = decrypt(getattr(row, stored_attr), label=f"{label} ({secret})")
+            data[secret] = decrypt(stored, label=f"{label} ({secret})")
 
         for column, target in section.references.items():
             data[f'{column}{REFERENCE_SUFFIX}'] = index.of(

@@ -289,6 +289,7 @@ The upload accepts archives up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), th
 - Users and settings
 - Audit logs
 - Templates
+- ACME client orders, with the key of a finalization in progress, approval requests and key recovery requests
 
 ---
 

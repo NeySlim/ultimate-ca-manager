@@ -83,6 +83,17 @@ def _is_ours(row) -> bool:
                for value in row.values())
 
 
+# Secrets the export reads as key material: only a PEM leaves the installation
+_PEM_SECRETS = {('acme_client_orders', 'pending_key')}
+
+
+def _secret_value(name, column):
+    value = f'{MARK}-secret-{name}-{column}'
+    if (name, column) in _PEM_SECRETS:
+        return f'-----BEGIN PRIVATE KEY-----\n{value}\n-----END PRIVATE KEY-----\n'
+    return value
+
+
 def _fill_secrets(name, row):
     """Put a real, encrypted value in every column the manifest calls a secret.
 
@@ -97,7 +108,7 @@ def _fill_secrets(name, row):
     for column in section.secrets:
         try:
             with db.session.begin_nested():
-                setattr(row, column, f'{MARK}-secret-{name}-{column}')
+                setattr(row, column, _secret_value(name, column))
                 db.session.flush()
         except Exception:
             # A column this version stores differently, or a setter that
@@ -366,7 +377,7 @@ class TestEverySecretTravelsReadable:
                     value = row.get(column)
                     if not isinstance(value, str) or not value:
                         continue
-                    expected = f'{MARK}-secret-{name}-{column}'
+                    expected = _secret_value(name, column)
                     if value == expected:
                         readable.add((name, column))
                     elif (key_encryption.is_string_encrypted(value)
