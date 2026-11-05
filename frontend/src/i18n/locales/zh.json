@@ -4141,6 +4141,7 @@
       "systemUpdateInitiated": "更新已启动",
       "systemUpdateInstalled": "更新已安装",
       "systemUpdateFailed": "更新失败",
+      "acmePreflight": "ACME 预检",
       "acmeOrderRenewalFailed": "ACME 续订失败"
     },
     "title": "Webhooks",

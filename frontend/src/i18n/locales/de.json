@@ -4141,6 +4141,7 @@
       "systemUpdateInitiated": "Update gestartet",
       "systemUpdateInstalled": "Update installiert",
       "systemUpdateFailed": "Update fehlgeschlagen",
+      "acmePreflight": "ACME-Vorabprüfung",
       "acmeOrderRenewalFailed": "ACME-Erneuerung fehlgeschlagen"
     },
     "title": "Webhooks",

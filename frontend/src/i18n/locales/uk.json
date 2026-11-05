@@ -4203,6 +4203,7 @@
       "systemUpdateInitiated": "Оновлення розпочато",
       "systemUpdateInstalled": "Оновлення встановлено",
       "systemUpdateFailed": "Оновлення не вдалося",
+      "acmePreflight": "Попередня перевірка ACME",
       "acmeOrderRenewalFailed": "Поновлення ACME не вдалося"
     },
     "title": "Webhooks",
