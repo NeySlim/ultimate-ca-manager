@@ -298,7 +298,7 @@ def test_domain_access():
         time.sleep(2)
         
         # Delete test record
-        dns_client.delete_txt_record(base_domain, test_record)
+        dns_client.delete_txt_record(base_domain, test_record, test_value)
         
         return success_response(
             data={

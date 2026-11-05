@@ -1702,11 +1702,14 @@ class AcmeProxyService:
             db.session.commit()
 
     @staticmethod
-    def _delete_dns_record(provider, zone: str, record_name: str) -> None:
+    def _delete_dns_record(provider, zone: str, record_name: str, value) -> None:
         """Best-effort TXT cleanup helper."""
+        if not value:
+            logger.warning("DNS cleanup skipped for %s: no TXT value recorded", record_name)
+            return
         try:
             with _txt_record_lock(record_name):
-                provider.delete_txt_record(zone, record_name)
+                provider.delete_txt_record(zone, record_name, value)
         except Exception as e:
             logger.warning("Failed to cleanup DNS record %s (%s): %s", record_name, zone, e)
 
@@ -1725,7 +1728,8 @@ class AcmeProxyService:
                         credentials = json.loads(provider_model.credentials) if provider_model.credentials else {}
                         provider = create_provider(provider_model.provider_type, credentials)
                         logger.info(f"[ACME Proxy] Cleaning up DNS record: {record['record_name']} in zone {record['domain']}")
-                        self._delete_dns_record(provider, record['domain'], record['record_name'])
+                        self._delete_dns_record(provider, record['domain'], record['record_name'],
+                                                record.get('value'))
                     except Exception as e:
                         logger.warning("[ACME Proxy] DNS record cleanup failed: %s", e)
             finally:

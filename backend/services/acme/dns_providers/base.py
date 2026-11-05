@@ -5,6 +5,7 @@ Extensible architecture for adding new providers easily
 from abc import ABC, abstractmethod
 from typing import Tuple, List, Dict, Any, Optional
 import logging
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -135,21 +136,32 @@ class BaseDnsProvider(ABC):
     
     @abstractmethod
     def delete_txt_record(
-        self, 
-        domain: str, 
-        record_name: str
+        self,
+        domain: str,
+        record_name: str,
+        record_value: str,
     ) -> Tuple[bool, str]:
         """
-        Delete a TXT record after ACME validation.
-        
-        Args:
-            domain: The base domain
-            record_name: Full record name to delete
-        
+        Delete the TXT record of `record_name` that holds `record_value`, and only it.
+
+        A wildcard and its apex, or two orders for one domain, share the name: the
+        other values under it belong to challenges that may still be validating.
+
         Returns:
-            Tuple of (success: bool, message: str)
+            Tuple of (success: bool, message: str); a value already gone is a success.
         """
         pass
+
+    @staticmethod
+    def txt_matches(stored, expected) -> bool:
+        """Whether a TXT value as an API returns it (quoted, split in strings) is `expected`."""
+        if stored is None or expected is None:
+            return False
+        text = str(stored).strip()
+        if len(text) >= 2 and text.startswith('"') and text.endswith('"'):
+            chunks = re.findall(r'"((?:[^"\\]|\\.)*)"', text)
+            text = ''.join(c.replace('\\"', '"').replace('\\\\', '\\') for c in chunks)
+        return text == str(expected).strip()
     
     @abstractmethod
     def test_connection(self) -> Tuple[bool, str]:

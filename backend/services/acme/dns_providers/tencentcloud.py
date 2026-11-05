@@ -173,7 +173,7 @@ class TencentCloudDnsProvider(BaseDnsProvider):
         logger.info(f"TencentCloud: Created TXT record {record_name} (ID: {record_id})")
         return True, f"Record created successfully (ID: {record_id})"
 
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         zone = self._get_zone(domain)
         if not zone:
             return False, f"Could not find zone for domain {domain}"
@@ -193,7 +193,8 @@ class TencentCloudDnsProvider(BaseDnsProvider):
                 return True, "Record not found (already deleted?)"
             return False, f"Failed to list records: {result}"
 
-        records = result.get("RecordList", [])
+        records = [rec for rec in result.get("RecordList", [])
+                   if self.txt_matches(rec.get("Value"), record_value)]
         if not records:
             return True, "Record not found (already deleted?)"
 

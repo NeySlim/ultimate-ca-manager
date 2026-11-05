@@ -57,7 +57,7 @@ class BunnyDnsProvider(BaseDnsProvider):
             return False, f"Failed: {result}"
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         info = self._find_zone(domain)
         if not info:
             return False, f"Zone not found for {domain}"
@@ -68,7 +68,8 @@ class BunnyDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed: {result}"
         for rec in result.get('Records', []):
-            if rec.get('Type') == 5 and rec.get('Name') == relative:
+            if (rec.get('Type') == 5 and rec.get('Name') == relative
+                    and self.txt_matches(rec.get('Value'), record_value)):
                 self._request('DELETE', f'/dnszone/{zone_id}/records/{rec["Id"]}')
         return True, "Record deleted"
     

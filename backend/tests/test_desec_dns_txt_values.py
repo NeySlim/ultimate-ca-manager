@@ -125,17 +125,31 @@ def test_unreadable_rrset_is_not_overwritten(api):
     assert api.rrsets['_acme-challenge']['records'] == ['"other"']
 
 
-def test_cleanup_called_once_per_challenge_succeeds_twice(api):
+def test_cleanup_removes_only_its_value(api):
     provider = _provider()
-    for token in ('a', 'b'):
-        provider.create_txt_record('example.com', NAME, token)
+    api.rrsets['_acme-challenge'] = {'ttl': 3600, 'records': ['"a"', '"b"']}
+    ok, msg = provider.delete_txt_record('example.com', NAME, 'a')
+    assert ok, msg
+    assert ('PATCH', '/domains/example.com/rrsets/_acme-challenge/TXT/', {'records': ['"b"'], 'ttl': 3600}) in api.calls
+    assert api.rrsets['_acme-challenge'] == {'ttl': 3600, 'records': ['"b"']}
     for _ in range(2):
-        ok, msg = provider.delete_txt_record('example.com', NAME)
+        ok, msg = provider.delete_txt_record('example.com', NAME, 'b')
         assert ok, msg
     assert api.rrsets == {}
+    assert sum(c[0] == 'DELETE' for c in api.calls) == 1
+
+
+def test_cleanup_read_failure_changes_nothing(api):
+    api.rrsets['_acme-challenge'] = {'ttl': 3600, 'records': ['"a"', '"b"']}
+    api.get_status = 500
+    ok, msg = _provider().delete_txt_record('example.com', NAME, 'a')
+    assert not ok
+    assert not [c for c in api.calls if c[0] in ('PATCH', 'DELETE')]
+    assert api.rrsets['_acme-challenge']['records'] == ['"a"', '"b"']
 
 
 def test_delete_answered_404_without_text_is_a_success(api, monkeypatch):
+    api.rrsets['_acme-challenge'] = {'ttl': 3600, 'records': ['"a"']}
     real = api.__call__
 
     def gone(method, url, **kwargs):
@@ -144,13 +158,13 @@ def test_delete_answered_404_without_text_is_a_success(api, monkeypatch):
         return real(method, url, **kwargs)
 
     monkeypatch.setattr(requests, 'request', gone)
-    ok, msg = _provider().delete_txt_record('example.com', '_acme-challenge.example.com')
+    ok, msg = _provider().delete_txt_record('example.com', '_acme-challenge.example.com', 'a')
     assert ok, msg
 
 
 def test_apex_rrset_is_deleted_through_the_at_placeholder(api):
     api.rrsets['@'] = {'ttl': 3600, 'records': ['"x"']}
-    ok, msg = _provider().delete_txt_record('example.com', 'example.com')
+    ok, msg = _provider().delete_txt_record('example.com', 'example.com', 'x')
     assert ok, msg
     assert ('DELETE', '/domains/example.com/rrsets/@/TXT/', None) in api.calls
     assert api.rrsets == {}

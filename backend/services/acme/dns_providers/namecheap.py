@@ -71,7 +71,7 @@ class NamecheapDnsProvider(BaseDnsProvider):
             # Check for errors
             status = root.attrib.get('Status', '')
             if status.lower() == 'error':
-                errors = root.findall('.//Error')
+                errors = root.findall('.//{*}Error')
                 if errors:
                     error_msg = errors[0].text or 'Unknown error'
                     return False, error_msg
@@ -110,18 +110,20 @@ class NamecheapDnsProvider(BaseDnsProvider):
             return record_name[:-len(zone) - 1]
         return record_name
     
-    def _get_existing_records(self, sld: str, tld: str) -> List[Dict]:
-        """Get existing DNS records for a domain"""
+    def _get_existing_records(self, sld: str, tld: str) -> Optional[List[Dict]]:
+        """Get existing DNS records for a domain; None when they cannot be read."""
         success, result = self._make_request(
             'namecheap.domains.dns.getHosts',
             {'SLD': sld, 'TLD': tld}
         )
         
         if not success:
-            return []
+            logger.error(f"Namecheap: Failed to read hosts of {sld}.{tld}: {result}")
+            return None
         
         records = []
-        for host in result.findall('.//host'):
+        # Answers carry a default namespace: match the tag in any namespace
+        for host in result.findall('.//{*}host'):
             records.append({
                 'HostName': host.attrib.get('Name', ''),
                 'RecordType': host.attrib.get('Type', ''),
@@ -146,8 +148,10 @@ class NamecheapDnsProvider(BaseDnsProvider):
         # Get relative name, against the zone Namecheap is addressing
         host_name = self._relative_host(record_name, domain)
         
-        # Get existing records
+        # setHosts replaces the whole host list: never write it from a failed read
         existing_records = self._get_existing_records(sld, tld)
+        if existing_records is None:
+            return False, "Failed to read existing records"
         
         # Add new record
         existing_records.append({
@@ -175,7 +179,7 @@ class NamecheapDnsProvider(BaseDnsProvider):
         logger.info(f"Namecheap: Created TXT record {record_name}")
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via Namecheap API"""
         # Parse domain
         sld, tld = self._parse_domain(domain)
@@ -183,13 +187,16 @@ class NamecheapDnsProvider(BaseDnsProvider):
         # Get relative name, against the zone Namecheap is addressing
         host_name = self._relative_host(record_name, domain)
         
-        # Get existing records
+        # setHosts replaces the whole host list: never write it from a failed read
         existing_records = self._get_existing_records(sld, tld)
+        if existing_records is None:
+            return False, "Failed to read existing records"
         
-        # Filter out the TXT record to delete
+        # Drop only this value: other values of the name belong to other challenges
         filtered_records = [
             r for r in existing_records
-            if not (r['RecordType'] == 'TXT' and r['HostName'] == host_name)
+            if not (r['RecordType'] == 'TXT' and r['HostName'] == host_name
+                    and self.txt_matches(r['Address'], record_value))
         ]
         
         if len(filtered_records) == len(existing_records):
@@ -217,7 +224,7 @@ class NamecheapDnsProvider(BaseDnsProvider):
         """Test Namecheap API connection"""
         success, result = self._make_request('namecheap.domains.getList')
         if success:
-            domains = result.findall('.//Domain')
+            domains = result.findall('.//{*}Domain')
             domain_names = [d.attrib.get('Name', '') for d in domains]
             return True, f"Connected successfully. Found {len(domains)} domain(s): {', '.join(domain_names[:5])}"
         return False, f"Connection failed: {result}"

@@ -702,11 +702,15 @@ def _renew_with_new_order(acme_client, order, account_id, old_certificate, lease
             record_name = challenge_info.get(
                 'dns_txt_name', f"_acme-challenge.{strip_wildcard(domain)}"
             )
+            value = challenge_info.get('dns_txt_value')
+            if not value:
+                continue  # nothing was published under this name by this order
             try:
                 with txt_record_lock(record_name):
                     dns_provider.delete_txt_record(
                         domain=strip_wildcard(domain),
                         record_name=record_name,
+                        record_value=value,
                     )
             except Exception as exc:
                 logger.warning(

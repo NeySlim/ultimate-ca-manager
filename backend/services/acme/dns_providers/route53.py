@@ -137,7 +137,7 @@ class Route53DnsProvider(BaseDnsProvider):
             logger.error(f"Route53 create record failed: {self._failure(e)}")
             return False, self._failure(e)
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via Route53"""
         zone = self._get_zone(domain)
         if not zone:
@@ -167,15 +167,20 @@ class Route53DnsProvider(BaseDnsProvider):
             if 'AliasTarget' in txt_record or 'SetIdentifier' in txt_record:
                 return False, f"{record_name} is an alias or routing-policy TXT record; not deleting it"
             
-            # Delete the record
+            # Other values belong to other challenges: UPSERT them back, DELETE (exact set) only when none remain
+            values = txt_record.get('ResourceRecords', [])
+            remaining = [r for r in values if not self.txt_matches(r.get('Value'), record_value)]
+            if len(remaining) == len(values):
+                return True, "Record not found (already deleted?)"
+            if remaining:
+                change = {'Action': 'UPSERT', 'ResourceRecordSet': {**txt_record, 'ResourceRecords': remaining}}
+            else:
+                change = {'Action': 'DELETE', 'ResourceRecordSet': txt_record}
             client.change_resource_record_sets(
                 HostedZoneId=zone['Id'],
                 ChangeBatch={
                     'Comment': 'ACME cleanup',
-                    'Changes': [{
-                        'Action': 'DELETE',
-                        'ResourceRecordSet': txt_record
-                    }]
+                    'Changes': [change]
                 }
             )
             

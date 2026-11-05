@@ -51,7 +51,7 @@ class HostingerDnsProvider(BaseDnsProvider):
             return False, f"Failed to create record: {result}"
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         # Same zone resolution as the create path, so the record is looked
         # for where it was written.
         zone = self.get_zone_for_domain(domain) or domain
@@ -60,8 +60,11 @@ class HostingerDnsProvider(BaseDnsProvider):
             return False, f"Failed to list records: {records}"
         relative = self.get_relative_record_name(record_name, zone)
         for rec in (records or []):
-            if rec.get('type') == 'TXT' and rec.get('name') == relative:
-                self._request('DELETE', f'/dns/{zone}/records/{rec["id"]}')
+            if (rec.get('type') == 'TXT' and rec.get('name') == relative
+                    and self.txt_matches(rec.get('content'), record_value)):
+                success, result = self._request('DELETE', f'/dns/{zone}/records/{rec["id"]}')
+                if not success:
+                    return False, f"Failed to delete record: {result}"
         return True, "Record deleted successfully"
     
     def test_connection(self) -> Tuple[bool, str]:

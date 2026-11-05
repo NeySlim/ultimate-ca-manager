@@ -85,7 +85,7 @@ class RackspaceDnsProvider(BaseDnsProvider):
             return False, f"Failed to create record: {result}"
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         dom = self._find_domain(domain)
         if not dom:
             return False, f"Could not find domain {domain}"
@@ -93,7 +93,8 @@ class RackspaceDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed to list records: {result}"
         for rec in result.get('records', []):
-            self._request('DELETE', f'/domains/{dom["id"]}/records/{rec["id"]}')
+            if self.txt_matches(rec.get('data'), record_value):
+                self._request('DELETE', f'/domains/{dom["id"]}/records/{rec["id"]}')
         return True, "Record deleted successfully"
     
     def test_connection(self) -> Tuple[bool, str]:

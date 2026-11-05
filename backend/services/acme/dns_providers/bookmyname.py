@@ -107,21 +107,14 @@ class BookMyNameDnsProvider(BaseDnsProvider):
         else:
             return False, f"Failed to create record: {result}"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via BookMyName DynDNS API"""
-        # For deletion, we need the value - try with empty first
-        # BookMyName might require the exact value to delete
-        # We'll try a generic delete approach
-        
-        # Note: BookMyName requires the exact value to delete a TXT record
-        # This is a limitation - we'd need to store the value somewhere
-        # For ACME challenges, we can try to delete by record name
-        
+        # do=remove takes the exact value: other values of the name stay
         success, result = self._make_request(
             hostname=record_name,
             record_type='txt',
             action='remove',
-            value='*',  # Attempt wildcard removal
+            value=record_value,
             ttl=300
         )
         
@@ -129,7 +122,6 @@ class BookMyNameDnsProvider(BaseDnsProvider):
             logger.info(f"BookMyName: Deleted TXT record {record_name}")
             return True, "Record deleted successfully"
         else:
-            # If wildcard doesn't work, consider it already deleted
             if 'not found' in result.lower() or 'nohost' in result.lower():
                 return True, "Record not found (already deleted?)"
             return False, f"Failed to delete record: {result}"

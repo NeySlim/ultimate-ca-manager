@@ -1999,10 +1999,16 @@ class AcmeClientService:
             
             challenges = order.challenges_dict
             for domain, challenge in challenges.items():
+                value = challenge.get('dns_txt_value')
+                if not value:
+                    # Deleting by name alone would take other orders' values with it
+                    logger.warning("DNS cleanup skipped for %s: no TXT value recorded", challenge['dns_txt_name'])
+                    continue
                 with txt_record_lock(challenge['dns_txt_name']):
                     provider.delete_txt_record(
                         domain=strip_wildcard(domain),
-                        record_name=challenge['dns_txt_name']
+                        record_name=challenge['dns_txt_name'],
+                        record_value=value,
                     )
             
             return True, "DNS records cleaned up"

@@ -71,7 +71,7 @@ class ConstellixDnsProvider(BaseDnsProvider):
             return False, f"Failed to create record: {result}"
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         dom = self._find_domain(domain)
         if not dom:
             return False, f"Could not find domain {domain}"
@@ -79,9 +79,22 @@ class ConstellixDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed to list records: {result}"
         relative = self.get_relative_record_name(record_name, dom['name'])
+        # A record's roundRobin holds every value of the name: keep the others, delete it only when empty.
         for rec in result.get('data', []):
-            if rec.get('name') == relative:
-                self._request('DELETE', f'/domains/{dom["id"]}/records/txt/{rec["id"]}')
+            if rec.get('name') != relative:
+                continue
+            values = list(rec.get('roundRobin') or [])
+            remaining = [v for v in values if not self.txt_matches(v.get('value'), record_value)]
+            if len(remaining) == len(values):
+                continue
+            path = f'/domains/{dom["id"]}/records/txt/{rec["id"]}'
+            if remaining:
+                success, result = self._request(
+                    'PUT', path, {'name': relative, 'ttl': rec.get('ttl', 300), 'roundRobin': remaining})
+            else:
+                success, result = self._request('DELETE', path)
+            if not success:
+                return False, f"Failed to delete record: {result}"
         return True, "Record deleted successfully"
     
     def test_connection(self) -> Tuple[bool, str]:
