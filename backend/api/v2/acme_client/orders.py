@@ -611,6 +611,9 @@ def cancel_order(order_id):
             pass  # Best effort cleanup
 
     order_domains = ', '.join([d.get('value', '') for d in (order.identifiers_list if hasattr(order, 'identifiers_list') else [])]) or f'Order {order_id}'
+    # SQLite enforces no foreign key: the orders its renewals opened stop naming it here
+    AcmeClientOrder.query.filter_by(renewal_of_order_id=order.id).update(
+        {AcmeClientOrder.renewal_of_order_id: None}, synchronize_session=False)
     db.session.delete(order)
     ok, _err = safe_commit(logger, "Failed to cancel ACME order")
     if not ok:

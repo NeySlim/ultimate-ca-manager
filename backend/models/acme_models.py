@@ -438,10 +438,10 @@ class AcmeClientOrder(db.Model):
         Stored like ``Certificate.prv``, under the master key when it is enabled."""
         if not self._pending_key:
             return None
-        from utils.key_codec import MalformedKey, load_pem_bytes
+        from utils.key_codec import load_pem_bytes
         try:
             return load_pem_bytes(self._pending_key, context=f'ACME order {self.id}').decode()
-        except MalformedKey as exc:  # under another master key: the order holds no usable key
+        except ValueError as exc:  # under another master key, or damaged: no usable key
             logger.warning("Pending key of ACME order %s not readable: %s", self.id, exc)
             return None
 

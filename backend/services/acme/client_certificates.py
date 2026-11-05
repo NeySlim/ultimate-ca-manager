@@ -39,6 +39,24 @@ def load_leaf(cert_pem: str) -> x509.Certificate:
 KEY_MISMATCH = 'The certificate the CA issued does not match the key held for this order'
 
 
+def csr_key_refusal(row, csr_pem: str) -> Optional[str]:
+    """Why a renewal in place of ``row`` from ``csr_pem`` cannot keep the row's key, or None."""
+    from cryptography.hazmat.primitives import serialization
+    from utils.key_codec import load_pem_bytes
+    if not row.prv:
+        return None
+    spki = (serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    try:
+        held = serialization.load_pem_private_key(load_pem_bytes(row.prv, context=f'certificate {row.id}'), None)
+        asked = x509.load_pem_x509_csr(csr_pem.encode()).public_key()
+    except ValueError as exc:
+        return f'The key of certificate {row.id} or the CSR of this order cannot be read: {exc}'
+    if held.public_key().public_bytes(*spki) != asked.public_bytes(*spki):
+        return (f'The CSR of this order carries another key than certificate {row.id}: give the order '
+                'a CSR made with that key, or renew it with a generated or reused key')
+    return None
+
+
 def check_key(leaf: x509.Certificate, key_pem: Optional[str]) -> None:
     """ValueError when the key held for the order is not the certificate's."""
     if key_pem is None:

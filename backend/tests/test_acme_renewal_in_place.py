@@ -740,3 +740,110 @@ def test_a_revoked_row_renewed_into_a_new_one_is_not_revoked_again(bench, revoke
     local.assert_not_called()
     assert 'Failed to revoke' not in caplog.text
     assert bench.row().revoke_reason == 'keyCompromise'
+
+
+# ---- second review ----------------------------------------------------------------------------
+
+def _foreign_pending_key():
+    """A pending key as another installation's master key wrote it."""
+    from cryptography.fernet import Fernet
+    from security.encryption import ENCRYPTED_MARKER
+    pem = key_pem(ec.generate_private_key(ec.SECP256R1())).encode()
+    return base64.b64encode(ENCRYPTED_MARKER + Fernet(Fernet.generate_key()).encrypt(base64.b64encode(pem))).decode()
+
+
+def test_a_pending_key_under_another_master_key_is_no_key(app, auth_client, bench, encryption_enabled):
+    order = bench.child(status='processing')
+    order._pending_key = _foreign_pending_key()
+    db.session.commit()
+    assert db.session.get(AcmeClientOrder, order.id).pending_key is None
+    bench.ca.orders[order.order_url].update(status='valid', pem=bench.ca.issue(bench.key.public_key(), [bench.name]))
+    with patch('services.acme.acme_client_service.AcmeClientService.for_order', return_value=bench.client):
+        answer = auth_client.get(f'/api/v2/acme/client/orders/{order.id}/status')
+    assert answer.status_code == 200
+
+
+def test_a_kept_order_whose_key_cannot_be_read_is_replaced(bench, encryption_enabled):
+    kept = bench.child(status='valid', renewal_enabled=False, renewal_of_order_id=bench.parent_id)
+    kept._pending_key = _foreign_pending_key()
+    db.session.commit()
+    bench.ca.orders[kept.order_url].update(pem=bench.ca.issue(bench.key.public_key(), [bench.name]))
+    ok, _message = bench.renew()
+    assert ok and db.session.get(AcmeClientOrder, kept.id) is None
+    bench.client.create_order.assert_called_once()
+
+
+def test_deleting_an_order_leaves_no_dangling_renewal_link(app, auth_client, bench):
+    from services.database_admin.verify import check_declared_foreign_keys
+    kept = bench.child(status='processing', renewal_enabled=False, renewal_of_order_id=bench.parent_id)
+    with patch('services.acme.acme_client_service.AcmeClientService.for_order', return_value=bench.client):
+        answer = auth_client.delete(f'/api/v2/acme/client/orders/{bench.parent_id}')
+    assert answer.status_code == 200
+    db.session.expire_all()
+    assert db.session.get(AcmeClientOrder, kept.id).renewal_of_order_id is None
+    # What the SQLite to PostgreSQL migration checks first
+    assert check_declared_foreign_keys(db.engine)['orphans'] == 0
+
+
+def test_a_kept_order_under_another_account_is_dropped_not_resumed(bench, caplog):
+    from models import AcmeClientAccount
+    account = AcmeClientAccount(directory_url=f'https://{uuid.uuid4().hex[:8]}.example/directory',
+                                label='other', email='ops@example.com', account_key='k')
+    db.session.add(account)
+    db.session.commit()
+    try:
+        kept = bench.child(status='valid', renewal_enabled=False, renewal_of_order_id=bench.parent_id,
+                           acme_client_account_id=account.id)
+        kept.pending_key = key_pem(bench.key)
+        db.session.commit()
+        bench.ca.orders[kept.order_url].update(pem=bench.ca.issue(bench.key.public_key(), [bench.name]))
+        with caplog.at_level('WARNING', logger=renew_mod.logger.name):
+            ok, _message = bench.renew()
+        assert ok and db.session.get(AcmeClientOrder, kept.id) is None
+        bench.client.create_order.assert_called_once()
+        assert 'another CA account' in caplog.text
+    finally:
+        db.session.rollback()
+        AcmeClientOrder.query.filter_by(acme_client_account_id=account.id).delete(synchronize_session=False)
+        db.session.delete(db.session.get(AcmeClientAccount, account.id))
+        db.session.commit()
+
+
+def test_a_csr_for_another_key_than_the_certificate_blocks_before_the_ca(bench):
+    parent = bench.parent()
+    parent.key_source = 'csr'
+    parent.csr_pem = _csr_for(ec.generate_private_key(ec.SECP256R1()), bench.name).public_bytes(
+        serialization.Encoding.PEM).decode()
+    db.session.commit()
+    with pytest.raises(renew_mod.RenewalBlocked, match='CSR made with that key'):
+        bench.renew()
+    bench.client.create_order.assert_not_called()
+    assert bench.row().serial_number == bench.old_serial
+
+
+def test_a_csr_for_the_certificate_key_renews_in_place(bench):
+    parent = bench.parent()
+    parent.key_source = 'csr'
+    parent.csr_pem = _csr_for(bench.key, bench.name).public_bytes(serialization.Encoding.PEM).decode()
+    db.session.commit()
+    ok, _message = bench.renew()
+    row = bench.row()
+    assert ok and row.serial_number != bench.old_serial and _pub(_stored_key(row)) == _pub(bench.key)
+
+
+def test_a_pending_http01_order_of_another_renewal_is_not_reused(bench):
+    other, _cert = bench.second_parent()
+    challenge = {bench.name: {'token': 't', 'key_authorization': 't.k'}}
+    mine = AcmeClientOrder(domains=names_json([bench.name]), environment='production', challenge_type='http-01',
+                           status='pending', order_url=f'{bench.ca.base}/order/h-{uuid.uuid4().hex[:6]}',
+                           created_at=utc_now() - timedelta(minutes=1))
+    theirs = AcmeClientOrder(domains=names_json([bench.name]), environment='production', challenge_type='http-01',
+                             status='pending', order_url=f'{bench.ca.base}/order/h-{uuid.uuid4().hex[:6]}',
+                             renewal_of_order_id=other.id)
+    for row in (mine, theirs):
+        row.set_challenges_dict(challenge)
+        db.session.add(row)
+    db.session.commit()
+    bench.extra_orders += [mine.id, theirs.id]
+    # Newest first: the other order's renewal is skipped, the unlinked one is taken
+    assert renew_mod._pending_http01_order(bench.parent(), None).id == mine.id

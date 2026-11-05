@@ -49,6 +49,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: the upgrade removes each order a past renewal left behind, recognised by holding the certificate and order URL of an older order. It also puts orders back on the renewal schedule if a status check had taken them off, so a certificate you had stopped relying on can renew: delete its order if you do not want that.
 - ACME client: two orders for the same names that have already renewed apart cannot be told from two wanted orders, so both keep renewing: delete the one you do not want.
 - ACME client: a renewal now keeps the certificate's id and refid, and `/renew` and the renewal logs no longer announce a new certificate id. Certificates that past renewals imported as new rows stay in the inventory: archive or delete them by hand.
+- ACME client: a backup carries neither the pending key nor the renewal link of an order being renewed, so after a restore that order is not resumed and its next renewal opens a new order at the CA.
 - Templates: the API and import accept only true or false for `is_active`, `enforce_san_types`, `ad_derived_subject` and `autoenroll_enabled`; 0 and 1 are refused.
 - Public endpoints: certificates issued before this update keep a `:0` in their CRL, OCSP and AIA URLs: reissue them.
 - SSH: the option is off for every CA, existing ones included. A client that sends `key_id` gets a 400 until the option is ticked on its CA; sending the CA's own `principals@CA name` is still accepted.

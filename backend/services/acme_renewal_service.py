@@ -8,12 +8,15 @@ import logging
 from datetime import timedelta
 from types import SimpleNamespace
 
+from sqlalchemy import or_
+
 from models import CA, Certificate, DnsProvider, RevokedSerial, SystemConfig, db
 from models.acme_models import AcmeClientOrder
 from services.acme import dns_providers
 from services.acme.acme_client_service import AcmeClientService
 from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challenges
 from services.acme.http01 import wait_for_http01
+from services.acme import client_certificates
 from services.acme.client_certificates import KEY_MISMATCH
 from services.acme.order_lease import BUSY, LEASE_LOST, OrderLease, RenewalInProgress
 from services.audit.staging import stage_audit_entry
@@ -102,6 +105,8 @@ def _pending_http01_order(order, account_id):
         AcmeClientOrder.status == 'pending',
         AcmeClientOrder.acme_client_account_id == account_id,
         AcmeClientOrder.environment == order.environment,
+        # Never the order another order's renewal opened
+        or_(AcmeClientOrder.renewal_of_order_id.is_(None), AcmeClientOrder.renewal_of_order_id == order.id),
     ).order_by(AcmeClientOrder.created_at.desc()).all()
     for candidate in candidates:
         if candidate.is_proxy_order or (candidate.expires_at and candidate.expires_at <= now):
@@ -305,6 +310,12 @@ def _renew(order, lease) -> tuple:
     )
     # Read before the renewal writes the new certificate into the same row
     replaced = _replaced_snapshot(old_certificate)
+    if (order.key_source == 'csr' and order.csr_pem and old_certificate is not None
+            and old_certificate.crt and not old_certificate.revoked):
+        # Refused before the CA is asked: each attempt would cost a certificate
+        refusal = client_certificates.csr_key_refusal(old_certificate, order.csr_pem)
+        if refusal:
+            raise RenewalBlocked(refusal)
 
     # Initialize ACME client for the same CA that issued the original order
     acme_client = AcmeClientService.for_order(order)
@@ -333,13 +344,18 @@ _RESUMABLE = ('validating', 'ready', 'processing', 'valid', 'error')
 
 
 def _kept_renewal_order(order, account_id):
-    """The newest order whose ``renewal_of_order_id`` names ``order``, opened under this
-    account and still resumable, or None."""
-    return AcmeClientOrder.query.filter(
+    """The newest resumable order whose ``renewal_of_order_id`` names ``order``, or None.
+    Those opened under another account than ``account_id`` cannot be finished: removed."""
+    linked = AcmeClientOrder.query.filter(
         AcmeClientOrder.renewal_of_order_id == order.id,
         AcmeClientOrder.status.in_(_RESUMABLE),
-        AcmeClientOrder.acme_client_account_id == account_id,
-    ).order_by(AcmeClientOrder.id.desc()).first()
+    ).order_by(AcmeClientOrder.id.desc()).all()
+    usable = next((c for c in linked if c.acme_client_account_id == account_id), None)
+    for other in [c for c in linked if c.acme_client_account_id != account_id]:
+        logger.warning("Renewal of order %s drops order %s: it was opened under another CA account",
+                       order.id, other.id)
+        _drop_kept_order(other)
+    return usable
 
 
 def renewal_parent(order):
@@ -430,6 +446,8 @@ def _renew_with_new_order(acme_client, order, account_id, old_certificate, lease
     reused_order = new_order is not None  # maybe the operator's own: never removed here
     if reused_order:
         logger.info("Renewal of order %s reuses pending order %s", order.id, new_order.id)
+        if new_order.renewal_of_order_id is None:
+            new_order.renewal_of_order_id = order.id
     else:
         success, message, new_order = acme_client.create_order(
             domains=domains,
