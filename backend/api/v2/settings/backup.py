@@ -13,6 +13,7 @@ from fips_mode import FipsRestricted
 from services.backup.decrypt_mixin import BackupDecryptionError
 from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.restore.plan import RestoreValidationError
+from services.backup.restore_report import restore_audit_details
 from services.backup.restore_completion import (
     record_restore, request_restart, restore_message)
 from services.database_admin.lock import (
@@ -90,7 +91,8 @@ def create_backup():
         return error_response(str(e), 400)
 
     try:
-        backup_bytes = BackupService().create_backup(password, kdf=kdf)
+        service = BackupService()
+        backup_bytes = service.create_backup(password, kdf=kdf)
         _filepath, filename = storage.create_archive(backup_bytes)
     except BackupPasswordError as e:
         return error_response(str(e), 400)
@@ -123,15 +125,20 @@ def create_backup():
         'download_url': f'/api/v2/settings/backup/{filename}/download',
     }
 
+    warning = storage.restore_limit_warning(len(backup_bytes), service.last_payload_size,
+                                            service.last_payload_containers)
+    if warning:
+        response_data['restore_limit_warning'] = warning
+
     # Include generated password in response so user can save it
     if generated_password:
         response_data['password'] = password
         response_data['password_generated'] = True
 
-    return success_response(
-        data=response_data,
-        message='Backup created successfully' + (' - SAVE THE PASSWORD!' if generated_password else '')
-    )
+    message = 'Backup created successfully' + (' - SAVE THE PASSWORD!' if generated_password else '')
+    if warning:
+        message += (' ' if message.endswith('!') else '. ') + warning
+    return success_response(data=response_data, message=message)
 
 
 @bp.route('/api/v2/settings/backup/restore', methods=['POST'])
@@ -146,6 +153,9 @@ def restore_backup():
     takes a `mode` for the rare case of merging an archive into a live
     instance; this one always replaces.
     """
+    limit = storage.restore_upload_limit()
+    # Before anything reads the body: this route's ceiling, not the global one
+    request.max_content_length = limit + storage.RESTORE_FORM_MARGIN
     if 'file' not in request.files:
         return error_response('No backup file provided', 400)
 
@@ -177,7 +187,7 @@ def restore_backup():
         # did on every failed attempt.
         try:
             backup_bytes, _ = validate_upload(
-                file, BACKUP_EXTENSIONS, max_size=100 * 1024 * 1024
+                file, BACKUP_EXTENSIONS, max_size=limit
             )
         except ValueError as exc:
             logger.warning(f"Backup upload validation error: {exc}")
@@ -216,9 +226,7 @@ def restore_backup():
             action='system_restore',
             resource_type='system',
             resource_name=file.filename,
-            details=(f'Restored from backup: {file.filename}' if _carried else
-                     f'Backup carried no data section, nothing was restored: '
-                     f'{file.filename}'),
+            details=restore_audit_details(file.filename, results),
             success=True
         )
 

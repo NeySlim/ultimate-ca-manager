@@ -28,6 +28,7 @@ import hashlib
 import io
 import json
 import struct
+from contextlib import contextmanager
 
 import pytest
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
@@ -332,6 +333,20 @@ SHAPES = {
 }
 
 
+@contextmanager
+def _target_for(app, tmp_path, mode):
+    """A replacing restore prunes: it runs on an installation no other test wrote to."""
+    if mode != 'replace':
+        with app.app_context():
+            yield
+        return
+    from tests.test_backup_cross_installation import Keys, _installation
+    with _installation(app, f"sqlite:///{tmp_path / 'hostile.db'}", Keys(tmp_path, 'hostile')), \
+            app.app_context():
+        yield
+        db.session.rollback()
+
+
 class TestASectionOfTheWrongTypeIsRefusedByName:
     """A payload is JSON a caller chose: every section is checked, not trusted.
 
@@ -342,15 +357,16 @@ class TestASectionOfTheWrongTypeIsRefusedByName:
     first write, and the refusal names the section it is about.
     """
 
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
     @pytest.mark.parametrize('label', sorted(SHAPES))
-    def test_the_service_names_the_section(self, app, label):
+    def test_the_service_names_the_section(self, app, tmp_path, label, mode):
         mutate, named = SHAPES[label]
-        with app.app_context():
+        with _target_for(app, tmp_path, mode):
             blob = _forged([SECTION], mutate=mutate)
             before = _census()
 
             with pytest.raises(RestoreValidationError) as refusal:
-                _service().restore_backup(blob, PASSWORD)
+                _service().restore_backup(blob, PASSWORD, mode=mode)
             db.session.rollback()
 
             assert named in str(refusal.value), (

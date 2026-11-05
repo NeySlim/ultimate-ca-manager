@@ -126,8 +126,8 @@ class RestorePoliciesMixin:
                     dns_provider_id=plan.resolve('acme_domains', ad_data,
                                                  'dns_provider_id'))
                 db.session.add(domain)
-            apply_columns(domain, 'acme_domains', ad_data, plan)
-            results['acme_domains'] += 1
+            if apply_columns(domain, 'acme_domains', ad_data, plan):
+                results['acme_domains'] += 1
 
     def _restore_acme_local_domains(self, backup_data: Dict, results: Dict,
                                     plan: Optional[RestorePlan] = None) -> None:
@@ -161,5 +161,5 @@ class RestorePoliciesMixin:
                     domain=ld_data['domain'],
                     issuing_ca_id=ld_data.get('issuing_ca_id'))
                 db.session.add(domain)
-            apply_columns(domain, 'acme_local_domains', ld_data, plan)
-            results['acme_local_domains'] += 1
+            if apply_columns(domain, 'acme_local_domains', ld_data, plan):
+                results['acme_local_domains'] += 1

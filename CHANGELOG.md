@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Security
+
+- Key recovery: a request named its certificate by number, and SQLite gives a deleted certificate's number to the next one created, so an approved request could export another certificate's private key, after a replacing restore in particular. Approval and recovery now answer 410 unless the number still names the certificate the request was opened on, and a replacing restore cancels the open requests on the certificates it removes.
+
 ### Fixed
 
 - Docker: the images lacked pyspnego's Kerberos backend, which the DEB and RPM installs can add, so the Kerberos binding of Windows autoenrollment could not work in a container. Both images now ship it, at the pyspnego version the requirements resolve (#435, thanks @JPromi).
@@ -19,6 +23,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: a manual and a scheduled renewal of one order could run at once and obtain two certificates. Each renewal or finalization now holds a lease on its order, which a stopped process leaves for 10 minutes: a second one gets a 409, and the scheduler skips the order.
 - ACME client: after 5 failed scheduled renewals an order was never renewed again, silently. It is now retried once a day, each failure emits the `acme_order.renewal_failed` webhook event, the order list shows the failure count and last error, and the scheduler task reports a warning.
 - ACME client: an order whose CA account had been deleted renewed under another account, possibly at another CA. The renewal and the order's other actions now stop with a message saying what to do, and deleting or deactivating an account is refused (409) while issued orders renew through it; each order's automatic renewal can now be turned off from the order list (`PATCH /api/v2/acme/client/orders/<id>`).
+- Restore: a membership, deployment binding, CRL binding, template pin or role permission was matched by the source's row numbers first, and could overwrite another row here. Rows are now matched by what they name; an archive records the database it comes from, and its numbers count only there and only when they still name the same rows.
+- Restore: a replacing restore failed on PostgreSQL as soon as a CRL, a cached OCSP response, a session or an ACME client order pointed at a row it removed, and left such rows pointing at nothing on SQLite. Both engines now clear regenerable rows and queues, detach or drop history as deleting the row does, empty the optional links the schema does not enforce, and refuse any other link with the row named.
+- Restore: a replacing restore wrote the archive before removing what it does not carry, so a SCEP slug or a name still held by a removed row failed with a bare 500. Removals now come first, a homonym replacing the row here keeps its name unless a kept row still points at that row, in which case it is restored as `name (2)`, and a remaining database conflict names the table and the row.
+- Restore: an archive over 50 MB was refused with a 413 although it had been created without a word. The restore upload now accepts and reads up to `BACKUP_MAX_UPLOAD_MB` (512 by default), refusals name the setting, and creating an archive a restore would not read warns.
+- Restore: an archive older than 2.230 holding an API key or an ACME domain was refused whole, its nested group members went to whichever account held the source's number, and its nested WebAuthn keys were ignored. A row whose required link is a bare number, nested members included, is now left out and listed, and the WebAuthn keys come back.
+- Restore: a hybrid certificate pair came back with the source's number for its partner, which on another installation named another certificate or none. The partner, and a SCEP request's profile, are now found by name; for any link an older archive carries as a bare number, a row here keeps its own link unless the archive records none or the restore removes the target, and a new row is restored without it, with a warning in the result.
+- Restore: an HSM field an older archive holds under another installation's key was dropped with a log line that did not name the provider. The log and the restore result now name the provider and the field.
 
 ### Upgrade notes
 
@@ -26,6 +37,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: a renewal now keeps the certificate's id and refid, and `/renew` and the renewal logs no longer announce a new certificate id. Certificates that past renewals imported as new rows stay in the inventory: archive or delete them by hand.
 - ACME client: a backup carries neither the pending key nor the renewal link of an order being renewed, so after a restore that order is not resumed and its next renewal opens a new order at the CA.
 - ACME client: orders stopped by the old limit of 5 failed renewals resume at one attempt a day, and orders with no failure count recorded, which were skipped, are renewed again. Turn off the automatic renewal of an order you no longer want renewed, or delete it.
+- Restore: a replacing restore now removes the CRLs, cached OCSP responses, sessions, in-flight ACME server orders, approval requests, Microsoft CA requests, SAML replay entries and webhook or deployment deliveries (history included) that point at a removed row, detaches ACME client orders, SCEP requests, discovery results and revocation records from it, and cancels the key recovery requests still open on a removed certificate. The restore message and its audit entry list them.
+- Restore: `BACKUP_MAX_UPLOAD_MB` (default 512) is the restore upload's own ceiling, the decompressed content may be four times that, and the archive may hold one JSON object per 100 bytes of it; a reverse proxy in front of UCM keeps its own body limit. A restore holds the archive in memory, with a peak of several times its size.
 
 ## [2.249] - 2026-11-05
 

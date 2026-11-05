@@ -52,7 +52,7 @@ class TestAnErrorAtAnyPhaseChangesNothing:
         with app.app_context():
             monkeypatch.setattr(
                 rbac.RestoreRbacMixin, '_restore_groups',
-                lambda self, data, results: (_ for _ in ()).throw(
+                lambda self, data, results, *rest: (_ for _ in ()).throw(
                     RuntimeError('the section could not be applied')))
 
             with pytest.raises(RuntimeError):
@@ -77,13 +77,15 @@ class TestAnErrorAtAnyPhaseChangesNothing:
             db.session.rollback()
             assert _names() == before
 
+    @pytest.mark.parametrize('phase', ['remove_before_writes', 'remove_after_writes'])
     def test_a_failure_while_removing_what_the_archive_omits(
-            self, app, archive_of_one_group, monkeypatch):
+            self, app, archive_of_one_group, monkeypatch, phase):
+        """Before the writes, or after them with the archive's rows already written."""
         blob, before = archive_of_one_group
         import services.backup.restore_core as core
         with app.app_context():
             monkeypatch.setattr(
-                core, 'replace_sections',
+                core, phase,
                 lambda *args, **kwargs: (_ for _ in ()).throw(
                     RuntimeError('the replacement could not be carried out')))
 

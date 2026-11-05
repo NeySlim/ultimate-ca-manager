@@ -107,7 +107,8 @@ SECTIONS: Dict[str, Section] = {
         model='models:Certificate',
         identity=('refid',),
         exclude={**_SURROGATE},
-        references={'template_id': 'certificate_templates', 'owner_group_id': 'groups'},
+        references={'template_id': 'certificate_templates', 'owner_group_id': 'groups',
+                    'related_certificate_id': 'certificates'},
         custom=True,
         handled={'crt': 'certificate_pem', 'prv': 'private_key_pem_encrypted',
                  'csr': 'csr_pem'},
@@ -458,6 +459,7 @@ SECTIONS: Dict[str, Section] = {
         model='models.scep:SCEPRequest',
         identity=('transaction_id',),
         exclude={**_SURROGATE},
+        references={'profile_id': 'scep_profiles'},
         optional=True,
     ),
     'key_recovery_requests': Section(

@@ -94,6 +94,18 @@ def get_system_fqdn():
     return None
 
 
+def backup_max_upload_mb() -> int:
+    """`BACKUP_MAX_UPLOAD_MB`, at least 1; a value that is not a number falls back to 512."""
+    raw = os.getenv("BACKUP_MAX_UPLOAD_MB", "512")
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        import logging
+        logging.getLogger(__name__).warning(
+            "BACKUP_MAX_UPLOAD_MB=%r is not a whole number of MB: using 512", raw)
+        return 512
+
+
 class Config:
     """Base configuration - values can be overridden by database settings"""
     
@@ -143,6 +155,8 @@ class Config:
     
     # File Upload Limits (security)
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max (base64 inflates ~33%)
+    # The restore routes alone accept an archive up to this size, in MiB
+    BACKUP_MAX_UPLOAD_MB = backup_max_upload_mb()
     
     # Database
     # Supports SQLite (default) or PostgreSQL for high availability

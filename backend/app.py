@@ -1119,6 +1119,11 @@ def create_app(config_name=None):
     @app.errorhandler(413)
     def handle_413(e):
         if request.path.startswith('/api/'):
+            from services.backup.storage import RESTORE_FORM_MARGIN, restore_upload_limit
+            if request.max_content_length == restore_upload_limit() + RESTORE_FORM_MARGIN:
+                return _json_error(413, 'Backup archive too large: a restore accepts up to '
+                                        f'{restore_upload_limit() // (1024 * 1024)} MB '
+                                        '(BACKUP_MAX_UPLOAD_MB)')
             return _json_error(413, 'Request too large')
         return e
     

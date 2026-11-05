@@ -469,6 +469,7 @@ def _seed_source():
         keys[refid], issued[refid] = key, certificate
     leaves[1].template_id = templates[1].id
     leaves[1].owner_group_id = groups[1].id
+    leaves[0].related_certificate_id = leaves[1].id     # a hybrid pair
     db.session.flush()
 
     # -- the rows that point at them ---------------------------------------
@@ -602,6 +603,8 @@ def _seed_source():
                ca_refid='xinst-ca-b', template_id=templates[1].id,
                intune_enabled=True, intune_app_id=intune.id)
     secret(scep, 'scep_profiles', 'challenge_password')
+    add('scep_requests', transaction_id='xinst-scep-tx', ca_refid='xinst-ca-b', csr='x',
+        profile_id=scep.id)
 
     deploy_targets = [add('deploy_targets', name=f'xinst-deploy-{suffix}',
                           host=f'deploy-{suffix}.example.test', username='ucm',
@@ -720,7 +723,7 @@ RESTORABLE_SECTIONS = tuple(
         'acme_domains', 'acme_local_domains', 'acme_client_accounts',
         'acme_client_orders', 'acme_dns_update_keys',
         'ssh_cas', 'ssh_certificates', 'microsoft_cas', 'msca_requests',
-        'scep_profiles', 'deploy_targets', 'scan_profiles', 'scan_runs',
+        'scep_profiles', 'scep_requests', 'deploy_targets', 'scan_profiles', 'scan_runs',
         'intune_apps',
         'discovered_certificates', 'smtp_config', 'ad_connector',
         'webhook_endpoints',
@@ -1038,6 +1041,20 @@ class TestEveryReferenceLandsOnTheRowTheArchiveNames:
     def test_on_postgresql(self, app, restored_on_postgresql):
         with restored_on_postgresql.open(app):
             _assert_every_reference_landed(restored_on_postgresql)
+
+    def test_a_hybrid_partner_is_the_certificate_the_archive_paired(self, app, restored_on_sqlite):
+        """Checked by name: an undeclared link is not one the loop above looks at."""
+        from models import Certificate
+        with restored_on_sqlite.open(app):
+            restored = Certificate.query.filter_by(refid='xinst-cert-a').one()
+            partner = db.session.get(Certificate, restored.related_certificate_id)
+            assert partner is not None and partner.refid == 'xinst-cert-b'
+
+    def test_a_scep_request_names_the_profile_the_archive_names(self, app, restored_on_sqlite):
+        from models.scep import ScepProfile, SCEPRequest
+        with restored_on_sqlite.open(app):
+            request = SCEPRequest.query.filter_by(transaction_id='xinst-scep-tx').one()
+            assert db.session.get(ScepProfile, request.profile_id).name == 'xinst-scep'
 
     def test_a_binding_pinned_to_a_cross_certificate_follows_it_on_sqlite(
             self, app, restored_on_sqlite):

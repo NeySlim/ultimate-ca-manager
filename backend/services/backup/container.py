@@ -38,16 +38,14 @@ GCM_TAG_SIZE = 16
 
 # Resource ceilings. They bound what a container can ask of this process
 # before anything it contains has been authenticated.
-MAX_CONTAINER_BYTES = 200 * 1024 * 1024
 MAX_HEADER_METADATA_BYTES = 4096
-MAX_PLAINTEXT_BYTES = 512 * 1024 * 1024
+# The decompressed payload may be this many times the accepted archive size.
+PLAINTEXT_PER_ARCHIVE_BYTE = 4
 MAX_COMPRESSION_RATIO = 100
 MAX_JSON_DEPTH = 64
-# Each parsed object costs a few hundred bytes of interpreter memory, so this
-# is a memory ceiling, not a size one: five million objects is roughly a
-# gigabyte of parsed structures, and well above the largest real archive
-# (an instance exporting its audit log is the case that grows here).
-MAX_JSON_CONTAINERS = 5_000_000
+# Each parsed object costs a few hundred bytes of interpreter memory: one per
+# this many bytes of accepted archive, about five million at the 512 MB default.
+ARCHIVE_BYTES_PER_JSON_CONTAINER = 100
 _INFLATE_CHUNK = 1024 * 1024
 
 # KDF profiles this reader accepts, with the exact shapes each version emits
@@ -103,6 +101,45 @@ def build_header(*, format_version: int, flags: int, kdf_id: int,
     )
 
 
+_MIB = 1024 * 1024
+
+
+def max_container_bytes() -> int:
+    """The largest archive read: what the restore routes accept (`BACKUP_MAX_UPLOAD_MB`)."""
+    from .storage import restore_upload_limit
+    return restore_upload_limit()
+
+
+def max_plaintext_bytes() -> int:
+    return PLAINTEXT_PER_ARCHIVE_BYTE * max_container_bytes()
+
+
+def max_json_containers() -> int:
+    return max(1, max_container_bytes() // ARCHIVE_BYTES_PER_JSON_CONTAINER)
+
+
+def count_containers(value: Any) -> int:
+    """Objects and arrays in a payload, as `json_loads_bounded` counts them."""
+    count, pending = 0, [value]
+    while pending:
+        item = pending.pop()
+        if isinstance(item, dict):
+            count += 1
+            pending.extend(item.values())
+        elif isinstance(item, (list, tuple)):
+            count += 1
+            pending.extend(item)
+    return count
+
+
+def refuse_oversized(container: bytes) -> None:
+    limit = max_container_bytes()
+    if len(container) > limit:
+        raise ContainerError(
+            f"Backup file is too large to read ({len(container) / _MIB:.1f} MB, more than "
+            f"the {limit / _MIB:.0f} MB BACKUP_MAX_UPLOAD_MB allows)")
+
+
 def parse_header(container: bytes) -> Tuple[Dict[str, Any], bytes, bytes]:
     """Validate the framing of a v2/v3 container.
 
@@ -110,8 +147,7 @@ def parse_header(container: bytes) -> Tuple[Dict[str, Any], bytes, bytes]:
     or decompressed here: this only decides whether the framing is one this
     reader knows, and whether its lengths are consistent with the file.
     """
-    if len(container) > MAX_CONTAINER_BYTES:
-        raise ContainerError("Backup file is too large to read")
+    refuse_oversized(container)
     if len(container) < HEADER_PREFIX_SIZE:
         raise ContainerError("Invalid backup file: truncated header")
     if container[:4] != MAGIC:
@@ -244,7 +280,8 @@ def decompress_bounded(plaintext: bytes) -> bytes:
     only ever written one, but a reader that stopped after the first would
     return a truncated payload rather than refuse it.
     """
-    limit = min(MAX_PLAINTEXT_BYTES, max(len(plaintext), 1) * MAX_COMPRESSION_RATIO)
+    ceiling = max_plaintext_bytes()
+    limit = min(ceiling, max(len(plaintext), 1) * MAX_COMPRESSION_RATIO)
     chunks = []
     produced = 0
     remaining = plaintext
@@ -258,8 +295,9 @@ def decompress_bounded(plaintext: bytes) -> bytes:
                 if produced > limit:
                     raise ContainerError(
                         "Refusing backup: its compressed payload expands beyond "
-                        "the accepted size"
-                    )
+                        + (f"{ceiling / _MIB:.0f} MB, {PLAINTEXT_PER_ARCHIVE_BYTE} times "
+                           "BACKUP_MAX_UPLOAD_MB" if limit == ceiling
+                           else "the accepted size"))
                 if chunk:
                     chunks.append(chunk)
                 consumed = len(remaining) - len(decompressor.unconsumed_tail)
@@ -299,6 +337,7 @@ def json_loads_bounded(payload: bytes) -> Any:
 
     depth = 0
     containers = 0
+    limit = max_json_containers()
     in_string = False
     escaped = False
     for char in text:
@@ -318,10 +357,10 @@ def json_loads_bounded(payload: bytes) -> Any:
             if depth > MAX_JSON_DEPTH:
                 raise ContainerError(
                     f"Refusing backup: its JSON nests deeper than {MAX_JSON_DEPTH} levels")
-            if containers > MAX_JSON_CONTAINERS:
+            if containers > limit:
                 raise ContainerError(
-                    "Refusing backup: its JSON holds more objects than this "
-                    "reader accepts")
+                    f"Refusing backup: its JSON holds more than {limit} objects, one per "
+                    f"{ARCHIVE_BYTES_PER_JSON_CONTAINER} bytes of BACKUP_MAX_UPLOAD_MB")
         elif char in '}]':
             depth -= 1
 

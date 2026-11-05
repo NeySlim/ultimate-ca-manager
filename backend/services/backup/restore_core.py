@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List
 
+from sqlalchemy.exc import IntegrityError
 from models import db, CA, Certificate
 from utils.datetime_utils import utc_now
 from compliance_profiles import is_valid as is_valid_profile
@@ -17,15 +18,17 @@ from models.acme_models import AcmeAccount
 from config.settings import Config
 from services.file_regen_service import mirror_private_key
 
+from . import installation
 from .errors import BackupSchemaError
 from .restore import RestorePlan, single_transaction
 from .restore.files import StagedFiles
 from .manifest import SECTIONS
 from .restore.apply import apply_columns, apply_section, relink_references
 from .restore.names import rename_clashing_rows
-from .restore.replace import replace_sections
+from .restore.conflict import conflict_from_integrity_error
+from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
 from .restore.settings import restore_encrypted_settings
-from .restore_rbac import upgrade_archived_permissions
+from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
 
 logger = logging.getLogger(__name__)
 
@@ -242,9 +245,17 @@ class RestoreCoreMixin:
         # discovered halfway through a restore.
         self._check_payload_schema(backup_data)
         upgrade_archived_permissions(backup_data)
+        if mode not in ('replace', 'merge'):
+            raise BackupSchemaError(
+                f"Unknown restore mode {mode!r}: use 'replace' (the archive "
+                "becomes the instance) or 'merge' (the archive is added to it)")
+        pruned = (self._sections_the_archive_replaces(backup_data)
+                  if mode == 'replace' else set())
         # Before the plan, which finds these rows again by name.
         ambiguous_references: List[str] = []
-        renamed = rename_clashing_rows(backup_data, ambiguous_references)
+        displaced: Dict[str, set] = {}
+        renamed = rename_clashing_rows(backup_data, ambiguous_references,
+                                       replacing=frozenset(pruned), displaced=displaced)
 
         # An archive of metadata alone restores nothing. Announcing it as a
         # success made the caller revoke every session and ask for a restart
@@ -314,19 +325,23 @@ class RestoreCoreMixin:
         plan = RestorePlan.build(backup_data)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
+        built_with = len(plan.warnings)
 
         # Files are written to a staging directory during the transaction and
         # published once it has committed, so the database and the files on
         # disk can never disagree about whether the restore happened.
-        if mode not in ('replace', 'merge'):
-            raise BackupSchemaError(
-                f"Unknown restore mode {mode!r}: use 'replace' (the archive "
-                "becomes the instance) or 'merge' (the archive is added to it)")
         results['mode'] = mode
 
         staged = StagedFiles()
         try:
             with single_transaction():
+                replacement = None
+                if mode == 'replace':
+                    # Removed before the writes, so what they free is free
+                    replacement = remove_before_writes(plan_replacement(
+                        backup_data, plan, pruned, displaced=displaced))
+                    plan.refresh()
+
                 self._apply_all(backup_data, results, master_key, plan, staged)
 
                 # Sections are applied in an order that cannot satisfy every
@@ -336,14 +351,25 @@ class RestoreCoreMixin:
                 results['relinked'] = relink_references(backup_data, plan)
                 results['chain_variant_fallbacks'] = list(plan.chain_variant_fallbacks)
 
-                if mode == 'replace':
-                    results['removed'] = self._remove_what_the_archive_omits(
-                        backup_data, plan)
+                if replacement is not None:
+                    results.update(remove_after_writes(replacement).report())
+                results['left_out'] = list(plan.left_out)
+                # What applying the rows had to warn about reaches the log and the result
+                for warning in dict.fromkeys(plan.warnings[built_with:]):
+                    logger.warning("Restore: %s", warning)
+                results['warnings'] = list(dict.fromkeys(plan.warnings))
+                results['dropped_secrets'] = list(plan.dropped_fields)
 
                 # Published inside the transaction, so a file that cannot be
                 # placed rolls the database back with it. The window that
                 # remains is the commit itself, and it is compensated below.
                 staged.publish()
+        except IntegrityError as exc:
+            staged.unpublish()
+            staged.discard()
+            conflict = conflict_from_integrity_error(exc)
+            logger.warning("Restore refused by the database: %s", conflict)
+            raise conflict from exc
         except Exception:
             # The commit is the last thing the block does: if it is what
             # failed, the files are already in place and describe a restore
@@ -394,7 +420,7 @@ class RestoreCoreMixin:
         return found
 
     @staticmethod
-    def _remove_what_the_archive_omits(backup_data, plan):
+    def _sections_the_archive_replaces(backup_data):
         """Make the restore a replacement, as the documentation says it is.
 
         Only the sections the archive claims to describe are pruned. An
@@ -420,7 +446,7 @@ class RestoreCoreMixin:
                 "Nothing has been changed."
             )
 
-        return replace_sections(backup_data, plan, sections)
+        return sections
 
     def _apply_all(self, backup_data, results, master_key, plan, staged):
         """Every write of a restore, inside the one transaction."""
@@ -441,7 +467,7 @@ class RestoreCoreMixin:
         self._regenerate_files(staged)
 
         # RBAC restores
-        self._restore_groups(backup_data, results)
+        self._restore_groups(backup_data, results, plan)
         self._restore_custom_roles(backup_data, results, plan)
         self._restore_templates(backup_data, results)
         # Settings came back before the templates: point the ACME profile
@@ -523,6 +549,11 @@ class RestoreCoreMixin:
             if not carried_hash:
                 existing.password_hash = previous_hash
             results['users'] += 1
+
+        db.session.flush()
+        nested = restore_nested_webauthn(backup_data, plan)
+        if nested:
+            results['webauthn_credentials'] = nested
 
     @staticmethod
     def _apply_ca_revocation(ca, ca_data: Dict) -> None:
@@ -748,7 +779,8 @@ class RestoreCoreMixin:
 
             # Every column of the section, references resolved through the
             # plan; the PEMs and the key are `handled` and set right after.
-            apply_columns(cert, 'certificates', cert_data, plan)
+            if not apply_columns(cert, 'certificates', cert_data, plan):
+                continue    # left out, and listed: nothing more is written for it
 
             cert.crt = (
                 base64.b64encode(cert_data['certificate_pem'].encode()).decode()
@@ -870,6 +902,8 @@ class RestoreCoreMixin:
             config_data = configuration.get('settings', {})
         from utils import admin_allowlist
         for key, value in config_data.items():
+            if key == installation.CONFIG_KEY:
+                continue    # this database's own, never the source's
             if key == admin_allowlist.CONFIG_KEY and admin_allowlist.restored_value_locks_out(value):
                 if admin_allowlist.disabled_by_env():
                     logger.warning(

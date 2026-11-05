@@ -10,6 +10,8 @@ from typing import Any, Dict, Iterable
 
 from models import SystemConfig, db
 
+from .. import installation
+
 logger = logging.getLogger(__name__)
 
 
@@ -23,8 +25,8 @@ def restore_encrypted_settings(configuration: Dict[str, Any],
     settings = configuration.get('settings') or {}
     restored = 0
     for key in keys or ():
-        if key not in settings:
-            continue
+        if key not in settings or key == installation.CONFIG_KEY:
+            continue    # the installation keeps its own identifier
         value = settings[key]
         if value is None:
             continue

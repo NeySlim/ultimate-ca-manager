@@ -360,8 +360,8 @@ class RestoreExtendedMixin:
                 )
                 db.session.add(sc)
 
-            apply_columns(sc, 'ssh_certificates', sc_data, plan)
-            results['ssh_certificates'] += 1
+            if apply_columns(sc, 'ssh_certificates', sc_data, plan):
+                results['ssh_certificates'] += 1
 
         db.session.flush()
 
@@ -508,8 +508,8 @@ class RestoreExtendedMixin:
                 )
                 db.session.add(hk)
 
-            apply_columns(hk, 'hsm_keys', k_data, plan)
-            results['hsm_keys'] += 1
+            if apply_columns(hk, 'hsm_keys', k_data, plan):
+                results['hsm_keys'] += 1
 
         db.session.flush()
 
@@ -563,9 +563,9 @@ class RestoreExtendedMixin:
                     requester_id=requester_id)
                 db.session.add(request)
 
-            apply_columns(request, 'approval_requests',
-                          dict(ar_data, created_at=created_at), plan)
-            results['approval_requests'] += 1
+            if apply_columns(request, 'approval_requests',
+                             dict(ar_data, created_at=created_at), plan):
+                results['approval_requests'] += 1
 
         db.session.flush()
 
@@ -605,8 +605,8 @@ class RestoreExtendedMixin:
             # carries no identity for the issued certificate, so there is
             # nothing to resolve it against and the archive's own number is
             # written, exactly as this restore has always written it.
-            apply_columns(order, 'acme_client_orders', o_data, plan)
-            results['acme_client_orders'] += 1
+            if apply_columns(order, 'acme_client_orders', o_data, plan):
+                results['acme_client_orders'] += 1
 
         db.session.flush()
 

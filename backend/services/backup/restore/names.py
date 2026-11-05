@@ -53,13 +53,18 @@ RULES = {
 
 
 def rename_clashing_rows(backup_data: Dict[str, Any],
-                         warnings: Optional[List[str]] = None) -> List[Dict[str, str]]:
+                         warnings: Optional[List[str]] = None, *,
+                         replacing: frozenset = frozenset(),
+                         displaced: Optional[Dict[str, set]] = None) -> List[Dict[str, str]]:
     """Rename, in the archive, the rows that would land on another row's name.
 
     References carried by identity follow the rename; an ambiguous one is added
-    to `warnings`. Returns one entry per row restored under another name.
+    to `warnings`. Returns one entry per row restored under another name. In a
+    section a replacing restore prunes (`replacing`), a row here that is not
+    the same thing gives its name up instead: its id lands in `displaced`.
     """
     warnings = warnings if warnings is not None else []
+    displaced = displaced if displaced is not None else {}
     renamed = []
     for section_name, rule in RULES.items():
         rows = backup_data.get(section_name)
@@ -70,7 +75,9 @@ def rename_clashing_rows(backup_data: Dict[str, Any],
         if not rows:
             continue
         before = [dict(row) for row in rows]
-        final, reasons = _place(section_name, rule, rows)
+        final, reasons, given_up = _place(section_name, rule, rows, replacing, backup_data)
+        if given_up:
+            displaced.setdefault(section_name, set()).update(given_up)
         for index, row in enumerate(rows):
             if final[index] != row[rule.column]:
                 renamed.append({'section': section_name, 'from': row[rule.column],
@@ -83,8 +90,9 @@ def rename_clashing_rows(backup_data: Dict[str, Any],
     return renamed
 
 
-def _place(section_name, rule, rows):
-    """The name each archived row is restored under, and why it changed."""
+def _place(section_name, rule, rows, pruned=frozenset(), backup_data=None):
+    """The name each archived row is restored under, why it changed, and the
+    rows here that give their name up to it."""
     model = load_model(SECTIONS[section_name])
     here = model.query.order_by(model.id).all()
     by_name: Dict[str, list] = {}
@@ -124,12 +132,24 @@ def _place(section_name, rule, rows):
                 reasons[index] = 'same row here under this name'
 
     # Anything else takes its own name if free, else the first free suffix.
+    # A replacing restore removes the rows here nothing claimed: their names are free.
     used = set(final.values())
     originals = {row[rule.column] for row in rows}
+    given_up = set()
     for index, row in enumerate(rows):
         if index in final:
             continue
         wanted = row[rule.column]
+        holders = [t for t in by_name.get(wanted, ()) if t.id not in claimed]
+        if (section_name in pruned and wanted not in used and holders
+                and len(holders) == len(by_name[wanted])
+                and not _required_by_kept_rows(model, {t.id for t in holders}, pruned,
+                                               backup_data or {})):
+            given_up.update(t.id for t in holders)
+            claimed.update(t.id for t in holders)
+            final[index] = wanted
+            used.add(wanted)
+            continue
         candidate, number = wanted, 2
         while True:
             if candidate not in used and (candidate == wanted or candidate not in originals):
@@ -142,7 +162,37 @@ def _place(section_name, rule, rows):
                               else 'name held here by a different row')
         final[index] = candidate
         used.add(candidate)
-    return final, reasons
+    return final, reasons, given_up
+
+
+def _required_by_kept_rows(model, ids, pruned, backup_data) -> bool:
+    """Whether a row the restore keeps, in a pruned section, names one of these
+    through a required column. Such a row waits for the writes, so its name
+    cannot be handed over first; a row the restore removes does not count.
+    """
+    from models import db
+    from sqlalchemy import select
+    from .plan import RestorePlan
+    from .replace import _SECTION_OF_TABLE, _foreign_keys_into, _index_tables, _primary, rows_to_remove
+
+    _index_tables()
+    plan = None
+    for dependent, column, named in _foreign_keys_into(model.__table__.name):
+        dependent_section = _SECTION_OF_TABLE.get(dependent.name)
+        archived = backup_data.get(dependent_section)
+        if (column.nullable or dependent_section not in pruned or _primary(dependent) is None
+                or not isinstance(archived, list)):
+            continue
+        held = select(named).where(model.__table__.c.id.in_(ids))
+        pointing = {row[0] for row in db.session.execute(
+            select(_primary(dependent)).where(column.in_(held))).all()}
+        if not pointing:
+            continue
+        if plan is None:
+            plan = RestorePlan.build(backup_data)
+        if pointing - set(rows_to_remove(dependent_section, archived, plan)):
+            return True
+    return False
 
 
 def _length(section_name, rule):
