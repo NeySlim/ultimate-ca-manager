@@ -59,6 +59,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Database migration: a role inheriting from a role created after it made the copy to PostgreSQL fail when the database role cannot disable foreign keys. A link to a row of the same table is now written once the whole table is in.
 - mTLS: a client certificate could not be enrolled, imported or assigned when an enrolled certificate of another CA had the same serial number, legitimate in X.509. An enrolment is now identified by its issuer and serial, at login and by a restore too (migration 130).
 - Backups: a webhook's authentication token was archived twice, in the clear and encrypted under the source's key, which no other installation can read. The archive now carries it in the clear only, and a restore ignores the encrypted copy of an older archive.
+- Restore: rows sharing an identity the database does not keep unique, such as one certificate discovered under two SNI names or one SCEP transaction at two CAs, were matched to the archive at random, and a replacing restore silently kept the extra ones. Archived rows now go to them oldest first, the extra ones are kept by a merge and removed by a replacement, each case is listed in the result's warnings, and a SCEP request is identified by its transaction and its CA.
 
 ### Upgrade notes
 

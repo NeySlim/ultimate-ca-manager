@@ -202,7 +202,9 @@ def _existing_row(section_name: str, identity: Dict[str, Any]):
             f"{', '.join(identity)}")
     if all(value in (None, '') for value in identity.values()):
         return None
-    return load_model(section).query.filter_by(**identity).first()
+    # The oldest of rows sharing it, as the plan's index has it
+    model = load_model(section)
+    return model.query.filter_by(**identity).order_by(*sa_inspect(model).primary_key).first()
 
 
 class RestoreExtendedMixin:

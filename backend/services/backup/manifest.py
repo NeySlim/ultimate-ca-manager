@@ -459,7 +459,8 @@ SECTIONS: Dict[str, Section] = {
     ),
     'scep_requests': Section(
         model='models.scep:SCEPRequest',
-        identity=('transaction_id',),
+        # Unique per CA only (RFC 8894 §3.2.1.1), as the table's constraint says
+        identity=('transaction_id', 'ca_refid'),
         exclude={**_SURROGATE},
         references={'profile_id': 'scep_profiles'},
         optional=True,

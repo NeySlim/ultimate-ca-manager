@@ -361,7 +361,7 @@ class RestoreCoreMixin:
         # each reference resolves to on this installation.
         # Orders this installation moved on with: kept in a merge, named in a replacement
         order_warnings = keep_newer_orders(backup_data, mode)
-        plan = RestorePlan.build(backup_data)
+        plan = RestorePlan.build(backup_data, pruned=pruned)
         plan.warnings.extend(order_warnings)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
@@ -714,7 +714,7 @@ class RestoreCoreMixin:
             where = f"revoked serial {serial} of CA {caref}"
             existing = RevokedSerial.query.filter_by(
                 caref=caref, serial_number=serial
-            ).first()
+            ).order_by(RevokedSerial.id).first()
             valid_to = _archived_datetime(
                 where, 'valid_to', rs_data.get('valid_to')) or utc_now()
             revoked_at = _archived_datetime(

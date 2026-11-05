@@ -164,8 +164,8 @@ class RestoreAuthMixin:
         for ac_data in backup_data.get('auth_certificates', []):
             # By fingerprint, the manifest's identity: a serial is only unique per issuer.
             fingerprint = ac_data.get('cert_fingerprint')
-            ac = (AuthCertificate.query.filter_by(cert_fingerprint=fingerprint).first()
-                  if fingerprint else None)
+            ac = (AuthCertificate.query.filter_by(cert_fingerprint=fingerprint)
+                  .order_by(AuthCertificate.id).first() if fingerprint else None)
             if ac is None:
                 # The row of that (issuer, serial), when its fingerprint is empty or the same one spelled otherwise
                 from services.mtls_enrollment import enrolments_of
