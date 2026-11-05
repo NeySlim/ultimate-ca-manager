@@ -80,14 +80,10 @@ def _keep_attached_key(ca, entry, stats):
         return
     try:
         from cryptography.hazmat.primitives import serialization
-        from cryptography.hazmat.primitives.asymmetric import ed448, ed25519
         from utils.key_codec import load_pem_bytes
-        private_key = serialization.load_pem_private_key(load_pem_bytes(key), password=None)
+        serialization.load_pem_private_key(load_pem_bytes(key), password=None)
     except Exception:
         stats['errors'].append(f"{label}: the key could not be read")
-        return
-    if isinstance(private_key, (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)):
-        stats['errors'].append(f"{label}: Ed25519 and Ed448 CA keys are not supported")
         return
     cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
     if ca.prv:

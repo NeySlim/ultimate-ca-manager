@@ -3,8 +3,9 @@ import {
   ACME_CLIENT_LABELS, CA_DEFAULT_LABELS, GROUP_PQ, ISSUE_DEFAULT_LABELS, KEY_ALGORITHMS,
   algorithmForKeyType, algorithmName, caKeyParts, defaultDigestFor, defaultKeyChoice, keyFamilyOptions,
   exportExcludedFor, findAlgorithm, isExportFormatAllowed, groupedOptions, isBrainpool, isPostQuantum, keyAlgorithmLabel,
-  listAlgorithms,
+  isUsable, listAlgorithms,
 } from '../keyAlgorithms'
+import { CA_KEY_CHOICES, caKeyLabel } from '../policyAlgorithms'
 
 const t = (key) => key
 const labels = (rows) => rows.map(r => r.label)
@@ -134,13 +135,27 @@ describe('post-quantum keys', () => {
     expect(caKeyParts('')).toEqual({ family: null, spec: null })
   })
 
-  it('offers RSA, ECDSA and ML-DSA as families of the CA and issue forms', () => {
+  it('offers RSA, ECDSA, EdDSA and ML-DSA to the CA form, EdDSA not to the issue form', () => {
     expect(keyFamilyOptions('ca')).toEqual([
-      { value: 'RSA', label: 'RSA' }, { value: 'ECDSA', label: 'ECDSA' }, { value: 'ML-DSA', label: 'ML-DSA' },
+      { value: 'RSA', label: 'RSA' }, { value: 'ECDSA', label: 'ECDSA' }, { value: 'EdDSA', label: 'EdDSA' },
+      { value: 'ML-DSA', label: 'ML-DSA' },
     ])
     expect(keyFamilyOptions('issue')).toEqual([
       { value: 'rsa', label: 'RSA' }, { value: 'ecdsa', label: 'ECDSA' }, { value: 'ml-dsa', label: 'ML-DSA' },
     ])
+  })
+
+  it('declares Ed25519 and Ed448 as CA keys only: no leaf, template or HSM generation', () => {
+    expect(caKeyLabel('EdDSA', 'Ed25519')).toBe('ED25519')
+    expect(caKeyLabel('EdDSA', 'Ed448')).toBe('ED448')
+    expect(CA_KEY_CHOICES).toEqual(expect.arrayContaining([['EdDSA', 'Ed25519'], ['EdDSA', 'Ed448']]))
+    expect(defaultKeyChoice('ca', 'EdDSA', CA_DEFAULT_LABELS)).toEqual(['EdDSA', 'Ed25519'])
+    expect(defaultDigestFor('EdDSA', 'Ed25519')).toBe('sha256')
+    expect(findAlgorithm('ED25519').digest).toBeNull()
+    for (const provider of [undefined, 'pkcs11', 'openbao']) {
+      expect(labels(listAlgorithms({ generate: true, provider })).filter(l => l.startsWith('ED'))).toEqual([])
+    }
+    expect(isUsable(findAlgorithm('ED25519'), { fips: true })).toBe(false)
   })
 
   it('starts each family on its default key, ML-DSA on level 65', () => {

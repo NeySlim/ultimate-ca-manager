@@ -112,6 +112,12 @@ class KeyAlgorithm:
     aliases: tuple[str, ...] = ()       # extra spellings accepted by normalize_label
     security_level: int | None = None   # NIST post-quantum security category, None for classical keys
     oid: str | None = None              # OID of a post-quantum key and of its signatures (one names both)
+    ca_only_key_type: str | None = None  # KEY_TYPES id of a key generated for CAs only (EdDSA: no leaf one)
+
+    @property
+    def ca_key_type(self) -> str | None:
+        """KEY_TYPES id a CA key of this algorithm is generated under; None when UCM generates none."""
+        return self.trust_store_id or self.ca_only_key_type
 
     def generate(self):
         return self.generator()
@@ -171,7 +177,7 @@ def _edwards(name: str, private_class: type, public_class: type, bits: int) -> K
         generator=_non_fips_generator(name, private_class),
         needs_digest=False, default_digest=None,
         display=name, legacy_key_algo=name, trust_store_id=None,
-        fips_approved=False, key_size=bits,
+        fips_approved=False, key_size=bits, ca_only_key_type=name.lower(),
     )
 
 
@@ -234,7 +240,7 @@ class _Registry:
                 raise ValueError(f'duplicate key algorithm label {alg.label!r}')
             self.by_label[alg.label] = alg
             spellings = (alg.label, alg.display, alg.legacy_key_algo, alg.trust_store_id,
-                         *alg.curve_names, *alg.aliases)
+                         alg.ca_only_key_type, *alg.curve_names, *alg.aliases)
             for spelling in spellings:
                 if not spelling:
                     continue

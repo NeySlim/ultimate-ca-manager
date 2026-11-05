@@ -90,14 +90,14 @@ class TestCreateCaKey:
         assert isinstance(key, rsa.RSAPublicKey if family == 'RSA' else ec.EllipticCurvePublicKey)
 
     @pytest.mark.parametrize('fields', [
-        {'keyAlgo': 'Ed25519'},
+        {'keyAlgo': 'EdDSA', 'keySize': 'Ed999'},
         {'keyAlgo': 'DSA', 'keySize': 2048},
         {'keyAlgo': 'magic'},
         {'keyAlgo': 'RSA', 'keySize': 1024},
         {'keyAlgo': 'RSA', 'keySize': 'secp384r1'},
         {'keyAlgo': 'EC', 'keySize': 'secp256k1'},
         {'keyAlgo': 'EC', 'keySize': 2048},
-        {'keyType': 'Ed25519'},
+        {'keyType': 'Ed25519', 'keySize': 2048},
         {'keySize': 4096},
         {'keyAlgo': 'RSA', 'keyType': 'EC'},
         {'keyType': 'RSA-4096', 'keySize': 2048},

@@ -68,7 +68,7 @@ describe('CreateCAModal policy algorithms (#397)', () => {
     renderModal({ allowed_key_types: null, allowed_digests: null })
     await waitFor(() => {
       expect(mocks.getEffective).toHaveBeenCalled()
-      expect(optionValues('common.keyAlgorithm')).toEqual(['RSA', 'ECDSA', 'ML-DSA'])
+      expect(optionValues('common.keyAlgorithm')).toEqual(['RSA', 'ECDSA', 'EdDSA', 'ML-DSA'])
       expect(optionValues('common.signatureAlgorithm')).toEqual(['auto', 'sha256', 'sha384', 'sha512'])
     })
   })
@@ -98,7 +98,7 @@ describe('CreateCAModal policy algorithms (#397)', () => {
   })
 
   it('blocks creation when the policies allow no key type', async () => {
-    renderModal({ allowed_key_types: ['ED25519'], allowed_digests: null })
+    renderModal({ allowed_key_types: ['DSA-1024'], allowed_digests: null })
     expect(await screen.findByText('cas.create.noKeyTypeAllowedByPolicy')).toBeTruthy()
     expect(screen.getByText('common.createCA').closest('button').disabled).toBe(true)
   })

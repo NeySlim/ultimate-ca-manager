@@ -1,7 +1,6 @@
 """Certificate import route"""
 import logging
 import base64
-from cryptography.hazmat.primitives.asymmetric import ed25519, ed448
 import uuid
 import json
 import traceback
@@ -102,9 +101,6 @@ def import_certificate():
         # it would sign nothing anyone can verify (#347 review)
         if private_key is not None and not private_key_matches(private_key, cert):
             return error_response('Private key does not match the certificate', 400)
-        if is_ca_certificate(cert) and isinstance(private_key, (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)):
-            return error_response('Ed25519 and Ed448 CA keys are not supported: '
-                                  'such a CA could sign neither certificates nor CRLs', 400)
 
         # Extract certificate info
         cert_info = extract_cert_info(cert)

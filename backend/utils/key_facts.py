@@ -19,6 +19,9 @@ def facts_for_key_type(key_type: str, verifiable: bool = True) -> dict:
                 'security_level': pq.security_level, 'post_quantum': True, 'verifiable': verifiable}
     parts = (key_type or '').split()
     size = int(parts[1]) if len(parts) >= 2 and parts[1].isdigit() else 0
+    alg = key_algorithms.get(key_type) if not size else None
+    if alg is not None and alg.family in ('ED25519', 'ED448'):
+        size = alg.key_size  # the spelling 'Ed25519' carries no size
     return {'key_type': key_type, 'key_algorithm': parts[0] if parts else 'Unknown', 'key_size': size,
             'security_level': None, 'post_quantum': False, 'verifiable': verifiable}
 
