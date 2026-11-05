@@ -826,3 +826,33 @@ def test_an_hsm_eddsa_ca_key_is_refused_with_a_400(app, auth_client, type_name, 
             HsmKey.query.filter_by(provider_id=pid).delete()
             HsmProvider.query.filter_by(id=pid).delete()
             db.session.commit()
+
+
+# ---- XCEP / WSTEP: Windows validates no EdDSA signature ---------------------------------
+
+@pytest.fixture
+def xcep_ca_setting(app):
+    from models import SystemConfig
+    with app.app_context():
+        saved = getattr(SystemConfig.query.filter_by(key='xcep_ca_refid').first(), 'value', None)
+        _set_config('xcep_ca_refid', None)
+    yield
+    with app.app_context():
+        _set_config('xcep_ca_refid', saved)
+
+
+@pytest.mark.parametrize('field', ['ca_id', 'ca_refid'])
+@pytest.mark.parametrize('name', ['Ed25519', 'Ed448'])
+def test_xcep_settings_refuse_an_eddsa_ca(app, auth_client, xcep_ca_setting, field, name):
+    from models import SystemConfig
+    ca = _ca(auth_client, f'{name} XCEP {field}', keyAlgo=name)
+    r = auth_client.patch('/api/v2/xcep/config', json={field: ca['id'] if field == 'ca_id' else ca['refid']})
+    assert r.status_code == 400, r.get_json()
+    assert name in r.get_json()['message'] and 'Windows' in r.get_json()['message']
+    with app.app_context():
+        assert not getattr(SystemConfig.query.filter_by(key='xcep_ca_refid').first(), 'value', None)
+
+
+def test_xcep_settings_still_take_an_rsa_ca(app, auth_client, xcep_ca_setting, rsa_root):
+    r = auth_client.patch('/api/v2/xcep/config', json={'ca_id': rsa_root['id']})
+    assert r.status_code == 200, r.get_json()

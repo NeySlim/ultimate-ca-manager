@@ -4,6 +4,7 @@ The protocol endpoints refuse a CA that cannot sign at request time; the
 settings that name a CA apply the same rule when the CA is chosen, so an
 enrolment does not fail later for a reason the operator was never told.
 """
+from utils import key_algorithms
 
 
 def signing_ca_problem(ca):
@@ -34,4 +35,16 @@ def scep_ca_problem(ca):
     if not str(ca.key_type).startswith('RSA'):
         return (f'Selected CA key is {ca.key_type}: SCEP clients encrypt their request '
                 'to an RSA key')
+    return None
+
+
+def xcep_ca_problem(ca):
+    """Why *ca* cannot be the XCEP/WSTEP CA, or None: Windows validates no EdDSA signature."""
+    problem = signing_ca_problem(ca)
+    if problem:
+        return problem
+    alg = key_algorithms.get(ca.key_type)
+    if alg is not None and alg.family in ('ED25519', 'ED448'):
+        return (f'Selected CA key is {ca.key_type}: Windows (CryptoAPI/CNG) does not '
+                'validate certificates signed with EdDSA')
     return None

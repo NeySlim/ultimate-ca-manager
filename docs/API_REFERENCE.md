@@ -530,9 +530,10 @@ and `keyType` is an alias of `keyAlgo`. An unknown `keyAlgo`, or a `keySize` tha
 belong to it, answers `400`. Without `keySize`, `RSA` gives RSA-2048, `ECDSA` P-256 and `EdDSA`
 Ed25519; a request without any key field gets RSA-2048. An EdDSA CA key is generated in software
 only (no HSM provider holds one), is refused in FIPS mode and signs without a separate digest,
-like ML-DSA below. Windows (CryptoAPI/CNG) and SCEP clients do not accept Ed25519 or Ed448: keep such
-a CA for clients that do (OpenSSL, Go, modern browsers for TLS 1.3 leaves). SCEP refuses an EdDSA
-CA, and an EdDSA CA cannot sign timestamps itself (it can issue the TSA signer). ML-DSA needs
+like ML-DSA below. Web browsers (Chrome, Firefox, Safari), Windows (CryptoAPI/CNG) and SCEP clients
+do not verify an Ed25519 or Ed448 signature on a certificate, so they reject anything such a CA issues,
+whatever the leaf key: keep it for clients that do (OpenSSL, Go, Java 15 and later). SCEP and XCEP
+refuse an EdDSA CA, and an EdDSA CA cannot sign timestamps itself (it can issue the TSA signer). ML-DSA needs
 OpenSSL 3.5 or later and is refused in FIPS mode; `keyAlgo` generates it in software, and
 an HSM-held ML-DSA key is chosen with `hsm_key_algorithm` on a provider that has it (see [HSM](#hsm)).
 An ML-DSA key signs without a separate digest: a `digest` sent for it is ignored and named

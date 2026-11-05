@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
-- CAs: Ed25519 and Ed448 keys can be generated for a root, intermediate or external CA, and a certificate-only EdDSA CA now accepts its key imported afterwards instead of a 400 (#436, reported by @Faraphel).
+- CAs: Ed25519 and Ed448 keys can be generated for a root, intermediate or external CA, and an EdDSA CA key imported with or after its certificate (`POST /cas/import`, certificate import with its key, `POST /cas/<id>/key`) is accepted instead of a 400 (#436, reported by @Faraphel).
 
 ### Fixed
 
