@@ -3065,7 +3065,12 @@ Content-Type: application/json
 ```http
 GET /api/v2/acme/client/orders
 GET /api/v2/acme/client/orders?status=pending&environment=production
+GET /api/v2/acme/client/orders?page=2&per_page=100
 ```
+
+Newest first, 100 per page at most (`per_page`, default 100); `meta` gives `total`, `page`
+and `total_pages`. Orders left `pending` for more than 7 days, whose order at the CA has expired,
+are removed by the renewal task.
 
 ### Get Order Details
 ```http

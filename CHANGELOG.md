@@ -22,9 +22,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: a CSR whose key was revoked as compromised was refused only at finalization, after the CA had opened an order and checked the challenges at each renewal. It is now refused with a 409 by the request and before a renewal opens any order.
 - ACME client: a failed manual renewal answered a bare 500 and was neither counted nor audited. It now answers 409 or 422 with the reason, counts towards the order's failures and emits `acme_order.renewal_failed`.
 - ACME client: an order the CA answered 404 or 410 for was polled until the timeout, up to several minutes per scheduler pass. Polling now stops at once and the order turns invalid with the reason.
+- ACME client: a restart during the automatic validation left the order `processing` for good. At startup such an order goes back to `pending`, with a message, ready for Verify.
+- ACME client: the order list stopped at the 100 newest orders, so an older issued order disappeared from the page. The API now pages (`page`, `per_page`) and the page loads every order.
+- ACME client: the TXT records of a DNS-01 order whose automatic validation failed stayed in the zone. They are now removed once the order is invalid or its finalization failed; an order left pending keeps them for Verify.
 
 ### Upgrade notes
 
+- ACME client: the renewal task now removes the orders left `pending` for more than 7 days whose order at the CA has expired, with their TXT records, and audits each removal.
 - DNS providers, ACME CA accounts and webhooks: the upgrade renames duplicate names to `name (2)`, `name (3)`, oldest first, then makes the name unique (migration 124).
 - ACME client: a renewal now keeps the certificate's id and refid, and `/renew` and the renewal logs no longer announce a new certificate id. Certificates that past renewals imported as new rows stay in the inventory: archive or delete them by hand.
 - ACME client: a backup carries neither the pending key nor the renewal link of an order being renewed, so after a restore that order is not resumed and its next renewal opens a new order at the CA.

@@ -241,3 +241,127 @@ def test_a_verification_of_a_gone_order_leaves_it_invalid(app, auth_client, benc
     db.session.expire_all()
     order = db.session.get(AcmeClientOrder, order.id)
     assert order.status == 'invalid' and order.error_message == ORDER_GONE
+
+
+# ---- orders left behind: a restart, a pending order nobody finished --------------------
+
+from datetime import timedelta  # noqa: E402
+
+from services.acme import order_housekeeping as housekeeping  # noqa: E402
+from utils.datetime_utils import utc_now  # noqa: E402
+
+
+def test_a_restart_sets_an_interrupted_auto_poll_back_to_pending(bench):
+    plain = bench.child(status='processing', renewal_enabled=True)
+    finalizing = bench.child(status='processing', renewal_enabled=True)
+    finalizing.pending_key = key_pem(bench.key)
+    renewal = bench.child(status='processing', renewal_of_order_id=bench.parent_id)
+    proxy = bench.child(status='processing', is_proxy_order=True)
+    leased = bench.child(status='processing', renewal_enabled=True)
+    db.session.commit()
+    OrderLease.take(leased.id)
+    stale_lease = bench.child(status='processing', renewal_enabled=True,
+                              renewal_claimed_at=utc_now() - timedelta(hours=1))
+    housekeeping.recover_interrupted_orders()
+    db.session.expire_all()
+    status = {o.id: (o.status, o.error_message) for o in AcmeClientOrder.query.filter(
+        AcmeClientOrder.id.in_(bench.extra_orders))}
+    assert status[plain.id] == ('pending', housekeeping.INTERRUPTED)
+    assert status[stale_lease.id] == ('pending', housekeeping.INTERRUPTED)
+    for kept in (finalizing, renewal, proxy, leased):
+        assert status[kept.id] == ('processing', None)
+
+
+def test_the_app_recovers_interrupted_orders_at_startup(monkeypatch, tmp_path):
+    monkeypatch.setenv('UCM_DATABASE_PATH', str(tmp_path / 'boot.db'))
+    from app import create_app
+    with patch.object(housekeeping, 'recover_interrupted_orders') as recover:
+        create_app('testing')
+    recover.assert_called_once_with()
+
+
+def _aged(order, days, expires_in_days=-1):
+    order.created_at = utc_now() - timedelta(days=days)
+    order.expires_at = utc_now() + timedelta(days=expires_in_days)
+    db.session.commit()
+    return order.id
+
+
+def test_an_order_pending_for_more_than_a_week_is_removed_with_its_txt(bench):
+    stale = _aged(bench.child(status='pending', renewal_enabled=True), 8)
+    with patch('services.acme.acme_client_service.AcmeClientService.cleanup_dns_challenge') as cleanup:
+        assert housekeeping.purge_stale_pending_orders() >= 1
+    assert db.session.get(AcmeClientOrder, stale) is None
+    assert stale in [c.args[0].id for c in cleanup.call_args_list]
+    entry = AuditLog.query.filter_by(action='acme_order_cancel', resource_id=str(stale)).order_by(
+        AuditLog.id.desc()).first()
+    assert entry is not None and '7 days' in entry.details
+
+
+@pytest.mark.parametrize('days, expires_in, fields', [
+    (6, -1, {}),                          # younger than a week
+    (8, 2, {}),                           # the CA still holds it open
+    (8, -1, {'is_proxy_order': True}),    # its ACME client drives it
+    (8, -1, {'status': 'invalid'}),
+])
+def test_an_order_still_of_use_is_not_purged(bench, days, expires_in, fields):
+    kept = _aged(bench.child(**{'status': 'pending', 'renewal_enabled': True, **fields}), days, expires_in)
+    with patch('services.acme.acme_client_service.AcmeClientService.cleanup_dns_challenge'):
+        housekeeping.purge_stale_pending_orders()
+    assert db.session.get(AcmeClientOrder, kept) is not None
+
+
+def test_the_renewal_task_purges(bench):
+    stale = _aged(bench.child(status='pending', renewal_enabled=True), 8)
+    with patch('services.acme.acme_client_service.AcmeClientService.cleanup_dns_challenge'), \
+            patch.object(renew_mod, '_order_is_due', return_value=False):
+        renew_mod.scheduled_acme_renewal()
+    assert db.session.get(AcmeClientOrder, stale) is None
+
+
+def test_the_list_pages_and_an_old_issued_order_is_still_listed(app, auth_client, bench):
+    old = bench.parent()
+    old.created_at = utc_now() - timedelta(days=3650)
+    db.session.commit()
+    for _ in range(101):
+        bench.child(status='pending')
+    first = auth_client.get('/api/v2/acme/client/orders').get_json()
+    assert len(first['data']) == 100 and first['meta']['total'] >= 102
+    pages = first['meta']['total_pages']
+    seen = [o['id'] for p in range(1, pages + 1)
+            for o in auth_client.get(f'/api/v2/acme/client/orders?page={p}').get_json()['data']]
+    assert bench.parent_id in seen and len(seen) == first['meta']['total']
+    small = auth_client.get('/api/v2/acme/client/orders?per_page=2&status=issued').get_json()
+    assert len(small['data']) == 2 or small['meta']['total'] < 2
+
+
+# ---- the TXT records of a failed auto-poll ------------------------------------------------
+
+@pytest.mark.parametrize('ca_status, cleaned', [('invalid', True), ('gone', True), ('pending', False)])
+def test_a_failed_auto_poll_removes_its_txt_unless_the_order_waits_for_verify(app, bench, monkeypatch,
+                                                                            ca_status, cleaned):
+    from api.v2.acme_client import orders as orders_module
+    monkeypatch.setattr(orders_module, '_dns_propagation_timeout', lambda: 0)
+    monkeypatch.setattr(orders_module.time, 'sleep', lambda _s: None)
+    bench.client.get_poll_settings = lambda: {'order_poll_timeout_sec': 2, 'order_poll_interval_sec': 1}
+    bench.client.find_invalid_authorization = lambda _order: None
+    order = bench.child(status='processing', renewal_enabled=True)
+    bench.ca.orders[order.order_url]['status'] = ca_status
+    with patch('services.acme.acme_client_service.AcmeClientService.cleanup_dns_challenge') as cleanup:
+        orders_module._auto_poll_and_finalize(bench.client, order)
+    assert cleanup.called is cleaned
+    db.session.expire_all()
+    assert db.session.get(AcmeClientOrder, order.id).status == ('pending' if not cleaned else 'invalid')
+
+
+def test_a_failed_auto_finalization_removes_its_txt(app, bench, monkeypatch):
+    from api.v2.acme_client import orders as orders_module
+    monkeypatch.setattr(orders_module, '_dns_propagation_timeout', lambda: 0)
+    monkeypatch.setattr(orders_module.time, 'sleep', lambda _s: None)
+    bench.client.find_invalid_authorization = lambda _order: None
+    order = bench.child(status='processing', renewal_enabled=True)
+    bench.ca.orders[order.order_url]['status'] = 'ready'
+    bench.client.finalize_order = lambda *_a, **_k: (False, 'refused', None)
+    with patch('services.acme.acme_client_service.AcmeClientService.cleanup_dns_challenge') as cleanup:
+        result = orders_module._auto_poll_and_finalize(bench.client, order)
+    assert result['error'] == 'refused' and cleanup.called

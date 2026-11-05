@@ -556,6 +556,14 @@ def create_app(config_name=None):
     except Exception as e:
         app.logger.warning(f"File regeneration failed (non-fatal): {e}")
     
+    # No auto-poll thread survives a restart: its orders go back to pending
+    try:
+        with app.app_context():
+            from services.acme.order_housekeeping import recover_interrupted_orders
+            recover_interrupted_orders()
+    except Exception as e:
+        app.logger.warning(f"Interrupted ACME orders not recovered (non-fatal): {e}")
+
     # Initialize general task scheduler (CRL auto-regen, etc) - AFTER database is ready
     try:
         from services.scheduler_service import init_scheduler
