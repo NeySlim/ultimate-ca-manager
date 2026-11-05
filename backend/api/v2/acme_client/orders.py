@@ -13,6 +13,8 @@ POST   /api/v2/acme/client/orders/<id>/renew
 
 import logging
 import threading
+
+import requests
 import time
 from flask import request, current_app
 
@@ -46,6 +48,8 @@ from utils.acme_ip import normalize_ip_for_identifier
 from utils.dns_txt_lookup import txt_record_present
 
 logger = logging.getLogger(__name__)
+
+RENEWAL_CA_UNREACHABLE = 'Renewal failed: the CA could not be reached'
 
 # DNS-01 propagation: poll for the expected TXT record before telling the CA to
 # validate, instead of a fixed sleep (#140). Timeout is configurable (up to
@@ -656,7 +660,7 @@ def cancel_order(order_id):
 
     order_domains = ', '.join([d.get('value', '') for d in (order.identifiers_list if hasattr(order, 'identifiers_list') else [])]) or f'Order {order_id}'
     from services.acme.order_housekeeping import delete_order
-    delete_order(order)
+    notes = delete_order(order)
     ok, _err = safe_commit(logger, "Failed to cancel ACME order")
     if not ok:
         return _err
@@ -666,7 +670,7 @@ def cancel_order(order_id):
         resource_type='acme_order',
         resource_id=str(order_id),
         resource_name=order_domains,
-        details=f'Cancelled/deleted ACME order {order_id}',
+        details='; '.join([f'Cancelled/deleted ACME order {order_id}'] + notes),
         success=True
     )
 
@@ -716,7 +720,10 @@ def renew_order(order_id):
         return error_response(record_renewal_failure(order, e, manual=True), 409)
     except Exception as e:
         logger.error(f'ACME certificate renewal failed: {e}')
-        return error_response(record_renewal_failure(order, e, manual=True), 422)
+        message = record_renewal_failure(order, e, manual=True)
+        if isinstance(e, (requests.RequestException, OSError)):
+            message = RENEWAL_CA_UNREACHABLE  # its text names hosts and URLs
+        return error_response(message, 422)
 
 
 def _renewal_parent(order):

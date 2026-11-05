@@ -14,7 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from models import CA, Certificate, DnsProvider, RevokedSerial, SystemConfig, db
 from models.acme_models import AcmeClientOrder
 from services.acme import dns_providers
-from services.acme.acme_client_service import ACCOUNT_GONE, ORDER_GONE, AcmeClientService
+from services.acme.acme_client_service import ACCOUNT_GONE, AcmeClientService
 from services.acme.compromised_keys import refuse_compromised_csr
 from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challenges
 from services.acme.http01 import wait_for_http01
@@ -27,6 +27,7 @@ from services.audit_service import AuditService
 from services.cert_service import CertificateService
 from services.webhook_service import emit_acme_renewal_failed, emit_acme_revocation_failed
 from utils.revocation_reasons import reason_code
+from utils.spki_digest import certificate_key_sha256
 from utils.acme_debug import acme_log
 from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
@@ -44,6 +45,7 @@ DAILY_RETRY = timedelta(days=1)
 HTTP01_RENEWAL_WAIT = 10
 
 
+RENEWAL_ORDER_GONE = 'The order is gone at the CA; the next pass opens a new one'
 REUSE_SOURCE_GONE = ('The certificate holding the key this order reuses was deleted: request a new '
                      'certificate for these names, with a new key or the key of another certificate')
 
@@ -167,6 +169,8 @@ def _record_replaced_serial(replaced):
     row.revoke_reason = 'superseded'
     row.valid_to = replaced.valid_to or now + timedelta(days=365)
     row.certificate_id = replaced.id
+    # The row now holds the new key: the digest comes from the replaced certificate
+    row.public_key_sha256 = certificate_key_sha256(base64.b64encode(replaced.pem))
     commit_or_rollback(logger, f"Revocation record of serial {replaced.serial} not saved")
 
 
@@ -249,7 +253,7 @@ def send_upstream_revocation(acme_client, pem, reason, label):
     response = acme_client.revoke_certificate(pem, reason=reason)
     if _revoked_upstream(response):
         return None
-    if _problem(response)[0] == _ACME_ERROR + 'badRevocationReason' and reason:
+    if _problem(response)[0] == _ACME_ERROR + 'badRevocationReason' and reason is not None:
         logger.warning("The CA refused revocation reason %s for %s: revoking it without a reason",
                        reason, label)
         response = acme_client.revoke_certificate(pem, reason=None)
@@ -259,9 +263,17 @@ def send_upstream_revocation(acme_client, pem, reason, label):
     return f"HTTP {response.status_code}{': ' + detail if detail else ''}"
 
 
-def _upstream_reason(replaced) -> int:
-    """The RFC 5280 §5.3.1 code sent to the CA: the local reason of a revoked row, else superseded."""
-    return reason_code(replaced.revoke_reason) if replaced.revoked else 4
+# Local reasons the CA is told; any other leaves the optional field out (never a hold)
+_UPSTREAM_REASONS = {1, 3, 4, 5}
+
+
+def _upstream_reason(replaced):
+    """The RFC 5280 §5.3.1 code sent to the CA, or None: superseded for a row renewed,
+    the local reason of a revoked row when it is one a replaced certificate may carry."""
+    if not replaced.revoked:
+        return 4
+    code = reason_code(replaced.revoke_reason)
+    return code if code in _UPSTREAM_REASONS else None
 
 
 def _owe_upstream_revocation(order, entry, error) -> None:
@@ -774,7 +786,7 @@ def _renew_with_new_order(acme_client, order, account_id, old_certificate, lease
         logger.info("Waiting for ACME validation...")
         status, order_data = acme_client.wait_for_order(new_order)
         if status == 'gone':
-            raise Exception(ORDER_GONE)
+            raise Exception(RENEWAL_ORDER_GONE)
         if status == 'invalid':
             raise Exception(
                 f"Order became invalid: {_order_invalid_detail(acme_client, new_order, order_data)}"

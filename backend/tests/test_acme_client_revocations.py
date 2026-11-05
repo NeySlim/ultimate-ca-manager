@@ -247,3 +247,40 @@ def test_a_backup_carries_the_key_digest(app, bench, create_ca):
     db.session.commit()
     assert RevokedSerial.query.filter_by(caref=caref, serial_number=serial).one().public_key_sha256 == digest
     assert db.session.get(CA, CA.query.filter_by(refid=caref).one().id) is not None
+
+
+@pytest.mark.parametrize('local, sent', [('keyCompromise', 1), ('affiliationChanged', 3),
+                                         ('cessationOfOperation', 5), ('certificateHold', None),
+                                         ('unspecified', None), ('privilegeWithdrawn', None)])
+def test_only_a_reason_a_replaced_certificate_may_carry_reaches_the_ca(bench, local, sent):
+    row = bench.row()
+    row.revoked, row.revoke_reason = True, local
+    db.session.commit()
+    assert bench.renew()[0]
+    assert bench.client.revoke_certificate.call_args.kwargs == {'reason': sent}
+
+
+def test_a_refused_reason_zero_is_also_dropped():
+    client = MagicMock()
+    client.revoke_certificate.side_effect = [_answer(400, 'badRevocationReason'), _answer(200)]
+    assert renew_mod.send_upstream_revocation(client, b'pem', 0, 'x') is None
+    assert [c.kwargs for c in client.revoke_certificate.call_args_list] == [{'reason': 0}, {'reason': None}]
+
+
+def test_a_renewal_in_place_records_the_old_key_on_the_old_serial(bench, create_ca):
+    _under_a_ca_held_here(bench, create_ca)
+    assert bench.renew()[0]
+    record = RevokedSerial.query.filter_by(serial_number=bench.old_serial, certificate_id=bench.cert_id).one()
+    assert record.public_key_sha256 == public_key_sha256(bench.key.public_key())
+    record_id = record.id
+    # Deleting the row (now the new certificate) leaves the old serial with the old key
+    row = bench.row()
+    row.valid_to = utc_now() - timedelta(days=1)
+    db.session.commit()
+    record.public_key_sha256 = None
+    db.session.commit()
+    assert CertificateService.delete_certificate(bench.cert_id, username='admin')
+    record = db.session.get(RevokedSerial, record_id)
+    assert record.public_key_sha256 is None  # never the new key
+    db.session.delete(record)
+    db.session.commit()

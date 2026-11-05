@@ -172,7 +172,7 @@ def test_a_renewal_stops_at_the_first_404_on_its_order(bench):
     _gone_on_creation(bench)
     with patch('services.acme.acme_client_service.AcmeClientService._sleep_before_next_poll',
                side_effect=AssertionError('polled on')):
-        with pytest.raises(Exception, match='no longer has this order'):
+        with pytest.raises(Exception, match='gone at the CA; the next pass opens a new one'):
             bench.renew()
     assert AcmeClientOrder.query.filter(AcmeClientOrder.id.in_(bench.extra_orders)).count() == 0
 
@@ -420,3 +420,35 @@ def test_a_reuse_falls_back_on_its_first_source(bench):
     db.session.commit()
     ok, _message = bench.renew()
     assert ok
+
+
+def test_a_renewal_that_cannot_reach_the_ca_names_no_host(app, auth_client, bench):
+    import requests
+    bench.client.create_order = MagicMock(side_effect=requests.ConnectionError(
+        "HTTPSConnectionPool(host='ca.internal.example', port=443): Max retries exceeded"))
+    with _routed(bench):
+        answer = auth_client.post(f'/api/v2/acme/client/orders/{bench.parent_id}/renew')
+    assert answer.status_code == 422
+    assert answer.get_json()['message'] == 'Renewal failed: the CA could not be reached'
+    db.session.expire_all()
+    assert bench.parent().renewal_failures == 1
+
+
+def test_deleting_an_order_with_revocations_owed_says_so(app, auth_client, bench):
+    order = bench.child(status='issued', renewal_enabled=True)
+    order.upstream_revocations_list = [{'serial': '1'}, {'serial': '2'}]
+    db.session.commit()
+    assert auth_client.delete(f'/api/v2/acme/client/orders/{order.id}').status_code == 200
+    entry = AuditLog.query.filter_by(action='acme_order_cancel', resource_id=str(order.id)).order_by(
+        AuditLog.id.desc()).first()
+    assert '2 upstream revocation(s) abandoned' in entry.details
+
+
+def test_a_purge_records_txt_records_it_could_not_remove(bench):
+    stale = _aged(bench.child(status='pending', renewal_enabled=True), 8)
+    with patch('services.acme.acme_client_service.AcmeClientService.cleanup_dns_challenge',
+               return_value=(False, 'zone API refused')):
+        housekeeping.purge_stale_pending_orders()
+    entry = AuditLog.query.filter_by(action='acme_order_cancel', resource_id=str(stale)).order_by(
+        AuditLog.id.desc()).first()
+    assert 'TXT records not removed: zone API refused' in entry.details

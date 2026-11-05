@@ -3073,8 +3073,15 @@ GET /api/v2/acme/client/orders?page=2&per_page=100
 ```
 
 Newest first, 100 per page at most (`per_page`, default 100); `meta` gives `total`, `page`
-and `total_pages`. Orders left `pending` for more than 7 days, whose order at the CA has expired,
-are removed by the renewal task.
+and `total_pages`. Orders left `pending` for more than 7 days, whose order at the CA has expired
+or whose expiry is unknown, are removed by the renewal task.
+
+Each order carries `renewal_failures`, `renewal_retry_daily`, `last_error_at` and
+`error_message`, and `upstream_revocations_owed`: the replaced certificates whose revocation the
+CA has not confirmed yet (with `acme.revoke_on_renewal`). The renewal task sends them again
+until the certificate expires, and each failure emits the `acme_order.revocation_failed`
+webhook event (`order`, `serial_number`, `error`, `attempts`). Deleting the order abandons them;
+its audit entry says how many.
 
 ### Get Order Details
 ```http

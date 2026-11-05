@@ -574,7 +574,9 @@ class LifecycleMixin:
         try:
             digest = certificate_key_sha256(certificate.crt)
             if digest:  # a record older than the column learns the key before the row goes
+                # Only the row's own serial: an earlier one, renewed in place, had another key
                 RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id,
+                                           RevokedSerial.serial_number == certificate.serial_number,
                                            RevokedSerial.public_key_sha256.is_(None)).update(
                     {RevokedSerial.public_key_sha256: digest}, synchronize_session='fetch')
             RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id).update(

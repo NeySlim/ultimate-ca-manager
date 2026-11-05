@@ -40,22 +40,33 @@ def recover_interrupted_orders() -> int:
     return count
 
 
-def delete_order(order) -> None:
-    """Stage the removal of ``order``: its TXT records, then the row; the caller commits."""
+def delete_order(order) -> list:
+    """Stage the removal of ``order``: its TXT records, then the row; the caller commits.
+    Returns what the audit entry should add: TXT records left, revocations abandoned."""
     from services.acme.acme_client_service import AcmeClientService
+    notes = []
     if order.challenge_type == 'dns-01' and order.dns_provider_id:
         try:
-            AcmeClientService.cleanup_dns_challenge(order)  # no CA account: it may be gone
+            ok, message = AcmeClientService.cleanup_dns_challenge(order)  # no CA account: it may be gone
         except Exception as exc:
-            logger.warning("TXT records of ACME order %s not removed: %s", order.id, exc)
+            ok, message = False, str(exc)
+        if not ok:
+            logger.warning("TXT records of ACME order %s not removed: %s", order.id, message)
+            notes.append(f'TXT records not removed: {message}')
+    owed = len(order.upstream_revocations_list)
+    if owed:  # never refused: the operator chose to drop the order
+        logger.warning("ACME order %s deleted with %s revocation(s) the CA never confirmed", order.id, owed)
+        notes.append(f'{owed} upstream revocation(s) abandoned')
     # SQLite enforces no foreign key: the orders its renewals opened stop naming it here
     AcmeClientOrder.query.filter_by(renewal_of_order_id=order.id).update(
         {AcmeClientOrder.renewal_of_order_id: None}, synchronize_session=False)
     db.session.delete(order)
+    return notes
 
 
 def purge_stale_pending_orders() -> int:
-    """Remove the orders pending for more than 7 days whose CA order has expired too."""
+    """Remove the orders pending for more than 7 days whose CA order has expired, or whose
+    expiry is unknown."""
     from services.audit.staging import stage_audit_entry
     now = utc_now()
     stale = AcmeClientOrder.query.filter(
@@ -64,10 +75,12 @@ def purge_stale_pending_orders() -> int:
         or_(AcmeClientOrder.expires_at.is_(None), AcmeClientOrder.expires_at < now),
     ).all()
     for order in stale:
-        stage_audit_entry(action='acme_order_cancel', resource_type='acme_order', resource_id=str(order.id),
-                          resource_name=order.primary_domain,
-                          details=f'Removed ACME order {order.id}, pending for more than 7 days')
-        delete_order(order)
+        order_id, name = order.id, order.primary_domain
+        notes = delete_order(order)
+        stage_audit_entry(action='acme_order_cancel', resource_type='acme_order', resource_id=str(order_id),
+                          resource_name=name,
+                          details='; '.join([f'Removed ACME order {order_id}, pending for more than 7 days']
+                                            + notes))
     db.session.commit()
     if stale:
         logger.info("Removed %s ACME order(s) pending for more than 7 days", len(stale))
