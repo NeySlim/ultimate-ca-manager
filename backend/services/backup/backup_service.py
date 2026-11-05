@@ -134,6 +134,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
 
     def __init__(self):
         self.app_version = Config.APP_VERSION
+        self.last_payload_size = 0    # decompressed bytes of the last archive created
     def create_backup(
         self,
         password: str,
@@ -262,6 +263,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
 
         # Serialize final payload
         final_json = json.dumps(backup_data, indent=2, sort_keys=True).encode()
+        self.last_payload_size = len(final_json)
 
         # Compress (gzip level 6 — good ratio, fast)
         flags = self.FLAG_GZIP

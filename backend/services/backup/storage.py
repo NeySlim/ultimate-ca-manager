@@ -331,14 +331,25 @@ def restore_upload_limit() -> int:
     return int(Config.BACKUP_MAX_UPLOAD_MB) * 1024 * 1024
 
 
-def restore_limit_warning(size: int):
-    """What to tell whoever created an archive no restore route accepts, or None."""
+def restore_limit_warning(size: int, payload_size: int = 0):
+    """What to tell whoever created an archive no restore reads, or None.
+
+    Checked against both ceilings: the archive itself, and its decompressed payload.
+    """
+    from . import container
+
     limit = restore_upload_limit()
-    if size <= limit:
-        return None
-    return (f"This archive is {size / (1024 * 1024):.1f} MB, more than the "
-            f"{limit // (1024 * 1024)} MB a restore accepts: raise BACKUP_MAX_UPLOAD_MB "
-            "on the server that will restore it.")
+    if size > limit:
+        return (f"This archive is {size / (1024 * 1024):.1f} MB, more than the "
+                f"{limit // (1024 * 1024)} MB a restore accepts: raise BACKUP_MAX_UPLOAD_MB "
+                "on the server that will restore it.")
+    ceiling = container.max_plaintext_bytes()
+    if payload_size > ceiling:
+        return (f"This archive decompresses to {payload_size / (1024 * 1024):.1f} MB, more "
+                f"than the {ceiling // (1024 * 1024)} MB a restore reads "
+                f"({container.PLAINTEXT_PER_ARCHIVE_BYTE} times BACKUP_MAX_UPLOAD_MB): raise "
+                "BACKUP_MAX_UPLOAD_MB on the server that will restore it.")
+    return None
 
 
 def create_archive(data: bytes, backup_dir=None) -> tuple:

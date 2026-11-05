@@ -20,7 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Restore: a membership, deployment binding, CRL binding, template pin or role permission was matched by the source's row numbers first, and could overwrite another row here. Rows are now matched by what they name; an archive records the database it comes from, and its numbers count only there and only when they still name the same rows.
 - Restore: a replacing restore failed on PostgreSQL as soon as a CRL, a cached OCSP response, a session or an ACME client order pointed at a row it removed, and left such rows pointing at nothing on SQLite. Both engines now clear the regenerable rows, detach orders and drop approvals as deleting the row does, and refuse anything else with the row named.
 - Restore: a replacing restore wrote the archive before removing what it does not carry, so a SCEP slug or a name still held by a removed row failed with a bare 500. Removals now come first, a homonym replacing the row here keeps its name unless a kept row still points at that row, in which case it is restored as `name (2)`, and a remaining database conflict names the table and the row.
-- Restore: an archive over 50 MB was refused with a 413 although it had been created without a word. The restore upload now accepts up to `BACKUP_MAX_UPLOAD_MB` (512 by default), and creating a larger archive warns.
+- Restore: an archive over 50 MB was refused with a 413 although it had been created without a word. The restore upload now accepts and reads up to `BACKUP_MAX_UPLOAD_MB` (512 by default), refusals name the setting, and creating an archive a restore would not read warns.
 - Restore: an archive older than 2.230 holding an API key or an ACME domain was refused whole, its nested group members went to whichever account held the source's number, and its nested WebAuthn keys were ignored. A row whose required link is a bare number is now left out and listed, members are placed by username, and the WebAuthn keys come back.
 - Restore: an HSM field an older archive holds under another installation's key was dropped with a log line that did not name the provider. The log and the restore result now name the provider and the field.
 
@@ -28,7 +28,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - DNS providers, ACME CA accounts and webhooks: the upgrade renames duplicate names to `name (2)`, `name (3)`, oldest first, then makes the name unique (migration 124).
 - Restore: a replacing restore now removes the CRLs, cached OCSP responses, sessions, in-flight ACME server orders, approval requests and Microsoft CA requests that point at a removed row, detaches ACME client orders, discovery results and revocation records from it, and cancels the key recovery requests still open on a removed certificate. The restore message lists them.
-- Restore: `BACKUP_MAX_UPLOAD_MB` (default 512) is the restore upload's own ceiling; a reverse proxy in front of UCM keeps its own body limit.
+- Restore: `BACKUP_MAX_UPLOAD_MB` (default 512) is the restore upload's own ceiling, and the decompressed content may be four times that; a reverse proxy in front of UCM keeps its own body limit. A restore holds the archive in memory, with a peak of several times its size.
 
 ## [2.249] - 2026-11-05
 

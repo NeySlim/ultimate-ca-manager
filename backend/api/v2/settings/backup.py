@@ -90,7 +90,8 @@ def create_backup():
         return error_response(str(e), 400)
 
     try:
-        backup_bytes = BackupService().create_backup(password, kdf=kdf)
+        service = BackupService()
+        backup_bytes = service.create_backup(password, kdf=kdf)
         _filepath, filename = storage.create_archive(backup_bytes)
     except BackupPasswordError as e:
         return error_response(str(e), 400)
@@ -123,7 +124,7 @@ def create_backup():
         'download_url': f'/api/v2/settings/backup/{filename}/download',
     }
 
-    warning = storage.restore_limit_warning(len(backup_bytes))
+    warning = storage.restore_limit_warning(len(backup_bytes), service.last_payload_size)
     if warning:
         response_data['restore_limit_warning'] = warning
 

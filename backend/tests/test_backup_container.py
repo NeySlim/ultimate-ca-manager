@@ -128,9 +128,33 @@ class TestFramingIsRefusedEarly:
             container.parse_header(blob)
         assert expected in str(exc.value)
 
-    def test_an_oversized_container_is_refused_before_parsing(self):
-        with pytest.raises(ContainerError, match='too large'):
-            container.parse_header(b'UCMB' + b'\x00' * (container.MAX_CONTAINER_BYTES + 1))
+    def test_an_oversized_container_is_refused_before_parsing(self, monkeypatch):
+        from services.backup import storage
+        monkeypatch.setattr(storage, 'restore_upload_limit', lambda: 4096)
+        with pytest.raises(ContainerError, match='too large') as refused:
+            container.parse_header(b'UCMB' + b'\x00' * 4096)
+        assert 'BACKUP_MAX_UPLOAD_MB' in str(refused.value)
+
+    def test_the_ceilings_follow_the_restore_upload_setting(self, monkeypatch):
+        """What a restore route accepts, the reader reads: no second, smaller ceiling."""
+        from services.backup import storage
+        monkeypatch.setattr(storage, 'restore_upload_limit', lambda: 300 * 1024 * 1024)
+        assert container.max_container_bytes() == 300 * 1024 * 1024
+        assert container.max_plaintext_bytes() == (
+            container.PLAINTEXT_PER_ARCHIVE_BYTE * 300 * 1024 * 1024)
+        with pytest.raises(ContainerError) as refused:
+            container.parse_header(b'UCMB' + b'\x00' * 64)
+        assert 'too large' not in str(refused.value)
+
+    def test_a_payload_past_the_decompressed_ceiling_names_the_setting(self, monkeypatch):
+        import gzip
+        import os
+        from services.backup import storage
+        monkeypatch.setattr(storage, 'restore_upload_limit', lambda: 1024)
+        payload = gzip.compress(os.urandom(4000).hex().encode())
+        with pytest.raises(ContainerError) as refused:
+            container.decompress_bounded(payload)
+        assert 'BACKUP_MAX_UPLOAD_MB' in str(refused.value)
 
 
 class TestKdfProfilesAreBounded:

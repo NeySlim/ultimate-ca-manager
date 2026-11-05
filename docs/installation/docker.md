@@ -144,7 +144,7 @@ volumes:
 | `UCM_LOG_BACKUPS` | `5` | Generations of `ucm.log` kept in the data volume |
 | `UCM_SECRET_KEY` | auto-generated | Session secret key |
 | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use an external PostgreSQL 13+ instance instead of the bundled SQLite. |
-| `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive the restore upload accepts, in MB. Every other request keeps the 50 MB limit. |
+| `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive a restore accepts and reads, in MB; its decompressed content may be four times that. Every other request keeps the 50 MB limit. |
 
 See full list in [docker-compose.yml](../../docker-compose.yml). SMTP, ACME, the session timeout and the other application settings are configured in the web interface.
 

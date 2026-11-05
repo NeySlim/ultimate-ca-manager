@@ -38,9 +38,9 @@ GCM_TAG_SIZE = 16
 
 # Resource ceilings. They bound what a container can ask of this process
 # before anything it contains has been authenticated.
-MAX_CONTAINER_BYTES = 200 * 1024 * 1024
 MAX_HEADER_METADATA_BYTES = 4096
-MAX_PLAINTEXT_BYTES = 512 * 1024 * 1024
+# The decompressed payload may be this many times the accepted archive size.
+PLAINTEXT_PER_ARCHIVE_BYTE = 4
 MAX_COMPRESSION_RATIO = 100
 MAX_JSON_DEPTH = 64
 # Each parsed object costs a few hundred bytes of interpreter memory, so this
@@ -103,6 +103,27 @@ def build_header(*, format_version: int, flags: int, kdf_id: int,
     )
 
 
+_MIB = 1024 * 1024
+
+
+def max_container_bytes() -> int:
+    """The largest archive read: what the restore routes accept (`BACKUP_MAX_UPLOAD_MB`)."""
+    from .storage import restore_upload_limit
+    return restore_upload_limit()
+
+
+def max_plaintext_bytes() -> int:
+    return PLAINTEXT_PER_ARCHIVE_BYTE * max_container_bytes()
+
+
+def refuse_oversized(container: bytes) -> None:
+    limit = max_container_bytes()
+    if len(container) > limit:
+        raise ContainerError(
+            f"Backup file is too large to read ({len(container) / _MIB:.1f} MB, more than "
+            f"the {limit / _MIB:.0f} MB BACKUP_MAX_UPLOAD_MB allows)")
+
+
 def parse_header(container: bytes) -> Tuple[Dict[str, Any], bytes, bytes]:
     """Validate the framing of a v2/v3 container.
 
@@ -110,8 +131,7 @@ def parse_header(container: bytes) -> Tuple[Dict[str, Any], bytes, bytes]:
     or decompressed here: this only decides whether the framing is one this
     reader knows, and whether its lengths are consistent with the file.
     """
-    if len(container) > MAX_CONTAINER_BYTES:
-        raise ContainerError("Backup file is too large to read")
+    refuse_oversized(container)
     if len(container) < HEADER_PREFIX_SIZE:
         raise ContainerError("Invalid backup file: truncated header")
     if container[:4] != MAGIC:
@@ -244,7 +264,8 @@ def decompress_bounded(plaintext: bytes) -> bytes:
     only ever written one, but a reader that stopped after the first would
     return a truncated payload rather than refuse it.
     """
-    limit = min(MAX_PLAINTEXT_BYTES, max(len(plaintext), 1) * MAX_COMPRESSION_RATIO)
+    ceiling = max_plaintext_bytes()
+    limit = min(ceiling, max(len(plaintext), 1) * MAX_COMPRESSION_RATIO)
     chunks = []
     produced = 0
     remaining = plaintext
@@ -258,8 +279,9 @@ def decompress_bounded(plaintext: bytes) -> bytes:
                 if produced > limit:
                     raise ContainerError(
                         "Refusing backup: its compressed payload expands beyond "
-                        "the accepted size"
-                    )
+                        + (f"{ceiling / _MIB:.0f} MB, {PLAINTEXT_PER_ARCHIVE_BYTE} times "
+                           "BACKUP_MAX_UPLOAD_MB" if limit == ceiling
+                           else "the accepted size"))
                 if chunk:
                     chunks.append(chunk)
                 consumed = len(remaining) - len(decompressor.unconsumed_tail)

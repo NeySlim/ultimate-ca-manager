@@ -824,6 +824,12 @@ class TestRestoreUploadCeiling:
             assert 'BACKUP_MAX_UPLOAD_MB' in _message(response)
         assert calls == []
 
+    @pytest.mark.parametrize('raw, expected', [('64', 64), ('0', 1), ('lots', 512), ('', 512)])
+    def test_the_setting_never_stops_the_server_from_starting(self, monkeypatch, raw, expected):
+        from config.settings import backup_max_upload_mb
+        monkeypatch.setenv('BACKUP_MAX_UPLOAD_MB', raw)
+        assert backup_max_upload_mb() == expected
+
     def test_the_ceiling_is_read_from_the_setting(self, monkeypatch):
         from services.backup import storage
         monkeypatch.setattr(Config, 'BACKUP_MAX_UPLOAD_MB', 3)
@@ -841,6 +847,17 @@ class TestRestoreUploadCeiling:
         body = response.get_json()
         assert 'BACKUP_MAX_UPLOAD_MB' in body['data']['restore_limit_warning']
         assert 'BACKUP_MAX_UPLOAD_MB' in body['message']
+
+    @pytest.mark.parametrize('url', ['/api/v2/system/backup', '/api/v2/settings/backup/create'])
+    def test_creating_an_archive_too_large_once_decompressed_warns(
+            self, auth_client, backup_dir, audit_spy, monkeypatch, url):
+        from services.backup import container
+        monkeypatch.setattr(container, 'PLAINTEXT_PER_ARCHIVE_BYTE', 0)
+
+        response = _create(auth_client, {'password': PASSWORD}, url=url)
+
+        assert response.status_code == 200, response.data
+        assert 'decompresses' in response.get_json()['data']['restore_limit_warning']
 
     def test_an_archive_a_restore_accepts_carries_no_warning(
             self, auth_client, backup_dir, audit_spy):

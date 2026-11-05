@@ -148,7 +148,8 @@ def create_backup():
         return error_response(str(e), 400)
 
     try:
-        backup_bytes = BackupService().create_backup(password, kdf=kdf)
+        service = BackupService()
+        backup_bytes = service.create_backup(password, kdf=kdf)
         _filepath, filename = storage.create_archive(backup_bytes)
     except FipsRestricted:
         raise  # the application maps it to its problem type
@@ -183,7 +184,7 @@ def create_backup():
         'download_url': f'/api/v2/system/backup/{filename}/download',
     }
     message = 'Backup created successfully'
-    warning = storage.restore_limit_warning(size)
+    warning = storage.restore_limit_warning(size, service.last_payload_size)
     if warning:
         data['restore_limit_warning'] = warning
         message = f'{message}. {warning}'
