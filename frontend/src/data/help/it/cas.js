@@ -25,6 +25,7 @@ export default {
           { label: 'Importa chiave privata', text: 'Collegare la chiave privata di una CA che possiede solo il proprio certificato, perché possa firmare' },
           { label: 'Chiave e validità', text: 'RSA-3072 per impostazione predefinita, locale o HSM. Validità di 1, 2, 3, 5, 10, 15 o 20 anni, oppure Personalizzata (giorni) fino a 50 anni. Una CA RSA-2048 che sopravvivrebbe al 2030 viene segnalata: l\'ANSSI accetta RSA-2048 fino alla fine del 2030, ETSI TS 119 312 fino alla fine del 2026' },
           { label: 'Post-quantistica (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 o ML-DSA-87 (FIPS 204, livelli NIST 2, 3 e 5), generate via software o su un provider HSM che supporta ML-DSA, e nascoste in modalità FIPS. Una chiave ML-DSA firma senza un digest separato, quindi per la CA, le sue CRL e le sue risposte OCSP non c\'è alcun digest da scegliere. Una CA ML-DSA può firmare certificati RSA o EC, e una CA RSA o EC può firmare una intermedia ML-DSA. Il rinnovo mantiene lo stesso livello' },
+          { label: 'EdDSA (Ed25519, Ed448)', text: 'Chiavi Ed25519 o Ed448 per una CA root, intermedia o esterna, solo via software (nessun provider HSM firma EdDSA) e nascoste in modalità FIPS. Come ML-DSA, una chiave EdDSA firma senza digest, e la gerarchia può essere mista con RSA, EC o ML-DSA. I browser, Windows (CryptoAPI/CNG) e i client SCEP non accettano ciò che firma una CA EdDSA, qualunque sia la chiave della foglia: riservala a consumatori OpenSSL, Go o Java 15+. SCEP e XCEP rifiutano una tale CA' },
           { label: 'Vincoli sui nomi', text: 'Vincoli avanzati (RFC 5280): i sottoalberi consentiti ed esclusi (DNS, intervallo IP, email) limitano i nomi che la CA può certificare. Per una CA firmata esternamente sono impostati dalla CA firmataria' },
           { label: 'Schema di firma RSA', text: 'PKCS#1 v1.5 per impostazione predefinita, oppure RSA-PSS (salt lungo quanto l\'hash) per una CA RSA con chiave locale, PKCS#11 o OpenBao. Si applica ai certificati, alle CRL, alle risposte OCSP e alle risposte SCEP firmati dalla CA; le marche temporali restano in PKCS#1 v1.5, lo schema che openssl ts -verify controlla. "Firma con RSA-PSS" nei dettagli della CA fa passare una CA esistente da uno schema all\'altro: i certificati già emessi mantengono la loro firma' },
           { label: 'Profilo di conformità', text: 'ANSSI, BSI o EU ACM: regole allineate a un testo di riferimento vincolano ciò che la CA emette (tipi di chiave, hash, schema RSA, orizzonti di data e, per EU ACM, una chiave della CA custodita su HSM). Scegline uno alla creazione (a una CA intermedia viene proposto il profilo della CA padre, altrimenti quello predefinito impostato in Impostazioni, Informazioni). Su una CA esistente, il campo nei dettagli lo associa, lo cambia o lo rimuove: la verifica del profilo viene eseguita prima su quella CA, i rilievi sono elencati e confermi che le regole si applicano solo alle emissioni future, nulla di già emesso viene firmato di nuovo. Richiede write:cas, e admin:system per associare o cambiare' },
@@ -139,7 +140,7 @@ Raggruppa le CA per il campo Organizzazione (O). Utile per configurazioni multi-
 ### Crea CA Root
 1. Clicca **Crea** → **CA Root**
 2. Compila i campi del Soggetto (CN, O, OU, C, ST, L)
-3. Seleziona l'algoritmo della chiave (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87): RSA-3072 per impostazione predefinita
+3. Seleziona l'algoritmo della chiave (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87, EdDSA Ed25519/Ed448): RSA-3072 per impostazione predefinita
 4. Imposta il periodo di validità: 1, 2, 3, 5, 10, 15 o 20 anni, oppure **Personalizzata (giorni)** fino a 50 anni (tipicamente 10-20 anni per le CA Root)
 5. Facoltativamente seleziona un template di certificato
 6. Clicca **Crea**
@@ -162,6 +163,13 @@ Il modulo segnala una CA RSA-2048 che sopravvivrebbe al 2030: l'ANSSI accetta RS
 - Le gerarchie possono essere miste: una root ML-DSA può firmare una intermedia RSA o EC, e una CA RSA o EC può firmare una intermedia ML-DSA, che usa poi il digest del padre.
 - Il rinnovo mantiene la chiave e il suo livello.
 - Una CA ML-DSA si esporta in PEM o DER, non in PKCS#12 o JKS. I client senza supporto ML-DSA (OpenSSL prima della 3.5, la maggior parte dei browser oggi) non possono verificare ciò che firma.
+
+### CA EdDSA (Ed25519, Ed448)
+Le chiavi **Ed25519** e **Ed448** possono essere generate per una CA root, intermedia o esterna, oppure importate con o dopo il certificato della CA. La chiave è generata via software (nessun provider HSM firma EdDSA) e l'algoritmo è nascosto in modalità FIPS.
+
+- Una chiave EdDSA firma senza digest, come ML-DSA: il campo digest scompare e le CRL e le risposte OCSP seguono la stessa regola.
+- Le gerarchie possono essere miste: una CA EdDSA può firmare intermedie e foglie RSA, EC o ML-DSA, e viceversa.
+- I browser, Windows (CryptoAPI/CNG) e i client SCEP non accettano i certificati firmati da una CA EdDSA, qualunque sia la chiave della foglia. SCEP e XCEP/WSTEP rifiutano una tale CA. Usala dove i consumatori sono OpenSSL, Go o Java 15+.
 
 ### Crea una CA firmata esternamente (modalità CSR, v2.214)
 Per il pattern della root offline: la chiave della CA emittente risiede in UCM, il suo certificato viene firmato altrove:
