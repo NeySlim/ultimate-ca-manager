@@ -4145,7 +4145,8 @@
       "systemUpdateInstalled": "アップデート完了",
       "systemUpdateFailed": "アップデート失敗",
       "acmePreflight": "ACME 事前チェック",
-      "acmeOrderRenewalFailed": "ACME 更新失敗"
+      "acmeOrderRenewalFailed": "ACME 更新失敗",
+      "acmeOrderRevocationFailed": "ACME 失効失敗"
     },
     "title": "Webhooks",
     "subtitle": "証明書イベント発生時にHTTP通知を送信",

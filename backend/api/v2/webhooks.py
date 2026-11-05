@@ -555,5 +555,6 @@ def list_events():
             'csr.rejected': 'When a CSR is rejected',
             'acme.preflight': 'When an ACME preflight dry-run completes',
             'acme_order.renewal_failed': 'When an ACME client renewal fails, scheduled or manual',
+            'acme_order.revocation_failed': 'When the CA refuses or misses the revocation of a renewed certificate',
         }
     })

@@ -4142,7 +4142,8 @@
       "systemUpdateInstalled": "Update installiert",
       "systemUpdateFailed": "Update fehlgeschlagen",
       "acmePreflight": "ACME-Vorabprüfung",
-      "acmeOrderRenewalFailed": "ACME-Erneuerung fehlgeschlagen"
+      "acmeOrderRenewalFailed": "ACME-Erneuerung fehlgeschlagen",
+      "acmeOrderRevocationFailed": "ACME-Widerruf fehlgeschlagen"
     },
     "title": "Webhooks",
     "subtitle": "HTTP-Benachrichtigungen bei Zertifikatsereignissen senden",

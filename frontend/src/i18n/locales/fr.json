@@ -4145,7 +4145,8 @@
       "systemUpdateInstalled": "Mise à jour installée",
       "systemUpdateFailed": "Mise à jour échouée",
       "acmePreflight": "Pré-vérification ACME",
-      "acmeOrderRenewalFailed": "Échec du renouvellement ACME"
+      "acmeOrderRenewalFailed": "Échec du renouvellement ACME",
+      "acmeOrderRevocationFailed": "Échec de la révocation ACME"
     },
     "title": "Webhooks",
     "subtitle": "Envoyer des notifications HTTP lors d'événements de certificats",

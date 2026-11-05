@@ -4145,7 +4145,8 @@
       "systemUpdateInstalled": "Update Installed",
       "systemUpdateFailed": "Update Failed",
       "acmePreflight": "ACME Preflight",
-      "acmeOrderRenewalFailed": "ACME Renewal Failed"
+      "acmeOrderRenewalFailed": "ACME Renewal Failed",
+      "acmeOrderRevocationFailed": "ACME Revocation Failed"
     },
     "title": "Webhooks",
     "subtitle": "Send HTTP notifications when certificate events occur",

@@ -4204,7 +4204,8 @@
       "systemUpdateInstalled": "Оновлення встановлено",
       "systemUpdateFailed": "Оновлення не вдалося",
       "acmePreflight": "Попередня перевірка ACME",
-      "acmeOrderRenewalFailed": "Поновлення ACME не вдалося"
+      "acmeOrderRenewalFailed": "Поновлення ACME не вдалося",
+      "acmeOrderRevocationFailed": "Відкликання ACME не вдалося"
     },
     "title": "Webhooks",
     "subtitle": "Надсилайте HTTP-сповіщення, коли відбуваються події сертифікатів",

@@ -102,3 +102,8 @@ REASON_CODES = {
     x509.ReasonFlags.privilege_withdrawn: 9,
     x509.ReasonFlags.aa_compromise: 10,
 }
+
+
+def reason_code(value) -> int:
+    """The CRLReason code of a stored reason; 0 (unspecified) when it is not a known one."""
+    return REASON_CODES.get(REASON_FLAGS.get(normalize_revocation_reason(value) or 'unspecified'), 0)

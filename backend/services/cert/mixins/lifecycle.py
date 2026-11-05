@@ -20,6 +20,7 @@ from services.trust_store import TrustStoreService
 from utils.ct_client import embed_scts_in_certificate
 from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, cleanup_old_files
 from utils.datetime_utils import utc_now, to_naive_utc
+from utils.spki_digest import certificate_key_sha256
 
 logger = logging.getLogger(__name__)
 
@@ -422,6 +423,7 @@ class LifecycleMixin:
                 record.invalidity_at = certificate.invalidity_at
                 record.valid_to = valid_to
                 record.certificate_id = certificate.id
+                record.public_key_sha256 = certificate_key_sha256(certificate.crt)  # None, never raises
             elif certificate.caref:
                 logger.warning("Certificate %s: CA %s not found, no revocation record written",
                                cert_id, certificate.caref)
@@ -570,6 +572,11 @@ class LifecycleMixin:
 
         # The revocation record outlives the certificate: unlinked, never cascaded
         try:
+            digest = certificate_key_sha256(certificate.crt)
+            if digest:  # a record older than the column learns the key before the row goes
+                RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id,
+                                           RevokedSerial.public_key_sha256.is_(None)).update(
+                    {RevokedSerial.public_key_sha256: digest}, synchronize_session='fetch')
             RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id).update(
                 {RevokedSerial.certificate_id: None}, synchronize_session='fetch')
         except Exception as e:

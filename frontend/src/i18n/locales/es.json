@@ -4142,7 +4142,8 @@
       "systemUpdateInstalled": "Actualización instalada",
       "systemUpdateFailed": "Actualización fallida",
       "acmePreflight": "Comprobación previa ACME",
-      "acmeOrderRenewalFailed": "Renovación ACME fallida"
+      "acmeOrderRenewalFailed": "Renovación ACME fallida",
+      "acmeOrderRevocationFailed": "Revocación ACME fallida"
     },
     "title": "Webhooks",
     "subtitle": "Enviar notificaciones HTTP cuando ocurran eventos de certificados",

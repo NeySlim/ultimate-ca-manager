@@ -882,13 +882,15 @@ class AcmeClientService:
             retry_at = retry_at.astimezone(timezone.utc)
         return retry_at.replace(tzinfo=None)
 
-    def revoke_certificate(self, certificate_pem_or_der, reason: int = 0) -> requests.Response:
+    def revoke_certificate(self, certificate_pem_or_der, reason: Optional[int] = 0) -> requests.Response:
         """Revoke a certificate upstream using the registered account KID.
 
         The certificate is encoded as base64url DER and the request is signed
         with the external ACME account key, as required by RFC 8555 §7.6.
+        ``reason`` None leaves the optional field out.
         """
-        reason = self.validate_revocation_reason(reason)
+        if reason is not None:
+            reason = self.validate_revocation_reason(reason)
         cert_obj = self._load_x509_certificate(certificate_pem_or_der)
         directory = self._fetch_directory()
         revoke_url = directory.get('revokeCert')
@@ -899,8 +901,9 @@ class AcmeClientService:
             'certificate': self._b64url(
                 cert_obj.public_bytes(serialization.Encoding.DER)
             ),
-            'reason': reason,
         }
+        if reason is not None:
+            payload['reason'] = reason
         return self._post(revoke_url, payload, use_jwk=False)
 
     def get_renewal_info(self, certificate) -> Optional[Dict[str, Any]]:

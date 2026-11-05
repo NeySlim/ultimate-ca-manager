@@ -28,9 +28,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: deleting a certificate after revoking it did not stop its order, and the next pass issued a new one. The order's automatic renewal is now turned off, with a message saying so.
 - ACME client: a renewal used a DNS provider that had been disabled, and an order reusing the key of a deleted certificate silently got a new key. Both now stop before the CA with a message.
 - ACME client: the help of the renewal threshold did not say that a certificate whose life is shorter than 1.5 times the threshold renews in its last third. It now does.
+- ACME client: with `revoke_on_renewal`, a revocation the CA refused or never received was only logged, and a certificate revoked here as compromised was revoked at the CA as superseded. The CA now gets the local reason (without one if it refuses it), and a failed revocation is retried by the renewal task until the certificate expires, emitting `acme_order.revocation_failed`.
+- Revocation: a key revoked as compromised was forgotten once its certificate was deleted, so the ACME client could certify it again. The revocation record, written when the issuing CA is held here, now keeps the key's SHA-256 (migration 125).
 
 ### Upgrade notes
 
+- Revocation records written before migration 125 carry no key digest: they learn it when their certificate is deleted, and until then the certificate row itself answers.
 - ACME client: the renewal task now removes the orders left `pending` for more than 7 days whose order at the CA has expired, with their TXT records, and audits each removal.
 - DNS providers, ACME CA accounts and webhooks: the upgrade renames duplicate names to `name (2)`, `name (3)`, oldest first, then makes the name unique (migration 124).
 - ACME client: a renewal now keeps the certificate's id and refid, and `/renew` and the renewal logs no longer announce a new certificate id. Certificates that past renewals imported as new rows stay in the inventory: archive or delete them by hand.
