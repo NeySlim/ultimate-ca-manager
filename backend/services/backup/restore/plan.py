@@ -207,6 +207,10 @@ class RestorePlan:
 
         return self._id_of(target, identity, translate=translate)
 
+    def id_for(self, section_name: str, identity: Dict[str, Any]) -> Optional[Any]:
+        """The id here of the row an archived identity names, from the last refresh."""
+        return self._id_of(section_name, identity, translate=True)
+
     def existing_id(self, section_name: str, row: Dict[str, Any]) -> Optional[Any]:
         """The id of the row here that this archived row is, if it exists."""
         section = SECTIONS.get(section_name)

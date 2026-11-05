@@ -88,7 +88,10 @@ class ExportCoreMixin:
 
             config[sc.key] = val
 
+        from .restore.setting_refs import export_references
         return {
+            # The row each numbered setting names, by identity (restore/setting_refs.py)
+            'settings_refs': export_references(config),
             'system': {
                 'fqdn': os.environ.get('FQDN', ''),
                 'https_port': int(os.environ.get('HTTPS_PORT', 8443)),

@@ -18,7 +18,7 @@ a new table or a new column fails the suite until it is either exported or
 excluded here, on purpose and in writing.
 """
 from dataclasses import dataclass, field
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -514,3 +514,31 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',
 }
+
+
+@dataclass(frozen=True)
+class SettingReference:
+    """A setting that names a row by its number, in its key, its value, or both."""
+
+    pattern: str                    # regular expression matching the whole key
+    value: Optional[str] = None     # section the value names (a number, or a refid)
+    key: Optional[str] = None       # section the number in the key (group 1) names
+
+
+# Settings holding a row number: carried with the identity of that row
+# (`settings_refs` in the configuration section) and renumbered on restore.
+# A refid reads the same everywhere and is not one of them: est_ca_refid,
+# tsa_ca_refid, tsa_signer_cert_refid, wstep_ca_refid, xcep_ca_refid,
+# mtls_trusted_ca_id, https_bound_certificate_refid, est_labels. The number in
+# `ca_url_alias_<n>` is the one published URLs carry, and stays the source's.
+SETTING_REFERENCES: Tuple[SettingReference, ...] = (
+    SettingReference(r'scep_ca_id', value='certificate_authorities'),
+    SettingReference(r'acme\.issuing_ca_id', value='certificate_authorities'),
+    SettingReference(r'acme_public_tls_cert_id', value='certificates'),
+    SettingReference(r'acme\.proxy\.acme_account_id', value='acme_client_accounts'),
+    SettingReference(r'ocsp_responder_cert_(\d+)', key='certificate_authorities',
+                     value='certificates'),
+    SettingReference(r'scep_challenge_(\d+)(?:_generated_at)?', key='certificate_authorities'),
+    SettingReference(r'cert_scts_(\d+)', key='certificates'),
+    SettingReference(r'ca_url_cross_.+', value='ca_cross_certificates'),
+)

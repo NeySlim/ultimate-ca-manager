@@ -28,6 +28,7 @@ from .restore.names import rename_clashing_rows
 from .restore.repairs import replay_order_repairs
 from .restore.conflict import conflict_from_integrity_error
 from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
+from .restore.setting_refs import deferred_keys, restore_setting_references
 from .restore.settings import restore_encrypted_settings
 from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
 
@@ -352,6 +353,8 @@ class RestoreCoreMixin:
                 results['relinked'] = relink_references(backup_data, plan)
                 if backup_data.get('acme_client_orders'):
                     results['acme_client_orders_repaired'] = replay_order_repairs()
+                results['settings'] += restore_setting_references(
+                    backup_data.get('configuration'), plan)
                 results['chain_variant_fallbacks'] = list(plan.chain_variant_fallbacks)
 
                 if replacement is not None:
@@ -905,8 +908,10 @@ class RestoreCoreMixin:
         else:
             config_data = configuration.get('settings', {})
         from utils import admin_allowlist
+        # Settings naming a row by number wait for that row: see restore/setting_refs.py
+        deferred = deferred_keys(configuration if isinstance(configuration, dict) else {})
         for key, value in config_data.items():
-            if key == installation.CONFIG_KEY:
+            if key == installation.CONFIG_KEY or key in deferred:
                 continue    # this database's own, never the source's
             if key == admin_allowlist.CONFIG_KEY and admin_allowlist.restored_value_locks_out(value):
                 if admin_allowlist.disabled_by_env():
@@ -931,7 +936,7 @@ class RestoreCoreMixin:
         # encrypted: written back encrypted with this installation's key.
         results['encrypted_settings'] = restore_encrypted_settings(
             configuration if isinstance(configuration, dict) else {},
-            (configuration or {}).get('encrypted_settings') or [])
+            (configuration or {}).get('encrypted_settings') or [], skip=deferred)
 
     def _regenerate_files(self, staged) -> None:
         """Write the files that materialise the restored rows on disk.
