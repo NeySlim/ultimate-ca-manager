@@ -502,3 +502,18 @@ class TestImports:
         r = auth_client.post(url, data={'pem_content': pem, 'name': 'ed import'})
         _assert_fips_problem(r)
         assert 'the imported file' in r.get_json()['detail']
+
+    @pytest.mark.parametrize('url', ['/api/v2/import/analyze', '/api/v2/import/execute'])
+    @pytest.mark.parametrize('ca', [True, False])
+    def test_smart_import_answers_the_fips_problem(self, app, auth_client, fips_on, url, ca):
+        cn = f'Smart Ed25519 {uuid.uuid4().hex[:6]}'
+        r = _post(auth_client, url, {'content': _ed_pem_bundle(cn, ca=ca)})
+        _assert_fips_problem(r)
+        assert 'the imported file' in r.get_json()['detail']
+        with app.app_context():
+            assert CA.query.filter(CA.subject.contains(cn)).count() == 0
+            assert Certificate.query.filter(Certificate.subject.contains(cn)).count() == 0
+
+    def test_smart_import_keeps_eddsa_outside_fips_mode(self, auth_client, fips_off):
+        r = _post(auth_client, '/api/v2/import/analyze', {'content': _ed_pem_bundle('Smart Ed off')})
+        assert r.status_code == 200, r.get_json()

@@ -33,6 +33,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: a failed manual renewal answered a bare 500 and was neither counted nor audited. It now answers 409 or 422 with the reason, counts towards the order's failures and emits `acme_order.renewal_failed`.
 - ACME client: an order the CA answered 404 or 410 for was polled until the timeout, up to several minutes per scheduler pass. Polling now stops at once and the order turns invalid with the reason.
 - ACME client: a restart during the automatic validation left the order `processing` for good. At startup such an order goes back to `pending`, with a message, ready for Verify.
+- FIPS mode: Smart Import accepted a file holding an Ed25519 or Ed448 key, which the other imports refuse. It now answers the same FIPS refusal before parsing.
 - ACME client: with two instances on one database, a restart of one set back to `pending` the orders the other was validating. Only an order untouched for 15 minutes is now set back, and the DNS wait of the automatic validation keeps its order fresh.
 - ACME client: the order list stopped at the 100 newest orders, so an older issued order disappeared from the page. The API now pages (`page`, `per_page`) and the page loads every order.
 - ACME client: the TXT records of a DNS-01 order whose automatic validation failed stayed in the zone. They are now removed once the order is invalid or its finalization failed; an order left pending keeps them for Verify.
