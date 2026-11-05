@@ -1,4 +1,4 @@
-"""After a renewal exactly one order holds the schedule, however it got there."""
+"""A renewal leaves one order for its names, whatever status it started from."""
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -76,45 +76,38 @@ def _next_cycle():
 
 
 @pytest.mark.parametrize('status', ['issued', 'valid'])
-def test_only_the_original_order_comes_up_again(orders, status):
+def test_a_renewal_leaves_one_order_and_it_comes_up_again(orders, status):
     # Renew is also offered on a valid order, whose import was refused
     parent_id, child_id, _provider = orders
     parent = db.session.get(AcmeClientOrder, parent_id)
     parent.status = status
+    db.session.get(AcmeClientOrder, child_id).certificate_url = 'https://ca.example/cert/new'
     db.session.commit()
     ok, message = _renew(parent_id, child_id)
     assert ok, message
-    renewed = _next_cycle()
-    assert parent_id in renewed and child_id not in renewed
-    assert db.session.get(AcmeClientOrder, parent_id).certificate_id == 4242
+    assert db.session.get(AcmeClientOrder, child_id) is None
+    parent = db.session.get(AcmeClientOrder, parent_id)
+    assert (parent.certificate_id, parent.order_url, parent.certificate_url) == \
+        (4242, URLS[1], 'https://ca.example/cert/new')
+    assert parent_id in _next_cycle()
 
 
-def test_a_failed_renewal_leaves_the_other_order_its_own_schedule(orders):
+def test_a_failed_renewal_leaves_the_other_order_alone(orders):
     # A pending HTTP-01 order picked for reuse may be one the operator asked for
     parent_id, child_id, _provider = orders
     with pytest.raises(Exception, match='refused'):
         _renew(parent_id, child_id, finalize=lambda _order: (False, 'refused', None))
-    assert db.session.get(AcmeClientOrder, child_id).renewal_enabled is True
+    child = db.session.get(AcmeClientOrder, child_id)
+    assert child is not None and child.renewal_enabled is True
+    assert db.session.get(AcmeClientOrder, parent_id).order_url == URLS[0]
 
 
-def test_deleting_the_original_hands_the_schedule_on(app, auth_client, orders):
+def test_a_failed_save_keeps_both_orders_and_the_original_retries(orders):
     parent_id, child_id, _provider = orders
-    ok, message = _renew(parent_id, child_id)
-    assert ok, message
-    assert db.session.get(AcmeClientOrder, child_id).renewal_enabled is False
-    with patch('api.v2.acme_client.orders.AcmeClientService.for_order', side_effect=RuntimeError):
-        assert auth_client.delete(f'/api/v2/acme/client/orders/{parent_id}').status_code == 200
+    with patch.object(renew_mod, 'commit_or_rollback', side_effect=lambda *_args: db.session.rollback() or False), \
+            pytest.raises(RuntimeError, match='persist renewed'):
+        _renew(parent_id, child_id)
     db.session.expire_all()
-    assert child_id in _next_cycle()
-
-
-def test_deleting_an_order_leaves_a_stranger_alone(app, auth_client, orders):
-    parent_id, child_id, _provider = orders
-    parent, child = db.session.get(AcmeClientOrder, parent_id), db.session.get(AcmeClientOrder, child_id)
-    parent.certificate_id, parent.status = 4242, 'issued'
-    child.certificate_id, child.status, child.renewal_enabled = 4243, 'issued', False
-    db.session.commit()
-    with patch('api.v2.acme_client.orders.AcmeClientService.for_order', side_effect=RuntimeError):
-        assert auth_client.delete(f'/api/v2/acme/client/orders/{parent_id}').status_code == 200
-    db.session.expire_all()
-    assert db.session.get(AcmeClientOrder, child_id).renewal_enabled is False
+    assert db.session.get(AcmeClientOrder, child_id) is not None
+    assert db.session.get(AcmeClientOrder, parent_id).status == 'issued'
+    assert parent_id in _next_cycle()

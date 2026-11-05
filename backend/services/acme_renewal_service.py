@@ -420,10 +420,11 @@ def renew_certificate(order) -> tuple:
         # Update original order with new certificate reference
         order.certificate_id = cert_id
         order.order_url = new_order_url
-        # This order keeps the schedule, whatever status it was renewed from; the
-        # one that fetched the certificate would otherwise renew these names again
+        order.certificate_url = new_order.certificate_url
+        # This order carries on, whatever status it was renewed from. The one that fetched
+        # the certificate has nothing left of its own: kept, it would renew these names again
         order.status = 'issued'
-        new_order.renewal_enabled = False
+        db.session.delete(new_order)
         order.last_renewal_at = utc_now()
         order.renewal_failures = 0
         order.error_message = None

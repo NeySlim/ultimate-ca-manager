@@ -1,7 +1,7 @@
 """A finalization that fails on a database error or a refused import says so on the order."""
 import json
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -200,6 +200,65 @@ def test_a_status_check_loses_to_an_import_during_its_round_trip(app):
         svc._post = background_import_meanwhile
         status, _data = svc.check_order_status(order)
         assert status == 'valid'
+        assert _stored(order_id).status == 'issued'
+
+
+def test_a_database_error_in_a_status_check_leaves_the_session_usable(app):
+    with app.app_context():
+        order = _order()
+        svc = object.__new__(AcmeClientService)
+        svc._post = _failed_flush
+        status, data = svc.check_order_status(order)
+        assert (status, data) == ('ready', {})
+        assert db.session.execute(text('SELECT 1')).scalar() == 1
+
+
+def test_a_verification_loses_to_an_import_during_its_round_trip(app, auth_client):
+    with app.app_context():
+        order = _order()
+        order.set_challenges_dict({'flush.example.com': {'status': 'pending'}})
+        order.status = 'validating'
+        db.session.commit()
+        order_id = order.id
+
+    def import_meanwhile(_order):
+        db.session.execute(text(f"UPDATE {AcmeClientOrder.__tablename__} SET status = 'issued' "
+                                f"WHERE id = {order_id}"))
+        return 'valid', {}
+
+    client = MagicMock()
+    client.verify_challenge.return_value = (True, 'ok')
+    client.check_order_status.side_effect = import_meanwhile
+    with patch.object(AcmeClientService, 'for_order', return_value=client), \
+            patch.object(orders_module, '_dns_propagation_timeout', lambda: 0):
+        answer = auth_client.post(f'/api/v2/acme/client/orders/{order_id}/verify', json={'force': True})
+    assert answer.status_code == 200, answer.get_json()
+    with app.app_context():
+        assert _stored(order_id).status == 'issued'
+
+
+def test_the_automatic_path_loses_to_an_import_during_its_own_failure(app, monkeypatch):
+    # Another finalize imported while this one failed: its pending must not undo the import
+    monkeypatch.setattr(orders_module, '_dns_propagation_timeout', lambda: 0)
+    monkeypatch.setattr(orders_module.time, 'sleep', lambda _seconds: None)
+    with app.app_context():
+        order = _order()
+        order.set_challenges_dict({'flush.example.com': {'dns_txt_value': 'token'}})
+        db.session.commit()
+        order_id = order.id
+
+        def finalize_fails_after_the_import(_order):
+            db.session.execute(text(f"UPDATE {AcmeClientOrder.__tablename__} SET status = 'issued' "
+                                    f"WHERE id = {order_id}"))
+            return False, 'Order not ready for finalization (status: processing)', None
+
+        client = SimpleNamespace(
+            verify_challenge=lambda _order, _domain: (True, 'submitted'),
+            get_poll_settings=lambda: {'order_poll_timeout_sec': 30, 'order_poll_interval_sec': 3},
+            find_invalid_authorization=lambda _order: None,
+            check_order_status=lambda _order: ('ready', {}),
+            finalize_order=finalize_fails_after_the_import)
+        orders_module._auto_poll_and_finalize(client, order)
         assert _stored(order_id).status == 'issued'
 
 

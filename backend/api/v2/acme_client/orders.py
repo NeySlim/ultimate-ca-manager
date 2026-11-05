@@ -473,21 +473,16 @@ def verify_challenges(order_id):
             # Check if LE has already validated (poll order status)
             try:
                 le_status, _ = client.check_order_status(order)
-                if le_status in ['ready', 'valid']:
-                    order.status = le_status
-                else:
-                    order.status = 'validating'
+                new_status = le_status if le_status in ['ready', 'valid'] else 'validating'
             except Exception:
-                order.status = 'validating'
+                new_status = 'validating'
+            AcmeClientService.write_order_status(order, new_status)
         elif any_failed:
             invalid_hit = any(
                 AUTHZ_INVALID_USER_MSG in (r.get('message') or '')
                 for r in results.values() if not r.get('success')
             )
-            if invalid_hit:
-                order.status = 'invalid'
-            else:
-                order.status = 'pending'
+            AcmeClientService.write_order_status(order, 'invalid' if invalid_hit else 'pending')
             order.error_message = '; '.join(
                 f"{d}: {r['message']}" for d, r in results.items() if not r['success']
             )
@@ -600,14 +595,6 @@ def cancel_order(order_id):
             pass  # Best effort cleanup
 
     order_domains = ', '.join([d.get('value', '') for d in (order.identifiers_list if hasattr(order, 'identifiers_list') else [])]) or f'Order {order_id}'
-    if order.renewal_enabled and order.certificate_id:
-        # A renewal's order holds the same certificate: it takes over the schedule
-        heir = AcmeClientOrder.query.filter(
-            AcmeClientOrder.id != order.id,
-            AcmeClientOrder.certificate_id == order.certificate_id,
-        ).order_by(AcmeClientOrder.id.desc()).first()
-        if heir:
-            heir.renewal_enabled = True
     db.session.delete(order)
     ok, _err = safe_commit(logger, "Failed to cancel ACME order")
     if not ok:
@@ -681,7 +668,7 @@ def _auto_poll_and_finalize(client, order) -> dict:
     def _set_status(status, error_message=None):
         """Persist a status transition on the order (best-effort)."""
         try:
-            order.status = status
+            AcmeClientService.write_order_status(order, status)
             if error_message is not None:
                 order.error_message = error_message
             db.session.commit()

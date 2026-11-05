@@ -1452,6 +1452,15 @@ class AcmeClientService:
         finally:
             listener.stop()
 
+    @staticmethod
+    def write_order_status(order, status: str) -> None:
+        """Write a status, unless the order is issued: that means imported here, which the CA
+        cannot know and the scheduler needs. Tested in the write, as a background finalize may
+        import at any moment. The caller commits, and sees the outcome after that."""
+        AcmeClientOrder.query.filter(
+            AcmeClientOrder.id == order.id, AcmeClientOrder.status != 'issued',
+        ).update({'status': status}, synchronize_session=False)
+
     def check_order_status(self, order: AcmeClientOrder) -> Tuple[str, Dict]:
         """
         Check current order status from ACME server.
@@ -1463,11 +1472,7 @@ class AcmeClientService:
             resp = self._post(order.order_url, "")  # POST-as-GET
             if resp.status_code == 200:
                 data = resp.json()
-                # Issued means imported here, which the CA cannot know and the scheduler needs.
-                # Tested in the write: the background finalize may import during this round trip
-                AcmeClientOrder.query.filter(
-                    AcmeClientOrder.id == order.id, AcmeClientOrder.status != 'issued',
-                ).update({'status': data.get('status', order.status)}, synchronize_session=False)
+                self.write_order_status(order, data.get('status', order.status))
                 if data.get('certificate'):
                     order.certificate_url = data['certificate']
                 db.session.commit()
@@ -1475,6 +1480,9 @@ class AcmeClientService:
             return order.status, {}
         except Exception as e:
             logger.error(f"Status check error: {e}")
+            if isinstance(e, SQLAlchemyError):
+                # Otherwise every later statement of this request fails too
+                db.session.rollback()
             return order.status, {}
     
     # =========================================================================
@@ -1636,7 +1644,7 @@ class AcmeClientService:
         try:
             db.session.rollback()
             if order.status not in ('valid', 'invalid'):
-                order.status = 'error'
+                AcmeClientService.write_order_status(order, 'error')
             order.error_message = message
             db.session.commit()
         except Exception as commit_err:
