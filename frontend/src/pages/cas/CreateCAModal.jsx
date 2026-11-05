@@ -531,7 +531,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
             <Select
               label={t('common.keySize')}
               options={groupedOptions(
-                KEY_ALGORITHMS.filter(k => k.generate && k.ca && k.ca[0] === createFormKeyAlgo), t,
+                KEY_ALGORITHMS.filter(k => k.ca && k.ca[0] === createFormKeyAlgo), t,
                 k => algorithmName(k, t, 'sizeKey'), k => k.ca[1],
               ).filter(o => noKeyAllowed || allowedLocalKeys.some(([a, sz]) => a === createFormKeyAlgo && sz === o.value))}
               value={createFormKeySize}

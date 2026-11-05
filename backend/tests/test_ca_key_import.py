@@ -83,11 +83,11 @@ class TestCaKeyImport:
         assert r.status_code == 400
         r = _post(auth_client, ca_id, {})
         assert r.status_code == 400
-        # An Ed25519 CA key is refused with the reason
+        # An Ed25519 CA key is accepted: such a CA signs (#436)
         edkey = ed25519.Ed25519PrivateKey.generate()
         ed_id = _keyless_ca(app, edkey, 'Ed Keyless CA')
         r = _post(auth_client, ed_id, {'key': _pem(edkey)})
-        assert r.status_code == 400 and 'Ed25519' in json.loads(r.data)['message']
+        assert r.status_code == 200, r.data
         # A CA that already has a key
         full = create_ca(cn='Already Keyed CA')
         r = _post(auth_client, full['id'], {'key': _pem(key)})

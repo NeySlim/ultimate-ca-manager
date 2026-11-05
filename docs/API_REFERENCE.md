@@ -464,11 +464,11 @@ GET /api/v2/cas?page=1&per_page=20
 ```
 
 **Key fields** (CAs, certificates and CSRs): `key_type` (`"RSA 4096"`, `"EC secp384r1"`,
-`"ML-DSA-65"`), `key_algorithm` (`"RSA"`, `"EC"`, `"ML-DSA-65"`), `key_size` (bits of an RSA key; `0`
-for EC and `null` for a post-quantum key), `security_level` (NIST level `2`, `3` or `5` for ML-DSA-44/65/87,
-`null` otherwise), `post_quantum` (boolean) and `verifiable` (`false` for an SLH-DSA
-signature, which UCM reads but cannot check). An ML-DSA CA reports `signature_algorithm`
-as its parameter set, e.g. `"ML-DSA-65"`. A certificate in a hybrid pair (RFC 9763) also
+`"ML-DSA-65"`), `key_algorithm` (`"RSA"`, `"EC"`, `"ML-DSA-65"`), `key_size` (bits of an RSA key, `256`
+or `448` for Ed25519 or Ed448; `0` for EC and `null` for a post-quantum key), `security_level` (NIST level
+`2`, `3` or `5` for ML-DSA-44/65/87, `null` otherwise), `post_quantum` (boolean) and `verifiable` (`false`
+for an SLH-DSA signature, which UCM reads but cannot check). An ML-DSA CA reports `signature_algorithm`
+as its parameter set, e.g. `"ML-DSA-65"`, an EdDSA CA as `"Ed25519"` or `"Ed448"`. A certificate in a hybrid pair (RFC 9763) also
 reports `related_certificate_id` (the other member) and `hybrid_role` (`"classical"` or `"pq"`);
 both are `null` otherwise.
 
@@ -523,11 +523,16 @@ are sent. An intermediate CA never outlives its parent. A CA of type
 `external` takes neither: its signer decides.
 
 `keyAlgo` is `RSA` (`keySize` 2048, 3072 or 4096), `ECDSA` or `EC` (`keySize` a curve:
-`prime256v1`, `secp384r1`, `secp521r1`, or a Brainpool curve) or `ML-DSA` (`keySize` 44, 65
-or 87, required). A full label such as `RSA-3072`, `EC-P384` or `ML-DSA-65` is also accepted,
+`prime256v1`, `secp384r1`, `secp521r1`, or a Brainpool curve), `EdDSA` (`keySize` `Ed25519` or
+`Ed448`) or `ML-DSA` (`keySize` 44, 65 or 87, required). A full label such as `RSA-3072`, `EC-P384`,
+`Ed25519` or `ML-DSA-65` is also accepted,
 and `keyType` is an alias of `keyAlgo`. An unknown `keyAlgo`, or a `keySize` that does not
-belong to it, answers `400`. Without `keySize`, `RSA` gives RSA-2048 and `ECDSA` P-256; a request
-without any key field gets RSA-2048. ML-DSA needs
+belong to it, answers `400`. Without `keySize`, `RSA` gives RSA-2048, `ECDSA` P-256 and `EdDSA`
+Ed25519; a request without any key field gets RSA-2048. An EdDSA CA key is generated in software
+only (no HSM provider holds one), is refused in FIPS mode and signs without a separate digest,
+like ML-DSA below. Windows (CryptoAPI/CNG) and SCEP clients do not accept Ed25519 or Ed448: keep such
+a CA for clients that do (OpenSSL, Go, modern browsers for TLS 1.3 leaves). SCEP refuses an EdDSA
+CA, and an EdDSA CA cannot sign timestamps itself (it can issue the TSA signer). ML-DSA needs
 OpenSSL 3.5 or later and is refused in FIPS mode; `keyAlgo` generates it in software, and
 an HSM-held ML-DSA key is chosen with `hsm_key_algorithm` on a provider that has it (see [HSM](#hsm)).
 An ML-DSA key signs without a separate digest: a `digest` sent for it is ignored and named

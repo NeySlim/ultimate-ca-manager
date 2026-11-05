@@ -435,7 +435,9 @@ class CA(db.Model):
                 from utils.signature_label import signature_algorithm_label
                 return signature_algorithm_label(cert)
             from utils.foreign_algorithms import signature_name
-            known = signature_name(cert.signature_algorithm_oid.dotted_string)
+            from utils.signature_label import EDDSA_SIGNATURE_NAMES
+            dotted = cert.signature_algorithm_oid.dotted_string
+            known = EDDSA_SIGNATURE_NAMES.get(dotted) or signature_name(dotted)
             if known:
                 return known
             return cert.signature_algorithm_oid._name.upper().replace('SHA', 'SHA-')

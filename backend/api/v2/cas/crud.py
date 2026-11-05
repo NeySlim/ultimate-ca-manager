@@ -83,7 +83,9 @@ _MAX_PATH_LENGTH = 32
 _OID_RE = re.compile(r'^[0-2](\.\d+)+$')
 
 
-_CA_KEY_FAMILIES = {'rsa': 'RSA', 'ecdsa': 'EC', 'ec': 'EC', 'ml-dsa': 'ML-DSA', 'mldsa': 'ML-DSA'}
+_CA_KEY_FAMILIES = {'rsa': ('RSA',), 'ecdsa': ('EC',), 'ec': ('EC',), 'ml-dsa': ('ML-DSA',),
+                    'mldsa': ('ML-DSA',), 'eddsa': ('ED25519', 'ED448')}
+_CA_KEY_NAMES = 'RSA, ECDSA (EC), EdDSA or ML-DSA'
 
 
 def _size_names(alg, size) -> bool:
@@ -109,39 +111,41 @@ def _resolve_local_key_type(data):
     if _blank(algo) and _blank(alias):
         if _blank(size):
             return '2048', None
-        return None, 'keySize requires keyAlgo (RSA, ECDSA or ML-DSA)'
+        return None, f'keySize requires keyAlgo ({_CA_KEY_NAMES})'
     names = [v for v in (algo, alias) if not _blank(v)]
     if not all(isinstance(v, str) for v in names):
-        return None, 'keyAlgo must be a string (RSA, ECDSA or ML-DSA)'
-    # A full label ('RSA-4096', 'EC-P384', '2048') names size and curve at once
+        return None, f'keyAlgo must be a string ({_CA_KEY_NAMES})'
+    # A full label ('RSA-4096', 'EC-P384', '2048', 'Ed25519') names size and curve at once
     labels = {key_algorithms.get(v) for v in names}
     if len(labels) == 1 and None not in labels:
         alg = labels.pop()
-        if alg.trust_store_id:
+        if alg.ca_key_type:
             if not _blank(size) and not _size_names(alg, size):
                 return None, 'keyAlgo and keySize name different keys'
-            return alg.trust_store_id, None
+            return alg.ca_key_type, None
     families = {_CA_KEY_FAMILIES.get(v.strip().lower()) for v in names}
     if None in families:
-        return None, f'Unsupported keyAlgo {names[0]!r}: a CA key is RSA, ECDSA (EC) or ML-DSA'
+        return None, f'Unsupported keyAlgo {names[0]!r}: a CA key is {_CA_KEY_NAMES}'
     if len(families) > 1:
         return None, 'keyAlgo and keyType name different algorithms'
     family = families.pop()
-    choices = [a for a in key_algorithms.algorithms(family) if a.trust_store_id]
+    choices = [a for f in family for a in key_algorithms.algorithms(f) if a.ca_key_type]
     if not choices:
-        return None, f'{family} keys are not available on this build: they need OpenSSL 3.5 or later'
-    if _blank(size) and family != 'ML-DSA':
-        return choices[0].trust_store_id, None
+        return None, f'{family[0]} keys are not available on this build: they need OpenSSL 3.5 or later'
+    if _blank(size) and family != ('ML-DSA',):
+        return choices[0].ca_key_type, None
     alg = None
     if isinstance(size, (int, str)) and not _blank(size):
         alg = next((a for a in choices if _size_names(a, size)), None)
     if alg is None:
-        if family == 'RSA':
+        if family == ('RSA',):
             return None, f'RSA key size must be one of {[a.key_size for a in choices]}'
-        if family == 'ML-DSA':
+        if family == ('ML-DSA',):
             return None, f'ML-DSA key size must be one of {[int(a.param) for a in choices]}'
-        return None, f'ECDSA curve must be one of {[a.trust_store_id for a in choices]}'
-    return alg.trust_store_id, None
+        if family == ('EC',):
+            return None, f'ECDSA curve must be one of {[a.trust_store_id for a in choices]}'
+        return None, f'EdDSA keySize must be one of {[a.display for a in choices]}'
+    return alg.ca_key_type, None
 
 
 def _public_key_summary(public_key):
