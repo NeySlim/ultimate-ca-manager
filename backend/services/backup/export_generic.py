@@ -11,12 +11,12 @@ import importlib
 import logging
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import inspect as sa_inspect
 
 from .errors import BackupExportError
-from .key_material import decrypt_stored_fields, decrypt_stored_secret
+from .key_material import as_pem, decrypt_stored_fields, decrypt_stored_key, decrypt_stored_secret
 from .manifest import SECTIONS, Section
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,15 @@ logger = logging.getLogger(__name__)
 # Suffix carrying the stable identity of a referenced row, next to the
 # numeric foreign key the source happened to use.
 REFERENCE_SUFFIX = '_ref'
+
+
+_TRANSIENT_KEY = ('AcmeClientOrder', '_pending_key')
+
+
+def _key_material_columns():
+    """(model, attribute) of the columns holding base64 key material under the master key."""
+    from security.encryption import MASTER_KEY_COLUMNS
+    return {(name, attribute) for _module, name, attribute, fmt in MASTER_KEY_COLUMNS if fmt == 'b64'}
 
 
 def load_model(section: Section):
@@ -75,7 +84,8 @@ class IdentityIndex:
         return index
 
 
-def export_section(section_name: str, index: IdentityIndex) -> List[Dict[str, Any]]:
+def export_section(section_name: str, index: IdentityIndex,
+                   warnings: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """Read one section: every column, the secrets in the clear, the
     references carried by identity as well as by number."""
     section = SECTIONS[section_name]
@@ -110,8 +120,24 @@ def export_section(section_name: str, index: IdentityIndex) -> List[Dict[str, An
                 raise BackupExportError(
                     f"Section '{section_name}' declares a secret {secret!r} the "
                     "model does not hold")
+            stored = getattr(row, stored_attr)
+            if (model.__name__, stored_attr) in _key_material_columns():
+                # Base64 key material under the master key, carried as the PEM
+                try:
+                    data[secret] = as_pem(decrypt_stored_key(stored, label=label), label=label) if stored else None
+                except BackupExportError as exc:
+                    if (model.__name__, stored_attr) != _TRANSIENT_KEY:
+                        raise
+                    # A finalization's key: one this key cannot open is left out, not the backup
+                    message = (f"ACME order {getattr(row, 'id', '?')}: its pending key could not "
+                               "be read and is not in the archive")
+                    logger.warning("Backup: %s (%s)", message, exc)
+                    if warnings is not None:
+                        warnings.append(message)
+                    data[secret] = None
+                continue
             decrypt = decrypt_stored_fields if section.stored.get(secret) == 'fields' else decrypt_stored_secret
-            data[secret] = decrypt(getattr(row, stored_attr), label=f"{label} ({secret})")
+            data[secret] = decrypt(stored, label=f"{label} ({secret})")
 
         for column, target in section.references.items():
             data[f'{column}{REFERENCE_SUFFIX}'] = index.of(

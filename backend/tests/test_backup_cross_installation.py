@@ -264,6 +264,9 @@ SECRET_VALUES = {
     ('webhook_endpoints', 'secret'): 'xinst-webhook-secret',
     ('webhook_endpoints', 'auth_token'): 'xinst-webhook-auth-token',
     ('deploy_targets', 'private_key'): 'xinst-deploy-private-key',
+    ('acme_client_orders', 'pending_key'): (
+        '-----BEGIN PRIVATE KEY-----\nxinst-pending-key\n'
+        '-----END PRIVATE KEY-----\n'),
 }
 
 # The row each section's secrets were written on, as this installation names
@@ -283,6 +286,7 @@ SECRET_ROW = {
     'ad_connector': {},
     'webhook_endpoints': {'name': 'xinst-webhook'},
     'deploy_targets': {'name': 'xinst-deploy-b'},
+    'acme_client_orders': {'order_url': 'https://acme-b.example.test/order/1'},
 }
 
 
@@ -560,13 +564,20 @@ def _seed_source():
     secret(tsig, 'acme_dns_update_keys', 'secret')
     db.session.flush()
 
-    add('acme_client_orders', order_url='https://acme-b.example.test/order/1',
+    renewed = [add('acme_client_orders', order_url=f'https://acme-b.example.test/order/0{suffix}',
+                   domains='["xinst-order.example.test"]', environment='production',
+                   status='issued', created_at=now - timedelta(days=index + 1))
+               for index, suffix in enumerate('ab')]
+    db.session.flush()
+    order = add('acme_client_orders', order_url='https://acme-b.example.test/order/1',
+        renewal_of_order_id=renewed[1].id,
         domains='["xinst-order.example.test"]', challenge_type='http-01',
         environment='production', key_source='generate', status='valid',
         account_id=acme_accounts[1].account_id,
         acme_client_account_id=client_accounts[1].id,
         dns_provider_id=dns_providers[1].id,
         certificate_id=leaves[1].id, source_certificate_id=leaves[0].id)
+    secret(order, 'acme_client_orders', 'pending_key')
 
     ssh_authorities = [
         add('ssh_cas', refid=f'xinst-sshca-{suffix}',
@@ -1373,6 +1384,8 @@ AT_REST_AFTER_A_RESTORE = {
     # product writes it with.
     ('acme_client_accounts', 'account_key'): 'key-encryption key',
     ('acme_client_accounts', 'eab_hmac_key'): 'key-encryption key',
+    # Key material like a certificate's: under the target's master key
+    ('acme_client_orders', 'pending_key'): 'key-encryption key',
 }
 
 # Secrets the archive carried as the source's own ciphertext: the export

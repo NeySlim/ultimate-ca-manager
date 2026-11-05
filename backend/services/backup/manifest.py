@@ -18,7 +18,7 @@ a new table or a new column fails the suite until it is either exported or
 excluded here, on purpose and in writing.
 """
 from dataclasses import dataclass, field
-from typing import Dict, Tuple
+from typing import Dict, Optional, Tuple
 
 
 @dataclass(frozen=True)
@@ -231,7 +231,6 @@ SECTIONS: Dict[str, Section] = {
         exclude={**_SURROGATE},
         references={'certificate_id': 'certificates', 'policy_id': 'certificate_policies',
                     'requester_id': 'users'},
-        optional=True,
     ),
     'dns_providers': Section(
         model='models.acme_models:DnsProvider',
@@ -282,26 +281,23 @@ SECTIONS: Dict[str, Section] = {
     ),
     'acme_client_orders': Section(
         model='models.acme_models:AcmeClientOrder',
-        identity=('order_url',),
+        # What never changes on an order: a renewal hands the parent its
+        # child's `order_url`, and two rows left by the renewal doubling share one.
+        identity=('environment', 'domains', 'created_at'),
         exclude={
             **_SURROGATE,
-            'pending_key': 'key of a finalization in progress, resumed on the source only',
             'renewal_claimed_at': 'lease of a renewal running on the source, meaningless elsewhere',
-            'renewal_of_order_id': 'link of a renewal in progress, resumed on the source only',
         },
+        # Property `pending_key`: exported as a PEM, the setter re-encrypts it on restore.
+        secrets=('pending_key',),
         # `account_id` names the local ACME account by its account id, the
         # string the protocol itself uses, and is deliberately not a
         # reference: see the note above `references`.
-        #
-        # `acme_client_account_id` is a number, and names the account at the
-        # external CA the order was placed with. Exported as it stood, the
-        # source's number landed here on whichever account happened to hold
-        # it: a renewal placed against a different CA, or against nothing.
         references={'dns_provider_id': 'dns_providers',
                     'acme_client_account_id': 'acme_client_accounts',
                     'certificate_id': 'certificates',
-                    'source_certificate_id': 'certificates'},
-        optional=True,
+                    'source_certificate_id': 'certificates',
+                    'renewal_of_order_id': 'acme_client_orders'},
     ),
     'acme_dns_update_keys': Section(
         model='models.acme_dns_update:AcmeDnsUpdateKey',
@@ -466,8 +462,8 @@ SECTIONS: Dict[str, Section] = {
         model='models.key_recovery:KeyRecoveryRequest',
         identity=('cert_refid', 'requested_at'),
         exclude={**_SURROGATE},
-        references={'cert_id': 'certificates'},
-        optional=True,
+        # `cert_id` is no reference: the restorer points it at the certificate
+        # of `cert_refid` here, and cancels an open request whose certificate is not.
     ),
     'audit_logs': Section(
         model='models.audit_log:AuditLog',
@@ -518,3 +514,31 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',
 }
+
+
+@dataclass(frozen=True)
+class SettingReference:
+    """A setting that names a row by its number, in its key, its value, or both."""
+
+    pattern: str                    # regular expression matching the whole key
+    value: Optional[str] = None     # section the value names (a number, or a refid)
+    key: Optional[str] = None       # section the number in the key (group 1) names
+
+
+# Settings holding a row number: carried with the identity of that row
+# (`settings_refs` in the configuration section) and renumbered on restore.
+# A refid reads the same everywhere and is not one of them: est_ca_refid,
+# tsa_ca_refid, tsa_signer_cert_refid, wstep_ca_refid, xcep_ca_refid,
+# mtls_trusted_ca_id, https_bound_certificate_refid, est_labels. The number in
+# `ca_url_alias_<n>` is the one published URLs carry, and stays the source's.
+SETTING_REFERENCES: Tuple[SettingReference, ...] = (
+    SettingReference(r'scep_ca_id', value='certificate_authorities'),
+    SettingReference(r'acme\.issuing_ca_id', value='certificate_authorities'),
+    SettingReference(r'acme_public_tls_cert_id', value='certificates'),
+    SettingReference(r'acme\.proxy\.acme_account_id', value='acme_client_accounts'),
+    SettingReference(r'ocsp_responder_cert_(\d+)', key='certificate_authorities',
+                     value='certificates'),
+    SettingReference(r'scep_challenge_(\d+)(?:_generated_at)?', key='certificate_authorities'),
+    SettingReference(r'cert_scts_(\d+)', key='certificates'),
+    SettingReference(r'ca_url_cross_.+', value='ca_cross_certificates'),
+)

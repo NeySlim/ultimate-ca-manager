@@ -189,6 +189,9 @@ def create_backup():
     if warning:
         data['restore_limit_warning'] = warning
         message = f'{message}. {warning}'
+    if service.last_export_warnings:
+        data['export_warnings'] = list(service.last_export_warnings)
+        message = f"{message}. {'; '.join(service.last_export_warnings)}"
     return success_response(data=data, message=message)
 
 

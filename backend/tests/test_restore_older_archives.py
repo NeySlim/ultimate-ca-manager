@@ -156,7 +156,8 @@ def test_an_hsm_secret_under_another_key_is_named_in_the_result(here, caplog):
     ('services.backup.restore_core', '_restore_certificates', 'certificates',
      {'refid': 'older-left-out', 'descr': 'older'}),
     ('services.backup.restore_extended', '_restore_acme_client_orders', 'acme_client_orders',
-     {'order_url': 'https://acme.example.test/order/1', 'domains': '[]'}),
+     {'order_url': 'https://acme.example.test/order/1', 'domains': '[]',
+      'environment': 'production', 'created_at': '2026-01-01T00:00:00'}),
 ])
 def test_a_row_apply_columns_leaves_out_is_not_counted(here, monkeypatch, module, method,
                                                        section, row):

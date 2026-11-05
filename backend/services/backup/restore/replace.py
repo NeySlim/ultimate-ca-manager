@@ -164,15 +164,17 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'acme_authorizations': 'in-flight protocol state, tied to orders',
     'acme_challenges': 'in-flight protocol state, tied to authorizations',
     'acme_proxy_dns_challenges': 'expected TXT values of in-flight proxy orders',
-    # Optional sections, absent from an archive unless asked for. Unlinked as
-    # deleting the certificate, account or user they name does.
-    'acme_client_orders': 'carried by no archive yet',
-    'approval_requests': 'history, carried only when asked for',
+    # Carried by default since 2.250, so pruned with the rest; listed for an
+    # archive without them (older, or an include map). Unlinked as deleting
+    # the certificate, account or user they name does.
+    'acme_client_orders': 'carried since 2.250; an older archive lacks them',
+    'approval_requests': 'carried since 2.250; an older archive lacks them',
+    'key_recovery_requests': 'carried since 2.250; an older archive lacks them',
+    # Optional sections, absent from an archive unless asked for.
     'msca_requests': 'history, carried only when asked for',
     'scep_requests': 'history, carried only when asked for',
     'discovery_scan_runs': 'history, carried only when asked for',
     'discovered_certificates': 'history, carried only when asked for',
-    'key_recovery_requests': 'history, carried only when asked for',
     'revoked_serials': 'a revocation outlives its certificate; the serial stays revoked',
     # Queues: a pending delivery would reach whichever row takes the number
     'webhook_deliveries': 'delivery queue, removed with its endpoint as deleting it does',

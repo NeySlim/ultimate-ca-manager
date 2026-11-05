@@ -206,26 +206,31 @@ def _follow_references(backup_data, section_name, rule, before, final, warnings)
     An identity matching several archived rows names the first of them: the
     archive does not carry the source id that would tell them apart.
     """
+    holders = []     # (where, the mapping holding the identity, its key)
     for name, section in SECTIONS.items():
         columns = [c for c, target in section.references.items() if target == section_name]
         rows = backup_data.get(name)
         if not columns or not isinstance(rows, list):
             continue
-        for row in rows:
-            if not isinstance(row, dict):
-                continue
-            for column in columns:
-                identity = row.get(f'{column}{REFERENCE_SUFFIX}')
-                if not isinstance(identity, dict) or rule.column not in identity:
-                    continue
-                matches = [i for i, archived in enumerate(before)
-                           if all(archived.get(k) == v for k, v in identity.items())]
-                index = matches[0] if matches else None
-                if len(matches) > 1:
-                    warnings.append(
-                        f"{name}.{column} names {identity[rule.column]!r}, which "
-                        f"{len(matches)} archived {section_name} rows hold: it now points "
-                        f"at the first one, restored as {final[index]!r}")
-                    logger.warning("Restore: %s", warnings[-1])
-                if index is not None and final[index] != identity[rule.column]:
-                    row[f'{column}{REFERENCE_SUFFIX}'] = {**identity, rule.column: final[index]}
+        holders.extend((f'{name}.{column}', row, f'{column}{REFERENCE_SUFFIX}')
+                       for row in rows if isinstance(row, dict) for column in columns)
+    configuration = backup_data.get('configuration')
+    refs = configuration.get('settings_refs') if isinstance(configuration, dict) else None
+    if isinstance(refs, list):
+        holders.extend((f"setting {entry.get('key')}", entry, 'identity') for entry in refs
+                       if isinstance(entry, dict) and entry.get('table') == section_name)
+    for where, holder, field_name in holders:
+        identity = holder.get(field_name)
+        if not isinstance(identity, dict) or rule.column not in identity:
+            continue
+        matches = [i for i, archived in enumerate(before)
+                   if all(archived.get(k) == v for k, v in identity.items())]
+        index = matches[0] if matches else None
+        if len(matches) > 1:
+            warnings.append(
+                f"{where} names {identity[rule.column]!r}, which "
+                f"{len(matches)} archived {section_name} rows hold: it now points "
+                f"at the first one, restored as {final[index]!r}")
+            logger.warning("Restore: %s", warnings[-1])
+        if index is not None and final[index] != identity[rule.column]:
+            holder[field_name] = {**identity, rule.column: final[index]}
