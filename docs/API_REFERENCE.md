@@ -3099,6 +3099,9 @@ Content-Type: application/json
 }
 ```
 
+A CSR (`key_source: "csr"`) whose key was revoked as compromised is refused with `409` before
+any order is opened at the CA.
+
 `key_type` sets the certificate key UCM generates: `RSA-2048`, `RSA-4096`, `EC-P256`,
 `EC-P384`, `EC-BP256`, `EC-BP384`, or `ML-DSA-44`, `ML-DSA-65`, `ML-DSA-87` when this build
 has ML-DSA. Without it the `key_type` client setting applies (RSA-2048 when unset); a value
@@ -3135,6 +3138,11 @@ DELETE /api/v2/acme/client/orders/{order_id}
 ```http
 POST /api/v2/acme/client/orders/{order_id}/renew
 ```
+
+A failure answers `409` when the renewal is blocked before the CA (account gone, key revoked
+as compromised, DNS provider disabled) and `422` otherwise, with the reason; both are counted
+on the order and emit `acme_order.renewal_failed`. `409` also answers while another renewal or
+finalization of the order runs, and that one is not counted.
 
 ### Register ACME Account
 ```http

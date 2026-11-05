@@ -23,6 +23,7 @@ from utils.db_transaction import safe_commit
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import (
     ACCOUNT_GONE,
+    ORDER_GONE,
     AcmeClientService,
     AUTHZ_INVALID_USER_MSG,
     CERT_KEY_TYPES,
@@ -32,6 +33,7 @@ from services.acme.acme_client_service import (
     fips_private_key_refusal,
 )
 from services.audit_service import AuditService
+from services.acme.compromised_keys import CompromisedKey, refuse_compromised_csr
 from services.acme.http01 import wait_for_http01
 from services.acme.order_lease import BUSY, OrderLease
 from services.acme.dns_selfcheck import (
@@ -287,6 +289,10 @@ def request_certificate():
         match_ok, match_msg = csr_identifiers_match_order(csr, domains)
         if not match_ok:
             return error_response(match_msg, 400)
+        try:
+            refuse_compromised_csr(csr)
+        except CompromisedKey as exc:
+            return error_response(str(exc), 409)
     elif csr_pem:
         return error_response('csr_pem is only valid when key_source is csr', 400)
 
@@ -510,7 +516,10 @@ def verify_challenges(order_id):
             # Check if LE has already validated (poll order status)
             try:
                 le_status, _ = client.check_order_status(order)
-                new_status = le_status if le_status in ['ready', 'valid'] else 'validating'
+                if le_status == 'gone':
+                    new_status = 'invalid'  # the check recorded why
+                else:
+                    new_status = le_status if le_status in ['ready', 'valid'] else 'validating'
             except Exception:
                 new_status = 'validating'
             AcmeClientService.write_order_status(order, new_status)
@@ -558,6 +567,8 @@ def check_order_status(order_id):
         if client is None:
             return error_response(ACCOUNT_GONE, 409)
         status, data = client.check_order_status(order)
+        if status == 'gone':
+            status = order.status  # invalid with the reason, or issued as it was
         if status == 'valid' and data and _resumable_here(client, order):
             status = _resume_finalization(client, order) or status
 
@@ -685,7 +696,8 @@ def renew_order(order_id):
     if order.status not in ('valid', 'issued'):
         return error_response('Only valid/issued orders can be renewed', 400)
 
-    from services.acme_renewal_service import RenewalBlocked, RenewalInProgress, renew_certificate
+    from services.acme_renewal_service import (
+        RenewalBlocked, RenewalInProgress, record_renewal_failure, renew_certificate)
 
     try:
         success, message = renew_certificate(order)
@@ -706,11 +718,13 @@ def renew_order(order_id):
         else:
             return error_response(message, 400)
 
-    except (RenewalBlocked, RenewalInProgress) as e:
+    except RenewalInProgress as e:
         return error_response(str(e), 409)
+    except (RenewalBlocked, CompromisedKey) as e:
+        return error_response(record_renewal_failure(order, e, manual=True), 409)
     except Exception as e:
         logger.error(f'ACME certificate renewal failed: {e}')
-        return error_response('Renewal failed', 500)
+        return error_response(record_renewal_failure(order, e, manual=True), 422)
 
 
 def _renewal_parent(order):
@@ -853,6 +867,10 @@ def _auto_poll_and_finalize(client, order) -> dict:
             le_status, le_data = client.check_order_status(order)
             result['polling_status'] = le_status
             logger.info(f'ACME order {order.id} status after {elapsed}s: {le_status}')
+
+            if le_status == 'gone':  # recorded as invalid by the status check
+                result['error'] = ORDER_GONE
+                break
 
             if le_status in ('ready', 'valid'):
                 # 4. Auto-finalize (finalize_order sets status='issued' on success)

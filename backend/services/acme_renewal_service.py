@@ -9,17 +9,20 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 from sqlalchemy import or_
+from sqlalchemy.exc import SQLAlchemyError
 
 from models import CA, Certificate, DnsProvider, RevokedSerial, SystemConfig, db
 from models.acme_models import AcmeClientOrder
 from services.acme import dns_providers
-from services.acme.acme_client_service import ACCOUNT_GONE, AcmeClientService
+from services.acme.acme_client_service import ACCOUNT_GONE, ORDER_GONE, AcmeClientService
+from services.acme.compromised_keys import CompromisedKey, refuse_compromised_csr
 from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challenges
 from services.acme.http01 import wait_for_http01
 from services.acme import client_certificates
 from services.acme.client_certificates import KEY_MISMATCH
 from services.acme.order_lease import BUSY, LEASE_LOST, OrderLease, RenewalInProgress
 from services.audit.staging import stage_audit_entry
+from services.audit_service import AuditService
 from services.cert_service import CertificateService
 from services.webhook_service import emit_acme_renewal_failed
 from utils.acme_debug import acme_log
@@ -228,23 +231,28 @@ def _attempt_allowed(order, now):
     return now - order.last_error_at >= DAILY_RETRY
 
 
-def _record_scheduled_failure(order, error):
-    """Count, audit and announce one failed scheduled renewal of ``order``."""
+def record_renewal_failure(order, error, manual=False):
+    """Count, audit and announce one failed renewal of ``order``, scheduled or asked for;
+    returns the message recorded."""
+    message = 'Database error during renewal' if isinstance(error, SQLAlchemyError) else str(error)
+    db.session.rollback()  # a failed flush would refuse the writes below
     order.renewal_failures = (order.renewal_failures or 0) + 1
     order.last_error_at = utc_now()
-    order.error_message = str(error)
-    stage_audit_entry(
-        action='acme_order.auto_renewal_failed',
-        resource_type='acme_order',
-        resource_id=str(order.id),
-        resource_name=order.primary_domain,
-        details=f'Auto-renewal failed: {error}',
-        success=False,
-    )
+    order.error_message = message
+    if not manual:  # in the counter's commit; a manual one names its user below
+        stage_audit_entry(action='acme_order.auto_renewal_failed', resource_type='acme_order',
+                          resource_id=str(order.id), resource_name=order.primary_domain,
+                          details=f'Auto-renewal failed: {message}', success=False)
     if commit_or_rollback(logger, f"Failed to persist renewal failure for order {order.id}"):
         payload = order.to_dict()
         payload.pop('challenges', None)  # tokens and TXT values stay out of webhooks
-        emit_acme_renewal_failed(payload, order.renewal_failures, str(error), order.renewal_retry_daily)
+        if manual:
+            AuditService.log_action(action='acme_renew', resource_type='acme_order',
+                                    resource_id=str(order.id), resource_name=payload.get('primary_domain'),
+                                    details=f'Renewal failed: {message}', success=False)
+        emit_acme_renewal_failed(payload, payload.get('renewal_failures'), message,
+                                 payload.get('renewal_retry_daily'))
+    return message
 
 
 def _pass_outcome(failed, daily):
@@ -312,7 +320,7 @@ def scheduled_acme_renewal():
             except Exception as e:
                 logger.error(f"Failed to renew order {order_id}: {e}")
                 failed += 1
-                _record_scheduled_failure(order, e)
+                record_renewal_failure(order, e)
                 if order.renewal_retry_daily:
                     daily_ids.add(order_id)
             finally:
@@ -355,6 +363,8 @@ def _renew(order, lease) -> tuple:
     )
     # Read before the renewal writes the new certificate into the same row
     replaced = _replaced_snapshot(old_certificate)
+    if order.key_source == 'csr' and order.csr_pem:
+        _refuse_compromised_order_csr(order)
     if (order.key_source == 'csr' and order.csr_pem and old_certificate is not None
             and old_certificate.crt and not old_certificate.revoked):
         # Refused before the CA is asked: each attempt would cost a certificate
@@ -382,6 +392,16 @@ def _renew(order, lease) -> tuple:
         _revoke_replaced_certificate(acme_client, replaced, in_place=cert_id == old_certificate_id)
 
     return True, f"Successfully renewed (certificate ID: {cert_id})"
+
+
+def _refuse_compromised_order_csr(order):
+    """CompromisedKey before any order is opened: the CA would issue, the finalize refuse."""
+    from utils.acme_csr import load_pem_csr
+    try:
+        csr = load_pem_csr(order.csr_pem)
+    except ValueError as exc:
+        raise RenewalBlocked(f'The CSR of this order cannot be read: {exc}')
+    refuse_compromised_csr(csr)
 
 
 # Statuses of a renewal order that may hold a finalization: kept for the next renewal.
@@ -621,6 +641,8 @@ def _renew_with_new_order(acme_client, order, account_id, old_certificate, lease
         # Wait for validation
         logger.info("Waiting for ACME validation...")
         status, order_data = acme_client.wait_for_order(new_order)
+        if status == 'gone':
+            raise Exception(ORDER_GONE)
         if status == 'invalid':
             raise Exception(
                 f"Order became invalid: {_order_invalid_detail(acme_client, new_order, order_data)}"
@@ -676,7 +698,8 @@ def _discard_failed_renewal_order(new_order) -> None:
     try:
         if new_order.status not in _NOTHING_ISSUED:
             return
+        order_id = new_order.id  # read after the delete, it would flush it and fail
         db.session.delete(new_order)
-        commit_or_rollback(logger, f"Could not remove the failed renewal order {new_order.id}")
+        commit_or_rollback(logger, f"Could not remove the failed renewal order {order_id}")
     except Exception as exc:  # never hide the renewal's own error
         logger.warning("Could not remove the failed renewal order: %s", exc)

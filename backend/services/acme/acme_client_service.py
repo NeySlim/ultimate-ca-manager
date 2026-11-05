@@ -17,7 +17,6 @@ from typing import Dict, Any, Optional, Tuple, List, Union, TYPE_CHECKING
 
 import requests
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import load_only
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding, utils as asym_utils
 from cryptography.hazmat.backends import default_backend
@@ -38,14 +37,13 @@ from utils.acme_ip import (
     TlsAlpn01Listener,
 )
 import fips_mode
-from cryptography.exceptions import UnsupportedAlgorithm
-from utils.revocation_reasons import normalize_revocation_reason
 from utils import key_algorithms, ssrf_protection
 from utils.ca_profile import default_digest_for_key_type
 from utils.signing_hash import HASH_BY_NAME, signing_hash_for
 from utils.san_parse import strip_wildcard
 from services.acme.dns_txt_lock import txt_record_lock
 from services.acme.order_lease import LEASE_LOST
+from services.acme import compromised_keys
 
 if TYPE_CHECKING:
     from models.acme_client_account import AcmeClientAccount
@@ -62,6 +60,8 @@ ACCOUNT_KEY_TYPES = {
     'ES256': {'alg': 'ES256', 'generate': lambda: key_algorithms.generate('EC-P256')},
     'ES384': {'alg': 'ES384', 'generate': lambda: key_algorithms.generate('EC-P384')},
 }
+
+ORDER_GONE = 'The CA no longer has this order: it expired or was removed there, request a new certificate'
 
 ACCOUNT_GONE = ('The ACME CA account this order was issued under no longer exists, and another '
                 'account could be at another CA. Request a new certificate for these names '
@@ -1546,6 +1546,9 @@ class AcmeClientService:
         try:
             resp = self._post(order.order_url, "")  # POST-as-GET
             self._note_retry_after(resp)
+            if resp.status_code in (404, 410):
+                self._record_order_gone(order)
+                return 'gone', {}
             if resp.status_code == 200:
                 data = resp.json()
                 self.write_order_status(order, data.get('status', order.status))
@@ -1561,31 +1564,26 @@ class AcmeClientService:
                 db.session.rollback()
             return order.status, {}
     
+    @staticmethod
+    def _record_order_gone(order) -> None:
+        """An order the CA answers 404 or 410 for cannot complete: invalid here too, with the
+        reason. An issued order keeps its status."""
+        AcmeClientOrder.query.filter(
+            AcmeClientOrder.id == order.id, AcmeClientOrder.status != 'issued',
+        ).update({'status': 'invalid', 'error_message': ORDER_GONE}, synchronize_session=False)
+        db.session.commit()
+
     # =========================================================================
     # Finalization
     # =========================================================================
     
     @staticmethod
     def _revoked_as_compromised(certificate) -> bool:
-        return bool(certificate.revoked
-                    and normalize_revocation_reason(certificate.revoke_reason) == 'keyCompromise')
+        return compromised_keys.revoked_as_compromised(certificate)
 
-    @classmethod
-    def _key_revoked_as_compromised(cls, public_key) -> bool:
-        """Whether any row holding this key was revoked as compromised: a key reused along
-        renewals sits on several certificates, and only one of them may carry the revocation."""
-        wanted = public_key.public_bytes(Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
-        rows = Certificate.query.options(load_only(Certificate.crt, Certificate.revoked, Certificate.revoke_reason))
-        for row in rows.filter(Certificate.revoked.is_(True)).all():
-            if not row.crt or not cls._revoked_as_compromised(row):
-                continue
-            try:
-                held = cls._load_x509_certificate(row).public_key()
-            except (ValueError, UnsupportedAlgorithm):
-                continue  # a row this build cannot read says nothing about this key
-            if held.public_bytes(Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo) == wanted:
-                return True
-        return False
+    @staticmethod
+    def _key_revoked_as_compromised(public_key) -> bool:
+        return compromised_keys.key_revoked_as_compromised(public_key)
 
     def held_finalize_key(self, order: AcmeClientOrder) -> Tuple[Optional[str], Optional[str]]:
         """The PEM key an order the CA already finalized was certified with: ``(pem, None)``,
@@ -1628,7 +1626,7 @@ class AcmeClientService:
             if not match_ok:
                 return None, None, False, match_msg
             if self._key_revoked_as_compromised(csr.public_key()):
-                return None, None, False, 'The key of this CSR was revoked as compromised: submit a new CSR'
+                return None, None, False, compromised_keys.COMPROMISED_CSR
             return None, csr_to_b64url_der(csr), False, None
 
         cert_key = None
@@ -1696,6 +1694,8 @@ class AcmeClientService:
                 if key_error:
                     return False, key_error, None
                 order_data = data
+            elif status == 'gone':
+                return False, ORDER_GONE, None
             elif status != 'ready':
                 return False, f"Order not ready for finalization (status: {status})", None
             else:
@@ -1730,6 +1730,8 @@ class AcmeClientService:
                     status, order_data = self.check_order_status(order)
                     if status == 'invalid':
                         return False, "Order became invalid during finalization", None
+                    if status == 'gone':
+                        return False, ORDER_GONE, None
 
             if lease is not None and not lease.refresh():
                 return False, LEASE_LOST, None

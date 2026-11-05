@@ -19,6 +19,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: a manual and a scheduled renewal of one order could run at once and obtain two certificates. Each renewal or finalization now holds a lease on its order, which a stopped process leaves for 10 minutes: a second one gets a 409, and the scheduler skips the order.
 - ACME client: after 5 failed scheduled renewals an order was never renewed again, silently. It is now retried once a day, each failure emits the `acme_order.renewal_failed` webhook event, the order list shows the failure count and last error, and the scheduler task reports a warning.
 - ACME client: an order whose CA account had been deleted renewed under another account, possibly at another CA. The renewal and the order's other actions now stop with a message saying what to do, and deleting or deactivating an account is refused (409) while issued orders renew through it; each order's automatic renewal can now be turned off from the order list (`PATCH /api/v2/acme/client/orders/<id>`).
+- ACME client: a CSR whose key was revoked as compromised was refused only at finalization, after the CA had opened an order and checked the challenges at each renewal. It is now refused with a 409 by the request and before a renewal opens any order.
+- ACME client: a failed manual renewal answered a bare 500 and was neither counted nor audited. It now answers 409 or 422 with the reason, counts towards the order's failures and emits `acme_order.renewal_failed`.
+- ACME client: an order the CA answered 404 or 410 for was polled until the timeout, up to several minutes per scheduler pass. Polling now stops at once and the order turns invalid with the reason.
 
 ### Upgrade notes
 
