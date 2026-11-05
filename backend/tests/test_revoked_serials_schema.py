@@ -45,8 +45,8 @@ def _migration():
 
 
 def _key_digest_migration():
-    # 125 adds the key digest a fresh install has from the model
-    return importlib.import_module('migrations.125_revoked_key_digest_upstream_revocations')
+    # 128 adds the key digest a fresh install has from the model
+    return importlib.import_module('migrations.128_revoked_key_digest_upstream_revocations')
 
 
 def _snapshot(conn, table='revoked_serials'):

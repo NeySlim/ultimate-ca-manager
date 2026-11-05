@@ -1,4 +1,4 @@
-"""Migration 125 adds the key digest of revocation records and the revocations an ACME order is
+"""Migration 128 adds the key digest of revocation records and the revocations an ACME order is
 owed, idempotently."""
 import importlib
 import os
@@ -15,7 +15,7 @@ SERIALS, ORDERS = RevokedSerial.__tablename__, AcmeClientOrder.__tablename__
 
 
 def _migration():
-    return importlib.import_module('migrations.125_revoked_key_digest_upstream_revocations')
+    return importlib.import_module('migrations.128_revoked_key_digest_upstream_revocations')
 
 
 def test_the_models_hold_the_columns_the_migration_adds():
@@ -50,7 +50,7 @@ def test_sqlite_without_the_tables_is_a_no_op():
 @pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
 @pytest.mark.parametrize('with_tables', [True, False])
 def test_postgres_adds_the_columns_and_keeps_rows(with_tables):
-    schema = f"migtest_125{'' if with_tables else 'e'}_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
+    schema = f"migtest_128{'' if with_tables else 'e'}_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
     engine = create_engine(PG_URL)
     conn = engine.connect()
     try:

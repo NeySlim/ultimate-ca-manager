@@ -1,4 +1,4 @@
-"""Migration 125: a revocation record keeps its key, an ACME order the revocations its CA still owes.
+"""Migration 128: a revocation record keeps its key, an ACME order the revocations its CA still owes.
 
 `revoked_serials.public_key_sha256` is the SHA-256 of the revoked certificate's
 SubjectPublicKeyInfo: a key revoked as compromised stays known once its certificate row is

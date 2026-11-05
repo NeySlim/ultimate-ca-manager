@@ -1,5 +1,5 @@
 """ACME client revocations: the CA is told the local reason, and is asked again until it answers;
-a key revoked as compromised stays known once its certificate is deleted (migration 125)."""
+a key revoked as compromised stays known once its certificate is deleted (migration 128)."""
 import json
 import uuid
 from datetime import timedelta
