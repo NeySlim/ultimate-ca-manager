@@ -442,7 +442,7 @@ def restore_backup():
                 f'{busy} A backend migration or another restore is still '
                 'running.', 409)
         except BackupBusyError as busy:
-            return error_response(f'{busy} Retry once the backup has finished.', 409)
+            return error_response(f'{busy} Retry once it has finished.', 409)
 
         carried = bool((results or {}).get('sections_carried'))
         _safe_audit_log(

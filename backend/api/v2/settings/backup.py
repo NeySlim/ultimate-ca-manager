@@ -220,7 +220,7 @@ def restore_backup():
                 f"{busy} A backend migration or another restore is still "
                 "running.", 409)
         except BackupBusyError as busy:
-            return error_response(f"{busy} Retry once the backup has finished.", 409)
+            return error_response(f"{busy} Retry once it has finished.", 409)
 
         # Recorded before the archive is judged empty or not, as the system
         # route does: a file that restored nothing was still uploaded and

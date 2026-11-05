@@ -54,7 +54,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Restore: a value longer than its column failed on PostgreSQL with a bare 500. It is now refused with a 400 naming the table, the row and the column.
 - Backups: a manual backup could read the database while a restore was committing and archive half of each. Backups and restores now share one lock: a restore is refused (409) while a backup runs, and a manual backup waits for a restore.
 - Restore: an archive older than migrations 101 to 105 put back what they had cleaned (legacy EAB keys, dead and `ldap_*` settings, SAML providers signing requests, group permissions stored as text). Those repairs are now replayed on the rows the restore writes.
-- CAs: deleting a CA left its SCEP challenge and its OCSP responder setting, which SQLite could hand to the next CA given its number. They now go with it.
+- CAs and certificates: deleting a CA left its SCEP challenge and OCSP responder settings, and deleting a certificate its SCTs, which SQLite could hand to the next row given that number. They now go with the row.
 - Database migration: a role inheriting from a role created after it made the copy to PostgreSQL fail when the database role cannot disable foreign keys. A link to a row of the same table is now written once the whole table is in.
 
 ### Upgrade notes

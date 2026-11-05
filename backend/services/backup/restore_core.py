@@ -366,9 +366,8 @@ class RestoreCoreMixin:
             logger.warning("Restore: %s", warning)
         built_with = len(plan.warnings)
 
-        # Files are written to a staging directory during the transaction and
-        # published once it has committed, so the database and the files on
-        # disk can never disagree about whether the restore happened.
+        # Files are staged during the transaction and published just before the
+        # commit; a commit that fails puts them back (`unpublish()`).
         results['mode'] = mode
 
         staged = StagedFiles()
@@ -1006,8 +1005,8 @@ class RestoreCoreMixin:
         matches what the caller is told.
 
         The certificate, CSR and key files are staged rather than written in
-        place, and published with the rest once the transaction has
-        committed: written directly, a restore that failed afterwards left
+        place, published with the rest just before the commit and put back by
+        `unpublish()` if the commit fails: written directly, a restore that failed afterwards left
         every certificate file holding the archive's content while the rows
         had gone back to what they were. With database encryption on, a key
         mirror is staged as a removal.

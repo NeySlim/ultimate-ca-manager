@@ -28,12 +28,18 @@ NOT_RESTORED_AS_ARCHIVED = {
         "sealed under each archive's own salt and nonce: never the same bytes twice",
 }
 
+# {(section, column): exception} -- columns whose model refuses a generic value.
+# Empty today: every nullable column takes one, and a new refusal must be written here.
+UNFILLABLE: dict = {}
+
 _STAMP = datetime.datetime(2025, 3, 4, 5, 6, 7)
 
 
 def _fill_nullable(rows):
-    """A value in every empty column the restore could drop without anyone noticing."""
-    index = 1000
+    """A value in every empty column the restore could drop without anyone noticing.
+
+    Returns the `(section, column)` the model refused the value for."""
+    index, refused = 1000, {}
     for name, row in rows.items():
         section = manifest.SECTIONS[name]
         for column in sa_inspect(type(row)).local_table.columns:
@@ -53,9 +59,10 @@ def _fill_nullable(rows):
                 with db.session.begin_nested():
                     setattr(row, attribute, value)
                     db.session.flush()
-            except Exception:
-                continue
+            except Exception as exc:
+                refused[(name, column.name)] = type(exc).__name__
     db.session.commit()
+    return refused
 
 
 def _key(name, row):
@@ -87,7 +94,7 @@ def both_archives(app, tmp_path_factory):
                                      public_key_sha256='ab' * 32))
         db.session.commit()
         rows, _failures, _order, _secrets = _seed_all()
-        _fill_nullable(rows)
+        refused = _fill_nullable(rows)
         # A request on a certificate the archive carries, or the restore cancels it
         leaf = db.session.query(Certificate).one()
         rows['key_recovery_requests'].cert_id = leaf.id
@@ -101,11 +108,11 @@ def both_archives(app, tmp_path_factory):
         svc = _service()
         svc.restore_backup(blob, PASSWORD, mode='merge')
         _key_, restored = svc._decrypt_framed(svc.create_backup(PASSWORD, include=include), PASSWORD)
-    return archived, restored
+    return archived, restored, refused
 
 
 def test_every_carried_column_comes_back(both_archives):
-    archived, restored = both_archives
+    archived, restored, _refused = both_archives
     gaps = {}
     for name in sorted(manifest.SECTIONS):
         if not isinstance(archived.get(name), list):
@@ -125,7 +132,7 @@ def test_every_carried_column_comes_back(both_archives):
 
 
 def test_nearly_every_section_is_exercised(both_archives):
-    archived, _restored = both_archives
+    archived, _restored, _refused = both_archives
     empty = sorted(name for name in manifest.SECTIONS
                    if isinstance(archived.get(name), list) and not archived[name])
     # An SSH authority needs a real key pair, and its certificates hang off it
@@ -133,10 +140,16 @@ def test_nearly_every_section_is_exercised(both_archives):
 
 
 def test_every_exemption_is_still_needed_and_explained(both_archives):
-    archived, restored = both_archives
+    archived, restored, _refused = both_archives
     for (name, column), reason in NOT_RESTORED_AS_ARCHIVED.items():
         assert reason.strip()
         back = {_key(name, row): row.get(column) for row in restored[name]}
         assert any(back.get(_key(name, row)) != row.get(column) for row in archived[name]), \
             f'{name}.{column} now comes back as archived: drop its exemption'
 
+
+
+def test_a_column_left_empty_is_one_written_down(both_archives):
+    """A column the seeder could not fill is a column the comparison cannot see."""
+    _archived, _restored, refused = both_archives
+    assert refused == UNFILLABLE, f'columns the seeder could not fill: {refused}'
