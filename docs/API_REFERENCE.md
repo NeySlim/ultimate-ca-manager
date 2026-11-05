@@ -464,11 +464,11 @@ GET /api/v2/cas?page=1&per_page=20
 ```
 
 **Key fields** (CAs, certificates and CSRs): `key_type` (`"RSA 4096"`, `"EC secp384r1"`,
-`"ML-DSA-65"`), `key_algorithm` (`"RSA"`, `"EC"`, `"ML-DSA-65"`), `key_size` (bits of an RSA key; `0`
-for EC and `null` for a post-quantum key), `security_level` (NIST level `2`, `3` or `5` for ML-DSA-44/65/87,
-`null` otherwise), `post_quantum` (boolean) and `verifiable` (`false` for an SLH-DSA
-signature, which UCM reads but cannot check). An ML-DSA CA reports `signature_algorithm`
-as its parameter set, e.g. `"ML-DSA-65"`. A certificate in a hybrid pair (RFC 9763) also
+`"ML-DSA-65"`), `key_algorithm` (`"RSA"`, `"EC"`, `"ML-DSA-65"`), `key_size` (bits of an RSA key, `256`
+or `448` for Ed25519 or Ed448; `0` for EC and `null` for a post-quantum key), `security_level` (NIST level
+`2`, `3` or `5` for ML-DSA-44/65/87, `null` otherwise), `post_quantum` (boolean) and `verifiable` (`false`
+for an SLH-DSA signature, which UCM reads but cannot check). An ML-DSA CA reports `signature_algorithm`
+as its parameter set, e.g. `"ML-DSA-65"`, an EdDSA CA as `"Ed25519"` or `"Ed448"`. A certificate in a hybrid pair (RFC 9763) also
 reports `related_certificate_id` (the other member) and `hybrid_role` (`"classical"` or `"pq"`);
 both are `null` otherwise.
 
@@ -523,11 +523,17 @@ are sent. An intermediate CA never outlives its parent. A CA of type
 `external` takes neither: its signer decides.
 
 `keyAlgo` is `RSA` (`keySize` 2048, 3072 or 4096), `ECDSA` or `EC` (`keySize` a curve:
-`prime256v1`, `secp384r1`, `secp521r1`, or a Brainpool curve) or `ML-DSA` (`keySize` 44, 65
-or 87, required). A full label such as `RSA-3072`, `EC-P384` or `ML-DSA-65` is also accepted,
+`prime256v1`, `secp384r1`, `secp521r1`, or a Brainpool curve), `EdDSA` (`keySize` `Ed25519` or
+`Ed448`) or `ML-DSA` (`keySize` 44, 65 or 87, required). A full label such as `RSA-3072`, `EC-P384`,
+`Ed25519` or `ML-DSA-65` is also accepted,
 and `keyType` is an alias of `keyAlgo`. An unknown `keyAlgo`, or a `keySize` that does not
-belong to it, answers `400`. Without `keySize`, `RSA` gives RSA-2048 and `ECDSA` P-256; a request
-without any key field gets RSA-2048. ML-DSA needs
+belong to it, answers `400`. Without `keySize`, `RSA` gives RSA-2048, `ECDSA` P-256 and `EdDSA`
+Ed25519; a request without any key field gets RSA-2048. An EdDSA CA key is generated in software
+only (no HSM provider holds one), is refused in FIPS mode and signs without a separate digest,
+like ML-DSA below. Web browsers (Chrome, Firefox, Safari), Windows (CryptoAPI/CNG) and SCEP clients
+do not verify an Ed25519 or Ed448 signature on a certificate, so they reject anything such a CA issues,
+whatever the leaf key: keep it for clients that do (OpenSSL, Go, Java 15 and later). SCEP and XCEP
+refuse an EdDSA CA, and an EdDSA CA cannot sign timestamps itself (it can issue the TSA signer). ML-DSA needs
 OpenSSL 3.5 or later and is refused in FIPS mode; `keyAlgo` generates it in software, and
 an HSM-held ML-DSA key is chosen with `hsm_key_algorithm` on a provider that has it (see [HSM](#hsm)).
 An ML-DSA key signs without a separate digest: a `digest` sent for it is ignored and named
@@ -763,6 +769,8 @@ are ignored; a `classical` member that is post-quantum, a `pq` member that is no
 key type answers `400`, and so does a policy that requires approval. The response is
 `201` with `data.certificate` (A) and `data.related` (B).
 
+**Custom extensions.** `custom_extensions` takes the list described under [Templates](#templates). They join the template's; an entry with the OID of one of the template's replaces it. An invalid list answers `400` before anything is issued or queued for approval. A renewal keeps the extensions of the certificate it renews, the template's current entries replacing those of the same OID and joining the others; one the template no longer lists stays, since UCM cannot tell it from one the request added.
+
 **Response:**
 ```json
 {
@@ -783,6 +791,8 @@ key type answers `400`, and so does a policy that requires approval. The respons
 ```http
 GET /api/v2/certificates/{cert_id}
 ```
+
+`extensions.other_extensions` lists the extensions without a section of their own, custom ones included: `[{oid, name, critical, value_hex}]`, `name` being null for an OID UCM cannot name. `GET /api/v2/cas/{ca_id}` returns the same under `extensions`, and `GET /api/v2/csrs/{csr_id}` lists under `other_extensions` the extensions of the request outside basic constraints, key usage, extended key usage, names, key identifiers, CRL distribution points, authority information access, certificate policies, name constraints and SCT.
 
 ### Export Certificate
 ```http
@@ -1155,6 +1165,8 @@ Content-Type: application/json
 }
 ```
 
+`custom_extensions` adds extensions to the template's, as on `POST /api/v2/certificates`; the template's apply to end-entity certificates only. Extensions the CSR itself asks for outside the usual ones are not copied.
+
 A CSR carrying a relatedCertRequest (RFC 9763), here or through ACME, EST or WSTEP, issues a
 certificate linked to the A it names. A must be held here, valid, unrevoked and an end-entity
 certificate issued by a CA of this instance whose chain passes RFC 5280 path checks now (validity,
@@ -1309,6 +1321,20 @@ ML-DSA key under an RSA or EC CA, and an ML-DSA CA ignores it.
 - `certificate_policies`: up to 20 dotted OIDs, added after the CA's CPS policy.
 - `qc_statements`: `compliance` is QcCompliance and `cc_legislation` (ISO 3166 country codes, QcCClegislation) names the non-EU legal framework of a qualified certificate, left out for an EU one; `type` is `esign`, `eseal` or `web`; `pds` entries need an `https` URL and a two-letter language, at most one per language, and an EU qualified certificate (QcCompliance without QcCClegislation) needs one in English; `semantics` is `natural`, `legal`, `eidas-natural` or `eidas-legal` (RFC 3739 semantics identifier). Unknown keys are refused.
 - Certificates issued from the UI, Sign CSR (single and bulk), ACME, SCEP and approvals carry both; renewals keep them. EST, WSTEP and mTLS enrollment do not add them. `GET /api/v2/certificates/{id}` decodes the extension under `extensions.qc_statements`, and `GET /api/v2/certificates/{id}/lint?profile=etsi` runs the ETSI EN 319 412 checks.
+
+**Custom extensions (#437).** `custom_extensions` adds extensions UCM does not model, each given by its OID and the DER bytes of its value:
+
+```json
+"custom_extensions": [
+  {"oid": "1.3.6.1.4.1.99999.1", "critical": false, "value": "0c0568656c6c6f"}
+]
+```
+
+- `value` is the DER encoding of the extension value (the content of `extnValue`) in hex; colons and spaces are ignored. `value_base64` may be given instead. It must be a single DER element (tag, minimal definite length, content of that length); UCM checks nothing more and copies the bytes as they are. Stored and returned as lowercase hex in `value`.
+- `critical` defaults to `false`. A client that does not recognise a critical extension must reject the certificate (RFC 5280, section 4.2): mark one critical only when every relying party understands it.
+- `400` for an OID that is not dotted (`1.2.840...`), an empty value, a value above 4096 bytes, more than 20 entries, the same OID twice, or an extension UCM sets itself or parses (basic constraints, key usage, extended key usage, names, key identifiers, CRL distribution points, authority and subject information access, certificate policies, name constraints, TLS feature, OCSP no-check, SCT, qcStatements, relatedCertificate, the Microsoft template and SID extensions...): those keep their dedicated settings. The rule is "set by UCM or parsed by the X.509 library": any other OID is accepted, an unparsed `2.5.29.x` included.
+- `[]` clears the list. Duplicate, export, import and backups carry it. A stored list that no longer validates (a restored or hand-edited row) is reported in `custom_extensions_error`, and issuance from the template is refused until it is fixed: `400` with the reason for an operator, `serverInternal` without the template's name for an ACME client, `badRequest` for SCEP (RFC 8894 has no server-side failInfo).
+- Certificates issued from the template carry the list: issue form, Sign CSR (single and bulk, end-entity certificates only), ACME profiles bound to the template, SCEP profiles, WSTEP (the matched template) and approvals. EST and mTLS enrollment use no template and add none.
 
 ### Get Template
 ```http
@@ -3045,6 +3071,10 @@ Content-Type: application/json
 }
 ```
 
+`renewal_days` (1 to 60) applies when the CA suggests no renewal window (ARI). When it is more
+than two thirds of a certificate's lifetime, that certificate is renewed in the last third of
+its lifetime instead.
+
 Fields of the DNS UPDATE (RFC 2136) listener of the ACME proxy:
 
 | Field | Method | Description |
@@ -3065,7 +3095,19 @@ Content-Type: application/json
 ```http
 GET /api/v2/acme/client/orders
 GET /api/v2/acme/client/orders?status=pending&environment=production
+GET /api/v2/acme/client/orders?page=2&per_page=100
 ```
+
+Newest first, 100 per page at most (`per_page`, default 100); `meta` gives `total`, `page`
+and `total_pages`. Orders left `pending` for more than 7 days, whose order at the CA has expired
+or whose expiry is unknown, are removed by the renewal task.
+
+Each order carries `renewal_failures`, `renewal_retry_daily`, `last_error_at` and
+`error_message`, and `upstream_revocations_owed`: the replaced certificates whose revocation the
+CA has not confirmed yet (with `acme.revoke_on_renewal`). The renewal task sends them again
+until the certificate expires, and each failure emits the `acme_order.revocation_failed`
+webhook event (`order`, `serial_number`, `error`, `attempts`). Deleting the order abandons them;
+its audit entry says how many.
 
 ### Get Order Details
 ```http
@@ -3098,6 +3140,9 @@ Content-Type: application/json
   "dns_provider_id": 1
 }
 ```
+
+A CSR (`key_source: "csr"`) whose key was revoked as compromised is refused with `409` before
+any order is opened at the CA.
 
 `key_type` sets the certificate key UCM generates: `RSA-2048`, `RSA-4096`, `EC-P256`,
 `EC-P384`, `EC-BP256`, `EC-BP384`, or `ML-DSA-44`, `ML-DSA-65`, `ML-DSA-87` when this build
@@ -3135,6 +3180,11 @@ DELETE /api/v2/acme/client/orders/{order_id}
 ```http
 POST /api/v2/acme/client/orders/{order_id}/renew
 ```
+
+A failure answers `409` when the renewal is blocked before the CA (account gone, key revoked
+as compromised, DNS provider disabled) and `422` otherwise, with the reason; both are counted
+on the order and emit `acme_order.renewal_failed`. `409` also answers while another renewal or
+finalization of the order runs, and that one is not counted.
 
 ### Register ACME Account
 ```http

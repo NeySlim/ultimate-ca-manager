@@ -238,6 +238,7 @@ def _issue_approved_csr(approval, data):
         extra_san=general_names_from_buckets(data['extra_san']) if data.get('extra_san') else None,
         policy_template_id=data.get('template_id'),
         notices=sign_notices,
+        custom_extensions=data.get('custom_extensions'),
     )
     if isinstance(signed, CA):
         # An intermediate CA request: the result lives in the CA table, the
@@ -732,6 +733,9 @@ def _issue_approved_certificate(approval):
     builder = add_certificate_policies(
         builder, ca.cps_uri if ca.cps_enabled else None, ca.cps_oid, template_policy_oids(tpl_ext))
     builder = add_qc_statements(builder, tpl_ext)
+    from utils.custom_extensions import add_custom_extensions, issuance_custom_extensions
+    builder = add_custom_extensions(
+        builder, issuance_custom_extensions(template, data.get('custom_extensions')))
     
     # Sign with the digest resolved against the policies above
     new_cert = builder.sign(ca_key, _sign_hash, default_backend(),
@@ -1304,10 +1308,13 @@ def approve_request(request_id):
                          exc_info=True)
             from services.policy_service import PolicyViolation
             from services.cert.renewal import RenewalError
+            from utils.custom_extensions import TemplateConfigError
             if isinstance(e, PolicyViolation):
                 issue_error = f'Policy violation: {e}'
             elif isinstance(e, RenewalError):
                 issue_error = e.message
+            elif isinstance(e, TemplateConfigError):
+                issue_error = str(e)
             elif isinstance(e, RuntimeError) and 'already issued' in str(e):
                 issue_error = 'A certificate was already issued for this request by another approver; reload it'
             elif isinstance(e, ValueError) and not any(

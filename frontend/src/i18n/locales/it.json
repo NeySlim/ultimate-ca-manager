@@ -1575,7 +1575,7 @@
     "autoRenewal": "Rinnovo automatico",
     "autoRenewalDesc": "Rinnova automaticamente i certificati prima della scadenza",
     "renewalDays": "Giorni prima della scadenza",
-    "renewalDaysHelper": "Rinnova con questo anticipo in giorni (da 1 a 60) quando la CA non suggerisce una finestra di rinnovo (ARI).",
+    "renewalDaysHelper": "Rinnova con questo anticipo in giorni (da 1 a 60) quando la CA non suggerisce una finestra di rinnovo (ARI). Se supera i due terzi della durata di un certificato, questo viene rinnovato nell'ultimo terzo della sua durata.",
     "renewalFailures": "Rinnovi non riusciti: {{count}}",
     "renewalLastFailure": "Ultimo errore: {{date}}",
     "renewalRetryDaily": "Il rinnovo continua a non riuscire: ora un tentativo al giorno",
@@ -4006,6 +4006,8 @@
       "policies": "Politiche del certificato",
       "nameConstraints": "Vincoli di nome",
       "sct": "Timestamp di certificati firmati (SCT)",
+      "otherExtensions": "Altre estensioni",
+      "copyValue": "Copia il valore",
       "qcStatements": "Qualified Certificate Statements",
       "qc": {
         "compliance": "QcCompliance",
@@ -4142,7 +4144,8 @@
       "systemUpdateInstalled": "Aggiornamento installato",
       "systemUpdateFailed": "Aggiornamento non riuscito",
       "acmePreflight": "Verifica preliminare ACME",
-      "acmeOrderRenewalFailed": "Rinnovo ACME non riuscito"
+      "acmeOrderRenewalFailed": "Rinnovo ACME non riuscito",
+      "acmeOrderRevocationFailed": "Revoca ACME non riuscita"
     },
     "title": "Webhook",
     "subtitle": "Invia notifiche HTTP quando si verificano eventi certificato",
@@ -5870,5 +5873,21 @@
     "notServable": "revocato, scaduto o non ancora valido",
     "exportHint": "Un certificato incrociato permette ai client che si fidano di un'altra root di costruire un percorso verso questa CA.",
     "deployHint": "La catena scritta nel file della catena completa. Un certificato incrociato revocato, scaduto o non ancora valido non viene mai inviato."
+  },
+  "customExtensions": {
+    "title": "Estensioni personalizzate",
+    "hint": "Aggiunte al certificato così come sono: un OID e il suo valore codificato in DER, in esadecimale. UCM non analizza il valore. Le estensioni che UCM imposta da sé (utilizzo della chiave, nomi, criteri...) mantengono le proprie impostazioni.",
+    "requestHint": "Si aggiungono a quelle del modello; una voce con lo stesso OID sostituisce quella del modello.",
+    "oid": "OID",
+    "value": "Valore (DER, esadecimale)",
+    "critical": "Critica",
+    "add": "Aggiungi estensione",
+    "criticalWarning": "Un client che non riconosce un'estensione critica deve rifiutare il certificato (RFC 5280, sezione 4.2). Contrassegnala come critica solo se tutte le parti che vi fanno affidamento la comprendono.",
+    "invalidOid": "Non è un OID in notazione puntata (ad esempio 1.3.6.1.4.1.99999.1)",
+    "invalidHex": "Il valore deve avere un numero pari di cifre esadecimali",
+    "emptyValue": "Il valore è vuoto",
+    "duplicateOid": "Questo OID è già presente nell'elenco",
+    "fixErrors": "Correggi prima le estensioni personalizzate",
+    "storedInvalid": "Le estensioni personalizzate salvate non sono valide: l'emissione da questo modello è rifiutata finché non vengono corrette o svuotate."
   }
 }

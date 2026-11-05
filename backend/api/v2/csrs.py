@@ -24,6 +24,7 @@ from services.cert.mixins.csr import RelatedSignerError
 from services.deletion_blockers import parse_bulk_ids
 from services.policy_service import PolicyViolation
 from utils.csr_extensions import csr_extensions
+from utils.custom_extensions import TemplateConfigError
 from fips_mode import FipsRestricted
 from utils.key_type import unsignable_csr_key
 from utils.san_parse import (general_names_from_buckets, parse_extra_san_payload,
@@ -226,7 +227,7 @@ def _policy_rule_refusal(ca, cert, template_id, validity_days, extra_dns=()):
 
 
 def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus, validity_notice=None,
-                      extra_san=None):
+                      extra_san=None, custom_extensions=None):
     """Queue the signing for approval when a policy requires it: ``(policy,
     approval)`` or ``(None, None)``. Raises on evaluation error."""
     from services.approval_gate import queue_if_approval_required
@@ -242,6 +243,7 @@ def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus
             'template_id': data.get('template_id'),
             # Names added to the request's own (#389), signed as approved
             'extra_san': extra_san,
+            'custom_extensions': custom_extensions or [],
             # The duration was already capped by policy: the approver is told
             'validity_notice': validity_notice or None,
         },
@@ -314,8 +316,20 @@ def get_csr(csr_id):
             data['csr_pem'] = base64.b64decode(cert.csr).decode('utf-8')
         except Exception:
             data['csr_pem'] = cert.csr
+    data['other_extensions'] = _csr_other_extensions(cert.csr)
     
     return success_response(data=data)
+
+
+def _csr_other_extensions(stored):
+    """The extensions of a request outside those the certificate details show in a section."""
+    from utils.cert_extensions import SHOWN_EXTENSION_OIDS
+    from utils.custom_extensions import describe_other_extensions
+    try:
+        pem = stored.encode() if stored.startswith('-----BEGIN') else base64.b64decode(stored)
+        return describe_other_extensions(csr_extensions(x509.load_pem_x509_csr(pem)), SHOWN_EXTENSION_OIDS)
+    except (ValueError, TypeError, x509.DuplicateExtension):
+        return []
 
 @bp.route('/api/v2/csrs', methods=['POST'])
 @require_auth(['write:csrs'])
@@ -962,6 +976,7 @@ def sign_csr(csr_id):
         cert_type: server, client, combined, code_signing, email or intermediate_ca
         extra_ekus: EKU names or OIDs added to the type's own
         san_dns, san_ip, san_email, san_uri: names added to the request's own
+        custom_extensions: [{oid, critical, value (hex)}] added verbatim (#437)
     """
     
     cert = db.session.get(Certificate, csr_id)
@@ -999,7 +1014,12 @@ def sign_csr(csr_id):
     if san_err:
         return error_response(san_err, 400)
     extra_san = extra_san if any(extra_san.values()) else None
-    
+
+    from utils.custom_extensions import validate_custom_extensions
+    custom_extensions, ext_err = validate_custom_extensions(data.get('custom_extensions'))
+    if ext_err:
+        return error_response(ext_err, 400)
+
     # Map frontend cert_type to backend cert_type format
     cert_type_map = {
         'server': 'server_cert',
@@ -1066,7 +1086,7 @@ def sign_csr(csr_id):
     try:
         policy, approval = _approval_for_csr(
             g.current_user, ca, cert, data, validity_days, backend_cert_type, extra_ekus,
-            validity_notice=validity_notice, extra_san=extra_san)
+            validity_notice=validity_notice, extra_san=extra_san, custom_extensions=custom_extensions)
     except Exception as e:
         logger.error(f"Policy evaluation failed for CSR {csr_id}; refusing to sign: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the request was not signed', 500)
@@ -1112,6 +1132,7 @@ def sign_csr(csr_id):
             extra_san=general_names_from_buckets(extra_san) if extra_san else None,
             policy_template_id=data.get('template_id'),
             notices=sign_notices,
+            custom_extensions=custom_extensions,
         )
         
         # Determine if result is a CA or Certificate
@@ -1141,6 +1162,8 @@ def sign_csr(csr_id):
         raise
     except PolicyViolation as e:
         return error_response(f'Policy violation: {e}', 400)
+    except TemplateConfigError as e:
+        return error_response(str(e), 400)
     except ValueError as e:
         if 'another request' in str(e):
             return error_response('CSR was signed by another request; reload it', 409)
@@ -1252,9 +1275,10 @@ def bulk_sign_csrs():
             signed_notices += [f'CSR {csr_id}: {n}' for n in item_notices if n]
         except PolicyViolation as e:
             results['failed'].append({'id': csr_id, 'error': f'Policy violation: {e}'})
-        except FipsRestricted as e:
+        except (FipsRestricted, TemplateConfigError) as e:
             results['failed'].append({'id': csr_id, 'error': str(e)})
         except Exception as e:
+            logger.error(f"Bulk sign: CSR {csr_id} failed (template {data.get('template_id')}): {e}", exc_info=True)
             results['failed'].append({'id': csr_id, 'error': 'Signing failed'})
 
     AuditService.log_action(

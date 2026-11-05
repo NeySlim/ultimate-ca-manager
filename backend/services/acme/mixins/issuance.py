@@ -509,7 +509,8 @@ class IssuanceMixin:
             from services.ca.ca_signing import CAOfflineError
         except Exception:  # pragma: no cover - defensive import
             CAOfflineError = ()
-        if isinstance(exc, (IssuerWindowError, CAOfflineError)):
+        from utils.custom_extensions import TemplateConfigError
+        if isinstance(exc, (IssuerWindowError, CAOfflineError, TemplateConfigError)):
             return False
         # Only messages our own CA/key code emits, never a name or a subject
         # the client chose (a name constraint refusal quoting "hsm.example")
@@ -645,4 +646,9 @@ class IssuanceMixin:
         except Exception as e:
             db.session.rollback()
             self._last_signing_exception = e
+            from utils.custom_extensions import TemplateConfigError
+            if isinstance(e, TemplateConfigError):
+                # The template's name stays in the log, not in the client's error
+                logger.error("ACME: order %s not signed: %s", order.order_id, e)
+                return False, None, f"Certificate signing failed: {e.public_message}"
             return False, None, f"Certificate signing failed: {str(e)}"

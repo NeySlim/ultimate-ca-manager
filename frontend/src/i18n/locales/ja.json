@@ -1575,7 +1575,7 @@
     "autoRenewal": "自動更新",
     "autoRenewalDesc": "証明書を期限切れ前に自動更新",
     "renewalDays": "期限切れまでの日数",
-    "renewalDaysHelper": "CA が更新ウィンドウ (ARI) を示さない場合、期限切れのこの日数前に更新します (1〜60)。",
+    "renewalDaysHelper": "CA が更新ウィンドウ (ARI) を示さない場合、期限切れのこの日数前に更新します (1〜60)。この日数が証明書の有効期間の 3 分の 2 を超える場合は、有効期間の最後の 3 分の 1 で更新します。",
     "renewalFailures": "更新失敗: {{count}} 回",
     "renewalLastFailure": "最終失敗: {{date}}",
     "renewalRetryDaily": "更新の失敗が続いています: 現在は 1 日 1 回試行します",
@@ -4009,6 +4009,8 @@
       "policies": "証明書ポリシー",
       "nameConstraints": "名前制約",
       "sct": "署名済み証明書タイムスタンプ（SCT）",
+      "otherExtensions": "その他の拡張",
+      "copyValue": "値をコピー",
       "qcStatements": "適格証明書ステートメント (qcStatements)",
       "qc": {
         "compliance": "QcCompliance",
@@ -4145,7 +4147,8 @@
       "systemUpdateInstalled": "アップデート完了",
       "systemUpdateFailed": "アップデート失敗",
       "acmePreflight": "ACME 事前チェック",
-      "acmeOrderRenewalFailed": "ACME 更新失敗"
+      "acmeOrderRenewalFailed": "ACME 更新失敗",
+      "acmeOrderRevocationFailed": "ACME 失効失敗"
     },
     "title": "Webhooks",
     "subtitle": "証明書イベント発生時にHTTP通知を送信",
@@ -5873,5 +5876,21 @@
     "notServable": "失効済み、期限切れ、または有効期間前",
     "exportHint": "クロス証明書により、別のルートを信頼するクライアントもこの CA へのパスを構築できます。",
     "deployHint": "フルチェーンファイルに書き込まれるチェーンです。失効済み、期限切れ、または有効期間前のクロス証明書は送信されません。"
+  },
+  "customExtensions": {
+    "title": "カスタム拡張",
+    "hint": "指定どおりに証明書へ追加されます: OID と、DER エンコードした値の 16 進表記です。UCM は値を解析しません。UCM 自身が設定する拡張 (鍵用途、名前、ポリシーなど) はそれぞれの設定を使います。",
+    "requestHint": "テンプレートの拡張に追加されます。同じ OID のエントリはテンプレートのものを置き換えます。",
+    "oid": "OID",
+    "value": "値 (DER、16 進)",
+    "critical": "クリティカル",
+    "add": "拡張を追加",
+    "criticalWarning": "クリティカルな拡張を認識できないクライアントは証明書を拒否しなければなりません (RFC 5280 4.2 節)。証明書を利用するすべての当事者が理解できる場合にのみクリティカルにしてください。",
+    "invalidOid": "ドット区切りの OID ではありません (例: 1.3.6.1.4.1.99999.1)",
+    "invalidHex": "値は偶数個の 16 進数字である必要があります",
+    "emptyValue": "値が空です",
+    "duplicateOid": "この OID はすでに一覧にあります",
+    "fixErrors": "先にカスタム拡張を修正してください",
+    "storedInvalid": "保存されているカスタム拡張が無効です: 修正するか空にするまで、このテンプレートからの発行は拒否されます。"
   }
 }

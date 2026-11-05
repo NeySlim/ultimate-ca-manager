@@ -13,6 +13,8 @@ import {
   isPostQuantum, isUsable, keyFamilyOptions,
 } from '../../lib/keyAlgorithms'
 import { BrainpoolNotice } from '../../components/BrainpoolNotice'
+import { CustomExtensionsEditor } from '../../components/CustomExtensionsEditor'
+import { customExtensionsPayload } from '../../lib/customExtensions'
 
 const ISSUE_FAMILY_OPTIONS = keyFamilyOptions('issue')
 const [DEFAULT_KEY_TYPE, DEFAULT_KEY_SIZE] = findAlgorithm(ISSUE_DEFAULT_LABELS[0]).issue
@@ -31,6 +33,8 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   const issuingRef = useRef(false)
   const [showAllTemplates, setShowAllTemplates] = useState(false)
   const [showHiddenCas, setShowHiddenCas] = useState(false)
+  const [customExtRows, setCustomExtRows] = useState([])
+  const [showCustomExt, setShowCustomExt] = useState(false)
 
   const [formData, setFormData] = useState({
     ca_id: '',
@@ -312,6 +316,12 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
       showError(t(sanError.key, sanError.params))
       return
     }
+    const customExt = customExtensionsPayload(customExtRows)
+    if (!customExt.valid) {
+      setShowCustomExt(true)
+      showError(t('customExtensions.fixErrors'))
+      return
+    }
 
     // Build SAN arrays (manual + auto-included from CN)
     const san_dns = [], san_ip = [], san_email = [], san_uri = [], san_upn = []
@@ -362,6 +372,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
       ...(selectedTemplate && { template_id: parseInt(selectedTemplate) }),
       ...(formData.ocsp_must_staple && { ocsp_must_staple: true }),
       ...(formData.extra_ekus?.length && { extra_ekus: formData.extra_ekus }),
+      ...(customExt.entries.length && { custom_extensions: customExt.entries }),
     }
     setIssuing(true)
     issuingRef.current = true
@@ -737,6 +748,28 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
         <label htmlFor="ocsp_must_staple" className="text-sm text-text-secondary cursor-pointer">
           {t('certificates.ocspMustStaple')}
         </label>
+      </div>
+
+      {/* Custom extensions (#437) */}
+      <div className="space-y-2">
+        <button
+          type="button"
+          onClick={() => setShowCustomExt(v => !v)}
+          className="flex items-center gap-1 text-sm font-medium text-text-secondary hover:text-text-primary"
+          aria-expanded={showCustomExt}
+        >
+          {showCustomExt ? <CaretUp size={14} /> : <CaretDown size={14} />}
+          {t('customExtensions.title')}
+          {customExtRows.length > 0 && <span className="text-xs text-text-tertiary">({customExtRows.length})</span>}
+        </button>
+        {showCustomExt && (
+          <CustomExtensionsEditor
+            rows={customExtRows}
+            onChange={setCustomExtRows}
+            t={t}
+            hint={`${t('customExtensions.hint')} ${selectedTemplate ? t('customExtensions.requestHint') : ''}`.trim()}
+          />
+        )}
       </div>
 
       {/* Actions */}

@@ -22,6 +22,9 @@ _SHORT_NAMES = {
     '1.2.840.10045.4.3.4': 'ECDSA-SHA512',
 }
 
+# pyca names them 'ed25519' and 'ed448': shown as the key algorithms are
+EDDSA_SIGNATURE_NAMES = {'1.3.101.112': 'Ed25519', '1.3.101.113': 'Ed448'}
+
 
 def signature_display_name(obj) -> str:
     """The certificate list's spelling: 'SHA256-RSA', 'ECDSA-SHA384', else the readable label."""
@@ -32,7 +35,7 @@ def signature_algorithm_label(obj) -> str:
     """'RSASSA-PSS SHA-256 (salt 32)' for PSS, the OID name (or dotted string) otherwise."""
     oid = obj.signature_algorithm_oid
     if oid != SignatureAlgorithmOID.RSASSA_PSS:
-        return signature_label(oid)
+        return EDDSA_SIGNATURE_NAMES.get(oid.dotted_string) or signature_label(oid)
     hash_name = obj.signature_hash_algorithm.name
     der = obj.public_bytes(serialization.Encoding.DER)
     parsed = (asn1crypto.x509.Certificate if isinstance(obj, x509.Certificate)

@@ -221,6 +221,17 @@ class TestInPlace:
         assert result['new_serial'] == after['serial'] and result['rekeyed'] is True
         assert result['ca_id'] == ca['id'] and result['notices'] == []
 
+    def test_the_superseded_serial_keeps_the_old_key_digest(self, app, leaf):
+        from utils.spki_digest import certificate_key_sha256
+        cid = leaf()
+        before = _state(app, cid)
+        _renew(app, cid)
+        after = _state(app, cid)
+        with app.app_context():
+            record = RevokedSerial.query.filter_by(certificate_id=cid).one()
+            assert record.public_key_sha256 == certificate_key_sha256(before['crt'])
+            assert record.public_key_sha256 != certificate_key_sha256(after['crt'])
+
     def test_second_renewal_records_the_intermediate_serial(self, app, leaf):
         cid = leaf()
         first = _state(app, cid)['serial']

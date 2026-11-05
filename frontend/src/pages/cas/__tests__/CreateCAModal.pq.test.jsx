@@ -139,7 +139,7 @@ describe('CreateCAModal ML-DSA', () => {
     expect(hsmOffered).toContain('EC-BP256')
     expect(hsmOffered.filter(l => PQ_ROWS.some(a => a.label === l))).toEqual([])
     fireEvent.click(screen.getByLabelText('cas.create.keyStorageLocal'))
-    expect(optionValues('common.keyAlgorithm')).toEqual(['RSA', 'ECDSA'])
+    expect(optionValues('common.keyAlgorithm')).toEqual(['RSA', 'ECDSA', 'EdDSA'])
   })
 
   async function onHsm(providers, effective = { allowed_key_types: null, allowed_digests: null }) {

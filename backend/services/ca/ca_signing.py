@@ -149,6 +149,11 @@ class CASigningMixin:
         cps_uri = ca.cps_uri if ca.cps_enabled and ca.cps_uri else None
         cps_oid = ca.cps_oid if cps_uri else None
 
+        # The matched template (WSTEP) adds its custom extensions (#437)
+        policy_template = (db.session.get(CertificateTemplate, policy_template_id)
+                           if policy_template_id else None)
+        from utils.custom_extensions import template_custom_extensions
+
         # Sign via TrustStoreService
         cert_pem_bytes = TrustStoreService.sign_csr(
             csr_pem=csr_pem,
@@ -172,8 +177,8 @@ class CASigningMixin:
             template_ext={'extended_key_usage': list(template_ekus)} if template_ekus else None,
             policy_scope={'ca_id': ca.id, 'template_id': policy_template_id,
                           'digest_explicit': False},
-            san_template=(db.session.get(CertificateTemplate, policy_template_id)
-                          if policy_template_id else None),
+            san_template=policy_template,
+            custom_extensions=template_custom_extensions(policy_template),
         )
 
         # Extract serial number

@@ -44,6 +44,11 @@ def _migration():
     return importlib.import_module('migrations.078_revoked_serials')
 
 
+def _key_digest_migration():
+    # 128 adds the key digest a fresh install has from the model
+    return importlib.import_module('migrations.128_revoked_key_digest_upstream_revocations')
+
+
 def _snapshot(conn, table='revoked_serials'):
     """Columns, primary key, indexes and foreign keys as the engine reports them."""
     insp = inspect(conn)
@@ -168,6 +173,7 @@ class TestSqliteUpgrade:
 
         with _sqlite_db(tmp_path) as (raw, migrated), _sqlite_db(tmp_path, (), 'fresh.db') as (_r, fresh):
             _migration().upgrade(raw)
+            _key_digest_migration().upgrade(raw)
             db.metadata.create_all(bind=fresh)
             assert _sqlite_snapshot(migrated) == _sqlite_snapshot(fresh)
             for engine in (migrated, fresh):
@@ -307,6 +313,8 @@ class TestPostgresUpgrade:
 
         with _pg_schema('mig') as migrated, _pg_schema('fresh', ()) as fresh:
             _pg_upgrade(migrated)
+            _key_digest_migration().upgrade(migrated)
+            migrated.commit()
             db.metadata.create_all(bind=fresh)
             fresh.commit()
             assert _snapshot(migrated) == _snapshot(fresh)
@@ -348,7 +356,7 @@ class _PgExec:
 # --------------------------------------------------------------------------
 
 class TestRevokedSerialModel:
-    def test_to_dict_carries_the_nine_keys_with_iso_dates(self):
+    def test_to_dict_carries_the_ten_keys_with_iso_dates(self):
         from models.revoked_serial import RevokedSerial
 
         row = RevokedSerial(
@@ -357,7 +365,7 @@ class TestRevokedSerialModel:
             valid_to=datetime(2027, 1, 2, 3, 4, 5), certificate_id=None,
             created_at=datetime(2026, 1, 2, 3, 4, 6))
         data = row.to_dict()
-        assert set(data) == set(COLUMNS)
+        assert set(data) == set(COLUMNS) | {'public_key_sha256'}
         assert data['revoked_at'] == '2026-01-02T03:04:05Z'
         assert data['valid_to'] == '2027-01-02T03:04:05Z'
         assert data['created_at'] == '2026-01-02T03:04:06Z'

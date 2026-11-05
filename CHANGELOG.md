@@ -9,6 +9,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- CAs: Ed25519 and Ed448 keys can be generated for a root, intermediate or external CA, and an EdDSA CA key imported with or after its certificate (`POST /cas/import`, certificate import with its key, `POST /cas/<id>/key`) is accepted instead of a 400 (#436, reported by @Faraphel).
+- Certificates: templates and the issue form can add custom X.509 extensions, each an OID, a critical flag and its DER value in hex, and the certificate and CA details list the extensions UCM has no section for, with their raw value (#437, requested by @Faraphel).
+
 ### Security
 
 - Key recovery: a request named its certificate by number, and SQLite gives a deleted certificate's number to the next one created, so an approved request could export another certificate's private key, after a replacing restore in particular. Approval and recovery now answer 410 unless the number still names the certificate the request was opened on, and a replacing restore cancels the open requests on the certificates it removes.
@@ -23,6 +28,17 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: a manual and a scheduled renewal of one order could run at once and obtain two certificates. Each renewal or finalization now holds a lease on its order, which a stopped process leaves for 10 minutes: a second one gets a 409, and the scheduler skips the order.
 - ACME client: after 5 failed scheduled renewals an order was never renewed again, silently. It is now retried once a day, each failure emits the `acme_order.renewal_failed` webhook event, the order list shows the failure count and last error, and the scheduler task reports a warning.
 - ACME client: an order whose CA account had been deleted renewed under another account, possibly at another CA. The renewal and the order's other actions now stop with a message saying what to do, and deleting or deactivating an account is refused (409) while issued orders renew through it; each order's automatic renewal can now be turned off from the order list (`PATCH /api/v2/acme/client/orders/<id>`).
+- ACME client: a CSR whose key was revoked as compromised was refused only at finalization, after the CA had opened an order and checked the challenges at each renewal. It is now refused with a 409 by the request and before a renewal opens any order.
+- ACME client: a failed manual renewal answered a bare 500 and was neither counted nor audited. It now answers 409 or 422 with the reason, counts towards the order's failures and emits `acme_order.renewal_failed`.
+- ACME client: an order the CA answered 404 or 410 for was polled until the timeout, up to several minutes per scheduler pass. Polling now stops at once and the order turns invalid with the reason.
+- ACME client: a restart during the automatic validation left the order `processing` for good. At startup such an order goes back to `pending`, with a message, ready for Verify.
+- ACME client: the order list stopped at the 100 newest orders, so an older issued order disappeared from the page. The API now pages (`page`, `per_page`) and the page loads every order.
+- ACME client: the TXT records of a DNS-01 order whose automatic validation failed stayed in the zone. They are now removed once the order is invalid or its finalization failed; an order left pending keeps them for Verify.
+- ACME client: deleting a certificate after revoking it did not stop its order, and the next pass issued a new one. The order's automatic renewal is now turned off, with a message saying so.
+- ACME client: a renewal used a DNS provider that had been disabled, and an order reusing the key of a deleted certificate silently got a new key. Both now stop before the CA with a message.
+- ACME client: the help of the renewal threshold did not say that a certificate whose life is shorter than 1.5 times the threshold renews in its last third. It now does.
+- ACME client: with `revoke_on_renewal`, a revocation the CA refused or never received was only logged, and a certificate revoked here as compromised was revoked at the CA as superseded. The CA now gets the local reason when it is keyCompromise, affiliationChanged, superseded or cessationOfOperation and none otherwise, and a failed revocation is retried by the renewal task until the certificate expires, emitting `acme_order.revocation_failed`.
+- Revocation: a key revoked as compromised was forgotten once its certificate was deleted, so the ACME client could certify it again. The revocation record, written when the issuing CA is held here, now keeps the key's SHA-256 (migration 128).
 - Restore: a membership, deployment binding, CRL binding, template pin or role permission was matched by the source's row numbers first, and could overwrite another row here. Rows are now matched by what they name; an archive records the database it comes from, and its numbers count only there and only when they still name the same rows.
 - Restore: a replacing restore failed on PostgreSQL as soon as a CRL, a cached OCSP response, a session or an ACME client order pointed at a row it removed, and left such rows pointing at nothing on SQLite. Both engines now clear regenerable rows and queues, detach or drop history as deleting the row does, empty the optional links the schema does not enforce, and refuse any other link with the row named.
 - Restore: a replacing restore wrote the archive before removing what it does not carry, so a SCEP slug or a name still held by a removed row failed with a bare 500. Removals now come first, a homonym replacing the row here keeps its name unless a kept row still points at that row, in which case it is restored as `name (2)`, and a remaining database conflict names the table and the row.
@@ -35,6 +51,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- Revocation records written before migration 128 carry no key digest: they learn it when their certificate is deleted, and until then the certificate row itself answers.
+- ACME client: the renewal task now removes the orders left `pending` for more than 7 days whose order at the CA has expired or whose expiry is unknown, with their TXT records, and audits each removal.
 - DNS providers, ACME CA accounts and webhooks: the upgrade renames duplicate names to `name (2)`, `name (3)`, oldest first, then makes the name unique (migration 124).
 - ACME client: a renewal now keeps the certificate's id and refid, and `/renew` and the renewal logs no longer announce a new certificate id. Certificates that past renewals imported as new rows stay in the inventory: archive or delete them by hand.
 - Backups: archives now carry ACME client orders, approval requests and key recovery requests, and the duplicate orders migration 121 removes are removed again from what a restore brings back. Restoring over an order renewed since the archive puts the archived order and certificate back and says so; an archive written before this version leaves the rows here as they are.
@@ -42,6 +60,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: orders stopped by the old limit of 5 failed renewals resume at one attempt a day, and orders with no failure count recorded, which were skipped, are renewed again. Turn off the automatic renewal of an order you no longer want renewed, or delete it.
 - Restore: a replacing restore now removes the CRLs, cached OCSP responses, sessions, in-flight ACME server orders, approval requests (from an archive without them), Microsoft CA requests, SAML replay entries and webhook or deployment deliveries (history included) that point at a removed row, detaches ACME client orders, SCEP requests, discovery results and revocation records from it, and cancels the key recovery requests still open on a removed certificate. The restore message and its audit entry list them.
 - Restore: `BACKUP_MAX_UPLOAD_MB` (default 512) is the restore upload's own ceiling, the decompressed content may be four times that, and the archive may hold one JSON object per 100 bytes of it; a reverse proxy in front of UCM keeps its own body limit. A restore holds the archive in memory, with a peak of several times its size.
+- Templates: the upgrade adds the `custom_extensions` column, empty for every existing template (migration 127).
 
 ## [2.249] - 2026-11-05
 

@@ -25,6 +25,7 @@ export default {
           { label: 'Privaten Schlüssel importieren', text: 'Den privaten Schlüssel einer CA anhängen, die nur ihr Zertifikat besitzt, damit sie signieren kann' },
           { label: 'Schlüssel und Gültigkeit', text: 'Standardmäßig RSA-3072, lokal oder HSM. Gültigkeit von 1, 2, 3, 5, 10, 15 oder 20 Jahren oder Benutzerdefiniert (Tage) bis zu 50 Jahren. Eine RSA-2048-CA, die 2030 überdauern würde, wird markiert: Die ANSSI akzeptiert RSA-2048 bis Ende 2030, ETSI TS 119 312 bis Ende 2026' },
           { label: 'Post-Quanten (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 oder ML-DSA-87 (FIPS 204, NIST-Level 2, 3 und 5), in Software oder bei einem HSM-Anbieter erzeugt, der ML-DSA unterstützt, und im FIPS-Modus ausgeblendet. Ein ML-DSA-Schlüssel signiert ohne separaten Digest, daher gibt es für die CA, ihre CRLs und ihre OCSP-Antworten keinen Digest zu wählen. Eine ML-DSA-CA kann RSA- oder EC-Zertifikate signieren, und eine RSA- oder EC-CA kann eine ML-DSA-Intermediate signieren. Die Erneuerung behält dieselbe Stufe' },
+          { label: 'EdDSA (Ed25519, Ed448)', text: 'Ed25519- oder Ed448-Schlüssel für eine Root-, Intermediate- oder externe CA, nur in Software (kein HSM-Anbieter signiert EdDSA) und im FIPS-Modus ausgeblendet. Wie bei ML-DSA signiert ein EdDSA-Schlüssel ohne Digest, und die Hierarchie kann mit RSA, EC oder ML-DSA gemischt sein. Browser, Windows (CryptoAPI/CNG) und SCEP-Clients akzeptieren nicht, was eine EdDSA-CA signiert, unabhängig vom Schlüssel des Endzertifikats: Reservieren Sie sie für Konsumenten mit OpenSSL, Go oder Java 15+. SCEP und XCEP lehnen eine solche CA ab' },
           { label: 'Name Constraints', text: 'Erweiterte Einschränkungen (RFC 5280): erlaubte und ausgeschlossene Teilbäume (DNS, IP-Bereich, E-Mail) begrenzen die Namen, die die CA zertifizieren darf. Bei einer extern signierten CA legt die signierende CA sie fest' },
           { label: 'RSA-Signaturverfahren', text: 'Standardmäßig PKCS#1 v1.5, oder RSA-PSS (Salt so lang wie der Hash) für eine RSA-CA mit lokalem, PKCS#11- oder OpenBao-Schlüssel. Es gilt für die Zertifikate, CRLs, OCSP-Antworten und SCEP-Antworten, die die CA signiert; Zeitstempel bleiben bei PKCS#1 v1.5, dem Verfahren, das openssl ts -verify prüft. „Mit RSA-PSS signieren" in den CA-Details stellt eine bestehende CA in beide Richtungen um: Bereits ausgestellte Zertifikate behalten ihre Signatur' },
           { label: 'Compliance-Profil', text: 'ANSSI, BSI oder EU ACM: Regeln, die sich an einem Referenztext orientieren, binden, was die CA ausstellt (Schlüsseltypen, Digests, RSA-Verfahren, Datumshorizonte und für EU ACM ein im HSM gehaltener CA-Schlüssel). Wählen Sie eines bei der Erstellung (einer Zwischen-CA wird das Profil der übergeordneten CA vorgeschlagen, sonst das in Einstellungen, Info festgelegte Standardprofil). Bei einer bestehenden CA weist das Feld in den Details es zu, ändert oder entfernt es: Zuerst läuft die Profilprüfung für diese CA, ihre Feststellungen werden aufgelistet, und Sie bestätigen, dass die Regeln nur für künftige Ausstellungen gelten; nichts bereits Ausgestelltes wird neu signiert. Erfordert write:cas, zum Zuweisen oder Ändern zusätzlich admin:system' },
@@ -139,7 +140,7 @@ Gruppiert CAs nach ihrem Organisation-Feld (O). Nützlich für Multi-Mandanten-S
 ### Root-CA erstellen
 1. Klicken Sie auf **Erstellen** → **Root-CA**
 2. Füllen Sie die Betreffsfelder aus (CN, O, OU, C, ST, L)
-3. Wählen Sie den Schlüsselalgorithmus (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87): standardmäßig RSA-3072
+3. Wählen Sie den Schlüsselalgorithmus (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87, EdDSA Ed25519/Ed448): standardmäßig RSA-3072
 4. Legen Sie die Gültigkeitsdauer fest: 1, 2, 3, 5, 10, 15 oder 20 Jahre oder **Benutzerdefiniert (Tage)** bis zu 50 Jahren (typischerweise 10-20 Jahre für Root-CAs)
 5. Wählen Sie optional ein Zertifikatstemplate
 6. Klicken Sie auf **Erstellen**
@@ -162,6 +163,13 @@ Das Formular markiert eine RSA-2048-CA, die 2030 überdauern würde: Die ANSSI a
 - Hierarchien können gemischt sein: Eine ML-DSA-Root kann eine RSA- oder EC-Intermediate signieren, und eine RSA- oder EC-CA kann eine ML-DSA-Intermediate signieren, die dann den Digest ihrer übergeordneten CA verwendet.
 - Die Erneuerung behält den Schlüssel und seine Stufe.
 - Eine ML-DSA-CA wird als PEM oder DER exportiert, nicht als PKCS#12 oder JKS. Clients ohne ML-DSA-Unterstützung (OpenSSL vor 3.5, die meisten Browser heute) können nicht verifizieren, was sie signiert.
+
+### EdDSA-CAs (Ed25519, Ed448)
+Schlüssel vom Typ **Ed25519** und **Ed448** können für eine Root-, Intermediate- oder externe CA erzeugt oder mit oder nach dem CA-Zertifikat importiert werden. Der Schlüssel ist ein Software-Schlüssel (kein HSM-Anbieter signiert EdDSA), und der Algorithmus ist im FIPS-Modus ausgeblendet.
+
+- Ein EdDSA-Schlüssel signiert wie ML-DSA ohne separaten Digest: Das Digest-Feld entfällt, und CRLs und OCSP-Antworten folgen derselben Regel.
+- Hierarchien können gemischt sein: Eine EdDSA-CA kann RSA-, EC- oder ML-DSA-Intermediates und -Zertifikate signieren, und umgekehrt.
+- Browser, Windows (CryptoAPI/CNG) und SCEP-Clients akzeptieren keine von einer EdDSA-CA signierten Zertifikate, unabhängig vom Schlüssel des Endzertifikats. SCEP und XCEP/WSTEP lehnen eine solche CA ab. Verwenden Sie sie dort, wo die Konsumenten OpenSSL, Go oder Java 15+ sind.
 
 ### Eine extern signierte CA erstellen (CSR-Modus, v2.214)
 Für das Offline-Root-Muster: der Schlüssel der ausstellenden CA liegt in UCM, ihr Zertifikat wird extern signiert:

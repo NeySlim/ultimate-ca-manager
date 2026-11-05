@@ -3,9 +3,11 @@
  * Used by CertificateDetails, CADetails, and DiscoveryPage.
  */
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck } from '@phosphor-icons/react'
+import { ShieldCheck, Copy, Check } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { CompactSection } from './DetailCard'
+import { useClipboard } from '../hooks/useClipboard'
+import { truncateHex } from '../lib/customExtensions'
 
 const SAN_COLORS = {
   DNS: 'primary', IP: 'warning', Email: 'teal', URI: 'cyan',
@@ -163,8 +165,44 @@ export function CertificateExtensions({ extensions, defaultOpen = true }) {
             <Badge variant="teal" size="sm">Present</Badge>
           </div>
         )}
+
+        {/* Extensions without a section of their own, custom ones included */}
+        {extensions.other_extensions?.length > 0 && <OtherExtensions items={extensions.other_extensions} />}
       </div>
     </CompactSection>
+  )
+}
+
+function OtherExtensions({ items }) {
+  const { t } = useTranslation()
+  const { copy, isCopied } = useClipboard()
+  return (
+    <div className="space-y-1" data-testid="other-extensions">
+      <div className="text-xs font-semibold text-text-primary">{t('details.ext.otherExtensions')}</div>
+      {items.map(e => (
+        <div key={e.oid} className="space-y-0.5">
+          <div className="flex flex-wrap items-center gap-1.5 text-2xs">
+            {e.name && <span className="font-medium text-text-primary">{e.name}</span>}
+            <span className="font-mono text-text-secondary">{e.oid}</span>
+            {e.critical && <Badge variant="danger" size="sm">Critical</Badge>}
+          </div>
+          {e.value_hex && (
+            <div className="flex items-start gap-1.5">
+              <span className="text-2xs font-mono text-text-secondary break-all" title={e.value_hex}>{truncateHex(e.value_hex)}</span>
+              <button
+                type="button"
+                onClick={() => copy(e.value_hex, e.oid)}
+                className="shrink-0 text-text-tertiary hover:text-text-primary"
+                title={isCopied(e.oid) ? t('common.copied') : t('details.ext.copyValue')}
+                aria-label={t('details.ext.copyValue')}
+              >
+                {isCopied(e.oid) ? <Check size={12} /> : <Copy size={12} />}
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   )
 }
 

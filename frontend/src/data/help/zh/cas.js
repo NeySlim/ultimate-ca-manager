@@ -25,6 +25,7 @@ export default {
           { label: '导入私钥', text: '为仅持有证书的 CA 附加私钥，使其能够签名' },
           { label: '密钥与有效期', text: '默认 RSA-3072，本地或 HSM。有效期为 1、2、3、5、10、15 或 20 年，或自定义（天），最长 50 年。将在 2030 年之后到期的 RSA-2048 CA 会被标记：ANSSI 接受 RSA-2048 至 2030 年底，ETSI TS 119 312 接受至 2026 年底' },
           { label: '后量子（ML-DSA）', text: 'ML-DSA-44、ML-DSA-65 或 ML-DSA-87（FIPS 204，NIST 级别 2、3 和 5），在软件中生成，或在持有 ML-DSA 的 HSM 提供商上生成，且在 FIPS 模式下隐藏。ML-DSA 密钥无需单独的摘要即可签名，因此 CA、其 CRL 和 OCSP 响应没有可选的摘要。ML-DSA CA 可签发 RSA 或 EC 证书，RSA 或 EC CA 也可签发 ML-DSA 中间 CA。续期保持相同级别' },
+          { label: 'EdDSA（Ed25519、Ed448）', text: 'Ed25519 或 Ed448 密钥，用于根 CA、中间 CA 或外部 CA，仅限软件密钥（没有 HSM 提供商支持 EdDSA 签名），且在 FIPS 模式下隐藏。与 ML-DSA 一样，EdDSA 密钥无需摘要即可签名，且层次结构可与 RSA、EC 或 ML-DSA 混用。无论叶证书使用何种密钥，浏览器、Windows（CryptoAPI/CNG）和 SCEP 客户端都不接受 EdDSA CA 签发的内容：请仅用于 OpenSSL、Go 或 Java 15+ 的使用方。SCEP 和 XCEP 拒绝此类 CA' },
           { label: '名称约束', text: '高级约束 (RFC 5280)：允许和排除的子树（DNS、IP 范围、电子邮件）限制该 CA 可认证的名称。对于外部签名的 CA，由签发 CA 设置' },
           { label: 'RSA 签名方案', text: '默认为 PKCS#1 v1.5；使用本地、PKCS#11 或 OpenBao 密钥的 RSA CA 也可使用 RSA-PSS（盐长度与哈希相同）。它适用于该 CA 签署的证书、CRL、OCSP 响应和 SCEP 应答；时间戳仍使用 PKCS#1 v1.5，这是 openssl ts -verify 检查的方案。在 CA 详情中点击“使用 RSA-PSS 签名”可在两种方案间切换现有 CA：已签发的证书保留其原有签名' },
           { label: '合规配置文件', text: 'ANSSI、BSI 或 EU ACM：与参考文本对齐的规则约束该 CA 的签发内容（密钥类型、摘要、RSA 方案、日期期限，EU ACM 还要求 CA 密钥由 HSM 持有）。创建时选择一个（中级 CA 会建议其上级的配置文件，否则使用设置“关于”中设定的默认值）。对现有 CA，可通过详情中的该字段关联、更改或移除：系统先对该 CA 运行配置文件检查并列出结果，由你确认这些规则仅适用于今后的签发，已签发的内容不会被重新签名。需要 write:cas，关联或更改还需要 admin:system' },
@@ -139,7 +140,7 @@ export default {
 ### 创建根 CA
 1. 点击**创建** → **根 CA**
 2. 填写主题字段（CN、O、OU、C、ST、L）
-3. 选择密钥算法（RSA 2048/3072/4096、ECDSA P-256/P-384/P-521、ML-DSA 44/65/87）：默认 RSA-3072
+3. 选择密钥算法（RSA 2048/3072/4096、ECDSA P-256/P-384/P-521、ML-DSA 44/65/87、EdDSA Ed25519/Ed448）：默认 RSA-3072
 4. 设置有效期：1、2、3、5、10、15 或 20 年，或**自定义（天）**，最长 50 年（根 CA 通常为 10-20 年）
 5. 可选择证书模板
 6. 点击**创建**
@@ -162,6 +163,13 @@ export default {
 - 层次结构可以混用：ML-DSA 根 CA 可签发 RSA 或 EC 中间 CA，RSA 或 EC CA 也可签发 ML-DSA 中间 CA，后者使用其上级的摘要。
 - 续期保留密钥及其级别。
 - ML-DSA CA 可导出为 PEM 或 DER，不能导出为 PKCS#12 或 JKS。不支持 ML-DSA 的客户端（OpenSSL 3.5 之前的版本、目前大多数浏览器）无法验证其签发的内容。
+
+### EdDSA CA（Ed25519、Ed448）
+可为根 CA、中间 CA 或外部 CA 生成 **Ed25519** 和 **Ed448** 密钥，也可随 CA 证书一并导入或在之后导入。该密钥为软件密钥（没有 HSM 提供商支持 EdDSA 签名），且该算法在 FIPS 模式下隐藏。
+
+- EdDSA 密钥与 ML-DSA 一样无需摘要即可签名：摘要字段消失，CRL 和 OCSP 响应遵循相同规则。
+- 层次结构可以混用：EdDSA CA 可签发 RSA、EC 或 ML-DSA 中间 CA 和叶证书，反之亦然。
+- 无论叶证书使用何种密钥，浏览器、Windows（CryptoAPI/CNG）和 SCEP 客户端都不接受 EdDSA CA 签发的证书。SCEP 和 XCEP/WSTEP 拒绝此类 CA。请用于 OpenSSL、Go 或 Java 15+ 的使用方。
 
 ### 创建外部签名 CA（CSR 模式，v2.214）
 适用于离线根模式:, 签发 CA 的密钥保存在 UCM 中，其证书在外部签署：

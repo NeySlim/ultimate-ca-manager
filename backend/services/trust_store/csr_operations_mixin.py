@@ -30,6 +30,7 @@ _MS_CERTIFICATE_TEMPLATE_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.21.7')
 
 from utils.signing_hash import signing_hash_for, rsa_padding_for
 from utils.qc_statements import add_certificate_policies, add_qc_statements, template_policy_oids
+from utils.custom_extensions import add_custom_extensions
 
 
 def _certificate_template_extension(template_oid, major=100, minor=0):
@@ -628,6 +629,7 @@ class CSROperationsMixin:
         san_template=None,
         qualification_template=None,
         notices: Optional[list] = None,
+        custom_extensions: Optional[list] = None,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
         signing renews — its names are graced by NameConstraints validation.
@@ -676,7 +678,9 @@ class CSROperationsMixin:
         names implied by the subject alone are dropped instead of refused.
         ``qualification_template``: template whose qcStatements and policy OIDs
         land on a leaf (EST, WSTEP and mTLS pass none).
-        ``notices``: list that receives what was granted otherwise than asked."""
+        ``notices``: list that receives what was granted otherwise than asked.
+        ``custom_extensions``: validated ``{oid, critical, value}`` entries
+        (utils.custom_extensions) added verbatim."""
         from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 
         # Load CSR
@@ -832,6 +836,8 @@ class CSROperationsMixin:
             ExtensionOID.SUBJECT_KEY_IDENTIFIER,
             ExtensionOID.AUTHORITY_KEY_IDENTIFIER,
         }
+        # The operator's custom extensions win over the CSR's (sub-CA copy)
+        skip_from_csr |= {x509.ObjectIdentifier(e['oid']) for e in custom_extensions or ()}
         for extension in csr_exts:
             if extension.oid in skip_from_csr:
                 continue
@@ -1142,6 +1148,7 @@ class CSROperationsMixin:
                 builder = add_certificate_policies(
                     builder, cps_uri, cps_oid, template_policy_oids(qc_tpl_ext))
         builder = add_qc_statements(builder, qc_tpl_ext)
+        builder = add_custom_extensions(builder, custom_extensions)
 
         # SubjectKeyIdentifier — always from the CSR subject public key
         builder = builder.add_extension(

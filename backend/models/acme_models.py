@@ -407,6 +407,8 @@ class AcmeClientOrder(db.Model):
     _pending_key = db.Column('pending_key', db.Text)
     # Lease of the renewal or finalization running on this order (services/acme/order_lease.py)
     renewal_claimed_at = db.Column(db.DateTime)
+    # JSON list of replaced certificates whose revocation the CA has not confirmed yet
+    upstream_revocations = db.Column(db.Text)
     # On the order a renewal opens: the order it renews
     renewal_of_order_id = db.Column(
         db.Integer, db.ForeignKey('acme_client_orders.id', ondelete='SET NULL'), nullable=True, index=True)
@@ -457,6 +459,18 @@ class AcmeClientOrder(db.Model):
             self._pending_key = store_pem_bytes(value.encode())
         else:
             self._pending_key = None
+
+    @property
+    def upstream_revocations_list(self):
+        try:
+            entries = json.loads(self.upstream_revocations) if self.upstream_revocations else []
+        except ValueError:
+            return []
+        return entries if isinstance(entries, list) else []
+
+    @upstream_revocations_list.setter
+    def upstream_revocations_list(self, entries):
+        self.upstream_revocations = json.dumps(entries) if entries else None
 
     @property
     def domains_list(self):
@@ -561,6 +575,7 @@ class AcmeClientOrder(db.Model):
             'opened_by_renewal': self.renewal_of_order_id is not None,
             'renewal_failures': self.renewal_failures or 0,
             'renewal_retry_daily': self.renewal_retry_daily,
+            'upstream_revocations_owed': len(self.upstream_revocations_list),
             'last_renewal_at': utc_isoformat(self.last_renewal_at),
             'last_error_at': utc_isoformat(self.last_error_at),
             'error_message': self.error_message,

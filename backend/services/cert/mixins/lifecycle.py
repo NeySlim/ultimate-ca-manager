@@ -20,6 +20,7 @@ from services.trust_store import TrustStoreService
 from utils.ct_client import embed_scts_in_certificate
 from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, cleanup_old_files
 from utils.datetime_utils import utc_now, to_naive_utc
+from utils.spki_digest import certificate_key_sha256
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +59,10 @@ def _restore_revocation_state(cert_id, previous):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Certificate {cert_id}: previous revocation state not restored: {e}")
+
+
+REVOKED_THEN_DELETED = ('Certificate {id} was revoked, then deleted: automatic renewal is off. '
+                        'Turn it back on to obtain a new certificate for these names.')
 
 
 class LifecycleMixin:
@@ -418,6 +423,7 @@ class LifecycleMixin:
                 record.invalidity_at = certificate.invalidity_at
                 record.valid_to = valid_to
                 record.certificate_id = certificate.id
+                record.public_key_sha256 = certificate_key_sha256(certificate.crt)  # None, never raises
             elif certificate.caref:
                 logger.warning("Certificate %s: CA %s not found, no revocation record written",
                                cert_id, certificate.caref)
@@ -566,6 +572,13 @@ class LifecycleMixin:
 
         # The revocation record outlives the certificate: unlinked, never cascaded
         try:
+            digest = certificate_key_sha256(certificate.crt)
+            if digest:  # a record older than the column learns the key before the row goes
+                # Only the row's own serial: an earlier one, renewed in place, had another key
+                RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id,
+                                           RevokedSerial.serial_number == certificate.serial_number,
+                                           RevokedSerial.public_key_sha256.is_(None)).update(
+                    {RevokedSerial.public_key_sha256: digest}, synchronize_session='fetch')
             RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id).update(
                 {RevokedSerial.certificate_id: None}, synchronize_session='fetch')
         except Exception as e:
@@ -573,8 +586,12 @@ class LifecycleMixin:
 
         # PostgreSQL refuses the delete while an ACME order points at the row
         try:
+            unlinked = {AcmeClientOrder.certificate_id: None}
+            if certificate.revoked:  # revoked then deleted: never issued again unasked
+                unlinked.update({AcmeClientOrder.renewal_enabled: False,
+                                 AcmeClientOrder.error_message: REVOKED_THEN_DELETED.format(id=cert_id)})
             AcmeClientOrder.query.filter(AcmeClientOrder.certificate_id == cert_id).update(
-                {AcmeClientOrder.certificate_id: None}, synchronize_session='fetch')
+                unlinked, synchronize_session='fetch')
             AcmeClientOrder.query.filter(AcmeClientOrder.source_certificate_id == cert_id).update(
                 {AcmeClientOrder.source_certificate_id: None}, synchronize_session='fetch')
             AcmeOrder.query.filter(AcmeOrder.certificate_id == cert_id).update(

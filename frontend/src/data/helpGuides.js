@@ -109,7 +109,7 @@ Groups CAs by their Organization (O) field. Useful for multi-tenant setups where
 ### Create Root CA
 1. Click **Create** → **Root CA**
 2. Fill in the Subject fields (CN, O, OU, C, ST, L)
-3. Select the key algorithm (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87): RSA-3072 by default
+3. Select the key algorithm (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87, EdDSA Ed25519/Ed448): RSA-3072 by default
 4. Set the validity period: 1, 2, 3, 5, 10, 15 or 20 years, or **Custom (days)** up to 50 years (typically 10-20 years for Root CAs)
 5. Optionally select a certificate template
 6. Click **Create**
@@ -132,6 +132,13 @@ The form flags an RSA-2048 CA that would outlive 2030: ANSSI accepts RSA-2048 un
 - Hierarchies can mix: an ML-DSA root can sign an RSA or EC intermediate, and an RSA or EC CA can sign an ML-DSA intermediate, which then uses its parent's digest.
 - Renewal keeps the key and its level.
 - An ML-DSA CA exports as PEM or DER, not as PKCS#12 or JKS. Clients without ML-DSA support (OpenSSL before 3.5, most browsers today) cannot verify what it signs.
+
+### EdDSA CAs (Ed25519, Ed448)
+**Ed25519** and **Ed448** keys can be generated for a root, intermediate or external CA, or imported with or after the CA certificate. The key is a software key (no HSM provider signs EdDSA), and the algorithm is hidden in FIPS mode.
+
+- An EdDSA key signs without a digest, like ML-DSA: the digest field disappears and CRLs and OCSP responses follow the same rule.
+- Hierarchies can mix: an EdDSA CA can sign RSA, EC or ML-DSA intermediates and leaves, and the reverse.
+- Browsers, Windows (CryptoAPI/CNG) and SCEP clients do not accept certificates signed by an EdDSA CA, whatever the leaf key. SCEP and XCEP/WSTEP refuse such a CA. Use it where the consumers are OpenSSL, Go or Java 15+.
 
 ### Create an externally-signed CA (CSR mode, v2.214)
 For the offline-root pattern: the issuing CA's key lives in UCM, its certificate is signed elsewhere:
@@ -678,6 +685,17 @@ A template can **pin** the organizational subject fields: **C, ST, L, O, OU**: f
 - Templates with pinned fields show a **Pinned** badge, and the pinned values appear in the template detail panel
 
 Use this to guarantee a uniform organizational identity (e.g. a fixed \`O\` and \`C\`) across an autoenrolled fleet, regardless of what each Windows client submits.
+
+## Custom Extensions
+
+A template can add extensions UCM has no setting for. Each one is an **OID**, a **Critical** flag and the **value**: the DER encoding of the extension value, in hex. UCM copies the bytes as given and never parses them, so check the encoding with your own tools first.
+
+- Every certificate issued from the template carries them: issue form, Sign CSR, ACME profiles bound to the template, SCEP profiles, WSTEP and approvals. Renewals keep them
+- The issue form can add more for one certificate; an entry with the OID of one of the template's replaces it
+- Extensions UCM sets itself (key usage, EKU, names, key identifiers, CRL and OCSP pointers, policies, name constraints, qcStatements...) are refused: use their own settings
+- A client that does not recognise a **critical** extension must reject the certificate (RFC 5280, section 4.2). Leave it non-critical unless every relying party understands it
+
+The certificate and CA detail panels list such extensions under **Other extensions**, with their OID, name when known, criticality and value.
 
 ## Duplicating Templates
 
