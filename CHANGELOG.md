@@ -27,6 +27,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: the TXT records of a DNS-01 order whose automatic validation failed stayed in the zone. They are now removed once the order is invalid or its finalization failed; an order left pending keeps them for Verify.
 - ACME client: deleting a certificate after revoking it did not stop its order, and the next pass issued a new one. The order's automatic renewal is now turned off, with a message saying so.
 - ACME client: a renewal used a DNS provider that had been disabled, and an order reusing the key of a deleted certificate silently got a new key. Both now stop before the CA with a message.
+- ACME client: the help of the renewal threshold did not say that a certificate whose life is shorter than 1.5 times the threshold renews in its last third. It now does.
 
 ### Upgrade notes
 

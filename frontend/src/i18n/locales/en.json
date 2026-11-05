@@ -1575,7 +1575,7 @@
     "autoRenewal": "Auto-Renewal",
     "autoRenewalDesc": "Automatically renew certificates before they expire",
     "renewalDays": "Days before expiry",
-    "renewalDaysHelper": "Renew this many days before expiry (1 to 60) when the CA suggests no renewal window (ARI).",
+    "renewalDaysHelper": "Renew this many days before expiry (1 to 60) when the CA suggests no renewal window (ARI). When that is more than two thirds of a certificate's lifetime, it is renewed in the last third of its lifetime instead.",
     "renewalFailures": "Renewal failures: {{count}}",
     "renewalLastFailure": "Last failure: {{date}}",
     "renewalRetryDaily": "Renewal keeps failing: now attempted once a day",

@@ -3045,6 +3045,10 @@ Content-Type: application/json
 }
 ```
 
+`renewal_days` (1 to 60) applies when the CA suggests no renewal window (ARI). When it is more
+than two thirds of a certificate's lifetime, that certificate is renewed in the last third of
+its lifetime instead.
+
 Fields of the DNS UPDATE (RFC 2136) listener of the ACME proxy:
 
 | Field | Method | Description |
