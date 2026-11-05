@@ -13,6 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from models import CA, Certificate, DnsProvider, RevokedSerial, SystemConfig, db
 from models.acme_models import AcmeClientOrder
+from models.compromised_key import remember_if_compromised
 from services.acme import dns_providers
 from services.acme.acme_client_service import ACCOUNT_GONE, AcmeClientService
 from services.acme.compromised_keys import refuse_compromised_csr
@@ -505,6 +506,9 @@ def _renew(order, lease) -> tuple:
     )
     # Read before the renewal writes the new certificate into the same row
     replaced = _replaced_snapshot(old_certificate)
+    # Before the CA is asked: a renewal in place overwrites the revoked row and its key
+    if old_certificate is not None and remember_if_compromised(old_certificate):
+        commit_or_rollback(logger, f"Compromised key of certificate {old_certificate.id} not saved")
     if order.key_source == 'csr' and order.csr_pem:
         _refuse_compromised_order_csr(order)
     if (order.key_source == 'csr' and order.csr_pem and old_certificate is not None

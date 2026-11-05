@@ -38,6 +38,11 @@ PROTECTED = {
     'users': lambda row: False,          # handled by the caller's own guard
 }
 
+# Sections a replacing restore merges and never prunes, and why.
+MERGED_ONLY: Dict[str, str] = {
+    'compromised_keys': 'a block list: a key known here as compromised stays refused, archived or not',
+}
+
 # Which section a table belongs to, and which sections each one points into.
 # Built once: the mappers do not change between restores.
 _SECTION_OF_TABLE: Dict[str, str] = {}
@@ -299,7 +304,8 @@ def plan_replacement(backup_data: Dict[str, Any], plan: RestorePlan, sections: S
     _index_tables()
     keep = keep or {}
     displaced = displaced or {}
-    pruned = {name for name in sections if isinstance(backup_data.get(name), list)}
+    pruned = {name for name in sections
+              if isinstance(backup_data.get(name), list) and name not in MERGED_ONLY}
     doomed: Dict[str, Set[Any]] = {}
     for name in pruned:
         ids = set(rows_to_remove(name, backup_data[name], plan)) | set(displaced.get(name, ()))

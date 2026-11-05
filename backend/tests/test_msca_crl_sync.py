@@ -286,3 +286,14 @@ class TestCrlSyncCrud:
             'crl_url': 'ldap:///CN=ca,CN=cdp',
         })
         assert r.status_code == 400
+
+
+def test_a_key_the_ca_revoked_as_compromised_is_kept(app, auth_client, fake_adcs, patched_network):
+    from models.compromised_key import CompromisedKeyRecord
+    from utils.spki_digest import public_key_sha256
+    msca_id, _ids = _add_connection_with_certs(app, 'CRL Sync K', fake_adcs)
+    assert post_json(auth_client, f'{BASE}/{msca_id}/sync-crl', {}).status_code == 200
+    with app.app_context():
+        kept = {r.public_key_sha256: r.source for r in CompromisedKeyRecord.query.filter_by(source='msca')}
+        assert kept.get(public_key_sha256(fake_adcs['revoked_cert'].public_key())) == 'msca'
+        assert public_key_sha256(fake_adcs['valid_cert'].public_key()) not in kept

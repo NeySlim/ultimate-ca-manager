@@ -13,6 +13,7 @@ from cryptography import x509
 
 from models import db, Certificate
 from models.msca import MicrosoftCA, MSCARequest
+from models.compromised_key import remember_if_compromised
 from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ class MicrosoftCACRLSyncMixin:
                 cert.revoked = True
                 cert.revoked_at = revoked_at
                 cert.revoke_reason = reason
+                remember_if_compromised(cert)
                 newly_revoked.append(cert)
 
             summary = {

@@ -12,6 +12,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, CertificateTemplate, Certificate, SystemConfig
+from models.compromised_key import remember_if_compromised
 from utils.validity import DEFAULT_CERTIFICATE_VALIDITY_DAYS
 from utils.key_type import issue_key_type_from_template
 from services.file_regen_service import mirror_private_key
@@ -439,6 +440,7 @@ class LifecycleMixin:
                     username=username, user_id=_request_user_id(username),
                     certificate_id=certificate.id, reason='Revoked directly', commit=False)
             db.session.flush()
+            remember_if_compromised(certificate)
         except Exception:
             db.session.rollback()
             logger.error("Revocation of certificate %s not staged", cert_id, exc_info=True)
@@ -573,6 +575,7 @@ class LifecycleMixin:
         # The revocation record outlives the certificate: unlinked, never cascaded
         try:
             digest = certificate_key_sha256(certificate.crt)
+            remember_if_compromised(certificate, digest)  # revoked before the table existed
             if digest:  # a record older than the column learns the key before the row goes
                 # Only the row's own serial: an earlier one, renewed in place, had another key
                 RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id,

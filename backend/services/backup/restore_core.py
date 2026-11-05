@@ -72,6 +72,7 @@ def _archived_datetime(where: str, column: str, value: Any):
 # section comes after everything it points at: a membership needs its user and
 # its group, a binding needs its target and its certificate.
 GENERIC_SECTIONS = (
+    'compromised_keys',
     'role_permissions',
     'group_members',
     'webauthn_credentials',

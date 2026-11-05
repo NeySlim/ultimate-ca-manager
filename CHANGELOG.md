@@ -16,6 +16,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Revocation: a key revoked as compromised was kept only for a certificate of a CA held here, so a Let's Encrypt certificate revoked as compromised then deleted let the ACME client certify the same key again. Such keys are now kept whatever CA issued the certificate, and refused at the request, the renewal and the finalization (migration 129).
 - Key recovery: a request named its certificate by number, and SQLite gives a deleted certificate's number to the next one created, so an approved request could export another certificate's private key, after a replacing restore in particular. Approval and recovery now answer 410 unless the number still names the certificate the request was opened on, and a replacing restore cancels the open requests on the certificates it removes.
 
 ### Fixed
@@ -51,6 +52,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- Revocation: migration 129 adds the `compromised_keys` table and fills it from the certificates revoked as compromised and from the revocation records holding such a key's digest. A replacing restore adds the archived keys and never removes one known here.
 - Revocation records written before migration 128 carry no key digest: they learn it when their certificate is deleted, and until then the certificate row itself answers.
 - ACME client: the renewal task now removes the orders left `pending` for more than 7 days whose order at the CA has expired or whose expiry is unknown, with their TXT records, and audits each removal.
 - DNS providers, ACME CA accounts and webhooks: the upgrade renames duplicate names to `name (2)`, `name (3)`, oldest first, then makes the name unique (migration 124).
