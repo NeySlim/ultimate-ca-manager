@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
 from models import AcmeClientAccount, Certificate, db
+from tests.seeded_rows import ensure_acme_account
 from models.acme_models import AcmeClientOrder
 
 
@@ -64,6 +65,7 @@ def proxy_revocation_rows(app):
         )
         db.session.add_all([account, cert])
         db.session.flush()
+        ensure_acme_account('internal-acme-account')
         order = AcmeClientOrder(
             domains='["proxy-revoke.example"]',
             challenge_type='dns-01',

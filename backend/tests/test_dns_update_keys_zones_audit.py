@@ -11,6 +11,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
+from tests.seeded_rows import delete_client_accounts
 
 import dns.name
 import pytest
@@ -101,8 +102,7 @@ def env(app):
         AcmeDomain.query.delete()
         AcmeEabCredential.query.filter(AcmeEabCredential.id.in_(created['creds'])).delete(
             synchronize_session=False)
-        AcmeClientAccount.query.filter(AcmeClientAccount.id.in_(created['accounts'])).delete(
-            synchronize_session=False)
+        delete_client_accounts(AcmeClientAccount.query.filter(AcmeClientAccount.id.in_(created['accounts'])), synchronize_session=False)
         db.session.commit()
 
 
@@ -187,6 +187,7 @@ def test_K8_used_credential_without_account_matches_nothing_neg(env):
     assert not scope.allows(k.acme_client_account_id, None)
 
 
+@pytest.mark.sqlite_only(reason='leaves a dangling credential id with PRAGMA foreign_keys=OFF')
 def test_K8_deleted_credential_matches_nothing_neg(env):
     from models.acme_models import AcmeEabCredential
     from sqlalchemy import text
@@ -236,9 +237,10 @@ def test_K9_deleted_account_row_neg(env):
     from sqlalchemy import text
     acc = env.make_account(True)
     k = env.make_key(acc)
+    name = k.name  # PostgreSQL cascades the delete to the key row
     env.db.session.execute(text('DELETE FROM acme_client_accounts WHERE id=:i'), {'i': acc})
     env.db.session.commit()
-    assert KeyStore().lookup(_n(k.name)) is None
+    assert KeyStore().lookup(_n(name)) is None
 
 
 def test_K9_revoked_key_neg(env):
@@ -639,7 +641,8 @@ def test_B1_credential_query_selects_only_referenced_pos(env):
     stmts = _eab_statements(env, lambda: store.lookup(_n(k.name)))
     assert len(stmts) == 1
     assert 'IN' in stmts[0][0]
-    assert list(stmts[0][1]) == [cred_id]
+    params = stmts[0][1]  # a tuple for sqlite3, a dict for psycopg2
+    assert list(params.values() if isinstance(params, dict) else params) == [cred_id]
     assert store.scope(k.id).allows(k.acme_client_account_id, 'acct-x')
     assert not store.scope(k.id).allows(k.acme_client_account_id, 'other')
 

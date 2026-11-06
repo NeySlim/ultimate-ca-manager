@@ -436,33 +436,39 @@ class PolicyEvaluationService:
     @staticmethod
     def choose_digest(policies: list, default='sha256'):
         """The digest for a path whose hash nobody chose: *default* when the
-        policies accept it, else the weakest one they all accept. An explicit
-        choice (template, ACME profile, CA form) is checked, never replaced."""
+        policies accept it, else the weakest they all accept that is at least as
+        strong, else the strongest they accept. An explicit choice (template,
+        ACME profile, CA form) is checked, never replaced."""
         default = normalize_digest(default) or 'sha256'
         allowed = PolicyEvaluationService.allowed_digests(policies)
         if not allowed or default in allowed:
             return default
-        return allowed[0]
+        floor = POLICY_DIGESTS.index(default)
+        stronger = [d for d in allowed if POLICY_DIGESTS.index(d) > floor]
+        return stronger[0] if stronger else allowed[-1]
 
     @staticmethod
     def checked_signing_hash(policies: list, ca_key, digest=None, *, explicit=True,
                              key_type=None, context=None, validity_days=None, not_after=None,
                              tsa_signer=False, notices=None, ca_id=None, pq_hybrid=False):
-        """``(hash for builder.sign(), violations)``. An implicit *digest* yields
-        to the weakest one the policies allow; the hash the key really signs
-        with (HSM-bound, None for Ed25519, Ed448 and ML-DSA) is then checked with *key_type*,
-        and *ca_key* (its scheme and storage) against the signature rules."""
+        """``(hash for builder.sign(), violations)``. Without *digest*, the one
+        matching the CA key; an implicit *digest* is a preference kept while the
+        policies allow it, else the CA key's yields to them. The hash the key really
+        signs with (HSM-bound, None for Ed25519, Ed448 and ML-DSA) is then checked
+        with *key_type*, and *ca_key* (its scheme and storage) against the signature rules."""
         from cryptography.hazmat.primitives import hashes
         from services.trust_store.constants import hash_algorithm
+        from utils.issuance_defaults import digest_for_key
         from utils.signing_hash import signing_hash_for
-        key_default = key_algorithms.default_digest_for_key(ca_key)  # None: the key takes no digest
+        key_default = digest_for_key(ca_key)  # None: the key takes no digest
         requested = None
         if digest or key_default:
             name = str(digest or key_default).strip().lower()
             if not explicit:
-                # SHA-256 is the callers' placeholder default: the key's registry digest stands in
-                name = PolicyEvaluationService.choose_digest(
-                    policies, (key_default or name) if name == 'sha256' else name)
+                preferred = normalize_digest(digest)
+                allowed = PolicyEvaluationService.allowed_digests(policies)
+                name = (preferred if preferred and (not allowed or preferred in allowed)
+                        else PolicyEvaluationService.choose_digest(policies, key_default))
             try:
                 requested = hash_algorithm(name)
             except ValueError as e:

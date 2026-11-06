@@ -19,6 +19,7 @@ from utils.db_transaction import safe_commit
 from models import db, User, Certificate, CA
 from services.audit_service import AuditService
 from utils.key_codec import load_pem_bytes
+from utils.issuance_defaults import browser_key_type
 from utils.validity import MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS
 from services.mtls_enrollment import parse_validity_days, remove_enrolment
 
@@ -81,8 +82,8 @@ def create_user_mtls_certificate(user_id):
         valid_from = cert_obj.not_valid_before_utc if hasattr(cert_obj, 'not_valid_before_utc') else cert_obj.not_valid_before
         valid_until = cert_obj.not_valid_after_utc if hasattr(cert_obj, 'not_valid_after_utc') else cert_obj.not_valid_after
 
-        existing = AuthCertificate.query.filter_by(cert_serial=serial).first()
-        if existing:
+        from services.mtls_enrollment import enrolments_of
+        if enrolments_of(cert_obj.serial_number, cert_obj.issuer):
             return error_response('This certificate is already enrolled', 409)
 
         cn = ''
@@ -177,7 +178,7 @@ def create_user_mtls_certificate(user_id):
                 caref=ca.refid,
                 dn={'commonName': name},
                 cert_type='usr_cert',
-                key_type='2048',
+                key_type=browser_key_type(ca, name),
                 validity_days=validity_days,
                 username=target_user.username,
             )

@@ -161,7 +161,7 @@ class InwxDnsProvider(BaseDnsProvider):
         finally:
             self._logout()
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via INWX API"""
         success, msg = self._login()
         if not success:
@@ -185,8 +185,10 @@ class InwxDnsProvider(BaseDnsProvider):
             if not records:
                 return True, "Record not found (already deleted?)"
             
-            # Delete each matching record
+            # Other values under this name belong to challenges still validating.
             for record in records:
+                if not self.txt_matches(record.get('content'), record_value):
+                    continue
                 record_id = record.get('id')
                 if record_id:
                     success, _ = self._rpc_call('nameserver.deleteRecord', {'id': record_id})

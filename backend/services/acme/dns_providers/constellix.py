@@ -8,7 +8,7 @@ import hmac
 import hashlib
 import base64
 import time
-from typing import Tuple, Dict, Any, Optional
+from typing import Tuple, Dict, Any, List, Optional
 import logging
 
 from .base import BaseDnsProvider
@@ -21,9 +21,11 @@ class ConstellixDnsProvider(BaseDnsProvider):
     PROVIDER_NAME = "Constellix"
     PROVIDER_DESCRIPTION = "Constellix Managed DNS API"
     REQUIRED_CREDENTIALS = ["api_key", "secret_key"]
-    
+
     BASE_URL = "https://api.dns.constellix.com/v4"
-    
+    MAX_PAGES = 50
+    CREATE_VISIBLE_TRIES = 3
+
     def _get_headers(self) -> Dict[str, str]:
         timestamp = str(int(time.time() * 1000))
         hmac_hash = hmac.new(
@@ -33,64 +35,125 @@ class ConstellixDnsProvider(BaseDnsProvider):
         ).digest()
         token = base64.b64encode(hmac_hash).decode()
         return {
-            'x-cns-security-token': f'{self.credentials["api_key"]}:{token}:{timestamp}',
+            'Authorization': f'Bearer {self.credentials["api_key"]}:{token}:{timestamp}',
             'Content-Type': 'application/json',
         }
-    
-    def _request(self, method: str, path: str, data: Optional[Dict] = None) -> Tuple[bool, Any]:
+
+    def _request(self, method: str, path: str, data: Optional[Dict] = None,
+                 params: Optional[Dict] = None) -> Tuple[bool, Any]:
         url = f"{self.BASE_URL}{path}"
         try:
-            resp = requests.request(method=method, url=url, headers=self._get_headers(), json=data, timeout=30)
+            resp = requests.request(method=method, url=url, headers=self._get_headers(),
+                                    json=data, params=params, timeout=30)
             if resp.status_code >= 400:
-                return False, resp.reason
+                return False, self._error(resp)
             return True, resp.json() if resp.text else None
-        except requests.RequestException as e:
+        except (requests.RequestException, ValueError) as e:
             return False, self._failure(e)
-    
+
+    def _list(self, path: str) -> Tuple[bool, Any]:
+        """Every item of a paginated listing; `meta.links.next` is null on the last page."""
+        items: List[Dict] = []
+        for page in range(1, self.MAX_PAGES + 1):
+            success, result = self._request('GET', path, params={'page': page})
+            if not success:
+                return False, result
+            items.extend((result or {}).get('data') or [])
+            links = ((result or {}).get('meta') or {}).get('links') or {}
+            if not links.get('next'):
+                return True, items
+        return False, f"More than {self.MAX_PAGES} pages at {path}"
+
     def _find_domain(self, domain: str) -> Optional[Dict]:
-        success, result = self._request('GET', '/domains')
+        success, domains = self._list('/domains')
         if not success:
             return None
-        domains = result.get('data', [])
-        domain_parts = domain.split('.')
-        for i in range(len(domain_parts) - 1):
-            name = '.'.join(domain_parts[i:])
-            for d in domains:
-                if d['name'] == name:
-                    return d
-        return None
-    
+        return self.find_zone(domain, domains, key=lambda d: d.get('name'))
+
+    def _txt_record(self, dom: Dict, relative: str) -> Tuple[bool, Any]:
+        """The domain's TXT record named `relative` (one record holds every value), or None."""
+        success, records = self._list(f'/domains/{dom["id"]}/records')
+        if not success:
+            return False, records
+        for rec in records:
+            if rec.get('type') == 'TXT' and (rec.get('name') or '') == relative:
+                return True, rec
+        return True, None
+
+    def _await_record(self, dom: Dict, relative: str) -> None:
+        """A create answers 202 before the record is listed: wait for it, so a second
+        value for the name (apex and wildcard) joins it instead of POSTing a twin."""
+        for _ in range(self.CREATE_VISIBLE_TRIES):
+            time.sleep(1)
+            success, rec = self._txt_record(dom, relative)
+            if success and rec is not None:
+                return
+        logger.warning(f"Constellix: TXT record {relative} not listed yet after its creation")
+
+    def _write_values(self, dom: Dict, rec: Dict, relative: str, values: List[Dict]) -> Tuple[bool, Any]:
+        # Each value keeps its `enabled` flag as read: a disabled one stays disabled.
+        values = [{'value': v.get('value'), 'enabled': v.get('enabled', True)} for v in values]
+        body = {'name': relative, 'type': 'TXT', 'ttl': rec.get('ttl', 300),
+                'mode': rec.get('mode') or 'standard', 'value': values}
+        return self._request('PUT', f'/domains/{dom["id"]}/records/{rec["id"]}', body)
+
     def create_txt_record(self, domain: str, record_name: str, record_value: str, ttl: int = 300) -> Tuple[bool, str]:
         dom = self._find_domain(domain)
         if not dom:
             return False, f"Could not find domain {domain}"
         relative = self.get_relative_record_name(record_name, dom['name'])
-        data = {'name': relative, 'ttl': ttl, 'roundRobin': [{'value': f'"{record_value}"'}]}
-        success, result = self._request('POST', f'/domains/{dom["id"]}/records/txt', data)
+        success, rec = self._txt_record(dom, relative)
+        if not success:
+            msg = f"Failed to list records: {rec}"
+            logger.warning(f"Constellix: {msg}")
+            return False, msg
+        entry = {'value': record_value, 'enabled': True}
+        if rec is None:
+            body = {'name': relative, 'type': 'TXT', 'ttl': ttl, 'mode': 'standard', 'value': [entry]}
+            success, result = self._request('POST', f'/domains/{dom["id"]}/records', body)
+            if success:
+                self._await_record(dom, relative)
+        else:
+            # A second value under the name joins the existing record's value list.
+            values = list(rec.get('value') or [])
+            if any(self.txt_matches(v.get('value'), record_value) for v in values):
+                return True, "Record already present"
+            success, result = self._write_values(dom, rec, relative, values + [entry])
         if not success:
             return False, f"Failed to create record: {result}"
         return True, "Record created successfully"
-    
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         dom = self._find_domain(domain)
         if not dom:
             return False, f"Could not find domain {domain}"
-        success, result = self._request('GET', f'/domains/{dom["id"]}/records/txt')
-        if not success:
-            return False, f"Failed to list records: {result}"
         relative = self.get_relative_record_name(record_name, dom['name'])
-        for rec in result.get('data', []):
-            if rec.get('name') == relative:
-                self._request('DELETE', f'/domains/{dom["id"]}/records/txt/{rec["id"]}')
+        success, rec = self._txt_record(dom, relative)
+        if not success:
+            msg = f"Failed to list records: {rec}"
+            logger.warning(f"Constellix: {msg}")
+            return False, msg
+        if rec is None:
+            return True, "Record already absent"
+        values = list(rec.get('value') or [])
+        remaining = [v for v in values if not self.txt_matches(v.get('value'), record_value)]
+        if len(remaining) == len(values):
+            return True, "Record already absent"
+        if remaining:
+            success, result = self._write_values(dom, rec, relative, remaining)
+        else:
+            success, result = self._request('DELETE', f'/domains/{dom["id"]}/records/{rec["id"]}')
+        if not success:
+            logger.warning(f"Constellix: failed to delete TXT value of {record_name}: {result}")
+            return False, f"Failed to delete record: {result}"
         return True, "Record deleted successfully"
-    
+
     def test_connection(self) -> Tuple[bool, str]:
-        success, result = self._request('GET', '/domains')
+        success, result = self._list('/domains')
         if success:
-            domains = result.get('data', [])
-            return True, f"Connected. Found {len(domains)} domain(s)"
+            return True, f"Connected. Found {len(result)} domain(s)"
         return False, f"Connection failed: {result}"
-    
+
     @classmethod
     def get_credential_schema(cls):
         return [

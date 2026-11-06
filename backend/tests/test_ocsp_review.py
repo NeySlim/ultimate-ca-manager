@@ -35,7 +35,7 @@ def _leaf(cn, key, issuer_cert, signer, serial=None, days=30):
 
 def _store_leaf(cert, key, caref, serial_number, **extra):
     row = Certificate(
-        refid=f'ocsp-review-{cert.serial_number}', descr='leaf', caref=caref,
+        refid=f'ocsp-review-{cert.serial_number:x}'[:36], descr='leaf', caref=caref,
         crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode(),
         prv=base64.b64encode(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
                                                serialization.NoEncryption())).decode(),

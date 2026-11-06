@@ -87,13 +87,28 @@ class PowerDnsDnsProvider(BaseDnsProvider):
             return False, f"Failed to create record: {result}"
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         zone = self._find_zone(domain)
         if not zone:
             return False, f"Could not find zone for {domain}"
         fqdn = record_name if record_name.endswith('.') else record_name + '.'
-        data = {'rrsets': [{'name': fqdn, 'type': 'TXT', 'changetype': 'DELETE'}]}
-        success, result = self._request('PATCH', f'/zones/{zone}', data)
+        # The other values of the rrset belong to other challenges: write them back
+        success, result = self._request('GET', f'/zones/{zone}?rrset_name={quote(fqdn)}&rrset_type=TXT')
+        if not success:
+            return False, f"Failed to read existing records: {result}"
+        rrsets = [r for r in (result or {}).get('rrsets', [])
+                  if r.get('type') == 'TXT' and r.get('name', '').lower() == fqdn.lower()]
+        records = [{'content': r['content'], 'disabled': r.get('disabled', False)}
+                   for rr in rrsets for r in rr.get('records', [])]
+        remaining = [r for r in records if not self.txt_matches(r['content'], record_value)]
+        if len(remaining) == len(records):
+            return True, "Record not found (already deleted?)"
+        if remaining:
+            rrset = {'name': fqdn, 'type': 'TXT', 'ttl': rrsets[0].get('ttl', 300),
+                     'changetype': 'REPLACE', 'records': remaining}
+        else:
+            rrset = {'name': fqdn, 'type': 'TXT', 'changetype': 'DELETE'}
+        success, result = self._request('PATCH', f'/zones/{zone}', {'rrsets': [rrset]})
         if not success:
             return False, f"Failed to delete record: {result}"
         return True, "Record deleted successfully"

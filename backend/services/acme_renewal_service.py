@@ -702,12 +702,21 @@ def _renew_with_new_order(acme_client, order, account_id, old_certificate, lease
             record_name = challenge_info.get(
                 'dns_txt_name', f"_acme-challenge.{strip_wildcard(domain)}"
             )
+            value = challenge_info.get('dns_txt_value')
+            if not value:
+                # Deleting by name alone would take other orders' values with it
+                logger.warning("Renewal DNS cleanup skipped for %s: no TXT value recorded", record_name)
+                continue
             try:
                 with txt_record_lock(record_name):
-                    dns_provider.delete_txt_record(
+                    result = dns_provider.delete_txt_record(
                         domain=strip_wildcard(domain),
                         record_name=record_name,
+                        record_value=value,
                     )
+                if isinstance(result, tuple) and not result[0]:
+                    logger.warning('Failed to delete renewal DNS TXT for %s (%s): %s',
+                                   domain, record_name, result[1])
             except Exception as exc:
                 logger.warning(
                     'Failed to delete renewal DNS TXT for %s (%s): %s',

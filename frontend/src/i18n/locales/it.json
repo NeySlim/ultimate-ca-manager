@@ -1923,6 +1923,7 @@
     "editEmailCaveat": "Secondo la RFC 8555 il contatto appartiene al client ACME: il suo prossimo aggiornamento dell'account può sovrascrivere questo valore.",
     "emailUpdated": "E-mail dell'account aggiornata",
     "letsEncryptOrders": "Ordini Let's Encrypt",
+    "ordersListPartial": "Elenco parziale: {{loaded}} ordini caricati su {{total}}. Aggiorna per riprovare.",
     "dnsUpdate": {
       "title": "Chiavi DNS UPDATE (RFC 2136)",
       "manage": "Chiavi DNS UPDATE (RFC 2136)",
@@ -5669,6 +5670,8 @@
     "tasksTitle": "Attivita in background",
     "runNow": "Esegui",
     "taskRan": "Attivita {{name}} eseguita",
+    "taskQueued": "Attività {{name}} avviata: è ancora in esecuzione",
+    "stateStale": "Il processo dello scheduler non risponde da un po': lo stato mostrato potrebbe non essere aggiornato",
     "runFailed": "Impossibile eseguire l'attivita",
     "loadFailed": "Impossibile caricare le attivita",
     "noTasks": "Nessuna attivita pianificata",
@@ -5676,6 +5679,7 @@
     "skipReasons": {
       "disabled": "i backup automatici sono disattivati",
       "acme_renewal_off": "il rinnovo automatico ACME è disattivato",
+      "no_interrupted_order": "nessun ordine ACME interrotto",
       "not_due": "non ancora prevista",
       "unknown": "nessun motivo indicato"
     },

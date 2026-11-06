@@ -7,6 +7,8 @@ import base64
 import json
 
 import pytest
+
+from tests.seeded_rows import ensure_acme_account
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
@@ -147,6 +149,7 @@ class TestConcurrencyGuards:
         from models.acme_models import AcmeOrder
         from services.acme.acme_service import AcmeService
         with app.app_context():
+            ensure_acme_account('race-account')
             order = AcmeOrder(order_id='race-order-1', account_id='race-account', status='ready',
                               identifiers=json.dumps([{'type': 'dns', 'value': 'race.example.test'}]))
             db.session.add(order)

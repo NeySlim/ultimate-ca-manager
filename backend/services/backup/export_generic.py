@@ -100,7 +100,8 @@ def export_section(section_name: str, index: IdentityIndex,
             attribute_of[column.key] = prop.key
 
     rows = []
-    for row in model.query.all():
+    # Oldest first, the order a restore pairs the rows of a shared identity in
+    for row in model.query.order_by(*mapper.primary_key).all():
         data: Dict[str, Any] = {}
         for column in mapper.columns:
             name = column.key

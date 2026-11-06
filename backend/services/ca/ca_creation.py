@@ -29,17 +29,9 @@ logger = logging.getLogger(__name__)
 
 
 def _key_default_digest(private_key) -> Optional[str]:
-    """The digest 'auto' picks for this key: its curve's for EC, None for a key
-    that takes none (ML-DSA), SHA-256 otherwise (#366)."""
-    from cryptography.hazmat.primitives.asymmetric import ec
-    from utils import key_algorithms
-    from utils.ca_profile import default_digest_for_key_type
-    public_key = private_key.public_key()
-    if isinstance(public_key, ec.EllipticCurvePublicKey):
-        return default_digest_for_key_type(public_key.curve.name)
-    if not key_algorithms.needs_digest(public_key):
-        return None
-    return 'sha256'
+    """The digest 'auto' picks for this key (#366): see ``issuance_defaults.digest_for_key``."""
+    from utils.issuance_defaults import digest_for_key
+    return digest_for_key(private_key)
 
 
 def _ca_policies(parent_refid, dn, key_type, hsm_key_id, hsm_key_algorithm,

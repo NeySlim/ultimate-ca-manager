@@ -1923,6 +1923,7 @@
     "editEmailCaveat": "RFC 8555 では contact は ACME クライアントに属します。クライアントの次回のアカウント更新でこの値が上書きされる可能性があります。",
     "emailUpdated": "アカウントのメールを更新しました",
     "letsEncryptOrders": "Let's Encrypt の注文",
+    "ordersListPartial": "一部のみ表示: {{total}} 件中 {{loaded}} 件の注文を読み込みました。再読み込みして再試行してください。",
     "dnsUpdate": {
       "title": "DNS UPDATE キー (RFC 2136)",
       "manage": "DNS UPDATE キー (RFC 2136)",
@@ -5672,6 +5673,8 @@
     "tasksTitle": "バックグラウンドタスク",
     "runNow": "今すぐ実行",
     "taskRan": "タスク {{name}} を実行しました",
+    "taskQueued": "タスク {{name}} を開始しました（実行中）",
+    "stateStale": "スケジューラープロセスからしばらく報告がありません。表示中の状態は古い可能性があります",
     "runFailed": "タスクの実行に失敗しました",
     "loadFailed": "タスクの読み込みに失敗しました",
     "noTasks": "スケジュールされたタスクはありません",
@@ -5679,6 +5682,7 @@
     "skipReasons": {
       "disabled": "自動バックアップが無効です",
       "acme_renewal_off": "ACME 自動更新はオフです",
+      "no_interrupted_order": "中断された ACME 注文はありません",
       "not_due": "まだ実行時期ではありません",
       "unknown": "理由は記録されていません"
     },

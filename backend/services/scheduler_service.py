@@ -7,6 +7,9 @@ import threading
 import time
 import os
 import atexit
+import errno
+import fcntl
+import json
 import logging
 from datetime import datetime
 from typing import Dict, Callable, Optional, Any
@@ -14,6 +17,31 @@ from threading import Lock
 from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
+
+# Set by gunicorn_config: the loop runs in a process of its own (scheduler_main),
+# the master and the web workers only register the tasks
+SUPERVISED_ENV = 'UCM_SCHEDULER_SUPERVISED'
+# How often a process waiting for the scheduler lock tries again
+LOCK_RETRY_SECONDS = 5
+# How soon the loop sees a "run now" asked by a web worker, and how long that worker waits
+REQUEST_POLL_SECONDS = 1
+RUN_NOW_WAIT_SECONDS = 30
+STATE_FILE = 'scheduler_state.json'
+REQUESTS_DIR = 'scheduler_requests'
+# flock's answers for "someone else holds it"; any other error means no flock here
+_BUSY_ERRNOS = frozenset(filter(None, (errno.EACCES, errno.EAGAIN, getattr(errno, 'EWOULDBLOCK', None))))
+
+
+def supervised() -> bool:
+    return os.environ.get(SUPERVISED_ENV) == '1'
+
+
+def _data_path(name: str) -> str:
+    try:
+        from config.settings import DATA_DIR
+        return os.path.join(str(DATA_DIR), name)
+    except Exception:
+        return os.path.join('/tmp', f'ucm-{name}')
 
 
 class TaskReportedFailure(RuntimeError):
@@ -118,6 +146,12 @@ class SchedulerService:
         self._owns_lock = False
         self._owner_pid = None
         self._lock_path = None
+        self._lock_fd = None
+        self._pid_file = None
+        self._flock_unsupported = False
+        self._lock_error_logged = False
+        self._publish_error_logged = False
+        self._wake = threading.Event()
         logger.info(f"SchedulerService initialized (wake interval: {wake_interval}s)")
     
     def register_task(
@@ -190,30 +224,129 @@ class SchedulerService:
                 return True
             return False
     
+    def _delegated(self) -> bool:
+        """Whether the loop runs in the scheduler process rather than here."""
+        return supervised() and not self._running
+
     def run_task_now(self, name: str) -> Optional[Dict[str, Any]]:
-        """Trigger immediate execution of a task, returns task status after run"""
+        """Run a task at once and return its status after the run.
+
+        Where the scheduler process runs the loop, the run is asked of it and
+        awaited up to RUN_NOW_WAIT_SECONDS; past that the status says ``queued``.
+        """
         with self.tasks_lock:
             task = self.tasks.get(name)
         if not task:
             return None
+        if self._delegated():
+            return self._run_in_scheduler_process(name)
         self._run_task(task)
         with self.tasks_lock:
             return task.to_dict()
-    
+
+    def _run_in_scheduler_process(self, name: str) -> Dict[str, Any]:
+        def marker(status):
+            return status.get('run_count'), status.get('last_run')
+        before = marker(self.get_task_status(name) or {})
+        directory = _data_path(REQUESTS_DIR)
+        os.makedirs(directory, exist_ok=True)
+        with open(os.path.join(directory, name), 'w') as handle:
+            handle.write(utc_now().isoformat())
+        deadline = time.monotonic() + RUN_NOW_WAIT_SECONDS
+        while True:
+            status = self.get_task_status(name) or {}
+            if marker(status) != before:
+                return status
+            if time.monotonic() >= deadline:
+                return dict(status, queued=True)
+            time.sleep(0.25)
+
     def get_task_status(self, name: str) -> Optional[Dict[str, Any]]:
         """Get status of a specific task"""
-        with self.tasks_lock:
-            if name in self.tasks:
-                return self.tasks[name].to_dict()
-            return None
-    
+        return self.get_all_tasks_status().get(name)
+
     def get_all_tasks_status(self) -> Dict[str, Dict[str, Any]]:
-        """Get status of all registered tasks"""
+        """Status of every registered task, as the process running the loop last published it."""
         with self.tasks_lock:
-            return {
+            statuses = {
                 name: task.to_dict()
                 for name, task in self.tasks.items()
             }
+        if self._delegated():
+            state = _read_state()
+            published = state.get('tasks', {})
+            statuses.update({name: published[name] for name in statuses if name in published})
+            if self.state_is_stale(state):
+                for status in statuses.values():
+                    status['stale'] = True
+        return statuses
+
+    def state_is_stale(self, state=None) -> bool:
+        """Whether the scheduler process stopped publishing (two passes missed)."""
+        if not self._delegated():
+            return False
+        state = _read_state() if state is None else state
+        published_at = state.get('published_at')
+        if not isinstance(published_at, (int, float)):
+            return True
+        return time.time() - published_at > 2 * self.wake_interval
+
+    def rearm_grace(self) -> None:
+        """First runs wait the grace period from now, not from registration."""
+        now = utc_now()
+        with self.tasks_lock:
+            for task in self.tasks.values():
+                task._created_at = now
+
+    def _publish_state(self) -> None:
+        """Write the tasks' status where the web workers read it (atomic replace)."""
+        if not supervised():
+            return
+        path = _data_path(STATE_FILE)
+        temp = f'{path}.{os.getpid()}.tmp'
+        with self.tasks_lock:
+            tasks = {name: task.to_dict() for name, task in self.tasks.items()}
+        try:
+            with open(temp, 'w') as handle:
+                json.dump({'pid': os.getpid(), 'published_at': time.time(), 'tasks': tasks}, handle)
+            os.replace(temp, path)
+        except OSError as e:
+            if not self._publish_error_logged:  # once: the loop publishes every pass
+                logger.warning(f"Scheduler state not published to {path}: {e}")
+                self._publish_error_logged = True
+
+    def _take_requests(self) -> list:
+        """The tasks a web worker asked to run now, each request consumed once."""
+        directory = _data_path(REQUESTS_DIR)
+        try:
+            names = os.listdir(directory)
+        except OSError:
+            return []
+        taken = []
+        for name in names:
+            try:
+                os.unlink(os.path.join(directory, name))
+            except OSError:
+                continue
+            with self.tasks_lock:
+                task = self.tasks.get(name)
+            if task is not None and task not in taken:
+                taken.append(task)
+        return taken
+
+    def _has_requests(self) -> bool:
+        try:
+            return bool(os.listdir(_data_path(REQUESTS_DIR)))
+        except OSError:
+            return False
+
+    def _wait_for_next_pass(self) -> None:
+        deadline = time.monotonic() + self.wake_interval
+        while self._running:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0 or (supervised() and self._has_requests()):
+                return
+            self._wake.wait(min(REQUEST_POLL_SECONDS, remaining))
     
     def _run_task(self, task: ScheduledTask) -> None:
         """
@@ -286,48 +419,82 @@ class SchedulerService:
         logger.info("Scheduler thread started")
         loop_pid = os.getpid()
 
-        while self._running:
-            try:
-                # Under gunicorn + gevent the scheduler greenlet can be inherited
-                # by a forked worker (start() is not called again there, so the
-                # pidfile lock alone wouldn't catch it). If this loop is running
-                # in a process that is not the lock owner, it's a forked copy —
-                # exit so only the owning process runs scheduled tasks (#139).
-                if os.getpid() != loop_pid or (self._owner_pid and os.getpid() != self._owner_pid):
-                    logger.info("Scheduler loop detected in a non-owner (forked) process; exiting")
+        try:
+            while self._running:
+                if os.getpid() != loop_pid:
+                    # A copy inherited through fork: only the process that started it runs it
+                    logger.info("Scheduler loop detected in a forked process; exiting")
                     self._running = False
                     break
-                # Make a snapshot of tasks to avoid holding lock during execution
-                with self.tasks_lock:
-                    tasks_to_run = [
-                        task for task in self.tasks.values()
-                        if task.should_run()
-                    ]
-                
-                # Execute tasks outside of lock
-                with self.tasks_lock:
-                    tasks_to_run = [
-                        task for task in self.tasks.values()
-                        if task.should_run()
-                    ]
-                
-                # Execute tasks outside of lock
-                for task in tasks_to_run:
-                    try:
-                        self._run_task(task)
-                    except Exception as e:
-                        logger.error(
-                            f"Unexpected error running task '{task.name}': {e}",
-                            exc_info=True
-                        )
-                
-                # Sleep for wake_interval before checking again
-                time.sleep(self.wake_interval)
-            
-            except Exception as e:
-                logger.error(f"Error in scheduler loop: {e}", exc_info=True)
-                time.sleep(self.wake_interval)
-    
+                if not self._owns_lock:
+                    if not self._acquire_singleton_lock():
+                        self._wake.wait(LOCK_RETRY_SECONDS)
+                        continue
+                    logger.info(f"Scheduler lock acquired: pid {os.getpid()} runs the scheduled tasks")
+                    self._publish_state()
+                try:
+                    requested = self._take_requests() if supervised() else []
+                    with self.tasks_lock:
+                        tasks_to_run = requested + [
+                            task for task in self.tasks.values()
+                            if task.should_run() and task not in requested
+                        ]
+
+                    # Execute tasks outside of lock
+                    for task in tasks_to_run:
+                        if not self._running:
+                            break
+                        try:
+                            self._run_task(task)
+                        except Exception as e:
+                            logger.error(
+                                f"Unexpected error running task '{task.name}': {e}",
+                                exc_info=True
+                            )
+                        self._publish_state()
+                except Exception as e:
+                    logger.error(f"Error in scheduler loop: {e}", exc_info=True)
+                self._publish_state()  # every pass: the web workers judge staleness by it
+                self._wait_for_next_pass()
+        finally:
+            # The next process waiting for the lock takes over from here
+            self._release_lock()
+
+    def _acquire_singleton_lock(self) -> bool:
+        """Take the host-wide scheduler lock, so only ONE process runs the loop.
+
+        An flock held for as long as the loop runs: the kernel frees it when its
+        holder dies. A filesystem without flock falls back to a pid file.
+        """
+        self._lock_path = _data_path('scheduler.lock')
+        if self._flock_unsupported:
+            return self._acquire_pid_file()
+        try:
+            fd = os.open(self._lock_path, os.O_CREAT | os.O_RDWR, 0o644)
+        except OSError as e:
+            if not self._lock_error_logged:
+                logger.error(f"Scheduler lock {self._lock_path} cannot be opened: {e}")
+                self._lock_error_logged = True
+            return False
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as e:
+            os.close(fd)
+            if e.errno in _BUSY_ERRNOS:
+                return False
+            logger.error(f"No flock on {self._lock_path} ({e}): the scheduler falls back to a pid file")
+            self._flock_unsupported = True
+            return self._acquire_pid_file()
+        try:
+            os.ftruncate(fd, 0)
+            os.write(fd, str(os.getpid()).encode())  # who holds it, for an operator
+        except OSError:
+            pass
+        self._lock_fd = fd
+        self._owns_lock = True
+        self._owner_pid = os.getpid()
+        return True
+
     @staticmethod
     def _pid_alive(pid: int) -> bool:
         if pid <= 0:
@@ -340,51 +507,60 @@ class SchedulerService:
             return True  # exists but owned by another user
         return True
 
-    def _acquire_singleton_lock(self) -> bool:
-        """Acquire the cross-process scheduler lock so only ONE process runs the
-        background loop. Under gunicorn the app is started in both the master and
-        the worker(s); without this every scheduled task (incl. webhook delivery)
-        would run in each process. Atomic O_EXCL create on a pidfile — survives
-        fork because the filesystem, not inherited memory, is the source of truth.
+    def _acquire_pid_file(self) -> bool:
+        """Atomic O_EXCL pid file, reclaimed when its process is gone.
+
+        Only on filesystems without flock: after a container restart a reused pid
+        can make a stale file look held, until that process exits.
         """
-        try:
-            from config.settings import DATA_DIR
-            self._lock_path = os.path.join(str(DATA_DIR), 'scheduler.lock')
-        except Exception:
-            self._lock_path = '/tmp/ucm-scheduler.lock'
+        path = _data_path('scheduler.pid')
         for _ in range(2):
             try:
-                fd = os.open(self._lock_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
-                os.write(fd, str(os.getpid()).encode())
-                os.close(fd)
-                self._owns_lock = True
-                self._owner_pid = os.getpid()
-                return True
+                fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
             except FileExistsError:
                 try:
-                    with open(self._lock_path) as f:
-                        other = int((f.read().strip() or '0'))
+                    with open(path) as handle:
+                        other = int(handle.read().strip() or '0')
                 except (OSError, ValueError):
                     other = 0
                 if other and other != os.getpid() and self._pid_alive(other):
-                    return False  # another live process owns the scheduler
-                # Stale lock (owner died) — remove and retry once.
+                    return False
                 try:
-                    os.unlink(self._lock_path)
+                    os.unlink(path)  # stale: its process is gone
                 except OSError:
                     pass
+                continue
+            except OSError as e:
+                if not self._lock_error_logged:
+                    logger.error(f"Scheduler pid file {path} cannot be created: {e}")
+                    self._lock_error_logged = True
+                return False
+            os.write(fd, str(os.getpid()).encode())
+            os.close(fd)
+            self._pid_file = path
+            self._owns_lock = True
+            self._owner_pid = os.getpid()
+            return True
         return False
 
     def _release_lock(self) -> None:
-        # Only the process that actually acquired the lock may remove it — a
-        # forked worker inherits _owns_lock=True and this atexit handler but must
-        # not delete the master's lock when it exits.
-        if self._owns_lock and self._lock_path and self._owner_pid == os.getpid():
+        # A forked copy shares the holder's open file: closing it there would not free
+        # the lock, and must not touch the holder's state either
+        if not self._owns_lock or self._owner_pid != os.getpid():
+            return
+        self._owns_lock = False
+        if self._lock_fd is not None:
+            fd, self._lock_fd = self._lock_fd, None
             try:
-                os.unlink(self._lock_path)
+                os.close(fd)
             except OSError:
                 pass
-            self._owns_lock = False
+        if self._pid_file is not None:
+            path, self._pid_file = self._pid_file, None
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
 
     def start(self, app=None) -> None:
         """
@@ -398,18 +574,22 @@ class SchedulerService:
             return
 
         self._app = app
-        # Only one process across master/workers may run the background loop.
-        if not self._acquire_singleton_lock():
-            logger.info("Scheduler background loop owned by another process, "
-                        "tasks registered here, but not running the loop in this process")
-            return
-
         self._running = True
+        self._wake.clear()
+        # The loop waits for the lock if another process holds it, then takes over
         self._thread = threading.Thread(target=self._scheduler_loop, daemon=True)
         self._thread.name = "SchedulerService"
         self._thread.start()
         atexit.register(self._release_lock)
-        logger.info(f"Scheduler started (pid {os.getpid()} owns the scheduler lock)")
+        logger.info(f"Scheduler started in pid {os.getpid()}")
+
+    def relinquish(self) -> None:
+        """Ask the loop to stop after the task it is running, then free the lock.
+
+        Returns at once; the caller bounds the wait (scheduler_main: graceful_timeout).
+        """
+        self._running = False
+        self._wake.set()
     
     def stop(self, timeout: int = 10) -> bool:
         """
@@ -426,7 +606,7 @@ class SchedulerService:
             return True
         
         logger.info("Stopping scheduler...")
-        self._running = False
+        self.relinquish()
         
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=timeout)
@@ -477,3 +657,25 @@ def init_scheduler(app=None, wake_interval: int = 60, autostart: bool = True) ->
         _scheduler._app = app
     
     return _scheduler
+
+
+def _read_state() -> dict:
+    try:
+        with open(_data_path(STATE_FILE)) as handle:
+            return json.load(handle)
+    except (OSError, ValueError):
+        return {}
+
+
+def start_scheduler(app) -> bool:
+    """Start the loop in this process, unless the scheduler process runs it.
+
+    Under gunicorn the loop runs in a process of its own (scheduler_main): a task
+    there blocks no request, and no fork happens while it holds a connection.
+    """
+    if supervised():
+        return False
+    if app is not None and app.config.get('TESTING'):
+        return False  # tests share one SQLite connection: a loop would race requests
+    get_scheduler().start(app=app)
+    return True

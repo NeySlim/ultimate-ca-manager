@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
+from utils.issuance_defaults import browser_key_type
 
 from auth.unified import require_auth, has_permission
 from config.settings import is_docker, restart_ucm_service
@@ -29,8 +30,8 @@ from utils import trusted_proxy
 from utils.key_codec import load_pem_bytes
 from utils.validity import MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS
 from services.mtls_enrollment import (
-    certificate_row_for, issuing_ca_for, normalized_fingerprint, parse_validity_days,
-    remove_enrolment,
+    certificate_row_for, enrolments_of, issuing_ca_for, normalized_fingerprint,
+    parse_validity_days, remove_enrolment,
 )
 from utils.response import success_response, error_response, created_response
 from utils.export_password import validate_export_password
@@ -41,19 +42,6 @@ from utils.export_options import json_boolean, query_boolean
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('mtls', __name__, url_prefix='/api/v2/mtls')
-
-
-def _serial_forms(raw) -> set:
-    """Every stored form of a serial (decimal, hex): one certificate is one
-    enrolment whatever route recorded it."""
-    from utils.serial_format import serial_variants
-    forms = {str(raw)}
-    for base in (10, 16):
-        try:
-            forms |= serial_variants(int(str(raw), base))
-        except (TypeError, ValueError):
-            continue
-    return forms
 
 
 def _get_mtls_config(key, default=None):
@@ -256,7 +244,7 @@ def create_mtls_certificate():
                 'OU': 'mTLS Clients',
             },
             cert_type='usr_cert',
-            key_type='2048',
+            key_type=browser_key_type(ca, f'{user.username}@mtls'),
             validity_days=validity_days,
             username=user.username,
         )
@@ -529,10 +517,11 @@ def enroll_presented_certificate():
             return error_response('Cannot enroll certificate that is not yet valid', 400)
 
     # Check if already enrolled
-    existing = AuthCertificate.query.filter(
-        AuthCertificate.cert_serial.in_(_serial_forms(cert_info['serial']))
-    ).first()
-    if existing:
+    from services.mtls_enrollment import presented_identity
+    presented_serial, presented_issuer = presented_identity(cert_info)
+    if presented_serial is None:
+        return error_response('The client certificate serial number cannot be read', 400)
+    if enrolments_of(presented_serial, presented_issuer):
         return error_response('This certificate is already enrolled', 409)
 
     data = request.get_json() or {}
@@ -618,10 +607,7 @@ def enroll_import_certificate():
     )
     # The serial may be stored decimal (this route, assign) or hexadecimal
     # (/enroll from a proxy): the same certificate is one enrolment
-    from utils.serial_format import serial_variants
-    existing_auth = AuthCertificate.query.filter(
-        AuthCertificate.cert_serial.in_(serial_variants(cert_obj.serial_number))
-    ).first()
+    existing_auth = next(iter(enrolments_of(cert_obj.serial_number, cert_obj.issuer)), None)
     if existing_auth:
         if existing_auth.user_id == user.id:
             return error_response('This certificate is already enrolled to your account', 409)
@@ -729,22 +715,23 @@ def list_available_certificates():
 
     user = g.current_user
 
-    # Get all enrolled serials
-    enrolled_serials = {s[0] for s in db.session.query(AuthCertificate.cert_serial).all()}
-
-    # Query unassigned usr_cert
+    # Unassigned usr_cert: no enrolment may be of that (issuer, serial), by the rule of the other routes
+    from utils.serial_format import serial_to_int
+    pool = {}
+    for enrolment in AuthCertificate.query.all():
+        pool.setdefault(enrolment.cert_serial, []).append(enrolment)
     query = Certificate.query.filter(
         Certificate.cert_type == 'usr_cert',
         Certificate.revoked == False,
     )
-    if enrolled_serials:
-        query = query.filter(~Certificate.serial_number.in_(enrolled_serials))
 
     # Non-admin: only own certs (the rule `assign` enforces)
     if user.role != 'admin':
         query = query.filter(Certificate.created_by == user.username)
 
-    certs = query.order_by(Certificate.id.desc()).all()
+    certs = [c for c in query.order_by(Certificate.id.desc()).all()
+             if serial_to_int(c.serial_number) is None
+             or not enrolments_of(serial_to_int(c.serial_number), c.issuer, pool=pool)]
 
     results = []
     for c in certs:
@@ -802,9 +789,13 @@ def assign_certificate():
 
     # Check duplicate enrollment
     serial = certificate.serial_number
-    existing = AuthCertificate.query.filter(
-        AuthCertificate.cert_serial.in_(_serial_forms(serial))
-    ).first()
+    from utils.serial_format import serial_to_int
+    try:
+        held = cx509.load_pem_x509_certificate(base64.b64decode(certificate.crt), default_backend())
+        number, issuer = held.serial_number, held.issuer
+    except Exception:
+        number, issuer = serial_to_int(serial), certificate.issuer
+    existing = next(iter(enrolments_of(number, issuer)), None) if number is not None else None
     if existing:
         if existing.user_id == enroll_user_id:
             return error_response('This certificate is already assigned to this account', 409)

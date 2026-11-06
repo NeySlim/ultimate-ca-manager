@@ -109,10 +109,32 @@ def test_read_failure_does_not_overwrite(api):
     assert _values(fake) == [['tok1']]
 
 
-def test_cleanup_removes_the_set_and_second_call_succeeds(api):
+def test_cleanup_keeps_the_other_value_then_removes_the_set(api):
     provider, fake = api
-    provider.create_txt_record('example.com', '_acme-challenge.example.com', 'tok1')
-    provider.create_txt_record('example.com', '_acme-challenge.example.com', 'tok2')
-    assert provider.delete_txt_record('example.com', '_acme-challenge.example.com')[0]
-    assert 'tok1' not in json.dumps(fake.sets)
-    assert provider.delete_txt_record('example.com', '_acme-challenge.example.com')[0]
+    fake.sets['_acme-challenge'] = {'TTL': 120, 'metadata': {'k': 'v'},
+                                    'TXTRecords': [{'value': ['tok1']}, {'value': ['tok2']}]}
+    fake.calls.clear()
+    assert provider.delete_txt_record('example.com', '_acme-challenge.example.com', 'tok1')[0]
+    assert fake.calls[-2:] == ['GET', 'PUT']
+    assert fake.sets['_acme-challenge'] == {'TTL': 120, 'metadata': {'k': 'v'}, 'TXTRecords': [{'value': ['tok2']}]}
+    assert provider.delete_txt_record('example.com', '_acme-challenge.example.com', 'tok2')[0]
+    assert fake.sets == {}
+    assert provider.delete_txt_record('example.com', '_acme-challenge.example.com', 'tok2')[0]
+
+
+def test_cleanup_matches_a_value_split_in_strings(api):
+    provider, fake = api
+    fake.sets['_acme-challenge'] = {'TTL': 120, 'TXTRecords': [{'value': ['to', 'k1']}, {'value': ['tok2']}]}
+    assert provider.delete_txt_record('example.com', '_acme-challenge.example.com', 'tok1')[0]
+    assert _values(fake) == [['tok2']]
+
+
+def test_cleanup_read_failure_changes_nothing(api):
+    provider, fake = api
+    fake.sets['_acme-challenge'] = {'TTL': 120, 'TXTRecords': [{'value': ['tok1']}, {'value': ['tok2']}]}
+    fake.get_status = 429
+    fake.calls.clear()
+    ok, _ = provider.delete_txt_record('example.com', '_acme-challenge.example.com', 'tok1')
+    assert not ok
+    assert 'PUT' not in fake.calls and 'DELETE' not in fake.calls
+    assert _values(fake) == [['tok1'], ['tok2']]

@@ -3,5 +3,6 @@
 pytest==9.0.3
 pytest-cov==7.0.0
 pytest-mock
+pytest-xdist==3.8.0
 black==26.10.1
 flake8==7.3.0

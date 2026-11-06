@@ -74,11 +74,28 @@ class Ns1DnsProvider(BaseDnsProvider):
             return False, f"Failed to create record: {result}"
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         zone = self._find_zone(domain)
         if not zone:
             return False, f"Could not find zone for {domain}"
-        success, result = self._request('DELETE', f'/zones/{zone}/{record_name}/TXT')
+        path = f'/zones/{zone}/{record_name}/TXT'
+        success, existing = self._request('GET', path)
+        if not success:
+            if 'not found' in str(existing).lower():
+                return True, "Record not found (already deleted?)"
+            return False, f"Failed to read existing records: {existing}"
+        answers = list((existing or {}).get('answers') or [])
+        # The record holds every value of the name: keep the others, drop the set only when empty.
+        remaining = [a for a in answers
+                     if not self.txt_matches(''.join(a.get('answer') or []), record_value)]
+        if len(remaining) == len(answers):
+            return True, "Record not found (already deleted?)"
+        if remaining:
+            data = {'zone': zone, 'domain': record_name, 'type': 'TXT',
+                    'ttl': (existing or {}).get('ttl', 300), 'answers': remaining}
+            success, result = self._request('POST', path, data)
+        else:
+            success, result = self._request('DELETE', path)
         if not success:
             if 'not found' in str(result).lower():
                 return True, "Record not found (already deleted?)"

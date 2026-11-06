@@ -298,7 +298,7 @@ class TestPurge:
             ids = [_log(f'chain_before_{i}') for i in range(2)]
             db.session.execute(text(
                 "INSERT INTO audit_logs (id, action, username, success) "
-                "VALUES (:id, 'forged', 'someone', 1)"), {'id': ids[0] - 100})
+                "VALUES (:id, 'forged', 'someone', :ok)"), {'id': ids[0] - 100, 'ok': True})
             db.session.commit()
             report = AuditService.verify_integrity()
             assert report['status'] == 'broken', report

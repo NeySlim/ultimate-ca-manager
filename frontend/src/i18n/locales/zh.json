@@ -1923,6 +1923,7 @@
     "editEmailCaveat": "根据 RFC 8555，contact 属于 ACME 客户端：其下一次账户更新可能会覆盖此值。",
     "emailUpdated": "账户邮箱已更新",
     "letsEncryptOrders": "Let's Encrypt 订单",
+    "ordersListPartial": "列表不完整：已加载 {{total}} 个订单中的 {{loaded}} 个。请刷新重试。",
     "dnsUpdate": {
       "title": "DNS UPDATE 密钥 (RFC 2136)",
       "manage": "DNS UPDATE 密钥 (RFC 2136)",
@@ -5669,6 +5670,8 @@
     "tasksTitle": "后台任务",
     "runNow": "立即运行",
     "taskRan": "任务 {{name}} 已执行",
+    "taskQueued": "任务 {{name}} 已启动，仍在运行",
+    "stateStale": "调度进程已有一段时间未报告，显示的状态可能已过时",
     "runFailed": "运行任务失败",
     "loadFailed": "加载任务失败",
     "noTasks": "没有计划任务",
@@ -5676,6 +5679,7 @@
     "skipReasons": {
       "disabled": "自动备份已关闭",
       "acme_renewal_off": "ACME 自动续期已关闭",
+      "no_interrupted_order": "没有中断的 ACME 订单",
       "not_due": "尚未到期",
       "unknown": "未说明原因"
     },

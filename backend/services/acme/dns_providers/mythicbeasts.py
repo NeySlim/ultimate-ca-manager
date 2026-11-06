@@ -40,7 +40,8 @@ class MythicBeastsDnsProvider(BaseDnsProvider):
         except requests.RequestException as e:
             return False, self._failure(e)
     
-    def _request(self, method: str, path: str, data: Optional[str] = None) -> Tuple[bool, Any]:
+    def _request(self, method: str, path: str, data: Optional[str] = None,
+                 params: Optional[Dict] = None) -> Tuple[bool, Any]:
         ok, err = self._authenticate()
         if not ok:
             return False, err
@@ -49,7 +50,8 @@ class MythicBeastsDnsProvider(BaseDnsProvider):
         if data:
             headers['Content-Type'] = 'text/dns'
         try:
-            resp = requests.request(method=method, url=url, headers=headers, data=data, timeout=30)
+            resp = requests.request(method=method, url=url, headers=headers, data=data,
+                                    params=params, timeout=30)
             if resp.status_code >= 400:
                 return False, self._error(resp)
             return True, resp.json() if resp.text and resp.headers.get('content-type', '').startswith('application/json') else resp.text
@@ -67,15 +69,25 @@ class MythicBeastsDnsProvider(BaseDnsProvider):
             return False, f"Failed to create record: {result}"
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         # Same zone resolution as the create path, so the record is looked
         # for where it was written.
         zone = self.get_zone_for_domain(domain) or domain
         relative = self.get_relative_record_name(record_name, zone)
-        record_line = f"{relative} TXT"
-        success, result = self._request('DELETE', f'/zones/{zone}/records', data=record_line)
-        if not success:
-            return False, f"Failed to delete record: {result}"
+        path = f'/zones/{zone}/records/{relative}/TXT'
+        success, result = self._request('GET', path)
+        if not success or not isinstance(result, dict):
+            return False, f"Failed to list records: {result}"
+        for rec in result.get('records') or []:
+            if not self.txt_matches(rec.get('data'), record_value):
+                continue
+            # Without a `data` filter the DELETE removes every TXT value of the host: pass it as stored.
+            success, result = self._request('DELETE', path, params={'data': rec.get('data')})
+            if success and not (isinstance(result, dict) and result.get('records_removed')):
+                success, result = False, f"no record removed ({result})"
+            if not success:
+                logger.warning(f"Mythic Beasts: failed to delete TXT value of {record_name}: {result}")
+                return False, f"Failed to delete record: {result}"
         return True, "Record deleted successfully"
     
     def test_connection(self) -> Tuple[bool, str]:

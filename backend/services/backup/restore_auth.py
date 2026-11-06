@@ -68,6 +68,41 @@ def _digest(fingerprint) -> str:
     return ''.join(ch for ch in str(fingerprint or '') if ch not in ': ').upper()
 
 
+def _enrolment_here(ac_data: Dict, plan: RestorePlan):
+    """The enrolment here an archived one is, by rank among those it may be.
+
+    The same fingerprint first; else the same serial as spelled under the same
+    issuer, the manifest's identity; else under an issuer unrecorded on either
+    side, when its fingerprint is empty or the same one spelled otherwise.
+    """
+    from models.auth_certificate import AuthCertificate
+    from services.mtls_enrollment import same_issuer
+    fingerprint = ac_data.get('cert_fingerprint')
+    if fingerprint:
+        rows = AuthCertificate.query.filter_by(cert_fingerprint=fingerprint).order_by(AuthCertificate.id).all()
+        if rows:
+            return _ranked(plan, ('fingerprint', fingerprint), ac_data, rows)
+    def issuer_rank(here):
+        same = same_issuer(ac_data.get('cert_issuer'), here.cert_issuer)
+        return 1 if same is None else (0 if same else None)
+
+    candidates = []
+    for here in AuthCertificate.query.filter_by(cert_serial=ac_data['cert_serial']).order_by(AuthCertificate.id):
+        rank = issuer_rank(here)
+        if rank is None:
+            continue
+        if rank and fingerprint and here.cert_fingerprint and _digest(here.cert_fingerprint) != _digest(fingerprint):
+            continue      # no issuer to say so: another certificate of that serial
+        candidates.append((rank, here))
+    rows = [here for _rank, here in sorted(candidates, key=lambda item: (item[0], item[1].id))]
+    return _ranked(plan, ('serial', ac_data.get('cert_issuer') or '', ac_data['cert_serial']), ac_data, rows)
+
+
+def _ranked(plan: RestorePlan, key, ac_data: Dict, rows):
+    taken = plan.rank('auth_certificates', key, ac_data, [here.id for here in rows])
+    return next((here for here in rows if here.id == taken), None)
+
+
 class RestoreAuthMixin:
     def _restore_sso_providers(self, backup_data: Dict, results: Dict,
                                plan: Optional[RestorePlan] = None) -> None:
@@ -162,17 +197,7 @@ class RestoreAuthMixin:
         plan = plan if plan is not None else RestorePlan.build(backup_data)
         reindex_reference_targets('auth_certificates', plan)
         for ac_data in backup_data.get('auth_certificates', []):
-            # By fingerprint, the manifest's identity: a serial is only unique per issuer.
-            fingerprint = ac_data.get('cert_fingerprint')
-            ac = (AuthCertificate.query.filter_by(cert_fingerprint=fingerprint).first()
-                  if fingerprint else None)
-            if ac is None:
-                # The row of that serial, when its fingerprint is empty or the same one spelled otherwise
-                same_serial = AuthCertificate.query.filter_by(cert_serial=ac_data['cert_serial']).first()
-                if same_serial is not None and (not fingerprint or not same_serial.cert_fingerprint or
-                                                _digest(same_serial.cert_fingerprint) == _digest(fingerprint)):
-                    ac = same_serial
-
+            ac = _enrolment_here(ac_data, plan)
             row = ac_data
             if 'cert_pem' in ac_data:
                 row = dict(ac_data, cert_pem=_archived_client_certificate(ac_data))
@@ -184,5 +209,5 @@ class RestoreAuthMixin:
                     user_id=ac_data.get('user_id', 1),
                     cert_subject=ac_data.get('cert_subject', ''))
                 db.session.add(ac)
-            if apply_columns(ac, 'auth_certificates', row, plan):
+            if apply_columns(ac, 'auth_certificates', row, plan, archived=ac_data):
                 results['auth_certificates'] += 1

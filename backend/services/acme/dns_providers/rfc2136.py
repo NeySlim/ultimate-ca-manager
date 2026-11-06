@@ -103,7 +103,7 @@ class Rfc2136DnsProvider(BaseDnsProvider):
         except Exception as e:
             return False, f"DNS update failed: {e}"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         try:
             import dns.update
             import dns.query
@@ -127,7 +127,8 @@ class Rfc2136DnsProvider(BaseDnsProvider):
         
         try:
             update = dns.update.Update(zone, keyring=keyring, keyalgorithm=algo)
-            update.delete(dns.name.from_text(record_name), 'TXT')
+            # Class NONE delete of this one RR (RFC 2136 §2.5.4): other values stay
+            update.delete(dns.name.from_text(record_name), 'TXT', record_value)
             response = dns.query.tcp(update, server, port=port, timeout=30)
             rcode = response.rcode()
             if rcode == 0:

@@ -1923,6 +1923,7 @@
     "editEmailCaveat": "Per RFC 8555 the contact belongs to the ACME client: its next account update may overwrite this value.",
     "emailUpdated": "Account e-mail updated",
     "letsEncryptOrders": "Let's Encrypt orders",
+    "ordersListPartial": "Partial list: {{loaded}} of {{total}} orders loaded. Refresh to try again.",
     "dnsUpdate": {
       "title": "DNS UPDATE keys (RFC 2136)",
       "manage": "DNS UPDATE keys (RFC 2136)",
@@ -5672,6 +5673,8 @@
     "tasksTitle": "Background tasks",
     "runNow": "Run now",
     "taskRan": "Task '{{name}}' executed",
+    "taskQueued": "Task '{{name}}' started: it is still running",
+    "stateStale": "The scheduler process has not reported for a while: the status shown may be out of date",
     "runFailed": "Failed to run task",
     "loadFailed": "Failed to load scheduler tasks",
     "noTasks": "No scheduled tasks",
@@ -5679,6 +5682,7 @@
     "skipReasons": {
       "disabled": "automatic backups are off",
       "acme_renewal_off": "ACME auto-renewal is off",
+      "no_interrupted_order": "no interrupted ACME order",
       "not_due": "not due yet",
       "unknown": "no reason given"
     },

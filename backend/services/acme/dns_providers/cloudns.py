@@ -80,7 +80,7 @@ class ClouDnsDnsProvider(BaseDnsProvider):
             return False, f"Failed: {result}"
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         zone = self._find_zone(domain) or self.get_zone_for_domain(domain)
         relative = self.get_relative_record_name(record_name, zone)
         
@@ -90,7 +90,9 @@ class ClouDnsDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed: {result}"
         if isinstance(result, dict):
-            for rec_id in result:
+            for rec_id, rec in result.items():
+                if not isinstance(rec, dict) or not self.txt_matches(rec.get('record'), record_value):
+                    continue
                 self._post('/dns/delete-record.json', {'domain-name': zone, 'record-id': rec_id})
         return True, "Record deleted"
     

@@ -10,6 +10,10 @@ import os
 import ssl
 import sys
 
+# Before the preloaded app: the master and its workers only register the scheduled
+# tasks, which run in the scheduler process started below (when_ready)
+os.environ['UCM_SCHEDULER_SUPERVISED'] = '1'
+
 # Detect environment
 base_path = os.getenv('UCM_BASE_PATH', '/opt/ucm')
 data_path = os.getenv('DATA_DIR', f'{base_path}/data')
@@ -232,8 +236,19 @@ tmp_upload_dir = None
 def on_starting(server):
     server.log.info("Starting UCM with Gunicorn")
 
+def when_ready(server):
+    from scheduler_supervisor import supervisor
+    supervisor.start(server)
+
 def on_reload(server):
     server.log.info("Reloading UCM")
+    # The scheduler process takes the new code and configuration too
+    from scheduler_supervisor import supervisor
+    supervisor.restart()
+
+def on_exit(server):
+    from scheduler_supervisor import supervisor
+    supervisor.stop()
 
 def worker_int(worker):
     worker.log.info("Worker received INT or QUIT signal")
@@ -243,7 +258,7 @@ def worker_abort(worker):
 
 def post_worker_init(worker):
     """Post-worker initialization:
-    0. Drop the database connections inherited from the master
+    0. Drop the database and syslog connections inherited from the master
     1. Suppress noisy SSL/connection tracebacks from gevent
     2. Start HTTP protocol server for CDP/OCSP (if configured)
     3. Start the DNS UPDATE listener (if configured)
@@ -256,7 +271,9 @@ def post_worker_init(worker):
     from utils.db_fork import forget_inherited_connections
     from wsgi import app as flask_app
     with flask_app.app_context():
-        forget_inherited_connections(db.engine)
+        forget_inherited_connections(db.engines.values())
+    from services.syslog_service import syslog_forwarder
+    syslog_forwarder.forget_inherited_socket()
 
     hub = gevent.get_hub()
     _original_handle_error = hub.handle_error

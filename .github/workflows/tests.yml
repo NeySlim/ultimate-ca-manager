@@ -11,6 +11,11 @@ permissions:
   contents: read
   security-events: write
 
+# A new push to a branch replaces the run of its previous commit
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Code Linting
@@ -115,9 +120,16 @@ jobs:
           INITIAL_ADMIN_PASSWORD: changeme123
           CSRF_DISABLED: 'true'
           UCM_DEV_MODE: 'true'
+          # test and main run the suite on one database, as a user does; the
+          # other branches spread the files over the runner's 4 cores
+          PYTEST_WORKERS: ${{ (github.ref_name == 'test' || github.ref_name == 'main') && '0' || '4' }}
         run: |
           cd backend
-          pytest -v --tb=short
+          if [ "$PYTEST_WORKERS" = "0" ]; then
+            pytest -v --tb=short
+          else
+            pytest -v --tb=short -n "$PYTEST_WORKERS" --dist loadfile
+          fi
 
   test-backend-postgres:
     name: Backend Tests (PostgreSQL)
@@ -187,11 +199,10 @@ jobs:
           INITIAL_ADMIN_PASSWORD: changeme123
           CSRF_DISABLED: 'true'
           UCM_DEV_MODE: 'true'
-          # No DATABASE_URL here on purpose: the application reads it and would
-          # run the whole test app against PostgreSQL, where the harness never
-          # created the schema, so every fixture died on the migration ledger.
-          # These tests keep their own SQLite instance and reach PostgreSQL
-          # through the two variables below, each building its own engine.
+          # No DATABASE_URL here on purpose: these tests keep their own SQLite
+          # instance and reach PostgreSQL through the two variables below, each
+          # building its own engine. The application on PostgreSQL is the next
+          # step, through UCM_TEST_APP_PG_URL.
           UCM_TEST_POSTGRES_URL: postgresql://ucm:ucm_ci_password@localhost:5432/ucm_test
           UCM_TEST_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
         run: |
@@ -213,6 +224,34 @@ jobs:
             tests/test_database_admin.py \
             tests/test_migration_036.py \
             tests/test_migration_runner_pg.py
+
+      # The application itself on PostgreSQL: the session `app` fixture builds
+      # it in a schema of its own (docs/testing/postgres-harness.md), so the
+      # routes and services run on this backend and not only the migrations.
+      # The unprivileged role, as on a managed PostgreSQL; its `public` schema,
+      # emptied by the step above, is never touched here.
+      - name: Run the application tests on PostgreSQL
+        timeout-minutes: 30
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+          UCM_TEST_APP_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
+        run: |
+          cd backend
+          pytest --tb=short \
+            tests/test_acme*.py \
+            tests/test_backup*.py \
+            tests/test_restore*.py \
+            tests/test_mtls*.py \
+            tests/test_certificates*.py \
+            tests/test_revocation*.py \
+            tests/test_scheduler*.py \
+            tests/test_postgres_schema_of_its_own.py \
+            tests/test_db_error_parameters_hidden.py
   
   test-frontend:
     name: Frontend Tests

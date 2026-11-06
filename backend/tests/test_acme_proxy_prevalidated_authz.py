@@ -7,6 +7,7 @@ import json
 import pytest
 
 from models import db, AcmeClientOrder
+from tests.seeded_rows import ensure_acme_account
 
 
 class _Resp:
@@ -35,6 +36,7 @@ def _drop_orders_created_here(app):
 
 def _seed_order(authz_url, domain):
     AcmeClientOrder.query.filter_by(is_proxy_order=True).delete()
+    ensure_acme_account('acct-pv')
     order = AcmeClientOrder(
         domains=json.dumps([domain]),
         environment='staging',

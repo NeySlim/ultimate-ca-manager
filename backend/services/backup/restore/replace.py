@@ -17,7 +17,7 @@ row is decided here, the same way on every database engine: see
 `DEPENDENT_TABLES`.
 """
 import logging
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
@@ -28,7 +28,7 @@ from models import db
 from ..export_generic import load_model
 from ..manifest import SECTIONS
 from .conflict import RestoreConflictError, describe_row
-from .plan import RestorePlan, _normalise, _temporal_identity
+from .plan import RestorePlan, _normalise, _temporal_identity, shared_identity_warning
 
 logger = logging.getLogger(__name__)
 
@@ -121,11 +121,27 @@ def rows_to_remove(section_name: str, archived_rows: List[Dict[str, Any]],
     if section.identity == ('id',):
         return []          # singleton configuration: nothing to prune
 
-    archived = set()
+    archived = Counter()
     for row in archived_rows:
         archived.update(_archived_identities(section_name, section, row, plan))
     present = plan.target_ids.get(section_name) or {}
-    return [target_id for key, target_id in present.items() if key not in archived]
+    shared = plan.shared.get(section_name) or {}
+    doomed = [target_id for key, target_id in present.items()
+              if key not in archived and key not in shared]
+    # An identity several rows share keeps, oldest first, as many as the archive carries
+    for key, ids in shared.items():
+        gone = ids[archived.get(key, 0):]
+        doomed.extend(gone)
+        plan.warnings.append(shared_identity_warning(section_name, key, ids, 'removed', gone))
+    # No archived row can be one whose identity misses a part
+    incomplete = plan.incomplete.get(section_name) or []
+    if incomplete:
+        doomed.extend(incomplete)
+        plan.warnings.append(
+            f"{section_name}: {len(incomplete)} row(s) here without a complete "
+            f"{'/'.join(section.identity)} (id {', '.join(map(str, incomplete))}) are removed, "
+            "then those the archive carries are restored from it as new rows")
+    return doomed
 
 
 def _archived_identities(section_name: str, section, row: Dict[str, Any],

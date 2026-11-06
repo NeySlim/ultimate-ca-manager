@@ -176,7 +176,7 @@ class OvhDnsProvider(BaseDnsProvider):
         logger.info(f"OVH: Created TXT record {record_name} = {record_value}")
         return True, f"Record created successfully (ID: {result.get('id', 'unknown')})"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via OVH API"""
         zone = self._get_zone(domain)
         if not zone:
@@ -195,9 +195,20 @@ class OvhDnsProvider(BaseDnsProvider):
         if not records:
             return True, "Record not found (already deleted?)"
         
-        # Delete all matching records
-        deleted = 0
+        # The listing returns IDs only: read every record before deleting just this value
+        matching = []
         for record_id in records:
+            success, record = self._request('GET', f'/domain/zone/{zone}/record/{record_id}')
+            if not success:
+                return False, f"Failed to read record {record_id}: {record}"
+            if self.txt_matches((record or {}).get('target'), record_value):
+                matching.append(record_id)
+        
+        if not matching:
+            return True, "Record not found (already deleted?)"
+        
+        deleted = 0
+        for record_id in matching:
             success, _ = self._request('DELETE', f'/domain/zone/{zone}/record/{record_id}')
             if success:
                 deleted += 1

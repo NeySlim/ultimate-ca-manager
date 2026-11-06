@@ -215,7 +215,7 @@ def _seed():
     rows['auth_certificates'] = AuthCertificate(
         user_id=owner.id, cert_pem=_CERTIFICATE_PEM.encode(),
         cert_serial=f'{MARK}-cert-serial', cert_subject='CN=Restore Secrets',
-        cert_issuer='CN=Restore Secrets',
+        cert_issuer=f'{MARK}-issuer',   # the identity, marked as this file's
         cert_fingerprint=f'{MARK}-cert-fingerprint',
         name=f'{MARK}-auth-cert', enabled=True)
 

@@ -1,5 +1,6 @@
 """ACME client account: external key import (#277) and upstream deactivation (#278)."""
 from unittest.mock import patch
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -20,7 +21,7 @@ def _pem(key):
 @pytest.fixture
 def fresh_account_table(app):
     with app.app_context():
-        AcmeClientAccount.query.delete()
+        delete_client_accounts(AcmeClientAccount.query)
         db.session.commit()
         yield
 

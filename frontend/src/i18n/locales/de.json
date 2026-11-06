@@ -1923,6 +1923,7 @@
     "editEmailCaveat": "Laut RFC 8555 gehört der Kontakt dem ACME-Client: seine nächste Kontoaktualisierung kann diesen Wert überschreiben.",
     "emailUpdated": "Konto-E-Mail aktualisiert",
     "letsEncryptOrders": "Let's-Encrypt-Bestellungen",
+    "ordersListPartial": "Unvollständige Liste: {{loaded}} von {{total}} Bestellungen geladen. Zum erneuten Versuch aktualisieren.",
     "dnsUpdate": {
       "title": "DNS-UPDATE-Schlüssel (RFC 2136)",
       "manage": "DNS-UPDATE-Schlüssel (RFC 2136)",
@@ -5669,6 +5670,8 @@
     "tasksTitle": "Hintergrundaufgaben",
     "runNow": "Jetzt ausfuhren",
     "taskRan": "Aufgabe {{name}} ausgefuhrt",
+    "taskQueued": "Aufgabe {{name}} gestartet: sie läuft noch",
+    "stateStale": "Der Planer-Prozess hat sich länger nicht gemeldet: der angezeigte Status ist möglicherweise veraltet",
     "runFailed": "Aufgabe konnte nicht ausgefuhrt werden",
     "loadFailed": "Aufgaben konnten nicht geladen werden",
     "noTasks": "Keine geplanten Aufgaben",
@@ -5676,6 +5679,7 @@
     "skipReasons": {
       "disabled": "automatische Sicherungen sind deaktiviert",
       "acme_renewal_off": "die automatische ACME-Erneuerung ist ausgeschaltet",
+      "no_interrupted_order": "keine unterbrochene ACME-Bestellung",
       "not_due": "noch nicht fällig",
       "unknown": "kein Grund angegeben"
     },

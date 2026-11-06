@@ -116,27 +116,26 @@ class FreeDnsDnsProvider(BaseDnsProvider):
             logger.error(f"FreeDNS get domain ID failed: {self._failure(e)}")
             return None
     
-    def _get_txt_record_id(self, record_name: str) -> Optional[str]:
-        """Get data_id for existing TXT record"""
+    def _get_txt_record_id(self, record_name: str) -> Tuple[bool, Optional[str]]:
+        """(ok, data_id or None): a page that could not be read is not an absent record."""
         session = self._get_session()
         
         try:
             response = session.get(f"{self.BASE_URL}/subdomain/", timeout=30)
             
-            # Parse data_id for _acme-challenge record
-            # Format: data_id=12345>_acme-challenge
-            subdomain = record_name.split('.')[0]  # Get first part (e.g., _acme-challenge)
-            pattern = rf'data_id=(\d+)[^>]*>{re.escape(subdomain)}'
+            # Rows link the full name (data_id=12345>_acme-challenge.example.com): match all of it,
+            # its first label alone is the _acme-challenge of any domain of the account
+            pattern = rf'data_id=(\d+)[^>]*>\s*{re.escape(record_name.rstrip("."))}\s*<'
             match = re.search(pattern, response.text, re.IGNORECASE)
             
-            if match:
-                return match.group(1)
-            
-            return None
+            if response.status_code >= 400:
+                logger.warning(f"FreeDNS: record listing answered HTTP {response.status_code}")
+                return False, None
+            return True, (match.group(1) if match else None)
             
         except requests.RequestException as e:
             logger.error(f"FreeDNS get TXT record ID failed: {self._failure(e)}")
-            return None
+            return False, None
     
     def create_txt_record(
         self, 
@@ -160,7 +159,9 @@ class FreeDnsDnsProvider(BaseDnsProvider):
             subdomain = record_name.split('.')[0]
         
         # Check if record already exists
-        existing_id = self._get_txt_record_id(record_name)
+        listed, existing_id = self._get_txt_record_id(record_name)
+        if not listed:
+            return False, "Could not read the FreeDNS record list"
         
         try:
             # Create or update TXT record
@@ -178,28 +179,32 @@ class FreeDnsDnsProvider(BaseDnsProvider):
             )
             
             # Verify record was created
-            new_id = self._get_txt_record_id(record_name)
+            listed, new_id = self._get_txt_record_id(record_name)
             if new_id:
                 self._txt_record_cache[record_name] = new_id
                 logger.info(f"FreeDNS: Created TXT record {record_name} (ID: {new_id})")
                 return True, "Record created successfully"
             
-            # Check response for errors
-            if 'error' in response.text.lower():
-                return False, "FreeDNS returned an error"
-            
-            return True, "Record submitted (verification pending)"
+            logger.warning(f"FreeDNS: TXT record {record_name} is not listed after saving "
+                           f"(HTTP {response.status_code})")
+            return False, f"FreeDNS did not list the record after saving (HTTP {response.status_code})"
             
         except requests.RequestException as e:
             logger.error(f"FreeDNS create record failed: {self._failure(e)}")
             return False, self._failure(e)
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via FreeDNS web interface"""
         session = self._get_session()
+        # The listing page truncates TXT values, so the record cannot be matched on its value
+        logger.warning(f"FreeDNS: cleanup of {record_name} removes its TXT record, whichever value it holds")
         
         # Get record ID
-        data_id = self._txt_record_cache.get(record_name) or self._get_txt_record_id(record_name)
+        data_id = self._txt_record_cache.get(record_name)
+        if not data_id:
+            listed, data_id = self._get_txt_record_id(record_name)
+            if not listed:
+                return False, "Could not read the FreeDNS record list"
         
         if not data_id:
             return True, "Record not found (already deleted?)"
@@ -218,6 +223,11 @@ class FreeDnsDnsProvider(BaseDnsProvider):
             # Remove from cache
             self._txt_record_cache.pop(record_name, None)
             
+            # The web form reports no status of its own: the listing says whether the record went.
+            listed, still = self._get_txt_record_id(record_name)
+            if not listed or still == data_id:
+                logger.warning(f"FreeDNS: TXT record {record_name} (ID: {data_id}) may still be listed after deletion")
+                return False, f"FreeDNS kept the record (HTTP {response.status_code})"
             logger.info(f"FreeDNS: Deleted TXT record {record_name} (ID: {data_id})")
             return True, "Record deleted successfully"
             

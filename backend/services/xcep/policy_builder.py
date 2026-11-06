@@ -249,15 +249,23 @@ def _key_type_info(key_type):
     return ('RSA' if alg.family == 'RSA' else f'ECDSA_{alg.param}'), alg.key_size
 
 
-def _request_hash(template):
-    """The digest a client must sign its request with: the template's own
-    digest when it is one XCEP can announce, else SHA-256. Never SHA-1."""
+def _request_hash(template, key_label=None):
+    """The digest a client must sign its request with: the template's own, raised to
+    the one matching its key (SHA-384 for P-384), SHA-512 for ML-DSA. Never SHA-1."""
+    from services.policy_service import POLICY_DIGESTS
+    from utils.issuance_defaults import digest_for_label
+    if key_label in _MLDSA_OIDS:
+        # RFC 9882 §3.3: an ML-DSA CMS signer digests with SHA-512, the one hash it must support
+        return _HASH_ALGORITHM_OIDS['sha512']
     digest = (getattr(template, 'digest', None) or _DEFAULT_HASH).strip().lower().replace('-', '')
     if digest not in _HASH_ALGORITHM_OIDS:
         if digest == 'sha1':
             logger.warning("XCEP: template %r digest SHA-1 not announced, using %s",
                            getattr(template, 'name', '?'), _DEFAULT_HASH)
         digest = _DEFAULT_HASH
+    floor = digest_for_label(key_label) if key_label else None
+    if floor in POLICY_DIGESTS and POLICY_DIGESTS.index(floor) > POLICY_DIGESTS.index(digest):
+        digest = floor
     return _HASH_ALGORITHM_OIDS[digest]
 
 
@@ -419,13 +427,14 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         cas_el = etree.SubElement(policy, '{%s}cAs' % XCEP_NS)
         etree.SubElement(cas_el, '{%s}cAReference' % XCEP_NS).text = str(ca_ref_id)
 
-        # algorithmOIDReference and a KSP, which an ML-DSA template needs, are v3 attributes
+        # algorithmOIDReference and a KSP, which an ML-DSA template needs, are v3 attributes;
+        # MS-XCEP 3.1.4.1.3.1 announces the request hash of a schema 3 policy only, so
+        # every KSP template (ECDSA, ML-DSA, FIPS mode) is schema 3 and names its hash
         mldsa_oid = _MLDSA_OIDS.get(algo_name)
+        schema3 = pin_request_hash or mldsa_oid is not None or algo_name.startswith('ECDSA')
         attributes = etree.SubElement(policy, '{%s}attributes' % XCEP_NS)
         etree.SubElement(attributes, '{%s}commonName' % XCEP_NS).text = template.name
-        etree.SubElement(attributes, '{%s}policySchema' % XCEP_NS).text = (
-            '3' if pin_request_hash or mldsa_oid is not None else '2'
-        )
+        etree.SubElement(attributes, '{%s}policySchema' % XCEP_NS).text = '3' if schema3 else '2'
 
         validity = etree.SubElement(attributes, '{%s}certificateValidity' % XCEP_NS)
         validity_seconds = int(template.validity_days or 397) * 86400
@@ -457,8 +466,7 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         # must appear even when nil. Outside FIPS mode keySpec and cryptoProviders
         # are populated per the real-ADCS trace referenced in the module
         # docstring; algorithmOIDReference stays nil (same trace) except for ML-DSA.
-        is_ecdsa = algo_name.startswith('ECDSA')
-        use_ksp = is_ecdsa or mldsa_oid is not None or pin_request_hash
+        use_ksp = schema3
         pk_attrs = etree.SubElement(attributes, '{%s}privateKeyAttributes' % XCEP_NS)
         etree.SubElement(pk_attrs, '{%s}minimalKeyLength' % XCEP_NS).text = str(min_key_length)
         if mldsa_oid is not None:
@@ -505,10 +513,8 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
             etree.SubElement(attributes, '{%s}generalFlags' % XCEP_NS).text = str(_GENERAL_MACHINE_TYPE)
         else:
             _nil_element(attributes, 'generalFlags')
-        if mldsa_oid is not None or pin_request_hash:
-            # RFC 9882 §3.3: an ML-DSA CMS signer digests with SHA-512, the one hash it must support
-            hash_oid, hash_name = (_HASH_ALGORITHM_OIDS['sha512'] if mldsa_oid is not None
-                                   else _request_hash(template))
+        if schema3:
+            hash_oid, hash_name = _request_hash(template, key_algorithms.normalize_label(template.key_type))
             hash_ref = oids.ref(hash_oid, group=_GROUP_HASH_ALGORITHM, default_name=hash_name)
             etree.SubElement(attributes, '{%s}hashAlgorithmOIDReference' % XCEP_NS).text = str(hash_ref)
         else:

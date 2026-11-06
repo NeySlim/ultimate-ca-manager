@@ -120,7 +120,8 @@ class CASigningMixin:
                 cap keyed off cert_type could otherwise never let through.
             policy_template_id: template scoping the issuance policies (the
                 WSTEP matched template), none for EST; its SAN types bind
-                the request's names.
+                the request's names and its digest is the preferred one
+                (``issuance_defaults.template_digest``).
             template_ekus: EKUs that replace the CSR's, as a bound template's
                 do (WSTEP renewal); protocol-forbidden ones still dropped.
 
@@ -153,6 +154,8 @@ class CASigningMixin:
         policy_template = (db.session.get(CertificateTemplate, policy_template_id)
                            if policy_template_id else None)
         from utils.custom_extensions import template_custom_extensions
+        from utils.issuance_defaults import template_digest as _template_digest
+        template_digest = _template_digest(policy_template, ca_private_key)
 
         # Sign via TrustStoreService
         cert_pem_bytes = TrustStoreService.sign_csr(
@@ -160,7 +163,7 @@ class CASigningMixin:
             ca_cert=ca_cert,
             ca_private_key=ca_private_key,
             validity_days=validity_days,
-            digest='sha256',
+            digest=template_digest,
             cert_type=cert_type,
             cdp_urls=cdp_urls,
             ocsp_urls=ocsp_urls,

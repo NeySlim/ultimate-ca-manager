@@ -23,6 +23,9 @@ from services.database_admin.lock import (
 )
 from services.database_admin.verify import VerificationError
 
+pytestmark = pytest.mark.sqlite_only(
+    reason='the session database is the migration source, SQLite by design; a PostgreSQL source has its own engine (UCM_TEST_PG_URL)')
+
 _PG_URL = os.environ.get('UCM_TEST_PG_URL')
 _needs_pg = pytest.mark.skipif(
     not _PG_URL, reason='UCM_TEST_PG_URL not set; skipping PostgreSQL matrix')

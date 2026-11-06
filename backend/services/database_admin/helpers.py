@@ -419,7 +419,7 @@ def _backup_current_db(reasons: Optional[list] = None,
     return path
 
 
-# Columns of the public schema whose default is nextval(), with the sequence
+# Columns of the current schema whose default is nextval(), with the sequence
 # the column owns (NULL when it owns none). The catalogue quotes the table
 # name itself, so no metadata is concatenated on the Python side.
 _PG_SERIAL_COLUMNS_SQL = text(
@@ -430,7 +430,7 @@ _PG_SERIAL_COLUMNS_SQL = text(
     "FROM information_schema.columns AS c "
     "JOIN information_schema.tables AS t "
     "ON t.table_schema = c.table_schema AND t.table_name = c.table_name "
-    "WHERE c.table_schema = 'public' AND t.table_type = 'BASE TABLE' "
+    "WHERE c.table_schema = current_schema() AND t.table_type = 'BASE TABLE' "
     "AND strpos(c.column_default, 'nextval(') = 1 "
     "ORDER BY c.table_name, c.column_name"
 )
@@ -453,7 +453,7 @@ def _pg_setval_stmt(schema_name, table_name, column_name):
 
 
 def _reset_pg_sequences(engine):
-    """Realign every serial sequence of the public schema on its table's data."""
+    """Realign every serial sequence of the current schema on its table's data."""
     if not str(getattr(engine.dialect, "name", "")).startswith("postgres"):
         return
     done = failed = 0

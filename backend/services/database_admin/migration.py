@@ -422,6 +422,10 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
     try:
         target_engine = create_engine(sqlalchemy_url(target_url), pool_pre_ping=True, hide_parameters=True)
         target_is_pg = target_url.startswith("postgresql")
+        if target_is_pg:
+            # The schema the URL's search_path lands in: the one a reset must name
+            with target_engine.connect() as conn:
+                stats["target_schema"] = conn.execute(text("SELECT current_schema()")).scalar()
 
         # 1. Nothing is touched until the target is known to be empty.
         # Kept as a count rather than a table-by-table listing: what the
@@ -537,11 +541,13 @@ def _rollback_hint(target_url: str, stats: dict) -> str:
     # enough to write to it: sending someone to drop a schema that this
     # migration never created is how an unrelated database gets dropped.
     if stats.get("target_written"):
-        cleanup = (
-            'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'
-            if target_url.startswith("postgresql")
-            else 'delete the target SQLite file'
-        )
+        if target_url.startswith("postgresql"):
+            from sqlalchemy.dialects import postgresql
+            schema = postgresql.dialect().identifier_preparer.quote(
+                stats.get("target_schema") or "public")
+            cleanup = f'DROP SCHEMA {schema} CASCADE; CREATE SCHEMA {schema};'
+        else:
+            cleanup = 'delete the target SQLite file'
         hint += f" Reset the target before retrying: {cleanup}"
 
     snapshot = stats.get("snapshot") or {}
