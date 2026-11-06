@@ -6,6 +6,7 @@ returned the copy when no account was linked, and wrote both, so the two
 could disagree while only the account was used.
 """
 import json
+from tests.acme_rows import delete_client_accounts
 
 import pytest
 
@@ -73,5 +74,5 @@ def test_eab_is_written_to_the_linked_account_only(app, auth_client, no_linked_a
         assert data['proxy_eab_kid'] == 'kid-1' and data['proxy_eab_hmac_key_set'] is True
     finally:
         with app.app_context():
-            AcmeClientAccount.query.filter_by(id=acct_id).delete()
+            delete_client_accounts(AcmeClientAccount.query.filter_by(id=acct_id))
             db.session.commit()

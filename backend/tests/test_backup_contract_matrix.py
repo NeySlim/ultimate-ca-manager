@@ -91,7 +91,10 @@ def _secret_value(name, column):
     value = f'{MARK}-secret-{name}-{column}'
     if (name, column) in _PEM_SECRETS:
         return f'-----BEGIN PRIVATE KEY-----\n{value}\n-----END PRIVATE KEY-----\n'
-    return value
+    # PostgreSQL enforces the declared length (users.totp_secret is 32)
+    table_column = load_model(manifest.SECTIONS[name]).__table__.c.get(column)
+    length = getattr(getattr(table_column, 'type', None), 'length', None)
+    return value[:length] if length else value
 
 
 def _fill_secrets(name, row):

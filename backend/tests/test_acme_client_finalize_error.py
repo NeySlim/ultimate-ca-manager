@@ -9,6 +9,7 @@ from sqlalchemy import text
 
 from api.v2.acme_client import orders as orders_module
 from models import Certificate, db
+from tests.acme_rows import placeholder_certificate_id
 from models.acme_models import AcmeClientOrder
 from services.acme.acme_client_service import AcmeClientService
 from tests.db_write_probe import watching_writes
@@ -120,7 +121,7 @@ def test_a_failure_after_the_ca_said_valid_keeps_the_order_renewable(app, auth_c
     with app.app_context():
         order = _order()
         order_id = order.id
-        svc = _service_that_imports_with(lambda **_kwargs: 4242)
+        svc = _service_that_imports_with(lambda **_kwargs: placeholder_certificate_id())
         svc._select_certificate_chain = _download_fails
         ok, msg, _cert_id = svc.finalize_order(order)
         assert not ok and msg == 'CA unreachable'
@@ -171,7 +172,7 @@ def test_a_download_the_ca_refuses_is_recorded(app):
     with app.app_context():
         order = _order()
         order_id = order.id
-        svc = _service_that_imports_with(lambda **_kwargs: 4242)
+        svc = _service_that_imports_with(lambda **_kwargs: placeholder_certificate_id())
         responses = iter([
             SimpleNamespace(status_code=200, headers={}, json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'}),
             SimpleNamespace(status_code=500, headers={}),
@@ -268,7 +269,7 @@ def test_no_write_is_pending_during_any_call_to_the_ca(app):
     # A pending write would hold the database's write lock for the whole network call
     with app.app_context(), watching_writes() as pending_writes:
         order = _order()
-        svc = _service_that_imports_with(lambda **_kwargs: 4242)
+        svc = _service_that_imports_with(lambda **_kwargs: placeholder_certificate_id())
         seen = []
         responses = iter([
             SimpleNamespace(status_code=200, headers={}, json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'}),
@@ -297,7 +298,7 @@ def test_a_second_finalize_does_not_undo_the_first_ones_import(app):
             return SimpleNamespace(status_code=200, headers={},
                                    json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'})
 
-        svc = _service_that_imports_with(lambda **_kwargs: 4242)
+        svc = _service_that_imports_with(lambda **_kwargs: placeholder_certificate_id())
         responses = iter([imported_meanwhile, lambda *_args: SimpleNamespace(status_code=500, headers={})])
         svc._post = lambda *args: next(responses)(*args)
         ok, _msg, _cert_id = svc.finalize_order(order)
@@ -312,8 +313,8 @@ def test_a_later_success_clears_the_old_error(app):
         order_id = order.id
         order.error_message = 'Certificate obtained but import failed'
         db.session.commit()
-        ok, _msg, cert_id = _service_that_imports_with(lambda **_kwargs: 4242).finalize_order(order)
-        assert ok and cert_id == 4242
+        ok, _msg, cert_id = _service_that_imports_with(lambda **_kwargs: placeholder_certificate_id()).finalize_order(order)
+        assert ok and cert_id == placeholder_certificate_id()
         stored = _stored(order_id)
         assert stored.status == 'issued' and stored.error_message is None
         assert stored.certificate_url == 'https://ca.example/cert'

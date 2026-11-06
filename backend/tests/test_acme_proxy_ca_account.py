@@ -2,6 +2,7 @@
 import pytest
 from models import db, AcmeClientAccount, AcmeClientOrder, SystemConfig
 from services.acme.acme_proxy_account import resolve_proxy_account, PROXY_ACCOUNT_ID_KEY
+from tests.acme_rows import delete_client_accounts
 
 
 @pytest.fixture(autouse=True)
@@ -20,7 +21,7 @@ def _drop_orders_created_here(app):
 @pytest.fixture
 def clean_proxy_state(app):
     with app.app_context():
-        AcmeClientAccount.query.delete()
+        delete_client_accounts(AcmeClientAccount.query)
         for key in (
             PROXY_ACCOUNT_ID_KEY,
             'acme.proxy.upstream_url',
@@ -31,7 +32,7 @@ def clean_proxy_state(app):
             SystemConfig.query.filter_by(key=key).delete()
         db.session.commit()
         yield
-        AcmeClientAccount.query.delete()
+        delete_client_accounts(AcmeClientAccount.query)
         for key in (
             PROXY_ACCOUNT_ID_KEY,
             'acme.proxy.upstream_url',

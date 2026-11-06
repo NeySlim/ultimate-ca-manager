@@ -10,6 +10,7 @@ import json
 import pytest
 
 from models import db, AcmeAccount, AcmeClientOrder
+from tests.acme_rows import ensure_acme_account
 from services.acme.acme_proxy_service import (
     AcmeProxyService,
     ProxyAuthzStateError,
@@ -69,6 +70,7 @@ def _csr_b64():
 
 def _seed(order_url=ORDER_URL, account='acct-a', thumb='thumb-a', status='pending',
           deactivated=None):
+    ensure_acme_account(account)
     order = AcmeClientOrder(
         domains=json.dumps([DOMAIN]),
         environment='staging',

@@ -196,6 +196,7 @@ def test_a_key_revoked_as_compromised_is_not_certified_again(app, clock, order):
         seen = {}
         svc._build_csr_b64 = lambda cert_key, *_args: seen.update(key=cert_key) or 'csr'
         svc.finalize_order(order)
+        order.source_certificate_id = None
         db.session.delete(source)
         db.session.commit()
         return seen['key'].public_key().public_numbers()
@@ -237,6 +238,7 @@ def test_a_compromised_key_on_an_earlier_certificate_of_the_chain_is_not_reused(
         db.session.commit()
         assert not reused_from(later)
     finally:
+        order.source_certificate_id = None
         db.session.delete(later)
         db.session.delete(earlier)
         db.session.commit()
@@ -274,6 +276,7 @@ def test_a_csr_whose_key_was_revoked_as_compromised_never_reaches_the_ca(app, cl
         db.session.commit()
 
 
+@pytest.mark.sqlite_only(reason='a dangling source_certificate_id is refused by the foreign key')
 def test_a_reuse_whose_source_is_gone_says_so(app, clock, order):
     order.key_source = 'reuse'
     order.source_certificate_id = 987654

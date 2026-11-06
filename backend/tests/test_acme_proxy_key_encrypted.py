@@ -7,6 +7,7 @@ as the ACME client). Keys live on ``acme_client_accounts.account_key``, not
 legacy ``system_config`` proxy keys.
 """
 from __future__ import annotations
+from tests.acme_rows import delete_client_accounts
 
 import inspect
 
@@ -41,9 +42,9 @@ def _remove_the_accounts_these_tests_encrypt(app):
     from models import db, AcmeClientAccount
 
     with app.app_context():
-        AcmeClientAccount.query.filter(
+        delete_client_accounts(AcmeClientAccount.query.filter(
             AcmeClientAccount.directory_url.like('%-test.example/directory')
-        ).delete(synchronize_session=False)
+        ), synchronize_session=False)
         db.session.commit()
 
 
@@ -56,7 +57,7 @@ def test_proxy_account_key_encrypted_at_rest(app, encryption_enabled):
     from services.acme.acme_proxy_service import AcmeProxyService
 
     with app.app_context():
-        AcmeClientAccount.query.delete()
+        delete_client_accounts(AcmeClientAccount.query)
         SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
         db.session.commit()
 
@@ -172,9 +173,9 @@ def test_proxy_account_key_legacy_plaintext_still_loads(app, encryption_enabled)
     from services.acme.acme_proxy_service import AcmeProxyService
 
     with app.app_context():
-        AcmeClientAccount.query.filter_by(
+        delete_client_accounts(AcmeClientAccount.query.filter_by(
             directory_url='https://proxy-plaintext-test.example/directory'
-        ).delete()
+        ))
         SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
         db.session.commit()
 

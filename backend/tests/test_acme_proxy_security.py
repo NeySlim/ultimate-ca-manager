@@ -5,6 +5,7 @@ import json
 import pytest
 
 from models import db, SystemConfig, AcmeClientAccount, AcmeClientOrder
+from tests.acme_rows import delete_client_accounts, ensure_acme_account
 from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
 from services.acme.jws_problems import UNKNOWN_ACCOUNT
 
@@ -125,9 +126,9 @@ def proxy_protocol_upstream_stub(app, monkeypatch):
 
     with app.app_context():
         SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-        AcmeClientAccount.query.filter_by(
+        delete_client_accounts(AcmeClientAccount.query.filter_by(
             directory_url=_STUB_DIRECTORY_URL
-        ).delete()
+        ))
         db.session.commit()
         acct = AcmeClientAccount(
             directory_url=_STUB_DIRECTORY_URL,
@@ -145,9 +146,9 @@ def proxy_protocol_upstream_stub(app, monkeypatch):
     yield
     with app.app_context():
         SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-        AcmeClientAccount.query.filter_by(
+        delete_client_accounts(AcmeClientAccount.query.filter_by(
             directory_url=_STUB_DIRECTORY_URL
-        ).delete()
+        ))
         db.session.commit()
 
 
@@ -496,6 +497,7 @@ class TestFinalizeFailClosed:
                 client_jwk_thumbprint='thumb-owner-1',
             )
             kwargs.update(overrides)
+            ensure_acme_account(kwargs['account_id'])
             order = AcmeClientOrder(**kwargs)
             db.session.add(order)
             db.session.commit()

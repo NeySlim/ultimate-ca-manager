@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import uuid
 from pathlib import Path
+from tests.acme_rows import delete_client_accounts
 
 import pytest
 from cryptography import x509
@@ -630,10 +631,17 @@ def test_client_orders_an_mldsa_certificate_from_ucm_itself(app, acme_loop, sign
     from services.acme.acme_client_service import AcmeClientService
     signing_ca(mldsa_issuing_ca)
     imported = {}
+    from models import Certificate
+    with app.app_context():
+        # A real row: the order's certificate_id is a foreign key on PostgreSQL
+        row = Certificate(refid=f'loop-import-{label}', descr='loop')
+        db.session.add(row)
+        db.session.commit()
+        row_id = row.id
 
     def _keep(self, cert_pem, key_pem, domains, source='acme_client'):
         imported.update(cert=cert_pem, key=key_pem)
-        return 4242
+        return row_id
     monkeypatch.setattr(AcmeClientService, '_import_certificate', _keep)
     domain = f'loop-{label.lower()}.pq.example.com'
     from models.acme_client_account import AcmeClientAccount
@@ -656,13 +664,14 @@ def test_client_orders_an_mldsa_certificate_from_ucm_itself(app, acme_loop, sign
         db.session.commit()
         ok, msg, cert_id = svc.finalize_order(order)
         assert ok, msg
-        assert cert_id == 4242
+        assert cert_id == row_id
         leaf = x509.load_pem_x509_certificate(imported['cert'].encode())
         key = serialization.load_pem_private_key(imported['key'].encode(), None)
         assert key_algorithms.label_for_public_key(leaf.public_key()) == label
         assert leaf.public_key() == key.public_key()
         AcmeClientOrder.query.filter_by(acme_client_account_id=account_id).delete()
-        AcmeClientAccount.query.filter_by(id=account_id).delete()
+        delete_client_accounts(AcmeClientAccount.query.filter_by(id=account_id))
+        Certificate.query.filter_by(id=row_id).delete()
         db.session.commit()
 
 

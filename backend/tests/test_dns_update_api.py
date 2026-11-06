@@ -10,6 +10,7 @@ import base64
 import json
 import logging
 import uuid
+from tests.acme_rows import delete_client_accounts, ensure_acme_account
 
 import dns.name
 import pytest
@@ -74,8 +75,7 @@ def env(app):
         AcmeDomain.query.delete()
         AcmeEabCredential.query.filter(AcmeEabCredential.id.in_(created['creds'])).delete(
             synchronize_session=False)
-        AcmeClientAccount.query.filter(AcmeClientAccount.id.in_(created['accounts'])).delete(
-            synchronize_session=False)
+        delete_client_accounts(AcmeClientAccount.query.filter(AcmeClientAccount.id.in_(created['accounts'])), synchronize_session=False)
         SystemConfig.query.filter(SystemConfig.key.in_([PORT_KEY, TLS_KEY])).delete(
             synchronize_session=False)
         db.session.commit()
@@ -961,6 +961,7 @@ def _warm_row(app, acct_id, tag):
     from models import AcmeClientOrder
     from models.acme_dns_update import AcmeProxyDnsChallenge
     from utils.datetime_utils import utc_now
+    ensure_acme_account(f'acct-{tag}')
     order = AcmeClientOrder(
         domains=json.dumps([f'{tag}.example.com']), environment='staging',
         challenge_type='dns-01', status='pending', is_proxy_order=True,

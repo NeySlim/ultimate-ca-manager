@@ -1,5 +1,6 @@
 """A name already taken is refused with 409, on creation and on rename (migration 124)."""
 import uuid
+from tests.acme_rows import delete_client_accounts
 
 import pytest
 
@@ -75,6 +76,5 @@ def test_a_placeholder_account_does_not_take_an_operator_label(app, caplog):
             assert f'Created placeholder ACME account: {label} (2) ({directory})' in caplog.text
         finally:
             db.session.rollback()
-            AcmeClientAccount.query.filter(AcmeClientAccount.id.in_(ids)).delete(
-                synchronize_session=False)
+            delete_client_accounts(AcmeClientAccount.query.filter(AcmeClientAccount.id.in_(ids)), synchronize_session=False)
             db.session.commit()

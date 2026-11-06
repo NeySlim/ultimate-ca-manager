@@ -36,6 +36,7 @@ import base64
 import json
 from collections import defaultdict
 from datetime import datetime
+from tests.acme_rows import delete_client_accounts, ensure_acme_account
 
 import pytest
 from sqlalchemy import inspect as sa_inspect
@@ -261,6 +262,7 @@ def _seed():
     db.session.add_all(parents)
     db.session.flush()
 
+    ensure_acme_account(f'{MARK}-acme-account')
     db.session.add(AcmeClientOrder(
         renewal_of_order_id=parents[1].id,
         order_url=IDENTITIES['acme_client_orders']['order_url'],
@@ -320,9 +322,8 @@ def _unseed():
     AcmeClientOrder.query.filter(
         AcmeClientOrder.order_url.like(f'%{MARK}%')).delete(
             synchronize_session=False)
-    AcmeClientAccount.query.filter(
-        AcmeClientAccount.label.like(f'{MARK}%')).delete(
-            synchronize_session=False)
+    delete_client_accounts(AcmeClientAccount.query.filter(
+        AcmeClientAccount.label.like(f'{MARK}%')), synchronize_session=False)
     for model, column in (
             (ApprovalRequest, ApprovalRequest.requester_comment),
             (AcmeDomain, AcmeDomain.domain),
@@ -494,6 +495,14 @@ def _drift(section_name):
 
 def _drifted(column, current):
     kind = column.type
+    if column.foreign_keys:
+        # Another row of the referenced table: PostgreSQL enforces the key
+        target = next(iter(column.foreign_keys)).column
+        query = db.session.query(target)
+        if current is not None:
+            query = query.filter(target != current)
+        other = query.order_by(target).first()
+        return current if other is None else other[0]
     if isinstance(kind, Boolean):
         return not bool(current)
     if isinstance(kind, (DateTime, Date)):
@@ -504,7 +513,8 @@ def _drifted(column, current):
         return float(current or 0) + 7
     if isinstance(kind, LargeBinary):
         return b'drifted'
-    return f'drifted-{column.key}'
+    length = getattr(kind, 'length', None)
+    return f'drifted-{column.key}'[:length] if length else f'drifted-{column.key}'
 
 
 # ---------------------------------------------------------------------------

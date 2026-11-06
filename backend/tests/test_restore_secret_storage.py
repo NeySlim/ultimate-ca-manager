@@ -67,9 +67,11 @@ def _acme_client_account(secret):
 
 
 def _scep_challenge(secret):
+    from models import CA
     from models.scep import ScepProfile
+    ca = CA.query.order_by(CA.id).first()  # a real one: PostgreSQL enforces ca_refid
     row = ScepProfile(name=f'{MARK}-challenge', url_slug=f'{MARK}-challenge',
-                      ca_refid=f'{MARK}-ca', challenge_password=_master(secret))
+                      ca_refid=ca.refid if ca else None, challenge_password=_master(secret))
     return ScepProfile, row, ScepProfile.name == f'{MARK}-challenge'
 
 
@@ -119,6 +121,11 @@ CASES = [
     ('deploy_targets', 'private_key', _deploy_target, _read_master),
     ('hsm_providers', 'config', _hsm_provider, _read_hsm_token),
 ]
+
+
+@pytest.fixture(scope='module', autouse=True)
+def _a_ca_for_the_scep_profile(create_ca):
+    create_ca(cn=f'{MARK} scep CA')
 
 
 class TestASecretGoesBackTheWayTheColumnHoldsIt:

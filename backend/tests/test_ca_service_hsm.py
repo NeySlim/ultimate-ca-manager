@@ -8,6 +8,8 @@ construction, certificate signing, and CA persistence with hsm_key_id.
 
 import os
 import sys
+import uuid
+
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -315,7 +317,7 @@ class TestHsmCaReimport:
         with app.app_context():
             from models import db, CA
             cert = self._selfsigned(cn, fx['real_key'])
-            ca = CA(refid=f'hsm-reimport-{cn}', descr=cn, serial=0,
+            ca = CA(refid=f'hsm-re-{uuid.uuid4().hex[:24]}', descr=cn, serial=0,
                     crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode(),
                     prv=None, hsm_key_id=fx['hsm_key_id'],
                     subject=cert.subject.rfc4514_string(), issuer=cert.issuer.rfc4514_string())

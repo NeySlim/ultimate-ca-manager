@@ -998,6 +998,7 @@ class TestOrphanFilter:
             _db.session.commit()
         return cert
 
+    @pytest.mark.sqlite_only(reason='an orphan caref is refused by the foreign key')
     def test_orphan_is_found_beyond_the_first_page(self, app, auth_client, create_ca):
         orphan = self._orphan(app, auth_client, create_ca, 'orphan-page2.example.com')
         # A page size of one puts the orphan far from the first page in any order
@@ -1008,6 +1009,7 @@ class TestOrphanFilter:
         ids = {c['id'] for c in json.loads(r.data)['data']}
         assert orphan['id'] in ids
 
+    @pytest.mark.sqlite_only(reason='an orphan caref is refused by the foreign key')
     def test_orphan_count_matches_the_filter(self, app, auth_client, create_ca):
         self._orphan(app, auth_client, create_ca, 'orphan-count.example.com')
         stats = json.loads(auth_client.get(f'{BASE}/stats').data)['data']

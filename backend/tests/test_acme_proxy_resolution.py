@@ -7,6 +7,7 @@ import logging
 import threading
 import time
 from types import SimpleNamespace
+from tests.acme_rows import delete_client_accounts
 
 import pytest
 
@@ -511,7 +512,7 @@ def stub_directory(app, monkeypatch):
     monkeypatch.setattr('utils.ssrf_protection.safe_request_get', _counting_get)
     with app.app_context():
         SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-        AcmeClientAccount.query.filter_by(directory_url=DIRECTORY_URL).delete()
+        delete_client_accounts(AcmeClientAccount.query.filter_by(directory_url=DIRECTORY_URL))
         account = AcmeClientAccount(directory_url=DIRECTORY_URL, label='C1 stub',
                                     email='c1@example.com')
         db.session.add(account)
@@ -523,7 +524,7 @@ def stub_directory(app, monkeypatch):
     yield SimpleNamespace(gets=gets, account_id=account_id)
     with app.app_context():
         SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-        AcmeClientAccount.query.filter_by(directory_url=DIRECTORY_URL).delete()
+        delete_client_accounts(AcmeClientAccount.query.filter_by(directory_url=DIRECTORY_URL))
         db.session.commit()
 
 

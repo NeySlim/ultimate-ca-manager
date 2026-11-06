@@ -1,6 +1,7 @@
 """Per-CA ACME timing settings and authorization invalid handling."""
 import json
 from unittest.mock import MagicMock, patch
+from tests.acme_rows import delete_client_accounts
 
 import pytest
 
@@ -11,7 +12,7 @@ from services.acme.acme_client_service import AcmeClientService, AUTHZ_INVALID_U
 @pytest.fixture
 def custom_ca_account(app):
     with app.app_context():
-        AcmeClientAccount.query.delete()
+        delete_client_accounts(AcmeClientAccount.query)
         db.session.commit()
         acct = AcmeClientAccount(
             directory_url='https://acme.example.com/directory',

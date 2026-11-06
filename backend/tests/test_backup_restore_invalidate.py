@@ -60,11 +60,13 @@ class TestSessionsAreRevoked:
                 db.text("SELECT id FROM pro_sso_providers LIMIT 1")
             ).first()
             if provider is None:
-                db.session.add(SSOSession(user_id=user_id, provider_id=1,
-                                          session_id='restore-invalidate-sso'))
-            else:
-                db.session.add(SSOSession(user_id=user_id, provider_id=provider[0],
-                                          session_id='restore-invalidate-sso'))
+                from models.sso import SSOProvider
+                row = SSOProvider(name='restore-invalidate-sso', provider_type='ldap')
+                db.session.add(row)
+                db.session.flush()
+                provider = (row.id,)
+            db.session.add(SSOSession(user_id=user_id, provider_id=provider[0],
+                                      session_id='restore-invalidate-sso'))
             db.session.commit()
 
             result = invalidate_after_restore()

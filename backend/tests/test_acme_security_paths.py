@@ -1359,6 +1359,16 @@ class TestSiblingChallengeDeprovisioning:
         assert [c['type'] for c in payload['challenges']] == ['dns-01']
 
 
+_DEDICATED_CAS = {}
+
+
+def _dedicated_ca(create_ca, cn):
+    """The refid of a CA only this class issues under, created once."""
+    if cn not in _DEDICATED_CAS:
+        _DEDICATED_CAS[cn] = create_ca(cn=cn)['refid']
+    return _DEDICATED_CAS[cn]
+
+
 class TestARefusedRevocationRevokesNothing:
     """A revocation the server refuses leaves the certificate alone.
 
@@ -1376,21 +1386,23 @@ class TestARefusedRevocationRevokesNothing:
     """
 
     @pytest.fixture(autouse=True)
-    def _cleaned_up(self, app):
+    def _cleaned_up(self, app, create_ca):
         """The row is removed afterwards.
 
         The suite shares one database per worker and does not roll back
         between tests, and this row deliberately names an authority that does
         not exist. Left behind, it reached the migration round-trip in
-        `test_database_admin.py` and failed it there.
+        `test_database_admin.py` and failed it there. It now names a real CA
+        of its own, since PostgreSQL enforces the reference.
         """
+        self.caref = _dedicated_ca(create_ca, 'Revoke refusal CA')
         yield
         from models import Certificate, RevokedSerial
         with app.app_context():
             RevokedSerial.query.filter_by(
-                caref='revoke-refusal-ca').delete(synchronize_session=False)
+                caref=self.caref).delete(synchronize_session=False)
             Certificate.query.filter_by(
-                caref='revoke-refusal-ca').delete(synchronize_session=False)
+                caref=self.caref).delete(synchronize_session=False)
             db.session.commit()
 
     def _a_certificate_and_its_key(self, app):
@@ -1419,7 +1431,7 @@ class TestARefusedRevocationRevokesNothing:
             row = Certificate(
                 refid=uuid.uuid4().hex[:13],
                 descr='revoke-refusal.example',
-                caref='revoke-refusal-ca',
+                caref=self.caref,
                 serial_number=format(cert.serial_number, 'x'),
                 crt=b64.b64encode(pem.encode()).decode(),
                 valid_from=now.replace(tzinfo=None) - timedelta(days=1),
@@ -1475,10 +1487,9 @@ class TestARefusedRevocationRevokesNothing:
 class TestRevocationByAForgedCertificate:
     """revoke-cert acts on the stored certificate only when the one sent is it, byte for byte."""
 
-    CAREF = 'revoke-forge-ca'
-
     @pytest.fixture(autouse=True)
-    def _cleaned_up(self, app):
+    def _cleaned_up(self, app, create_ca):
+        self.CAREF = _dedicated_ca(create_ca, 'Revoke forge CA')
         yield
         from models import Certificate, RevokedSerial
         with app.app_context():
