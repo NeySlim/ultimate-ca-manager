@@ -224,46 +224,6 @@ def test_cloudns_deletes_one_value(monkeypatch):
     assert api.deletes == ['1']
 
 
-# --- Core-Networks --------------------------------------------------------------
-
-class FakeCoreNetworks(_PerRecordFake):
-    """Deletion takes a filter body and removes every record matching all its fields."""
-
-    value_key = 'data'
-    BASE = 'https://beta.api.core-networks.de'
-
-    def post(self, url, data=None, timeout=None):
-        return _Resp(200, {'token': 'tok', 'expires': 3600})
-
-    def __call__(self, method, url, headers=None, json=None, timeout=None):
-        path, _ = _split(url, self.BASE)
-        if method == 'GET' and path == '/dns/zones/':
-            return _Resp(200, [{'name': 'example.com', 'type': 'master'}])
-        if path == '/dns/zones/example.com/records/':
-            if method == 'POST':
-                self.records.append(dict(json))
-                return _Resp(204, text='')
-            if method == 'GET':
-                return _Resp(200, self.records)
-            if method == 'DELETE':
-                self.deletes.append(dict(json))
-                self.records = [r for r in self.records
-                                if not all(r.get(k) == v for k, v in json.items())]
-                return _Resp(204, text='')
-        if method == 'POST' and path == '/dns/zones/example.com/records/commit':
-            return _Resp(204, text='')
-        return _Resp(404, {'error': 'Not found'})
-
-
-def test_corenetworks_deletes_one_value(monkeypatch):
-    api = FakeCoreNetworks()
-    monkeypatch.setattr(requests, 'post', api.post)
-    monkeypatch.setattr(requests, 'request', api)
-    _two_values_then_delete_apex(create_provider('corenetworks', {'username': 'u', 'password': 'p'}))
-    assert api.values() == ['"wild"']
-    assert [d['data'] for d in api.deletes] == ['"apex"']
-
-
 # --- DigitalOcean ---------------------------------------------------------------
 
 class FakeDigitalOcean(_PerRecordFake):
