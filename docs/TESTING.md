@@ -97,6 +97,7 @@ Each test file covers 3 levels per endpoint:
 - Factory helpers: `create_ca()`, `create_cert()`, `create_user()`
 - CSRF disabled via `CSRF_DISABLED=true` environment variable
 - No external dependencies (no Docker, no network)
+- PostgreSQL mode: `UCM_TEST_APP_PG_URL` runs the same fixtures on PostgreSQL, see [testing/postgres-harness.md](testing/postgres-harness.md)
 
 ### Frontend Tests
 
