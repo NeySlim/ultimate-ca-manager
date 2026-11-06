@@ -11,6 +11,7 @@ account routes and the user-certificates routes so the rule cannot drift.
 import base64
 import hashlib
 import logging
+import re
 from typing import Optional, Tuple
 
 from cryptography import x509
@@ -40,81 +41,89 @@ def normalized_fingerprint(value) -> Optional[Tuple[str, str]]:
     return None
 
 
-# Attribute names a proxy writes (OpenSSL's, RFC 4514's) to their OID
-_DN_NAMES = {
-    'cn': '2.5.4.3', 'commonname': '2.5.4.3', 'c': '2.5.4.6', 'countryname': '2.5.4.6',
-    'l': '2.5.4.7', 'localityname': '2.5.4.7', 'st': '2.5.4.8', 's': '2.5.4.8',
-    'stateorprovincename': '2.5.4.8', 'street': '2.5.4.9', 'streetaddress': '2.5.4.9',
-    'o': '2.5.4.10', 'organizationname': '2.5.4.10', 'ou': '2.5.4.11',
-    'organizationalunitname': '2.5.4.11', 'title': '2.5.4.12', 'sn': '2.5.4.4', 'surname': '2.5.4.4',
-    'serialnumber': '2.5.4.5', 'gn': '2.5.4.42', 'givenname': '2.5.4.42', 'initials': '2.5.4.43',
-    'generationqualifier': '2.5.4.44', 'dnqualifier': '2.5.4.46', 'pseudonym': '2.5.4.65',
-    'postalcode': '2.5.4.17', 'businesscategory': '2.5.4.15', 'organizationidentifier': '2.5.4.97',
-    'dc': '0.9.2342.19200300.100.1.25', 'domaincomponent': '0.9.2342.19200300.100.1.25',
-    'uid': '0.9.2342.19200300.100.1.1', 'userid': '0.9.2342.19200300.100.1.1',
-    'emailaddress': '1.2.840.113549.1.9.1', 'email': '1.2.840.113549.1.9.1', 'e': '1.2.840.113549.1.9.1',
+# Names proxies write that RFC 4514 does not define, to their OID
+_DN_ALIASES = {
+    '2.5.4.3': ('commonName',), '2.5.4.6': ('countryName',), '2.5.4.7': ('localityName',),
+    '2.5.4.8': ('S', 'stateOrProvinceName'), '2.5.4.9': ('streetAddress',),
+    '2.5.4.10': ('organizationName',), '2.5.4.11': ('organizationalUnitName',),
+    '2.5.4.12': ('title', 'T'), '2.5.4.4': ('SN', 'surname'), '2.5.4.5': ('serialNumber',),
+    '2.5.4.42': ('GN', 'G', 'givenName'), '2.5.4.43': ('initials', 'I'),
+    '2.5.4.44': ('generationQualifier',), '2.5.4.46': ('dnQualifier',), '2.5.4.65': ('pseudonym',),
+    '2.5.4.17': ('postalCode',), '2.5.4.15': ('businessCategory',), '2.5.4.97': ('organizationIdentifier',),
+    '2.5.4.13': ('description',), '2.5.4.41': ('name',), '2.5.4.20': ('telephoneNumber',),
+    '1.3.6.1.4.1.311.60.2.1.3': ('jurisdictionC', 'jurisdictionCountryName'),
+    '1.3.6.1.4.1.311.60.2.1.2': ('jurisdictionST', 'jurisdictionStateOrProvinceName'),
+    '1.3.6.1.4.1.311.60.2.1.1': ('jurisdictionL', 'jurisdictionLocalityName'),
+    '0.9.2342.19200300.100.1.25': ('domainComponent',), '0.9.2342.19200300.100.1.1': ('userId', 'userID'),
+    '1.2.840.113549.1.9.1': ('emailAddress', 'E', 'email', 'Email', 'EMAIL'),
 }
+_NAME_OVERRIDES = {}
+for _dotted, _names in _DN_ALIASES.items():
+    for _name in _names:
+        for _spelling in {_name, _name.upper(), _name.lower()}:
+            _NAME_OVERRIDES[_spelling] = x509.ObjectIdentifier(_dotted)
+# DER tags of the string types a '#hex' value carries
+_DER_STRINGS = {0x0c: 'utf-8', 0x13: 'ascii', 0x16: 'ascii', 0x14: 'latin-1', 0x1e: 'utf-16-be', 0x1c: 'utf-32-be'}
 
 
-def _dn_value(text: str) -> str:
-    r"""An attribute value with its RFC 4514 escapes (``\,``, ``\C3\A9``) undone, compared caselessly."""
-    out, i = bytearray(), 0
-    while i < len(text):
-        pair = text[i + 1:i + 3]
-        if text[i] == '\\' and len(pair) == 2 and all(c in '0123456789abcdefABCDEF' for c in pair):
-            out.append(int(text[i + 1:i + 3], 16))
-            i += 3
-        elif text[i] == '\\' and i + 1 < len(text):
-            out += text[i + 1].encode()
-            i += 2
-        else:
-            out += text[i].encode()
-            i += 1
-    return ' '.join(out.decode('utf-8').split()).casefold()
-
-
-def _split_unescaped(text: str, separators: str) -> list:
+def _legacy_to_rfc4514(text: str) -> str:
+    """OpenSSL's ``/C=FR/O=Soci\xC3\xA9t\xC3\xA9`` (nginx ``_legacy``, Apache ``LegacyDNStringFormat``) as RFC 4514."""
     parts, current, i = [], '', 0
     while i < len(text):
         if text[i] == '\\' and i + 1 < len(text):
             current += text[i:i + 2]
             i += 2
-            continue
-        if text[i] in separators:
+        elif text[i] == '/':
             parts.append(current)
-            current = ''
+            current, i = '', i + 1
         else:
-            current += text[i]
-        i += 1
-    return parts + [current]
+            current, i = current + text[i], i + 1
+    parts.append(current)
+    rdns = []
+    for part in filter(None, parts):
+        name, sep, value = part.partition('=')
+        if not sep:
+            raise ValueError(part)
+        raw = re.sub(rb'\\x([0-9a-fA-F]{2})', lambda m: bytes([int(m.group(1), 16)]),
+                     value.encode('utf-8')).decode('utf-8')
+        escaped = re.sub(r'([,+"\\<>;=])', r'\\\1', raw)
+        if escaped[:1] in ('#', ' '):
+            escaped = '\\' + escaped
+        if escaped.endswith(' '):
+            escaped = escaped[:-1] + '\\ '
+        rdns.append(f'{name.strip()}={escaped}')
+    return ','.join(reversed(rdns))
+
+
+def _attribute_value(value) -> str:
+    """An attribute value compared caselessly, a '#hex' string type read back as its text."""
+    if isinstance(value, bytes):
+        return value.hex()
+    if len(value) >= 2 and ord(value[0]) in _DER_STRINGS and ord(value[1]) == len(value) - 2:
+        try:
+            value = value[2:].encode('latin-1').decode(_DER_STRINGS[ord(value[0])])
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
+    return ' '.join(value.split()).casefold()
 
 
 def dn_attributes(dn) -> Optional[frozenset]:
     """A DN as a set of (OID, value), order ignored, or None when it cannot be read.
 
     Takes a ``x509.Name``, an RFC 4514 string (cryptography's, or OpenSSL's
-    with short names such as ``emailAddress``) or OpenSSL's ``/C=FR/CN=..``.
+    with names such as ``emailAddress``) or OpenSSL's legacy ``/C=FR/CN=..``.
     """
-    if isinstance(dn, x509.Name):
-        return frozenset((a.oid.dotted_string, ' '.join(str(a.value).split()).casefold()) for a in dn)
-    text = str(dn or '').strip()
-    if not text:
-        return None
-    parts = _split_unescaped(text[1:], '/') if text.startswith('/') else _split_unescaped(text, ',+')
-    attributes = set()
-    for part in parts:
-        name, sep, value = part.partition('=')
-        name = name.strip()
-        if not sep or not name:
+    if not isinstance(dn, x509.Name):
+        text = str(dn or '')   # not stripped: '\ ' at the end is an escaped space
+        if not text.strip():
             return None
-        oid = name if all(c.isdigit() or c == '.' for c in name) else _DN_NAMES.get(name.casefold())
-        if oid is None:
-            return None
+        legacy = text.lstrip().startswith('/')
         try:
-            attributes.add((oid, _dn_value(value.strip())))
-        except UnicodeDecodeError:
+            dn = x509.Name.from_rfc4514_string(_legacy_to_rfc4514(text.strip()) if legacy else text,
+                                               attr_name_overrides=_NAME_OVERRIDES)
+        except Exception:
             return None
-    return frozenset(attributes)
+    return frozenset((a.oid.dotted_string, _attribute_value(a.value)) for a in dn)
 
 
 def _issuer_match(row, presented) -> Optional[bool]:
@@ -155,8 +164,9 @@ def _serial_match(row, serial: int) -> Optional[int]:
 def _ranked(serial: int, issuer, pool=None) -> list:
     """(rank, row) of the enrolments that may be certificate (issuer, serial), best first.
 
-    An issuer read on both sides excludes another one; unreadable, or unrecorded,
-    it only ranks lower.
+    An issuer read on both sides excludes another one; one recorded here but not
+    readable there only ranks lower; a presented one that cannot be read leaves
+    only the enrolments that recorded none.
     """
     from models.auth_certificate import AuthCertificate
     forms = serial_variants(serial)
@@ -165,11 +175,14 @@ def _ranked(serial: int, issuer, pool=None) -> list:
     else:
         rows = sorted({row.id: row for form in forms for row in pool.get(form, ())}.values(), key=lambda r: r.id)
     presented = dn_attributes(issuer) if issuer is not None else None
+    unreadable = issuer is not None and presented is None
     ranked = []
     for row in rows:
         serial_rank = _serial_match(row, serial)
         if serial_rank is None:
             continue
+        if unreadable and row.cert_issuer:
+            continue      # an issuer that cannot be read is no recorded one
         same = _issuer_match(row, presented) if row.cert_issuer or row.cert_pem else None
         if same is False:
             continue

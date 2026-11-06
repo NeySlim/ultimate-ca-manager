@@ -139,7 +139,8 @@ def rows_to_remove(section_name: str, archived_rows: List[Dict[str, Any]],
         doomed.extend(incomplete)
         plan.warnings.append(
             f"{section_name}: {len(incomplete)} row(s) here without a complete "
-            f"{'/'.join(section.identity)} (id {', '.join(map(str, incomplete))}) are removed")
+            f"{'/'.join(section.identity)} (id {', '.join(map(str, incomplete))}) are removed, "
+            "then those the archive carries are restored from it as new rows")
     return doomed
 
 

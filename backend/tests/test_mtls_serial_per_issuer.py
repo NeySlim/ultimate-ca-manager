@@ -225,3 +225,47 @@ def test_a_serial_from_headers_is_hexadecimal(app, auth_client, same_serial):
         assert MTLSAuthService.authenticate_certificate(dict(info, serial='10'))[2] == 'Certificate not enrolled'
         user, _found, err = MTLSAuthService.authenticate_certificate(dict(info, serial='0A'))
         assert user is not None, err
+
+
+def _header_login(serial, issuer_dn):
+    return MTLSAuthService.authenticate_certificate(
+        {'serial': format(serial, 'X'), 'issuer_dn': issuer_dn, 'fingerprint': None, 'subject_dn': f'CN={SUBJECT}'})
+
+
+@pytest.mark.parametrize('issuer, header', [
+    (x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Société'),
+                x509.NameAttribute(NameOID.COMMON_NAME, 'Legacy CA')]),
+     '/O=Soci\\xC3\\xA9t\\xC3\\xA9/CN=Legacy CA'),          # nginx _legacy, Apache LegacyDNStringFormat
+    (x509.Name([x509.NameAttribute(x509.ObjectIdentifier('1.2.3.4'), 'abc'),
+                x509.NameAttribute(NameOID.COMMON_NAME, 'Hex CA')]),
+     'CN=Hex CA,1.2.3.4=#0C03616263'),                      # a value as its DER
+    (x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, ' Root ')]),
+     'CN=\\ Root\\ '),                                      # escaped spaces at both ends
+    (x509.Name([x509.NameAttribute(x509.ObjectIdentifier('2.5.4.13'), 'Issuing'),
+                x509.NameAttribute(NameOID.COMMON_NAME, 'Described CA')]),
+     'CN=Described CA,description=Issuing'),               # a name RFC 4514 does not define
+])
+def test_other_spellings_of_the_issuer_sign_in(app, auth_client, same_serial, issuer, header):
+    serial = same_serial[0] + 11
+    r = _import(auth_client, _named_leaf(issuer, serial))
+    assert r.status_code == 201, r.get_json()
+    with app.app_context():
+        user, found, err = _header_login(serial, header)
+        assert user is not None and found.id == r.get_json()['data']['id'], err
+
+
+@pytest.mark.parametrize('header', ['CN=Evil,description=x', 'CN=Evil,notAnAttribute=x'],
+                         ids=['readable-other-issuer', 'unreadable-issuer'])
+def test_another_issuers_certificate_does_not_open_the_account(app, auth_client, same_serial, header):
+    """Headers only: a serial of CA A presented under an issuer that is not A's opens nothing."""
+    serial, pem_a, _pem_b = same_serial
+    r = _import(auth_client, pem_a)
+    assert r.status_code == 201, r.get_json()
+    with app.app_context():
+        assert _header_login(serial, header)[2] == 'Certificate not enrolled'
+        # An enrolment that recorded no issuer is still found by an unreadable one
+        row = db.session.get(AuthCertificate, r.get_json()['data']['id'])
+        row.cert_issuer, row.cert_pem = '', None
+        db.session.commit()
+        user, _found, err = _header_login(serial, 'CN=Evil,notAnAttribute=x')
+        assert user is not None, err

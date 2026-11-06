@@ -374,7 +374,7 @@ def test_a_replacement_removes_every_row_without_a_complete_identity(app):
             results = svc.restore_backup(_reseal(blob, data), PASSWORD, mode='replace')
             db.session.expire_all()
             assert [r.name for r in AuthCertificate.query.filter_by(cert_subject='CN=zzincomplete')] == ['kept']
-            told = [w for w in results['warnings'] if w.startswith('auth_certificates: ') and w.endswith('are removed')]
+            told = [w for w in results['warnings'] if w.startswith('auth_certificates: ') and 'are removed, then those the archive carries' in w]
             listed = told[0].split('(id ', 1)[1].split(')', 1)[0].split(', ') if told else []
             assert set(map(str, ids)) <= set(listed)
         finally:
