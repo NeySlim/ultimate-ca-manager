@@ -4,6 +4,7 @@ import json
 import uuid
 from datetime import timedelta
 from unittest.mock import patch
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 
@@ -62,8 +63,7 @@ def make(app):
             synchronize_session=False)
         WebhookEndpoint.query.filter(WebhookEndpoint.id.in_(made['endpoints'])).delete(synchronize_session=False)
         AcmeClientOrder.query.filter(AcmeClientOrder.id.in_(made['orders'])).delete(synchronize_session=False)
-        AcmeClientAccount.query.filter(AcmeClientAccount.id.in_(made['accounts'])).delete(
-            synchronize_session=False)
+        delete_client_accounts(AcmeClientAccount.query.filter(AcmeClientAccount.id.in_(made['accounts'])), synchronize_session=False)
         db.session.commit()
 
 
@@ -177,6 +177,7 @@ def test_an_order_whose_account_was_deleted_is_not_renewed_elsewhere(make):
     assert AcmeClientAccount.query.count() == accounts  # no placeholder account either
 
 
+@pytest.mark.sqlite_only(reason='an id naming no account row is refused by the foreign key')
 def test_an_order_pinned_to_a_missing_account_row_is_blocked(make):
     order = make.order(acme_client_account_id=987654321)
     with pytest.raises(renew_mod.RenewalBlocked, match='no longer exists'):

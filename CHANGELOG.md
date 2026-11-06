@@ -16,11 +16,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Database: on PostgreSQL, an error carried the values bound to its statement, private keys included, into the logs despite hidden parameters: in the quoted statement, in the refused row of a NOT NULL or CHECK violation, and in the input a data error quotes. These are now removed from the message; its first line, the other DETAIL lines, HINT and SQLSTATE are kept.
 - Revocation: a key revoked as compromised was kept only for a certificate of a CA held here, so a Let's Encrypt certificate revoked as compromised then deleted let the ACME client certify the same key again. Such keys are now kept whatever CA issued the certificate, and refused at the request, the renewal and the finalization (migration 129).
 - Key recovery: a request named its certificate by number, and SQLite gives a deleted certificate's number to the next one created, so an approved request could export another certificate's private key, after a replacing restore in particular. Approval and recovery now answer 410 unless the number still names the certificate the request was opened on, and a replacing restore cancels the open requests on the certificates it removes.
 
 ### Fixed
 
+- Database: on PostgreSQL in a schema other than `public`, the integrity check reported 0 tables. It now counts the tables of the schema in use.
+- Database migration: to PostgreSQL in a schema other than `public` (a `search_path` in the URL), the sequences of the copied tables were never found, so the migration was refused at its verification. The sequences of the schema in use are now realigned, and the reset the failure message asks for names that schema.
+- Database: on PostgreSQL, the database reset waited forever for the transaction of its own request. It now closes that transaction before dropping the tables.
 - Docker: the images lacked pyspnego's Kerberos backend, which the DEB and RPM installs can add, so the Kerberos binding of Windows autoenrollment could not work in a container. Both images now ship it, at the pyspnego version the requirements resolve (#435, thanks @JPromi).
 - Restore: two DNS providers, ACME CA accounts or webhooks of the same name were merged into one row, and one credential was lost. A clashing row is now restored as `name (2)`, and the restore result lists it; an account is matched by its account URL and a webhook by its URL first.
 - DNS providers, ACME CA accounts and webhooks: the API accepted a name already in use. It now answers 409, on creation and on rename.

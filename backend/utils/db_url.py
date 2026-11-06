@@ -60,3 +60,9 @@ def postgres_gssenc_problem(url, environ=None) -> Optional[str]:
     environ = os.environ if environ is None else environ
     mode = _postgres_tcp_setting(url, 'gssencmode', 'PGGSSENCMODE', environ)
     return f'gssencmode={mode}' if mode and mode != 'disable' else None
+
+
+# Every engine UCM builds reads its URL here: the error scrubber goes with it
+from utils.db_errors import install as _install_error_scrubber  # noqa: E402
+
+_install_error_scrubber()

@@ -113,6 +113,7 @@ def test_migrate_refuses_non_empty_target(populated_app, sqlite_target):
     assert stats['tables_migrated'] == 0
 
 
+@pytest.mark.sqlite_only(reason='the session database is the SQLite source of this round trip')
 def test_migrate_full_roundtrip_sqlite_to_sqlite(populated_app, sqlite_target):
     with populated_app.app_context():
         ok, msg, stats = svc.migrate_data(sqlite_target)

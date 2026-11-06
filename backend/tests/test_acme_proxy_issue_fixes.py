@@ -15,7 +15,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from models import db
+from models import Certificate, db
+from tests.seeded_rows import ensure_acme_account
 from models.acme_models import AcmeClientOrder
 
 UPSTREAM = 'https://acme-stub.example'
@@ -53,6 +54,7 @@ def _make_service(app):
 
 
 def _seed_proxy_order(**kwargs):
+    ensure_acme_account(kwargs.get('account_id'))
     order = AcmeClientOrder(
         domains=json.dumps(['proxy-fix.test']),
         status=kwargs.pop('status', 'pending'),
@@ -69,6 +71,7 @@ def _clean_orders(app):
     with app.app_context():
         yield
         AcmeClientOrder.query.filter_by(domains=json.dumps(['proxy-fix.test'])).delete()
+        Certificate.query.filter_by(refid='proxy-fix-imported').delete()
         db.session.commit()
 
 
@@ -200,9 +203,16 @@ class TestGetCertificateResponsePath:
         )
         svc = _make_service(app)
         monkeypatch.setattr(svc, '_post_with_account', lambda *_a, **_k: upstream_resp)
+        # A real row: the order's certificate_id is a foreign key on PostgreSQL
+        imported = Certificate.query.filter_by(refid='proxy-fix-imported').first()
+        if imported is None:
+            imported = Certificate(refid='proxy-fix-imported', descr='proxy-fix')
+            db.session.add(imported)
+            db.session.commit()
+        self.imported_id = imported.id
         monkeypatch.setattr(
             CertificateService, 'import_certificate',
-            staticmethod(lambda **_kw: SimpleNamespace(id=4242)),
+            staticmethod(lambda **_kw: SimpleNamespace(id=imported.id)),
         )
 
         spawned = []
@@ -238,7 +248,7 @@ class TestGetCertificateResponsePath:
             refreshed = db.session.get(AcmeClientOrder, order.id)
             assert refreshed.status == 'valid'
             assert refreshed.dns_records_created is None
-            assert refreshed.certificate_id == 4242
+            assert refreshed.certificate_id == self.imported_id
 
     def test_upstream_link_header_not_forwarded(self, app, monkeypatch):
         with app.app_context():

@@ -19,6 +19,9 @@ from sqlalchemy import create_engine, text
 
 from models import db
 
+pytestmark = pytest.mark.sqlite_only(
+    reason='the session database is the migration source, SQLite by design; a PostgreSQL source has its own engine (UCM_TEST_PG_URL)')
+
 # Wide enough rows that materialising them is visible, few enough that the
 # test stays under a second per run.
 _ROW_PAYLOAD = 'x' * 2000

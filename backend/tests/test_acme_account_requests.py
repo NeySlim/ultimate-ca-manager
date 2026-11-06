@@ -3,6 +3,7 @@ import base64
 import hashlib
 import hmac
 import json
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 from cryptography.hazmat.primitives import hashes
@@ -83,7 +84,7 @@ def slug_endpoint(app):
     with app.app_context():
         db.session.rollback()
         AcmeClientOrder.query.filter_by(acme_client_account_id=upstream_id).delete()
-        AcmeClientAccount.query.filter_by(id=upstream_id).delete()
+        delete_client_accounts(AcmeClientAccount.query.filter_by(id=upstream_id))
         db.session.commit()
 
 
@@ -188,7 +189,7 @@ class TestProxyAccountUrl:
         finally:
             with app.app_context():
                 AcmeClientOrder.query.filter_by(acme_client_account_id=other_id).delete()
-                AcmeClientAccount.query.filter_by(id=other_id).delete()
+                delete_client_accounts(AcmeClientAccount.query.filter_by(id=other_id))
                 db.session.commit()
 
     def test_orders_is_post_as_get(self, client, slug_endpoint):

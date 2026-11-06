@@ -6,6 +6,7 @@ python_functions = ["test_*"]
 addopts = "-v --ignore=tests/e2e_test_suite.py"
 markers = [
     "postgres: marks tests requiring a real PostgreSQL instance (set UCM_TEST_POSTGRES_URL)",
+    "sqlite_only(reason): skipped when the session app runs on PostgreSQL (UCM_TEST_APP_PG_URL)",
 ]
 
 [tool.coverage.run]

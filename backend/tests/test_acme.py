@@ -15,6 +15,7 @@ import os
 import sys
 from tests.conftest import get_json, assert_success, assert_error
 from services.acme.jws_problems import UNKNOWN_ACCOUNT
+from tests.seeded_rows import delete_client_accounts
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -591,7 +592,7 @@ class TestAcmeClientSettings:
         yield acct_id
         with app.app_context():
             SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-            AcmeClientAccount.query.filter_by(id=acct_id).delete()
+            delete_client_accounts(AcmeClientAccount.query.filter_by(id=acct_id))
             db.session.commit()
 
     def test_patch_proxy_eab_kid(self, auth_client, linked_proxy_account):
@@ -659,7 +660,7 @@ class TestAcmeClientProxy:
         custom_dir = 'https://proxy-reg-test.example/directory'
         with app.app_context():
             SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-            AcmeClientAccount.query.filter_by(directory_url=custom_dir).delete()
+            delete_client_accounts(AcmeClientAccount.query.filter_by(directory_url=custom_dir))
             db.session.commit()
             acct = AcmeClientAccount(
                 directory_url=custom_dir,
@@ -721,7 +722,7 @@ class TestAcmeClientProxy:
         custom_dir = 'https://proxy-unreg-test.example/directory'
         with app.app_context():
             SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-            AcmeClientAccount.query.filter_by(directory_url=custom_dir).delete()
+            delete_client_accounts(AcmeClientAccount.query.filter_by(directory_url=custom_dir))
             db.session.commit()
             acct = AcmeClientAccount(
                 directory_url=custom_dir,
@@ -1431,9 +1432,9 @@ class TestAcmeProxyProtocol:
 
         with app.app_context():
             SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-            AcmeClientAccount.query.filter_by(
+            delete_client_accounts(AcmeClientAccount.query.filter_by(
                 directory_url=self._STUB_DIRECTORY_URL
-            ).delete()
+            ))
             db.session.commit()
             acct = AcmeClientAccount(
                 directory_url=self._STUB_DIRECTORY_URL,
@@ -1451,9 +1452,9 @@ class TestAcmeProxyProtocol:
         yield
         with app.app_context():
             SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
-            AcmeClientAccount.query.filter_by(
+            delete_client_accounts(AcmeClientAccount.query.filter_by(
                 directory_url=self._STUB_DIRECTORY_URL
-            ).delete()
+            ))
             db.session.commit()
 
     @staticmethod
@@ -1674,14 +1675,14 @@ class TestAcmeProxyFreshInstall:
                     SystemConfig.key.in_([PROXY_ACCOUNT_ID_KEY, 'acme.proxy.upstream_url'])
                 ).all()
             ]
-            AcmeClientAccount.query.delete()
+            delete_client_accounts(AcmeClientAccount.query)
             SystemConfig.query.filter(
                 SystemConfig.key.in_([PROXY_ACCOUNT_ID_KEY, 'acme.proxy.upstream_url'])
             ).delete(synchronize_session=False)
             db.session.commit()
         yield
         with app.app_context():
-            AcmeClientAccount.query.delete()
+            delete_client_accounts(AcmeClientAccount.query)
             for row in keep:
                 db.session.add(AcmeClientAccount(**row))
             for row in keep_cfg:

@@ -97,6 +97,11 @@ if 'DATA_DIR' not in os.environ or _xdist_worker:
 # itself runs in memory. Pinned before settings.py loads one, like DATA_DIR above.
 if 'DATABASE_PATH' not in os.environ or _xdist_worker:
     os.environ['DATABASE_PATH'] = os.path.join(os.environ['DATA_DIR'], 'ucm.db')
+from tests import pg_app_harness as _pg_app  # noqa: E402
+
+if _pg_app.ENABLED:
+    os.environ['DATABASE_URL'] = _pg_app.app_url()
+    _pg_app.create_schema()
 os.environ.setdefault('DATABASE_URL', '')
 
 # The backend-switch routes rewrite /etc/ucm/ucm.env, the file the installed
@@ -138,6 +143,28 @@ from services.database_admin import persistence as _db_persistence  # noqa: E402
 
 _db_helpers.UCM_ENV_PATH = UCM_TEST_ENV_FILE
 _db_persistence.UCM_ENV_PATH = UCM_TEST_ENV_FILE
+
+if _pg_app.ENABLED:
+    # TestingConfig pins in-memory SQLite; in PostgreSQL mode it takes the URL Config read.
+    from config import settings as _settings  # noqa: E402
+
+    assert _settings.Config.DATABASE_TYPE == 'postgresql', _settings.Config.SQLALCHEMY_DATABASE_URI
+    _settings.TestingConfig.SQLALCHEMY_DATABASE_URI = _settings.Config.SQLALCHEMY_DATABASE_URI
+    _settings.TestingConfig.SQLALCHEMY_ENGINE_OPTIONS = dict(_settings.Config.SQLALCHEMY_ENGINE_OPTIONS)
+    import app as _app_module  # noqa: E402
+
+    _app_module.create_app = _pg_app.isolating(_app_module.create_app, _settings.TestingConfig)
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip the tests marked sqlite_only when the session app runs on PostgreSQL."""
+    if not _pg_app.ENABLED:
+        return
+    for item in items:
+        marker = item.get_closest_marker('sqlite_only')
+        if marker is not None:
+            reason = marker.kwargs.get('reason') or (marker.args[0] if marker.args else '')
+            item.add_marker(pytest.mark.skip(reason=f'SQLite only: {reason}'))
 
 # The host's master key, when the machine runs UCM, must not reach the tests:
 # rows encrypted with it outlive the test that wrote them and break any later
@@ -310,6 +337,15 @@ def _admin_api_keys_stay_in_their_module():
         db.session.commit()
 
 
+@pytest.fixture(autouse=True, scope='module')
+def _seeded_rows_stay_in_their_module():
+    """Rows `tests.seeded_rows` wrote for a module are deleted after it."""
+    yield
+    from tests.seeded_rows import _SEEDED, remove_seeded
+    if _SEEDED:
+        remove_seeded()
+
+
 @pytest.fixture(scope='session')
 def app():
     """Create Flask app with test configuration (shared across all tests)."""
@@ -325,7 +361,10 @@ def app():
         temp_db = f.name
 
     from app import create_app
-    application = create_app('testing')
+    if _pg_app.ENABLED:
+        application = _pg_app.session_app(create_app, 'testing')
+    else:
+        application = create_app('testing')
 
     # Keep the suite off the machine's real files. The restore writes the
     # HTTPS certificate and key where the configuration points, and the
@@ -364,6 +403,12 @@ def app():
     _SESSION_APP.append(application)
     yield application
     _SESSION_APP.clear()
+    if _pg_app.ENABLED:
+        from models import db as _db
+        with application.app_context():
+            _db.session.remove()
+            _db.engine.dispose()
+        _pg_app.drop_schema()
 
     if os.path.exists(temp_db):
         os.unlink(temp_db)
@@ -664,6 +709,7 @@ def clean_dangling_rows(app):
     _force_register_all_models()
     removed = 0
     with app.app_context():
+        row_key = 'ctid' if _db.engine.dialect.name == 'postgresql' else 'rowid'
         present = set(_db.inspect(_db.engine).get_table_names())
         for table in reversed(_db.metadata.sorted_tables):
             if table.name not in present:
@@ -679,8 +725,8 @@ def clean_dangling_rows(app):
                     f'c."{a}" = p."{b}"' for a, b in zip(child, parent))
                 not_null = ' AND '.join(f'c."{a}" IS NOT NULL' for a in child)
                 result = _db.session.execute(_text(
-                    f'DELETE FROM "{table.name}" WHERE rowid IN ('
-                    f'  SELECT c.rowid FROM "{table.name}" c '
+                    f'DELETE FROM "{table.name}" WHERE {row_key} IN ('
+                    f'  SELECT c.{row_key} FROM "{table.name}" c '
                     f'  LEFT JOIN "{parent_table}" p ON {on} '
                     f'  WHERE {not_null} AND p."{parent[0]}" IS NULL)'))
                 removed += result.rowcount or 0
@@ -710,13 +756,16 @@ def clean_unreadable_secrets(app):
         from services.database_admin.verify import encrypted_columns
         from services.backup.key_material import decrypt_stored_secret
 
+        is_pg = _db.engine.dialect.name == 'postgresql'
+        row_key = 'ctid' if is_pg else 'rowid'
+        match = 'ctid = CAST(:rowid AS tid)' if is_pg else 'rowid = :rowid'
         present = set(_db.inspect(_db.engine).get_table_names())
         for table, column in encrypted_columns():
             if table not in present:
                 continue
             try:
                 rows = _db.session.execute(_text(
-                    f'SELECT rowid, "{column}" FROM "{table}" '
+                    f'SELECT {row_key}, "{column}" FROM "{table}" '
                     f'WHERE "{column}" IS NOT NULL')).fetchall()
             except Exception:
                 _db.session.rollback()
@@ -731,7 +780,7 @@ def clean_unreadable_secrets(app):
                     doomed.append(rowid)
             for rowid in doomed:
                 _db.session.execute(_text(
-                    f'DELETE FROM "{table}" WHERE rowid = :rowid'),
+                    f'DELETE FROM "{table}" WHERE {match}'),
                     {'rowid': rowid})
                 removed += 1
         if removed:

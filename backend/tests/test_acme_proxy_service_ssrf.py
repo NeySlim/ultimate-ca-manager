@@ -1,5 +1,6 @@
 """SSRF hardening for ACME proxy upstream URLs from directory JSON."""
 import pytest
+from tests.seeded_rows import delete_client_accounts
 
 from models import db, AcmeClientAccount
 from services.acme.acme_proxy_service import AcmeProxyService
@@ -8,7 +9,7 @@ from services.acme.acme_proxy_service import AcmeProxyService
 @pytest.fixture
 def proxy_svc(app):
     with app.app_context():
-        AcmeClientAccount.query.delete()
+        delete_client_accounts(AcmeClientAccount.query)
         db.session.commit()
         acct = AcmeClientAccount(
             directory_url='https://acme.example/directory',
@@ -18,7 +19,7 @@ def proxy_svc(app):
         db.session.add(acct)
         db.session.commit()
         yield AcmeProxyService(base_url='https://ucm.example/acme/proxy', account_id=acct.id)
-        AcmeClientAccount.query.delete()
+        delete_client_accounts(AcmeClientAccount.query)
         db.session.commit()
 
 

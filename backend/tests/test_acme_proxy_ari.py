@@ -11,6 +11,7 @@ import base64
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 
@@ -26,7 +27,7 @@ def _b64url(b: bytes) -> str:
 @pytest.fixture
 def proxy_account(app):
     with app.app_context():
-        AcmeClientAccount.query.delete()
+        delete_client_accounts(AcmeClientAccount.query)
         db.session.commit()
         acct = AcmeClientAccount(
             directory_url='https://acme-ari-stub.example/directory',
@@ -38,7 +39,7 @@ def proxy_account(app):
         db.session.add(acct)
         db.session.commit()
         yield acct
-        AcmeClientAccount.query.delete()
+        delete_client_accounts(AcmeClientAccount.query)
         db.session.commit()
 
 

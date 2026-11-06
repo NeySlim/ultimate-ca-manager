@@ -467,7 +467,8 @@ def test_a_disabled_dns_provider_blocks_the_renewal_before_the_ca(bench):
     bench.client.create_order.assert_not_called()
 
 
-@pytest.mark.parametrize('source', ['none', 'dangling'])
+@pytest.mark.parametrize('source', ['none', pytest.param('dangling', marks=pytest.mark.sqlite_only(
+    reason='an id naming no certificate is refused by the foreign key'))])
 def test_a_reuse_whose_key_holder_is_gone_is_blocked_not_given_a_new_key(bench, source):
     parent = bench.parent()
     parent.key_source = 'reuse'
@@ -479,6 +480,7 @@ def test_a_reuse_whose_key_holder_is_gone_is_blocked_not_given_a_new_key(bench, 
     bench.client.create_order.assert_not_called()
 
 
+@pytest.mark.sqlite_only(reason='an id naming no certificate is refused by the foreign key')
 def test_a_reuse_falls_back_on_its_first_source(bench):
     parent = bench.parent()
     parent.key_source, parent.source_certificate_id, parent.certificate_id = 'reuse', bench.cert_id, 987654321

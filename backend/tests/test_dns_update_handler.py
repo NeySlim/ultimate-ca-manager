@@ -21,6 +21,7 @@ import struct
 import threading
 from datetime import datetime, timedelta, timezone
 from unittest import mock
+from tests.seeded_rows import delete_client_accounts, ensure_acme_account
 
 import dns.edns
 import dns.flags
@@ -2014,6 +2015,7 @@ def real(app):
                                algorithm="hmac-sha256", status="active")
         key.secret = base64.b64encode(SECRET).decode()
         db.session.add(key)
+        ensure_acme_account("acct-int")
         order = AcmeClientOrder(
             domains=json.dumps(["app.example.com"]), environment="staging",
             challenge_type="dns-01", status="pending", is_proxy_order=True,
@@ -2060,7 +2062,7 @@ def real(app):
             synchronize_session=False)
         AcmeDomain.query.filter_by(domain="example.com").delete()
         DnsProvider.query.filter_by(id=provider.id).delete()
-        AcmeClientAccount.query.filter_by(id=account.id).delete()
+        delete_client_accounts(AcmeClientAccount.query.filter_by(id=account.id))
         # Audit rows stay: the log is a hash chain that later tests verify.
         db.session.commit()
 
