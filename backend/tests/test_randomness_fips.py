@@ -99,7 +99,7 @@ class TestSitesDrawFromTheDrbg:
     def test_est_server_generated_key(self, drbg, rsa_identity):
         from utils.est_cms import build_server_generated_key_cms
         key, cert = rsa_identity
-        build_server_generated_key_cms(key, cert, cert)
+        build_server_generated_key_cms(key, key, cert, cert)
         assert [len(v) for v in drbg] == [32, 16]
 
     def test_scep_key_transport_envelope(self, drbg, rsa_identity):

@@ -259,7 +259,7 @@ def _server_keygen_identifiers(csr):
     else:
         logger.info(
             'EST serverkeygen: no decrypt key identifier supplied; '
-            'using authentication-derived key protection'
+            'the key is delivered in clear under TLS'
         )
     return identifiers
 
@@ -274,6 +274,27 @@ def _certificate_key_identifier(cert):
         return x509.SubjectKeyIdentifier.from_public_key(
             cert.public_key()
         ).digest
+
+
+def _ca_certificate(ca):
+    from services.ca.helpers import get_ca_cert_pem
+    return x509.load_pem_x509_certificate(get_ca_cert_pem(ca))
+
+
+def _key_transport_refusal(recipient_cert, ca):
+    """Why the key cannot go encrypted to *recipient_cert* signed by *ca*, None when it can."""
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from utils.est_cms import key_package_signer_problem
+    try:
+        usage = recipient_cert.extensions.get_extension_for_class(x509.KeyUsage).value
+    except x509.ExtensionNotFound:
+        usage = None
+    # RFC 7030 §4.4.1.2: key transport asserted or use unrestricted (kari is not offered)
+    if usage is not None and not usage.key_encipherment:
+        return 'Requested asymmetric key does not allow key transport'
+    if not isinstance(recipient_cert.public_key(), rsa.RSAPublicKey):
+        return 'Unsupported client key transport'
+    return key_package_signer_problem(_ca_certificate(ca))
 
 
 def _fallback_csrattrs_der():
@@ -812,9 +833,9 @@ def get_csr_attrs(label=None):
 def server_keygen(label=None):
     """
     EST /serverkeygen - Server-side key generation (RFC 7030 §3.4).
-    Generates key pair and certificate on server. Basic-authenticated
-    clients receive password-encrypted PKCS#8; mTLS clients receive CMS
-    SignedData protected by KeyTransRecipientInfo EnvelopedData.
+    Generates key pair and certificate on server. The key is PKCS#8 in clear
+    under TLS, or, when the CSR names the mTLS certificate's key, an RFC 5958
+    key package signed by the CA inside KeyTransRecipientInfo EnvelopedData.
     """
     # Defensive: cap body size before parsing. RSA keygen is the most
     # CPU-intensive EST endpoint, so reject obviously-bogus payloads
@@ -855,10 +876,9 @@ def server_keygen(label=None):
             return Response('Invalid CSR', status=400)
         
         from cryptography import x509
-        from cryptography.hazmat.primitives.asymmetric import rsa
         from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives.serialization import (
-            Encoding, PrivateFormat, BestAvailableEncryption
+            Encoding, PrivateFormat, NoEncryption
         )
         
         # RFC 7030 §4.4.1 requires the request public key and signature to be
@@ -882,28 +902,27 @@ def server_keygen(label=None):
                 logger.error(f"EST serverkeygen: bad client mTLS cert: {e}")
                 return Response('Invalid client mTLS certificate', status=400)
 
-            symmetric_id = key_identifiers.get(DECRYPT_KEY_IDENTIFIER_OID)
-            if symmetric_id is not None:
-                logger.warning(
-                    'EST serverkeygen: symmetric DecryptKeyIdentifier is unsupported'
-                )
-                return Response('Requested symmetric key is unavailable', status=400)
-            asymmetric_id = key_identifiers.get(
-                ASYMMETRIC_DECRYPT_KEY_IDENTIFIER_OID
+        # RFC 7030 §4.4.1.1/§4.4.1.2: a requested key the server lacks ends the request
+        if key_identifiers.get(DECRYPT_KEY_IDENTIFIER_OID) is not None:
+            logger.warning(
+                'EST serverkeygen: symmetric DecryptKeyIdentifier is unsupported'
             )
-            if (
-                asymmetric_id is not None
-                and not hmac.compare_digest(
-                    asymmetric_id, _certificate_key_identifier(mtls_cert_obj)
-                )
-            ):
+            return Response('Requested symmetric key is unavailable', status=400)
+        asymmetric_id = key_identifiers.get(ASYMMETRIC_DECRYPT_KEY_IDENTIFIER_OID)
+        recipient_cert = None
+        if asymmetric_id is not None:
+            if mtls_cert_obj is None or not hmac.compare_digest(
+                    asymmetric_id, _certificate_key_identifier(mtls_cert_obj)):
                 logger.warning(
                     'EST serverkeygen: AsymmetricDecryptKeyIdentifier does not '
                     'match the authenticated client certificate'
                 )
                 return Response('Requested asymmetric key is unavailable', status=400)
-            if not isinstance(mtls_cert_obj.public_key(), rsa.RSAPublicKey):
-                return Response('Unsupported client key transport', status=400)
+            refusal = _key_transport_refusal(mtls_cert_obj, ca)
+            if refusal is not None:
+                logger.warning(f'EST serverkeygen: {refusal}')
+                return Response(refusal, status=400)
+            recipient_cert = mtls_cert_obj
 
         # RFC 7030 implies the subject in the CSR identifies the
         # enrollee. We refuse empty / whitespace-only CNs so a
@@ -938,8 +957,7 @@ def server_keygen(label=None):
         )
         
         # RFC 7030 §4.4 leaves the key to the server: the request key's family (its values
-        # are ignored) else the CA's, at the CA's strength, bounded by the policies; the CMS
-        # key package is signed with RSA or EC
+        # are ignored) else the CA's, at the CA's strength, bounded by the policies
         try:
             request_key = csr.public_key()
         except Exception:  # an algorithm pyca cannot read: no hint
@@ -952,7 +970,7 @@ def server_keygen(label=None):
             ca.id, None, subject_cn, [v for t, v in (_san_values(csr) or ()) if t == 'DNSName'])
         alg = generated_key_algorithm(
             x509.load_pem_x509_certificate(get_ca_cert_pem(ca)).public_key(), policies,
-            ca_id=ca.id, request_public_key=request_key, classical_only=auth_method == 'mtls')
+            ca_id=ca.id, request_public_key=request_key)
         key = key_algorithms.generate(alg.label)
 
         # Create a new CSR with the server-generated key while retaining the
@@ -979,20 +997,19 @@ def server_keygen(label=None):
         # The certificate part exactly matches /simpleenroll: one certificate.
         p7_b64 = _certs_only_base64(cert)
 
-        if auth_method == 'basic':
-            # RFC 7030 §4.4.2 permits password-encrypted PKCS#8 for clients
-            # authenticated with HTTP Basic credentials.
-            auth = request.authorization
+        if recipient_cert is None:
+            # RFC 7030 §4.4.2: without additional encryption, PrivateKeyInfo under TLS only
             key_der = key.private_bytes(
                 encoding=Encoding.DER,
                 format=PrivateFormat.PKCS8,
-                encryption_algorithm=BestAvailableEncryption(auth.password.encode())
+                encryption_algorithm=NoEncryption(),
             )
             key_content_type = 'application/pkcs8'
         else:
             try:
+                from services.hsm.ca_key_loader import get_ca_signing_key
                 key_der = build_server_generated_key_cms(
-                    key, cert, mtls_cert_obj
+                    key, get_ca_signing_key(ca), _ca_certificate(ca), recipient_cert
                 )
             except ValueError as e:
                 logger.warning(f"EST serverkeygen: unsupported key transport: {e}")

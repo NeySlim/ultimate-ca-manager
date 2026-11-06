@@ -1,49 +1,123 @@
 """CMS encoding helpers for RFC 7030 server-side key generation."""
-from asn1crypto import algos, cms, x509 as asn1_x509
+import hashlib
+
+from asn1crypto import algos, cms, core, x509 as asn1_x509
+from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, padding as asym_padding, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, padding as asym_padding, rsa
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 
-from utils.issuance_defaults import digest_for_key
+from utils import key_algorithms
 from utils.randomness import csp_bytes
-from utils.signing_hash import HASH_BY_NAME
+from utils.signing_hash import pss_algorithm_identifier, pss_padding, signing_hash_for, signs_pss
 
 
-def _signed_private_key(private_key, issued_cert, pkcs8_der):
-    """Return a CMS SignedData value containing and authenticating PKCS#8."""
-    cert_der = issued_cert.public_bytes(serialization.Encoding.DER)
-    signer_cert = asn1_x509.Certificate.load(cert_der)
-    # RSA PKCS#1 v1.5 with SHA-256, ECDSA with the curve's digest (RFC 5754)
-    if isinstance(private_key, ec.EllipticCurvePrivateKey):
-        digest = digest_for_key(private_key)
-        signature = private_key.sign(pkcs8_der, ec.ECDSA(HASH_BY_NAME[digest]()))
-        signature_algorithm = f'{digest}_ecdsa'
-    elif isinstance(private_key, rsa.RSAPrivateKey):
-        digest, signature_algorithm = 'sha256', 'sha256_rsa'
-        signature = private_key.sign(pkcs8_der, asym_padding.PKCS1v15(), hashes.SHA256())
-    else:
-        raise ValueError('EST server-generated key transport signs with an RSA or EC key only')
+# RFC 5958 Appendix A: id-ct-KP-aKeyPackage
+AKEY_PACKAGE_OID = '2.16.840.1.101.2.1.2.78.5'
+
+# Digest identifiers with absent parameters (RFC 5754 §2, RFC 9882 §3.3); Ed448 takes
+# id-shake256-len with 512 output bits (RFC 8419 §2.3)
+_DIGEST_DER = {
+    'sha256': bytes.fromhex('300b0609608648016503040201'),
+    'sha384': bytes.fromhex('300b0609608648016503040202'),
+    'sha512': bytes.fromhex('300b0609608648016503040203'),
+    'shake256_len': bytes.fromhex('300f060960864801650304021202020200'),
+}
+
+
+class _AsymmetricKeyPackage(core.SequenceOf):
+    _child_spec = core.Any
+
+
+def asymmetric_key_package(private_key):
+    """RFC 5958 AsymmetricKeyPackage holding *private_key* as one OneAsymmetricKey (v1)."""
+    pkcs8 = private_key.private_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=serialization.NoEncryption(),
+    )
+    return _AsymmetricKeyPackage([core.Any.load(pkcs8)]).dump()
+
+
+def key_package_signer_problem(signer_cert):
+    """Why *signer_cert* may not sign a key package, None when it may.
+
+    A CMS signature needs digitalSignature when KeyUsage is present (RFC 5280 §4.2.1.3).
+    """
+    try:
+        usage = signer_cert.extensions.get_extension_for_class(x509.KeyUsage).value
+    except x509.ExtensionNotFound:
+        return None
+    if usage.digital_signature:
+        return None
+    return ('The issuing CA certificate does not assert digitalSignature (RFC 5280 '
+            'section 4.2.1.3) and cannot sign an encrypted key package')
+
+
+def _signature_suite(signer_key):
+    """(digest name, signature AlgorithmIdentifier, sign(tbs)) for the CA key, HSM included."""
+    family = key_algorithms.family_for_public_key(signer_key.public_key())
+    if family == 'ML-DSA':
+        # RFC 9882 §3.3: SHA-512 digests the content, pure ML-DSA signs the attributes
+        oid = key_algorithms.get(key_algorithms.label_for_public_key(signer_key.public_key())).oid
+        return 'sha512', {'algorithm': oid}, signer_key.sign
+    if isinstance(signer_key, ed25519.Ed25519PrivateKey):
+        return 'sha512', {'algorithm': 'ed25519'}, signer_key.sign  # RFC 8419 §3.1
+    if isinstance(signer_key, ed448.Ed448PrivateKey):
+        return 'shake256_len', {'algorithm': 'ed448'}, signer_key.sign
+    algorithm = signing_hash_for(signer_key)
+    if isinstance(signer_key, ec.EllipticCurvePrivateKey):
+        return (algorithm.name, {'algorithm': f'{algorithm.name}_ecdsa'},
+                lambda tbs: signer_key.sign(tbs, ec.ECDSA(algorithm)))
+    if isinstance(signer_key, rsa.RSAPrivateKey):
+        if signs_pss(signer_key):
+            return (algorithm.name, pss_algorithm_identifier(algorithm),
+                    lambda tbs: signer_key.sign(tbs, pss_padding(algorithm), algorithm))
+        return (algorithm.name, {'algorithm': f'{algorithm.name}_rsa'},
+                lambda tbs: signer_key.sign(tbs, asym_padding.PKCS1v15(), algorithm))
+    raise ValueError('EST key package signing does not support this CA key type')
+
+
+def _content_digest(name, content):
+    if name == 'shake256_len':
+        return hashlib.shake_256(content).digest(64)
+    return hashlib.new(name, content).digest()
+
+
+def signed_key_package(private_key, signer_key, signer_cert):
+    """CMS SignedData over the RFC 5958 package of *private_key*, signed by the CA key.
+
+    eContentType is id-ct-KP-aKeyPackage, so signedAttrs carry content-type and
+    message-digest (RFC 5652 §5.3) and the version is 3 (§5.1).
+    """
+    package = asymmetric_key_package(private_key)
+    digest_name, signature_algorithm, sign = _signature_suite(signer_key)
+    digest_algorithm = cms.DigestAlgorithm.load(_DIGEST_DER[digest_name])
+    signed_attrs = cms.CMSAttributes([
+        cms.CMSAttribute({'type': 'content_type', 'values': [cms.ContentType(AKEY_PACKAGE_OID)]}),
+        cms.CMSAttribute({'type': 'message_digest',
+                          'values': [core.OctetString(_content_digest(digest_name, package))]}),
+    ])
+    signer = asn1_x509.Certificate.load(signer_cert.public_bytes(serialization.Encoding.DER))
     signer_info = cms.SignerInfo({
         'version': 'v1',
-        'sid': {
-            'issuer_and_serial_number': {
-                'issuer': signer_cert.issuer,
-                'serial_number': signer_cert.serial_number,
-            }
-        },
-        'digest_algorithm': {'algorithm': digest},
-        'signature_algorithm': {'algorithm': signature_algorithm},
-        'signature': signature,
+        'sid': {'issuer_and_serial_number': {
+            'issuer': signer.issuer, 'serial_number': signer.serial_number}},
+        'digest_algorithm': digest_algorithm,
+        'signed_attrs': signed_attrs,
+        'signature_algorithm': signature_algorithm,
+        # RFC 5652 §5.4: the signature covers the DER of signedAttrs as a SET OF
+        'signature': sign(signed_attrs.dump()),
     })
     return cms.SignedData({
-        'version': 'v1',
-        'digest_algorithms': [{'algorithm': digest}],
+        'version': 'v3',
+        'digest_algorithms': [digest_algorithm],
         'encap_content_info': {
-            'content_type': 'data',
-            'content': pkcs8_der,
+            'content_type': AKEY_PACKAGE_OID,
+            'content': core.ParsableOctetString(package),
         },
-        'certificates': [signer_cert],
+        'certificates': [signer],
         'signer_infos': [signer_info],
     })
 
@@ -63,8 +137,8 @@ def _rsa_oaep_algorithm():
     return {'algorithm': 'rsaes_oaep', 'parameters': parameters}
 
 
-def build_server_generated_key_cms(private_key, issued_cert, recipient_cert):
-    """Wrap a generated PKCS#8 key in SignedData and RSA KeyTrans EnvelopedData.
+def build_server_generated_key_cms(private_key, signer_key, signer_cert, recipient_cert):
+    """Wrap the generated key in a CA-signed key package and RSA KeyTrans EnvelopedData.
 
     The content is encrypted with AES-256-CBC. The content-encryption key is
     transported with RSA-OAEP/SHA-256 under the authenticated EST client's
@@ -76,12 +150,7 @@ def build_server_generated_key_cms(private_key, issued_cert, recipient_cert):
             'EST server-generated key transport requires an RSA client certificate'
         )
 
-    pkcs8_der = private_key.private_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-    signed_data = _signed_private_key(private_key, issued_cert, pkcs8_der)
+    signed_data = signed_key_package(private_key, signer_key, signer_cert)
     signed_der = signed_data.dump()
 
     content_key = csp_bytes(32)
