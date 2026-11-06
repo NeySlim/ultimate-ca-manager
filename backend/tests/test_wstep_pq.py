@@ -149,6 +149,9 @@ class TestTemplateKeyFamily:
     @pytest.mark.parametrize('template_key, csr_key, csr_label', [
         ('ML-DSA-65', 'RSA-2048', 'RSA-2048'),
         ('RSA-2048', 'ML-DSA-65', 'ML-DSA-65'),
+        ('EC-P256', 'EC-P384', 'EC-P384'),
+        ('RSA-4096', 'RSA-2048', 'RSA-2048'),
+        ('ML-DSA-44', 'ML-DSA-65', 'ML-DSA-65'),
     ])
     def test_a_key_of_another_family_is_refused(self, app, pinned_templates,
                                                 template_key, csr_key, csr_label):
@@ -161,11 +164,13 @@ class TestTemplateKeyFamily:
         assert err == (f"Template 'WSTEP family CA {template_key} {template_key}' issues "
                        f'{template_key} keys, not {csr_label}'), err
 
-    @pytest.mark.parametrize('csr_key', ['ML-DSA-65', 'RSA-2048'])
+    @pytest.mark.parametrize('csr_key', ['ML-DSA-65', 'RSA-2048', 'EC-P384', 'EC-P256'])
     def test_the_template_of_the_key_family_wins_an_eku_tie(self, app, pinned_templates, csr_key):
+        # Bench of 06/11: a P-384 request was issued under the P-256 template (lower id)
         from services.xcep.policy_builder import _policy_oid_for_template
         with app.app_context():
-            ca, ids = pinned_templates(f'WSTEP family tie CA {csr_key}', 'RSA-2048', 'ML-DSA-65')
+            ca, ids = pinned_templates(f'WSTEP family tie CA {csr_key}',
+                                       'RSA-2048', 'ML-DSA-65', 'EC-P256', 'EC-P384')
             csr = _client_auth_csr(key_algorithms.generate(csr_key), 'tie.pq.example.test')
             cert_pem, err = wstep_service.issue(ca, csr.public_bytes(serialization.Encoding.DER),
                                                 validity_days=30)
@@ -174,6 +179,17 @@ class TestTemplateKeyFamily:
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
         assert key_algorithms.label_for_public_key(cert.public_key()) == csr_key
         assert _names_template(cert, expected)
+
+
+def test_a_longer_rsa_key_fits_a_shorter_rsa_template(app, pinned_templates):
+    with app.app_context():
+        ca, _ = pinned_templates('WSTEP RSA floor CA', 'RSA-2048')
+        csr = _client_auth_csr(key_algorithms.generate('RSA-3072'), 'floor.pq.example.test')
+        cert_pem, err = wstep_service.issue(ca, csr.public_bytes(serialization.Encoding.DER),
+                                            validity_days=30)
+    assert err is None, err
+    assert key_algorithms.label_for_public_key(
+        x509.load_pem_x509_certificate(cert_pem.encode()).public_key()) == 'RSA-3072'
 
 
 def _mldsa_leaf(app, ca):

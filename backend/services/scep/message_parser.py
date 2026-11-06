@@ -259,7 +259,9 @@ def verify_cms_signature(signed_data, signer_cert, signer_info=None) -> None:
             bytes(signature), signed_bytes, padding.PKCS1v15(), hash_cls()
         )
     elif isinstance(public_key, ec.EllipticCurvePublicKey):
-        if sig_alg != f"{digest_name}_ecdsa":
+        # Windows CertEnroll puts the key type (id-ecPublicKey) there instead of
+        # RFC 5753's ecdsa-with-SHA*; the digest then comes from digestAlgorithm
+        if sig_alg not in (f"{digest_name}_ecdsa", "1.2.840.10045.2.1"):
             raise ValueError(f"Unsupported ECDSA CMS signature algorithm: {sig_alg}")
         public_key.verify(bytes(signature), signed_bytes, ec.ECDSA(hash_cls()))
     elif isinstance(public_key, dsa.DSAPublicKey):

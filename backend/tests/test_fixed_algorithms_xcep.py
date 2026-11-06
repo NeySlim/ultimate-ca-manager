@@ -39,3 +39,20 @@ def test_rsa_outside_fips_stays_schema_2_with_a_nil_hash(monkeypatch):
     assert policy.findtext('x:attributes/x:policySchema', namespaces=NS) == '2'
     assert policy.find('x:attributes/x:hashAlgorithmOIDReference', NS).get(
         '{http://www.w3.org/2001/XMLSchema-instance}nil') == 'true'
+
+
+@pytest.mark.parametrize('key_type,curve_oid', [
+    ('EC-P256', '1.2.840.10045.3.1.7'),
+    ('EC-P384', '1.3.132.0.34'),
+    ('EC-P521', '1.3.132.0.35'),
+])
+def test_ecdsa_templates_name_their_curve_as_a_signature_key(monkeypatch, key_type, curve_oid):
+    # Without algorithmOIDReference CertEnroll generates an RSA key of the EC size (bench of 06/11)
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: False)
+    root, oids = _build([_template(1, key_type=key_type)])
+    pk = _policies(root)[0].find('x:attributes/x:privateKeyAttributes', NS)
+    ref = pk.findtext('x:algorithmOIDReference', namespaces=NS)
+    assert ref, 'algorithmOIDReference is nil'
+    value, group = oids[ref]
+    assert (value, group) == (curve_oid, '3')
+    assert pk.findtext('x:keySpec', namespaces=NS) == '2'

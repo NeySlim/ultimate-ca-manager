@@ -276,8 +276,8 @@ def _match_template(ca, csr):
     both want serverAuth-only), and ties break on lowest template id —
     arbitrary but deterministic. Returns ``(template, refusal)``: the matched
     ``CertificateTemplate`` row or ``None`` if nothing matches at all, and a
-    refusal when the request's EKUs match only a template of another key kind
-    (ML-DSA or not). A template of the other kind that scores 0 is no match:
+    refusal when the request's EKUs match only a template its key does not fit
+    (family, curve or size). A template the key does not fit that scores 0 is no match:
     the request falls back to no template, which is safe because the Enroll
     ACL and pinned fields then fall back to every template of the CA (a CA
     offering none is refused by the callers).
@@ -302,18 +302,18 @@ def _match_template(ca, csr):
 
     csr_eku = _eku_oids(csr) or set()
 
-    # An ML-DSA template only takes an ML-DSA key and the others never do: the
-    # match is made among the templates of the request key's kind, and a request
-    # whose EKUs name only a template of the other kind is refused.
-    csr_mldsa = _csr_key_label(csr).startswith('ML-DSA')
-    same = [t for t in candidates if _template_is_mldsa(t) == csr_mldsa]
+    # The match is made among the templates the request key fits (a P-384 key
+    # is not issued under a P-256 template sharing its EKUs); a request whose
+    # EKUs name only a template of another key is refused.
+    csr_label = _csr_key_label(csr)
+    same = [t for t in candidates if _template_takes_key(t, csr_label)]
     best, _score = _best_eku_match(same, csr_eku)
     if best is not None:
         return best, None
     other, score = _best_eku_match([t for t in candidates if t not in same], csr_eku)
     if other is not None and score > 0:
         return None, (f"Template '{other.name}' issues {_template_key_label(other)} keys, "
-                      f'not {_csr_key_label(csr)}')
+                      f'not {csr_label}')
     return None, None
 
 
@@ -365,7 +365,7 @@ def _renewal_template(ca, renewed_cert, csr):
     if template is None:
         return None, [], None, ('The certificate template of the certificate being renewed '
                                 'is not offered by this CA')
-    if _template_is_mldsa(template) != _csr_key_label(csr).startswith('ML-DSA'):
+    if not _template_takes_key(template, _csr_key_label(csr)):
         return None, [], None, (f"Template '{template.name}' issues {_template_key_label(template)} "
                                 f'keys, not {_csr_key_label(csr)}')
     extra = _template_extra_ekus(template)
@@ -413,9 +413,20 @@ def _template_key_label(template):
     return alg.label if alg is not None else str(template.key_type)
 
 
-def _template_is_mldsa(template):
-    alg = key_algorithms.get(template.key_type or 'RSA-2048')
-    return alg is not None and alg.family == 'ML-DSA'
+def _template_takes_key(template, csr_label):
+    """Whether a key of ``csr_label`` fits ``template``: same curve or ML-DSA
+    set, an RSA key at least as long. An unknown key fits any non-ML-DSA template."""
+    wanted = key_algorithms.get(template.key_type or 'RSA-2048')
+    got = key_algorithms.get(csr_label)
+    if wanted is None:
+        return True
+    if got is None:
+        return wanted.family != 'ML-DSA'
+    if wanted.family != got.family:
+        return False
+    if wanted.family == 'RSA':
+        return got.key_size >= wanted.key_size
+    return got.label == wanted.label
 
 
 def _csr_key_label(csr):
