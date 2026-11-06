@@ -82,7 +82,7 @@ def create_user_mtls_certificate(user_id):
         valid_until = cert_obj.not_valid_after_utc if hasattr(cert_obj, 'not_valid_after_utc') else cert_obj.not_valid_after
 
         from services.mtls_enrollment import enrolments_of
-        if enrolments_of(serial, issuer_dn):
+        if enrolments_of(cert_obj.serial_number, cert_obj.issuer):
             return error_response('This certificate is already enrolled', 409)
 
         cn = ''

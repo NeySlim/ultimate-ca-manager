@@ -171,3 +171,57 @@ def test_a_restore_adds_the_other_issuers_certificate_of_that_serial(app, auth_c
         db.session.expire_all()
         rows = AuthCertificate.query.filter(AuthCertificate.cert_subject == f'CN={SUBJECT}').all()
         assert sorted(r.cert_issuer for r in rows) == sorted([_info(pem_a)['issuer_dn'], archived['cert_issuer']])
+
+
+def _named_leaf(issuer, serial):
+    key = ec.generate_private_key(ec.SECP256R1())
+    now = datetime.now(timezone.utc)
+    cert = (x509.CertificateBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, SUBJECT)]))
+            .issuer_name(issuer).public_key(key.public_key()).serial_number(serial)
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
+            .sign(ec.generate_private_key(ec.SECP256R1()), hashes.SHA256()))
+    return cert.public_bytes(serialization.Encoding.PEM).decode()
+
+
+@pytest.mark.parametrize('keep_pem', [True, False], ids=['enrolled-with-its-pem', 'issuer-text-only'])
+@pytest.mark.parametrize('header', [
+    'emailAddress=ca@x.org,O=Soci\\C3\\A9t\\C3\\A9',   # nginx $ssl_client_i_dn
+    'O=Société,emailAddress=ca@x.org',                # another order, raw UTF-8
+    '/O=Société/emailAddress=ca@x.org',               # OpenSSL's legacy form
+])
+def test_the_issuer_a_proxy_spells_otherwise_still_signs_in(app, auth_client, same_serial, header, keep_pem):
+    tag = uuid.uuid4().hex[:6]
+    issuer = x509.Name([x509.NameAttribute(NameOID.EMAIL_ADDRESS, 'ca@x.org'),
+                        x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Société')])
+    serial = same_serial[0] + 7
+    pem = _named_leaf(issuer, serial)
+    r = _import(auth_client, pem)
+    assert r.status_code == 201, (tag, r.get_json())
+    with app.app_context():
+        row = db.session.get(AuthCertificate, r.get_json()['data']['id'])
+        assert row.cert_issuer == issuer.rfc4514_string() == 'O=Société,1.2.840.113549.1.9.1=ca@x.org'
+        if not keep_pem:
+            row.cert_pem = None
+            db.session.commit()
+        info = {'serial': format(serial, 'X'), 'issuer_dn': header, 'fingerprint': None,
+                'subject_dn': f'CN={SUBJECT}'}
+        user, found, err = MTLSAuthService.authenticate_certificate(info)
+        assert user is not None and found.id == row.id, err
+        # Another issuer, read on both sides, is another certificate
+        other = dict(info, issuer_dn=header.replace('x.org', 'y.org'))
+        assert MTLSAuthService.authenticate_certificate(other)[2] == 'Certificate not enrolled'
+
+
+def test_a_serial_from_headers_is_hexadecimal(app, auth_client, same_serial):
+    """`10` in a header is 0x10: it never opens the enrolment of the certificate numbered ten."""
+    issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'Hex reading {uuid.uuid4().hex[:6]}')])
+    pem = _named_leaf(issuer, 10)
+    r = _import(auth_client, pem)
+    assert r.status_code == 201, r.get_json()
+    with app.app_context():
+        assert db.session.get(AuthCertificate, r.get_json()['data']['id']).cert_serial == '10'
+        info = {'issuer_dn': issuer.rfc4514_string(), 'fingerprint': None, 'subject_dn': f'CN={SUBJECT}'}
+        assert MTLSAuthService.authenticate_certificate(dict(info, serial='10'))[2] == 'Certificate not enrolled'
+        user, _found, err = MTLSAuthService.authenticate_certificate(dict(info, serial='0A'))
+        assert user is not None, err

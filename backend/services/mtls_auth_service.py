@@ -41,7 +41,7 @@ class MTLSAuthService:
         
         # By (issuer, serial) in any stored form, the fingerprint telling same-serial ones apart
         from services.mtls_enrollment import presented_enrolment
-        auth_cert = presented_enrolment(serial, cert_info.get('issuer_dn'), fingerprint)
+        auth_cert = presented_enrolment(cert_info)
         
         # If not found by serial, try fingerprint
         if not auth_cert and fingerprint:
@@ -186,7 +186,7 @@ class MTLSAuthService:
         
         # Check if certificate already enrolled
         from services.mtls_enrollment import enrolments_of
-        if enrolments_of(cert_info['serial'], cert_info['issuer_dn']):
+        if enrolments_of(cert.serial_number, cert.issuer):
             return False, "Certificate already enrolled", None
         
         # Check validity

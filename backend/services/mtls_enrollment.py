@@ -40,68 +40,187 @@ def normalized_fingerprint(value) -> Optional[Tuple[str, str]]:
     return None
 
 
-def serial_forms(raw) -> set:
-    """Every stored form of a serial (decimal, hex): one certificate is one
-    enrolment whatever route recorded it."""
-    forms = {str(raw)}
-    for base in (10, 16):
-        try:
-            forms |= serial_variants(int(str(raw), base))
-        except (TypeError, ValueError):
+# Attribute names a proxy writes (OpenSSL's, RFC 4514's) to their OID
+_DN_NAMES = {
+    'cn': '2.5.4.3', 'commonname': '2.5.4.3', 'c': '2.5.4.6', 'countryname': '2.5.4.6',
+    'l': '2.5.4.7', 'localityname': '2.5.4.7', 'st': '2.5.4.8', 's': '2.5.4.8',
+    'stateorprovincename': '2.5.4.8', 'street': '2.5.4.9', 'streetaddress': '2.5.4.9',
+    'o': '2.5.4.10', 'organizationname': '2.5.4.10', 'ou': '2.5.4.11',
+    'organizationalunitname': '2.5.4.11', 'title': '2.5.4.12', 'sn': '2.5.4.4', 'surname': '2.5.4.4',
+    'serialnumber': '2.5.4.5', 'gn': '2.5.4.42', 'givenname': '2.5.4.42', 'initials': '2.5.4.43',
+    'generationqualifier': '2.5.4.44', 'dnqualifier': '2.5.4.46', 'pseudonym': '2.5.4.65',
+    'postalcode': '2.5.4.17', 'businesscategory': '2.5.4.15', 'organizationidentifier': '2.5.4.97',
+    'dc': '0.9.2342.19200300.100.1.25', 'domaincomponent': '0.9.2342.19200300.100.1.25',
+    'uid': '0.9.2342.19200300.100.1.1', 'userid': '0.9.2342.19200300.100.1.1',
+    'emailaddress': '1.2.840.113549.1.9.1', 'email': '1.2.840.113549.1.9.1', 'e': '1.2.840.113549.1.9.1',
+}
+
+
+def _dn_value(text: str) -> str:
+    r"""An attribute value with its RFC 4514 escapes (``\,``, ``\C3\A9``) undone, compared caselessly."""
+    out, i = bytearray(), 0
+    while i < len(text):
+        pair = text[i + 1:i + 3]
+        if text[i] == '\\' and len(pair) == 2 and all(c in '0123456789abcdefABCDEF' for c in pair):
+            out.append(int(text[i + 1:i + 3], 16))
+            i += 3
+        elif text[i] == '\\' and i + 1 < len(text):
+            out += text[i + 1].encode()
+            i += 2
+        else:
+            out += text[i].encode()
+            i += 1
+    return ' '.join(out.decode('utf-8').split()).casefold()
+
+
+def _split_unescaped(text: str, separators: str) -> list:
+    parts, current, i = [], '', 0
+    while i < len(text):
+        if text[i] == '\\' and i + 1 < len(text):
+            current += text[i:i + 2]
+            i += 2
             continue
-    return forms
+        if text[i] in separators:
+            parts.append(current)
+            current = ''
+        else:
+            current += text[i]
+        i += 1
+    return parts + [current]
 
 
-def issuer_key(dn) -> str:
-    """An issuer DN compared across spellings: RFC 4514, or OpenSSL's ``/C=../CN=..``."""
+def dn_attributes(dn) -> Optional[frozenset]:
+    """A DN as a set of (OID, value), order ignored, or None when it cannot be read.
+
+    Takes a ``x509.Name``, an RFC 4514 string (cryptography's, or OpenSSL's
+    with short names such as ``emailAddress``) or OpenSSL's ``/C=FR/CN=..``.
+    """
+    if isinstance(dn, x509.Name):
+        return frozenset((a.oid.dotted_string, ' '.join(str(a.value).split()).casefold()) for a in dn)
     text = str(dn or '').strip()
-    if text.startswith('/'):
-        text = ','.join(reversed([part for part in text.split('/') if part]))
-    return ','.join(part.strip() for part in text.split(',')).casefold()
+    if not text:
+        return None
+    parts = _split_unescaped(text[1:], '/') if text.startswith('/') else _split_unescaped(text, ',+')
+    attributes = set()
+    for part in parts:
+        name, sep, value = part.partition('=')
+        name = name.strip()
+        if not sep or not name:
+            return None
+        oid = name if all(c.isdigit() or c == '.' for c in name) else _DN_NAMES.get(name.casefold())
+        if oid is None:
+            return None
+        try:
+            attributes.add((oid, _dn_value(value.strip())))
+        except UnicodeDecodeError:
+            return None
+    return frozenset(attributes)
 
 
-def _rank(row, serial, wanted):
-    # Same issuer before an unrecorded one, the serial as spelled before another form
-    same_issuer = wanted is None or (row.cert_issuer and issuer_key(row.cert_issuer) == wanted)
-    return (0 if same_issuer else 1), (0 if row.cert_serial == str(serial) else 1)
+def _issuer_match(row, presented) -> Optional[bool]:
+    """Whether an enrolment's issuer is the presented one; None when either cannot be read."""
+    if presented is None:
+        return None
+    enrolled = _load(row.cert_pem)
+    stored = dn_attributes(enrolled.issuer) if enrolled is not None else dn_attributes(row.cert_issuer)
+    return None if stored is None else stored == presented
 
 
-def enrolments_of(serial, issuer=None) -> list:
-    """The enrolments of certificate (``issuer``, ``serial``), best match first.
+def same_issuer(one, other) -> Optional[bool]:
+    """Whether two DNs name one issuer: the same text, or the same attributes; None when unreadable."""
+    if one and one == other:
+        return True
+    one, other = dn_attributes(one), dn_attributes(other)
+    return None if one is None or other is None else one == other
 
-    A serial is unique per issuer only: an enrolment under another issuer is
-    another certificate. One that recorded no issuer may be of any; without
-    ``issuer``, every enrolment of that serial is returned.
+
+def _serial_match(row, serial: int) -> Optional[int]:
+    """How an enrolment's serial is ``serial``: 0 by its certificate, 1 read as decimal, 2 as hex.
+
+    None when it is not: the stored text is read both ways, its certificate settles it.
+    """
+    enrolled = _load(row.cert_pem)
+    if enrolled is not None:
+        return 0 if enrolled.serial_number == serial else None
+    raw = str(row.cert_serial or '').replace(':', '').strip()
+    for rank, base in ((1, 10), (2, 16)):
+        try:
+            if int(raw, base) == serial:
+                return rank
+        except ValueError:
+            continue
+    return None
+
+
+def _ranked(serial: int, issuer, pool=None) -> list:
+    """(rank, row) of the enrolments that may be certificate (issuer, serial), best first.
+
+    An issuer read on both sides excludes another one; unreadable, or unrecorded,
+    it only ranks lower.
     """
     from models.auth_certificate import AuthCertificate
-    if serial in (None, ''):
-        return []
-    rows = AuthCertificate.query.filter(
-        AuthCertificate.cert_serial.in_(serial_forms(serial))
-    ).order_by(AuthCertificate.id).all()
-    wanted = issuer_key(issuer) if issuer else None
-    if wanted is not None:
-        rows = [row for row in rows if not row.cert_issuer or issuer_key(row.cert_issuer) == wanted]
-    return sorted(rows, key=lambda row: _rank(row, serial, wanted))
+    forms = serial_variants(serial)
+    if pool is None:
+        rows = AuthCertificate.query.filter(AuthCertificate.cert_serial.in_(forms)).order_by(AuthCertificate.id).all()
+    else:
+        rows = sorted({row.id: row for form in forms for row in pool.get(form, ())}.values(), key=lambda r: r.id)
+    presented = dn_attributes(issuer) if issuer is not None else None
+    ranked = []
+    for row in rows:
+        serial_rank = _serial_match(row, serial)
+        if serial_rank is None:
+            continue
+        same = _issuer_match(row, presented) if row.cert_issuer or row.cert_pem else None
+        if same is False:
+            continue
+        ranked.append(((0 if same else 1, serial_rank), row))
+    return sorted(ranked, key=lambda item: (item[0], item[1].id))
 
 
-def presented_enrolment(serial, issuer=None, fingerprint=None):
-    """The enrolment a presented certificate names, or None.
+def enrolments_of(serial: int, issuer=None, pool=None) -> list:
+    """The enrolments that may be certificate (``issuer``, ``serial``), best match first.
+
+    A serial is unique per issuer only (RFC 5280 §4.1.2.2). ``issuer`` is a
+    ``x509.Name`` or a DN string; ``pool`` maps stored serials to rows, for a caller checking many.
+    """
+    return [row for _rank, row in _ranked(serial, issuer, pool)]
+
+
+def presented_identity(cert_info: dict):
+    """(serial, issuer) of a presented certificate: from the certificate when it came, else its headers.
+
+    A serial from headers is hexadecimal (nginx, Apache); None when unreadable.
+    """
+    cert = _load((cert_info.get('cert_pem') or '').encode()) if cert_info.get('cert_pem') else None
+    if cert is not None:
+        return cert.serial_number, cert.issuer
+    try:
+        return int(str(cert_info.get('serial')).replace(':', ''), 16), cert_info.get('issuer_dn')
+    except (TypeError, ValueError):
+        return None, cert_info.get('issuer_dn')
+
+
+def presented_enrolment(cert_info: dict):
+    """The enrolment of a presented certificate, or None.
 
     The fingerprint tells same-serial enrolments apart; failing it, the best
     match must be the only one of its rank, never a guess between two.
     """
-    rows = enrolments_of(serial, issuer)
-    presented = normalized_fingerprint(fingerprint)
+    serial, issuer = presented_identity(cert_info)
+    if serial is None:
+        return None
+    ranked = _ranked(serial, issuer)
+    presented = normalized_fingerprint(cert_info.get('fingerprint'))
     if presented:
-        for row in rows:
+        for _rank, row in ranked:
             if normalized_fingerprint(row.cert_fingerprint) == presented:
                 return row
-    if not rows:
+    best = [row for rank, row in ranked if ranked and rank == ranked[0][0]]
+    if len(best) > 1:
+        logger.warning("mTLS: %d enrolments compete for serial %X (ids %s), none chosen",
+                       len(best), serial, ', '.join(str(row.id) for row in best))
         return None
-    wanted = issuer_key(issuer) if issuer else None
-    best = [row for row in rows if _rank(row, serial, wanted) == _rank(rows[0], serial, wanted)]
-    return best[0] if len(best) == 1 else None
+    return best[0] if best else None
 
 
 def _fingerprint(der: bytes, algorithm: str) -> str:
