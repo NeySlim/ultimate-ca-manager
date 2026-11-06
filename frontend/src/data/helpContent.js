@@ -251,9 +251,10 @@ export const helpContent = {
       {
         title: 'Deployment (v2.215)',
         icon: CloudArrowUp,
-        content: 'Push this certificate to remote hosts over SSH/SFTP, admin-only, targets are managed in Settings › Deployment.',
+        content: 'Push this certificate to remote hosts over SSH/SFTP or to an HTTP API, admin-only, targets are managed in Settings › Deployment.',
         items: [
           { label: 'Attach target', text: 'From the certificate detail view: pick a deploy target and set absolute destination paths for the certificate, private key and/or full chain (at least one). The full chain leaves out the root CA unless Include Root CA is ticked' },
+          { label: 'HTTP API (v2.252)', text: 'An HTTP target takes no paths: on issuance, renewal and Deploy now, UCM sends one request built from the target\'s body template (certificate, chain, subject, serial, and the private key only when the target allows it)' },
           { label: 'Same host', text: 'To deploy on the UCM host itself, use an SFTP target at 127.0.0.1 with a dedicated SSH account; the sandboxed service cannot write outside its data directory' },
           { label: 'Automatic', text: 'On issuance and renewal, the bound files are pushed again and that deployment\'s optional reload command runs; deliveries are queued with retries' },
           { label: 'Files', text: 'Written atomically at the exact configured paths (parent directory must exist): key 0600, certificate/chain 0644' },
@@ -1106,7 +1107,7 @@ export const helpContent = {
           { label: 'Updates', text: 'Check for new versions, view changelog, scheduled daily check with opt-in unattended install (DEB/RPM)' },
           { label: 'Webhooks', text: 'HTTP webhooks for certificate events (issue, revoke, expire): internal LAN URLs allowed; cloud-metadata IPs blocked. Optional outbound auth: Bearer, Basic, API key, or custom header' },
           { label: 'Unique webhook names (v2.251)', text: 'A webhook name already in use is refused (409), on creation and on rename. The upgrade renamed earlier duplicates "name (2)", "name (3)", oldest first' },
-          { label: 'Deployment', text: 'Deploy targets provide reusable SSH/SFTP connections; certificate and CRL deployments define their own paths and optional reload commands (admin-only, v2.215)' },
+          { label: 'Deployment', text: 'Deploy targets provide reusable SSH/SFTP connections, or an HTTP API request (v2.252); certificate and CRL deployments define their own paths and optional reload commands (admin-only, v2.215)' },
           { label: 'Active Directory', text: "UCM's own AD/LDAP connection for certificate-related lookups (Kerberos principal resolution, AD-derived subjects)" },
           { label: 'Windows Autoenrollment', text: 'MS-XCEP/MS-WSTEP native Windows enrollment: policy discovery, certificate issuance, and Kerberos/SPNEGO binding' },
           { label: 'About', text: 'System Information, Links & Resources and the Support UCM link to Ko-fi (administrators also see a dismissible Ko-fi card once per UCM version). With admin:system, Check FIPS readiness lists what FIPS mode would refuse on this instance, with a remedy for each, and changes nothing' },
@@ -1116,9 +1117,10 @@ export const helpContent = {
       {
         title: 'Deploy hooks (v2.215)',
         icon: CloudArrowUp,
-        content: 'Settings › Deployment (admin-only): reusable SSH/SFTP connections for certificate and CRL deployments. Paths and optional reload commands are configured on each deployment.',
+        content: 'Settings › Deployment (admin-only): reusable SSH/SFTP connections, or HTTP API requests, for certificate and CRL deployments. Paths and optional reload commands are configured on each SSH deployment.',
         items: [
           { label: 'Target', text: 'Host, port, SSH user. UCM generates an ed25519 key (install the shown public key on the target) or accepts an imported private key, stored encrypted' },
+          { label: 'HTTP API target (v2.252)', text: 'URL, method (POST, PUT, PATCH), request headers stored encrypted and never shown again, and a body template with {{cert_pem}}, {{fullchain_pem}}, {{cn}}, {{serial}}... plus |json, |b64 and |urlencode filters. A JSON body is checked at save time. The private key ({{key_pem}}) leaves only with the target\'s explicit opt-in and an https URL; the TLS certificate is always verified, against a pasted trust anchor if the appliance is self-signed. Redirects are refused, cloud-metadata addresses blocked. Certificates only: CRLs stay on SSH targets' },
           { label: 'Host key', text: 'Pinned on the first successful connection (trust-on-first-use); any later change fails closed. Changing the host re-pins' },
           { label: 'Reload command', text: 'An optional command configured per certificate or CRL binding and run after a successful push (e.g. systemctl reload nginx): exit 0 = success, no templating' },
           { label: 'Bindings', text: 'Certificates are attached from the certificate detail view; CRLs are attached under CRL & OCSP. Each binding owns its paths, file options and reload command' },

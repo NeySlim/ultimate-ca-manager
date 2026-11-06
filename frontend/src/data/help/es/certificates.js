@@ -77,9 +77,10 @@ export default {
       },
       {
         title: 'Despliegue (v2.215)',
-        content: 'Envíe este certificado a hosts remotos por SSH/SFTP, solo administradores, los destinos se gestionan en Ajustes › Despliegue.',
+        content: 'Envíe este certificado a hosts remotos por SSH/SFTP o a una API HTTP, solo administradores, los destinos se gestionan en Ajustes › Despliegue.',
         items: [
           { label: 'Asociar destino', text: 'Desde la vista de detalle del certificado: elija un destino de despliegue y defina rutas de destino absolutas para el certificado, la clave privada y/o la cadena completa (al menos una). La cadena completa omite la CA raíz salvo que se marque Incluir CA raíz' },
+          { label: 'API HTTP (v2.252)', text: "Un destino HTTP no usa rutas: en la emisión, la renovación y Desplegar ahora, UCM envía una solicitud construida a partir de la plantilla de cuerpo del destino (certificado, cadena, sujeto, número de serie y la clave privada solo si el destino lo permite)" },
           { label: 'Mismo host', text: 'Para desplegar en el propio host de UCM, use un destino SFTP en 127.0.0.1 con una cuenta SSH dedicada; el servicio aislado no puede escribir fuera de su directorio de datos' },
           { label: 'Automático', text: 'En la emisión y renovación, los archivos vinculados se envían de nuevo y se ejecuta el comando de recarga opcional de ese despliegue; las entregas se encolan con reintentos' },
           { label: 'Archivos', text: 'Se escriben de forma atómica en las rutas exactas configuradas (el directorio padre debe existir): clave 0600, certificado/cadena 0644' },

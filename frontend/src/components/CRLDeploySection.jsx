@@ -53,7 +53,8 @@ export function CRLDeploySection({ ca, hasCRL }) {
       ])
       if (seq !== sequence.current) return
       setBindings(extractData(bindingRes) || [])
-      setTargets((extractData(targetRes) || []).filter(target => target.enabled))
+      // CRLs are files: an HTTP target (#428) carries certificates only
+      setTargets((extractData(targetRes) || []).filter(target => target.enabled && target.kind !== 'http'))
     } catch (error) {
       if (!silent) {
         showError(error.message || t('crlDeploy.loadFailed', 'Failed to load CRL deployments'))

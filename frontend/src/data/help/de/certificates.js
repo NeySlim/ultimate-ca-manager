@@ -77,9 +77,10 @@ export default {
       },
       {
         title: 'Bereitstellung (v2.215)',
-        content: 'Dieses Zertifikat per SSH/SFTP auf entfernte Hosts übertragen, nur für Admins, Ziele werden unter Einstellungen › Bereitstellung verwaltet.',
+        content: 'Dieses Zertifikat per SSH/SFTP auf entfernte Hosts oder an eine HTTP-API übertragen, nur für Admins, Ziele werden unter Einstellungen › Bereitstellung verwaltet.',
         items: [
           { label: 'Ziel verknüpfen', text: 'Aus der Zertifikat-Detailansicht: ein Deploy-Ziel wählen und absolute Zielpfade für Zertifikat, privaten Schlüssel und/oder vollständige Kette festlegen (mindestens einen). Die vollständige Kette enthält die Root-CA nur, wenn Root-CA einschließen aktiviert ist' },
+          { label: 'HTTP-API (v2.252)', text: 'Ein HTTP-Ziel benötigt keine Pfade: Bei Ausstellung, Erneuerung und „Jetzt bereitstellen" sendet UCM eine Anfrage, die aus der Body-Vorlage des Ziels erzeugt wird (Zertifikat, Kette, Subject, Seriennummer und den privaten Schlüssel nur, wenn das Ziel es erlaubt)' },
           { label: 'Derselbe Host', text: 'Für eine Bereitstellung auf dem UCM-Host selbst ein SFTP-Ziel unter 127.0.0.1 mit einem dedizierten SSH-Konto verwenden; der Sandbox-Dienst kann nicht außerhalb seines Datenverzeichnisses schreiben' },
           { label: 'Automatisch', text: 'Bei Ausstellung und Erneuerung werden die verknüpften Dateien erneut übertragen und der Reload-Befehl dieser Zertifikats-Bereitstellung ausgeführt, Zustellungen werden mit Wiederholungen in die Warteschlange gestellt' },
           { label: 'Dateien', text: 'Werden atomar an den exakt konfigurierten Pfaden geschrieben (übergeordnetes Verzeichnis muss existieren): Schlüssel 0600, Zertifikat/Kette 0644' },

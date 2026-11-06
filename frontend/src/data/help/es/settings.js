@@ -104,7 +104,7 @@ export default {
           { label: 'Actualizaciones', text: 'Buscar nuevas versiones, ver registro de cambios, comprobación diaria programada con instalación desatendida opcional (DEB/RPM)' },
           { label: 'Webhooks', text: 'Webhooks HTTP para eventos de certificados (emisión, revocación, expiración). Autenticación saliente opcional: Bearer, Basic, API key o encabezado personalizado' },
           { label: 'Nombres de webhook únicos (v2.251)', text: 'Se rechaza (409) un nombre de webhook ya en uso, al crear y al renombrar. La actualización renombró los duplicados anteriores como «nombre (2)», «nombre (3)», empezando por el más antiguo' },
-          { label: 'Despliegue', text: 'Los destinos de despliegue son conexiones SSH/SFTP reutilizables; cada despliegue de certificado o de CRL define sus propias rutas y su comando de recarga opcional (solo administradores, v2.215)' },
+          { label: 'Despliegue', text: 'Los destinos de despliegue son conexiones SSH/SFTP reutilizables, o una solicitud a una API HTTP (v2.252); cada despliegue de certificado o de CRL define sus propias rutas y su comando de recarga opcional (solo administradores, v2.215)' },
           { label: 'Active Directory', text: 'Conexión propia de UCM a AD/LDAP para búsquedas relacionadas con certificados (resolución de entidades de seguridad Kerberos, sujetos derivados de AD)' },
           { label: 'Autoinscripción de Windows', text: 'Inscripción nativa de Windows MS-XCEP/MS-WSTEP: descubrimiento de directivas, emisión de certificados y vinculación Kerberos/SPNEGO' },
           { label: 'Acerca de', text: 'Información del sistema, Enlaces y recursos y Apoyar UCM enlazan a Ko-fi (los administradores ven además una tarjeta de Ko-fi descartable una vez por versión de UCM). Con admin:system, Comprobar la preparación para FIPS enumera lo que el modo FIPS rechazaría en esta instancia, con un remedio para cada caso, y no modifica nada' },
@@ -113,9 +113,10 @@ export default {
       },
       {
         title: 'Hooks de despliegue (v2.215)',
-        content: 'Ajustes › Despliegue (solo administradores): conexiones SSH/SFTP reutilizables para los despliegues de certificados y de CRL. Las rutas y el comando de recarga opcional se configuran en cada despliegue.',
+        content: 'Ajustes › Despliegue (solo administradores): conexiones SSH/SFTP reutilizables, o solicitudes a una API HTTP, para los despliegues de certificados y de CRL. Las rutas y el comando de recarga opcional se configuran en cada despliegue SSH.',
         items: [
           { label: 'Destino', text: 'Host, puerto, usuario SSH. UCM genera una clave ed25519 (instale la clave pública mostrada en el destino) o acepta una clave privada importada, almacenada cifrada' },
+          { label: 'Destino de API HTTP (v2.252)', text: "URL, método (POST, PUT, PATCH), cabeceras de la solicitud almacenadas cifradas y que no se vuelven a mostrar, y una plantilla de cuerpo con {{cert_pem}}, {{fullchain_pem}}, {{cn}}, {{serial}}... más los filtros |json, |b64 y |urlencode. Un cuerpo JSON se valida al guardar. La clave privada ({{key_pem}}) solo sale con la aceptación explícita del destino y una URL https; el certificado TLS siempre se verifica, contra un ancla de confianza pegada si el equipo es autofirmado. Se rechazan las redirecciones y se bloquean las direcciones de metadatos de la nube. Solo certificados: las CRL permanecen en destinos SSH" },
           { label: 'Host key', text: 'Se fija en la primera conexión exitosa (trust-on-first-use); cualquier cambio posterior falla en cerrado. Cambiar el host vuelve a fijarla' },
           { label: 'Comando de recarga', text: 'Un comando opcional, configurado en cada vinculación de certificado o de CRL y ejecutado tras un envío exitoso (por ej. systemctl reload nginx): exit 0 = éxito, sin plantillas' },
           { label: 'Vinculaciones', text: 'Los certificados se asocian desde la vista de detalle del certificado; las CRL, desde CRL & OCSP. Cada vinculación tiene sus propias rutas, opciones de archivo y comando de recarga' },

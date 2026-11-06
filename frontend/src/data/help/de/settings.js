@@ -104,7 +104,7 @@ export default {
           { label: 'Updates', text: 'Nach neuen Versionen suchen, Änderungsprotokoll anzeigen, geplante tägliche Prüfung mit optionaler unbeaufsichtigter Installation (DEB/RPM)' },
           { label: 'Webhooks', text: 'HTTP-Webhooks für Zertifikatsereignisse (Ausstellung, Widerruf, Ablauf)' },
           { label: 'Eindeutige Webhook-Namen (v2.251)', text: 'Ein bereits verwendeter Webhook-Name wird abgelehnt (409), beim Anlegen und beim Umbenennen. Das Upgrade hat frühere Duplikate in „Name (2)“, „Name (3)“ umbenannt, die ältesten zuerst' },
-          { label: 'Bereitstellung', text: 'Deploy-Ziele stellen wiederverwendbare SSH-/SFTP-Verbindungen bereit; Zertifikats- und CRL-Bereitstellungen legen eigene Pfade und optionale Reload-Befehle fest (nur Admins, v2.215)' },
+          { label: 'Bereitstellung', text: 'Deploy-Ziele stellen wiederverwendbare SSH-/SFTP-Verbindungen oder eine HTTP-API-Anfrage (v2.252) bereit; Zertifikats- und CRL-Bereitstellungen legen eigene Pfade und optionale Reload-Befehle fest (nur Admins, v2.215)' },
           { label: 'Active Directory', text: 'UCMs eigene AD/LDAP-Verbindung für zertifikatsbezogene Abfragen (Kerberos-Prinzipalauflösung, AD-abgeleitete Betreffe)' },
           { label: 'Windows-Autoregistrierung', text: 'MS-XCEP/MS-WSTEP native Windows-Registrierung: Richtlinienermittlung, Zertifikatsausstellung und Kerberos/SPNEGO-Bindung' },
           { label: 'Info', text: 'Systeminformationen, Links & Ressourcen und UCM unterstützen verweisen auf Ko-fi (Administratoren sehen zudem einmal pro UCM-Version eine ausblendbare Ko-fi-Karte). Mit admin:system listet FIPS-Bereitschaft prüfen auf, was der FIPS-Modus auf dieser Instanz ablehnen würde, mit je einer Abhilfe, und ändert nichts' },
@@ -113,9 +113,10 @@ export default {
       },
       {
         title: 'Deploy-Hooks (v2.215)',
-        content: 'Einstellungen › Bereitstellung (nur Admins): wiederverwendbare SSH-/SFTP-Verbindungen für Zertifikats- und CRL-Bereitstellungen. Pfade und optionale Reload-Befehle werden an jeder Bereitstellung konfiguriert.',
+        content: 'Einstellungen › Bereitstellung (nur Admins): wiederverwendbare SSH-/SFTP-Verbindungen oder HTTP-API-Anfragen für Zertifikats- und CRL-Bereitstellungen. Pfade und optionale Reload-Befehle werden an jeder SSH-Bereitstellung konfiguriert.',
         items: [
           { label: 'Ziel', text: 'Host, Port, SSH-Benutzer. UCM generiert einen ed25519-Schlüssel (den angezeigten öffentlichen Schlüssel auf dem Ziel installieren) oder akzeptiert einen importierten privaten Schlüssel, verschlüsselt gespeichert' },
+          { label: 'HTTP-API-Ziel (v2.252)', text: 'URL, Methode (POST, PUT, PATCH), Anfrage-Header, verschlüsselt gespeichert und nie wieder angezeigt, und eine Body-Vorlage mit {{cert_pem}}, {{fullchain_pem}}, {{cn}}, {{serial}}... plus den Filtern |json, |b64 und |urlencode. Ein JSON-Body wird beim Speichern geprüft. Der private Schlüssel ({{key_pem}}) wird nur mit ausdrücklichem Opt-in des Ziels und einer https-URL gesendet; das TLS-Zertifikat wird immer geprüft, bei selbstsignierter Appliance gegen einen eingefügten Vertrauensanker. Weiterleitungen werden abgelehnt, Cloud-Metadaten-Adressen blockiert. Nur Zertifikate: CRLs bleiben auf SSH-Zielen' },
           { label: 'Host-Key', text: 'Wird bei der ersten erfolgreichen Verbindung gepinnt (Trust-on-first-use); jede spätere Änderung lässt die Verbindung fehlschlagen (fail-closed). Bei Änderung des Hosts wird neu gepinnt' },
           { label: 'Reload-Befehl', text: 'Ein optionaler Befehl, der pro Zertifikats- oder CRL-Verknüpfung konfiguriert und nach einer erfolgreichen Übertragung ausgeführt wird (z. B. systemctl reload nginx): exit 0 = Erfolg, kein Templating' },
           { label: 'Verknüpfungen', text: 'Zertifikate werden aus der Zertifikat-Detailansicht verknüpft, CRLs unter CRL & OCSP. Jede Verknüpfung besitzt eigene Pfade, Dateioptionen und ihren Reload-Befehl' },

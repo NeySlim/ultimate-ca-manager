@@ -77,9 +77,10 @@ export default {
       },
       {
         title: 'Déploiement (v2.215)',
-        content: "Poussez ce certificat vers des hôtes distants en SSH/SFTP, réservé aux admins, les cibles se gèrent dans Paramètres › Déploiement.",
+        content: "Poussez ce certificat vers des hôtes distants en SSH/SFTP ou vers une API HTTP, réservé aux admins, les cibles se gèrent dans Paramètres › Déploiement.",
         items: [
           { label: 'Attacher une cible', text: "Depuis le panneau de détails du certificat : choisissez une cible de déploiement et définissez des chemins de destination absolus pour le certificat, la clé privée et/ou la chaîne complète (au moins un). La chaîne complète omet la CA racine sauf si Inclure l'AC racine est coché" },
+          { label: 'API HTTP (v2.252)', text: "Une cible HTTP n'a pas de chemins : à l'émission, au renouvellement et avec Déployer maintenant, UCM envoie une requête construite à partir du modèle de corps de la cible (certificat, chaîne, sujet, numéro de série, et la clé privée seulement si la cible l'autorise)" },
           { label: 'Même hôte', text: "Pour déployer sur l’hôte UCM lui-même, utilisez une cible SFTP sur 127.0.0.1 avec un compte SSH dédié ; le service isolé ne peut pas écrire hors de son répertoire de données" },
           { label: 'Automatique', text: "À l'émission et au renouvellement, les fichiers liés sont transférés à nouveau et la commande de rechargement de ce déploiement de certificat s'exécute ; les livraisons sont mises en file avec réessais" },
           { label: 'Fichiers', text: "Écrits de façon atomique aux chemins exacts configurés (le répertoire parent doit exister) : clé 0600, certificat/chaîne 0644" },

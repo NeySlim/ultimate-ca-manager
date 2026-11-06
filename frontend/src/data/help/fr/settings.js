@@ -104,7 +104,7 @@ export default {
           { label: 'Mises à jour', text: 'Vérifier les nouvelles versions, voir le journal des modifications, vérification quotidienne planifiée avec installation sans surveillance en opt-in (DEB/RPM)' },
           { label: 'Webhooks', text: 'Webhooks HTTP pour les événements de certificat (émission, révocation, expiration). Authentification sortante optionnelle : Bearer, Basic, API key ou en-tête personnalisé' },
           { label: "Noms de webhooks uniques (v2.251)", text: "Un nom de webhook déjà utilisé est refusé (409), à la création comme au renommage. La mise à jour a renommé les doublons existants « nom (2) », « nom (3) », du plus ancien au plus récent" },
-          { label: 'Déploiement', text: "Cibles de déploiement : connexions SSH/SFTP réutilisables ; chaque déploiement de certificat ou de CRL définit ses propres chemins et sa commande de rechargement facultative (réservé aux admins, v2.215)" },
+          { label: 'Déploiement', text: "Cibles de déploiement : connexions SSH/SFTP réutilisables, ou requête d'API HTTP (v2.252) ; chaque déploiement de certificat ou de CRL définit ses propres chemins et sa commande de rechargement facultative (réservé aux admins, v2.215)" },
           { label: 'Active Directory', text: "Connexion AD/LDAP propre à UCM pour les recherches liées aux certificats (résolution de principal Kerberos, sujets dérivés d'AD)" },
           { label: 'Auto-inscription Windows', text: 'Inscription Windows native MS-XCEP/MS-WSTEP : découverte de stratégie, émission de certificats et liaison Kerberos/SPNEGO' },
           { label: 'À propos', text: 'Informations système, Liens & Ressources et le lien Soutenir UCM mènent à Ko-fi (les administrateurs voient aussi une carte Ko-fi masquable une fois par version d\'UCM). Avec admin:system, Vérifier la préparation à FIPS liste ce que le mode FIPS refuserait sur cette instance, avec un remède pour chacun, et ne modifie rien' },
@@ -113,9 +113,10 @@ export default {
       },
       {
         title: 'Hooks de déploiement (v2.215)',
-        content: "Paramètres › Déploiement (réservé aux admins) : connexions SSH/SFTP réutilisables pour les déploiements de certificats et de CRL. Les chemins et la commande de rechargement facultative se règlent sur chaque déploiement.",
+        content: "Paramètres › Déploiement (réservé aux admins) : connexions SSH/SFTP réutilisables, ou requêtes d'API HTTP, pour les déploiements de certificats et de CRL. Les chemins et la commande de rechargement facultative se règlent sur chaque déploiement SSH.",
         items: [
           { label: 'Cible', text: "Hôte, port, utilisateur SSH. UCM génère une clé ed25519 (installez la clé publique affichée sur la cible) ou accepte une clé privée importée, stockée chiffrée" },
+          { label: 'Cible API HTTP (v2.252)', text: "URL, méthode (POST, PUT, PATCH), en-têtes de requête stockés chiffrés et jamais réaffichés, et un modèle de corps avec {{cert_pem}}, {{fullchain_pem}}, {{cn}}, {{serial}}... ainsi que les filtres |json, |b64 et |urlencode. Un corps JSON est vérifié à l'enregistrement. La clé privée ({{key_pem}}) ne part qu'avec l'accord explicite de la cible et une URL https ; le certificat TLS est toujours vérifié, contre une ancre de confiance collée si l'appliance est auto-signée. Les redirections sont refusées, les adresses de métadonnées cloud bloquées. Certificats uniquement : les CRL restent sur les cibles SSH" },
           { label: "Clé d'hôte", text: "Épinglée à la première connexion réussie (trust-on-first-use) ; tout changement ultérieur fait échouer la connexion. Changer l'hôte ré-épingle la clé" },
           { label: 'Commande de rechargement', text: "Une commande facultative, configurée sur chaque liaison de certificat ou de CRL et exécutée après un envoi réussi (par ex. systemctl reload nginx) : exit 0 = succès, pas de templating" },
           { label: 'Liaisons', text: "Les certificats sont attachés depuis le panneau de détails du certificat, les CRL depuis CRL & OCSP. Chaque liaison possède ses chemins, ses options de fichier et sa commande de rechargement" },

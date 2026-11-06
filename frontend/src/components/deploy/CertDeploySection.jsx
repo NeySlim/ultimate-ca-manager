@@ -3,6 +3,7 @@
  *
  * Shows the certificate's deploy bindings (target + destination paths + last
  * delivery status), lets an admin attach a target, push now, or detach.
+ * An HTTP target (#428) takes no paths: its body template decides what is sent.
  * Renders nothing for non-admin users or certificates without a cert.
  */
 import { useEffect, useState } from 'react'
@@ -61,6 +62,12 @@ export function CertDeploySection({ certificate }) {
   if (!eligible || bindings === null) return null
   if (bindings.length === 0 && !hasPermission('write:deploy')) return null
 
+  const selectedTarget = editing
+    ? { kind: editing.target_kind, allow_private_key: false }
+    : targets.find(target => String(target.id) === String(form.target_id))
+  const httpTarget = selectedTarget?.kind === 'http'
+  const hasPath = Boolean(form.cert_path.trim() || form.key_path.trim() || form.fullchain_path.trim())
+
   const openAdd = async () => {
     setEditing(null)
     try {
@@ -92,14 +99,18 @@ export function CertDeploySection({ certificate }) {
     setSaving(true)
     try {
       const optionalPath = value => value.trim() || (editing ? null : undefined)
-      const payload = {
+      const chainWanted = httpTarget || Boolean(form.fullchain_path.trim())
+      const payload = httpTarget ? {
+        include_root: Boolean(form.include_root),
+      } : {
         cert_path: optionalPath(form.cert_path),
         key_path: optionalPath(form.key_path),
         fullchain_path: optionalPath(form.fullchain_path),
         include_root: Boolean(form.fullchain_path.trim() && form.include_root),
         reload_command: form.reload_command.trim(),
-        ...(form.chain_variant !== 'auto' || (editing?.chain_variant && editing.chain_variant !== 'auto')
-          ? { chain_variant: form.fullchain_path.trim() ? form.chain_variant : 'auto' } : {}),
+      }
+      if (form.chain_variant !== 'auto' || (editing?.chain_variant && editing.chain_variant !== 'auto')) {
+        payload.chain_variant = chainWanted ? form.chain_variant : 'auto'
       }
       if (editing) {
         await deployService.updateBinding(editing.id, payload)
@@ -201,7 +212,9 @@ export function CertDeploySection({ certificate }) {
                 )}
               </div>
               <p className="text-2xs text-text-tertiary font-mono truncate">
-                {[binding.cert_path, binding.key_path, binding.fullchain_path].filter(Boolean).join(' · ')}
+                {binding.target_kind === 'http'
+                  ? t('deploy.httpBinding')
+                  : [binding.cert_path, binding.key_path, binding.fullchain_path].filter(Boolean).join(' · ')}
               </p>
               {binding.reload_command && (
                 <p className="text-2xs text-text-tertiary font-mono truncate"
@@ -247,7 +260,7 @@ export function CertDeploySection({ certificate }) {
                   <option value="" disabled>{t('deploy.selectTarget')}</option>
                   {targets.map(target => (
                     <option key={target.id} value={target.id}>
-                      {target.name} ({target.username}@{target.host})
+                      {target.name} ({target.kind === 'http' ? `${target.http_method} ${target.url}` : `${target.username}@${target.host}`})
                     </option>
                   ))}
                 </>
@@ -257,6 +270,13 @@ export function CertDeploySection({ certificate }) {
               <p className="text-2xs text-text-tertiary">{t('deploy.noAvailableTargets')}</p>
             )}
           </div>
+          {httpTarget && (
+            <p className="text-xs text-text-secondary p-3 bg-bg-tertiary border border-border rounded-md">
+              {t('deploy.httpBindingHint', { chainVariable: '{{chain_pem}}', fullchainVariable: '{{fullchain_pem}}' })}
+              {selectedTarget?.allow_private_key && ` ${t('deploy.httpBindingKeyHint')}`}
+            </p>
+          )}
+          {!httpTarget && (<>
           <div className="space-y-1">
             <label className="block text-xs font-medium text-text-secondary">{t('deploy.certPath')}</label>
             <input className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent-primary"
@@ -276,7 +296,8 @@ export function CertDeploySection({ certificate }) {
             <input className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm font-mono text-text-primary focus:outline-none focus:border-accent-primary"
                    placeholder="/etc/ssl/certs/app-fullchain.pem" value={form.fullchain_path} onChange={field('fullchain_path')} />
           </div>
-          {form.fullchain_path.trim() && (
+          </>)}
+          {(httpTarget || form.fullchain_path.trim()) && (
             <label className="flex items-start gap-3 p-3 bg-bg-tertiary border border-border rounded-md cursor-pointer">
               <input type="checkbox" className="mt-0.5 w-4 h-4 accent-accent-primary"
                      checked={form.include_root}
@@ -287,7 +308,7 @@ export function CertDeploySection({ certificate }) {
               </div>
             </label>
           )}
-          {form.fullchain_path.trim() && chainVariants.length > 1 && (
+          {(httpTarget || form.fullchain_path.trim()) && chainVariants.length > 1 && (
             <div className="space-y-1">
               <label htmlFor="deploy-chain-variant" className="block text-xs font-medium text-text-secondary">
                 {t('chainVariant.label')}
@@ -298,6 +319,7 @@ export function CertDeploySection({ certificate }) {
               <p className="text-2xs text-text-tertiary">{t('chainVariant.deployHint')}</p>
             </div>
           )}
+          {!httpTarget && (
           <div className="space-y-1">
             <label className="block text-xs font-medium text-text-secondary">
               {t('deploy.reloadCommand')}
@@ -307,14 +329,15 @@ export function CertDeploySection({ certificate }) {
                    value={form.reload_command} onChange={field('reload_command')} maxLength={512} />
             <p className="text-2xs text-text-tertiary">{t('deploy.reloadCommandHint')}</p>
           </div>
-          <p className="text-2xs text-text-tertiary">{t('deploy.pathsHint')}</p>
+          )}
+          {!httpTarget && <p className="text-2xs text-text-tertiary">{t('deploy.pathsHint')}</p>}
           <div className="flex justify-end gap-2 pt-3 border-t border-border">
             <Button type="button" variant="secondary"
                     onClick={() => { setAddOpen(false); setEditing(null) }} disabled={saving}>
               {t('common.cancel')}
             </Button>
             <Button type="submit" variant="primary" loading={saving}
-                    disabled={!form.target_id || !(form.cert_path.trim() || form.key_path.trim() || form.fullchain_path.trim())}>
+                    disabled={!form.target_id || !(httpTarget || hasPath)}>
               {editing ? t('common.save') : t('deploy.attach')}
             </Button>
           </div>

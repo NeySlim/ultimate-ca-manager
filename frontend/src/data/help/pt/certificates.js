@@ -77,9 +77,10 @@ export default {
       },
       {
         title: 'Implantação (v2.215)',
-        content: 'Envie este certificado para hosts remotos via SSH/SFTP, somente admin, os alvos são gerenciados em Configurações › Implantação.',
+        content: 'Envie este certificado para hosts remotos via SSH/SFTP ou para uma API HTTP, somente admin, os alvos são gerenciados em Configurações › Implantação.',
         items: [
           { label: 'Anexar alvo', text: 'A partir da visão de detalhe do certificado: escolha um alvo de implantação e defina caminhos de destino absolutos para o certificado, a chave privada e/ou a cadeia completa (pelo menos um). A cadeia completa omite a CA raiz, a menos que Incluir CA raiz esteja marcado' },
+          { label: 'API HTTP (v2.252)', text: "Um alvo HTTP não usa caminhos: na emissão, na renovação e em Implantar agora, o UCM envia uma única requisição construída a partir do modelo de corpo do alvo (certificado, cadeia, subject, número de série e a chave privada somente quando o alvo permitir)" },
           { label: 'Mesmo host', text: 'Para implantar no próprio host UCM, use um alvo SFTP em 127.0.0.1 com uma conta SSH dedicada; o serviço isolado não pode gravar fora do diretório de dados' },
           { label: 'Automático', text: 'Na emissão e na renovação, os arquivos vinculados são reenviados e o comando de recarga opcional dessa implantação é executado; as entregas são enfileiradas com tentativas de repetição' },
           { label: 'Arquivos', text: 'Gravados de forma atômica exatamente nos caminhos configurados (o diretório pai deve existir): chave 0600, certificado/cadeia 0644' },

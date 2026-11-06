@@ -104,7 +104,7 @@ export default {
           { label: 'Aggiornamenti', text: 'Verifica nuove versioni, visualizza changelog, controllo giornaliero pianificato con installazione non presidiata opt-in (DEB/RPM)' },
           { label: 'Webhook', text: 'Webhook HTTP per eventi certificato (emissione, revoca, scadenza). Autenticazione in uscita opzionale: Bearer, Basic, API key o intestazione personalizzata' },
           { label: 'Nomi webhook univoci (v2.251)', text: 'Un nome di webhook già in uso viene rifiutato (409), alla creazione e alla rinomina. L\'aggiornamento ha rinominato i duplicati esistenti «nome (2)», «nome (3)», dal più vecchio' },
-          { label: 'Distribuzione', text: 'Le destinazioni di distribuzione sono connessioni SSH/SFTP riutilizzabili; ogni distribuzione di certificato o di CRL definisce i propri percorsi e il proprio comando di ricarica opzionale (solo admin, v2.215)' },
+          { label: 'Distribuzione', text: 'Le destinazioni di distribuzione offrono connessioni SSH/SFTP riutilizzabili, o una richiesta a un\'API HTTP (v2.252); ogni distribuzione di certificato o di CRL definisce i propri percorsi e il proprio comando di ricarica opzionale (solo admin, v2.215)' },
           { label: 'Active Directory', text: 'Connessione AD/LDAP propria di UCM per le ricerche relative ai certificati (risoluzione principal Kerberos, soggetti derivati da AD)' },
           { label: 'Iscrizione automatica Windows', text: 'Iscrizione Windows nativa MS-XCEP/MS-WSTEP: rilevamento dei criteri, emissione dei certificati e associazione Kerberos/SPNEGO' },
           { label: 'Informazioni', text: 'Informazioni di sistema, Link e risorse e il link Sostieni UCM rimandano a Ko-fi (gli amministratori vedono anche una scheda Ko-fi chiudibile una volta per versione di UCM). Con admin:system, Verifica idoneità a FIPS elenca ciò che la modalità FIPS rifiuterebbe su questa istanza, con un rimedio per ciascuno, e non modifica nulla' },
@@ -113,9 +113,10 @@ export default {
       },
       {
         title: 'Hook di distribuzione (v2.215)',
-        content: 'Impostazioni › Distribuzione (solo admin): connessioni SSH/SFTP riutilizzabili per le distribuzioni di certificati e CRL. Percorsi e comando di ricarica opzionale si configurano su ogni distribuzione.',
+        content: 'Impostazioni › Distribuzione (solo admin): connessioni SSH/SFTP riutilizzabili, o richieste a API HTTP, per le distribuzioni di certificati e CRL. Percorsi e comando di ricarica opzionale si configurano su ogni distribuzione SSH.',
         items: [
           { label: 'Destinazione', text: 'Host, porta, utente SSH. UCM genera una chiave ed25519 (installa la chiave pubblica mostrata sulla destinazione) o accetta una chiave privata importata, archiviata cifrata' },
+          { label: 'Destinazione API HTTP (v2.252)', text: 'URL, metodo (POST, PUT, PATCH), header della richiesta memorizzati cifrati e mai più mostrati, e un template del corpo con {{cert_pem}}, {{fullchain_pem}}, {{cn}}, {{serial}}... più i filtri |json, |b64 e |urlencode. Un corpo JSON viene verificato al salvataggio. La chiave privata ({{key_pem}}) esce solo con l\'opt-in esplicito della destinazione e un URL https; il certificato TLS viene sempre verificato, rispetto a un trust anchor incollato se l\'appliance è autofirmata. I redirect sono rifiutati, gli indirizzi dei metadati cloud bloccati. Solo certificati: le CRL restano sulle destinazioni SSH' },
           { label: 'Host key', text: 'Registrata alla prima connessione riuscita (trust-on-first-use); qualsiasi cambiamento successivo blocca la connessione. Cambiare l\'host la registra di nuovo' },
           { label: 'Comando di ricarica', text: 'Un comando opzionale, configurato su ogni associazione di certificato o di CRL ed eseguito dopo un invio riuscito (es. systemctl reload nginx): exit 0 = successo, senza templating' },
           { label: 'Associazioni', text: 'I certificati vengono associati dalla vista di dettaglio del certificato, le CRL da CRL e OCSP. Ogni associazione ha i propri percorsi, opzioni di file e comando di ricarica' },

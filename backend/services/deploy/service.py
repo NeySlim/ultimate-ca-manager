@@ -2,9 +2,10 @@
 
 Certificates and CRLs bound to deploy targets are pushed over SFTP after
 updates (and on demand), then the binding's optional reload command runs over SSH.
+An HTTP target receives one request built from its body template instead.
 Deliveries go through a durable queue drained by a scheduler task with
 exponential backoff — the same model as webhook deliveries: the issuing
-request is never blocked on SSH.
+request is never blocked on the transport.
 """
 import base64
 import json
@@ -21,8 +22,10 @@ from utils.datetime_utils import utc_now
 from utils.export_options import json_boolean
 from utils.key_codec import load_pem_bytes
 from services.deploy import ssh as deploy_ssh
+from services.deploy import http as deploy_http
 from fips_mode import FipsRestricted
 from services.deploy.ssh import DeploySSHError
+from services.deploy.http import DeployHTTPError
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +97,27 @@ class DeployService:
         if not files:
             raise ValueError("Binding has no destination path configured")
         return files
+
+    @staticmethod
+    def resolve_variables(binding: DeployBinding, certificate: Certificate, event: str = 'manual') -> dict:
+        """Template values for an HTTP push. Raises ValueError when the
+        certificate lacks what the target's template names."""
+        if not certificate.crt:
+            raise ValueError("Certificate has no certificate data to deploy")
+        pem_data = base64.b64decode(certificate.crt).decode('utf-8')
+        blocks = DeployService._split_pem(pem_data)
+        if not blocks:
+            raise ValueError("Certificate PEM could not be parsed")
+        chain_pem = DeployService._chain_pem(
+            certificate, pem_data, include_root=bool(binding.include_root),
+            variant=binding.chain_variant or 'auto')
+        key_pem = None
+        target = binding.target
+        if target and target.allow_private_key and certificate.prv:
+            key_pem = load_pem_bytes(
+                certificate.prv, context=f"certificate {certificate.id} deploy").decode()
+        return deploy_http.certificate_variables(
+            certificate, blocks[0], chain_pem, key_pem=key_pem, event=event)
 
     @staticmethod
     def _split_pem(pem_data: str):
@@ -230,6 +254,28 @@ class DeployService:
                 return False
 
         detail = {}
+        if target.is_http:
+            if binding_type == DeployDelivery.BINDING_CRL:
+                DeployService._record_failure(
+                    delivery, target, 'CRL deployment requires an SSH target', now, permanent=True)
+                return False
+            try:
+                variables = DeployService.resolve_variables(
+                    binding, certificate, event=delivery.event_type or 'manual')
+                detail = deploy_http.push(target, variables)
+            except ValueError as e:
+                DeployService._record_failure(delivery, target, str(e), now, permanent=True)
+                return False
+            except DeployHTTPError as e:
+                DeployService._record_failure(delivery, target, str(e), now, detail=detail)
+                return False
+            except Exception as e:
+                logger.error(f"Deploy delivery {delivery.id} unexpected failure: {e}", exc_info=True)
+                DeployService._record_failure(delivery, target, 'Internal deploy error', now, detail=detail)
+                return False
+            return DeployService._record_success(delivery, target, binding_type, binding,
+                                                 certificate, detail, now)
+
         try:
             files = (DeployService.resolve_crl_files(binding)
                      if binding_type == DeployDelivery.BINDING_CRL
@@ -277,7 +323,11 @@ class DeployService:
                     client.close()
                 except Exception:
                     pass
+        return DeployService._record_success(delivery, target, binding_type, binding,
+                                             certificate, detail, now)
 
+    @staticmethod
+    def _record_success(delivery, target, binding_type, binding, certificate, detail, now) -> bool:
         delivery.status = DeployDelivery.STATUS_DELIVERED
         delivery.delivered_at = now
         delivery.last_error = None
@@ -301,7 +351,10 @@ class DeployService:
             details=(
                 ((f"Deployed CRL for {binding.ca.descr}" if binding_type == DeployDelivery.BINDING_CRL
                   else f"Deployed certificate {certificate.descr or certificate.refid}") + ' ')
-                + f"to {target.name} ({', '.join(detail.get('pushed', []))})"
+                + f"to {target.name} ("
+                + (f"HTTP {detail.get('status')} {detail.get('method')} {detail.get('url')}"
+                   if target.is_http else ', '.join(detail.get('pushed', [])))
+                + ')'
                 + (f", reload exit {detail.get('reload_exit')}" if 'reload_exit' in detail else '')
                 + ('' if recorded else
                    '; the delivery record could not be saved, so this push '
@@ -522,7 +575,7 @@ class DeployService:
 
     @staticmethod
     def validate_target_input(data: dict, partial: bool = False) -> dict:
-        """Validate/normalize target fields. Raises ValueError."""
+        """Validate/normalize SSH target fields. Raises ValueError."""
         out = {}
         if not partial or 'name' in data:
             name = str(data.get('name') or '').strip()
@@ -552,7 +605,73 @@ class DeployService:
         return out
 
     @staticmethod
+    def validate_http_target_input(data: dict, current: DeployTarget = None) -> dict:
+        """Validate/normalize HTTP target fields; *current* supplies what a
+        partial update leaves unchanged, so the whole is checked together."""
+        out = {}
+        partial = current is not None
+        if not partial or 'name' in data:
+            name = str(data.get('name') or '').strip()
+            if not name or len(name) > 120:
+                raise ValueError('name is required (max 120 chars)')
+            out['name'] = name
+        if 'enabled' in data:
+            out['enabled'] = bool(data['enabled'])
+        if 'allow_private_key' in data:
+            out['allow_private_key'] = json_boolean(data, 'allow_private_key')
+        allow_key = out.get('allow_private_key', bool(current.allow_private_key) if current else False)
+        if not partial or 'url' in data:
+            out['url'] = deploy_http.validate_url(data.get('url'), allow_key)
+        elif 'allow_private_key' in out:
+            deploy_http.validate_url(current.url, allow_key)
+        if not partial or 'http_method' in data:
+            method = str(data.get('http_method') or 'POST').strip().upper()
+            if method not in DeployTarget.HTTP_METHODS:
+                raise ValueError('http_method must be POST, PUT or PATCH')
+            out['http_method'] = method
+        if 'http_headers' in data and data['http_headers'] not in (None, ''):
+            out['http_headers'] = deploy_http.store_headers(deploy_http.parse_headers(data['http_headers']))
+        elif not partial:
+            out['http_headers'] = None
+        if not partial or 'body_template' in data:
+            template = str(data.get('body_template') or '')
+            if not template.strip():
+                raise ValueError('body_template is required')
+            out['body_template'] = template
+        if not partial or 'tls_ca_pem' in data:
+            out['tls_ca_pem'] = deploy_http.validate_ca_pem(data.get('tls_ca_pem')) or None
+        headers = deploy_http.load_headers(
+            out['http_headers'] if 'http_headers' in out else (current.http_headers if current else None))
+        template = out.get('body_template', current.body_template if current else '')
+        deploy_http.validate_template(template, headers, allow_key)
+        host, port = deploy_http.url_host_port(out.get('url', current.url if current else ''))
+        out['host'], out['port'] = host, port
+        return out
+
+    @staticmethod
+    def validate_http_binding(target: DeployTarget, certificate: Certificate, fields: dict) -> None:
+        """A binding on an HTTP target carries no paths or reload command, and
+        the template may only name key_pem when UCM holds the key."""
+        for field in ('cert_path', 'key_path', 'fullchain_path', 'reload_command'):
+            if fields.get(field):
+                raise ValueError(f'{field} does not apply to an HTTP target')
+        names = {name for source in (target.url, target.body_template)
+                 for name, _ in deploy_http.template_variables(source or '')}
+        if 'key_pem' in names and not certificate.prv:
+            raise ValueError("This certificate has no private key in UCM, "
+                             "but the target's body template sends one")
+
+    @staticmethod
     def create_target(data: dict, username: str) -> DeployTarget:
+        kind = str(data.get('kind') or DeployTarget.KIND_SSH).strip().lower()
+        if kind not in DeployTarget.KINDS:
+            raise ValueError('kind must be ssh or http')
+        if kind == DeployTarget.KIND_HTTP:
+            fields = DeployService.validate_http_target_input(data)
+            target = DeployTarget(kind=kind, username='', private_key='',
+                                  created_by=username, **fields)
+            db.session.add(target)
+            return target
         fields = DeployService.validate_target_input(data)
         provided_key = str(data.get('private_key') or '').strip()
         if provided_key:
@@ -573,6 +692,12 @@ class DeployService:
 
     @staticmethod
     def update_target(target: DeployTarget, data: dict) -> DeployTarget:
+        if 'kind' in data and str(data['kind']).strip().lower() != (target.kind or DeployTarget.KIND_SSH):
+            raise ValueError('kind cannot be changed: create another target')
+        if target.is_http:
+            for key, value in DeployService.validate_http_target_input(data, current=target).items():
+                setattr(target, key, value)
+            return target
         fields = DeployService.validate_target_input(data, partial=True)
         host_changed = ('host' in fields and fields['host'] != target.host) or \
                        ('port' in fields and fields['port'] != target.port)
@@ -591,7 +716,10 @@ class DeployService:
     @staticmethod
     def test_target(target: DeployTarget) -> dict:
         """Connect + authenticate + open SFTP without writing anything.
-        Pins the host key on a first successful connect."""
+        Pins the host key on a first successful connect. An HTTP target is
+        probed with a HEAD instead."""
+        if target.is_http:
+            return deploy_http.probe(target)
         private_key = decrypt_text(target.private_key)
         client, learned = deploy_ssh.open_client(
             target.host, target.port, target.username, private_key, target.host_key)

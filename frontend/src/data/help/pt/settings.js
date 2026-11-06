@@ -104,7 +104,7 @@ export default {
           { label: 'Atualizações', text: 'Verificar novas versões, visualizar changelog, verificação diária agendada com instalação não assistida opcional (DEB/RPM)' },
           { label: 'Webhooks', text: 'Webhooks HTTP para eventos de certificado (emissão, revogação, expiração). Autenticação de saída opcional: Bearer, Basic, API key ou cabeçalho personalizado' },
           { label: 'Nomes de webhook únicos (v2.251)', text: 'Um nome de webhook já em uso é recusado (409), na criação e ao renomear. A atualização renomeou os duplicados anteriores para "nome (2)", "nome (3)", do mais antigo ao mais recente' },
-          { label: 'Implantação', text: 'Os alvos de implantação são conexões SSH/SFTP reutilizáveis; cada implantação de certificado ou de CRL define seus próprios caminhos e seu comando de recarga opcional (somente admin, v2.215)' },
+          { label: 'Implantação', text: 'Os alvos de implantação fornecem conexões SSH/SFTP reutilizáveis, ou uma requisição a uma API HTTP (v2.252); as implantações de certificado e de CRL definem seus próprios caminhos e comandos de recarga opcionais (somente admin, v2.215)' },
           { label: 'Active Directory', text: 'Conexão própria do UCM com AD/LDAP para consultas relacionadas a certificados (resolução de entidade de segurança Kerberos, assuntos derivados do AD)' },
           { label: 'Autoinscrição do Windows', text: 'Inscrição nativa do Windows MS-XCEP/MS-WSTEP: descoberta de diretiva, emissão de certificados e vinculação Kerberos/SPNEGO' },
           { label: 'Sobre', text: 'Informações do sistema, Links e recursos e Apoiar o UCM levam ao Ko-fi (os administradores também veem um cartão Ko-fi dispensável uma vez por versão do UCM). Com admin:system, Verificar preparação para FIPS lista o que o modo FIPS recusaria nesta instância, com um remédio para cada item, e não altera nada' },
@@ -113,9 +113,10 @@ export default {
       },
       {
         title: 'Hooks de implantação (v2.215)',
-        content: 'Configurações › Implantação (somente admin): conexões SSH/SFTP reutilizáveis para as implantações de certificados e de CRL. Os caminhos e o comando de recarga opcional são configurados em cada implantação.',
+        content: 'Configurações › Implantação (somente admin): conexões SSH/SFTP reutilizáveis, ou requisições a uma API HTTP, para as implantações de certificados e de CRL. Os caminhos e o comando de recarga opcional são configurados em cada implantação SSH.',
         items: [
           { label: 'Alvo', text: 'Host, porta, usuário SSH. O UCM gera uma chave ed25519 (instale a chave pública exibida no alvo) ou aceita uma chave privada importada, armazenada criptografada' },
+          { label: 'Alvo de API HTTP (v2.252)', text: "URL, método (POST, PUT, PATCH), cabeçalhos da requisição armazenados criptografados e nunca exibidos novamente, e um modelo de corpo com {{cert_pem}}, {{fullchain_pem}}, {{cn}}, {{serial}}... mais os filtros |json, |b64 e |urlencode. Um corpo JSON é validado ao salvar. A chave privada ({{key_pem}}) só sai com a autorização explícita do alvo e uma URL https; o certificado TLS é sempre verificado, contra uma âncora de confiança colada se o appliance for autoassinado. Redirecionamentos são recusados, endereços de metadados de nuvem bloqueados. Somente certificados: as CRLs permanecem nos alvos SSH" },
           { label: 'Host key', text: 'Fixada na primeira conexão bem-sucedida (trust-on-first-use); qualquer mudança posterior falha de forma segura. Alterar o host refaz a fixação' },
           { label: 'Comando de recarga', text: 'Um comando opcional, configurado em cada vínculo de certificado ou de CRL e executado após um envio bem-sucedido (ex.: systemctl reload nginx): exit 0 = sucesso, sem templating' },
           { label: 'Vínculos', text: 'Os certificados são anexados a partir da visão de detalhe do certificado; as CRLs, em CRL e OCSP. Cada vínculo tem seus próprios caminhos, opções de arquivo e comando de recarga' },

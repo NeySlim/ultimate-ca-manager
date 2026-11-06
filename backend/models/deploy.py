@@ -1,9 +1,10 @@
 """Deploy hooks models (#299).
 
-Push issued/renewed certificates and CRLs to remote hosts over SFTP. Each
-binding may run its own fixed reload command over SSH after a successful push.
-Admin-only feature: UCM holds SSH credentials that can execute commands on the
-fleet, so everything is encrypted at rest and audited.
+Push issued/renewed certificates and CRLs to remote hosts over SFTP, or a
+certificate to an HTTP API (discussion #428). Each SSH binding may run its own
+fixed reload command after a successful push. Admin-only feature: UCM holds
+credentials that can act on the fleet, so everything is encrypted at rest and
+audited.
 """
 import json
 
@@ -12,16 +13,40 @@ from utils.datetime_utils import utc_now, utc_isoformat
 
 
 class DeployTarget(db.Model):
-    """A remote host certificates can be pushed to."""
+    """A remote host certificates can be pushed to.
+
+    ``kind`` is ``ssh`` (SFTP push, optional reload over SSH) or ``http`` (one
+    request to an API, body built from a template). An HTTP target keeps the
+    SSH-only columns at their empty values: ``host`` and ``port`` mirror its
+    URL for the listing, ``username`` and ``private_key`` are ``''``.
+    """
     __tablename__ = 'deploy_targets'
+
+    KIND_SSH = 'ssh'
+    KIND_HTTP = 'http'
+    KINDS = (KIND_SSH, KIND_HTTP)
+    HTTP_METHODS = ('POST', 'PUT', 'PATCH')
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False, unique=True)
+    kind = db.Column(db.String(8), nullable=False, default=KIND_SSH, server_default=KIND_SSH)
     host = db.Column(db.String(255), nullable=False)
     port = db.Column(db.Integer, nullable=False, default=22)
     username = db.Column(db.String(120), nullable=False)
     # SSH private key (PEM/OpenSSH), encrypted at rest like every other secret
     private_key = db.Column(db.Text, nullable=False)
+    # HTTP target: the request. Headers carry API tokens, so they are stored
+    # encrypted as a JSON object and never returned by the API (names only).
+    url = db.Column(db.String(2048))
+    http_method = db.Column(db.String(8))
+    http_headers = db.Column(db.Text)
+    body_template = db.Column(db.Text)
+    # Extra trust anchor(s) for the target's TLS certificate, PEM. Verification
+    # is never switched off: a self-signed appliance certificate goes here.
+    tls_ca_pem = db.Column(db.Text)
+    # The body template may name key_pem only when this is set, and then the
+    # URL must be https.
+    allow_private_key = db.Column(db.Boolean, nullable=False, default=False, server_default='0')
     # Matching OpenSSH public key — shown to the admin to install on the target
     public_key = db.Column(db.Text)
     # Pinned host key, '<type> <base64>', recorded on first connect (TOFU)
@@ -50,17 +75,24 @@ class DeployTarget(db.Model):
         except Exception:
             return None
 
+    @property
+    def is_http(self):
+        return self.kind == self.KIND_HTTP
+
+    def http_header_names(self):
+        """Names of the stored request headers; their values never leave."""
+        from services.deploy.http import load_headers
+        return sorted(load_headers(self.http_headers).keys())
+
     def to_dict(self):
-        # private_key is never exposed through the API
-        return {
+        # private_key and header values are never exposed through the API
+        data = {
             'id': self.id,
             'name': self.name,
+            'kind': self.kind or self.KIND_SSH,
             'host': self.host,
             'port': self.port,
             'username': self.username,
-            'public_key': self.public_key,
-            'host_key_fingerprint': self.host_key_fingerprint(),
-            'host_key_pinned': bool(self.host_key),
             'enabled': self.enabled,
             'created_at': utc_isoformat(self.created_at),
             'created_by': self.created_by,
@@ -68,6 +100,22 @@ class DeployTarget(db.Model):
             'last_failure_at': utc_isoformat(self.last_failure_at),
             'failure_count': self.failure_count or 0,
         }
+        if self.is_http:
+            data.update({
+                'url': self.url,
+                'http_method': self.http_method or 'POST',
+                'http_header_names': self.http_header_names(),
+                'body_template': self.body_template or '',
+                'tls_ca_pem': self.tls_ca_pem or '',
+                'allow_private_key': bool(self.allow_private_key),
+            })
+        else:
+            data.update({
+                'public_key': self.public_key,
+                'host_key_fingerprint': self.host_key_fingerprint(),
+                'host_key_pinned': bool(self.host_key),
+            })
+        return data
 
 
 class DeployBinding(db.Model):
@@ -119,6 +167,7 @@ class DeployBinding(db.Model):
         if include_target and self.target:
             data['target_name'] = self.target.name
             data['target_host'] = self.target.host
+            data['target_kind'] = self.target.kind or DeployTarget.KIND_SSH
             data['target_enabled'] = self.target.enabled
         return data
 

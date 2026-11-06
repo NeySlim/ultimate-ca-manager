@@ -1,12 +1,13 @@
 /**
  * DeploySection — deploy targets management (#299, admin-only).
  *
- * A deploy target contains only the reusable SSH/SFTP connection. Files,
- * paths and optional reload commands belong to certificate/CRL bindings.
+ * A deploy target contains only the reusable connection: SSH/SFTP, or an
+ * HTTP API with its body template (#428). Files, paths and optional reload
+ * commands belong to certificate/CRL bindings.
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CloudArrowUp, Plus, TestTube, PencilSimple, Trash, ArrowsClockwise, Copy, Check } from '@phosphor-icons/react'
+import { CloudArrowUp, Globe, Plus, TestTube, PencilSimple, Trash, ArrowsClockwise, Copy, Check } from '@phosphor-icons/react'
 import { Button, Badge, HelpCard, DetailSection, DetailContent, DetailHeader, EmptyState } from '../../components'
 import { Modal } from '../../components/Modal'
 import { deployService } from '../../services'
@@ -16,8 +17,20 @@ import { extractData, formatDate } from '../../lib/utils'
 import { useFipsMode } from '../../lib/policyAlgorithms'
 
 const EMPTY_FORM = {
-  name: '', host: '', port: 22, username: '', private_key: '', enabled: true,
+  kind: 'ssh', name: '', host: '', port: 22, username: '', private_key: '', enabled: true,
+  url: '', http_method: 'POST', http_headers: '', body_template: '', tls_ca_pem: '', allow_private_key: false,
 }
+
+const HTTP_TEMPLATE_VARIABLES = [
+  'cert_pem', 'key_pem', 'chain_pem', 'fullchain_pem', 'name', 'cn', 'san_dns', 'serial', 'serial_hex',
+  'not_before', 'not_after', 'fingerprint_sha256', 'refid', 'certificate_id', 'event',
+]
+// Literal template syntax passed as values: a {{ }} inside a locale string would be interpolated
+const TEMPLATE_HINT_VARS = {
+  example: '{{name}}', jsonExample: '{{cert_pem|json}}', b64Example: '{{cert_pem|b64}}', urlExample: '{{cn|urlencode}}',
+}
+const HTTP_TEMPLATE_EXAMPLE = '{"name": "{{name}}", "cert": {{cert_pem|json}}, "chain": {{chain_pem|json}}}'
+const INPUT_CLASS = 'w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-accent-primary'
 
 export default function DeploySection() {
   const { t } = useTranslation()
@@ -54,22 +67,40 @@ export default function DeploySection() {
   const openEdit = (target) => {
     setEditing(target)
     setForm({
-      name: target.name, host: target.host, port: target.port,
+      ...EMPTY_FORM,
+      kind: target.kind || 'ssh', name: target.name, host: target.host, port: target.port,
       username: target.username, private_key: '', enabled: target.enabled,
+      url: target.url || '', http_method: target.http_method || 'POST', http_headers: '',
+      body_template: target.body_template || '', tls_ca_pem: target.tls_ca_pem || '',
+      allow_private_key: Boolean(target.allow_private_key),
     })
     setFormOpen(true)
+  }
+
+  const isHttp = form.kind === 'http'
+
+  const httpPayload = () => {
+    const payload = {
+      name: form.name.trim(), url: form.url.trim(), http_method: form.http_method,
+      body_template: form.body_template, tls_ca_pem: form.tls_ca_pem.trim(),
+      allow_private_key: form.allow_private_key, enabled: form.enabled,
+    }
+    // Header values are never read back: an empty box keeps the stored ones
+    if (form.http_headers.trim()) payload.http_headers = form.http_headers
+    if (!editing) payload.kind = 'http'
+    return payload
   }
 
   const handleSubmit = async (e) => {
     e?.preventDefault?.()
     setSaving(true)
     try {
-      const payload = {
+      const payload = isHttp ? httpPayload() : {
         name: form.name.trim(), host: form.host.trim(),
         port: Number(form.port) || 22, username: form.username.trim(),
         enabled: form.enabled,
       }
-      if (form.private_key.trim()) payload.private_key = form.private_key
+      if (!isHttp && form.private_key.trim()) payload.private_key = form.private_key
       if (editing) {
         await deployService.updateTarget(editing.id, payload)
         showSuccess(t('deploy.targetUpdated'))
@@ -91,7 +122,9 @@ export default function DeploySection() {
     setTesting(target.id)
     try {
       const result = extractData(await deployService.testTarget(target.id))
-      showSuccess(t('deploy.testOk', { fingerprint: result?.host_key_fingerprint || '?' }))
+      showSuccess(target.kind === 'http'
+        ? t('deploy.testOkHttp', { status: result?.status_code ?? '?' })
+        : t('deploy.testOk', { fingerprint: result?.host_key_fingerprint || '?' }))
       await load()
     } catch (err) {
       showError(err?.message || t('deploy.testFailed'))
@@ -133,6 +166,7 @@ export default function DeploySection() {
   const copyPublicKey = () => copy(publicKeyFor?.public_key || '')
 
   const field = (key) => (e) => setForm({ ...form, [key]: e.target.value })
+  const clearHeaders = () => setForm({ ...form, http_headers: '' })
   const applySameHostPreset = () => setForm(current => ({
     ...current,
     host: '127.0.0.1',
@@ -169,7 +203,9 @@ export default function DeploySection() {
               <div key={target.id} className="flex items-center justify-between p-4 bg-tertiary-50 border border-border rounded-lg">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="w-10 h-10 rounded-lg bg-accent-primary-op10 flex items-center justify-center flex-shrink-0">
-                    <CloudArrowUp size={20} className="text-accent-primary" />
+                    {target.kind === 'http'
+                      ? <Globe size={20} className="text-accent-primary" />
+                      : <CloudArrowUp size={20} className="text-accent-primary" />}
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
@@ -182,20 +218,26 @@ export default function DeploySection() {
                       )}
                     </div>
                     <p className="text-xs text-text-secondary truncate font-mono">
-                      {target.username}@{target.host}:{target.port}
+                      {target.kind === 'http'
+                        ? `${target.http_method} ${target.url}`
+                        : `${target.username}@${target.host}:${target.port}`}
                     </p>
                     <p className="text-2xs text-text-tertiary truncate">
-                      {target.host_key_pinned
-                        ? t('deploy.hostKeyPinned', { fingerprint: target.host_key_fingerprint })
-                        : t('deploy.hostKeyNotPinned')}
+                      {target.kind === 'http'
+                        ? (target.allow_private_key ? t('deploy.httpSendsKey') : t('deploy.httpCertOnly'))
+                        : target.host_key_pinned
+                          ? t('deploy.hostKeyPinned', { fingerprint: target.host_key_fingerprint })
+                          : t('deploy.hostKeyNotPinned')}
                       {target.last_success_at && ` · ${t('deploy.lastSuccess', { date: formatDate(target.last_success_at) })}`}
                     </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0 ml-3">
-                  <Button type="button" size="sm" variant="secondary" onClick={() => setPublicKeyFor(target)} title={t('deploy.showPublicKey')}>
-                    <Copy size={14} />
-                  </Button>
+                  {target.kind !== 'http' && (
+                    <Button type="button" size="sm" variant="secondary" onClick={() => setPublicKeyFor(target)} title={t('deploy.showPublicKey')}>
+                      <Copy size={14} />
+                    </Button>
+                  )}
                   <Button type="button" size="sm" variant="secondary" onClick={() => handleTest(target)} disabled={testing === target.id} title={t('deploy.testConnection')}>
                     {testing === target.id ? <ArrowsClockwise size={14} className="animate-spin" /> : <TestTube size={14} />}
                   </Button>
@@ -219,18 +261,96 @@ export default function DeploySection() {
       <Modal open={formOpen} onOpenChange={(v) => !v && !saving && setFormOpen(false)}
              title={editing ? t('deploy.editTarget') : t('deploy.addTarget')} size="md">
         <form onSubmit={handleSubmit} className="p-4 space-y-3">
+          {!editing && (
+            <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label={t('deploy.kind')}>
+              {['ssh', 'http'].map(kind => (
+                <button key={kind} type="button" role="radio" aria-checked={form.kind === kind}
+                        onClick={() => setForm({ ...form, kind })}
+                        className={`flex items-center gap-2 p-3 rounded-md border text-left text-sm ${
+                          form.kind === kind ? 'border-accent-primary bg-accent-primary-op10' : 'border-border bg-bg-tertiary'}`}>
+                  {kind === 'http' ? <Globe size={18} /> : <CloudArrowUp size={18} />}
+                  <span>
+                    <span className="block text-text-primary">{t(`deploy.kind_${kind}`)}</span>
+                    <span className="block text-2xs text-text-tertiary">{t(`deploy.kind_${kind}Hint`)}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <label className="block text-xs font-medium text-text-secondary">{t('common.name')}</label>
-              <input className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-accent-primary"
+              <input className={INPUT_CLASS}
                      value={form.name} onChange={field('name')} required maxLength={120} />
             </div>
-            <div className="space-y-1">
-              <label className="block text-xs font-medium text-text-secondary">{t('deploy.sshUser')}</label>
-              <input className="w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-accent-primary"
-                     value={form.username} onChange={field('username')} required maxLength={120} />
-            </div>
+            {!isHttp && (
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-text-secondary">{t('deploy.sshUser')}</label>
+                <input className={INPUT_CLASS}
+                       value={form.username} onChange={field('username')} required maxLength={120} />
+              </div>
+            )}
           </div>
+          {isHttp && (
+            <>
+              <div className="grid grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium text-text-secondary">{t('deploy.httpMethod')}</label>
+                  <select className={INPUT_CLASS} value={form.http_method} onChange={field('http_method')}>
+                    {['POST', 'PUT', 'PATCH'].map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1 col-span-3">
+                  <label className="block text-xs font-medium text-text-secondary">{t('deploy.httpUrl')}</label>
+                  <input className={`${INPUT_CLASS} font-mono`} type="url" placeholder="https://firewall.example.net/api/trust/cert/add"
+                         value={form.url} onChange={field('url')} required maxLength={2048} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-text-secondary">
+                  {editing ? t('deploy.httpHeadersRotate', { count: editing.http_header_names?.length || 0 }) : t('deploy.httpHeaders')}
+                </label>
+                <textarea className={`${INPUT_CLASS} h-16 text-xs font-mono resize-y`} spellCheck={false}
+                          placeholder={'Authorization: Bearer ...\nX-Api-Key: ...'}
+                          value={form.http_headers} onChange={field('http_headers')} />
+                {editing?.http_header_names?.length > 0 && (
+                  <p className="text-2xs text-text-tertiary">
+                    {t('deploy.httpHeadersStored', { names: editing.http_header_names.join(', ') })}
+                    {' '}
+                    <button type="button" className="text-accent-primary hover:underline" onClick={clearHeaders}>
+                      {t('deploy.httpHeadersKeep')}
+                    </button>
+                  </p>
+                )}
+              </div>
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-text-secondary">{t('deploy.bodyTemplate')}</label>
+                <textarea className={`${INPUT_CLASS} h-28 text-xs font-mono resize-y`} spellCheck={false} required
+                          placeholder={HTTP_TEMPLATE_EXAMPLE}
+                          value={form.body_template} onChange={field('body_template')} />
+                <p className="text-2xs text-text-tertiary">{t('deploy.bodyTemplateHint', TEMPLATE_HINT_VARS)}</p>
+                <p className="text-2xs text-text-tertiary font-mono break-words">
+                  {HTTP_TEMPLATE_VARIABLES.map(v => `{{${v}}}`).join(' ')}
+                </p>
+              </div>
+              <label className="flex items-start gap-3 p-3 bg-bg-tertiary border border-border rounded-md cursor-pointer">
+                <input type="checkbox" className="mt-0.5 w-4 h-4 accent-accent-primary" checked={form.allow_private_key}
+                       onChange={(e) => setForm({ ...form, allow_private_key: e.target.checked })} />
+                <div>
+                  <div className="text-sm text-text-primary">{t('deploy.allowPrivateKey')}</div>
+                  <div className="text-xs text-text-tertiary">{t('deploy.allowPrivateKeyHint', { keyVariable: '{{key_pem}}' })}</div>
+                </div>
+              </label>
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-text-secondary">{t('deploy.tlsCaPem')}</label>
+                <textarea className={`${INPUT_CLASS} h-16 text-xs font-mono resize-y`} spellCheck={false}
+                          placeholder="-----BEGIN CERTIFICATE-----"
+                          value={form.tls_ca_pem} onChange={field('tls_ca_pem')} />
+                <p className="text-2xs text-text-tertiary">{t('deploy.tlsCaPemHint')}</p>
+              </div>
+            </>
+          )}
+          {!isHttp && (
           <div className="grid grid-cols-3 gap-3">
             <div className="space-y-1 col-span-2">
               <label className="block text-xs font-medium text-text-secondary">{t('deploy.host')}</label>
@@ -254,6 +374,8 @@ export default function DeploySection() {
                      value={form.port} onChange={field('port')} />
             </div>
           </div>
+          )}
+          {!isHttp && (
           <div className="space-y-1">
             <label className="block text-xs font-medium text-text-secondary">
               {editing ? t('deploy.privateKeyRotate') : t(fips ? 'deploy.privateKeyOptionalFips' : 'deploy.privateKeyOptional')}
@@ -262,6 +384,7 @@ export default function DeploySection() {
                       placeholder={t('deploy.privateKeyPlaceholder')}
                       value={form.private_key} onChange={field('private_key')} spellCheck={false} />
           </div>
+          )}
           {editing && (
             <label className="flex items-center gap-2 text-sm text-text-primary">
               <input type="checkbox" checked={form.enabled}
@@ -271,7 +394,7 @@ export default function DeploySection() {
           )}
           <div className="flex items-center justify-between gap-2 pt-3 border-t border-border">
             <div>
-              {editing?.host_key_pinned && (
+              {!isHttp && editing?.host_key_pinned && (
                 <Button type="button" size="sm" variant="danger" onClick={handleResetHostKey} disabled={saving}>
                   {t('deploy.resetHostKey')}
                 </Button>

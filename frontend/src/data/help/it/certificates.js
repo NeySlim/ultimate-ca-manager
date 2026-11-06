@@ -77,9 +77,10 @@ export default {
       },
       {
         title: 'Distribuzione (v2.215)',
-        content: 'Invia questo certificato a host remoti via SSH/SFTP, solo admin, le destinazioni si gestiscono in Impostazioni › Distribuzione.',
+        content: 'Invia questo certificato a host remoti via SSH/SFTP o a un\'API HTTP, solo admin, le destinazioni si gestiscono in Impostazioni › Distribuzione.',
         items: [
           { label: 'Associa destinazione', text: 'Dalla vista di dettaglio del certificato: scegli una destinazione di distribuzione e imposta i percorsi di destinazione assoluti per certificato, chiave privata e/o catena completa (almeno uno). La catena completa omette la CA root a meno che Includi CA radice sia selezionato' },
+          { label: 'API HTTP (v2.252)', text: 'Una destinazione HTTP non usa percorsi: all\'emissione, al rinnovo e con Distribuisci ora, UCM invia una richiesta costruita dal template del corpo della destinazione (certificato, catena, soggetto, seriale e la chiave privata solo se la destinazione lo consente)' },
           { label: 'Stesso host', text: 'Per distribuire sullo stesso host UCM, usa una destinazione SFTP su 127.0.0.1 con un account SSH dedicato; il servizio isolato non può scrivere fuori dalla directory dei dati' },
           { label: 'Automatico', text: 'All\'emissione e al rinnovo, i file associati vengono inviati di nuovo e viene eseguito il comando di ricarica opzionale di quella distribuzione; le consegne sono messe in coda con tentativi' },
           { label: 'File', text: 'Scritti in modo atomico esattamente nei percorsi configurati (la directory padre deve esistere): chiave 0600, certificato/catena 0644' },
