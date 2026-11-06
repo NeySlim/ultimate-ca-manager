@@ -1036,7 +1036,7 @@ Configure DNS-01 challenge providers for domain validation. Supported providers 
 
 Each provider requires API credentials specific to the DNS service.
 
-Cleanup removes only the TXT value of its order, so another order, or the wildcard and apex sharing the name, keep theirs; DuckDNS, Hurricane Electric and FreeDNS hold one value per name and still clear it. Vercel takes an optional **Team ID** for domains owned by a team, and RcodeZero needs a token with zone read and write access. A provider name already in use is refused (v2.251).
+Cleanup removes only the TXT value of its order, so another order, or the wildcard and apex sharing the name, keep theirs; DuckDNS, Hurricane Electric and FreeDNS hold one value per name, so they clear it only when no other order in progress uses it and refuse an order for a domain and its wildcard. Vercel takes an optional **Team ID** for domains owned by a team, and RcodeZero needs a token with zone read and write access. A provider name already in use is refused (v2.251).
 
 #### Custom Command provider
 For DNS services without a native driver, the **Custom Command** provider runs admin-configured local commands for TXT record create/delete. Record details are passed as environment variables:
