@@ -41,16 +41,18 @@ class ManualDnsProvider(BaseDnsProvider):
         return True, instructions
     
     def delete_txt_record(
-        self, 
-        domain: str, 
-        record_name: str
+        self,
+        domain: str,
+        record_name: str,
+        record_value: str,
     ) -> Tuple[bool, str]:
         """
         For manual provider, remind user to clean up.
         """
         message = (
             f"You can now remove the TXT record:\n"
-            f"  Name: {record_name}\n"
+            f"  Name:  {record_name}\n"
+            f"  Value: {record_value}\n"
             f"This is optional but recommended for DNS hygiene."
         )
         return True, message

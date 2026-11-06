@@ -14,6 +14,8 @@ logger = logging.getLogger(__name__)
 INTERRUPTED = ('Interrupted by a restart of UCM before validation: verify the challenges '
                'again, or delete the order')
 PENDING_KEPT = timedelta(days=7)
+# The auto-poll refreshes updated_at during its DNS wait: a fresher order may be another instance's
+PROCESSING_IDLE = timedelta(minutes=15)
 
 
 def _not_proxy():
@@ -26,18 +28,35 @@ def _no_live_lease(now):
 
 
 def recover_interrupted_orders() -> int:
-    """At startup: an order the automatic path left ``processing`` goes back to ``pending``,
-    with a message. A finalization (pending key or live lease) and a renewal's own order,
-    resumed by their own paths, and proxy orders are left as they are."""
+    """At startup and every 15 minutes: an order the automatic path left ``processing``
+    goes back to ``pending``, with a message. A finalization (pending key or live lease) and a
+    renewal's own order, resumed by their own paths, and proxy orders are left as they are, and
+    so is an order updated in the last 15 minutes: an instance sharing the database may be
+    polling it."""
     now = utc_now()
-    count = AcmeClientOrder.query.filter(
+    candidates = (
         AcmeClientOrder.status == 'processing', _not_proxy(), _no_live_lease(now),
         AcmeClientOrder.renewal_of_order_id.is_(None), AcmeClientOrder._pending_key.is_(None),
-    ).update({'status': 'pending', 'error_message': INTERRUPTED}, synchronize_session=False)
+    )
+    idle = or_(AcmeClientOrder.updated_at.is_(None), AcmeClientOrder.updated_at < now - PROCESSING_IDLE)
+    count = AcmeClientOrder.query.filter(*candidates, idle).update(
+        {'status': 'pending', 'error_message': INTERRUPTED}, synchronize_session=False)
     db.session.commit()
     if count:
         logger.warning("%s ACME order(s) interrupted by a restart set back to pending", count)
+    active = AcmeClientOrder.query.filter(*candidates).count()
+    if active:
+        logger.info("%s processing ACME order(s) updated in the last 15 minutes left as they are: "
+                    "another instance may be polling them", active)
     return count
+
+
+def scheduled_order_recovery() -> dict:
+    """Scheduler task: an order a restart cut short resumes within about 15 minutes of its last activity."""
+    count = recover_interrupted_orders()
+    if not count:
+        return {'status': 'skipped', 'reason': 'no_interrupted_order'}
+    return {'status': 'ok', 'reason': f'{count} order(s) set back to pending', 'recovered': count}
 
 
 def delete_order(order) -> list:

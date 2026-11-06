@@ -119,10 +119,10 @@ class CustomCommandDnsProvider(BaseDnsProvider):
             self.credentials['create_command'], 'create',
             domain, record_name, record_value=record_value, ttl=ttl)
 
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         return self._run(
             (self.credentials.get('delete_command') or '').strip(),
-            'delete', domain, record_name)
+            'delete', domain, record_name, record_value=record_value)
 
     def test_connection(self) -> Tuple[bool, str]:
         """Smoke-test the configured binaries exist + are executable."""

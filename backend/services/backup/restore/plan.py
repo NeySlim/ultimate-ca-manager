@@ -56,17 +56,27 @@ class RestorePlan:
         self.dropped_fields: List[str] = []
         # Ids a restorer wrote, per section: what a replayed repair may touch
         self.written: Dict[str, set] = {}
+        # Rows here sharing an identity, oldest first, and those whose identity
+        # misses a part, per section (see `_index_of`)
+        self.shared: Dict[str, Dict[Tuple, List[Any]]] = {}
+        self.incomplete: Dict[str, List[Any]] = {}
+        # The archived rows that claimed a row here, per identity, in order; and
+        # the row each archived row was written to, which a second pass reuses
+        self._claims: Dict[Tuple, List[int]] = {}
+        self._placed: Dict[Tuple[str, int], Any] = {}
 
     # -- building ---------------------------------------------------------
 
     @classmethod
-    def build(cls, backup_data: Dict[str, Any]) -> 'RestorePlan':
+    def build(cls, backup_data: Dict[str, Any], pruned=frozenset()) -> 'RestorePlan':
+        """`pruned`: the sections a replacing restore prunes; `rows_to_remove` tells theirs."""
         from ..installation import same_installation
 
         plan = cls()
         plan.same_installation = same_installation(backup_data)
         plan._validate_shape(backup_data)
         plan._index_target_rows(backup_data)
+        plan._warn_shared_identities(pruned)
         return plan
 
     def _validate_shape(self, backup_data: Dict[str, Any]) -> None:
@@ -118,7 +128,7 @@ class RestorePlan:
         if section.identity == ('id',):
             return  # singleton configuration rows
         missing = [field for field in section.identity
-                   if row.get(field) in (None, '')]
+                   if missing_identity_value(name, field, row.get(field))]
         if not missing:
             return
 
@@ -159,7 +169,12 @@ class RestorePlan:
             section = SECTIONS.get(name)
             if section is None or name in _MAPPING_SECTIONS:
                 continue
-            self.target_ids[name] = _index_of(name, section)
+            self.target_ids[name], self.shared[name], self.incomplete[name] = _index_of(name, section)
+
+    def _warn_shared_identities(self, pruned) -> None:
+        for name in sorted(set(self.shared) - set(pruned)):
+            for key, ids in self.shared[name].items():
+                self.warnings.append(shared_identity_warning(name, key, ids, 'left as they are'))
 
     def refresh(self, section_names=None) -> None:
         """Rebuild the identity indexes from the database as it is now.
@@ -173,7 +188,7 @@ class RestorePlan:
             section = SECTIONS.get(name)
             if section is None or name in _MAPPING_SECTIONS:
                 continue
-            self.target_ids[name] = _index_of(name, section)
+            self.target_ids[name], self.shared[name], self.incomplete[name] = _index_of(name, section)
 
     # -- using ------------------------------------------------------------
 
@@ -218,6 +233,9 @@ class RestorePlan:
         section = SECTIONS.get(section_name)
         if section is None:
             return None
+        placed = self._placed.get((section_name, id(row)))
+        if placed is not None and sa_inspect(placed).persistent:
+            return sa_inspect(placed).identity[0]
         index = self.target_ids.get(section_name, {})
 
         if section.identity == ('id',):
@@ -230,15 +248,32 @@ class RestorePlan:
             return next(iter(index.values()), None)
 
         if not _identified_by_a_reference(section):
-            return index.get(_identity_key(row, section.identity,
-                                           _temporal_identity(section_name)))
+            return self._claimed(section_name, _identity_key(
+                row, section.identity, _temporal_identity(section_name)), row)
         # By what the references name first; the source's numbers only when
         # they are this database's own and still name the same rows.
-        found = index.get(self._identity_here(section_name, row))
-        if found is None and self.source_numbers_hold(section_name, row):
-            found = index.get(_identity_key(row, section.identity,
-                                            _temporal_identity(section_name)))
-        return found
+        key = self._identity_here(section_name, row)
+        if key not in index and self.source_numbers_hold(section_name, row):
+            key = _identity_key(row, section.identity, _temporal_identity(section_name))
+        return self._claimed(section_name, key, row)
+
+    def _claimed(self, section_name: str, key: Tuple, row: Dict[str, Any]) -> Optional[Any]:
+        """The row here for that identity, by rank: the n-th archived row of it takes the n-th oldest."""
+        index = self.target_ids.get(section_name, {})
+        ids = self.shared.get(section_name, {}).get(key) or ([index[key]] if key in index else [])
+        return self.rank(section_name, key, row, ids)
+
+    def rank(self, section_name: str, key: Tuple, row: Dict[str, Any], ids: List[Any]) -> Optional[Any]:
+        """Of `ids` (oldest first), the one this archived row takes: beyond them, None, a new row."""
+        claims = self._claims.setdefault((section_name, key), [])
+        if id(row) not in claims:
+            claims.append(id(row))
+        position = claims.index(id(row))
+        return ids[position] if position < len(ids) else None
+
+    def place(self, section_name: str, row: Dict[str, Any], instance) -> None:
+        """Record the row here an archived row was written to: a later pass finds that one."""
+        self._placed[(section_name, id(row))] = instance
 
     def source_numbers_hold(self, section_name: str, row: Dict[str, Any]) -> bool:
         """Whether the numbers in this row's identity name, here, the rows it carries.
@@ -427,21 +462,70 @@ def _normalise(value: Any, temporal: bool = False) -> Any:
         return text
 
 
-def _index_of(section_name: str, section: Section) -> Dict[Tuple, Any]:
+def missing_identity_value(section_name: str, field: str, value: Any) -> bool:
+    """Whether an identity part is absent: None, or ''.
+
+    Except '' in a column that requires a value and defaults to '' (an
+    SNI-less endpoint's `sni_hostname`), where it is one.
+    """
+    if value is None:
+        return True
+    if value != '':
+        return False
+    nullable = _NULLABLE.get((section_name, field))
+    if nullable is None:
+        try:
+            column = sa_inspect(load_model(SECTIONS[section_name])).local_table.columns.get(field)
+            default = getattr(getattr(column, 'default', None), 'arg', None)
+            nullable = column is None or bool(column.nullable) or default != ''
+
+        except Exception:
+            nullable = True
+        _NULLABLE[(section_name, field)] = nullable
+    return nullable
+
+
+_NULLABLE: Dict[Tuple[str, str], bool] = {}
+
+
+def _index_of(section_name: str, section: Section):
+    """(identity to its oldest row here, the rows of each identity several share, the rows
+    whose identity misses a part), all oldest first.
+
+    A table without a unique constraint on its identity can hold two rows of
+    one. An identity missing a part identifies nothing: no archived row is
+    matched to such a row, and a replacement removes it.
+    """
     model = load_model(section)
     mapper = sa_inspect(model)
     primary = [column.key for column in mapper.primary_key]
     if len(primary) != 1:
-        return {}
+        return {}, {}, []
     # Read the same way the archive is: a backend that hands a timestamp back
     # as text would otherwise never match the archive's spelling of it.
     temporal = _temporal_identity(section_name)
-    index = {}
-    for row in model.query.all():
-        key = tuple(_normalise(getattr(row, field, None), field in temporal)
-                    for field in section.identity)
-        index[key] = getattr(row, primary[0])
-    return index
+    singleton = section.identity == ('id',)
+    rows, incomplete = {}, []
+    for row in model.query.order_by(getattr(model, primary[0])).all():
+        values = [getattr(row, field, None) for field in section.identity]
+        if not singleton and any(missing_identity_value(section_name, field, value)
+                                 for field, value in zip(section.identity, values)):
+            incomplete.append(getattr(row, primary[0]))
+            continue
+        key = tuple(_normalise(value, field in temporal) for field, value in zip(section.identity, values))
+        rows.setdefault(key, []).append(getattr(row, primary[0]))
+    index = {key: ids[0] for key, ids in rows.items()}
+    shared = {key: ids for key, ids in rows.items() if len(ids) > 1 and not singleton}
+    return index, shared, incomplete
+
+
+def shared_identity_warning(section_name: str, key: Tuple, ids: List[Any], fate: str,
+                            others: Optional[List[Any]] = None) -> str:
+    others = ids[1:] if others is None else others
+    message = (f"{section_name} {'/'.join(key)}: {len(ids)} rows here share this "
+               f"{'/'.join(SECTIONS[section_name].identity)} (id {', '.join(map(str, ids))}); "
+               "the archive's rows of it go to them oldest first")
+    return f"{message}, and the others (id {', '.join(map(str, others))}) are {fate}" if others else message
 
 
 def _referenced_sections(backup_data: Dict[str, Any]) -> set:

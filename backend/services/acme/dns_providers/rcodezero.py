@@ -65,12 +65,40 @@ class RcodeZeroDnsProvider(BaseDnsProvider):
             return False, f"Failed to create record: {result}"
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def _get_txt_rrset(self, zone: str, fqdn: str) -> Tuple[bool, Any]:
+        """The TXT rrset of `fqdn` (None if absent), read through every page of the zone."""
+        page = 1
+        while True:
+            success, result = self._request('GET', f'/zones/{zone}/rrsets?page={page}&page_size=100')
+            if not success:
+                return False, result
+            rrsets = result.get('data', []) if isinstance(result, dict) else (result or [])
+            for rr in rrsets:
+                if rr.get('type') == 'TXT' and rr.get('name', '').rstrip('.').lower() == fqdn.rstrip('.').lower():
+                    return True, rr
+            if not isinstance(result, dict) or page >= int(result.get('last_page') or 1):
+                return True, None
+            page += 1
+
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         zone = self._find_zone(domain)
         if not zone:
             return False, f"Could not find zone for {domain}"
         fqdn = record_name if record_name.endswith('.') else record_name + '.'
-        data = [{'name': fqdn, 'type': 'TXT', 'changetype': 'DELETE'}]
+        # The other values of the rrset belong to other challenges: write them back
+        success, rrset = self._get_txt_rrset(zone, fqdn)
+        if not success:
+            return False, f"Failed to read existing records: {rrset}"
+        records = (rrset or {}).get('records', [])
+        remaining = [r for r in records
+                     if not self.txt_matches(r.get('content') if isinstance(r, dict) else r, record_value)]
+        if len(remaining) == len(records):
+            return True, "Record not found (already deleted?)"
+        if remaining:
+            data = [{'name': fqdn, 'type': 'TXT', 'ttl': rrset.get('ttl', 300),
+                     'records': remaining, 'changetype': 'UPDATE'}]
+        else:
+            data = [{'name': fqdn, 'type': 'TXT', 'changetype': 'DELETE'}]
         success, result = self._request('PATCH', f'/zones/{zone}/rrsets', data)
         if not success:
             return False, f"Failed to delete record: {result}"

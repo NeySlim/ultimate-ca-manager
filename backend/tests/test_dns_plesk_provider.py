@@ -270,7 +270,7 @@ class TestCreateTxtRecord:
 
 
 class TestDeleteTxtRecord:
-    def test_deletes_only_matching_txt_record_ids(self, provider):
+    def test_deletes_only_the_matching_value_of_the_name(self, provider):
         records = """
         <packet><dns><get_rec>
           <result><status>ok</status><id>10</id><data><site-id>1</site-id><type>TXT</type>
@@ -280,7 +280,9 @@ class TestDeleteTxtRecord:
           <result><status>ok</status><id>12</id><data><site-id>1</site-id><type>TXT</type>
             <host>other.example.com</host><value>keep</value></data></result>
           <result><status>ok</status><id>13</id><data><site-id>1</site-id><type>TXT</type>
-                        <host>_acme-challenge</host><value>second</value></data></result>
+                        <host>_acme-challenge</host><value>first</value></data></result>
+          <result><status>ok</status><id>14</id><data><site-id>1</site-id><type>TXT</type>
+            <host>_acme-challenge.example.com</host><value>second</value></data></result>
         </get_rec></dns></packet>
         """
         deleted = """
@@ -291,7 +293,7 @@ class TestDeleteTxtRecord:
         """
         responses = [_response(_sites_response((1, "example.com"))), _response(records), _response(deleted)]
         with patch("services.acme.dns_providers.plesk.safe_request_post", side_effect=responses) as post:
-            ok, message = provider.delete_txt_record("example.com", "_acme-challenge.example.com")
+            ok, message = provider.delete_txt_record("example.com", "_acme-challenge.example.com", "first")
 
         assert ok, message
         packet = ET.fromstring(post.call_args_list[2].kwargs["data"])
@@ -303,7 +305,7 @@ class TestDeleteTxtRecord:
             _response("<packet><dns><get_rec/></dns></packet>"),
         ]
         with patch("services.acme.dns_providers.plesk.safe_request_post", side_effect=responses) as post:
-            ok, message = provider.delete_txt_record("example.com", "_acme-challenge.example.com")
+            ok, message = provider.delete_txt_record("example.com", "_acme-challenge.example.com", "value")
 
         assert ok
         assert "not found" in message.lower()
@@ -320,7 +322,7 @@ class TestDeleteTxtRecord:
         """
         responses = [_response(_sites_response((1, "example.com"))), _response(records), _response(deleted)]
         with patch("services.acme.dns_providers.plesk.safe_request_post", side_effect=responses):
-            ok, message = provider.delete_txt_record("example.com", "_acme-challenge.example.com")
+            ok, message = provider.delete_txt_record("example.com", "_acme-challenge.example.com", "value")
 
         assert ok, message
 
@@ -328,8 +330,8 @@ class TestDeleteTxtRecord:
         records = "<packet><dns><get_rec/></dns></packet>"
         responses = [_response(_sites_response((1, "example.com"))), _response(records), _response(records)]
         with patch("services.acme.dns_providers.plesk.safe_request_post", side_effect=responses) as post:
-            assert provider.delete_txt_record("example.com", "_acme-challenge.example.com")[0]
-            assert provider.delete_txt_record("example.com", "_acme-challenge.example.com")[0]
+            assert provider.delete_txt_record("example.com", "_acme-challenge.example.com", "value")[0]
+            assert provider.delete_txt_record("example.com", "_acme-challenge.example.com", "value")[0]
 
         assert post.call_count == 3
 

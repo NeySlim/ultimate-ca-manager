@@ -123,10 +123,9 @@ class FreeDnsDnsProvider(BaseDnsProvider):
         try:
             response = session.get(f"{self.BASE_URL}/subdomain/", timeout=30)
             
-            # Parse data_id for _acme-challenge record
-            # Format: data_id=12345>_acme-challenge
-            subdomain = record_name.split('.')[0]  # Get first part (e.g., _acme-challenge)
-            pattern = rf'data_id=(\d+)[^>]*>{re.escape(subdomain)}'
+            # Rows link the full name (data_id=12345>_acme-challenge.example.com): match all of it,
+            # its first label alone is the _acme-challenge of any domain of the account
+            pattern = rf'data_id=(\d+)[^>]*>\s*{re.escape(record_name.rstrip("."))}\s*<'
             match = re.search(pattern, response.text, re.IGNORECASE)
             
             if match:
@@ -194,9 +193,11 @@ class FreeDnsDnsProvider(BaseDnsProvider):
             logger.error(f"FreeDNS create record failed: {self._failure(e)}")
             return False, self._failure(e)
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via FreeDNS web interface"""
         session = self._get_session()
+        # The listing page truncates TXT values, so the record cannot be matched on its value
+        logger.warning(f"FreeDNS: cleanup of {record_name} removes its TXT record, whichever value it holds")
         
         # Get record ID
         data_id = self._txt_record_cache.get(record_name) or self._get_txt_record_id(record_name)

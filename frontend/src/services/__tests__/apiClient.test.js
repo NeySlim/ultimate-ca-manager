@@ -44,6 +44,27 @@ describe('API Client', () => {
     )
   })
 
+  it('keeps the Retry-After of a 429 on the error', async () => {
+    global.fetch.mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      headers: new Headers({ 'content-type': 'application/json', 'retry-after': '7' }),
+      json: () => Promise.resolve({ error: 'Rate limit exceeded' })
+    })
+    const { apiClient } = await import('../apiClient')
+    await expect(apiClient.get('/acme/client/orders')).rejects.toMatchObject({ status: 429, retryAfter: 7 })
+  })
+
+  it('reads Retry-After as seconds or as an HTTP date', async () => {
+    const { parseRetryAfter } = await import('../apiClient')
+    expect(parseRetryAfter('12')).toBe(12)
+    expect(parseRetryAfter(null)).toBeUndefined()
+    expect(parseRetryAfter('soon')).toBeUndefined()
+    const inFive = new Date(Date.now() + 5000).toUTCString()
+    expect(parseRetryAfter(inFive)).toBeGreaterThanOrEqual(4)
+    expect(parseRetryAfter(inFive)).toBeLessThanOrEqual(5)
+  })
+
   it('makes POST request with body', async () => {
     const mockResponse = {
       ok: true,

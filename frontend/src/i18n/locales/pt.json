@@ -1923,6 +1923,7 @@
     "editEmailCaveat": "Segundo a RFC 8555 o contacto pertence ao cliente ACME: a sua próxima atualização de conta pode sobrescrever este valor.",
     "emailUpdated": "E-mail da conta atualizado",
     "letsEncryptOrders": "Pedidos Let's Encrypt",
+    "ordersListPartial": "Lista parcial: {{loaded}} de {{total}} pedidos carregados. Atualize para tentar novamente.",
     "dnsUpdate": {
       "title": "Chaves DNS UPDATE (RFC 2136)",
       "manage": "Chaves DNS UPDATE (RFC 2136)",
@@ -5676,6 +5677,7 @@
     "skipReasons": {
       "disabled": "as cópias de segurança automáticas estão desativadas",
       "acme_renewal_off": "a renovação automática ACME está desativada",
+      "no_interrupted_order": "nenhum pedido ACME interrompido",
       "not_due": "ainda não está prevista",
       "unknown": "sem motivo indicado"
     },

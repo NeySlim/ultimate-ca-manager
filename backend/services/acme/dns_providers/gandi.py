@@ -164,7 +164,7 @@ class GandiDnsProvider(BaseDnsProvider):
         logger.info(f"Gandi: Created TXT record {record_name}")
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via Gandi API"""
         gandi_domain = self._get_domain(domain)
         if not gandi_domain:
@@ -176,12 +176,26 @@ class GandiDnsProvider(BaseDnsProvider):
         else:
             relative_name = record_name
         
-        # Delete the record
         encoded_name = quote(relative_name, safe='')
-        success, result = self._request(
-            'DELETE',
-            f'/domains/{gandi_domain}/records/{encoded_name}/TXT',
-        )
+        path = f'/domains/{gandi_domain}/records/{encoded_name}/TXT'
+
+        # The RRset holds the other challenges' values: write them back, DELETE only an empty set
+        ok_get, current = self._request('GET', path)
+        if not ok_get:
+            if self._last_status == 404:
+                return True, "Record not found (already deleted?)"
+            return False, f"Failed to read existing record: {current}"
+        values = list(current.get('rrset_values') or []) if isinstance(current, dict) else []
+        remaining = [v for v in values if not self.txt_matches(v, record_value)]
+        if len(remaining) == len(values):
+            return True, "Record not found (already deleted?)"
+        if remaining:
+            success, result = self._request('PUT', path, {
+                'rrset_values': remaining,
+                'rrset_ttl': current.get('rrset_ttl') or 300,
+            })
+        else:
+            success, result = self._request('DELETE', path)
         
         if not success:
             # 404 means record doesn't exist, which is fine

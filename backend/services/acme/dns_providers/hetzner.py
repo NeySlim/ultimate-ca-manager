@@ -142,7 +142,7 @@ class HetznerDnsProvider(BaseDnsProvider):
         logger.info(f"Hetzner: Created TXT record {record_name}")
         return True, f"Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via Hetzner Cloud API"""
         zone = self._get_zone(domain)
         if not zone:
@@ -151,8 +151,20 @@ class HetznerDnsProvider(BaseDnsProvider):
         zone_id = zone['id']
         relative_name = self.get_relative_record_name(record_name, zone['name'])
         
-        # Delete the entire TXT rrset for this name
-        success, result = self._request('DELETE', f'/zones/{zone_id}/rrsets/{relative_name}/TXT')
+        # remove_records takes values exactly as stored and drops the RRset once it is empty
+        path = f'/zones/{zone_id}/rrsets/{relative_name}/TXT'
+        success, result = self._request('GET', path)
+        if not success:
+            if self._last_status == 404:
+                return True, "Record not found (already deleted?)"
+            return False, f"Failed to read existing record: {result}"
+        records = ((result or {}).get('rrset') or {}).get('records') or []
+        targets = [{'value': r['value']} for r in records if self.txt_matches(r.get('value'), record_value)]
+        if not targets:
+            return True, "Record not found (already deleted?)"
+        success, result = self._request('POST', f'{path}/actions/remove_records', {'records': targets})
+        if success and ((result or {}).get('action') or {}).get('status') == 'error':
+            success, result = False, result['action'].get('error')
         
         if not success:
             if 'not found' in str(result).lower():

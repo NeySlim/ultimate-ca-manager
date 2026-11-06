@@ -64,7 +64,7 @@ class DnsMadeEasyDnsProvider(BaseDnsProvider):
             return False, f"Failed: {result}"
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         info = self._find_domain(domain)
         if not info:
             return False, f"Domain not found for {domain}"
@@ -75,6 +75,8 @@ class DnsMadeEasyDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed: {result}"
         for rec in result.get('data', []):
+            if not self.txt_matches(rec.get('value'), record_value):
+                continue
             self._request('DELETE', f'/dns/managed/{domain_id}/records/{rec["id"]}')
         return True, "Record deleted"
     

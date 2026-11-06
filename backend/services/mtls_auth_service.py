@@ -39,20 +39,9 @@ class MTLSAuthService:
         if not serial:
             return None, None, "Certificate serial number not found"
         
-        # Try to find certificate by serial number (hex or decimal)
-        auth_cert = AuthCertificate.query.filter_by(cert_serial=serial).first()
-        
-        # Serial may be stored in decimal but presented in hex (or vice-versa)
-        if not auth_cert:
-            try:
-                if all(c in '0123456789ABCDEFabcdef' for c in serial):
-                    decimal_serial = str(int(serial, 16))
-                    auth_cert = AuthCertificate.query.filter_by(cert_serial=decimal_serial).first()
-                if not auth_cert:
-                    hex_serial = format(int(serial), 'X')
-                    auth_cert = AuthCertificate.query.filter_by(cert_serial=hex_serial).first()
-            except (ValueError, OverflowError):
-                pass
+        # By (issuer, serial) in any stored form, the fingerprint telling same-serial ones apart
+        from services.mtls_enrollment import presented_enrolment
+        auth_cert = presented_enrolment(cert_info)
         
         # If not found by serial, try fingerprint
         if not auth_cert and fingerprint:
@@ -196,8 +185,8 @@ class MTLSAuthService:
         cert_info = CertificateParser.extract_certificate_info(cert)
         
         # Check if certificate already enrolled
-        existing = AuthCertificate.query.filter_by(cert_serial=cert_info['serial']).first()
-        if existing:
+        from services.mtls_enrollment import enrolments_of
+        if enrolments_of(cert.serial_number, cert.issuer):
             return False, "Certificate already enrolled", None
         
         # Check validity
