@@ -110,6 +110,25 @@ def test_no_new_process_once_the_master_stops(supervisor):
     assert s.pid == first
 
 
+def test_the_inherited_watcher_parks_instead_of_returning(supervisor, monkeypatch):
+    # Returning from the thread raises KeyError under gevent after a fork
+    s = supervisor()
+    s._owner_pid = os.getpid() + 1
+    parked = []
+
+    class _Parked(Exception):
+        pass
+
+    def _park():
+        parked.append(True)
+        raise _Parked
+
+    monkeypatch.setattr(s, '_park', _park)
+    with pytest.raises(_Parked):
+        s._watch()
+    assert parked and s.pid is None
+
+
 def test_a_forked_worker_never_signals_the_scheduler_process(supervisor):
     s = supervisor()
     s.start()

@@ -52,12 +52,20 @@ class SchedulerSupervisor:
         # there they must neither signal nor start anything
         return self._owner_pid == os.getpid()
 
+    def _park(self) -> None:
+        # The inherited copy must never return: under gevent, Thread._bootstrap's
+        # cleanup raises KeyError in a forked child. It idles instead.
+        while True:
+            time.sleep(3600)
+
     def _master_stopping(self) -> bool:
         # Arbiter.stop() empties LISTENERS first, before on_exit, while workers drain
         return self._stopping or (self._server is not None and not self._server.LISTENERS)
 
     def _watch(self) -> None:
         delay = 1
+        if not self._mine():
+            self._park()
         while self._mine() and not self._master_stopping():
             started = time.monotonic()
             try:
@@ -66,11 +74,13 @@ class SchedulerSupervisor:
                 self.log.error("Scheduler process not started: %s", e)
                 proc = None
             if not self._mine():
-                return
+                self._park()
             if proc is not None:
                 self.log.info("Scheduler process started (pid %s)", proc.pid)
                 code = proc.wait()
-                if not self._mine() or self._master_stopping():
+                if not self._mine():
+                    self._park()
+                if self._master_stopping():
                     break
                 if self._restarting:
                     self._restarting, delay = False, 1
