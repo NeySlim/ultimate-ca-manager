@@ -21,6 +21,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Database: on PostgreSQL in a schema other than `public`, the integrity check reported 0 tables. It now counts the tables of the schema in use.
 - Database migration: on PostgreSQL in a schema other than `public` (a `search_path` in the URL), the sequences were not realigned after the copy, so the next row created collided with a copied one. The schema in use is now the one realigned.
 - Database: on PostgreSQL, the database reset waited forever for the transaction of its own request. It now closes that transaction before dropping the tables.
 - Docker: the images lacked pyspnego's Kerberos backend, which the DEB and RPM installs can add, so the Kerberos binding of Windows autoenrollment could not work in a container. Both images now ship it, at the pyspnego version the requirements resolve (#435, thanks @JPromi).

@@ -3,6 +3,8 @@
 Runs only when the session app is on PostgreSQL (UCM_TEST_APP_PG_URL), whose
 harness gives each process a schema of its own.
 """
+import json
+
 import pytest
 from sqlalchemy import text
 
@@ -19,6 +21,18 @@ def pg_schema(app):
         db.session.rollback()
     assert schema != 'public'
     return schema
+
+
+def test_the_integrity_check_counts_the_tables_of_its_schema(app, auth_client, pg_schema):
+    with app.app_context():
+        expected = db.session.execute(text(
+            'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = :s'),
+            {'s': pg_schema}).scalar()
+        db.session.rollback()
+    r = auth_client.post('/api/v2/system/database/integrity-check',
+                         data=json.dumps({}), content_type='application/json')
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['tables'] == expected > 0
 
 
 def test_the_sequences_of_its_schema_are_realigned(app, pg_schema):
