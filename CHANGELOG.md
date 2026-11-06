@@ -69,6 +69,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - DNS providers: Core Networks called zone and deletion endpoints the API does not have, logged in with a form instead of JSON and ignored a failed commit, so cleanup reported success with the record still published. It now uses the documented `/dnszones` endpoints, deletes one value through `records/delete` and fails when the commit fails.
 - DNS providers: Hostinger called an API host and record endpoints that do not exist. It now uses the documented `/api/dns/v1/zones` endpoints, appending a value on creation and rewriting the name's other TXT values on deletion.
 - DNS providers: Epik sent records in a shape the API rejects, read the listing with field names it does not use and deleted through a path it does not have, so no TXT record was ever removed. It now follows the documented v2 host-records calls and sends the key in the `Authorization` header instead of the deprecated `SIGNATURE` query parameter.
+- DNS providers: Mythic Beasts reported a TXT value deleted when the API had removed nothing, as when the zone stores it in another form. It now deletes the value as the API lists it and fails when no record was removed.
 
 ### Upgrade notes
 

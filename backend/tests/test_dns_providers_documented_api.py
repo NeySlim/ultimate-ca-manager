@@ -1,5 +1,6 @@
 """DNS providers against fakes that answer as each provider's public API documentation says."""
 import json
+import re
 from urllib.parse import parse_qsl, urlsplit
 
 import pytest
@@ -449,3 +450,95 @@ def test_epik_key_never_in_the_url(monkeypatch):
     p = create_provider('epik', {'api_key': 'k'})
     assert p.create_txt_record('example.com', NAME, 'apex')[0]
     assert all('SIGNATURE' not in q for _, q in seen)
+
+
+# --- Mythic Beasts ------------------------------------------------------------------------
+# https://www.mythic-beasts.com/support/api/dnsv2 and /support/api/auth: token from
+# POST auth.mythic-beasts.com/login (Basic key:secret, grant_type=client_credentials);
+# POST /zones/{z}/records takes zone-file text; GET /zones/{z}/records/{host}/{type} answers
+# {records: [{host, ttl, type, data}]}; DELETE on the same path removes every record the
+# path and filters (`data`, `ttl`) select, 200 {records_removed: n} even when n is 0.
+
+class FakeMythicBeasts:
+    BASE = 'https://api.mythic-beasts.com/dns/v2'
+    JSON = {'content-type': 'application/json'}
+
+    def __init__(self, stored_quoted=False):
+        self.records = [{'host': '@', 'ttl': 300, 'type': 'TXT', 'data': 'v=spf1 -all'}]
+        self.stored_quoted = stored_quoted
+        self.fail = None
+
+    def token(self, url, data=None, auth=None, timeout=None):
+        if url != 'https://auth.mythic-beasts.com/login' or auth != ('k', 's') \
+                or (data or {}).get('grant_type') != 'client_credentials':
+            return _Resp(401, {'error': 'invalid_client', 'error_description': 'Invalid credentials.'})
+        return _Resp(200, {'access_token': 'bearer-token-value', 'expires_in': 300, 'token_type': 'bearer'})
+
+    def __call__(self, method, url, headers=None, data=None, params=None, timeout=None):
+        path, query = _split(url, self.BASE)
+        query.update(params or {})
+        if (headers or {}).get('Authorization') != 'Bearer bearer-token-value':
+            return _Resp(401, {'error': 'Unauthorized'}, headers=self.JSON)
+        if self.fail == method:
+            return _Resp(403, {'error': 'Permission denied'}, headers=self.JSON)
+        if path == '/zones/example.com/records' and method == 'POST':
+            host, ttl, rtype, value = data.split(None, 3)
+            if self.stored_quoted:
+                value = f'"{value}"'
+            self.records.append({'host': host, 'ttl': int(ttl), 'type': rtype, 'data': value})
+            return _Resp(200, {'records_added': 1, 'message': '1 records added'}, headers=self.JSON)
+        m = re.fullmatch(r'/zones/example\.com/records/([^/]+)/([^/]+)', path)
+        if m:
+            host, rtype = m.groups()
+            sel = [r for r in self.records if r['host'] == host and r['type'] == rtype
+                   and all(str(r[k]) == v for k, v in query.items() if k in ('data', 'ttl'))]
+            if method == 'GET':
+                return _Resp(200, {'records': sel}, headers=self.JSON)
+            if method == 'DELETE':
+                self.records = [r for r in self.records if r not in sel]
+                return _Resp(200, {'records_removed': len(sel),
+                                   'message': f'{len(sel)} records removed'}, headers=self.JSON)
+        return _Resp(404, {'error': 'Not found'}, headers=self.JSON)
+
+    def values(self):
+        return [r['data'].strip('"') for r in self.records if r['host'] == '_acme-challenge']
+
+
+def _mythicbeasts(monkeypatch, api):
+    monkeypatch.setattr(requests, 'post', api.token)
+    monkeypatch.setattr(requests, 'request', api)
+    return create_provider('mythicbeasts', {'api_key': 'k', 'api_secret': 's'})
+
+
+@pytest.mark.parametrize('stored_quoted', [False, True])
+def test_mythicbeasts_lifecycle(monkeypatch, stored_quoted):
+    api = FakeMythicBeasts(stored_quoted)
+    _lifecycle(_mythicbeasts(monkeypatch, api), api.values)
+    assert [r['host'] for r in api.records] == ['@']
+
+
+def test_mythicbeasts_failed_delete_is_false(monkeypatch):
+    api = FakeMythicBeasts()
+    p = _mythicbeasts(monkeypatch, api)
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    api.fail = 'DELETE'
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and '403' in msg
+    assert api.values() == ['apex']
+
+
+def test_mythicbeasts_nothing_removed_is_false(monkeypatch):
+    """A 200 removing zero records left the value in the zone."""
+    api = FakeMythicBeasts()
+    p = _mythicbeasts(monkeypatch, api)
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    real = api.__call__
+
+    def ignore_filter(method, url, params=None, **kw):
+        if method == 'DELETE':
+            return _Resp(200, {'records_removed': 0, 'message': '0 records removed'}, headers=api.JSON)
+        return real(method, url, params=params, **kw)
+
+    monkeypatch.setattr(requests, 'request', ignore_filter)
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'no record removed' in msg

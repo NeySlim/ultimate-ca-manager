@@ -270,45 +270,6 @@ def test_netlify_deletes_one_value(monkeypatch):
     assert [r['value'] for r in api.records] == ['wild']
 
 
-# --- Mythic Beasts: DELETE /zones/{zone}/records/{host}/{type}, narrowed by `data` ---
-
-class FakeMythicBeasts:
-    def __init__(self):
-        self.records = []
-        self.deletes = []
-
-    def token(self, url, data=None, auth=None, timeout=None):
-        return _Resp(200, {'access_token': 'bearer-token-value'})
-
-    def __call__(self, method, url, headers=None, data=None, params=None, timeout=None):
-        path = url.removeprefix('https://api.mythic-beasts.com/dns/v2')
-        if path == '/zones/example.com/records' and method == 'POST':
-            host, ttl, rtype, value = data.split(' ', 3)
-            self.records.append({'host': host, 'ttl': int(ttl), 'type': rtype, 'data': value})
-            return _Resp(200, {'records_added': 1})
-        m = re.fullmatch(r'/zones/example.com/records(?:/([^/]+)(?:/([^/]+))?)?', path)
-        if m and method == 'DELETE':
-            self.deletes.append((path, params))
-            host, rtype = m.groups()
-            wanted = (params or {}).get('data')
-            gone = [r for r in self.records
-                    if (host is None or r['host'] == host) and (rtype is None or r['type'] == rtype)
-                    and (wanted is None or r['data'] == wanted)]
-            self.records = [r for r in self.records if r not in gone]
-            return _Resp(200, {'records_removed': len(gone)})
-        return _Resp(404, {'error': 'not found'})
-
-
-def test_mythicbeasts_deletes_one_value(monkeypatch):
-    api = FakeMythicBeasts()
-    monkeypatch.setattr(requests, 'post', api.token)
-    monkeypatch.setattr(requests, 'request', api)
-    ok, msg = _two_values_then_delete_one(create_provider('mythicbeasts', {'api_key': 'k', 'api_secret': 's'}))
-    assert ok, msg
-    assert api.deletes == [('/zones/example.com/records/_acme-challenge/TXT', {'data': 'apex'})]
-    assert [r['data'] for r in api.records] == ['wild']
-
-
 # --- whole-zone APIs: read, drop the value, write the rest back ------------------
 
 class FakeNamecheap:
