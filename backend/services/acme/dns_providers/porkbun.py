@@ -50,14 +50,15 @@ class PorkbunDnsProvider(BaseDnsProvider):
             return False, f"Failed: {result}"
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         zone = self.get_zone_for_domain(domain)
         relative = self.get_relative_record_name(record_name, zone)
         
         success, result = self._request(f'/dns/retrieveByNameType/{zone}/TXT/{relative}')
         if success:
             for rec in result.get('records', []):
-                self._request(f'/dns/delete/{zone}/{rec["id"]}')
+                if self.txt_matches(rec.get('content'), record_value):
+                    self._request(f'/dns/delete/{zone}/{rec["id"]}')
         return True, "Record deleted"
     
     def test_connection(self):

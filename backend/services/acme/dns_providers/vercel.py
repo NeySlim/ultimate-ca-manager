@@ -45,7 +45,7 @@ class VercelDnsProvider(BaseDnsProvider):
             return False, f"Failed: {result}"
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         zone = self.get_zone_for_domain(domain)
         relative = self.get_relative_record_name(record_name, zone)
         
@@ -53,7 +53,8 @@ class VercelDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed: {result}"
         for rec in result.get('records', []):
-            if rec.get('type') == 'TXT' and rec.get('name') == relative:
+            if (rec.get('type') == 'TXT' and rec.get('name') == relative
+                    and self.txt_matches(rec.get('value'), record_value)):
                 self._request('DELETE', f'/v2/domains/{zone}/records/{rec["id"]}')
         return True, "Record deleted"
     

@@ -251,25 +251,33 @@ class TestDeleteTxtRecord:
         cn["DeleteRecord"] = delete_record
         return h, deleted
 
-    def test_delete_all_matching(self, provider):
-        records = [{"RecordId": 101}, {"RecordId": 102}]
+    def test_delete_only_the_matching_value(self, provider):
+        records = [{"RecordId": 101, "Value": "apex"}, {"RecordId": 102, "Value": "wild"},
+                   {"RecordId": 103, "Value": "apex"}]
         h, deleted = self._handlers(records)
         with patch("services.acme.dns_providers.tencentcloud.requests.post", side_effect=_requests_router(h)):
-            ok, msg = provider.delete_txt_record("example.com", "_acme-challenge.example.com")
+            ok, msg = provider.delete_txt_record("example.com", "_acme-challenge.example.com", "apex")
         assert ok, msg
-        assert deleted == [101, 102]
+        assert deleted == [101, 103]
+
+    def test_other_value_only_is_already_deleted(self, provider):
+        h, deleted = self._handlers([{"RecordId": 102, "Value": "wild"}])
+        with patch("services.acme.dns_providers.tencentcloud.requests.post", side_effect=_requests_router(h)):
+            ok, msg = provider.delete_txt_record("example.com", "_acme-challenge.example.com", "apex")
+        assert ok and "not found" in msg.lower()
+        assert deleted == []
 
     def test_delete_empty_list_is_success(self, provider):
         h, _ = self._handlers(records=[])
         with patch("services.acme.dns_providers.tencentcloud.requests.post", side_effect=_requests_router(h)):
-            ok, msg = provider.delete_txt_record("example.com", "_acme-challenge.example.com")
+            ok, msg = provider.delete_txt_record("example.com", "_acme-challenge.example.com", "apex")
         assert ok
         assert "not found" in msg.lower()
 
     def test_delete_not_found_error_is_success(self, provider):
         h, _ = self._handlers(records=None)
         with patch("services.acme.dns_providers.tencentcloud.requests.post", side_effect=_requests_router(h)):
-            ok, msg = provider.delete_txt_record("example.com", "_acme-challenge.example.com")
+            ok, msg = provider.delete_txt_record("example.com", "_acme-challenge.example.com", "apex")
         assert ok
 
 

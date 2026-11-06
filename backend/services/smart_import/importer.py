@@ -20,6 +20,7 @@ from cryptography.hazmat.backends import default_backend
 
 from flask import has_request_context, request
 from fips_mode import FipsRestricted
+from utils.key_codec import refuse_eddsa_key
 from utils.trusted_proxy import client_ip
 from models import db, Certificate, CA, AuditLog
 from .parser import ParsedObject, ObjectType, SmartParser
@@ -153,10 +154,15 @@ class SmartImporter:
         if self._parsed is not None and self._parsed[0] is content and self._parsed[1] == password:
             objects = self._parsed[2]
         else:
-            objects = self.parser.parse(content, password)
+            objects = self._parse_fresh(content, password)
         self._parsed = None
         return objects
     
+    def _parse_fresh(self, content, password) -> List[ParsedObject]:
+        # Before any parsing, as the other imports: the FIPS provider cannot load an EdDSA key
+        refuse_eddsa_key(content, 'the imported file')
+        return self.parser.parse(content, password)
+
     def analyze(self, content: str | bytes, password=None) -> AnalysisResult:
         """
         Analyze content without importing.
@@ -171,7 +177,7 @@ class SmartImporter:
         result = AnalysisResult()
         
         # Parse content
-        objects = self.parser.parse(content, password)
+        objects = self._parse_fresh(content, password)
         result.objects = [o.to_dict() for o in objects]
         
         # Build chains
@@ -214,7 +220,7 @@ class SmartImporter:
         options = options or {}
         if not options.get("import_cas", True):
             return False
-        objects = self.parser.parse(content, password)
+        objects = self._parse_fresh(content, password)
         self._parsed = (content, password, objects)
         objects = _selected(objects, options) or []
         return any(o.type == ObjectType.CERTIFICATE and _is_ca_import_target(o) for o in objects)

@@ -144,7 +144,7 @@ class GoDaddyDnsProvider(BaseDnsProvider):
         logger.info(f"GoDaddy: Created TXT record {record_name}")
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via GoDaddy API"""
         domain_name = self._get_domain(domain)
         if not domain_name:
@@ -158,10 +158,23 @@ class GoDaddyDnsProvider(BaseDnsProvider):
         else:
             name = record_name
         
-        success, result = self._request(
-            'DELETE',
-            f'/domains/{domain_name}/records/TXT/{name}',
-        )
+        # PUT and DELETE act on every value of the name: write back the others, DELETE only the last
+        path = f'/domains/{domain_name}/records/TXT/{name}'
+        ok_get, current = self._request('GET', path)
+        if not ok_get:
+            if self._last_status == 404:
+                return True, "Record not found (already deleted?)"
+            return False, f"Failed to read existing record: {current}"
+        existing = [r for r in (current if isinstance(current, list) else [])
+                    if isinstance(r, dict) and 'data' in r]
+        remaining = [r for r in existing if not self.txt_matches(r['data'], record_value)]
+        if len(remaining) == len(existing):
+            return True, "Record not found (already deleted?)"
+        if remaining:
+            data = [{'data': r['data'], 'ttl': max(int(r.get('ttl') or 600), 600)} for r in remaining]
+            success, result = self._request('PUT', path, data)
+        else:
+            success, result = self._request('DELETE', path)
 
         if not success:
             if self._last_status == 404 or 'not found' in str(result).lower():

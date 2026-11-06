@@ -249,7 +249,7 @@ class GoogleCloudDnsProvider(BaseDnsProvider):
         logger.info(f"Google Cloud DNS: Created TXT record {record_name}")
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via Google Cloud DNS API"""
         zone = self._get_zone(domain)
         if not zone:
@@ -262,8 +262,20 @@ class GoogleCloudDnsProvider(BaseDnsProvider):
         existing = self._get_existing_rrset(project, zone_name, fqdn)
         if not existing:
             return True, "Record not found (already deleted?)"
+        rrdatas = list(existing.get('rrdatas', []))
+        remaining = [v for v in rrdatas if not self.txt_matches(v, record_value)]
+        if len(remaining) == len(rrdatas):
+            return True, "Record not found (already deleted?)"
         
+        # A change replaces the RRset atomically: re-add the other challenges' values with its TTL
         change = {"deletions": [existing]}
+        if remaining:
+            change["additions"] = [{
+                "name": fqdn,
+                "type": "TXT",
+                "ttl": existing.get('ttl', 300),
+                "rrdatas": remaining,
+            }]
         
         success, result = self._request(
             'POST',

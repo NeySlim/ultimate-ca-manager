@@ -71,7 +71,7 @@ class CoreNetworksDnsProvider(BaseDnsProvider):
         self._request('POST', f'/dns/zones/{zone}/records/commit')
         return True, "Record created"
     
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         zone = self._find_zone(domain)
         if not zone:
             return False, f"Zone not found for {domain}"
@@ -81,7 +81,8 @@ class CoreNetworksDnsProvider(BaseDnsProvider):
         if not success:
             return False, f"Failed: {result}"
         for rec in result or []:
-            if rec.get('type') == 'TXT' and rec.get('name') == relative:
+            if (rec.get('type') == 'TXT' and rec.get('name') == relative
+                    and self.txt_matches(rec.get('data'), record_value)):
                 self._request('DELETE', f'/dns/zones/{zone}/records/', rec)
         self._request('POST', f'/dns/zones/{zone}/records/commit')
         return True, "Record deleted"

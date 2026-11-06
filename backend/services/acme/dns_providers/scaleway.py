@@ -135,7 +135,7 @@ class ScalewayDnsProvider(BaseDnsProvider):
         logger.info(f"Scaleway: Created TXT record {record_name}")
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         """Delete TXT record via Scaleway API"""
         zone_name = self._get_zone_name(domain)
         if not zone_name:
@@ -143,16 +143,29 @@ class ScalewayDnsProvider(BaseDnsProvider):
         
         relative_name = self.get_relative_record_name(record_name, zone_name)
         
+        # Delete by record ID: id_fields without data would drop every value of the name
+        record_ids = []
+        page = 1
+        while True:
+            success, result = self._request('GET', f'/dns-zones/{zone_name}/records', params={
+                'name': relative_name, 'type': 'TXT', 'page': page, 'page_size': 100,
+            })
+            if not success:
+                return False, f"Failed to list records: {result}"
+            records = (result or {}).get('records', [])
+            record_ids += [r['id'] for r in records
+                           if r.get('type') == 'TXT' and r.get('name', '') == relative_name
+                           and self.txt_matches(r.get('data'), record_value)]
+            if len(records) < 100:
+                break
+            page += 1
+        
+        if not record_ids:
+            return True, "Record not found (already deleted?)"
+        
         # Scaleway uses PATCH with delete action
         data = {
-            'changes': [{
-                'delete': {
-                    'id_fields': {
-                        'name': relative_name,
-                        'type': 'TXT'
-                    }
-                }
-            }],
+            'changes': [{'delete': {'id': record_id}} for record_id in record_ids],
             'return_all_records': False
         }
         

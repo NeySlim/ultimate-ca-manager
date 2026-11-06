@@ -37,6 +37,9 @@ class FakePowerDns:
             return _Response(200, {'rrsets': list(self.rrsets.values())})
         if method == 'PATCH' and path == '/zones/example.com.':
             for rr in kw['json']['rrsets']:
+                if rr['changetype'] == 'DELETE':
+                    self.rrsets.pop(rr['name'], None)
+                    continue
                 assert rr['changetype'] == 'REPLACE'
                 contents = [r['content'] for r in rr['records']]
                 if len(contents) != len(set(contents)):
@@ -109,3 +112,45 @@ def test_disabled_copy_of_the_value_is_re_enabled_not_duplicated(api):
     assert ok, msg
     assert api.rrsets[NAME]['records'] == [{'content': '"tok1"', 'disabled': False},
                                            {'content': '"other"', 'disabled': False}]
+
+
+def _delete(value):
+    return PowerDnsDnsProvider({'server_url': 'http://pdns:8081', 'api_key': 'k'}).delete_txt_record(
+        'example.com', '_acme-challenge.example.com', value)
+
+
+def test_cleanup_writes_back_the_other_values_with_their_ttl(api):
+    api.rrsets[NAME] = {'name': NAME, 'type': 'TXT', 'ttl': 60,
+                        'records': [{'content': '"apex"', 'disabled': False},
+                                    {'content': '"wild"', 'disabled': False}]}
+    ok, msg = _delete('apex')
+    assert ok, msg
+    patch = [c for c in api.calls if c[0] == 'PATCH'][-1][2]['rrsets'][0]
+    assert patch['changetype'] == 'REPLACE' and patch['ttl'] == 60
+    assert api.contents() == ['"wild"']
+
+
+def test_cleanup_of_the_last_value_deletes_the_rrset(api):
+    assert _create('apex')[0]
+    ok, msg = _delete('apex')
+    assert ok, msg
+    assert NAME not in api.rrsets
+    assert [c for c in api.calls if c[0] == 'PATCH'][-1][2]['rrsets'][0]['changetype'] == 'DELETE'
+
+
+def test_cleanup_of_an_absent_value_writes_nothing(api):
+    assert _create('wild')[0]
+    api.calls.clear()
+    ok, msg = _delete('apex')
+    assert ok and 'not found' in msg.lower()
+    assert not [c for c in api.calls if c[0] == 'PATCH']
+
+
+def test_cleanup_read_failure_writes_nothing(api):
+    assert _create('apex')[0]
+    api.get_status = 500
+    api.calls.clear()
+    ok, msg = _delete('apex')
+    assert not ok and 'backend down' in msg
+    assert not [c for c in api.calls if c[0] == 'PATCH']
+    assert api.contents() == ['"apex"']

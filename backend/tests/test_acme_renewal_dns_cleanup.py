@@ -120,6 +120,7 @@ def test_renewal_submits_upstream_when_propagation_not_ready(app, renewal_order)
     # TXT is still cleaned up on the way out (finally block).
     assert len(deleted) == 1
     assert deleted[0]['record_name'] == '_acme-challenge.example.com'
+    assert deleted[0]['record_value'] == 'token-value'
 
 
 def test_renewal_deletes_txt_when_create_fails_on_second_domain(app, renewal_order):
@@ -177,6 +178,7 @@ def test_renewal_deletes_txt_when_create_fails_on_second_domain(app, renewal_ord
     assert create_calls == ['example.com', 'www.example.com']
     assert len(deleted) == 2
     assert {d['domain'] for d in deleted} == {'example.com', 'www.example.com'}
+    assert {d['record_value'] for d in deleted} == {'token-a', 'token-b'}
 
 
 def test_renewal_writes_and_cleans_up_txt_under_the_name_lock(app, renewal_order, monkeypatch):

@@ -40,7 +40,8 @@ class MythicBeastsDnsProvider(BaseDnsProvider):
         except requests.RequestException as e:
             return False, self._failure(e)
     
-    def _request(self, method: str, path: str, data: Optional[str] = None) -> Tuple[bool, Any]:
+    def _request(self, method: str, path: str, data: Optional[str] = None,
+                 params: Optional[Dict] = None) -> Tuple[bool, Any]:
         ok, err = self._authenticate()
         if not ok:
             return False, err
@@ -49,7 +50,8 @@ class MythicBeastsDnsProvider(BaseDnsProvider):
         if data:
             headers['Content-Type'] = 'text/dns'
         try:
-            resp = requests.request(method=method, url=url, headers=headers, data=data, timeout=30)
+            resp = requests.request(method=method, url=url, headers=headers, data=data,
+                                    params=params, timeout=30)
             if resp.status_code >= 400:
                 return False, self._error(resp)
             return True, resp.json() if resp.text and resp.headers.get('content-type', '').startswith('application/json') else resp.text
@@ -67,13 +69,14 @@ class MythicBeastsDnsProvider(BaseDnsProvider):
             return False, f"Failed to create record: {result}"
         return True, "Record created successfully"
     
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         # Same zone resolution as the create path, so the record is looked
         # for where it was written.
         zone = self.get_zone_for_domain(domain) or domain
         relative = self.get_relative_record_name(record_name, zone)
-        record_line = f"{relative} TXT"
-        success, result = self._request('DELETE', f'/zones/{zone}/records', data=record_line)
+        # `data` narrows the delete to this value; the other values of the name stay.
+        success, result = self._request('DELETE', f'/zones/{zone}/records/{relative}/TXT',
+                                        params={'data': record_value})
         if not success:
             return False, f"Failed to delete record: {result}"
         return True, "Record deleted successfully"

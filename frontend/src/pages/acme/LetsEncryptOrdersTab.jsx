@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowsClockwise, Certificate, CheckCircle, DownloadSimple, Eye,
-  MagnifyingGlass, Play, Trash,
+  MagnifyingGlass, Play, Trash, Warning,
 } from '@phosphor-icons/react'
 import { Badge, Button, EmptyState, FilterSelect } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
@@ -21,6 +21,7 @@ const statusVariant = (status) => {
 
 export default function LetsEncryptOrdersTab({
   clientOrders = [],
+  partial = null,
   selectedClientOrder,
   onSelectOrder,
   onRefresh,
@@ -65,6 +66,13 @@ export default function LetsEncryptOrdersTab({
           <ArrowsClockwise size={14} />
         </Button>
       </div>
+
+      {partial && (
+        <p className="flex items-center gap-1.5 text-xs status-warning-text" role="status">
+          <Warning size={14} />
+          {t('acme.ordersListPartial', { loaded: partial.loaded, total: partial.total })}
+        </p>
+      )}
 
       {clientOrders.length === 0 ? (
         <EmptyState

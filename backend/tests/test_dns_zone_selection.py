@@ -69,7 +69,7 @@ class _ConcreteProvider(BaseDnsProvider):
     def create_txt_record(self, domain, record_name, record_value, ttl=300):
         return True, 'ok'
 
-    def delete_txt_record(self, domain, record_name):
+    def delete_txt_record(self, domain, record_name, record_value):
         return True, 'ok'
 
     def test_connection(self):

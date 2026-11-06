@@ -49,6 +49,11 @@ class FakeNs1:
                 return _Response(404, {'message': 'record not found'})
             self.records[name] = {'ttl': json['ttl'], 'answers': list(json['answers'])}
             return _Response(200, self.records[name])
+        if method == 'DELETE':
+            if name not in self.records:
+                return _Response(404, {'message': 'record not found'})
+            del self.records[name]
+            return _Response(200, {})
         return _Response(405, {'message': 'method not allowed'})
 
     def values(self, name='_acme-challenge.example.com'):
@@ -101,3 +106,46 @@ def test_unreadable_record_is_not_overwritten(api):
     assert not ok and 'internal error' in msg
     assert not [c for c in api.calls if c[0] in ('PUT', 'POST')]
     assert api.values() == ['other']
+
+
+def _delete(value):
+    return Ns1DnsProvider({'api_key': 'k'}).delete_txt_record('example.com', '_acme-challenge.example.com', value)
+
+
+def test_delete_keeps_the_other_value(api):
+    api.records['_acme-challenge.example.com'] = {'ttl': 60, 'answers': [{'answer': ['apex']}, {'answer': ['wild']}]}
+    ok, msg = _delete('apex')
+    assert ok, msg
+    assert api.values() == ['wild']
+    assert api.records['_acme-challenge.example.com']['ttl'] == 60
+    assert [c[0] for c in api.calls if c[0] in ('PUT', 'POST', 'DELETE')] == ['POST']
+
+
+def test_delete_of_the_last_value_removes_the_record(api):
+    assert _create('apex')[0]
+    ok, msg = _delete('apex')
+    assert ok, msg
+    assert '_acme-challenge.example.com' not in api.records
+    assert api.calls[-1][0] == 'DELETE'
+
+
+def test_delete_of_an_absent_value_writes_nothing(api):
+    api.records['_acme-challenge.example.com'] = {'ttl': 300, 'answers': [{'answer': ['wild']}]}
+    assert _delete('apex')[0]
+    assert _delete('apex')[0]
+    assert api.values() == ['wild']
+    assert not [c for c in api.calls if c[0] in ('PUT', 'POST', 'DELETE')]
+
+
+def test_delete_of_a_missing_record_is_a_success(api):
+    ok, msg = _delete('apex')
+    assert ok and 'not found' in msg.lower()
+
+
+def test_unreadable_record_is_not_deleted(api):
+    api.records['_acme-challenge.example.com'] = {'ttl': 300, 'answers': [{'answer': ['apex']}, {'answer': ['wild']}]}
+    api.get_status = 500
+    ok, msg = _delete('apex')
+    assert not ok and 'internal error' in msg
+    assert not [c for c in api.calls if c[0] in ('PUT', 'POST', 'DELETE')]
+    assert api.values() == ['apex', 'wild']

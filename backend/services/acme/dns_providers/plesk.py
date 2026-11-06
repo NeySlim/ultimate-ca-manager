@@ -301,7 +301,7 @@ class PleskDnsProvider(BaseDnsProvider):
         suffix = f" (ID {record_id})" if record_id else ""
         return True, f"Record created successfully{suffix}"
 
-    def delete_txt_record(self, domain: str, record_name: str) -> Tuple[bool, str]:
+    def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
         record_name = self._normalise_name(record_name)
         logger.info("Plesk: Deleting TXT record(s) for %s", record_name)
         success, site = self._find_site(record_name or domain)
@@ -328,7 +328,8 @@ class PleskDnsProvider(BaseDnsProvider):
             record_type = (result.findtext("./data/type") or "").strip().upper()
             host = self._absolute_host(result.findtext("./data/host"), site["name"])
             record_id = result.findtext("id")
-            if record_type == "TXT" and host == record_name and record_id:
+            value = result.findtext("./data/value")
+            if record_type == "TXT" and host == record_name and record_id and self.txt_matches(value, record_value):
                 record_ids.append(record_id)
 
         if not record_ids:

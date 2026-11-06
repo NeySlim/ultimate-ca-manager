@@ -595,6 +595,18 @@ def create_app(config_name=None):
         except ImportError:
             pass
 
+        # An order a restart cut short resumes once idle, whichever instance restarted
+        try:
+            from services.acme.order_housekeeping import scheduled_order_recovery
+            scheduler.register_task(
+                name="acme_order_recovery",
+                func=scheduled_order_recovery,
+                interval=900,
+                description="Set ACME orders interrupted by a restart back to pending"
+            )
+        except ImportError:
+            pass
+
         # Delivery history does not grow for ever (webhooks, deployments,
         # notifications) — every 6 hours, same cadence as the ACME purge
         try:
