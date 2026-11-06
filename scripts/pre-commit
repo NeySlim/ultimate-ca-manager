@@ -1,15 +1,16 @@
 #!/bin/bash
 #
-# UCM Pre-commit Quality Checks
-# Install: cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
-# Or: ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
+# UCM pre-commit: the fast gate (target: under a minute).
+# Install: ln -sf ../../scripts/pre-commit .git/hooks/pre-commit
 #
 # Checks:
 #   1. i18n locale sync (all 9 files have same keys)
-#   2. Frontend tests (Vitest — component smoke tests)
-#   3. Backend tests (pytest — API logic tests)
-#   4. No 'icon: undefined' in navigation components
-#
+#   2. No 'icon: undefined' in navigation components
+#   3. Backend: pyflakes gate (ruff), undefined-name and import audits,
+#      the tests named after the staged modules, then the last failures
+#   4. Frontend: vitest on the files touched since HEAD
+# A version-bump commit (VERSION, CHANGELOG, package files, chart) runs 1 and 2 only.
+# The full suites run in scripts/pre-push before anything reaches dev.
 
 set -e
 
@@ -21,6 +22,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 FAILED=0
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
+BACKEND_PY=$(echo "$STAGED" | grep -E '^backend/.*\.py$' || true)
+FRONTEND=$(echo "$STAGED" | grep -E '^frontend/' || true)
+VERSION_ONLY=1
+echo "$STAGED" | grep -vE '^(VERSION|CHANGELOG\.md|frontend/package\.json|frontend/package-lock\.json|charts/ucm/Chart\.yaml)$' | grep -q . && VERSION_ONLY=0
 
 echo "🔍 UCM Pre-commit Checks"
 echo "========================"
@@ -35,43 +42,8 @@ else
     FAILED=1
 fi
 
-# ── 2. Frontend unit tests ────────────────────────────────────
-echo -n "  Frontend tests... "
-# `|| true`: under set -e a failing run would end the hook before the report.
-FRONT_OUT=$(cd "$ROOT/frontend" && npx vitest run --no-coverage 2>&1) || true
-FRONT_RESULT=$(echo "$FRONT_OUT" | grep "Tests" | tail -1)
-# Strict: "N failed | M passed" must fail, not sneak through on "passed".
-if echo "$FRONT_RESULT" | grep -q "passed" && ! echo "$FRONT_RESULT" | grep -qE "fail|error"; then
-    echo -e "${GREEN}✅${NC} $FRONT_RESULT"
-else
-    echo -e "${RED}❌${NC} $FRONT_RESULT"
-    # A crashed run (worker killed under load) prints no summary line: show its tail.
-    [ -n "$FRONT_RESULT" ] || echo "$FRONT_OUT" | tail -15 | sed 's/^/    /'
-    echo -e "${YELLOW}    Run 'cd frontend && npx vitest run' for details${NC}"
-    FAILED=1
-fi
-
-# ── 3. Backend tests ──────────────────────────────────────────
-# Single parallel run (pytest-xdist; --dist loadfile is mandatory, tests
-# share state within a file). Strict: any "N failed" / "N error(s)" in the
-# summary fails the hook; "xfailed" does not.
-# UCM_PYTEST_WORKERS caps the workers when several commits run at once.
-echo -n "  Backend tests... "
-BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -rfE -n "${UCM_PYTEST_WORKERS:-auto}" --dist loadfile 2>&1) || true
-BACK_RESULT=$(echo "$BACK_OUT" | tail -1)
-if echo "$BACK_RESULT" | grep -q "passed" && ! echo "$BACK_RESULT" | grep -qE "[0-9]+ (failed|errors?)\b"; then
-    echo -e "${GREEN}✅${NC} $BACK_RESULT"
-else
-    echo -e "${RED}❌${NC} $BACK_RESULT"
-    # Name the failing tests: intermittent ones rarely fail twice in a row.
-    echo "$BACK_OUT" | grep -E "^(FAILED|ERROR) " | head -20 | sed 's/^/    /'
-    echo -e "${YELLOW}    Run 'cd backend && $PYTEST_PY -m pytest tests/ -v' for details${NC}"
-    FAILED=1
-fi
-
-# ── 4. Quick grep checks ─────────────────────────────────────
+# ── 2. Quick grep checks ─────────────────────────────────────
 echo -n "  No 'icon: undefined'... "
-# Exclude test files from this check
 if grep -rn "icon:\s*undefined" "$ROOT/frontend/src/" --include='*.jsx' --include='*.tsx' --include='*.js' \
     | grep -v '__tests__/' | grep -v '.test.' | grep -v '.spec.' 2>/dev/null; then
     echo -e "${RED}❌ Found 'icon: undefined' — will cause React Error #130${NC}"
@@ -80,23 +52,118 @@ else
     echo -e "${GREEN}✅${NC}"
 fi
 
-# ── 5. Backend static audit (undefined references + import smoke) ──
-echo -n "  Backend undefined refs... "
-if "$PYTEST_PY" "$ROOT/backend/scripts/audit_undefined_names.py" > /tmp/ucm-audit-refs.log 2>&1; then
-    echo -e "${GREEN}✅${NC}"
-else
-    echo -e "${RED}❌ Undefined references in backend (logger / helpers / imports)${NC}"
-    grep '^\[UNDEFINED\]' /tmp/ucm-audit-refs.log | sed 's/^/    /'
-    FAILED=1
+if [ "$VERSION_ONLY" = 1 ]; then
+    echo "  Version bump only: tests skipped (the pre-push hook runs the suites)"
 fi
 
-echo -n "  Backend module import smoke... "
-if cd "$ROOT/backend" && "$PYTEST_PY" scripts/audit_imports.py > /tmp/ucm-audit-imports.log 2>&1; then
-    echo -e "${GREEN}✅${NC}"
-else
-    echo -e "${RED}❌ Module import errors (NameError / ImportError at load time)${NC}"
-    tail -20 /tmp/ucm-audit-imports.log | sed 's/^/    /'
-    FAILED=1
+# ── 3. Backend ───────────────────────────────────────────────
+if [ "$VERSION_ONLY" = 0 ] && [ -n "$BACKEND_PY" ]; then
+    echo -n "  Backend pyflakes gate (ruff)... "
+    # Same gate as the CI lint job; the four ignored codes are style debt.
+    if RUFF_OUT=$(cd "$ROOT" && "$PYTEST_PY" -m ruff check --select F --ignore F401,F541,F811,F841 --quiet $BACKEND_PY 2>&1); then
+        echo -e "${GREEN}✅${NC}"
+    else
+        echo -e "${RED}❌${NC}"
+        echo "$RUFF_OUT" | head -20 | sed 's/^/    /'
+        FAILED=1
+    fi
+
+    echo -n "  Backend undefined refs... "
+    if "$PYTEST_PY" "$ROOT/backend/scripts/audit_undefined_names.py" > /tmp/ucm-audit-refs.log 2>&1; then
+        echo -e "${GREEN}✅${NC}"
+    else
+        echo -e "${RED}❌ Undefined references in backend (logger / helpers / imports)${NC}"
+        grep '^\[UNDEFINED\]' /tmp/ucm-audit-refs.log | sed 's/^/    /'
+        FAILED=1
+    fi
+
+    echo -n "  Backend module import smoke... "
+    if (cd "$ROOT/backend" && "$PYTEST_PY" scripts/audit_imports.py > /tmp/ucm-audit-imports.log 2>&1); then
+        echo -e "${GREEN}✅${NC}"
+    else
+        echo -e "${RED}❌ Module import errors (NameError / ImportError at load time)${NC}"
+        tail -20 /tmp/ucm-audit-imports.log | sed 's/^/    /'
+        FAILED=1
+    fi
+
+    # Targeted tests: the staged test files, plus tests/test_<module>*.py for
+    # each staged backend module. Name matching is a heuristic, the pre-push
+    # suite is the real net.
+    TARGETS=""
+    for f in $BACKEND_PY; do
+        case "$f" in
+            backend/tests/test_*.py) TARGETS="$TARGETS ${f#backend/}" ;;
+            backend/tests/*|backend/migrations/*|backend/scripts/*) ;;
+            *) name=$(basename "$f" .py)
+               for t in "$ROOT"/backend/tests/test_"$name".py "$ROOT"/backend/tests/test_"$name"_*.py; do
+                   [ -f "$t" ] && TARGETS="$TARGETS ${t#$ROOT/backend/}"
+               done ;;
+        esac
+    done
+    TARGETS=$(echo $TARGETS | tr ' ' '\n' | sort -u | tr '\n' ' ')
+    if [ -n "$TARGETS" ]; then
+        echo -n "  Backend targeted tests ($(echo $TARGETS | wc -w) files)... "
+        BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest $TARGETS -q -x --tb=short -rfE -p no:cacheprovider 2>&1) || true
+        BACK_RESULT=$(echo "$BACK_OUT" | tail -1)
+        if echo "$BACK_RESULT" | grep -q "passed" && ! echo "$BACK_RESULT" | grep -qE "[0-9]+ (failed|errors?)\b"; then
+            echo -e "${GREEN}✅${NC} $BACK_RESULT"
+        else
+            echo -e "${RED}❌${NC} $BACK_RESULT"
+            echo "$BACK_OUT" | grep -E "^(FAILED|ERROR) " | head -20 | sed 's/^/    /'
+            FAILED=1
+        fi
+    else
+        echo "  Backend targeted tests: no test file matches the staged modules"
+    fi
+
+    # Last failures of the previous local run, replayed from their files only
+    # (collecting the whole tree costs more than the commit). Beyond 10 files
+    # the cache is a stale full run: left to the pre-push suite.
+    echo -n "  Backend last failures... "
+    LF_FILES=$(cd "$ROOT/backend" && "$PYTEST_PY" - <<'PY'
+import json, os
+try:
+    d = json.load(open(".pytest_cache/v/cache/lastfailed"))
+except Exception:
+    d = {}
+files = sorted({k.split("::")[0] for k in d if k.startswith("tests/")})
+print(" ".join(f for f in files if os.path.isfile(f)))
+PY
+)
+    LF_COUNT=$(echo $LF_FILES | wc -w)
+    if [ "$LF_COUNT" = 0 ]; then
+        echo -e "${GREEN}✅${NC} none"
+    elif [ "$LF_COUNT" -gt 10 ]; then
+        echo -e "${YELLOW}skipped${NC} ($LF_COUNT files on record, the pre-push suite will replay them)"
+    else
+        LF_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest $LF_FILES --lf --lfnf=none -q -x --tb=short -rfE 2>&1) || true
+        LF_RESULT=$(echo "$LF_OUT" | tail -1)
+        if echo "$LF_RESULT" | grep -qE "[0-9]+ (failed|errors?)\b"; then
+            echo -e "${RED}❌${NC} $LF_RESULT"
+            echo "$LF_OUT" | grep -E "^(FAILED|ERROR) " | head -20 | sed 's/^/    /'
+            FAILED=1
+        else
+            echo -e "${GREEN}✅${NC} $LF_RESULT"
+        fi
+    fi
+fi
+
+# ── 4. Frontend ──────────────────────────────────────────────
+if [ "$VERSION_ONLY" = 0 ] && [ -n "$FRONTEND" ]; then
+    echo -n "  Frontend tests (changed since HEAD)... "
+    FRONT_OUT=$(cd "$ROOT/frontend" && npx vitest run --changed HEAD --no-coverage 2>&1) || true
+    FRONT_RESULT=$(echo "$FRONT_OUT" | grep "Tests" | tail -1)
+    # Strict: "N failed | M passed" must fail; "No test files found" is a pass.
+    if echo "$FRONT_OUT" | grep -q "No test files found"; then
+        echo -e "${GREEN}✅${NC} no related test files"
+    elif echo "$FRONT_RESULT" | grep -q "passed" && ! echo "$FRONT_RESULT" | grep -qE "fail|error"; then
+        echo -e "${GREEN}✅${NC} $FRONT_RESULT"
+    else
+        echo -e "${RED}❌${NC} $FRONT_RESULT"
+        [ -n "$FRONT_RESULT" ] || echo "$FRONT_OUT" | tail -15 | sed 's/^/    /'
+        echo -e "${YELLOW}    Run 'cd frontend && npx vitest run' for details${NC}"
+        FAILED=1
+    fi
 fi
 
 echo "========================"

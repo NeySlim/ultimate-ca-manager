@@ -1,0 +1,76 @@
+#!/bin/bash
+#
+# UCM pre-push: the full suites before anything reaches dev.
+# Install: ln -sf ../../scripts/pre-push .git/hooks/pre-push
+#
+# git feeds "<local ref> <local sha> <remote ref> <remote sha>" lines on stdin.
+# Only a push to refs/heads/dev runs the suites: test, main and tags carry
+# content that is already green on dev, and the CI judges them sequentially.
+# One suite at a time on the machine (flock), workers capped by UCM_PYTEST_WORKERS.
+
+set -e
+
+ROOT="$(git rev-parse --show-toplevel)"
+PYTEST_PY="$ROOT/.venv/bin/python"; [ -x "$PYTEST_PY" ] || PYTEST_PY=python3
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+FAILED=0
+
+NEED=0
+while read -r _lref _lsha rref _rsha; do
+    [ "$rref" = "refs/heads/dev" ] && NEED=1
+done
+if [ "$NEED" = 0 ]; then
+    echo "pre-push: not a push to dev, suites skipped"
+    exit 0
+fi
+
+# Serialise the suites across worktrees: two pushes queue instead of adding up.
+VENV_DIR=$(dirname "$(dirname "$(readlink -f "$PYTEST_PY")")")
+LOCK="${UCM_PRE_PUSH_LOCK:-$VENV_DIR/.pre-push.lock}"
+exec 9>"$LOCK"
+if ! flock -n 9; then
+    echo "pre-push: another suite is running, waiting for the lock..."
+    flock 9
+fi
+
+echo "🧪 UCM Pre-push Suites (dev)"
+echo "============================"
+
+# ── 1. Frontend ──────────────────────────────────────────────
+echo -n "  Frontend tests... "
+FRONT_OUT=$(cd "$ROOT/frontend" && npx vitest run --no-coverage 2>&1) || true
+FRONT_RESULT=$(echo "$FRONT_OUT" | grep "Tests" | tail -1)
+# Strict: "N failed | M passed" must fail, not sneak through on "passed".
+if echo "$FRONT_RESULT" | grep -q "passed" && ! echo "$FRONT_RESULT" | grep -qE "fail|error"; then
+    echo -e "${GREEN}✅${NC} $FRONT_RESULT"
+else
+    echo -e "${RED}❌${NC} $FRONT_RESULT"
+    [ -n "$FRONT_RESULT" ] || echo "$FRONT_OUT" | tail -15 | sed 's/^/    /'
+    echo -e "${YELLOW}    Run 'cd frontend && npx vitest run' for details${NC}"
+    FAILED=1
+fi
+
+# ── 2. Backend ───────────────────────────────────────────────
+# --dist loadfile is mandatory: tests share state within a file.
+echo -n "  Backend tests (-n ${UCM_PYTEST_WORKERS:-10})... "
+BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -rfE -n "${UCM_PYTEST_WORKERS:-10}" --dist loadfile 2>&1) || true
+BACK_RESULT=$(echo "$BACK_OUT" | tail -1)
+if echo "$BACK_RESULT" | grep -q "passed" && ! echo "$BACK_RESULT" | grep -qE "[0-9]+ (failed|errors?)\b"; then
+    echo -e "${GREEN}✅${NC} $BACK_RESULT"
+else
+    echo -e "${RED}❌${NC} $BACK_RESULT"
+    echo "$BACK_OUT" | grep -E "^(FAILED|ERROR) " | head -20 | sed 's/^/    /'
+    echo -e "${YELLOW}    Run 'cd backend && $PYTEST_PY -m pytest --lf -x' for details${NC}"
+    FAILED=1
+fi
+
+echo "============================"
+if [ $FAILED -ne 0 ]; then
+    echo -e "${RED}❌ Pre-push suites FAILED — nothing pushed${NC}"
+    exit 1
+else
+    echo -e "${GREEN}✅ Suites green, pushing${NC}"
+fi
