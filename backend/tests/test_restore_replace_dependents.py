@@ -28,6 +28,10 @@ from tests.test_backup_cross_installation import (
 from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
 from utils.datetime_utils import utc_now
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 _PG_URL = os.environ.get('UCM_TEST_PG_URL')
 ENGINES = [
     'sqlite',

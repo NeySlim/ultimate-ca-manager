@@ -7,6 +7,10 @@ import pytest
 
 from models import db, CA, Certificate, SystemConfig
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 
 def _service():
     from services.backup_service import BackupService

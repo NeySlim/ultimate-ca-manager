@@ -2,6 +2,10 @@
 had, not today's default: deployment full chains carried the root before 089."""
 from services.backup.restore.apply import legacy_defaults
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 
 def test_a_binding_without_the_column_keeps_its_root():
     assert legacy_defaults('deploy_bindings', {'fullchain_path': '/etc/ssl/fc.pem'}) == {'include_root': True}

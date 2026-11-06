@@ -15,6 +15,9 @@ import fips_mode
 from config.settings import Config
 from services.backup import manifest, storage
 from services.backup.locking import backup_operation_lock
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
 
 PASSWORD = 'Correct-Horse-Battery-9'
 

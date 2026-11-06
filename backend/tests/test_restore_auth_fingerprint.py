@@ -11,6 +11,10 @@ from models.auth_certificate import AuthCertificate
 from services.backup.restore.conflict import RestoreConflictError
 from tests.test_backup_restore_failfast import PASSWORD, _only, _reseal, _service
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 
 def _row(**values):
     admin = User.query.filter_by(username='admin').first()

@@ -10,6 +10,10 @@ import pytest
 from models import SystemConfig, db
 from services.backup import manifest
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 PASSWORD = 'Correct-Horse-Battery-9'
 
 

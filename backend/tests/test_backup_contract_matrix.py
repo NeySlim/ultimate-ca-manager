@@ -33,6 +33,10 @@ from models import db
 from services.backup import manifest
 from services.backup.export_generic import load_model
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 PASSWORD = 'Correct-Horse-Battery-9'
 
 # Rows this file creates are recognisable, so the teardown removes exactly

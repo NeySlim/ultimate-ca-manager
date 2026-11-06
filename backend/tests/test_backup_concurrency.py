@@ -13,6 +13,10 @@ import pytest
 from services.backup import storage
 from services.backup.locking import BackupBusyError, backup_operation_lock
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 
 def _hold_the_lock(directory, ready, release):
     """Take the lock in another process and hold it until told to stop."""
