@@ -269,3 +269,81 @@ def test_another_issuers_certificate_does_not_open_the_account(app, auth_client,
         db.session.commit()
         user, _found, err = _header_login(serial, 'CN=Evil,notAnAttribute=x')
         assert user is not None, err
+
+
+# A serial without its issuer (RFC 5280 §4.1.2.2): headers that name no readable issuer
+# never open an enrolment that recorded one.
+
+def _proxy_headers(pem, **extra):
+    info = _info(pem)
+    headers = {'X-SSL-Client-Verify': 'SUCCESS', 'X-SSL-Client-S-DN': info['subject_dn'],
+               'X-SSL-Client-Serial': info['serial']}
+    headers.update(extra)
+    return headers
+
+
+@pytest.mark.parametrize('issuer_dn', [None, '', 'CN=Evil,notAnAttribute=x'],
+                         ids=['absent', 'empty', 'unreadable'])
+def test_a_serial_alone_does_not_open_an_enrolment_with_an_issuer(app, auth_client, same_serial,
+                                                                   issuer_dn, caplog):
+    serial, pem_a, _pem_b = same_serial
+    r = _import(auth_client, pem_a)
+    assert r.status_code == 201, r.get_json()
+    info = {'serial': format(serial, 'X'), 'issuer_dn': issuer_dn, 'fingerprint': None,
+            'subject_dn': f'CN={SUBJECT}'}
+    with app.app_context():
+        with caplog.at_level('WARNING', logger='services.mtls_enrollment'):
+            assert MTLSAuthService.authenticate_certificate(info)[2] == 'Certificate not enrolled'
+        assert 'X-SSL-Client-I-DN' in caplog.text
+        # The issuer text alone, without the stored certificate, is still a registered issuer
+        row = db.session.get(AuthCertificate, r.get_json()['data']['id'])
+        row.cert_pem = None
+        db.session.commit()
+        assert MTLSAuthService.authenticate_certificate(info)[2] == 'Certificate not enrolled'
+        # And the stored certificate alone too
+        row.cert_pem, row.cert_issuer = pem_a.encode(), ''
+        db.session.commit()
+        assert MTLSAuthService.authenticate_certificate(info)[2] == 'Certificate not enrolled'
+
+
+def test_an_enrolment_without_an_issuer_still_opens_by_serial(app, auth_client, same_serial):
+    serial, pem_a, _pem_b = same_serial
+    r = _import(auth_client, pem_a)
+    assert r.status_code == 201, r.get_json()
+    with app.app_context():
+        row = db.session.get(AuthCertificate, r.get_json()['data']['id'])
+        row.cert_issuer, row.cert_pem = '', None
+        db.session.commit()
+        user, found, err = _header_login(serial, None)
+        assert user is not None and found.id == row.id, err
+
+
+def test_proxy_login_needs_the_issuer_header_or_the_certificate(app, client, auth_client, same_serial):
+    import urllib.parse
+    _serial, pem_a, _pem_b = same_serial
+    assert _import(auth_client, pem_a).status_code == 201
+    login = '/api/v2/auth/login/mtls'
+    r = client.post(login, headers=_proxy_headers(pem_a))
+    assert r.status_code == 401, r.get_json()
+    methods = client.get('/api/v2/auth/methods', headers=_proxy_headers(pem_a)).get_json()['data']
+    assert methods.get('mtls_status') == 'present_not_enrolled' and methods.get('mtls_user') is None
+    r = client.post(login, headers=_proxy_headers(pem_a, **{'X-SSL-Client-I-DN': _info(pem_a)['issuer_dn']}))
+    assert r.status_code == 200, r.get_json()
+    client.post('/api/v2/auth/logout')
+    r = client.post(login, headers=_proxy_headers(pem_a, **{'X-SSL-Client-Cert': urllib.parse.quote(pem_a)}))
+    assert r.status_code == 200, r.get_json()
+
+
+def test_enrolling_from_headers_needs_the_issuer(app, auth_client, same_serial):
+    """An enrolment made from a serial alone could never be told apart from another CA's."""
+    _serial, pem_a, _pem_b = same_serial
+    r = auth_client.post('/api/v2/mtls/enroll', json={}, headers=_proxy_headers(pem_a))
+    assert r.status_code == 400, r.get_json()
+    assert 'X-SSL-Client-I-DN' in r.get_json()['message']
+    assert _enrolments(app) == 0
+    r = auth_client.post('/api/v2/mtls/enroll', json={},
+                         headers=_proxy_headers(pem_a, **{'X-SSL-Client-I-DN': _info(pem_a)['issuer_dn']}))
+    assert r.status_code == 200, r.get_json()
+    with app.app_context():
+        row = AuthCertificate.query.filter(AuthCertificate.cert_subject == f'CN={SUBJECT}').one()
+        assert row.cert_issuer == _info(pem_a)['issuer_dn']

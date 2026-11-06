@@ -58,5 +58,5 @@ def test_a_revocation_held_under_any_ca_of_the_issuer_name_closes_the_pemless_fa
             valid_from=utc_now() - timedelta(days=1), valid_until=utc_now() + timedelta(days=10)))
         db.session.add(RevokedSerial(caref=new.refid, serial_number=serial, valid_to=utc_now() + timedelta(days=10)))
         db.session.commit()
-        got, _, err = MTLSAuthService.authenticate_certificate({'serial': serial})
+        got, _, err = MTLSAuthService.authenticate_certificate({'serial': serial, 'issuer_dn': old.subject})
         assert got is None and 'revoked' in err.lower()

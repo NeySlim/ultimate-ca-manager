@@ -135,6 +135,11 @@ def _issuer_match(row, presented) -> Optional[bool]:
     return None if stored is None else stored == presented
 
 
+def records_issuer(row) -> bool:
+    """Whether an enrolment recorded its issuer, as text or by its stored certificate."""
+    return bool(row.cert_issuer) or _load(row.cert_pem) is not None
+
+
 def same_issuer(one, other) -> Optional[bool]:
     """Whether two DNs name one issuer: the same text, or the same attributes; None when unreadable."""
     if one and one == other:
@@ -217,17 +222,27 @@ def presented_enrolment(cert_info: dict):
     """The enrolment of a presented certificate, or None.
 
     The fingerprint tells same-serial enrolments apart; failing it, the best
-    match must be the only one of its rank, never a guess between two.
+    match must be the only one of its rank, never a guess between two. A
+    serial without a readable issuer opens only enrolments that recorded none.
     """
     serial, issuer = presented_identity(cert_info)
     if serial is None:
         return None
-    ranked = _ranked(serial, issuer)
+    readable = dn_attributes(issuer) is not None
+    ranked = _ranked(serial, issuer if readable else None)
     presented = normalized_fingerprint(cert_info.get('fingerprint'))
     if presented:
         for _rank, row in ranked:
             if normalized_fingerprint(row.cert_fingerprint) == presented:
                 return row
+    if not readable:
+        # A serial is unique per issuer only: without one, it opens no enrolment that recorded one
+        refused = [row.id for _rank, row in ranked if records_issuer(row)]
+        if refused:
+            logger.warning("mTLS: serial %X presented without a readable issuer; enrolments %s "
+                           "record one and are refused (forward X-SSL-Client-I-DN or X-SSL-Client-Cert)",
+                           serial, ', '.join(str(i) for i in refused))
+            ranked = [(rank, row) for rank, row in ranked if not records_issuer(row)]
     best = [row for rank, row in ranked if ranked and rank == ranked[0][0]]
     if len(best) > 1:
         logger.warning("mTLS: %d enrolments compete for serial %X (ids %s), none chosen",
