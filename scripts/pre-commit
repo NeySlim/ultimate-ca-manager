@@ -100,8 +100,9 @@ if [ "$VERSION_ONLY" = 0 ] && [ -n "$BACKEND_PY" ]; then
                done ;;
         esac
     done
-    TARGETS=$(echo $TARGETS | tr ' ' '\n' | sort -u | tr '\n' ' ')
-    if [ -n "$TARGETS" ]; then
+    # Empty means empty: a bare pytest here would run the whole suite.
+    TARGETS=$(printf '%s\n' $TARGETS | grep . | sort -u | tr '\n' ' ')
+    if [ "$(echo $TARGETS | wc -w)" -gt 0 ]; then
         echo -n "  Backend targeted tests ($(echo $TARGETS | wc -w) files)... "
         BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest $TARGETS -q -x --tb=short -rfE -p no:cacheprovider 2>&1) || true
         BACK_RESULT=$(echo "$BACK_OUT" | tail -1)

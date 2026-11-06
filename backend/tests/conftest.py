@@ -346,6 +346,55 @@ def _seeded_rows_stay_in_their_module():
         remove_seeded()
 
 
+# Tables a file must leave as it found them: the sequential suite shares one
+# database, so a leftover row is visible to every later file.
+_LEAK_TABLES = (
+    'certificate_authorities', 'certificates', 'acme_orders', 'acme_domains',
+    'users', 'certificate_templates', 'scep_profiles', 'certificate_policies',
+)
+# Files allowed to change the shared tables: they reset or migrate the database.
+_LEAK_EXEMPT = {
+    'test_api_routes.py', 'test_admin_seed_kwargs.py', 'test_system.py',
+    'test_database_reset_records_itself.py',
+}
+
+
+def _leak_counts():
+    if not _SESSION_APP:
+        return None
+    from sqlalchemy import text as _text
+    from models import db
+    counts = {}
+    with _SESSION_APP[0].app_context():
+        present = set(db.inspect(db.engine).get_table_names())
+        for table in _LEAK_TABLES:
+            if table in present:
+                counts[table] = db.session.execute(_text(f'SELECT COUNT(*) FROM "{table}"')).scalar()
+        db.session.rollback()
+    return counts
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _shared_tables_stay_in_their_module(request):
+    """Row counts of the shared tables before and after each file. UCM_TEST_LEAK_MODE
+    is `warn` (default) or `fail`; a file in _LEAK_EXEMPT is never checked."""
+    name = os.path.basename(str(request.fspath))
+    before = _leak_counts()
+    yield
+    if name in _LEAK_EXEMPT or before is None:
+        return
+    after = _leak_counts() or {}
+    deltas = {t: after[t] - before[t] for t in before if t in after and after[t] != before[t]}
+    if not deltas:
+        return
+    message = f'{name} left the shared tables changed: ' + ', '.join(
+        f'{t} {d:+d}' for t, d in sorted(deltas.items()))
+    if os.environ.get('UCM_TEST_LEAK_MODE', 'warn') == 'fail':
+        pytest.fail(message)
+    import warnings
+    warnings.warn(message, stacklevel=1)
+
+
 @pytest.fixture(scope='session')
 def app():
     """Create Flask app with test configuration (shared across all tests)."""
