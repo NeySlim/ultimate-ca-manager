@@ -198,30 +198,6 @@ def test_epik_deletes_one_value(monkeypatch):
     assert ('DELETE', '/domains/example.com/records/2') in api.calls
 
 
-# --- Hostinger ------------------------------------------------------------------
-
-class FakeHostinger(_RecordApi):
-    def __call__(self, method, url, headers=None, json=None, timeout=None):
-        path = url.split('/v1', 1)[1]
-        self.calls.append((method, path))
-        if path == '/dns/example.com/records' and method == 'GET':
-            return _Resp(200, self.records)
-        if path == '/dns/example.com/records' and method == 'POST':
-            return _Resp(201, self.add(**json))
-        m = re.fullmatch(r'/dns/example\.com/records/(\d+)', path)
-        if m and method == 'DELETE':
-            return _Resp(204) if self.delete(m.group(1)) else _Resp(404, {'message': 'nf'})
-        return _Resp(404, {'message': 'not found'})
-
-
-def test_hostinger_deletes_one_value(monkeypatch):
-    api = FakeHostinger('content')
-    monkeypatch.setattr(requests, 'request', api)
-    _create_two_delete_one(create_provider('hostinger', {'api_token': 't'}))
-    assert api.values() == ['apex']
-    assert ('DELETE', '/dns/example.com/records/2') in api.calls
-
-
 # --- Google Cloud DNS -------------------------------------------------------------
 
 class FakeCloudDns:

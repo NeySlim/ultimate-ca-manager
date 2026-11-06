@@ -67,6 +67,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - DNS providers: Constellix called v1 record paths on the v4 API and added a second record for a name already holding a TXT value. It now uses the documented v4 records endpoint, reads every page, and adds or removes a value inside the name's single record.
 - DNS providers: Checkdomain reported success when the API refused the deletion of a TXT record. The deletion now fails with the API's answer.
 - DNS providers: Core Networks called zone and deletion endpoints the API does not have, logged in with a form instead of JSON and ignored a failed commit, so cleanup reported success with the record still published. It now uses the documented `/dnszones` endpoints, deletes one value through `records/delete` and fails when the commit fails.
+- DNS providers: Hostinger called an API host and record endpoints that do not exist. It now uses the documented `/api/dns/v1/zones` endpoints, appending a value on creation and rewriting the name's other TXT values on deletion.
 
 ### Upgrade notes
 

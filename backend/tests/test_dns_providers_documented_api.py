@@ -257,3 +257,95 @@ def test_corenetworks_failed_login_is_false(monkeypatch):
     p = create_provider('corenetworks', {'username': 'u', 'password': 'wrong'})
     ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
     assert not ok
+
+
+# --- Hostinger ----------------------------------------------------------------------
+# https://developers.hostinger.com/ (openapi/openapi.json, DNS Zone): GET/PUT/DELETE
+# /api/dns/v1/zones/{domain}; records grouped by name and type; PUT overwrite=false
+# appends, overwrite=true replaces the name+type set; DELETE takes {filters:[{name,type}]}
+# and removes the whole set.
+
+class FakeHostinger:
+    BASE = 'https://developers.hostinger.com'
+
+    def __init__(self):
+        self.zone = [{'name': '@', 'type': 'TXT', 'ttl': 14400,
+                      'records': [{'content': 'v=spf1 -all', 'is_disabled': False}]},
+                     {'name': 'www', 'type': 'A', 'ttl': 14400,
+                      'records': [{'content': '192.0.2.1', 'is_disabled': False}]}]
+        self.fail = None
+
+    def _set(self, name, rtype):
+        return next((s for s in self.zone if s['name'] == name and s['type'] == rtype), None)
+
+    def __call__(self, method, url, headers=None, json=None, timeout=None):
+        path, _ = _split(url, self.BASE)
+        if (headers or {}).get('Authorization') != 'Bearer t':
+            return _Resp(401, {'message': 'Unauthenticated'})
+        if self.fail == method:
+            return _Resp(500, {'message': 'Error message'})
+        if path == '/api/domains/v1/portfolio' and method == 'GET':
+            return _Resp(200, [{'id': 1, 'domain': 'example.com', 'type': 'domain'}])
+        if path != '/api/dns/v1/zones/example.com':
+            return _Resp(404, {'message': 'Not found'})
+        if method == 'GET':
+            return _Resp(200, self.zone)
+        if method == 'PUT':
+            for rr in json['zone']:
+                if not rr.get('name') or not rr.get('type') or not rr.get('records'):
+                    return _Resp(422, {'message': 'The name field is required.'})
+                current = self._set(rr['name'], rr['type'])
+                fresh = [{'content': r['content'], 'is_disabled': False} for r in rr['records']]
+                if current is None:
+                    self.zone.append({'name': rr['name'], 'type': rr['type'],
+                                      'ttl': rr.get('ttl', 14400), 'records': fresh})
+                elif json.get('overwrite', True):
+                    current['records'] = fresh
+                else:
+                    current['records'] += fresh
+                    current['ttl'] = rr.get('ttl', current['ttl'])
+            return _Resp(200, {'message': 'Request accepted'})
+        if method == 'DELETE':
+            for f in json['filters']:
+                self.zone = [s for s in self.zone if (s['name'], s['type']) != (f['name'], f['type'])]
+            return _Resp(200, {'message': 'Request accepted'})
+        return _Resp(405, {'message': 'Method not allowed'})
+
+    def values(self):
+        s = self._set('_acme-challenge', 'TXT')
+        return [r['content'] for r in s['records']] if s else []
+
+
+@pytest.fixture
+def hostinger(monkeypatch):
+    api = FakeHostinger()
+    monkeypatch.setattr(requests, 'request', api)
+    return api, create_provider('hostinger', {'api_token': 't'})
+
+
+def test_hostinger_lifecycle(hostinger):
+    api, p = hostinger
+    _lifecycle(p, api.values)
+    assert [(s['name'], s['type']) for s in api.zone] == [('@', 'TXT'), ('www', 'A')]
+    assert p.test_connection()[0]
+
+
+def test_hostinger_failed_delete_is_false(hostinger):
+    api, p = hostinger
+    for value in ('apex', 'wild'):
+        assert p.create_txt_record('example.com', NAME, value)[0]
+    api.fail = 'PUT'
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and '500' in msg
+    api.fail = None
+    assert p.delete_txt_record('example.com', NAME, 'apex')[0]
+    api.fail = 'DELETE'
+    ok, msg = p.delete_txt_record('example.com', NAME, 'wild')
+    assert not ok and '500' in msg
+    assert api.values() == ['wild']
+
+
+def test_hostinger_failed_read_is_false(hostinger):
+    api, p = hostinger
+    api.fail = 'GET'
+    assert not p.delete_txt_record('example.com', NAME, 'apex')[0]

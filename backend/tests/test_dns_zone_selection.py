@@ -243,7 +243,7 @@ class TestTheProvidersWithNoZoneApi:
 # (module, class, credentials, the API path the zone is written into)
 VERBATIM = [
     ('epik', 'EpikDnsProvider', {'api_key': 'k'}, '/domains/{zone}/records'),
-    ('hostinger', 'HostingerDnsProvider', {'api_token': 't'}, '/dns/{zone}/records'),
+    ('hostinger', 'HostingerDnsProvider', {'api_token': 't'}, '/api/dns/v1/zones/{zone}'),
     ('hover', 'HoverDnsProvider', {'username': 'u', 'password': 'p'},
      '/domains/{zone}/dns'),
     ('mythicbeasts', 'MythicBeastsDnsProvider',
