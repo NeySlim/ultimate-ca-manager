@@ -265,16 +265,26 @@ jobs:
             /tmp/rpm-output/*.rpm.sha256
 
   # ============================================================
-  # Build Docker Image
+  # Build Docker Image (one native runner per arch, then a manifest)
   # ============================================================
   build-docker:
-    name: Build Docker Image
-    runs-on: ubuntu-latest
+    name: Build Docker Image (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
     needs: build-deb
-    
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          # Native: the arm64 half under QEMU took 45 minutes
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
@@ -299,27 +309,105 @@ jobs:
       - name: Set image name
         id: image
         run: |
-          echo "name=$(echo ${{ github.repository }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
-      
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
-      
+          echo "name=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Log in to Docker Hub
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: |
+            ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
+            neyslim/ultimate-ca-manager
+          labels: |
+            org.opencontainers.image.licenses=AGPL-3.0-only
+
+      # The tags are set by the manifest job, once both architectures exist
+      - name: Push by digest
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,"name=${{ env.REGISTRY }}/${{ steps.image.outputs.name }},neyslim/ultimate-ca-manager",push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=std-${{ matrix.arch }}
+          cache-to: type=gha,mode=max,scope=std-${{ matrix.arch }}
+          build-args: |
+            VERSION=${{ needs.build-deb.outputs.version }}
+
+      - name: Export digest
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.push.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: std-digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # Tags the two per-arch digests as <version> and latest
+  docker-manifest:
+    name: Publish Docker Image
+    runs-on: ubuntu-latest
+    needs: [build-deb, build-docker]
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download digests
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: std-digest-*
+          merge-multiple: true
+
+      - name: Require both architectures
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          find . -type f -printf '%f\n'
+          test "$(find . -type f | wc -l)" -eq 2
+
+      - name: Set image name
+        id: image
+        run: |
+          echo "name=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
@@ -332,19 +420,20 @@ jobs:
           tags: |
             type=raw,value=${{ needs.build-deb.outputs.version }}
             type=raw,value=latest,enable=${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') && !contains(github.ref, 'dev') }}
-      
-      - name: Build and push
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            VERSION=${{ needs.build-deb.outputs.version }}
+
+      - name: Create manifest lists
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          set -euo pipefail
+          for repo in "${{ env.REGISTRY }}/${{ steps.image.outputs.name }}" neyslim/ultimate-ca-manager; do
+            mapfile -t tags < <(jq -r --arg r "$repo:" '.tags[] | select(startswith($r))' <<< "$DOCKER_METADATA_OUTPUT_JSON")
+            test "${#tags[@]}" -ge 1
+            args=()
+            for t in "${tags[@]}"; do args+=(-t "$t"); done
+            for d in *; do args+=("$repo@sha256:$d"); done
+            docker buildx imagetools create "${args[@]}"
+            docker buildx imagetools inspect "${tags[0]}"
+          done
 
       - name: Update Docker Hub description
         uses: peter-evans/dockerhub-description@1b9a80c056b620d92cedb9d9b5a223409c68ddfa # v5.0.0
@@ -558,7 +647,7 @@ jobs:
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build-deb, build-rpm, build-docker]
+    needs: [build-deb, build-rpm, docker-manifest]
     if: startsWith(github.ref, 'refs/tags/')
     
     steps:
