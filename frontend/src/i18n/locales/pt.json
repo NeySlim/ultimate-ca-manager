@@ -2292,7 +2292,7 @@
     "httpHeadersStored": "Cabeçalhos armazenados: {{names}}. Os valores nunca são exibidos; digitar qualquer cabeçalho substitui todos.",
     "httpHeadersKeep": "Manter os cabeçalhos armazenados",
     "bodyTemplate": "Modelo de corpo",
-    "bodyTemplateHint": "As variáveis são escritas {{example}} e um filtro pode segui-las: {{jsonExample}} (uma string JSON, com aspas), {{b64Example}}, {{urlExample}}. Um corpo que começa com { ou [ é enviado como application/json e validado ao salvar; defina um cabeçalho Content-Type para qualquer outro formato. O caminho e a query da URL aceitam as mesmas variáveis. Disponíveis:",
+    "bodyTemplateHint": "As variáveis são escritas {{example}} e um filtro pode segui-las: {{jsonExample}} (uma string JSON, com aspas), {{jsonstrExample}} (escapada sem aspas, dentro de uma string mais longa), {{b64Example}}, {{urlExample}}. Um corpo que começa com { ou [ é enviado como application/json e validado ao salvar; defina um cabeçalho Content-Type para qualquer outro formato. O caminho e a query da URL aceitam as mesmas variáveis. Disponíveis:",
     "allowPrivateKey": "Enviar a chave privada",
     "allowPrivateKeyHint": "Permite que o modelo de corpo use {{keyVariable}}. Requer uma URL https://; o certificado do alvo é sempre verificado.",
     "tlsCaPem": "Âncora de confiança TLS (opcional, PEM)",

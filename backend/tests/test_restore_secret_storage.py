@@ -102,6 +102,19 @@ def _deploy_target(secret):
     return DeployTarget, row, DeployTarget.name == f'{MARK}-target'
 
 
+def _http_target(secret):
+    from models.deploy import DeployTarget
+    row = DeployTarget(name=f'{MARK}-http-target', kind='http', host=f'{MARK}.example.test',
+                       port=443, url=f'https://{MARK}.example.test/api',
+                       body_template='{{cert_pem}}', username='', private_key='',
+                       http_headers=_master(json.dumps({'Authorization': secret})))
+    return DeployTarget, row, DeployTarget.name == f'{MARK}-http-target'
+
+
+def _read_master_headers(stored):
+    return json.loads(_read_master(stored))['Authorization']
+
+
 # (section, column, how the row is made, how the application reads the column)
 def _hsm_provider(cleartext):
     from models.hsm import HsmProvider
@@ -123,6 +136,7 @@ CASES = [
     ('intune_apps', 'client_secret', _intune_app, _read_database),
     ('webhook_endpoints', 'secret', _webhook, _read_database),
     ('deploy_targets', 'private_key', _deploy_target, _read_master),
+    ('deploy_targets', 'http_headers', _http_target, _read_master_headers),
     ('hsm_providers', 'config', _hsm_provider, _read_hsm_token),
 ]
 

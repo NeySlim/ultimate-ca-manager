@@ -2292,7 +2292,7 @@
     "httpHeadersStored": "已存储的标头：{{names}}。值不会显示；输入任何标头将替换全部标头。",
     "httpHeadersKeep": "保留已存储的标头",
     "bodyTemplate": "正文模板",
-    "bodyTemplateHint": "变量写作 {{example}}，后面可接过滤器：{{jsonExample}}（JSON 字符串，含引号）、{{b64Example}}、{{urlExample}}。以 { 或 [ 开头的正文将以 application/json 发送，并在保存时检查；其他内容请设置 Content-Type 标头。URL 路径和查询参数接受相同的变量。可用变量：",
+    "bodyTemplateHint": "变量写作 {{example}}，后面可接过滤器：{{jsonExample}}（JSON 字符串，含引号）、{{jsonstrExample}}（转义但不含引号，用于较长字符串内）、{{b64Example}}、{{urlExample}}。以 { 或 [ 开头的正文将以 application/json 发送，并在保存时检查；其他内容请设置 Content-Type 标头。URL 路径和查询参数接受相同的变量。可用变量：",
     "allowPrivateKey": "发送私钥",
     "allowPrivateKeyHint": "允许正文模板使用 {{keyVariable}}。需要 https:// URL；始终会验证目标的证书。",
     "tlsCaPem": "TLS 信任锚（可选，PEM）",

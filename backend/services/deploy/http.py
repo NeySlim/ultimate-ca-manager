@@ -49,10 +49,11 @@ TEXT_VARIABLES = ('name', 'refid', 'cn', 'san_dns')
 HOSTILE_SAMPLE = 'x", "y": "\\\n'
 VALIDATION_VARIABLES = {name: (value + HOSTILE_SAMPLE if name in TEXT_VARIABLES else value)
                         for name, value in VARIABLES.items()}
-FILTERS = ('raw', 'json', 'b64', 'urlencode')
+FILTERS = ('raw', 'json', 'jsonstr', 'b64', 'urlencode')
 _VAR_RE = re.compile(r'\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\|\s*([A-Za-z0-9]+)\s*)?\}\}')
-_ANY_PLACEHOLDER_RE = re.compile(r'\{\{.*?\}\}', re.DOTALL)
 _PEM_BLOCK_RE = re.compile(r'-----BEGIN [^-]*-----.*?(?:-----END [^-]*-----|$)', re.DOTALL)
+# A PEM sent through |b64: base64 of "-----BEGIN" always starts this way.
+_PEM_B64_RE = re.compile(r'LS0tLS1CRUdJTi[A-Za-z0-9+/=_\\-]*')
 _HEADER_NAME_RE = re.compile(r'^[!#$%&\'*+\-.^_`|~0-9A-Za-z]+$')
 # Set by the transport itself or meaningless as a stored value.
 RESERVED_HEADERS = {'host', 'content-length', 'transfer-encoding', 'connection', 'expect'}
@@ -68,16 +69,17 @@ def template_variables(template: str):
     """(name, filter) pairs named by *template*; ValueError on an unknown or
     malformed one, so a typo cannot leave a literal placeholder in a request."""
     found = []
-    for placeholder in _ANY_PLACEHOLDER_RE.finditer(template or ''):
-        if not _VAR_RE.fullmatch(placeholder.group(0)):
-            raise ValueError(f"Malformed template placeholder: {placeholder.group(0)[:60]} "
-                             "(expected {{name}} or {{name|filter}})")
+    # A '{{' left once the valid placeholders are gone opens a malformed one.
+    rest = _VAR_RE.sub(' ', template or '')
+    if '{{' in rest:
+        raise ValueError(f"Malformed template placeholder: {rest[rest.index('{{'):][:60]} "
+                         "(expected {{name}} or {{name|filter}})")
     for match in _VAR_RE.finditer(template or ''):
         name, flt = match.group(1), (match.group(2) or 'raw').lower()
         if name not in VARIABLES:
             raise ValueError(f"Unknown template variable: {name}")
         if flt not in FILTERS:
-            raise ValueError(f"Unknown template filter: {flt} (use json, b64 or urlencode)")
+            raise ValueError(f"Unknown template filter: {flt} (use json, jsonstr, b64 or urlencode)")
         found.append((name, flt))
     return found
 
@@ -85,6 +87,8 @@ def template_variables(template: str):
 def _apply(value: str, flt: str) -> str:
     if flt == 'json':
         return json.dumps(value)
+    if flt == 'jsonstr':
+        return json.dumps(value)[1:-1]
     if flt == 'b64':
         return base64.b64encode(value.encode()).decode()
     if flt == 'urlencode':
@@ -127,7 +131,8 @@ def validate_template(template: str, headers: dict, allow_private_key: bool) -> 
         except ValueError:
             raise ValueError("body_template does not render valid JSON: write every value as "
                              "{{name|json}} or {{cert_pem|json}} (quotes included, so a quote in a "
-                             "subject cannot break out), or set a Content-Type header")
+                             "subject cannot break out), use {{name|jsonstr}} inside a longer "
+                             "string, or set a Content-Type header")
 
 
 def validate_url(url: str, allow_private_key: bool) -> str:
@@ -150,14 +155,24 @@ def validate_url(url: str, allow_private_key: bool) -> str:
 
 
 def _is_loopback_host(hostname: str) -> bool:
+    """Loopback in any spelling the resolver accepts without DNS (127.1,
+    localhost., *.localhost); names that need DNS are judged at send time."""
     import ipaddress
-    if (hostname or '').lower() == 'localhost':
+    import socket
+    from utils.ssrf_protection import _forbidden_ip_reason
+    host = (hostname or '').lower().rstrip('.')
+    if host == 'localhost' or host.endswith('.localhost'):
         return True
     try:
-        ip = ipaddress.ip_address(hostname)
-    except ValueError:
+        infos = socket.getaddrinfo(host, None, flags=socket.AI_NUMERICHOST)
+    except (socket.gaierror, UnicodeError, ValueError):
         return False
-    return ip.is_loopback or ip.is_unspecified
+    for info in infos:
+        ip = ipaddress.ip_address(info[4][0].split('%')[0])
+        # Forbidden only as loopback/unspecified: metadata is refused at send time
+        if _forbidden_ip_reason(ip) and not _forbidden_ip_reason(ip, allow_loopback=True):
+            return True
+    return False
 
 
 def url_host_port(url: str):
@@ -295,8 +310,9 @@ def _response_tail(response) -> str:
 
 
 def redact_pem(text: str) -> str:
-    """An API that echoes what it received must not put a PEM in the record."""
-    return _PEM_BLOCK_RE.sub('[PEM removed]', text or '')
+    """An API that echoes what it received must not put a PEM, plain or
+    base64, in the record."""
+    return _PEM_B64_RE.sub('[PEM removed]', _PEM_BLOCK_RE.sub('[PEM removed]', text or ''))
 
 
 def _request(target, method: str, url: str, headers: dict, body):

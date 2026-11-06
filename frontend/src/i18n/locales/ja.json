@@ -2292,7 +2292,7 @@
     "httpHeadersStored": "保存済みヘッダー: {{names}}。値は表示されません。ヘッダーを入力すると、すべて置き換えられます。",
     "httpHeadersKeep": "保存済みヘッダーを維持",
     "bodyTemplate": "ボディテンプレート",
-    "bodyTemplateHint": "変数は {{example}} のように記述し、フィルターを続けられます: {{jsonExample}}(引用符を含む JSON 文字列)、{{b64Example}}、{{urlExample}}。{ または [ で始まるボディは application/json として送信され、保存時に検証されます。それ以外は Content-Type ヘッダーを設定してください。URL のパスとクエリでも同じ変数を使用できます。使用可能:",
+    "bodyTemplateHint": "変数は {{example}} のように記述し、フィルターを続けられます: {{jsonExample}}(引用符を含む JSON 文字列)、{{jsonstrExample}}(引用符なしでエスケープ、長い文字列の中で使用)、{{b64Example}}、{{urlExample}}。{ または [ で始まるボディは application/json として送信され、保存時に検証されます。それ以外は Content-Type ヘッダーを設定してください。URL のパスとクエリでも同じ変数を使用できます。使用可能:",
     "allowPrivateKey": "秘密鍵を送信",
     "allowPrivateKeyHint": "ボディテンプレートで {{keyVariable}} を使用できるようにします。https:// の URL が必要です。ターゲットの証明書は常に検証されます。",
     "tlsCaPem": "TLS トラストアンカー(任意、PEM)",

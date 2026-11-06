@@ -2292,7 +2292,7 @@
     "httpHeadersStored": "Stored headers: {{names}}. Values are never shown; typing any header replaces them all.",
     "httpHeadersKeep": "Keep the stored headers",
     "bodyTemplate": "Body template",
-    "bodyTemplateHint": "Variables are written {{example}} and a filter can follow: {{jsonExample}} (a JSON string, quotes included), {{b64Example}}, {{urlExample}}. A body starting with { or [ is sent as application/json and checked at save time; set a Content-Type header for anything else. The URL path and query accept the same variables. Available:",
+    "bodyTemplateHint": "Variables are written {{example}} and a filter can follow: {{jsonExample}} (a JSON string, quotes included), {{jsonstrExample}} (escaped without quotes, inside a longer string), {{b64Example}}, {{urlExample}}. A body starting with { or [ is sent as application/json and checked at save time; set a Content-Type header for anything else. The URL path and query accept the same variables. Available:",
     "allowPrivateKey": "Send the private key",
     "allowPrivateKeyHint": "Lets the body template use {{keyVariable}}. Requires an https:// URL; the target's certificate is always verified.",
     "tlsCaPem": "TLS trust anchor (optional, PEM)",

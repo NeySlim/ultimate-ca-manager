@@ -2292,7 +2292,7 @@
     "httpHeadersStored": "Cabeceras almacenadas: {{names}}. Los valores nunca se muestran; al escribir cualquier cabecera se reemplazan todas.",
     "httpHeadersKeep": "Conservar las cabeceras almacenadas",
     "bodyTemplate": "Plantilla del cuerpo",
-    "bodyTemplateHint": "Las variables se escriben {{example}} y pueden ir seguidas de un filtro: {{jsonExample}} (una cadena JSON, comillas incluidas), {{b64Example}}, {{urlExample}}. Un cuerpo que empieza por { o [ se envía como application/json y se valida al guardar; para cualquier otro formato, defina una cabecera Content-Type. La ruta y la consulta de la URL aceptan las mismas variables. Disponibles:",
+    "bodyTemplateHint": "Las variables se escriben {{example}} y pueden ir seguidas de un filtro: {{jsonExample}} (una cadena JSON, comillas incluidas), {{jsonstrExample}} (escapada sin comillas, dentro de una cadena más larga), {{b64Example}}, {{urlExample}}. Un cuerpo que empieza por { o [ se envía como application/json y se valida al guardar; para cualquier otro formato, defina una cabecera Content-Type. La ruta y la consulta de la URL aceptan las mismas variables. Disponibles:",
     "allowPrivateKey": "Enviar la clave privada",
     "allowPrivateKeyHint": "Permite que la plantilla del cuerpo use {{keyVariable}}. Requiere una URL https://; el certificado del destino siempre se verifica.",
     "tlsCaPem": "Ancla de confianza TLS (opcional, PEM)",

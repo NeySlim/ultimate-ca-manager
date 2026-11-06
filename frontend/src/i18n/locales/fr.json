@@ -1885,7 +1885,7 @@
     "httpHeadersStored": "En-têtes enregistrés : {{names}}. Les valeurs ne sont jamais affichées ; saisir un en-tête les remplace tous.",
     "httpHeadersKeep": "Conserver les en-têtes enregistrés",
     "bodyTemplate": "Modèle de corps",
-    "bodyTemplateHint": "Les variables s'écrivent {{example}} et un filtre peut suivre : {{jsonExample}} (une chaîne JSON, guillemets inclus), {{b64Example}}, {{urlExample}}. Un corps commençant par { ou [ est envoyé en application/json et vérifié à l'enregistrement ; définissez un en-tête Content-Type pour tout autre format. Le chemin et la requête de l'URL acceptent les mêmes variables. Disponibles :",
+    "bodyTemplateHint": "Les variables s'écrivent {{example}} et un filtre peut suivre : {{jsonExample}} (une chaîne JSON, guillemets inclus), {{jsonstrExample}} (échappée sans guillemets, dans une chaîne plus longue), {{b64Example}}, {{urlExample}}. Un corps commençant par { ou [ est envoyé en application/json et vérifié à l'enregistrement ; définissez un en-tête Content-Type pour tout autre format. Le chemin et la requête de l'URL acceptent les mêmes variables. Disponibles :",
     "allowPrivateKey": "Envoyer la clé privée",
     "allowPrivateKeyHint": "Permet au modèle de corps d'utiliser {{keyVariable}}. Nécessite une URL https:// ; le certificat de la cible est toujours vérifié.",
     "tlsCaPem": "Ancre de confiance TLS (facultatif, PEM)",

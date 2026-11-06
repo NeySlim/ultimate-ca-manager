@@ -311,8 +311,7 @@ class TestTransport:
     def test_request_goes_through_the_ssrf_client_without_redirects_and_with_the_pinned_ca(
             self, app, auth_client, create_cert, monkeypatch):
         from cryptography import x509
-        from cryptography.hazmat.primitives import serialization
-        from models import db, CA
+        from models import CA
         with app.app_context():
             ca_pem = base64.b64decode(CA.query.first().crt).decode()
         x509.load_pem_x509_certificate(ca_pem.encode())  # the bench CA is a valid PEM
@@ -392,12 +391,33 @@ class TestReviewFindings:
         body = json.loads(_call_for(fake_http, target)['body'])
         assert body['name'] == hostile and 'admin' not in body
 
-    def test_headers_follow_the_master_key_and_the_backups(self):
-        from security.encryption import MASTER_KEY_COLUMNS
-        from services.backup.manifest import SECTIONS
-        assert ('models.deploy', 'DeployTarget', 'http_headers', 'text') in MASTER_KEY_COLUMNS
-        section = SECTIONS['deploy_targets']
-        assert 'http_headers' in section.secrets and section.stored.get('http_headers') == 'master'
+    def test_headers_follow_the_master_key_and_the_backups(self, app, auth_client, encryption_enabled, monkeypatch):
+        from models import db, DeployTarget
+        from security.encryption import decrypt_all_keys, decrypt_text, encrypt_all_keys, key_encryption
+        from services.backup.export_generic import IdentityIndex, export_section
+        http = _create_target(auth_client)
+        ssh = assert_success(post_json(auth_client, f'{BASE}/targets', {
+            'name': _name('ssh'), 'host': 'web.example.test', 'username': 'deploy'}), status=201)
+        expected = {'Authorization': 'Bearer s3cret', 'X-Api-Key': 'k'}
+        with app.app_context():
+            assert key_encryption.is_encrypted(db.session.get(DeployTarget, http['id']).http_headers)
+            exported = {row['name']: row for row in export_section('deploy_targets', IdentityIndex())}
+            assert json.loads(exported[http['name']]['http_headers']) == expected
+            assert exported[ssh['name']]['http_headers'] is None
+
+            # Only these two rows: the shared database holds other tests' secrets
+            every = encryption_enabled.master_key_values
+            mine = {http['id'], ssh['id']}
+            monkeypatch.setattr(encryption_enabled, 'master_key_values', lambda: (
+                v for v in every() if isinstance(v[1], DeployTarget) and v[1].id in mine))
+            assert not decrypt_all_keys(dry_run=False)[2]
+            db.session.expire_all()
+            stored = db.session.get(DeployTarget, http['id']).http_headers
+            assert json.loads(stored) == expected and json.loads(decrypt_text(stored)) == expected
+            assert not encrypt_all_keys(dry_run=False)[2]
+            db.session.expire_all()
+            stored = db.session.get(DeployTarget, http['id']).http_headers
+            assert key_encryption.is_encrypted(stored) and json.loads(decrypt_text(stored)) == expected
 
     def test_unreadable_headers_fail_loudly(self, app, auth_client, create_cert, fake_http):
         target = _create_target(auth_client)
@@ -418,7 +438,9 @@ class TestReviewFindings:
         r = post_json(auth_client, f'{BASE}/targets', _target_payload(url='https://fw.example.test/{{cn|url_encode}}'))
         assert_error(r, 400)
 
-    @pytest.mark.parametrize('url', ['https://127.0.0.1/api', 'https://localhost:8443/api', 'https://[::1]/api', 'https://0.0.0.0/api'])
+    @pytest.mark.parametrize('url', ['https://127.0.0.1/api', 'https://localhost:8443/api', 'https://[::1]/api',
+                                     'https://0.0.0.0/api', 'https://localhost./api', 'https://127.1/api',
+                                     'https://foo.localhost/api', 'https://[::ffff:127.0.0.1]/api'])
     def test_a_loopback_url_is_refused_when_saved(self, auth_client, url):
         r = post_json(auth_client, f'{BASE}/targets', _target_payload(url=url))
         assert 'loopback' in json.dumps(_error_body(r, 400)).lower()
@@ -447,3 +469,51 @@ class TestReviewFindings:
         assert _drain(app)['retry'] >= 1
         delivery = _delivery(auth_client, binding['id'])
         assert 'MIIE' not in json.dumps(delivery) and 'rejected' in delivery['last_error']
+
+
+class TestSecondReviewFindings:
+    """What the review of the first round of fixes found."""
+
+    def test_a_keyless_binding_does_not_lock_the_target(self, app, auth_client, create_cert):
+        target = _create_target(auth_client, body_template=KEY_TEMPLATE, allow_private_key=True)
+        cert = create_cert()
+        _create_binding(auth_client, target['id'], cert['id'])
+        from models import db, Certificate
+        with app.app_context():
+            db.session.get(Certificate, cert['id']).prv = None
+            db.session.commit()
+        url = f"{BASE}/targets/{target['id']}"
+        assert assert_success(patch_json(auth_client, url, {'enabled': False}))['enabled'] is False
+        renamed = assert_success(patch_json(auth_client, url, {'name': _name(), 'http_headers': 'X-Api-Key: other'}))
+        assert renamed['http_header_names'] == ['X-Api-Key']
+        r = patch_json(auth_client, url, {'body_template': KEY_TEMPLATE})
+        assert 'no private key' in json.dumps(_error_body(r, 400))
+
+    def test_a_text_variable_inside_a_longer_json_string(self, auth_client):
+        from services.deploy.http import render
+        r = post_json(auth_client, f'{BASE}/targets', _target_payload(body_template='{"d": "ucm-{{cn}}"}'))
+        assert 'jsonstr' in json.dumps(_error_body(r, 400))
+        template = '{"d": "ucm-{{cn|jsonstr}}", "cert": {{cert_pem|json}}}'
+        _create_target(auth_client, body_template=template)
+        body = render(template, {'cn': 'a"b\\c\n', 'cert_pem': 'x'})
+        assert json.loads(body) == {'d': 'ucm-a"b\\c\n', 'cert': 'x'}
+
+    def test_a_minified_object_keyed_by_a_variable(self, auth_client):
+        from services.deploy.http import render
+        template = '{{{cn|json}}:{{cert_pem|json}}}'
+        _create_target(auth_client, body_template=template)
+        assert json.loads(render(template, {'cn': 'a', 'cert_pem': 'b'})) == {'a': 'b'}
+        nested = '{"a": {"b": {{cn|json}}}}'
+        _create_target(auth_client, body_template=nested)
+
+    def test_a_base64_pem_echoed_by_the_api_is_removed(self, app, auth_client, create_cert, fake_http):
+        from services.deploy.http import redact_pem
+        key = base64.b64encode(b'-----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY-----\n').decode()
+        assert redact_pem(f'bad key {key} rejected') == 'bad key [PEM removed] rejected'
+        target = _create_target(auth_client, body_template='{"key": "{{key_pem|b64}}"}', allow_private_key=True)
+        cert = create_cert()
+        binding = _create_binding(auth_client, target['id'], cert['id'])
+        fake_http.answer = (400, f'{{"error": "bad key", "got": "{key}"}} rejected')
+        assert _drain(app)['retry'] >= 1
+        delivery = _delivery(auth_client, binding['id'])
+        assert 'LS0tLS1CRUdJTi' not in json.dumps(delivery) and 'rejected' in delivery['last_error']

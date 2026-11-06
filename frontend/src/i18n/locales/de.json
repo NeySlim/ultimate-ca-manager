@@ -2292,7 +2292,7 @@
     "httpHeadersStored": "Gespeicherte Header: {{names}}. Werte werden nie angezeigt; die Eingabe eines Headers ersetzt alle.",
     "httpHeadersKeep": "Gespeicherte Header beibehalten",
     "bodyTemplate": "Body-Vorlage",
-    "bodyTemplateHint": "Variablen werden als {{example}} geschrieben, ein Filter kann folgen: {{jsonExample}} (ein JSON-String inklusive Anführungszeichen), {{b64Example}}, {{urlExample}}. Ein Body, der mit { oder [ beginnt, wird als application/json gesendet und beim Speichern geprüft; setzen Sie für alles andere einen Content-Type-Header. Pfad und Query der URL akzeptieren dieselben Variablen. Verfügbar:",
+    "bodyTemplateHint": "Variablen werden als {{example}} geschrieben, ein Filter kann folgen: {{jsonExample}} (ein JSON-String inklusive Anführungszeichen), {{jsonstrExample}} (maskiert ohne Anführungszeichen, innerhalb eines längeren Strings), {{b64Example}}, {{urlExample}}. Ein Body, der mit { oder [ beginnt, wird als application/json gesendet und beim Speichern geprüft; setzen Sie für alles andere einen Content-Type-Header. Pfad und Query der URL akzeptieren dieselben Variablen. Verfügbar:",
     "allowPrivateKey": "Privaten Schlüssel senden",
     "allowPrivateKeyHint": "Erlaubt der Body-Vorlage die Verwendung von {{keyVariable}}. Erfordert eine https://-URL; das Zertifikat des Ziels wird immer geprüft.",
     "tlsCaPem": "TLS-Vertrauensanker (optional, PEM)",

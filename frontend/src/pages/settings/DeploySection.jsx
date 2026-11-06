@@ -28,7 +28,7 @@ const HTTP_TEMPLATE_VARIABLES = [
 ]
 // Literal template syntax passed as values: a {{ }} inside a locale string would be interpolated
 const TEMPLATE_HINT_VARS = {
-  example: '{{name}}', jsonExample: '{{cert_pem|json}}', b64Example: '{{cert_pem|b64}}', urlExample: '{{cn|urlencode}}',
+  example: '{{name}}', jsonExample: '{{cert_pem|json}}', jsonstrExample: '{{cn|jsonstr}}', b64Example: '{{cert_pem|b64}}', urlExample: '{{cn|urlencode}}',
 }
 const HTTP_TEMPLATE_EXAMPLE = '{"name": {{name|json}}, "cert": {{cert_pem|json}}, "chain": {{chain_pem|json}}}'
 const INPUT_CLASS = 'w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-accent-primary'

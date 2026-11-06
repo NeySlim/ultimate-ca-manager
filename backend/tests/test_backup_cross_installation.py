@@ -264,6 +264,7 @@ SECRET_VALUES = {
     ('webhook_endpoints', 'secret'): 'xinst-webhook-secret',
     ('webhook_endpoints', 'auth_token'): 'xinst-webhook-auth-token',
     ('deploy_targets', 'private_key'): 'xinst-deploy-private-key',
+    ('deploy_targets', 'http_headers'): '{"Authorization": "Bearer xinst-deploy-http"}',
     ('acme_client_orders', 'pending_key'): (
         '-----BEGIN PRIVATE KEY-----\nxinst-pending-key\n'
         '-----END PRIVATE KEY-----\n'),
@@ -288,6 +289,12 @@ SECRET_ROW = {
     'deploy_targets': {'name': 'xinst-deploy-b'},
     'acme_client_orders': {'order_url': 'https://acme-b.example.test/order/1'},
 }
+# A secret held on another row of its section: an HTTP target has no SSH key.
+SECRET_ROW_OF = {('deploy_targets', 'http_headers'): {'name': 'xinst-deploy-http'}}
+
+
+def _secret_row(section_name, column):
+    return SECRET_ROW_OF.get((section_name, column), SECRET_ROW[section_name])
 
 
 def _secret_attribute(model, column):
@@ -315,6 +322,7 @@ def _has_encrypting_property(model, column):
 WRAPPED_WITH_THE_MASTER_KEY = {
     ('acme_client_accounts', 'account_key'),
     ('acme_client_accounts', 'eab_hmac_key'),
+    ('deploy_targets', 'http_headers'),
 }
 
 
@@ -623,6 +631,10 @@ def _seed_source():
                           host=f'deploy-{suffix}.example.test', username='ucm',
                           private_key='x') for suffix in 'ab']
     secret(deploy_targets[1], 'deploy_targets', 'private_key')
+    http_target = add('deploy_targets', name='xinst-deploy-http', kind='http',
+                      host='api.example.test', port=443, url='https://api.example.test/certs',
+                      body_template='{"cert": {{cert_pem|json}}}', username='', private_key='')
+    secret(http_target, 'deploy_targets', 'http_headers')
     db.session.flush()
 
     add('deploy_bindings', target_id=deploy_targets[1].id,
@@ -667,7 +679,7 @@ def _seed_source():
     # target can be shown to hold something else.
     stored = {}
     for (section_name, column) in SECRET_VALUES:
-        row = _model(section_name).query.filter_by(**SECRET_ROW[section_name]).one()
+        row = _model(section_name).query.filter_by(**_secret_row(section_name, column)).one()
         stored[(section_name, column)] = _stored_secret(row, column)
 
     return {
@@ -1365,6 +1377,7 @@ AT_REST_AFTER_A_RESTORE = {
     # the layer each column is kept under and the restore puts them back
     # under it.
     ('deploy_targets', 'private_key'): 'key-encryption key',
+    ('deploy_targets', 'http_headers'): 'key-encryption key',
     ('scep_profiles', 'challenge_password'): 'key-encryption key',
     ('intune_apps', 'client_secret'): 'database key',
     ('webhook_endpoints', 'secret'): 'database key',
@@ -1428,7 +1441,7 @@ def secrets_on_the_target(app, restored_on_sqlite):
     with restored_on_sqlite.open(app):
         for section_name, column in _secrets_under_test():
             row = _model(section_name).query.filter_by(
-                **SECRET_ROW[section_name]).one()
+                **_secret_row(section_name, column)).one()
             stored = _stored_secret(row, column)
             measured[(section_name, column)] = {
                 'stored': stored,
@@ -1451,7 +1464,7 @@ class TestEverySecretSurvivesAChangeOfDatabaseKey:
         carried_as_ciphertext = []
         for section_name, column in _secrets_under_test():
             row = restored_on_sqlite.archived_row(
-                section_name, **SECRET_ROW[section_name])
+                section_name, **_secret_row(section_name, column))
             if row.get(column) != SECRET_VALUES[(section_name, column)]:
                 carried_as_ciphertext.append((section_name, column))
         assert set(carried_as_ciphertext) == CARRIED_AS_SOURCE_CIPHERTEXT, (
