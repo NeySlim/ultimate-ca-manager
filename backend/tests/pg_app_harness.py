@@ -91,8 +91,11 @@ def session_app(create_app, config_name):
 
 def isolating(create_app, testing_config):
     """create_app() that builds every other testing app in a schema of its own."""
+    import functools
+
     from utils.db_url import sqlalchemy_url
 
+    @functools.wraps(create_app)
     def create_isolated_app(config_name=None, *args, **kwargs):
         if _creating_session_app or config_name != 'testing' or not _marker:
             return create_app(config_name, *args, **kwargs)
