@@ -39,8 +39,21 @@ def test_the_sections_whose_identity_the_database_does_not_hold():
     ]
 
 
+def _reseal_ledger_after(floor):
+    """Seal again the entries after ``floor``: real ones chained onto the fabricated
+    audit_logs twins, which are deleted, and would leave the ledger broken."""
+    from models.audit_log import AuditLog
+    from services.audit.chain import append_entry
+    for entry in AuditLog.query.filter(AuditLog.id > floor).order_by(AuditLog.id).all():
+        append_entry(entry)
+    db.session.commit()
+
+
 @pytest.fixture(scope='module')
 def seeded(app, create_ca, create_cert):
+    from models.audit_log import AuditLog
+    with app.app_context():
+        floor = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
     authority = create_ca(cn='zzcontract-shared-identity-ca.test')
     create_cert(cn='zzcontract-shared-identity-leaf.test', ca_id=authority['id'])
     with app.app_context():
@@ -54,6 +67,7 @@ def seeded(app, create_ca, create_cert):
             type(row).query.filter_by(id=row.id).delete()
         db.session.commit()
         _remove(order)
+        _reseal_ledger_after(floor)
 
 
 def _seed_by_hand(ca_id):
