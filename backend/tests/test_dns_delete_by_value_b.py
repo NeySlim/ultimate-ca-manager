@@ -271,6 +271,8 @@ def test_freedns_cleanup_warns_that_it_removes_the_name(monkeypatch, caplog):
         def get(self, url, params=None, timeout=None):
             if params:
                 self.deleted.append(params['data_id[]'])
+            if '5' in self.deleted:
+                return _Resp(200, text='')
             return _Resp(200, text='<a href=edit.php?data_id=5>_acme-challenge.example.com</a>')
 
     session = Session()
@@ -294,11 +296,27 @@ def test_freedns_cleanup_leaves_the_record_of_another_domain(monkeypatch):
         def get(self, url, params=None, timeout=None):
             if params:
                 self.deleted.append(params['data_id[]'])
-            return _Resp(200, text='<a href=edit.php?data_id=4>_acme-challenge.other.example</a>'
-                                   '<a href=edit.php?data_id=5>_acme-challenge.example.com</a>')
+            rows = [r for r in ('4', '5') if r not in self.deleted]
+            names = {'4': '_acme-challenge.other.example', '5': '_acme-challenge.example.com'}
+            return _Resp(200, text=''.join(f'<a href=edit.php?data_id={r}>{names[r]}</a>' for r in rows))
 
     session = Session()
     monkeypatch.setattr(freedns_module, 'create_session', lambda: session)
     p = create_provider('freedns', {'username': 'u', 'password': 'p'})
     assert p.delete_txt_record('example.com', NAME, 'apex')[0]
     assert session.deleted == ['5']
+
+
+def test_freedns_record_still_listed_is_false(monkeypatch):
+    class Session:
+        def post(self, url, data=None, timeout=None):
+            return _Resp(200, text='Logout')
+
+        def get(self, url, params=None, timeout=None):
+            # The delete page answers 200 but the record stays.
+            return _Resp(200, text='<a href=edit.php?data_id=5>_acme-challenge.example.com</a>')
+
+    monkeypatch.setattr(freedns_module, 'create_session', lambda: Session())
+    p = create_provider('freedns', {'username': 'u', 'password': 'p'})
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'kept the record' in msg
