@@ -890,3 +890,103 @@ def test_porkbun_failed_delete_is_false(porkbun):
     ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
     assert not ok and 'DNS_RECORD_ERROR' in msg
     assert api.values() == ['apex']
+
+
+# --- Checkdomain ------------------------------------------------------------------------------
+# developer.checkdomain.de/reference (archived 2021-08-04): /v1/domains and
+# /v1/domains/{d}/nameservers/records paginated (page, limit, pages, total, _embedded);
+# records carry no id (name, value, ttl, priority, type, maybe _links); POST 201; no DELETE;
+# PUT /records replaces all records (204); GET /nameservers gives general.include_www, soa.ttl.
+
+class FakeCheckdomain:
+    BASE = 'https://api.checkdomain.de/v1'
+    CAP = 3
+
+    def __init__(self):
+        self.domains = [{'id': i, 'name': f'other{i}.test', 'active': True} for i in range(1, 5)]
+        self.domains.append({'id': 5, 'name': 'example.com', 'active': True})
+        self.generated = [{'name': '@', 'value': '192.0.2.1', 'ttl': 180, 'priority': 0, 'type': 'A'},
+                          {'name': 'www', 'value': '192.0.2.1', 'ttl': 180, 'priority': 0, 'type': 'A'},
+                          {'name': '', 'value': 'ns1.checkdomain.de', 'ttl': 180, 'priority': 0, 'type': 'NS'},
+                          {'name': 'example.com', 'value': 'IN SOA ns1.checkdomain.de. hostmaster 1 2 3',
+                           'ttl': 15800, 'priority': 0, 'type': 'SOA'}]
+        self.user = [{'name': 'mail', 'value': '192.0.2.5', 'ttl': 0, 'priority': 0, 'type': 'A'},
+                     {'name': 'sub', 'value': 'v=spf1 -all', 'ttl': 180, 'priority': 0, 'type': 'TXT'}]
+        self.puts = []
+        self.fail = None
+
+    def records(self):
+        return self.generated + [{**r, '_links': {'self': {'href': f'/v1/domains/5/nameservers/records/{i}'}}}
+                                 for i, r in enumerate(self.user, 22)]
+
+    def _page(self, key, items, query, path):
+        limit = min(self.CAP, int(query.get('limit', 10)))
+        page = int(query.get('page', 1))
+        pages = max(1, -(-len(items) // limit))
+        return _Resp(200, {'page': page, 'limit': limit, 'pages': pages, 'total': len(items),
+                           '_links': {'self': {'href': f'/v1{path}?page={page}&limit={limit}'}},
+                           '_embedded': {key: items[(page - 1) * limit:page * limit]}})
+
+    def __call__(self, method, url, headers=None, json=None, params=None, timeout=None):
+        path, query = _split(url, self.BASE)
+        query.update({k: str(v) for k, v in (params or {}).items()})
+        if (headers or {}).get('Authorization') != 'Bearer t':
+            return _Resp(401, {'message': 'OAuth2 authentication required'})
+        if self.fail == method:
+            return _Resp(500, {'message': 'Something on our end went wrong'})
+        if method == 'GET' and path == '/domains':
+            return self._page('domains', self.domains, query, path)
+        if method == 'GET' and path == '/domains/5/nameservers':
+            return _Resp(200, {'general': {'ip_v4': '192.0.2.1', 'ip_v6': '::1', 'include_www': True},
+                               'soa': {'mail': 'hostmaster@checkdomain.de', 'ttl': 10800}})
+        if path == '/domains/5/nameservers/records':
+            if method == 'GET':
+                return self._page('records', self.records(), query, path)
+            if method == 'POST':
+                self.user.append({'name': json['name'], 'value': json['value'], 'ttl': json.get('ttl', 180),
+                                  'priority': json.get('priority', 0), 'type': json['type']})
+                return _Resp(201, text='')
+            if method == 'PUT':
+                self.puts.append(json)
+                for r in json:
+                    if r['type'] in ('SOA', 'NS') or r['name'] in ('@', 'www') or not r.get('ttl'):
+                        return _Resp(400, {'message': 'Nameserver update failed'})
+                self.user = [dict(r) for r in json]
+                return _Resp(204, text='')
+        return _Resp(405 if method == 'DELETE' else 404, {'message': 'Not found'})
+
+    def values(self):
+        return [r['value'] for r in self.user if r['type'] == 'TXT' and r['name'] == '_acme-challenge']
+
+
+@pytest.fixture
+def checkdomain(monkeypatch):
+    api = FakeCheckdomain()
+    monkeypatch.setattr(requests, 'request', api)
+    return api, create_provider('checkdomain', {'api_token': 't'})
+
+
+def test_checkdomain_lifecycle(checkdomain):
+    api, p = checkdomain
+    _lifecycle(p, api.values)
+    # The user's records survive every replacement, the zero ttl as the SOA's.
+    assert [(r['name'], r['type'], r['ttl']) for r in api.user] == [('mail', 'A', 10800), ('sub', 'TXT', 180)]
+
+
+def test_checkdomain_failed_replace_is_false(checkdomain):
+    api, p = checkdomain
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    api.fail = 'PUT'
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and '500' in msg
+    assert api.values() == ['apex']
+
+
+def test_checkdomain_failed_read_writes_nothing(checkdomain, monkeypatch):
+    api, p = checkdomain
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    monkeypatch.setattr(requests, 'request', lambda method, url, **kw: (
+        _Resp(500, {'message': 'Something on our end went wrong'})
+        if method == 'GET' and '/nameservers/records' in url else api(method, url, **kw)))
+    assert not p.delete_txt_record('example.com', NAME, 'apex')[0]
+    assert api.puts == [] and api.values() == ['apex']

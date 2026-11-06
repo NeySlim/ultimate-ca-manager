@@ -147,45 +147,6 @@ def test_bunny_deletes_one_value(monkeypatch):
     assert api.deletes == ['/dnszone/3/records/1']
 
 
-# --- Checkdomain ----------------------------------------------------------------
-
-class FakeCheckdomain(_PerRecordFake):
-    def __call__(self, method, url, headers=None, json=None, timeout=None):
-        path, _ = _split(url, 'https://api.checkdomain.de/v1')
-        if method == 'GET' and path == '/domains':
-            return _Resp(200, {'_embedded': {'domains': [{'id': 5, 'name': 'example.com'}]}})
-        if path == '/domains/5/nameservers/records' and method == 'POST':
-            self.add(dict(json))
-            return _Resp(201, text='')
-        if path == '/domains/5/nameservers/records' and method == 'GET':
-            return _Resp(200, {'_embedded': {'records': self.records}})
-        if method == 'DELETE' and path.startswith('/domains/5/nameservers/records/'):
-            self.deletes.append(path)
-            self.drop(path.rsplit('/', 1)[1])
-            return _Resp(204, text='')
-        return _Resp(404, {'message': 'Not found'})
-
-
-def test_checkdomain_deletes_one_value(monkeypatch):
-    api = FakeCheckdomain()
-    monkeypatch.setattr(requests, 'request', api)
-    _two_values_then_delete_apex(create_provider('checkdomain', {'api_token': 't'}))
-    assert api.values() == ['wild']
-    assert api.deletes == ['/domains/5/nameservers/records/1']
-
-
-def test_checkdomain_refused_delete_is_false(monkeypatch):
-    api = FakeCheckdomain()
-    monkeypatch.setattr(requests, 'request', api)
-    p = create_provider('checkdomain', {'api_token': 't'})
-    assert p.create_txt_record('example.com', NAME, 'apex')[0]
-    monkeypatch.setattr(requests, 'request', lambda method, url, **kw: (
-        _Resp(405, {'message': 'Method Not Allowed'}) if method == 'DELETE' else api(method, url, **kw)))
-    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
-    assert not ok and '405' in msg
-    assert api.values() == ['apex']
-
-
 # --- ClouDNS ------------------------------------------------------------------
 
 class FakeClouDns(_PerRecordFake):
