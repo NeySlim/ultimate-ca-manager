@@ -884,7 +884,7 @@ class TestRfc8555StateMachine:
                     {'type': 'dns', 'value': 'second-failure.example.com'},
                 ],
             )
-            authorizations = order.authorizations.all()
+            authorizations = order.authorizations.order_by(AcmeAuthorization.id).all()
             first_challenge = authorizations[0].challenges.first()
             second_challenge = authorizations[1].challenges.first()
 
