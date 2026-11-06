@@ -256,7 +256,7 @@ def post_worker_init(worker):
     from utils.db_fork import forget_inherited_connections
     from wsgi import app as flask_app
     with flask_app.app_context():
-        forget_inherited_connections(db.engine)
+        forget_inherited_connections(db.engines.values())
 
     hub = gevent.get_hub()
     _original_handle_error = hub.handle_error

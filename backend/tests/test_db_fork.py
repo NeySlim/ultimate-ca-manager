@@ -33,7 +33,7 @@ def _child_backend_pid(engine, reset):
         try:
             os.close(read_fd)
             if reset:
-                forget_inherited_connections(engine)
+                forget_inherited_connections([engine])
             os.write(write_fd, str(_backend_pid(engine)).encode())
         finally:
             os._exit(0)
@@ -61,12 +61,16 @@ def test_a_forked_child_gets_its_own_connection(reset):
         engine.dispose()
 
 
-def test_post_worker_init_forgets_the_inherited_pool_first(app, monkeypatch):
+def test_every_engine_is_forgotten(tmp_path):
+    engines = [create_engine(f'sqlite:///{tmp_path}/{name}.db') for name in ('default', 'bind')]
+    pools = [engine.pool for engine in engines]
+    forget_inherited_connections(engines)
+    assert all(engine.pool is not pool for engine, pool in zip(engines, pools))
+
+
+def _load_gunicorn_config(monkeypatch, app):
     import gevent
     import gevent.monkey
-    import protocol_http_server
-    from models import db
-    import utils.db_fork
 
     monkeypatch.setattr(gevent.monkey, 'patch_all', lambda *a, **k: None)
     spec = importlib.util.spec_from_file_location('_ucm_gunicorn_config_fork',
@@ -77,16 +81,31 @@ def test_post_worker_init_forgets_the_inherited_pool_first(app, monkeypatch):
     wsgi.app = app
     monkeypatch.setitem(sys.modules, 'wsgi', wsgi)
     monkeypatch.setattr(gevent, 'get_hub', lambda: types.SimpleNamespace(handle_error=None))
+    return module
+
+
+def _worker():
+    return types.SimpleNamespace(cfg=types.SimpleNamespace(graceful_timeout=30),
+                                 log=logging.getLogger('test.worker'))
+
+
+def test_post_worker_init_forgets_the_inherited_pool_first(app, monkeypatch, tmp_path):
+    import protocol_http_server
+    from models import db
+    import utils.db_fork
+
+    module = _load_gunicorn_config(monkeypatch, app)
+    bind = create_engine(f'sqlite:///{tmp_path}/bind.db')
+    monkeypatch.setitem(db._app_engines[app], 'extra_bind', bind)
 
     order = []
     monkeypatch.setattr(utils.db_fork, 'forget_inherited_connections',
-                        lambda engine: order.append(('forget', engine)))
+                        lambda engines: order.append(('forget', list(engines))))
     monkeypatch.setattr(protocol_http_server, 'start_http_protocol_server',
                         lambda a, **kw: order.append(('http', a)))
-    worker = types.SimpleNamespace(cfg=types.SimpleNamespace(graceful_timeout=30),
-                                   log=logging.getLogger('test.worker'))
-    module.post_worker_init(worker)
+    module.post_worker_init(_worker())
 
     with app.app_context():
-        assert order[0] == ('forget', db.engine)
+        assert order[0] == ('forget', list(db.engines.values()))
+        assert bind in order[0][1] and db.engine in order[0][1]
     assert ('http', app) in order
