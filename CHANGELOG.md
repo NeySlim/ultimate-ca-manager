@@ -13,6 +13,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Deployment: a deploy target can be an HTTP API instead of an SSH host, with a URL, a method, encrypted request headers and a body template rendered from the certificate (`{{cert_pem|json}}`, `{{fullchain_pem}}`, `{{cn}}`, `{{serial}}`...), through the same delivery queue; the private key is sent only with an explicit opt-in over verified HTTPS, with an optional pasted trust anchor for a self-signed appliance (discussion #428, requested by @gjarassier, migration 131).
 
+### Fixed
+
+- ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: these providers hold one TXT value per name, so the cleanup of one order cleared the value another order was still validating. The name is now left alone while another order in progress uses it.
+- ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: an order for a domain and its wildcard could not hold both values and failed at validation, and the ACME proxy replaced the CA's value with its clients' own. Such an order, or on DuckDNS one naming two hosts under the same subdomain, is now refused at the request before the CA is asked, and the proxy publishes only the CA's value there.
+- ACME client: a CA refusal of `replaces` whose message merely contained "rateLimited" was taken for a rate limit and not retried. A rate limit is now recognised by its problem type or a 429 only (RFC 8555 §6.7).
+
 ## [2.251] - 2026-11-06
 
 ### Added

@@ -28,6 +28,8 @@ class BaseDnsProvider(ABC):
     PROVIDER_DESCRIPTION: str = "Base DNS provider class"
     REQUIRED_CREDENTIALS: List[str] = []
     OPTIONAL_CREDENTIALS: List[str] = []
+    # One TXT value per name: a new value replaces the old, a cleanup clears the name
+    SINGLE_TXT_VALUE: bool = False
 
     # How much of a failing response body an error message may quote. The body
     # is attacker-influenced text on its way to a log line and to the browser.
@@ -151,6 +153,11 @@ class BaseDnsProvider(ABC):
             Tuple of (success: bool, message: str); a value already gone is a success.
         """
         pass
+
+    @classmethod
+    def single_value_key(cls, record_name: str) -> str:
+        """What a one-value provider keeps a single TXT value under (SINGLE_TXT_VALUE)."""
+        return (record_name or '').strip().lower().rstrip('.')
 
     @staticmethod
     def txt_matches(stored, expected) -> bool:

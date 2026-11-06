@@ -22,6 +22,8 @@ from sqlalchemy.exc import NoInspectionAvailable
 from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
 from services.acme.dns_txt_lock import txt_record_lock as _txt_record_lock
+from services.acme.single_txt_value import (apex_and_wildcard_refusal, holds_one_value, keep_for_another_order,
+                                            txt_lock_name)
 
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding, utils as asym_utils
@@ -54,6 +56,10 @@ _CERT_FALLBACK_SCAN_LIMIT = 25
 
 class ProxyDns01OnlyError(ValueError):
     """The ACME proxy deliberately supports DNS identifiers/DNS-01 only."""
+
+
+class ProxySingleTxtValueError(ValueError):
+    """The DNS provider cannot hold the values these identifiers need under one name."""
 
 
 class ProxyResourceNotFoundError(LookupError):
@@ -802,6 +808,7 @@ class AcmeProxyService:
         """Proxy new-order with domain validation and RFC 9773 replacement."""
         from api.v2.acme_domains import find_provider_for_domain
         from models import AcmeClientOrder
+        from services.acme.dns_providers import get_provider_class
 
         if not identifiers:
             raise ValueError("identifiers must be a non-empty list")
@@ -831,6 +838,16 @@ class AcmeProxyService:
             if not provider:
                 raise Exception(f"No DNS provider configured for domain: {domain}. Configure it in ACME > Domains.")
             domain_providers[domain] = provider
+
+        # Refused before upstream opens the order: the CA would see one value and fail the other
+        served = {}
+        for domain, info in domain_providers.items():
+            model = info['provider']
+            served.setdefault((getattr(model, 'id', None), getattr(model, 'provider_type', None)), []).append(domain)
+        for (_provider_id, provider_type), served_domains in served.items():
+            refusal = apex_and_wildcard_refusal(served_domains, get_provider_class(provider_type))
+            if refusal:
+                raise ProxySingleTxtValueError(refusal)
 
         # Same-account dedupe (#303 minor 4): a client that retries new-order
         # for the same identifiers (Traefik does) must get its still-pending
@@ -1633,7 +1650,7 @@ class AcmeProxyService:
         # Both authorizations of a domain and its wildcard merge into one record set,
         # possibly from two workers: read-merge-write must not interleave.
         db.session.commit()  # no transaction held while waiting for the lock
-        with _txt_record_lock(full_record_name):
+        with _txt_record_lock(txt_lock_name(provider, full_record_name)):
             provider.create_txt_record(zone_name, full_record_name, txt_value)
             published = [txt_value]
 
@@ -1643,9 +1660,10 @@ class AcmeProxyService:
             # never see the value published above. The client thumbprints
             # are known: publish their values too (extra TXT records on
             # the same name are ignored by the upstream CA validator).
-            for extra_value in self._client_txt_values(
-                order, key_authz, txt_value, authz_url=authz_url
-            ):
+            # A second value would replace the one the CA validates
+            extra_values = [] if holds_one_value(provider) else self._client_txt_values(
+                order, key_authz, txt_value, authz_url=authz_url)
+            for extra_value in extra_values:
                 try:
                     provider.create_txt_record(zone_name, full_record_name, extra_value)
                     published.append(extra_value)
@@ -1702,20 +1720,22 @@ class AcmeProxyService:
             db.session.commit()
 
     @staticmethod
-    def _delete_dns_record(provider, zone: str, record_name: str, value) -> None:
-        """Best-effort TXT cleanup helper."""
+    def _delete_dns_record(provider, zone: str, record_name: str, value, order_id=None) -> None:
+        """Best-effort TXT cleanup helper; ``order_id`` is the order the record was published for."""
         if not value:
             logger.warning("DNS cleanup skipped for %s: no TXT value recorded", record_name)
             return
         try:
-            with _txt_record_lock(record_name):
+            with _txt_record_lock(txt_lock_name(provider, record_name)):
+                if keep_for_another_order(provider, record_name, order_id):
+                    return
                 result = provider.delete_txt_record(zone, record_name, value)
             if isinstance(result, tuple) and not result[0]:
                 logger.warning("Failed to cleanup DNS record %s (%s): %s", record_name, zone, result[1])
         except Exception as e:
             logger.warning("Failed to cleanup DNS record %s (%s): %s", record_name, zone, e)
 
-    def _bg_cleanup_dns_records(self, app, records):
+    def _bg_cleanup_dns_records(self, app, records, order_id=None):
         """Background task: delete DNS-01 TXT records after cert issuance (#218)."""
         from models import DnsProvider
         from services.acme.dns_providers import create_provider
@@ -1731,7 +1751,7 @@ class AcmeProxyService:
                         provider = create_provider(provider_model.provider_type, credentials)
                         logger.info(f"[ACME Proxy] Cleaning up DNS record: {record['record_name']} in zone {record['domain']}")
                         self._delete_dns_record(provider, record['domain'], record['record_name'],
-                                                record.get('value'))
+                                                record.get('value'), order_id)
                     except Exception as e:
                         logger.warning("[ACME Proxy] DNS record cleanup failed: %s", e)
             finally:
@@ -2030,6 +2050,7 @@ class AcmeProxyService:
             # DNS cleanup runs in the background so the client is not blocked
             # on DNS-provider API latency (#218).
             records_to_cleanup = []
+            order_id = order.id  # read before a rollback expires the row
             try:
                 # Link certificate to order
                 if stored_cert:
@@ -2065,7 +2086,7 @@ class AcmeProxyService:
 
                 thread = threading.Thread(
                     target=self._bg_cleanup_dns_records,
-                    args=(app, records_to_cleanup)
+                    args=(app, records_to_cleanup, order_id)
                 )
                 thread.name = "ACMEProxy-DNS-Cleanup"
                 thread.daemon = True

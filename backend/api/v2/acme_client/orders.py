@@ -264,6 +264,10 @@ def request_certificate():
     has_wildcard = any(d.startswith('*.') for d in domains)
     if has_wildcard and challenge_type != 'dns-01':
         return error_response('Wildcard domains require DNS-01 challenge', 400)
+    if provider is not None:
+        refusal = AcmeClientService.single_txt_value_refusal(domains, provider.id)
+        if refusal:
+            return error_response(refusal, 400)
 
     # Key type for certificate (ignored when key_source=csr)
     key_type = data.get('key_type')

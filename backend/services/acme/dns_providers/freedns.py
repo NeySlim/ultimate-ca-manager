@@ -31,6 +31,7 @@ class FreeDnsDnsProvider(BaseDnsProvider):
     PROVIDER_NAME = "FreeDNS"
     PROVIDER_DESCRIPTION = "FreeDNS afraid.org (Free DNS)"
     REQUIRED_CREDENTIALS = ["username", "password"]
+    SINGLE_TXT_VALUE = True
     
     BASE_URL = "https://freedns.afraid.org"
     

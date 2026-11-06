@@ -354,6 +354,7 @@ def test_an_absurd_retry_after_falls_back_to_the_interval(clock, order, value):
     (400, 'no', True), (404, 'no', True), (409, 'no', True), (429, 'no', False), (500, 'no', False),
     (429, 'too many replacements', False), (500, 'cannot replace', True),
     (403, 'urn:ietf:params:acme:error:rateLimited', False),
+    (400, 'replaces rejected: rateLimited would apply on retry', True),  # the type decides, not the detail
 ])
 def test_a_refused_replaces_is_dropped_but_not_on_a_rate_limit(app, status, detail, retried):
     svc = _service()
