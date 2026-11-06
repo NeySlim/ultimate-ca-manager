@@ -694,7 +694,7 @@ def clean_dangling_rows(app):
     _force_register_all_models()
     removed = 0
     with app.app_context():
-        rowid = 'ctid' if _db.engine.dialect.name == 'postgresql' else 'rowid'
+        row_key = 'ctid' if _db.engine.dialect.name == 'postgresql' else 'rowid'
         present = set(_db.inspect(_db.engine).get_table_names())
         for table in reversed(_db.metadata.sorted_tables):
             if table.name not in present:
@@ -710,8 +710,8 @@ def clean_dangling_rows(app):
                     f'c."{a}" = p."{b}"' for a, b in zip(child, parent))
                 not_null = ' AND '.join(f'c."{a}" IS NOT NULL' for a in child)
                 result = _db.session.execute(_text(
-                    f'DELETE FROM "{table.name}" WHERE {rowid} IN ('
-                    f'  SELECT c.{rowid} FROM "{table.name}" c '
+                    f'DELETE FROM "{table.name}" WHERE {row_key} IN ('
+                    f'  SELECT c.{row_key} FROM "{table.name}" c '
                     f'  LEFT JOIN "{parent_table}" p ON {on} '
                     f'  WHERE {not_null} AND p."{parent[0]}" IS NULL)'))
                 removed += result.rowcount or 0
@@ -742,7 +742,7 @@ def clean_unreadable_secrets(app):
         from services.backup.key_material import decrypt_stored_secret
 
         is_pg = _db.engine.dialect.name == 'postgresql'
-        rowid = 'ctid' if is_pg else 'rowid'
+        row_key = 'ctid' if is_pg else 'rowid'
         match = 'ctid = CAST(:rowid AS tid)' if is_pg else 'rowid = :rowid'
         present = set(_db.inspect(_db.engine).get_table_names())
         for table, column in encrypted_columns():
@@ -750,7 +750,7 @@ def clean_unreadable_secrets(app):
                 continue
             try:
                 rows = _db.session.execute(_text(
-                    f'SELECT {rowid}, "{column}" FROM "{table}" '
+                    f'SELECT {row_key}, "{column}" FROM "{table}" '
                     f'WHERE "{column}" IS NOT NULL')).fetchall()
             except Exception:
                 _db.session.rollback()
