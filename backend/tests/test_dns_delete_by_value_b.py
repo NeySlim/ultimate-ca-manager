@@ -183,7 +183,10 @@ class FakeCloudDns:
         parts = urlsplit(url)
         path = parts.path.split('/dns/v1', 1)[1]
         if path == '/projects/p/managedZones':
-            return _Resp(200, {'managedZones': [{'name': 'ex', 'dnsName': 'example.com.'}]})
+            # Paginated by nextPageToken / pageToken (managedZones.list).
+            if parse_qs(parts.query).get('pageToken') == ['t2']:
+                return _Resp(200, {'managedZones': [{'name': 'ex', 'dnsName': 'example.com.'}]})
+            return _Resp(200, {'managedZones': [{'name': 'co', 'dnsName': 'com.'}], 'nextPageToken': 't2'})
         if path == '/projects/p/managedZones/ex/rrsets' and method == 'GET':
             if self.list_status:
                 return _Resp(self.list_status, {'error': {'message': 'backend error'}})
@@ -236,7 +239,10 @@ def test_gcloud_failed_read_writes_nothing(monkeypatch):
     p = _gcloud()
     assert p.create_txt_record('example.com', NAME, 'apex')[0]
     api.list_status = 500
-    p.delete_txt_record('example.com', NAME, 'apex')
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'backend error' in msg
+    ok, msg = p.create_txt_record('example.com', NAME, 'wild')
+    assert not ok and 'backend error' in msg
     assert len(api.changes) == 1
     assert api.rrsets[NAME + '.']['rrdatas'] == ['"apex"']
 

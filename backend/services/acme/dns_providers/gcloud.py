@@ -8,6 +8,7 @@ import time
 import base64
 import requests
 import logging
+from urllib.parse import quote
 from typing import Tuple, Dict, Any, Optional, List
 
 from .base import BaseDnsProvider
@@ -33,6 +34,7 @@ class GoogleCloudDnsProvider(BaseDnsProvider):
     REQUIRED_CREDENTIALS = ["project_id", "service_account_json"]
     
     BASE_URL = "https://dns.googleapis.com/dns/v1"
+    MAX_PAGES = 50
     TOKEN_URL = "https://oauth2.googleapis.com/token"
     SCOPE = "https://www.googleapis.com/auth/ndev.clouddns.readwrite"
     
@@ -150,31 +152,31 @@ class GoogleCloudDnsProvider(BaseDnsProvider):
             return self._zone_cache[domain]
         
         project = self.credentials['project_id']
-        success, result = self._request(
-            'GET', f'/projects/{project}/managedZones'
-        )
-        if not success:
+        zones: List[Dict] = []
+        token = None
+        for _ in range(self.MAX_PAGES):
+            path = f'/projects/{project}/managedZones'
+            if token:
+                path += f'?pageToken={quote(token)}'
+            success, result = self._request('GET', path)
+            if not success:
+                return None
+            zones.extend((result or {}).get('managedZones') or [])
+            token = (result or {}).get('nextPageToken')
+            if not token:
+                break
+        else:
             return None
-        
-        zones = result.get('managedZones', [])
-        
-        # Find best matching zone (longest suffix match)
-        # Google Cloud DNS stores dnsName with trailing dot
-        domain_parts = domain.split('.')
-        for i in range(len(domain_parts) - 1):
-            zone_name = '.'.join(domain_parts[i:])
-            for zone in zones:
-                # dnsName has trailing dot, e.g. "example.com."
-                if zone['dnsName'].rstrip('.') == zone_name:
-                    self._zone_cache[domain] = zone
-                    return zone
-        
-        return None
+
+        zone = self.find_zone(domain, zones, key=lambda z: z.get('dnsName'))
+        if zone:
+            self._zone_cache[domain] = zone
+        return zone
     
     def _get_existing_rrset(
         self, project: str, zone_name: str, record_name: str
-    ) -> Optional[Dict]:
-        """Get existing TXT RRSet if it exists"""
+    ) -> Tuple[bool, Any]:
+        """(ok, the TXT RRSet or None); a failed read is not an absent record."""
         # Ensure record_name ends with dot for API
         if not record_name.endswith('.'):
             record_name = record_name + '.'
@@ -182,16 +184,16 @@ class GoogleCloudDnsProvider(BaseDnsProvider):
         success, result = self._request(
             'GET',
             f'/projects/{project}/managedZones/{zone_name}'
-            f'/rrsets?type=TXT&name={record_name}',
+            f'/rrsets?type=TXT&name={quote(record_name)}',
         )
         if not success:
-            return None
+            return False, result
         
-        rrsets = result.get('rrsets', [])
+        rrsets = (result or {}).get('rrsets', [])
         for rrset in rrsets:
             if rrset.get('name') == record_name and rrset.get('type') == 'TXT':
-                return rrset
-        return None
+                return True, rrset
+        return True, None
     
     def create_txt_record(
         self,
@@ -213,7 +215,9 @@ class GoogleCloudDnsProvider(BaseDnsProvider):
         quoted_value = f'"{record_value}"'
         
         # Check for existing RRSet
-        existing = self._get_existing_rrset(project, zone_name, fqdn)
+        success, existing = self._get_existing_rrset(project, zone_name, fqdn)
+        if not success:
+            return False, f"Failed to read existing records: {existing}"
         
         change: Dict[str, List[Dict]] = {"additions": []}
         
@@ -259,7 +263,9 @@ class GoogleCloudDnsProvider(BaseDnsProvider):
         zone_name = zone['name']
         fqdn = record_name if record_name.endswith('.') else record_name + '.'
         
-        existing = self._get_existing_rrset(project, zone_name, fqdn)
+        success, existing = self._get_existing_rrset(project, zone_name, fqdn)
+        if not success:
+            return False, f"Failed to read existing records: {existing}"
         if not existing:
             return True, "Record not found (already deleted?)"
         rrdatas = list(existing.get('rrdatas', []))
@@ -286,6 +292,7 @@ class GoogleCloudDnsProvider(BaseDnsProvider):
         if not success:
             if 'not found' in str(result).lower():
                 return True, "Record not found (already deleted?)"
+            logger.warning(f"Google Cloud DNS: failed to delete TXT value of {record_name}: {result}")
             return False, f"Failed to delete record: {result}"
         
         logger.info(f"Google Cloud DNS: Deleted TXT record {record_name}")
