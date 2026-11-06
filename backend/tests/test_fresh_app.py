@@ -30,6 +30,20 @@ def test_its_paths_and_scheduler_are_put_back(app):
     assert scheduler_service._scheduler is scheduler
 
 
+def test_its_restores_do_not_sign_the_session_app_out(auth_client):
+    from services.backup.restore.invalidate import invalidate_after_restore
+    signed_in = auth_client._client  # the raw client: no silent sign-in again
+    assert signed_in.get('/api/v2/users').status_code == 200
+    with fresh_app() as other:
+        fresh_admin = other.test_client()
+        assert fresh_admin.post('/api/v2/auth/login', json={
+            'username': 'admin', 'password': 'changeme123'}).status_code == 200
+        with other.app_context():
+            assert invalidate_after_restore()['session_files_removed'] >= 1
+        assert fresh_admin.get('/api/v2/users').status_code == 401
+    assert signed_in.get('/api/v2/users').status_code == 200
+
+
 class TestTheClassVariant:
     app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures('class')
 

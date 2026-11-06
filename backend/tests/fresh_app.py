@@ -9,6 +9,8 @@ at module level, or inside a class with ``fresh_app_fixtures('class')``.
 """
 import contextlib
 import shutil
+import tempfile
+from pathlib import Path
 
 import pytest
 
@@ -16,6 +18,8 @@ from tests.conftest import (
     admin_client, ca_factory, cert_factory, clear_admin_password_flag,
     configure_test_app, sandbox_paths, user_factory,
 )
+
+_UNSET = object()
 
 
 @contextlib.contextmanager
@@ -28,7 +32,18 @@ def fresh_app():
 
     # create_app replaces the process-wide scheduler with one bound to the new app.
     scheduler = scheduler_service._scheduler
-    application = create_app('testing')
+    # A store of its own, bound when create_app builds the session interface:
+    # a restore empties the store, which signed the session app's clients out.
+    sessions = Path(tempfile.mkdtemp(prefix='ucm-test-sessions-'))
+    shared_sessions = Config.__dict__.get('SESSION_FILE_DIR', _UNSET)
+    Config.SESSION_FILE_DIR = sessions
+    try:
+        application = create_app('testing')
+    finally:
+        if shared_sessions is _UNSET:
+            del Config.SESSION_FILE_DIR
+        else:
+            Config.SESSION_FILE_DIR = shared_sessions
     sandbox, replaced = sandbox_paths(application)
     configure_test_app(application)
     clear_admin_password_flag(application)
@@ -42,6 +57,7 @@ def fresh_app():
             setattr(Config, name, value)
         scheduler_service._scheduler = scheduler
         shutil.rmtree(sandbox, ignore_errors=True)
+        shutil.rmtree(sessions, ignore_errors=True)
 
 
 def fresh_app_fixtures(scope='module'):
