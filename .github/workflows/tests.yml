@@ -11,6 +11,11 @@ permissions:
   contents: read
   security-events: write
 
+# A new push to a branch replaces the run of its previous commit
+concurrency:
+  group: tests-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   lint:
     name: Code Linting
@@ -115,9 +120,16 @@ jobs:
           INITIAL_ADMIN_PASSWORD: changeme123
           CSRF_DISABLED: 'true'
           UCM_DEV_MODE: 'true'
+          # test and main run the suite on one database, as a user does; the
+          # other branches spread the files over the runner's 4 cores
+          PYTEST_WORKERS: ${{ (github.ref_name == 'test' || github.ref_name == 'main') && '0' || '4' }}
         run: |
           cd backend
-          pytest -v --tb=short
+          if [ "$PYTEST_WORKERS" = "0" ]; then
+            pytest -v --tb=short
+          else
+            pytest -v --tb=short -n "$PYTEST_WORKERS" --dist loadfile
+          fi
 
   test-backend-postgres:
     name: Backend Tests (PostgreSQL)
