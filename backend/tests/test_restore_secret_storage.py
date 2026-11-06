@@ -22,6 +22,10 @@ import pytest
 from models import db
 from services.backup.manifest import SECTIONS
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 PASSWORD = 'secret-storage-password-0123456789'
 MARK = 'secstore'
 

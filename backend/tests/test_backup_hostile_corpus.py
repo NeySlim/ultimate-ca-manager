@@ -37,6 +37,10 @@ from models import db
 from services.backup import container, manifest
 from services.backup.restore import RestorePlan, RestoreValidationError
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 PASSWORD = 'Correct-Horse-Battery-9'
 
 RESTORE_URL = '/api/v2/system/restore'

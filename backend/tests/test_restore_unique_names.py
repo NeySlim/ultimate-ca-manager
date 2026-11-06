@@ -15,6 +15,10 @@ from services.backup.restore_report import with_restore_warnings
 from services.webhook_service import WebhookEndpoint
 from tests.test_backup_hostile_corpus import PASSWORD, _forged, _service
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 PREFIX = 'lot124-'
 
 
