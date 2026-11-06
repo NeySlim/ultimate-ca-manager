@@ -169,35 +169,6 @@ def test_easydns_deletes_one_value(monkeypatch):
     assert ('DELETE', '/zones/records/example.com/2') in api.calls
 
 
-# --- Epik -----------------------------------------------------------------------
-
-class FakeEpik(_RecordApi):
-    def __call__(self, method, url, params=None, json=None, timeout=None):
-        path = url.split('/v2', 1)[1]
-        self.calls.append((method, path))
-        ok = {'code': 200, 'status': 'SUCCESS'}
-        if path == '/domains/example.com/records' and method == 'GET':
-            return _Resp(200, {**ok, 'data': {'records': self.records}})
-        if path == '/domains/example.com/records' and method == 'POST':
-            rec = self.add(**json)
-            rec['ID'] = rec.pop('id')
-            return _Resp(200, ok)
-        m = re.fullmatch(r'/domains/example\.com/records/(\d+)', path)
-        if m and method == 'DELETE':
-            before = len(self.records)
-            self.records = [r for r in self.records if str(r['ID']) != m.group(1)]
-            return _Resp(200, ok) if len(self.records) != before else _Resp(404, {'message': 'nf'})
-        return _Resp(404, {'message': 'not found'})
-
-
-def test_epik_deletes_one_value(monkeypatch):
-    api = FakeEpik('DATA')
-    monkeypatch.setattr(requests, 'request', api)
-    _create_two_delete_one(create_provider('epik', {'api_key': 'k'}))
-    assert api.values() == ['apex']
-    assert ('DELETE', '/domains/example.com/records/2') in api.calls
-
-
 # --- Google Cloud DNS -------------------------------------------------------------
 
 class FakeCloudDns:

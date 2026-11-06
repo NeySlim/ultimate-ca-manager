@@ -349,3 +349,103 @@ def test_hostinger_failed_read_is_false(hostinger):
     api, p = hostinger
     api.fail = 'GET'
     assert not p.delete_txt_record('example.com', NAME, 'apex')[0]
+
+
+# --- Epik -----------------------------------------------------------------------------
+# https://usersapiv2.epik.com/v2 (embedded OpenAPI 3.1): Authorization: Bearer <key>,
+# POST /domains/{D}/records {create_host_records_payload: {HOST, TYPE, DATA, AUX, TTL}},
+# GET answers data.records[{id, name, type, data, aux, ttl}] (a registry error in the
+# 200 answer carries data.code/description and no records), DELETE ?ID=<id>, errors 4xx.
+
+class FakeEpik:
+    BASE = 'https://usersapiv2.epik.com/v2'
+    REFUSED = {'errors': [{'code': 3, 'message': 'Unable to perform this operation',
+                           'description': 'Error API'}]}
+
+    def __init__(self):
+        self.records = [{'id': '1', 'name': '@', 'type': 'TXT', 'data': 'v=spf1 -all', 'aux': 0, 'ttl': 3600}]
+        self.next_id = 2
+        self.fail = None
+
+    def __call__(self, method, url, params=None, json=None, headers=None, timeout=None):
+        path, query = _split(url, self.BASE)
+        query.update(params or {})
+        if (headers or {}).get('Authorization') != 'Bearer k':
+            return _Resp(401, {'errors': [{'code': 1, 'message': 'Unauthorized',
+                                           'description': 'Signature was not provided or was invalid'}]})
+        if self.fail == method:
+            return _Resp(400, self.REFUSED)
+        if path == '/domains' and method == 'GET':
+            return _Resp(200, {'data': [{'name': 'example.com'}]})
+        if path != '/domains/example.com/records':
+            return _Resp(400, {'errors': [{'code': 2, 'message': 'Invalid parameter',
+                                           'description': 'Wrong param DOMAIN'}]})
+        if method == 'GET':
+            if self.fail == 'registry':
+                return _Resp(200, {'data': {'name': 'example.com', 'code': 2400,
+                                            'description': 'Registry unavailable'}})
+            return _Resp(200, {'data': {'name': 'example.com', 'code': 1000, 'records': self.records}})
+        if method == 'POST':
+            rec = (json or {}).get('create_host_records_payload')
+            if not rec or not rec.get('TYPE') or not rec.get('DATA'):
+                return _Resp(400, {'errors': [{'code': 2, 'message': 'Invalid parameter',
+                                               'description': 'Wrong param TYPE'}]})
+            self.records.append({'id': str(self.next_id), 'name': rec.get('HOST') or '@',
+                                 'type': rec['TYPE'], 'data': rec['DATA'],
+                                 'aux': rec.get('AUX', 0), 'ttl': rec.get('TTL', 3600)})
+            self.next_id += 1
+            return _Resp(200, {'code': 1000, 'message': 'Command completed successfully', 'description': None})
+        if method == 'DELETE':
+            rid = query.get('ID')
+            if not any(r['id'] == rid for r in self.records):
+                return _Resp(400, self.REFUSED)
+            self.records = [r for r in self.records if r['id'] != rid]
+            return _Resp(200, {'code': 1000, 'message': 'Command completed successfully', 'description': None})
+        return _Resp(405, self.REFUSED)
+
+    def values(self):
+        return [r['data'] for r in self.records if r['type'] == 'TXT' and r['name'] == '_acme-challenge']
+
+
+@pytest.fixture
+def epik(monkeypatch):
+    api = FakeEpik()
+    monkeypatch.setattr(requests, 'request', api)
+    return api, create_provider('epik', {'api_key': 'k'})
+
+
+def test_epik_lifecycle(epik):
+    api, p = epik
+    _lifecycle(p, api.values)
+    assert [r['id'] for r in api.records] == ['1']
+
+
+def test_epik_failed_delete_is_false(epik):
+    api, p = epik
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    api.fail = 'DELETE'
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and '400' in msg
+    assert api.values() == ['apex']
+
+
+def test_epik_registry_error_in_the_listing_is_false(epik):
+    api, p = epik
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    api.fail = 'registry'
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'Registry unavailable' in msg
+
+
+def test_epik_key_never_in_the_url(monkeypatch):
+    seen = []
+    api = FakeEpik()
+
+    def spy(method, url, params=None, **kw):
+        seen.append((url, dict(params or {})))
+        return api(method, url, params=params, **kw)
+
+    monkeypatch.setattr(requests, 'request', spy)
+    p = create_provider('epik', {'api_key': 'k'})
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    assert all('SIGNATURE' not in q for _, q in seen)
