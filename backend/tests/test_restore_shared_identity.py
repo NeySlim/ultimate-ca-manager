@@ -66,6 +66,9 @@ def seeded(app, create_ca, create_cert):
         for row in reversed(list(extra.values())):
             type(row).query.filter_by(id=row.id).delete()
         db.session.commit()
+        # Replacing restores put the seeded enrolment back under a new id
+        from models.auth_certificate import AuthCertificate
+        AuthCertificate.query.filter_by(user_id=seeded['users']).delete()
         _remove(order)
         _reseal_ledger_after(floor)
 
