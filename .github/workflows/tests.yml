@@ -3,10 +3,14 @@ name: Tests & Quality Checks
 on:
   push:
     branches: [main, master, develop, dev, test, 'v*', '*-dev', 'feature/**']
-    # Prose-only commits do not need the suite (no required checks on any branch)
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
+    # Prose-only commits do not need the suite (no required checks on any
+    # branch), except the two files tests read.
+    paths:
+      - '**'
+      - '!**.md'
+      - '!docs/**'
+      - 'README.md'
+      - 'docs/LOG_ROTATION.md'
   pull_request:
     branches: [main, master, develop, dev]
   workflow_dispatch:
@@ -19,15 +23,17 @@ permissions:
   security-events: write
 
 # A new push to a branch replaces the run of its previous commit, except on
-# test and main where every run is a release record and must finish
+# test and main where every run is a release record: one group per commit
+# there, so nothing is cancelled or queued away
 concurrency:
-  group: tests-${{ github.workflow }}-${{ github.ref }}
+  group: tests-${{ github.workflow }}-${{ github.event_name }}-${{ (github.ref_name == 'test' || github.ref_name == 'main') && github.sha || github.ref }}
   cancel-in-progress: ${{ github.ref_name != 'test' && github.ref_name != 'main' }}
 
 jobs:
   lint:
     name: Code Linting
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     
     steps:
       - name: Checkout code
@@ -40,7 +46,7 @@ jobs:
           cache: 'pip'
       
       - name: Install ruff
-        run: pip install ruff
+        run: pip install ruff==0.17.4
 
       # Blocking: undefined names, bad star imports, syntax errors. The four
       # ignored codes are style debt tracked in backend/pyproject.toml.
@@ -50,6 +56,7 @@ jobs:
   security:
     name: Security Scanning
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     
     steps:
       - name: Checkout code
@@ -88,6 +95,7 @@ jobs:
   test-backend:
     name: Backend Tests
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     
     steps:
       - name: Checkout code
@@ -166,6 +174,7 @@ jobs:
   test-backend-postgres:
     name: Backend Tests (PostgreSQL)
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
 
     services:
       postgres:
@@ -288,6 +297,7 @@ jobs:
   test-frontend:
     name: Frontend Tests
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     
     steps:
       - name: Checkout code
@@ -313,6 +323,7 @@ jobs:
   build-test:
     name: Docker Build Test
     runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
     needs: [test-frontend]
     
     steps:

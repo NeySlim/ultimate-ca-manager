@@ -6,3 +6,4 @@ pytest-mock
 pytest-xdist==3.8.0
 black==26.10.1
 flake8==7.3.0
+ruff==0.17.4
