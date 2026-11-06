@@ -10,6 +10,7 @@ export default {
           { label: 'Anfrage', text: 'Ein Benutzer beantragt die Wiederherstellung des archivierten Schlüssels eines bestimmten Zertifikats und gibt einen Grund an' },
           { label: 'Genehmigung (Vier-Augen-Prinzip)', text: 'Ein zweiter autorisierter Operator prüft und genehmigt, der Antragsteller kann seine eigene Anfrage nicht genehmigen' },
           { label: 'Download', text: 'Nach der Genehmigung wird der Schlüssel als passwortgeschütztes PKCS#12-Paket freigegeben' },
+          { label: 'Zertifikat ersetzt (v2.251)', text: 'Genehmigung und Wiederherstellung antworten mit 410, sofern das Zertifikat der Anfrage nicht mehr dasjenige ist, auf dem sie geöffnet wurde. Eine ersetzende Wiederherstellung bricht die offenen Anfragen zu den Zertifikaten ab, die sie entfernt' },
         ]
       },
       {

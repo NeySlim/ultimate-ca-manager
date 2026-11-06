@@ -20,6 +20,7 @@ export default {
           { label: 'Matriz de permisos', text: 'Marcar/desmarcar permisos por categoría (CA, Certificados, Claves privadas, etc.)' },
           { label: 'Cobertura', text: 'Porcentaje visual del total de permisos otorgados al rol' },
           { label: 'Cantidad de usuarios', text: 'Ver cuántos usuarios están asignados a cada rol' },
+          { label: 'Permisos de CA SSH (v2.248)', text: 'read:ssh_cas, write:ssh_cas y delete:ssh_cas gobiernan las CA SSH, de modo que write:ssh ya no las crea ni las edita. Los roles, grupos y claves API con un permiso SSH recibieron el correspondiente al actualizar' },
         ]
       },
     ],

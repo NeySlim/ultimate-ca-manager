@@ -14,6 +14,7 @@ export default {
           { label: 'URL CDP', text: 'URL del CRL Distribution Point da incorporare nei certificati' },
           { label: 'Validità', text: 'Validità della CRL per CA da 1 giorno fino a 5 anni (90d/180d/1y/3y/5y per le CA offline che non possono rifirmare secondo pianificazione). Oltre un anno appare un avviso, le relying party possono conservare dati di revoca obsoleti per l\'intera finestra' },
           { label: 'Digest della firma', text: 'SHA-256, SHA-384 o SHA-512 per una CA RSA o EC. Una CA Ed25519, Ed448 o ML-DSA firma senza digest: un digest memorizzato in precedenza viene mostrato come ignorato, con un pulsante Cancella' },
+          { label: 'Digest predefinito (v2.251)', text: 'Senza un digest impostato, una CA P-384 o P-521 firma le sue CRL con SHA-384 o SHA-512. Le CRL già emesse mantengono il proprio: la successiva lo segue' },
           { label: 'CRL esterna', text: 'Le CA senza chiave/offline non possono autofirmare una CRL, carica dal pannello di dettaglio della CA una CRL generata accanto alla chiave offline; viene validata (firma, emittente, monotonicità) e servita allo stesso URL CDP (v2.215)' },
         ]
       },

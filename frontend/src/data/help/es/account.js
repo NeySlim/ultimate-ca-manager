@@ -19,6 +19,7 @@ export default {
           { label: '2FA (TOTP)', text: 'Activa contraseñas de un solo uso basadas en tiempo mediante una app de autenticación. Volver a activarla mientras está activa se rechaza: desactívala primero' },
           { label: 'Claves de seguridad', text: 'Registra claves WebAuthn/FIDO2 (YubiKey, huella dactilar, etc.)' },
           { label: 'mTLS', text: 'Gestiona certificados de cliente para autenticación TLS mutua' },
+          { label: 'Cambio de contraseña forzado (v2.245)', text: 'Una cuenta a la que se pide una contraseña nueva, como el administrador del primer arranque con changeme123 por defecto, no puede hacer nada más hasta cambiarla, API y WebSocket incluidos; el aviso ofrece Cerrar sesión en lugar de Omitir. Una contraseña definida con INITIAL_ADMIN_PASSWORD no tiene que cambiarse' },
         ]
       },
       {

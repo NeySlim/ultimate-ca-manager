@@ -10,6 +10,7 @@ export default {
           { label: 'Pedido', text: 'Um utilizador pede a recuperação da chave arquivada de um certificado específico, indicando um motivo' },
           { label: 'Aprovação (quatro olhos)', text: 'Um segundo operador autorizado analisa e aprova, o requerente não pode aprovar o seu próprio pedido' },
           { label: 'Transferência', text: 'Uma vez aprovada, a chave é disponibilizada como um pacote PKCS#12 protegido por palavra-passe' },
+          { label: 'Certificado substituído (v2.251)', text: 'A aprovação e a recuperação respondem 410 a menos que o certificado do pedido ainda seja aquele em que foi aberto. Uma restauração que substitui cancela os pedidos abertos sobre os certificados que remove' },
         ]
       },
       {

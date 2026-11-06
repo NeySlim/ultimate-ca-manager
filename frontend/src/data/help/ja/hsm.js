@@ -22,6 +22,10 @@ export default {
           { label: '鍵の生成', text: 'HSM上で直接新しいキーペアを作成' },
           { label: 'ステータス', text: 'プロバイダーの接続状態を監視' },
           { label: '認証 (Certification)', text: 'HSM の認証を申告します: Common Criteria EAL 4+、EUCC high、FIPS 140-3 レベル 3、FIPS 140-2 レベル 3、またはその他。空の場合は未申告です。eu-acm コンプライアンスプロファイルは、HSM 裏付けの CA に対して Common Criteria EAL 4+、EUCC high、FIPS 140-3 レベル 3 (2030年12月31日まで) のみを受け付けます' },
+          { label: '使用済みの名前 (v2.249)', text: 'OpenBao または Azure Key Vault がすでに保持している名前で鍵を生成すると拒否されます (409)。既存の鍵は鍵同期 (POST /api/v2/hsm/providers/<id>/sync) で取り込んでください' },
+          { label: '同時に 1 件の生成 (v2.249)', text: '鍵の生成はプロバイダーごとに順番に実行され、60 秒を過ぎても待機中のものには 409 が返されます。レコードを保存できなかった鍵は HSM から削除されます' },
+          { label: 'バックアップ内の PIN (v2.249)', text: 'バックアップには、プロバイダーの PIN またはトークンが、パスワードで保護されたアーカイブ内に平文で含まれるため、別のインストールでも復元できます。別のインストールの鍵でしか開けない値は復元時に破棄され、再入力を求めるログエントリが残ります' },
+          { label: 'FIPS モードの SoftHSM (v2.247)', text: 'SoftHSM は検証済みモジュールではないため、FIPS モードでは新しい SoftHSM プロバイダーが拒否されます。テスト用には UCM_FIPS_ALLOW_SOFTHSM=1 で許可できます' },
         ]
       },
       {

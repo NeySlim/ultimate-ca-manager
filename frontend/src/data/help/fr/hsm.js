@@ -22,6 +22,10 @@ export default {
           { label: 'Générer une clé', text: 'Créer une nouvelle paire de clés directement sur le HSM' },
           { label: 'Statut', text: 'Surveiller la santé de la connexion du fournisseur' },
           { label: 'Certification', text: 'Déclarer la certification du HSM : Common Criteria EAL 4+, EUCC élevé, FIPS 140-3 niveau 3, FIPS 140-2 niveau 3 ou autre. Laissée vide, elle n\'est pas déclarée. Le profil de conformité eu-acm n\'accepte que Common Criteria EAL 4+, EUCC élevé et FIPS 140-3 niveau 3 (jusqu\'au 31 décembre 2030) pour une CA adossée à un HSM' },
+          { label: "Nom déjà utilisé (v2.249)", text: "Générer une clé sous un nom qu'OpenBao ou Azure Key Vault détient déjà est refusé (409) : importez une clé existante par une synchronisation de clés (POST /api/v2/hsm/providers/<id>/sync)" },
+          { label: "Une génération à la fois (v2.249)", text: "Les générations de clé passent à tour de rôle sur chaque fournisseur, et celle qui attend encore après 60 secondes reçoit un 409. Une clé dont l'enregistrement n'a pas pu être stocké est supprimée du HSM" },
+          { label: "PIN dans les sauvegardes (v2.249)", text: "Une sauvegarde contient en clair, dans l'archive protégée par son mot de passe, le PIN ou le jeton du fournisseur, afin de se restaurer sur une autre installation. Une valeur que seule la clé d'une autre installation ouvre est abandonnée à la restauration, avec une entrée de journal demandant de la saisir de nouveau" },
+          { label: "SoftHSM en mode FIPS (v2.247)", text: "Le mode FIPS refuse un nouveau fournisseur SoftHSM, SoftHSM n'étant pas un module validé ; UCM_FIPS_ALLOW_SOFTHSM=1 en autorise un pour les tests" },
         ]
       },
       {

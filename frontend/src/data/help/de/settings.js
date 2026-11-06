@@ -35,11 +35,14 @@ export default {
       },
       {
         title: "Planer-Ansicht",
-        content: "Einstellungen › System listet die Hintergrundaufgaben mit Status und letzter Ausführung auf.",
+        content: "Einstellungen › Planer listet die Hintergrundaufgaben mit Status und letzter Ausführung auf.",
         items: [
           { label: "Aufgaben", text: "Ablaufprüfungen, CRL-Aktualisierung, Webhook-Zustellung, geplante Backups, Auto-Erneuerung usw." },
           { label: "Jetzt ausführen", text: "Jede Aufgabe bei Bedarf auslösen" },
           { label: "Sichtbarkeit", text: "Letzte Ausführung, letzte Dauer und Fehleranzahl je Aufgabe" },
+          { label: "Planer-Prozess (v2.251)", text: "Die Aufgaben laufen in einem eigenen Planer-Prozess, der mit dem Dienst startet und nach einem Absturz oder einem Reload innerhalb weniger Sekunden neu startet. Eine lange Aufgabe verzögert so weder Anfragen noch Worker. Er benötigt etwa 150 MB Speicher" },
+          { label: "Veralteter Status (v2.251)", text: "Hat der Planer-Prozess eine Zeit lang nichts gemeldet, warnt der Tab, dass der angezeigte Status veraltet sein kann" },
+          { label: "Lange Aufgaben (v2.251)", text: "Jetzt ausführen wartet bis zu 30 Sekunden auf das Ergebnis. Eine Aufgabe, die dann noch läuft, wird als gestartet und weiterhin laufend gemeldet, ihr Ergebnis erscheint bei einer späteren Aktualisierung" },
         ]
       },
       {
@@ -50,6 +53,17 @@ export default {
           { label: "Aufbewahrung", text: "Die N neuesten Backups behalten; ältere werden bereinigt" },
           { label: "Verschlüsselung", text: "Backups werden mit dem konfigurierten Backup-Passwort verschlüsselt" },
           { label: "Schlüsselableitung", text: "Automatisch (Argon2id, sofern verfügbar, PBKDF2 im FIPS-Modus), PBKDF2-HMAC-SHA256 oder Argon2id. Mit Argon2id geschriebene Archive lassen sich auf einer Instanz im FIPS-Modus nicht wiederherstellen" },
+        ]
+      },
+      {
+        title: 'Wiederherstellung (v2.251)',
+        items: [
+          { label: 'Ersetzen oder zusammenführen', text: 'Wiederherstellen aus Backup ersetzt die Daten hier durch die des Archivs und entfernt, was das Archiv nicht enthält; der Audit-Eintrag listet das Entfernte auf. Die API akzeptiert auch mode=merge, das das Archiv zu den Daten hier hinzufügt' },
+          { label: 'Gemeinsame Sperre', text: 'Backups und Wiederherstellungen teilen eine Sperre: Eine Wiederherstellung wird abgelehnt (409), solange ein Backup läuft, und ein manuelles Backup wartet auf eine laufende Wiederherstellung' },
+          { label: 'Upload-Limit', text: 'Eine Wiederherstellung akzeptiert ein Archiv bis BACKUP_MAX_UPLOAD_MB (standardmäßig 512 MB), gesetzt in der Server-Umgebung; eine Ablehnung nennt diese Einstellung. Ein Reverse-Proxy vor UCM hat sein eigenes Body-Limit' },
+          { label: 'Inhalt eines Archivs', text: 'Archive enthalten ACME-Client-Orders, Genehmigungsanfragen und Schlüsselwiederherstellungsanfragen. Beim Wiederherstellen eines Archivs, das vor dieser Version geschrieben wurde, bleiben diese Zeilen hier unverändert' },
+          { label: 'Gleiche Namen', text: 'Ein DNS-Anbieter, ACME-CA-Konto oder Webhook, dessen Namen hier eine andere Zeile trägt, wird als „Name (2)“ wiederhergestellt, und das von der API zurückgegebene Ergebnis listet ihn auf' },
+          { label: 'Einstellungen, die eine Zeile benennen', text: 'Die SCEP- und ACME-Ausstellungs-CAs, OCSP-Responder und ähnliche Einstellungen folgen den archivierten Zeilen. Aus einem älteren Archiv auf einer anderen Installation wiederhergestellt, werden sie geleert und müssen neu gewählt werden' },
         ]
       },
       {
@@ -85,9 +99,11 @@ export default {
           { label: 'Sicherung', text: 'Manuelle und geplante Datenbanksicherungen' },
           { label: 'Audit', text: 'Protokollaufbewahrung, Syslog-Weiterleitung, Integritätsüberprüfung' },
           { label: 'Datenbank', text: 'Aktives Backend (SQLite oder PostgreSQL), Größe, Tabellenanzahl, testen/wechseln/migrieren zwischen Backends' },
+          { label: 'PostgreSQL-Schema (v2.251)', text: 'Eine PostgreSQL-URL, deren search_path ein anderes Schema als public nennt, wird unterstützt: Die Integritätsprüfung zählt die Tabellen dieses Schemas, und eine Migration dorthin gleicht seine Sequenzen an' },
           { label: 'HTTPS', text: 'TLS-Zertifikat für die UCM-Weboberfläche. Das angewendete Zertifikat wird gespeichert und bei seiner Erneuerung automatisch erneut angewendet (v2.217); das gebundene Zertifikat wird mit einer Schaltfläche zum Aufheben der Bindung angezeigt, um Erneuerungen nicht mehr zu folgen (v2.218)' },
           { label: 'Updates', text: 'Nach neuen Versionen suchen, Änderungsprotokoll anzeigen, geplante tägliche Prüfung mit optionaler unbeaufsichtigter Installation (DEB/RPM)' },
           { label: 'Webhooks', text: 'HTTP-Webhooks für Zertifikatsereignisse (Ausstellung, Widerruf, Ablauf)' },
+          { label: 'Eindeutige Webhook-Namen (v2.251)', text: 'Ein bereits verwendeter Webhook-Name wird abgelehnt (409), beim Anlegen und beim Umbenennen. Das Upgrade hat frühere Duplikate in „Name (2)“, „Name (3)“ umbenannt, die ältesten zuerst' },
           { label: 'Bereitstellung', text: 'Deploy-Ziele stellen wiederverwendbare SSH-/SFTP-Verbindungen bereit; Zertifikats- und CRL-Bereitstellungen legen eigene Pfade und optionale Reload-Befehle fest (nur Admins, v2.215)' },
           { label: 'Active Directory', text: 'UCMs eigene AD/LDAP-Verbindung für zertifikatsbezogene Abfragen (Kerberos-Prinzipalauflösung, AD-abgeleitete Betreffe)' },
           { label: 'Windows-Autoregistrierung', text: 'MS-XCEP/MS-WSTEP native Windows-Registrierung: Richtlinienermittlung, Zertifikatsausstellung und Kerberos/SPNEGO-Bindung' },
@@ -138,6 +154,10 @@ export default {
           { label: 'Einrichtungs-Checkliste', text: 'Der Tab zeigt eine Live-Checkliste dessen, was konfiguriert ist bzw. noch fehlt, sowohl für die manuelle als auch die unbeaufsichtigte Registrierung' },
           { label: 'AD-abgeleitete Betreffe', text: 'Vorlagen können sich für die Ableitung ihres Betreffs/SAN aus Active Directory (über den AD-Connector) für die unbeaufsichtigte Registrierung entscheiden' },
           { label: 'ML-DSA-Vorlagen (v2.248)', text: 'Werden über ihre Schlüsselalgorithmus-OID mit dem Microsoft Software Key Storage Provider angekündigt, sind noch nicht mit einem echten Windows-Client getestet und im FIPS-Modus ausgeblendet. Die zertifikatsbasierte Erneuerung kann kein ML-DSA-Zertifikat verwenden (XML-DSig kennt keine ML-DSA-Signatur): ein neues Zertifikat registrieren' },
+          { label: 'ECDSA-Vorlagen (v2.251)', text: 'Werden in Richtlinienschema 3 mit ihrer Kurve (ECDSA_P256, ECDSA_P384, ECDSA_P521) als Signaturschlüssel und Anfrage-Hash angekündigt, dem stärkeren aus Vorlagen-Digest und dem zur Kurve passenden. RSA-Vorlagen außerhalb des FIPS-Modus bleiben bei Schema 2' },
+          { label: 'Vorlage und Schlüssel (v2.251)', text: 'Der Anfrageschlüssel muss zur Vorlage passen, unter der ausgestellt wird: dieselbe Kurve oder derselbe ML-DSA-Satz, oder ein mindestens ebenso langer RSA-Schlüssel. Eine P-384-Anfrage wird also nicht mehr unter einer P-256-Vorlage mit gleichem EKU ausgestellt. Der Anfrage-Umschlag, den Windows mit einem ECDSA-Schlüssel signiert, wird akzeptiert' },
+          { label: 'Erneuerung von Windows (v2.248)', text: 'certreq ... Renew authentifiziert sich mit dem zu erneuernden Zertifikat als TLS-Client-Zertifikat: mTLS muss aktiviert und die WSTEP-CA oder eine ihrer übergeordneten CAs vertrauenswürdig sein. Eine Erneuerung behält Vorlage und EKUs des erneuerten Zertifikats' },
+          { label: 'Kerberos in Docker (v2.251)', text: 'Die Docker-Images enthalten das Kerberos-Backend von pyspnego, sodass die Kerberos-Bindung in einem Container wie bei den DEB- und RPM-Installationen funktioniert' },
         ]
       },
       {
@@ -148,6 +168,7 @@ export default {
           { label: 'Inzwischen erneuert', text: 'Ein Zertifikat, das ein Operator während des Durchlaufs erneuert hat, wird nicht ein zweites Mal erneuert; ein während des Durchlaufs gelöschtes wird übersprungen' },
           { label: 'Kurzlebige Zertifikate', text: 'Die Erneuerung beginnt nie vor dem letzten Drittel der Laufzeit eines Zertifikats: ein 27-Tage-Zertifikat wird 9 Tage vor Ablauf erneuert, nicht schon ab der Ausstellung' },
           { label: 'Jetzt ausführen', text: 'Startet sofort einen Erneuerungsdurchlauf und meldet die ablaufenden Zertifikate, die er unberührt ließ, nach Grund gezählt: noch nicht im letzten Drittel der Laufzeit, privater Schlüssel nicht beim Server, Quelle nicht ausgewählt' },
+          { label: 'Signatur-Digest (v2.251)', text: 'Eine Erneuerung behält den Digest des ursprünglichen Zertifikats, solange er mindestens dem zum CA-Schlüssel passenden entspricht und die Richtlinien ihn erlauben, sonst folgt sie der Ausstellungsregel: Unter einer P-384- oder P-521-CA wird ein SHA-256-Original mit SHA-384 oder SHA-512 erneuert' },
         ]
       },
 
@@ -280,6 +301,12 @@ Automatische Sicherungen konfigurieren:
 ### Wiederherstellen
 Laden Sie eine Sicherungsdatei hoch, um UCM auf einen früheren Zustand zurückzusetzen.
 
+- Backups und Wiederherstellungen teilen eine Sperre: Eine Wiederherstellung wird abgelehnt (409), solange ein Backup läuft, und ein manuelles Backup wartet auf eine laufende Wiederherstellung
+- Der Upload wird bis \`BACKUP_MAX_UPLOAD_MB\` akzeptiert (standardmäßig 512 MB, gesetzt in der Server-Umgebung); ein Reverse-Proxy vor UCM hat sein eigenes Body-Limit
+- Archive enthalten ACME-Client-Orders, Genehmigungsanfragen und Schlüsselwiederherstellungsanfragen (v2.251)
+- Ein DNS-Anbieter, ACME-CA-Konto oder Webhook, dessen Namen hier eine andere Zeile trägt, wird als \`name (2)\` wiederhergestellt
+- Die API akzeptiert auch \`mode=merge\`, das das Archiv zu den Daten hier hinzufügt, statt sie zu ersetzen
+
 > ⚠ Die Wiederherstellung einer Sicherung ersetzt ALLE aktuellen Daten.
 
 ## Audit
@@ -321,6 +348,7 @@ Kopiert alle Zeilen vom aktuellen zum Ziel-Backend. Funktioniert in beide Richtu
 **Sicherheitsprüfungen (schneller Abbruch, Quelle unangetastet):**
 - Das Ziel muss leer sein. Wenn \`users\`, \`cas\` oder \`certificates\` bereits Zeilen enthalten, wird die Migration mit HTTP 409 abgelehnt und ein Bereinigungshinweis ausgegeben:
   - PostgreSQL: \`psql ... -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'\`
+  - PostgreSQL in einem anderen Schema als \`public\` (ein \`search_path\` in der URL): Der Hinweis nennt dieses Schema, dessen Sequenzen die Migration angleicht (v2.251)
   - SQLite: löschen Sie die Ziel-\`.db\`-Datei
 - Wenn die Migration auf halbem Weg fehlschlägt, bleibt die Quelle unangetastet und die Fehlermeldung verweist auf die Quellsicherung. Setzen Sie das Ziel zurück, bevor Sie es erneut versuchen.
 
@@ -392,11 +420,12 @@ Opt-in-Endpunkt **\`/metrics\`** mit Token-Schutz.
 
 ## Planer-Ansicht
 
-Einstellungen › System zeigt die Hintergrundaufgaben.
+Einstellungen › Planer zeigt die Hintergrundaufgaben.
 
 - Aufgabenliste mit **Status**, **letzter Ausführung**, **Dauer** und **Fehlern**
-- **Jetzt ausführen** für jede Aufgabe
+- **Jetzt ausführen** für jede Aufgabe: Es wartet bis zu 30 Sekunden, und eine Aufgabe, die dann noch läuft, wird als gestartet gemeldet, ihr Ergebnis erscheint bei einer späteren Aktualisierung
 - Umfasst Ablauf, CRL, Webhook-Zustellung, Backups, Auto-Erneuerung…
+- **Planer-Prozess** (v2.251): Die Aufgaben laufen in einem eigenen Prozess, der mit dem Dienst startet und nach einem Absturz oder einem Reload innerhalb weniger Sekunden neu startet. Eine lange Aufgabe verzögert so weder Anfragen noch Worker. Eine Warnung erscheint, wenn er eine Zeit lang nichts gemeldet hat
 
 ## Auto-Erneuerung
 
@@ -449,6 +478,8 @@ Der Tab verfolgt, was konfiguriert ist und was noch benötigt wird, sowohl für 
 
 Eine Vorlage mit dem Schlüsseltyp **ML-DSA** wird über ihre Schlüsselalgorithmus-OID angekündigt, mit dem Microsoft Software Key Storage Provider und einer reinen Signatur-Schlüsselspezifikation. Sie ist im FIPS-Modus ausgeblendet, und die Registrierung durch einen echten Windows-Client wurde noch nicht getestet.
 
+Eine **ECDSA**-Vorlage wird in Richtlinienschema 3 mit ihrer Kurve (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) als Signaturschlüssel und Anfrage-Hash angekündigt, dem stärkeren aus Vorlagen-Digest und dem zur Kurve passenden. RSA-Vorlagen außerhalb des FIPS-Modus bleiben bei Schema 2. Der Anfrageschlüssel muss zur Vorlage passen, unter der ausgestellt wird: dieselbe Kurve oder derselbe ML-DSA-Satz, oder ein mindestens ebenso langer RSA-Schlüssel (v2.251).
+
 ### Kerberos / SPNEGO
 
 Bindet die Kerberos-authentifizierten XCEP/WSTEP-Endpunkte für die stille GPO-Autoregistrierung, sodass Maschinen und Benutzer über ihr Kerberos-Ticket statt per Anmeldeaufforderung authentifiziert werden:
@@ -456,6 +487,8 @@ Bindet die Kerberos-authentifizierten XCEP/WSTEP-Endpunkte für die stille GPO-A
 - **Keytab**: Erstellt mit \`ktpass\` oder \`ktutil\` auf dem Domänencontroller für den obigen SPN
 
 > ⚠ Wenn die serverseitige SPNEGO-Bibliothek nicht installiert ist, funktioniert die Kerberos-Authentifizierung nicht, selbst wenn sie hier aktiviert ist -- eine Warnung wird im Tab angezeigt.
+
+Die Docker-Images enthalten dieses Backend seit v2.251.
 
 ### Registrierungsrichtlinien-URLs
 
@@ -467,6 +500,8 @@ Bindet die Kerberos-authentifizierten XCEP/WSTEP-Endpunkte für die stille GPO-A
 Neben Benutzername/Passwort und Kerberos unterstützt WSTEP die **Erneuerung per Client-Zertifikat**, analog zu echten ADCS-CES-Endpunkten: Die Erneuerungsanfrage (RST) muss mit dem privaten Schlüssel eines Zertifikats XML-DSig-signiert sein, das **UCM selbst ausgestellt hat**. Das vorgelegte Zertifikat wird **Byte für Byte** mit dem gespeicherten Zertifikat der konfigurierten CA abgeglichen, Seriennummer oder Betreff allein genügen nie. So können Windows-Clients unbeaufsichtigt mit ihrem aktuellen Zertifikat erneuern, ohne Anmeldedaten oder Kerberos-Ticket.
 
 XML-DSig kennt keine ML-DSA-Signaturmethode, daher kann ein **ML-DSA**-Zertifikat auf diesem Weg nicht erneuern: UCM nennt den Schlüssel in der Ablehnung, und der Client registriert stattdessen ein neues Zertifikat.
+
+Windows kann auch mit \`certreq ... Renew\` erneuern, authentifiziert durch das zu erneuernde Zertifikat als TLS-Client-Zertifikat: mTLS aktivieren, mit der WSTEP-CA oder einer ihrer übergeordneten CAs als vertrauenswürdig. Eine Erneuerung behält Vorlage und EKUs des erneuerten Zertifikats (v2.248).
 
 ### SID-Sicherheitserweiterung (KB5014754)
 

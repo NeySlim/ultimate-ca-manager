@@ -19,6 +19,7 @@ export default {
           { label: '2FA (TOTP)', text: 'Ativar senhas únicas baseadas em tempo via aplicativo autenticador. Ativá-lo de novo enquanto já está ativo é recusado: desative-o primeiro' },
           { label: 'Chaves de Segurança', text: 'Registrar chaves WebAuthn/FIDO2 (YubiKey, impressão digital, etc.)' },
           { label: 'mTLS', text: 'Gerenciar certificados de cliente para autenticação TLS mútua' },
+          { label: 'Alteração de senha forçada (v2.245)', text: 'Uma conta a quem foi pedida uma nova senha, como o admin do primeiro arranque com a predefinição changeme123, não pode fazer mais nada até a alterar, API e WebSocket incluídos; o aviso oferece Log out em vez de Skip. Uma senha definida por INITIAL_ADMIN_PASSWORD não tem de ser alterada' },
         ]
       },
       {

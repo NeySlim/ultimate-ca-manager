@@ -49,6 +49,9 @@ export default {
         items: [
           { label: 'CA de confiance', text: 'La CA dont les certificats client sont acceptés à la connexion, et l\'émettrice par défaut lorsqu\'un utilisateur en génère un. Toute CA dont le certificat n\'est pas révoqué peut être choisie, y compris sans clé ou hors ligne : une telle CA n\'émet rien, ses utilisateurs importent donc des certificats émis ailleurs (v2.248)' },
           { label: 'Exiger un certificat client', text: 'Rendre optionnellement mTLS obligatoire pour l\'interface web, la modification des paramètres mTLS nécessite un redémarrage du service' },
+          { label: "Même numéro de série, autre AC (v2.251)", text: "Un enrôlement est identifié par son émetteur et son numéro de série : un certificat client peut être enrôlé, importé ou assigné même si le certificat enrôlé d'une autre AC porte le même numéro de série" },
+          { label: "En-têtes de reverse proxy (v2.251)", text: "Derrière un proxy qui transmet le certificat client sous forme d'en-têtes, envoyez le DN de l'émetteur (X-SSL-Client-I-DN) avec le numéro de série, lu en hexadécimal : sans l'émetteur ni le certificat, deux enrôlements qui partagent un numéro de série ne se distinguent pas et aucun n'est retenu" },
+          { label: "Clés générées (v2.251)", text: "Un certificat mTLS utilisateur généré par UCM reçoit une clé à la force de l'AC émettrice, RSA ou courbe NIST acceptée par les navigateurs, ramenée au type autorisé le plus proche par les politiques, au lieu de toujours du RSA-2048" },
         ]
       },
     ],

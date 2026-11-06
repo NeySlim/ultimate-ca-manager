@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'Einen CSR einreichen und ein signiertes Zertifikat erhalten' },
           { label: '/simplereenroll', text: 'Ein bestehendes Zertifikat erneuern (erfordert mTLS)' },
           { label: '/csrattrs', text: 'Vom Server empfohlene CSR-Attribute abrufen' },
-          { label: '/serverkeygen', text: 'Server generiert ein RSA-2048-Schlüsselpaar und gibt Zertifikat + Schlüssel zurück; der Schlüssel der Anfrage, auch ML-DSA, wird ignoriert (RFC 7030)' },
+          { label: '/serverkeygen', text: 'Server generiert ein Schlüsselpaar und gibt Zertifikat + Schlüssel zurück. Der Schlüssel übernimmt die Stärke der ausstellenden CA, in der Familie des Anfrageschlüssels bei RSA oder EC (dessen Größe oder Kurve wird ignoriert), sonst der der CA, auf den nächstliegenden Typ verschoben, den die Richtlinien erlauben; über mTLS ist er RSA oder EC (v2.251)' },
         ]
       },
     ],
@@ -125,7 +125,7 @@ Vom Server empfohlene CSR-Attribute (OIDs) abrufen.
 ### POST /serverkeygen
 Server generiert ein Schlüsselpaar und gibt das Zertifikat zusammen mit dem privaten Schlüssel zurück. Nützlich, wenn der Client keine Schlüssel lokal generieren kann.
 
-Die erzeugten Schlüssel sind RSA-2048. Eine Anfrage, deren CSR einen Post-Quanten-Schlüssel enthält, wird mit \`400\` und einer Meldung abgelehnt: den ML-DSA-Schlüssel auf dem Gerät erzeugen und \`/simpleenroll\` verwenden.
+Der erzeugte Schlüssel übernimmt die Stärke der ausstellenden CA: die Familie des Anfrageschlüssels bei RSA oder EC (dessen Größe oder Kurve wird ignoriert), sonst die der CA, auf den nächstliegenden Typ verschoben, den die Richtlinien erlauben. Über mTLS ist er RSA oder EC, die Schlüsseltypen, die sein CMS-Schlüsseltransport trägt (v2.251).
 
 ## Informations-Tab
 

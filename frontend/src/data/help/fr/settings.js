@@ -35,11 +35,14 @@ export default {
       },
       {
         title: "Vue du planificateur",
-        content: "Paramètres › Système liste les tâches d'arrière-plan avec leur statut et leur dernière exécution.",
+        content: "Paramètres › Planificateur liste les tâches d'arrière-plan avec leur statut et leur dernière exécution.",
         items: [
           { label: "Tâches", text: "Vérifications d'expiration, rafraîchissement CRL, livraison webhooks, sauvegardes planifiées, renouvellement auto, etc." },
           { label: "Exécuter", text: "Déclencher n'importe quelle tâche à la demande" },
           { label: "Visibilité", text: "Dernière exécution, dernière durée et nombre d'échecs par tâche" },
+          { label: "Processus du planificateur (v2.251)", text: "Les tâches s'exécutent dans un processus de planification dédié, lancé avec le service et relancé en quelques secondes après un plantage ou un rechargement : une tâche longue ne retarde ni les requêtes ni les workers. Il occupe environ 150 Mo de mémoire" },
+          { label: "Statut périmé (v2.251)", text: "Quand le processus du planificateur n'a pas donné signe de vie depuis un moment, l'onglet avertit que le statut affiché peut être obsolète" },
+          { label: "Tâches longues (v2.251)", text: "Exécuter attend jusqu'à 30 secondes le résultat. Une tâche encore en cours est alors signalée comme démarrée et toujours en cours, et son résultat apparaît à un rafraîchissement ultérieur" },
         ]
       },
       {
@@ -50,6 +53,17 @@ export default {
           { label: "Rétention", text: "Conserver les N sauvegardes les plus récentes ; les plus anciennes sont purgées" },
           { label: "Chiffrement", text: "Les sauvegardes sont chiffrées avec le mot de passe de sauvegarde configuré" },
           { label: "Dérivation de clé", text: "Automatique (Argon2id si disponible, PBKDF2 en mode FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Les archives écrites avec Argon2id ne peuvent pas être restaurées sur une instance en mode FIPS" },
+        ]
+      },
+      {
+        title: 'Restauration (v2.251)',
+        items: [
+          { label: "Remplacer ou fusionner", text: "Restaurer depuis une sauvegarde remplace les données d'ici par celles de l'archive et supprime ce que l'archive ne contient pas ; l'entrée d'audit liste ce qui a été supprimé. L'API accepte aussi mode=merge, qui ajoute l'archive aux données d'ici" },
+          { label: "Verrou partagé", text: "Sauvegardes et restaurations partagent un même verrou : une restauration est refusée (409) pendant une sauvegarde, et une sauvegarde manuelle attend la fin d'une restauration en cours" },
+          { label: "Limite de téléversement", text: "Une restauration accepte une archive jusqu'à BACKUP_MAX_UPLOAD_MB (512 Mo par défaut), défini dans l'environnement du serveur, et un refus nomme ce paramètre. Un reverse proxy placé devant UCM garde sa propre limite de corps de requête" },
+          { label: "Contenu d'une archive", text: "Les archives incluent les orders du client ACME, les demandes d'approbation et les demandes de récupération de clé. Restaurer une archive écrite avant cette version laisse ces lignes ici telles quelles" },
+          { label: "Mêmes noms", text: "Un fournisseur DNS, un compte CA ACME ou un webhook dont le nom est déjà porté par une autre ligne ici est restauré sous « nom (2) », et le résultat de restauration renvoyé par l'API le liste" },
+          { label: "Paramètres qui désignent une ligne", text: "Les AC émettrices SCEP et ACME, les répondeurs OCSP et paramètres similaires suivent les lignes archivées. Depuis une archive plus ancienne restaurée sur une autre installation, ils sont vidés et doivent être choisis de nouveau" },
         ]
       },
       {
@@ -85,9 +99,11 @@ export default {
           { label: 'Sauvegarde', text: 'Sauvegardes de base de données manuelles et programmées' },
           { label: 'Audit', text: 'Rétention des journaux, transfert syslog, vérification d\'intégrité' },
           { label: 'Base de données', text: 'Backend actif (SQLite ou PostgreSQL), taille, nombre de tables, tester/basculer/migrer entre les backends' },
+          { label: "Schéma PostgreSQL (v2.251)", text: "Une URL PostgreSQL dont le search_path désigne un schéma autre que public est prise en charge : le contrôle d'intégrité compte les tables de ce schéma, et une migration vers lui réaligne ses séquences" },
           { label: 'HTTPS', text: 'Certificat TLS pour l\'interface web UCM. Le certificat appliqué est mémorisé et réappliqué lors de son renouvellement (v2.217) ; le certificat lié est affiché avec un bouton pour le délier et ne plus suivre les renouvellements (v2.218)' },
           { label: 'Mises à jour', text: 'Vérifier les nouvelles versions, voir le journal des modifications, vérification quotidienne planifiée avec installation sans surveillance en opt-in (DEB/RPM)' },
           { label: 'Webhooks', text: 'Webhooks HTTP pour les événements de certificat (émission, révocation, expiration). Authentification sortante optionnelle : Bearer, Basic, API key ou en-tête personnalisé' },
+          { label: "Noms de webhooks uniques (v2.251)", text: "Un nom de webhook déjà utilisé est refusé (409), à la création comme au renommage. La mise à jour a renommé les doublons existants « nom (2) », « nom (3) », du plus ancien au plus récent" },
           { label: 'Déploiement', text: "Cibles de déploiement : connexions SSH/SFTP réutilisables ; chaque déploiement de certificat ou de CRL définit ses propres chemins et sa commande de rechargement facultative (réservé aux admins, v2.215)" },
           { label: 'Active Directory', text: "Connexion AD/LDAP propre à UCM pour les recherches liées aux certificats (résolution de principal Kerberos, sujets dérivés d'AD)" },
           { label: 'Auto-inscription Windows', text: 'Inscription Windows native MS-XCEP/MS-WSTEP : découverte de stratégie, émission de certificats et liaison Kerberos/SPNEGO' },
@@ -138,6 +154,10 @@ export default {
           { label: 'Liste de contrôle de configuration', text: "L'onglet affiche une liste de contrôle en direct de ce qui est configuré par rapport à ce qui manque encore, pour l'inscription manuelle et sans surveillance" },
           { label: "Sujets dérivés d'AD", text: "Les modèles peuvent choisir de dériver leur sujet/SAN depuis Active Directory (via le connecteur AD) pour l'inscription sans surveillance" },
           { label: 'Templates ML-DSA (v2.248)', text: 'Annoncés par l\'OID de leur algorithme de clé avec le Microsoft Software Key Storage Provider, pas encore testés avec un vrai client Windows, et masqués en mode FIPS. Le renouvellement par certificat ne peut pas utiliser un certificat ML-DSA (XML-DSig n\'a pas de signature ML-DSA) : inscrivez-en un nouveau' },
+          { label: "Templates ECDSA (v2.251)", text: "Annoncés en schéma de stratégie 3 avec leur courbe (ECDSA_P256, ECDSA_P384, ECDSA_P521) comme clé de signature et condensat de requête, le plus fort entre le condensat du template et celui de la courbe. Les templates RSA hors mode FIPS restent en schéma 2" },
+          { label: "Template et clé (v2.251)", text: "La clé de la requête doit convenir au template sous lequel elle est émise : même courbe ou même jeu ML-DSA, ou clé RSA au moins aussi longue. Une requête P-384 n'est donc plus émise sous un template P-256 qui partage son EKU. L'enveloppe de requête que Windows signe avec une clé ECDSA est acceptée" },
+          { label: "Renouvellement depuis Windows (v2.248)", text: "certreq ... Renew s'authentifie avec le certificat à renouveler comme certificat client TLS : mTLS doit être activé, avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé" },
+          { label: "Kerberos dans Docker (v2.251)", text: "Les images Docker embarquent le backend Kerberos de pyspnego : la liaison Kerberos fonctionne en conteneur comme dans les installations DEB et RPM" },
         ]
       },
       {
@@ -148,6 +168,7 @@ export default {
           { label: 'Renouvelé entre-temps', text: 'Un certificat qu\'un opérateur a renouvelé pendant le lot n\'est pas renouvelé une seconde fois ; un certificat supprimé pendant le lot est ignoré' },
           { label: 'Certificats courts', text: 'Le renouvellement ne commence jamais avant le dernier tiers de la durée d\'un certificat : un certificat de 27 jours est renouvelé à 9 jours de l\'échéance, et non dès son émission' },
           { label: 'Exécuter maintenant', text: 'Exécute immédiatement une passe de renouvellement et signale les certificats arrivant à expiration qu\'elle a laissés de côté, comptés par motif : pas encore dans le dernier tiers de leur durée de vie, clé privée non détenue par le serveur, source non sélectionnée' },
+          { label: "Digest de signature (v2.251)", text: "Un renouvellement conserve le condensat du certificat d'origine tant qu'il est au moins celui qui correspond à la clé de l'AC et que les politiques l'autorisent ; sinon il suit la règle d'émission : sous une AC P-384 ou P-521, un original en SHA-256 est renouvelé en SHA-384 ou SHA-512" },
         ]
       },
 
@@ -280,6 +301,12 @@ Configurez des sauvegardes automatiques :
 ### Restauration
 Téléversez un fichier de sauvegarde pour restaurer UCM à un état précédent.
 
+- Sauvegardes et restaurations partagent un même verrou : une restauration est refusée (409) pendant une sauvegarde, et une sauvegarde manuelle attend la fin d'une restauration en cours
+- Le téléversement est accepté jusqu'à \`BACKUP_MAX_UPLOAD_MB\` (512 Mo par défaut, défini dans l'environnement du serveur) ; un reverse proxy placé devant UCM garde sa propre limite de corps de requête
+- Les archives contiennent les orders du client ACME, les demandes d'approbation et les demandes de récupération de clé (v2.251)
+- Un fournisseur DNS, un compte CA ACME ou un webhook dont le nom est déjà porté par une autre ligne ici est restauré sous \`nom (2)\`
+- L'API accepte aussi \`mode=merge\`, qui ajoute l'archive aux données d'ici au lieu de les remplacer
+
 > ⚠ La restauration d'une sauvegarde remplace TOUTES les données actuelles.
 
 ## Audit
@@ -321,6 +348,7 @@ Copie toutes les lignes du backend actuel vers le backend cible. Fonctionne dans
 **Contrôles de sécurité (échec rapide, source intacte) :**
 - La cible doit être vide. Si \`users\`, \`cas\` ou \`certificates\` contiennent déjà des lignes, la migration est refusée avec un HTTP 409 et un indice de nettoyage :
   - PostgreSQL : \`psql ... -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'\`
+  - PostgreSQL dans un schéma autre que \`public\` (un \`search_path\` dans l'URL) : l'indice nomme ce schéma, dont la migration réaligne les séquences (v2.251)
   - SQLite : supprimez le fichier cible \`.db\`
 - Si la migration échoue en cours de route, la source est intacte et le message d'erreur indique la sauvegarde source. Réinitialisez la cible avant de réessayer.
 
@@ -393,11 +421,12 @@ Ouvrez l'historique (icône horloge) sur un webhook pour voir ses livraisons.
 
 ## Vue du planificateur
 
-Paramètres › Système expose les tâches d'arrière-plan.
+Paramètres › Planificateur expose les tâches d'arrière-plan.
 
 - Liste des tâches avec **statut**, **dernière exécution**, **durée** et **échecs**
-- **Exécuter maintenant** sur n'importe quelle tâche
+- **Exécuter maintenant** sur n'importe quelle tâche : attend jusqu'à 30 secondes, et une tâche encore en cours est alors signalée comme démarrée, son résultat apparaissant à un rafraîchissement ultérieur
 - Couvre expiration, CRL, livraison webhooks, sauvegardes, renouvellement auto…
+- **Processus du planificateur** (v2.251) : les tâches s'exécutent dans un processus dédié, lancé avec le service et relancé en quelques secondes après un plantage ou un rechargement : une tâche longue ne retarde ni les requêtes ni les workers. Un avertissement s'affiche quand il n'a pas donné signe de vie depuis un moment
 
 ## Renouvellement automatique
 
@@ -450,6 +479,8 @@ L'onglet suit ce qui est configuré par rapport à ce qui manque encore, pour le
 
 Un modèle avec un type de clé **ML-DSA** est annoncé par l'OID de son algorithme de clé, avec le Microsoft Software Key Storage Provider et une spécification de clé réservée à la signature. Il est masqué en mode FIPS, et l'inscription depuis un vrai client Windows n'a pas encore été testée.
 
+Un template **ECDSA** est annoncé en schéma de stratégie 3 avec sa courbe (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) comme clé de signature et condensat de requête, le plus fort entre le condensat du template et celui de la courbe ; les templates RSA hors mode FIPS restent en schéma 2. La clé de la requête doit convenir au template sous lequel elle est émise : même courbe ou même jeu ML-DSA, ou clé RSA au moins aussi longue (v2.251).
+
 ### Kerberos / SPNEGO
 
 Lie les points de terminaison XCEP/WSTEP authentifiés par Kerberos utilisés pour l'auto-inscription GPO silencieuse, afin que les machines et les utilisateurs soient authentifiés par leur ticket Kerberos plutôt que par une invite d'identifiants :
@@ -457,6 +488,8 @@ Lie les points de terminaison XCEP/WSTEP authentifiés par Kerberos utilisés po
 - **Keytab** : Généré avec \`ktpass\` ou \`ktutil\` sur le contrôleur de domaine pour le SPN ci-dessus
 
 > ⚠ Kerberos nécessite le **backend \`gssapi\`** côté serveur (la bibliothèque Python \`gssapi\` plus les bibliothèques Kerberos système) : le paquet SPNEGO de base seul ne suffit pas. Sans lui, l'authentification Kerberos ne fonctionnera pas même si elle est activée ici, et la liaison Kerberos n'est pas annoncée ; un avertissement s'affiche sur l'onglet.
+
+Les images Docker embarquent ce backend depuis la v2.251.
 
 ### URL de stratégie d'inscription
 
@@ -468,6 +501,8 @@ Lie les points de terminaison XCEP/WSTEP authentifiés par Kerberos utilisés po
 En plus de Nom d'utilisateur/Mot de passe et Kerberos, WSTEP prend en charge le **renouvellement par certificat client**, à l'image des vrais endpoints CES d'ADCS : la requête de renouvellement (RST) doit être signée en XML-DSig avec la clé privée d'un certificat **émis par UCM lui-même**. Le certificat présenté est comparé **octet par octet** au certificat stocké pour la CA configurée, le numéro de série ou le sujet seuls ne suffisent jamais. Cela permet aux clients Windows de renouveler sans surveillance avec leur certificat actuel, sans identifiants ni ticket Kerberos.
 
 XML-DSig n'a pas de méthode de signature ML-DSA : un certificat **ML-DSA** ne peut donc pas se renouveler ainsi, UCM nomme la clé dans son refus et le client inscrit un nouveau certificat.
+
+Windows peut aussi renouveler avec \`certreq ... Renew\`, authentifié par le certificat à renouveler comme certificat client TLS : activez mTLS avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé (v2.248).
 
 ### Extension de sécurité SID (KB5014754)
 

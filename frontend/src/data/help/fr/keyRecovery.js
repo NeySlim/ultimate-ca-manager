@@ -10,6 +10,7 @@ export default {
           { label: 'Demande', text: 'Un utilisateur demande la récupération de la clé archivée d\'un certificat spécifique, avec un motif' },
           { label: 'Approbation (quatre yeux)', text: 'Un second opérateur autorisé examine et approuve, le demandeur ne peut pas approuver sa propre demande' },
           { label: 'Téléchargement', text: 'Une fois approuvée, la clé est délivrée sous forme d\'archive PKCS#12 protégée par mot de passe' },
+          { label: "Certificat remplacé (v2.251)", text: "L'approbation et la récupération répondent 410 sauf si le certificat de la demande est toujours celui sur lequel elle a été ouverte. Une restauration avec remplacement annule les demandes ouvertes sur les certificats qu'elle supprime" },
         ]
       },
       {

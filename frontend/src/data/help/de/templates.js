@@ -28,6 +28,7 @@ export default {
           { label: 'Policy-OIDs', text: 'Zusätzliche Zertifikatsrichtlinien-OIDs (zum Beispiel die ETSI-Richtlinien QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd und QCP-w), die nach der Richtlinie der CA selbst hinzugefügt werden' },
           { label: 'Benutzerdefinierte Erweiterungen', text: 'Erweiterungen, die UCM nicht modelliert, jeweils eine OID, ein Kritisch-Kennzeichen und der DER-Wert als Hex, unverändert in jedes aus der Vorlage ausgestellte Zertifikat übernommen (Ausstellungsformular, CSR signieren, ACME, SCEP, WSTEP, Genehmigungen; Verlängerungen behalten sie). Das Ausstellungsformular kann weitere hinzufügen oder eine mit derselben OID ersetzen. Erweiterungen, die UCM selbst setzt, werden abgelehnt: nutzen Sie deren eigene Einstellungen. Ein Client, der eine kritische Erweiterung nicht kennt, lehnt das Zertifikat ab' },
           { label: 'Schlüsseltyp', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 oder EC-P521, mit einem Digest SHA-256, SHA-384 oder SHA-512, oder ML-DSA-44, ML-DSA-65 oder ML-DSA-87. Der Digest ist der Signatur-Hash der ausstellenden CA, nicht der des Leaf-Schlüssels: Er gilt weiterhin für ein ML-DSA-Leaf unter einer RSA- oder EC-CA, und eine ML-DSA-CA ignoriert ihn' },
+          { label: 'Digest-Präferenz (v2.251)', text: 'Jeder Pfad, der aus dem Template ausstellt (Ausstellungsformular, CSR signieren, ACME, EST, SCEP, WSTEP, TSA-Signierer), signiert mit dessen Digest, angehoben auf den zum CA-Schlüssel passenden: SHA-384 für P-384, SHA-512 für P-521. Verbietet eine Richtlinie ihn, signiert stattdessen der nächststärkere erlaubte Digest, und das Ergebnis meldet „Signature digest X replaced by Y by policy“' },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 und EC-BP512 (RFC 5639, in Schlüsseltyp-Listen unter Brainpool aufgeführt, im FIPS-Modus ausgeblendet). OpenSSL und Windows lesen ihre Ketten und Signaturen, aber Chrome, Firefox, Go, rustls, GnuTLS und Java ohne Bouncy Castle lehnen sie für TLS ab, und Windows Schannel aktiviert sie standardmäßig nicht. Auf einem HSM halten nur PKCS#11-Provider sie vor' },
         ]
       },
@@ -105,6 +106,17 @@ Ein Template kann die organisatorischen Betreffsfelder: **C, ST, L, O, OU**: fü
 - Templates mit gepinnten Feldern zeigen ein **Pinned**-Badge, und die gepinnten Werte erscheinen im Template-Detailbereich
 
 Nutzen Sie dies, um eine einheitliche organisatorische Identität (z.B. ein festes \`O\` und \`C\`) über eine autoregistrierte Flotte hinweg zu garantieren, unabhängig davon, was jeder Windows-Client übermittelt.
+
+## Benutzerdefinierte Erweiterungen
+
+Ein Template kann Erweiterungen hinzufügen, für die UCM keine Einstellung hat. Jede besteht aus einer **OID**, einem **Critical**-Flag und dem **Wert**: der DER-Kodierung des Erweiterungswerts, in Hex. UCM übernimmt die Bytes unverändert und analysiert sie nie, prüfen Sie die Kodierung daher vorher mit Ihren eigenen Werkzeugen.
+
+- Jedes aus dem Template ausgestellte Zertifikat trägt sie: Ausstellungsformular, CSR signieren, an das Template gebundene ACME-Profile, SCEP-Profile, WSTEP und Genehmigungen. Erneuerungen behalten sie
+- Das Ausstellungsformular kann für ein einzelnes Zertifikat weitere hinzufügen; ein Eintrag mit der OID eines Template-Eintrags ersetzt diesen
+- Erweiterungen, die UCM selbst setzt (Key Usage, EKU, Namen, Schlüsselkennungen, CRL- und OCSP-Verweise, Richtlinien, Name Constraints, qcStatements...), werden abgelehnt: Verwenden Sie deren eigene Einstellungen
+- Ein Client, der eine **kritische** Erweiterung nicht erkennt, muss das Zertifikat ablehnen (RFC 5280, Abschnitt 4.2). Lassen Sie sie nicht kritisch, sofern nicht jede vertrauende Partei sie versteht
+
+Die Detailfelder von Zertifikaten und CAs listen solche Erweiterungen unter **Weitere Erweiterungen** auf, mit OID, Name sofern bekannt, Kritikalität und Wert.
 
 ## Templates duplizieren
 

@@ -35,11 +35,14 @@ export default {
       },
       {
         title: "Vista del planificador",
-        content: "Ajustes › Sistema enumera las tareas en segundo plano con su estado y última ejecución.",
+        content: "Ajustes › Planificador enumera las tareas en segundo plano con su estado y última ejecución.",
         items: [
           { label: "Tareas", text: "Comprobaciones de expiración, actualización de CRL, entrega de webhooks, copias programadas, autorrenovación, etc." },
           { label: "Ejecutar ahora", text: "Desencadenar cualquier tarea bajo demanda" },
           { label: "Visibilidad", text: "Última ejecución, última duración y número de fallos por tarea" },
+          { label: 'Proceso del planificador (v2.251)', text: 'Las tareas se ejecutan en un proceso propio del planificador, que arranca con el servicio y se reinicia en pocos segundos tras un fallo o una recarga, de modo que una tarea larga no retrasa ni las solicitudes ni los workers. Ocupa unos 150 MB de memoria' },
+          { label: 'Estado obsoleto (v2.251)', text: 'Cuando el proceso del planificador lleva un tiempo sin informar, la pestaña avisa de que el estado mostrado puede estar desactualizado' },
+          { label: 'Tareas largas (v2.251)', text: 'Ejecutar ahora espera hasta 30 segundos el resultado. Una tarea que sigue en curso se notifica como iniciada y en ejecución, y su resultado aparece en una actualización posterior' },
         ]
       },
       {
@@ -50,6 +53,17 @@ export default {
           { label: "Retención", text: "Conservar las N copias más recientes; las más antiguas se eliminan" },
           { label: "Cifrado", text: "Las copias se cifran con la contraseña de copia de seguridad configurada" },
           { label: "Derivación de clave", text: "Automática (Argon2id si está disponible, PBKDF2 en modo FIPS), PBKDF2-HMAC-SHA256 o Argon2id. Los archivos escritos con Argon2id no se pueden restaurar en una instancia en modo FIPS" },
+        ]
+      },
+      {
+        title: 'Restauración (v2.251)',
+        items: [
+          { label: 'Reemplazar o fusionar', text: 'Restaurar desde copia reemplaza los datos de aquí por los del archivo y elimina lo que el archivo no contiene; la entrada de auditoría enumera lo eliminado. La API también acepta mode=merge, que añade el archivo a los datos de aquí' },
+          { label: 'Bloqueo compartido', text: 'Las copias y las restauraciones comparten un único bloqueo: se rechaza una restauración (409) mientras se ejecuta una copia, y una copia manual espera a que termine una restauración en curso' },
+          { label: 'Límite de subida', text: 'Una restauración acepta un archivo de hasta BACKUP_MAX_UPLOAD_MB (512 MB por defecto), definido en el entorno del servidor, y el rechazo nombra esa variable. Un reverse proxy delante de UCM mantiene su propio límite de cuerpo' },
+          { label: 'Qué contiene un archivo', text: 'Los archivos incluyen los pedidos del cliente ACME, las solicitudes de aprobación y las solicitudes de recuperación de claves. Restaurar un archivo escrito antes de esta versión deja esas filas de aquí como están' },
+          { label: 'Mismos nombres', text: 'Un proveedor DNS, una cuenta de CA ACME o un webhook cuyo nombre ya tiene otra fila aquí se restaura como «nombre (2)», y el resultado de la restauración que devuelve la API lo enumera' },
+          { label: 'Ajustes que nombran una fila', text: 'Las CA emisoras de SCEP y ACME, los respondedores OCSP y ajustes similares siguen las filas archivadas. Al restaurar un archivo antiguo en otra instalación, quedan vacíos y hay que elegirlos de nuevo' },
         ]
       },
       {
@@ -85,9 +99,11 @@ export default {
           { label: 'Respaldo', text: 'Copias de seguridad manuales y programadas de la base de datos' },
           { label: 'Auditoría', text: 'Retención de registros, reenvío a syslog, verificación de integridad' },
           { label: 'Base de datos', text: 'Backend activo (SQLite o PostgreSQL), tamaño, número de tablas, probar/cambiar/migrar entre backends' },
+          { label: 'Esquema de PostgreSQL (v2.251)', text: 'Se admite una URL de PostgreSQL cuyo search_path nombra un esquema distinto de public: la verificación de integridad cuenta las tablas de ese esquema y una migración hacia él realinea sus secuencias' },
           { label: 'HTTPS', text: 'Certificado TLS para la interfaz web de UCM. El certificado aplicado se recuerda y se vuelve a aplicar cuando se renueva (v2.217); el certificado vinculado se muestra con un botón para desvincularlo y dejar de seguir las renovaciones (v2.218)' },
           { label: 'Actualizaciones', text: 'Buscar nuevas versiones, ver registro de cambios, comprobación diaria programada con instalación desatendida opcional (DEB/RPM)' },
           { label: 'Webhooks', text: 'Webhooks HTTP para eventos de certificados (emisión, revocación, expiración). Autenticación saliente opcional: Bearer, Basic, API key o encabezado personalizado' },
+          { label: 'Nombres de webhook únicos (v2.251)', text: 'Se rechaza (409) un nombre de webhook ya en uso, al crear y al renombrar. La actualización renombró los duplicados anteriores como «nombre (2)», «nombre (3)», empezando por el más antiguo' },
           { label: 'Despliegue', text: 'Los destinos de despliegue son conexiones SSH/SFTP reutilizables; cada despliegue de certificado o de CRL define sus propias rutas y su comando de recarga opcional (solo administradores, v2.215)' },
           { label: 'Active Directory', text: 'Conexión propia de UCM a AD/LDAP para búsquedas relacionadas con certificados (resolución de entidades de seguridad Kerberos, sujetos derivados de AD)' },
           { label: 'Autoinscripción de Windows', text: 'Inscripción nativa de Windows MS-XCEP/MS-WSTEP: descubrimiento de directivas, emisión de certificados y vinculación Kerberos/SPNEGO' },
@@ -138,6 +154,10 @@ export default {
           { label: 'Lista de verificación de configuración', text: 'La pestaña muestra una lista de verificación en vivo de lo configurado frente a lo que falta, tanto para la inscripción manual como la desatendida' },
           { label: 'Sujetos derivados de AD', text: 'Las plantillas pueden optar por derivar su sujeto/SAN de Active Directory (mediante el conector de AD) para la inscripción desatendida' },
           { label: 'Plantillas ML-DSA (v2.248)', text: 'Se anuncian por el OID de su algoritmo de clave con el Microsoft Software Key Storage Provider, aún no probadas con un cliente Windows real, y ocultas en modo FIPS. La renovación con certificado no puede usar un certificado ML-DSA (XML-DSig no tiene firma ML-DSA): inscriba uno nuevo' },
+          { label: 'Plantillas ECDSA (v2.251)', text: 'Se anuncian en el esquema de directiva 3 con su curva (ECDSA_P256, ECDSA_P384, ECDSA_P521) como clave de firma y un hash de solicitud, el más fuerte entre el resumen de la plantilla y el que corresponde a la curva. Las plantillas RSA fuera del modo FIPS siguen en el esquema 2' },
+          { label: 'Plantilla y clave (v2.251)', text: 'La clave de la solicitud debe ajustarse a la plantilla con la que se emite: la misma curva o el mismo conjunto ML-DSA, o una clave RSA al menos igual de larga, de modo que una solicitud P-384 ya no se emite con una plantilla P-256 que comparta su EKU. Se acepta el sobre de solicitud que Windows firma con una clave ECDSA' },
+          { label: 'Renovación desde Windows (v2.248)', text: 'certreq ... Renew se autentica con el certificado que se renueva como certificado de cliente TLS: requiere mTLS activado y la CA de WSTEP, o una de sus ancestras, de confianza. Una renovación conserva la plantilla y los EKU del certificado que renueva' },
+          { label: 'Kerberos en Docker (v2.251)', text: 'Las imágenes Docker incluyen el backend Kerberos de pyspnego, por lo que la vinculación Kerberos funciona en un contenedor igual que en las instalaciones DEB y RPM' },
         ]
       },
       {
@@ -148,6 +168,7 @@ export default {
           { label: 'Renovado entretanto', text: 'Un certificado que un operador renovó durante el lote no se renueva una segunda vez; uno eliminado durante el lote se omite' },
           { label: 'Certificados de corta duración', text: 'La renovación nunca empieza antes del último tercio de la vigencia de un certificado: uno de 27 días se renueva cuando le quedan 9, no desde su emisión' },
           { label: 'Ejecutar ahora', text: 'Ejecuta una pasada de renovación de inmediato e informa de los certificados por expirar que dejó sin tocar, contados por motivo: aún no en el último tercio de su vigencia, clave privada no en poder del servidor, fuente no seleccionada' },
+          { label: 'Resumen de firma (v2.251)', text: 'Una renovación conserva el resumen del certificado original mientras sea al menos el que corresponde a la clave de la CA y las políticas lo permitan; si no, sigue la regla de emisión: bajo una CA P-384 o P-521, un original SHA-256 se renueva con SHA-384 o SHA-512' },
         ]
       },
 
@@ -280,6 +301,12 @@ Configure copias de seguridad automáticas:
 ### Restaurar
 Suba un archivo de respaldo para restaurar UCM a un estado anterior.
 
+- Las copias y las restauraciones comparten un único bloqueo: se rechaza una restauración (409) mientras se ejecuta una copia, y una copia manual espera a que termine una restauración en curso
+- Se acepta una subida de hasta \`BACKUP_MAX_UPLOAD_MB\` (512 MB por defecto, definido en el entorno del servidor); un reverse proxy delante de UCM mantiene su propio límite de cuerpo
+- Los archivos incluyen los pedidos del cliente ACME, las solicitudes de aprobación y las solicitudes de recuperación de claves (v2.251)
+- Un proveedor DNS, una cuenta de CA ACME o un webhook cuyo nombre ya tiene otra fila aquí se restaura como \`nombre (2)\`
+- La API también acepta \`mode=merge\`, que añade el archivo a los datos de aquí en lugar de reemplazarlos
+
 > ⚠ Restaurar un respaldo reemplaza TODOS los datos actuales.
 
 ## Auditoría
@@ -321,6 +348,7 @@ Copia todas las filas del backend actual al backend destino. Funciona en ambas d
 **Comprobaciones de seguridad (fallo rápido, origen intacto):**
 - El destino debe estar vacío. Si \`users\`, \`cas\` o \`certificates\` ya contienen filas, la migración se rechaza con HTTP 409 y una sugerencia de limpieza:
   - PostgreSQL: \`psql ... -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'\`
+  - PostgreSQL en un esquema distinto de \`public\` (un \`search_path\` en la URL): la sugerencia nombra ese esquema, cuyas secuencias realinea la migración (v2.251)
   - SQLite: elimine el archivo \`.db\` de destino
 - Si la migración falla a mitad de camino, el origen permanece intacto y el mensaje de error apunta a la copia de seguridad del origen. Restablezca el destino antes de reintentar.
 
@@ -393,11 +421,12 @@ Abra el historial (icono de reloj) en un webhook para ver sus entregas.
 
 ## Vista del planificador
 
-Ajustes › Sistema muestra las tareas en segundo plano.
+Ajustes › Planificador muestra las tareas en segundo plano.
 
 - Lista de tareas con **estado**, **última ejecución**, **duración** y **fallos**
-- **Ejecutar ahora** en cualquier tarea
+- **Ejecutar ahora** en cualquier tarea: espera hasta 30 segundos, y una tarea que sigue en curso se notifica como iniciada, con su resultado en una actualización posterior
 - Cubre expiración, CRL, entrega de webhooks, copias, autorrenovación…
+- **Proceso del planificador** (v2.251): las tareas se ejecutan en un proceso propio, que arranca con el servicio y se reinicia en pocos segundos tras un fallo o una recarga, de modo que una tarea larga no retrasa ni las solicitudes ni los workers. Se muestra una advertencia cuando lleva un tiempo sin informar
 
 ## Autorrenovación
 Los ajustes de autorrenovación gobiernan el planificador de renovaciones.
@@ -448,6 +477,8 @@ La pestaña realiza un seguimiento de lo que está configurado frente a lo que a
 
 Una plantilla con tipo de clave **ML-DSA** se anuncia por el OID de su algoritmo de clave, con el Microsoft Software Key Storage Provider y una especificación de clave solo de firma. Se oculta en modo FIPS y la inscripción desde un cliente Windows real aún no se ha probado.
 
+Una plantilla **ECDSA** se anuncia en el esquema de directiva 3 con su curva (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) como clave de firma y un hash de solicitud, el más fuerte entre el resumen de la plantilla y el que corresponde a la curva; las plantillas RSA fuera del modo FIPS siguen en el esquema 2. La clave de la solicitud debe ajustarse a la plantilla con la que se emite: la misma curva o el mismo conjunto ML-DSA, o una clave RSA al menos igual de larga (v2.251).
+
 ### Kerberos / SPNEGO
 
 Vincula los puntos de conexión XCEP/WSTEP autenticados por Kerberos usados para la autoinscripción GPO silenciosa, de modo que las máquinas y los usuarios se autentiquen mediante su ticket Kerberos en lugar de una solicitud de credenciales:
@@ -455,6 +486,8 @@ Vincula los puntos de conexión XCEP/WSTEP autenticados por Kerberos usados para
 - **Keytab**: Generado con \`ktpass\` o \`ktutil\` en el controlador de dominio para el SPN anterior
 
 > ⚠ Kerberos requiere el **backend \`gssapi\`** del lado del servidor (la biblioteca Python \`gssapi\` más las bibliotecas Kerberos del sistema): el paquete SPNEGO base por sí solo no es suficiente. Sin él, la autenticación Kerberos no funcionará aunque esté habilitada aquí, y la vinculación Kerberos no se anuncia; se muestra una advertencia en la pestaña.
+
+Las imágenes Docker incluyen este backend desde la v2.251.
 
 ### URL de directiva de inscripción
 
@@ -466,6 +499,8 @@ Vincula los puntos de conexión XCEP/WSTEP autenticados por Kerberos usados para
 Además de Usuario/Contraseña y Kerberos, WSTEP admite la **renovación con certificado de cliente**, reflejando los endpoints CES de un ADCS real: la solicitud de renovación (RST) debe firmarse con XML-DSig usando la clave privada de un certificado que **el propio UCM emitió**. El certificado presentado se compara **byte a byte** con el certificado almacenado para la CA configurada, el número de serie o el sujeto por sí solos nunca son suficientes. Esto permite a los clientes Windows renovar de forma desatendida con su certificado actual, sin credenciales ni ticket Kerberos.
 
 XML-DSig no tiene método de firma ML-DSA, por lo que un certificado **ML-DSA** no puede renovarse así: UCM nombra la clave en su rechazo y el cliente inscribe un certificado nuevo.
+
+Windows también puede renovar con \`certreq ... Renew\`, autenticado por el certificado que se renueva como certificado de cliente TLS: active mTLS con la CA de WSTEP, o una de sus ancestras, de confianza. Una renovación conserva la plantilla y los EKU del certificado que renueva (v2.248).
 
 ### Extensión de seguridad SID (KB5014754)
 

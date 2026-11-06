@@ -957,6 +957,10 @@ Manage your ACME client configuration:
 - **Auto-Renewal**: Automatically renew certificates before expiry
 - **Certificate Key Type**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384, ML-DSA-44, ML-DSA-65 or ML-DSA-87. ML-DSA is not offered in FIPS mode or on a build without it. A configured type this instance cannot generate fails the order instead of falling back to RSA-2048
 - **Account Key Algorithm**: ES256, ES384, or RS256 for ACME account signing
+- **Renewal in place** (v2.251): a renewal keeps the certificate's id and refid, so its HTTPS binding, deployment bindings and webhooks follow it
+- **Failed renewals** (v2.251): the order list shows the failure count and the last error; after 5 failed scheduled renewals an order is retried once a day. The **Automatic renewal** switch of a selected order stops or resumes its renewal
+- **Orders list** (v2.251): every order is loaded, four pages at a time; a page still missing after its retries leaves a notice that the list is partial
+- **Compromised keys** (v2.251): a key revoked as compromised is refused (409) at the request and before any renewal opens an order
 
 ### Custom ACME Server
 Use any RFC 8555-compliant CA, not just Let's Encrypt:
@@ -1031,6 +1035,8 @@ Configure DNS-01 challenge providers for domain validation. Supported providers 
 - And more
 
 Each provider requires API credentials specific to the DNS service.
+
+Cleanup removes only the TXT value of its order, so another order, or the wildcard and apex sharing the name, keep theirs; DuckDNS, Hurricane Electric and FreeDNS hold one value per name and still clear it. Vercel takes an optional **Team ID** for domains owned by a team, and RcodeZero needs a token with zone read and write access. A provider name already in use is refused (v2.251).
 
 #### Custom Command provider
 For DNS services without a native driver, the **Custom Command** provider runs admin-configured local commands for TXT record create/delete. Record details are passed as environment variables:
@@ -1414,7 +1420,7 @@ Get the CSR attributes (OIDs) recommended by the server.
 ### POST /serverkeygen
 Server generates a key pair and returns the certificate along with the private key. Useful when the client cannot generate keys locally.
 
-Generated keys are RSA-2048. A request whose CSR carries a post-quantum key is refused with \`400\` and a message: generate the ML-DSA key on the device and use \`/simpleenroll\`.
+The generated key takes the issuing CA's strength: the family of the request's key when it is RSA or EC (its size or curve is ignored), else the CA's, moved to the closest type the policies allow. Over mTLS it is RSA or EC, the key types its CMS key transport carries (v2.251).
 
 ## Information Tab
 
@@ -2056,6 +2062,12 @@ Configure automatic backups:
 ### Restore
 Upload a backup file to restore UCM to a previous state.
 
+- Backups and restores share one lock: a restore is refused (409) while a backup runs, and a manual backup waits for a running restore
+- The upload is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default, set in the server environment); a reverse proxy in front of UCM keeps its own body limit
+- Archives carry ACME client orders, approval requests and key recovery requests (v2.251)
+- A DNS provider, ACME CA account or webhook whose name another row holds here is restored as \`name (2)\`
+- The API also accepts \`mode=merge\`, which adds the archive to the data here instead of replacing it
+
 > ⚠ Restoring a backup replaces ALL current data.
 
 ## Audit
@@ -2097,6 +2109,7 @@ Copies all rows from the current backend to the target. Works in both directions
 **Safety checks (fail fast, source untouched):**
 - The target must be empty. If \`users\`, \`cas\`, or \`certificates\` already contain rows, the migration is refused with HTTP 409 and a cleanup hint:
   - PostgreSQL: \`psql ... -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'\`
+  - PostgreSQL in a schema other than \`public\` (a \`search_path\` in the URL): the hint names that schema, whose sequences the migration realigns (v2.251)
   - SQLite: delete the target \`.db\` file
 - If the migration fails mid-way, the source is left untouched and the error message points to the source backup. Reset the target before retrying.
 
@@ -2170,11 +2183,12 @@ Open the history (clock icon) on a webhook to see its deliveries.
 
 ## Scheduler view
 
-Settings › System surfaces the background tasks.
+Settings › Scheduler surfaces the background tasks.
 
 - Task list with **status**, **last run**, **duration** and **failures**
-- **Run now** on any task
+- **Run now** on any task: it waits up to 30 seconds, and a task still running then is reported as started, its result showing on a later refresh
 - Covers expiry, CRL, webhook delivery, backups, auto-renewal…
+- **Scheduler process** (v2.251): the tasks run in a process of their own, started with the service and restarted within seconds after a crash or a reload, so a long task delays neither requests nor workers. A warning shows when it has not reported for a while
 
 ## Auto-renewal
 The auto-renewal settings drive the renewal scheduler.
@@ -2223,6 +2237,8 @@ The tab tracks what's configured versus what's still needed, for both manual and
 
 A template with an **ML-DSA** key type is announced by its key algorithm OID, with the Microsoft Software Key Storage Provider and a signature-only key spec. It is hidden in FIPS mode, and enrollment from a real Windows client has not been tested yet.
 
+An **ECDSA** template is announced in policy schema 3 with its curve (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) as a signature key and a request hash, the stronger of the template digest and the one matching the curve; RSA templates outside FIPS mode stay schema 2. The request key must fit the template it is issued under: the same curve or ML-DSA set, or an RSA key at least as long (v2.251).
+
 ### Kerberos / SPNEGO
 
 Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoenrollment, so machines and users are authenticated by their Kerberos ticket instead of a credential prompt:
@@ -2230,6 +2246,8 @@ Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoen
 - **Keytab**: Generated with \`ktpass\` or \`ktutil\` on the domain controller for the SPN above
 
 > ⚠ Kerberos requires the server-side **\`gssapi\` backend** (the Python \`gssapi\` library plus the system Kerberos libraries): the base SPNEGO package alone is not enough. Without it, Kerberos authentication won't work even when enabled here, and the Kerberos binding is not advertised; a warning is shown on the tab.
+
+The Docker images ship this backend since v2.251.
 
 ### Enrollment Policy URLs
 
@@ -2241,6 +2259,8 @@ Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoen
 Besides Username/Password and Kerberos, WSTEP supports **client-certificate renewal**, mirroring real ADCS CES endpoints: the renewal request (RST) must be XML-DSig-signed with the private key of a certificate **UCM itself issued**. The presented certificate is matched **byte-for-byte** against the stored certificate for the configured CA, serial number or subject alone are never enough. This lets Windows clients renew unattended using their current certificate, without credentials or a Kerberos ticket.
 
 XML-DSig has no ML-DSA signature method, so an **ML-DSA** certificate cannot renew this way: UCM names the key in its refusal, and the client enrolls a new certificate instead.
+
+Windows can also renew with \`certreq ... Renew\`, authenticated by the certificate being renewed as TLS client certificate: enable mTLS with the WSTEP CA, or one of its ancestors, trusted. A renewal keeps the template and EKUs of the certificate it renews (v2.248).
 
 ### SID Security Extension (KB5014754)
 

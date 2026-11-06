@@ -49,6 +49,9 @@ export default {
         items: [
           { label: 'CA de confianza', text: 'La CA cuyos certificados de cliente se aceptan al iniciar sesión, y el emisor por defecto cuando un usuario genera uno. Se puede elegir cualquier CA cuyo certificado no esté revocado, incluidas las sin clave o sin conexión: una CA así no emite nada, por lo que sus usuarios suben certificados emitidos en otro lugar (v2.248)' },
           { label: 'Requerir certificado de cliente', text: 'Opcionalmente, haga que mTLS sea obligatorio para la interfaz web, cambiar la configuración mTLS requiere un reinicio del servicio' },
+          { label: 'Mismo número de serie, otra CA (v2.251)', text: 'Una inscripción se identifica por su emisor y número de serie, de modo que un certificado de cliente puede inscribirse, importarse o asignarse aunque el certificado inscrito de otra CA tenga el mismo número de serie' },
+          { label: 'Encabezados de reverse proxy (v2.251)', text: 'Detrás de un proxy que reenvía el certificado de cliente como encabezados, envíe el DN del emisor (X-SSL-Client-I-DN) junto con el número de serie, leído como hexadecimal: sin el emisor o el certificado, dos inscripciones con el mismo número de serie no se distinguen y no se elige ninguna' },
+          { label: 'Claves generadas (v2.251)', text: 'Un certificado mTLS de usuario generado por UCM recibe una clave de la fortaleza de la CA emisora, RSA o una curva NIST que aceptan los navegadores, llevada al tipo más cercano que permitan las políticas, en lugar de siempre RSA-2048' },
         ]
       },
     ],

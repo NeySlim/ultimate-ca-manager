@@ -20,6 +20,7 @@ export default {
           { label: 'Berechtigungsmatrix', text: 'Berechtigungen nach Kategorie aktivieren/deaktivieren (CAs, Zertifikate, Private Schlüssel, usw.)' },
           { label: 'Abdeckung', text: 'Visuelle Prozentzahl der insgesamt gewährten Berechtigungen für die Rolle' },
           { label: 'Benutzeranzahl', text: 'Sehen, wie viele Benutzer jeder Rolle zugewiesen sind' },
+          { label: 'SSH-CA-Berechtigungen (v2.248)', text: 'read:ssh_cas, write:ssh_cas und delete:ssh_cas steuern SSH-CAs, sodass write:ssh sie nicht mehr anlegt oder bearbeitet. Rollen, Gruppen und API-Schlüssel mit einer SSH-Berechtigung haben beim Upgrade die entsprechende erhalten' },
         ]
       },
     ],

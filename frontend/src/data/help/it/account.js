@@ -19,6 +19,7 @@ export default {
           { label: '2FA (TOTP)', text: 'Abilita le password monouso basate sul tempo tramite app di autenticazione. Riabilitarlo mentre è attivo viene rifiutato: disabilitalo prima' },
           { label: 'Chiavi di sicurezza', text: 'Registra chiavi WebAuthn/FIDO2 (YubiKey, impronta digitale, ecc.)' },
           { label: 'mTLS', text: 'Gestisci i certificati client per l\'autenticazione TLS reciproca' },
+          { label: 'Cambio password forzato (v2.245)', text: 'Un account a cui è stata richiesta una nuova password, come l\'admin del primo avvio con la password predefinita changeme123, non può fare altro finché non la cambia, API e WebSocket compresi; la richiesta offre Esci al posto di Salta. Una password impostata tramite INITIAL_ADMIN_PASSWORD non deve essere cambiata' },
         ]
       },
       {

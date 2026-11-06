@@ -28,6 +28,7 @@ export default {
           { label: 'OIDs de política', text: 'OIDs de política de certificado adicionais (por exemplo as políticas ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd e QCP-w), adicionados após a política própria da CA' },
           { label: 'Extensões personalizadas', text: 'Extensões que o UCM não modela, cada uma com um OID, um indicador de criticidade e o valor DER em hexadecimal, adicionadas tal como são a cada certificado emitido a partir do modelo (formulário de emissão, assinatura de CSR, ACME, SCEP, WSTEP, aprovações; as renovações mantêm-nas). O formulário de emissão pode adicionar mais ou substituir a do mesmo OID. As extensões que o UCM define por si são recusadas: use as suas próprias definições. Um cliente que não reconhece uma extensão crítica rejeita o certificado' },
           { label: 'Tipo de chave', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 ou EC-P521, com um resumo SHA-256, SHA-384 ou SHA-512, ou ML-DSA-44, ML-DSA-65 ou ML-DSA-87. O resumo é o hash de assinatura da CA emissora, não o da chave da folha: aplica-se também a uma folha ML-DSA sob uma CA RSA ou EC, e uma CA ML-DSA ignora-o' },
+          { label: 'Preferência de digest (v2.251)', text: 'Todos os caminhos que emitem a partir do modelo (formulário de emissão, Sign CSR, ACME, EST, SCEP, WSTEP, signatário TSA) assinam com o seu digest, elevado ao que corresponde à chave da CA: SHA-384 para P-384, SHA-512 para P-521. Quando uma política o proíbe, assina o digest mais forte mais próximo permitido, e o resultado indica "Signature digest X replaced by Y by policy"' },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 e EC-BP512 (RFC 5639, listados em Brainpool nas listas de tipos de chave, ocultos no modo FIPS). O OpenSSL e o Windows leem as suas cadeias e assinaturas, mas Chrome, Firefox, Go, rustls, GnuTLS e Java sem Bouncy Castle recusam-nos em TLS, e o Windows Schannel não os ativa por padrão. Num HSM, apenas os provedores PKCS#11 os guardam' },
         ]
       },
@@ -105,6 +106,17 @@ Um modelo pode **fixar** os campos organizacionais do sujeito: **C, ST, L, O, OU
 - Modelos com campos fixados mostram um selo **Fixado**, e os valores fixados aparecem no painel de detalhes do modelo
 
 Use isso para garantir uma identidade organizacional uniforme (ex. \`O\` e \`C\` fixos) em uma frota autoinscrita, independentemente do que cada cliente Windows enviar.
+
+## Extensões personalizadas
+
+Um modelo pode adicionar extensões para as quais o UCM não tem configuração. Cada uma é um **OID**, um indicador **Crítica** e o **valor**: a codificação DER do valor da extensão, em hexadecimal. O UCM copia os bytes tal como foram dados e nunca os interpreta, por isso verifique a codificação com as suas próprias ferramentas antes.
+
+- Todo certificado emitido a partir do modelo as contém: formulário de emissão, Sign CSR, perfis ACME vinculados ao modelo, perfis SCEP, WSTEP e aprovações. As renovações as mantêm
+- O formulário de emissão pode adicionar outras para um só certificado; uma entrada com o OID de uma das do modelo a substitui
+- As extensões que o UCM define por si (key usage, EKU, nomes, identificadores de chave, ponteiros CRL e OCSP, políticas, name constraints, qcStatements...) são recusadas: use as suas próprias configurações
+- Um cliente que não reconhece uma extensão **crítica** deve rejeitar o certificado (RFC 5280, seção 4.2). Deixe-a não crítica, a menos que todas as partes confiantes a entendam
+
+Os painéis de detalhes de certificados e CAs listam essas extensões em **Other extensions**, com o seu OID, nome quando conhecido, criticidade e valor.
 
 ## Duplicando Modelos
 

@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: '提交 CSR 并接收签名证书' },
           { label: '/simplereenroll', text: '续期已有证书（需要 mTLS）' },
           { label: '/csrattrs', text: '获取服务器推荐的 CSR 属性' },
-          { label: '/serverkeygen', text: '服务器生成 RSA-2048 密钥对并返回证书 + 密钥；请求中的密钥（包括 ML-DSA）会被忽略 (RFC 7030)' },
+          { label: '/serverkeygen', text: '服务器生成密钥对并返回证书 + 密钥。密钥采用签发 CA 的强度：请求密钥为 RSA 或 EC 时沿用其类型（其大小或曲线被忽略），否则沿用 CA 的类型，并调整为策略允许的最接近类型；通过 mTLS 时为 RSA 或 EC (v2.251)' },
         ]
       },
     ],
@@ -125,7 +125,7 @@ curl -k --cert client.pem --key client.key \\
 ### POST /serverkeygen
 服务器生成密钥对并返回证书和私钥。适用于客户端无法在本地生成密钥的场景。
 
-生成的密钥为 RSA-2048。CSR 携带后量子密钥的请求会被拒绝，返回 \`400\` 和提示信息：请在设备上生成 ML-DSA 密钥并使用 \`/simpleenroll\`。
+生成的密钥采用签发 CA 的强度：请求密钥为 RSA 或 EC 时沿用其类型（其大小或曲线被忽略），否则沿用 CA 的类型，并调整为策略允许的最接近类型。通过 mTLS 时为 RSA 或 EC，即其 CMS 密钥传输所承载的密钥类型 (v2.251)。
 
 ## 信息选项卡
 

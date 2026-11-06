@@ -28,6 +28,7 @@ export default {
           { label: 'OID di policy', text: 'OID di policy del certificato aggiuntivi (ad esempio le policy ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd e QCP-w), aggiunti dopo la policy della CA stessa' },
           { label: 'Estensioni personalizzate', text: 'Estensioni che UCM non modella, ognuna con un OID, un indicatore di criticità e il valore DER in esadecimale, aggiunte così come sono a ogni certificato emesso dal modello (modulo di emissione, firma CSR, ACME, SCEP, WSTEP, approvazioni; i rinnovi le mantengono). Il modulo di emissione può aggiungerne altre o sostituire quella con lo stesso OID. Le estensioni che UCM imposta da sé sono rifiutate: usa le loro impostazioni. Un client che non riconosce un\'estensione critica rifiuta il certificato' },
           { label: 'Tipo di chiave', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 o EC-P521, con digest SHA-256, SHA-384 o SHA-512, oppure ML-DSA-44, ML-DSA-65 o ML-DSA-87. Il digest è l\'hash di firma della CA emittente, non quello della chiave foglia: si applica ancora a una foglia ML-DSA sotto una CA RSA o EC, mentre una CA ML-DSA lo ignora' },
+          { label: 'Preferenza del digest (v2.251)', text: 'Ogni percorso che emette dal modello (modulo di emissione, Sign CSR, ACME, EST, SCEP, WSTEP, firmatario TSA) firma con il suo digest, portato a quello corrispondente alla chiave della CA: SHA-384 per P-384, SHA-512 per P-521. Quando una policy lo vieta, firma invece il digest più forte consentito più vicino, e il risultato indica «Signature digest X replaced by Y by policy»' },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 e EC-BP512 (RFC 5639, elencati sotto Brainpool negli elenchi dei tipi di chiave, nascosti in modalità FIPS). OpenSSL e Windows leggono le loro catene e firme, ma Chrome, Firefox, Go, rustls, GnuTLS e Java senza Bouncy Castle li rifiutano per TLS, e Windows Schannel non li abilita per impostazione predefinita. Su un HSM, solo i provider PKCS#11 li gestiscono' },
         ]
       },
@@ -105,6 +106,17 @@ Un modello può **bloccare** i campi organizzativi del soggetto: **C, ST, L, O, 
 - I modelli con campi bloccati mostrano un badge **Pinned** e i valori bloccati appaiono nel pannello di dettaglio del modello
 
 Usalo per garantire un'identità organizzativa uniforme (es. \`O\` e \`C\` fissi) su un intero parco in autoenrollment, indipendentemente da ciò che ogni client Windows invia.
+
+## Estensioni personalizzate
+
+Un modello può aggiungere estensioni per cui UCM non ha un'impostazione. Ognuna è un **OID**, un flag **Critical** e il **valore**: la codifica DER del valore dell'estensione, in esadecimale. UCM copia i byte così come sono e non li interpreta mai, quindi verifica prima la codifica con i tuoi strumenti.
+
+- Ogni certificato emesso dal modello le porta: modulo di emissione, Sign CSR, profili ACME associati al modello, profili SCEP, WSTEP e approvazioni. I rinnovi le mantengono
+- Il modulo di emissione può aggiungerne altre per un singolo certificato; una voce con l'OID di una del modello la sostituisce
+- Le estensioni che UCM imposta da sé (key usage, EKU, nomi, identificatori di chiave, puntatori CRL e OCSP, policy, name constraints, qcStatements...) vengono rifiutate: usa le loro impostazioni
+- Un client che non riconosce un'estensione **critical** deve rifiutare il certificato (RFC 5280, sezione 4.2). Lasciala non critica a meno che ogni parte che si affida al certificato non la comprenda
+
+I pannelli di dettaglio di certificati e CA elencano tali estensioni sotto **Altre estensioni**, con OID, nome se noto, criticità e valore.
 
 ## Duplicazione dei modelli
 

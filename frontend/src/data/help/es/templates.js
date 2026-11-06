@@ -28,6 +28,7 @@ export default {
           { label: 'OID de política', text: 'OID de política de certificado adicionales (por ejemplo las políticas ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd y QCP-w), añadidos después de la política propia de la CA' },
           { label: 'Extensiones personalizadas', text: 'Extensiones que UCM no modela, cada una con un OID, un indicador de criticidad y el valor DER en hexadecimal, añadidas tal cual a cada certificado emitido desde la plantilla (formulario de emisión, firma de CSR, ACME, SCEP, WSTEP, aprobaciones; las renovaciones las conservan). El formulario de emisión puede añadir más o sustituir la del mismo OID. Las extensiones que UCM establece por sí mismo se rechazan: use sus propios ajustes. Un cliente que no reconoce una extensión crítica rechaza el certificado' },
           { label: 'Tipo de clave', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 o EC-P521, con un resumen SHA-256, SHA-384 o SHA-512, o ML-DSA-44, ML-DSA-65 o ML-DSA-87. El resumen es el hash de firma de la CA emisora, no el de la clave final: sigue aplicándose a una clave final ML-DSA bajo una CA RSA o EC, y una CA ML-DSA lo ignora' },
+          { label: 'Preferencia de resumen (v2.251)', text: 'Toda vía que emite desde la plantilla (formulario de emisión, Sign CSR, ACME, EST, SCEP, WSTEP, firmante TSA) firma con su resumen, elevado al que corresponde a la clave de la CA: SHA-384 para P-384, SHA-512 para P-521. Cuando una política lo prohíbe, firma en su lugar el resumen más fuerte más cercano permitido, y el resultado indica «Signature digest X replaced by Y by policy»' },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 y EC-BP512 (RFC 5639, listadas en Brainpool en las listas de tipos de clave, ocultas en modo FIPS). OpenSSL y Windows leen sus cadenas y firmas, pero Chrome, Firefox, Go, rustls, GnuTLS y Java sin Bouncy Castle las rechazan para TLS, y Windows Schannel no las habilita de forma predeterminada. En un HSM, solo los proveedores PKCS#11 las admiten' },
         ]
       },
@@ -105,6 +106,17 @@ Una plantilla puede **fijar** los campos organizativos del sujeto: **C, ST, L, O
 - Las plantillas con campos fijados muestran una insignia **Pinned**, y los valores fijados aparecen en el panel de detalles de la plantilla
 
 Utilícelo para garantizar una identidad organizativa uniforme (por ejemplo, \`O\` y \`C\` fijos) en toda una flota autoinscrita, independientemente de lo que envíe cada cliente de Windows.
+
+## Extensiones personalizadas
+
+Una plantilla puede añadir extensiones para las que UCM no tiene ningún ajuste. Cada una es un **OID**, un indicador **Critical** y el **valor**: la codificación DER del valor de la extensión, en hexadecimal. UCM copia los bytes tal cual y nunca los analiza, así que compruebe la codificación con sus propias herramientas antes.
+
+- Todo certificado emitido desde la plantilla las lleva: formulario de emisión, Sign CSR, perfiles ACME vinculados a la plantilla, perfiles SCEP, WSTEP y aprobaciones. Las renovaciones las conservan
+- El formulario de emisión puede añadir más para un solo certificado; una entrada con el OID de una de la plantilla la reemplaza
+- Se rechazan las extensiones que UCM define por sí mismo (uso de clave, EKU, nombres, identificadores de clave, punteros CRL y OCSP, políticas, restricciones de nombre, qcStatements...): use sus propios ajustes
+- Un cliente que no reconoce una extensión **crítica** debe rechazar el certificado (RFC 5280, sección 4.2). Déjela no crítica salvo que todas las partes confiantes la entiendan
+
+Los paneles de detalle de certificados y CA enumeran esas extensiones en **Other extensions**, con su OID, nombre si se conoce, criticidad y valor.
 
 ## Duplicar plantillas
 

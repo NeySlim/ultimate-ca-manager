@@ -38,6 +38,9 @@ export default {
           { label: 'Exportar', text: 'Descargar en formato PEM, DER o PKCS#12' },
           { label: 'Modo compatibilidad PKCS#12 (v2.222)', text: 'Los diálogos de exportación ofrecen un perfil 3DES/SHA-1 para los importadores que rechazan el archivo AES-256 por defecto como contraseña incorrecta: Android 15 y anteriores, macOS 14 y anteriores, Windows Server 2016 y anteriores, Java antiguo. Desactivado por defecto, protege menos el archivo' },
           { label: 'Comparar', text: 'Comparación lado a lado de dos certificados' },
+          { label: 'Otras extensiones (v2.251)', text: 'Los detalles del certificado y de la CA enumeran bajo Otras extensiones las que UCM no tiene sección para mostrar, con su OID, nombre si se conoce, criticidad y valor sin procesar. El formulario de emisión puede añadir extensiones personalizadas además de las de la plantilla' },
+          { label: 'Claves comprometidas (v2.251)', text: 'Una clave revocada como keyCompromise sigue conocida tras eliminar su certificado, sea cual sea la CA que lo emitió, Let\'s Encrypt incluida: se rechaza una solicitud, renovación o finalización con esa clave' },
+          { label: 'Certificados del cliente ACME (v2.251)', text: 'Un certificado obtenido por el cliente ACME también se renueva in situ, conservando su id y su refid. Las copias que renovaciones anteriores importaron como filas nuevas permanecen en el inventario hasta que se archivan o eliminan' },
         ]
       },
       {

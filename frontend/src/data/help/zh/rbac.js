@@ -20,6 +20,7 @@ export default {
           { label: '权限矩阵', text: '按类别（CA、证书、私钥等）勾选/取消权限' },
           { label: '覆盖率', text: '授予该角色的总权限百分比可视化显示' },
           { label: '用户数量', text: '查看分配到每个角色的用户数量' },
+          { label: 'SSH CA 权限 (v2.248)', text: 'read:ssh_cas、write:ssh_cas 和 delete:ssh_cas 管理 SSH CA，因此 write:ssh 不再能创建或编辑它们。持有 SSH 权限的角色、组和 API 密钥在升级时获得了对应的权限' },
         ]
       },
     ],

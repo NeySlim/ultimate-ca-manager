@@ -49,6 +49,9 @@ export default {
         items: [
           { label: 'Vertrauenswürdige CA', text: 'Die CA, deren Client-Zertifikate bei der Anmeldung akzeptiert werden, und der Standardaussteller, wenn ein Benutzer eines erzeugt. Jede CA mit nicht widerrufenem Zertifikat kann gewählt werden, auch schlüssellose oder Offline-CAs: Eine solche CA stellt nichts aus, ihre Benutzer laden daher anderswo ausgestellte Zertifikate hoch (v2.248)' },
           { label: 'Client-Zertifikat erfordern', text: 'mTLS optional für die Web-UI verpflichtend machen, das Ändern der mTLS-Einstellungen erfordert einen Dienstneustart' },
+          { label: 'Gleiche Seriennummer, andere CA (v2.251)', text: 'Eine Registrierung wird über Aussteller und Seriennummer identifiziert, sodass ein Client-Zertifikat registriert, importiert oder zugewiesen werden kann, wenn das registrierte Zertifikat einer anderen CA dieselbe Seriennummer hat' },
+          { label: 'Reverse-Proxy-Header (v2.251)', text: 'Hinter einem Proxy, der das Client-Zertifikat als Header weiterleitet, senden Sie den Aussteller-DN (X-SSL-Client-I-DN) mit der Seriennummer, als Hexadezimalwert gelesen: Ohne Aussteller oder Zertifikat lassen sich zwei Registrierungen mit gleicher Seriennummer nicht unterscheiden, und keine wird gewählt' },
+          { label: 'Erzeugte Schlüssel (v2.251)', text: 'Ein von UCM erzeugtes mTLS-Benutzerzertifikat erhält einen Schlüssel in der Stärke der ausstellenden CA, RSA oder eine NIST-Kurve, die Browser akzeptieren, auf den nächstliegenden von den Richtlinien erlaubten Typ verschoben, statt immer RSA-2048' },
         ]
       },
     ],

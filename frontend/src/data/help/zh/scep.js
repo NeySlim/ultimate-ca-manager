@@ -29,6 +29,7 @@ export default {
         items: [
           { label: 'URL 片段', text: '每个配置文件通过 /scep/<segment>/pkiclient.exe 提供, 将每个设备群或 MDM 配置指向其专属 URL' },
           { label: '证书模板', text: '绑定模板后，其密钥用法（KU/EKU）和有效期将决定通过该配置文件签发的每个证书' },
+          { label: '签名摘要 (v2.251)', text: '通过配置文件签发的证书使用其模板的摘要签名，并提升到与 CA 密钥对应的摘要，这是策略可以覆盖的偏好。没有模板时，使用 CA 密钥的摘要' },
           { label: '按配置文件的质询', text: '每个配置文件都有自己的质询密码，加密存储，过期窗口与全局质询相同' },
           { label: '默认端点', text: '不带片段的 /scep/pkiclient.exe 端点继续使用全局配置' },
           { label: 'Microsoft Intune 验证', text: '配置文件可以针对 Intune 自己的按设备 SCEP 质询进行验证，而不使用静态密码：在配置文件中从 Intune 应用注册选项卡选择一个应用注册（SCEP challenge validation 和 Application.Read.All 权限），自动批准仍为必需；升级时，每个现有配置文件会自动获得一个以其命名的应用，按租户和客户端去重' },

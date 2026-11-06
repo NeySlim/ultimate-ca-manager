@@ -28,6 +28,24 @@ export default {
           { label: 'Custom Command', text: 'Tipo de proveedor DNS que ejecuta comandos locales configurados por el administrador para crear/eliminar registros TXT, los detalles del registro se pasan mediante las variables de entorno DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Ruta absoluta al binario obligatoria, sin shell, tiempo límite configurable' },
           { label: 'Dominios', text: 'Mapea dominios a proveedores DNS para validación automática' },
           { label: 'HTTP-01', text: 'UCM sirve el archivo de desafío de sus pedidos pendientes en /.well-known/acme-challenge/ en el puerto del protocolo HTTP (8080 por defecto): redirija esa ruta desde el puerto 80 del dominio hacia UCM. Verificar comprueba primero el archivo, y los pedidos HTTP-01 se renuevan automáticamente' },
+          { label: 'Renovación in situ (v2.251)', text: 'Una renovación conserva el id y el refid del certificado, de modo que la vinculación HTTPS, las vinculaciones de despliegue y los webhooks lo siguen. Los certificados que renovaciones anteriores importaron como filas nuevas permanecen en el inventario: archívelos o elimínelos a mano' },
+          { label: 'Pedidos interrumpidos (v2.251)', text: 'Un pedido que un reinicio dejó en procesamiento vuelve a pendiente con un mensaje, listo para Verify Challenge, en unos 15 minutos. Un certificado que la CA emitió antes de un reinicio o de una importación fallida se recupera con Check Status, la finalización o la siguiente renovación' },
+          { label: 'Pedidos pendientes obsoletos (v2.251)', text: 'La tarea de renovación elimina los pedidos pendientes desde hace más de 7 días cuyo pedido en la CA ha expirado, o cuya expiración se desconoce, junto con sus registros TXT, y audita cada eliminación. Los registros TXT de un pedido cuya validación falló se eliminan cuando pasa a inválido' },
+          { label: 'Lista de pedidos (v2.251)', text: 'La pestaña de pedidos de Let\'s Encrypt carga todos los pedidos, hasta 5000, de cuatro en cuatro páginas, y reintenta una página rechazada con 429 tras su Retry-After. Si aún falta una página, se muestran los pedidos obtenidos con un aviso de que la lista es parcial' },
+          { label: 'Fallos de renovación (v2.251)', text: 'Un pedido muestra su número de renovaciones fallidas, con el último error y su fecha. Tras 5 renovaciones programadas fallidas se reintenta una vez al día, y cada fallo, también los manuales, emite el evento acme_order.renewal_failed' },
+          { label: 'Renovación automática por pedido (v2.251)', text: 'Un pedido seleccionado muestra un interruptor de Renovación automática que detiene o reanuda su renovación. Eliminar un certificado después de revocarlo desactiva la renovación de su pedido, con un mensaje' },
+          { label: 'Una renovación a la vez (v2.251)', text: 'Una renovación o finalización bloquea su pedido: una segunda iniciada mientras tanto recibe un 409 y el planificador omite el pedido' },
+          { label: 'Cuenta o proveedor ausente (v2.251)', text: 'Un pedido cuya cuenta de CA se eliminó, cuyo proveedor DNS está desactivado o que reutiliza la clave de un certificado eliminado se detiene antes de llegar a la CA con un mensaje que indica qué hacer. Se rechaza (409) eliminar o desactivar una cuenta de CA mientras pedidos emitidos se renueven a través de ella' },
+          { label: 'Claves comprometidas (v2.251)', text: 'Una clave revocada como comprometida, sea cual sea la CA que emitió su certificado, se rechaza (409) en la solicitud y antes de que una renovación abra un pedido, incluso después de eliminar ese certificado. Una renovación configurada para reutilizar esa clave genera una nueva' },
+          { label: 'Revocar al renovar (v2.251)', text: 'Con Revocar el certificado anterior tras la renovación activado (ACME local › Política de renovación), la CA recibe el motivo local cuando es keyCompromise, affiliationChanged, superseded o cessationOfOperation, y ninguno en los demás casos. La tarea de renovación reintenta una revocación fallida hasta que el certificado expira, y emite acme_order.revocation_failed' },
+          { label: 'Umbral de renovación (v2.249)', text: 'Días antes de la expiración se aplica cuando la CA no sugiere ninguna ventana de renovación (ARI). Un certificado cuya vigencia es inferior a 1,5 veces ese umbral se renueva en su último tercio' },
+          { label: 'Nombres largos (v2.249)', text: 'Un primer nombre de más de 64 caracteres va solo en el nombre alternativo del sujeto, marcado como crítico, en lugar de hacer fallar la finalización' },
+          { label: 'Dominio y comodín (v2.247)', text: 'Un pedido de un dominio y su comodín recibe un valor TXT por autorización bajo el nombre compartido, y los proveedores DNS añaden cada valor junto a los demás. DuckDNS, Hurricane Electric y FreeDNS guardan un valor por nombre, por lo que no pueden validar ambos a la vez' },
+          { label: 'Limpieza de TXT (v2.251)', text: 'La limpieza elimina solo el valor TXT de su pedido, de modo que otro pedido, o el comodín y el apex que comparten el nombre, conservan los suyos. DuckDNS, Hurricane Electric y FreeDNS guardan un valor por nombre y aun así lo borran, con una advertencia en el registro, como en cualquier limpieza que el proveedor rechaza' },
+          { label: 'Nombres únicos (v2.251)', text: 'Se rechaza (409) el nombre de un proveedor DNS o de una cuenta de CA externa ya en uso, al crear y al renombrar. La actualización renombró los duplicados anteriores como «nombre (2)», «nombre (3)», empezando por el más antiguo' },
+          { label: 'Equipo de Vercel (v2.251)', text: 'El proveedor Vercel admite un Team ID opcional para los dominios que pertenecen a un equipo' },
+          { label: 'Token de RcodeZero (v2.251)', text: 'RcodeZero necesita un token de API con acceso de lectura y escritura a la zona, no uno limitado al permiso ACME' },
+          { label: 'Checkdomain (v2.251)', text: 'Checkdomain elimina un valor reescribiendo los registros de la zona sin él, como documenta su API, tras leer todas las páginas. El SOA, el NS del apex y las copias www generadas quedan fuera de esa reescritura' },
         ]
       },
       {
@@ -55,6 +73,7 @@ export default {
           { label: 'Desafíos DNS', text: 'UCM maneja los desafíos DNS-01 en nombre de los clientes usando los proveedores DNS configurados' },
           { label: 'Purgar certificados reemplazados', text: 'Opción opcional: cuando una orden proxy finaliza, se eliminan los certificados importados previamente por órdenes proxy para exactamente el mismo conjunto de dominios. Los certificados revocados siempre se conservan; los certificados ajenos al proxy nunca se tocan. Desactivado por defecto' },
                   { label: 'Pre-checks de clientes (v2.217)', text: 'El proxy también publica los valores TXT dns-01 calculados con la clave de cuenta de cada cliente: los pre-checks de propagación de lego/Traefik/Caddy pasan sin desactivarse; un new-order reintentado devuelve el pedido aún pendiente de la cuenta' },
+                  { label: 'Compatibilidad de clientes (v2.246)', text: 'Con EAB obligatorio, una consulta onlyReturnExisting y un new-account con una clave registrada devuelven la cuenta existente (cert-manager). La URL de la cuenta responde a lecturas, actualizaciones de contacto y desactivación, se acepta la desactivación de autorizaciones (lego) y las respuestas de desafío llevan Link rel="up"' },
         ]
       },
       {
@@ -169,6 +188,10 @@ Gestiona la configuración de tu cliente ACME:
 - **Renovación automática**: Renueva automáticamente los certificados antes de su expiración
 - **Tipo de clave de certificado**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 o P-384, ML-DSA-44, ML-DSA-65 o ML-DSA-87. ML-DSA no se ofrece en modo FIPS ni en una compilación que no lo incluya. Un tipo configurado que esta instancia no puede generar hace fallar el pedido en lugar de recurrir a RSA-2048
 - **Algoritmo de clave de cuenta**: ES256, ES384 o RS256 para la firma de cuenta ACME
+- **Renovación in situ** (v2.251): una renovación conserva el id y el refid del certificado, de modo que su vinculación HTTPS, sus vinculaciones de despliegue y sus webhooks lo siguen
+- **Renovaciones fallidas** (v2.251): la lista de pedidos muestra el número de fallos y el último error; tras 5 renovaciones programadas fallidas, un pedido se reintenta una vez al día. El interruptor **Renovación automática** de un pedido seleccionado detiene o reanuda su renovación
+- **Lista de pedidos** (v2.251): se cargan todos los pedidos, de cuatro en cuatro páginas; si aún falta una página tras sus reintentos, se muestra un aviso de que la lista es parcial
+- **Claves comprometidas** (v2.251): una clave revocada como comprometida se rechaza (409) en la solicitud y antes de que cualquier renovación abra un pedido
 
 ### Servidor ACME personalizado
 Usa cualquier CA compatible con RFC 8555, no solo Let's Encrypt:
@@ -243,6 +266,8 @@ Configura proveedores de desafío DNS-01 para la validación de dominio. Los pro
 - Y más
 
 Cada proveedor requiere credenciales API específicas del servicio DNS.
+
+La limpieza elimina solo el valor TXT de su pedido, de modo que otro pedido, o el comodín y el apex que comparten el nombre, conservan los suyos; DuckDNS, Hurricane Electric y FreeDNS guardan un valor por nombre y aun así lo borran. Vercel admite un **Team ID** opcional para los dominios que pertenecen a un equipo, y RcodeZero necesita un token con acceso de lectura y escritura a la zona. Se rechaza el nombre de un proveedor ya en uso (v2.251).
 
 #### Proveedor Custom Command
 Para servicios DNS sin driver nativo, el proveedor **Custom Command** ejecuta comandos locales configurados por el administrador para crear/eliminar registros TXT. Los detalles del registro se pasan como variables de entorno:

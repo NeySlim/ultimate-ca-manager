@@ -49,6 +49,9 @@ export default {
         items: [
           { label: 'CA Confiável', text: 'A CA cujos certificados de cliente são aceitos no login e emissora padrão quando um usuário gera um. Qualquer CA cujo certificado não esteja revogado pode ser escolhida, inclusive sem chave ou offline: essa CA não emite nada, então seus usuários enviam certificados emitidos em outro lugar (v2.248)' },
           { label: 'Exigir certificado de cliente', text: 'Opcionalmente tornar o mTLS obrigatório para a interface web, alterar configurações mTLS requer reinício do serviço' },
+          { label: 'Mesmo número de série, outra CA (v2.251)', text: 'Uma inscrição é identificada pelo seu emissor e número de série, de modo que um certificado de cliente pode ser inscrito, importado ou atribuído quando o certificado inscrito de outra CA tem o mesmo número de série' },
+          { label: 'Cabeçalhos do reverse proxy (v2.251)', text: 'Atrás de um proxy que reencaminha o certificado de cliente em cabeçalhos, envie o DN do emissor (X-SSL-Client-I-DN) com o número de série, lido como hexadecimal: sem o emissor ou o certificado, duas inscrições com o mesmo número de série não se distinguem e nenhuma é escolhida' },
+          { label: 'Chaves geradas (v2.251)', text: 'Um certificado mTLS de utilizador gerado pelo UCM recebe uma chave com a força da CA emissora, RSA ou uma curva NIST que os navegadores aceitam, movida para o tipo mais próximo que as políticas permitem, em vez de sempre RSA-2048' },
         ]
       },
     ],

@@ -22,6 +22,10 @@ export default {
           { label: 'Generar clave', text: 'Crear un nuevo par de claves directamente en el HSM' },
           { label: 'Estado', text: 'Monitorear el estado de conexión del proveedor' },
           { label: 'Certificación', text: 'Declarar la certificación del HSM: Common Criteria EAL 4+, EUCC high, FIPS 140-3 nivel 3, FIPS 140-2 nivel 3 u otra. Si se deja vacía, no se declara. El perfil de cumplimiento eu-acm solo acepta Common Criteria EAL 4+, EUCC high y FIPS 140-3 nivel 3 (hasta el 31 de diciembre de 2030) para una CA respaldada por HSM' },
+          { label: 'Nombre ya en uso (v2.249)', text: 'Se rechaza (409) generar una clave con un nombre que OpenBao o Azure Key Vault ya tienen: traiga una clave existente con una sincronización de claves (POST /api/v2/hsm/providers/<id>/sync)' },
+          { label: 'Una generación a la vez (v2.249)', text: 'Las generaciones de claves se turnan en cada proveedor, y una que sigue esperando tras 60 segundos recibe un 409. Una clave cuyo registro no pudo guardarse se elimina del HSM' },
+          { label: 'PIN en las copias (v2.249)', text: 'Una copia contiene el PIN o el token del proveedor en claro dentro del archivo, protegido por su contraseña, de modo que se restaura en otra instalación. Un valor que solo abre la clave de otra instalación se descarta al restaurar, con una entrada de registro que pide introducirlo de nuevo' },
+          { label: 'SoftHSM en modo FIPS (v2.247)', text: 'El modo FIPS rechaza un nuevo proveedor SoftHSM, al no ser SoftHSM un módulo validado; UCM_FIPS_ALLOW_SOFTHSM=1 permite uno para pruebas' },
         ]
       },
       {

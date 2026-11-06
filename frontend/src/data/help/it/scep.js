@@ -29,6 +29,7 @@ export default {
         items: [
           { label: 'Segmento URL', text: 'Ogni profilo è servito su /scep/<segment>/pkiclient.exe, punta ogni flotta di dispositivi o profilo MDM al proprio URL' },
           { label: 'Modello di certificato', text: 'Quando un modello è associato, i suoi KU/EKU e la validità governano ogni certificato emesso tramite il profilo' },
+          { label: 'Digest della firma (v2.251)', text: 'I certificati emessi tramite un profilo sono firmati con il digest del suo modello, portato a quello corrispondente alla chiave della CA, come preferenza che le policy possono sovrascrivere. Senza modello si applica il digest della chiave della CA' },
           { label: 'Challenge per profilo', text: 'Ogni profilo ha la propria password di challenge, memorizzata cifrata, con la stessa finestra di scadenza della challenge globale' },
           { label: 'Endpoint predefinito', text: 'L\'endpoint /scep/pkiclient.exe senza segmento continua a servire la configurazione globale' },
           { label: 'Validazione Microsoft Intune', text: 'Un profilo può validarsi contro la challenge SCEP propria di Intune per dispositivo invece di una password statica: scegli una registrazione app dalla scheda Registrazioni dell\'app Intune (permessi SCEP challenge validation + Application.Read.All), l\'approvazione automatica resta obbligatoria; all\'aggiornamento ogni profilo esistente ottiene un\'app con il suo nome, deduplicata per tenant e client' },

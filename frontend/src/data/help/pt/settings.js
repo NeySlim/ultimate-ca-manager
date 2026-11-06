@@ -35,11 +35,14 @@ export default {
       },
       {
         title: "Vista do agendador",
-        content: "Definições › Sistema lista as tarefas em segundo plano com o seu estado e última execução.",
+        content: "Definições › Agendador lista as tarefas em segundo plano com o seu estado e última execução.",
         items: [
           { label: "Tarefas", text: "Verificações de expiração, atualização de CRL, entrega de webhooks, backups agendados, renovação automática, etc." },
           { label: "Executar agora", text: "Acionar qualquer tarefa a pedido" },
           { label: "Visibilidade", text: "Última execução, última duração e número de falhas por tarefa" },
+          { label: "Processo do agendador (v2.251)", text: "As tarefas rodam num processo próprio do agendador, iniciado com o serviço e reiniciado em poucos segundos após uma falha ou um reload, de modo que uma tarefa longa não atrasa nem pedidos nem workers. Ocupa cerca de 150 MB de memória" },
+          { label: "Estado desatualizado (v2.251)", text: "Quando o processo do agendador não reporta há algum tempo, o separador avisa que o estado mostrado pode estar desatualizado" },
+          { label: "Tarefas longas (v2.251)", text: "Executar agora espera até 30 segundos pelo resultado. Uma tarefa ainda em curso nesse momento é indicada como iniciada e ainda em execução, e o seu resultado aparece numa atualização posterior" },
         ]
       },
       {
@@ -50,6 +53,17 @@ export default {
           { label: "Retenção", text: "Manter os N backups mais recentes; os mais antigos são removidos" },
           { label: "Cifragem", text: "Os backups são cifrados com a palavra-passe de backup configurada" },
           { label: "Derivação de chave", text: "Automática (Argon2id quando disponível, PBKDF2 no modo FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Os arquivos gravados com Argon2id não podem ser restaurados numa instância em modo FIPS" },
+        ]
+      },
+      {
+        title: 'Restauração (v2.251)',
+        items: [
+          { label: 'Substituir ou mesclar', text: 'Restore from Backup substitui os dados daqui pelos do arquivo e remove o que o arquivo não contém; a entrada de auditoria lista o que foi removido. A API também aceita mode=merge, que adiciona o arquivo aos dados daqui' },
+          { label: 'Bloqueio compartilhado', text: 'Backups e restaurações compartilham um só bloqueio: uma restauração é recusada (409) enquanto um backup está em curso, e um backup manual espera por uma restauração em curso' },
+          { label: 'Limite de envio', text: 'Uma restauração aceita um arquivo de até BACKUP_MAX_UPLOAD_MB (512 MB por padrão), definido no ambiente do servidor, e a recusa indica essa configuração. Um reverse proxy à frente do UCM mantém o seu próprio limite de corpo' },
+          { label: 'O que um arquivo contém', text: 'Os arquivos incluem pedidos do cliente ACME, pedidos de aprovação e pedidos de recuperação de chaves. Restaurar um arquivo gravado antes desta versão deixa essas linhas daqui como estão' },
+          { label: 'Mesmos nomes', text: 'Um provedor DNS, conta CA ACME ou webhook cujo nome outra linha já tem aqui é restaurado como "nome (2)", e o resultado da restauração devolvido pela API o lista' },
+          { label: 'Configurações que nomeiam uma linha', text: 'As CAs emissoras de SCEP e ACME, os responders OCSP e configurações semelhantes seguem as linhas do arquivo. Num arquivo mais antigo restaurado noutra instalação, ficam vazias e devem ser escolhidas de novo' },
         ]
       },
       {
@@ -85,9 +99,11 @@ export default {
           { label: 'Backup', text: 'Backups manuais e agendados do banco de dados' },
           { label: 'Auditoria', text: 'Retenção de logs, encaminhamento syslog, verificação de integridade' },
           { label: 'Banco de Dados', text: 'Backend ativo (SQLite ou PostgreSQL), tamanho, número de tabelas, testar/alternar/migrar entre backends' },
+          { label: 'Esquema PostgreSQL (v2.251)', text: 'Uma URL PostgreSQL cujo search_path indica um esquema diferente de public é suportada: a verificação de integridade conta as tabelas desse esquema, e uma migração para ele realinha as suas sequências' },
           { label: 'HTTPS', text: 'Certificado TLS para a interface web do UCM. O certificado aplicado é lembrado e reaplicado quando é renovado (v2.217); o certificado vinculado é exibido com um botão de desvinculação para deixar de seguir as renovações (v2.218)' },
           { label: 'Atualizações', text: 'Verificar novas versões, visualizar changelog, verificação diária agendada com instalação não assistida opcional (DEB/RPM)' },
           { label: 'Webhooks', text: 'Webhooks HTTP para eventos de certificado (emissão, revogação, expiração). Autenticação de saída opcional: Bearer, Basic, API key ou cabeçalho personalizado' },
+          { label: 'Nomes de webhook únicos (v2.251)', text: 'Um nome de webhook já em uso é recusado (409), na criação e ao renomear. A atualização renomeou os duplicados anteriores para "nome (2)", "nome (3)", do mais antigo ao mais recente' },
           { label: 'Implantação', text: 'Os alvos de implantação são conexões SSH/SFTP reutilizáveis; cada implantação de certificado ou de CRL define seus próprios caminhos e seu comando de recarga opcional (somente admin, v2.215)' },
           { label: 'Active Directory', text: 'Conexão própria do UCM com AD/LDAP para consultas relacionadas a certificados (resolução de entidade de segurança Kerberos, assuntos derivados do AD)' },
           { label: 'Autoinscrição do Windows', text: 'Inscrição nativa do Windows MS-XCEP/MS-WSTEP: descoberta de diretiva, emissão de certificados e vinculação Kerberos/SPNEGO' },
@@ -138,6 +154,10 @@ export default {
           { label: 'Lista de verificação de configuração', text: 'A guia mostra uma lista de verificação em tempo real do que está configurado versus o que ainda falta, tanto para a inscrição manual quanto para a não assistida' },
           { label: 'Assuntos derivados do AD', text: 'Os modelos podem optar por derivar seu assunto/SAN do Active Directory (via conector AD) para a inscrição não assistida' },
           { label: 'Modelos ML-DSA (v2.248)', text: 'Anunciados pelo OID do seu algoritmo de chave com o Microsoft Software Key Storage Provider, ainda não testados com um cliente Windows real, e ocultos em modo FIPS. A renovação por certificado não pode usar um certificado ML-DSA (XML-DSig não tem assinatura ML-DSA): inscreva um novo' },
+          { label: 'Modelos ECDSA (v2.251)', text: 'Anunciados no esquema de diretiva 3 com a sua curva (ECDSA_P256, ECDSA_P384, ECDSA_P521) como chave de assinatura e um hash de pedido, o mais forte entre o digest do modelo e o que corresponde à curva. Os modelos RSA fora do modo FIPS permanecem no esquema 2' },
+          { label: 'Modelo e chave (v2.251)', text: 'A chave do pedido deve caber no modelo sob o qual é emitida: a mesma curva ou o mesmo conjunto ML-DSA, ou uma chave RSA pelo menos igual em tamanho, de modo que um pedido P-384 já não é emitido sob um modelo P-256 com o mesmo EKU. O envelope de pedido que o Windows assina com uma chave ECDSA é aceito' },
+          { label: 'Renovação a partir do Windows (v2.248)', text: 'certreq ... Renew autentica-se com o certificado a renovar como certificado de cliente TLS: requer mTLS ativado com a CA WSTEP, ou uma das suas ancestrais, como confiável. Uma renovação mantém o modelo e os EKUs do certificado que renova' },
+          { label: 'Kerberos no Docker (v2.251)', text: 'As imagens Docker incluem o backend Kerberos do pyspnego, de modo que a vinculação Kerberos funciona num contêiner como nas instalações DEB e RPM' },
         ]
       },
       {
@@ -148,6 +168,7 @@ export default {
           { label: 'Renovado entretanto', text: 'Um certificado que um operador renovou durante o lote não é renovado uma segunda vez; um excluído durante o lote é ignorado' },
           { label: 'Certificados de curta duração', text: 'A renovação nunca começa antes do último terço da validade de um certificado: um certificado de 27 dias é renovado quando faltam 9, e não desde a emissão' },
           { label: 'Executar agora', text: 'Executa uma passagem de renovação imediatamente e informa os certificados prestes a expirar que deixou de lado, contados por motivo: ainda não no último terço da validade, chave privada não detida pelo servidor, fonte não selecionada' },
+          { label: 'Digest de assinatura (v2.251)', text: 'Uma renovação mantém o digest do certificado original enquanto ele for pelo menos o que corresponde à chave da CA e as políticas o permitirem; caso contrário segue a regra de emissão: sob uma CA P-384 ou P-521, um original SHA-256 é renovado com SHA-384 ou SHA-512' },
         ]
       },
 
@@ -280,6 +301,12 @@ Configure backups automáticos:
 ### Restauração
 Envie um arquivo de backup para restaurar o UCM a um estado anterior.
 
+- Backups e restaurações compartilham um só bloqueio: uma restauração é recusada (409) enquanto um backup está em curso, e um backup manual espera por uma restauração em curso
+- O envio é aceito até \`BACKUP_MAX_UPLOAD_MB\` (512 MB por padrão, definido no ambiente do servidor); um reverse proxy à frente do UCM mantém o seu próprio limite de corpo
+- Os arquivos contêm pedidos do cliente ACME, pedidos de aprovação e pedidos de recuperação de chaves (v2.251)
+- Um provedor DNS, conta CA ACME ou webhook cujo nome outra linha já tem aqui é restaurado como \`nome (2)\`
+- A API também aceita \`mode=merge\`, que adiciona o arquivo aos dados daqui em vez de os substituir
+
 > ⚠ Restaurar um backup substitui TODOS os dados atuais.
 
 ## Auditoria
@@ -322,6 +349,7 @@ Copia todas as linhas do backend atual para o backend de destino. Funciona em am
 **Verificações de segurança (falha rápida, origem intacta):**
 - O destino deve estar vazio. Se \`users\`, \`cas\` ou \`certificates\` já contiverem linhas, a migração é recusada com HTTP 409 e uma dica de limpeza:
   - PostgreSQL: \`psql ... -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'\`
+  - PostgreSQL num esquema diferente de \`public\` (um \`search_path\` na URL): a dica indica esse esquema, cujas sequências a migração realinha (v2.251)
   - SQLite: exclua o arquivo \`.db\` de destino
 - Se a migração falhar no meio do caminho, a origem permanece intacta e a mensagem de erro aponta para o backup da origem. Reinicialize o destino antes de tentar novamente.
 
@@ -394,11 +422,12 @@ Abra o histórico (ícone de relógio) num webhook para ver as suas entregas.
 
 ## Vista do agendador
 
-Definições › Sistema mostra as tarefas em segundo plano.
+Definições › Agendador mostra as tarefas em segundo plano.
 
 - Lista de tarefas com **estado**, **última execução**, **duração** e **falhas**
-- **Executar agora** em qualquer tarefa
+- **Executar agora** em qualquer tarefa: espera até 30 segundos, e uma tarefa ainda em curso nesse momento é indicada como iniciada, com o resultado numa atualização posterior
 - Cobre expiração, CRL, entrega de webhooks, backups, renovação automática…
+- **Processo do agendador** (v2.251): as tarefas rodam num processo próprio, iniciado com o serviço e reiniciado em poucos segundos após uma falha ou um reload, de modo que uma tarefa longa não atrasa nem pedidos nem workers. Um aviso aparece quando ele não reporta há algum tempo
 
 ## Renovação automática
 As definições de renovação automática comandam o agendador de renovação.
@@ -449,6 +478,8 @@ A guia rastreia o que está configurado versus o que ainda falta, tanto para o c
 
 Um modelo com tipo de chave **ML-DSA** é anunciado pelo OID do seu algoritmo de chave, com o Microsoft Software Key Storage Provider e um key spec só de assinatura. Fica oculto em modo FIPS, e a inscrição a partir de um cliente Windows real ainda não foi testada.
 
+Um modelo **ECDSA** é anunciado no esquema de diretiva 3 com a sua curva (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) como chave de assinatura e um hash de pedido, o mais forte entre o digest do modelo e o que corresponde à curva; os modelos RSA fora do modo FIPS permanecem no esquema 2. A chave do pedido deve caber no modelo sob o qual é emitida: a mesma curva ou o mesmo conjunto ML-DSA, ou uma chave RSA pelo menos igual em tamanho (v2.251).
+
 ### Kerberos / SPNEGO
 
 Vincula os endpoints XCEP/WSTEP autenticados por Kerberos usados para a autoinscrição GPO silenciosa, para que máquinas e usuários sejam autenticados por seu tíquete Kerberos em vez de uma solicitação de credenciais:
@@ -456,6 +487,8 @@ Vincula os endpoints XCEP/WSTEP autenticados por Kerberos usados para a autoinsc
 - **Keytab**: Gerado com \`ktpass\` ou \`ktutil\` no controlador de domínio para o SPN acima
 
 > ⚠ Se a biblioteca SPNEGO do lado do servidor não estiver instalada, a autenticação Kerberos não funcionará mesmo se habilitada aqui -- um aviso é exibido na guia.
+
+As imagens Docker incluem esse backend desde a v2.251.
 
 ### URLs de diretiva de inscrição
 
@@ -466,6 +499,8 @@ Vincula os endpoints XCEP/WSTEP autenticados por Kerberos usados para a autoinsc
 
 Além de Usuário/Senha e Kerberos, o WSTEP suporta a **renovação por certificado de cliente**, espelhando os endpoints CES do ADCS real: a solicitação de renovação (RST) deve ser assinada em XML-DSig com a chave privada de um certificado **emitido pelo próprio UCM**. O certificado apresentado é comparado **byte a byte** com o certificado armazenado para a CA configurada, número de série ou assunto sozinhos nunca são suficientes. Isso permite que clientes Windows renovem de forma não assistida usando seu certificado atual, sem credenciais nem tíquete Kerberos.
 XML-DSig não tem método de assinatura ML-DSA, portanto um certificado **ML-DSA** não pode renovar assim: o UCM nomeia a chave na recusa, e o cliente inscreve um novo certificado.
+
+O Windows também pode renovar com \`certreq ... Renew\`, autenticado pelo certificado a renovar como certificado de cliente TLS: ative o mTLS com a CA WSTEP, ou uma das suas ancestrais, como confiável. Uma renovação mantém o modelo e os EKUs do certificado que renova (v2.248).
 
 
 ### Extensão de segurança SID (KB5014754)

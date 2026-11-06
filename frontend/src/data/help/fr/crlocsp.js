@@ -14,6 +14,7 @@ export default {
           { label: 'URL CDP', text: 'URL du point de distribution CRL à intégrer dans les certificats' },
           { label: 'Validité', text: 'Validité de la CRL par CA de 1 jour à 5 ans (90j/180j/1a/3a/5a pour les CA hors ligne qui ne peuvent pas re-signer à l\'échéance). Un avertissement s\'affiche au-delà d\'un an, les parties utilisatrices peuvent conserver des données de révocation périmées pendant toute la fenêtre' },
           { label: 'Digest de signature', text: 'SHA-256, SHA-384 ou SHA-512 pour une CA RSA ou EC. Une CA Ed25519, Ed448 ou ML-DSA signe sans digest : un digest enregistré auparavant est affiché comme ignoré, avec un bouton Effacer' },
+          { label: "Condensat par défaut (v2.251)", text: "Sans condensat défini, une AC P-384 ou P-521 signe ses CRL avec SHA-384 ou SHA-512. Les CRL déjà émises gardent le leur : la suivante applique la règle" },
           { label: 'CRL externe', text: "Les CA sans clé ou hors ligne ne peuvent pas auto-signer une CRL, téléversez depuis le panneau de détails de la CA une CRL générée auprès de la clé hors ligne ; elle est validée (signature, émetteur, monotonie) et servie à la même URL CDP (v2.215)" },
         ]
       },

@@ -20,6 +20,7 @@ export default {
           { label: '権限マトリックス', text: 'カテゴリ別に権限をチェック/アンチェック（CA、証明書、秘密鍵など）' },
           { label: 'カバレッジ', text: 'ロールに付与された合計権限の視覚的なパーセンテージ' },
           { label: 'ユーザー数', text: '各ロールに割り当てられているユーザー数を表示' },
+          { label: 'SSH CA の権限 (v2.248)', text: 'read:ssh_cas、write:ssh_cas、delete:ssh_cas が SSH CA を制御するため、write:ssh では SSH CA の作成や編集はできなくなりました。SSH 権限を持つロール、グループ、API キーには、アップグレード時に対応する権限が付与されました' },
         ]
       },
     ],

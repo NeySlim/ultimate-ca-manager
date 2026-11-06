@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'Enviar un CSR y recibir un certificado firmado' },
           { label: '/simplereenroll', text: 'Renovar un certificado existente (requiere mTLS)' },
           { label: '/csrattrs', text: 'Obtener los atributos de CSR recomendados por el servidor' },
-          { label: '/serverkeygen', text: 'El servidor genera un par de claves RSA-2048 y devuelve el certificado + clave; la clave de la solicitud, ML-DSA incluida, se ignora (RFC 7030)' },
+          { label: '/serverkeygen', text: 'El servidor genera un par de claves y devuelve el certificado + clave. La clave toma la fortaleza de la CA emisora, en la familia de la clave de la solicitud si es RSA o EC (su tamaño o curva se ignora), si no la de la CA, llevada al tipo más cercano que permitan las políticas; sobre mTLS es RSA o EC (v2.251)' },
         ]
       },
     ],
@@ -125,7 +125,7 @@ Obtener los atributos de CSR (OID) recomendados por el servidor.
 ### POST /serverkeygen
 El servidor genera un par de claves y devuelve el certificado junto con la clave privada. Útil cuando el cliente no puede generar claves localmente.
 
-Las claves generadas son RSA-2048. Una solicitud cuyo CSR lleve una clave poscuántica se rechaza con \`400\` y un mensaje: genere la clave ML-DSA en el dispositivo y use \`/simpleenroll\`.
+La clave generada toma la fortaleza de la CA emisora: la familia de la clave de la solicitud cuando es RSA o EC (su tamaño o curva se ignora), si no la de la CA, llevada al tipo más cercano que permitan las políticas. Sobre mTLS es RSA o EC, los tipos de clave que transporta su transporte de clave CMS (v2.251).
 
 ## Pestaña de Información
 

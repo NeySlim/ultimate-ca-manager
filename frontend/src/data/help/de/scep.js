@@ -29,6 +29,7 @@ export default {
         items: [
           { label: 'URL-Segment', text: 'Jedes Profil wird unter /scep/<segment>/pkiclient.exe bereitgestellt, jede Geräteflotte oder jedes MDM-Profil auf die eigene URL zeigen lassen' },
           { label: 'Zertifikatsvorlage', text: 'Ist eine Vorlage gebunden, bestimmen deren KU/EKU und Gültigkeit jedes über das Profil ausgestellte Zertifikat' },
+          { label: 'Signatur-Digest (v2.251)', text: 'Über ein Profil ausgestellte Zertifikate werden mit dem Digest ihres Templates signiert, angehoben auf den zum CA-Schlüssel passenden, als Präferenz, die die Richtlinien überschreiben können. Ohne Template gilt der Digest des CA-Schlüssels' },
           { label: 'Challenge pro Profil', text: 'Jedes Profil hat ein eigenes, verschlüsselt gespeichertes Challenge-Passwort mit demselben Ablauffenster wie die globale Challenge' },
           { label: 'Standard-Endpunkt', text: 'Der Endpunkt /scep/pkiclient.exe ohne Segment bedient weiterhin die globale Konfiguration' },
           { label: 'Microsoft Intune-Validierung', text: 'Ein Profil kann anstelle eines statischen Passworts gegen Intunes eigene gerätespezifische SCEP-Challenge validieren: im Profil eine App-Registrierung aus dem Tab Intune-App-Registrierungen auswählen (Berechtigungen SCEP challenge validation + Application.Read.All), Auto-Genehmigung bleibt Pflicht; beim Upgrade erhält jedes bestehende Profil eine nach ihm benannte App, dedupliziert nach Mandant und Client' },

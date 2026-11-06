@@ -10,6 +10,7 @@ export default {
           { label: 'Richiesta', text: 'Un utente richiede il recupero della chiave archiviata di un certificato specifico, indicando un motivo' },
           { label: 'Approvazione (quattro occhi)', text: 'Un secondo operatore autorizzato esamina e approva, il richiedente non può approvare la propria richiesta' },
           { label: 'Download', text: 'Una volta approvata, la chiave viene rilasciata come pacchetto PKCS#12 protetto da password' },
+          { label: 'Certificato sostituito (v2.251)', text: 'Approvazione e recupero rispondono 410 a meno che il certificato della richiesta sia ancora quello su cui è stata aperta. Un ripristino con sostituzione annulla le richieste aperte sui certificati che rimuove' },
         ]
       },
       {

@@ -29,6 +29,7 @@ export default {
         items: [
           { label: 'Segment d\'URL', text: 'Chaque profil est servi sur /scep/<segment>/pkiclient.exe, pointez chaque flotte d\'appareils ou profil MDM vers sa propre URL' },
           { label: 'Template de certificat', text: 'Quand un template est lié, ses usages de clé (KU/EKU) et sa validité gouvernent chaque certificat émis via le profil' },
+          { label: "Digest de signature (v2.251)", text: "Les certificats émis via un profil sont signés avec le condensat de son template, relevé à celui qui correspond à la clé de l'AC, comme préférence que les politiques peuvent écarter. Sans template, le condensat de la clé de l'AC s'applique" },
           { label: 'Challenge par profil', text: 'Chaque profil a son propre mot de passe de défi, stocké chiffré, avec la même fenêtre d\'expiration que le challenge global' },
           { label: 'Endpoint par défaut', text: 'L\'endpoint /scep/pkiclient.exe sans segment continue de servir la configuration globale' },
           { label: 'Validation Microsoft Intune', text: 'Un profil peut se valider face au challenge SCEP propre à Intune par appareil au lieu d\'un mot de passe statique : choisissez une inscription d\'application dans l\'onglet Inscriptions d\'application Intune (permissions SCEP challenge validation + Application.Read.All), l\'approbation automatique reste obligatoire ; à la mise à niveau, chaque profil existant reçoit une app nommée d\'après lui, dédupliquée par locataire et client' },

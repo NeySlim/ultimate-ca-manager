@@ -20,6 +20,7 @@ export default {
           { label: 'Matriz de Permissões', text: 'Marcar/desmarcar permissões por categoria (CAs, Certs, Chaves Privadas, etc.)' },
           { label: 'Cobertura', text: 'Percentual visual do total de permissões concedidas à função' },
           { label: 'Contagem de Usuários', text: 'Ver quantos usuários estão atribuídos a cada função' },
+          { label: 'Permissões das CAs SSH (v2.248)', text: 'read:ssh_cas, write:ssh_cas e delete:ssh_cas governam as CAs SSH, de modo que write:ssh já não as cria nem edita. As funções, grupos e chaves de API com uma permissão SSH receberam a correspondente na atualização' },
         ]
       },
     ],

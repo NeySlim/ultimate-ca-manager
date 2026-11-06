@@ -20,6 +20,7 @@ export default {
           { label: 'Matrice dei permessi', text: 'Seleziona/deseleziona i permessi per categoria (CA, Certificati, Chiavi private, ecc.)' },
           { label: 'Copertura', text: 'Percentuale visuale dei permessi totali concessi al ruolo' },
           { label: 'Conteggio utenti', text: 'Vedi quanti utenti sono assegnati a ogni ruolo' },
+          { label: 'Permessi CA SSH (v2.248)', text: 'read:ssh_cas, write:ssh_cas e delete:ssh_cas regolano le CA SSH, quindi write:ssh non le crea né le modifica più. Ruoli, gruppi e chiavi API con un permesso SSH hanno ricevuto quello corrispondente all\'aggiornamento' },
         ]
       },
     ],

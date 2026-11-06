@@ -49,6 +49,9 @@ export default {
         items: [
           { label: 'CA fidata', text: 'La CA i cui certificati client sono accettati all\'accesso, e l\'emittente predefinito quando un utente ne genera uno. Si può scegliere qualsiasi CA il cui certificato non sia revocato, anche senza chiave o offline: una CA di questo tipo non emette nulla, quindi i suoi utenti caricano certificati emessi altrove (v2.248)' },
           { label: 'Richiedi certificato client', text: 'Facoltativamente rendi l\'mTLS obbligatorio per l\'interfaccia web, la modifica delle impostazioni mTLS richiede un riavvio del servizio' },
+          { label: 'Stesso seriale, altra CA (v2.251)', text: 'Un\'iscrizione è identificata dal suo emittente e dal numero di serie, quindi un certificato client può essere iscritto, importato o assegnato anche quando il certificato iscritto di un\'altra CA ha lo stesso seriale' },
+          { label: 'Header del reverse proxy (v2.251)', text: 'Dietro un proxy che inoltra il certificato client come header, invia il DN dell\'emittente (X-SSL-Client-I-DN) con il seriale, letto come esadecimale: senza l\'emittente o il certificato, due iscrizioni con lo stesso seriale non si distinguono e nessuna viene scelta' },
+          { label: 'Chiavi generate (v2.251)', text: 'Un certificato mTLS utente generato da UCM riceve una chiave della robustezza della CA emittente, RSA o una curva NIST accettata dai browser, portata al tipo consentito dalle policy più vicino, invece di sempre RSA-2048' },
         ]
       },
     ],

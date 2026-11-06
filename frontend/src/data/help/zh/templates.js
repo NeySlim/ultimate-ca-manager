@@ -28,6 +28,7 @@ export default {
           { label: 'qcStatements', text: '可选的 ETSI EN 319 412-5 声明，添加到使用该模板签发的每个证书：QcCompliance、QcType（签名、印章或网站）、QcSSCD、QcPDS（HTTPS URL 和两位语言代码）、QcRetentionPeriod、QcLimitValue、QcCClegislation（用于依据欧盟以外法律框架认定的合格证书）以及语义标识符。不适用于 EST、WSTEP 或 mTLS 签发，CSR 中的 qcStatements 扩展会被忽略。不支持 QcIdentMethod、QcQSCDlegislation 和 PSD2 声明' },
           { label: '策略 OID', text: '额外的证书策略 OID（例如 ETSI QCP-n、QCP-l、QCP-n-qscd、QCP-l-qscd 和 QCP-w 策略），添加在 CA 自身策略之后' },
           { label: '自定义扩展', text: 'UCM 未建模的扩展, 每项包含一个 OID、关键标志和十六进制的 DER 值, 按原样添加到使用该模板签发的每个证书 (签发表单、签署 CSR、ACME、SCEP、WSTEP、审批; 续期时保留)。签发表单可以添加更多扩展, 或替换 OID 相同的扩展。UCM 自身设置的扩展会被拒绝: 请使用它们各自的设置。不识别关键扩展的客户端会拒绝该证书' },
+          { label: '摘要偏好 (v2.251)', text: '所有基于该模板签发的路径（签发表单、签署 CSR、ACME、EST、SCEP、WSTEP、TSA 签名者）都使用其摘要签名，并提升到与 CA 密钥对应的摘要：P-384 为 SHA-384，P-521 为 SHA-512。策略禁止时，改用所允许的最接近的更强摘要，结果会显示“Signature digest X replaced by Y by policy”' },
           { label: 'Brainpool', text: 'EC-BP256、EC-BP384 和 EC-BP512（RFC 5639，在密钥类型列表中归入 Brainpool 分组，FIPS 模式下隐藏）。OpenSSL 和 Windows 可以读取其证书链和签名，但 Chrome、Firefox、Go、rustls、GnuTLS 以及未使用 Bouncy Castle 的 Java 在 TLS 中会拒绝它们，Windows Schannel 默认也未启用。在 HSM 上，只有 PKCS#11 提供者可以存放这些密钥' },
         ]
       },
@@ -105,6 +106,17 @@ export default {
 - 带有固定字段的模板会显示 **Pinned** 徽章，固定的值会出现在模板详情面板中
 
 用它来保证自动注册的设备群拥有统一的组织身份（如固定的 \`O\` 和 \`C\`），无论每台 Windows 客户端提交什么。
+
+## 自定义扩展
+
+模板可以添加 UCM 没有对应设置的扩展。每个扩展包含一个 **OID**、一个**关键**标志和**值**：扩展值的 DER 编码，十六进制。UCM 按原样复制这些字节，从不解析，因此请先用自己的工具检查编码。
+
+- 使用该模板签发的每个证书都带有它们：签发表单、签署 CSR、绑定到该模板的 ACME 配置文件、SCEP 配置文件、WSTEP 和审批。续期时保留
+- 签发表单可以为单个证书添加更多扩展；OID 与模板中某个扩展相同的条目会替换它
+- UCM 自身设置的扩展（密钥用法、EKU、名称、密钥标识符、CRL 和 OCSP 指针、策略、名称约束、qcStatements……）会被拒绝：请使用它们各自的设置
+- 不识别**关键**扩展的客户端必须拒绝该证书（RFC 5280，第 4.2 节）。除非所有依赖方都理解，否则请保持非关键
+
+证书和 CA 详情面板在**其他扩展**下列出此类扩展，包括其 OID、已知时的名称、关键性和值。
 
 ## 复制模板
 

@@ -19,6 +19,7 @@ export default {
           { label: '2FA (TOTP)', text: 'Aktivieren Sie zeitbasierte Einmalpasswörter über eine Authenticator-App. Erneutes Aktivieren, solange sie aktiv ist, wird abgelehnt: deaktivieren Sie sie zuerst' },
           { label: 'Sicherheitsschlüssel', text: 'Registrieren Sie WebAuthn/FIDO2-Schlüssel (YubiKey, Fingerabdruck, usw.)' },
           { label: 'mTLS', text: 'Verwalten Sie Client-Zertifikate für die gegenseitige TLS-Authentifizierung' },
+          { label: 'Erzwungene Passwortänderung (v2.245)', text: 'Ein Konto, das zu einem neuen Passwort aufgefordert wurde, etwa der Admin beim ersten Start mit dem Standard changeme123, kann nichts anderes tun, bis es es ändert, API und WebSocket eingeschlossen; die Aufforderung bietet Abmelden statt Überspringen. Ein über INITIAL_ADMIN_PASSWORD gesetztes Passwort muss nicht geändert werden' },
         ]
       },
       {
