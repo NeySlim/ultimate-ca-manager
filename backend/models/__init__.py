@@ -40,6 +40,7 @@ from models.webhook_delivery import WebhookDelivery
 from models.key_recovery import KeyRecoveryRequest
 from models.revoked_serial import RevokedSerial
 from models.compromised_key import CompromisedKeyRecord
+from models.est_signer_cert import EstSignerCert
 from models.deploy import DeployTarget, DeployBinding, CRLDeployBinding, DeployDelivery
 
 from utils.datetime_utils import utc_now, utc_isoformat
@@ -61,6 +62,6 @@ __all__ = [
     "CATemplatePin",
     "WebhookDelivery",
     "KeyRecoveryRequest",
-    "ADConnectorConfig", "RevokedSerial", "CompromisedKeyRecord",
+    "ADConnectorConfig", "RevokedSerial", "CompromisedKeyRecord", "EstSignerCert",
     "DeployTarget", "DeployBinding", "CRLDeployBinding", "DeployDelivery",
 ]

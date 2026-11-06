@@ -2,7 +2,6 @@
 import hashlib
 
 from asn1crypto import algos, cms, core, x509 as asn1_x509
-from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, padding as asym_padding, rsa
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
@@ -40,21 +39,6 @@ def asymmetric_key_package(private_key):
     return _AsymmetricKeyPackage([core.Any.load(pkcs8)]).dump()
 
 
-def key_package_signer_problem(signer_cert):
-    """Why *signer_cert* may not sign a key package, None when it may.
-
-    A CMS signature needs digitalSignature when KeyUsage is present (RFC 5280 §4.2.1.3).
-    """
-    try:
-        usage = signer_cert.extensions.get_extension_for_class(x509.KeyUsage).value
-    except x509.ExtensionNotFound:
-        return None
-    if usage.digital_signature:
-        return None
-    return ('The issuing CA certificate does not assert digitalSignature (RFC 5280 '
-            'section 4.2.1.3) and cannot sign an encrypted key package')
-
-
 def _signature_suite(signer_key):
     """(digest name, signature AlgorithmIdentifier, sign(tbs)) for the CA key, HSM included."""
     family = key_algorithms.family_for_public_key(signer_key.public_key())
@@ -85,8 +69,10 @@ def _content_digest(name, content):
     return hashlib.new(name, content).digest()
 
 
-def signed_key_package(private_key, signer_key, signer_cert):
-    """CMS SignedData over the RFC 5958 package of *private_key*, signed by the CA key.
+def signed_key_package(private_key, signer_key, signer_cert, chain=()):
+    """CMS SignedData over the RFC 5958 package of *private_key*, signed by *signer_key*.
+
+    certificates carries *signer_cert* then *chain*, so a client builds the path to its anchor.
 
     eContentType is id-ct-KP-aKeyPackage, so signedAttrs carry content-type and
     message-digest (RFC 5652 §5.3) and the version is 3 (§5.1).
@@ -117,7 +103,8 @@ def signed_key_package(private_key, signer_key, signer_cert):
             'content_type': AKEY_PACKAGE_OID,
             'content': core.ParsableOctetString(package),
         },
-        'certificates': [signer],
+        'certificates': [signer, *(
+            asn1_x509.Certificate.load(c.public_bytes(serialization.Encoding.DER)) for c in chain)],
         'signer_infos': [signer_info],
     })
 
@@ -137,8 +124,8 @@ def _rsa_oaep_algorithm():
     return {'algorithm': 'rsaes_oaep', 'parameters': parameters}
 
 
-def build_server_generated_key_cms(private_key, signer_key, signer_cert, recipient_cert):
-    """Wrap the generated key in a CA-signed key package and RSA KeyTrans EnvelopedData.
+def build_server_generated_key_cms(private_key, signer_key, signer_cert, recipient_cert, chain=()):
+    """Wrap the generated key in a signed key package and RSA KeyTrans EnvelopedData.
 
     The content is encrypted with AES-256-CBC. The content-encryption key is
     transported with RSA-OAEP/SHA-256 under the authenticated EST client's
@@ -150,7 +137,7 @@ def build_server_generated_key_cms(private_key, signer_key, signer_cert, recipie
             'EST server-generated key transport requires an RSA client certificate'
         )
 
-    signed_data = signed_key_package(private_key, signer_key, signer_cert)
+    signed_data = signed_key_package(private_key, signer_key, signer_cert, chain)
     signed_der = signed_data.dump()
 
     content_key = csp_bytes(32)

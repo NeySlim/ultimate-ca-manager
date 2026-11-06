@@ -281,10 +281,9 @@ def _ca_certificate(ca):
     return x509.load_pem_x509_certificate(get_ca_cert_pem(ca))
 
 
-def _key_transport_refusal(recipient_cert, ca):
-    """Why the key cannot go encrypted to *recipient_cert* signed by *ca*, None when it can."""
+def _key_transport_refusal(recipient_cert):
+    """Why the key cannot go encrypted to *recipient_cert*, None when it can."""
     from cryptography.hazmat.primitives.asymmetric import rsa
-    from utils.est_cms import key_package_signer_problem
     try:
         usage = recipient_cert.extensions.get_extension_for_class(x509.KeyUsage).value
     except x509.ExtensionNotFound:
@@ -294,7 +293,7 @@ def _key_transport_refusal(recipient_cert, ca):
         return 'Requested asymmetric key does not allow key transport'
     if not isinstance(recipient_cert.public_key(), rsa.RSAPublicKey):
         return 'Unsupported client key transport'
-    return key_package_signer_problem(_ca_certificate(ca))
+    return None
 
 
 def _fallback_csrattrs_der():
@@ -835,7 +834,8 @@ def server_keygen(label=None):
     EST /serverkeygen - Server-side key generation (RFC 7030 §3.4).
     Generates key pair and certificate on server. The key is PKCS#8 in clear
     under TLS, or, when the CSR names the mTLS certificate's key, an RFC 5958
-    key package signed by the CA inside KeyTransRecipientInfo EnvelopedData.
+    key package signed by the CA's EST key generator inside KeyTransRecipientInfo
+    EnvelopedData.
     """
     # Defensive: cap body size before parsing. RSA keygen is the most
     # CPU-intensive EST endpoint, so reject obviously-bogus payloads
@@ -921,7 +921,7 @@ def server_keygen(label=None):
                     'authentication, no client certificate to encrypt to'
                 )
                 return Response('Requested asymmetric key is unavailable', status=400)
-            refusal = _key_transport_refusal(mtls_cert_obj, ca)
+            refusal = _key_transport_refusal(mtls_cert_obj)
             if refusal is not None:
                 logger.warning(f'EST serverkeygen: {refusal}')
                 return Response(refusal, status=400)
@@ -976,7 +976,7 @@ def server_keygen(label=None):
             ca_id=ca.id, request_public_key=request_key)
         key = key_algorithms.generate(alg.label)
 
-        # Built before issuance: a CA that cannot sign the package leaves no certificate behind
+        # Built before issuance: a package that cannot be signed leaves no certificate behind
         if recipient_cert is None:
             # RFC 7030 §4.4.2: without additional encryption, PrivateKeyInfo under TLS only
             key_der = key.private_bytes(
@@ -987,14 +987,16 @@ def server_keygen(label=None):
             key_content_type = 'application/pkcs8'
         else:
             try:
-                from services.hsm.ca_key_loader import get_ca_signing_key
+                from services.est_key_generator import key_generator
+                ca_cert = _ca_certificate(ca)
+                signer_key, signer_cert = key_generator(ca, ca_cert)
                 key_der = build_server_generated_key_cms(
-                    key, get_ca_signing_key(ca), _ca_certificate(ca), recipient_cert
+                    key, signer_key, signer_cert, recipient_cert, chain=(ca_cert,)
                 )
             except Exception as e:
-                logger.error(f"EST serverkeygen: the CA could not sign the key package: {e}")
+                logger.error(f"EST serverkeygen: the key package could not be signed: {e}")
                 return Response(
-                    'Server key generation failed: the CA could not sign the key package',
+                    'Server key generation failed: the key package could not be signed',
                     status=500,
                 )
             key_content_type = (

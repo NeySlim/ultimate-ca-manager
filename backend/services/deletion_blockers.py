@@ -251,7 +251,9 @@ def purge_ca_dependents(ca) -> str:
 
     from models.ca_cross_certificate import CACrossCertificate
 
+    from models.est_signer_cert import EstSignerCert
     CACrossCertificate.query.filter_by(ca_id=ca.id).delete()
+    EstSignerCert.query.filter_by(ca_id=ca.id).delete()
     crl_count = CRLMetadata.query.filter_by(ca_id=ca.id).delete()
     ocsp_count = OCSPResponse.query.filter_by(ca_id=ca.id).delete()
     rs_count = RevokedSerial.query.filter_by(caref=ca.refid).delete()

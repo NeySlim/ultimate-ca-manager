@@ -29,9 +29,26 @@ _KEYS = ('est_enabled', 'est_ca_refid', 'est_username', 'est_password', 'est_val
 needs_openssl = pytest.mark.skipif(not OPENSSL, reason='needs the openssl command')
 
 
-def expected_key_package_signer(ca_cert):
-    """The certificate that must sign an encrypted serverkeygen package of *ca_cert*."""
-    return ca_cert
+def expected_key_package_signer(app, ca_cert):
+    """The certificate that must sign an encrypted serverkeygen package under *ca_cert*: the
+    CA's EST key generator, issued by it with digitalSignature only."""
+    from models.est_signer_cert import EstSignerCert
+    with app.app_context():
+        rows = [x509.load_pem_x509_certificate(r.crt.encode()) for r in EstSignerCert.query.all()]
+    (delegate,) = [c for c in rows if c.issuer == ca_cert.subject and _issued_by(c, ca_cert)]
+    usage = delegate.extensions.get_extension_for_class(x509.KeyUsage)
+    assert usage.critical and usage.value.digital_signature
+    assert not (usage.value.key_cert_sign or usage.value.crl_sign or usage.value.key_encipherment)
+    assert delegate.extensions.get_extension_for_class(x509.BasicConstraints).value.ca is False
+    return delegate
+
+
+def _issued_by(cert, issuer):
+    try:
+        cert.verify_directly_issued_by(issuer)
+        return True
+    except Exception:
+        return False
 
 
 def openssl_verify_signed_by(signed_p7, anchor_pem, expected_signer, workdir):
@@ -167,10 +184,11 @@ class TestClearPkcs8:
 
 class TestKeyPackage:
 
-    def test_signed_data_carries_an_asymmetric_key_package_signed_by_the_issuing_ca(
+    def test_signed_data_carries_an_asymmetric_key_package_signed_by_the_key_generator(
             self, client, est_ca):
         ca_cert, _, client_key, parts = _encrypted_keygen(client, est_ca, 'package.keygen.test')
         signed_der = _decrypt_signed_data(parts[1], client_key)
+        delegate = expected_key_package_signer(client.application, ca_cert)
 
         # Decoded by pyasn1 with the RFC 5652 and RFC 5958 modules, not by the encoder's library
         signed, rest = der_decoder.decode(signed_der, asn1Spec=rfc5652.SignedData())
@@ -187,7 +205,12 @@ class TestKeyPackage:
 
         (signer,) = signed['signerInfos']
         sid = signer['sid']['issuerAndSerialNumber']
-        assert int(sid['serialNumber']) == ca_cert.serial_number
+        assert int(sid['serialNumber']) == delegate.serial_number
+        # The delegate and the CA for the path to the /cacerts anchor (a SET OF: no order)
+        from pyasn1.codec.der import encoder as der_encoder
+        carried = {x509.load_der_x509_certificate(der_encoder.encode(c['certificate']))
+                   for c in signed['certificates']}
+        assert carried == {delegate, ca_cert}
         attrs = {str(a['attrType']): a['attrValues'] for a in signer['signedAttrs']}
         assert str(der_decoder.decode(bytes(attrs[str(rfc5652.id_contentType)][0]))[0]) == AKEY_PACKAGE
         digest = bytes(der_decoder.decode(bytes(attrs[str(rfc5652.id_messageDigest)][0]))[0])
@@ -199,8 +222,8 @@ class TestKeyPackage:
         for a in signer['signedAttrs']:
             attrs_set.append(a)
         to_be_signed = der_encoder.encode(attrs_set)
-        ca_cert.public_key().verify(bytes(signer['signature']), to_be_signed,
-                                    asym_padding.PKCS1v15(), hashes.SHA256())
+        delegate.public_key().verify(bytes(signer['signature']), to_be_signed,
+                                     asym_padding.PKCS1v15(), hashes.SHA256())
         with pytest.raises(Exception):
             key.public_key().verify(bytes(signer['signature']), to_be_signed,
                                     asym_padding.PKCS1v15(), hashes.SHA256())
@@ -229,7 +252,8 @@ class TestKeyPackage:
         (tmp_path / 'signed.p7').write_bytes(
             cms.ContentInfo({'content_type': 'signed_data', 'content': signed}).dump())
         package_der = openssl_verify_signed_by(tmp_path / 'signed.p7', tmp_path / 'anchor.pem',
-                                               expected_key_package_signer(ca_cert), tmp_path)
+                                               expected_key_package_signer(client.application, ca_cert),
+                                               tmp_path)
         printed = subprocess.run(
             [OPENSSL, 'cms', '-cmsout', '-print', '-inform', 'DER', '-in', str(tmp_path / 'signed.p7')],
             capture_output=True, text=True, check=True).stdout
@@ -254,17 +278,19 @@ class TestKeyPackage:
         with app.app_context():
             assert Certificate.query.filter(Certificate.subject_cn == cn).count() == 0
 
-    def test_a_ca_without_digital_signature_refuses_to_sign_before_issuing(
-            self, app, client, est_ca):
-        est_ca('nosign')
-        transport, _, client_pem = _enrol_transport(client, 'transport-nosign.keygen.test')
-        cn = 'refused-nosign.keygen.test'
-        csr, _ = _make_csr(common_name=cn, extra_attributes=((ASYMMETRIC_ID, _ski(transport)),))
+    def test_a_root_without_digital_signature_delivers_through_its_key_generator(
+            self, client, est_ca):
+        """The CA only issues the delegate (keyCertSign); the delegate signs the package."""
+        ca_cert = est_ca('nosign')
+        assert not ca_cert.extensions.get_extension_for_class(x509.KeyUsage).value.digital_signature
+        transport, client_key, client_pem = _enrol_transport(client, 'transport-nosign.keygen.test')
+        csr, _ = _make_csr(common_name='nosign.keygen.test',
+                           extra_attributes=((ASYMMETRIC_ID, _ski(transport)),))
         r = _post_csr(client, 'serverkeygen', csr, client_cert_pem=client_pem)
-        assert r.status_code == 400, r.data
-        assert b'digitalSignature' in r.data
-        with app.app_context():
-            assert Certificate.query.filter(Certificate.subject_cn == cn).count() == 0
+        assert r.status_code == 200, r.data
+        signed = cms.SignedData.load(_decrypt_signed_data(_multipart_parts(r)[1], client_key))
+        delegate = expected_key_package_signer(client.application, ca_cert)
+        assert signed['signer_infos'][0]['sid'].chosen['serial_number'].native == delegate.serial_number
 
 
 class TestRequestedProtection:
@@ -426,14 +452,6 @@ def test_a_provider_bound_digest_drives_the_cms_digest():
     assert info['signature_algorithm']['algorithm'].native == 'sha512_ecdsa'
     raw.public_key().verify(info['signature'].native, b'\x31' + info['signed_attrs'].dump()[1:],
                             ec.ECDSA(hashes.SHA512()))
-
-
-def test_a_signer_certificate_without_digital_signature_is_named():
-    from utils.est_cms import key_package_signer_problem
-    key = ec.generate_private_key(ec.SECP256R1())
-    assert key_package_signer_problem(_self_signed_signer(key)) is None
-    assert 'digitalSignature' in key_package_signer_problem(
-        _self_signed_signer(key, digital_signature=False))
 
 
 def test_attribute_encoding_is_a_der_set():

@@ -466,9 +466,11 @@ class TestServerKeygen:
             der_encoder.encode(package_key), password=None
         )
         assert generated_key.public_key().public_numbers() == certs[0].public_key().public_numbers()
-        # Signed by the issuing CA, never by the generated key
+        # Signed by the CA's EST key generator, never by the generated key
+        from tests.test_est_serverkeygen_cms import expected_key_package_signer
         with client.application.app_context():
             ca_cert = x509.load_pem_x509_certificate(
                 base64.b64decode(db.session.get(CA, est_config['id']).crt))
         sid = signed_data['signer_infos'][0]['sid'].chosen
-        assert sid['serial_number'].native == ca_cert.serial_number
+        assert sid['serial_number'].native == expected_key_package_signer(
+            client.application, ca_cert).serial_number

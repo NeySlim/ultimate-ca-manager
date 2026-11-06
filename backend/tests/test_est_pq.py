@@ -237,4 +237,4 @@ def test_an_mldsa_ca_signs_the_encrypted_key_package(client, est_ca, tmp_path):
     subprocess.run([OPENSSL, 'pkcs7', '-inform', 'DER', '-in', 'cacerts.p7', '-print_certs',
                     '-out', 'anchor.pem'], check=True, cwd=tmp_path)
     openssl_verify_signed_by(tmp_path / 'signed.p7', tmp_path / 'anchor.pem',
-                             expected_key_package_signer(ca_cert), tmp_path)
+                             expected_key_package_signer(client.application, ca_cert), tmp_path)
