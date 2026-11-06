@@ -201,7 +201,8 @@ SECTIONS: Dict[str, Section] = {
     ),
     'auth_certificates': Section(
         model='models.auth_certificate:AuthCertificate',
-        identity=('cert_fingerprint',),
+        # Unique since migration 130; the restorer looks for the fingerprint first
+        identity=('cert_issuer', 'cert_serial'),
         exclude={**_SURROGATE, 'last_used_at': 'usage statistic'},
         references={'user_id': 'users'},
     ),
@@ -405,6 +406,7 @@ SECTIONS: Dict[str, Section] = {
             'last_success': 'delivery statistic',
             'last_failure': 'delivery statistic',
             'failure_count': 'delivery statistic',
+            '_auth_token': "under this installation's key; the token travels in the clear as auth_token",
         },
         secrets=('secret', 'auth_token'),
         stored={'secret': 'database'},
@@ -450,7 +452,8 @@ SECTIONS: Dict[str, Section] = {
     ),
     'discovered_certificates': Section(
         model='models.discovered_certificate:DiscoveredCertificate',
-        identity=('fingerprint_sha256', 'target', 'port'),
+        # The endpoint, as the table's unique constraint has it: its certificate changes
+        identity=('target', 'port', 'sni_hostname'),
         exclude={**_SURROGATE},
         references={'scan_profile_id': 'scan_profiles',
                     'ucm_certificate_id': 'certificates'},
@@ -458,7 +461,8 @@ SECTIONS: Dict[str, Section] = {
     ),
     'scep_requests': Section(
         model='models.scep:SCEPRequest',
-        identity=('transaction_id',),
+        # Unique per CA only (RFC 8894 §3.2.1.1), as the table's constraint says
+        identity=('transaction_id', 'ca_refid'),
         exclude={**_SURROGATE},
         references={'profile_id': 'scep_profiles'},
         optional=True,

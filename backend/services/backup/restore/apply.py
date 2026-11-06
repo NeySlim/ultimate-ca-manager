@@ -16,7 +16,7 @@ import base64
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.types import (
@@ -62,7 +62,7 @@ class UnplaceableLegacyRow(RestoreValidationError):
 
 
 def apply_columns(instance, section_name: str, row: Dict[str, Any],
-                  plan: RestorePlan) -> bool:
+                  plan: RestorePlan, archived: Optional[Dict[str, Any]] = None) -> bool:
     """Put every column the archive carries for this row onto `instance`.
 
     This is the whole of "restoring a row", and it is deliberately the same
@@ -76,12 +76,17 @@ def apply_columns(instance, section_name: str, row: Dict[str, Any],
     (the PEMs and the private key). Everything else comes from here.
 
     Returns False when the row is left out (`UnplaceableLegacyRow`): a new
-    row leaves the session again, and `plan.left_out` says why.
+    row leaves the session again, and `plan.left_out` says why. `archived`
+    is the archive's row when `row` is a copy of it: the plan records the
+    row written for that one (`RestorePlan.place`).
     """
     section = SECTIONS[section_name]
     columns, attribute_of = _mapping_of(type(instance))
-    return _apply_or_leave_out(section_name, section, instance, row, columns,
-                               attribute_of, plan)
+    applied = _apply_or_leave_out(section_name, section, instance, row, columns,
+                                  attribute_of, plan)
+    if applied:
+        plan.place(section_name, row if archived is None else archived, instance)
+    return applied
 
 
 def _apply_or_leave_out(section_name, section, instance, row, columns, attribute_of, plan) -> bool:
@@ -145,6 +150,7 @@ def apply_section(section_name: str, rows: List[Dict[str, Any]],
 
         if _apply_or_leave_out(section_name, section, instance, row, columns,
                                attribute_of, plan):
+            plan.place(section_name, row, instance)
             applied += 1
 
     db.session.flush()

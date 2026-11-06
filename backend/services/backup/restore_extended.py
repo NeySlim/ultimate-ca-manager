@@ -34,7 +34,7 @@ from .errors import BackupSchemaError
 from .export_generic import REFERENCE_SUFFIX, load_model
 from .manifest import SECTIONS
 from .restore.apply import apply_columns
-from .restore.plan import RestorePlan, RestoreValidationError
+from .restore.plan import RestorePlan, RestoreValidationError, _normalise, missing_identity_value
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +181,8 @@ def _target_id(section_name: str, row: Dict[str, Any], column: str) -> Optional[
     return getattr(found, primary[0].key)
 
 
-def _existing_row(section_name: str, identity: Dict[str, Any]):
+def _existing_row(section_name: str, identity: Dict[str, Any], plan: Optional[RestorePlan] = None,
+                  archived: Optional[Dict[str, Any]] = None):
     """The row here that an archived row is, by the identity the manifest declares.
 
     Looked up on the session rather than in the plan's index: for an approval
@@ -192,7 +193,8 @@ def _existing_row(section_name: str, identity: Dict[str, Any]):
 
     A row whose identity is empty is no row in particular: it is created
     rather than matched against every other row that has none either. The
-    plan has already said so, as a warning, when it read the archive.
+    plan has already said so, as a warning, when it read the archive. Rows
+    sharing an identity are taken by rank, as `RestorePlan.rank` does.
     """
     section = SECTIONS[section_name]
     if tuple(identity) != section.identity:
@@ -200,9 +202,15 @@ def _existing_row(section_name: str, identity: Dict[str, Any]):
             f"Section '{section_name}' is identified by "
             f"{', '.join(section.identity)}, not by "
             f"{', '.join(identity)}")
-    if all(value in (None, '') for value in identity.values()):
+    if all(missing_identity_value(section_name, field, value) for field, value in identity.items()):
         return None
-    return load_model(section).query.filter_by(**identity).first()
+    model = load_model(section)
+    rows = model.query.filter_by(**identity).order_by(*sa_inspect(model).primary_key).all()
+    if plan is None or archived is None:
+        return rows[0] if rows else None
+    key = tuple(_normalise(value) for value in identity.values())
+    taken = plan.rank(section_name, key, archived, [sa_inspect(row).identity[0] for row in rows])
+    return next((row for row in rows if sa_inspect(row).identity[0] == taken), None)
 
 
 class RestoreExtendedMixin:
@@ -331,7 +339,7 @@ class RestoreExtendedMixin:
             # the source used.
             sc = _existing_row('ssh_certificates',
                                {'serial': sc_data.get('serial'),
-                                'ssh_ca_id': authority_id})
+                                'ssh_ca_id': authority_id}, plan, sc_data)
             if sc is None:
                 # refid, ssh_ca_id, cert_type, key_id, public_key,
                 # certificate, principals, serial, valid_from, valid_to,
@@ -557,7 +565,7 @@ class RestoreExtendedMixin:
 
             request = _existing_row('approval_requests',
                                     {'certificate_id': certificate_id,
-                                     'created_at': created_at})
+                                     'created_at': created_at}, plan, ar_data)
             if request is None:
                 # request_type is NOT NULL; apply_columns overwrites it and requester_id
                 request = ApprovalRequest(
@@ -566,7 +574,7 @@ class RestoreExtendedMixin:
                 db.session.add(request)
 
             if apply_columns(request, 'approval_requests',
-                             dict(ar_data, created_at=created_at), plan):
+                             dict(ar_data, created_at=created_at), plan, archived=ar_data):
                 results['approval_requests'] += 1
 
         db.session.flush()
@@ -599,7 +607,7 @@ class RestoreExtendedMixin:
             order = _existing_row('acme_client_orders',
                                   {'environment': o_data.get('environment'),
                                    'domains': o_data.get('domains'),
-                                   'created_at': created_at})
+                                   'created_at': created_at}, plan, o_data)
             if order is None:
                 # domains, challenge_type, environment, key_source and status
                 # are NOT NULL; all of them are overwritten by apply_columns.
@@ -607,7 +615,7 @@ class RestoreExtendedMixin:
                 db.session.add(order)
 
             if apply_columns(order, 'acme_client_orders',
-                             dict(o_data, created_at=created_at), plan):
+                             dict(o_data, created_at=created_at), plan, archived=o_data):
                 results['acme_client_orders'] += 1
                 written.append(order)
 
@@ -654,12 +662,12 @@ class RestoreExtendedMixin:
                     "the certificate is not on this installation")
 
             request = _existing_row('key_recovery_requests',
-                                    {'cert_refid': refid, 'requested_at': requested_at})
+                                    {'cert_refid': refid, 'requested_at': requested_at}, plan, kr_data)
             if request is None:
                 request = KeyRecoveryRequest(cert_id=row['cert_id'], reason=row.get('reason') or '',
                                              requested_by=row.get('requested_by') or '')
                 db.session.add(request)
-            if apply_columns(request, 'key_recovery_requests', row, plan):
+            if apply_columns(request, 'key_recovery_requests', row, plan, archived=kr_data):
                 results['key_recovery_requests'] += 1
 
         db.session.flush()

@@ -165,7 +165,7 @@ def test_a_row_apply_columns_leaves_out_is_not_counted(here, monkeypatch, module
     from services.backup.restore import RestorePlan
 
     monkeypatch.setattr(importlib.import_module(module), 'apply_columns',
-                        lambda instance, *args: (db.session.expunge(instance), False)[1])
+                        lambda instance, *args, **kwargs: (db.session.expunge(instance), False)[1])
     data = {section: [row]}
     results = {section: 0}
     restore = getattr(_service(), method)
