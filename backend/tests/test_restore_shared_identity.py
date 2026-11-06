@@ -145,7 +145,8 @@ def test_the_oldest_row_is_the_archives_and_the_others_are_told(app, seeded, nam
             assert not any(w.startswith(f'{name} ') for w in replace.warnings)
             doomed = rows_to_remove(name, [archived], replace)
             assert newer in doomed and oldest not in doomed
-            assert replace.warnings[-1].endswith(f'the others (id {newer}) are removed')
+            assert any(w.startswith(f'{name} ') and w.endswith(f'the others (id {newer}) are removed')
+                       for w in replace.warnings)
             with db.session.begin_nested() as savepoint:
                 replace_sections({name: [archived]}, replace, {name})
                 assert db.session.get(model, oldest) is not None
