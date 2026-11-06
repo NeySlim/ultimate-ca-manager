@@ -66,6 +66,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Restore: rows sharing an identity the database does not keep unique, such as two revocation records of one serial, were matched to the archive at random, and a replacing restore silently kept the extra ones. Archived rows now go to them by rank, oldest first, a row without a complete identity is matched to none (the dedicated restorers still match one with any part of it set), a replacement removes those the archive does not carry and lists them in the result's warnings, and client certificates, discovered certificates and SCEP requests are identified by issuer and serial, endpoint, and transaction and CA.
 - Database: a gunicorn worker dropped the inherited connections of the default database engine only. It now drops those of every engine.
 - Scheduler: under gunicorn the scheduled tasks ran in the master, so a worker forked while a task held a database connection shared it with the master. They now run in one worker, elected by a lock freed when its holder exits or dies, and another worker takes over within seconds of a reload or a crash.
+- Syslog: the TCP connection opened by the gunicorn master was inherited by its workers, so the frames of several processes could interleave on one stream. Each worker now opens its own connection, leaving the master's open.
 
 ### Upgrade notes
 

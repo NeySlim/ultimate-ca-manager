@@ -109,6 +109,8 @@ def test_post_worker_init_forgets_the_inherited_pool_first(app, monkeypatch, tmp
                         lambda a, **kw: order.append(('http', a)))
     monkeypatch.setattr('services.scheduler_service.start_scheduler',
                         lambda a, in_worker=False: order.append(('scheduler', a, in_worker)))
+    monkeypatch.setattr('services.syslog_service.syslog_forwarder.forget_inherited_socket',
+                        lambda: order.append(('syslog',)))
     module.post_worker_init(_worker())
 
     with app.app_context():
@@ -116,6 +118,7 @@ def test_post_worker_init_forgets_the_inherited_pool_first(app, monkeypatch, tmp
         assert bind in order[0][1] and db.engine in order[0][1]
     assert ('http', app) in order
     assert ('scheduler', app, True) in order
+    assert order.index(('syslog',)) < order.index(('http', app))  # before anything can log
 
 
 def test_under_gunicorn_the_master_leaves_the_loop_to_a_worker(app, monkeypatch):
@@ -239,3 +242,76 @@ def test_the_scheduled_tasks_never_run_on_the_masters_connection(tmp_path, monke
         assert _backend_pid(engine) == master  # the master's pool survived the child
     finally:
         engine.dispose()
+
+
+class _SyslogCollector:
+    """A TCP syslog server recording what each connection carried."""
+
+    def __init__(self):
+        import socket
+        import threading
+
+        self.listener = socket.create_server(('127.0.0.1', 0))
+        self.port = self.listener.getsockname()[1]
+        self.streams = []
+        self.closed = []
+        threading.Thread(target=self._accept, daemon=True).start()
+
+    def _accept(self):
+        import threading
+        while True:
+            try:
+                conn, _ = self.listener.accept()
+            except OSError:
+                return
+            index = len(self.streams)
+            self.streams.append(b'')
+            threading.Thread(target=self._read, args=(conn, index), daemon=True).start()
+
+    def _read(self, conn, index):
+        while True:
+            data = conn.recv(65536)
+            if not data:
+                self.closed.append(index)
+                return
+            self.streams[index] += data
+
+    def close(self):
+        self.listener.close()
+
+
+def _audit(action):
+    return types.SimpleNamespace(success=True, timestamp=None, action=action, username=None,
+                                 ip_address=None, resource_type='system', resource_id=None,
+                                 resource_name=None, details=action)
+
+
+@pytest.mark.parametrize('explicit', [True, False], ids=['post_worker_init', 'first_frame'])
+def test_a_forked_worker_opens_its_own_syslog_connection(explicit):
+    from services.syslog_service import SyslogForwarder
+
+    collector = _SyslogCollector()
+    forwarder = object.__new__(SyslogForwarder)
+    forwarder._initialize()
+    forwarder.configure(enabled=True, host='127.0.0.1', port=collector.port, protocol='tcp')
+    try:
+        assert forwarder.send(_audit('master-before'))
+        assert _wait_for(lambda: b'master-before' in b''.join(collector.streams), 5)
+        pid = os.fork()
+        if pid == 0:
+            try:
+                if explicit:
+                    forwarder.forget_inherited_socket()
+                forwarder.send(_audit('worker'))
+            finally:
+                os._exit(0)
+        os.waitpid(pid, 0)
+        assert forwarder.send(_audit('master-after'))
+        assert _wait_for(lambda: len(collector.streams) == 2
+                         and b'master-after' in collector.streams[0], 5)
+        master, worker = collector.streams
+        assert b'worker' in worker and b'worker' not in master
+        assert 0 not in collector.closed  # the worker sent no FIN on the master's stream
+    finally:
+        forwarder._close()
+        collector.close()

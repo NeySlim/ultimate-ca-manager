@@ -246,7 +246,7 @@ def worker_abort(worker):
 
 def post_worker_init(worker):
     """Post-worker initialization:
-    0. Drop the database connections inherited from the master
+    0. Drop the database and syslog connections inherited from the master
     1. Suppress noisy SSL/connection tracebacks from gevent
     2. Start HTTP protocol server for CDP/OCSP (if configured)
     3. Start the DNS UPDATE listener (if configured)
@@ -261,6 +261,8 @@ def post_worker_init(worker):
     from wsgi import app as flask_app
     with flask_app.app_context():
         forget_inherited_connections(db.engines.values())
+    from services.syslog_service import syslog_forwarder
+    syslog_forwarder.forget_inherited_socket()
 
     hub = gevent.get_hub()
     _original_handle_error = hub.handle_error

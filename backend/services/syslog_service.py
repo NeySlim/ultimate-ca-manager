@@ -3,6 +3,7 @@ Remote Syslog Forwarder for Audit Logs
 Forwards audit events to a remote syslog server via UDP, TCP, or TCP+TLS.
 """
 
+import os
 import re
 import socket
 import ssl
@@ -71,6 +72,7 @@ class SyslogForwarder:
         self._framing = 'line'
         self._categories = list(self.ALL_CATEGORIES)  # all enabled by default
         self._socket = None
+        self._socket_pid = None
         self._hostname = ''
         self._hostname_resolved_at = 0.0
         self._initialized = True
@@ -129,12 +131,29 @@ class SyslogForwarder:
 
     def _close(self):
         """Close existing socket."""
+        self.forget_inherited_socket()
         if self._socket:
             safe_call(self._socket.close)
             self._socket = None
 
+    def forget_inherited_socket(self):
+        """Drop a connection opened by the process this one was forked from.
+
+        Frames from both would interleave on it. Only this copy of the descriptor
+        is closed: no FIN, no TLS close_notify, the parent's stream is untouched.
+        """
+        sock = getattr(self, '_socket', None)
+        if sock is None or self._socket_pid == os.getpid():
+            return
+        self._socket = None
+        try:
+            os.close(sock.detach())
+        except OSError:
+            pass
+
     def _get_socket(self):
         """Get or create socket connection."""
+        self.forget_inherited_socket()
         if self._socket:
             return self._socket
 
@@ -154,6 +173,7 @@ class SyslogForwarder:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                 sock.settimeout(5)
                 self._socket = sock
+            self._socket_pid = os.getpid()
             return self._socket
         except Exception as e:
             logger.error(f"Syslog connection failed: {e}")
