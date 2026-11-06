@@ -22,6 +22,7 @@ from services.acme.acme_proxy_service import (
     AcmeProxyService,
     ProxyChallengeIdentifierError,
     ProxyDns01OnlyError,
+    ProxySingleTxtValueError,
     ProxyOrderNotReadyError,
     ProxyResourceNotFoundError,
 )
@@ -648,6 +649,8 @@ def new_order(slug=None):
 
     except ProxyDns01OnlyError as e:
         return proxy_error('unsupportedIdentifier', str(e), 400)
+    except ProxySingleTxtValueError as e:
+        return proxy_error('rejectedIdentifier', str(e), 400)
     except ValueError as e:
         return proxy_error("malformed", str(e))
     except ProxyEndpointNotConfiguredError as e:

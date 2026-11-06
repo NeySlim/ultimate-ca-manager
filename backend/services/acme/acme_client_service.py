@@ -42,6 +42,7 @@ from utils.ca_profile import default_digest_for_key_type
 from utils.signing_hash import HASH_BY_NAME, signing_hash_for
 from utils.san_parse import strip_wildcard
 from services.acme.dns_txt_lock import txt_record_lock
+from services.acme.single_txt_value import apex_and_wildcard_refusal, keep_for_another_order
 from services.acme.order_lease import LEASE_LOST
 from services.acme import compromised_keys
 
@@ -1121,6 +1122,13 @@ class AcmeClientService:
     # Order Management
     # =========================================================================
     
+    @staticmethod
+    def single_txt_value_refusal(domains, dns_provider_id) -> Optional[str]:
+        """Why the provider cannot validate these identifiers in one order, else None."""
+        model = db.session.get(DnsProvider, dns_provider_id)
+        provider_class = get_provider_class(model.provider_type) if model else None
+        return apex_and_wildcard_refusal(domains, provider_class) if provider_class else None
+
     def create_order(
         self,
         domains: List[str],
@@ -1158,6 +1166,10 @@ class AcmeClientService:
                 identifier['type'] == 'ip' for identifier in identifiers
             ):
                 return False, 'dns-01 cannot be used with IP identifiers', None
+            if challenge_type == 'dns-01' and dns_provider_id:
+                refusal = self.single_txt_value_refusal(normalized_domains, dns_provider_id)
+                if refusal:
+                    return False, refusal, None
 
             # Ensure account exists
             success, msg = self.ensure_account(email)
@@ -2005,6 +2017,8 @@ class AcmeClientService:
                     logger.warning("DNS cleanup skipped for %s: no TXT value recorded", challenge['dns_txt_name'])
                     continue
                 with txt_record_lock(challenge['dns_txt_name']):
+                    if keep_for_another_order(provider, challenge['dns_txt_name'], getattr(order, 'id', None)):
+                        continue
                     result = provider.delete_txt_record(
                         domain=strip_wildcard(domain),
                         record_name=challenge['dns_txt_name'],

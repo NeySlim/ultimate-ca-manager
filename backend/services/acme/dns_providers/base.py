@@ -28,6 +28,8 @@ class BaseDnsProvider(ABC):
     PROVIDER_DESCRIPTION: str = "Base DNS provider class"
     REQUIRED_CREDENTIALS: List[str] = []
     OPTIONAL_CREDENTIALS: List[str] = []
+    # One TXT value per name: a new value replaces the old, a cleanup clears the name
+    SINGLE_TXT_VALUE: bool = False
 
     # How much of a failing response body an error message may quote. The body
     # is attacker-influenced text on its way to a log line and to the browser.

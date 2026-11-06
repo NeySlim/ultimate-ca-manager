@@ -22,6 +22,7 @@ from sqlalchemy.exc import NoInspectionAvailable
 from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
 from services.acme.dns_txt_lock import txt_record_lock as _txt_record_lock
+from services.acme.single_txt_value import apex_and_wildcard_refusal, holds_one_value, keep_for_another_order
 
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding, utils as asym_utils
@@ -54,6 +55,10 @@ _CERT_FALLBACK_SCAN_LIMIT = 25
 
 class ProxyDns01OnlyError(ValueError):
     """The ACME proxy deliberately supports DNS identifiers/DNS-01 only."""
+
+
+class ProxySingleTxtValueError(ValueError):
+    """The DNS provider cannot hold the values these identifiers need under one name."""
 
 
 class ProxyResourceNotFoundError(LookupError):
@@ -802,6 +807,7 @@ class AcmeProxyService:
         """Proxy new-order with domain validation and RFC 9773 replacement."""
         from api.v2.acme_domains import find_provider_for_domain
         from models import AcmeClientOrder
+        from services.acme.dns_providers import get_provider_class
 
         if not identifiers:
             raise ValueError("identifiers must be a non-empty list")
@@ -831,6 +837,14 @@ class AcmeProxyService:
             if not provider:
                 raise Exception(f"No DNS provider configured for domain: {domain}. Configure it in ACME > Domains.")
             domain_providers[domain] = provider
+
+        # Refused before upstream opens the order: the CA would see one value and fail the other
+        for domain, info in domain_providers.items():
+            same_name = [d for d in domains if strip_wildcard(d).lower() == strip_wildcard(domain).lower()]
+            refusal = apex_and_wildcard_refusal(
+                same_name, get_provider_class(getattr(info['provider'], 'provider_type', None)))
+            if refusal:
+                raise ProxySingleTxtValueError(refusal)
 
         # Same-account dedupe (#303 minor 4): a client that retries new-order
         # for the same identifiers (Traefik does) must get its still-pending
@@ -1643,9 +1657,10 @@ class AcmeProxyService:
             # never see the value published above. The client thumbprints
             # are known: publish their values too (extra TXT records on
             # the same name are ignored by the upstream CA validator).
-            for extra_value in self._client_txt_values(
-                order, key_authz, txt_value, authz_url=authz_url
-            ):
+            # A second value would replace the one the CA validates
+            extra_values = [] if holds_one_value(provider) else self._client_txt_values(
+                order, key_authz, txt_value, authz_url=authz_url)
+            for extra_value in extra_values:
                 try:
                     provider.create_txt_record(zone_name, full_record_name, extra_value)
                     published.append(extra_value)
@@ -1709,6 +1724,8 @@ class AcmeProxyService:
             return
         try:
             with _txt_record_lock(record_name):
+                if keep_for_another_order(provider, record_name):
+                    return
                 result = provider.delete_txt_record(zone, record_name, value)
             if isinstance(result, tuple) and not result[0]:
                 logger.warning("Failed to cleanup DNS record %s (%s): %s", record_name, zone, result[1])

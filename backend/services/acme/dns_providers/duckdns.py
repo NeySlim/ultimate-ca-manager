@@ -28,6 +28,7 @@ class DuckDnsDnsProvider(BaseDnsProvider):
     PROVIDER_NAME = "DuckDNS"
     PROVIDER_DESCRIPTION = "DuckDNS (Free Dynamic DNS)"
     REQUIRED_CREDENTIALS = ["token"]
+    SINGLE_TXT_VALUE = True
     
     BASE_URL = "https://www.duckdns.org/update"
     

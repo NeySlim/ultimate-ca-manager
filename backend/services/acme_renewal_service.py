@@ -33,6 +33,7 @@ from utils.acme_debug import acme_log
 from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
 from services.acme.dns_txt_lock import txt_record_lock
+from services.acme.single_txt_value import keep_for_another_order
 from utils.db_transaction import commit_or_rollback
 
 logger = logging.getLogger(__name__)
@@ -709,6 +710,8 @@ def _renew_with_new_order(acme_client, order, account_id, old_certificate, lease
                 continue
             try:
                 with txt_record_lock(record_name):
+                    if keep_for_another_order(dns_provider, record_name, new_order.id):
+                        continue
                     result = dns_provider.delete_txt_record(
                         domain=strip_wildcard(domain),
                         record_name=record_name,

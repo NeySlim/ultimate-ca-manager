@@ -17,6 +17,7 @@ class HurricaneDnsProvider(BaseDnsProvider):
     PROVIDER_NAME = "Hurricane Electric"
     PROVIDER_DESCRIPTION = "Hurricane Electric Free DNS (he.net)"
     REQUIRED_CREDENTIALS = ["password"]
+    SINGLE_TXT_VALUE = True
     
     BASE_URL = "https://dyn.dns.he.net"
     
