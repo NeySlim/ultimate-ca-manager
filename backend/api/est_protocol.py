@@ -916,6 +916,9 @@ def server_keygen(label=None):
                 logger.warning(
                     'EST serverkeygen: AsymmetricDecryptKeyIdentifier does not '
                     'match the authenticated client certificate'
+                    if mtls_cert_obj is not None else
+                    'EST serverkeygen: AsymmetricDecryptKeyIdentifier sent with Basic '
+                    'authentication, no client certificate to encrypt to'
                 )
                 return Response('Requested asymmetric key is unavailable', status=400)
             refusal = _key_transport_refusal(mtls_cert_obj, ca)
@@ -973,6 +976,31 @@ def server_keygen(label=None):
             ca_id=ca.id, request_public_key=request_key)
         key = key_algorithms.generate(alg.label)
 
+        # Built before issuance: a CA that cannot sign the package leaves no certificate behind
+        if recipient_cert is None:
+            # RFC 7030 §4.4.2: without additional encryption, PrivateKeyInfo under TLS only
+            key_der = key.private_bytes(
+                encoding=Encoding.DER,
+                format=PrivateFormat.PKCS8,
+                encryption_algorithm=NoEncryption(),
+            )
+            key_content_type = 'application/pkcs8'
+        else:
+            try:
+                from services.hsm.ca_key_loader import get_ca_signing_key
+                key_der = build_server_generated_key_cms(
+                    key, get_ca_signing_key(ca), _ca_certificate(ca), recipient_cert
+                )
+            except Exception as e:
+                logger.error(f"EST serverkeygen: the CA could not sign the key package: {e}")
+                return Response(
+                    'Server key generation failed: the CA could not sign the key package',
+                    status=500,
+                )
+            key_content_type = (
+                'application/pkcs7-mime; smime-type=server-generated-key'
+            )
+
         # Create a new CSR with the server-generated key while retaining the
         # subject and requested extensions (including SubjectAltName).
         new_csr_builder = x509.CertificateSigningRequestBuilder().subject_name(
@@ -997,32 +1025,6 @@ def server_keygen(label=None):
         # The certificate part exactly matches /simpleenroll: one certificate.
         p7_b64 = _certs_only_base64(cert)
 
-        if recipient_cert is None:
-            # RFC 7030 §4.4.2: without additional encryption, PrivateKeyInfo under TLS only
-            key_der = key.private_bytes(
-                encoding=Encoding.DER,
-                format=PrivateFormat.PKCS8,
-                encryption_algorithm=NoEncryption(),
-            )
-            key_content_type = 'application/pkcs8'
-        else:
-            try:
-                from services.hsm.ca_key_loader import get_ca_signing_key
-                key_der = build_server_generated_key_cms(
-                    key, get_ca_signing_key(ca), _ca_certificate(ca), recipient_cert
-                )
-            except ValueError as e:
-                logger.warning(f"EST serverkeygen: unsupported key transport: {e}")
-                return Response('Unsupported client key transport', status=400)
-            except Exception as e:
-                logger.error(f"EST serverkeygen: failed to wrap private key: {e}")
-                return Response(
-                    'Server key generation failed: unable to encrypt private key',
-                    status=500,
-                )
-            key_content_type = (
-                'application/pkcs7-mime; smime-type=server-generated-key'
-            )
         key_b64 = _b64_body(key_der)
         # MIME parts are framed in CRLF (RFC 2046 4.1.1), their base64 lines too.
         p7_b64, key_b64 = (b.rstrip('\n').replace('\n', '\r\n') for b in (p7_b64, key_b64))

@@ -15,7 +15,7 @@ from pyasn1.codec.der import decoder as der_decoder
 from pyasn1_alt_modules import rfc5652, rfc5958
 
 from models import CA, Certificate, SystemConfig, db
-from tests.test_acme_pq import OPENSSL
+from tests.test_acme_pq import OPENSSL, needs_openssl_35
 from tests.test_est_rfc7030 import (
     EST_PASSWORD, EST_USER, _basic_auth, _make_csr, _multipart_parts, _post_csr, _set_config,
     _unpad_aes_cbc,
@@ -27,6 +27,24 @@ ASYMMETRIC_ID = '1.2.840.113549.1.9.16.2.54'
 SYMMETRIC_ID = '1.2.840.113549.1.9.16.2.37'
 _KEYS = ('est_enabled', 'est_ca_refid', 'est_username', 'est_password', 'est_validity_days')
 needs_openssl = pytest.mark.skipif(not OPENSSL, reason='needs the openssl command')
+
+
+def expected_key_package_signer(ca_cert):
+    """The certificate that must sign an encrypted serverkeygen package of *ca_cert*."""
+    return ca_cert
+
+
+def openssl_verify_signed_by(signed_p7, anchor_pem, expected_signer, workdir):
+    """`openssl cms -verify` against *anchor_pem*, pinned to *expected_signer*; the eContent."""
+    verify = subprocess.run(
+        [OPENSSL, 'cms', '-verify', '-inform', 'DER', '-in', str(signed_p7),
+         '-CAfile', str(anchor_pem), '-purpose', 'any', '-binary',
+         '-signer', str(workdir / 'signer.pem'), '-out', str(workdir / 'package.der')],
+        capture_output=True, text=True)
+    assert verify.returncode == 0, verify.stderr
+    signers = x509.load_pem_x509_certificates((workdir / 'signer.pem').read_bytes())
+    assert signers == [expected_signer], [c.subject.rfc4514_string() for c in signers]
+    return (workdir / 'package.der').read_bytes()
 
 
 @pytest.fixture(scope='module')
@@ -190,7 +208,8 @@ class TestKeyPackage:
     @needs_openssl
     def test_openssl_decrypts_and_verifies_against_the_cacerts_anchor(
             self, client, est_ca, tmp_path):
-        _, transport, client_key, parts = _encrypted_keygen(client, est_ca, 'openssl.keygen.test')
+        ca_cert, transport, client_key, parts = _encrypted_keygen(client, est_ca,
+                                                                  'openssl.keygen.test')
         cacerts = client.get('/.well-known/est/cacerts')
         assert cacerts.status_code == 200
         (tmp_path / 'cacerts.p7').write_bytes(base64.b64decode(cacerts.data))
@@ -209,18 +228,31 @@ class TestKeyPackage:
         signed = cms.SignedData.load((tmp_path / 'signed.der').read_bytes())
         (tmp_path / 'signed.p7').write_bytes(
             cms.ContentInfo({'content_type': 'signed_data', 'content': signed}).dump())
-        verify = subprocess.run(
-            [OPENSSL, 'cms', '-verify', '-inform', 'DER', '-in', str(tmp_path / 'signed.p7'),
-             '-CAfile', str(tmp_path / 'anchor.pem'), '-purpose', 'any', '-binary',
-             '-out', str(tmp_path / 'package.der')], capture_output=True, text=True)
-        assert verify.returncode == 0, verify.stderr
+        package_der = openssl_verify_signed_by(tmp_path / 'signed.p7', tmp_path / 'anchor.pem',
+                                               expected_key_package_signer(ca_cert), tmp_path)
         printed = subprocess.run(
             [OPENSSL, 'cms', '-cmsout', '-print', '-inform', 'DER', '-in', str(tmp_path / 'signed.p7')],
             capture_output=True, text=True, check=True).stdout
         assert '2.16.840.1.101.2.1.2.78.5' in printed or 'id-ct-KP-aKeyPackage' in printed
-        package, _ = der_decoder.decode((tmp_path / 'package.der').read_bytes(),
-                                        asn1Spec=rfc5958.AsymmetricKeyPackage())
+        package, _ = der_decoder.decode(package_der, asn1Spec=rfc5958.AsymmetricKeyPackage())
         assert len(package) == 1
+
+    def test_a_signer_failure_answers_5xx_before_any_certificate_is_issued(
+            self, app, client, est_ca, monkeypatch):
+        import utils.est_cms as est_cms
+        est_ca('signing')
+        transport, _, client_pem = _enrol_transport(client, 'transport-hsmfail.keygen.test')
+
+        def failing_suite(_key):
+            raise ValueError('The HSM returned a signature that does not verify')
+        monkeypatch.setattr(est_cms, '_signature_suite', failing_suite)
+        cn = 'hsmfail.keygen.test'
+        csr, _ = _make_csr(common_name=cn, extra_attributes=((ASYMMETRIC_ID, _ski(transport)),))
+        r = _post_csr(client, 'serverkeygen', csr, client_cert_pem=client_pem)
+        assert r.status_code >= 500, (r.status_code, r.data)
+        assert b'client' not in r.data.lower()
+        with app.app_context():
+            assert Certificate.query.filter(Certificate.subject_cn == cn).count() == 0
 
     def test_a_ca_without_digital_signature_refuses_to_sign_before_issuing(
             self, app, client, est_ca):
@@ -238,12 +270,15 @@ class TestKeyPackage:
 class TestRequestedProtection:
     """§4.4.1.1 and §4.4.1.2: a requested key the server lacks terminates the request."""
 
-    def test_basic_with_an_asymmetric_identifier_is_refused(self, client, est_ca):
+    def test_basic_with_an_asymmetric_identifier_is_refused(self, client, est_ca, caplog):
         est_ca('signing')
         csr, _ = _make_csr(common_name='basic-asym.keygen.test',
                            extra_attributes=((ASYMMETRIC_ID, b'\x01' * 20),))
-        r = _post_csr(client, 'serverkeygen', csr, headers=_basic_auth())
+        with caplog.at_level('WARNING', logger='api.est_protocol'):
+            r = _post_csr(client, 'serverkeygen', csr, headers=_basic_auth())
         assert r.status_code == 400, r.data
+        logged = ' '.join(rec.getMessage() for rec in caplog.records if rec.name == 'api.est_protocol')
+        assert 'Basic' in logged and 'authenticated client certificate' not in logged
 
     def test_basic_with_a_symmetric_identifier_is_refused(self, client, est_ca):
         est_ca('signing')
@@ -305,12 +340,8 @@ def _verify_with_openssl(signed, signer_cert, tmp_path):
     (tmp_path / 'signed.p7').write_bytes(
         cms.ContentInfo({'content_type': 'signed_data', 'content': signed}).dump())
     (tmp_path / 'anchor.pem').write_bytes(signer_cert.public_bytes(serialization.Encoding.PEM))
-    verify = subprocess.run(
-        [OPENSSL, 'cms', '-verify', '-inform', 'DER', '-in', str(tmp_path / 'signed.p7'),
-         '-CAfile', str(tmp_path / 'anchor.pem'), '-purpose', 'any', '-binary',
-         '-out', str(tmp_path / 'package.der')], capture_output=True, text=True)
-    assert verify.returncode == 0, verify.stderr
-    return (tmp_path / 'package.der').read_bytes()
+    return openssl_verify_signed_by(tmp_path / 'signed.p7', tmp_path / 'anchor.pem',
+                                    signer_cert, tmp_path)
 
 
 def _verify_ed448(signed, signer_cert):
@@ -332,7 +363,9 @@ def _verify_ed448(signed, signer_cert):
 
 
 @needs_openssl
-@pytest.mark.parametrize('which', sorted(_signer_keys()))
+@pytest.mark.parametrize('which', [
+    pytest.param(name, marks=needs_openssl_35) if name.startswith('ml-dsa') else name
+    for name in sorted(_signer_keys())])
 def test_every_ca_key_family_signs_a_package_an_independent_verifier_accepts(which, tmp_path):
     from utils.est_cms import signed_key_package
     signer_key = _signer_keys()[which]()

@@ -214,7 +214,8 @@ def test_mtls_serverkeygen_under_an_mldsa_ca_follows_the_ca_like_basic(client, e
 def test_an_mldsa_ca_signs_the_encrypted_key_package(client, est_ca, tmp_path):
     from asn1crypto import cms
     from tests.test_est_rfc7030 import _multipart_parts, _post_csr
-    est_ca('mldsa')
+    from tests.test_est_serverkeygen_cms import expected_key_package_signer, openssl_verify_signed_by
+    ca_cert = est_ca('mldsa')
     transport, client_key = _mtls_transport(client)
     ski = x509.SubjectKeyIdentifier.from_public_key(transport.public_key()).digest
     csr = _ed25519_csr('mtls-cms.pq.example.test', ((('1.2.840.113549.1.9.16.2.54', ski)),))
@@ -235,7 +236,5 @@ def test_an_mldsa_ca_signs_the_encrypted_key_package(client, est_ca, tmp_path):
     (tmp_path / 'cacerts.p7').write_bytes(base64.b64decode(cacerts.data))
     subprocess.run([OPENSSL, 'pkcs7', '-inform', 'DER', '-in', 'cacerts.p7', '-print_certs',
                     '-out', 'anchor.pem'], check=True, cwd=tmp_path)
-    verify = subprocess.run([OPENSSL, 'cms', '-verify', '-inform', 'DER', '-in', 'signed.p7',
-                             '-CAfile', 'anchor.pem', '-purpose', 'any', '-binary', '-out', 'pkg.der'],
-                            capture_output=True, text=True, cwd=tmp_path)
-    assert verify.returncode == 0, verify.stderr
+    openssl_verify_signed_by(tmp_path / 'signed.p7', tmp_path / 'anchor.pem',
+                             expected_key_package_signer(ca_cert), tmp_path)

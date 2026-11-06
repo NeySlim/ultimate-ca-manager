@@ -104,7 +104,7 @@ def generated_key_algorithm(issuer_public_key, policies, *, ca_id=None, request_
     """Registry algorithm of a key UCM generates for a requester (EST serverkeygen, mTLS),
     at the issuer's strength: the family of *request_public_key* when RSA or EC (a hint only,
     RFC 7030 §4.4.1 ignores its values), else the issuer's; the closest the policies allow.
-    *classical_only* (browsers, CMS key transport) keeps RSA and NIST EC.
+    *classical_only* (browsers) keeps RSA and NIST EC.
     PolicyViolation when the policies allow none UCM can generate."""
     from services.policy_service import PolicyEvaluationService, PolicyViolation
 
