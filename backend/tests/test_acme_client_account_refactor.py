@@ -8,7 +8,7 @@ the key/URL together via the AcmeClientAccount row, making drift impossible.
 import pytest
 from models import db, AcmeClientAccount, SystemConfig
 from services.acme.acme_client_service import AcmeClientService
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 
 def _wipe_acme_client_state():

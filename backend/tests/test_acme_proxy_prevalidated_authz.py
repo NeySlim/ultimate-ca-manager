@@ -7,7 +7,7 @@ import json
 import pytest
 
 from models import db, AcmeClientOrder
-from tests.acme_rows import ensure_acme_account
+from tests.seeded_rows import ensure_acme_account
 
 
 class _Resp:

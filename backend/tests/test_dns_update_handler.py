@@ -21,7 +21,7 @@ import struct
 import threading
 from datetime import datetime, timedelta, timezone
 from unittest import mock
-from tests.acme_rows import delete_client_accounts, ensure_acme_account
+from tests.seeded_rows import delete_client_accounts, ensure_acme_account
 
 import dns.edns
 import dns.flags

@@ -11,7 +11,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 import dns.name
 import pytest

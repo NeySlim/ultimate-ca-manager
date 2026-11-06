@@ -11,7 +11,7 @@ import base64
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 

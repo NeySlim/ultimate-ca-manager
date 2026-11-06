@@ -7,7 +7,7 @@ as the ACME client). Keys live on ``acme_client_accounts.account_key``, not
 legacy ``system_config`` proxy keys.
 """
 from __future__ import annotations
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 import inspect
 

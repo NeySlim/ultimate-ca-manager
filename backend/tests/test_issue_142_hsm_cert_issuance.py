@@ -20,6 +20,8 @@ import sys
 from unittest.mock import patch
 
 import pytest
+
+from tests.seeded_rows import delete_cas
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
@@ -66,7 +68,8 @@ def hsm_provider_and_key(app, request):
         }
 
         from models import CA
-        CA.query.filter_by(hsm_key_id=hsm_key.id).delete()
+        db.session.rollback()
+        delete_cas(CA.query.filter_by(hsm_key_id=hsm_key.id))
         HsmKey.query.filter_by(id=hsm_key.id).delete()
         HsmProvider.query.filter_by(id=provider.id).delete()
         db.session.commit()

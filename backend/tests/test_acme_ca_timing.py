@@ -1,7 +1,7 @@
 """Per-CA ACME timing settings and authorization invalid handling."""
 import json
 from unittest.mock import MagicMock, patch
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 

@@ -8,7 +8,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519
 
 from models import db, SystemConfig
-from tests.acme_rows import placeholder_certificate_id
+from tests.seeded_rows import placeholder_certificate_id
 from models.acme_models import AcmeClientOrder
 from services.acme.acme_client_service import AcmeClientService
 

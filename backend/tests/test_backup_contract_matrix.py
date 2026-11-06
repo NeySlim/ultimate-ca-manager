@@ -74,7 +74,8 @@ def _value_for(column, index):
         return b'contract'
     if 'JSON' in declared:
         return {}
-    return f'{MARK}-{index}'
+    length = getattr(column.type, 'length', None)  # PostgreSQL enforces it
+    return f'{MARK}-{index}'[:length] if length else f'{MARK}-{index}'
 
 
 def _is_ours(row) -> bool:

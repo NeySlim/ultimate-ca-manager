@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import uuid
 from pathlib import Path
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 from cryptography import x509

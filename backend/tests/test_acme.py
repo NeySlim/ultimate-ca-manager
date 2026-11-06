@@ -15,7 +15,7 @@ import os
 import sys
 from tests.conftest import get_json, assert_success, assert_error
 from services.acme.jws_problems import UNKNOWN_ACCOUNT
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

@@ -11,6 +11,8 @@ import sys
 import uuid
 
 import pytest
+
+from tests.seeded_rows import delete_cas
 from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -74,7 +76,8 @@ def hsm_provider_and_key(app, request):
     with app.app_context():
         from models import db, CA
         from models.hsm import HsmProvider, HsmKey
-        CA.query.filter_by(hsm_key_id=hsm_key_id).delete()
+        db.session.rollback()
+        delete_cas(CA.query.filter_by(hsm_key_id=hsm_key_id))
         HsmKey.query.filter_by(id=hsm_key_id).delete()
         HsmProvider.query.filter_by(id=provider_id).delete()
         db.session.commit()

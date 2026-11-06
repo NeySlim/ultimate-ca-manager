@@ -10,7 +10,7 @@ import base64
 import json
 import logging
 import uuid
-from tests.acme_rows import delete_client_accounts, ensure_acme_account
+from tests.seeded_rows import delete_client_accounts, ensure_acme_account
 
 import dns.name
 import pytest

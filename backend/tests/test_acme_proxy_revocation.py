@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
 from models import AcmeClientAccount, Certificate, db
-from tests.acme_rows import ensure_acme_account
+from tests.seeded_rows import ensure_acme_account
 from models.acme_models import AcmeClientOrder
 
 

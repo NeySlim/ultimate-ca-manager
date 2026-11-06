@@ -1,6 +1,6 @@
 """SSRF hardening for ACME proxy upstream URLs from directory JSON."""
 import pytest
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 from models import db, AcmeClientAccount
 from services.acme.acme_proxy_service import AcmeProxyService

@@ -4,7 +4,7 @@ import json
 import uuid
 from datetime import timedelta
 from unittest.mock import patch
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 

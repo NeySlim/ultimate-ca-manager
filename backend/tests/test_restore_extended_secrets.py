@@ -36,7 +36,7 @@ import base64
 import json
 from collections import defaultdict
 from datetime import datetime
-from tests.acme_rows import delete_client_accounts, ensure_acme_account
+from tests.seeded_rows import delete_client_accounts, ensure_acme_account
 
 import pytest
 from sqlalchemy import inspect as sa_inspect

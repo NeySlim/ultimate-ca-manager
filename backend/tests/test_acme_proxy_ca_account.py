@@ -2,7 +2,7 @@
 import pytest
 from models import db, AcmeClientAccount, AcmeClientOrder, SystemConfig
 from services.acme.acme_proxy_account import resolve_proxy_account, PROXY_ACCOUNT_ID_KEY
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 
 @pytest.fixture(autouse=True)

@@ -3,7 +3,7 @@ import base64
 import hashlib
 import hmac
 import json
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 from cryptography.hazmat.primitives import hashes

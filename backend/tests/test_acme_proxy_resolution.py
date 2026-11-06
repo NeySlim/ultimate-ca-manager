@@ -7,7 +7,7 @@ import logging
 import threading
 import time
 from types import SimpleNamespace
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 

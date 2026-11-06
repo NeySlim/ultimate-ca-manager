@@ -6,7 +6,7 @@ resolution preference (default account wins when several share a URL).
 """
 import importlib
 import sqlite3
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 

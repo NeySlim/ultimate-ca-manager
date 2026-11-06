@@ -9,7 +9,7 @@ from sqlalchemy import text
 
 from api.v2.acme_client import orders as orders_module
 from models import Certificate, db
-from tests.acme_rows import placeholder_certificate_id
+from tests.seeded_rows import placeholder_certificate_id
 from models.acme_models import AcmeClientOrder
 from services.acme.acme_client_service import AcmeClientService
 from tests.db_write_probe import watching_writes

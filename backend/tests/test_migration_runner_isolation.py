@@ -9,6 +9,10 @@ def test_migration_runner_targets_the_test_data_dir(app):
     import migration_runner
 
     url = migration_runner._get_db_url()
+    if url.startswith('postgresql'):
+        from tests import pg_app_harness
+        assert pg_app_harness.ENABLED and f'search_path%3D{pg_app_harness.SCHEMA}%20' in url
+        return
     assert url.startswith('sqlite:///'), url
     target = Path(url[len('sqlite:///'):]).resolve()
     data_dir = Path(os.environ['DATA_DIR']).resolve()

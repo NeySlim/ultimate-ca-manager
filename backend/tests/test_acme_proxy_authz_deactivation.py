@@ -10,7 +10,7 @@ import json
 import pytest
 
 from models import db, AcmeAccount, AcmeClientOrder
-from tests.acme_rows import ensure_acme_account
+from tests.seeded_rows import ensure_acme_account
 from services.acme.acme_proxy_service import (
     AcmeProxyService,
     ProxyAuthzStateError,

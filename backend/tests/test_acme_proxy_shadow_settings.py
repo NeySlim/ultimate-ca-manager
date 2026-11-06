@@ -6,7 +6,7 @@ returned the copy when no account was linked, and wrote both, so the two
 could disagree while only the account was used.
 """
 import json
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 

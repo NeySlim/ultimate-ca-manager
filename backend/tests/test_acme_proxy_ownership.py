@@ -19,7 +19,7 @@ import json
 import pytest
 
 from models import db, SystemConfig, AcmeAccount, AcmeClientAccount, AcmeClientOrder
-from tests.acme_rows import delete_client_accounts, ensure_acme_account
+from tests.seeded_rows import delete_client_accounts, ensure_acme_account
 from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
 from services.acme.acme_proxy_service import (
     AcmeProxyService,

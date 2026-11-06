@@ -452,7 +452,9 @@ def _archive_behind_the_session(row_id):
                        .execution_options(synchronize_session=False))
 
 
-@pytest.mark.parametrize('backend', ['sqlite', pytest.param('postgresql', marks=pytest.mark.postgres)])
+@pytest.mark.parametrize('backend', [
+    pytest.param('sqlite', marks=pytest.mark.sqlite_only(reason='the SQLite half runs on the session database')),
+    pytest.param('postgresql', marks=pytest.mark.postgres)])
 def test_supersede_is_a_compare_and_set(app, backend):
     """Of two signings superseding one row, only the first stores a certificate."""
     from tests.test_crl_persistent_revocations import _PG_URL, _make_ca, _on_postgresql

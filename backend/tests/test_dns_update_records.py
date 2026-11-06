@@ -10,7 +10,7 @@ import secrets
 import uuid
 from datetime import timedelta
 from types import SimpleNamespace
-from tests.acme_rows import delete_client_accounts, ensure_acme_account, placeholder_certificate_id
+from tests.seeded_rows import delete_client_accounts, ensure_acme_account, placeholder_certificate_id
 
 import pytest
 from sqlalchemy import event

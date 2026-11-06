@@ -113,7 +113,8 @@ class TestEnforceAtStartup:
         from app import create_app
         with pytest.raises(_Stopped):
             create_app('testing')
-        assert seen['url'].startswith('sqlite:')
+        from config.settings import TestingConfig
+        assert seen['url'] == TestingConfig.SQLALCHEMY_DATABASE_URI
 
     def test_without_ucm_fips_nothing_is_checked(self, monkeypatch, providers):
         monkeypatch.delenv('UCM_FIPS', raising=False)

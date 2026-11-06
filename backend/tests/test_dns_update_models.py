@@ -2,7 +2,7 @@
 import json
 import uuid
 from datetime import timedelta
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 from sqlalchemy import text

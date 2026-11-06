@@ -16,7 +16,7 @@ from types import SimpleNamespace
 import pytest
 
 from models import Certificate, db
-from tests.acme_rows import ensure_acme_account
+from tests.seeded_rows import ensure_acme_account
 from models.acme_models import AcmeClientOrder
 
 UPSTREAM = 'https://acme-stub.example'

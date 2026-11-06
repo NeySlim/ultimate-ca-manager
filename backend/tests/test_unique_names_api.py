@@ -1,6 +1,6 @@
 """A name already taken is refused with 409, on creation and on rename (migration 124)."""
 import uuid
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 import pytest
 

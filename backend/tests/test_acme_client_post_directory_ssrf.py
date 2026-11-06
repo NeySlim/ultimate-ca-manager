@@ -1,6 +1,6 @@
 """SSRF hardening for ACME client URLs taken from directory JSON (GHSA-5p92 follow-up)."""
 import pytest
-from tests.acme_rows import delete_client_accounts
+from tests.seeded_rows import delete_client_accounts
 
 from models import db, AcmeClientAccount
 from services.acme.acme_client_service import AcmeClientService
