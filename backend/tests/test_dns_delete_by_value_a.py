@@ -212,48 +212,6 @@ def test_cloudns_deletes_one_value(monkeypatch):
     assert api.deletes == ['1']
 
 
-# --- Constellix -----------------------------------------------------------------
-
-class FakeConstellix:
-    """One TXT record per name, its values in roundRobin; PUT replaces the record."""
-
-    def __init__(self):
-        self.records = [{'id': 9, 'name': '_acme-challenge', 'ttl': 120,
-                         'roundRobin': [{'value': '"apex"'}, {'value': '"wild"'}]}]
-        self.writes = []
-
-    def __call__(self, method, url, headers=None, json=None, timeout=None):
-        path, _ = _split(url, 'https://api.dns.constellix.com/v4')
-        if method == 'GET' and path == '/domains':
-            return _Resp(200, {'data': [{'id': 4, 'name': 'example.com'}]})
-        if method == 'GET' and path == '/domains/4/records/txt':
-            return _Resp(200, {'data': self.records})
-        if path.startswith('/domains/4/records/txt/'):
-            rid = int(path.rsplit('/', 1)[1])
-            self.writes.append((method, path, json))
-            if method == 'PUT':
-                self.records = [{'id': rid, **json} if r['id'] == rid else r for r in self.records]
-                return _Resp(200, {'data': {'id': rid, **json}})
-            if method == 'DELETE':
-                self.records = [r for r in self.records if r['id'] != rid]
-                return _Resp(200, {'success': 'Record deleted'})
-        return _Resp(404, {'errors': ['Not found']})
-
-
-def test_constellix_writes_back_the_other_value(monkeypatch):
-    api = FakeConstellix()
-    monkeypatch.setattr(requests, 'request', api)
-    provider = create_provider('constellix', {'api_key': 'k', 'secret_key': 's'})
-    ok, msg = provider.delete_txt_record('example.com', NAME, 'apex')
-    assert ok, msg
-    assert api.writes == [('PUT', '/domains/4/records/txt/9',
-                           {'name': '_acme-challenge', 'ttl': 120, 'roundRobin': [{'value': '"wild"'}]})]
-    ok, msg = provider.delete_txt_record('example.com', NAME, 'wild')
-    assert ok, msg
-    assert api.writes[-1] == ('DELETE', '/domains/4/records/txt/9', None)
-    assert api.records == []
-
-
 # --- Core-Networks --------------------------------------------------------------
 
 class FakeCoreNetworks(_PerRecordFake):

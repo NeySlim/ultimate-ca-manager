@@ -64,6 +64,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - mTLS: a client certificate could not be enrolled, imported or assigned when an enrolled certificate of another CA had the same serial number, legitimate in X.509. An enrolment is now identified by its issuer and serial, at login and by a restore too (migration 130).
 - Backups: a webhook's authentication token was archived twice, in the clear and encrypted under the source's key, which no other installation can read. The archive now carries it in the clear only, and a restore ignores the encrypted copy of an older archive.
 - Restore: rows sharing an identity the database does not keep unique, such as two revocation records of one serial, were matched to the archive at random, and a replacing restore silently kept the extra ones. Archived rows now go to them by rank, oldest first, a row without a complete identity is matched to none (the dedicated restorers still match one with any part of it set), a replacement removes those the archive does not carry and lists them in the result's warnings, and client certificates, discovered certificates and SCEP requests are identified by issuer and serial, endpoint, and transaction and CA.
+- DNS providers: Constellix called v1 record paths on the v4 API and added a second record for a name already holding a TXT value. It now uses the documented v4 records endpoint, reads every page, and adds or removes a value inside the name's single record.
 
 ### Upgrade notes
 
