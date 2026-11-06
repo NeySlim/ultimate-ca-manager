@@ -18,22 +18,31 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 FAILED=0
 
-NEED=0
-while read -r _lref _lsha rref _rsha; do
-    [ "$rref" = "refs/heads/dev" ] && NEED=1
+NEED=0; PUSHED=""
+while read -r _lref lsha rref _rsha; do
+    [ "$rref" = "refs/heads/dev" ] && { NEED=1; PUSHED="$lsha"; }
 done
 if [ "$NEED" = 0 ]; then
     echo "pre-push: not a push to dev, suites skipped"
     exit 0
 fi
 
+# The suites run the working tree: it must be the commit being pushed.
+if [ "$PUSHED" != "$(git rev-parse HEAD)" ]; then
+    echo "pre-push: $PUSHED is not the HEAD of this worktree, push dev from its own worktree"
+    exit 1
+fi
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    echo "pre-push: warning, uncommitted changes are part of this verdict"
+fi
+
 # Serialise the suites across worktrees: two pushes queue instead of adding up.
-VENV_DIR=$(dirname "$(dirname "$(readlink -f "$PYTEST_PY")")")
-LOCK="${UCM_PRE_PUSH_LOCK:-$VENV_DIR/.pre-push.lock}"
+if [ -d "$ROOT/.venv" ]; then LOCK_DIR=$(readlink -f "$ROOT/.venv"); else LOCK_DIR=$(git rev-parse --git-common-dir); fi
+LOCK="${UCM_PRE_PUSH_LOCK:-$LOCK_DIR/.pre-push.lock}"
 exec 9>"$LOCK"
 if ! flock -n 9; then
-    echo "pre-push: another suite is running, waiting for the lock..."
-    flock 9
+    echo "pre-push: another suite is running, waiting for the lock (1 h max)..."
+    flock -w 3600 9 || { echo "pre-push: lock still held after 1 h, giving up"; exit 1; }
 fi
 
 echo "🧪 UCM Pre-push Suites (dev)"
@@ -41,7 +50,7 @@ echo "============================"
 
 # ── 1. Frontend ──────────────────────────────────────────────
 echo -n "  Frontend tests... "
-FRONT_OUT=$(cd "$ROOT/frontend" && npx vitest run --no-coverage 2>&1) || true
+FRONT_OUT=$(cd "$ROOT/frontend" && npx vitest run --no-coverage 2>&1 9>&-) || true
 FRONT_RESULT=$(echo "$FRONT_OUT" | grep "Tests" | tail -1)
 # Strict: "N failed | M passed" must fail, not sneak through on "passed".
 if echo "$FRONT_RESULT" | grep -q "passed" && ! echo "$FRONT_RESULT" | grep -qE "fail|error"; then
@@ -56,7 +65,7 @@ fi
 # ── 2. Backend ───────────────────────────────────────────────
 # --dist loadfile is mandatory: tests share state within a file.
 echo -n "  Backend tests (-n ${UCM_PYTEST_WORKERS:-10})... "
-BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -rfE -n "${UCM_PYTEST_WORKERS:-10}" --dist loadfile 2>&1) || true
+BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -rfE -n "${UCM_PYTEST_WORKERS:-10}" --dist loadfile 2>&1 9>&-) || true
 BACK_RESULT=$(echo "$BACK_OUT" | tail -1)
 if echo "$BACK_RESULT" | grep -q "passed" && ! echo "$BACK_RESULT" | grep -qE "[0-9]+ (failed|errors?)\b"; then
     echo -e "${GREEN}✅${NC} $BACK_RESULT"

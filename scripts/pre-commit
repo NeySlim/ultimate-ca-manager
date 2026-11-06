@@ -23,11 +23,17 @@ YELLOW='\033[1;33m'
 NC='\033[0m'
 FAILED=0
 
+STAGED_ALL=$(git diff --cached --name-only --diff-filter=ACMRD)
 STAGED=$(git diff --cached --name-only --diff-filter=ACMR)
 BACKEND_PY=$(echo "$STAGED" | grep -E '^backend/.*\.py$' || true)
 FRONTEND=$(echo "$STAGED" | grep -E '^frontend/' || true)
-VERSION_ONLY=1
-echo "$STAGED" | grep -vE '^(VERSION|CHANGELOG\.md|frontend/package\.json|frontend/package-lock\.json|charts/ucm/Chart\.yaml)$' | grep -q . && VERSION_ONLY=0
+# A version bump stages VERSION with the files that carry it; package files
+# without VERSION are a dependency bump and get the tests.
+VERSION_ONLY=0
+if echo "$STAGED_ALL" | grep -qx 'VERSION' \
+   && ! echo "$STAGED_ALL" | grep -vE '^(VERSION|CHANGELOG\.md|frontend/package\.json|frontend/package-lock\.json|charts/ucm/Chart\.yaml)$' | grep -q .; then
+    VERSION_ONLY=1
+fi
 
 echo "🔍 UCM Pre-commit Checks"
 echo "========================"
@@ -106,7 +112,8 @@ if [ "$VERSION_ONLY" = 0 ] && [ -n "$BACKEND_PY" ]; then
         echo -n "  Backend targeted tests ($(echo $TARGETS | wc -w) files)... "
         BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest $TARGETS -q -x --tb=short -rfE -p no:cacheprovider 2>&1) || true
         BACK_RESULT=$(echo "$BACK_OUT" | tail -1)
-        if echo "$BACK_RESULT" | grep -q "passed" && ! echo "$BACK_RESULT" | grep -qE "[0-9]+ (failed|errors?)\b"; then
+        # A file skipped as a whole (PG-only) ends on "N skipped": that is a pass.
+        if echo "$BACK_RESULT" | grep -qE "[0-9]+ (passed|skipped|deselected|xfailed)" && ! echo "$BACK_RESULT" | grep -qE "[0-9]+ (failed|errors?)\b"; then
             echo -e "${GREEN}✅${NC} $BACK_RESULT"
         else
             echo -e "${RED}❌${NC} $BACK_RESULT"
