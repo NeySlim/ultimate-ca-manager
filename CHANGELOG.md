@@ -67,6 +67,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Database: a gunicorn worker dropped the inherited connections of the default database engine only. It now drops those of every engine.
 - Scheduler: under gunicorn the scheduled tasks ran in the master, so a worker forked while a task held a database connection shared it with the master. They now run in one worker, elected by a lock freed when its holder exits or dies, and another worker takes over within seconds of a reload or a crash.
 - Syslog: the TCP connection opened by the gunicorn master was inherited by its workers, so the frames of several processes could interleave on one stream. Each worker now opens its own connection, leaving the master's open.
+- PKCS#11: a gunicorn worker went on using the library its master had initialized, a state Cryptoki leaves undefined after fork: a module that resets itself in the child, such as SoftHSM with `library.reset_on_fork`, refused every operation. Each process now initializes the library itself, and keeps the inherited state only when the module refuses a second initialization.
 
 ### Upgrade notes
 

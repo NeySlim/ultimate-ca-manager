@@ -7,6 +7,7 @@ Based on python-pkcs11 library and PKCS#11 v3.0 standard (OASIS)
 
 import hashlib
 import logging
+import os
 from typing import Dict, List, Optional, Any
 from pathlib import Path
 
@@ -20,6 +21,11 @@ from utils.pkcs11_config import normalize_pkcs11_config
 from utils.request_helpers import safe_call
 
 logger = logging.getLogger(__name__)
+
+# Which process initialized each Cryptoki library, and the copies a forked child
+# inherited: kept referenced, since releasing one would call C_Finalize in the child
+_initialized_by: Dict[str, int] = {}
+_inherited: List[Any] = []
 
 # Try to import pkcs11 - it's optional
 PKCS11_AVAILABLE = False
@@ -95,6 +101,32 @@ except ImportError:
     pkcs11 = None
 
 
+def cryptoki_library(module_path: str):
+    """The PKCS#11 library as initialized by this process.
+
+    Cryptoki leaves an initialized library undefined in a forked child, which must
+    call C_Initialize itself; one that refuses (no fork detection) keeps its own state.
+    """
+    pid = os.getpid()
+    owner = _initialized_by.get(module_path)
+    if owner is None or owner == pid:
+        lib = pkcs11.lib(module_path)
+    else:
+        inherited = pkcs11._loaded.pop(module_path, None)
+        if inherited is not None:
+            _inherited.append(inherited)
+        try:
+            lib = pkcs11.lib(module_path)
+        except pkcs11.PKCS11Error as e:
+            if inherited is None:
+                raise
+            logger.warning("PKCS#11 module %s not initialized again after fork (%s): "
+                           "using the state it kept", module_path, e)
+            lib = pkcs11._loaded[module_path] = inherited
+    _initialized_by[module_path] = pid
+    return lib
+
+
 class Pkcs11Provider(BaseHsmProvider):
     """
     PKCS#11 HSM Provider
@@ -150,7 +182,7 @@ class Pkcs11Provider(BaseHsmProvider):
         """Connect to HSM and open session"""
         try:
             # Load PKCS#11 library
-            self._lib = pkcs11.lib(self.module_path)
+            self._lib = cryptoki_library(self.module_path)
             
             # Find token
             if self.slot_index is not None:
