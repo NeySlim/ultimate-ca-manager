@@ -38,6 +38,12 @@ def digest_ignored(requested: str, key_label: str) -> str:
             f'separate digest.')
 
 
+def digest_replaced(requested: str, granted: str, policy_name: str) -> str:
+    """A policy moved the signature off the template's digest."""
+    return (f'Signature digest {requested.upper()} replaced by {granted.upper()} '
+            f'by policy "{policy_name}".')
+
+
 def key_usage_dropped(bits, key_label: str, family=None, signature_added=False) -> str:
     """KeyUsage bits that were asked for and that the certified key cannot honour."""
     reason = 'encrypt only through keyAgreement' if family == 'EC' else 'only sign'
@@ -71,6 +77,7 @@ __all__ = [
     'policy_validity_reason',
     'issuer_expiry_reason',
     'digest_ignored',
+    'digest_replaced',
     'key_usage_dropped',
     'collect',
     'meta_with_notices',

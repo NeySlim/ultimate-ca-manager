@@ -240,5 +240,7 @@ class TestApproval:
                 row = db.session.get(Certificate, result['id'])
                 cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
                 assert cert.signature_hash_algorithm.name == 'sha384'
+                assert any(n.startswith('Signature digest SHA256 replaced by SHA384 by policy "algo-appr-digest')
+                           for n in result['notices'])
         finally:
             _cleanup(app, ca_data['id'], policy_ids=[pid, gate], template_ids=[tid])

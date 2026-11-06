@@ -44,6 +44,21 @@ def template_digest(template, ca_key) -> str | None:
     return chosen if POLICY_DIGESTS.index(chosen) >= POLICY_DIGESTS.index(floor) else None
 
 
+def digest_replaced_notice(policies, requested, sign_hash) -> str | None:
+    """The notice naming the policy that moved the signature off *requested*, or None."""
+    from services.policy_service import normalize_digest
+    from utils import notices
+    requested = normalize_digest(requested)
+    granted = getattr(sign_hash, 'name', None)
+    if not requested or not granted or granted == requested:
+        return None
+    for policy in policies:
+        allowed = {normalize_digest(d) for d in (policy.get_rules() or {}).get('allowed_digests') or []}
+        if allowed and requested not in allowed:
+            return notices.digest_replaced(requested, granted, policy.name)
+    return None
+
+
 def _strength(alg) -> int:
     return alg.security_level or alg.key_size or 0
 

@@ -312,9 +312,10 @@ def create_certificate():
             violations = list(dict.fromkeys(list(violations) + list(pq_violations)))
             capped_by = pq_capped_by or capped_by
         # The template's digest, floored at the CA key's, yields to the policies
-        from utils.issuance_defaults import template_digest
+        from utils.issuance_defaults import digest_replaced_notice, template_digest
+        preferred_digest = template_digest(template, ca_key)
         sign_hash, digest_violations = PolicyEvaluationService.checked_signing_hash(
-            policies, ca_key, template_digest(template, ca_key), explicit=False,
+            policies, ca_key, preferred_digest, explicit=False,
             context=rule_context, notices=advisories)
         violations += digest_violations
         if violations:
@@ -324,6 +325,7 @@ def create_certificate():
             notices.append(notices_mod.validity_shortened(
                 requested_validity, validity_days,
                 notices_mod.policy_validity_reason(capped_by, validity_days)))
+        notices += notices_mod.collect(digest_replaced_notice(policies, preferred_digest, sign_hash))
         notices += advisories
 
         # Record which inherited values the request explicitly diverged from

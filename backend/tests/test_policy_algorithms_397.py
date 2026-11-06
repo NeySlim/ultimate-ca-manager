@@ -215,6 +215,8 @@ class TestOperatorPaths:
             assert r.status_code in (200, 201), r.data
             cert = _signed(app, get_json(r)['data']['id'])
             assert isinstance(cert.signature_hash_algorithm, hashes.SHA384)
+            assert ('Signature digest SHA256 replaced by SHA384 by policy "algo-issue".'
+                    in r.get_json()['meta']['notices'])
         finally:
             _drop(app, CertificatePolicy, pid)
             _drop(app, CertificateTemplate, tpl_id)
