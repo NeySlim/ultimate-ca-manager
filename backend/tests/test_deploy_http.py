@@ -486,7 +486,23 @@ class TestSecondReviewFindings:
         assert assert_success(patch_json(auth_client, url, {'enabled': False}))['enabled'] is False
         renamed = assert_success(patch_json(auth_client, url, {'name': _name(), 'http_headers': 'X-Api-Key: other'}))
         assert renamed['http_header_names'] == ['X-Api-Key']
-        r = patch_json(auth_client, url, {'body_template': KEY_TEMPLATE})
+        r = patch_json(auth_client, url, {'body_template': '{"key": {{key_pem|json}}}'})
+        assert 'no private key' in json.dumps(_error_body(r, 400))
+
+    def test_a_save_from_the_ui_keeps_working_on_a_keyless_binding(self, app, auth_client, create_cert):
+        target = _create_target(auth_client, body_template=KEY_TEMPLATE, allow_private_key=True)
+        cert = create_cert()
+        _create_binding(auth_client, target['id'], cert['id'])
+        from models import db, Certificate
+        with app.app_context():
+            db.session.get(Certificate, cert['id']).prv = None
+            db.session.commit()
+        url = f"{BASE}/targets/{target['id']}"
+        # What DeploySection sends on every save, changed fields or not
+        ui = {'name': target['name'], 'url': target['url'], 'http_method': target['http_method'],
+              'body_template': KEY_TEMPLATE, 'tls_ca_pem': '', 'allow_private_key': True, 'enabled': True}
+        assert_success(patch_json(auth_client, url, ui))
+        r = patch_json(auth_client, url, {**ui, 'body_template': '{"k": {{key_pem|json}}, "c": {{cn|json}}}'})
         assert 'no private key' in json.dumps(_error_body(r, 400))
 
     def test_a_text_variable_inside_a_longer_json_string(self, auth_client):

@@ -116,7 +116,7 @@ export default {
         content: '设置 › 部署（仅管理员）：用于证书和 CRL 部署的可复用 SSH/SFTP 连接或 HTTP API 请求。路径和可选的重载命令在每个 SSH 部署上单独配置。',
         items: [
           { label: '目标', text: '主机、端口、SSH 用户。UCM 会生成一个 ed25519 密钥（将显示的公钥安装到目标主机上），也接受导入的私钥,, 均加密存储' },
-          { label: 'HTTP API 目标 (v2.252)', text: 'URL、方法（POST、PUT、PATCH）、加密存储且不再显示的请求标头，以及带有 {{cert_pem}}、{{fullchain_pem}}、{{cn}}、{{serial}}…… 以及 |json、|b64 和 |urlencode 过滤器的正文模板。JSON 正文在保存时检查。私钥（{{key_pem}}）仅在目标明确启用且使用 https URL 时才会发出；始终会验证 TLS 证书，若设备为自签名，则对照粘贴的信任锚验证。拒绝重定向，阻止云元数据地址。仅限证书：CRL 仍使用 SSH 目标' },
+          { label: 'HTTP API 目标 (v2.252)', text: 'URL、方法（POST、PUT、PATCH）、加密存储且不再显示的请求标头，以及带有 {{cert_pem}}、{{fullchain_pem}}、{{cn}}、{{serial}}…… 以及 |json、|jsonstr、|b64 和 |urlencode 过滤器的正文模板。JSON 正文在保存时检查。私钥（{{key_pem}}）仅在目标明确启用且使用 https URL 时才会发出；始终会验证 TLS 证书，若设备为自签名，则对照粘贴的信任锚验证。拒绝重定向，阻止云元数据地址和环回地址。仅限证书：CRL 仍使用 SSH 目标' },
           { label: '主机密钥', text: '在首次成功连接时固定（首次使用即信任，TOFU）；此后任何变化都会直接导致连接失败。更改主机后会重新固定' },
           { label: '重载命令', text: '按证书或 CRL 绑定配置的可选命令，在推送成功后运行（例如 systemctl reload nginx）：exit 0 即成功，不支持模板' },
           { label: '绑定', text: '证书在证书详情视图中关联，CRL 在「CRL 与 OCSP」中关联。每个绑定拥有自己的路径、文件选项和重载命令' },

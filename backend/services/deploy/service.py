@@ -644,7 +644,8 @@ class DeployService:
             out['http_headers'] if 'http_headers' in out else (current.http_headers if current else None))
         template = out.get('body_template', current.body_template if current else '')
         deploy_http.validate_template(template, headers, allow_key)
-        template_changed = 'body_template' in data or 'url' in data
+        template_changed = current is not None and (
+            template != current.body_template or out.get('url', current.url) != current.url)
         if current and template_changed and 'key_pem' in {n for n, _ in deploy_http.template_variables(template)}:
             # Bindings are checked when made, and again when the template
             # changes; other edits must stay possible on a keyless binding.
