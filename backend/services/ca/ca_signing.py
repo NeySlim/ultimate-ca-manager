@@ -87,6 +87,7 @@ class CASigningMixin:
         supersedes=None,
         policy_template_id: int = None,
         template_ekus: list = None,
+        template_id: int = None,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -124,6 +125,8 @@ class CASigningMixin:
                 (``issuance_defaults.template_digest``).
             template_ekus: EKUs that replace the CSR's, as a bound template's
                 do (WSTEP renewal); protocol-forbidden ones still dropped.
+            template_id: template the certificate is issued under, recorded on
+                its row (WSTEP: the one whose OID it carries).
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -246,6 +249,7 @@ class CASigningMixin:
             san_email=json.dumps(san_email) if san_email else None,
             san_upn=json.dumps(san_upn) if san_upn else None,
             source=source,
+            template_id=template_id,
         )
         db.session.add(new_cert)
 

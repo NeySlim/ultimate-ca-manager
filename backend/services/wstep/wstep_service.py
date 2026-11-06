@@ -909,6 +909,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             # way a Smartcard Logon template still issues correctly.
             extra_ekus=_template_extra_ekus(matched_template),
             policy_template_id=getattr(matched_template, 'id', None),
+            template_id=getattr(matched_template, 'id', None),
         )
     except PolicyViolation as e:
         logger.warning('WSTEP issue refused by policy: %s', e)
@@ -1120,6 +1121,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
             extra_ekus=extra_ekus,
             template_ekus=issued_ekus,
             policy_template_id=getattr(matched_template, 'id', None),
+            template_id=getattr(matched_template, 'id', None),
         )
     except AlreadySuperseded:
         return None, 'Signing certificate has been superseded by a newer one'
