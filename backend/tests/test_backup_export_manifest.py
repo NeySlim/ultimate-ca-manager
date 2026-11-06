@@ -112,11 +112,20 @@ class TestFieldsNoArchiveUsedToCarry:
 class TestRelationsTravelByIdentity:
     """A numeric id means nothing on the target; the identity beside it does."""
 
-    def test_every_declared_reference_is_exported_with_its_identity(self, app):
+    def test_every_declared_reference_is_exported_with_its_identity(
+            self, app, auth_client, create_ca, create_cert):
         from tests.test_backup_contract_matrix import _remove, _seed_all
+        # The factory hangs its rows off a CA and certificates; a revoked one fills
+        # the revocation sections. SSH material is the one thing nothing can invent.
+        ca = create_ca(cn='Manifest Reference CA')
+        create_cert(cn='manifest-issued.example.com', ca_id=ca['id'])
+        revoked = create_cert(cn='manifest-revoked.example.com', ca_id=ca['id'])
+        r = auth_client.post(f"/api/v2/certificates/{revoked['id']}/revoke", json={'reason': 'superseded'})
+        assert r.status_code == 200, r.get_json()
+        exempt = {'ssh_cas', 'ssh_certificates'}
         with app.app_context():
             # A row in every section the factory can build, so none is skipped as empty.
-            seeded, _failures, order, _secrets = _seed_all()
+            _seeded, _failures, order, _secrets = _seed_all()
             try:
                 index = IdentityIndex()
                 checked = set()
@@ -130,8 +139,9 @@ class TestRelationsTravelByIdentity:
                     for column in section.references:
                         assert f'{column}_ref' in rows[0], \
                             f"{name}.{column} travels as a number only"
-                assert {n for n in seeded if manifest.SECTIONS[n].references
-                        and not manifest.SECTIONS[n].optional} <= checked
+                wanted = {n for n, s in manifest.SECTIONS.items()
+                          if s.references and not s.optional} - exempt
+                assert checked == wanted, sorted(wanted - checked)
             finally:
                 _remove(order)
 

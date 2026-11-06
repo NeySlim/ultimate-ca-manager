@@ -12,11 +12,17 @@ def _certificate_count(app):
 
 
 def test_it_has_a_database_of_its_own(app, create_cert):
-    create_cert(cn='session-side.example.com')
-    with fresh_app() as other:
-        assert other is not app
-        assert _certificate_count(other) == 0
-        assert _certificate_count(app) >= 1
+    cert = create_cert(cn='session-side.example.com')
+    try:
+        with fresh_app() as other:
+            assert other is not app
+            assert _certificate_count(other) == 0
+            assert _certificate_count(app) >= 1
+    finally:
+        from models import Certificate, db
+        with app.app_context():
+            Certificate.query.filter_by(id=cert['id']).delete()
+            db.session.commit()
 
 
 def test_its_paths_and_scheduler_are_put_back(app):

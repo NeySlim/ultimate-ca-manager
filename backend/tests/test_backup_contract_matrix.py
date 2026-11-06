@@ -45,9 +45,9 @@ MARK = 'zzcontract'
 
 # {section: reason} — sections that hang off one the factory does not build,
 # because its exporter reads real cryptographic material nothing can invent.
-# Whether they seed depends on what the rest of the suite left in the shared
-# database, so they are allowed to be absent, never to be absent silently:
-# an entry is a decision, with a reason someone can check.
+# On the fresh database of this module they never seed, so they are allowed
+# to be absent, never to be absent silently: an entry is a decision, with a
+# reason someone can check.
 NEEDS_REAL_MATERIAL: dict = {
     'ssh_certificates': (
         'it hangs off an SSH authority, whose exporter reads a real key, and '

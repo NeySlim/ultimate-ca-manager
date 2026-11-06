@@ -395,8 +395,9 @@ def _shared_tables_stay_in_their_module(request):
     warnings.warn(message, stacklevel=1)
 
 
-def sandbox_paths(application):
+def sandbox_paths(application, replaced=None):
     """Point the file paths at a temp tree; returns it and the Config values replaced.
+    `replaced` may be the caller's dict, filled as it goes, for a partial undo.
 
     The restore writes the HTTPS certificate and key where the configuration
     points and the backup routes write archives to the configured directory:
@@ -404,7 +405,8 @@ def sandbox_paths(application):
     """
     from config.settings import Config as _Config
     sandbox = Path(tempfile.mkdtemp(prefix='ucm-test-paths-'))
-    replaced = {}
+    if replaced is None:
+        replaced = {}
     for name, relative in (
         ('HTTPS_CERT_PATH', 'etc/https_cert.pem'),
         ('HTTPS_KEY_PATH', 'etc/https_key.pem'),
@@ -569,11 +571,9 @@ def viewer_client(app):
     return admin
 
 
-# =====================================================
-
+# ============================================================
 # Factory fixtures
-# =====================================================
-
+# ============================================================
 
 @pytest.fixture(scope='session')
 def create_ca(auth_client):
@@ -742,11 +742,9 @@ def set_acme_public_config(app, clear_acme_public_vhost_settings):
     return _set
 
 
-# =====================================================
-
+# ============================================================
 # Helpers
-# =====================================================
-
+# ============================================================
 
 def get_json(response):
     """Parse JSON response, return dict."""

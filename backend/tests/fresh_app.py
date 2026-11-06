@@ -24,7 +24,7 @@ _UNSET = object()
 
 @contextlib.contextmanager
 def fresh_app():
-    """create_app('testing') on its own database, its paths sandboxed, undone on exit."""
+    """create_app('testing') on its own database; paths, session store and scheduler put back on exit."""
     from app import create_app
     from config.settings import Config
     from models import db
@@ -37,28 +37,32 @@ def fresh_app():
     sessions = Path(tempfile.mkdtemp(prefix='ucm-test-sessions-'))
     shared_sessions = Config.__dict__.get('SESSION_FILE_DIR', _UNSET)
     Config.SESSION_FILE_DIR = sessions
+    application = sandbox = None
+    replaced = {}
     try:
-        application = create_app('testing')
-    finally:
-        if shared_sessions is _UNSET:
-            del Config.SESSION_FILE_DIR
-        else:
-            Config.SESSION_FILE_DIR = shared_sessions
-    sandbox, replaced = sandbox_paths(application)
-    configure_test_app(application)
-    clear_admin_password_flag(application)
-    try:
+        try:
+            application = create_app('testing')
+        finally:
+            if shared_sessions is _UNSET:
+                del Config.SESSION_FILE_DIR
+            else:
+                Config.SESSION_FILE_DIR = shared_sessions
+        sandbox, _ = sandbox_paths(application, replaced)
+        configure_test_app(application)
+        clear_admin_password_flag(application)
         yield application
     finally:
-        with application.app_context():
-            db.session.remove()
-            db.engine.dispose()
+        # Also after a failed build: the next files inherit whatever is left here.
+        if application is not None:
+            with application.app_context():
+                db.session.remove()
+                db.engine.dispose()
         for name, value in replaced.items():
             setattr(Config, name, value)
         scheduler_service._scheduler = scheduler
-        shutil.rmtree(sandbox, ignore_errors=True)
+        if sandbox is not None:
+            shutil.rmtree(sandbox, ignore_errors=True)
         shutil.rmtree(sessions, ignore_errors=True)
-
 
 def fresh_app_fixtures(scope='module'):
     """The fixtures `app`, `auth_client`, `create_ca`, `create_cert`, `create_user` on a fresh app.
