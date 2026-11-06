@@ -190,7 +190,9 @@ def reset_db():
         actor = getattr(g, 'current_user', None)
         actor_name = getattr(actor, 'username', None) or 'unknown'
 
-        # Drop all tables and recreate
+        # The request's own transaction holds locks on these tables: on
+        # PostgreSQL, drop_all on another connection would wait for it forever.
+        db.session.close()
         db.drop_all()
         db.create_all()
 
