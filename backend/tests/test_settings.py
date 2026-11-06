@@ -16,6 +16,7 @@ import json
 import os
 import sys
 from tests.conftest import get_json, assert_success, assert_error
+from tests.fresh_app import fresh_app_fixtures
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -241,6 +242,9 @@ class TestGeneralSettings:
 
 class TestBackupSettings:
     """Backup endpoints: GET config, create, download, delete, schedule, history."""
+
+    # An archive serialises the whole database: an empty one keeps it fast.
+    app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures('class')
 
     def test_get_backup_settings(self, auth_client):
         r = auth_client.get('/api/v2/settings/backup')

@@ -12,6 +12,7 @@ from models import AuditLog, User, db
 from models.rbac import CustomRole
 from models.sso import SSOProvider
 from tests.conftest import get_json
+from tests.fresh_app import fresh_app_fixtures
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 JSON = 'application/json'
@@ -362,14 +363,18 @@ def test_a_manual_write_of_the_custom_role_clears_the_source(app, auth_client, p
     assert shown['custom_role_id'] is None and shown['custom_role_source'] is None
 
 
-def test_the_backup_carries_the_source(app, provider, role):
-    from services.backup_service import BackupService
-    a = role()
-    with app.app_context():
-        name = f'u-{_uid()}'
-        _login(app, provider('ldap', {'g': {'custom_role': a}}), name, ['g'])
-        svc = BackupService()
-        _key, data = svc._decrypt_framed(svc.create_backup('Correct-Horse-Battery-9'),
-                                         'Correct-Horse-Battery-9')
-        row = next(u for u in data['users'] if u['username'] == name)
-        assert row['custom_role_source'] == 'sso'
+class TestTheBackup:
+    # An archive serialises the whole database: an empty one keeps it fast.
+    app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures('class')
+
+    def test_the_backup_carries_the_source(self, app, provider, role):
+        from services.backup_service import BackupService
+        a = role()
+        with app.app_context():
+            name = f'u-{_uid()}'
+            _login(app, provider('ldap', {'g': {'custom_role': a}}), name, ['g'])
+            svc = BackupService()
+            _key, data = svc._decrypt_framed(svc.create_backup('Correct-Horse-Battery-9'),
+                                             'Correct-Horse-Battery-9')
+            row = next(u for u in data['users'] if u['username'] == name)
+            assert row['custom_role_source'] == 'sso'
