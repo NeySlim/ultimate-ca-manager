@@ -17,7 +17,8 @@ _marker = []
 def app_url():
     """The URL the application and the migration runner use."""
     separator = '&' if '?' in APP_PG_URL else '?'
-    return (f'{APP_PG_URL}{separator}options=-csearch_path%3D{SCHEMA}'
+    # A lock wait the process itself holds would hang the run: it fails instead.
+    return (f'{APP_PG_URL}{separator}options=-csearch_path%3D{SCHEMA}%20-clock_timeout%3D30s'
             f'&application_name={SCHEMA}')
 
 
