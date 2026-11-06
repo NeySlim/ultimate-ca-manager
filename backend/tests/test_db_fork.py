@@ -76,7 +76,7 @@ def _load_gunicorn_config(monkeypatch, app):
     import gevent.monkey
 
     monkeypatch.setattr(gevent.monkey, 'patch_all', lambda *a, **k: None)
-    monkeypatch.delenv('UCM_SCHEDULER_IN_WORKER', raising=False)  # set by the config
+    monkeypatch.setenv('UCM_SCHEDULER_SUPERVISED', '')  # set by the config, undone after
     spec = importlib.util.spec_from_file_location('_ucm_gunicorn_config_fork',
                                                   BACKEND / 'gunicorn_config.py')
     module = importlib.util.module_from_spec(spec)
@@ -107,8 +107,6 @@ def test_post_worker_init_forgets_the_inherited_pool_first(app, monkeypatch, tmp
                         lambda engines: order.append(('forget', list(engines))))
     monkeypatch.setattr(protocol_http_server, 'start_http_protocol_server',
                         lambda a, **kw: order.append(('http', a)))
-    monkeypatch.setattr('services.scheduler_service.start_scheduler',
-                        lambda a, in_worker=False: order.append(('scheduler', a, in_worker)))
     monkeypatch.setattr('services.syslog_service.syslog_forwarder.forget_inherited_socket',
                         lambda: order.append(('syslog',)))
     module.post_worker_init(_worker())
@@ -117,29 +115,27 @@ def test_post_worker_init_forgets_the_inherited_pool_first(app, monkeypatch, tmp
         assert order[0] == ('forget', list(db.engines.values()))
         assert bind in order[0][1] and db.engine in order[0][1]
     assert ('http', app) in order
-    assert ('scheduler', app, True) in order
     assert order.index(('syslog',)) < order.index(('http', app))  # before anything can log
 
 
-def test_under_gunicorn_the_master_leaves_the_loop_to_a_worker(app, monkeypatch):
+def test_under_gunicorn_no_process_but_the_scheduler_one_runs_the_loop(app, monkeypatch):
     _load_gunicorn_config(monkeypatch, app)
-    assert os.environ.get('UCM_SCHEDULER_IN_WORKER') == '1'
+    assert os.environ.get('UCM_SCHEDULER_SUPERVISED') == '1'
 
 
-def test_a_worker_told_to_exit_hands_the_scheduler_over(monkeypatch):
-    import gevent
-    from services import scheduler_service
-    from workers import MTLSGeventWebSocketWorker
+def test_the_master_hooks_drive_the_scheduler_process(app, monkeypatch):
+    import scheduler_supervisor
 
-    scheduler = scheduler_service.SchedulerService()
-    scheduler._running = True
-    monkeypatch.setattr(scheduler_service, '_scheduler', scheduler)
-    monkeypatch.setattr(gevent, 'spawn', lambda fn, *a: fn(*a))
-    worker = object.__new__(MTLSGeventWebSocketWorker)
-    worker.alive = True
-    worker.handle_exit(signal.SIGTERM, None)
-    assert worker.alive is False
-    assert scheduler._running is False and scheduler._wake.is_set()
+    module = _load_gunicorn_config(monkeypatch, app)
+    calls = []
+    for name in ('start', 'restart', 'stop'):
+        monkeypatch.setattr(scheduler_supervisor.supervisor, name,
+                            lambda *a, _n=name: calls.append(_n))
+    server = types.SimpleNamespace(log=logging.getLogger('test.arbiter'))
+    module.when_ready(server)
+    module.on_reload(server)
+    module.on_exit(server)
+    assert calls == ['start', 'restart', 'stop']
 
 
 def _fork_scheduler(sched, prepare=None):
@@ -192,7 +188,7 @@ def _recording_scheduler(log, record):
     return sched
 
 
-def test_one_forked_worker_runs_the_scheduler_and_another_takes_over(tmp_path, monkeypatch):
+def test_one_process_runs_the_scheduler_and_another_takes_over(tmp_path, monkeypatch):
     from services import scheduler_service
 
     monkeypatch.setattr('config.settings.DATA_DIR', str(tmp_path), raising=False)

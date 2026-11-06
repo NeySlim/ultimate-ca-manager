@@ -71,6 +71,26 @@ def _rate_limit_lan_exempt():
         return False
 
 
+def run_startup_housekeeping(app):
+    """Files missing on disk rewritten from the database, interrupted ACME orders reset."""
+    try:
+        with app.app_context():
+            from services.file_regen_service import regenerate_all_files
+            stats = regenerate_all_files()
+            if sum(stats.values()) > 0:
+                app.logger.info(f"✓ File regeneration completed: {stats}")
+    except Exception as e:
+        app.logger.warning(f"File regeneration failed (non-fatal): {e}")
+
+    # No auto-poll thread survives a restart: its orders go back to pending
+    try:
+        with app.app_context():
+            from services.acme.order_housekeeping import recover_interrupted_orders
+            recover_interrupted_orders()
+    except Exception as e:
+        app.logger.warning(f"Interrupted ACME orders not recovered (non-fatal): {e}")
+
+
 def create_app(config_name=None):
     """Application factory"""
     app = Flask(__name__, 
@@ -548,23 +568,11 @@ def create_app(config_name=None):
     app.logger.info("✓ DATABASE INITIALIZATION COMPLETE - Safe to proceed")
     app.logger.info("=" * 60)
     
-    # Regenerate certificate/key files from database if missing
-    try:
-        with app.app_context():
-            from services.file_regen_service import regenerate_all_files
-            stats = regenerate_all_files()
-            if sum(stats.values()) > 0:
-                app.logger.info(f"✓ File regeneration completed: {stats}")
-    except Exception as e:
-        app.logger.warning(f"File regeneration failed (non-fatal): {e}")
-    
-    # No auto-poll thread survives a restart: its orders go back to pending
-    try:
-        with app.app_context():
-            from services.acme.order_housekeeping import recover_interrupted_orders
-            recover_interrupted_orders()
-    except Exception as e:
-        app.logger.warning(f"Interrupted ACME orders not recovered (non-fatal): {e}")
+    # Under gunicorn the scheduler process does this before its loop: the master
+    # leaves the database alone once the workers are forked
+    from services.scheduler_service import supervised
+    if not supervised():
+        run_startup_housekeeping(app)
 
     # Initialize general task scheduler (CRL auto-regen, etc) - AFTER database is ready
     try:
@@ -901,7 +909,7 @@ def create_app(config_name=None):
         elif app.config.get('TESTING'):
             app.logger.info("Scheduler tasks registered (background thread disabled under TESTING)")
         else:
-            app.logger.info("Scheduler tasks registered: the loop runs in a gunicorn worker")
+            app.logger.info("Scheduler tasks registered: the loop runs in the scheduler process")
         
         # Register scheduler in app context for graceful shutdown
         app.scheduler = scheduler

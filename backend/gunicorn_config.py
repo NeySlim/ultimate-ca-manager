@@ -10,8 +10,9 @@ import os
 import ssl
 import sys
 
-# Before the preloaded app: the master registers the scheduled tasks, a worker runs them
-os.environ['UCM_SCHEDULER_IN_WORKER'] = '1'
+# Before the preloaded app: the master and its workers only register the scheduled
+# tasks, which run in the scheduler process started below (when_ready)
+os.environ['UCM_SCHEDULER_SUPERVISED'] = '1'
 
 # Detect environment
 base_path = os.getenv('UCM_BASE_PATH', '/opt/ucm')
@@ -235,8 +236,19 @@ tmp_upload_dir = None
 def on_starting(server):
     server.log.info("Starting UCM with Gunicorn")
 
+def when_ready(server):
+    from scheduler_supervisor import supervisor
+    supervisor.start(server)
+
 def on_reload(server):
     server.log.info("Reloading UCM")
+    # The scheduler process takes the new code and configuration too
+    from scheduler_supervisor import supervisor
+    supervisor.restart()
+
+def on_exit(server):
+    from scheduler_supervisor import supervisor
+    supervisor.stop()
 
 def worker_int(worker):
     worker.log.info("Worker received INT or QUIT signal")
@@ -250,7 +262,6 @@ def post_worker_init(worker):
     1. Suppress noisy SSL/connection tracebacks from gevent
     2. Start HTTP protocol server for CDP/OCSP (if configured)
     3. Start the DNS UPDATE listener (if configured)
-    4. Start the scheduler, which runs once the scheduler lock is free
     """
     import ssl
     import gevent
@@ -302,10 +313,3 @@ def post_worker_init(worker):
         logging.getLogger('ucm.protocol').warning(
             "Could not initialize DNS UPDATE listener: %s", e
         )
-
-    try:
-        from services.scheduler_service import start_scheduler
-        from wsgi import app as flask_app
-        start_scheduler(flask_app, in_worker=True)
-    except Exception as e:
-        worker.log.error("Could not start the scheduler: %s", e)

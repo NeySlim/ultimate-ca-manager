@@ -95,6 +95,8 @@ def run_scheduler_task(task_name):
             success=not bool(result.get('last_error')),
         )
         result['label'] = _TASK_LABELS.get(task_name, task_name.replace('_', ' ').title())
+        if result.get('queued'):  # still running in the scheduler process
+            return success_response(data=result, message=f"Task '{task_name}' started")
         return success_response(data=result, message=f"Task '{task_name}' executed")
     except Exception as e:
         logger.error(f"Failed to run scheduler task {task_name}: {e}")

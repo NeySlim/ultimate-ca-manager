@@ -65,11 +65,3 @@ class MTLSWebSocketHandler(WebSocketHandler, PyWSGIHandler):
 class MTLSGeventWebSocketWorker(GeventWebSocketWorker):
     """Gunicorn worker that uses MTLSWebSocketHandler for peercert injection."""
     wsgi_handler = MTLSWebSocketHandler
-
-    def handle_exit(self, sig, frame):
-        super().handle_exit(sig, frame)
-        # The replacement worker takes the scheduler over without waiting for
-        # this one's connections to drain; out of the signal handler, like handle_quit
-        import gevent
-        from services.scheduler_service import get_scheduler
-        gevent.spawn(get_scheduler().relinquish)
