@@ -205,6 +205,23 @@ def _ssh_blob_eddsa(blob: bytes) -> Optional[str]:
     return None
 
 
+def _pem_block_eddsa(label: bytes, body: bytes) -> Optional[str]:
+    der = base64.b64decode(b''.join(body.split()))
+    if label == b'OPENSSH PRIVATE KEY':
+        return _ssh_blob_eddsa(der)
+    if label in (b'PRIVATE KEY', b'PUBLIC KEY'):
+        return _der_eddsa(der)
+    if label in (b'CERTIFICATE', b'X509 CERTIFICATE', b'TRUSTED CERTIFICATE'):
+        return _cert_eddsa(der)
+    if b'ED448' in label:
+        return 'Ed448'
+    if b'ED25519' in label:
+        return 'Ed25519'
+    # ENCRYPTED PRIVATE KEY hides its algorithm in the ciphertext: it is told only
+    # once decrypted, where the FIPS provider refuses it with its own error
+    return None
+
+
 def eddsa_key_name(data) -> Optional[str]:
     """'Ed25519' or 'Ed448' when *data* (PEM, DER, OpenSSH private key, public
     key line, SSH or X.509 certificate) holds an EdDSA key, else None; never raises."""
@@ -216,27 +233,23 @@ def eddsa_key_name(data) -> Optional[str]:
     try:
         blocks = _PEM_BLOCK.findall(data)
         for label, body in blocks:
-            der = base64.b64decode(b''.join(body.split()))
-            if label == b'OPENSSH PRIVATE KEY':
-                found = _ssh_blob_eddsa(der)
-            elif label in (b'PRIVATE KEY', b'PUBLIC KEY'):
-                found = _der_eddsa(der)
-            elif label in (b'CERTIFICATE', b'X509 CERTIFICATE', b'TRUSTED CERTIFICATE'):
-                found = _cert_eddsa(der)
-            elif b'ED448' in label:
-                found = 'Ed448'
-            elif b'ED25519' in label:
-                found = 'Ed25519'
-            else:
-                # ENCRYPTED PRIVATE KEY hides its algorithm in the ciphertext: it is told only
-                # once decrypted, where the FIPS provider refuses it with its own error
+            try:  # a malformed block does not hide the blocks after it
+                found = _pem_block_eddsa(label, body)
+            except (ValueError, IndexError, binascii.Error):
                 found = None
             if found:
                 return found
         if blocks:
             return None
         if data[:1] == b'\x30':
-            return _der_eddsa(data) or _cert_eddsa(data)
+            for read in (_der_eddsa, _cert_eddsa):
+                try:
+                    found = read(data)
+                except (ValueError, IndexError):
+                    found = None
+                if found:
+                    return found
+            return None
         for token in data.split()[:2]:
             if token in _EDDSA_SSH_TYPES:
                 return _EDDSA_SSH_TYPES[token]

@@ -320,6 +320,9 @@ class FakeNamecheap:
         self.get_fails = False
         self.email_type = 'MX'
 
+    def _email_attr(self):
+        return f' EmailType="{self.email_type}"' if self.email_type else ''
+
     def post(self, url, data=None, timeout=None):
         assert data['Command'] == 'namecheap.domains.dns.setHosts'
         return self(url, params=data, timeout=timeout)
@@ -331,7 +334,7 @@ class FakeNamecheap:
                 return _Resp(200, text='<ApiResponse Status="ERROR" xmlns="http://api.namecheap.com/xml.response"><Errors><Error>Internal error</Error></Errors></ApiResponse>')
             hosts = ''.join(f'<host Name="{h["Name"]}" Type="{h["Type"]}" Address="{h["Address"]}" '
                             f'TTL="{h["TTL"]}" MXPref="{h["MXPref"]}"/>' for h in self.hosts)
-            return _Resp(200, text=f'<ApiResponse Status="OK" xmlns="http://api.namecheap.com/xml.response"><CommandResponse><DomainDNSGetHostsResult Domain="example.com" EmailType="{self.email_type}" IsUsingOurDNS="true">'
+            return _Resp(200, text=f'<ApiResponse Status="OK" xmlns="http://api.namecheap.com/xml.response"><CommandResponse><DomainDNSGetHostsResult Domain="example.com"{self._email_attr()} IsUsingOurDNS="true">'
                                    f'{hosts}</DomainDNSGetHostsResult></CommandResponse></ApiResponse>')
         if cmd == 'namecheap.domains.dns.setHosts':
             self.sets.append(dict(params))
@@ -369,6 +372,15 @@ def test_namecheap_keeps_the_mail_setting(monkeypatch):
     _two_values_then_delete_one(p)
     assert api.sets and all(s['EmailType'] == 'MX' for s in api.sets)
     assert api.email_type == 'MX'
+
+
+def test_namecheap_sends_mx_when_the_answer_omits_the_mail_setting(monkeypatch):
+    api, p = _namecheap(monkeypatch)
+    api.email_type = None
+    api.hosts.append({'Name': '@', 'Type': 'MX', 'Address': 'mail.example.com', 'TTL': '1800', 'MXPref': '10'})
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    assert api.sets[-1]['EmailType'] == 'MX'
+    assert ('@', 'MX') in [(h['Name'], h['Type']) for h in api.hosts]
 
 
 def test_namecheap_failed_read_writes_nothing(monkeypatch):

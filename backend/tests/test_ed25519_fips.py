@@ -132,6 +132,13 @@ class TestEddsaKeyName:
         assert eddsa_key_name(cert.public_bytes(serialization.Encoding.PEM)) == name
         assert eddsa_key_name(cert.public_bytes(serialization.Encoding.DER)) == name
 
+    def test_a_malformed_certificate_does_not_hide_the_key_after_it(self):
+        key = ed25519.Ed25519PrivateKey.generate()
+        truncated = b'-----BEGIN CERTIFICATE-----\n' + base64.b64encode(b'\x30\x82\x05\x00\x30\x80') + \
+            b'\n-----END CERTIFICATE-----\n'
+        assert eddsa_key_name(truncated + _pkcs8(key)) == 'Ed25519'
+        assert eddsa_key_name(b'\x30\x82\x05\x00\x30\x80') is None
+
     def test_encrypted_pkcs8_is_told_only_by_an_explicit_label(self):
         key = ed25519.Ed25519PrivateKey.generate()
         encrypted = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
@@ -543,11 +550,13 @@ class TestImports:
         r = _post(auth_client, '/api/v2/import/analyze', {'content': _ed_pem_bundle('Smart Ed off')})
         assert r.status_code == 200, r.get_json()
 
-    @pytest.mark.parametrize('field', ['pem', 'private_key'])
+    @pytest.mark.parametrize('field', ['pem', 'private_key', 'chain'])
     def test_the_converter_answers_the_fips_problem(self, auth_client, fips_on, field):
         bundle = _ed_pem_bundle('Converted Ed25519', ca=False)
-        key = '-----BEGIN PRIVATE KEY-----' + bundle.split('-----BEGIN PRIVATE KEY-----')[1]
-        payload = ({'pem': bundle} if field == 'pem' else {'pem': _rsa_cert_pem(), 'private_key': key})
+        cert, key = bundle.split('-----BEGIN PRIVATE KEY-----')
+        key = '-----BEGIN PRIVATE KEY-----' + key
+        payload = {'pem': {'pem': bundle}, 'private_key': {'pem': _rsa_cert_pem(), 'private_key': key},
+                   'chain': {'pem': _rsa_cert_pem(), 'chain': cert}}[field]
         _assert_fips_problem(_post(auth_client, '/api/v2/tools/convert', {**payload, 'output_format': 'pem'}))
 
 def _rsa_cert_pem():
@@ -558,3 +567,15 @@ def _rsa_cert_pem():
             .serial_number(1).not_valid_before(now).not_valid_after(now + timedelta(days=1))
             .sign(key, hashes.SHA256()))
     return cert.public_bytes(serialization.Encoding.PEM).decode()
+
+
+class TestCertificateOnlyImports:
+    def test_an_ed25519_certificate_without_its_key_is_refused(self, auth_client, fips_on):
+        cert = _ed_pem_bundle(f'Ed25519 alone {uuid.uuid4().hex[:6]}', ca=False).split('-----BEGIN PRIVATE KEY-----')[0]
+        r = auth_client.post('/api/v2/certificates/import', data={'pem_content': cert, 'name': 'ed alone'})
+        _assert_fips_problem(r)
+
+    def test_an_rsa_certificate_alone_is_imported(self, auth_client, fips_on):
+        r = auth_client.post('/api/v2/certificates/import',
+                             data={'pem_content': _rsa_cert_pem(), 'name': f'rsa alone {uuid.uuid4().hex[:6]}'})
+        assert r.status_code in (200, 201), r.get_json()

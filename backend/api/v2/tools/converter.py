@@ -55,6 +55,8 @@ def convert_certificate():
         if key_pem:
             refuse_eddsa_key(base64.b64decode(key_pem[7:]) if key_pem.startswith('BASE64:') else key_pem,
                              'the converted key')
+        if chain_pem:
+            refuse_eddsa_key(chain_pem, 'the converted chain')
 
         # Guard rail: binary files (PKCS12/PFX) require a password
         if is_binary and not password:

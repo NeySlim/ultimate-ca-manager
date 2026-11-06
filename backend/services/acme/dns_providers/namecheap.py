@@ -133,6 +133,8 @@ class NamecheapDnsProvider(BaseDnsProvider):
             })
         hosts_result = result.find('.//{*}DomainDNSGetHostsResult')
         email_type = hosts_result.attrib.get('EmailType') if hosts_result is not None else None
+        if not email_type and any(r['RecordType'] == 'MX' for r in records):
+            email_type = 'MX'  # setHosts drops MX records unless EmailType says MX
         return records, email_type
 
     def _set_hosts(self, sld: str, tld: str, records: List[Dict], email_type: Optional[str]) -> Tuple[bool, Any]:
