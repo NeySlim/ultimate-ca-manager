@@ -10,6 +10,9 @@ on:
   pull_request:
     branches: [main, master, develop, dev]
   workflow_dispatch:
+  schedule:
+    # Nightly sequential run of dev (the default branch is main, see the job)
+    - cron: '0 3 * * *'
 
 permissions:
   contents: read
@@ -114,16 +117,51 @@ jobs:
           INITIAL_ADMIN_PASSWORD: changeme123
           CSRF_DISABLED: 'true'
           UCM_DEV_MODE: 'true'
-          # test and main run the suite on one database, as a user does; the
-          # other branches spread the files over the runner's 4 cores
-          PYTEST_WORKERS: ${{ (github.ref_name == 'test' || github.ref_name == 'main') && '0' || '4' }}
         run: |
           cd backend
-          if [ "$PYTEST_WORKERS" = "0" ]; then
-            pytest -v --tb=short
-          else
-            pytest -v --tb=short -n "$PYTEST_WORKERS" --dist loadfile
-          fi
+          pytest -v --tb=short -n 4 --dist loadfile
+
+  # One database for the whole suite, as a user runs it: the integration judge.
+  # Release branches, the nightly run of dev, and on demand. Not on dev pushes.
+  test-backend-sequential:
+    name: Backend Tests (sequential)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main'))
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event_name == 'schedule' && 'dev' || github.ref }}
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+          # As the packages do: pyjks without its twofish dependency
+          pip install --no-deps pyjks==20.0.0
+
+      - name: Run tests
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+        run: |
+          cd backend
+          pytest -v --tb=short --durations=30
 
   test-backend-postgres:
     name: Backend Tests (PostgreSQL)
