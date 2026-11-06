@@ -151,6 +151,9 @@ if _pg_app.ENABLED:
     assert _settings.Config.DATABASE_TYPE == 'postgresql', _settings.Config.SQLALCHEMY_DATABASE_URI
     _settings.TestingConfig.SQLALCHEMY_DATABASE_URI = _settings.Config.SQLALCHEMY_DATABASE_URI
     _settings.TestingConfig.SQLALCHEMY_ENGINE_OPTIONS = dict(_settings.Config.SQLALCHEMY_ENGINE_OPTIONS)
+    import app as _app_module  # noqa: E402
+
+    _app_module.create_app = _pg_app.isolating(_app_module.create_app, _settings.TestingConfig)
 
 
 def pytest_collection_modifyitems(config, items):
@@ -349,7 +352,10 @@ def app():
         temp_db = f.name
 
     from app import create_app
-    application = create_app('testing')
+    if _pg_app.ENABLED:
+        application = _pg_app.session_app(create_app, 'testing')
+    else:
+        application = create_app('testing')
 
     # Keep the suite off the machine's real files. The restore writes the
     # HTTPS certificate and key where the configuration points, and the
