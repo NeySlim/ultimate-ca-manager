@@ -114,3 +114,5 @@ SECURITY_AUDIT.md
 .env.lab
 .env*.local
 CHANGELOG.md.tmp
+# pytest-testmon database (local iteration only)
+.testmondata
