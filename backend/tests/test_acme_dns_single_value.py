@@ -97,7 +97,8 @@ def test_a_cleanup_leaves_the_name_to_another_order_in_progress(rows, monkeypatc
 
 
 @pytest.mark.parametrize('status, expires_in, age, blocks', [
-    ('ready', None, None, True), ('processing', None, None, True), ('validating', None, None, True),
+    # 'ready': every authorization is valid already (RFC 8555 §7.1.6), the TXT is no longer needed
+    ('ready', None, None, False), ('processing', None, None, True), ('validating', None, None, True),
     ('valid', None, None, False), ('invalid', None, None, False), ('error', None, None, False),
     ('pending', timedelta(hours=1), None, True), ('pending', -timedelta(hours=1), None, False),
     ('pending', None, timedelta(days=8), False),
@@ -240,3 +241,148 @@ def test_the_proxy_publishes_only_the_upstream_value_on_a_single_value_provider(
     assert [c[0] for c in calls] == ['create'] and calls[0][2] != 'client-value'
     assert [r['value'] for r in json.loads(db.session.get(AcmeClientOrder, order.id).dns_records_created)] \
         == [calls[0][2]]
+
+
+def test_a_repeated_identifier_is_not_a_second_value(rows, auth_client, monkeypatch):
+    """The CA deduplicates identifiers: only distinct names under one value are refused."""
+    created = []
+    name = f'{uuid.uuid4().hex[:8]}.duckdns.org'
+    provider = rows.provider('duckdns')
+
+    def create_order(**kw):
+        created.append(kw['domains'])
+        return True, 'Order created', rows.order([name], provider)
+    client = SimpleNamespace(create_order=create_order,
+                             setup_dns_challenge=lambda _o: (False, 'not published here', {}))
+    monkeypatch.setattr(AcmeClientService, 'for_issuance', classmethod(lambda cls, **_kw: client))
+    answer = auth_client.post('/api/v2/acme/client/request', json={
+        'domains': [name, name.upper()], 'email': 'a@example.com', 'challenge_type': 'dns-01',
+        'environment': 'staging', 'dns_provider_id': provider.id})
+    assert answer.status_code == 201, answer.get_json()
+    assert len(created) == 1
+
+
+def test_the_refusal_names_each_identifier_once():
+    from services.acme.single_txt_value import apex_and_wildcard_refusal
+    message = apex_and_wildcard_refusal(['x.example', '*.x.example', 'X.example.'],
+                                        get_provider_class('hurricane'))
+    assert 'so x.example, *.x.example cannot' in message
+
+
+def test_the_proxy_cleanup_of_an_order_still_pending_is_not_left_to_itself(rows, monkeypatch):
+    """A failed commit of 'valid' leaves the order pending: its own cleanup must still clear the name."""
+    calls = []
+    name = _domain()
+    provider = rows.provider('hurricane')
+    order = rows.order([name], provider)
+    order.is_proxy_order = True
+    db.session.commit()
+    svc = AcmeProxyService('https://ucm.example/acme/proxy')
+    from flask import current_app
+    with patch('services.acme.dns_providers.create_provider', return_value=_recording('hurricane', calls)), \
+         patch.object(db.session, 'remove', lambda: None):
+        svc._bg_cleanup_dns_records(current_app._get_current_object(), [
+            {'provider_id': provider.id, 'domain': name, 'record_name': f'_acme-challenge.{name}',
+             'value': 'v'}], order.id)
+    assert calls == [('delete', f'_acme-challenge.{name}', 'v')]
+
+
+def test_duckdns_holds_one_value_per_sub_name():
+    from services.acme.single_txt_value import apex_and_wildcard_refusal
+    duckdns = get_provider_class('duckdns')
+    assert duckdns.single_value_key('_acme-challenge.a.foo.duckdns.org') == 'foo'
+    assert duckdns.single_value_key('_acme-challenge.FOO.duckdns.org.') == 'foo'
+    assert 'foo.duckdns.org, www.foo.duckdns.org' in apex_and_wildcard_refusal(
+        ['foo.duckdns.org', 'www.foo.duckdns.org'], duckdns)
+    for other in ('hurricane', 'freedns'):
+        cls = get_provider_class(other)
+        assert cls.single_value_key('_acme-challenge.A.x.example.') == '_acme-challenge.a.x.example'
+        assert apex_and_wildcard_refusal(['x.example', 'a.x.example'], cls) is None
+
+
+def test_a_duckdns_cleanup_sees_an_order_on_the_same_sub_name(rows, monkeypatch):
+    calls = []
+    monkeypatch.setattr(client_mod, 'create_provider', lambda *_a: _recording('duckdns', calls))
+    sub = uuid.uuid4().hex[:8]
+    provider = rows.provider('duckdns')
+    rows.order([f'{sub}.duckdns.org'], provider)
+    assert AcmeClientService.cleanup_dns_challenge(rows.order([f'a.{sub}.duckdns.org'], provider))[0]
+    assert calls == []
+
+
+def test_a_hurricane_cleanup_ignores_an_order_on_the_parent_name(rows, monkeypatch):
+    calls = []
+    monkeypatch.setattr(client_mod, 'create_provider', lambda *_a: _recording('hurricane', calls))
+    name = _domain()
+    provider = rows.provider('hurricane')
+    rows.order([name], provider)
+    assert AcmeClientService.cleanup_dns_challenge(rows.order([f'a.{name}'], provider))[0]
+    assert [c[:2] for c in calls] == [('delete', f'_acme-challenge.a.{name}')]
+
+
+def test_the_txt_lock_is_taken_on_the_single_value_key(rows, monkeypatch):
+    from contextlib import contextmanager
+    from services.acme import acme_proxy_service as proxy_mod
+    from services import acme_renewal_service as renew_mod
+
+    held = []
+
+    @contextmanager
+    def recording(name):
+        held.append(name)
+        yield
+    for module, attr in ((client_mod, 'txt_record_lock'), (proxy_mod, '_txt_record_lock'),
+                         (renew_mod, 'txt_record_lock')):
+        monkeypatch.setattr(module, attr, recording)
+    calls = []
+    monkeypatch.setattr(client_mod, 'create_provider', lambda *_a: _recording('duckdns', calls))
+    sub = uuid.uuid4().hex[:8]
+    provider = rows.provider('duckdns')
+    order = rows.order([f'a.{sub}.duckdns.org'], provider)
+    svc = AcmeClientService.__new__(AcmeClientService)
+    assert svc.setup_dns_challenge(order)[0]
+    assert AcmeClientService.cleanup_dns_challenge(order)[0]
+    AcmeProxyService._delete_dns_record(_recording('duckdns', calls), 'x', f'_acme-challenge.{sub}.duckdns.org', 'v')
+    assert held == [sub, sub, sub]
+
+
+def test_the_renewal_and_the_proxy_publish_lock_the_single_value_key(rows, monkeypatch):
+    from contextlib import contextmanager
+    from unittest.mock import MagicMock
+    from services.acme import acme_proxy_service as proxy_mod
+    from services import acme_renewal_service as renew_mod
+
+    held = []
+
+    @contextmanager
+    def recording(name):
+        held.append(name)
+        yield
+    monkeypatch.setattr(proxy_mod, '_txt_record_lock', recording)
+    monkeypatch.setattr(renew_mod, 'txt_record_lock', recording)
+    sub = uuid.uuid4().hex[:8]
+    name = f'a.{sub}.duckdns.org'
+    provider = rows.provider('duckdns')
+    parent = rows.order([name], provider, status='issued')
+    client = MagicMock()
+    client.account = None
+    client.create_order.return_value = (True, 'ok', rows.order([name], provider))
+    client.verify_challenge.side_effect = RuntimeError('STOP')
+    with patch.object(renew_mod, 'renewal_client', return_value=client), \
+         patch('services.acme.dns_providers.create_provider', return_value=_recording('duckdns', [])), \
+         patch.object(renew_mod, 'wait_for_challenges', return_value={'ok': True, 'missing': [], 'waited': 0}):
+        with pytest.raises(Exception):
+            renew_mod.renew_certificate(db.session.get(AcmeClientOrder, parent.id))
+    assert held == [sub, sub]  # publish, then cleanup
+
+    held.clear()
+    order = rows.order([name], provider)
+    order.is_proxy_order = True
+    db.session.commit()
+    svc = AcmeProxyService('https://ucm.example/acme/proxy')
+    monkeypatch.setattr(svc, '_post_with_account', lambda *_a, **_k: SimpleNamespace(status_code=200, text=''))
+    monkeypatch.setattr(proxy_mod, 'wait_for_txt', lambda *_a: {'ok': True, 'waited': 0})
+    with patch('api.v2.acme_domains.find_provider_for_domain', return_value={'provider': provider}), \
+         patch('services.acme.dns_providers.create_provider', return_value=_recording('duckdns', [])):
+        svc._run_dns01_automation('https://ca.example/chall/1', 'token.thumb', name, order.id)
+    assert held == [sub]

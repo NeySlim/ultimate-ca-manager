@@ -42,7 +42,7 @@ from utils.ca_profile import default_digest_for_key_type
 from utils.signing_hash import HASH_BY_NAME, signing_hash_for
 from utils.san_parse import strip_wildcard
 from services.acme.dns_txt_lock import txt_record_lock
-from services.acme.single_txt_value import apex_and_wildcard_refusal, keep_for_another_order
+from services.acme.single_txt_value import apex_and_wildcard_refusal, keep_for_another_order, txt_lock_name
 from services.acme.order_lease import LEASE_LOST
 from services.acme import compromised_keys
 
@@ -1324,7 +1324,7 @@ class AcmeClientService:
             record_name = challenge['dns_txt_name']
             record_value = challenge['dns_txt_value']
             
-            with txt_record_lock(record_name):
+            with txt_record_lock(txt_lock_name(provider, record_name)):
                 success, message = provider.create_txt_record(
                     domain=strip_wildcard(domain),
                     record_name=record_name,
@@ -2017,7 +2017,7 @@ class AcmeClientService:
                     # Deleting by name alone would take other orders' values with it
                     logger.warning("DNS cleanup skipped for %s: no TXT value recorded", challenge['dns_txt_name'])
                     continue
-                with txt_record_lock(challenge['dns_txt_name']):
+                with txt_record_lock(txt_lock_name(provider, challenge['dns_txt_name'])):
                     if keep_for_another_order(provider, challenge['dns_txt_name'], getattr(order, 'id', None)):
                         continue
                     result = provider.delete_txt_record(

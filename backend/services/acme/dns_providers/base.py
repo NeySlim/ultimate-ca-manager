@@ -154,6 +154,11 @@ class BaseDnsProvider(ABC):
         """
         pass
 
+    @classmethod
+    def single_value_key(cls, record_name: str) -> str:
+        """What a one-value provider keeps a single TXT value under (SINGLE_TXT_VALUE)."""
+        return (record_name or '').strip().lower().rstrip('.')
+
     @staticmethod
     def txt_matches(stored, expected) -> bool:
         """Whether a TXT value as an API returns it (quoted, split in strings) is `expected`."""

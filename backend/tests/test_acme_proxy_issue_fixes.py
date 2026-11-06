@@ -244,6 +244,7 @@ class TestGetCertificateResponsePath:
             target, args = spawned[0]
             assert target.__name__ == '_bg_cleanup_dns_records'
             assert args[1] == records
+            assert args[2] == order.id  # its own cleanup is never left to itself
 
             refreshed = db.session.get(AcmeClientOrder, order.id)
             assert refreshed.status == 'valid'

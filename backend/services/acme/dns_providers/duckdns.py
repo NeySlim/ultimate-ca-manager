@@ -35,6 +35,14 @@ class DuckDnsDnsProvider(BaseDnsProvider):
     def __init__(self, credentials: Dict[str, Any]):
         super().__init__(credentials)
     
+    @classmethod
+    def single_value_key(cls, record_name: str) -> str:
+        """DuckDNS keeps one TXT value per account sub-name (foo), whatever is under it."""
+        name = super().single_value_key(record_name)
+        if name.endswith('.duckdns.org'):
+            return name[:-len('.duckdns.org')].rsplit('.', 1)[-1]
+        return name
+
     def _extract_subdomain(self, domain: str) -> str:
         """Extract subdomain from full domain name"""
         # DuckDNS domains are like: subdomain.duckdns.org
