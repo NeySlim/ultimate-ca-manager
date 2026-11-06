@@ -22,6 +22,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- XCEP: an ECDSA template was announced without its key algorithm, so Windows generated an RSA key of the curve's size and the enrolment failed. The template now names its curve (`ECDSA_P256`, `ECDSA_P384`, `ECDSA_P521`) as a signature key.
+- WSTEP: two templates sharing an EKU were told apart by their id alone, so a P-384 request was issued under the P-256 template and stamped with its OID. The request key must now fit the template: same curve or ML-DSA set, an RSA key at least as long.
+- WSTEP: the CMC envelope Windows signs with an ECDSA key was refused, because CertEnroll names the key type (`id-ecPublicKey`) as its signature algorithm. It is now verified with the digest the envelope declares.
 - Database: on PostgreSQL in a schema other than `public`, the integrity check reported 0 tables. It now counts the tables of the schema in use.
 - Database migration: to PostgreSQL in a schema other than `public` (a `search_path` in the URL), the sequences of the copied tables were never found, so the migration was refused at its verification. The sequences of the schema in use are now realigned, and the reset the failure message asks for names that schema.
 - Database: on PostgreSQL, the database reset waited forever for the transaction of its own request. It now closes that transaction before dropping the tables.

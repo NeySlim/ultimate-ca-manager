@@ -193,7 +193,8 @@ def _policies(client):
 def _assert_ecdsa_p384(policy):
     attrs = policy.find(f'.//{{{XCEP_NS}}}privateKeyAttributes')
     assert attrs.find(f'{{{XCEP_NS}}}minimalKeyLength').text == '384'
-    assert attrs.find(f'{{{XCEP_NS}}}keySpec').get(XSI_NIL) == 'true'
+    assert attrs.find(f'{{{XCEP_NS}}}keySpec').text == '2'  # AT_SIGNATURE, the key is named too
+    assert attrs.find(f'{{{XCEP_NS}}}algorithmOIDReference').get(XSI_NIL) is None
     providers = [p.text for p in attrs.findall(f'.//{{{XCEP_NS}}}provider')]
     assert providers == ['Microsoft Software Key Storage Provider']
 
