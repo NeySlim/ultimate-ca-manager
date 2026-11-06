@@ -855,7 +855,6 @@ def server_keygen(label=None):
             return Response('Invalid CSR', status=400)
         
         from cryptography import x509
-        from cryptography.hazmat.primitives import hashes
         from cryptography.hazmat.primitives.asymmetric import rsa
         from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives.serialization import (
@@ -938,16 +937,28 @@ def server_keygen(label=None):
             success=True,
         )
         
-        # Generate new key pair
-        key = key_algorithms.generate('RSA-2048')
-        
+        # RFC 7030 §4.4 leaves the key to the server: the CA's family and strength,
+        # bounded by the policies; the CMS key package is signed with RSA or EC
+        from services.policy_service import PolicyEvaluationService
+        from utils.issuance_defaults import digest_for_key, generated_key_algorithm
+        from utils.signing_hash import HASH_BY_NAME
+        from services.ca.helpers import get_ca_cert_pem
+        policies = PolicyEvaluationService.applicable_policies(
+            ca.id, None, subject_cn, [v for t, v in (_san_values(csr) or ()) if t == 'DNSName'])
+        alg = generated_key_algorithm(
+            x509.load_pem_x509_certificate(get_ca_cert_pem(ca)).public_key(), policies,
+            ca_id=ca.id, classical_only=auth_method == 'mtls')
+        key = key_algorithms.generate(alg.label)
+
         # Create a new CSR with the server-generated key while retaining the
         # subject and requested extensions (including SubjectAltName).
         new_csr_builder = x509.CertificateSigningRequestBuilder().subject_name(
             csr.subject
         )
         new_csr_builder = _copy_csr_extensions(new_csr_builder, csr)
-        new_csr = new_csr_builder.sign(key, hashes.SHA256(), default_backend())
+        csr_digest = digest_for_key(key)
+        new_csr = new_csr_builder.sign(key, HASH_BY_NAME[csr_digest]() if csr_digest else None,
+                                       default_backend())
         
         from models import SystemConfig
         validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()

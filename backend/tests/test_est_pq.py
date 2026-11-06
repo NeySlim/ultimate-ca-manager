@@ -139,11 +139,13 @@ def test_serverkeygen_ignores_an_mldsa_request_key(client, est_ca, tmp_path, whi
     r = _post(client, 'serverkeygen', csr.public_bytes(serialization.Encoding.DER))
     assert r.status_code == 200, r.data
     leaf = _serverkeygen_leaf(r)
-    assert key_algorithms.label_for_public_key(leaf.public_key()) == 'RSA-2048'
+    # The key follows the CA (#397), never the request's
+    expected = {'rsa': 'RSA-2048', 'mldsa': 'ML-DSA-65'}[which]
+    assert key_algorithms.label_for_public_key(leaf.public_key()) == expected
     assert leaf.subject.rfc4514_string() == f'CN={cn}'
 
 
-def test_serverkeygen_stays_rsa_2048_under_an_mldsa_ca(client, est_ca):
+def test_serverkeygen_follows_an_mldsa_ca(client, est_ca):
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.x509.oid import NameOID
@@ -155,7 +157,7 @@ def test_serverkeygen_stays_rsa_2048_under_an_mldsa_ca(client, est_ca):
     r = _post(client, 'serverkeygen', csr.public_bytes(serialization.Encoding.DER))
     assert r.status_code == 200, r.data
     leaf = _serverkeygen_leaf(r)
-    assert key_algorithms.label_for_public_key(leaf.public_key()) == 'RSA-2048'
+    assert key_algorithms.label_for_public_key(leaf.public_key()) == 'ML-DSA-65'
     leaf.verify_directly_issued_by(ca_cert)
 
 
