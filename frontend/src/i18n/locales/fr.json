@@ -5673,6 +5673,8 @@
     "tasksTitle": "Taches de fond",
     "runNow": "Executer",
     "taskRan": "Tache « {{name}} » executee",
+    "taskQueued": "Tâche « {{name}} » lancée : elle est toujours en cours",
+    "stateStale": "Le processus planificateur ne s'est pas manifesté depuis un moment : le statut affiché peut être dépassé",
     "runFailed": "Echec de l'execution de la tache",
     "loadFailed": "Echec du chargement des taches",
     "noTasks": "Aucune tache planifiee",

@@ -228,3 +228,49 @@ def test_under_gunicorn_the_master_skips_the_startup_housekeeping(monkeypatch):
     monkeypatch.setenv(scheduler_service.SUPERVISED_ENV, '')
     application = app_module.create_app('testing')
     assert ran == [application]
+
+
+@pytest.mark.parametrize('outcome, expected', [
+    (lambda: 0, 0), (lambda: None, 0), (lambda: sys.exit(0), 0),
+    (lambda: 1, 1), (lambda: sys.exit(3), 1), (lambda: sys.exit(4), 1), (lambda: 4, 1),
+    (lambda: 1 / 0, 1), (lambda: (_ for _ in ()).throw(KeyboardInterrupt), 1),
+])
+def test_the_scheduler_process_never_exits_with_a_code_that_halts_gunicorn(outcome, expected):
+    import scheduler_main
+    assert scheduler_main.exit_code(outcome) == expected
+
+
+def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch):
+    import app as app_module
+    import scheduler_main
+    from services import scheduler_service
+
+    handlers, exits = {}, []
+    monkeypatch.setenv(scheduler_service.SUPERVISED_ENV, '')
+    monkeypatch.setattr(scheduler_main.signal, 'signal', lambda sig, h: handlers.__setitem__(sig, h))
+
+    class Exit(Exception):
+        pass
+
+    def fake_exit(code):
+        exits.append(code)
+        raise Exit
+    monkeypatch.setattr(scheduler_main.os, '_exit', fake_exit)
+
+    class Scheduler:
+        _thread = types.SimpleNamespace(join=lambda timeout: None, is_alive=lambda: True)
+
+        def rearm_grace(self):
+            pass
+
+        def start(self, app):
+            handlers[signal.SIGTERM]()
+
+        def relinquish(self):
+            pass
+    monkeypatch.setattr(app_module, 'create_app', lambda: 'the-app')
+    monkeypatch.setattr(app_module, 'run_startup_housekeeping', lambda a: None)
+    monkeypatch.setattr(scheduler_service, 'get_scheduler', lambda: Scheduler())
+    with pytest.raises(Exit):
+        scheduler_main.main()
+    assert exits == [0]

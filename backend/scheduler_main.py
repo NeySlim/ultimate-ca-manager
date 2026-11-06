@@ -6,7 +6,6 @@ request and no worker heartbeat, and nothing forks while it runs. No gevent here
 import logging
 import os
 import signal
-import sys
 import threading
 
 GRACE_ENV = 'UCM_SCHEDULER_GRACEFUL_TIMEOUT'
@@ -43,12 +42,32 @@ def main() -> int:
     if thread is not None:
         thread.join(grace)
         if thread.is_alive():
+            # A stop that was asked for: 0, or the arbiter logs "Worker exited with code 1"
             logger.warning("A scheduled task outlasted %ss: the scheduler process exits anyway", grace)
             logging.shutdown()
-            os._exit(1)
+            os._exit(0)
     logger.info("Scheduler process %s stopped", os.getpid())
     return 0
 
 
+def exit_code(run) -> int:
+    """0 or 1, whatever ``run`` returns or raises.
+
+    The gunicorn arbiter reaps every child with waitpid(-1) and halts the whole
+    service on 3 or 4 (worker boot / app load error); a SIGKILL here still logs
+    "Worker (pid) was sent SIGKILL", which nothing in this process can prevent.
+    """
+    try:
+        code = run()
+    except SystemExit as e:
+        code = e.code
+    except BaseException:
+        logger.exception("The scheduler process failed")
+        code = 1
+    return 0 if code in (0, None) else 1
+
+
 if __name__ == '__main__':
-    sys.exit(main())
+    code = exit_code(main)
+    logging.shutdown()
+    os._exit(code)

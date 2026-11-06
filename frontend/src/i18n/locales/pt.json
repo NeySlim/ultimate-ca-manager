@@ -5670,6 +5670,8 @@
     "tasksTitle": "Tarefas em segundo plano",
     "runNow": "Executar",
     "taskRan": "Tarefa {{name}} executada",
+    "taskQueued": "Tarefa {{name}} iniciada: ainda em execução",
+    "stateStale": "O processo do agendador não reporta há algum tempo: o estado exibido pode estar desatualizado",
     "runFailed": "Falha ao executar a tarefa",
     "loadFailed": "Falha ao carregar as tarefas",
     "noTasks": "Nenhuma tarefa agendada",

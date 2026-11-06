@@ -5673,6 +5673,8 @@
     "tasksTitle": "Background tasks",
     "runNow": "Run now",
     "taskRan": "Task '{{name}}' executed",
+    "taskQueued": "Task '{{name}}' started: it is still running",
+    "stateStale": "The scheduler process has not reported for a while: the status shown may be out of date",
     "runFailed": "Failed to run task",
     "loadFailed": "Failed to load scheduler tasks",
     "noTasks": "No scheduled tasks",

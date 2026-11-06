@@ -1,5 +1,6 @@
 """Single-scheduler lock (#139 root cause): only one process runs the loop."""
 import errno
+import json
 import logging
 import os
 import threading
@@ -204,3 +205,52 @@ def test_run_now_says_queued_when_the_run_outlasts_the_wait(sched, monkeypatch):
     monkeypatch.setattr(scheduler_service, 'RUN_NOW_WAIT_SECONDS', 0.3)
     status = worker.run_task_now('t')  # no scheduler process running
     assert status['queued'] is True and status['run_count'] == 0
+
+
+def test_a_worker_flags_a_state_no_longer_published(sched, monkeypatch, data_dir):
+    loop, worker = _pair(sched, monkeypatch, lambda: None)
+    assert worker.state_is_stale()  # nothing published yet
+    loop._publish_state()
+    assert not worker.state_is_stale() and 'stale' not in worker.get_task_status('t')
+    state = json.loads((data_dir / scheduler_service.STATE_FILE).read_text())
+    state['published_at'] -= 2 * worker.wake_interval + 1
+    (data_dir / scheduler_service.STATE_FILE).write_text(json.dumps(state))
+    assert worker.state_is_stale() and worker.get_task_status('t')['stale'] is True
+
+
+def test_every_pass_is_published_even_with_nothing_due(sched, monkeypatch, data_dir):
+    loop, _ = _pair(sched, monkeypatch, lambda: None)
+    loop.wake_interval = 0.1
+    loop.start()
+    path = data_dir / scheduler_service.STATE_FILE
+    assert _wait(lambda: path.exists())
+    first = json.loads(path.read_text())['published_at']
+    assert _wait(lambda: json.loads(path.read_text())['published_at'] > first, timeout=3)
+
+
+def test_an_unwritable_data_dir_is_reported_once(sched, monkeypatch, caplog):
+    loop, _ = _pair(sched, monkeypatch, lambda: None)
+    monkeypatch.setattr(scheduler_service, '_data_path', lambda name: f'/nonexistent-ucm/{name}')
+    with caplog.at_level(logging.WARNING, logger='services.scheduler_service'):
+        loop._publish_state()
+        loop._publish_state()
+    assert len([r for r in caplog.records if 'not published' in r.message]) == 1
+
+
+def test_the_api_reports_a_stale_state_and_a_queued_run(app, auth_client, monkeypatch, tmp_path):
+    from services.audit import AuditService
+
+    monkeypatch.setattr('config.settings.DATA_DIR', str(tmp_path), raising=False)
+    monkeypatch.setenv(scheduler_service.SUPERVISED_ENV, '1')
+    monkeypatch.setattr(scheduler_service, 'RUN_NOW_WAIT_SECONDS', 0.2)
+    audits = []
+    monkeypatch.setattr(AuditService, 'log_action', staticmethod(lambda **kw: audits.append(kw)))
+    listed = auth_client.get('/api/v2/system/scheduler').get_json()['data']
+    assert listed['stale'] is True  # no scheduler process publishes here
+    name = listed['tasks'][0]['name']
+    with app.app_context():
+        task = scheduler_service.get_scheduler().tasks[name]
+        monkeypatch.setattr(task, 'last_error', 'the previous run failed')
+    resp = auth_client.post(f'/api/v2/system/scheduler/{name}/run').get_json()
+    assert resp['data']['queued'] is True and 'started' in resp['message']
+    assert audits[-1]['success'] is True and 'still running' in audits[-1]['details']

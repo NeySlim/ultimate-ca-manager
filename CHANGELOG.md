@@ -84,7 +84,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Restore: `BACKUP_MAX_UPLOAD_MB` (default 512) is the restore upload's own ceiling, the decompressed content may be four times that, and the archive may hold one JSON object per 100 bytes of it; a reverse proxy in front of UCM keeps its own body limit. A restore holds the archive in memory, with a peak of several times its size.
 - Templates: the upgrade adds the `custom_extensions` column, empty for every existing template (migration 127).
 - mTLS: migration 130 makes client certificate enrolments unique per issuer and serial instead of serial alone, first filling a missing issuer from the stored certificate.
-- Scheduler: the scheduled tasks now run in a process of their own (`scheduler_main`), which adds about 150 MB of memory (proportional set size at rest); the 1 GiB limit of the Helm chart and the 2 GiB of `docker-compose.yml` leave room for it. A reload restarts that process, and its tasks run again from the next pass after the usual 30-second grace, as after a service restart. "Run now" asks that process and waits up to 30 seconds for the result.
+- Scheduler: the scheduled tasks now run in a process of their own (`scheduler_main`), which adds about 150 MB of memory (proportional set size at rest); the 1 GiB limit of the Helm chart and the 2 GiB of `docker-compose.yml` leave room for it, and the chart's memory request rises from 256Mi to 512Mi. A reload restarts that process, and its tasks run again from the next pass after the usual 30-second grace, as after a service restart. "Run now" asks that process and waits up to 30 seconds for the result.
 
 ## [2.249] - 2026-11-05
 

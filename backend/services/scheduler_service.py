@@ -150,6 +150,7 @@ class SchedulerService:
         self._pid_file = None
         self._flock_unsupported = False
         self._lock_error_logged = False
+        self._publish_error_logged = False
         self._wake = threading.Event()
         logger.info(f"SchedulerService initialized (wake interval: {wake_interval}s)")
     
@@ -272,9 +273,23 @@ class SchedulerService:
                 for name, task in self.tasks.items()
             }
         if self._delegated():
-            published = _read_state().get('tasks', {})
+            state = _read_state()
+            published = state.get('tasks', {})
             statuses.update({name: published[name] for name in statuses if name in published})
+            if self.state_is_stale(state):
+                for status in statuses.values():
+                    status['stale'] = True
         return statuses
+
+    def state_is_stale(self, state=None) -> bool:
+        """Whether the scheduler process stopped publishing (two passes missed)."""
+        if not self._delegated():
+            return False
+        state = _read_state() if state is None else state
+        published_at = state.get('published_at')
+        if not isinstance(published_at, (int, float)):
+            return True
+        return time.time() - published_at > 2 * self.wake_interval
 
     def rearm_grace(self) -> None:
         """First runs wait the grace period from now, not from registration."""
@@ -293,10 +308,12 @@ class SchedulerService:
             tasks = {name: task.to_dict() for name, task in self.tasks.items()}
         try:
             with open(temp, 'w') as handle:
-                json.dump({'pid': os.getpid(), 'tasks': tasks}, handle)
+                json.dump({'pid': os.getpid(), 'published_at': time.time(), 'tasks': tasks}, handle)
             os.replace(temp, path)
         except OSError as e:
-            logger.warning(f"Scheduler state not published to {path}: {e}")
+            if not self._publish_error_logged:  # once: the loop publishes every pass
+                logger.warning(f"Scheduler state not published to {path}: {e}")
+                self._publish_error_logged = True
 
     def _take_requests(self) -> list:
         """The tasks a web worker asked to run now, each request consumed once."""
@@ -437,6 +454,7 @@ class SchedulerService:
                         self._publish_state()
                 except Exception as e:
                     logger.error(f"Error in scheduler loop: {e}", exc_info=True)
+                self._publish_state()  # every pass: the web workers judge staleness by it
                 self._wait_for_next_pass()
         finally:
             # The next process waiting for the lock takes over from here
@@ -490,7 +508,11 @@ class SchedulerService:
         return True
 
     def _acquire_pid_file(self) -> bool:
-        """Atomic O_EXCL pid file, reclaimed when its process is gone."""
+        """Atomic O_EXCL pid file, reclaimed when its process is gone.
+
+        Only on filesystems without flock: after a container restart a reused pid
+        can make a stale file look held, until that process exits.
+        """
         path = _data_path('scheduler.pid')
         for _ in range(2):
             try:
