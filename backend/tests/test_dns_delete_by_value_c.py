@@ -405,3 +405,10 @@ def test_hurricane_warns_that_cleanup_clears_the_name(monkeypatch, caplog):
     assert ok, msg
     assert sent == [{'hostname': NAME, 'password': 'ddnskey', 'txt': ''}]
     assert any('every TXT value' in r.getMessage() for r in caplog.records)
+
+
+def test_hurricane_refused_clear_is_false(monkeypatch):
+    monkeypatch.setattr(requests, 'post', lambda url, data=None, timeout=None: _Resp(200, text='badauth'))
+    p = create_provider('hurricane', {'password': 'ddnskey'})
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'badauth' in msg
