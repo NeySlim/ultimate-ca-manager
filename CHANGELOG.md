@@ -15,12 +15,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- EST: the encrypted `serverkeygen` key came in a SignedData of type `data`, signed by the generated key itself and without signed attributes. It now comes in an RFC 5958 key package (`id-ct-KP-aKeyPackage`) with content-type and message-digest attributes, signed by the issuing CA through its usual signing path, HSM included (RFC 7030 section 4.4.2, RFC 5652 section 5.3).
+- EST: the encrypted `serverkeygen` key came in a SignedData of type `data`, signed by the generated key itself and without signed attributes. It now comes in an RFC 5958 key package (`id-ct-KP-aKeyPackage`) with content-type and message-digest attributes, signed by an `EST key generator` certificate that the issuing CA issues on first use, HSM CAs included (RFC 7030 section 4.4.2, RFC 5652 section 5.3).
 - EST: without a requested encryption key, `serverkeygen` returned a PKCS#8 encrypted with the Basic password, or a CMS over mTLS. The key now comes as unencrypted `application/pkcs8` under TLS, and a request naming a key UCM does not hold, or a client certificate that does not allow key transport, is refused (RFC 7030 section 4.4.1).
 
 ### Upgrade notes
 
-- EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the issuing CA from `/cacerts`. That CA certificate must assert digitalSignature, which the default root profile does not: such a root answers 400 to an encrypted request and still serves the key in clear. Under an Ed448 CA the package verifies only with RFC 8419-aware tools (id-shake256-len), which OpenSSL 3.5 is not.
+- EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the `EST key generator` certificate the SignedData carries, which chains to the issuing CA from `/cacerts`. Migration 132 adds the `est_signer_certs` table that holds these certificates; backups leave it out, as they are issued again on demand.
 - EST: `serverkeygen` without `AsymmetricDecryptKeyIdentifier` now returns the key unencrypted, without the Basic password, and over mTLS the key type is chosen as over Basic, ML-DSA under an ML-DSA CA included.
 
 ## [2.251] - 2026-11-06
