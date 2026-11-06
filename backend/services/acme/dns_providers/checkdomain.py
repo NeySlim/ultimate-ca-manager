@@ -71,17 +71,20 @@ class CheckdomainDnsProvider(BaseDnsProvider):
         return True, "Record created"
 
     @staticmethod
-    def _kept(rec, include_www) -> bool:
+    def _kept(rec, include_www, zone, www_copies) -> bool:
         """Whether a listed record goes back in the replacing PUT.
 
-        SOA and NS are the server's and, with include_www, `www` is generated. Apex (`@`)
-        records stay: if the server refuses one, the PUT fails and nothing is lost.
+        SOA and the apex NS are the server's and, with include_www, the `www` copies of
+        A/AAAA/CNAME records are generated. Everything else stays, apex records and
+        delegations included: if the server refuses one, the PUT fails and nothing is lost.
         """
         if not rec.get('value'):
             return False
-        if rec.get('type') in ('SOA', 'NS'):
+        if rec.get('type') == 'SOA':
             return False
-        return not (include_www and rec.get('name') == 'www')
+        if rec.get('type') == 'NS' and rec.get('name') in ('', '@', zone):
+            return False
+        return not (include_www and rec.get('name') in www_copies)
 
     def delete_txt_record(self, domain, record_name, record_value):
         info = self._find_domain(domain)
@@ -107,9 +110,11 @@ class CheckdomainDnsProvider(BaseDnsProvider):
             return False, f"Failed to read nameserver settings: {ns}"
         include_www = bool(((ns or {}).get('general') or {}).get('include_www'))
         soa_ttl = ((ns or {}).get('soa') or {}).get('ttl')
+        www_copies = {'www'} | {f"www.{r.get('name')}" for r in records
+                                if r.get('type') in ('A', 'AAAA', 'CNAME') and r.get('name') not in ('', '@')}
         keep = []
         for rec in records:
-            if any(rec is t for t in target) or not self._kept(rec, include_www):
+            if any(rec is t for t in target) or not self._kept(rec, include_www, zone, www_copies):
                 continue
             ttl = rec.get('ttl') or soa_ttl  # a ttl of 0 is refused on the way back
             keep.append({'name': rec.get('name'), 'value': rec.get('value'), 'ttl': ttl,
