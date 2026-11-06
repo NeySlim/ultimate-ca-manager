@@ -387,7 +387,7 @@ def test_two_generations_under_one_name_take_turns(app):
                     results.append(HsmService.generate_key(provider_id, 'raced', 'EC-P256').label)
                 except HsmKeyExistsError as e:
                     results.append(type(e).__name__)
-                except Exception as e:  # noqa: BLE001: named by the assertion below
+                except Exception as e:  # noqa: BLE001  # named by the assertion below
                     results.append(repr(e))
                 finally:
                     db.session.remove()

@@ -204,7 +204,7 @@ def _session_identity():
     """(user_id, permissions) for a full, valid session cookie holding the minimum permission."""
     try:
         info = AuthManager().verify_session()
-    except Exception as exc:  # noqa: BLE001: an unverifiable session is no session
+    except Exception as exc:  # noqa: BLE001  # an unverifiable session is no session
         logger.warning("WebSocket session check failed, treated as no session: %s", exc)
         return None
     if not info:
@@ -256,7 +256,7 @@ def _drop(sid, reason):
     logger.info("WebSocket client disconnected by the server: %s", reason)
     try:
         disconnect(sid)
-    except Exception as exc:  # noqa: BLE001: the local state is already gone
+    except Exception as exc:  # noqa: BLE001  # the local state is already gone
         logger.warning("Could not close WebSocket client: %s", exc)
 
 
@@ -447,7 +447,7 @@ def emit_event(event_type, data, room=None, include_self=True):
         options['skip_sid'] = _calling_sid()
     try:
         socketio.emit('event', payload, **options)
-    except Exception as exc:  # noqa: BLE001: a dead transport must not reach business code
+    except Exception as exc:  # noqa: BLE001  # a dead transport must not reach business code
         logger.warning("WebSocket emit of %s to %s failed: %s", type_name, room, exc)
 
 

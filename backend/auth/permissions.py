@@ -246,7 +246,7 @@ def get_custom_role_permissions(user) -> list:
         from models import db
         from models.rbac import CustomRole
         return custom_role_permissions(db.session.get(CustomRole, role_id))
-    except Exception as e:  # noqa: BLE001: authorisation must not 500 on this
+    except Exception as e:  # noqa: BLE001  # authorisation must not 500 on this
         logger.warning(f"Could not resolve custom role permissions for user {getattr(user, 'id', '?')}: {e}")
         return []
 
