@@ -149,7 +149,8 @@ def _ec(bits: int, curve: type, names: tuple[str, ...], trust_store_id: str) -> 
         label=f'EC-P{bits}', family='EC', param=f'P{bits}',
         private_class=ec.EllipticCurvePrivateKey, public_class=ec.EllipticCurvePublicKey,
         generator=lambda: generate_ec(curve()),
-        needs_digest=True, default_digest='sha256',
+        # A hash of the curve's strength (CA/Browser Forum BR 7.1.3.2.2)
+        needs_digest=True, default_digest={256: 'sha256', 384: 'sha384', 521: 'sha512'}[bits],
         display=f'EC P-{bits}', legacy_key_algo=f'EC {curve.name}', trust_store_id=trust_store_id,
         fips_approved=True, key_size=bits, curve_names=names,
         aliases=(f'P-{bits}', f'NIST P-{bits}', f'ECDSA-P{bits}'),
@@ -318,8 +319,8 @@ def label_for_public_key(public_key) -> str | None:
 
 
 def default_digest_for_key(key) -> str | None:
-    """Digest name UCM signs with when none is requested, for a public or private key;
-    None when its scheme takes no digest (Ed25519, Ed448, ML-DSA), sha256 if unregistered."""
+    """Digest name UCM signs with when none is requested, for a public or private key: the
+    curve's for EC, None when its scheme takes none (Ed25519, Ed448, ML-DSA), sha256 if unregistered."""
     for alg in _REGISTRY.algorithms:
         if alg.matches_key(key):
             return alg.default_digest

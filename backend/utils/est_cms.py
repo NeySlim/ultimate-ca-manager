@@ -1,22 +1,29 @@
 """CMS encoding helpers for RFC 7030 server-side key generation."""
 from asn1crypto import algos, cms, x509 as asn1_x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding as asym_padding, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, padding as asym_padding, rsa
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
 
+from utils.issuance_defaults import digest_for_key
 from utils.randomness import csp_bytes
+from utils.signing_hash import HASH_BY_NAME
 
 
 def _signed_private_key(private_key, issued_cert, pkcs8_der):
     """Return a CMS SignedData value containing and authenticating PKCS#8."""
     cert_der = issued_cert.public_bytes(serialization.Encoding.DER)
     signer_cert = asn1_x509.Certificate.load(cert_der)
-    signature = private_key.sign(
-        pkcs8_der,
-        asym_padding.PKCS1v15(),
-        hashes.SHA256(),
-    )
+    # RSA PKCS#1 v1.5 with SHA-256, ECDSA with the curve's digest (RFC 5754)
+    if isinstance(private_key, ec.EllipticCurvePrivateKey):
+        digest = digest_for_key(private_key)
+        signature = private_key.sign(pkcs8_der, ec.ECDSA(HASH_BY_NAME[digest]()))
+        signature_algorithm = f'{digest}_ecdsa'
+    elif isinstance(private_key, rsa.RSAPrivateKey):
+        digest, signature_algorithm = 'sha256', 'sha256_rsa'
+        signature = private_key.sign(pkcs8_der, asym_padding.PKCS1v15(), hashes.SHA256())
+    else:
+        raise ValueError('EST server-generated key transport signs with an RSA or EC key only')
     signer_info = cms.SignerInfo({
         'version': 'v1',
         'sid': {
@@ -25,13 +32,13 @@ def _signed_private_key(private_key, issued_cert, pkcs8_der):
                 'serial_number': signer_cert.serial_number,
             }
         },
-        'digest_algorithm': {'algorithm': 'sha256'},
-        'signature_algorithm': {'algorithm': 'sha256_rsa'},
+        'digest_algorithm': {'algorithm': digest},
+        'signature_algorithm': {'algorithm': signature_algorithm},
         'signature': signature,
     })
     return cms.SignedData({
         'version': 'v1',
-        'digest_algorithms': [{'algorithm': 'sha256'}],
+        'digest_algorithms': [{'algorithm': digest}],
         'encap_content_info': {
             'content_type': 'data',
             'content': pkcs8_der,

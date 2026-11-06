@@ -20,7 +20,7 @@ def signing_hash_for(key, requested=None):
     None when the registry says the key's scheme takes none (Ed25519, Ed448,
     ML-DSA). For an HSM-resident key, the digest its provider will sign with
     when *requested* is asked for. Otherwise *requested*, else the registry
-    digest of the key (SHA-256 for RSA and NIST curves, the curve's own for Brainpool).
+    digest of the key (SHA-256 for RSA, the curve's own for EC).
     """
     if not key_algorithms.needs_digest(key):
         return None

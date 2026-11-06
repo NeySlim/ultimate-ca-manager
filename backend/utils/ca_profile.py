@@ -43,12 +43,6 @@ DEFAULT_INTERMEDIATE_EKU = []
 ALLOWED_DIGESTS = frozenset({'sha256', 'sha384', 'sha512'})
 
 
-_CURVE_DIGESTS = {
-    'secp384r1': 'sha384', 'brainpoolp384r1': 'sha384',
-    'secp521r1': 'sha512', 'brainpoolp512r1': 'sha512',
-}
-
-
 def _signs_without_digest(key_type) -> bool:
     alg = key_algorithms.get(key_type)
     return alg is not None and not alg.needs_digest
@@ -56,13 +50,14 @@ def _signs_without_digest(key_type) -> bool:
 
 def default_digest_for_key_type(key_type: str) -> Optional[str]:
     """
-    Map key type to a hash of matching strength by curve size (NIST SP 800-57,
-    BSI TR-02102-1). RSA defaults to SHA-256 unless the caller overrides;
+    The registry digest of a key type: a hash of matching strength by curve size
+    (NIST SP 800-57, BSI TR-02102-1), SHA-256 for RSA and unknown types;
     None for a key whose scheme takes no digest (ML-DSA).
     """
-    if _signs_without_digest(key_type):
-        return None
-    return _CURVE_DIGESTS.get(str(key_type).lower(), 'sha256')
+    alg = key_algorithms.get(key_type)
+    if alg is None:
+        return 'sha256'
+    return alg.default_digest
 
 
 def resolve_digest(digest: Optional[str], key_type: str) -> Tuple[Optional[str], Optional[str]]:

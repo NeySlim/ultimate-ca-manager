@@ -635,7 +635,8 @@ class IssuanceMixin:
                 caref=ca.refid,
                 cert_type='server_cert',
                 validity_days=params['validity_days'],
-                digest=params['digest'],
+                # No digest configured: the CA key's
+                digest=params['digest'] if params.get('digest_explicit', True) else None,
                 digest_explicit=params.get('digest_explicit', True),
                 username='acme',
                 template_id=params.get('template_id'),

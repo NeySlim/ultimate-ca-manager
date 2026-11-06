@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
 from utils.algorithm_refusal import refuse_unexportable_key
+from utils.issuance_defaults import browser_key_type
 
 from auth.unified import require_auth, has_permission
 from config.settings import is_docker, restart_ucm_service
@@ -243,7 +244,7 @@ def create_mtls_certificate():
                 'OU': 'mTLS Clients',
             },
             cert_type='usr_cert',
-            key_type='2048',
+            key_type=browser_key_type(ca, f'{user.username}@mtls'),
             validity_days=validity_days,
             username=user.username,
         )
