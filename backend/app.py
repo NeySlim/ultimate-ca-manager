@@ -895,11 +895,13 @@ def create_app(config_name=None):
         # a request commits raises "cannot commit transaction - SQL statements
         # in progress" intermittently. Tasks stay registered (the admin view
         # and run-now execute them synchronously).
-        if not app.config.get('TESTING'):
-            scheduler.start(app=app)
+        from services.scheduler_service import start_scheduler
+        if start_scheduler(app):
             app.logger.info("Scheduler service started with all tasks")
-        else:
+        elif app.config.get('TESTING'):
             app.logger.info("Scheduler tasks registered (background thread disabled under TESTING)")
+        else:
+            app.logger.info("Scheduler tasks registered: the loop runs in a gunicorn worker")
         
         # Register scheduler in app context for graceful shutdown
         app.scheduler = scheduler

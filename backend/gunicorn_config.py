@@ -10,6 +10,9 @@ import os
 import ssl
 import sys
 
+# Before the preloaded app: the master registers the scheduled tasks, a worker runs them
+os.environ['UCM_SCHEDULER_IN_WORKER'] = '1'
+
 # Detect environment
 base_path = os.getenv('UCM_BASE_PATH', '/opt/ucm')
 data_path = os.getenv('DATA_DIR', f'{base_path}/data')
@@ -247,6 +250,7 @@ def post_worker_init(worker):
     1. Suppress noisy SSL/connection tracebacks from gevent
     2. Start HTTP protocol server for CDP/OCSP (if configured)
     3. Start the DNS UPDATE listener (if configured)
+    4. Start the scheduler, which runs once the scheduler lock is free
     """
     import ssl
     import gevent
@@ -296,3 +300,10 @@ def post_worker_init(worker):
         logging.getLogger('ucm.protocol').warning(
             "Could not initialize DNS UPDATE listener: %s", e
         )
+
+    try:
+        from services.scheduler_service import start_scheduler
+        from wsgi import app as flask_app
+        start_scheduler(flask_app, in_worker=True)
+    except Exception as e:
+        worker.log.error("Could not start the scheduler: %s", e)

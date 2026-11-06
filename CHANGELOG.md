@@ -65,6 +65,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Backups: a webhook's authentication token was archived twice, in the clear and encrypted under the source's key, which no other installation can read. The archive now carries it in the clear only, and a restore ignores the encrypted copy of an older archive.
 - Restore: rows sharing an identity the database does not keep unique, such as two revocation records of one serial, were matched to the archive at random, and a replacing restore silently kept the extra ones. Archived rows now go to them by rank, oldest first, a row without a complete identity is matched to none (the dedicated restorers still match one with any part of it set), a replacement removes those the archive does not carry and lists them in the result's warnings, and client certificates, discovered certificates and SCEP requests are identified by issuer and serial, endpoint, and transaction and CA.
 - Database: a gunicorn worker dropped the inherited connections of the default database engine only. It now drops those of every engine.
+- Scheduler: under gunicorn the scheduled tasks ran in the master, so a worker forked while a task held a database connection shared it with the master. They now run in one worker, elected by a lock freed when its holder exits or dies, and another worker takes over within seconds of a reload or a crash.
 
 ### Upgrade notes
 
@@ -81,6 +82,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Restore: `BACKUP_MAX_UPLOAD_MB` (default 512) is the restore upload's own ceiling, the decompressed content may be four times that, and the archive may hold one JSON object per 100 bytes of it; a reverse proxy in front of UCM keeps its own body limit. A restore holds the archive in memory, with a peak of several times its size.
 - Templates: the upgrade adds the `custom_extensions` column, empty for every existing template (migration 127).
 - mTLS: migration 130 makes client certificate enrolments unique per issuer and serial instead of serial alone, first filling a missing issuer from the stored certificate.
+- Scheduler: the scheduled tasks now run in a gunicorn worker instead of the master, and a reload or a worker restart runs each of them once on the next pass, as a service restart does.
 
 ## [2.249] - 2026-11-05
 
