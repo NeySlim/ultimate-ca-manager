@@ -604,7 +604,7 @@ class CSROperationsMixin:
         ca_cert: x509.Certificate,
         ca_private_key,
         validity_days: int = 397,
-        digest: str = 'sha256',
+        digest: Optional[str] = None,
         cert_type: str = 'server_cert',
         cdp_url: str = None,
         cdp_urls: Optional[List[str]] = None,

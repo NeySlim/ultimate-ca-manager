@@ -153,6 +153,8 @@ class CASigningMixin:
         policy_template = (db.session.get(CertificateTemplate, policy_template_id)
                            if policy_template_id else None)
         from utils.custom_extensions import template_custom_extensions
+        from utils.issuance_defaults import template_digest as _template_digest
+        template_digest = _template_digest(policy_template, ca_private_key)
 
         # Sign via TrustStoreService
         cert_pem_bytes = TrustStoreService.sign_csr(
@@ -160,7 +162,7 @@ class CASigningMixin:
             ca_cert=ca_cert,
             ca_private_key=ca_private_key,
             validity_days=validity_days,
-            digest='sha256',
+            digest=template_digest,
             cert_type=cert_type,
             cdp_urls=cdp_urls,
             ocsp_urls=ocsp_urls,
@@ -176,7 +178,7 @@ class CASigningMixin:
             extra_ekus=extra_ekus,
             template_ext={'extended_key_usage': list(template_ekus)} if template_ekus else None,
             policy_scope={'ca_id': ca.id, 'template_id': policy_template_id,
-                          'digest_explicit': False},
+                          'digest_explicit': template_digest is not None},
             san_template=policy_template,
             custom_extensions=template_custom_extensions(policy_template),
         )

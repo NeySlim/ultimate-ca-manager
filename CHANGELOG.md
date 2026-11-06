@@ -21,6 +21,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Issuance: EST, SCEP, WSTEP, Sign CSR, TSA signer and unconfigured ACME orders signed with SHA-256 whatever the CA key and the bound template. They now take the template's digest unless it is weaker than the one matching the CA key (SHA-384 for P-384, SHA-512 for P-521), and a policy refusing that default picks the closest stronger digest it allows, not the weakest (#397).
 - Docker: the images lacked pyspnego's Kerberos backend, which the DEB and RPM installs can add, so the Kerberos binding of Windows autoenrollment could not work in a container. Both images now ship it, at the pyspnego version the requirements resolve (#435, thanks @JPromi).
 - Restore: two DNS providers, ACME CA accounts or webhooks of the same name were merged into one row, and one credential was lost. A clashing row is now restored as `name (2)`, and the restore result lists it; an account is matched by its account URL and a webhook by its URL first.
 - DNS providers, ACME CA accounts and webhooks: the API accepted a name already in use. It now answers 409, on creation and on rename.

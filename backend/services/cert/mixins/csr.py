@@ -191,7 +191,7 @@ class CSRMixin:
         caref: str,
         cert_type: str = 'server_cert',
         validity_days: int = 397,
-        digest: str = 'sha256',
+        digest: str = None,
         username: str = 'system',
         extra_ekus: list = None,
         allow_sensitive_ekus: bool = False,
@@ -210,7 +210,7 @@ class CSRMixin:
             caref: CA refid to sign with
             cert_type: Certificate type
             validity_days: Validity in days
-            digest: Hash algorithm
+            digest: Hash algorithm; None: the policy template's, else the CA key's
             username: User signing
             extra_ekus: Additional EKU OIDs
             template_id: Certificate template bound to the issuance context
@@ -318,6 +318,11 @@ class CSRMixin:
         if san_template is None and policy_template_id:
             from models.certificate_template import CertificateTemplate
             san_template = db.session.get(CertificateTemplate, policy_template_id)
+        if digest is None and template is None:
+            # The Sign CSR form's template (issuance_defaults.template_digest)
+            from utils.issuance_defaults import template_digest
+            digest = template_digest(san_template, ca_private_key)
+            digest_explicit = digest is not None
         from utils.custom_extensions import issuance_custom_extensions
         custom_ext = issuance_custom_extensions(
             san_template if cert_type != 'intermediate_ca' else None, custom_extensions)
