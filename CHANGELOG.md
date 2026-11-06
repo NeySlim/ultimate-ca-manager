@@ -20,7 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
-- EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the issuing CA from `/cacerts`. That CA certificate must assert digitalSignature, which the default root profile does not: such a root answers 400 to an encrypted request and still serves the key in clear.
+- EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the issuing CA from `/cacerts`. That CA certificate must assert digitalSignature, which the default root profile does not: such a root answers 400 to an encrypted request and still serves the key in clear. Under an Ed448 CA the package verifies only with RFC 8419-aware tools (id-shake256-len), which OpenSSL 3.5 is not.
 - EST: `serverkeygen` without `AsymmetricDecryptKeyIdentifier` now returns the key unencrypted, without the Basic password, and over mTLS the key type is chosen as over Basic, ML-DSA under an ML-DSA CA included.
 
 ## [2.251] - 2026-11-06

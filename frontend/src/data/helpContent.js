@@ -552,7 +552,7 @@ export const helpContent = {
           { label: '/simpleenroll', text: 'Submit a CSR and receive a signed certificate' },
           { label: '/simplereenroll', text: 'Renew an existing certificate (requires mTLS)' },
           { label: '/csrattrs', text: 'Get CSR attributes recommended by the server' },
-          { label: '/serverkeygen', text: 'Server generates a key pair and returns certificate + key. The key takes the issuing CA\'s strength, in the family of the request\'s key when RSA or EC (its size or curve is ignored), else the CA\'s, moved to the closest type the policies allow. The key comes as unencrypted PKCS#8 under TLS; a CSR naming the mTLS certificate\'s key (AsymmetricDecryptKeyIdentifier) gets it encrypted to that certificate, in a key package signed by the issuing CA, which must assert digitalSignature (v2.252)' },
+          { label: '/serverkeygen', text: 'Server generates a key pair and returns certificate + key. The key takes the issuing CA\'s strength, in the family of the request\'s key when RSA or EC (its size or curve is ignored), else the CA\'s, moved to the closest type the policies allow. The key comes as unencrypted PKCS#8 under TLS; a CSR naming the mTLS certificate\'s key (AsymmetricDecryptKeyIdentifier) gets it encrypted to that certificate, which must assert keyEncipherment, in a key package signed by the issuing CA, which must assert digitalSignature. Under an Ed448 CA, only RFC 8419-aware tools verify that package (v2.252)' },
         ]
       },
     ],
