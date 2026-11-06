@@ -72,6 +72,7 @@ def get_scheduler_tasks():
             'tasks': tasks,
             'total': len(tasks),
             'warnings': warnings,
+            'stale': any(t.get('stale') for t in tasks),
         })
     except Exception as e:
         logger.error(f"Failed to list scheduler tasks: {e}")
@@ -89,12 +90,17 @@ def run_scheduler_task(task_name):
         result = scheduler.run_task_now(task_name)
         if result is None:
             return error_response("Task not found", 404)
+        queued = bool(result.get('queued'))
+        # A run still going has no outcome yet: its last_error is the previous run's
         AuditService.log_action(
-            action='scheduler_task_run', resource_type='system',
-            resource_name=task_name, details=f"Manually ran scheduler task: {task_name}",
-            success=not bool(result.get('last_error')),
+            action='scheduler_task_run', resource_type='system', resource_name=task_name,
+            details=(f"Started scheduler task: {task_name} (still running)" if queued
+                     else f"Manually ran scheduler task: {task_name}"),
+            success=True if queued else not bool(result.get('last_error')),
         )
         result['label'] = _TASK_LABELS.get(task_name, task_name.replace('_', ' ').title())
+        if queued:  # still running in the scheduler process
+            return success_response(data=result, message=f"Task '{task_name}' started")
         return success_response(data=result, message=f"Task '{task_name}' executed")
     except Exception as e:
         logger.error(f"Failed to run scheduler task {task_name}: {e}")

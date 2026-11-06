@@ -57,9 +57,9 @@ function fmtDuration(ms) {
 
 export default function SchedulerSection({ hasPermission }) {
   const { t } = useTranslation()
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showInfo, showError } = useNotification()
   const [tasks, setTasks] = useState([])
-  const [meta, setMeta] = useState({ total: 0, warnings: 0 })
+  const [meta, setMeta] = useState({ total: 0, warnings: 0, stale: false })
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState({})
   const pollRef = useRef(null)
@@ -71,7 +71,7 @@ export default function SchedulerSection({ hasPermission }) {
       const res = await systemService.getSchedulerTasks()
       const data = res.data || res
       setTasks(data.tasks || [])
-      setMeta({ total: data.total || 0, warnings: data.warnings || 0 })
+      setMeta({ total: data.total || 0, warnings: data.warnings || 0, stale: !!data.stale })
     } catch (e) {
       if (!silent) showError(e.message || t('scheduler.loadFailed'))
     } finally {
@@ -88,8 +88,10 @@ export default function SchedulerSection({ hasPermission }) {
   const handleRun = async (name) => {
     setRunning((r) => ({ ...r, [name]: true }))
     try {
-      await systemService.runSchedulerTask(name)
-      showSuccess(t('scheduler.taskRan', { name }))
+      const res = await systemService.runSchedulerTask(name)
+      // Still running in the scheduler process after the API's wait
+      if ((res?.data || res)?.queued) showInfo(t('scheduler.taskQueued', { name }))
+      else showSuccess(t('scheduler.taskRan', { name }))
       await load(true)
     } catch (e) {
       showError(e.message || t('scheduler.runFailed'))
@@ -114,6 +116,13 @@ export default function SchedulerSection({ hasPermission }) {
           { label: t('common.refresh'), icon: ArrowsClockwise, onClick: () => load(), variant: 'secondary' },
         ]}
       />
+
+      {meta.stale && (
+        <p className="mb-3 flex items-center gap-1.5 text-xs text-status-warning">
+          <WarningCircle size={14} className="shrink-0" />
+          {t('scheduler.stateStale')}
+        </p>
+      )}
 
       <DetailSection title={t('scheduler.tasksTitle')} icon={Timer} iconClass="icon-bg-blue">
         {loading ? (

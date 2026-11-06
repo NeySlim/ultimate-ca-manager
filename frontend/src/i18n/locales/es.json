@@ -5670,6 +5670,8 @@
     "tasksTitle": "Tareas en segundo plano",
     "runNow": "Ejecutar",
     "taskRan": "Tarea {{name}} ejecutada",
+    "taskQueued": "Tarea {{name}} iniciada: sigue en ejecución",
+    "stateStale": "El proceso del planificador no informa desde hace un tiempo: el estado mostrado puede estar desactualizado",
     "runFailed": "Error al ejecutar la tarea",
     "loadFailed": "Error al cargar las tareas",
     "noTasks": "Sin tareas programadas",

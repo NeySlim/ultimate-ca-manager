@@ -5670,6 +5670,8 @@
     "tasksTitle": "Attivita in background",
     "runNow": "Esegui",
     "taskRan": "Attivita {{name}} eseguita",
+    "taskQueued": "Attività {{name}} avviata: è ancora in esecuzione",
+    "stateStale": "Il processo dello scheduler non risponde da un po': lo stato mostrato potrebbe non essere aggiornato",
     "runFailed": "Impossibile eseguire l'attivita",
     "loadFailed": "Impossibile caricare le attivita",
     "noTasks": "Nessuna attivita pianificata",

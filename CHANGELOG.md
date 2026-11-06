@@ -86,6 +86,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - DNS providers: Hurricane Electric reported a TXT record cleared whatever the update endpoint answered, `badauth` included. A clear the endpoint does not confirm now fails.
 - DNS providers: FreeDNS reported a TXT record created or deleted without checking the outcome, and took an unreadable record list for an absent record. A record missing after creation, still listed after deletion, or a list it cannot read now fails.
 - ACME client, renewals and proxy: a DNS-01 TXT cleanup the provider refused left nothing in the logs. It is now logged as a warning with the provider's answer, as is a failed record listing.
+- Database: a gunicorn worker dropped the inherited connections of the default database engine only. It now drops those of every engine.
+- Scheduler: under gunicorn the scheduled tasks ran in the master, so a worker forked while a task held a database connection shared it with the master. They now run in a dedicated scheduler process that the master starts, restarts within seconds after a crash or a reload, and stops with it, so a long task delays neither requests nor workers.
+- Syslog: the TCP connection opened by the gunicorn master was inherited by its workers, so the frames of several processes could interleave on one stream. Each worker now opens its own connection, leaving the master's open.
+- PKCS#11: a gunicorn worker went on using the library its master had initialized, a state Cryptoki leaves undefined after fork: a module that resets itself in the child, such as SoftHSM with `library.reset_on_fork`, refused every operation. Each process now initializes the library itself, and keeps the inherited state only when the module refuses a second initialization.
 
 ### Upgrade notes
 
@@ -104,6 +108,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Restore: `BACKUP_MAX_UPLOAD_MB` (default 512) is the restore upload's own ceiling, the decompressed content may be four times that, and the archive may hold one JSON object per 100 bytes of it; a reverse proxy in front of UCM keeps its own body limit. A restore holds the archive in memory, with a peak of several times its size.
 - Templates: the upgrade adds the `custom_extensions` column, empty for every existing template (migration 127).
 - mTLS: migration 130 makes client certificate enrolments unique per issuer and serial instead of serial alone, first filling a missing issuer from the stored certificate.
+- Scheduler: the scheduled tasks now run in a process of their own (`scheduler_main`), which adds about 150 MB of memory (proportional set size at rest); the 1 GiB limit of the Helm chart and the 2 GiB of `docker-compose.yml` leave room for it, and the chart's memory request rises from 256Mi to 512Mi. A reload restarts that process, and its tasks run again from the next pass after the usual 30-second grace, as after a service restart. "Run now" asks that process and waits up to 30 seconds for the result.
 
 ## [2.249] - 2026-11-05
 
