@@ -2302,7 +2302,8 @@
     "testOkHttp": "API accesible (HTTP {{status}})",
     "httpBinding": "API HTTP: solicitud construida a partir de la plantilla del cuerpo del destino",
     "httpBindingHint": "Este destino envía una solicitud construida a partir de su plantilla de cuerpo; no hay rutas ni comando de recarga que definir. Las opciones de cadena de abajo se aplican a {{chainVariable}} y {{fullchainVariable}}.",
-    "httpBindingKeyHint": "El destino tiene permitido enviar la clave privada."
+    "httpBindingKeyHint": "El destino tiene permitido enviar la clave privada.",
+    "httpHeadersRemoved": "Las cabeceras almacenadas se eliminarán al guardar."
   },
   "crlDeploy": {
     "title": "Despliegue de CRL",

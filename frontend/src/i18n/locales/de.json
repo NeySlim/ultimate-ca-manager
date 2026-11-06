@@ -2302,7 +2302,8 @@
     "testOkHttp": "API erreichbar (HTTP {{status}})",
     "httpBinding": "HTTP-API: Anfrage aus der Body-Vorlage des Ziels",
     "httpBindingHint": "Dieses Ziel sendet eine Anfrage, die aus seiner Body-Vorlage erzeugt wird; es sind keine Pfade oder Reload-Befehle festzulegen. Die Ketten-Optionen unten gelten für {{chainVariable}} und {{fullchainVariable}}.",
-    "httpBindingKeyHint": "Das Ziel darf den privaten Schlüssel senden."
+    "httpBindingKeyHint": "Das Ziel darf den privaten Schlüssel senden.",
+    "httpHeadersRemoved": "Die gespeicherten Header werden beim Speichern entfernt."
   },
   "crlDeploy": {
     "title": "CRL-Bereitstellung",

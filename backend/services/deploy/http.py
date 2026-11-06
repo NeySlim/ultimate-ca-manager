@@ -43,8 +43,16 @@ VARIABLES = {
     'certificate_id': '1',
     'event': 'manual',
 }
+# Values an operator can shape (description, subject, SAN): the validation
+# renders them hostile so a JSON body must quote them with |json.
+TEXT_VARIABLES = ('name', 'refid', 'cn', 'san_dns')
+HOSTILE_SAMPLE = 'x", "y": "\\\n'
+VALIDATION_VARIABLES = {name: (value + HOSTILE_SAMPLE if name in TEXT_VARIABLES else value)
+                        for name, value in VARIABLES.items()}
 FILTERS = ('raw', 'json', 'b64', 'urlencode')
 _VAR_RE = re.compile(r'\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*(?:\|\s*([A-Za-z0-9]+)\s*)?\}\}')
+_ANY_PLACEHOLDER_RE = re.compile(r'\{\{.*?\}\}', re.DOTALL)
+_PEM_BLOCK_RE = re.compile(r'-----BEGIN [^-]*-----.*?(?:-----END [^-]*-----|$)', re.DOTALL)
 _HEADER_NAME_RE = re.compile(r'^[!#$%&\'*+\-.^_`|~0-9A-Za-z]+$')
 # Set by the transport itself or meaningless as a stored value.
 RESERVED_HEADERS = {'host', 'content-length', 'transfer-encoding', 'connection', 'expect'}
@@ -57,8 +65,13 @@ class DeployHTTPError(Exception):
 # ------------------------------------------------------------------ template
 
 def template_variables(template: str):
-    """(name, filter) pairs named by *template*; ValueError on an unknown one."""
+    """(name, filter) pairs named by *template*; ValueError on an unknown or
+    malformed one, so a typo cannot leave a literal placeholder in a request."""
     found = []
+    for placeholder in _ANY_PLACEHOLDER_RE.finditer(template or ''):
+        if not _VAR_RE.fullmatch(placeholder.group(0)):
+            raise ValueError(f"Malformed template placeholder: {placeholder.group(0)[:60]} "
+                             "(expected {{name}} or {{name|filter}})")
     for match in _VAR_RE.finditer(template or ''):
         name, flt = match.group(1), (match.group(2) or 'raw').lower()
         if name not in VARIABLES:
@@ -107,13 +120,14 @@ def validate_template(template: str, headers: dict, allow_private_key: bool) -> 
     names = {name for name, _ in template_variables(template)}
     if 'key_pem' in names and not allow_private_key:
         raise ValueError("body_template uses key_pem: enable 'send private key' on this target first")
-    sample = render(template, VARIABLES)
+    sample = render(template, VALIDATION_VARIABLES)
     if 'json' in content_type_for(headers, sample).lower():
         try:
             json.loads(sample)
         except ValueError:
-            raise ValueError("body_template does not render valid JSON: write PEM values as "
-                             "{{cert_pem|json}} (quotes included) or set a Content-Type header")
+            raise ValueError("body_template does not render valid JSON: write every value as "
+                             "{{name|json}} or {{cert_pem|json}} (quotes included, so a quote in a "
+                             "subject cannot break out), or set a Content-Type header")
 
 
 def validate_url(url: str, allow_private_key: bool) -> str:
@@ -127,8 +141,23 @@ def validate_url(url: str, allow_private_key: bool) -> str:
         raise ValueError('The private key may only be sent over https')
     if _VAR_RE.search(parts.netloc):
         raise ValueError('Template variables are allowed in the URL path and query, not in the host')
-    template_variables(url)
+    if _is_loopback_host(parts.hostname):
+        raise ValueError('url must not point at a loopback or unspecified address: '
+                         'the deploy service does not reach them')
+    if any(name == 'key_pem' for name, _ in template_variables(url)):
+        raise ValueError('key_pem is not allowed in the URL: it would be logged with the request')
     return url
+
+
+def _is_loopback_host(hostname: str) -> bool:
+    import ipaddress
+    if (hostname or '').lower() == 'localhost':
+        return True
+    try:
+        ip = ipaddress.ip_address(hostname)
+    except ValueError:
+        return False
+    return ip.is_loopback or ip.is_unspecified
 
 
 def url_host_port(url: str):
@@ -164,6 +193,10 @@ def parse_headers(raw) -> dict:
             raise ValueError(f"Header {name} is set by UCM and cannot be configured")
         if any(c in value for c in '\r\n') or len(value) > 4096:
             raise ValueError(f"Invalid value for header {name}")
+        try:
+            value.encode('latin-1')
+        except UnicodeEncodeError:
+            raise ValueError(f"Header {name} holds characters HTTP cannot carry (latin-1 only)")
         headers[name] = value
     if len(headers) > MAX_HEADERS:
         raise ValueError(f"Too many headers (max {MAX_HEADERS})")
@@ -174,15 +207,23 @@ def store_headers(headers: dict):
     return encrypt_text(json.dumps(headers)) if headers else None
 
 
-def load_headers(stored) -> dict:
+def load_headers(stored, strict: bool = False) -> dict:
+    """The stored headers; unreadable ones (another master key) are {} for a
+    listing and DeployHTTPError for a request, which must not leave without
+    its credential."""
     if not stored:
         return {}
     try:
         data = json.loads(decrypt_text(stored))
+        if not isinstance(data, dict):
+            raise ValueError('not an object')
     except ValueError:
+        if strict:
+            raise DeployHTTPError('Stored request headers cannot be read (encrypted under another '
+                                  'master key?): save them again on the target')
         logger.error('Deploy target headers could not be read')
         return {}
-    return data if isinstance(data, dict) else {}
+    return data
 
 
 def validate_ca_pem(pem: str) -> str:
@@ -243,6 +284,7 @@ def certificate_variables(certificate, leaf_pem: str, chain_pem: str,
 # ----------------------------------------------------------------- transport
 
 def _response_tail(response) -> str:
+    """The start of the answer, kept for the delivery record."""
     try:
         chunk = next(response.iter_content(RESPONSE_TAIL_BYTES), b'')
     except Exception:
@@ -250,6 +292,11 @@ def _response_tail(response) -> str:
     finally:
         response.close()
     return chunk.decode('utf-8', 'replace')
+
+
+def redact_pem(text: str) -> str:
+    """An API that echoes what it received must not put a PEM in the record."""
+    return _PEM_BLOCK_RE.sub('[PEM removed]', text or '')
 
 
 def _request(target, method: str, url: str, headers: dict, body):
@@ -285,7 +332,7 @@ def _request(target, method: str, url: str, headers: dict, body):
 
 def push(target, variables: dict) -> dict:
     """Render and send; DeployHTTPError unless the API answered 2xx."""
-    headers = load_headers(target.http_headers)
+    headers = load_headers(target.http_headers, strict=True)
     url = render(target.url, variables, default_filter='urlencode')
     body = render(target.body_template or '', variables)
     content_type = content_type_for(headers, body)
@@ -294,6 +341,7 @@ def push(target, variables: dict) -> dict:
     sent.setdefault('User-Agent', USER_AGENT)
     method = (target.http_method or 'POST').upper()
     status, tail = _request(target, method, url, sent, body.encode())
+    tail = redact_pem(tail)
     detail = {'method': method, 'url': url, 'status': status,
               'variables': sorted(variables.keys()), 'response': tail[:300]}
     if 300 <= status < 400:
@@ -306,7 +354,7 @@ def push(target, variables: dict) -> dict:
 def probe(target) -> dict:
     """Reach the API without pushing: a HEAD with the stored headers. Any
     HTTP answer proves the address, the TLS trust and the route."""
-    headers = dict(load_headers(target.http_headers))
+    headers = dict(load_headers(target.http_headers, strict=True))
     headers.setdefault('User-Agent', USER_AGENT)
     url = render(target.url, VARIABLES, default_filter='urlencode')
     status, _ = _request(target, 'HEAD', url, headers, None)

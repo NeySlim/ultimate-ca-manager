@@ -644,6 +644,14 @@ class DeployService:
             out['http_headers'] if 'http_headers' in out else (current.http_headers if current else None))
         template = out.get('body_template', current.body_template if current else '')
         deploy_http.validate_template(template, headers, allow_key)
+        if current and 'key_pem' in {n for n, _ in deploy_http.template_variables(template)}:
+            # The key is checked when a binding is made; adding it to the
+            # template later must check the bindings already made.
+            keyless = [b.certificate.descr or b.certificate.refid for b in current.bindings
+                       if b.certificate and not b.certificate.prv]
+            if keyless:
+                raise ValueError("The body template would send the private key, but UCM holds "
+                                 f"no private key for a bound certificate: {', '.join(keyless[:3])}")
         host, port = deploy_http.url_host_port(out.get('url', current.url if current else ''))
         out['host'], out['port'] = host, port
         return out

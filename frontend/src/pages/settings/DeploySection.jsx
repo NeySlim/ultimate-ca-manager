@@ -19,6 +19,7 @@ import { useFipsMode } from '../../lib/policyAlgorithms'
 const EMPTY_FORM = {
   kind: 'ssh', name: '', host: '', port: 22, username: '', private_key: '', enabled: true,
   url: '', http_method: 'POST', http_headers: '', body_template: '', tls_ca_pem: '', allow_private_key: false,
+  clear_headers: false,
 }
 
 const HTTP_TEMPLATE_VARIABLES = [
@@ -29,7 +30,7 @@ const HTTP_TEMPLATE_VARIABLES = [
 const TEMPLATE_HINT_VARS = {
   example: '{{name}}', jsonExample: '{{cert_pem|json}}', b64Example: '{{cert_pem|b64}}', urlExample: '{{cn|urlencode}}',
 }
-const HTTP_TEMPLATE_EXAMPLE = '{"name": "{{name}}", "cert": {{cert_pem|json}}, "chain": {{chain_pem|json}}}'
+const HTTP_TEMPLATE_EXAMPLE = '{"name": {{name|json}}, "cert": {{cert_pem|json}}, "chain": {{chain_pem|json}}}'
 const INPUT_CLASS = 'w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-accent-primary'
 
 export default function DeploySection() {
@@ -85,8 +86,9 @@ export default function DeploySection() {
       body_template: form.body_template, tls_ca_pem: form.tls_ca_pem.trim(),
       allow_private_key: form.allow_private_key, enabled: form.enabled,
     }
-    // Header values are never read back: an empty box keeps the stored ones
+    // Header values are never read back: an empty box keeps the stored ones, {} removes them
     if (form.http_headers.trim()) payload.http_headers = form.http_headers
+    else if (form.clear_headers) payload.http_headers = {}
     if (!editing) payload.kind = 'http'
     return payload
   }
@@ -166,7 +168,8 @@ export default function DeploySection() {
   const copyPublicKey = () => copy(publicKeyFor?.public_key || '')
 
   const field = (key) => (e) => setForm({ ...form, [key]: e.target.value })
-  const clearHeaders = () => setForm({ ...form, http_headers: '' })
+  const clearHeaders = () => setForm({ ...form, http_headers: '', clear_headers: false })
+  const removeStoredHeaders = () => setForm({ ...form, http_headers: '', clear_headers: true })
   const applySameHostPreset = () => setForm(current => ({
     ...current,
     host: '127.0.0.1',
@@ -315,10 +318,13 @@ export default function DeploySection() {
                           value={form.http_headers} onChange={field('http_headers')} />
                 {editing?.http_header_names?.length > 0 && (
                   <p className="text-2xs text-text-tertiary">
-                    {t('deploy.httpHeadersStored', { names: editing.http_header_names.join(', ') })}
+                    {form.clear_headers
+                      ? t('deploy.httpHeadersRemoved')
+                      : t('deploy.httpHeadersStored', { names: editing.http_header_names.join(', ') })}
                     {' '}
-                    <button type="button" className="text-accent-primary hover:underline" onClick={clearHeaders}>
-                      {t('deploy.httpHeadersKeep')}
+                    <button type="button" className="text-accent-primary hover:underline"
+                            onClick={form.clear_headers ? clearHeaders : removeStoredHeaders}>
+                      {form.clear_headers ? t('deploy.httpHeadersKeep') : t('common.remove')}
                     </button>
                   </p>
                 )}

@@ -420,8 +420,8 @@ SECTIONS: Dict[str, Section] = {
             'last_failure_at': 'delivery statistic',
             'failure_count': 'delivery statistic',
         },
-        secrets=('private_key',),
-        stored={'private_key': 'master'},
+        secrets=('private_key', 'http_headers'),
+        stored={'private_key': 'master', 'http_headers': 'master'},
     ),
     'deploy_bindings': Section(
         model='models.deploy:DeployBinding',

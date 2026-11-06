@@ -2302,7 +2302,8 @@
     "testOkHttp": "API reachable (HTTP {{status}})",
     "httpBinding": "HTTP API: request built from the target's body template",
     "httpBindingHint": "This target sends one request built from its body template; there are no paths or reload command to set. The chain options below apply to {{chainVariable}} and {{fullchainVariable}}.",
-    "httpBindingKeyHint": "The target is allowed to send the private key."
+    "httpBindingKeyHint": "The target is allowed to send the private key.",
+    "httpHeadersRemoved": "The stored headers will be removed when you save."
   },
   "crlDeploy": {
     "title": "CRL Deployment",

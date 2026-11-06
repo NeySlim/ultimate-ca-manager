@@ -333,6 +333,7 @@ MASTER_KEY_COLUMNS = (
     ('models.certificate', 'Certificate', 'prv', 'b64'),
     ('models.ssh', 'SSHCertificateAuthority', 'private_key', 'b64'),
     ('models.deploy', 'DeployTarget', 'private_key', 'text'),
+    ('models.deploy', 'DeployTarget', 'http_headers', 'text'),
     ('models.acme_client_account', 'AcmeClientAccount', 'account_key', 'text'),
     ('models.acme_client_account', 'AcmeClientAccount', '_eab_hmac_key', 'text'),
     ('models.scep', 'ScepProfile', 'challenge_password', 'text'),

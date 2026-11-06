@@ -1895,7 +1895,8 @@
     "testOkHttp": "API joignable (HTTP {{status}})",
     "httpBinding": "API HTTP : requête construite à partir du modèle de corps de la cible",
     "httpBindingHint": "Cette cible envoie une requête construite à partir de son modèle de corps ; aucun chemin ni commande de rechargement à définir. Les options de chaîne ci-dessous s'appliquent à {{chainVariable}} et {{fullchainVariable}}.",
-    "httpBindingKeyHint": "La cible est autorisée à envoyer la clé privée."
+    "httpBindingKeyHint": "La cible est autorisée à envoyer la clé privée.",
+    "httpHeadersRemoved": "Les en-têtes enregistrés seront supprimés à l'enregistrement."
   },
   "csrs": {
     "uploadCSR": "Téléverser une CSR",

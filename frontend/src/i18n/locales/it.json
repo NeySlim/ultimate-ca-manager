@@ -2302,7 +2302,8 @@
     "testOkHttp": "API raggiungibile (HTTP {{status}})",
     "httpBinding": "API HTTP: richiesta costruita dal template del corpo della destinazione",
     "httpBindingHint": "Questa destinazione invia una richiesta costruita dal proprio template del corpo; non ci sono percorsi né comando di ricarica da impostare. Le opzioni della catena qui sotto si applicano a {{chainVariable}} e {{fullchainVariable}}.",
-    "httpBindingKeyHint": "La destinazione è autorizzata a inviare la chiave privata."
+    "httpBindingKeyHint": "La destinazione è autorizzata a inviare la chiave privata.",
+    "httpHeadersRemoved": "Le intestazioni salvate verranno rimosse al salvataggio."
   },
   "crlDeploy": {
     "title": "Distribuzione CRL",

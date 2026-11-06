@@ -827,3 +827,29 @@ def test_a_self_signed_orphan_is_not_grouped_with_the_certificates_of_its_name()
     root_copy = SimpleNamespace(id=1, crt=base64.b64encode(pem(pki.root_b).encode()).decode())
     leaf = SimpleNamespace(id=2, crt=base64.b64encode(pem(direct).encode()).decode())
     assert _group_key(root_copy) != _group_key(leaf)
+
+
+def bind_http(app, cert_id, variant, template, include_root=False):
+    """An HTTP target (#428) with no paths: the template decides whether the chain is sent."""
+    with app.app_context():
+        target = DeployTarget(name=f'h-{uuid.uuid4().hex[:8]}', kind='http', host='fw.example', port=443,
+                              username='', private_key='', url='https://fw.example/api', http_method='POST',
+                              body_template=template, enabled=True)
+        db.session.add(target)
+        db.session.flush()
+        b = DeployBinding(target_id=target.id, certificate_id=cert_id, include_root=include_root,
+                          chain_variant=variant, enabled=True)
+        db.session.add(b)
+        db.session.commit()
+        return b.id
+
+
+def test_an_http_binding_counts_when_its_template_sends_the_chain(app, auth_client, world):
+    bid = bind_http(app, world.leaf_id, f'cross:{world.xid}', '{"c": {{fullchain_pem|json}}}')
+    d = usage(auth_client, world.a_id)['deployments']
+    assert d['count'] == 1 and d['items'][0]['id'] == bid
+
+
+def test_an_http_binding_that_sends_the_leaf_only_is_not_counted(app, auth_client, world):
+    bind_http(app, world.leaf_id, f'cross:{world.xid}', '{"c": {{cert_pem|json}}}')
+    assert counts(auth_client, world.a_id)[2] == 0

@@ -10,7 +10,7 @@ from tests.conftest import assert_error, assert_success
 BASE = '/api/v2/deploy'
 _seq = [0]
 
-TEMPLATE = ('{"name": "{{name}}", "cn": "{{cn}}", "cert": {{cert_pem|json}}, '
+TEMPLATE = ('{"name": {{name|json}}, "cn": {{cn|json}}, "cert": {{cert_pem|json}}, '
             '"chain": {{fullchain_pem|json}}, "serial": "{{serial_hex}}"}')
 KEY_TEMPLATE = '{"cert": {{cert_pem|json}}, "key": {{key_pem|json}}}'
 
@@ -367,3 +367,83 @@ class TestTemplate:
         assert render('{{cn|raw}}', variables, default_filter='urlencode') == 'x y&z'
         with pytest.raises(ValueError, match='not available'):
             render('{{key_pem}}', variables)
+
+
+class TestReviewFindings:
+    """What the first review of #428 found, each refused or contained."""
+
+    def test_the_private_key_never_goes_into_the_url(self, auth_client):
+        r = post_json(auth_client, f'{BASE}/targets', _target_payload(
+            url='https://fw.example.test/api?k={{key_pem}}', allow_private_key=True, body_template=KEY_TEMPLATE))
+        assert 'key_pem' in json.dumps(_error_body(r, 400))
+
+    def test_a_text_variable_cannot_break_out_of_a_json_string(self, app, auth_client, create_cert, fake_http):
+        r = post_json(auth_client, f'{BASE}/targets', _target_payload(body_template='{"name": "{{name}}"}'))
+        assert '|json' in json.dumps(_error_body(r, 400))
+        target = _create_target(auth_client, body_template='{"name": {{name|json}}, "cert": {{cert_pem|json}}}')
+        cert = create_cert()
+        hostile = 'x", "admin": true, "y": "'
+        from models import db, Certificate
+        with app.app_context():
+            db.session.get(Certificate, cert['id']).descr = hostile
+            db.session.commit()
+        _create_binding(auth_client, target['id'], cert['id'])
+        assert _drain(app)['delivered'] >= 1
+        body = json.loads(_call_for(fake_http, target)['body'])
+        assert body['name'] == hostile and 'admin' not in body
+
+    def test_headers_follow_the_master_key_and_the_backups(self):
+        from security.encryption import MASTER_KEY_COLUMNS
+        from services.backup.manifest import SECTIONS
+        assert ('models.deploy', 'DeployTarget', 'http_headers', 'text') in MASTER_KEY_COLUMNS
+        section = SECTIONS['deploy_targets']
+        assert 'http_headers' in section.secrets and section.stored.get('http_headers') == 'master'
+
+    def test_unreadable_headers_fail_loudly(self, app, auth_client, create_cert, fake_http):
+        target = _create_target(auth_client)
+        cert = create_cert()
+        binding = _create_binding(auth_client, target['id'], cert['id'])
+        from models import db, DeployTarget
+        with app.app_context():
+            db.session.get(DeployTarget, target['id']).http_headers = 'not json at all'
+            db.session.commit()
+        assert _drain(app)['retry'] >= 1
+        assert 'headers' in _delivery(auth_client, binding['id'])['last_error'].lower()
+        assert not [c for c in fake_http.calls if c['target_id'] == target['id']]
+
+    @pytest.mark.parametrize('template', ['{"c": "{{cert-pem}}"}', '{"c": {{cn|url_encode}}}', '{"c": {{ cn | json | b64 }}}'])
+    def test_a_malformed_placeholder_is_refused(self, auth_client, template):
+        r = post_json(auth_client, f'{BASE}/targets', _target_payload(body_template=template))
+        assert_error(r, 400)
+        r = post_json(auth_client, f'{BASE}/targets', _target_payload(url='https://fw.example.test/{{cn|url_encode}}'))
+        assert_error(r, 400)
+
+    @pytest.mark.parametrize('url', ['https://127.0.0.1/api', 'https://localhost:8443/api', 'https://[::1]/api', 'https://0.0.0.0/api'])
+    def test_a_loopback_url_is_refused_when_saved(self, auth_client, url):
+        r = post_json(auth_client, f'{BASE}/targets', _target_payload(url=url))
+        assert 'loopback' in json.dumps(_error_body(r, 400)).lower()
+
+    def test_a_header_value_the_wire_cannot_carry_is_refused_when_saved(self, auth_client):
+        r = post_json(auth_client, f'{BASE}/targets', _target_payload(http_headers='X-Note: café → 中'))
+        assert_error(r, 400)
+
+    def test_adding_the_key_to_the_template_checks_the_bound_certificates(self, app, auth_client, create_cert):
+        target = _create_target(auth_client)
+        cert = create_cert()
+        _create_binding(auth_client, target['id'], cert['id'])
+        from models import db, Certificate
+        with app.app_context():
+            db.session.get(Certificate, cert['id']).prv = None
+            db.session.commit()
+        r = patch_json(auth_client, f"{BASE}/targets/{target['id']}", {
+            'allow_private_key': True, 'body_template': KEY_TEMPLATE})
+        assert 'no private key' in json.dumps(_error_body(r, 400))
+
+    def test_a_pem_echoed_by_the_api_is_removed_from_what_is_kept(self, app, auth_client, create_cert, fake_http):
+        target = _create_target(auth_client, body_template=KEY_TEMPLATE, allow_private_key=True)
+        cert = create_cert()
+        binding = _create_binding(auth_client, target['id'], cert['id'])
+        fake_http.answer = (400, 'bad key: -----BEGIN PRIVATE KEY-----\nMIIE\n-----END PRIVATE KEY----- rejected')
+        assert _drain(app)['retry'] >= 1
+        delivery = _delivery(auth_client, binding['id'])
+        assert 'MIIE' not in json.dumps(delivery) and 'rejected' in delivery['last_error']

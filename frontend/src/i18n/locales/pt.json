@@ -2302,7 +2302,8 @@
     "testOkHttp": "API acessível (HTTP {{status}})",
     "httpBinding": "API HTTP: requisição construída a partir do modelo de corpo do alvo",
     "httpBindingHint": "Este alvo envia uma única requisição construída a partir do seu modelo de corpo; não há caminhos nem comando de recarga a definir. As opções de cadeia abaixo se aplicam a {{chainVariable}} e {{fullchainVariable}}.",
-    "httpBindingKeyHint": "O alvo está autorizado a enviar a chave privada."
+    "httpBindingKeyHint": "O alvo está autorizado a enviar a chave privada.",
+    "httpHeadersRemoved": "Os cabeçalhos armazenados serão removidos ao guardar."
   },
   "crlDeploy": {
     "title": "Implantação de CRL",

@@ -89,7 +89,7 @@ describe('DeploySection HTTP API target (#428)', () => {
     fireEvent.change(inputs[0], { target: { value: 'fw' } })
     fireEvent.change(byPlaceholder('/api/trust/cert/add'), { target: { value: 'https://fw.example.net/api/x' } })
     fireEvent.change(byPlaceholder('Authorization'), { target: { value: 'X-Api-Key: k' } })
-    fireEvent.change(byPlaceholder('{{name}}'), { target: { value: '{"cert": {{cert_pem|json}}}' } })
+    fireEvent.change(byPlaceholder('{{name|json}}'), { target: { value: '{"cert": {{cert_pem|json}}}' } })
     fireEvent.submit(dialog.querySelector('form'))
 
     await vi.waitFor(() => expect(deployService.createTarget).toHaveBeenCalled())
@@ -125,5 +125,27 @@ describe('DeploySection HTTP API target (#428)', () => {
     expect(payload.http_headers).toBeUndefined()
     expect(payload.kind).toBeUndefined()
     expect(payload).toMatchObject({ url: 'https://fw.example.net/api', http_method: 'PUT', allow_private_key: true })
+  })
+
+  it('removes the stored headers only through the explicit action', async () => {
+    const { deployService } = await import('../../../services')
+    deployService.getTargets = vi.fn().mockResolvedValue({ data: [{
+      id: 3, kind: 'http', name: 'fw', enabled: true, url: 'https://fw.example.net/api', http_method: 'POST',
+      http_header_names: ['Authorization'], body_template: '{}', allow_private_key: false, failure_count: 0,
+    }] })
+    deployService.updateTarget = vi.fn().mockResolvedValue({ data: {} })
+    render(<DeploySection />)
+    await screen.findByText('POST https://fw.example.net/api')
+    const buttons = screen.getAllByRole('button')
+    fireEvent.click(buttons.find(b => b.textContent === '' && !b.title) || buttons[2])
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(screen.getByText('common.remove'))
+    expect(screen.getByText('deploy.httpHeadersRemoved')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('deploy.httpHeadersKeep'))  // changed my mind: stored headers stay
+    expect(screen.queryByText('deploy.httpHeadersRemoved')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('common.remove'))
+    fireEvent.submit(dialog.querySelector('form'))
+    await vi.waitFor(() => expect(deployService.updateTarget).toHaveBeenCalled())
+    expect(deployService.updateTarget.mock.calls[0][1].http_headers).toEqual({})
   })
 })

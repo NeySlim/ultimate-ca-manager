@@ -2302,7 +2302,8 @@
     "testOkHttp": "API 可访问（HTTP {{status}}）",
     "httpBinding": "HTTP API：由目标的正文模板构建请求",
     "httpBindingHint": "此目标发送一个由其正文模板构建的请求；无需设置路径或重载命令。下方的链选项适用于 {{chainVariable}} 和 {{fullchainVariable}}。",
-    "httpBindingKeyHint": "该目标被允许发送私钥。"
+    "httpBindingKeyHint": "该目标被允许发送私钥。",
+    "httpHeadersRemoved": "保存时将移除已存储的请求头。"
   },
   "crlDeploy": {
     "title": "CRL 部署",

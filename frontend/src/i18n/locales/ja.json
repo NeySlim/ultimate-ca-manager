@@ -2302,7 +2302,8 @@
     "testOkHttp": "API に到達可能(HTTP {{status}})",
     "httpBinding": "HTTP API: ターゲットのボディテンプレートから組み立てたリクエスト",
     "httpBindingHint": "このターゲットはボディテンプレートから組み立てた 1 つのリクエストを送信します。パスやリロードコマンドの設定はありません。以下のチェーンオプションは {{chainVariable}} と {{fullchainVariable}} に適用されます。",
-    "httpBindingKeyHint": "このターゲットは秘密鍵の送信が許可されています。"
+    "httpBindingKeyHint": "このターゲットは秘密鍵の送信が許可されています。",
+    "httpHeadersRemoved": "保存時に、保存済みのヘッダーは削除されます。"
   },
   "crlDeploy": {
     "title": "CRL デプロイ",
