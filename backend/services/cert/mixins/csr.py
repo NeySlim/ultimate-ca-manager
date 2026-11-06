@@ -322,7 +322,6 @@ class CSRMixin:
             # The Sign CSR form's template (issuance_defaults.template_digest)
             from utils.issuance_defaults import template_digest
             digest = template_digest(san_template, ca_private_key)
-            digest_explicit = digest is not None
         from utils.custom_extensions import issuance_custom_extensions
         custom_ext = issuance_custom_extensions(
             san_template if cert_type != 'intermediate_ca' else None, custom_extensions)

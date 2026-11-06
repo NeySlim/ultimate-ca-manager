@@ -542,9 +542,9 @@ def _issue_approved_certificate(approval):
         dns_name_count=len(set(_requested_dns) | set(_implicit_dns)),
         validity_days=validity_days, context=_rule_context, notices=_advisories,
     )
-    _template_digest = template.digest if template and template.digest else None
+    from utils.issuance_defaults import template_digest
     _sign_hash, _digest_violations = PolicyEvaluationService.checked_signing_hash(
-        _policies, ca_key, _template_digest, explicit=_template_digest is not None,
+        _policies, ca_key, template_digest(template, ca_key), explicit=False,
         context=_rule_context, notices=_advisories)
     _violations += _digest_violations
     if _violations:

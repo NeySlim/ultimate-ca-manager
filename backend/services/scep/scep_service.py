@@ -1196,7 +1196,7 @@ class SCEPService:
         from utils.issuance_defaults import template_digest
         digest = template_digest(self.template, self.ca_key)
         sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
-            policies, self.ca_key, digest, explicit=digest is not None,
+            policies, self.ca_key, digest, explicit=False,
             key_type=key_label_for_public_key(csr.public_key()), context=context)
         limit_violations, _, _ = PolicyEvaluationService.enforce_rules(
             policies, dns_name_count=len(dns), context=context)

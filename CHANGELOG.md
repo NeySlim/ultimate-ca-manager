@@ -21,10 +21,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- Renewals: a renewed OCSP responder certificate was signed with the policies' default digest instead of the original's, and a renewal that could not keep the original's digest said nothing. Both keep it while the CA key and the policies allow it, else follow the issuance rule and log the change (#397).
+- Renewals: a renewed OCSP responder certificate was signed with the policies' default digest instead of the original's, and a renewal that changed the digest said nothing. Both keep the original's while it is at least the CA key's and the policies allow it, else follow the issuance rule, and log the change (#397).
 - XCEP: an ECDSA template outside FIPS mode announced no request hash, and a P-384 or P-521 template asked for its template digest, SHA-256 by default. ECDSA templates are now schema 3 and announce the stronger of the template digest and the one matching their key; RSA templates outside FIPS mode stay schema 2, whose hash MS-XCEP requires to be nil (#397).
-- EST and mTLS: server-generated keys were always RSA-2048, so a policy refusing it (CNSA, strict FIPS profile) refused EST `serverkeygen` and user mTLS certificates. The key now follows the issuing CA (RSA-3072 under RSA-3072 and up, P-256 or P-384 under EC, a browser-usable type for mTLS) and moves to the closest type the policies allow (#397).
-- Issuance: EST, SCEP, WSTEP, Sign CSR, TSA signer and unconfigured ACME orders signed with SHA-256 whatever the CA key and the bound template. They now take the template's digest unless it is weaker than the one matching the CA key (SHA-384 for P-384, SHA-512 for P-521), and a policy refusing that default picks the closest stronger digest it allows, not the weakest (#397).
+- EST and mTLS: server-generated keys were always RSA-2048, so a policy refusing it (CNSA, strict FIPS profile) refused EST `serverkeygen` and user mTLS certificates. The key now takes the issuing CA's strength, in the family of the `serverkeygen` request's key when RSA or EC, else the CA's (a browser-usable type for mTLS), and moves to the closest type the policies allow (#397).
+- Issuance: EST, SCEP, WSTEP, Sign CSR, TSA signer and unconfigured ACME orders signed with SHA-256 whatever the CA key, and a P-384 CA's CRLs too. Every path now signs with the bound template's digest, raised to the one matching the CA key (SHA-384 for P-384, SHA-512 for P-521), as a preference that yields to the closest stronger digest the policies allow (#397).
 - Docker: the images lacked pyspnego's Kerberos backend, which the DEB and RPM installs can add, so the Kerberos binding of Windows autoenrollment could not work in a container. Both images now ship it, at the pyspnego version the requirements resolve (#435, thanks @JPromi).
 - Restore: two DNS providers, ACME CA accounts or webhooks of the same name were merged into one row, and one credential was lost. A clashing row is now restored as `name (2)`, and the restore result lists it; an account is matched by its account URL and a webhook by its URL first.
 - DNS providers, ACME CA accounts and webhooks: the API accepted a name already in use. It now answers 409, on creation and on rename.
@@ -71,6 +71,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- Algorithms (#397): EST `serverkeygen` and mTLS no longer give RSA-2048 under an EC, RSA-3072 or ML-DSA CA; ACME orders without a digest, EST, SCEP, WSTEP, Sign CSR, the issue form and CRLs sign with SHA-384 or SHA-512 under a P-384 or P-521 CA, and renewals raise SHA-256 originals there.
+- XCEP: ECDSA templates are announced as schema 3 with a request hash; CRLs already issued are unchanged, only the next one follows the new default.
 - Revocation: migration 129 adds the `compromised_keys` table and fills it from the certificates revoked as compromised and from the revocation records holding such a key's digest. A replacing restore adds the archived keys and never removes one known here.
 - Revocation records written before migration 128 carry no key digest: they learn it when their certificate is deleted, and until then the certificate row itself answers.
 - ACME client: the renewal task now removes the orders left `pending` for more than 7 days whose order at the CA has expired or whose expiry is unknown, with their TXT records, and audits each removal.

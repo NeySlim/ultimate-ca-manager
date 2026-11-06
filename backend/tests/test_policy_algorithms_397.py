@@ -188,7 +188,7 @@ class TestPolicyApi:
 
 class TestOperatorPaths:
 
-    def test_issue_form_default_digest_yields_template_digest_is_refused(
+    def test_issue_form_default_and_template_digest_yield(
             self, app, auth_client, create_ca):
         ca = create_ca(cn='Algo issue CA')
         pid = _policy(app, 'algo-issue', ca['id'], {'allowed_digests': ['sha384']})
@@ -208,10 +208,13 @@ class TestOperatorPaths:
             cert = _signed(app, get_json(r)['data']['id'])
             assert isinstance(cert.signature_hash_algorithm, hashes.SHA384)
 
+            # The template's digest is a preference too (#397 follow-up)
             payload['template_id'] = tpl_id
             r = auth_client.post('/api/v2/certificates', data=json.dumps(payload),
                                  content_type=CONTENT_JSON)
-            assert r.status_code == 400 and b'SHA256' in r.data and b'algo-issue' in r.data
+            assert r.status_code in (200, 201), r.data
+            cert = _signed(app, get_json(r)['data']['id'])
+            assert isinstance(cert.signature_hash_algorithm, hashes.SHA384)
         finally:
             _drop(app, CertificatePolicy, pid)
             _drop(app, CertificateTemplate, tpl_id)

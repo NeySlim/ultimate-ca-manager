@@ -224,7 +224,7 @@ class TestApproval:
             _cleanup(app, ca_data['id'], policy_ids=[pid, gate_a, gate_b],
                      template_ids=[tid], cert_ids=[weak_id, ok_id])
 
-    def test_issuing_a_request_checks_the_template_digest(self, app, create_ca):
+    def test_issuing_a_request_yields_the_template_digest(self, app, create_ca):
         from api.v2.policies import _issue_approved_certificate
         ca_data = create_ca(cn='Algo approval digest CA')
         with app.app_context():
@@ -234,15 +234,7 @@ class TestApproval:
                                      'cert_type': 'server', 'template_id': tid})
         try:
             with app.app_context():
-                with pytest.raises(PolicyViolation, match='SHA256'):
-                    _issue_approved_certificate(db.session.get(ApprovalRequest, ap_id))
-                db.session.rollback()
-                assert Certificate.query.filter_by(
-                    caref=db.session.get(CA, ca_data['id']).refid).count() == 0
-
-                # The same request passes once the template digest is allowed
-                db.session.get(CertificateTemplate, tid).digest = 'sha384'
-                db.session.commit()
+                # The template's SHA-256 is a preference: it yields to the policy (#397 follow-up)
                 result = _issue_approved_certificate(db.session.get(ApprovalRequest, ap_id))
                 db.session.commit()
                 row = db.session.get(Certificate, result['id'])

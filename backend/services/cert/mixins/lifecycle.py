@@ -21,6 +21,7 @@ from services.trust_store import TrustStoreService
 from utils.ct_client import embed_scts_in_certificate
 from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, cleanup_old_files
 from utils.datetime_utils import utc_now, to_naive_utc
+from utils.issuance_defaults import template_digest
 from utils.spki_digest import certificate_key_sha256
 
 logger = logging.getLogger(__name__)
@@ -129,8 +130,6 @@ class LifecycleMixin:
                                 or key_type)
                 if validity_days is None:
                     validity_days = template.validity_days or validity_days
-                if digest is None:
-                    digest = template.digest or digest
                 from services.template_service import bucket_san_refusal
                 san_refusal = bucket_san_refusal(template, {
                     'san_dns': san_dns, 'san_ip': san_ip, 'san_uri': san_uri, 'san_email': san_email})
@@ -142,10 +141,10 @@ class LifecycleMixin:
             key_type = '2048'
         if validity_days is None:
             validity_days = DEFAULT_CERTIFICATE_VALIDITY_DAYS
-        # A digest asked for (or the template's) is checked; the default yields
+        # A digest asked for is checked; the template's (floored at the CA key's) and the default yield
         digest_explicit = digest is not None
         if digest is None:
-            digest = 'sha256'
+            digest = (template.digest if template is not None else None) or 'sha256'
 
         # Record divergences from the template on the final effective values
         # (#258) — inherited-as-default values compare equal and are not
@@ -198,7 +197,9 @@ class LifecycleMixin:
         sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
             PolicyEvaluationService.applicable_policies(
                 ca.id, template_id, (dn or {}).get('CN'), san_dns),
-            ca_private_key, digest if digest_explicit else None, explicit=digest_explicit,
+            ca_private_key,
+            digest if digest_explicit else template_digest(template, ca_private_key),
+            explicit=digest_explicit,
             context={'operation': 'issuance', 'subject': (dn or {}).get('CN'), 'ca_id': ca.id},
             key_type=_normalize_key_type_label(key_type) or key_type, validity_days=validity_days)
         if violations:

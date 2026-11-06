@@ -41,14 +41,31 @@ def _renew(app, cert_id):
         renew_certificate_in_place(db.session.get(Certificate, cert_id), username='admin')
 
 
-def test_renewal_keeps_a_sha256_original_under_a_p384_ca(app, auth_client, create_ca):
-    ca = _p384_ca(create_ca, 'Renew keep P-384 CA')
-    tid = _template(app, 'renew-keep-sha256', 'sha256')
-    cid = _issue(auth_client, ca['id'], 'keep.renew.test', tid)
+def test_renewal_raises_a_sha256_original_under_a_p384_ca(app, auth_client, create_ca, caplog):
+    # Issued with SHA-256 under the CA before this rule; the renewal does not keep it forever
+    ca = _p384_ca(create_ca, 'Renew raise P-384 CA')
+    tid = _template(app, 'renew-raise-sha256', 'sha256')
+    pid = _policy(app, 'renew-sha256-only', ca['id'], {'allowed_digests': ['sha256']})
+    cid = _issue(auth_client, ca['id'], 'raise.renew.test', tid)
+    _drop(app, CertificatePolicy, pid)
     try:
         assert isinstance(_hash_of(app, cid), hashes.SHA256)
+        with caplog.at_level(logging.INFO, logger='services.cert.renewal'):
+            _renew(app, cid)
+        assert isinstance(_hash_of(app, cid), hashes.SHA384)
+        assert any('instead of the original SHA256' in r.getMessage() for r in caplog.records)
+    finally:
+        _drop(app, Certificate, cid)
+        _drop(app, CertificateTemplate, tid)
+
+
+def test_renewal_keeps_a_stronger_original(app, auth_client, create_ca):
+    ca = create_ca(cn='Renew keep RSA CA')
+    tid = _template(app, 'renew-keep-sha512', 'sha512')
+    cid = _issue(auth_client, ca['id'], 'keep.renew.test', tid)
+    try:
         _renew(app, cid)
-        assert isinstance(_hash_of(app, cid), hashes.SHA256)
+        assert isinstance(_hash_of(app, cid), hashes.SHA512)
     finally:
         _drop(app, Certificate, cid)
         _drop(app, CertificateTemplate, tid)

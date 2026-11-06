@@ -311,10 +311,10 @@ def create_certificate():
             )
             violations = list(dict.fromkeys(list(violations) + list(pq_violations)))
             capped_by = pq_capped_by or capped_by
-        # The template's digest is a choice, checked; without one the default yields
-        template_digest = template.digest if template and template.digest else None
+        # The template's digest, floored at the CA key's, yields to the policies
+        from utils.issuance_defaults import template_digest
         sign_hash, digest_violations = PolicyEvaluationService.checked_signing_hash(
-            policies, ca_key, template_digest, explicit=template_digest is not None,
+            policies, ca_key, template_digest(template, ca_key), explicit=False,
             context=rule_context, notices=advisories)
         violations += digest_violations
         if violations:
@@ -328,8 +328,8 @@ def create_certificate():
 
         # Record which inherited values the request explicitly diverged from
         # (#258): the template link is kept and the divergence flagged. The
-        # digest is not compared here — this path always signs with the
-        # template's digest (or SHA-256 by default), it cannot be overridden.
+        # digest is not compared here: the request cannot choose one (the
+        # template's or the CA key's, as the policies allow).
         template_overrides = compute_template_overrides(
             template,
             key_type=normalized_key,

@@ -112,10 +112,10 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
 
     from services.policy_service import (PolicyEvaluationService, PolicyViolation,
                                          key_label_for_public_key)
-    from utils.issuance_defaults import log_renewal_digest, original_digest
+    from utils.issuance_defaults import log_renewal_digest, renewal_digest
     sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
         PolicyEvaluationService.applicable_policies(ca.id, cert.template_id, cert.subject_cn),
-        ca_key, original_digest(old_cert), explicit=False,
+        ca_key, renewal_digest(old_cert, ca_key), explicit=False,
         key_type=key_label_for_public_key(private_key.public_key()),
         not_after=not_after.date(),
         context={'operation': 'renewal', 'subject': cert.subject_cn, 'ca_id': ca.id})

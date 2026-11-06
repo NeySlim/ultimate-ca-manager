@@ -46,7 +46,7 @@ from utils import notices as notices_mod
 from utils.signing_hash import rsa_padding_for
 from utils.related_cert import RELATED_CERT_EXTENSION_OID
 
-from utils.issuance_defaults import log_renewal_digest, original_digest
+from utils.issuance_defaults import log_renewal_digest, renewal_digest
 
 logger = logging.getLogger(__name__)
 
@@ -477,9 +477,9 @@ def _apply_policies(cert, ca, ca_key, original, days, pq_hybrid=False):
     key_label = key_label_for_public_key(original.public_key())
     advisories = []
     tsa_signer = _has_time_stamping(original)
-    # The original's hash while the CA key and the policies still allow it
+    # The original's hash while it is at least the CA key's and the policies allow it
     sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
-        policies, ca_key, original_digest(original), explicit=False,
+        policies, ca_key, renewal_digest(original, ca_key), explicit=False,
         key_type=key_label, context=context, tsa_signer=tsa_signer, notices=advisories,
         pq_hybrid=pq_hybrid)
     if not violations:

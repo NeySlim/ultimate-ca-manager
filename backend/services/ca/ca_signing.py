@@ -120,7 +120,8 @@ class CASigningMixin:
                 cap keyed off cert_type could otherwise never let through.
             policy_template_id: template scoping the issuance policies (the
                 WSTEP matched template), none for EST; its SAN types bind
-                the request's names.
+                the request's names and its digest is the preferred one
+                (``issuance_defaults.template_digest``).
             template_ekus: EKUs that replace the CSR's, as a bound template's
                 do (WSTEP renewal); protocol-forbidden ones still dropped.
 
@@ -178,7 +179,7 @@ class CASigningMixin:
             extra_ekus=extra_ekus,
             template_ext={'extended_key_usage': list(template_ekus)} if template_ekus else None,
             policy_scope={'ca_id': ca.id, 'template_id': policy_template_id,
-                          'digest_explicit': template_digest is not None},
+                          'digest_explicit': False},
             san_template=policy_template,
             custom_extensions=template_custom_extensions(policy_template),
         )

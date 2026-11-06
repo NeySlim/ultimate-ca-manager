@@ -50,10 +50,17 @@ def test_a_policy_refusing_the_issuer_match_moves_to_the_closest_allowed(app):
         assert generated_key_algorithm(issuer, [ec_only], classical_only=True).label == 'EC-P256'
 
 
-def test_a_template_type_wins_when_allowed(app):
-    issuer = _pub(rsa.generate_private_key(65537, 2048))
+def test_the_request_key_family_is_a_hint_at_the_issuer_strength(app):
+    p384 = _pub(ec.generate_private_key(ec.SECP384R1()))
+    rsa2048 = _pub(rsa.generate_private_key(65537, 2048))
     with app.app_context():
-        assert generated_key_algorithm(issuer, [], template_key_type='EC-P384').label == 'EC-P384'
+        assert generated_key_algorithm(p384, [], request_public_key=rsa2048).label == 'RSA-3072'
+        assert generated_key_algorithm(rsa2048, [], request_public_key=p384).label == 'EC-P256'
+        # Ed25519 is no hint, and a family the policies forbid falls back to the issuer's
+        ed = _pub(ed25519.Ed25519PrivateKey.generate())
+        assert generated_key_algorithm(p384, [], request_public_key=ed).label == 'EC-P384'
+        ec_only = _pol({'allowed_key_types': ['EC-P384', 'EC-P256']})
+        assert generated_key_algorithm(p384, [ec_only], request_public_key=rsa2048).label == 'EC-P384'
 
 
 def test_nothing_generable_is_a_policy_refusal(app):
@@ -75,9 +82,9 @@ def est_cas(create_ca):
             'rsa': create_ca(cn='Keys EST RSA root')}
 
 
-def _keygen_csr(cn):
+def _keygen_csr(cn, key=None):
     from cryptography.x509.oid import NameOID
-    key = ec.generate_private_key(ec.SECP256R1())
+    key = key or ec.generate_private_key(ec.SECP256R1())
     return (x509.CertificateSigningRequestBuilder()
             .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
             .sign(key, hashes.SHA256())).public_bytes(serialization.Encoding.DER)
@@ -90,6 +97,16 @@ def test_serverkeygen_under_a_p384_ca_generates_p384(client, est_ca):
     leaf = _serverkeygen_leaf(r)
     assert key_algorithms.label_for_public_key(leaf.public_key()) == 'EC-P384'
     assert isinstance(leaf.signature_hash_algorithm, hashes.SHA384)
+    leaf.verify_directly_issued_by(ca_cert)
+
+
+def test_serverkeygen_follows_the_family_of_an_rsa_request_under_a_p384_ca(client, est_ca):
+    ca_cert = est_ca('p384')
+    csr = _keygen_csr('keygen-rsa-hint.keys.test', rsa.generate_private_key(65537, 2048))
+    r = _post(client, 'serverkeygen', csr)
+    assert r.status_code == 200, r.data
+    leaf = _serverkeygen_leaf(r)
+    assert key_algorithms.label_for_public_key(leaf.public_key()) == 'RSA-3072'
     leaf.verify_directly_issued_by(ca_cert)
 
 

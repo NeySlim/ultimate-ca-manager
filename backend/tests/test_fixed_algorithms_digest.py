@@ -97,39 +97,59 @@ class TestPaths:
             _drop(app, Certificate, cert_id)
             _drop(app, CertificateTemplate, tid)
 
-    def test_template_digest_is_checked_by_the_policies(self, app, create_ca):
+    def test_a_template_sha256_yields_to_a_policy_on_every_protocol_path(self, app, create_ca):
+        # RSA CA, policy [sha384, sha512], template left at SHA-256: a preference, not a refusal
+        from services.ca_service import CAService
         from services.cert_service import CertificateService
-        from services.policy_service import PolicyViolation
-        ca = create_ca(cn='Fixed Sign CSR policy CA')
-        tid = _template(app, 'fixed-sign-sha512', 'sha512')
-        pid = _policy(app, 'fixed-sha384-only', ca['id'], {'allowed_digests': ['sha384']})
-        cert_id = _store_csr(app, _csr(cn='refused.fixed.test'))
+        from services.scep.scep_service import SCEPService
+        ca = create_ca(cn='Fixed yield CA')
+        tid = _template(app, 'fixed-yield-sha256', 'sha256')
+        pid = _policy(app, 'fixed-strong-only', ca['id'], {'allowed_digests': ['sha384', 'sha512']})
+        cert_id = _store_csr(app, _csr(cn='yield-sign.fixed.test'))
         try:
             with app.app_context():
-                with pytest.raises(PolicyViolation, match='SHA512'):
-                    CertificateService.sign_csr(cert_id=cert_id, caref=db.session.get(CA, ca['id']).refid,
-                                                validity_days=30, policy_template_id=tid)
-                db.session.rollback()
+                row = db.session.get(CA, ca['id'])
+                svc = SCEPService(row.refid, template=db.session.get(CertificateTemplate, tid))
+                sign_hash, v = svc._policy_signing_hash(_csr(cn='yield-scep.fixed.test'))
+                assert sign_hash.name == 'sha384' and v == []
+                pem, _ = CAService.sign_csr_from_crypto(
+                    ca=row, csr=_csr(cn='yield-wstep.fixed.test'), validity_days=30,
+                    source='wstep', policy_template_id=tid)
+                assert isinstance(x509.load_pem_x509_certificate(pem.encode()).signature_hash_algorithm,
+                                  hashes.SHA384)
+                CertificateService.sign_csr(cert_id=cert_id, caref=row.refid, validity_days=30,
+                                            policy_template_id=tid)
+                db.session.commit()
+            assert isinstance(_signed(app, cert_id).signature_hash_algorithm, hashes.SHA384)
         finally:
             _drop(app, CertificatePolicy, pid)
             _drop(app, Certificate, cert_id)
             _drop(app, CertificateTemplate, tid)
 
-    def test_acme_without_configured_digest_takes_the_ca_curve_digest(self, app, create_ca):
-        from services.cert_service import CertificateService
-        from services.acme import profiles as acme_profiles
-        ca = _ec384_ca(create_ca, 'Fixed ACME P-384 CA')
-        cert_id = _store_csr(app, _csr(cn='acme.fixed.test'))
+    def test_issue_form_template_digest_is_floored_at_the_ca_key(self, app, auth_client, create_ca):
+        import json
+        from tests.conftest import get_json
+        ca = _ec384_ca(create_ca, 'Fixed issue form P-384 CA')
+        tid = _template(app, 'fixed-issue-sha256', 'sha256')
+        cert_id = None
         try:
-            with app.app_context():
-                params = acme_profiles.issuance_params(None)
-                assert params['digest_explicit'] is False
-                CertificateService.sign_csr(cert_id=cert_id, caref=db.session.get(CA, ca['id']).refid,
-                                            validity_days=30, digest=None, digest_explicit=False)
-                db.session.commit()
+            r = auth_client.post('/api/v2/certificates', content_type='application/json', data=json.dumps({
+                'cn': 'issue.fixed.test', 'ca_id': ca['id'], 'key_type': 'rsa', 'key_size': 2048,
+                'validity_days': 30, 'template_id': tid}))
+            assert r.status_code in (200, 201), r.data
+            cert_id = get_json(r)['data']['id']
             assert isinstance(_signed(app, cert_id).signature_hash_algorithm, hashes.SHA384)
         finally:
-            _drop(app, Certificate, cert_id)
+            if cert_id:
+                _drop(app, Certificate, cert_id)
+            _drop(app, CertificateTemplate, tid)
+
+    def test_acme_finalize_without_configured_digest_takes_the_ca_curve_digest(
+            self, app, monkeypatch, create_ca):
+        from tests.test_acme_profile_template import TestFinalizeWithBoundTemplate
+        cert, _, _ = TestFinalizeWithBoundTemplate()._finalize(
+            app, monkeypatch, lambda cn: _ec384_ca(create_ca, cn), None)
+        assert isinstance(cert.signature_hash_algorithm, hashes.SHA384)
 
     def test_scep_profile_template_digest_is_used(self, app, create_ca):
         from services.scep.scep_service import SCEPService
@@ -162,3 +182,8 @@ class TestPaths:
                 SystemConfig.query.filter(SystemConfig.key.in_(
                     ['tsa_enabled', 'tsa_signer_cert_refid'])).delete(synchronize_session=False)
                 db.session.commit()
+
+    def test_crl_of_a_p384_ca_defaults_to_sha384(self, app, create_ca):
+        ca = _ec384_ca(create_ca, 'Fixed CRL P-384 CA')
+        with app.app_context():
+            assert db.session.get(CA, ca['id']).effective_crl_digest() == 'sha384'

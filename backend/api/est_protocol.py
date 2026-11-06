@@ -937,8 +937,13 @@ def server_keygen(label=None):
             success=True,
         )
         
-        # RFC 7030 §4.4 leaves the key to the server: the CA's family and strength,
-        # bounded by the policies; the CMS key package is signed with RSA or EC
+        # RFC 7030 §4.4 leaves the key to the server: the request key's family (its values
+        # are ignored) else the CA's, at the CA's strength, bounded by the policies; the CMS
+        # key package is signed with RSA or EC
+        try:
+            request_key = csr.public_key()
+        except Exception:  # an algorithm pyca cannot read: no hint
+            request_key = None
         from services.policy_service import PolicyEvaluationService
         from utils.issuance_defaults import digest_for_key, generated_key_algorithm
         from utils.signing_hash import HASH_BY_NAME
@@ -947,7 +952,7 @@ def server_keygen(label=None):
             ca.id, None, subject_cn, [v for t, v in (_san_values(csr) or ()) if t == 'DNSName'])
         alg = generated_key_algorithm(
             x509.load_pem_x509_certificate(get_ca_cert_pem(ca)).public_key(), policies,
-            ca_id=ca.id, classical_only=auth_method == 'mtls')
+            ca_id=ca.id, request_public_key=request_key, classical_only=auth_method == 'mtls')
         key = key_algorithms.generate(alg.label)
 
         # Create a new CSR with the server-generated key while retaining the

@@ -145,7 +145,7 @@ def test_serverkeygen_ignores_an_mldsa_request_key(client, est_ca, tmp_path, whi
     assert leaf.subject.rfc4514_string() == f'CN={cn}'
 
 
-def test_serverkeygen_follows_an_mldsa_ca(client, est_ca):
+def test_serverkeygen_under_an_mldsa_ca_follows_an_ec_request(client, est_ca):
     from cryptography.hazmat.primitives import hashes
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.x509.oid import NameOID
@@ -157,7 +157,8 @@ def test_serverkeygen_follows_an_mldsa_ca(client, est_ca):
     r = _post(client, 'serverkeygen', csr.public_bytes(serialization.Encoding.DER))
     assert r.status_code == 200, r.data
     leaf = _serverkeygen_leaf(r)
-    assert key_algorithms.label_for_public_key(leaf.public_key()) == 'ML-DSA-65'
+    # The request's EC family at the ML-DSA-65 CA's strength (#397)
+    assert key_algorithms.label_for_public_key(leaf.public_key()) == 'EC-P384'
     leaf.verify_directly_issued_by(ca_cert)
 
 
