@@ -1,0 +1,75 @@
+"""An app on an empty database of its own, for the files whose cost grows with the session one.
+
+A backup serialises the whole database: on the session app, after hundreds of
+files have filled it, each archive took tens of seconds. A file opts in with
+
+    app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
+at module level, or inside a class with ``fresh_app_fixtures('class')``.
+"""
+import contextlib
+import shutil
+
+import pytest
+
+from tests.conftest import (
+    admin_client, ca_factory, cert_factory, clear_admin_password_flag,
+    configure_test_app, sandbox_paths, user_factory,
+)
+
+
+@contextlib.contextmanager
+def fresh_app():
+    """create_app('testing') on its own database, its paths sandboxed, undone on exit."""
+    from app import create_app
+    from config.settings import Config
+    from models import db
+    from services import scheduler_service
+
+    # create_app replaces the process-wide scheduler with one bound to the new app.
+    scheduler = scheduler_service._scheduler
+    application = create_app('testing')
+    sandbox, replaced = sandbox_paths(application)
+    configure_test_app(application)
+    clear_admin_password_flag(application)
+    try:
+        yield application
+    finally:
+        with application.app_context():
+            db.session.remove()
+            db.engine.dispose()
+        for name, value in replaced.items():
+            setattr(Config, name, value)
+        scheduler_service._scheduler = scheduler
+        shutil.rmtree(sandbox, ignore_errors=True)
+
+
+def fresh_app_fixtures(scope='module'):
+    """The fixtures `app`, `auth_client`, `create_ca`, `create_cert`, `create_user` on a fresh app.
+
+    `*_bound` takes the instance when they are class attributes; the fixtures they
+    depend on are keyword-only, which pytest resolves by name either way.
+    """
+
+    @pytest.fixture(scope=scope)
+    def app(*_bound):
+        with fresh_app() as application:
+            yield application
+
+    @pytest.fixture(scope=scope)
+    def auth_client(*_bound, app):
+        return admin_client(app)
+
+    @pytest.fixture(scope=scope)
+    def create_ca(*_bound, auth_client):
+        return ca_factory(auth_client)
+
+    @pytest.fixture(scope=scope)
+    def create_cert(*_bound, auth_client, create_ca):
+        return cert_factory(auth_client, create_ca)
+
+    @pytest.fixture(scope=scope)
+    def create_user(*_bound, auth_client):
+        return user_factory(auth_client)
+
+    return app, auth_client, create_ca, create_cert, create_user

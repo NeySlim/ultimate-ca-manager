@@ -346,6 +346,43 @@ def _seeded_rows_stay_in_their_module():
         remove_seeded()
 
 
+def sandbox_paths(application):
+    """Point the file paths at a temp tree; returns it and the Config values replaced.
+
+    The restore writes the HTTPS certificate and key where the configuration
+    points and the backup routes write archives to the configured directory:
+    left at /etc/ucm and /opt/ucm, a run would replace the installed service's files.
+    """
+    from config.settings import Config as _Config
+    sandbox = Path(tempfile.mkdtemp(prefix='ucm-test-paths-'))
+    replaced = {}
+    for name, relative in (
+        ('HTTPS_CERT_PATH', 'etc/https_cert.pem'),
+        ('HTTPS_KEY_PATH', 'etc/https_key.pem'),
+        ('DATA_DIR', 'data'),
+        ('BACKUP_DIR', 'data/backups'),
+        ('CA_DIR', 'data/ca'),
+        ('CRL_DIR', 'data/crl'),
+        ('CERT_DIR', 'data/certs'),
+        ('PRIVATE_DIR', 'data/private'),
+    ):
+        if not hasattr(_Config, name):
+            continue
+        target = sandbox / relative
+        (target.parent if target.suffix else target).mkdir(parents=True, exist_ok=True)
+        replaced[name] = getattr(_Config, name)
+        setattr(_Config, name, target)
+        application.config[name] = target
+    return sandbox, replaced
+
+
+def configure_test_app(application):
+    application.config['TESTING'] = True
+    application.config['WTF_CSRF_ENABLED'] = False
+    # Deterministic FQDN: the CA OCSP/CDP/AIA auto-URLs must not depend on `hostname -f`.
+    application.config['FQDN'] = 'ucm.test'
+
+
 @pytest.fixture(scope='session')
 def app():
     """Create Flask app with test configuration (shared across all tests)."""
@@ -366,37 +403,8 @@ def app():
     else:
         application = create_app('testing')
 
-    # Keep the suite off the machine's real files. The restore writes the
-    # HTTPS certificate and key where the configuration points, and the
-    # backup routes write archives to the configured directory: pointed at
-    # /etc/ucm and /opt/ucm as they are by default, a test run would replace
-    # the files the installed service is using.
-    from config.settings import Config as _Config
-    _sandbox = Path(tempfile.mkdtemp(prefix='ucm-test-paths-'))
-    for _name, _relative in (
-        ('HTTPS_CERT_PATH', 'etc/https_cert.pem'),
-        ('HTTPS_KEY_PATH', 'etc/https_key.pem'),
-        ('DATA_DIR', 'data'),
-        ('BACKUP_DIR', 'data/backups'),
-        ('CA_DIR', 'data/ca'),
-        ('CRL_DIR', 'data/crl'),
-        ('CERT_DIR', 'data/certs'),
-        ('PRIVATE_DIR', 'data/private'),
-    ):
-        if not hasattr(_Config, _name):
-            continue
-        _target = _sandbox / _relative
-        (_target.parent if _target.suffix else _target).mkdir(parents=True, exist_ok=True)
-        setattr(_Config, _name, _target)
-        application.config[_name] = _target
-
-    application.config['TESTING'] = True
-    application.config['WTF_CSRF_ENABLED'] = False
-    # Deterministic FQDN so CA OCSP/CDP/AIA auto-URL generation does not depend
-    # on the CI runner's `hostname -f` (which can lack a domain part and thus
-    # resolve to None, flaking tests that patch `ocsp_enabled=True` without a
-    # configured protocol_base_url).
-    application.config['FQDN'] = 'ucm.test'
+    _sandbox, _ = sandbox_paths(application)
+    configure_test_app(application)
 
     # Module fixtures are built before the per-test autouse that clears the flag.
     clear_admin_password_flag(application)
@@ -465,6 +473,10 @@ class _ReloggingClient:
 @pytest.fixture(scope='session')
 def auth_client(app):
     """Authenticated Flask test client (admin role)."""
+    return admin_client(app)
+
+
+def admin_client(app):
     def login(client):
         r = client.post('/api/v2/auth/login',
                         data=json.dumps({'username': 'admin',
@@ -515,6 +527,10 @@ def viewer_client(app):
 @pytest.fixture(scope='session')
 def create_ca(auth_client):
     """Factory fixture to create a root CA. Returns CA dict."""
+    return ca_factory(auth_client)
+
+
+def ca_factory(auth_client):
     _counter = [0]
 
     def _create(cn=None, **kwargs):
@@ -553,6 +569,10 @@ def create_cert(auth_client, create_ca):
     the cached id to the next CA created, possibly one that cannot sign, so the
     cache is checked by refid and rebuilt when the row is gone or is another CA.
     """
+    return cert_factory(auth_client, create_ca)
+
+
+def cert_factory(auth_client, create_ca):
     _ca_cache = {}
     _counter = [0]
 
@@ -593,6 +613,10 @@ def create_cert(auth_client, create_ca):
 @pytest.fixture(scope='session')
 def create_user(auth_client):
     """Factory fixture to create a user. Returns user dict."""
+    return user_factory(auth_client)
+
+
+def user_factory(auth_client):
     _counter = [0]
 
     def _create(username=None, role='operator', **kwargs):
