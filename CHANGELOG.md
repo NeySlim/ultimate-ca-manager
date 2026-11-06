@@ -70,6 +70,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - DNS providers: Hostinger called an API host and record endpoints that do not exist. It now uses the documented `/api/dns/v1/zones` endpoints, appending a value on creation and rewriting the name's other TXT values on deletion.
 - DNS providers: Epik sent records in a shape the API rejects, read the listing with field names it does not use and deleted through a path it does not have, so no TXT record was ever removed. It now follows the documented v2 host-records calls and sends the key in the `Authorization` header instead of the deprecated `SIGNATURE` query parameter.
 - DNS providers: Mythic Beasts reported a TXT value deleted when the API had removed nothing, as when the zone stores it in another form. It now deletes the value as the API lists it and fails when no record was removed.
+- DNS providers: RcodeZero used the deprecated v1 API with upper-case change types and plain-string records, sent `ADD` on a name already holding a TXT value, and took a refusal answered with HTTP 200 for success. It now follows the v2 API, writes the whole rrset when adding a second value, and fails on `status: failed`.
 
 ### Upgrade notes
 

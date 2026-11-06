@@ -542,3 +542,103 @@ def test_mythicbeasts_nothing_removed_is_false(monkeypatch):
     monkeypatch.setattr(requests, 'request', ignore_filter)
     ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
     assert not ok and 'no record removed' in msg
+
+
+# --- RcodeZero ----------------------------------------------------------------------------
+# https://my.rcodezero.at/openapi/rcode0api-v2.json: /api/v2 (v1 deprecated but for ACME),
+# GET /zones and /zones/{z}/rrsets paginated (current_page/last_page, names/types filters),
+# PATCH rrsets with changetype add|update|delete and records [{content, disabled}];
+# only complete rrsets are written; a refusal can answer 200 {status: "failed"}.
+
+class FakeRcodeZero:
+    BASE = 'https://my.rcodezero.at/api/v2'
+
+    def __init__(self):
+        self.zones = [{'id': i, 'domain': f'zone{i}.test', 'type': 'MASTER'} for i in range(150)]
+        self.zones.append({'id': 999, 'domain': 'example.com', 'type': 'MASTER'})
+        self.rrsets = [{'name': f'h{i}.example.com.', 'type': 'A', 'ttl': 60,
+                        'records': [{'content': '192.0.2.1', 'disabled': False}]} for i in range(3)]
+        self.patches = []
+        self.fail = None
+
+    def _page(self, items, query):
+        size = int(query.get('page_size', 100))
+        page = int(query.get('page', 1))
+        last = max(1, -(-len(items) // size))
+        return _Resp(200, {'current_page': page, 'last_page': last, 'per_page': size, 'total': len(items),
+                           'data': items[(page - 1) * size:page * size]})
+
+    def _find(self, name, rtype):
+        return next((r for r in self.rrsets if r['name'] == name and r['type'] == rtype), None)
+
+    def __call__(self, method, url, headers=None, json=None, params=None, timeout=None):
+        path, query = _split(url, self.BASE)
+        query.update({k: str(v) for k, v in (params or {}).items()})
+        if (headers or {}).get('Authorization') != 'Bearer tokentoken':
+            return _Resp(401, {'message': 'Unauthenticated.'})
+        if self.fail == method:
+            return _Resp(500, {'message': 'backend down'})
+        if method == 'GET' and path == '/zones':
+            return self._page(self.zones, query)
+        if path == '/zones/example.com/rrsets':
+            if method == 'GET':
+                sel = [r for r in self.rrsets
+                       if ('names' not in query or r['name'] == query['names'])
+                       and ('types' not in query or r['type'] == query['types'])]
+                return self._page(sel, query)
+            if method == 'PATCH':
+                self.patches.append(json)
+                for rr in json:
+                    if rr.get('changetype') not in ('add', 'update', 'delete') or 'ttl' not in rr:
+                        return _Resp(422, {'message': 'The given data was invalid.'})
+                    if any(not isinstance(r, dict) for r in rr.get('records', [])):
+                        return _Resp(422, {'message': 'records.0 must be an object'})
+                    current = self._find(rr['name'], rr['type'])
+                    if rr['changetype'] == 'add' and current is not None:
+                        # Undocumented for an existing rrset: refused so the provider never relies on it.
+                        return _Resp(200, {'status': 'failed', 'message': 'RRset already exists'})
+                    if current is not None:
+                        self.rrsets.remove(current)
+                    if rr['changetype'] != 'delete':
+                        self.rrsets.append({'name': rr['name'], 'type': rr['type'], 'ttl': rr['ttl'],
+                                            'records': [{'disabled': False, **r} for r in rr['records']]})
+                return _Resp(200, {'status': 'ok', 'message': 'RRsets updated'})
+        return _Resp(404, {'message': 'not found'})
+
+    def values(self):
+        rr = self._find(NAME + '.', 'TXT')
+        return [r['content'].strip('"') for r in rr['records']] if rr else []
+
+
+@pytest.fixture
+def rcodezero(monkeypatch):
+    api = FakeRcodeZero()
+    monkeypatch.setattr(requests, 'request', api)
+    return api, create_provider('rcodezero', {'api_token': 'tokentoken'})
+
+
+def test_rcodezero_lifecycle(rcodezero):
+    api, p = rcodezero
+    _lifecycle(p, api.values)
+    assert [c['changetype'] for (c,) in api.patches] == ['add', 'update', 'update', 'delete']
+    assert len(api.rrsets) == 3
+
+
+def test_rcodezero_refused_change_is_false(rcodezero, monkeypatch):
+    api, p = rcodezero
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    monkeypatch.setattr(requests, 'request', lambda method, url, **kw: (
+        _Resp(200, {'status': 'failed', 'message': 'zone is locked'}) if method == 'PATCH'
+        else api(method, url, **kw)))
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'zone is locked' in msg
+    assert api.values() == ['apex']
+
+
+def test_rcodezero_failed_read_writes_nothing(rcodezero):
+    api, p = rcodezero
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    api.fail = 'GET'
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok
+    assert len(api.patches) == 1
