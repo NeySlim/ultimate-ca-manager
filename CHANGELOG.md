@@ -16,7 +16,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
-- Database: on PostgreSQL, an error that quoted the failing statement carried the values bound to it, private keys included, into the logs despite hidden parameters. The quoted statement is now removed from the message; the error, its DETAIL, HINT and SQLSTATE are kept.
+- Database: on PostgreSQL, an error that quoted the failing statement carried the values bound to it, private keys included, into the logs despite hidden parameters. The quoted statement, a refused row and a refused input value are now removed from the message; the error, its other DETAIL, HINT and SQLSTATE are kept.
 - Revocation: a key revoked as compromised was kept only for a certificate of a CA held here, so a Let's Encrypt certificate revoked as compromised then deleted let the ACME client certify the same key again. Such keys are now kept whatever CA issued the certificate, and refused at the request, the renewal and the finalization (migration 129).
 - Key recovery: a request named its certificate by number, and SQLite gives a deleted certificate's number to the next one created, so an approved request could export another certificate's private key, after a replacing restore in particular. Approval and recovery now answer 410 unless the number still names the certificate the request was opened on, and a replacing restore cancels the open requests on the certificates it removes.
 

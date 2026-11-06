@@ -102,6 +102,23 @@ def test_a_duplicate_key_keeps_its_detail(app):
             db.session.commit()
 
 
+@pytest.mark.parametrize('statement, pgcode, primary', [
+    # NOT NULL: the DETAIL quotes the refused row
+    ('INSERT INTO system_config (key, value) VALUES (NULL, :v)', '23502',
+     'null value in column "key" of relation "system_config" violates not-null constraint'),
+    # A refused input: the primary line quotes it
+    ("INSERT INTO system_config (id, key) VALUES (CAST(:v AS integer), 'scrub-probe')", '22P02',
+     'invalid input syntax for type integer: "\u2026"'),
+])
+def test_a_refused_row_or_input_is_not_quoted(app, statement, pgcode, primary):
+    _on_postgresql(app)
+    with app.app_context(), db.engine.connect() as conn, pytest.raises(SQLAlchemyError) as caught:
+        conn.execute(text(statement), {'v': _SECRET})
+    assert caught.value.orig.pgcode == pgcode
+    assert _SECRET not in str(caught.value) and 'Failing row' not in str(caught.value)
+    assert str(caught.value.orig).split('\n')[0] == primary
+
+
 def test_sqlite_errors_are_left_as_they_are(tmp_path):
     from sqlalchemy import create_engine
     engine = create_engine(f"sqlite:///{tmp_path / 'probe.db'}")
@@ -124,3 +141,20 @@ def test_sqlite_errors_are_left_as_they_are(tmp_path):
 def test_the_scrubber_keeps_the_message_detail_and_hint(message, scrubbed):
     from utils.db_errors import scrub_postgres_message
     assert scrub_postgres_message(message) == scrubbed
+
+
+@pytest.mark.parametrize('message, pgcode, scrubbed', [
+    ('null value in column "v"\nDETAIL:  Failing row contains (1, null, s3cret).\n', '23502',
+     'null value in column "v"\n'),
+    ('new row violates check constraint "c"\nDETAIL:  Failing row contains (-1, s3cret).\n', '23514',
+     'new row violates check constraint "c"\n'),
+    ('invalid input syntax for type timestamp: "s3cret"\n', '22007',
+     'invalid input syntax for type timestamp: "\u2026"\n'),
+    ('date/time field value out of range: "s3cret"\n', '22008',
+     'date/time field value out of range: "\u2026"\n'),
+    # Outside class 22 a quoted name is an identifier, not an input
+    ('relation "s3cret_table" does not exist\n', '42P01', 'relation "s3cret_table" does not exist\n'),
+])
+def test_the_scrubber_drops_refused_rows_and_inputs(message, pgcode, scrubbed):
+    from utils.db_errors import scrub_postgres_message
+    assert scrub_postgres_message(message, pgcode) == scrubbed
