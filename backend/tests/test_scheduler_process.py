@@ -162,8 +162,8 @@ def test_the_scheduler_process_runs_the_loop_and_stops_on_sigterm(tmp_path):
     try:
         assert _wait(lambda: (data / 'scheduler_state.json').exists(), timeout=60)
         assert (data / 'scheduler.lock').read_text() == str(proc.pid)
-        log = (tmp_path / 'ucm.log').read_text()
-        assert f'Scheduler process {proc.pid} started' in log
+        # The loop thread publishes its state before main() logs the start
+        assert _wait(lambda: f'Scheduler process {proc.pid} started' in (tmp_path / 'ucm.log').read_text())
         proc.send_signal(signal.SIGTERM)
         assert proc.wait(timeout=15) == 0
         assert f'Scheduler process {proc.pid} stopped' in (tmp_path / 'ucm.log').read_text()
