@@ -5,6 +5,10 @@ from models import db
 from services.backup.export_generic import IdentityIndex, export_section
 from tests.test_backup_restore_failfast import PASSWORD, _only, _reseal, _service
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 NAME = 'auth-token-archive-hook'
 TOKEN = 'bearer-token-of-the-source'
 

@@ -15,6 +15,10 @@ from services.backup.restore import RestorePlan
 from services.backup.restore.replace import replace_sections, rows_to_remove
 from tests.test_backup_contract_matrix import _any_existing, _remove, _seed_all, _value_for
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 
 def _identity_without_unique_constraint(name):
     section = manifest.SECTIONS[name]

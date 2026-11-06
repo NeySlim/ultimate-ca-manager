@@ -10,6 +10,10 @@ import fips_mode
 from fips_mode import FipsRestricted
 from services.backup import container, manifest
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 PASSWORD = 'Correct-Horse-Battery-9'
 ARGON2_REFUSAL = ('Backups protected with Argon2id cannot be restored in FIPS mode: '
                   'restore it on a standard instance and back up again with the PBKDF2 KDF')

@@ -9,6 +9,10 @@ from models import db
 from models.acme_models import AcmeEabCredential
 from services.backup import manifest
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 PASSWORD = 'Correct-Horse-Battery-9'
 LIMITED = ['example.org', '*.svc.example.org']
 KIDS = ('restore-eab-limited', 'restore-eab-blocked', 'restore-eab-open')

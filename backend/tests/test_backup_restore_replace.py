@@ -14,6 +14,10 @@ from services.backup.restore.replace import (
     deletion_order, replace_sections, rows_to_remove,
 )
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 
 class TestDeletionOrder:
     def test_a_section_goes_before_what_it_points_at(self):
