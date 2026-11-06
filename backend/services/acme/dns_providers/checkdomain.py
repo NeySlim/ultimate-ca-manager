@@ -69,7 +69,10 @@ class CheckdomainDnsProvider(BaseDnsProvider):
         for rec in result.get('_embedded', {}).get('records', []):
             if (rec.get('type') == 'TXT' and rec.get('name') == relative
                     and self.txt_matches(rec.get('value'), record_value)):
-                self._request('DELETE', f'/domains/{domain_id}/nameservers/records/{rec["id"]}')
+                ok, err = self._request('DELETE', f'/domains/{domain_id}/nameservers/records/{rec["id"]}')
+                if not ok:
+                    logger.warning(f"Checkdomain: failed to delete TXT value of {record_name}: {err}")
+                    return False, f"Failed to delete record: {err}"
         return True, "Record deleted"
     
     def test_connection(self):

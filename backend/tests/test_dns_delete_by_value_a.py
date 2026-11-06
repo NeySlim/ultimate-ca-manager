@@ -174,6 +174,18 @@ def test_checkdomain_deletes_one_value(monkeypatch):
     assert api.deletes == ['/domains/5/nameservers/records/1']
 
 
+def test_checkdomain_refused_delete_is_false(monkeypatch):
+    api = FakeCheckdomain()
+    monkeypatch.setattr(requests, 'request', api)
+    p = create_provider('checkdomain', {'api_token': 't'})
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    monkeypatch.setattr(requests, 'request', lambda method, url, **kw: (
+        _Resp(405, {'message': 'Method Not Allowed'}) if method == 'DELETE' else api(method, url, **kw)))
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and '405' in msg
+    assert api.values() == ['apex']
+
+
 # --- ClouDNS ------------------------------------------------------------------
 
 class FakeClouDns(_PerRecordFake):
