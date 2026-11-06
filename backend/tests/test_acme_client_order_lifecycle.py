@@ -291,6 +291,25 @@ def test_a_restart_leaves_a_processing_order_another_instance_works_on(bench):
     assert db.session.get(AcmeClientOrder, idle.id).status == 'pending'
 
 
+def test_an_order_left_fresh_by_a_restart_is_recovered_by_the_renewal_pass(bench):
+    from services import acme_renewal_service as renew_mod
+    order = bench.child(status='processing', renewal_enabled=True)
+    db.session.commit()
+    _idle(order.id, minutes=0)  # the restart came during the DNS wait
+    housekeeping.recover_interrupted_orders()
+    db.session.expire_all()
+    assert db.session.get(AcmeClientOrder, order.id).status == 'processing'
+    _idle(order.id)
+    switch = _set_config('acme.client.renewal_enabled', 'false')
+    try:
+        assert renew_mod.scheduled_acme_renewal()['reason'] == 'acme_renewal_off'
+    finally:
+        _restore_config('acme.client.renewal_enabled', switch)
+    db.session.expire_all()
+    row = db.session.get(AcmeClientOrder, order.id)
+    assert (row.status, row.error_message) == ('pending', housekeeping.INTERRUPTED)
+
+
 def test_the_dns_wait_of_an_auto_poll_keeps_the_order_fresh(bench, monkeypatch):
     from api.v2.acme_client import orders as orders_module
     order = bench.child(status='processing', renewal_enabled=True)

@@ -318,6 +318,11 @@ class FakeNamecheap:
         self.hosts = [{'Name': 'www', 'Type': 'A', 'Address': '192.0.2.10', 'TTL': '1800', 'MXPref': '10'}]
         self.sets = []
         self.get_fails = False
+        self.email_type = 'MX'
+
+    def post(self, url, data=None, timeout=None):
+        assert data['Command'] == 'namecheap.domains.dns.setHosts'
+        return self(url, params=data, timeout=timeout)
 
     def __call__(self, url, params=None, timeout=None):
         cmd = params['Command']
@@ -326,10 +331,11 @@ class FakeNamecheap:
                 return _Resp(200, text='<ApiResponse Status="ERROR" xmlns="http://api.namecheap.com/xml.response"><Errors><Error>Internal error</Error></Errors></ApiResponse>')
             hosts = ''.join(f'<host Name="{h["Name"]}" Type="{h["Type"]}" Address="{h["Address"]}" '
                             f'TTL="{h["TTL"]}" MXPref="{h["MXPref"]}"/>' for h in self.hosts)
-            return _Resp(200, text=f'<ApiResponse Status="OK" xmlns="http://api.namecheap.com/xml.response"><CommandResponse><DomainDNSGetHostsResult>'
+            return _Resp(200, text=f'<ApiResponse Status="OK" xmlns="http://api.namecheap.com/xml.response"><CommandResponse><DomainDNSGetHostsResult Domain="example.com" EmailType="{self.email_type}" IsUsingOurDNS="true">'
                                    f'{hosts}</DomainDNSGetHostsResult></CommandResponse></ApiResponse>')
         if cmd == 'namecheap.domains.dns.setHosts':
             self.sets.append(dict(params))
+            self.email_type = params.get('EmailType', 'NONE')  # setHosts without it resets mail
             hosts, i = [], 1
             while f'HostName{i}' in params:
                 hosts.append({'Name': params[f'HostName{i}'], 'Type': params[f'RecordType{i}'],
@@ -343,7 +349,10 @@ class FakeNamecheap:
 
 def _namecheap(monkeypatch):
     api = FakeNamecheap()
-    monkeypatch.setattr(requests, 'get', api)
+    monkeypatch.setattr(requests, 'get', lambda url, params=None, timeout=None: api(
+        url, params=params, timeout=timeout) if params['Command'] != 'namecheap.domains.dns.setHosts'
+        else pytest.fail('setHosts sent as GET'))
+    monkeypatch.setattr(requests, 'post', api.post)
     return api, create_provider('namecheap', {'api_user': 'u', 'api_key': 'k', 'client_ip': '198.51.100.1'})
 
 
@@ -353,6 +362,13 @@ def test_namecheap_deletes_one_value(monkeypatch):
     assert ok, msg
     assert [(h['Name'], h['Address'], h['TTL']) for h in api.hosts] == \
         [('www', '192.0.2.10', '1800'), ('_acme-challenge', 'wild', '1800')]
+
+
+def test_namecheap_keeps_the_mail_setting(monkeypatch):
+    api, p = _namecheap(monkeypatch)
+    _two_values_then_delete_one(p)
+    assert api.sets and all(s['EmailType'] == 'MX' for s in api.sets)
+    assert api.email_type == 'MX'
 
 
 def test_namecheap_failed_read_writes_nothing(monkeypatch):

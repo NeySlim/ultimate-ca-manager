@@ -123,10 +123,9 @@ class FreeDnsDnsProvider(BaseDnsProvider):
         try:
             response = session.get(f"{self.BASE_URL}/subdomain/", timeout=30)
             
-            # Parse data_id for _acme-challenge record
-            # Format: data_id=12345>_acme-challenge
-            subdomain = record_name.split('.')[0]  # Get first part (e.g., _acme-challenge)
-            pattern = rf'data_id=(\d+)[^>]*>{re.escape(subdomain)}'
+            # Rows link the full name (data_id=12345>_acme-challenge.example.com): match all of it,
+            # its first label alone is the _acme-challenge of any domain of the account
+            pattern = rf'data_id=(\d+)[^>]*>\s*{re.escape(record_name.rstrip("."))}\s*<'
             match = re.search(pattern, response.text, re.IGNORECASE)
             
             if match:

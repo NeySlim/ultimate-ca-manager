@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 INTERRUPTED = ('Interrupted by a restart of UCM before validation: verify the challenges '
                'again, or delete the order')
 PENDING_KEPT = timedelta(days=7)
-# The auto-poll refreshes updated_at at each pass: a fresher order may be another instance's
+# The auto-poll refreshes updated_at during its DNS wait: a fresher order may be another instance's
 PROCESSING_IDLE = timedelta(minutes=15)
 
 
@@ -28,10 +28,11 @@ def _no_live_lease(now):
 
 
 def recover_interrupted_orders() -> int:
-    """At startup: an order the automatic path left ``processing`` goes back to ``pending``,
-    with a message. A finalization (pending key or live lease) and a renewal's own order,
-    resumed by their own paths, and proxy orders are left as they are, and so is an order
-    updated in the last 15 minutes: an instance sharing the database may be polling it."""
+    """At startup and at each renewal pass: an order the automatic path left ``processing``
+    goes back to ``pending``, with a message. A finalization (pending key or live lease) and a
+    renewal's own order, resumed by their own paths, and proxy orders are left as they are, and
+    so is an order updated in the last 15 minutes: an instance sharing the database may be
+    polling it."""
     now = utc_now()
     candidates = (
         AcmeClientOrder.status == 'processing', _not_proxy(), _no_live_lease(now),

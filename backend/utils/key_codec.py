@@ -176,6 +176,27 @@ def _der_eddsa(der: bytes) -> Optional[str]:
     return None
 
 
+def _cert_eddsa(der: bytes) -> Optional[str]:
+    """X.509 certificate: the algorithm of the SubjectPublicKeyInfo of its TBSCertificate."""
+    tag, pos, _end = _der_tlv(der, 0)
+    if tag != 0x30:
+        return None
+    tag, pos, end = _der_tlv(der, pos)
+    if tag != 0x30:
+        return None
+    fields = []
+    while pos < end and len(fields) < 7:
+        tag, _start, stop = _der_tlv(der, pos)
+        fields.append((tag, pos, stop))
+        pos = stop
+    if fields and fields[0][0] == 0xa0:  # explicit version
+        fields = fields[1:]
+    # serial, signature, issuer, validity, subject, subjectPublicKeyInfo
+    if len(fields) < 6 or fields[5][0] != 0x30:
+        return None
+    return _der_eddsa(der[fields[5][1]:fields[5][2]])
+
+
 def _ssh_blob_eddsa(blob: bytes) -> Optional[str]:
     """SSH wire blob (key, certificate, openssh-key-v1 file) holding a length-prefixed EdDSA type."""
     for name, label in _EDDSA_SSH_TYPES.items():
@@ -186,7 +207,7 @@ def _ssh_blob_eddsa(blob: bytes) -> Optional[str]:
 
 def eddsa_key_name(data) -> Optional[str]:
     """'Ed25519' or 'Ed448' when *data* (PEM, DER, OpenSSH private key, public
-    key line or certificate) holds an EdDSA key, else None; never raises."""
+    key line, SSH or X.509 certificate) holds an EdDSA key, else None; never raises."""
     if isinstance(data, str):
         data = data.encode('utf-8', 'replace')
     if not isinstance(data, (bytes, bytearray)) or not data:
@@ -200,14 +221,22 @@ def eddsa_key_name(data) -> Optional[str]:
                 found = _ssh_blob_eddsa(der)
             elif label in (b'PRIVATE KEY', b'PUBLIC KEY'):
                 found = _der_eddsa(der)
+            elif label in (b'CERTIFICATE', b'X509 CERTIFICATE', b'TRUSTED CERTIFICATE'):
+                found = _cert_eddsa(der)
+            elif b'ED448' in label:
+                found = 'Ed448'
+            elif b'ED25519' in label:
+                found = 'Ed25519'
             else:
+                # ENCRYPTED PRIVATE KEY hides its algorithm in the ciphertext: it is told only
+                # once decrypted, where the FIPS provider refuses it with its own error
                 found = None
             if found:
                 return found
         if blocks:
             return None
         if data[:1] == b'\x30':
-            return _der_eddsa(data)
+            return _der_eddsa(data) or _cert_eddsa(data)
         for token in data.split()[:2]:
             if token in _EDDSA_SSH_TYPES:
                 return _EDDSA_SSH_TYPES[token]

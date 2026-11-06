@@ -42,7 +42,8 @@ class NamecheapDnsProvider(BaseDnsProvider):
     def _get_api_url(self) -> str:
         return self.SANDBOX_URL if self._use_sandbox else self.BASE_URL
     
-    def _make_request(self, command: str, extra_params: Optional[Dict] = None) -> Tuple[bool, Any]:
+    def _make_request(self, command: str, extra_params: Optional[Dict] = None,
+                      post: bool = False) -> Tuple[bool, Any]:
         """Make Namecheap API request"""
         params = {
             'ApiUser': self.credentials['api_user'],
@@ -56,11 +57,10 @@ class NamecheapDnsProvider(BaseDnsProvider):
             params.update(extra_params)
         
         try:
-            response = requests.get(
-                self._get_api_url(),
-                params=params,
-                timeout=60
-            )
+            if post:  # setHosts carries the whole zone: too long for a query string
+                response = requests.post(self._get_api_url(), data=params, timeout=60)
+            else:
+                response = requests.get(self._get_api_url(), params=params, timeout=60)
             
             if response.status_code >= 400:
                 return False, f"HTTP {response.status_code}: {response.reason}"
@@ -110,8 +110,8 @@ class NamecheapDnsProvider(BaseDnsProvider):
             return record_name[:-len(zone) - 1]
         return record_name
     
-    def _get_existing_records(self, sld: str, tld: str) -> Optional[List[Dict]]:
-        """Get existing DNS records for a domain; None when they cannot be read."""
+    def _get_existing_records(self, sld: str, tld: str) -> Optional[Tuple[List[Dict], Optional[str]]]:
+        """The host list of a domain and its EmailType; None when they cannot be read."""
         success, result = self._make_request(
             'namecheap.domains.dns.getHosts',
             {'SLD': sld, 'TLD': tld}
@@ -131,8 +131,23 @@ class NamecheapDnsProvider(BaseDnsProvider):
                 'TTL': host.attrib.get('TTL', '1800'),
                 'MXPref': host.attrib.get('MXPref', '10'),
             })
-        
-        return records
+        hosts_result = result.find('.//{*}DomainDNSGetHostsResult')
+        email_type = hosts_result.attrib.get('EmailType') if hosts_result is not None else None
+        return records, email_type
+
+    def _set_hosts(self, sld: str, tld: str, records: List[Dict], email_type: Optional[str]) -> Tuple[bool, Any]:
+        """setHosts replaces the host list and the mail setting: both are written back as read."""
+        params = {'SLD': sld, 'TLD': tld}
+        if email_type:
+            params['EmailType'] = email_type
+        for i, record in enumerate(records, 1):
+            params[f'HostName{i}'] = record['HostName']
+            params[f'RecordType{i}'] = record['RecordType']
+            params[f'Address{i}'] = record['Address']
+            params[f'TTL{i}'] = record.get('TTL', '1800')
+            if record['RecordType'] == 'MX':
+                params[f'MXPref{i}'] = record.get('MXPref', '10')
+        return self._make_request('namecheap.domains.dns.setHosts', params, post=True)
     
     def create_txt_record(
         self, 
@@ -149,9 +164,10 @@ class NamecheapDnsProvider(BaseDnsProvider):
         host_name = self._relative_host(record_name, domain)
         
         # setHosts replaces the whole host list: never write it from a failed read
-        existing_records = self._get_existing_records(sld, tld)
-        if existing_records is None:
+        current = self._get_existing_records(sld, tld)
+        if current is None:
             return False, "Failed to read existing records"
+        existing_records, email_type = current
         
         # Add new record
         existing_records.append({
@@ -161,17 +177,7 @@ class NamecheapDnsProvider(BaseDnsProvider):
             'TTL': str(max(ttl, 60)),
         })
         
-        # Build params for all records
-        params = {'SLD': sld, 'TLD': tld}
-        for i, record in enumerate(existing_records, 1):
-            params[f'HostName{i}'] = record['HostName']
-            params[f'RecordType{i}'] = record['RecordType']
-            params[f'Address{i}'] = record['Address']
-            params[f'TTL{i}'] = record.get('TTL', '1800')
-            if record['RecordType'] == 'MX':
-                params[f'MXPref{i}'] = record.get('MXPref', '10')
-        
-        success, result = self._make_request('namecheap.domains.dns.setHosts', params)
+        success, result = self._set_hosts(sld, tld, existing_records, email_type)
         
         if not success:
             return False, f"Failed to create record: {result}"
@@ -188,9 +194,10 @@ class NamecheapDnsProvider(BaseDnsProvider):
         host_name = self._relative_host(record_name, domain)
         
         # setHosts replaces the whole host list: never write it from a failed read
-        existing_records = self._get_existing_records(sld, tld)
-        if existing_records is None:
+        current = self._get_existing_records(sld, tld)
+        if current is None:
             return False, "Failed to read existing records"
+        existing_records, email_type = current
         
         # Drop only this value: other values of the name belong to other challenges
         filtered_records = [
@@ -202,17 +209,7 @@ class NamecheapDnsProvider(BaseDnsProvider):
         if len(filtered_records) == len(existing_records):
             return True, "Record not found (already deleted?)"
         
-        # Build params for remaining records
-        params = {'SLD': sld, 'TLD': tld}
-        for i, record in enumerate(filtered_records, 1):
-            params[f'HostName{i}'] = record['HostName']
-            params[f'RecordType{i}'] = record['RecordType']
-            params[f'Address{i}'] = record['Address']
-            params[f'TTL{i}'] = record.get('TTL', '1800')
-            if record['RecordType'] == 'MX':
-                params[f'MXPref{i}'] = record.get('MXPref', '10')
-        
-        success, result = self._make_request('namecheap.domains.dns.setHosts', params)
+        success, result = self._set_hosts(sld, tld, filtered_records, email_type)
         
         if not success:
             return False, f"Failed to delete record: {result}"

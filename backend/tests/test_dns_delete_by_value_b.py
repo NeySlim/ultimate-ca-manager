@@ -328,3 +328,24 @@ def test_freedns_cleanup_warns_that_it_removes_the_name(monkeypatch, caplog):
     assert ok, msg
     assert session.deleted == ['5']
     assert any(r.levelno == logging.WARNING and 'whichever value' in r.getMessage() for r in caplog.records)
+
+
+def test_freedns_cleanup_leaves_the_record_of_another_domain(monkeypatch):
+    class Session:
+        def __init__(self):
+            self.deleted = []
+
+        def post(self, url, data=None, timeout=None):
+            return _Resp(200, text='Logout')
+
+        def get(self, url, params=None, timeout=None):
+            if params:
+                self.deleted.append(params['data_id[]'])
+            return _Resp(200, text='<a href=edit.php?data_id=4>_acme-challenge.other.example</a>'
+                                   '<a href=edit.php?data_id=5>_acme-challenge.example.com</a>')
+
+    session = Session()
+    monkeypatch.setattr(freedns_module, 'create_session', lambda: session)
+    p = create_provider('freedns', {'username': 'u', 'password': 'p'})
+    assert p.delete_txt_record('example.com', NAME, 'apex')[0]
+    assert session.deleted == ['5']
