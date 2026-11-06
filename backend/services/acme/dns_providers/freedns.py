@@ -219,7 +219,7 @@ class FreeDnsDnsProvider(BaseDnsProvider):
             # Remove from cache
             self._txt_record_cache.pop(record_name, None)
             
-            # The page answers 200 whatever happened: the listing says whether the record went.
+            # The web form reports no status of its own: the listing says whether the record went.
             if self._get_txt_record_id(record_name) == data_id:
                 logger.warning(f"FreeDNS: TXT record {record_name} (ID: {data_id}) is still listed after deletion")
                 return False, self._error(response, "FreeDNS kept the record: ")
