@@ -46,6 +46,8 @@ from utils import notices as notices_mod
 from utils.signing_hash import rsa_padding_for
 from utils.related_cert import RELATED_CERT_EXTENSION_OID
 
+from utils.issuance_defaults import log_renewal_digest, original_digest
+
 logger = logging.getLogger(__name__)
 
 
@@ -455,13 +457,6 @@ def _dns_names(certificate) -> list:
     return names
 
 
-def _signature_hash_name(certificate):
-    try:
-        return getattr(certificate.signature_hash_algorithm, 'name', None)
-    except Exception:  # an algorithm cryptography cannot name: the policies choose
-        return None
-
-
 def _has_time_stamping(certificate):
     try:
         eku = certificate.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value
@@ -482,10 +477,13 @@ def _apply_policies(cert, ca, ca_key, original, days, pq_hybrid=False):
     key_label = key_label_for_public_key(original.public_key())
     advisories = []
     tsa_signer = _has_time_stamping(original)
+    # The original's hash while the CA key and the policies still allow it
     sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
-        policies, ca_key, _signature_hash_name(original), explicit=False,
+        policies, ca_key, original_digest(original), explicit=False,
         key_type=key_label, context=context, tsa_signer=tsa_signer, notices=advisories,
         pq_hybrid=pq_hybrid)
+    if not violations:
+        log_renewal_digest(logger, original, sign_hash, cn or cert.descr)
     rule_violations, granted, capped_by = PolicyEvaluationService.enforce_rules(
         policies, key_type=key_label, dns_name_count=len(dns), validity_days=days,
         context=context, tsa_signer=tsa_signer, notices=advisories, pq_hybrid=pq_hybrid)

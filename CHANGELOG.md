@@ -21,6 +21,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Renewals: a renewed OCSP responder certificate was signed with the policies' default digest instead of the original's, and a renewal that could not keep the original's digest said nothing. Both keep it while the CA key and the policies allow it, else follow the issuance rule and log the change (#397).
 - XCEP: an ECDSA template outside FIPS mode announced no request hash, and a P-384 or P-521 template asked for its template digest, SHA-256 by default. ECDSA templates are now schema 3 and announce the stronger of the template digest and the one matching their key; RSA templates outside FIPS mode stay schema 2, whose hash MS-XCEP requires to be nil (#397).
 - EST and mTLS: server-generated keys were always RSA-2048, so a policy refusing it (CNSA, strict FIPS profile) refused EST `serverkeygen` and user mTLS certificates. The key now follows the issuing CA (RSA-3072 under RSA-3072 and up, P-256 or P-384 under EC, a browser-usable type for mTLS) and moves to the closest type the policies allow (#397).
 - Issuance: EST, SCEP, WSTEP, Sign CSR, TSA signer and unconfigured ACME orders signed with SHA-256 whatever the CA key and the bound template. They now take the template's digest unless it is weaker than the one matching the CA key (SHA-384 for P-384, SHA-512 for P-521), and a policy refusing that default picks the closest stronger digest it allows, not the weakest (#397).

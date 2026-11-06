@@ -128,3 +128,21 @@ def browser_key_type(ca, cn=None) -> str:
     issuer = x509.load_pem_x509_certificate(get_ca_cert_pem(ca)).public_key()
     policies = PolicyEvaluationService.applicable_policies(ca.id, None, cn)
     return generated_key_algorithm(issuer, policies, ca_id=ca.id, classical_only=True).trust_store_id
+
+
+def original_digest(certificate) -> str | None:
+    """The signature hash of a certificate being renewed, its preference; None when
+    it has none or one cryptography cannot name (the CA key's then applies)."""
+    try:
+        return getattr(certificate.signature_hash_algorithm, 'name', None)
+    except Exception:
+        return None
+
+
+def log_renewal_digest(logger, certificate, sign_hash, subject) -> None:
+    """One log line when a renewal does not keep the original's signature hash."""
+    kept = original_digest(certificate)
+    signs = getattr(sign_hash, 'name', None)
+    if kept and kept != signs:
+        logger.info("Renewal of %s signs with %s instead of the original %s (CA key or policies)",
+                    subject, (signs or 'no separate digest').upper(), kept.upper())
