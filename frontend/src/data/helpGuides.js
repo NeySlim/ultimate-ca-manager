@@ -1420,7 +1420,9 @@ Get the CSR attributes (OIDs) recommended by the server.
 ### POST /serverkeygen
 Server generates a key pair and returns the certificate along with the private key. Useful when the client cannot generate keys locally.
 
-The generated key takes the issuing CA's strength: the family of the request's key when it is RSA or EC (its size or curve is ignored), else the CA's, moved to the closest type the policies allow. Over mTLS it is RSA or EC, the key types its CMS key transport carries (v2.251).
+The generated key takes the issuing CA's strength: the family of the request's key when it is RSA or EC (its size or curve is ignored), else the CA's, moved to the closest type the policies allow.
+
+The private key comes as unencrypted PKCS#8 (\`application/pkcs8\`), protected by TLS. To get it encrypted, authenticate with mTLS and put the client certificate's key identifier in the CSR (AsymmetricDecryptKeyIdentifier): the key then arrives in an RFC 5958 key package signed by the issuing CA and enveloped for that RSA certificate, and the CA certificate must assert digitalSignature (v2.252).
 
 ## Information Tab
 
