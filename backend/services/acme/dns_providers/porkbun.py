@@ -34,9 +34,13 @@ class PorkbunDnsProvider(BaseDnsProvider):
             resp = requests.post(f"{self.BASE_URL}{path}", json=body, timeout=30)
             result = resp.json()
             if result.get('status') == 'SUCCESS':
+                # A write to a domain not delegated to Porkbun succeeds and says so here.
+                for warning in result.get('warnings') or []:
+                    logger.warning(f"Porkbun: {warning}")
                 return True, result
-            return False, result.get('message', 'Unknown error')
-        except requests.RequestException as e:
+            message = result.get('message') or f"HTTP {resp.status_code}"
+            return False, self.redact_secrets(f"{result.get('code')}: {message}" if result.get('code') else message)
+        except (requests.RequestException, ValueError) as e:
             logger.error(f"Porkbun API error: {self._failure(e)}")
             return False, self._failure(e)
     
@@ -44,7 +48,7 @@ class PorkbunDnsProvider(BaseDnsProvider):
         zone = self.get_zone_for_domain(domain)
         relative = self.get_relative_record_name(record_name, zone)
         success, result = self._request(f'/dns/create/{zone}', {
-            'name': relative, 'type': 'TXT', 'content': record_value, 'ttl': str(ttl)
+            'name': relative, 'type': 'TXT', 'content': record_value, 'ttl': int(ttl)
         })
         if not success:
             return False, f"Failed: {result}"
@@ -55,10 +59,14 @@ class PorkbunDnsProvider(BaseDnsProvider):
         relative = self.get_relative_record_name(record_name, zone)
         
         success, result = self._request(f'/dns/retrieveByNameType/{zone}/TXT/{relative}')
-        if success:
-            for rec in result.get('records', []):
-                if self.txt_matches(rec.get('content'), record_value):
-                    self._request(f'/dns/delete/{zone}/{rec["id"]}')
+        if not success:
+            return False, f"Failed to list records: {result}"
+        for rec in result.get('records') or []:
+            if self.txt_matches(rec.get('content'), record_value):
+                ok, err = self._request(f'/dns/delete/{zone}/{rec["id"]}')
+                if not ok:
+                    logger.warning(f"Porkbun: failed to delete TXT value of {record_name}: {err}")
+                    return False, f"Failed to delete record: {err}"
         return True, "Record deleted"
     
     def test_connection(self):

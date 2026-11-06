@@ -84,44 +84,6 @@ def test_ovh_deletes_one_value(monkeypatch):
     assert [r['target'] for r in api.records.values()] == ['"wild"']
 
 
-# --- Porkbun ------------------------------------------------------------------
-
-class FakePorkbun:
-    def __init__(self):
-        self.records = []
-        self.next_id = 1
-        self.deleted = []
-
-    def post(self, url, json=None, timeout=None):
-        path = url.split('/api/json/v3', 1)[1]
-        ok = {'status': 'SUCCESS'}
-        if path == '/dns/create/example.com':
-            rec = {'id': str(self.next_id), 'name': f"{json['name']}.example.com", 'type': json['type'],
-                   'content': json['content'], 'ttl': json['ttl']}
-            self.next_id += 1
-            self.records.append(rec)
-            return _Resp(200, {**ok, 'id': rec['id']})
-        if path.startswith('/dns/retrieveByNameType/example.com/'):
-            rtype, sub = path.split('/')[4:6]
-            return _Resp(200, {**ok, 'records': [r for r in self.records
-                                                 if r['type'] == rtype and r['name'] == f'{sub}.example.com']})
-        if path.startswith('/dns/delete/example.com/'):
-            rid = path.rsplit('/', 1)[1]
-            self.deleted.append(rid)
-            self.records = [r for r in self.records if r['id'] != rid]
-            return _Resp(200, ok)
-        return _Resp(400, {'status': 'ERROR', 'message': f'unexpected {path}'})
-
-
-def test_porkbun_deletes_one_value(monkeypatch):
-    api = FakePorkbun()
-    monkeypatch.setattr(requests, 'post', api.post)
-    p = create_provider('porkbun', {'api_key': 'k', 'secret_api_key': 's'})
-    _two_values_then_delete_one(p)
-    assert api.deleted == ['1']
-    assert [r['content'] for r in api.records] == ['wild']
-
-
 # --- Rackspace ----------------------------------------------------------------
 
 class FakeRackspace:

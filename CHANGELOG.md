@@ -74,6 +74,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - DNS providers: Vultr read only the first page of domains and records, so a zone or a TXT value past it was never found. It now follows the `meta.links.next` cursor through every page.
 - DNS providers: Vercel read the first page of a zone's records only and reported success when a deletion failed. It now reads every page of the documented v5 listing and fails when the API refuses the deletion.
 - DNS providers: Google Cloud DNS took a failed read of the TXT records for an absent record, so a cleanup reported success with the value still published, and it read only the first page of managed zones. A failed read now fails, and every page of zones is read.
+- DNS providers: Porkbun reported a TXT record deleted when the listing or the deletion failed, and sent the TTL as text where the API takes an integer. Both failures now fail the cleanup, and the API's warnings, such as a domain not delegated to Porkbun, are logged.
 
 ### Upgrade notes
 

@@ -811,3 +811,82 @@ def test_vercel_failed_delete_is_false(vercel):
     ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
     assert not ok and 'Internal error' in msg
     assert api.values() == ['apex']
+
+
+# --- Porkbun ------------------------------------------------------------------------------------
+# https://porkbun.com/llms/dns (API v3): POST JSON with apikey/secretapikey; create answers
+# {status: SUCCESS, id: <int>} (ttl an integer), retrieveByNameType answers records with string
+# ids, delete/{domain}/{id}; an error answers {status: ERROR, code, message}.
+
+class FakePorkbun:
+    BASE = 'https://api.porkbun.com/api/json/v3'
+
+    def __init__(self):
+        self.records = [{'id': '100', 'name': 'example.com', 'type': 'TXT', 'content': 'v=spf1 -all',
+                         'ttl': '600', 'prio': '0', 'notes': ''}]
+        self.next_id = 101
+        self.fail = None
+
+    def post(self, url, json=None, timeout=None, headers=None):
+        path, _ = _split(url, self.BASE)
+        if (json or {}).get('apikey') != 'k' or json.get('secretapikey') != 's':
+            return _Resp(403, {'status': 'ERROR', 'code': 'INVALID_API_KEY', 'message': 'Invalid API key.'})
+        if self.fail and path.startswith(self.fail):
+            return _Resp(400, {'status': 'ERROR', 'code': 'DNS_RECORD_ERROR', 'message': 'Could not process.'})
+        if path == '/dns/create/example.com':
+            if not isinstance(json.get('ttl', 0), int):
+                return _Resp(400, {'status': 'ERROR', 'code': 'INVALID_TTL', 'message': 'ttl must be an integer'})
+            name = json.get('name') or ''
+            rec = {'id': str(self.next_id), 'name': f'{name}.example.com' if name else 'example.com',
+                   'type': json['type'], 'content': json['content'], 'ttl': str(json.get('ttl') or 600),
+                   'prio': '0', 'notes': ''}
+            self.next_id += 1
+            self.records.append(rec)
+            return _Resp(200, {'status': 'SUCCESS', 'id': int(rec['id'])})
+        m = re.fullmatch(r'/dns/retrieveByNameType/example\.com/([A-Z]+)(?:/([^/]*))?', path)
+        if m:
+            rtype, sub = m.groups()
+            fqdn = f'{sub}.example.com' if sub else 'example.com'
+            return _Resp(200, {'status': 'SUCCESS', 'cloudflare': 'disabled', 'records': [
+                r for r in self.records if r['type'] == rtype and r['name'] == fqdn]})
+        m = re.fullmatch(r'/dns/delete/example\.com/(\d+)', path)
+        if m:
+            if not any(r['id'] == m.group(1) for r in self.records):
+                return _Resp(400, {'status': 'ERROR', 'code': 'RECORD_NOT_FOUND', 'message': 'Invalid record ID.'})
+            self.records = [r for r in self.records if r['id'] != m.group(1)]
+            return _Resp(200, {'status': 'SUCCESS'})
+        return _Resp(404, {'status': 'ERROR', 'code': 'NOT_FOUND', 'message': 'Unknown endpoint'})
+
+    def values(self):
+        return [r['content'] for r in self.records if r['name'] == NAME]
+
+
+@pytest.fixture
+def porkbun(monkeypatch):
+    api = FakePorkbun()
+    monkeypatch.setattr(requests, 'post', api.post)
+    return api, create_provider('porkbun', {'api_key': 'k', 'secret_api_key': 's'})
+
+
+def test_porkbun_lifecycle(porkbun):
+    api, p = porkbun
+    _lifecycle(p, api.values)
+    assert [r['id'] for r in api.records] == ['100']
+
+
+def test_porkbun_failed_read_is_false(porkbun):
+    api, p = porkbun
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    api.fail = '/dns/retrieveByNameType'
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'Could not process' in msg
+    assert api.values() == ['apex']
+
+
+def test_porkbun_failed_delete_is_false(porkbun):
+    api, p = porkbun
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    api.fail = '/dns/delete'
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'DNS_RECORD_ERROR' in msg
+    assert api.values() == ['apex']
