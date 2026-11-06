@@ -724,3 +724,90 @@ def test_vultr_page_bound(vultr, monkeypatch):
     api, p = vultr
     monkeypatch.setattr(type(p), 'MAX_PAGES', 2)
     assert not p.test_connection()[0]
+
+
+# --- Vercel -----------------------------------------------------------------------------------
+# https://vercel.com/docs/rest-api (openapi.json): GET /v5/domains/{d}/records answers
+# {records, pagination: {count, next, prev}}, `next` a timestamp for `until` (records created
+# before it), 20 per page by default; POST /v2/domains/{d}/records {name, type, value, ttl}
+# answers {uid}; DELETE /v2/domains/{d}/records/{id} answers 200 {}.
+
+class FakeVercel:
+    BASE = 'https://api.vercel.com'
+    CAP = 2
+
+    def __init__(self):
+        self.clock = 1_700_000_000_000
+        self.records = []
+        for i in range(5):
+            self._add({'name': f'h{i}', 'type': 'A', 'value': '192.0.2.1', 'ttl': 60})
+        self.fail = None
+
+    def _add(self, rec):
+        self.clock += 1000
+        rec = {'id': f'rec_{self.clock}', 'slug': '', 'creator': 'u', 'created': self.clock,
+               'createdAt': self.clock, 'updated': self.clock, 'updatedAt': self.clock, **rec}
+        self.records.append(rec)
+        return rec
+
+    def __call__(self, method, url, headers=None, json=None, params=None, timeout=None):
+        path, query = _split(url, self.BASE)
+        query.update({k: str(v) for k, v in (params or {}).items()})
+        if (headers or {}).get('Authorization') != 'Bearer tokentoken':
+            return _Resp(401, {'error': {'code': 'forbidden', 'message': 'Not authorized'}})
+        if self.fail == method:
+            return _Resp(500, {'error': {'code': 'internal', 'message': 'Internal error'}})
+        if method == 'GET' and path == '/v5/domains':
+            return _Resp(200, {'domains': [{'name': 'example.com'}], 'pagination': {'count': 1, 'next': None, 'prev': None}})
+        if method == 'GET' and path == '/v5/domains/example.com/records':
+            ordered = sorted(self.records, key=lambda r: -r['createdAt'])
+            if 'until' in query:
+                ordered = [r for r in ordered if r['createdAt'] < int(query['until'])]
+            page = ordered[:min(self.CAP, int(query.get('limit', 20)))]
+            more = len(ordered) > len(page)
+            return _Resp(200, {'records': page, 'pagination': {
+                'count': len(page), 'next': page[-1]['createdAt'] if more else None, 'prev': None}})
+        if method == 'POST' and path == '/v2/domains/example.com/records':
+            if json.get('type') != 'TXT' or 'value' not in json or 'name' not in json:
+                return _Resp(400, {'error': {'code': 'bad_request', 'message': 'Invalid request'}})
+            return _Resp(200, {'uid': self._add(dict(json))['id']})
+        if method == 'DELETE' and path.startswith('/v2/domains/example.com/records/'):
+            rid = path.rsplit('/', 1)[1]
+            if not any(r['id'] == rid for r in self.records):
+                return _Resp(404, {'error': {'code': 'not_found', 'message': 'Record not found'}})
+            self.records = [r for r in self.records if r['id'] != rid]
+            return _Resp(200, {})
+        return _Resp(404, {'error': {'code': 'not_found', 'message': 'Not found'}})
+
+    def values(self):
+        return [r['value'] for r in self.records if r['name'] == '_acme-challenge']
+
+
+@pytest.fixture
+def vercel(monkeypatch):
+    api = FakeVercel()
+    monkeypatch.setattr(requests, 'request', api)
+    return api, create_provider('vercel', {'api_token': 'tokentoken'})
+
+
+def test_vercel_lifecycle_reads_every_page(vercel, monkeypatch):
+    api, p = vercel
+    for value in ('apex', 'wild'):
+        assert p.create_txt_record('example.com', NAME, value)[0]
+    # The challenge values come first, newest first: push them past the first page.
+    for i in range(3):
+        api._add({'name': f'later{i}', 'type': 'A', 'value': '192.0.2.2', 'ttl': 60})
+    assert p.delete_txt_record('example.com', NAME, 'apex')[0]
+    assert api.values() == ['wild']
+    assert p.delete_txt_record('example.com', NAME, 'wild')[0]
+    assert api.values() == []
+    assert len(api.records) == 8
+
+
+def test_vercel_failed_delete_is_false(vercel):
+    api, p = vercel
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    api.fail = 'DELETE'
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'Internal error' in msg
+    assert api.values() == ['apex']

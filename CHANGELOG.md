@@ -72,6 +72,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - DNS providers: Mythic Beasts reported a TXT value deleted when the API had removed nothing, as when the zone stores it in another form. It now deletes the value as the API lists it and fails when no record was removed.
 - DNS providers: RcodeZero used the deprecated v1 API with upper-case change types and plain-string records, sent `ADD` on a name already holding a TXT value, and took a refusal answered with HTTP 200 for success. It now follows the v2 API, writes the whole rrset when adding a second value, and fails on `status: failed`.
 - DNS providers: Vultr read only the first page of domains and records, so a zone or a TXT value past it was never found. It now follows the `meta.links.next` cursor through every page.
+- DNS providers: Vercel read the first page of a zone's records only and reported success when a deletion failed. It now reads every page of the documented v5 listing and fails when the API refuses the deletion.
 
 ### Upgrade notes
 

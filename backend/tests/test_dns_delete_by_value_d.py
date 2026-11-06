@@ -209,37 +209,3 @@ def test_scaleway_deletes_one_value(monkeypatch):
     _two_values_then_delete_one(p)
     assert api.patches[-1]['changes'] == [{'delete': {'id': 'r1'}}]
     assert [r['data'] for r in api.records] == ['"wild"']
-
-
-# --- Vercel -------------------------------------------------------------------------
-
-class FakeVercel:
-    def __init__(self):
-        self.records = [{'id': 'rec_a', 'name': 'other', 'type': 'TXT', 'value': 'apex'}]
-        self.next_id = 1
-        self.deleted = []
-
-    def request(self, method, url, headers=None, json=None, timeout=None):
-        path = url.split('api.vercel.com', 1)[1]
-        if method == 'POST' and path == '/v2/domains/example.com/records':
-            rec = {'id': f'rec_{self.next_id}', **json}
-            self.next_id += 1
-            self.records.append(rec)
-            return _Resp(200, {'uid': rec['id']})
-        if method == 'GET' and path == '/v4/domains/example.com/records':
-            return _Resp(200, {'records': self.records})
-        if method == 'DELETE' and path.startswith('/v2/domains/example.com/records/'):
-            rid = path.rsplit('/', 1)[1]
-            self.deleted.append(rid)
-            self.records = [r for r in self.records if r['id'] != rid]
-            return _Resp(200, {})
-        return _Resp(404, {'error': {'message': 'not found'}})
-
-
-def test_vercel_deletes_one_value(monkeypatch):
-    api = FakeVercel()
-    monkeypatch.setattr(requests, 'request', api.request)
-    p = create_provider('vercel', {'api_token': 'tokentoken'})
-    _two_values_then_delete_one(p)
-    assert api.deleted == ['rec_1']
-    assert [(r['name'], r['value']) for r in api.records] == [('other', 'apex'), ('_acme-challenge', 'wild')]
