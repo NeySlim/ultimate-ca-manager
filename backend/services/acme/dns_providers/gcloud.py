@@ -217,7 +217,9 @@ class GoogleCloudDnsProvider(BaseDnsProvider):
         # Check for existing RRSet
         success, existing = self._get_existing_rrset(project, zone_name, fqdn)
         if not success:
-            return False, f"Failed to read existing records: {existing}"
+            msg = f"Failed to read existing records: {existing}"
+            logger.warning(f"Google Cloud DNS: {msg}")
+            return False, msg
         
         change: Dict[str, List[Dict]] = {"additions": []}
         
@@ -265,7 +267,9 @@ class GoogleCloudDnsProvider(BaseDnsProvider):
         
         success, existing = self._get_existing_rrset(project, zone_name, fqdn)
         if not success:
-            return False, f"Failed to read existing records: {existing}"
+            msg = f"Failed to read existing records: {existing}"
+            logger.warning(f"Google Cloud DNS: {msg}")
+            return False, msg
         if not existing:
             return True, "Record not found (already deleted?)"
         rrdatas = list(existing.get('rrdatas', []))

@@ -74,6 +74,15 @@ class FakeConstellix:
                          'value': [{'server': 'mx.example.com', 'priority': 10}]}]
         self.next_id = 10
         self.fail = None
+        self.pending = []  # (record, record listings left before it shows): creates answer 202
+        self.delay = 0
+
+    def _listed(self):
+        for item in self.pending:
+            item[1] -= 1
+        self.records += [r for r, left in self.pending if left < 0]
+        self.pending = [i for i in self.pending if i[1] >= 0]
+        return self.records
 
     def _page(self, items, query, path):
         page = int(query.get('page', 1))
@@ -96,13 +105,16 @@ class FakeConstellix:
             return self._page(self.domains, query, path)
         if path == '/domains/4/records':
             if method == 'GET':
-                return self._page(self.records, query, path)
+                return self._page(self._listed() if query.get('page', '1') == '1' else self.records, query, path)
             if method == 'POST':
                 if not isinstance(json.get('value'), list) or json.get('type') != 'TXT':
                     return _Resp(422, {'errors': ['value must be an array']})
                 rec = {'id': self.next_id, **json}
                 self.next_id += 1
-                self.records.append(rec)
+                if self.delay:
+                    self.pending.append([rec, self.delay - 1])
+                else:
+                    self.records.append(rec)
                 loc = f'{self.BASE}/domains/4/records/{rec["id"]}'
                 return _Resp(202, {'id': rec['id'], 'location': loc}, headers={'Location': loc})
         if path.startswith('/domains/4/records/'):
@@ -126,9 +138,30 @@ class FakeConstellix:
 
 @pytest.fixture
 def constellix(monkeypatch):
+    import services.acme.dns_providers.constellix as mod
     api = FakeConstellix()
     monkeypatch.setattr(requests, 'request', api)
+    monkeypatch.setattr(mod.time, 'sleep', lambda s: None)
     return api, create_provider('constellix', {'api_key': 'k', 'secret_key': 's'})
+
+
+def test_constellix_waits_for_an_accepted_create(constellix):
+    api, p = constellix
+    api.delay = 2  # listed from the second listing after the POST
+    for value in ('apex', 'wild'):
+        assert p.create_txt_record('example.com', NAME, value)[0]
+    assert len(api.txt()) == 1
+    assert api.values() == ['apex', 'wild']
+
+
+def test_constellix_keeps_a_disabled_value_disabled(constellix):
+    api, p = constellix
+    api.records.append({'id': 50, 'type': 'TXT', 'name': '_acme-challenge', 'ttl': 60, 'mode': 'standard',
+                        'value': [{'value': 'old', 'enabled': False}, {'value': 'apex', 'enabled': True}]})
+    assert p.delete_txt_record('example.com', NAME, 'apex')[0]
+    assert api.txt()[0]['value'] == [{'value': 'old', 'enabled': False}]
+    assert p.create_txt_record('example.com', NAME, 'wild')[0]
+    assert api.txt()[0]['value'] == [{'value': 'old', 'enabled': False}, {'value': 'wild', 'enabled': True}]
 
 
 def test_constellix_lifecycle(constellix):
@@ -296,7 +329,7 @@ class FakeHostinger:
                 if not rr.get('name') or not rr.get('type') or not rr.get('records'):
                     return _Resp(422, {'message': 'The name field is required.'})
                 current = self._set(rr['name'], rr['type'])
-                fresh = [{'content': r['content'], 'is_disabled': False} for r in rr['records']]
+                fresh = [{'content': r['content'], 'is_disabled': bool(r.get('is_disabled'))} for r in rr['records']]
                 if current is None:
                     self.zone.append({'name': rr['name'], 'type': rr['type'],
                                       'ttl': rr.get('ttl', 14400), 'records': fresh})
@@ -329,6 +362,14 @@ def test_hostinger_lifecycle(hostinger):
     _lifecycle(p, api.values)
     assert [(s['name'], s['type']) for s in api.zone] == [('@', 'TXT'), ('www', 'A')]
     assert p.test_connection()[0]
+
+
+def test_hostinger_keeps_a_disabled_value_disabled(hostinger):
+    api, p = hostinger
+    api.zone.append({'name': '_acme-challenge', 'type': 'TXT', 'ttl': 300,
+                     'records': [{'content': 'old', 'is_disabled': True}, {'content': 'apex', 'is_disabled': False}]})
+    assert p.delete_txt_record('example.com', NAME, 'apex')[0]
+    assert api._set('_acme-challenge', 'TXT')['records'] == [{'content': 'old', 'is_disabled': True}]
 
 
 def test_hostinger_failed_delete_is_false(hostinger):
@@ -559,7 +600,16 @@ class FakeRcodeZero:
         self.rrsets = [{'name': f'h{i}.example.com.', 'type': 'A', 'ttl': 60,
                         'records': [{'content': '192.0.2.1', 'disabled': False}]} for i in range(3)]
         self.patches = []
+        self.zone_queries = []
         self.fail = None
+
+    @staticmethod
+    def _domain_filter(query, domain):
+        """filter[domain]: substring search, `^` anchors the start and `$` the end."""
+        f = query.get('filter[domain]')
+        if f is None:
+            return True
+        return re.search('^' * f.startswith('^') + re.escape(f.strip('^$')) + '$' * f.endswith('$'), domain)
 
     def _page(self, items, query):
         size = int(query.get('page_size', 100))
@@ -579,7 +629,8 @@ class FakeRcodeZero:
         if self.fail == method:
             return _Resp(500, {'message': 'backend down'})
         if method == 'GET' and path == '/zones':
-            return self._page(self.zones, query)
+            self.zone_queries.append(query.get('filter[domain]'))
+            return self._page([z for z in self.zones if self._domain_filter(query, z['domain'])], query)
         if path == '/zones/example.com/rrsets':
             if method == 'GET':
                 sel = [r for r in self.rrsets
@@ -622,6 +673,17 @@ def test_rcodezero_lifecycle(rcodezero):
     _lifecycle(p, api.values)
     assert [c['changetype'] for (c,) in api.patches] == ['add', 'update', 'update', 'delete']
     assert len(api.rrsets) == 3
+
+
+def test_rcodezero_asks_for_the_zone_by_name(rcodezero):
+    api, p = rcodezero
+    api.zones.append({'id': 1000, 'domain': 'sub.example.com', 'type': 'MASTER'})
+    assert p._find_zone('a.sub.example.com') == 'sub.example.com'
+    assert p._find_zone('www.example.com') == 'example.com'
+    assert p._find_zone('notexample.com') is None
+    assert api.zone_queries[:2] == ['^a.sub.example.com$', '^sub.example.com$']
+    assert p.test_connection() == (True, 'Connected. Found 152 zone(s)')
+    assert 'ACME' in p.get_credential_schema()[0]['help']
 
 
 def test_rcodezero_refused_change_is_false(rcodezero, monkeypatch):
@@ -736,7 +798,8 @@ class FakeVercel:
     BASE = 'https://api.vercel.com'
     CAP = 2
 
-    def __init__(self):
+    def __init__(self, team=None):
+        self.team = team
         self.clock = 1_700_000_000_000
         self.records = []
         for i in range(5):
@@ -755,6 +818,9 @@ class FakeVercel:
         query.update({k: str(v) for k, v in (params or {}).items()})
         if (headers or {}).get('Authorization') != 'Bearer tokentoken':
             return _Resp(401, {'error': {'code': 'forbidden', 'message': 'Not authorized'}})
+        if query.get('teamId') != self.team:
+            # A team's domain is not found without its teamId.
+            return _Resp(404, {'error': {'code': 'not_found', 'message': 'Domain not found'}})
         if self.fail == method:
             return _Resp(500, {'error': {'code': 'internal', 'message': 'Internal error'}})
         if method == 'GET' and path == '/v5/domains':
@@ -802,6 +868,16 @@ def test_vercel_lifecycle_reads_every_page(vercel, monkeypatch):
     assert p.delete_txt_record('example.com', NAME, 'wild')[0]
     assert api.values() == []
     assert len(api.records) == 8
+
+
+def test_vercel_team_domain_needs_the_team_id(monkeypatch):
+    api = FakeVercel(team='team_abc')
+    monkeypatch.setattr(requests, 'request', api)
+    assert not create_provider('vercel', {'api_token': 'tokentoken'}).create_txt_record('example.com', NAME, 'x')[0]
+    p = create_provider('vercel', {'api_token': 'tokentoken', 'team_id': 'team_abc'})
+    _lifecycle(p, api.values)
+    assert p.test_connection()[0]
+    assert any(f['name'] == 'team_id' and not f['required'] for f in p.get_credential_schema())
 
 
 def test_vercel_failed_delete_is_false(vercel):
@@ -990,3 +1066,47 @@ def test_checkdomain_failed_read_writes_nothing(checkdomain, monkeypatch):
         if method == 'GET' and '/nameservers/records' in url else api(method, url, **kw)))
     assert not p.delete_txt_record('example.com', NAME, 'apex')[0]
     assert api.puts == [] and api.values() == ['apex']
+
+
+@pytest.mark.parametrize('fixture,marker', [
+    ('constellix', '/records'), ('hostinger', '/zones/'), ('epik', '/records'),
+    ('rcodezero', '/rrsets'), ('vultr', '/records'), ('vercel', '/records'),
+    ('porkbun', '/retrieveByNameType/'),
+])
+def test_a_failed_listing_is_logged_with_its_status(request, monkeypatch, caplog, fixture, marker):
+    import logging
+    api, p = request.getfixturevalue(fixture)
+    target = 'post' if fixture == 'porkbun' else 'request'
+    real = getattr(requests, target)
+
+    def failing(*args, **kw):
+        if target == 'post':
+            url, listing = kw.get('url', args[0] if args else ''), True
+        else:
+            method = kw.get('method', args[0] if args else None)
+            url, listing = kw.get('url', args[1] if len(args) > 1 else ''), method == 'GET'
+        if listing and marker in url:
+            return _Resp(503, {'message': 'listing unavailable'})
+        return real(*args, **kw)
+
+    monkeypatch.setattr(requests, target, failing)
+    with caplog.at_level(logging.WARNING, logger=f'services.acme.dns_providers.{fixture}'):
+        ok, _msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok
+    assert any(r.levelno == logging.WARNING and 'records' in r.getMessage()
+               and ('503' in r.getMessage() or 'listing unavailable' in r.getMessage())
+               for r in caplog.records)
+
+
+def test_corenetworks_sends_quoted_txt(corenetworks):
+    """Core Networks stores TXT data as zone-file text: quoted."""
+    api, p = corenetworks
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    assert [r['data'] for r in api.records if r['name'] == '_acme-challenge'] == ['"apex"']
+
+
+def test_rcodezero_sends_quoted_txt(rcodezero):
+    """RcodeZero is PowerDNS underneath: TXT content is quoted."""
+    api, p = rcodezero
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    assert [r['content'] for r in api._find(NAME + '.', 'TXT')['records']] == ['"apex"']

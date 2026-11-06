@@ -161,7 +161,9 @@ class VultrDnsProvider(BaseDnsProvider):
         # Find the record
         success, records = self._list(f'/domains/{domain_name}/records', 'records')
         if not success:
-            return False, f"Failed to list records: {records}"
+            msg = f"Failed to list records: {records}"
+            logger.warning(f"Vultr: {msg}")
+            return False, msg
         
         record_ids = [r.get('id') for r in records
                       if r.get('type') == 'TXT' and r.get('name', '') == name

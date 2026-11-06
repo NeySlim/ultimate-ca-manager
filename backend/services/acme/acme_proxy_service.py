@@ -1709,7 +1709,9 @@ class AcmeProxyService:
             return
         try:
             with _txt_record_lock(record_name):
-                provider.delete_txt_record(zone, record_name, value)
+                result = provider.delete_txt_record(zone, record_name, value)
+            if isinstance(result, tuple) and not result[0]:
+                logger.warning("Failed to cleanup DNS record %s (%s): %s", record_name, zone, result[1])
         except Exception as e:
             logger.warning("Failed to cleanup DNS record %s (%s): %s", record_name, zone, e)
 

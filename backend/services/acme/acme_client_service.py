@@ -2005,11 +2005,13 @@ class AcmeClientService:
                     logger.warning("DNS cleanup skipped for %s: no TXT value recorded", challenge['dns_txt_name'])
                     continue
                 with txt_record_lock(challenge['dns_txt_name']):
-                    provider.delete_txt_record(
+                    result = provider.delete_txt_record(
                         domain=strip_wildcard(domain),
                         record_name=challenge['dns_txt_name'],
                         record_value=value,
                     )
+                if isinstance(result, tuple) and not result[0]:
+                    logger.warning("DNS cleanup of %s failed: %s", challenge['dns_txt_name'], result[1])
             
             return True, "DNS records cleaned up"
             

@@ -57,11 +57,19 @@ class RcodeZeroDnsProvider(BaseDnsProvider):
         return False, f"More than {self.MAX_PAGES} pages at {path}"
 
     def _find_zone(self, domain: str) -> Optional[str]:
-        success, zones = self._pages('/zones', {})
-        if not success:
-            return None
-        z = self.find_zone(domain, zones, key=lambda zone: zone.get('domain', ''))
-        return z['domain'].rstrip('.') if z else None
+        """The most specific zone held, asked by exact name (`^name$`) from the longest down."""
+        labels = self._normalise_name(domain).split('.')
+        for i in range(len(labels) - 1):
+            candidate = '.'.join(labels[i:])
+            success, result = self._request('GET', '/zones', params={
+                'filter[domain]': f'^{candidate}$', 'page_size': 10})
+            if not success:
+                logger.warning(f"RcodeZero: zone lookup for {candidate} failed: {result}")
+                return None
+            z = self.find_zone(domain, (result or {}).get('data') or [], key=lambda zone: zone.get('domain', ''))
+            if z and self._normalise_name(z.get('domain')) == candidate:
+                return candidate
+        return None
 
     def _get_txt_rrset(self, zone: str, fqdn: str) -> Tuple[bool, Any]:
         """The TXT rrset of `fqdn` (None if absent)."""
@@ -85,7 +93,9 @@ class RcodeZeroDnsProvider(BaseDnsProvider):
         fqdn = record_name if record_name.endswith('.') else record_name + '.'
         success, rrset = self._get_txt_rrset(zone, fqdn)
         if not success:
-            return False, f"Failed to read existing records: {rrset}"
+            msg = f"Failed to read existing records: {rrset}"
+            logger.warning(f"RcodeZero: {msg}")
+            return False, msg
         records = self._records(rrset)
         if any(self.txt_matches(r['content'], record_value) for r in records):
             return True, "Record already present"
@@ -108,7 +118,9 @@ class RcodeZeroDnsProvider(BaseDnsProvider):
         fqdn = record_name if record_name.endswith('.') else record_name + '.'
         success, rrset = self._get_txt_rrset(zone, fqdn)
         if not success:
-            return False, f"Failed to read existing records: {rrset}"
+            msg = f"Failed to read existing records: {rrset}"
+            logger.warning(f"RcodeZero: {msg}")
+            return False, msg
         records = self._records(rrset)
         remaining = [r for r in records if not self.txt_matches(r['content'], record_value)]
         if len(remaining) == len(records):
@@ -125,14 +137,15 @@ class RcodeZeroDnsProvider(BaseDnsProvider):
         return True, "Record deleted successfully"
 
     def test_connection(self) -> Tuple[bool, str]:
-        success, zones = self._pages('/zones', {})
+        success, result = self._request('GET', '/zones', params={'page_size': 1})
         if success:
-            return True, f"Connected. Found {len(zones)} zone(s)"
-        return False, f"Connection failed: {zones}"
+            return True, f"Connected. Found {(result or {}).get('total', 0)} zone(s)"
+        return False, f"Connection failed: {result}"
 
     @classmethod
     def get_credential_schema(cls):
         return [
             {'name': 'api_token', 'label': 'API Token', 'type': 'password', 'required': True,
-             'help': 'my.rcodezero.at > API Tokens'},
+             'help': 'my.rcodezero.at > API Tokens: a token with zone read and write access, '
+                     'not one limited to the ACME permission'},
         ]

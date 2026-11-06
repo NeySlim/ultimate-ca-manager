@@ -709,11 +709,14 @@ def _renew_with_new_order(acme_client, order, account_id, old_certificate, lease
                 continue
             try:
                 with txt_record_lock(record_name):
-                    dns_provider.delete_txt_record(
+                    result = dns_provider.delete_txt_record(
                         domain=strip_wildcard(domain),
                         record_name=record_name,
                         record_value=value,
                     )
+                if isinstance(result, tuple) and not result[0]:
+                    logger.warning('Failed to delete renewal DNS TXT for %s (%s): %s',
+                                   domain, record_name, result[1])
             except Exception as exc:
                 logger.warning(
                     'Failed to delete renewal DNS TXT for %s (%s): %s',

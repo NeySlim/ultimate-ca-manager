@@ -24,6 +24,7 @@ class ConstellixDnsProvider(BaseDnsProvider):
 
     BASE_URL = "https://api.dns.constellix.com/v4"
     MAX_PAGES = 50
+    CREATE_VISIBLE_TRIES = 3
 
     def _get_headers(self) -> Dict[str, str]:
         timestamp = str(int(time.time() * 1000))
@@ -79,7 +80,19 @@ class ConstellixDnsProvider(BaseDnsProvider):
                 return True, rec
         return True, None
 
+    def _await_record(self, dom: Dict, relative: str) -> None:
+        """A create answers 202 before the record is listed: wait for it, so a second
+        value for the name (apex and wildcard) joins it instead of POSTing a twin."""
+        for _ in range(self.CREATE_VISIBLE_TRIES):
+            time.sleep(1)
+            success, rec = self._txt_record(dom, relative)
+            if success and rec is not None:
+                return
+        logger.warning(f"Constellix: TXT record {relative} not listed yet after its creation")
+
     def _write_values(self, dom: Dict, rec: Dict, relative: str, values: List[Dict]) -> Tuple[bool, Any]:
+        # Each value keeps its `enabled` flag as read: a disabled one stays disabled.
+        values = [{'value': v.get('value'), 'enabled': v.get('enabled', True)} for v in values]
         body = {'name': relative, 'type': 'TXT', 'ttl': rec.get('ttl', 300),
                 'mode': rec.get('mode') or 'standard', 'value': values}
         return self._request('PUT', f'/domains/{dom["id"]}/records/{rec["id"]}', body)
@@ -91,11 +104,15 @@ class ConstellixDnsProvider(BaseDnsProvider):
         relative = self.get_relative_record_name(record_name, dom['name'])
         success, rec = self._txt_record(dom, relative)
         if not success:
-            return False, f"Failed to list records: {rec}"
+            msg = f"Failed to list records: {rec}"
+            logger.warning(f"Constellix: {msg}")
+            return False, msg
         entry = {'value': record_value, 'enabled': True}
         if rec is None:
             body = {'name': relative, 'type': 'TXT', 'ttl': ttl, 'mode': 'standard', 'value': [entry]}
             success, result = self._request('POST', f'/domains/{dom["id"]}/records', body)
+            if success:
+                self._await_record(dom, relative)
         else:
             # A second value under the name joins the existing record's value list.
             values = list(rec.get('value') or [])
@@ -113,7 +130,9 @@ class ConstellixDnsProvider(BaseDnsProvider):
         relative = self.get_relative_record_name(record_name, dom['name'])
         success, rec = self._txt_record(dom, relative)
         if not success:
-            return False, f"Failed to list records: {rec}"
+            msg = f"Failed to list records: {rec}"
+            logger.warning(f"Constellix: {msg}")
+            return False, msg
         if rec is None:
             return True, "Record already absent"
         values = list(rec.get('value') or [])

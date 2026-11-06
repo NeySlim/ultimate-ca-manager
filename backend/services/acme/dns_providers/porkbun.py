@@ -51,7 +51,9 @@ class PorkbunDnsProvider(BaseDnsProvider):
             'name': relative, 'type': 'TXT', 'content': record_value, 'ttl': int(ttl)
         })
         if not success:
-            return False, f"Failed: {result}"
+            msg = f"Failed: {result}"
+            logger.warning(f"Porkbun: {msg}")
+            return False, msg
         return True, "Record created"
     
     def delete_txt_record(self, domain, record_name, record_value):
@@ -60,7 +62,9 @@ class PorkbunDnsProvider(BaseDnsProvider):
         
         success, result = self._request(f'/dns/retrieveByNameType/{zone}/TXT/{relative}')
         if not success:
-            return False, f"Failed to list records: {result}"
+            msg = f"Failed to list records: {result}"
+            logger.warning(f"Porkbun: {msg}")
+            return False, msg
         for rec in result.get('records') or []:
             if self.txt_matches(rec.get('content'), record_value):
                 ok, err = self._request(f'/dns/delete/{zone}/{rec["id"]}')

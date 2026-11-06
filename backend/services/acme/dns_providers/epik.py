@@ -51,11 +51,15 @@ class EpikDnsProvider(BaseDnsProvider):
         zone = self._zone(domain)
         success, result = self._request('GET', f'/domains/{zone}/records')
         if not success:
-            return False, f"Failed to list records: {result}"
+            msg = f"Failed to list records: {result}"
+            logger.warning(f"Epik: {msg}")
+            return False, msg
         listing = (result or {}).get('data') or {}
         if 'records' not in listing:
             # A registry error comes back inside the 200 answer, without records.
-            return False, f"Failed to list records: {listing.get('description') or listing.get('code')}"
+            msg = f"Failed to list records: {listing.get('description') or listing.get('code')}"
+            logger.warning(f"Epik: {msg}")
+            return False, msg
         host = self.get_relative_record_name(record_name, zone)
         for rec in listing['records'] or []:
             if (rec.get('type') == 'TXT' and rec.get('name') == host

@@ -89,3 +89,24 @@ def test_cleanups_name_the_value_they_published(app, monkeypatch):
     provider.reset_mock()
     AcmeProxyService._delete_dns_record(provider, 'example.com', NAME, None)
     provider.delete_txt_record.assert_not_called()
+
+
+def test_cleanups_log_a_refused_delete(app, monkeypatch, caplog):
+    import logging
+    from models import db
+    from models.acme_models import DnsProvider
+
+    provider = MagicMock()
+    provider.delete_txt_record.return_value = (False, 'zone is locked')
+    monkeypatch.setattr(client_mod, 'create_provider', lambda *_a: provider)
+    with app.app_context(), caplog.at_level(logging.WARNING):
+        row = DnsProvider(name='refused-delete', provider_type='cloudflare', credentials='{}')
+        db.session.add(row)
+        db.session.commit()
+        AcmeClientService.cleanup_dns_challenge(_order(row.id))
+        assert any('zone is locked' in r.getMessage() and r.name == client_mod.logger.name
+                   for r in caplog.records)
+        caplog.clear()
+        AcmeProxyService._delete_dns_record(provider, 'example.com', NAME, 'v')
+        assert any('zone is locked' in r.getMessage() and r.name == proxy_mod.logger.name
+                   for r in caplog.records)

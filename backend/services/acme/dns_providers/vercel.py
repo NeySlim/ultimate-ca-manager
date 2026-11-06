@@ -16,6 +16,7 @@ class VercelDnsProvider(BaseDnsProvider):
     PROVIDER_NAME = "Vercel"
     PROVIDER_DESCRIPTION = "Vercel DNS API"
     REQUIRED_CREDENTIALS = ["api_token"]
+    OPTIONAL_CREDENTIALS = ["team_id"]
     
     BASE_URL = "https://api.vercel.com"
     MAX_PAGES = 50
@@ -27,6 +28,10 @@ class VercelDnsProvider(BaseDnsProvider):
         }
     
     def _request(self, method, path, data=None, params=None):
+        # Domains owned by a team are only reachable on its behalf (teamId on every call).
+        team = (self.credentials.get('team_id') or '').strip()
+        if team:
+            params = {**(params or {}), 'teamId': team}
         try:
             resp = requests.request(method, f"{self.BASE_URL}{path}",
                 headers=self._get_headers(), json=data, params=params, timeout=30)
@@ -59,7 +64,9 @@ class VercelDnsProvider(BaseDnsProvider):
         data = {'name': relative, 'type': 'TXT', 'value': record_value, 'ttl': ttl}
         success, result = self._request('POST', f'/v2/domains/{zone}/records', data)
         if not success:
-            return False, f"Failed: {result}"
+            msg = f"Failed: {result}"
+            logger.warning(f"Vercel: {msg}")
+            return False, msg
         return True, "Record created"
     
     def delete_txt_record(self, domain, record_name, record_value):
@@ -68,7 +75,9 @@ class VercelDnsProvider(BaseDnsProvider):
         
         success, records = self._records(zone)
         if not success:
-            return False, f"Failed: {records}"
+            msg = f"Failed to list records: {records}"
+            logger.warning(f"Vercel: {msg}")
+            return False, msg
         for rec in records:
             if (rec.get('type') == 'TXT' and rec.get('name') == relative
                     and self.txt_matches(rec.get('value'), record_value)):
@@ -90,4 +99,6 @@ class VercelDnsProvider(BaseDnsProvider):
         return [
             {'name': 'api_token', 'label': 'API Token', 'type': 'password', 'required': True,
              'help': 'vercel.com > Settings > Tokens'},
+            {'name': 'team_id', 'label': 'Team ID', 'type': 'text', 'required': False,
+             'help': 'Only for domains owned by a team: the team ID from its settings (team_...)'},
         ]

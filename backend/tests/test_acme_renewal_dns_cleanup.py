@@ -225,3 +225,38 @@ def test_renewal_writes_and_cleans_up_txt_under_the_name_lock(app, renewal_order
 
     name = '_acme-challenge.example.com'
     assert calls == [('create', [name]), ('delete', [name])]
+
+
+def test_renewal_logs_a_refused_txt_cleanup(app, renewal_order, caplog):
+    import logging
+    from models import db
+    from models.acme_models import AcmeClientOrder
+    from services import acme_renewal_service as renew_mod
+
+    order_id, _provider_id = renewal_order
+    mock_provider = MagicMock()
+    mock_provider.create_txt_record.side_effect = lambda **kw: (
+        (False, 'provider error') if kw['domain'] == 'www.example.com' else (True, 'ok'))
+    mock_provider.delete_txt_record.return_value = (False, 'zone is locked')
+
+    with app.app_context():
+        new_order = AcmeClientOrder(
+            domains='["example.com", "www.example.com"]', environment='production',
+            challenge_type='dns-01', status='pending', order_url='https://ca.example/order/rf',
+            finalize_url='https://ca.example/order/rf/finalize',
+        )
+        new_order.set_challenges_dict({'example.com': {'dns_txt_value': 'token-a'},
+                                       'www.example.com': {'dns_txt_value': 'token-b'}})
+        db.session.add(new_order)
+        db.session.commit()
+        mock_client = MagicMock()
+        mock_client.account = None
+        mock_client.create_order.return_value = (True, 'ok', new_order)
+        order = db.session.get(AcmeClientOrder, order_id)
+        with patch('services.acme.dns_providers.create_provider', return_value=mock_provider), \
+             patch('services.acme.acme_client_service.AcmeClientService.for_order', return_value=mock_client), \
+             caplog.at_level(logging.WARNING):
+            with pytest.raises(Exception, match='Failed to create DNS record'):
+                renew_mod.renew_certificate(order)
+
+    assert any('zone is locked' in r.getMessage() and r.levelno == logging.WARNING for r in caplog.records)

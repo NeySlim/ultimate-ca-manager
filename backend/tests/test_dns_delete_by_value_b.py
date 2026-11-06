@@ -233,14 +233,16 @@ def test_gcloud_deletes_the_rrset_with_its_last_value(monkeypatch):
     assert 'additions' not in api.changes[-1]
 
 
-def test_gcloud_failed_read_writes_nothing(monkeypatch):
+def test_gcloud_failed_read_writes_nothing(monkeypatch, caplog):
     api = FakeCloudDns()
     monkeypatch.setattr(requests, 'request', api)
     p = _gcloud()
     assert p.create_txt_record('example.com', NAME, 'apex')[0]
     api.list_status = 500
-    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    with caplog.at_level(logging.WARNING):
+        ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
     assert not ok and 'backend error' in msg
+    assert any(r.levelno == logging.WARNING and 'backend error' in r.getMessage() for r in caplog.records)
     ok, msg = p.create_txt_record('example.com', NAME, 'wild')
     assert not ok and 'backend error' in msg
     assert len(api.changes) == 1
@@ -320,3 +322,39 @@ def test_freedns_record_still_listed_is_false(monkeypatch):
     p = create_provider('freedns', {'username': 'u', 'password': 'p'})
     ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
     assert not ok and 'kept the record' in msg
+
+
+class _FreeDnsSession:
+    """Login answers 'Logout'; the listing shows `rows`, or raises when `down`."""
+
+    def __init__(self, rows=(), down=False):
+        self.rows, self.down, self.saved = list(rows), down, []
+
+    def post(self, url, data=None, timeout=None):
+        if 'save.php' in url:
+            self.saved.append(data)
+        return _Resp(200, text='Logout')
+
+    def get(self, url, params=None, timeout=None):
+        if self.down:
+            raise requests.ConnectionError('listing unreachable')
+        return _Resp(200, text='<a href=edit.php?domain_id=9>example.com</a>' + ''.join(
+            f'<a href=edit.php?data_id={i}>{n}</a>' for i, n in self.rows))
+
+
+def test_freedns_create_not_listed_afterwards_is_false(monkeypatch):
+    session = _FreeDnsSession()
+    monkeypatch.setattr(freedns_module, 'create_session', lambda: session)
+    p = create_provider('freedns', {'username': 'u', 'password': 'p'})
+    ok, msg = p.create_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'did not list' in msg
+    assert '<a' not in msg
+    assert len(session.saved) == 1
+
+
+def test_freedns_unreadable_listing_is_false_not_absent(monkeypatch):
+    session = _FreeDnsSession(rows=[('5', NAME)], down=True)
+    monkeypatch.setattr(freedns_module, 'create_session', lambda: session)
+    p = create_provider('freedns', {'username': 'u', 'password': 'p'})
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'Could not read' in msg

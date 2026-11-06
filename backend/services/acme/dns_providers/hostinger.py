@@ -40,6 +40,14 @@ class HostingerDnsProvider(BaseDnsProvider):
         # No zone lookup in the DNS API: the zone is the registrable domain.
         return self.get_zone_for_domain(domain) or domain
 
+    @staticmethod
+    def _kept(record: Dict) -> Dict:
+        # PUT documents only `content`; a disabled value says so rather than come back enabled.
+        kept = {'content': record.get('content')}
+        if record.get('is_disabled'):
+            kept['is_disabled'] = True
+        return kept
+
     def create_txt_record(self, domain: str, record_name: str, record_value: str, ttl: int = 300) -> Tuple[bool, str]:
         zone = self._zone(domain)
         relative = self.get_relative_record_name(record_name, zone)
@@ -56,7 +64,9 @@ class HostingerDnsProvider(BaseDnsProvider):
         path = f'/api/dns/v1/zones/{zone}'
         success, rrsets = self._request('GET', path)
         if not success:
-            return False, f"Failed to list records: {rrsets}"
+            msg = f"Failed to list records: {rrsets}"
+            logger.warning(f"Hostinger: {msg}")
+            return False, msg
         relative = self.get_relative_record_name(record_name, zone)
         for rrset in rrsets or []:
             if rrset.get('type') != 'TXT' or rrset.get('name') != relative:
@@ -69,7 +79,7 @@ class HostingerDnsProvider(BaseDnsProvider):
                 # The delete endpoint takes only name and type: keep the others by rewriting the set.
                 data = {'overwrite': True, 'zone': [
                     {'name': relative, 'type': 'TXT', 'ttl': rrset.get('ttl', 300),
-                     'records': [{'content': r.get('content')} for r in remaining]}]}
+                     'records': [self._kept(r) for r in remaining]}]}
                 success, result = self._request('PUT', path, data)
             else:
                 success, result = self._request(
