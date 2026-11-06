@@ -65,3 +65,12 @@ def test_a_renewal_stamped_with_no_template_records_none(app, templated_ca, unbi
                        _eku_csr(old_cert, old_key, ExtendedKeyUsageOID.CLIENT_AUTH))
     assert err is None, err
     assert _template_oid(cert) is None and _template_of(app, cert) is None
+
+
+def test_a_template_holding_wstep_certificates_is_not_deleted(app, auth_client, templated_ca, unbind_templates):
+    ca_id = templated_ca('WSTEP template id delete CA', USER_AND_CODESIGN)
+    _wstep_issued(app, ca_id, 'wstep-tid-delete.example.test')
+    template_id = _template_id(app, 'WSTEP template id delete CA User')
+    r = auth_client.delete(f'/api/v2/templates/{template_id}')
+    assert r.status_code == 409, r.get_json()
+    assert auth_client.get(f'/api/v2/templates/{template_id}').get_json()['data']['usage_count'] == 1
