@@ -72,14 +72,14 @@ class CheckdomainDnsProvider(BaseDnsProvider):
 
     @staticmethod
     def _kept(rec, include_www) -> bool:
-        """Whether a listed record goes back in the replacing PUT (as lego does).
+        """Whether a listed record goes back in the replacing PUT.
 
-        SOA, NS, `@` and, with include_www, `www` are generated from the nameserver
-        settings: sending them back makes the update fail.
+        SOA and NS are the server's and, with include_www, `www` is generated. Apex (`@`)
+        records stay: if the server refuses one, the PUT fails and nothing is lost.
         """
         if not rec.get('value'):
             return False
-        if rec.get('type') in ('SOA', 'NS') or rec.get('name') == '@':
+        if rec.get('type') in ('SOA', 'NS'):
             return False
         return not (include_www and rec.get('name') == 'www')
 

@@ -981,15 +981,18 @@ class FakeCheckdomain:
     def __init__(self):
         self.domains = [{'id': i, 'name': f'other{i}.test', 'active': True} for i in range(1, 5)]
         self.domains.append({'id': 5, 'name': 'example.com', 'active': True})
-        self.generated = [{'name': '@', 'value': '192.0.2.1', 'ttl': 180, 'priority': 0, 'type': 'A'},
-                          {'name': 'www', 'value': '192.0.2.1', 'ttl': 180, 'priority': 0, 'type': 'A'},
+        self.generated = [{'name': 'www', 'value': '192.0.2.1', 'ttl': 180, 'priority': 0, 'type': 'A'},
                           {'name': '', 'value': 'ns1.checkdomain.de', 'ttl': 180, 'priority': 0, 'type': 'NS'},
                           {'name': 'example.com', 'value': 'IN SOA ns1.checkdomain.de. hostmaster 1 2 3',
                            'ttl': 15800, 'priority': 0, 'type': 'SOA'}]
-        self.user = [{'name': 'mail', 'value': '192.0.2.5', 'ttl': 0, 'priority': 0, 'type': 'A'},
+        self.user = [{'name': '@', 'value': '192.0.2.1', 'ttl': 180, 'priority': 0, 'type': 'A'},
+                     {'name': '@', 'value': 'v=spf1 mx -all', 'ttl': 180, 'priority': 0, 'type': 'TXT'},
+                     {'name': '@', 'value': 'mx.example.com', 'ttl': 180, 'priority': 10, 'type': 'MX'},
+                     {'name': 'mail', 'value': '192.0.2.5', 'ttl': 0, 'priority': 0, 'type': 'A'},
                      {'name': 'sub', 'value': 'v=spf1 -all', 'ttl': 180, 'priority': 0, 'type': 'TXT'}]
         self.puts = []
         self.fail = None
+        self.refuse_apex = False
 
     def records(self):
         return self.generated + [{**r, '_links': {'self': {'href': f'/v1/domains/5/nameservers/records/{i}'}}}
@@ -1025,7 +1028,9 @@ class FakeCheckdomain:
             if method == 'PUT':
                 self.puts.append(json)
                 for r in json:
-                    if r['type'] in ('SOA', 'NS') or r['name'] in ('@', 'www') or not r.get('ttl'):
+                    # SOA, NS and the include_www copies are the server's; apex records are the user's.
+                    if r['type'] in ('SOA', 'NS') or r['name'] == 'www' or not r.get('ttl') \
+                            or (self.refuse_apex and r['name'] == '@'):
                         return _Resp(400, {'message': 'Nameserver update failed'})
                 self.user = [dict(r) for r in json]
                 return _Resp(204, text='')
@@ -1045,8 +1050,20 @@ def checkdomain(monkeypatch):
 def test_checkdomain_lifecycle(checkdomain):
     api, p = checkdomain
     _lifecycle(p, api.values)
-    # The user's records survive every replacement, the zero ttl as the SOA's.
-    assert [(r['name'], r['type'], r['ttl']) for r in api.user] == [('mail', 'A', 10800), ('sub', 'TXT', 180)]
+    # The user's records survive every replacement, apex SPF and MX included, the zero ttl as the SOA's.
+    assert [(r['name'], r['type'], r['ttl']) for r in api.user] == [
+        ('@', 'A', 180), ('@', 'TXT', 180), ('@', 'MX', 180), ('mail', 'A', 10800), ('sub', 'TXT', 180)]
+    assert [r['value'] for r in api.user if r['name'] == '@' and r['type'] == 'TXT'] == ['v=spf1 mx -all']
+
+
+def test_checkdomain_refused_apex_record_fails_and_loses_nothing(checkdomain):
+    api, p = checkdomain
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    api.refuse_apex = True
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'Nameserver update failed' in msg
+    assert api.values() == ['apex']
+    assert any(r['name'] == '@' and r['type'] == 'TXT' for r in api.user)
 
 
 def test_checkdomain_failed_replace_is_false(checkdomain):
