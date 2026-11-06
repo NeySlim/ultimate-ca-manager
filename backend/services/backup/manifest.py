@@ -201,7 +201,8 @@ SECTIONS: Dict[str, Section] = {
     ),
     'auth_certificates': Section(
         model='models.auth_certificate:AuthCertificate',
-        identity=('cert_fingerprint',),
+        # Unique since migration 130; the restorer looks for the fingerprint first
+        identity=('cert_issuer', 'cert_serial'),
         exclude={**_SURROGATE, 'last_used_at': 'usage statistic'},
         references={'user_id': 'users'},
     ),
@@ -451,7 +452,8 @@ SECTIONS: Dict[str, Section] = {
     ),
     'discovered_certificates': Section(
         model='models.discovered_certificate:DiscoveredCertificate',
-        identity=('fingerprint_sha256', 'target', 'port'),
+        # The endpoint, as the table's unique constraint has it: its certificate changes
+        identity=('target', 'port', 'sni_hostname'),
         exclude={**_SURROGATE},
         references={'scan_profile_id': 'scan_profiles',
                     'ucm_certificate_id': 'certificates'},

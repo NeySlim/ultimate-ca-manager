@@ -195,7 +195,7 @@ class ExportCoreMixin:
                 'certificate_id': rs.certificate_id,
                 'public_key_sha256': rs.public_key_sha256,
             }
-            for rs in RevokedSerial.query.all()
+            for rs in RevokedSerial.query.order_by(RevokedSerial.id).all()
         ]
 
     def _export_certificates(self, include: bool) -> List[Dict[str, Any]]:

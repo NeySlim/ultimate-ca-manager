@@ -712,9 +712,11 @@ class RestoreCoreMixin:
                 results['revoked_serials_skipped'] += 1
                 continue
             where = f"revoked serial {serial} of CA {caref}"
-            existing = RevokedSerial.query.filter_by(
+            here = RevokedSerial.query.filter_by(
                 caref=caref, serial_number=serial
-            ).order_by(RevokedSerial.id).first()
+            ).order_by(RevokedSerial.id).all()
+            taken = plan.rank('revoked_serials', (caref, str(serial)), rs_data, [r.id for r in here])
+            existing = next((r for r in here if r.id == taken), None)
             valid_to = _archived_datetime(
                 where, 'valid_to', rs_data.get('valid_to')) or utc_now()
             revoked_at = _archived_datetime(
@@ -731,8 +733,9 @@ class RestoreCoreMixin:
                 existing.certificate_id = certificate_id
                 # An archive older than the column says nothing of the key
                 existing.public_key_sha256 = rs_data.get('public_key_sha256') or existing.public_key_sha256
+                plan.place('revoked_serials', rs_data, existing)
             else:
-                db.session.add(RevokedSerial(
+                existing = RevokedSerial(
                     caref=caref,
                     serial_number=serial,
                     revoked_at=revoked_at or utc_now(),
@@ -741,7 +744,9 @@ class RestoreCoreMixin:
                     valid_to=valid_to,
                     certificate_id=certificate_id,
                     public_key_sha256=rs_data.get('public_key_sha256'),
-                ))
+                )
+                db.session.add(existing)
+                plan.place('revoked_serials', rs_data, existing)
             results['revoked_serials'] += 1
 
     def _restore_cas(self, backup_data: Dict, results: Dict, master_key: bytes,

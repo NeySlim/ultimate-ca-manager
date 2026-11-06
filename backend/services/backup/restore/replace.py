@@ -133,6 +133,13 @@ def rows_to_remove(section_name: str, archived_rows: List[Dict[str, Any]],
         gone = ids[archived.get(key, 0):]
         doomed.extend(gone)
         plan.warnings.append(shared_identity_warning(section_name, key, ids, 'removed', gone))
+    # No archived row can be one whose identity misses a part
+    incomplete = plan.incomplete.get(section_name) or []
+    if incomplete:
+        doomed.extend(incomplete)
+        plan.warnings.append(
+            f"{section_name}: {len(incomplete)} row(s) here without a complete "
+            f"{'/'.join(section.identity)} (id {', '.join(map(str, incomplete))}) are removed")
     return doomed
 
 
