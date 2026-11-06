@@ -1197,8 +1197,9 @@ class AcmeClientService:
                     err_body = {}
                 err_text = f"{err_body.get('type', '')} {err_body.get('detail', '')}".lower()
                 # A CA may reject the field however it likes. A rate limit is not about it,
-                # whatever its status: RFC 8555 §6.6 names it by type.
-                rate_limited = resp.status_code == 429 or 'ratelimited' in err_text
+                # whatever its status: RFC 8555 §6.7 names it by type, never by its detail.
+                rate_limited = (resp.status_code == 429
+                                or err_body.get('type') == 'urn:ietf:params:acme:error:rateLimited')
                 if not rate_limited and (400 <= resp.status_code < 500 or 'replace' in err_text):
                     logger.warning(
                         "newOrder with replaces rejected (%s); retrying without "
