@@ -28,7 +28,7 @@ def _no_live_lease(now):
 
 
 def recover_interrupted_orders() -> int:
-    """At startup and at each renewal pass: an order the automatic path left ``processing``
+    """At startup and every 15 minutes: an order the automatic path left ``processing``
     goes back to ``pending``, with a message. A finalization (pending key or live lease) and a
     renewal's own order, resumed by their own paths, and proxy orders are left as they are, and
     so is an order updated in the last 15 minutes: an instance sharing the database may be
@@ -49,6 +49,14 @@ def recover_interrupted_orders() -> int:
         logger.info("%s processing ACME order(s) updated in the last 15 minutes left as they are: "
                     "another instance may be polling them", active)
     return count
+
+
+def scheduled_order_recovery() -> dict:
+    """Scheduler task: an order a restart cut short resumes within about 15 minutes of its last activity."""
+    count = recover_interrupted_orders()
+    if not count:
+        return {'status': 'skipped', 'reason': 'no_interrupted_order'}
+    return {'status': 'ok', 'reason': f'{count} order(s) set back to pending', 'recovered': count}
 
 
 def delete_order(order) -> list:

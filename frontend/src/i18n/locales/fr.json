@@ -5680,6 +5680,7 @@
     "skipReasons": {
       "disabled": "les sauvegardes automatiques sont désactivées",
       "acme_renewal_off": "le renouvellement automatique ACME est désactivé",
+      "no_interrupted_order": "aucune commande ACME interrompue",
       "not_due": "pas encore due",
       "unknown": "aucune raison indiquée"
     },

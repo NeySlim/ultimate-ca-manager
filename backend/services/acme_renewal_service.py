@@ -21,7 +21,7 @@ from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challe
 from services.acme.http01 import wait_for_http01
 from services.acme import client_certificates
 from services.acme.client_certificates import KEY_MISMATCH
-from services.acme.order_housekeeping import purge_stale_pending_orders, recover_interrupted_orders
+from services.acme.order_housekeeping import purge_stale_pending_orders
 from services.acme.order_lease import BUSY, LEASE_LOST, OrderLease, RenewalInProgress
 from services.audit.staging import stage_audit_entry
 from services.audit_service import AuditService
@@ -406,11 +406,6 @@ def scheduled_acme_renewal():
     Called by scheduler service.
     """
     logger.info("Starting ACME auto-renewal check...")
-    try:  # an order left fresh by a restart is set back once idle, here rather than never
-        recover_interrupted_orders()
-    except Exception as exc:
-        db.session.rollback()
-        logger.warning("Interrupted ACME orders not recovered: %s", exc)
     try:
         purge_stale_pending_orders()
     except Exception as exc:  # housekeeping never stops the renewals

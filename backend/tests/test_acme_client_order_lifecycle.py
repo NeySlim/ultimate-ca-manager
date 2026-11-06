@@ -291,8 +291,7 @@ def test_a_restart_leaves_a_processing_order_another_instance_works_on(bench):
     assert db.session.get(AcmeClientOrder, idle.id).status == 'pending'
 
 
-def test_an_order_left_fresh_by_a_restart_is_recovered_by_the_renewal_pass(bench):
-    from services import acme_renewal_service as renew_mod
+def test_an_order_left_fresh_by_a_restart_is_recovered_by_the_frequent_task(bench):
     order = bench.child(status='processing', renewal_enabled=True)
     db.session.commit()
     _idle(order.id, minutes=0)  # the restart came during the DNS wait
@@ -300,14 +299,21 @@ def test_an_order_left_fresh_by_a_restart_is_recovered_by_the_renewal_pass(bench
     db.session.expire_all()
     assert db.session.get(AcmeClientOrder, order.id).status == 'processing'
     _idle(order.id)
-    switch = _set_config('acme.client.renewal_enabled', 'false')
-    try:
-        assert renew_mod.scheduled_acme_renewal()['reason'] == 'acme_renewal_off'
-    finally:
-        _restore_config('acme.client.renewal_enabled', switch)
+    outcome = housekeeping.scheduled_order_recovery()
+    assert outcome['status'] == 'ok' and outcome['recovered'] >= 1
     db.session.expire_all()
     row = db.session.get(AcmeClientOrder, order.id)
     assert (row.status, row.error_message) == ('pending', housekeeping.INTERRUPTED)
+    assert housekeeping.scheduled_order_recovery() == {'status': 'skipped', 'reason': 'no_interrupted_order'}
+
+
+def test_the_recovery_task_runs_every_15_minutes(monkeypatch, tmp_path):
+    monkeypatch.setenv('UCM_DATABASE_PATH', str(tmp_path / 'boot.db'))
+    from app import create_app
+    from services.scheduler_service import get_scheduler
+    create_app('testing')
+    task = get_scheduler().get_task_status('acme_order_recovery')
+    assert task is not None and task['interval'] == 900
 
 
 def test_the_dns_wait_of_an_auto_poll_keeps_the_order_fresh(bench, monkeypatch):

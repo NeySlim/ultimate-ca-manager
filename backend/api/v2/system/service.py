@@ -43,6 +43,7 @@ _TASK_LABELS = {
     'audit_log_cleanup': 'Audit log cleanup',
     'cert_expiry_alerts': 'Certificate expiry alerts',
     'acme_auto_renewal': 'ACME auto-renewal',
+    'acme_order_recovery': 'ACME interrupted orders',
     'ski_aki_backfill': 'Certificate chain repair',
     'cert_auto_renewal': 'Certificate auto-renewal',
     'ocsp_cache_cleanup': 'OCSP cache cleanup',

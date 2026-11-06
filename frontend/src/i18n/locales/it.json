@@ -5677,6 +5677,7 @@
     "skipReasons": {
       "disabled": "i backup automatici sono disattivati",
       "acme_renewal_off": "il rinnovo automatico ACME è disattivato",
+      "no_interrupted_order": "nessun ordine ACME interrotto",
       "not_due": "non ancora prevista",
       "unknown": "nessun motivo indicato"
     },

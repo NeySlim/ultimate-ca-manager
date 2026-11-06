@@ -5677,6 +5677,7 @@
     "skipReasons": {
       "disabled": "自动备份已关闭",
       "acme_renewal_off": "ACME 自动续期已关闭",
+      "no_interrupted_order": "没有中断的 ACME 订单",
       "not_due": "尚未到期",
       "unknown": "未说明原因"
     },

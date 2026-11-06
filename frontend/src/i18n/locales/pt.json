@@ -5677,6 +5677,7 @@
     "skipReasons": {
       "disabled": "as cópias de segurança automáticas estão desativadas",
       "acme_renewal_off": "a renovação automática ACME está desativada",
+      "no_interrupted_order": "nenhum pedido ACME interrompido",
       "not_due": "ainda não está prevista",
       "unknown": "sem motivo indicado"
     },
