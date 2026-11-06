@@ -642,3 +642,85 @@ def test_rcodezero_failed_read_writes_nothing(rcodezero):
     ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
     assert not ok
     assert len(api.patches) == 1
+
+
+# --- Vultr ----------------------------------------------------------------------------------
+# Vultr API v2 (official generated client docs, vultr/vultr-python-client DnsApi.md and
+# models Meta/Links): GET /domains and /domains/{d}/records take per_page and cursor, answer
+# meta.links.next (empty on the last page); POST records 201 {record}; DELETE 204.
+
+class _CursorPages:
+    CAP = 2  # the server returns at most this many items, whatever per_page asks
+
+    def _page(self, key, items, query):
+        start = int(query.get('cursor') or 0)
+        chunk = items[start:start + min(self.CAP, int(query.get('per_page', 100)))]
+        nxt = str(start + len(chunk)) if start + len(chunk) < len(items) else ''
+        return _Resp(200, {key: chunk, 'meta': {'total': len(items), 'links': {'next': nxt, 'prev': ''}}})
+
+
+class FakeVultr(_CursorPages):
+    BASE = 'https://api.vultr.com/v2'
+
+    def __init__(self):
+        self.domains = [{'domain': f'other{i}.test'} for i in range(5)] + [{'domain': 'example.com'}]
+        self.records = [{'id': f'a-{i}', 'type': 'A', 'name': f'h{i}', 'data': '192.0.2.1', 'ttl': 60}
+                        for i in range(5)]
+        self.next_id = 1
+        self.fail = None
+
+    def __call__(self, method, url, headers=None, json=None, params=None, timeout=None):
+        path, query = _split(url, self.BASE)
+        query.update({k: str(v) for k, v in (params or {}).items()})
+        if (headers or {}).get('Authorization') != 'Bearer k':
+            return _Resp(401, {'error': 'Invalid API token.', 'status': 401})
+        if self.fail == method:
+            return _Resp(500, {'error': 'Internal error', 'status': 500})
+        if method == 'GET' and path == '/domains':
+            return self._page('domains', self.domains, query)
+        if path == '/domains/example.com/records':
+            if method == 'GET':
+                return self._page('records', self.records, query)
+            if method == 'POST':
+                rec = {'id': f'id-{self.next_id}', 'priority': 0, **json}
+                self.next_id += 1
+                self.records.append(rec)
+                return _Resp(201, {'record': rec})
+        if method == 'DELETE' and path.startswith('/domains/example.com/records/'):
+            rid = path.rsplit('/', 1)[1]
+            if not any(r['id'] == rid for r in self.records):
+                return _Resp(404, {'error': 'Invalid record.', 'status': 404})
+            self.records = [r for r in self.records if r['id'] != rid]
+            return _Resp(204)
+        return _Resp(404, {'error': 'Not found', 'status': 404})
+
+    def values(self):
+        return [r['data'].strip('"') for r in self.records if r['name'] == '_acme-challenge']
+
+
+@pytest.fixture
+def vultr(monkeypatch):
+    api = FakeVultr()
+    monkeypatch.setattr(requests, 'request', api)
+    return api, create_provider('vultr', {'api_key': 'k'})
+
+
+def test_vultr_lifecycle_reads_every_page(vultr):
+    api, p = vultr
+    _lifecycle(p, api.values)
+    assert len(api.records) == 5
+
+
+def test_vultr_failed_delete_is_false(vultr):
+    api, p = vultr
+    assert p.create_txt_record('example.com', NAME, 'apex')[0]
+    api.fail = 'DELETE'
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'Internal error' in msg
+    assert api.values() == ['apex']
+
+
+def test_vultr_page_bound(vultr, monkeypatch):
+    api, p = vultr
+    monkeypatch.setattr(type(p), 'MAX_PAGES', 2)
+    assert not p.test_connection()[0]
