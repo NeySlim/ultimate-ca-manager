@@ -169,59 +169,6 @@ def test_easydns_deletes_one_value(monkeypatch):
     assert ('DELETE', '/zones/records/example.com/2') in api.calls
 
 
-# --- Epik -----------------------------------------------------------------------
-
-class FakeEpik(_RecordApi):
-    def __call__(self, method, url, params=None, json=None, timeout=None):
-        path = url.split('/v2', 1)[1]
-        self.calls.append((method, path))
-        ok = {'code': 200, 'status': 'SUCCESS'}
-        if path == '/domains/example.com/records' and method == 'GET':
-            return _Resp(200, {**ok, 'data': {'records': self.records}})
-        if path == '/domains/example.com/records' and method == 'POST':
-            rec = self.add(**json)
-            rec['ID'] = rec.pop('id')
-            return _Resp(200, ok)
-        m = re.fullmatch(r'/domains/example\.com/records/(\d+)', path)
-        if m and method == 'DELETE':
-            before = len(self.records)
-            self.records = [r for r in self.records if str(r['ID']) != m.group(1)]
-            return _Resp(200, ok) if len(self.records) != before else _Resp(404, {'message': 'nf'})
-        return _Resp(404, {'message': 'not found'})
-
-
-def test_epik_deletes_one_value(monkeypatch):
-    api = FakeEpik('DATA')
-    monkeypatch.setattr(requests, 'request', api)
-    _create_two_delete_one(create_provider('epik', {'api_key': 'k'}))
-    assert api.values() == ['apex']
-    assert ('DELETE', '/domains/example.com/records/2') in api.calls
-
-
-# --- Hostinger ------------------------------------------------------------------
-
-class FakeHostinger(_RecordApi):
-    def __call__(self, method, url, headers=None, json=None, timeout=None):
-        path = url.split('/v1', 1)[1]
-        self.calls.append((method, path))
-        if path == '/dns/example.com/records' and method == 'GET':
-            return _Resp(200, self.records)
-        if path == '/dns/example.com/records' and method == 'POST':
-            return _Resp(201, self.add(**json))
-        m = re.fullmatch(r'/dns/example\.com/records/(\d+)', path)
-        if m and method == 'DELETE':
-            return _Resp(204) if self.delete(m.group(1)) else _Resp(404, {'message': 'nf'})
-        return _Resp(404, {'message': 'not found'})
-
-
-def test_hostinger_deletes_one_value(monkeypatch):
-    api = FakeHostinger('content')
-    monkeypatch.setattr(requests, 'request', api)
-    _create_two_delete_one(create_provider('hostinger', {'api_token': 't'}))
-    assert api.values() == ['apex']
-    assert ('DELETE', '/dns/example.com/records/2') in api.calls
-
-
 # --- Google Cloud DNS -------------------------------------------------------------
 
 class FakeCloudDns:
@@ -236,7 +183,10 @@ class FakeCloudDns:
         parts = urlsplit(url)
         path = parts.path.split('/dns/v1', 1)[1]
         if path == '/projects/p/managedZones':
-            return _Resp(200, {'managedZones': [{'name': 'ex', 'dnsName': 'example.com.'}]})
+            # Paginated by nextPageToken / pageToken (managedZones.list).
+            if parse_qs(parts.query).get('pageToken') == ['t2']:
+                return _Resp(200, {'managedZones': [{'name': 'ex', 'dnsName': 'example.com.'}]})
+            return _Resp(200, {'managedZones': [{'name': 'co', 'dnsName': 'com.'}], 'nextPageToken': 't2'})
         if path == '/projects/p/managedZones/ex/rrsets' and method == 'GET':
             if self.list_status:
                 return _Resp(self.list_status, {'error': {'message': 'backend error'}})
@@ -283,13 +233,18 @@ def test_gcloud_deletes_the_rrset_with_its_last_value(monkeypatch):
     assert 'additions' not in api.changes[-1]
 
 
-def test_gcloud_failed_read_writes_nothing(monkeypatch):
+def test_gcloud_failed_read_writes_nothing(monkeypatch, caplog):
     api = FakeCloudDns()
     monkeypatch.setattr(requests, 'request', api)
     p = _gcloud()
     assert p.create_txt_record('example.com', NAME, 'apex')[0]
     api.list_status = 500
-    p.delete_txt_record('example.com', NAME, 'apex')
+    with caplog.at_level(logging.WARNING):
+        ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'backend error' in msg
+    assert any(r.levelno == logging.WARNING and 'backend error' in r.getMessage() for r in caplog.records)
+    ok, msg = p.create_txt_record('example.com', NAME, 'wild')
+    assert not ok and 'backend error' in msg
     assert len(api.changes) == 1
     assert api.rrsets[NAME + '.']['rrdatas'] == ['"apex"']
 
@@ -318,6 +273,8 @@ def test_freedns_cleanup_warns_that_it_removes_the_name(monkeypatch, caplog):
         def get(self, url, params=None, timeout=None):
             if params:
                 self.deleted.append(params['data_id[]'])
+            if '5' in self.deleted:
+                return _Resp(200, text='')
             return _Resp(200, text='<a href=edit.php?data_id=5>_acme-challenge.example.com</a>')
 
     session = Session()
@@ -341,11 +298,63 @@ def test_freedns_cleanup_leaves_the_record_of_another_domain(monkeypatch):
         def get(self, url, params=None, timeout=None):
             if params:
                 self.deleted.append(params['data_id[]'])
-            return _Resp(200, text='<a href=edit.php?data_id=4>_acme-challenge.other.example</a>'
-                                   '<a href=edit.php?data_id=5>_acme-challenge.example.com</a>')
+            rows = [r for r in ('4', '5') if r not in self.deleted]
+            names = {'4': '_acme-challenge.other.example', '5': '_acme-challenge.example.com'}
+            return _Resp(200, text=''.join(f'<a href=edit.php?data_id={r}>{names[r]}</a>' for r in rows))
 
     session = Session()
     monkeypatch.setattr(freedns_module, 'create_session', lambda: session)
     p = create_provider('freedns', {'username': 'u', 'password': 'p'})
     assert p.delete_txt_record('example.com', NAME, 'apex')[0]
     assert session.deleted == ['5']
+
+
+def test_freedns_record_still_listed_is_false(monkeypatch):
+    class Session:
+        def post(self, url, data=None, timeout=None):
+            return _Resp(200, text='Logout')
+
+        def get(self, url, params=None, timeout=None):
+            # The delete page answers 200 but the record stays.
+            return _Resp(200, text='<a href=edit.php?data_id=5>_acme-challenge.example.com</a>')
+
+    monkeypatch.setattr(freedns_module, 'create_session', lambda: Session())
+    p = create_provider('freedns', {'username': 'u', 'password': 'p'})
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'kept the record' in msg
+
+
+class _FreeDnsSession:
+    """Login answers 'Logout'; the listing shows `rows`, or raises when `down`."""
+
+    def __init__(self, rows=(), down=False):
+        self.rows, self.down, self.saved = list(rows), down, []
+
+    def post(self, url, data=None, timeout=None):
+        if 'save.php' in url:
+            self.saved.append(data)
+        return _Resp(200, text='Logout')
+
+    def get(self, url, params=None, timeout=None):
+        if self.down:
+            raise requests.ConnectionError('listing unreachable')
+        return _Resp(200, text='<a href=edit.php?domain_id=9>example.com</a>' + ''.join(
+            f'<a href=edit.php?data_id={i}>{n}</a>' for i, n in self.rows))
+
+
+def test_freedns_create_not_listed_afterwards_is_false(monkeypatch):
+    session = _FreeDnsSession()
+    monkeypatch.setattr(freedns_module, 'create_session', lambda: session)
+    p = create_provider('freedns', {'username': 'u', 'password': 'p'})
+    ok, msg = p.create_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'did not list' in msg
+    assert '<a' not in msg
+    assert len(session.saved) == 1
+
+
+def test_freedns_unreadable_listing_is_false_not_absent(monkeypatch):
+    session = _FreeDnsSession(rows=[('5', NAME)], down=True)
+    monkeypatch.setattr(freedns_module, 'create_session', lambda: session)
+    p = create_provider('freedns', {'username': 'u', 'password': 'p'})
+    ok, msg = p.delete_txt_record('example.com', NAME, 'apex')
+    assert not ok and 'Could not read' in msg

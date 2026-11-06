@@ -28,6 +28,7 @@ class VultrDnsProvider(BaseDnsProvider):
     REQUIRED_CREDENTIALS = ["api_key"]
     
     BASE_URL = "https://api.vultr.com/v2"
+    MAX_PAGES = 50
     
     def __init__(self, credentials: Dict[str, Any]):
         super().__init__(credentials)
@@ -43,7 +44,8 @@ class VultrDnsProvider(BaseDnsProvider):
         self, 
         method: str, 
         path: str, 
-        data: Optional[Dict] = None
+        data: Optional[Dict] = None,
+        params: Optional[Dict] = None
     ) -> Tuple[bool, Any]:
         """Make Vultr API request"""
         url = f"{self.BASE_URL}{path}"
@@ -54,6 +56,7 @@ class VultrDnsProvider(BaseDnsProvider):
                 url=url,
                 headers=self._get_headers(),
                 json=data,
+                params=params,
                 timeout=30
             )
             
@@ -69,31 +72,38 @@ class VultrDnsProvider(BaseDnsProvider):
                 return True, response.json()
             return True, None
             
-        except requests.RequestException as e:
+        except (requests.RequestException, ValueError) as e:
             logger.error(f"Vultr API request failed: {self._failure(e)}")
             return False, self._failure(e)
     
+    def _list(self, path: str, key: str) -> Tuple[bool, Any]:
+        """Every item of a cursor-paginated listing: `meta.links.next` is empty on the last page."""
+        items = []
+        params = {'per_page': 500}
+        for _ in range(self.MAX_PAGES):
+            success, result = self._request('GET', path, params=params)
+            if not success:
+                return False, result
+            items.extend((result or {}).get(key) or [])
+            cursor = (((result or {}).get('meta') or {}).get('links') or {}).get('next')
+            if not cursor:
+                return True, items
+            params = {'per_page': 500, 'cursor': cursor}
+        return False, f"More than {self.MAX_PAGES} pages at {path}"
+
     def _get_domain(self, domain: str) -> Optional[str]:
         """Get domain name for a subdomain"""
         if domain in self._domain_cache:
             return self._domain_cache[domain]
         
-        success, result = self._request('GET', '/domains')
+        success, domains = self._list('/domains', 'domains')
         if not success:
             return None
-        
-        domains = result.get('domains', [])
-        
-        # Find best matching domain
-        domain_parts = domain.split('.')
-        for i in range(len(domain_parts) - 1):
-            domain_name = '.'.join(domain_parts[i:])
-            for d in domains:
-                if d.get('domain') == domain_name:
-                    self._domain_cache[domain] = domain_name
-                    return domain_name
-        
-        return None
+        found = self.find_zone(domain, domains, key=lambda d: d.get('domain'))
+        if not found:
+            return None
+        self._domain_cache[domain] = found['domain']
+        return found['domain']
     
     def create_txt_record(
         self, 
@@ -149,11 +159,12 @@ class VultrDnsProvider(BaseDnsProvider):
             name = record_name
         
         # Find the record
-        success, result = self._request('GET', f'/domains/{domain_name}/records')
+        success, records = self._list(f'/domains/{domain_name}/records', 'records')
         if not success:
-            return False, f"Failed to list records: {result}"
+            msg = f"Failed to list records: {records}"
+            logger.warning(f"Vultr: {msg}")
+            return False, msg
         
-        records = result.get('records', [])
         record_ids = [r.get('id') for r in records
                       if r.get('type') == 'TXT' and r.get('name', '') == name
                       and self.txt_matches(r.get('data'), record_value)]
@@ -164,6 +175,7 @@ class VultrDnsProvider(BaseDnsProvider):
         for record_id in record_ids:
             success, result = self._request('DELETE', f'/domains/{domain_name}/records/{record_id}')
             if not success and 'not found' not in str(result).lower():
+                logger.warning(f"Vultr: failed to delete TXT value of {record_name}: {result}")
                 return False, f"Failed to delete record: {result}"
         
         logger.info(f"Vultr: Deleted TXT record {record_name}")
@@ -171,12 +183,11 @@ class VultrDnsProvider(BaseDnsProvider):
     
     def test_connection(self) -> Tuple[bool, str]:
         """Test Vultr API connection"""
-        success, result = self._request('GET', '/domains')
+        success, domains = self._list('/domains', 'domains')
         if success:
-            domains = result.get('domains', [])
             domain_names = [d.get('domain', '') for d in domains]
             return True, f"Connected successfully. Found {len(domains)} domain(s): {', '.join(domain_names[:5])}"
-        return False, f"Connection failed: {result}"
+        return False, f"Connection failed: {domains}"
     
     @classmethod
     def get_credential_schema(cls):

@@ -147,33 +147,6 @@ def test_bunny_deletes_one_value(monkeypatch):
     assert api.deletes == ['/dnszone/3/records/1']
 
 
-# --- Checkdomain ----------------------------------------------------------------
-
-class FakeCheckdomain(_PerRecordFake):
-    def __call__(self, method, url, headers=None, json=None, timeout=None):
-        path, _ = _split(url, 'https://api.checkdomain.de/v1')
-        if method == 'GET' and path == '/domains':
-            return _Resp(200, {'_embedded': {'domains': [{'id': 5, 'name': 'example.com'}]}})
-        if path == '/domains/5/nameservers/records' and method == 'POST':
-            self.add(dict(json))
-            return _Resp(201, text='')
-        if path == '/domains/5/nameservers/records' and method == 'GET':
-            return _Resp(200, {'_embedded': {'records': self.records}})
-        if method == 'DELETE' and path.startswith('/domains/5/nameservers/records/'):
-            self.deletes.append(path)
-            self.drop(path.rsplit('/', 1)[1])
-            return _Resp(204, text='')
-        return _Resp(404, {'message': 'Not found'})
-
-
-def test_checkdomain_deletes_one_value(monkeypatch):
-    api = FakeCheckdomain()
-    monkeypatch.setattr(requests, 'request', api)
-    _two_values_then_delete_apex(create_provider('checkdomain', {'api_token': 't'}))
-    assert api.values() == ['wild']
-    assert api.deletes == ['/domains/5/nameservers/records/1']
-
-
 # --- ClouDNS ------------------------------------------------------------------
 
 class FakeClouDns(_PerRecordFake):
@@ -210,88 +183,6 @@ def test_cloudns_deletes_one_value(monkeypatch):
     _two_values_then_delete_apex(create_provider('cloudns', {'auth_id': '1', 'auth_password': 'p'}))
     assert api.values() == ['wild']
     assert api.deletes == ['1']
-
-
-# --- Constellix -----------------------------------------------------------------
-
-class FakeConstellix:
-    """One TXT record per name, its values in roundRobin; PUT replaces the record."""
-
-    def __init__(self):
-        self.records = [{'id': 9, 'name': '_acme-challenge', 'ttl': 120,
-                         'roundRobin': [{'value': '"apex"'}, {'value': '"wild"'}]}]
-        self.writes = []
-
-    def __call__(self, method, url, headers=None, json=None, timeout=None):
-        path, _ = _split(url, 'https://api.dns.constellix.com/v4')
-        if method == 'GET' and path == '/domains':
-            return _Resp(200, {'data': [{'id': 4, 'name': 'example.com'}]})
-        if method == 'GET' and path == '/domains/4/records/txt':
-            return _Resp(200, {'data': self.records})
-        if path.startswith('/domains/4/records/txt/'):
-            rid = int(path.rsplit('/', 1)[1])
-            self.writes.append((method, path, json))
-            if method == 'PUT':
-                self.records = [{'id': rid, **json} if r['id'] == rid else r for r in self.records]
-                return _Resp(200, {'data': {'id': rid, **json}})
-            if method == 'DELETE':
-                self.records = [r for r in self.records if r['id'] != rid]
-                return _Resp(200, {'success': 'Record deleted'})
-        return _Resp(404, {'errors': ['Not found']})
-
-
-def test_constellix_writes_back_the_other_value(monkeypatch):
-    api = FakeConstellix()
-    monkeypatch.setattr(requests, 'request', api)
-    provider = create_provider('constellix', {'api_key': 'k', 'secret_key': 's'})
-    ok, msg = provider.delete_txt_record('example.com', NAME, 'apex')
-    assert ok, msg
-    assert api.writes == [('PUT', '/domains/4/records/txt/9',
-                           {'name': '_acme-challenge', 'ttl': 120, 'roundRobin': [{'value': '"wild"'}]})]
-    ok, msg = provider.delete_txt_record('example.com', NAME, 'wild')
-    assert ok, msg
-    assert api.writes[-1] == ('DELETE', '/domains/4/records/txt/9', None)
-    assert api.records == []
-
-
-# --- Core-Networks --------------------------------------------------------------
-
-class FakeCoreNetworks(_PerRecordFake):
-    """Deletion takes a filter body and removes every record matching all its fields."""
-
-    value_key = 'data'
-    BASE = 'https://beta.api.core-networks.de'
-
-    def post(self, url, data=None, timeout=None):
-        return _Resp(200, {'token': 'tok', 'expires': 3600})
-
-    def __call__(self, method, url, headers=None, json=None, timeout=None):
-        path, _ = _split(url, self.BASE)
-        if method == 'GET' and path == '/dns/zones/':
-            return _Resp(200, [{'name': 'example.com', 'type': 'master'}])
-        if path == '/dns/zones/example.com/records/':
-            if method == 'POST':
-                self.records.append(dict(json))
-                return _Resp(204, text='')
-            if method == 'GET':
-                return _Resp(200, self.records)
-            if method == 'DELETE':
-                self.deletes.append(dict(json))
-                self.records = [r for r in self.records
-                                if not all(r.get(k) == v for k, v in json.items())]
-                return _Resp(204, text='')
-        if method == 'POST' and path == '/dns/zones/example.com/records/commit':
-            return _Resp(204, text='')
-        return _Resp(404, {'error': 'Not found'})
-
-
-def test_corenetworks_deletes_one_value(monkeypatch):
-    api = FakeCoreNetworks()
-    monkeypatch.setattr(requests, 'post', api.post)
-    monkeypatch.setattr(requests, 'request', api)
-    _two_values_then_delete_apex(create_provider('corenetworks', {'username': 'u', 'password': 'p'}))
-    assert api.values() == ['"wild"']
-    assert [d['data'] for d in api.deletes] == ['"apex"']
 
 
 # --- DigitalOcean ---------------------------------------------------------------

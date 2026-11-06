@@ -45,7 +45,11 @@ class HurricaneDnsProvider(BaseDnsProvider):
                 'password': self.credentials['password'],
                 'txt': '',
             }, timeout=30)
-            return True, "Record cleared (HE does not support delete)"
+            body = resp.text.strip()
+            if body.startswith('good') or body.startswith('nochg'):
+                return True, "Record cleared (HE does not support delete)"
+            logger.warning(f"Hurricane Electric: clearing {record_name} failed: {self._error(resp)}")
+            return False, self._error(resp, "HE update failed: ")
         except requests.RequestException as e:
             return False, self._failure(e)
     

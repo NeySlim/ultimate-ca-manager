@@ -1,7 +1,7 @@
 """
 Epik DNS Provider
-Uses Epik Marketplace API for DNS record management
-https://docs.userapi.epik.com/v2/
+Uses Epik Domains API v2 for DNS host records
+https://usersapiv2.epik.com/v2 (API reference)
 """
 import requests
 from typing import Tuple, Dict, Any, Optional
@@ -17,62 +17,68 @@ class EpikDnsProvider(BaseDnsProvider):
     PROVIDER_NAME = "Epik"
     PROVIDER_DESCRIPTION = "Epik Domains DNS API"
     REQUIRED_CREDENTIALS = ["api_key"]
-    
+
     BASE_URL = "https://usersapiv2.epik.com/v2"
-    
+
     def _request(self, method: str, path: str, params: Optional[Dict] = None, data: Optional[Dict] = None) -> Tuple[bool, Any]:
         url = f"{self.BASE_URL}{path}"
-        if params is None:
-            params = {}
-        params['SIGNATURE'] = self.credentials['api_key']
+        # The key goes in the Authorization header; the SIGNATURE query parameter is deprecated.
+        headers = {'Authorization': f'Bearer {self.credentials["api_key"]}'}
         try:
-            resp = requests.request(method=method, url=url, params=params, json=data, timeout=30)
+            resp = requests.request(method=method, url=url, params=params, json=data,
+                                    headers=headers, timeout=30)
             if resp.status_code >= 400:
-                return False, resp.reason
-            body = resp.json()
-            if body.get('code') != 200 and body.get('status') != 'SUCCESS':
-                return False, body.get('message', 'Unknown error')
-            return True, body
-        except requests.RequestException as e:
-            return False, self.redact_secrets(e)
-    
+                return False, self._error(resp)
+            return True, resp.json() if resp.text else {}
+        except (requests.RequestException, ValueError) as e:
+            return False, self._failure(e)
+
+    def _zone(self, domain: str) -> str:
+        # No zone lookup: the zone is the registrable domain under the name.
+        return self.get_zone_for_domain(domain) or domain
+
     def create_txt_record(self, domain: str, record_name: str, record_value: str, ttl: int = 300) -> Tuple[bool, str]:
-        # The caller passes the name being validated; the zone to address is
-        # the registrable domain under it (no zone API here to ask).
-        zone = self.get_zone_for_domain(domain) or domain
+        zone = self._zone(domain)
         host = self.get_relative_record_name(record_name, zone)
-        data = {'HOST': host, 'TYPE': 'TXT', 'DATA': record_value, 'TTL': ttl, 'AUX': 0}
+        data = {'create_host_records_payload': {
+            'HOST': host, 'TYPE': 'TXT', 'DATA': record_value, 'TTL': ttl, 'AUX': 0}}
         success, result = self._request('POST', f'/domains/{zone}/records', data=data)
         if not success:
             return False, f"Failed to create record: {result}"
         return True, "Record created successfully"
-    
+
     def delete_txt_record(self, domain: str, record_name: str, record_value: str) -> Tuple[bool, str]:
-        # Same zone resolution as the create path, so the record is looked
-        # for where it was written.
-        zone = self.get_zone_for_domain(domain) or domain
+        zone = self._zone(domain)
         success, result = self._request('GET', f'/domains/{zone}/records')
         if not success:
-            return False, f"Failed to list records: {result}"
+            msg = f"Failed to list records: {result}"
+            logger.warning(f"Epik: {msg}")
+            return False, msg
+        listing = (result or {}).get('data') or {}
+        if 'records' not in listing:
+            # A registry error comes back inside the 200 answer, without records.
+            msg = f"Failed to list records: {listing.get('description') or listing.get('code')}"
+            logger.warning(f"Epik: {msg}")
+            return False, msg
         host = self.get_relative_record_name(record_name, zone)
-        records = result.get('data', {}).get('records', [])
-        for rec in records:
-            if (rec.get('TYPE') == 'TXT' and rec.get('HOST') == host
-                    and self.txt_matches(rec.get('DATA'), record_value)):
-                success, result = self._request('DELETE', f'/domains/{zone}/records/{rec["ID"]}')
+        for rec in listing['records'] or []:
+            if (rec.get('type') == 'TXT' and rec.get('name') == host
+                    and self.txt_matches(rec.get('data'), record_value)):
+                success, result = self._request('DELETE', f'/domains/{zone}/records', params={'ID': rec['id']})
                 if not success:
+                    logger.warning(f"Epik: failed to delete TXT value of {record_name}: {result}")
                     return False, f"Failed to delete record: {result}"
         return True, "Record deleted successfully"
-    
+
     def test_connection(self) -> Tuple[bool, str]:
         success, result = self._request('GET', '/domains')
         if success:
             return True, "Connected successfully"
         return False, f"Connection failed: {result}"
-    
+
     @classmethod
     def get_credential_schema(cls):
         return [
-            {'name': 'api_key', 'label': 'API Key (Signature)', 'type': 'password', 'required': True,
-             'help': 'Epik > Account > API Signature'},
+            {'name': 'api_key', 'label': 'API Key', 'type': 'password', 'required': True,
+             'help': 'Epik > Account > API key'},
         ]
