@@ -337,6 +337,15 @@ def _admin_api_keys_stay_in_their_module():
         db.session.commit()
 
 
+@pytest.fixture(autouse=True, scope='module')
+def _seeded_rows_stay_in_their_module():
+    """Rows `tests.seeded_rows` wrote for a module are deleted after it."""
+    yield
+    from tests.seeded_rows import _SEEDED, remove_seeded
+    if _SEEDED:
+        remove_seeded()
+
+
 @pytest.fixture(scope='session')
 def app():
     """Create Flask app with test configuration (shared across all tests)."""

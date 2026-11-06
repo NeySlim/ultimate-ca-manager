@@ -224,6 +224,10 @@ def _seed():
         approval_group_id=groups[1].id, rules='{"max_days": 90}',
         requires_approval=True, min_approvers=2, priority=42))
 
+    # A second one, for the approval's link to drift to
+    db.session.add(CertificatePolicy(
+        name=f'{MARK}-policy-other', policy_type='issuance', rules='{}'))
+
     db.session.flush()          # the approval below points at the policy
     policy = CertificatePolicy.query.filter_by(
         name=IDENTITIES['certificate_policies']['name']).one()
@@ -246,12 +250,11 @@ def _seed():
     # The account at the external authority the order was placed with. The
     # order's link to it is a number, so it only proves anything once there is
     # an account here whose own number is not the one the archive carries.
-    client_account = AcmeClientAccount(
-        directory_url=f'https://acme.example.test/{MARK}/directory',
-        label=f'{MARK} client account', email=f'{MARK}-client@example.test',
-        account_key_algorithm='ES256')
-    db.session.add(client_account)
-    db.session.flush()
+    # Two of each, so a drift of the order's links has another row to point at
+    client_account, _ = pair(lambda s: AcmeClientAccount(
+        directory_url=f'https://acme.example.test/{MARK}/directory-{s}',
+        label=f'{MARK} client account {s}', email=f'{MARK}-client@example.test',
+        account_key_algorithm='ES256'))
 
     # Two orders a renewal could belong to; the seeded one renews the second
     parents = [AcmeClientOrder(
@@ -263,6 +266,7 @@ def _seed():
     db.session.flush()
 
     ensure_acme_account(f'{MARK}-acme-account')
+    ensure_acme_account(f'{MARK}-acme-account-b')
     db.session.add(AcmeClientOrder(
         renewal_of_order_id=parents[1].id,
         order_url=IDENTITIES['acme_client_orders']['order_url'],
@@ -502,7 +506,8 @@ def _drifted(column, current):
         if current is not None:
             query = query.filter(target != current)
         other = query.order_by(target).first()
-        return current if other is None else other[0]
+        assert other is not None, f'{column} has no other row to drift to: seed one'
+        return other[0]
     if isinstance(kind, Boolean):
         return not bool(current)
     if isinstance(kind, (DateTime, Date)):

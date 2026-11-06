@@ -1,5 +1,14 @@
-"""Rows the tests write directly, in a shape PostgreSQL's constraints accept."""
+"""Rows the tests write directly, in a shape PostgreSQL's constraints accept.
+
+What the two seeding helpers create is recorded and removed after the module
+(`remove_seeded`, called from conftest).
+"""
+from flask import current_app
+from sqlalchemy import text
+
 from models import AcmeAccount, db
+
+_SEEDED = []  # (application, table, key column, value)
 
 
 def ensure_acme_account(account_id):
@@ -8,6 +17,7 @@ def ensure_acme_account(account_id):
         db.session.add(AcmeAccount(account_id=account_id, jwk='{}',
                                    jwk_thumbprint=f'seeded-{account_id}'))
         db.session.flush()
+        _SEEDED.append((current_app._get_current_object(), 'acme_accounts', 'account_id', account_id))
 
 
 def placeholder_certificate_id():
@@ -19,7 +29,35 @@ def placeholder_certificate_id():
         row = Certificate(refid='test-placeholder-certificate', descr='test placeholder')
         db.session.add(row)
         db.session.commit()
+        _SEEDED.append((current_app._get_current_object(), 'certificates', 'id', row.id))
     return row.id
+
+
+def remove_seeded():
+    """Delete the recorded rows, references to them cleared where the column allows
+    it; a row still held by a non-nullable reference is left."""
+    from services.database_admin.helpers import _force_register_all_models
+
+    _force_register_all_models()
+    while _SEEDED:
+        application, table, column, value = _SEEDED.pop()
+        with application.app_context():
+            db.session.rollback()
+            held = False
+            for child in db.metadata.sorted_tables:
+                for fk in child.foreign_keys:
+                    if fk.column.table.name != table or fk.column.name != column:
+                        continue
+                    where = f'"{child.name}"."{fk.parent.name}" = :v'
+                    if fk.parent.nullable:
+                        db.session.execute(text(
+                            f'UPDATE "{child.name}" SET "{fk.parent.name}" = NULL WHERE {where}'), {'v': value})
+                    elif db.session.execute(text(f'SELECT 1 FROM "{child.name}" WHERE {where}'),
+                                            {'v': value}).first():
+                        held = True
+            if not held:
+                db.session.execute(text(f'DELETE FROM "{table}" WHERE "{column}" = :v'), {'v': value})
+            db.session.commit()
 
 
 def delete_client_accounts(query, **kwargs):

@@ -19,7 +19,7 @@ two tests do.
 
 ## One schema per process
 
-Each pytest process creates its own schema, `ucm_app_<pid>`, and reaches it
+Each pytest process creates its own schema, `ucm_app_<pid>_<random>`, and reaches it
 through the URL's `search_path` (`options=-csearch_path=...`), so the
 application, the migration runner and any engine built from `DATABASE_URL`
 all land in it. The schema is created empty: `create_app()` builds it with
@@ -28,7 +28,7 @@ installation. It is dropped (`DROP SCHEMA ... CASCADE`) at the end of the
 session; a schema left behind by a killed run is dropped by the next run.
 
 A test module that builds its own application with `create_app('testing')`
-gets a further schema, `ucm_app_<pid>_<n>`, as it gets a fresh in-memory
+gets a further schema, `ucm_app_<pid>_<random>_<n>`, as it gets a fresh in-memory
 database on SQLite: it never shares rows (or a locked admin) with the session.
 
 The URL also sets `lock_timeout=30s`: a lock the process waits for while
@@ -66,6 +66,8 @@ python -m pytest tests/ -n 4 --dist loadfile
 
 ## CI
 
-The `test-backend-postgres` job runs, in this mode, the ACME, backup, restore,
-mTLS, certificate, revocation and scheduler files, plus
-`test_postgres_schema_of_its_own.py`, which only runs in this mode.
+The `test-backend-postgres` job runs, in this mode and as a non-superuser
+role, the ACME, backup, restore, mTLS, certificate, revocation and scheduler
+files, plus
+`test_postgres_schema_of_its_own.py` and `test_db_error_parameters_hidden.py`,
+whose PostgreSQL cases only run in this mode.

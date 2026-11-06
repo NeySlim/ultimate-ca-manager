@@ -1,16 +1,18 @@
 """Opt-in PostgreSQL mode of the session `app` (UCM_TEST_APP_PG_URL).
 
-Each process (sequential run or xdist worker) owns one schema, ucm_app_<pid>,
-reached through the URL's search_path, created empty and dropped at the end.
-Any other create_app('testing') gets a schema of its own, ucm_app_<pid>_<n>,
+Each process (sequential run or xdist worker) owns one schema,
+ucm_app_<pid>_<token>, reached through the URL's search_path, created empty and
+dropped at the end; the random token keeps two hosts with the same pid apart.
+Any other create_app('testing') gets a schema of its own, <that name>_<n>,
 as it gets a fresh in-memory database on SQLite.
 """
 import atexit
 import os
+import secrets
 
 APP_PG_URL = os.environ.get('UCM_TEST_APP_PG_URL', '')
 ENABLED = bool(APP_PG_URL)
-SCHEMA = f'ucm_app_{os.getpid()}'
+SCHEMA = f'ucm_app_{os.getpid()}_{secrets.token_hex(3)}'
 
 # Held open for the whole session: its application_name marks the schemas as alive.
 _marker = []
@@ -35,15 +37,15 @@ def _connect():
 
 
 def _sweep_abandoned(cur):
-    """Drop the schemas of runs that were killed: no session carries their pid."""
+    """Drop the schemas of runs that were killed: no session carries their name."""
     cur.execute("""
         SELECT n.nspname FROM pg_namespace n
-        WHERE n.nspname LIKE 'ucm\\_app\\_%'
+        WHERE n.nspname ~ '^ucm_app_[0-9]+_[0-9a-f]{6}(_[0-9]+)?$'
           AND pg_get_userbyid(n.nspowner) = current_user
           AND NOT EXISTS (
               SELECT 1 FROM pg_stat_activity a
-              WHERE a.application_name = 'ucm_app_' || split_part(n.nspname, '_', 3)
-                 OR a.application_name LIKE 'ucm\\_app\\_' || split_part(n.nspname, '_', 3) || '\\_%')
+              WHERE substring(a.application_name from '^ucm_app_[0-9]+_[0-9a-f]{6}')
+                    = substring(n.nspname from '^ucm_app_[0-9]+_[0-9a-f]{6}'))
     """)
     for (name,) in cur.fetchall():
         cur.execute(f'DROP SCHEMA IF EXISTS "{name}" CASCADE')

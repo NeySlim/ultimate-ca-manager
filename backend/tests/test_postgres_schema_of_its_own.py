@@ -49,3 +49,30 @@ def test_the_sequences_of_its_schema_are_realigned(app, pg_schema):
         finally:
             with db.engine.begin() as conn:
                 conn.execute(text('DROP TABLE seq_probe'))
+
+
+def test_the_reset_hint_names_the_schema_of_the_target():
+    from services.database_admin.migration import _rollback_hint
+    named = _rollback_hint('postgresql://u@h/db', {'target_written': True, 'target_schema': 'Tenant A'})
+    assert 'DROP SCHEMA "Tenant A" CASCADE; CREATE SCHEMA "Tenant A";' in named
+    assert 'DROP SCHEMA public CASCADE' in _rollback_hint('postgresql://u@h/db', {'target_written': True})
+
+
+def test_a_failed_migration_names_the_schema_it_wrote_to(app, pg_schema, monkeypatch):
+    from types import SimpleNamespace
+
+    from services.database_admin import migration
+    from tests import pg_app_harness
+
+    target = f'{pg_schema}_target'
+    pg_app_harness._new_schema(pg_app_harness._marker[0].cursor(), target)
+    monkeypatch.setattr(migration, '_check_source_integrity', lambda: {})
+    monkeypatch.setattr(migration, 'create_source_snapshot', lambda: SimpleNamespace(as_proof=lambda: {}))
+
+    def refused(*_args):
+        raise RuntimeError('schema refused')
+    monkeypatch.setattr(migration, '_create_target_schema', refused)
+    with app.app_context():
+        ok, message, stats = migration.migrate_data(pg_app_harness.app_url(target))
+    assert not ok and stats['target_schema'] == target
+    assert f'DROP SCHEMA {target} CASCADE; CREATE SCHEMA {target};' in message

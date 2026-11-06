@@ -216,7 +216,10 @@ jobs:
       # The application itself on PostgreSQL: the session `app` fixture builds
       # it in a schema of its own (docs/testing/postgres-harness.md), so the
       # routes and services run on this backend and not only the migrations.
+      # The unprivileged role, as on a managed PostgreSQL; its `public` schema,
+      # emptied by the step above, is never touched here.
       - name: Run the application tests on PostgreSQL
+        timeout-minutes: 30
         env:
           SECRET_KEY: test-secret-key-for-ci
           UCM_ENV: test
@@ -224,7 +227,7 @@ jobs:
           INITIAL_ADMIN_PASSWORD: changeme123
           CSRF_DISABLED: 'true'
           UCM_DEV_MODE: 'true'
-          UCM_TEST_APP_PG_URL: postgresql://ucm:ucm_ci_password@localhost:5432/ucm_test
+          UCM_TEST_APP_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
         run: |
           cd backend
           pytest --tb=short \
@@ -235,7 +238,8 @@ jobs:
             tests/test_certificates*.py \
             tests/test_revocation*.py \
             tests/test_scheduler*.py \
-            tests/test_postgres_schema_of_its_own.py
+            tests/test_postgres_schema_of_its_own.py \
+            tests/test_db_error_parameters_hidden.py
   
   test-frontend:
     name: Frontend Tests

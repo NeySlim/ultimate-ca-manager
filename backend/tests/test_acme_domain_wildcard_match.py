@@ -23,6 +23,9 @@ def _mapping_ids(app, create_ca):
     numbers the tests use: PostgreSQL enforces both foreign keys."""
     from models.acme_models import DnsProvider
 
+    from models import CA
+    from tests.seeded_rows import delete_cas
+
     ids = {n: create_ca(cn=f'Wildcard match CA {n}')['id'] for n in (2, 3, 7, 8, 9)}
     with app.app_context():
         provider = DnsProvider.query.filter_by(name='wildcard-match-provider').first()
@@ -31,7 +34,13 @@ def _mapping_ids(app, create_ca):
             db.session.add(provider)
             db.session.commit()
         ids['provider'] = provider.id
-    return ids
+    yield ids
+    with app.app_context():
+        db.session.rollback()
+        AcmeDomain.query.filter_by(dns_provider_id=ids['provider']).delete()
+        DnsProvider.query.filter_by(id=ids['provider']).delete()
+        delete_cas(CA.query.filter(CA.id.in_([ids[n] for n in (2, 3, 7, 8, 9)])))
+        db.session.commit()
 
 
 @pytest.fixture
