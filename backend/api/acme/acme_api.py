@@ -1650,6 +1650,58 @@ def _jws_incapable_key_label(cert_obj) -> Optional[str]:
     return label if label != 'Unknown' else type(key).__name__
 
 
+def _certificate_identifiers(cert_obj) -> set:
+    """(type, value, wildcard) of every dNSName and iPAddress, and of a CN outside them."""
+    import ipaddress
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    idents = set()
+
+    def dns(value):
+        value = value.lower().rstrip('.')
+        wildcard = value.startswith('*.')
+        idents.add(('dns', value[2:] if wildcard else value, wildcard))
+
+    try:
+        san = cert_obj.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+    except x509.ExtensionNotFound:
+        san = []
+    for name in san:
+        if isinstance(name, x509.DNSName):
+            dns(name.value)
+        elif isinstance(name, x509.IPAddress):
+            idents.add(('ip', str(name.value), False))
+    for attr in cert_obj.subject.get_attributes_for_oid(NameOID.COMMON_NAME):
+        try:
+            idents.add(('ip', str(ipaddress.ip_address(str(attr.value))), False))
+        except ValueError:
+            dns(str(attr.value))
+    return idents
+
+
+def _holds_authorizations_for(account_id: str, cert_obj) -> bool:
+    """Whether the account holds a valid, unexpired authorization for each identifier."""
+    wanted = _certificate_identifiers(cert_obj)
+    if not wanted:
+        return False
+    held = set()
+    rows = AcmeAuthorization.query.outerjoin(
+        AcmeOrder, AcmeAuthorization.order_id == AcmeOrder.order_id,
+    ).filter(
+        (AcmeAuthorization.account_id == account_id)
+        | (AcmeAuthorization.account_id.is_(None) & (AcmeOrder.account_id == account_id)),
+        AcmeAuthorization.status == 'valid',
+        AcmeAuthorization.expires > utc_now(),
+    ).all()
+    for row in rows:
+        ident = row.identifier_obj
+        value = str(ident.get('value', ''))
+        if ident.get('type') == 'dns':
+            value = value.lower().rstrip('.')
+        held.add((ident.get('type'), value, bool(row.wildcard)))
+    return wanted <= held
+
+
 @acme_bp.route('/revoke-cert', methods=['POST'])
 def revoke_cert():
     """Revoke certificate (RFC 8555 Section 7.6).
@@ -1658,6 +1710,8 @@ def revoke_cert():
       - JWS signed by an account that issued the cert (kid path), OR
       - JWS signed by the cert's own private key (jwk path, embedded JWK
         must match the cert's public key — proof of possession).
+      - JWS signed by an account holding valid authorizations for every
+        identifier of the certificate.
     """
     service = get_acme_service()
     
@@ -1733,6 +1787,9 @@ def revoke_cert():
                 account_id=request_account_id,
             ).first()
             if owning_order:
+                authorized = True
+            # RFC 8555 §7.6: so is an account holding authorizations for every identifier
+            elif _holds_authorizations_for(request_account_id, cert_obj):
                 authorized = True
         
         if not authorized and jwk:
