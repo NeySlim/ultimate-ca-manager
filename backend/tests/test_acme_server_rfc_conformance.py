@@ -535,6 +535,22 @@ class TestCaaIdentities:
         finally:
             self._set(app, None)
 
+    def test_finalize_checks_caa_against_the_same_identities(self, app, account, monkeypatch):
+        import utils.caa_checker as caa
+        seen = []
+        monkeypatch.setattr(caa, 'check_caa_for_domains',
+                            lambda domains, identities, **k: seen.append(identities) or (False, 'stop'))
+        self._set(app, 'ca.example.net')
+        try:
+            order_id = _ready_order(app, account, [{'type': 'dns', 'value': 'caa-same.example'}])
+            with app.test_request_context('/acme/directory'):
+                ok, _ = AcmeService(base_url=BASE).finalize_order(
+                    order_id, _csr_pem(rsa.generate_private_key(65537, 2048), dns=['caa-same.example']))
+            assert not ok
+            assert seen == [['ca.example.net']]
+        finally:
+            self._set(app, None)
+
     def test_directory_falls_back_to_the_public_host(self, app, client):
         self._set(app, None)
         assert client.get('/acme/directory').get_json()['meta']['caaIdentities'] == ['localhost']

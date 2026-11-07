@@ -17,6 +17,7 @@ from services.acme.account_requests import (
     consume_eab,
     require_valid_account,
 )
+from services.acme.caa_identities import caa_identities
 from services.acme.jws_problems import BAD_NONCE, UNKNOWN_ACCOUNT, jws_problem
 from models.acme_models import (
     AcmeAccount,
@@ -28,7 +29,7 @@ from config.settings import Config
 import logging
 import re
 from utils.datetime_utils import utc_now
-from utils.acme_public_url import get_acme_public_origin, get_acme_public_host, get_acme_expected_urls
+from utils.acme_public_url import get_acme_public_origin, get_acme_expected_urls
 
 logger = logging.getLogger(__name__)
 
@@ -492,7 +493,7 @@ def directory():
     directory_data['meta'] = {
         'termsOfService': f'{service.base_url}/acme/terms',
         'website': 'https://github.com/NeySlim/ultimate-ca-manager',
-        'caaIdentities': [get_acme_public_host(request)],
+        'caaIdentities': caa_identities(request),
         'externalAccountRequired': eab_required
     }
 

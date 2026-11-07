@@ -140,24 +140,9 @@ class IssuanceMixin:
                 from utils.caa_checker import check_caa_for_domains
                 from models import SystemConfig
                 
-                caa_identifiers = []
-                try:
-                    caa_cfg = SystemConfig.query.filter_by(key='acme_caa_identifiers').first()
-                    if caa_cfg and caa_cfg.value:
-                        caa_identifiers = [v.strip() for v in caa_cfg.value.split(',') if v.strip()]
-                except Exception:
-                    pass
-                
-                if not caa_identifiers:
-                    # Default CAA identity = the public hostname the directory
-                    # advertises (configured acme_public_vhost, else request host)
-                    from flask import request as flask_request
-                    from utils.acme_public_url import get_acme_public_host
-                    try:
-                        caa_identifiers = [get_acme_public_host(flask_request)]
-                    except Exception:
-                        pass
-                
+                from services.acme.caa_identities import caa_identities
+                caa_identifiers = caa_identities()
+
                 # DNS lookup errors are soft-fail by default (pre-2.200
                 # behaviour): air-gapped/split-horizon deployments cannot
                 # resolve CAA and were fully broken by fail-closed. Setting
