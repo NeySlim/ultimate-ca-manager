@@ -10,7 +10,6 @@ from flask import Blueprint, request, jsonify, make_response
 import base64
 import json
 import logging
-from datetime import datetime
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
@@ -44,6 +43,7 @@ from services.acme import domain_match
 from services.acme.jws_problems import jws_problem
 from services.acme.identifiers import validate_acme_identifier
 from services.acme.jwk_thumbprint import jwk_thumbprint_or_none
+from services.acme.requested_validity import parse_order_time
 from utils.acme_csr import decode_csr_b64
 from utils.acme_public_url import get_acme_public_origin, get_acme_proxy_public_base
 
@@ -336,10 +336,11 @@ def new_nonce(slug=None):
     except RuntimeError as e:
         logger.error(f"ACME proxy new-nonce error: {e}")
         return proxy_error("serverInternal", "Failed to issue nonce", 500)
-    resp = make_response('', 200)
-    resp.status_code = 204 if request.method == 'HEAD' else 200
+    # RFC 8555 §7.2: HEAD answers 200, GET 204; §7.1: every resource links the directory
+    resp = make_response('', 200 if request.method == 'HEAD' else 204)
     resp.headers['Replay-Nonce'] = nonce
     resp.headers['Cache-Control'] = 'no-store'
+    resp.headers['Link'] = f'<{_proxy_base_url(slug)}/directory>;rel="index"'
     return resp
 
 
@@ -361,15 +362,19 @@ def _unknown_slug_error(slug):
     return None
 
 
-def _account_response(account, slug, status_code):
-    """Account object (RFC 8555 §7.1.2) with its URL in Location."""
+def _account_response(account, slug, status_code, eab_data=None):
+    """Account object (RFC 8555 §7.1.2) with its URL in Location; a new account
+    echoes the binding it was created with (§7.3.4)."""
     acct_url = f"{_proxy_base_url(slug)}/acct/{account.account_id}"
-    resp = proxy_response({
+    data = {
         "status": account.status,
         "contact": account.contact_list,
         "termsOfServiceAgreed": account.terms_of_service_agreed,
         "orders": f"{acct_url}/orders"
-    }, status_code)
+    }
+    if eab_data:
+        data["externalAccountBinding"] = eab_data
+    resp = proxy_response(data, status_code)
     resp.headers['Location'] = acct_url
     return resp
 
@@ -451,7 +456,8 @@ def new_account(slug=None):
 
         if not is_new:
             require_valid_account(account)
-        return _account_response(account, slug, 201 if is_new else 200)
+        return _account_response(account, slug, 201 if is_new else 200,
+                                 eab_data if is_new else None)
     except AccountRequestError as e:
         return _problem(e)
     except Exception as e:
@@ -621,9 +627,7 @@ def new_order(slug=None):
             )
 
     try:  # malformed dates and upstream failures are mapped below
-        not_before = payload.get('notBefore')
-        if not_before:
-            not_before = datetime.fromisoformat(not_before.replace('Z', '+00:00'))
+        not_before = parse_order_time(payload.get('notBefore'), 'notBefore')
 
         replaces = payload.get('replaces')
         if replaces is not None and (
