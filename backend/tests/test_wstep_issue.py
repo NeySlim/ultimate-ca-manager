@@ -14,6 +14,7 @@ from lxml import etree
 from models import CA, db
 from models.certificate_template import CertificateTemplate
 from models.system_config import SystemConfig
+from tests.fixtures.templates import delete_templates, template_ids_named
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS
 
 
@@ -277,7 +278,7 @@ def test_issue_ignores_enroll_acl_on_username_password_path(client, app, wstep_c
     membership for. A template restricted to a group must still issue
     normally here, matching pre-feature behavior exactly."""
     with app.app_context():
-        CertificateTemplate.query.filter_by(name='Test UsernamePassword ACL Template').delete()
+        delete_templates(template_ids_named('Test UsernamePassword ACL Template'))
         template = CertificateTemplate(
             name='Test UsernamePassword ACL Template', template_type='client_auth',
             extensions_template='{}', is_active=True, allowed_ad_group='VPN-Enroll',
@@ -293,5 +294,5 @@ def test_issue_ignores_enroll_acl_on_username_password_path(client, app, wstep_c
         assert cert.subject.rfc4514_string() == 'CN=wstep-acl-unaffected.example.test'
     finally:
         with app.app_context():
-            CertificateTemplate.query.filter_by(name='Test UsernamePassword ACL Template').delete()
+            delete_templates(template_ids_named('Test UsernamePassword ACL Template'))
             db.session.commit()

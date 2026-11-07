@@ -23,6 +23,7 @@ from sqlalchemy.orm.attributes import set_committed_value
 
 from models import CA, AuditLog, CATemplatePin, Certificate, db
 from models.certificate_template import CertificateTemplate
+from tests.fixtures.templates import delete_templates
 from services.ca.ca_signing import AlreadySuperseded
 from services.ca_service import CAService
 from services.cert_service import CertificateService
@@ -562,8 +563,7 @@ def templated_ca(app, create_ca):
         return ca_data['id']
     yield _make
     with app.app_context():
-        CATemplatePin.query.filter(CATemplatePin.template_id.in_(made)).delete(synchronize_session=False)
-        CertificateTemplate.query.filter(CertificateTemplate.id.in_(made)).delete(synchronize_session=False)
+        delete_templates(made)
         db.session.commit()
 
 

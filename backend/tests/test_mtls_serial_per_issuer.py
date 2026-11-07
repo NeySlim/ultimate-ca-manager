@@ -269,3 +269,176 @@ def test_another_issuers_certificate_does_not_open_the_account(app, auth_client,
         db.session.commit()
         user, _found, err = _header_login(serial, 'CN=Evil,notAnAttribute=x')
         assert user is not None, err
+
+
+# A serial without its issuer (RFC 5280 §4.1.2.2): headers that name no readable issuer
+# never open an enrolment that recorded one.
+
+def _proxy_headers(pem, **extra):
+    info = _info(pem)
+    headers = {'X-SSL-Client-Verify': 'SUCCESS', 'X-SSL-Client-S-DN': info['subject_dn'],
+               'X-SSL-Client-Serial': info['serial']}
+    headers.update(extra)
+    return headers
+
+
+@pytest.mark.parametrize('issuer_dn', [None, '', 'CN=Evil,notAnAttribute=x'],
+                         ids=['absent', 'empty', 'unreadable'])
+def test_a_serial_alone_does_not_open_an_enrolment_with_an_issuer(app, auth_client, same_serial,
+                                                                   issuer_dn, caplog):
+    serial, pem_a, _pem_b = same_serial
+    r = _import(auth_client, pem_a)
+    assert r.status_code == 201, r.get_json()
+    info = {'serial': format(serial, 'X'), 'issuer_dn': issuer_dn, 'fingerprint': None,
+            'subject_dn': f'CN={SUBJECT}'}
+    with app.app_context():
+        with caplog.at_level('WARNING', logger='services.mtls_enrollment'):
+            assert MTLSAuthService.authenticate_certificate(info)[2] == 'Certificate not enrolled'
+        assert 'X-SSL-Client-I-DN' in caplog.text
+        # The issuer text alone, without the stored certificate, is still a registered issuer
+        row = db.session.get(AuthCertificate, r.get_json()['data']['id'])
+        row.cert_pem = None
+        db.session.commit()
+        assert MTLSAuthService.authenticate_certificate(info)[2] == 'Certificate not enrolled'
+        # And the stored certificate alone too
+        row.cert_pem, row.cert_issuer = pem_a.encode(), ''
+        db.session.commit()
+        assert MTLSAuthService.authenticate_certificate(info)[2] == 'Certificate not enrolled'
+
+
+def test_an_enrolment_without_an_issuer_still_opens_by_serial(app, auth_client, same_serial):
+    serial, pem_a, _pem_b = same_serial
+    r = _import(auth_client, pem_a)
+    assert r.status_code == 201, r.get_json()
+    with app.app_context():
+        row = db.session.get(AuthCertificate, r.get_json()['data']['id'])
+        row.cert_issuer, row.cert_pem = '', None
+        db.session.commit()
+        user, found, err = _header_login(serial, None)
+        assert user is not None and found.id == row.id, err
+
+
+def test_proxy_login_needs_the_issuer_header_or_the_certificate(app, client, auth_client, same_serial):
+    import urllib.parse
+    _serial, pem_a, _pem_b = same_serial
+    assert _import(auth_client, pem_a).status_code == 201
+    login = '/api/v2/auth/login/mtls'
+    r = client.post(login, headers=_proxy_headers(pem_a))
+    assert r.status_code == 401, r.get_json()
+    methods = client.get('/api/v2/auth/methods', headers=_proxy_headers(pem_a)).get_json()['data']
+    assert methods.get('mtls_status') == 'present_not_enrolled' and methods.get('mtls_user') is None
+    r = client.post(login, headers=_proxy_headers(pem_a, **{'X-SSL-Client-I-DN': _info(pem_a)['issuer_dn']}))
+    assert r.status_code == 200, r.get_json()
+    client.post('/api/v2/auth/logout')
+    r = client.post(login, headers=_proxy_headers(pem_a, **{'X-SSL-Client-Cert': urllib.parse.quote(pem_a)}))
+    assert r.status_code == 200, r.get_json()
+
+
+def test_enrolling_from_headers_needs_the_issuer(app, auth_client, same_serial):
+    """An enrolment made from a serial alone could never be told apart from another CA's."""
+    _serial, pem_a, _pem_b = same_serial
+    r = auth_client.post('/api/v2/mtls/enroll', json={}, headers=_proxy_headers(pem_a))
+    assert r.status_code == 400, r.get_json()
+    assert r.get_json()['message'].startswith('The client certificate issuer is missing')
+    assert 'X-SSL-Client-I-DN' in r.get_json()['message']
+    r = auth_client.post('/api/v2/mtls/enroll', json={},
+                         headers=_proxy_headers(pem_a, **{'X-SSL-Client-I-DN': 'CN=Evil,notAnAttribute=x'}))
+    assert r.status_code == 400, r.get_json()
+    assert r.get_json()['message'].startswith('The client certificate issuer cannot be read')
+    assert 'RFC 4514' in r.get_json()['message']
+    assert _enrolments(app) == 0
+    r = auth_client.post('/api/v2/mtls/enroll', json={},
+                         headers=_proxy_headers(pem_a, **{'X-SSL-Client-I-DN': _info(pem_a)['issuer_dn']}))
+    assert r.status_code == 200, r.get_json()
+    with app.app_context():
+        row = AuthCertificate.query.filter(AuthCertificate.cert_subject == f'CN={SUBJECT}').one()
+        assert row.cert_issuer == _info(pem_a)['issuer_dn']
+
+
+_ORG = x509.Name([x509.NameAttribute(NameOID.COUNTRY_NAME, 'FR'),
+                  x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Org, Inc'),
+                  x509.NameAttribute(NameOID.COMMON_NAME, 'Root CA')])
+
+
+@pytest.mark.parametrize('text', [
+    'CN=Root CA, O=Org\\, Inc, C=FR',             # a space after the separator (Java, F5, IIS)
+    'CN=Root CA, O="Org, Inc", C=FR',             # RFC 1779 quoted value
+    'C = FR, O = "Org, Inc", CN = Root CA',       # OpenSSL XN_FLAG_ONELINE
+    'C = FR, O = Org\\, Inc, CN = Root CA',
+    'cn=Root CA,o=Org\\, Inc,c=FR',               # lowercase attribute types
+    'CN=Root CA; O=Org\\, Inc; C=FR',             # RFC 1779 semicolons
+    'OID.2.5.4.3=Root CA, 2.5.4.10=Org\\2C Inc, c=FR',
+    '/c=FR/o=Org, Inc/cn=Root CA',                # legacy, lowercase
+])
+def test_an_issuer_written_loosely_is_still_read(text):
+    from services.mtls_enrollment import dn_attributes
+    assert dn_attributes(text) == dn_attributes(_ORG) is not None
+
+
+@pytest.mark.parametrize('text', ['/CN=R+O=O1', 'CN=R + O=O1', 'cn = R + o = O1'])
+def test_a_multivalued_rdn_is_read_in_every_form(text):
+    from services.mtls_enrollment import dn_attributes
+    rdn = x509.Name([x509.RelativeDistinguishedName([x509.NameAttribute(NameOID.COMMON_NAME, 'R'),
+                                                     x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'O1')])])
+    assert dn_attributes(text) == dn_attributes(rdn) is not None
+
+
+@pytest.mark.parametrize('text', ['CN=Root CA, nonsense', 'CN="unterminated', 'CN="a" b', 'notAType=x', 'CN=a,,O=b'])
+def test_a_broken_issuer_is_still_unreadable(text):
+    from services.mtls_enrollment import dn_attributes
+    assert dn_attributes(text) is None
+
+
+def test_a_proxy_spelling_the_issuer_loosely_signs_in(app, auth_client, same_serial):
+    serial = same_serial[0] + 13
+    r = _import(auth_client, _named_leaf(_ORG, serial))
+    assert r.status_code == 201, r.get_json()
+    with app.app_context():
+        user, found, err = _header_login(serial, 'C = FR, O = "Org, Inc", CN = Root CA')
+        assert user is not None and found.id == r.get_json()['data']['id'], err
+        # An issuer stored as a proxy spelled it still matches one written otherwise
+        row = db.session.get(AuthCertificate, found.id)
+        row.cert_issuer, row.cert_pem = 'CN=Root CA, O=Org\\, Inc, C=FR', None
+        db.session.commit()
+        user, _found, err = _header_login(serial, _ORG.rfc4514_string())
+        assert user is not None, err
+        assert _header_login(serial, 'CN=Root CA, O=Other, C=FR')[2] == 'Certificate not enrolled'
+
+
+def test_an_unreadable_issuer_never_matches_an_enrolment_holding_its_certificate(app, auth_client, same_serial):
+    """The issuer of an enrolment that kept only its certificate is still a recorded issuer."""
+    from services.mtls_enrollment import enrolments_of
+    serial, pem_a, _pem_b = same_serial
+    r = _import(auth_client, pem_a)
+    assert r.status_code == 201, r.get_json()
+    with app.app_context():
+        row = db.session.get(AuthCertificate, r.get_json()['data']['id'])
+        row.cert_issuer = ''
+        db.session.commit()
+        assert enrolments_of(serial, 'CN=Evil,notAnAttribute=x') == []
+        assert [e.id for e in enrolments_of(serial, _info(pem_a)['issuer_dn'])] == [row.id]
+        assert [e.id for e in enrolments_of(serial)] == [row.id]
+
+
+def _fr_cn(cn):
+    return x509.Name([x509.NameAttribute(NameOID.COUNTRY_NAME, 'FR'), x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+
+
+# X509_NAME_oneline (nginx $ssl_client_i_dn_legacy) as OpenSSL 3 prints these names
+@pytest.mark.parametrize('legacy, name', [
+    ('/C=FR/CN=Root\\+O=Evil\\/x', _fr_cn('Root+O=Evil/x')),
+    ('/C=FR/CN=A\\+B', _fr_cn('A+B')),
+    ('/C=FR/CN=x\\/y', _fr_cn('x/y')),
+])
+def test_a_legacy_issuer_escaping_plus_and_slash_is_read(legacy, name):
+    from services.mtls_enrollment import dn_attributes
+    assert dn_attributes(legacy) == dn_attributes(name) is not None
+
+
+@pytest.mark.parametrize('stored, presented', [
+    ('cn=ROOT,o=org', 'CN=Root, O=Org'),
+    ('CN=Root CA,O=Org', '/O=ORG/CN=root ca'),
+])
+def test_attribute_values_compare_caselessly(stored, presented):
+    from services.mtls_enrollment import same_issuer
+    assert same_issuer(stored, presented) is True

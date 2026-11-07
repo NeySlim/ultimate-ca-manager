@@ -517,10 +517,17 @@ def enroll_presented_certificate():
             return error_response('Cannot enroll certificate that is not yet valid', 400)
 
     # Check if already enrolled
-    from services.mtls_enrollment import presented_identity
+    from services.mtls_enrollment import dn_attributes, presented_identity
     presented_serial, presented_issuer = presented_identity(cert_info)
     if presented_serial is None:
         return error_response('The client certificate serial number cannot be read', 400)
+    # A serial is unique per issuer only (RFC 5280 §4.1.2.2): an enrolment needs both
+    if not str(presented_issuer or '').strip():
+        return error_response('The client certificate issuer is missing: the proxy must '
+                              'forward X-SSL-Client-I-DN or X-SSL-Client-Cert', 400)
+    if dn_attributes(presented_issuer) is None:
+        return error_response('The client certificate issuer cannot be read: forward '
+                              'X-SSL-Client-I-DN in RFC 4514 or legacy form, or forward X-SSL-Client-Cert', 400)
     if enrolments_of(presented_serial, presented_issuer):
         return error_response('This certificate is already enrolled', 409)
 

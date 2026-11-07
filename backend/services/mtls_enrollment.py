@@ -81,18 +81,112 @@ def _legacy_to_rfc4514(text: str) -> str:
     parts.append(current)
     rdns = []
     for part in filter(None, parts):
-        name, sep, value = part.partition('=')
-        if not sep:
-            raise ValueError(part)
-        raw = re.sub(rb'\\x([0-9a-fA-F]{2})', lambda m: bytes([int(m.group(1), 16)]),
-                     value.encode('utf-8')).decode('utf-8')
-        escaped = re.sub(r'([,+"\\<>;=])', r'\\\1', raw)
-        if escaped[:1] in ('#', ' '):
-            escaped = '\\' + escaped
-        if escaped.endswith(' '):
-            escaped = escaped[:-1] + '\\ '
-        rdns.append(f'{name.strip()}={escaped}')
+        avas = []
+        # A multi-valued RDN prints as /CN=R+O=O1: an unescaped '+' before another type separates its values
+        for ava in re.split(r'(?<!\\)\+(?=[A-Za-z][A-Za-z0-9-]*=|(?:OID\.)?\d+(?:\.\d+)+=)', part):
+            name, sep, value = ava.partition('=')
+            if not sep:
+                raise ValueError(part)
+            raw = re.sub(rb'\\x([0-9a-fA-F]{2})', lambda m: bytes([int(m.group(1), 16)]),
+                         value.encode('utf-8')).decode('utf-8')
+            raw = re.sub(r'\\(.)', r'\1', raw)      # OpenSSL 3 escapes '+' and '/' in values
+            escaped = re.sub(r'([,+"\\<>;=])', r'\\\1', raw)
+            if escaped[:1] in ('#', ' '):
+                escaped = '\\' + escaped
+            if escaped.endswith(' '):
+                escaped = escaped[:-1] + '\\ '
+            avas.append(f'{name.strip()}={escaped}')
+        rdns.append('+'.join(avas))
     return ','.join(reversed(rdns))
+
+
+_TYPE_OIDS = {name.casefold(): oid for name, oid in _NAME_OVERRIDES.items()}
+_TYPE_OIDS.update({name.casefold(): x509.ObjectIdentifier(dotted) for name, dotted in {
+    'CN': '2.5.4.3', 'C': '2.5.4.6', 'L': '2.5.4.7', 'ST': '2.5.4.8', 'STREET': '2.5.4.9',
+    'O': '2.5.4.10', 'OU': '2.5.4.11', 'DC': '0.9.2342.19200300.100.1.25',
+    'UID': '0.9.2342.19200300.100.1.1'}.items()})
+_HEX = frozenset('0123456789abcdefABCDEF')
+
+
+def _type_oid(name: str):
+    """An attribute type in any case, or a dotted OID with or without RFC 1779's ``OID.``."""
+    if name[:4].casefold() == 'oid.':
+        name = name[4:]
+    if re.fullmatch(r'\d+(\.\d+)+', name):
+        return x509.ObjectIdentifier(name)
+    return _TYPE_OIDS.get(name.casefold())
+
+
+def _lenient_attributes(text: str) -> Optional[frozenset]:
+    """A DN as written by proxies RFC 4514 does not describe, or None.
+
+    Spaces around ``,`` ``;`` ``+`` ``=`` (RFC 1779, OpenSSL ``XN_FLAG_ONELINE``,
+    Java, IIS), quoted values, ``;`` separators and type names in any case.
+    """
+    avas, i, n = [], 0, len(text)
+    while True:
+        j = i
+        while j < n and text[j] not in '=,;+':
+            j += 1
+        oid = _type_oid(text[i:j].strip()) if j < n and text[j] == '=' else None
+        if oid is None:
+            return None
+        i = j + 1
+        while i < n and text[i] == ' ':
+            i += 1
+        raw = bytearray()
+        if i < n and text[i] == '"':
+            i += 1
+            while i < n and text[i] != '"':
+                if text[i] == '\\' and i + 1 < n:
+                    i += 1
+                raw += text[i].encode('utf-8')
+                i += 1
+            if i >= n:
+                return None
+            i += 1
+            while i < n and text[i] == ' ':
+                i += 1
+            value = raw.decode('utf-8', 'replace')
+        elif i < n and text[i] == '#':
+            j = i + 1
+            while j < n and text[j] in _HEX:
+                j += 1
+            try:
+                value = bytes.fromhex(text[i + 1:j]).decode('latin-1')   # read as the strict parser does
+            except ValueError:
+                return None
+            i = j
+            while i < n and text[i] == ' ':
+                i += 1
+        else:
+            # Spaces before the separator stay in the value: _attribute_value folds them
+            while i < n and text[i] not in ',;+':
+                if text[i] == '\\' and i + 1 < n:
+                    pair = text[i + 1:i + 3]
+                    if len(pair) == 2 and set(pair) <= _HEX:
+                        raw.append(int(pair, 16))
+                        i += 3
+                    else:
+                        raw += text[i + 1].encode('utf-8')
+                        i += 2
+                elif text[i] == '"':
+                    return None
+                else:
+                    raw += text[i].encode('utf-8')
+                    i += 1
+            try:
+                value = raw.decode('utf-8')
+            except UnicodeDecodeError:
+                return None
+        avas.append((oid.dotted_string, _attribute_value(value)))
+        if i >= n:
+            return frozenset(avas)
+        if text[i] not in ',;+':
+            return None
+        i += 1
+        while i < n and text[i] == ' ':
+            i += 1
 
 
 def _attribute_value(value) -> str:
@@ -117,12 +211,17 @@ def dn_attributes(dn) -> Optional[frozenset]:
         text = str(dn or '')   # not stripped: '\ ' at the end is an escaped space
         if not text.strip():
             return None
-        legacy = text.lstrip().startswith('/')
         try:
-            dn = x509.Name.from_rfc4514_string(_legacy_to_rfc4514(text.strip()) if legacy else text,
-                                               attr_name_overrides=_NAME_OVERRIDES)
-        except Exception:
+            text = _legacy_to_rfc4514(text.strip()) if text.lstrip().startswith('/') else text
+        except ValueError:
             return None
+        try:
+            strict = x509.Name.from_rfc4514_string(text, attr_name_overrides=_NAME_OVERRIDES)
+        except Exception:
+            strict = None
+        read = (frozenset((a.oid.dotted_string, _attribute_value(a.value)) for a in strict)
+                if strict is not None else None)
+        return read or _lenient_attributes(text)
     return frozenset((a.oid.dotted_string, _attribute_value(a.value)) for a in dn)
 
 
@@ -133,6 +232,11 @@ def _issuer_match(row, presented) -> Optional[bool]:
     enrolled = _load(row.cert_pem)
     stored = dn_attributes(enrolled.issuer) if enrolled is not None else dn_attributes(row.cert_issuer)
     return None if stored is None else stored == presented
+
+
+def records_issuer(row) -> bool:
+    """Whether an enrolment recorded its issuer, as text or by its stored certificate."""
+    return bool(row.cert_issuer) or _load(row.cert_pem) is not None
 
 
 def same_issuer(one, other) -> Optional[bool]:
@@ -164,9 +268,9 @@ def _serial_match(row, serial: int) -> Optional[int]:
 def _ranked(serial: int, issuer, pool=None) -> list:
     """(rank, row) of the enrolments that may be certificate (issuer, serial), best first.
 
-    An issuer read on both sides excludes another one; one recorded here but not
-    readable there only ranks lower; a presented one that cannot be read leaves
-    only the enrolments that recorded none.
+    An issuer read on both sides excludes another one; with no issuer given, or one
+    recorded here that cannot be read, the row only ranks lower. A given issuer that
+    cannot be read leaves only the enrolments that recorded none (``records_issuer``).
     """
     from models.auth_certificate import AuthCertificate
     forms = serial_variants(serial)
@@ -181,7 +285,7 @@ def _ranked(serial: int, issuer, pool=None) -> list:
         serial_rank = _serial_match(row, serial)
         if serial_rank is None:
             continue
-        if unreadable and row.cert_issuer:
+        if unreadable and records_issuer(row):
             continue      # an issuer that cannot be read is no recorded one
         same = _issuer_match(row, presented) if row.cert_issuer or row.cert_pem else None
         if same is False:
@@ -217,17 +321,27 @@ def presented_enrolment(cert_info: dict):
     """The enrolment of a presented certificate, or None.
 
     The fingerprint tells same-serial enrolments apart; failing it, the best
-    match must be the only one of its rank, never a guess between two.
+    match must be the only one of its rank, never a guess between two. A
+    serial without a readable issuer opens only enrolments that recorded none.
     """
     serial, issuer = presented_identity(cert_info)
     if serial is None:
         return None
-    ranked = _ranked(serial, issuer)
+    readable = dn_attributes(issuer) is not None
+    ranked = _ranked(serial, issuer if readable else None)
     presented = normalized_fingerprint(cert_info.get('fingerprint'))
     if presented:
         for _rank, row in ranked:
             if normalized_fingerprint(row.cert_fingerprint) == presented:
                 return row
+    if not readable:
+        # A serial is unique per issuer only: without one, it opens no enrolment that recorded one
+        refused = [row.id for _rank, row in ranked if records_issuer(row)]
+        if refused:
+            logger.warning("mTLS: serial %X presented without a readable issuer; enrolments %s "
+                           "record one and are refused (forward X-SSL-Client-I-DN or X-SSL-Client-Cert)",
+                           serial, ', '.join(str(i) for i in refused))
+            ranked = [(rank, row) for rank, row in ranked if not records_issuer(row)]
     best = [row for rank, row in ranked if ranked and rank == ranked[0][0]]
     if len(best) > 1:
         logger.warning("mTLS: %d enrolments compete for serial %X (ids %s), none chosen",

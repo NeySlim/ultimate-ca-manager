@@ -19,6 +19,7 @@ from lxml import etree
 from models import CA, ADConnectorConfig, AuditLog, Certificate, db
 from models.certificate_template import CertificateTemplate
 from models.system_config import SystemConfig
+from tests.fixtures.templates import delete_templates, template_ids_named
 from services.ad_connector import lookup as ad_lookup
 from services.kerberos import negotiate_auth
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WST_NS, WSSE_NS
@@ -199,7 +200,7 @@ def _clear_ad_derived_templates(app):
     derivation is rejected when nothing has opted in could false-pass/fail
     depending on test execution order."""
     with app.app_context():
-        CertificateTemplate.query.filter_by(name='Test AD User Template').delete()
+        delete_templates(template_ids_named('Test AD User Template'))
         db.session.commit()
 
 
@@ -210,7 +211,7 @@ def _configure_ad_derived_user_template(app):
     active template when a CA has nothing pinned, so this alone is enough
     to make the CA eligible."""
     with app.app_context():
-        CertificateTemplate.query.filter_by(name='Test AD User Template').delete()
+        delete_templates(template_ids_named('Test AD User Template'))
         template = CertificateTemplate(
             name='Test AD User Template', template_type='client_auth',
             extensions_template='{}', is_active=True, ad_derived_subject=True,
@@ -481,14 +482,9 @@ class TestNakedCsrSubjectDerivation:
 
 
 def _clear_acl_template(app):
-    from models import CATemplatePin
-
     with app.app_context():
-        existing = CertificateTemplate.query.filter_by(name='Test Enroll ACL Template').first()
-        if existing:
-            CATemplatePin.query.filter_by(template_id=existing.id).delete()
-            db.session.delete(existing)
-            db.session.commit()
+        delete_templates(template_ids_named('Test Enroll ACL Template'))
+        db.session.commit()
 
 
 def _configure_acl_template(app, allowed_ad_group, ca_id, extended_key_usage=None):

@@ -25,6 +25,7 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, ExtensionOID, NameOID
 from models import CA, CATemplatePin, db
 from models.certificate_template import CertificateTemplate
 from models.system_config import SystemConfig
+from tests.fixtures.templates import delete_templates
 from services.wstep import wstep_service
 
 SMARTCARD_LOGON = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2.2')
@@ -72,17 +73,11 @@ def smartcard_template_config(app, create_ca):
         db.session.add(pin)
         db.session.commit()
         template_id = template.id
-        pin_id = pin.id
 
     yield ca_data
 
     with app.app_context():
-        pin_row = db.session.get(CATemplatePin, pin_id)
-        if pin_row:
-            db.session.delete(pin_row)
-        tmpl = db.session.get(CertificateTemplate, template_id)
-        if tmpl:
-            db.session.delete(tmpl)
+        delete_templates([template_id])
         db.session.commit()
         for key, value in previous.items():
             row = SystemConfig.query.filter_by(key=key).first()

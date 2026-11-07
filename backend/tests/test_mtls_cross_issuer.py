@@ -37,7 +37,8 @@ def test_legacy_enrolment_is_revoked_whichever_record_carries_the_revocation(app
     ])
     db.session.commit()
     try:
-        user, _, err = MTLSAuthService.authenticate_certificate({'serial': serial, 'fingerprint': ''})
+        user, _, err = MTLSAuthService.authenticate_certificate(
+            {'serial': serial, 'issuer_dn': twin_records['name_b'], 'fingerprint': ''})
         assert user is None and err == 'Certificate has been revoked'
     finally:
         AuthCertificate.query.filter_by(cert_serial=serial).delete()
