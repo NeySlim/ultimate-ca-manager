@@ -14,7 +14,7 @@ import { KeyRecoveryRequestModal } from './KeyRecoveryRequestModal'
 import { CADetails } from './CADetails'
 import { TrustCertDetails } from './TrustCertDetails'
 import { certificatesService, casService, truststoreService, userCertificatesService } from '../services'
-import { extractCN } from '../lib/utils'
+import { extractCN, isOnHold } from '../lib/utils'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
@@ -343,7 +343,7 @@ export function FloatingDetailWindow({ windowInfo }) {
   const isUserCert = windowInfo.type === 'user_certificate'
   const isCA = windowInfo.type === 'ca'
   const hasPrivateKey = !!data?.has_private_key
-  const isOnHold = !!data?.revoked && (data.revoke_reason === 'certificateHold' || data.revoke_reason === 'certificate_hold')
+  const onHold = isOnHold(data)
   const actionBarProps = data ? {
     onExport: handleExport,
     hasPrivateKey,
@@ -362,11 +362,11 @@ export function FloatingDetailWindow({ windowInfo }) {
     onRenew: isCert && canWrite('certificates') && !data.revoked && (data.has_private_key || data.source === 'msca') ? handleRenew : null,
     onRename: isCert && canWrite('certificates') ? handleRename : null,
     // A certificate on hold can still be revoked for good (RFC 5280 §5.2.4)
-    onRevoke: ((isCert || isUserCert) && canWrite(resource) && (!data.revoked || isOnHold))
+    onRevoke: ((isCert || isUserCert) && canWrite(resource) && (!data.revoked || onHold))
       // A CA is revoked by its parent, so it needs one held in UCM (#343)
       || (isCA && canWrite('cas') && !data.revoked && !data.revoked_in_chain && !data.pending && !data.is_root && data.type !== 'root' && !!data.parent_id)
       ? handleRevoke : null,
-    onUnhold: isCert && canWrite('certificates') && isOnHold ? handleUnhold : null,
+    onUnhold: isCert && canWrite('certificates') && onHold ? handleUnhold : null,
     // Offline needs the key in UCM's own store, and a revoked CA stays visibly revoked (#348, review)
     onOffline: isCA && canWrite('cas') && !data.offline && !data.pending && !data.revoked && data.has_private_key && !data.uses_hsm ? handleOffline : null,
     onRestore: isCA && canWrite('cas') && data.offline ? handleRestore : null,
@@ -439,7 +439,7 @@ export function FloatingDetailWindow({ windowInfo }) {
 
     {(isCert || isUserCert || isCA) && (
       <RevokeCertificateModal
-        allowHold={!isCA && !isOnHold}
+        allowHold={!isCA && !onHold}
         open={revokeOpen}
         onClose={() => { setRevokeOpen(false); setDeleteAfterRevoke(false) }}
         onConfirm={handleRevokeConfirm}

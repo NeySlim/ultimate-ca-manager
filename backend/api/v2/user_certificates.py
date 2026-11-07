@@ -81,6 +81,7 @@ def _build_cert_response(auth_cert, certificate, owner_user=None):
         result['valid_to'] = utc_isoformat(certificate.valid_to)
         result['cert_type'] = certificate.cert_type
         result['revoked'] = certificate.revoked or False
+        result['revoke_reason'] = certificate.revoke_reason if certificate.revoked else None
         result['has_private_key'] = bool(certificate.prv)
         result['caref'] = certificate.caref
         # Extract CN from subject for CertificateDetails compatibility

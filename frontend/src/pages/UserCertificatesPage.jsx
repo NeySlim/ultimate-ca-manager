@@ -19,7 +19,7 @@ import { ExportModal } from '../components/ExportModal'
 import { useNotification, useMobile } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { usePermission, usePersistedState } from '../hooks'
-import { formatDate, extractCN } from '../lib/utils'
+import { formatDate, extractCN, isOnHold } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { isExportFormatAllowed } from '../lib/keyAlgorithms'
@@ -286,7 +286,7 @@ export default function UserCertificatesPage() {
       icon: Download,
       onClick: () => { setExportFormat('pem'); setExportCert(row) },
     },
-    ...(canWrite('user_certificates') && row.status !== 'revoked' ? [{
+    ...(canWrite('user_certificates') && (row.status !== 'revoked' || isOnHold(row)) ? [{
       label: t('userCertificates.actions.revoke'),
       icon: XCircle,
       variant: 'danger',
@@ -331,7 +331,7 @@ export default function UserCertificatesPage() {
             <Certificate size={14} /> {t('userCertificates.actions.exportPKCS12')}
           </Button>
         )}
-        {canWrite('user_certificates') && selectedCert.status !== 'revoked' && (
+        {canWrite('user_certificates') && (selectedCert.status !== 'revoked' || isOnHold(selectedCert)) && (
           <Button type="button" size="sm" variant="danger" onClick={() => handleRevoke(selectedCert.id)}>
             <XCircle size={14} /> {t('userCertificates.actions.revoke')}
           </Button>
@@ -420,6 +420,7 @@ export default function UserCertificatesPage() {
         onExport={handleExport}
       />
       <RevokeCertificateModal
+        allowHold={!isOnHold(revokingCert)}
         open={!!revokingCert}
         onClose={() => setRevokingCert(null)}
         onConfirm={handleRevokeConfirm}
