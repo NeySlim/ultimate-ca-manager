@@ -3637,6 +3637,8 @@ Choose a preset or set custom duration:
 
 Short-lived certificates (8h–24h) are recommended for human users. Longer validity is acceptable for automated service accounts.
 
+A certificate is valid from 5 minutes before it is issued, so a server whose clock lags slightly behind accepts it at once; the lifetime still counts from issuance (v2.252).
+
 ### Extensions (User Certificates Only)
 
 | Extension | Description |
@@ -3647,12 +3649,15 @@ Short-lived certificates (8h–24h) are recommended for human users. Longer vali
 | permit-port-forwarding | Allow TCP port forwarding |
 | permit-user-rc | Allow execution of ~/.ssh/rc on login |
 
-### Critical Options
+### Critical Options (User Certificates Only)
 
 | Option | Description |
 |--------|-------------|
 | force-command | Restrict the certificate to a single command |
-| source-address | Restrict to specific source IP addresses/CIDRs |
+| source-address | Restrict to source addresses or CIDR networks, comma-separated (\`10.0.0.0/8,2001:db8::/32\`) |
+| verify-required | Require a FIDO key that verified the user (PIN or biometric), no value |
+
+A server refuses a certificate carrying a critical option it does not know, so UCM signs only these and vendor options named \`name@domain\`. OpenSSH defines no critical option for host certificates: a host request carrying one is refused (v2.252).
 
 **Example:** A certificate with \`force-command=ls\` and \`source-address=10.0.0.0/8\` can only run \`ls\` and only from the 10.x.x.x network.
 
@@ -3689,6 +3694,8 @@ On clients, add the Host CA to known_hosts:
 2. Click **Revoke** in the detail panel
 3. The certificate is added to the CA's Key Revocation List (KRL)
 4. Download and deploy the updated KRL to servers (from SSH CAs page)
+
+A revoked certificate stays in the KRL, and in the list, until it expires: deleting it earlier is refused, since the KRL is built from these records and the certificate would be accepted again. Each KRL download carries a higher version number (v2.252).
 
 > ⚠ Revocation only takes effect when servers check the KRL via \`RevokedKeys\` in sshd_config.
 

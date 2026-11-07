@@ -22,6 +22,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
 - SCEP: a RenewalReq signed by a certificate issued through the same endpoint is authenticated by that certificate, so its challenge password is no longer compared and a rotated secret no longer blocks renewal; a certificate from another profile or protocol still needs the endpoint's challenge.
 - SCEP: every FAILURE reply now carries a failInfoText attribute giving the reason (RFC 8894 §3.2.1.4).
+- SSH: certificates are valid from 5 minutes before issuance, so a server whose clock lags accepts them at once, and the KRL version now grows with each generation instead of staying 0 (PROTOCOL.krl).
 - mTLS: the trusted CA is now the only trust anchor of the HTTPS port. A client certificate from its parent or from a sibling intermediate passed the TLS handshake, and with it EST enrollment; it is now refused (RFC 5280 §6.1).
 
 ### Fixed
@@ -39,6 +40,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - In-app help: the SCEP URL was given as `/scep`, which serves the web interface, and HTTPS was said to protect the challenge password. The help now gives `/scep/pkiclient.exe` and the profile URLs, and says the CMS envelope protects the challenge.
 - SCEP: a request enveloped with single DES or an unknown cipher or key transport failed as badMessageCheck, and no failure said why. It now fails as badAlg, and every failure carries its reason in failInfoText, the administrator's rejection reason included (RFC 8894 §3.2.1.4, §3.3.2.2).
 - SCEP: a POST without `operation` was answered with the capabilities. It is now processed as the PKIOperation it must be (RFC 8894 §4.3).
+- SSH: deleting a revoked certificate removed it from the CA's KRL, so servers checking the KRL accepted it again. A revoked certificate now stays, and its deletion is refused with 409, until it expires.
+- SSH: any critical option was signed, on host certificates too, so a typo or unknown option produced a certificate sshd rejects. Only force-command, source-address (checked as addresses or CIDR networks), verify-required and `name@domain` options are signed, on user certificates only (PROTOCOL.certkeys).
 
 ### Security
 

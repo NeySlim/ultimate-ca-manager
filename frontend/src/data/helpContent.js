@@ -1996,9 +1996,9 @@ export const helpContent = {
         items: [
           { label: 'Key ID', text: 'Identifier sshd logs for the holder. The CA sets it to principals@CA name, unless it lets requesters choose it.' },
           { label: 'Principals', text: 'Usernames (user cert) or hostnames (host cert) this certificate is valid for. Comma-separated.' },
-          { label: 'Validity', text: 'Certificate lifetime. Choose a preset (1h, 8h, 24h, 7d, 30d, 90d, 365d) or set custom seconds.' },
+          { label: 'Validity', text: 'Certificate lifetime. Choose a preset (1h, 8h, 24h, 7d, 30d, 90d, 365d) or set custom seconds. Valid from 5 minutes before issuance, for servers whose clock lags (v2.252).' },
           { label: 'Extensions', text: 'SSH extensions like permit-pty, permit-agent-forwarding. Only applicable to user certificates.' },
-          { label: 'Critical Options', text: 'Restrictions like force-command or source-address to limit certificate usage.' },
+          { label: 'Critical Options', text: 'User certificates only: force-command, source-address (addresses or CIDR networks, comma-separated) and verify-required, plus vendor options named name@domain. Host certificates carry none, and any other option is refused (v2.252).' },
         ]
       },
       {
@@ -2013,7 +2013,7 @@ export const helpContent = {
         title: 'Management',
         icon: ArrowClockwise,
         items: [
-          { label: 'Revoke', text: 'Add a certificate to the CA\'s Key Revocation List (KRL). Servers must be configured to check the KRL.' },
+          { label: 'Revoke', text: 'Add a certificate to the CA\'s Key Revocation List (KRL). Servers must be configured to check the KRL. A revoked certificate stays in the KRL and cannot be deleted until it expires (v2.252).' },
           { label: 'Download', text: 'Download the certificate, public key, or private key (generate mode only).' },
         ]
       },

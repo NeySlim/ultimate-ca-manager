@@ -1,4 +1,5 @@
 import fnmatch
+import ipaddress
 import json
 import logging
 import time
@@ -13,6 +14,40 @@ from services.ssh_ca_service import SSHCAService, normalize_key_type
 from .utils import SSHCertificateUtilsMixin
 
 logger = logging.getLogger(__name__)
+
+BACKDATE_SECONDS = 300
+# PROTOCOL.certkeys: the critical options OpenSSH defines, all for user certificates
+USER_CRITICAL_OPTIONS = ('force-command', 'source-address', 'verify-required')
+
+
+def _checked_critical_options(cert_type, options):
+    """The options to sign, or ValueError: a verifier refuses a certificate whose
+    critical option it does not recognise, and none is defined for hosts."""
+    if not options:
+        return options
+    if cert_type != 'user':
+        raise ValueError("Critical options are not defined for host certificates")
+    checked = {}
+    for name, value in options.items():
+        value = value if isinstance(value, str) else ''
+        if name not in USER_CRITICAL_OPTIONS and '@' not in name.strip('@'):
+            raise ValueError(f"Unknown critical option: {name} "
+                             f"(allowed: {', '.join(USER_CRITICAL_OPTIONS)} or name@domain)")
+        if name == 'force-command' and not value.strip():
+            raise ValueError("force-command needs a command")
+        if name == 'verify-required' and value:
+            raise ValueError("verify-required takes no value")
+        if name == 'source-address':
+            entries = [entry.strip() for entry in value.split(',')]
+            try:
+                for entry in entries:
+                    ipaddress.ip_network(entry, strict=True)
+            except ValueError:
+                raise ValueError(f"source-address must list addresses or networks "
+                                 f"in CIDR form, comma-separated: {value!r}")
+            value = ','.join(entries)
+        checked[name] = value
+    return checked
 
 
 class SSHCertificateSigningMixin:
@@ -80,8 +115,11 @@ class SSHCertificateSigningMixin:
             if max_ttl > 0 and validity_seconds > max_ttl:
                 validity_seconds = max_ttl
 
+        critical_options = _checked_critical_options(cert_type, critical_options)
+
+        # Backdated so a server whose clock lags behind still accepts it at once
         now_ts = int(time.time())
-        valid_after = now_ts
+        valid_after = now_ts - BACKDATE_SECONDS
         valid_before = now_ts + validity_seconds
 
         serial = SSHCAService.get_next_serial(ca_id)
