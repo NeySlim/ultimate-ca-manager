@@ -23,8 +23,8 @@ later and with the deliberately permissive helpers in
 import re
 from typing import Any, Dict, Optional, Tuple
 
-# The label rule certificates are issued under (utils.san_parse), so an order
-# never validates a name its finalization then refuses.
+# The label rule certificates are issued under (utils.san_parse); a single
+# trailing root dot is still tolerated here, as before.
 from utils.san_parse import _HOSTNAME_LABEL_RE as _DNS_LABEL_RE
 
 
@@ -47,7 +47,7 @@ def is_valid_dns_identifier(value: Any) -> bool:
         value = value[:-1]          # tolerate a single trailing root dot
     if not value:
         return False
-    return all(_DNS_LABEL_RE.match(label) for label in value.split('.'))
+    return all(_DNS_LABEL_RE.fullmatch(label) for label in value.split('.'))
 
 
 def validate_acme_identifier(identifier: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[str]]:

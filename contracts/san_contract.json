@@ -403,7 +403,11 @@
       },
       {
         "value": "_sip._tcp.example.com",
-        "valid": true
+        "valid": false
+      },
+      {
+        "value": "a\n.example",
+        "valid": false
       },
       {
         "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example",

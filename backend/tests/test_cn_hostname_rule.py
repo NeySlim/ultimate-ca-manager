@@ -32,11 +32,11 @@ from utils.san_parse import auto_san_buckets_from_cn, cn_looks_like_hostname
     # The wildcard short-circuit used to accept this outright.
     ('*. ', False),
     ('*.', False),
-    # Real hostnames; an underscore only opens a service label (RFC 8552).
+    # Real hostnames; no underscore in a dNSName (RFC 5280 §4.2.1.6).
     ('web.example.com', True),
     ('*.example.com', True),
     ('host_name.example.com', False),
-    ('_sip._tcp.example.com', True),
+    ('_sip._tcp.example.com', False),
     ('srv-1.corp.example', True),
     ('3.5', True),
     ('example.com.', True),

@@ -102,8 +102,8 @@ export function isCnEmail(cn) {
 }
 
 // A hostname label, as the backend defines one (utils/san_parse.py): LDH,
-// hyphen never at an edge, an underscore only to open a service label.
-const HOSTNAME_LABEL = /^(?=.{1,63}$)_?(?!-)[A-Za-z0-9-]+(?<!-)$/
+// hyphen never at an edge, no underscore.
+const HOSTNAME_LABEL = /^(?!-)[A-Za-z0-9-]{1,63}(?<!-)$/
 
 /** Hostname shape — ASCII only, since x509.DNSName refuses a U-label. */
 export function looksLikeHostname(value) {

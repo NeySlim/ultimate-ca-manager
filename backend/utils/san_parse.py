@@ -55,13 +55,15 @@ def _looks_like_ip(value: str) -> bool:
 def dns_name_syntax_error(value: str) -> str | None:
     """RFC 5280 §4.2.1.6 preferred name syntax (RFC 1034 §3.5, RFC 1123 §2.1):
     LDH labels of 1 to 63, 253 in all, a wildcard only as the whole first label,
-    no trailing dot. An underscore only opens a service label (``_sip._tcp``)."""
+    no trailing dot, never the #.#.#.# form of an IP address."""
     v = value if isinstance(value, str) else ''
     body = v[2:] if v.startswith('*.') else v
     if (not body or len(v) > 253 or v.endswith('.')
-            or not all(_HOSTNAME_LABEL_RE.match(label) for label in body.split('.'))):
+            or not all(_HOSTNAME_LABEL_RE.fullmatch(label) for label in body.split('.'))):
         return (f'Invalid DNS name: {v!r} (letters, digits and hyphens in dot-separated '
                 'labels, a wildcard only as the first label, no trailing dot)')
+    if _looks_like_ip(v):
+        return f'Invalid DNS name: {v!r} is an IP address, which goes in an IP SAN'
     return None
 
 
@@ -187,17 +189,16 @@ def cn_looks_like_email(cn: str) -> bool:
     return is_valid_san_email((cn or '').strip())
 
 
-# An LDH label of 1 to 63 (RFC 1123 §2.1), hyphen never at an edge; a leading
-# underscore only, as service and attribute labels carry it (RFC 8552 §1.1).
-_HOSTNAME_LABEL_RE = re.compile(r'^(?=.{1,63}$)_?(?!-)[A-Za-z0-9-]+(?<!-)$')
+# An LDH label of 1 to 63 (RFC 1123 §2.1), hyphen never at an edge, no underscore.
+# Use fullmatch: a `$` anchor lets a final newline through.
+_HOSTNAME_LABEL_RE = re.compile(r'(?!-)[A-Za-z0-9-]{1,63}(?<!-)')
 
 
 def looks_like_hostname(value: str) -> bool:
     """Whether *value* has the shape of a dNSName UCM can actually emit.
 
-    ASCII only: ``x509.DNSName`` refuses a U-label outright ("DNSName values
-    should be passed as an A-label string"), and UCM converts nothing, so a
-    name like ``café.example.com`` is not a hostname this code can produce.
+    ASCII only: a CN such as ``café.example.com`` gives no DNS name; only a
+    SAN entry is converted to its A-label (``normalize_dns_san``).
     """
     v = (value or '').strip()
     if not v or len(v) > 253:
@@ -210,7 +211,7 @@ def looks_like_hostname(value: str) -> bool:
         # One label is a short name, not an FQDN; the CN-derived SAN has
         # always required a dot and this keeps that.
         return False
-    return all(_HOSTNAME_LABEL_RE.match(label) for label in v.split('.'))
+    return all(_HOSTNAME_LABEL_RE.fullmatch(label) for label in v.split('.'))
 
 
 def cn_looks_like_hostname(cn: str) -> bool:
