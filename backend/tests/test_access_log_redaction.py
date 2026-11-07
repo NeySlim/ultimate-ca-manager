@@ -1,5 +1,7 @@
 """The access log never holds a reset token or an OAuth code from a URL."""
+import importlib.util
 from datetime import timedelta
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -39,8 +41,16 @@ def test_the_gunicorn_line_carries_no_token():
     assert '/reset-password?token=[REDACTED]' in line
 
 
-def test_gunicorn_config_uses_the_redacting_logger():
-    import gunicorn_config
+def test_gunicorn_config_uses_the_redacting_logger(monkeypatch):
+    import gevent.monkey
+
+    # A plain import would monkey patch the whole test process for later tests
+    monkeypatch.setattr(gevent.monkey, 'patch_all', lambda *a, **k: None)
+    monkeypatch.setenv('UCM_SCHEDULER_SUPERVISED', '')
+    path = Path(__file__).resolve().parent.parent / 'gunicorn_config.py'
+    spec = importlib.util.spec_from_file_location('_ucm_gunicorn_config_log', path)
+    gunicorn_config = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(gunicorn_config)
     assert gunicorn_config.logger_class is RedactingLogger
     cfg = Config()
     cfg.set('logger_class', gunicorn_config.logger_class)
