@@ -113,7 +113,8 @@ class TestProxyIdentity:
             svc._account_jwk = {'kty': 'EC'}
             svc._key_loaded = True
             svc._sign_and_post('https://ca-ua.example/acme/new-order', {}, 'nonce', kid='k')
-        assert sent['User-Agent'].startswith('UCM-ACME-Client/')
+        from config.settings import Config
+        assert sent['User-Agent'] == f'UCM-ACME-Client/{Config.APP_VERSION}'
 
     def test_proxy_directory_does_not_offer_key_change(self, app, monkeypatch):
         from services.acme.acme_proxy_service import AcmeProxyService
