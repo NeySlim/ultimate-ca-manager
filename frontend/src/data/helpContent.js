@@ -1607,7 +1607,7 @@ export const helpContent = {
           { label: 'Max Validity', text: 'Maximum certificate lifetime in days' },
           { label: 'Allowed Key Types', text: 'Restrict which key algorithms and sizes can be used, ML-DSA-44, ML-DSA-65 and ML-DSA-87 included; FIPS mode removes ML-DSA' },
           { label: 'Allowed Signature Schemes', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA or SLH-DSA, matched against the signing CA\'s key. Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest' },
-          { label: 'SAN Restrictions', text: 'Limit the number of SANs and enforce DNS name patterns' },
+          { label: 'SAN Restrictions', text: 'Limit the number of SANs; the DNS pattern (*.company.com, or company.com to include the domain itself) scopes the policy to the matching names' },
           { label: 'Allowed Signature Hashes', text: 'SHA-256, SHA-384 or SHA-512; none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes' },
         ]
       },

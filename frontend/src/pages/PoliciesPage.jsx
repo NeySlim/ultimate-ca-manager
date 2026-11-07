@@ -800,7 +800,7 @@ export default function PoliciesPage() {
                     },
                   },
                 }))}
-                placeholder="*.company.com"
+                placeholder="*.company.com or company.com"
               />
             </div>
           </div>

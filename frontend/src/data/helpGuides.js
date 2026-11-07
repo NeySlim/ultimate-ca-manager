@@ -2940,7 +2940,7 @@ Restrict which key algorithms and sizes can be used:
 
 ### SAN Restrictions
 - **Max DNS Names**: Limit the number of Subject Alternative Names
-- **DNS Pattern**: Restrict to specific domain patterns (e.g. \`*.company.com\`)
+- **DNS Pattern**: Scopes the policy to the requests whose CN or DNS SANs match, label by label and ignoring case: \`*.company.com\` covers the names under company.com, \`company.com\` covers company.com as well. Other names are not refused: the policy does not apply to them
 
 ## Approval Workflows
 

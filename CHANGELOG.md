@@ -41,10 +41,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Certificate policies: a DNS pattern written `*.company.com`, as the form suggests, covered only that literal name, so approval and the policy's rules skipped `www.company.com`, while `company.com` also caught `evilcompany.com`. Patterns now match by DNS label, ignoring case and a final dot: `*.company.com` covers the names under company.com, `company.com` the domain as well (RFC 4343).
 - mTLS behind a proxy: a certificate presented by its serial number alone, without `X-SSL-Client-I-DN` or `X-SSL-Client-Cert`, opened the enrolment bearing that serial, even one of another CA. Such a serial now opens only an enrolment that recorded no issuer, and enrolling a presented certificate requires its issuer (RFC 5280 §4.1.2.2).
 
 ### Upgrade notes
 
+- Certificate policies: a `*.x` DNS pattern now applies to the names under x, so requests issued directly until now may wait for approval or meet the policy's rules; an `x` pattern no longer applies to names such as `evilx` or `x.other.org`.
 - mTLS behind a proxy: a proxy that forwards the serial number without `X-SSL-Client-I-DN` (nginx `$ssl_client_i_dn`, Apache `SSL_CLIENT_I_DN`) or `X-SSL-Client-Cert` must now forward one of them, or certificate login fails with a warning in the log; the I-DN is read in RFC 4514, RFC 1779, OpenSSL one-line and legacy forms.
 - EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the `EST key generator` certificate the SignedData carries, which chains to the issuing CA from `/cacerts` and is listed, and revoked when needed, with the CA's certificates like a delegated OCSP responder; the next encrypted request then gets a new one. Migration 132 adds the `est_signer_certs` table that names the current one; backups carry the certificate but not that table, so a restored installation issues a new one on first use.
 - EST: `serverkeygen` without `AsymmetricDecryptKeyIdentifier` now returns the key unencrypted, without the Basic password, and over mTLS the key type is chosen as over Basic, ML-DSA under an ML-DSA CA included.

@@ -597,17 +597,23 @@ class PolicyEvaluationService:
         if not names:
             return False
         
-        # Check if any name matches the pattern
-        for name in names:
-            name = str(name)
-            if dns_pattern == '*.':
-                # Wildcard policy: matches if name starts with *.
-                if name.startswith('*.'):
-                    return True
-            elif name.startswith(dns_pattern) or name.endswith(dns_pattern):
-                return True
-        
-        return False
+        return any(PolicyEvaluationService._dns_pattern_covers(dns_pattern, str(name)) for name in names)
+
+    @staticmethod
+    def _dns_pattern_covers(pattern: str, name: str) -> bool:
+        """Label match, case and root dot ignored (RFC 4343): ``*.x`` and ``.x`` cover
+        the names under x, ``x`` covers x too; ``*.`` covers wildcard names only."""
+        if pattern.strip() in ('*.', '*'):
+            return name.strip().startswith('*.')
+        name = name.strip().lower().rstrip('.')
+        if name.startswith('dns:'):
+            name = name[4:].strip()
+        base = pattern.strip().lower().rstrip('.')
+        subdomains_only = base.startswith(('*.', '.'))
+        base = base[2:] if base.startswith('*.') else base.lstrip('.')
+        if not base:
+            return True
+        return name.endswith('.' + base) or (not subdomains_only and name == base)
 
     @staticmethod
     def create_approval_request(
