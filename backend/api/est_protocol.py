@@ -826,17 +826,10 @@ def simple_reenroll(label=None):
         validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
         days = int(validity_days.value) if validity_days else 365
         
-        # RFC 7030 §4.2.2: the SubjectAltName stays the renewed certificate's, never
-        # one rebuilt from the CN because the CSR left it out
-        renewed_san = None
-        if _subject_alt_name(csr) is None:
-            san_ext = _subject_alt_name(client_cert_obj)
-            renewed_san = list(san_ext.value) if san_ext is not None else []
-
         cert_pem, serial = CAService.sign_csr_from_crypto(
             ca=ca, csr=csr, validity_days=days, source='est',
             renewal_of=client_cert_obj, cert_type='device_cert',
-            supersedes=renewed_row, override_san=renewed_san,
+            supersedes=renewed_row,
         )
 
         from services.audit.staging import stage_audit_entry

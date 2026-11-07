@@ -347,3 +347,25 @@ def test_renew_succeeds_and_reissues(client, app, wstep_renew_config):
     with app.app_context():
         db_row = Certificate.query.filter_by(serial_number=str(new_cert.serial_number)).first()
         assert db_row is not None
+
+
+def test_renewal_csr_without_san_keeps_the_certificate_names(client, app, wstep_renew_config):
+    """A renewal keeps its identity: a CSR without SAN renews the names, not the CN."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'renew-names.example.test')])
+    names = [x509.DNSName('a.renew-names.test'), x509.DNSName('b.renew-names.test')]
+    csr = x509.CertificateSigningRequestBuilder().subject_name(subject).sign(key, hashes.SHA256())
+    with app.app_context():
+        ca = db.session.get(CA, wstep_renew_config['id'])
+        cert_pem, _serial = CAService.sign_csr_from_crypto(
+            ca=ca, csr=csr, validity_days=30, source='test', override_san=names)
+    cert = x509.load_pem_x509_certificate(cert_pem.encode())
+    signed = _build_signed_rst(cert, key, _renewal_csr(subject, key),
+                               message_id='urn:uuid:renew-names')
+    r = client.post(RENEW_URL, data=signed)
+    assert r.status_code == 200, r.data
+    bst = etree.fromstring(r.data).find(f'.//{{{WSSE_NS}}}BinarySecurityToken')
+    renewed = x509.load_der_x509_certificate(base64.b64decode(bst.text))
+    san = renewed.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+    assert set(san.get_values_for_type(x509.DNSName)) == {'a.renew-names.test',
+                                                           'b.renew-names.test'}

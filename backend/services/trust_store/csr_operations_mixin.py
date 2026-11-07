@@ -632,7 +632,8 @@ class CSROperationsMixin:
         custom_extensions: Optional[list] = None,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
-        signing renews — its names are graced by NameConstraints validation.
+        signing renews — its names are graced by NameConstraints validation,
+        and stand for the SAN of a CSR that carries none.
         ``allow_sensitive_ekus``: keep OCSPSigning/timeStamping from the CSR —
         reserved for the admin Sign-CSR path (an operator explicitly signing a
         delegated responder/TSA CSR); protocol enrollees never get them.
@@ -729,6 +730,14 @@ class CSROperationsMixin:
             csr_sans = None
             has_csr_san = False
 
+        if override_san is None and not has_csr_san and renewal_of is not None:
+            # A renewal keeps its identity: the renewed certificate's names, or none,
+            # never a name built from the CN (RFC 7030 §4.2.2)
+            try:
+                override_san = list(renewal_of.extensions.get_extension_for_class(
+                    x509.SubjectAlternativeName).value)
+            except x509.ExtensionNotFound:
+                override_san = []
         if override_san is not None:
             effective_sans = override_san
         elif has_csr_san:
