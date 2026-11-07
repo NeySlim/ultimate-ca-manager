@@ -175,3 +175,27 @@ def test_a_backup_carries_the_compromised_keys(app, bench):
     apply_section('compromised_keys', rows, RestorePlan.build({'compromised_keys': rows}))
     db.session.commit()
     assert _record(bench).cert_refid == bench.refid
+
+
+@pytest.mark.parametrize('reason', ['superseded', 'key_compromise'])
+def test_the_fallback_scan_reads_only_rows_revoked_as_compromised(app, create_cert, monkeypatch, reason):
+    """The scan behind the two tables is not O(revoked): other reasons stay in the database."""
+    import base64
+    from cryptography.hazmat.primitives.asymmetric import ec
+    info = create_cert(cn=f'scan-{reason}.example.test')
+    with app.app_context():
+        row = db.session.get(Certificate, info['id'])
+        row.revoked, row.revoke_reason = True, reason
+        db.session.commit()
+        held = x509.load_pem_x509_certificate(base64.b64decode(row.crt)).public_key()
+        CompromisedKeyRecord.query.filter_by(public_key_sha256=public_key_sha256(held)).delete()
+        db.session.commit()
+        read = []
+        real = compromised_keys.revoked_as_compromised
+        monkeypatch.setattr(compromised_keys, 'revoked_as_compromised',
+                            lambda r: read.append(r.id) or real(r))
+        assert not compromised_keys.key_revoked_as_compromised(
+            ec.generate_private_key(ec.SECP256R1()).public_key())
+        assert (info['id'] in read) is (reason == 'key_compromise')
+        # The row revoked as compromised still refuses its key
+        assert compromised_keys.key_revoked_as_compromised(held) is (reason == 'key_compromise')
