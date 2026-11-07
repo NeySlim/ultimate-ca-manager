@@ -11,6 +11,7 @@ import ipaddress
 import json
 import ssl
 import socket
+import uuid
 from datetime import timedelta
 
 import pytest
@@ -261,7 +262,7 @@ class TestRequestedValidity:
         from services.cert_service import CertificateService
         key = rsa.generate_private_key(65537, 2048)
         with app.app_context():
-            row = Certificate(refid=f'na-{x509.random_serial_number()}', descr='na', caref=issuing_ca,
+            row = Certificate(refid=f'na-{uuid.uuid4().hex}', descr='na', caref=issuing_ca,
                               csr=b64.b64encode(_csr_pem(key, dns=['na.example']).encode()).decode(),
                               cert_type='server_cert', source='acme', created_by='acme')
             db.session.add(row)
@@ -403,7 +404,7 @@ def _issue_cert(app, ca_refid, dns=(), ips=(), source='acme'):
     key = rsa.generate_private_key(65537, 2048)
     csr = _csr_pem(key, dns=dns, ips=ips)
     with app.app_context():
-        row = Certificate(refid=f'rev-{x509.random_serial_number()}', descr='rev', caref=ca_refid,
+        row = Certificate(refid=f'rev-{uuid.uuid4().hex}', descr='rev', caref=ca_refid,
                           csr=b64.b64encode(csr.encode()).decode(), cert_type='server_cert',
                           source=source, created_by='acme')
         db.session.add(row)
@@ -547,7 +548,7 @@ class TestReplacesReflected:
                .serial_number(serial).not_valid_before(utc_now() - timedelta(minutes=5))
                .not_valid_after(utc_now() + timedelta(days=30)).sign(key, hashes.SHA256()))
         with app.app_context():
-            cert = Certificate(refid=f'replaced-{acct["account_id"]}', descr='replaced',
+            cert = Certificate(refid=f'replaced-{uuid.uuid4().hex[:24]}', descr='replaced',
                                crt=b64.b64encode(crt.public_bytes(serialization.Encoding.PEM)).decode(),
                                serial_number=str(serial), aki=':'.join(f'{b:02x}' for b in aki))
             db.session.add(cert)
