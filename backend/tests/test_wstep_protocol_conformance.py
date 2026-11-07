@@ -2,8 +2,9 @@
 import base64
 import datetime
 
-from asn1crypto import cms
+from asn1crypto import cms, core
 from cryptography import x509
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import Encoding
 from lxml import etree
@@ -11,7 +12,7 @@ from lxml import etree
 from services.wstep.cmc_response import ID_CCT_PKIRESPONSE, _CMCStatusInfoV2, _PKIResponse
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS, WSU_NS
 from tests.test_wstep_issue import ISSUE_URL, _basic_auth, _build_rst, _make_csr, wstep_config  # noqa: F401
-from tests.test_wstep_renew_tls import _cmc_renewal
+from tests.test_wstep_renew_tls import _cmc_renewal, _signer_info
 
 PKCS7 = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#PKCS7'
 PKCS10 = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10'
@@ -83,6 +84,40 @@ def test_a_pkcs10_request_gets_a_cmc_full_pki_response(client, wstep_config):
     assert status['cmc_status'].native == 0
     assert [p.native for p in status['body_list']] == [1]
     assert cert.public_bytes(Encoding.DER) in [c.dump() for c in signed['certificates']]
+
+
+def _pkcs10_in_signed_data(csr, key):
+    """A bare PKCS#10 as the id-data content of a SignedData, with no CMC PKIData around it."""
+    csr_der = csr.public_bytes(Encoding.DER)
+    digest = hashes.Hash(hashes.SHA256())
+    digest.update(csr_der)
+    signed_attrs = cms.CMSAttributes([
+        {'type': 'content_type', 'values': ['data']},
+        {'type': 'message_digest', 'values': [core.OctetString(digest.finalize())]},
+    ])
+    sid = {'subject_key_identifier': x509.SubjectKeyIdentifier.from_public_key(key.public_key()).digest}
+    return cms.ContentInfo({'content_type': 'signed_data', 'content': {
+        'version': 'v3', 'digest_algorithms': [{'algorithm': 'sha256'}],
+        'encap_content_info': {'content_type': 'data', 'content': csr_der},
+        'signer_infos': [_signer_info(key, sid, signed_attrs)],
+    }}).dump()
+
+
+def _status_body_list(cmc_token):
+    signed = cms.ContentInfo.load(base64.b64decode(cmc_token.text))['content']
+    response = _PKIResponse.load(signed['encap_content_info']['content'].native)
+    status = _CMCStatusInfoV2.load(response['control_sequence'][0]['attr_values'][0].dump())
+    return [p.native for p in status['body_list']]
+
+
+def test_a_pkcs10_in_a_signed_data_is_referenced_as_body_part_1(client, wstep_config):
+    """RFC 5272 3.2.2: bodyPartID 0 names the current PKIData, which this request has none of."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    csr, _ = _make_csr('conf-p10-in-sd.example.test', key=key)
+    r = _post(client, _rst(_pkcs10_in_signed_data(csr, key), value_type=PKCS7))
+    assert r.status_code == 200, r.data
+    _cert, cmc_tokens = _rstr_tokens(r.data)
+    assert _status_body_list(cmc_tokens[0]) == [1]
 
 
 def test_a_pkcs10_request_under_the_pkcs7_value_type_is_issued(client, wstep_config):

@@ -175,11 +175,11 @@ def _request_id_for(cert):
 
 def _cmc_response_der_for(ca, cert, parsed):
     """CMC full PKI response DER for build_issue_response's cmc_response_der,
-    which MS-WSTEP 3.1.4.1.3.2 requires for every request. A plain PKCS#10 is a
-    Simple PKI Request, referenced by bodyPartID 1 (RFC 5272 6.1.1). Failure
+    which MS-WSTEP 3.1.4.1.3.2 requires for every request. A PKCS#10 outside a
+    CMC PKIData is a Simple PKI Request, referenced by bodyPartID 1 (RFC 5272 6.1.1). Failure
     here doesn't fail the enrollment (the X509v3 token still works alone):
     logged and skipped."""
-    body_part_id = parsed.cmc_body_part_id if parsed.was_pkcs7_wrapped else 1
+    body_part_id = parsed.cmc_body_part_id if parsed.cmc_body_part_id is not None else 1
     try:
         chain_pems = CAService.get_certificate_chain(ca.refid) or []
         chain_ders = [
