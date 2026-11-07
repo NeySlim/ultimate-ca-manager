@@ -67,6 +67,16 @@ def tsa_signer_key_problem(public_key) -> Optional[str]:
     return None
 
 
+def certificate_validity_problem(cert: x509.Certificate) -> Optional[str]:
+    """Why *cert* cannot sign now (outside notBefore..notAfter), None when it can."""
+    now = datetime.now(timezone.utc)
+    if now < cert.not_valid_before_utc:
+        return f'is not valid until {cert.not_valid_before_utc.isoformat()}'
+    if now > cert.not_valid_after_utc:
+        return f'expired at {cert.not_valid_after_utc.isoformat()}'
+    return None
+
+
 class TSAConfigurationError(ValueError):
     """Raised when the TSA signing certificate is not RFC 3161 compliant.
 
@@ -98,6 +108,8 @@ class TSAService:
         # end-entity signer (#312) sets this; with a CA-certificate signer it
         # stays empty so the emitted token is byte-for-byte what it was.
         self.chain_certs = list(chain_certs) if chain_certs else []
+        # (failInfo, statusString) of the last rejection, for the audit trail
+        self.last_rejection: Optional[Tuple[Optional[str], str]] = None
 
     @staticmethod
     def _require_dedicated_tsa_cert() -> bool:
@@ -196,8 +208,16 @@ class TSAService:
     def process_request(self, tsp_request_der: bytes) -> Tuple[bytes, int]:
         """Process a TimeStampReq and return a TimeStampResp."""
         try:
-            req = tsp.TimeStampReq.load(tsp_request_der)
+            # strict refuses trailing bytes; .native forces the lazy parse of every field
+            req = tsp.TimeStampReq.load(tsp_request_der, strict=True)
+            req.native
+        except (ValueError, TypeError) as e:
+            logger.warning('TSA request refused: malformed TimeStampReq: %s',
+                           str(e).splitlines()[0] if str(e) else type(e).__name__)
+            return self._error_resp('rejection', 'bad_data_format',
+                                    'Malformed TimeStampReq'), 200
 
+        try:
             version = req['version'].native
             if version != 'v1':
                 # RFC 3161 §2.4.2: rejection + badRequest(2)
@@ -218,15 +238,15 @@ class TSAService:
             requested_policy = req['req_policy'].native
             token_policy = requested_policy if requested_policy is not None else self.policy_oid
 
+            # RFC 3161 §2.4.1: UCM recognizes no request extension, and one it does
+            # not recognize gets no token whether it is critical or not
             extensions = req['extensions']
-            if extensions.native is not None:
-                for extension in extensions:
-                    if extension['critical'].native:
-                        return self._error_resp(
-                            'rejection',
-                            'unaccepted_extensions',
-                            f"Unsupported critical extension: {extension['extn_id'].dotted}",
-                        ), 200
+            if extensions.native:
+                return self._error_resp(
+                    'rejection',
+                    'unaccepted_extensions',
+                    f"Unsupported extension: {extensions[0]['extn_id'].dotted}",
+                ), 200
 
             digest = msg_imprint['hashed_message'].native
             # RFC 3161 §2.4.1: hashed_message length MUST match hash algorithm
@@ -238,8 +258,7 @@ class TSAService:
             nonce = req['nonce'].native if req['nonce'].native is not None else None
             cert_req = req['cert_req'].native
 
-            tst_info = self._build_tst_info(hash_oid, digest, nonce,
-                                            policy_oid=token_policy)
+            tst_info = self._build_tst_info(msg_imprint, nonce, policy_oid=token_policy)
             tst_info_der = tst_info.dump()
 
             response_der = self._build_signed_response(
@@ -252,22 +271,22 @@ class TSAService:
             return self._error_resp('rejection', 'system_failure',
                                     'Internal error'), 200
 
-    def _build_tst_info(self, hash_oid: str, digest: bytes,
+    def _build_tst_info(self, message_imprint: tsp.MessageImprint,
                         nonce: Optional[int] = None,
                         policy_oid: Optional[str] = None) -> tsp.TSTInfo:
         """Build TSTInfo (RFC 3161 §2.4.2)"""
         serial = uuid.uuid4().int >> 64  # Unique serial, no collision across workers
-        now = datetime.now(timezone.utc)
+        # Whole seconds, with the 1 s accuracy that precision supports (§2.4.2)
+        now = datetime.now(timezone.utc).replace(microsecond=0)
 
         info = tsp.TSTInfo({
             'version': 'v1',
             'policy': policy_oid or self.policy_oid,
-            'message_imprint': {
-                'hash_algorithm': {'algorithm': hash_oid},
-                'hashed_message': digest,
-            },
+            # §2.4.2 MUST: the request's imprint as sent, absent or NULL parameters kept
+            'message_imprint': message_imprint,
             'serial_number': serial,
             'gen_time': now,
+            'accuracy': {'seconds': 1},
         })
 
         if nonce is not None:
@@ -348,6 +367,7 @@ class TSAService:
         badDataFormat(5), timeNotAvailable(14), unacceptedPolicy(15),
         unacceptedExtension(16), addInfoNotAvailable(17), systemFailure(25).
         """
+        self.last_rejection = (fail_info, message)
         psi_fields = {
             'status': status,
             'status_string': [message],
@@ -604,7 +624,8 @@ def tsa_ca_certificate_path_ready() -> bool:
 
     Only meaningful when no dedicated signer is configured. Mirrors the gates
     in api/tsa_protocol.py: an admin-designated tsa_ca_refid resolving to a CA
-    that exists, holds its cert and key, and is not offline. Without this the
+    that exists, holds its cert and key, is not offline, and is within its
+    validity period. Without this the
     protocol returns 503, so the dashboard must not report the CA path online.
     Only consumer is the dashboard, which wraps its own block.
     """
@@ -614,4 +635,11 @@ def tsa_ca_certificate_path_ready() -> bool:
     if not refid:
         return False
     ca = CA.query.filter_by(refid=refid).first()
-    return bool(ca and ca.crt and ca.prv and not ca.offline and not ca.revoked_in_chain)
+    if not (ca and ca.crt and ca.prv and not ca.offline and not ca.revoked_in_chain):
+        return False
+    import base64
+    try:
+        cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+    except Exception:
+        return False
+    return certificate_validity_problem(cert) is None

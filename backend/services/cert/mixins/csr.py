@@ -201,6 +201,8 @@ class CSRMixin:
         policy_template_id: int = None,
         notices: list = None,
         custom_extensions: list = None,
+        not_before=None,
+        not_after=None,
     ) -> Certificate:
         """
         Sign a CSR with a CA
@@ -224,6 +226,8 @@ class CSRMixin:
             notices: list that receives what was granted otherwise than asked
             custom_extensions: the request's own extensions (#437), which win
                 over the template's for the same OID; the template's apply to leaves only
+            not_before, not_after: dates the requester asked for (naive UTC), issued
+                exactly or refused (ACME notBefore/notAfter)
 
         Returns:
             Updated Certificate with signed cert (or new CA record for intermediate_ca)
@@ -352,6 +356,8 @@ class CSRMixin:
                 'digest_explicit': digest_explicit,
             },
             notices=notices,
+            not_before=not_before,
+            not_after=not_after,
         )
 
         # Parse signed certificate

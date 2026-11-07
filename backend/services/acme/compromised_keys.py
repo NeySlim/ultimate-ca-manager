@@ -4,6 +4,7 @@ import logging
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
+from sqlalchemy import func
 from sqlalchemy.orm import load_only
 
 from models import Certificate, RevokedSerial
@@ -47,7 +48,10 @@ def key_revoked_as_compromised(public_key) -> bool:
         return True
     rows = Certificate.query.options(load_only(Certificate.id, Certificate.crt, Certificate.revoked,
                                                Certificate.revoke_reason))
-    for row in rows.filter(Certificate.revoked.is_(True)).all():
+    # Pre-filter in SQL, as the scan runs on every EST and ACME request; LIKE, not TRIM,
+    # since TRIM keeps the tabs and newlines that str.strip() drops in revoked_as_compromised
+    reason = func.lower(Certificate.revoke_reason)
+    for row in rows.filter(Certificate.revoked.is_(True), reason.like('%key%compromise%')).all():
         if not row.crt or not revoked_as_compromised(row):
             continue
         try:

@@ -57,7 +57,7 @@ vi.mock('../../services/tsa.service', () => ({
   tsaService: {
     getConfig: vi.fn(),
     updateConfig: vi.fn().mockResolvedValue({ data: {} }),
-    getStats: vi.fn().mockResolvedValue({ data: { total_requests: 0 } }),
+    getStats: vi.fn().mockResolvedValue({ data: { total: 0 } }),
     getSignerCandidates: vi.fn().mockResolvedValue({ data: [] }),
   },
 }))
@@ -96,7 +96,7 @@ const labels = (field) => within(field).getAllByRole('option').filter((o) => o.v
 describe('TSAPage signing CA pickers (#426)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    tsaService.getStats.mockResolvedValue({ data: { total_requests: 0 } })
+    tsaService.getStats.mockResolvedValue({ data: { total: 0 } })
     tsaService.getSignerCandidates.mockResolvedValue({ data: [] })
   })
 

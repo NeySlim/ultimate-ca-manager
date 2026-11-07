@@ -144,10 +144,12 @@ def load_sp_credentials(provider, with_key=False):
                                        serialization.NoEncryption()).decode()
 
 
-def build_settings(provider, base, sp_cert=None, sp_key=None):
+def build_settings(provider, base, sp_cert=None, sp_key=None, want_messages_signed=False):
     """python3-saml settings: strict validation, SHA-1 refused.
 
     Requests are signed when the provider asks for it and `sp_key` is given.
+    `want_messages_signed` is for logout requests, which only their
+    redirect-binding signature authenticates (SAML Profiles §4.4.4.1).
     """
     endpoints = sp_endpoints(base)
     settings = {
@@ -168,7 +170,7 @@ def build_settings(provider, base, sp_cert=None, sp_key=None):
             # A valid signature on the Response or on the Assertion is always
             # required; demanding one place would refuse IdPs that sign the other.
             'wantAssertionsSigned': False,
-            'wantMessagesSigned': False,
+            'wantMessagesSigned': want_messages_signed,
             'authnRequestsSigned': bool(sp_key and provider.saml_sign_requests),
             'wantNameIdEncrypted': False,
             'wantAssertionsEncrypted': False,
@@ -232,14 +234,29 @@ def take_request(request_id, provider_id):
 
 def consume_assertion(assertion_id, provider_id, not_on_or_after):
     """Record an assertion id until it expires; False if it was already consumed."""
-    if not assertion_id or len(assertion_id) > MAX_MESSAGE_ID_LENGTH:
+    return _consume(SAMLMessageId.KIND_ASSERTION, assertion_id, provider_id, not_on_or_after)
+
+
+def logout_request_fresh(issue_instant):
+    """IssueInstant (epoch seconds) within the clock drift of now, either way."""
+    drift = OneLogin_Saml2_Constants.ALLOWED_CLOCK_DRIFT
+    return abs(utc_now().replace(tzinfo=timezone.utc).timestamp() - issue_instant) <= drift
+
+
+def consume_logout_request(request_id, provider_id, issue_instant):
+    """Record a LogoutRequest id while it is fresh; False if it was already consumed."""
+    return _consume(SAMLMessageId.KIND_LOGOUT, request_id, provider_id,
+                    issue_instant + OneLogin_Saml2_Constants.ALLOWED_CLOCK_DRIFT)
+
+
+def _consume(kind, message_id, provider_id, not_on_or_after):
+    if not message_id or len(message_id) > MAX_MESSAGE_ID_LENGTH:
         return False
     drift = timedelta(seconds=OneLogin_Saml2_Constants.ALLOWED_CLOCK_DRIFT)
     expires = datetime.fromtimestamp(not_on_or_after, timezone.utc).replace(tzinfo=None) + drift
     _purge_expired()
     db.session.add(SAMLMessageId(
-        kind=SAMLMessageId.KIND_ASSERTION, message_id=assertion_id,
-        provider_id=provider_id, expires_at=expires))
+        kind=kind, message_id=message_id, provider_id=provider_id, expires_at=expires))
     try:
         db.session.commit()
     except IntegrityError:

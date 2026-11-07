@@ -69,7 +69,7 @@ def _build_ldap_tls(provider):
     import ssl
     verify_ssl = provider.ldap_verify_ssl if provider.ldap_verify_ssl is not None else True
 
-    if not provider.ldap_use_ssl and not verify_ssl:
+    if not (provider.ldap_use_ssl or getattr(provider, 'ldap_start_tls', False)) and not verify_ssl:
         return None
 
     if not verify_ssl:
@@ -88,6 +88,27 @@ def _build_ldap_tls(provider):
     # (CERT_REQUIRED) rather than returning None, which would leave ldap3 on its default
     # unvalidated TLS — i.e. a "verify SSL" setting that silently doesn't verify.
     return __import__('ldap3').Tls(validate=ssl.CERT_REQUIRED)
+
+
+def ldap_auto_bind(provider):
+    """ldap3 auto_bind mode: StartTLS before the bind when chosen, so neither
+    password crosses in clear (RFC 4513 §3, §5.1.3). LDAPS needs none."""
+    import ldap3
+    if getattr(provider, 'ldap_start_tls', False) and not provider.ldap_use_ssl:
+        return ldap3.AUTO_BIND_TLS_BEFORE_BIND
+    return ldap3.AUTO_BIND_NO_TLS
+
+
+def ldap_bind(conn, provider):
+    """Bind ``conn`` (not yet bound), after StartTLS when chosen. False if refused;
+    a StartTLS or certificate failure raises before any bind is sent."""
+    import ldap3
+    from ldap3.core.exceptions import LDAPStartTLSError
+    if ldap_auto_bind(provider) == ldap3.AUTO_BIND_TLS_BEFORE_BIND:
+        conn.open(read_server_info=False)
+        if not conn.start_tls(read_server_info=False):
+            raise LDAPStartTLSError('StartTLS refused by the directory')
+    return conn.bind()
 
 
 def _encrypt_ldap_password(password: str) -> str:
@@ -429,6 +450,30 @@ def providers_using_custom_role(name):
     return users
 
 
+def _mapping_rules(provider):
+    """The provider's role_mapping as a dict; empty when it has no rule."""
+    rules = _parse_json_field(provider.role_mapping)
+    return rules if isinstance(rules, dict) else {}
+
+
+def _external_groups(external_data):
+    groups = (external_data or {}).get('roles', (external_data or {}).get('groups', []))
+    if isinstance(groups, str):
+        groups = [groups]
+    return groups if isinstance(groups, (list, tuple, set)) else []
+
+
+def sso_admission(provider, external_data):
+    """Whether a login may proceed. With mapping rules, only a user one of them
+    matches; without rules, every user gets the default role, and no default
+    role admits nobody (no implicit role)."""
+    rules = _mapping_rules(provider)
+    if rules:
+        groups = _external_groups(external_data)
+        return any(key in groups for key in rules)
+    return provider.default_role in VALID_ROLES
+
+
 def _resolve_mapped_roles(provider, external_data):
     """``(base_role, custom_role)`` the role_mapping gives, either may be None.
 
@@ -437,12 +482,10 @@ def _resolve_mapped_roles(provider, external_data):
     in mapping order, that names one. An invalid base role counts as viewer
     (as before) and an unknown custom role is ignored, both with a warning.
     """
-    role_mapping = _parse_json_field(provider.role_mapping)
-    if not role_mapping or not isinstance(role_mapping, dict):
+    role_mapping = _mapping_rules(provider)
+    if not role_mapping:
         return None, None
-    external_roles = external_data.get('roles', external_data.get('groups', []))
-    if isinstance(external_roles, str):
-        external_roles = [external_roles]
+    external_roles = _external_groups(external_data)
     logger.info(f"Role resolution: mapping={role_mapping}, external_groups={external_roles}")
     bases, customs = [], []
     for ext_role, value in role_mapping.items():

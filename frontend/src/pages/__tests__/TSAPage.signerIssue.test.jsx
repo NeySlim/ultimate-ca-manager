@@ -60,7 +60,7 @@ vi.mock('../../services/tsa.service', () => ({
   tsaService: {
     getConfig: vi.fn(),
     updateConfig: vi.fn().mockResolvedValue({ data: {} }),
-    getStats: vi.fn().mockResolvedValue({ data: { total_requests: 0 } }),
+    getStats: vi.fn().mockResolvedValue({ data: { total: 0 } }),
     getSignerCandidates: vi.fn().mockResolvedValue({ data: [] }),
     issueSignerCertificate: vi.fn(),
   },
@@ -91,7 +91,7 @@ describe('TSAPage — one-click signer issuance (#312)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     tsaService.updateConfig.mockResolvedValue({ data: {} })
-    tsaService.getStats.mockResolvedValue({ data: { total_requests: 0 } })
+    tsaService.getStats.mockResolvedValue({ data: { total: 0 } })
     tsaService.getSignerCandidates.mockResolvedValue({ data: [] })
     tsaService.issueSignerCertificate.mockResolvedValue({
       data: { selected: true, certificate: { refid: 'new-ts-1' }, signer: { configured: true, usable: true } },

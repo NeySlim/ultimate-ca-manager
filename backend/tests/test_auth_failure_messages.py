@@ -116,6 +116,11 @@ def test_the_ldap_door_names_a_deactivated_account(
 ):
     """It answers after the bind, so it may say why."""
     username = local_user(active=False)
+    with client.application.app_context():
+        # An account of this directory, disabled in UCM: a local one is never opened.
+        User.query.filter_by(username=username).update(
+            {'auth_source': 'ldap', 'sso_provider_id': ldap_provider})
+        db.session.commit()
     _bind_succeeds(monkeypatch, username)
     assert _login(client, username, '/api/v2/sso/ldap/login', ldap_provider) == (
         403, 'This account has been disabled')
@@ -150,27 +155,54 @@ def test_a_wrong_ldap_password_says_nothing_more(
 
 def test_each_door_keeps_its_own_lockout_wording(client, local_user, ldap_provider,
                                                  monkeypatch):
+    # The password door has not checked the password yet: a locked account
+    # answers like an unknown name, or the status would reveal it exists.
     locked = local_user(locked=True)
-    assert _login(client, locked, '/api/v2/auth/login/password') == (
-        429, 'Account temporarily locked. Try again later.')
+    assert _login(client, locked, '/api/v2/auth/login/password') == \
+        _login(client, f'nobody-{uuid.uuid4().hex[:8]}', '/api/v2/auth/login/password') == \
+        (401, 'Invalid credentials')
 
+    # The LDAP door checks the lock before the bind: same answer as a wrong password.
     locked_ldap = local_user(locked=True)
     _bind_succeeds(monkeypatch, locked_ldap)
     assert _login(client, locked_ldap, '/api/v2/sso/ldap/login', ldap_provider) == (
-        429, 'Account temporarily locked due to too many failed attempts')
+        401, 'Invalid credentials')
+
+
+def test_the_ldap_door_hides_a_locked_account(client, local_user, ldap_provider, monkeypatch):
+    locked = local_user(locked=True)
+    unknown = f'nobody-{uuid.uuid4().hex[:8]}'
+    _bind_succeeds(monkeypatch, unknown, error='Invalid credentials')
+    door = '/api/v2/sso/ldap/login'
+    assert _login(client, locked, door, ldap_provider) == \
+        _login(client, unknown, door, ldap_provider) == (401, 'Invalid credentials')
+    missing = 2_000_000_000  # no such provider
+    assert _login(client, locked, door, missing) == _login(client, unknown, door, missing) == \
+        (400, 'No LDAP provider configured')
+
+
+def test_a_locked_ldap_refusal_is_audited(app, client, local_user, ldap_provider, monkeypatch):
+    from models import AuditLog
+
+    locked = local_user(locked=True)
+    _bind_succeeds(monkeypatch, locked)
+    assert _login(client, locked, '/api/v2/sso/ldap/login', ldap_provider)[0] == 401
+    with app.app_context():
+        assert AuditLog.query.filter_by(action='login_failure', username=locked).filter(
+            AuditLog.details.contains('account locked')).count() == 1
 
 
 def test_the_named_reasons_are_decided_after_the_bind():
     """The property that makes them safe to say out loud.
 
     If ``account_disabled`` or ``group_denied`` were ever returned before
-    ``user_conn.bind()``, an unauthenticated caller could read an account's
+    the user's bind, an unauthenticated caller could read an account's
     state out of a 403. Checked on the source, because no amount of mocking
     the bind can demonstrate an ordering.
     """
     from api.v2.sso.connection_tests import _ldap_authenticate_user
 
     source = inspect.getsource(_ldap_authenticate_user)
-    bind = source.index('user_conn.bind()')
+    bind = source.index('ldap_bind(user_conn, provider)')
     for reason in ("'account_disabled'", "'group_denied'"):
         assert source.index(reason) > bind, f'{reason} is decided before the bind'

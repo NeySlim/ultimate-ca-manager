@@ -3,7 +3,7 @@ from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models.sso import SSOProvider
-from .helpers import _parse_json_field, _parse_group_list, _resolve_mapped_roles, _resolve_role, _check_ldap_lockout, _clear_ldap_failed_attempts, _decrypt_ldap_password, _build_ldap_tls
+from .helpers import _parse_json_field, _parse_group_list, _resolve_mapped_roles, _resolve_role, sso_admission, _check_ldap_lockout, _clear_ldap_failed_attempts, _decrypt_ldap_password, _build_ldap_tls, ldap_auto_bind
 import logging
 from models import db
 
@@ -42,7 +42,7 @@ def test_mapping(provider_id):
             server,
             user=provider.ldap_bind_dn,
             password=_decrypt_ldap_password(provider),
-            auto_bind=True
+            auto_bind=ldap_auto_bind(provider)
         )
 
         safe_username = escape_filter_chars(test_username)
@@ -117,6 +117,8 @@ def test_mapping(provider_id):
         if required_groups:
             user_groups_lower = {g.lower() for g in groups}
             access_allowed = any(g.lower() in user_groups_lower for g in required_groups)
+        # The login refuses a user no mapping rule matches, too.
+        access_allowed = access_allowed and sso_admission(provider, {'groups': groups})
 
         return success_response(data={
             'found': True,

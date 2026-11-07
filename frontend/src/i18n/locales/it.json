@@ -600,7 +600,10 @@
     "checkEmailDescAfter": ", riceverai un link per reimpostare a breve.",
     "accountDisabled": "Questo account è stato disabilitato",
     "samlValidationFailed": "Autenticazione SAML fallita",
-    "samlLoginExpired": "Questo accesso è scaduto o è stato avviato in un'altra scheda o in un altro browser. Ricomincia da questa pagina."
+    "samlLoginExpired": "Questo accesso è scaduto o è stato avviato in un'altra scheda o in un altro browser. Ricomincia da questa pagina.",
+    "ssoUsernameConflict": "Questo accesso corrisponde a un account esistente, locale o collegato a un'altra identità. Chiedi a un amministratore di collegare gli account.",
+    "ssoUnmapped": "Accesso negato: nessuna regola di mappatura dei ruoli di questo provider riconosce il tuo account. Contatta il tuo amministratore.",
+    "samlLogoutRejected": "Non è stato possibile verificare la richiesta di disconnessione del provider di identità; sei ancora connesso."
   },
   "dashboard": {
     "goodMorning": "Buongiorno",
@@ -677,7 +680,9 @@
       "generateReport": "Genera rapporto"
     },
     "expiresInDays": "Scade tra {{count}} giorni",
-    "chainRepairSameKey": "chiavi condivise, certificati distinti (certificato incrociato?)"
+    "chainRepairSameKey": "chiavi condivise, certificati distinti (certificato incrociato?)",
+    "keyEncryptionOffTitle": "Le chiavi private non sono cifrate.",
+    "keyEncryptionOffDesc": "Nessuna chiave master è caricata: le chiavi private delle CA e dei certificati sono salvate senza cifratura nel database. Attiva la crittografia in Impostazioni › Sicurezza, oppure rimetti al suo posto la chiave master e riavvia UCM."
   },
   "certificates": {
     "createCertificate": "Crea certificato",
@@ -2819,7 +2824,7 @@
     "saveSettings": "Salva impostazioni",
     "securitySubtitle": "Password, 2FA, crittografia e configurazione sessione",
     "keyEncryption": "Crittografia chiavi private",
-    "encryptionDesc": "Crittografa tutte le chiavi private nel database con AES-256. Protette da una chiave master in /etc/ucm/master.key. Quando è attiva, UCM non conserva più file di chiavi in chiaro nella directory privata e rimuove quelli esistenti. Usa gli hook di distribuzione per collocare le chiavi dove servono a un servizio.",
+    "encryptionDesc": "Crittografa tutte le chiavi private nel database con AES-128 (Fernet, con HMAC-SHA256). Protette da una chiave master in /etc/ucm/master.key. Quando è attiva, UCM non conserva più file di chiavi in chiaro nella directory privata e rimuove quelli esistenti. Usa gli hook di distribuzione per collocare le chiavi dove servono a un servizio.",
     "enableEncryption": "Attiva crittografia",
     "disableEncryption": "Disattiva crittografia",
     "encryptRemainingKeys": "Crittografa chiavi rimanenti ({{count}})",
@@ -3867,14 +3872,21 @@
     "defaultRoleHelp": "Applicato solo quando un utente viene creato automaticamente al primo accesso.",
     "accountStatusAttrHelp": "Attributo LDAP che indica se un account è disabilitato. Valori comuni: 'description', 'userAccountControl', 'accountStatus'. Lasciare vuoto per disabilitare questo controllo.",
     "enforce2fa": "Imponi 2FA",
-    "enforce2faHelp": "Richiedi agli utenti che si autenticano tramite questo provider di configurare l'autenticazione a due fattori TOTP.",
+    "enforce2faHelp": "Richiedi agli utenti di questo provider di registrare un secondo fattore. Gli accessi LDAP lo chiedono poi; gli accessi OIDC e SAML si affidano alla MFA del provider di identità.",
     "oidcIssuer": "Issuer OIDC",
     "oidcIssuerHelp": "Obbligatorio quando la verifica dell'ID token è attiva. La discovery usa <issuer>/.well-known/openid-configuration.",
     "oidcJwksUri": "URI JWKS (opzionale)",
     "oidcJwksUriHelp": "Lasciare vuoto per scoprire le chiavi di firma tramite l'issuer.",
     "idTokenVerify": "Verifica la firma dell'ID token (consigliato)",
     "idTokenVerifyWarning": "Disattivare la verifica della firma indebolisce la sicurezza dell'accesso. Usare solo come misura temporanea di compatibilità.",
-    "idTokenVerifyIssuerMissing": "La verifica è attiva ma nessun issuer è impostato: gli accessi OIDC falliranno finché non viene configurato."
+    "idTokenVerifyIssuerMissing": "La verifica è attiva ma nessun issuer è impostato: gli accessi OIDC falliranno finché non viene configurato.",
+    "defaultRoleNone": "Nessuno: rifiuta gli utenti che nessuna regola riconosce",
+    "provisioningRulesNotice": "Sono definite regole di mappatura dei ruoli: un utente che nessuna regola riconosce viene rifiutato all'accesso.",
+    "provisioningNoRulesNotice": "Nessuna regola di mappatura dei ruoli: ogni utente autenticato da questo provider può accedere, e i nuovi account ricevono il ruolo {{role}}.",
+    "provisioningNobodyNotice": "Nessuna regola di mappatura dei ruoli e nessun ruolo predefinito: nessuno può accedere tramite questo provider.",
+    "ldapStartTls": "Usa StartTLS",
+    "ldapStartTlsHelp": "Porta la connessione LDAP in chiaro su TLS prima di qualsiasi bind",
+    "ldapPlainWarning": "LDAP in chiaro: le password di bind e degli utenti viaggiano senza cifratura. Attiva SSL/TLS o StartTLS."
   },
   "notifications": {
     "certificateIssued": "Certificato emesso: {{name}}",
@@ -4270,6 +4282,8 @@
     "title": "Modalità sicura",
     "description": "UCM ha rilevato chiavi private crittografate ma la chiave di crittografia è mancante.",
     "step1Title": "Posiziona il file chiave master in:",
+    "mismatchDescription": "La chiave master configurata non decifra le chiavi private archiviate: non è quella con cui sono state cifrate. Le chiavi private restano inaccessibili finché non viene ripristinata la chiave master precedente.",
+    "mismatchStep1Title": "Rimetti il file della chiave master precedente in:",
     "step2Title": "Poi riavvia il servizio:",
     "lostKeyHint": "Se hai perso la chiave master, ripristina da un backup.",
     "polling": "Verifica in corso..."
@@ -5458,11 +5472,13 @@
     "selectCA": "Seleziona una CA per la firma delle marche temporali",
     "policyOid": "OID della politica",
     "policyOidHelp": "OID che identifica la politica TSA sotto la quale vengono emesse le marche temporali",
+    "policyPlaceholderWarning": "1.2.3.4.1 è l'OID di policy di esempio di OpenSSL, non assegnato a nessuno. In produzione usate un OID dell'arco della vostra organizzazione o della vostra CP/CPS.",
     "requireDedicatedCert": "Richiedi un certificato TSA dedicato",
     "requireDedicatedCertDesc": "Rifiuta di firmare le marche temporali con il certificato della CA stessa. Richiede un certificato di firma dedicato (entità finale) con una EKU timeStamping critica (RFC 3161).",
     "requireDedicatedCertBlocked": "Seleziona prima un certificato di firma dedicato utilizzabile qui sopra, altrimenti ogni richiesta di marca temporale fallirebbe.",
     "signingCert": "Certificato di firma",
     "signingCertDesc": "Scegli cosa firma i token di marcatura temporale. Il certificato della CA è il default storico; un certificato finale dedicato con EKU timeStamping è la raccomandazione RFC 3161.",
+    "caSignerWarning": "Il certificato della CA firma le marche temporali. I verificatori rigorosi come openssl ts -verify e jarsigner rifiutano questi token: la RFC 3161 richiede un firmatario dedicato con un EKU timeStamping critico ed esclusivo. Selezionate o generate qui sotto un certificato di firma dedicato.",
     "signingCertHelp": "Sono elencati solo i certificati la cui chiave privata è detenuta da UCM e che portano l'EKU timeStamping. I rinnovi vengono seguiti automaticamente.",
     "signingCertCa": "Certificato della CA (predefinito)",
     "signerExpires": "Scade",

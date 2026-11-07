@@ -2,6 +2,7 @@ from . import bp, VALID_ROLES, logger
 from .connection_tests import _ldap_authenticate_user
 from flask import request, session
 from auth.unified import require_auth
+from auth.session_start import begin_session
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, User
@@ -21,7 +22,7 @@ from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
 import ssl
 from . import saml_sp
-from .helpers import _check_ldap_lockout, _clear_ldap_failed_attempts, _record_ldap_failed_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password
+from .helpers import _check_ldap_lockout, _clear_ldap_failed_attempts, _record_ldap_failed_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
 @limiter.limit("5/minute")
@@ -58,10 +59,6 @@ def ldap_login():
     if not username:
         return error_response("Username and password required", 400)
 
-    # Check account lockout before attempting LDAP auth
-    if _check_ldap_lockout(username):
-        return error_response("Account temporarily locked due to too many failed attempts", 429)
-
     # Find LDAP provider
     if provider_id:
         provider = db.session.get(SSOProvider, provider_id)
@@ -74,6 +71,17 @@ def ldap_login():
 
     if not provider.enabled:
         return error_response("LDAP provider is disabled", 400)
+
+    # Checked before the bind, so a locked account answers like a wrong password
+    if _check_ldap_lockout(username):
+        AuditService.log_action(
+            action='login_failure',
+            resource_type='user',
+            details=f'LDAP login refused for {username} (account locked)',
+            success=False,
+            username=username
+        )
+        return error_response("Invalid credentials", 401)
 
     # Authenticate via LDAP
     user_info, error = _ldap_authenticate_user(provider, username, password)
@@ -124,6 +132,17 @@ def ldap_login():
     )
 
     if not user:
+        # The password is proved by now, so the refusal may say why.
+        if error_code == USERNAME_CONFLICT:
+            return error_response(
+                "Sign-in refused: a local account, or one linked to another identity, "
+                "already uses this name. An administrator can link the accounts.", 403)
+        if error_code == UNMAPPED:
+            if not _mapping_rules(provider):
+                return error_response(
+                    "Access denied: this provider has no default role and no role mapping rule", 403)
+            return error_response(
+                "Access denied: no role mapping rule of this provider matches your account", 403)
         # Generic message — don't disclose whether the LDAP user exists or whether
         # auto-provisioning is on/off. Details go to logs only.
         if error_code == 'auto_create_disabled':
@@ -167,9 +186,33 @@ def ldap_login():
     if not ok:
         return _err
 
-    # Establish Flask session (clear first to prevent session fixation)
+    # An enrolled second factor is asked, as at the password door.
+    from auth.twofa_enforcement import second_factor_methods
+    second_factors = second_factor_methods(user)
+    if second_factors:
+        begin_session(user)
+        session['pending_2fa_user_id'] = user.id
+        session['pending_2fa_username'] = user.username
+        session['pending_2fa_method'] = 'ldap'
+        session.permanent = True
+        AuditService.log_action(
+            action='login_2fa_required',
+            resource_type='user',
+            resource_id=user.id,
+            resource_name=user.username,
+            details=f'LDAP password verified via {provider.name}, 2FA required',
+            success=True,
+            username=user.username
+        )
+        return success_response(
+            data={'requires_2fa': True, 'methods': second_factors,
+                  'user': {'id': user.id, 'username': user.username}},
+            message='2FA verification required'
+        )
+
+    # Establish Flask session under a new identifier (no session fixation)
     _ldap_now = utc_now()
-    session.clear()
+    begin_session(user)
     session['user_id'] = user.id
     session['username'] = user.username
     session['role'] = user.role
@@ -255,10 +298,14 @@ def _extract_external_id(provider, external_data):
 
 
 def _bind_external_id(user, provider, external_id):
-    """Bind the stable id to the account (TOFU), unless another account already
-    owns it for this provider (guards against id theft)."""
+    """Bind the stable id to the account (TOFU). Never replaces an id already
+    bound, nor takes one another account of this provider owns. True if bound."""
     if not external_id or user.sso_external_id == external_id:
-        return
+        return True
+    if user.sso_external_id:
+        logger.warning(
+            f"SSO external id of '{user.username}' is already bound; not replacing it")
+        return False
     taken = User.query.filter(
         User.sso_provider_id == provider.id,
         User.sso_external_id == external_id,
@@ -268,8 +315,101 @@ def _bind_external_id(user, provider, external_id):
         logger.warning(
             f"SSO external id {external_id!r} already bound to '{taken.username}'; "
             f"not rebinding to '{user.username}'")
-        return
+        return False
     user.sso_external_id = external_id
+    return True
+
+
+SSO_NO_PASSWORD = '!SSO_NO_PASSWORD!'
+USERNAME_CONFLICT = 'sso_username_conflict'
+UNMAPPED = 'sso_unmapped'
+
+
+def _adoptable(user, provider):
+    """Whether an identity whose stable id matches nobody may claim ``user``:
+    an account of this provider (provisioned, or linked by an admin) not bound yet.
+    A local account, or one bound to another identity, is never claimed (OIDC Core §5.7)."""
+    if user.sso_external_id:
+        return False
+    if (user.auth_source or 'local') == 'local':
+        # SSO account from before migration 024 (which may have set its provider),
+        # never converted back by an admin (unlink forces a password change).
+        return (user.password_hash == SSO_NO_PASSWORD and not user.force_password_change
+                and _same_provider_or_idp(user, provider, legacy=True))
+    return user.auth_source == provider.provider_type and _same_provider_or_idp(user, provider)
+
+
+def _same_provider_or_idp(user, provider, legacy=False):
+    """Linked to this provider, or orphaned by a deleted provider for this same IdP.
+    An account with no recorded IdP is claimable only if it predates migration 024."""
+    if user.sso_provider_id is not None:
+        return user.sso_provider_id == provider.id
+    if user.sso_orphan_of is None:
+        return legacy
+    return user.sso_orphan_of == provider.idp_key()
+
+
+def _orphan_with_id(provider, external_id):
+    """The one account bound to ``external_id`` whose deleted provider served this
+    same IdP; None when there is none, or several (a stable id is per IdP)."""
+    key = provider.idp_key()
+    if not key:
+        return None
+    orphans = User.query.filter(
+        User.sso_external_id == external_id,
+        User.auth_source == provider.provider_type,
+        User.sso_provider_id.is_(None),
+        User.sso_orphan_of == key).limit(2).all()
+    return orphans[0] if len(orphans) == 1 else None
+
+
+def _bound_by_dn(provider, external_data, external_id):
+    """An LDAP account of this provider bound by its DN fallback, now that the
+    directory returns a stable uid for the DN the user bind just proved."""
+    from sqlalchemy import func
+    dn = str((external_data or {}).get('dn') or '').strip()
+    if provider.provider_type != 'ldap' or not dn or dn == external_id:
+        return None
+    return User.query.filter(User.sso_provider_id == provider.id,
+                             func.lower(User.sso_external_id) == dn.lower()).first()
+
+
+def _email_unverified(provider, external_data):
+    """The OIDC IdP says the e-mail is not verified (some send the claim as a string)."""
+    if provider.provider_type != 'oauth2':
+        return False
+    flag = (external_data or {}).get('email_verified')
+    return flag is False or (isinstance(flag, str) and flag.strip().lower() == 'false')
+
+
+def _refuse_username_conflict(provider, username):
+    logger.warning(
+        f"SSO login refused for '{username}' via {provider.name}: the name belongs to a "
+        f"local account or to one bound to another identity")
+    AuditService.log_action(
+        action='login_failure',
+        resource_type='sso',
+        resource_name=username,
+        details=(f"SSO login via {provider.name} refused: the name {username!r} belongs to a "
+                 f"local account or to one bound to another identity (link it with Link to SSO)"),
+        success=False,
+        username=username,
+    )
+    return None, USERNAME_CONFLICT
+
+
+def _refuse_unmapped(provider, username):
+    reason = 'no role mapping rule matches it' if _mapping_rules(provider) else 'the provider has no default role'
+    logger.warning(f"SSO login refused for '{username}' via {provider.name}: {reason}")
+    AuditService.log_action(
+        action='login_failure',
+        resource_type='sso',
+        resource_name=username,
+        details=f"SSO login via {provider.name} refused for {username!r}: {reason}",
+        success=False,
+        username=username,
+    )
+    return None, UNMAPPED
 
 
 def _get_or_create_sso_user(provider, username, email, fullname, external_data):
@@ -283,25 +423,35 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
 
     # 1. Stable-identifier match — robust to username/email changes (primary).
     user = None
+    rebind = False
     if external_id:
         user = User.query.filter_by(
             sso_provider_id=provider.id, sso_external_id=external_id).first()
+        if not user:
+            user = _bound_by_dn(provider, external_data, external_id)
+            rebind = user is not None
+        if not user:
+            user = _orphan_with_id(provider, external_id)
 
-    # 2. Legacy / not-yet-bound: match by username (the historical SSO link).
+    # 2. Not bound yet (legacy, or linked by an admin): match by username, but
+    #    only an account this identity may claim.
+    conflict = False
     if not user:
         user = User.query.filter_by(username=username).first()
+        if user and not _adoptable(user, provider):
+            conflict, user = True, None
 
-    # 3. An account an admin deliberately linked (auth_source != local) that owns
-    #    this email but whose username differs (#138). Only *linked* accounts are
-    #    eligible — a purely local account is never matched by email (takeover).
-    if not user and email:
+    # 3. An account an admin linked to this provider that owns this email but
+    #    whose username differs (#138). Never a local or already bound account,
+    #    nor by an e-mail the OIDC IdP says is unverified.
+    if not user and email and not _email_unverified(provider, external_data):
         norm = email.strip().lower()
         candidates = User.query.filter(func.lower(User.email) == norm).all()
-        user = (
-            next((u for u in candidates
-                  if u.sso_provider_id == provider.id and (u.auth_source or 'local') != 'local'), None)
-            or next((u for u in candidates if (u.auth_source or 'local') != 'local'), None)
-        )
+        user = next((u for u in candidates
+                     if (u.auth_source or 'local') != 'local' and _adoptable(u, provider)), None)
+
+    if not user and conflict:
+        return _refuse_username_conflict(provider, username)
 
     if user and not user.active:
         # A disabled account is a refused login: every caller checks it a
@@ -311,20 +461,26 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
             f"SSO sync skipped for '{username}': the local account is disabled")
         return user, None
 
+    if not sso_admission(provider, external_data):
+        return _refuse_unmapped(provider, username)
+
     if user:
         # Backfill auth_source/sso_provider_id for users created before
         # migration 024 — useful when several providers share a directory
         # and the migration could not infer the right one.
-        if (user.auth_source or 'local') == 'local' and user.password_hash == '!SSO_NO_PASSWORD!':
+        if (user.auth_source or 'local') == 'local' and user.password_hash == SSO_NO_PASSWORD:
             user.auth_source = provider.provider_type
             user.sso_provider_id = provider.id
-        elif user.sso_provider_id != provider.id and user.auth_source != 'local':
-            # User logged in through a different SSO provider — record latest.
-            user.sso_provider_id = provider.id
-            user.auth_source = provider.provider_type
+        elif user.sso_provider_id != provider.id:
+            user.sso_provider_id = provider.id  # unlinked, or its provider was deleted
+        user.sso_orphan_of = None
 
         # Bind the stable id (trust-on-first-use) for future stable matching.
-        _bind_external_id(user, provider, external_id)
+        if rebind:
+            logger.info(f"SSO external id of '{user.username}' moves from its DN to the LDAP uid")
+            user.sso_external_id = external_id
+        else:
+            _bind_external_id(user, provider, external_id)
 
         # ── Userinfo sync (email, full name) ─────────────────────────────
         # Controlled by `auto_update_users`. Does NOT touch the role.
@@ -441,7 +597,7 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         user.custom_role_source = 'sso'
 
     # SSO users don't have a password — use sentinel that cannot match any hash
-    user.password_hash = '!SSO_NO_PASSWORD!'
+    user.password_hash = SSO_NO_PASSWORD
 
     db.session.add(user)
     try:

@@ -600,7 +600,10 @@
     "checkEmailDescAfter": ", você receberá um link para redefinir em breve.",
     "accountDisabled": "Esta conta foi desativada",
     "samlValidationFailed": "A autenticação SAML falhou",
-    "samlLoginExpired": "Este login expirou ou foi iniciado em outra aba ou navegador. Comece novamente a partir desta página."
+    "samlLoginExpired": "Este login expirou ou foi iniciado em outra aba ou navegador. Comece novamente a partir desta página.",
+    "ssoUsernameConflict": "Este início de sessão corresponde a uma conta existente, local ou ligada a outra identidade. Peça a um administrador para ligar as contas.",
+    "ssoUnmapped": "Acesso negado: nenhuma regra de mapeamento de funções deste fornecedor reconhece a sua conta. Contacte o seu administrador.",
+    "samlLogoutRejected": "Não foi possível verificar o pedido de fim de sessão do fornecedor de identidade; continua com sessão iniciada."
   },
   "dashboard": {
     "goodMorning": "Bom dia",
@@ -677,7 +680,9 @@
       "generateReport": "Gerar relatório"
     },
     "expiresInDays": "Expira em {{count}} dias",
-    "chainRepairSameKey": "chaves partilhadas, certificados distintos (certificado cruzado?)"
+    "chainRepairSameKey": "chaves partilhadas, certificados distintos (certificado cruzado?)",
+    "keyEncryptionOffTitle": "As chaves privadas não estão cifradas.",
+    "keyEncryptionOffDesc": "Nenhuma chave mestra está carregada, por isso as chaves privadas das CAs e dos certificados são guardadas sem criptografia na base de dados. Ative a criptografia em Definições › Segurança, ou reponha a chave mestra e reinicie o UCM."
   },
   "certificates": {
     "createCertificate": "Criar certificado",
@@ -2819,7 +2824,7 @@
     "saveSettings": "Salvar configurações",
     "securitySubtitle": "Senha, 2FA, criptografia e configuração de sessão",
     "keyEncryption": "Criptografia de chaves privadas",
-    "encryptionDesc": "Criptografa todas as chaves privadas no banco de dados com AES-256. Protegidas por uma chave mestra em /etc/ucm/master.key. Quando ativada, a UCM deixa de manter arquivos de chave em texto claro no diretório privado e remove os existentes. Use hooks de implantação para colocar as chaves onde um serviço precisa delas.",
+    "encryptionDesc": "Criptografa todas as chaves privadas no banco de dados com AES-128 (Fernet, com HMAC-SHA256). Protegidas por uma chave mestra em /etc/ucm/master.key. Quando ativada, a UCM deixa de manter arquivos de chave em texto claro no diretório privado e remove os existentes. Use hooks de implantação para colocar as chaves onde um serviço precisa delas.",
     "enableEncryption": "Ativar criptografia",
     "disableEncryption": "Desativar criptografia",
     "encryptRemainingKeys": "Criptografar chaves restantes ({{count}})",
@@ -3867,14 +3872,21 @@
     "defaultRoleHelp": "Aplicado apenas quando um usuário é criado automaticamente no primeiro login.",
     "accountStatusAttrHelp": "Atributo LDAP que indica se uma conta está desativada. Valores comuns: 'description', 'userAccountControl', 'accountStatus'. Deixe vazio para desativar esta verificação.",
     "enforce2fa": "Exigir 2FA",
-    "enforce2faHelp": "Exigir que os utilizadores que se autenticam através deste fornecedor configurem a autenticação de dois fatores TOTP.",
+    "enforce2faHelp": "Exigir que os utilizadores deste fornecedor registem um segundo fator. Os inícios de sessão LDAP pedem-no depois; os de OIDC e SAML confiam na MFA do fornecedor de identidade.",
     "oidcIssuer": "Emissor OIDC (issuer)",
     "oidcIssuerHelp": "Obrigatório quando a verificação do ID token está ativada. A descoberta usa <issuer>/.well-known/openid-configuration.",
     "oidcJwksUri": "URI JWKS (opcional)",
     "oidcJwksUriHelp": "Deixe vazio para descobrir as chaves de assinatura através do emissor.",
     "idTokenVerify": "Verificar a assinatura do ID token (recomendado)",
     "idTokenVerifyWarning": "Desativar a verificação de assinatura enfraquece a segurança do login. Use apenas como medida temporária de compatibilidade.",
-    "idTokenVerifyIssuerMissing": "A verificação está ativada mas nenhum emissor está definido: os logins OIDC falharão até configurá-lo."
+    "idTokenVerifyIssuerMissing": "A verificação está ativada mas nenhum emissor está definido: os logins OIDC falharão até configurá-lo.",
+    "defaultRoleNone": "Nenhuma: recusar utilizadores que nenhuma regra reconhece",
+    "provisioningRulesNotice": "Existem regras de mapeamento de funções: um utilizador que nenhuma regra reconhece é recusado ao iniciar sessão.",
+    "provisioningNoRulesNotice": "Nenhuma regra de mapeamento de funções: qualquer utilizador autenticado por este fornecedor pode iniciar sessão, e as novas contas recebem a função {{role}}.",
+    "provisioningNobodyNotice": "Nenhuma regra de mapeamento de funções nem função predefinida: ninguém pode iniciar sessão através deste fornecedor.",
+    "ldapStartTls": "Usar StartTLS",
+    "ldapStartTlsHelp": "Passar a ligação LDAP sem cifra para TLS antes de qualquer bind",
+    "ldapPlainWarning": "LDAP sem cifra: as palavras-passe de bind e dos utilizadores circulam sem cifra. Ative SSL/TLS ou StartTLS."
   },
   "notifications": {
     "certificateIssued": "Certificado emitido: {{name}}",
@@ -4270,6 +4282,8 @@
     "title": "Modo seguro",
     "description": "UCM detectou chaves privadas criptografadas mas a chave de criptografia está ausente.",
     "step1Title": "Coloque seu arquivo de chave mestra em:",
+    "mismatchDescription": "A chave mestra configurada não descriptografa as chaves privadas armazenadas: não é a chave com que foram criptografadas. As chaves privadas ficam inacessíveis até que a chave mestra anterior seja restaurada.",
+    "mismatchStep1Title": "Coloque de volta o arquivo da chave mestra anterior em:",
     "step2Title": "Em seguida, reinicie o serviço:",
     "lostKeyHint": "Se perdeu a chave mestra, restaure a partir de um backup.",
     "polling": "Verificando..."
@@ -5458,11 +5472,13 @@
     "selectCA": "Selecione uma CA para assinatura de carimbos de data/hora",
     "policyOid": "OID de política",
     "policyOidHelp": "OID que identifica a política TSA sob a qual os carimbos de data/hora são emitidos",
+    "policyPlaceholderWarning": "1.2.3.4.1 é o OID de política de exemplo do OpenSSL, não atribuído a ninguém. Em produção, use um OID do arco da sua organização ou da sua CP/CPS.",
     "requireDedicatedCert": "Exigir um certificado TSA dedicado",
     "requireDedicatedCertDesc": "Recusar a assinatura de carimbos de data/hora com o próprio certificado da CA. Requer um certificado de assinatura dedicado (entidade final) com uma EKU timeStamping crítica (RFC 3161).",
     "requireDedicatedCertBlocked": "Selecione primeiro um certificado de assinatura dedicado utilizável acima; caso contrário, todos os pedidos de carimbo falhariam.",
     "signingCert": "Certificado de assinatura",
     "signingCertDesc": "Escolha o que assina os tokens de carimbo de tempo. O certificado da CA é a predefinição histórica; um certificado final dedicado com a EKU timeStamping é a recomendação da RFC 3161.",
+    "caSignerWarning": "O certificado da CA assina os carimbos de tempo. Verificadores rigorosos como openssl ts -verify e jarsigner rejeitam estes tokens: a RFC 3161 exige um signatário dedicado com um EKU timeStamping crítico e exclusivo. Selecione ou gere abaixo um certificado de assinatura dedicado.",
     "signingCertHelp": "Só são listados certificados cuja chave privada o UCM detém e que têm a EKU timeStamping. As renovações são seguidas automaticamente.",
     "signingCertCa": "Certificado da CA (predefinição)",
     "signerExpires": "Expira",

@@ -227,7 +227,7 @@ class TestCreationAndSync:
     def test_sync_removes_an_sso_custom_role_when_no_match_gives_one(self, app, provider, role, ptype):
         a = role()
         with app.app_context():
-            pid = provider(ptype, {'ga': {'custom_role': a}}, sync=True)
+            pid = provider(ptype, {'ga': {'custom_role': a}, 'other': 'viewer'}, sync=True)
             name = f'u-{_uid()}'
             _login(app, pid, name, ['ga'])
             user = _login(app, pid, name, ['other'])
@@ -237,7 +237,7 @@ class TestCreationAndSync:
     def test_sync_never_removes_a_role_assigned_by_hand(self, app, provider, role, ptype):
         a, manual = role(), role()
         with app.app_context():
-            pid = provider(ptype, {'ga': {'custom_role': a}}, sync=True)
+            pid = provider(ptype, {'ga': {'custom_role': a}, 'other': 'viewer'}, sync=True)
             name = f'u-{_uid()}'
             user = _login(app, pid, name, ['other'])
             user.custom_role_id = db.session.query(CustomRole.id).filter_by(name=manual).scalar()
@@ -248,7 +248,7 @@ class TestCreationAndSync:
     def test_sync_never_replaces_a_role_assigned_by_hand(self, app, provider, role, ptype):
         a, manual = role(), role()
         with app.app_context():
-            pid = provider(ptype, {'ga': {'custom_role': a}}, sync=True)
+            pid = provider(ptype, {'ga': {'custom_role': a}, 'other': 'viewer'}, sync=True)
             name = f'u-{_uid()}'
             user = _login(app, pid, name, ['other'])
             user.custom_role_id = db.session.query(CustomRole.id).filter_by(name=manual).scalar()

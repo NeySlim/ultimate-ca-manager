@@ -26,7 +26,7 @@ def _failure_info_native(resp_der):
 
 
 def _self_signed_tsa(include_eku=True, eku_critical=True, basic_constraints_ca=False,
-                     eku_oids=None):
+                     eku_oids=None, not_before=None, not_after=None):
     """Build a self-signed cert + key, optionally with a valid TSA EKU."""
     from cryptography import x509
     from cryptography.x509.oid import NameOID
@@ -40,8 +40,8 @@ def _self_signed_tsa(include_eku=True, eku_critical=True, basic_constraints_ca=F
                .subject_name(subject).issuer_name(issuer)
                .public_key(key.public_key())
                .serial_number(x509.random_serial_number())
-               .not_valid_before(datetime.now(timezone.utc) - timedelta(days=1))
-               .not_valid_after(datetime.now(timezone.utc) + timedelta(days=365)))
+               .not_valid_before(not_before or datetime.now(timezone.utc) - timedelta(days=1))
+               .not_valid_after(not_after or datetime.now(timezone.utc) + timedelta(days=365)))
     if include_eku:
         builder = builder.add_extension(
             x509.ExtendedKeyUsage(
@@ -105,6 +105,7 @@ class TestProcessRequest:
         resp_der, http = svc.process_request(b'\x30\x03not-a-tsq')
         assert http == 200
         assert _status_native(resp_der) == 'rejection'
+        assert _failure_info_native(resp_der) == {'bad_data_format'}
 
     def test_unsupported_hash_rejected(self):
         from services.tsa_service import TSAService
@@ -163,7 +164,8 @@ class TestProcessRequest:
         assert _status_native(resp_der) == 'rejection'
         assert _failure_info_native(resp_der) == {'unaccepted_extensions'}
 
-    def test_unknown_noncritical_extension_is_ignored(self):
+    def test_unknown_noncritical_extension_is_rejected(self):
+        # RFC 3161 §2.4.1: an unrecognized extension, critical or not, gets no token
         from services.tsa_service import TSAService
         cert, key = _self_signed_tsa()
         svc = TSAService(cert, key)
@@ -178,7 +180,8 @@ class TestProcessRequest:
             _build_tsq(digest, extensions=[extension])
         )
 
-        assert _status_native(resp_der) == 'granted'
+        assert _status_native(resp_der) == 'rejection'
+        assert _failure_info_native(resp_der) == {'unaccepted_extensions'}
 
     @pytest.mark.parametrize(
         ('hash_name', 'hash_oid', 'digest_size'),
@@ -831,6 +834,195 @@ class TestTsaSignerOneClickIssuance:
             assert b'positive' in r.data.lower()
         finally:
             self._cleanup(app)
+
+
+_SHA256_ALG_ABSENT = bytes.fromhex('300b0609608648016503040201')
+_SHA256_ALG_NULL = bytes.fromhex('300d06096086480165030402010500')
+
+
+def _imprint_der(alg_der, digest):
+    body = alg_der + b'\x04' + bytes([len(digest)]) + digest
+    return b'\x30' + bytes([len(body)]) + body
+
+
+class TestRfc3161Conformance:
+    @pytest.mark.parametrize('alg_der', [_SHA256_ALG_ABSENT, _SHA256_ALG_NULL],
+                             ids=['params-absent', 'params-null'])
+    def test_message_imprint_is_copied_byte_for_byte(self, alg_der):
+        # RFC 3161 §2.4.2: the token's messageImprint MUST equal the request's
+        from services.tsa_service import TSAService
+        cert, key = _self_signed_tsa()
+        imprint = _imprint_der(alg_der, hashlib.sha256(b'imprint').digest())
+        tsq = tsp.TimeStampReq({
+            'version': 1,
+            'message_imprint': tsp.MessageImprint.load(imprint),
+        }).dump()
+
+        resp_der, _ = TSAService(cert, key).process_request(tsq)
+
+        assert _status_native(resp_der) == 'granted'
+        assert _tst_info(resp_der)['message_imprint'].dump() == imprint
+
+    @pytest.mark.parametrize('payload', [
+        b'\x30\x00',
+        b'\x04\x02ab',
+        bytes(range(40)),
+        _build_tsq(hashlib.sha256(b'cut').digest())[:-5],
+        # SHA-256 AlgorithmIdentifier carrying INTEGER parameters
+        tsp.TimeStampReq({'version': 1, 'message_imprint': tsp.MessageImprint.load(
+            _imprint_der(bytes.fromhex('300e0609608648016503040201020101'),
+                         hashlib.sha256(b'int').digest()))}).dump(),
+        # A valid request followed by extra bytes
+        _build_tsq(hashlib.sha256(b'trailing').digest()) + b'\x00\x00',
+    ], ids=['empty-seq', 'octet-string', 'garbage', 'truncated', 'int-params', 'trailing'])
+    def test_unparsable_request_is_bad_data_format_without_a_trace(self, payload, caplog):
+        import logging
+        from services.tsa_service import TSAService
+        cert, key = _self_signed_tsa()
+
+        with caplog.at_level(logging.WARNING, logger='services.tsa_service'):
+            resp_der, http = TSAService(cert, key).process_request(payload)
+
+        assert http == 200
+        assert _status_native(resp_der) == 'rejection'
+        assert _failure_info_native(resp_der) == {'bad_data_format'}
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR or r.exc_info]
+
+    def test_token_announces_one_second_accuracy_on_a_whole_second(self):
+        from services.tsa_service import TSAService
+        cert, key = _self_signed_tsa()
+        resp_der, _ = TSAService(cert, key).process_request(
+            _build_tsq(hashlib.sha256(b'accuracy').digest()))
+
+        tst = _tst_info(resp_der)
+        assert tst['accuracy'].native == {'seconds': 1, 'millis': None, 'micros': None}
+        assert tst['gen_time'].native.microsecond == 0
+
+
+def _configure_ca_signer(app, create_ca, cert, key, cn):
+    """Point the CA-certificate TSA path at *cert*/*key*; returns the cleanup."""
+    from cryptography.hazmat.primitives import serialization
+    from models import CA, db, SystemConfig
+
+    ca_data = create_ca(cn=cn)
+    with app.app_context():
+        ca = db.session.get(CA, ca_data['id'])
+        ca.crt = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode()
+        ca.prv = base64.b64encode(key.private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        )).decode()
+        for config_key, value in (('tsa_enabled', 'true'), ('tsa_ca_refid', ca.refid),
+                                  ('tsa_signer_cert_refid', '')):
+            row = SystemConfig.query.filter_by(key=config_key).first()
+            if row is None:
+                row = SystemConfig(key=config_key)
+                db.session.add(row)
+            row.value = value
+        db.session.commit()
+
+    def cleanup():
+        with app.app_context():
+            SystemConfig.query.filter(SystemConfig.key.in_(
+                ['tsa_enabled', 'tsa_ca_refid', 'tsa_signer_cert_refid'])
+            ).delete(synchronize_session=False)
+            db.session.commit()
+    return cleanup
+
+
+class TestTsaProtocolHttp:
+    @pytest.mark.parametrize('window', ['expired', 'not-yet-valid'])
+    def test_ca_outside_its_validity_does_not_sign(self, app, client, create_ca, window):
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
+        bounds = ({'not_before': now - timedelta(days=30), 'not_after': now - timedelta(days=1)}
+                  if window == 'expired' else
+                  {'not_before': now + timedelta(days=1), 'not_after': now + timedelta(days=30)})
+        cert, key = _self_signed_tsa(include_eku=False, basic_constraints_ca=True, **bounds)
+        cleanup = _configure_ca_signer(app, create_ca, cert, key, f'TSA {window} CA')
+        try:
+            response = client.post(
+                '/tsa', data=_build_tsq(hashlib.sha256(b'late').digest()),
+                content_type='application/timestamp-query')
+            assert response.status_code == 503
+            assert response.mimetype == 'text/plain'
+        finally:
+            cleanup()
+
+    @pytest.mark.parametrize('window', ['expired', 'not-yet-valid'])
+    def test_dedicated_signer_outside_its_validity_does_not_sign(
+        self, app, client, create_cert, window,
+    ):
+        from datetime import datetime, timedelta, timezone
+        from cryptography.hazmat.primitives import serialization
+        from models import Certificate, SystemConfig, db
+
+        now = datetime.now(timezone.utc)
+        bounds = ({'not_before': now - timedelta(days=30), 'not_after': now - timedelta(days=1)}
+                  if window == 'expired' else
+                  {'not_before': now + timedelta(days=1), 'not_after': now + timedelta(days=30)})
+        cert, key = _self_signed_tsa(**bounds)
+        record = create_cert(cn=f'ucm-tsa-signer-{window}',
+                             extra_ekus=['1.3.6.1.5.5.7.3.8'])
+        with app.app_context():
+            row = Certificate.query.filter_by(refid=record['refid']).first()
+            row.crt = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode()
+            row.prv = base64.b64encode(key.private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption())).decode()
+            for k, v in (('tsa_enabled', 'true'), ('tsa_signer_cert_refid', record['refid'])):
+                cfg = SystemConfig.query.filter_by(key=k).first() or SystemConfig(key=k)
+                cfg.value = v
+                db.session.add(cfg)
+            db.session.commit()
+        try:
+            response = client.post(
+                '/tsa', data=_build_tsq(hashlib.sha256(b'signer window').digest()),
+                content_type='application/timestamp-query')
+            assert response.status_code == 503
+        finally:
+            with app.app_context():
+                SystemConfig.query.filter(SystemConfig.key.in_(
+                    ['tsa_enabled', 'tsa_signer_cert_refid'])).delete(synchronize_session=False)
+                db.session.commit()
+
+    def test_media_type_is_matched_exactly_and_without_case(self, app, client, create_ca):
+        cert, key = _self_signed_tsa(include_eku=False, basic_constraints_ca=True)
+        cleanup = _configure_ca_signer(app, create_ca, cert, key, 'TSA media type CA')
+        tsq = _build_tsq(hashlib.sha256(b'media type').digest())
+        try:
+            ok = client.post('/tsa', data=tsq, content_type='Application/Timestamp-Query')
+            assert ok.status_code == 200
+            assert _status_native(ok.data) == 'granted'
+
+            refused = client.post('/tsa', data=tsq,
+                                  content_type='application/x-not-a-timestamp-query')
+            assert refused.status_code == 400
+            assert refused.mimetype == 'text/plain'
+        finally:
+            cleanup()
+
+    def test_rejected_request_counts_as_failed(self, app, client, auth_client, create_ca):
+        from models import AuditLog, db
+        cert, key = _self_signed_tsa(include_eku=False, basic_constraints_ca=True)
+        cleanup = _configure_ca_signer(app, create_ca, cert, key, 'TSA failed stats CA')
+        try:
+            before = auth_client.get('/api/v2/tsa/stats').get_json()['data']
+            response = client.post(
+                '/tsa', data=_build_tsq(b'\x00' * 16, hash_oid='1.2.840.113549.2.5'),
+                content_type='application/timestamp-query')
+            assert _status_native(response.data) == 'rejection'
+            after = auth_client.get('/api/v2/tsa/stats').get_json()['data']
+
+            assert after['failed'] == before['failed'] + 1
+            assert after['total'] == before['total'] + 1
+            with app.app_context():
+                row = AuditLog.query.filter_by(action='tsa.timestamp_rejected').order_by(
+                    AuditLog.id.desc()).first()
+                assert row is not None and row.success is False
+                assert 'bad_alg' in row.details
+        finally:
+            cleanup()
 
 
 if __name__ == '__main__':

@@ -38,10 +38,15 @@ class SSHCertificateManagementMixin:
         if not cert:
             raise ValueError(f"SSH certificate not found: {cert_id}")
 
-        # A valid (not revoked, not expired) certificate cannot be deleted
-        if not cert.revoked and cert.valid_to > utc_now():
+        # The KRL is built from these rows: an unexpired certificate stays until it expires,
+        # or a revoked one would drop out of the KRL and be accepted again
+        if cert.valid_to > utc_now():
+            if not cert.revoked:
+                raise ValueError(
+                    "Cannot delete a valid, non-revoked SSH certificate. Revoke it first.")
             raise ValueError(
-                "Cannot delete a valid, non-revoked SSH certificate. Revoke it first.")
+                "A revoked SSH certificate stays in the KRL until it expires: "
+                f"it can be deleted after {cert.valid_to:%Y-%m-%d %H:%M} UTC.")
 
         cert_name = cert.key_id
         try:

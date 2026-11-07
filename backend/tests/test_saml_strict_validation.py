@@ -208,15 +208,27 @@ def test_role_mapping_reads_the_attribute_mapped_to_groups(app, mapped_provider,
     assert role == 'operator'
 
 
-def test_unmatched_groups_get_the_default_role(app, mapped_provider, idp_signer):
+def test_unmatched_groups_are_refused_when_rules_exist(app, mapped_provider, idp_signer):
     mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}))
+    client = app.test_client()
+    request_id = _start_login(client)
+    name_id = f'saml-{uuid.uuid4().hex[:12]}'
+    resp = _response(idp_signer, in_response_to=request_id, name_id=name_id,
+                     attributes={'groups': ['someone-else']})
+    assert _post(client, resp) == '/login?error=sso_unmapped'
+    with app.app_context():
+        assert User.query.filter_by(sso_external_id=name_id).count() == 0
+
+
+def test_without_rules_users_get_the_default_role(app, mapped_provider, idp_signer):
     role, _ = _login_role(app, idp_signer, attributes={'groups': ['someone-else']})
     assert role == 'viewer'
 
 
 def test_role_sync_follows_the_groups_on_the_next_login(app, mapped_provider, idp_signer):
-    mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}), sync_role_on_login=True)
-    role, name_id = _login_role(app, idp_signer)
+    mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin', 'pki-users': 'viewer'}),
+                    sync_role_on_login=True)
+    role, name_id = _login_role(app, idp_signer, attributes={'groups': ['pki-users']})
     assert role == 'viewer'
     client = app.test_client()
     request_id = _start_login(client)
@@ -225,6 +237,28 @@ def test_role_sync_follows_the_groups_on_the_next_login(app, mapped_provider, id
     assert _post(client, resp) == OK
     with app.app_context():
         assert User.query.filter_by(sso_external_id=name_id).one().role == 'admin'
+
+
+def test_a_signed_name_id_does_not_open_the_local_account_of_that_name(app, provider, idp_signer):
+    """OIDC Core §5.7 by analogy: only the IdP's own subject identifies the user."""
+    with app.app_context():
+        User.query.filter_by(username='samltkadmin').delete()
+        db.session.add(User(username='samltkadmin', email='samltk@corp.test', full_name='A',
+                            role='admin', active=True, password_hash='hash', auth_source='local'))
+        db.session.commit()
+    try:
+        client = app.test_client()
+        request_id = _start_login(client)
+        resp = _response(idp_signer, in_response_to=request_id, name_id='samltkadmin')
+        assert _post(client, resp) == '/login?error=sso_username_conflict'
+        assert not _authenticated(client)
+        with app.app_context():
+            admin = User.query.filter_by(username='samltkadmin').one()
+            assert admin.sso_external_id is None and admin.auth_source == 'local'
+    finally:
+        with app.app_context():
+            User.query.filter_by(username='samltkadmin').delete()
+            db.session.commit()
 
 
 def _cookie_headers(r):
@@ -715,3 +749,212 @@ def test_custom_role_follows_the_mapping_through_the_callback(app, mapped_provid
     with app.app_context():
         user = User.query.filter_by(sso_external_id=name_id).one()
         assert (user.role, user.custom_role_id, user.custom_role_source) == ('operator', role_id, 'sso')
+
+
+# ── IdP-initiated Single Logout (HTTP-Redirect, SAML Profiles §4.4) ──────────
+
+IDP_SLO = 'https://idp.example.test/slo'
+
+
+def _authenticated(client):
+    body = client.get('/api/v2/auth/verify', base_url=SP_BASE).get_json() or {}
+    return bool((body.get('data') or {}).get('authenticated'))
+
+
+def _logout_request(key_pem, name_id, *, sign=True, issuer=IDP_ENTITY, encode=None, session_index='_s1',
+                    destination=True, issued=0):
+    from urllib.parse import quote_plus
+    from cryptography.hazmat.primitives.asymmetric import padding
+    quote_plus = encode or quote_plus
+    rid = f'_lr{uuid.uuid4().hex}'
+    dest = f' Destination="{SP_BASE}{ACS}"' if destination else ''
+    xml = (f'<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" '
+           f'xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{rid}" Version="2.0" '
+           f'IssueInstant="{_ts(issued)}"{dest}><saml:Issuer>{issuer}</saml:Issuer>'
+           f'<saml:NameID Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">{name_id}'
+           f'</saml:NameID>'
+           + (f'<samlp:SessionIndex>{session_index}</samlp:SessionIndex>' if session_index else '')
+           + '</samlp:LogoutRequest>')
+    encoded = OneLogin_Saml2_Utils.deflate_and_base64_encode(xml)
+    query = f'SAMLRequest={quote_plus(encoded)}'
+    if sign:
+        query += f'&SigAlg={quote_plus(K.RSA_SHA256)}'
+        key = serialization.load_pem_private_key(key_pem.encode(), password=None)
+        signature = base64.b64encode(key.sign(query.encode(), padding.PKCS1v15(), hashes.SHA256()))
+        query += f'&Signature={quote_plus(signature.decode())}'
+    return rid, f'{ACS}?{query}'
+
+
+def _signed_in(app, idp_signer):
+    client = app.test_client()
+    request_id = _start_login(client)
+    name_id = f'saml-{uuid.uuid4().hex[:12]}'
+    assert _post(client, _response(idp_signer, in_response_to=request_id, name_id=name_id)) == OK
+    assert _authenticated(client)
+    return client, name_id
+
+
+@pytest.fixture
+def slo_url(app, provider):
+    _configure(app, provider, saml_slo_url=IDP_SLO)
+    yield IDP_SLO
+    _configure(app, provider, saml_slo_url=None)
+
+
+def test_signed_logout_request_closes_the_session_and_answers_the_idp(app, slo_url, idp_signer):
+    from urllib.parse import parse_qs, urlsplit
+    client, name_id = _signed_in(app, idp_signer)
+    rid, url = _logout_request(idp_signer[0], name_id)
+    r = client.get(url, base_url=SP_BASE)
+    assert r.status_code == 302 and r.headers['Location'].startswith(IDP_SLO + '?')
+    answer = parse_qs(urlsplit(r.headers['Location']).query)
+    xml = OneLogin_Saml2_Utils.decode_base64_and_inflate(answer['SAMLResponse'][0]).decode()
+    assert f'InResponseTo="{rid}"' in xml and K.STATUS_SUCCESS in xml
+    assert not _authenticated(client)
+    with app.app_context():
+        assert SSOSession.query.filter_by(sso_name_id=name_id).count() == 0
+
+
+@pytest.mark.parametrize('sign_requests', [True, False])
+def test_logout_response_is_signed_with_an_rsa_sp_key(app, slo_url, provider, idp_signer,
+                                                      https_identity, sign_requests):
+    """SAML Profiles §4.4.4.2: the responder MUST authenticate the LogoutResponse,
+    whatever request signing says."""
+    from urllib.parse import parse_qs, urlsplit
+    https_identity('rsa')
+    _configure(app, provider, saml_sign_requests=sign_requests)
+    try:
+        client, name_id = _signed_in(app, idp_signer)
+        _, url = _logout_request(idp_signer[0], name_id)
+        r = client.get(url, base_url=SP_BASE)
+        answer = parse_qs(urlsplit(r.headers['Location']).query)
+        assert answer['SigAlg'] == [K.RSA_SHA256] and answer.get('Signature')
+    finally:
+        _configure(app, provider, saml_sign_requests=False)
+
+
+def test_logout_response_without_an_rsa_sp_key_goes_unsigned(app, slo_url, idp_signer,
+                                                             https_identity, caplog):
+    from urllib.parse import parse_qs, urlsplit
+    https_identity('ec')
+    client, name_id = _signed_in(app, idp_signer)
+    _, url = _logout_request(idp_signer[0], name_id)
+    r = client.get(url, base_url=SP_BASE)
+    answer = parse_qs(urlsplit(r.headers['Location']).query)
+    assert 'Signature' not in answer and answer.get('SAMLResponse')
+    assert 'LogoutResponse sent unsigned' in caplog.text
+
+
+def test_signature_is_checked_on_the_query_as_the_idp_encoded_it(app, slo_url, idp_signer):
+    """AD FS percent-encodes in lower case: re-encoding the values would break its signature."""
+    import re
+    from urllib.parse import quote_plus
+
+    def lower(value):
+        return re.sub(r'%[0-9A-F]{2}', lambda m: m.group(0).lower(), quote_plus(value))
+    client, name_id = _signed_in(app, idp_signer)
+    _, url = _logout_request(idp_signer[0], name_id, encode=lower)
+    assert '%2b' in url or '%2f' in url or '%3d' in url
+    r = client.get(url, base_url=SP_BASE)
+    assert r.headers['Location'].startswith(IDP_SLO + '?')
+    assert not _authenticated(client)
+
+
+@pytest.mark.parametrize('forge', ['unsigned', 'other_key', 'other_issuer'])
+def test_forged_logout_request_is_refused_and_the_session_kept(app, slo_url, idp_signer, forge):
+    client, name_id = _signed_in(app, idp_signer)
+    if forge == 'unsigned':
+        _, url = _logout_request(idp_signer[0], name_id, sign=False)
+    elif forge == 'other_key':
+        other = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption()).decode()
+        _, url = _logout_request(other, name_id)
+    else:
+        _, url = _logout_request(idp_signer[0], name_id, issuer='https://evil.example.test')
+    r = client.get(url, base_url=SP_BASE)
+    assert r.headers['Location'] == '/login?error=saml_logout_rejected'
+    assert _authenticated(client)
+
+
+def test_logout_of_another_name_id_leaves_this_session(app, slo_url, idp_signer):
+    client, _ = _signed_in(app, idp_signer)
+    _, url = _logout_request(idp_signer[0], 'someone-else')
+    r = client.get(url, base_url=SP_BASE)
+    assert r.headers['Location'].startswith(IDP_SLO + '?')
+    assert _authenticated(client)
+
+
+def test_without_an_idp_slo_url_the_session_still_closes(app, provider, idp_signer):
+    client, name_id = _signed_in(app, idp_signer)
+    _, url = _logout_request(idp_signer[0], name_id)
+    r = client.get(url, base_url=SP_BASE)
+    assert r.headers['Location'] == '/login'
+    assert not _authenticated(client)
+
+
+@pytest.mark.parametrize('smuggled', ['%53AMLRequest', '%52elayState'])
+def test_a_parameter_outside_the_signed_query_is_refused(app, slo_url, idp_signer, smuggled):
+    """The values acted on must be the bytes the IdP signed, not a re-encoded twin."""
+    client, name_id = _signed_in(app, idp_signer)
+    forged = _logout_request(idp_signer[0], name_id, sign=False)[1].split('SAMLRequest=', 1)[1]
+    _, signed = _logout_request(idp_signer[0], 'attacker-own-nameid')
+    value = forged if smuggled == '%53AMLRequest' else 'https://evil.example.test/'
+    url = f'{ACS}?{smuggled}={value}&{signed.split("?", 1)[1]}'
+    r = client.get(url, base_url=SP_BASE)
+    assert r.headers['Location'] == '/login?error=saml_logout_rejected'
+    assert _authenticated(client)
+
+
+@pytest.mark.parametrize('session_index, closed', [('_s1', True), (None, True), ('_other', False)])
+def test_logout_closes_only_the_session_it_names(app, slo_url, idp_signer, session_index, closed):
+    """SAML Core §3.7.3.2: with SessionIndex values, only those sessions end; without, all of them."""
+    client, name_id = _signed_in(app, idp_signer)
+    _, url = _logout_request(idp_signer[0], name_id, session_index=session_index)
+    r = client.get(url, base_url=SP_BASE)
+    assert r.headers['Location'].startswith(IDP_SLO + '?')
+    assert _authenticated(client) is not closed
+
+
+@pytest.mark.parametrize('variant', ['no_destination', 'issued_long_ago', 'issued_in_the_future'])
+def test_a_signed_logout_request_without_destination_or_out_of_time_is_refused(
+        app, slo_url, idp_signer, variant):
+    """SAML Bindings §3.4.5.2: a signed message MUST carry Destination; IssueInstant
+    must fall within the clock window."""
+    client, name_id = _signed_in(app, idp_signer)
+    kwargs = {'no_destination': {'destination': False},
+              'issued_long_ago': {'issued': -600},
+              'issued_in_the_future': {'issued': 10}}[variant]
+    _, url = _logout_request(idp_signer[0], name_id, **kwargs)
+    r = client.get(url, base_url=SP_BASE)
+    assert r.headers['Location'] == '/login?error=saml_logout_rejected'
+    assert _authenticated(client)
+
+
+def test_a_replayed_logout_request_does_not_close_a_later_session(app, slo_url, idp_signer):
+    def sign_in(name_id):
+        client = app.test_client()
+        request_id = _start_login(client)
+        assert _post(client, _response(idp_signer, in_response_to=request_id, name_id=name_id)) == OK
+        assert _authenticated(client)
+        return client
+    name_id = f'saml-{uuid.uuid4().hex[:12]}'
+    first = sign_in(name_id)
+    _, url = _logout_request(idp_signer[0], name_id, session_index=None)
+    assert first.get(url, base_url=SP_BASE).headers['Location'].startswith(IDP_SLO + '?')
+    assert not _authenticated(first)
+    later = sign_in(name_id)
+    r = later.get(url, base_url=SP_BASE)
+    assert r.headers['Location'] == '/login?error=saml_logout_rejected'
+    assert _authenticated(later)
+
+
+def test_a_saml_login_issues_a_new_session_identifier(app, provider, idp_signer):
+    # RFC 6265 §8.4: an identifier planted before the login never becomes the session
+    client = app.test_client()
+    with client.session_transaction(base_url=SP_BASE) as planted_session:
+        planted_session['planted'] = True
+    planted = client.get_cookie('session', domain='ucm.example.test').value
+    request_id = _start_login(client)
+    assert _post(client, _response(idp_signer, in_response_to=request_id)) == OK
+    assert client.get_cookie('session', domain='ucm.example.test').value != planted

@@ -2,8 +2,9 @@
 CSR operations mixin for TrustStoreService
 """
 import ipaddress
+import math
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 from cryptography import x509
@@ -14,13 +15,13 @@ from cryptography.x509.oid import NameOID, ExtensionOID
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
-from utils.datetime_utils import utc_now, cert_not_before
+from utils.datetime_utils import CERT_NOT_BEFORE_SKEW, utc_now, cert_not_before
 from utils.ca_signing_window import check_issuer_window, clamp_not_after
 from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.leaf_key_usage import builder_key_usage, constrain_builder_key_usage, key_usage_notice
 from .constants import hash_algorithm
 from .key_operations_mixin import KeyOperationsMixin
-from .constraints_mixin import ConstraintsMixin
+from .constraints_mixin import ConstraintsMixin, CsrRefused
 from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
@@ -371,7 +372,7 @@ def _filter_csr_ekus(eku_oids, cert_type, allow_sensitive_ekus, renewal_of=None)
         # MORE than a CSR requesting nothing. Fall back to the type's profile.
         kept = _default_ekus_for_cert_type(cert_type)
         if not kept:
-            raise ValueError(
+            raise CsrRefused(
                 "CSR requests only Extended Key Usages that are not permitted "
                 f"for certificate type {cert_type!r}"
             )
@@ -402,7 +403,7 @@ def _capped_basic_constraints(csr_constraints, ca_cert):
         return csr_constraints
 
     if parent_limit <= 0:
-        raise ValueError(
+        raise CsrRefused(
             "Issuing CA has pathLenConstraint 0 and may not issue a subordinate CA"
         )
 
@@ -630,9 +631,12 @@ class CSROperationsMixin:
         qualification_template=None,
         notices: Optional[list] = None,
         custom_extensions: Optional[list] = None,
+        not_before: Optional[datetime] = None,
+        not_after: Optional[datetime] = None,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
-        signing renews — its names are graced by NameConstraints validation.
+        signing renews — its names are graced by NameConstraints validation,
+        and stand for the SAN of a CSR that carries none.
         ``allow_sensitive_ekus``: keep OCSPSigning/timeStamping from the CSR —
         reserved for the admin Sign-CSR path (an operator explicitly signing a
         delegated responder/TSA CSR); protocol enrollees never get them.
@@ -654,8 +658,8 @@ class CSROperationsMixin:
         CSR's own (empty) one — applying it later would let a CA's
         NameConstraints be silently bypassed by whatever subject was
         derived server-side.
-        ``override_san``: replaces the auto-synthesized SAN outright when
-        given, instead of deriving it from ``override_subject``'s CN via
+        ``override_san``: replaces the CSR's SAN or the auto-synthesized one
+        outright when given, instead of deriving it from ``override_subject``'s CN via
         ``_synthesize_san_from_subject``. Needed for AD-derived user
         subjects: a user's directory-path CN (e.g. "Roy Hagland") isn't a
         DNS name or email address, so synthesis would build a nonsensical
@@ -694,9 +698,9 @@ class CSROperationsMixin:
         from utils.key_type import validate_enrollment_csr
         key_err = validate_enrollment_csr(csr)
         if key_err:
-            raise ValueError(f"CSR public key rejected: {key_err}")
+            raise CsrRefused(f"CSR public key rejected: {key_err}")
         if require_pop and not csr.is_signature_valid:
-            raise ValueError("CSR has invalid signature")
+            raise CsrRefused("CSR has invalid signature")
         related_a = _verified_related_certificate(csr, cert_type)
 
         # Effective subject: an override (if any) wins outright; otherwise
@@ -729,6 +733,14 @@ class CSROperationsMixin:
             csr_sans = None
             has_csr_san = False
 
+        if override_san is None and not has_csr_san and renewal_of is not None:
+            # A renewal keeps its identity: the renewed certificate's names, or none,
+            # never a name built from the CN (RFC 7030 §4.2.2)
+            try:
+                override_san = list(renewal_of.extensions.get_extension_for_class(
+                    x509.SubjectAlternativeName).value)
+            except x509.ExtensionNotFound:
+                override_san = []
         if override_san is not None:
             effective_sans = override_san
         elif has_csr_san:
@@ -746,8 +758,8 @@ class CSROperationsMixin:
                 n for n in extra_san if n not in effective_sans]
         if san_template is not None:
             from services.template_service import allowed_san_types, check_san_types, san_type_of
-            # The names that land: the CSR's own SAN when it has one, else the override
-            requested = list(csr_sans or []) if has_csr_san or override_san is None else override_san
+            # The names that land: the override when given, else the CSR's own SAN
+            requested = override_san if override_san is not None else list(csr_sans or [])
             check_san_types(san_template, list(requested) + list(extra_san or []))
             allowed = allowed_san_types(san_template)
             if allowed is not None and override_san is None and not has_csr_san:
@@ -780,15 +792,26 @@ class CSROperationsMixin:
             explicit=bool((policy_scope or {}).get('digest_explicit', policy_scope is None)),
             key_type=key_label_for_public_key(csr.public_key()), context=policy_context,
             pq_hybrid=related_a is not None)
+        if not_after is not None:
+            # A requested notAfter is issued as asked: the days are what the policies judge,
+            # with the skew UCM's own certificates carry beyond their days
+            validity_days = max(1, math.ceil(
+                (not_after - (not_before or utc_now()) - CERT_NOT_BEFORE_SKEW).total_seconds() / 86400))
         if policy_scope is not None:
             # Name count, validity ceiling and key horizons, for the protocols as for the form
             dns_count = sum(isinstance(n, x509.DNSName) for n in (effective_sans or []))
             limit_violations, capped, capped_by = PolicyEvaluationService.enforce_rules(
                 policies, key_type=key_label_for_public_key(csr.public_key()),
                 dns_name_count=dns_count, validity_days=validity_days,
+                # Key horizons judge the notAfter actually issued, requested dates included
+                not_after=not_after.date() if not_after is not None else None,
+                not_before=not_before,
                 context=policy_context, pq_hybrid=related_a is not None)
             violations = list(dict.fromkeys(list(violations) + limit_violations))
-            if capped_by:
+            if capped_by and not_after is not None:
+                violations.append(f"The requested validity exceeds the {capped} days "
+                                  f"allowed by policy '{capped_by}'")
+            elif capped_by:
                 logger.info(f"Validity capped to {capped} days by policy '{capped_by}'")
                 validity_days = capped
         if violations:
@@ -800,10 +823,12 @@ class CSROperationsMixin:
         builder = builder.issuer_name(ca_cert.subject)
         builder = builder.public_key(csr.public_key())
         builder = builder.serial_number(x509.random_serial_number())
-        builder = builder.not_valid_before(cert_not_before())
-        builder = builder.not_valid_after(
-            clamp_not_after(utc_now() + timedelta(days=validity_days), ca_cert)
-        )
+        start = not_before or cert_not_before()
+        if not_after is not None and clamp_not_after(not_after, ca_cert) != not_after:
+            raise ValueError('The requested notAfter is later than the issuing CA certificate expires')
+        builder = builder.not_valid_before(start)
+        builder = builder.not_valid_after(not_after if not_after is not None else clamp_not_after(
+            (not_before or utc_now()) + timedelta(days=validity_days), ca_cert))
 
         # Copy only extensions appropriate for the requested certificate role.
         # CA-only constraints from an enrollee CSR must never reach a leaf.
@@ -820,7 +845,7 @@ class CSROperationsMixin:
             and csr_basic_constraints is not None
             and not csr_basic_constraints.value.ca
         ):
-            raise ValueError(
+            raise CsrRefused(
                 "Intermediate CA CSR BasicConstraints must set ca=True"
             )
 
@@ -905,6 +930,8 @@ class CSROperationsMixin:
                 builder = builder.add_extension(x509.TLSFeature(features), critical=False)
                 continue
             if extension.oid == ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
+                if override_san is not None:
+                    continue  # replaced by the override, added below
                 # RFC 5280 §4.2.1.6: SAN MUST be critical when the subject
                 # is empty -- the CSR's flag cannot override that.
                 san_value = (x509.SubjectAlternativeName(effective_sans)
@@ -919,7 +946,7 @@ class CSROperationsMixin:
         # effective_sans, already computed above for NameConstraints, so
         # what got constraint-checked and what actually lands on the
         # certificate can't drift apart.
-        if not has_csr_san and effective_sans:
+        if (not has_csr_san or override_san is not None) and effective_sans:
             builder = builder.add_extension(
                 x509.SubjectAlternativeName(effective_sans),
                 critical=len(subject) == 0,
@@ -1006,14 +1033,16 @@ class CSROperationsMixin:
             # on top, as on the issue form. Renewal at par does not apply:
             # the template is the policy, prior EKUs outside it are not
             # resurrected. A template whose every EKU was refused imposes
-            # the cert_type default profile, never the CSR's request.
-            if not tpl_ekus:
+            # the cert_type default profile, never the CSR's request, unless
+            # extra_ekus already give the leaf its purposes.
+            if not tpl_ekus and not extra_oids:
                 logger.warning(
                     "sign_csr: every template EKU was refused for certificate "
                     "type %r; issuing its default profile instead", cert_type,
                 )
             merged = merge_eku_lists(
-                tpl_ekus or _default_ekus_for_cert_type(cert_type), extra_oids
+                tpl_ekus or ([] if extra_oids else _default_ekus_for_cert_type(cert_type)),
+                extra_oids,
             )
             if merged:
                 builder = builder.add_extension(

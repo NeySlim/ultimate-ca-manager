@@ -516,6 +516,17 @@ def enroll_presented_certificate():
         if hasattr(valid_from, 'timestamp') and valid_from > datetime.now(timezone.utc):
             return error_response('Cannot enroll certificate that is not yet valid', 400)
 
+    # A revoked certificate is refused here as by /enroll-import: it could never log in
+    if cert_info.get('cert_pem'):
+        from services.cert.issued_lookup import REVOKED, issued_certificate_status
+        from services.mtls_enrollment import issuing_ca_for
+        presented = cx509.load_pem_x509_certificate(cert_info['cert_pem'].encode())
+        issuer = issuing_ca_for(presented)
+        if issuer is not None and issuer.revoked_in_chain:  # RFC 5280 §6.1.3: the whole path
+            return error_response('This certificate issuer has been revoked', 400)
+        if issuer is not None and issued_certificate_status(issuer, presented)[1] == REVOKED:
+            return error_response('This certificate has been revoked', 400)
+
     # Check if already enrolled
     from services.mtls_enrollment import dn_attributes, presented_identity
     presented_serial, presented_issuer = presented_identity(cert_info)
@@ -593,6 +604,8 @@ def enroll_import_certificate():
             'Certificate was not issued by a CA of this server and cannot be enrolled',
             400,
         )
+    if issuing_ca.revoked_in_chain:  # RFC 5280 §6.1.3(a)(3): the whole path, as /enroll
+        return error_response('This certificate issuer has been revoked', 400)
 
     serial = str(cert_obj.serial_number)
     subject_dn = cert_obj.subject.rfc4514_string()

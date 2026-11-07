@@ -254,7 +254,10 @@ def _validate_claims(claims, issuer, client_id, expected_nonce):
         raise OIDCValidationError('ID token has invalid audience')
     if client_id not in audiences:
         raise OIDCValidationError('ID token audience mismatch')
-    if len(audiences) > 1 and claims.get('azp') != client_id:
+    # OIDC Core §3.1.3.7 steps 4-5: azp required with several audiences, and
+    # whenever present it must be this client.
+    azp = claims.get('azp')
+    if (len(audiences) > 1 or azp is not None) and azp != client_id:
         raise OIDCValidationError('ID token authorized party mismatch')
 
     expires_at = _numeric_date(claims, 'exp', required=True)
