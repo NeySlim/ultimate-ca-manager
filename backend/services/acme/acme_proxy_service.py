@@ -1030,7 +1030,8 @@ class AcmeProxyService:
             if not (_same_instant(not_before, upstream_order.get('notBefore'))
                     and _same_instant(not_after, upstream_order.get('notAfter'))):
                 continue
-            if replaces and upstream_order.get('replaces') != replaces:
+            # Servers echo replaces only when it was sent: a plain retry must not inherit one
+            if (replaces or None) != (upstream_order.get('replaces') or None):
                 continue
             logger.info(
                 "[ACME Proxy] Reusing pending order %s for %s (same account, "

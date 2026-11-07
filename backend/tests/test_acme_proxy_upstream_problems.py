@@ -352,3 +352,18 @@ class TestProfileAndNotAfter:
                 not_after=_dt(2026, 12, 1, tzinfo=_tz.utc))
             assert [url for url, _p in upstream.calls] == [ORDER_URL, NEW_ORDER_URL]
             assert order['notAfter'] == '2026-12-01T00:00:00Z'
+
+    def test_pending_replacement_order_is_not_reused_for_a_plain_request(self, app, monkeypatch):
+        with app.app_context():
+            _order_row(thumbprint='up-thumb')
+            upstream = _Upstream({
+                ORDER_URL: _Resp({'status': 'pending', 'replaces': 'aYhba4dGQEHhs3uEe6CuLN4ByNQ.AIdlQyE',
+                                  'finalize': FINALIZE_URL}),
+                NEW_ORDER_URL: _Resp({'status': 'pending', 'authorizations': [AUTHZ_URL],
+                                      'finalize': FINALIZE_URL},
+                                     201, {'Location': f'{UPSTREAM}/acme/order/up/4'}),
+            })
+            svc = _svc(monkeypatch, upstream)
+            svc.directory['renewalInfo'] = f'{UPSTREAM}/acme/renewal-info'
+            svc.new_order([{'type': 'dns', 'value': DOMAIN}], client_thumbprint='up-thumb')
+            assert [url for url, _p in upstream.calls] == [ORDER_URL, NEW_ORDER_URL]
