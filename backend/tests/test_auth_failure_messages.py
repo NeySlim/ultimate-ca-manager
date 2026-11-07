@@ -116,6 +116,11 @@ def test_the_ldap_door_names_a_deactivated_account(
 ):
     """It answers after the bind, so it may say why."""
     username = local_user(active=False)
+    with client.application.app_context():
+        # An account of this directory, disabled in UCM: a local one is never opened.
+        User.query.filter_by(username=username).update(
+            {'auth_source': 'ldap', 'sso_provider_id': ldap_provider})
+        db.session.commit()
     _bind_succeeds(monkeypatch, username)
     assert _login(client, username, '/api/v2/sso/ldap/login', ldap_provider) == (
         403, 'This account has been disabled')
@@ -164,13 +169,13 @@ def test_the_named_reasons_are_decided_after_the_bind():
     """The property that makes them safe to say out loud.
 
     If ``account_disabled`` or ``group_denied`` were ever returned before
-    ``user_conn.bind()``, an unauthenticated caller could read an account's
+    the user's bind, an unauthenticated caller could read an account's
     state out of a 403. Checked on the source, because no amount of mocking
     the bind can demonstrate an ordering.
     """
     from api.v2.sso.connection_tests import _ldap_authenticate_user
 
     source = inspect.getsource(_ldap_authenticate_user)
-    bind = source.index('user_conn.bind()')
+    bind = source.index('ldap_bind(user_conn, provider)')
     for reason in ("'account_disabled'", "'group_denied'"):
         assert source.index(reason) > bind, f'{reason} is decided before the bind'
