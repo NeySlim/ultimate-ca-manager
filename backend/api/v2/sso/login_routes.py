@@ -83,6 +83,7 @@ def _saml_logout_request(provider):
     from onelogin.saml2.logout_request import OneLogin_Saml2_Logout_Request
     from onelogin.saml2.logout_response import OneLogin_Saml2_Logout_Response
     from onelogin.saml2.utils import OneLogin_Saml2_Utils
+    from onelogin.saml2.xml_utils import OneLogin_Saml2_XML
 
     base = saml_sp.sp_base_url(request)
     sp_cert = sp_key = None
@@ -106,6 +107,16 @@ def _saml_logout_request(provider):
             return _reject_saml_logout(provider, 'invalid or missing signature')
         if not logout_request.is_valid(data):
             return _reject_saml_logout(provider, logout_request.get_error() or 'invalid LogoutRequest')
+        # A signed message MUST name its Destination (SAML Bindings §3.4.5.2); the
+        # library checks it only when present. Fresh and used once, or a replay ends a later session.
+        root = OneLogin_Saml2_XML.to_etree(xml)
+        if not root.get('Destination'):
+            return _reject_saml_logout(provider, 'signed LogoutRequest without Destination')
+        issued = OneLogin_Saml2_Utils.parse_SAML_to_time(root.get('IssueInstant'))
+        if not saml_sp.logout_request_fresh(issued):
+            return _reject_saml_logout(provider, 'IssueInstant outside the clock window')
+        if not saml_sp.consume_logout_request(logout_request.id, provider.id, issued):
+            return _reject_saml_logout(provider, 'LogoutRequest already used')
         name_id = OneLogin_Saml2_Logout_Request.get_nameid(xml)
         indexes = OneLogin_Saml2_Logout_Request.get_session_indexes(xml)
     except Exception as e:

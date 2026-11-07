@@ -288,7 +288,8 @@ class SSOSession(db.Model):
 
 
 class SAMLMessageId(db.Model):
-    """AuthnRequest ids awaiting a response, and assertion ids already consumed.
+    """AuthnRequest ids awaiting a response, and assertion and LogoutRequest ids
+    already consumed.
 
     Shared by every worker; a row lives until `expires_at`, the unique key is
     what refuses a second use.
@@ -298,6 +299,7 @@ class SAMLMessageId(db.Model):
 
     KIND_REQUEST = 'request'
     KIND_ASSERTION = 'assertion'
+    KIND_LOGOUT = 'logout'
 
     id = db.Column(db.Integer, primary_key=True)
     kind = db.Column(db.String(16), nullable=False)

@@ -761,14 +761,16 @@ def _authenticated(client):
     return bool((body.get('data') or {}).get('authenticated'))
 
 
-def _logout_request(key_pem, name_id, *, sign=True, issuer=IDP_ENTITY, encode=None, session_index='_s1'):
+def _logout_request(key_pem, name_id, *, sign=True, issuer=IDP_ENTITY, encode=None, session_index='_s1',
+                    destination=True, issued=0):
     from urllib.parse import quote_plus
     from cryptography.hazmat.primitives.asymmetric import padding
     quote_plus = encode or quote_plus
     rid = f'_lr{uuid.uuid4().hex}'
+    dest = f' Destination="{SP_BASE}{ACS}"' if destination else ''
     xml = (f'<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" '
            f'xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{rid}" Version="2.0" '
-           f'IssueInstant="{_ts()}" Destination="{SP_BASE}{ACS}"><saml:Issuer>{issuer}</saml:Issuer>'
+           f'IssueInstant="{_ts(issued)}"{dest}><saml:Issuer>{issuer}</saml:Issuer>'
            f'<saml:NameID Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">{name_id}'
            f'</saml:NameID>'
            + (f'<samlp:SessionIndex>{session_index}</samlp:SessionIndex>' if session_index else '')
@@ -912,3 +914,36 @@ def test_logout_closes_only_the_session_it_names(app, slo_url, idp_signer, sessi
     r = client.get(url, base_url=SP_BASE)
     assert r.headers['Location'].startswith(IDP_SLO + '?')
     assert _authenticated(client) is not closed
+
+
+@pytest.mark.parametrize('variant', ['no_destination', 'issued_long_ago', 'issued_in_the_future'])
+def test_a_signed_logout_request_without_destination_or_out_of_time_is_refused(
+        app, slo_url, idp_signer, variant):
+    """SAML Bindings §3.4.5.2: a signed message MUST carry Destination; IssueInstant
+    must fall within the clock window."""
+    client, name_id = _signed_in(app, idp_signer)
+    kwargs = {'no_destination': {'destination': False},
+              'issued_long_ago': {'issued': -600},
+              'issued_in_the_future': {'issued': 10}}[variant]
+    _, url = _logout_request(idp_signer[0], name_id, **kwargs)
+    r = client.get(url, base_url=SP_BASE)
+    assert r.headers['Location'] == '/login?error=saml_logout_rejected'
+    assert _authenticated(client)
+
+
+def test_a_replayed_logout_request_does_not_close_a_later_session(app, slo_url, idp_signer):
+    def sign_in(name_id):
+        client = app.test_client()
+        request_id = _start_login(client)
+        assert _post(client, _response(idp_signer, in_response_to=request_id, name_id=name_id)) == OK
+        assert _authenticated(client)
+        return client
+    name_id = f'saml-{uuid.uuid4().hex[:12]}'
+    first = sign_in(name_id)
+    _, url = _logout_request(idp_signer[0], name_id, session_index=None)
+    assert first.get(url, base_url=SP_BASE).headers['Location'].startswith(IDP_SLO + '?')
+    assert not _authenticated(first)
+    later = sign_in(name_id)
+    r = later.get(url, base_url=SP_BASE)
+    assert r.headers['Location'] == '/login?error=saml_logout_rejected'
+    assert _authenticated(later)
