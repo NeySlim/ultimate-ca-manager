@@ -47,8 +47,9 @@ def _scenario():
     _, cross = _cert('Migration 134 Root', key)
     _, other = _cert('Migration 134 Other')
     cas = [(1, _stored(cert)), (2, _stored(cross)), (3, _stored(other))]
-    # (id, ca_id, crl_number): 11 and 12 share CA 1's number 5, 12 is the most recent
-    crls = [(10, 1, 4), (11, 1, 5), (12, 1, 5), (20, 2, 9), (30, 3, 2)]
+    # (id, ca_id, crl_number): 11 and 12 share CA 1's number 9, 12 is the most recent;
+    # the cross record's own highest (5) comes after it and must not lower the floor
+    crls = [(10, 1, 4), (11, 1, 9), (12, 1, 9), (20, 2, 5), (30, 3, 2)]
     expected = {crl_issuer_key(cert): 9, crl_issuer_key(other): 2}
     return cas, crls, expected
 
