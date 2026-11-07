@@ -82,13 +82,14 @@ def _legacy_to_rfc4514(text: str) -> str:
     rdns = []
     for part in filter(None, parts):
         avas = []
-        # A multi-valued RDN prints as /CN=R+O=O1: '+' before another type separates its values
-        for ava in re.split(r'\+(?=[A-Za-z][A-Za-z0-9-]*=|(?:OID\.)?\d+(?:\.\d+)+=)', part):
+        # A multi-valued RDN prints as /CN=R+O=O1: an unescaped '+' before another type separates its values
+        for ava in re.split(r'(?<!\\)\+(?=[A-Za-z][A-Za-z0-9-]*=|(?:OID\.)?\d+(?:\.\d+)+=)', part):
             name, sep, value = ava.partition('=')
             if not sep:
                 raise ValueError(part)
             raw = re.sub(rb'\\x([0-9a-fA-F]{2})', lambda m: bytes([int(m.group(1), 16)]),
                          value.encode('utf-8')).decode('utf-8')
+            raw = re.sub(r'\\(.)', r'\1', raw)      # OpenSSL 3 escapes '+' and '/' in values
             escaped = re.sub(r'([,+"\\<>;=])', r'\\\1', raw)
             if escaped[:1] in ('#', ' '):
                 escaped = '\\' + escaped

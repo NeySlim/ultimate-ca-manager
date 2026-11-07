@@ -418,3 +418,27 @@ def test_an_unreadable_issuer_never_matches_an_enrolment_holding_its_certificate
         assert enrolments_of(serial, 'CN=Evil,notAnAttribute=x') == []
         assert [e.id for e in enrolments_of(serial, _info(pem_a)['issuer_dn'])] == [row.id]
         assert [e.id for e in enrolments_of(serial)] == [row.id]
+
+
+def _fr_cn(cn):
+    return x509.Name([x509.NameAttribute(NameOID.COUNTRY_NAME, 'FR'), x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+
+
+# X509_NAME_oneline (nginx $ssl_client_i_dn_legacy) as OpenSSL 3 prints these names
+@pytest.mark.parametrize('legacy, name', [
+    ('/C=FR/CN=Root\\+O=Evil\\/x', _fr_cn('Root+O=Evil/x')),
+    ('/C=FR/CN=A\\+B', _fr_cn('A+B')),
+    ('/C=FR/CN=x\\/y', _fr_cn('x/y')),
+])
+def test_a_legacy_issuer_escaping_plus_and_slash_is_read(legacy, name):
+    from services.mtls_enrollment import dn_attributes
+    assert dn_attributes(legacy) == dn_attributes(name) is not None
+
+
+@pytest.mark.parametrize('stored, presented', [
+    ('cn=ROOT,o=org', 'CN=Root, O=Org'),
+    ('CN=Root CA,O=Org', '/O=ORG/CN=root ca'),
+])
+def test_attribute_values_compare_caselessly(stored, presented):
+    from services.mtls_enrollment import same_issuer
+    assert same_issuer(stored, presented) is True
