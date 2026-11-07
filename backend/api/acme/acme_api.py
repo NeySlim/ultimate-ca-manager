@@ -240,6 +240,9 @@ ALLOWED_JWS_ALGS = frozenset({
 })
 
 
+_BASE64URL = re.compile(r'[A-Za-z0-9_-]+')
+
+
 def _decode_jws_protected(protected_b64: str) -> Dict[str, Any]:
     """Decode a base64url JWS protected header. Raises on anything malformed."""
     padded = protected_b64 + '=' * (-len(protected_b64) % 4)
@@ -382,9 +385,12 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
             return False, None, None, url_error
 
         # Verify nonce
+        # RFC 8555 §6.5: an absent nonce is badNonce; one outside base64url is malformed
         nonce = protected.get('nonce')
         if not nonce:
-            return False, None, None, "Missing nonce in protected header"
+            return False, None, None, BAD_NONCE
+        if not isinstance(nonce, str) or not _BASE64URL.fullmatch(nonce):
+            return False, None, None, "Nonce is not base64url-encoded (RFC 8555 §6.5.1)"
         
         service = get_acme_service()
         if not service.validate_nonce(nonce):
@@ -418,6 +424,9 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
             payload = json.loads(payload_json) if payload_json else {}
         else:
             payload = {}
+        # Every ACME request payload is a JSON object (RFC 8555 §7)
+        if not isinstance(payload, dict):
+            return False, None, None, "JWS payload must be a JSON object"
         
         # Resolve the key this layer is signed with, then hand it to the
         # shared gate (algorithm allowlist, key type, signature).
@@ -591,10 +600,12 @@ def new_nonce():
     """
     service = get_acme_service()
     nonce = service.generate_nonce()
-    
-    response = make_response('', 204)
+
+    # RFC 8555 §7.2: HEAD answers 200, GET 204; §7.1: every resource links the directory
+    response = make_response('', 200 if request.method == 'HEAD' else 204)
     response.headers['Replay-Nonce'] = nonce
     response.headers['Cache-Control'] = 'no-store'
+    response.headers['Link'] = f'<{service.base_url}/acme/directory>;rel="index"'
     
     return response
 
@@ -846,7 +857,7 @@ def new_authz():
     service = get_acme_service()
     
     try:
-        jws_data = request.get_json()
+        jws_data = request.get_json(force=True, silent=True)
         if not jws_data:
             return acme_error('malformed', 'Request body required')
         
@@ -957,7 +968,7 @@ def new_order():
     service = get_acme_service()
     
     try:
-        jws_data = request.get_json()
+        jws_data = request.get_json(force=True, silent=True)
         
         if not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
@@ -1202,7 +1213,7 @@ def finalize_order(order_id: str):
     service = get_acme_service()
     
     try:
-        jws_data = request.get_json()
+        jws_data = request.get_json(force=True, silent=True)
         
         if not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
@@ -1441,7 +1452,7 @@ def respond_to_challenge(challenge_id: str):
     service = get_acme_service()
     
     try:
-        jws_data = request.get_json()
+        jws_data = request.get_json(force=True, silent=True)
         
         if not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
@@ -1495,8 +1506,6 @@ def respond_to_challenge(challenge_id: str):
         # RFC 8555 §6.3, §7.5.1 (erratum 5729): an empty payload is a read; only a
         # response object asks for validation
         post_as_get = jws_data.get('payload') == ''
-        if not post_as_get and not isinstance(payload, dict):
-            return acme_error('malformed', 'A challenge response must be a JSON object')
 
         authz = challenge.authorization
         if post_as_get or challenge.status in ('valid', 'invalid'):
@@ -1728,7 +1737,7 @@ def revoke_cert():
     service = get_acme_service()
     
     try:
-        jws_data = request.get_json()
+        jws_data = request.get_json(force=True, silent=True)
         
         if not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
@@ -1930,7 +1939,7 @@ def key_change():
     service = get_acme_service()
     
     try:
-        jws_data = request.get_json()
+        jws_data = request.get_json(force=True, silent=True)
         
         if not jws_data:
             return acme_error('malformed', 'Request body must be JWS')

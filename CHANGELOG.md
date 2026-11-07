@@ -27,6 +27,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- ACME server: a body that was not JSON, a payload that was not an object or an unreadable date answered 500 `serverInternal`. They now answer 400 `malformed` (RFC 8555 §6.2, §7).
+- ACME server: a missing nonce answered `malformed` and a nonce outside base64url `badNonce`, the reverse of RFC 8555 §6.5; HEAD on newNonce answered 204 without a link to the directory. Both errors now carry the right type, and newNonce answers 200 to HEAD with `Link: rel="index"` (§7.2).
 - ACME server: every response stored a nonce that was never deleted, so the nonce table only grew. The 6-hourly ACME purge now also deletes expired and consumed nonces.
 - ACME server: a CSR whose common name is one of the order's IP addresses, as lego v4 and the UCM ACME client send for an IP order, was refused as `badCSR`. Such a CN is now matched against the IP identifiers (RFC 8738).
 - ACME server: the directory advertised the public host as `caaIdentities` even when CAA identifiers were configured, while finalize checked CAA against the configured ones. Both now use the same list (RFC 8555 §7.1.1).
