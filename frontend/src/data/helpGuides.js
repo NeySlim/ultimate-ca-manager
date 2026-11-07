@@ -854,6 +854,7 @@ Configure the SCEP server:
 - **Enable/Disable**: Toggle the SCEP service
 - **Signing CA**: Select which CA signs SCEP-enrolled certificates. Devices encrypt their request to this CA, so it must hold an RSA key in software: EC, HSM-backed, keyless, offline and revoked CAs are not listed (v2.248)
 - **Auto-Approve**: Automatically approve requests with valid challenge passwords
+- **Serve on plain HTTP**: off by default. Also answers SCEP on the HTTP protocol port (8080 by default) for clients that cannot use HTTPS, such as sscep. RFC 8894 §7.10: SCEP messages are already protected, so TLS is not required; the CMS envelope keeps the challenge password private
 
 ### Profiles
 Named enrollment endpoints, each served at its own URL:
@@ -897,11 +898,13 @@ The device signs its PKCSReq with its own key: RSA, ECDSA, Ed25519 or ML-DSA. An
 ## SCEP URLs
 
 \`\`\`
-https://your-server:8443/scep                          (global endpoint)
+https://your-server:8443/scep/pkiclient.exe            (configured CA)
 https://your-server:8443/scep/<profile>/pkiclient.exe  (per-profile endpoint)
+https://your-server:8443/cgi-bin/pkiclient.exe         (configured CA, legacy path)
+http://your-server:8080/scep/pkiclient.exe             (with Serve on plain HTTP)
 \`\`\`
 
-Devices need the URL to enroll. Use a profile URL to target that profile's CA, template and challenge password.
+Devices need the URL to enroll; \`/scep\` alone is the web interface, not a SCEP endpoint. Use a profile URL to target that profile's CA, template and challenge password.
 
 ### CA rollover (GetNextCACert)
 GetNextCACert serves the successor of the endpoint's CA, signed by the current CA: another CA with the same parent and the same subject DN, not revoked, not offline, holding its key, and expiring later. A CA that only shares the display name is never served; without a successor the answer is 404.
@@ -915,20 +918,20 @@ For pending requests (auto-approve disabled):
 
 A request that came through a profile is issued with that profile's template (validity, key usages), exactly as auto-approval would.
 
-> ⚠ Challenge passwords are transmitted in the SCEP request. Always use HTTPS for the SCEP endpoint.
+> The challenge password belongs in the CSR, which travels inside the CMS envelope encrypted to the CA (RFC 8894 §2.4), so plain HTTP does not expose it. A client that sends it as a signed attribute outside the envelope exposes it: keep such clients on HTTPS.
 
 ## Device Integration
 
 ### Cisco IOS
 \`\`\`
 crypto pki trustpoint UCM
-  enrollment url https://your-server:8443/scep
+  enrollment url https://your-server:8443/scep/pkiclient.exe
   password <challenge-password>
 \`\`\`
 
 ### JAMF
 Configure the SCEP profile with:
-- Server URL: \`https://your-server:8443/scep\`
+- Server URL: \`https://your-server:8443/scep/pkiclient.exe\`, or a profile's \`/scep/<profile>/pkiclient.exe\`
 - Challenge: the password from UCM
 
 ### Microsoft Intune

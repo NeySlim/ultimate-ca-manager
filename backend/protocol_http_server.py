@@ -4,10 +4,12 @@ Lightweight HTTP-only server for CDP/OCSP/AIA endpoints and HTTP-01 tokens.
 Avoids TLS certificate verification loops when clients fetch CRLs.
 
 Started automatically when http_protocol_port > 0 (default: 8080).
-Only serves /cdp/, /ca/, /ocsp, /.well-known/acme-challenge/ and /health — all other paths return 404.
+Only serves /cdp/, /ca/, /ocsp, /.well-known/acme-challenge/, /health and,
+when the SCEP "Serve on plain HTTP" option is on, the SCEP endpoints; all other paths return 404.
 """
 import errno
 import logging
+import re
 import time
 
 logger = logging.getLogger(__name__)
@@ -31,6 +33,10 @@ def _spawn(fn, *args):
 
 _clock = time.monotonic  # tests replace _sleep, _spawn and _clock
 
+# The SCEP routes only; the view refuses them unless scep_plain_http is on.
+_SCEP_PATH = re.compile(r'^/(?:scep/(?:[^/]+/)?|cgi-bin/)pkiclient\.exe$')
+PLAIN_HTTP_ENVIRON_KEY = 'ucm.protocol_http_port'
+
 
 class ProtocolOnlyMiddleware:
     """WSGI middleware that restricts HTTP server to protocol endpoints only."""
@@ -51,8 +57,16 @@ class ProtocolOnlyMiddleware:
             environ['wsgi.url_scheme'] = 'https'
             return self.app(environ, start_response)
 
+        if _SCEP_PATH.match(path):
+            environ['wsgi.url_scheme'] = 'https'
+            environ[PLAIN_HTTP_ENVIRON_KEY] = True
+            return self.app(environ, start_response)
+
         start_response('404 Not Found', [('Content-Type', 'text/plain')])
-        return [b'Only CDP/OCSP/AIA and ACME HTTP-01 endpoints are available on this port']
+        return [NOT_SERVED_MESSAGE]
+
+
+NOT_SERVED_MESSAGE = b'Only CDP/OCSP/AIA and ACME HTTP-01 endpoints are available on this port'
 
 
 def get_http_protocol_port():

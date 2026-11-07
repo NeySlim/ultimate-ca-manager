@@ -2060,6 +2060,8 @@
     "enrollmentRequest": "SCEP Enrollment Request",
     "getCaCertChain": "Return full chain in GetCACert",
     "getCaCertChainHelp": "Off (default): single CA certificate, required for Apple/MDM clients. On: degenerate PKCS#7 with the full chain (RFC 8894).",
+    "plainHttp": "Serve on plain HTTP",
+    "plainHttpHelp": "Also answer SCEP on the HTTP protocol port (8080 by default), for clients such as sscep that cannot use HTTPS. The CMS envelope already protects the request and its challenge password (RFC 8894 §7.10).",
     "enforceSigningTime": "Enforce signingTime clock skew",
     "timeSkewMinutes": "Allowed clock skew (minutes)",
     "timeSkewMinutesHelp": "Devices without NTP drift: requests outside this window are rejected when enforcement is on.",

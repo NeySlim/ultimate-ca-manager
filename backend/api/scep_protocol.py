@@ -225,6 +225,11 @@ def scep_endpoint(profile_slug=None):
     - GetCACert: Get CA certificate
     - PKIOperation: Certificate enrollment (GET=poll, POST=enroll)
     """
+    # The plain HTTP protocol port passes SCEP through; serve it only on opt-in
+    from protocol_http_server import NOT_SERVED_MESSAGE, PLAIN_HTTP_ENVIRON_KEY
+    if request.environ.get(PLAIN_HTTP_ENVIRON_KEY) and get_config('scep_plain_http', 'false') != 'true':
+        return make_error_response(NOT_SERVED_MESSAGE.decode(), 404)
+
     operation = request.args.get('operation', '')
 
     # Log every inbound request. Only failures were logged before, so a silent

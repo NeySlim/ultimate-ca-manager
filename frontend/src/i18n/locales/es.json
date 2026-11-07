@@ -2060,6 +2060,8 @@
     "enrollmentRequest": "Solicitud de inscripción SCEP",
     "getCaCertChain": "Devolver la cadena completa en GetCACert",
     "getCaCertChainHelp": "Desactivado (predeterminado): certificado CA único, requerido para clientes Apple/MDM. Activado: PKCS#7 degenerado con la cadena completa (RFC 8894).",
+    "plainHttp": "Servir también en HTTP sin cifrar",
+    "plainHttpHelp": "Responder también a SCEP en el puerto de protocolo HTTP (8080 por defecto), para clientes como sscep que no pueden usar HTTPS. El sobre CMS ya protege la solicitud y su contraseña de desafío (RFC 8894 §7.10).",
     "enforceSigningTime": "Exigir tolerancia de reloj signingTime",
     "timeSkewMinutes": "Tolerancia de reloj (minutos)",
     "timeSkewMinutesHelp": "Los dispositivos sin NTP derivan: fuera de esta ventana las solicitudes se rechazan cuando la aplicación está activa.",

@@ -13,6 +13,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Deployment: a deploy target can be an HTTP API instead of an SSH host, with a URL, a method, encrypted request headers and a body template rendered from the certificate (`{{cert_pem|json}}`, `{{fullchain_pem}}`, `{{cn}}`, `{{serial}}`...), through the same delivery queue; the private key is sent only with an explicit opt-in over verified HTTPS, with an optional pasted trust anchor for a self-signed appliance (discussion #428, requested by @gjarassier, migration 131).
 - EST: the encrypted `serverkeygen` key can now go to an EC client certificate by key agreement (ephemeral-static ECDH, RFC 5753), and the key transport or key agreement and the content cipher follow the CSR's SMIMECapabilities in the client's order of preference, with AES-CBC when no listed content cipher is available. A list naming only key transport or agreement algorithms UCM lacks is refused with the supported ones named, as is an RSA client key under 2048 bits (RFC 7030 section 4.4.2).
+- SCEP: a "Serve on plain HTTP" setting, off by default, also answers SCEP on the HTTP protocol port (8080 by default) for clients such as sscep that cannot use HTTPS; RFC 8894 §7.10 needs no TLS, as the CMS envelope protects the messages.
 
 ### Changed
 
@@ -32,6 +33,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - SCEP: a RenewalReq signed by a certificate the CA issued was refused unless it carried the current challenge password, so a client that omitted it, as RFC 8894 §2.4 recommends, or sent the original one after a rotation could not renew. The signing certificate now authenticates the renewal and the challenge is no longer compared.
 - SCEP: a challenge password sent in the CSR as a BMPString or UniversalString was read as UTF-8 and refused. Every DirectoryString type is now decoded by its type (RFC 2985 §5.4.1).
 - SCEP: GetNextCACert served as the rollover certificate any CA sharing the current CA's display name, even one with another subject and key, or a revoked or offline one. It now serves only a CA with the same parent and subject DN that is usable and expires later, and answers 404 otherwise.
+- In-app help: the SCEP URL was given as `/scep`, which serves the web interface, and HTTPS was said to protect the challenge password. The help now gives `/scep/pkiclient.exe` and the profile URLs, and says the CMS envelope protects the challenge.
 
 ### Security
 

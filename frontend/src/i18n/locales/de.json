@@ -2060,6 +2060,8 @@
     "enrollmentRequest": "SCEP-Registrierungsanfrage",
     "getCaCertChain": "Vollständige Kette in GetCACert zurückgeben",
     "getCaCertChainHelp": "Aus (Standard): einzelnes CA-Zertifikat, für Apple/MDM-Clients erforderlich. Ein: degeneriertes PKCS#7 mit vollständiger Kette (RFC 8894).",
+    "plainHttp": "Auch über unverschlüsseltes HTTP bereitstellen",
+    "plainHttpHelp": "SCEP auch auf dem HTTP-Protokollport (standardmäßig 8080) beantworten, für Clients wie sscep, die kein HTTPS nutzen können. Die CMS-Hülle schützt die Anfrage und ihr Challenge-Passwort bereits (RFC 8894 §7.10).",
     "enforceSigningTime": "signingTime-Zeitabweichung erzwingen",
     "timeSkewMinutes": "Erlaubte Zeitabweichung (Minuten)",
     "timeSkewMinutesHelp": "Geräte ohne NTP driften: Anfragen außerhalb dieses Fensters werden bei aktiver Durchsetzung abgelehnt.",
