@@ -38,10 +38,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Access Control: the API no longer lets a custom role inherit from a built-in role, which the page never offered; a role that already does keeps its parent.
 - TSA: a request carrying any extension, critical or not, is now refused with unacceptedExtension, and a malformed one, trailing bytes included, with badDataFormat instead of systemFailure (RFC 3161 §2.4.1).
 - TSA: tokens carry genTime in whole seconds with a declared accuracy of one second, and `/tsa` matches `application/timestamp-query` or `application/octet-stream` exactly, ignoring case, instead of any type containing `timestamp-query`.
-- Sign CSR, EST, SCEP and ACME: a subject beyond the RFC 5280 bounds (CN over 64 characters, a country that is not two letters) was signed as received; it is now refused with the reason, as on the issue form. A renewal that keeps the subject of the certificate it renews is not affected.
-- Sign CSR and the enrollment protocols: a request without Key Usage signed as client, code signing or S/MIME got none, so the key was unrestricted; it now gets its type's Key Usage, as on the issue form.
+- Sign CSR, EST, SCEP and ACME: a subject beyond the RFC 5280 bounds (CN over 64 characters, a country that is not two letters) was signed as received; it is now refused with the reason, as on the issue form. An EST, SCEP, WSTEP or in-place renewal that keeps its certificate's subject is not affected; an ACME renewal is.
+- Sign CSR (single, bulk and approval): a request without Key Usage signed as client, code signing or S/MIME got none, so the key was unrestricted; it now gets its type's Key Usage, as on the issue form.
 - Certificates: an emailAddress in the subject is now also an rfc822Name in the SAN for every certificate type, not only email and combined (RFC 5280 §4.1.2.6).
-- Certificates and ACME: an underscore in a DNS name is now accepted only at the start of a service label (`_sip._tcp.example.com`); `my_host.example` is refused, as RFC 1123 §2.1 requires. A renewal keeps the names its certificate already carries.
+- Certificates and ACME: a DNS name holding an underscore (`my_host.example`, `_sip._tcp.example.com`) or in IP-address form is now refused, as RFC 5280 §4.2.1.6 requires. An EST, SCEP, WSTEP or in-place renewal keeps the names its certificate already carries; an ACME order does not.
 
 ### Fixed
 
@@ -125,6 +125,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST and mTLS: a device or user that authenticates with a certificate revoked or expired on this server, or issued under a revoked CA, must be given a valid one.
 - EST: a client that puts a password in the CSR `challengePassword` keeps enrolling with `{"ignore_challenge_password": true}`.
 - EST: a CA label named after an operation no longer shows on the EST page and is dropped on its next save; give its clients a label under another name.
+- Certificates and ACME: rename the hosts whose DNS name holds an underscore and shorten any CN over 64 characters before their next renewal, since ACME orders (cert-manager, certbot, lego) and Sign CSR requests carrying them are now refused.
 
 ## [2.251] - 2026-11-06
 

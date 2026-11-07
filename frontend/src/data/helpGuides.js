@@ -575,7 +575,7 @@ The resulting certificate appears in the Certificates page.
 
 What a request may carry is checked as on the issue form, and a refusal names its reason:
 - **Subject**: CN, O and OU at most 64 characters, L and ST 128, C a two-letter country code (RFC 5280 appendix A)
-- **DNS names**: letters, digits and hyphens in dot-separated labels, an underscore only to open a service label (\`_sip._tcp\`), a wildcard only as the whole first label, no trailing dot. An internationalized name typed in the form is issued as its A-label (\`xn--\`)
+- **DNS names**: letters, digits and hyphens in dot-separated labels (no underscore), a wildcard only as the whole first label, no trailing dot, never an IP address. An internationalized name typed in the form is issued as its A-label (\`xn--\`)
 - **Names from the CN**: a request without SAN gets a DNS name from its CN only when the CN is a hostname (never \`John Doe\`), and a sub-CA gets none
 - **Email in the subject**: an emailAddress is also added to the SAN as an email name, for every certificate type
 - **Key Usage**: a request without Key Usage gets its type's, as on the issue form (client, code signing and email included)
