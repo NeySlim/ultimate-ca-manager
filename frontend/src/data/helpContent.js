@@ -541,8 +541,10 @@ export const helpContent = {
         icon: ShieldCheck,
         items: [
           { label: 'mTLS (Mutual TLS)', text: 'Client presents a certificate during TLS handshake, strongest authentication method' },
-          { label: 'HTTP Basic Auth', text: 'Username/password fallback when mTLS is not available' },
-          { label: 'Presented certificate', text: 'For /simpleenroll and /serverkeygen over mTLS, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2); a certificate from another authority the TLS layer trusts is still accepted' },
+          { label: 'HTTP Basic Auth', text: 'Username/password fallback when mTLS is not available. With allow_empty_username set through PATCH /api/v2/est/config, a client may also send an empty username with the password (RFC 7030 §3.2.3, v2.252)' },
+          { label: 'Presented certificate', text: 'For /simpleenroll and /serverkeygen over mTLS, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2). A certificate another CA of this server issued is refused once it or a CA above it is revoked, or once expired (v2.252); one from an authority this server does not hold is left to the TLS layer' },
+          { label: 'tls-unique linking', text: 'A CSR with a challengePassword must carry the tls-unique value of its TLS 1.2 connection to UCM (RFC 7030 §3.5); it is refused with 400 when the value differs or cannot be verified (TLS 1.3, a proxy in front). /csrattrs does not ask for one. ignore_challenge_password, set through PATCH /api/v2/est/config, skips the check for a client that puts a password there (v2.252)' },
+          { label: 'Compromised keys', text: 'A CSR whose key was revoked as compromised (keyCompromise) is refused with 400 (v2.252)' },
         ]
       },
       {
@@ -551,8 +553,9 @@ export const helpContent = {
         items: [
           { label: '/cacerts', text: 'Retrieve the CA certificate chain (no authentication required)' },
           { label: '/simpleenroll', text: 'Submit a CSR and receive a signed certificate' },
-          { label: '/simplereenroll', text: 'Renew an existing certificate (requires mTLS)' },
-          { label: '/csrattrs', text: 'Get CSR attributes recommended by the server' },
+          { label: '/simplereenroll', text: 'Renew an existing certificate (requires mTLS; without a client certificate: 403). A CSR without SubjectAltName renews the certificate\'s own names, or none when it had none, instead of a name built from the CN (RFC 7030 §4.2.2, v2.252)' },
+          { label: '/csrattrs', text: 'Get CSR attributes recommended by the server: keyUsage, subjectAltName and extKeyUsage as bare OIDs (RFC 9908 §5.2, v2.252). csrattrs_legacy_encoding, set through PATCH /api/v2/est/config, serves the former shape (the OIDs inside an extensionRequest) for a client that needs it' },
+          { label: 'Errors', text: 'Enrollment refusals, rate limiting included, come as a plain-text message (text/plain, RFC 8951 §5) saying why, such as a body that is not base64 or not a PKCS#10 CSR, or the CA\'s name constraints (v2.252)' },
           { label: '/serverkeygen', text: 'Server generates a key pair and returns certificate + key. The key takes the issuing CA\'s strength, in the family of the request\'s key when RSA or EC (its size or curve is ignored), else the CA\'s, moved to the closest type the policies allow. The key comes as unencrypted PKCS#8 under TLS; a CSR naming the mTLS certificate\'s key (AsymmetricDecryptKeyIdentifier) gets it encrypted to that certificate, by key transport for RSA of 2048 bits or more (keyEncipherment) or key agreement for EC (keyAgreement), with the algorithms the CSR\'s SMIMECapabilities list, in a key package signed by an EST key generator certificate that the issuing CA issues for this purpose (Ed25519 under an Ed448 CA, v2.252)' },
         ]
       },
@@ -1174,7 +1177,7 @@ export const helpContent = {
           { label: 'ML-DSA templates (v2.248)', text: 'Announced by their key algorithm OID with the Microsoft Software Key Storage Provider, not yet tested with a real Windows client, and hidden in FIPS mode. Certificate-based renewal cannot use an ML-DSA certificate (XML-DSig has no ML-DSA signature): enroll a new one' },
           { label: 'ECDSA templates (v2.251)', text: 'Announced in policy schema 3 with their curve (ECDSA_P256, ECDSA_P384, ECDSA_P521) as a signature key and a request hash, the stronger of the template digest and the one matching the curve. RSA templates outside FIPS mode stay schema 2' },
           { label: 'Template and key (v2.251)', text: 'The request key must fit the template it is issued under: the same curve or ML-DSA set, or an RSA key at least as long, so a P-384 request is no longer issued under a P-256 template sharing its EKU. The request envelope Windows signs with an ECDSA key is accepted' },
-          { label: 'Renewal from Windows (v2.248)', text: 'certreq ... Renew authenticates with the certificate being renewed as TLS client certificate: it needs mTLS enabled with the WSTEP CA, or one of its ancestors, trusted. A renewal keeps the template and EKUs of the certificate it renews' },
+          { label: 'Renewal from Windows (v2.248)', text: 'certreq ... Renew authenticates with the certificate being renewed as TLS client certificate: it needs mTLS enabled with the WSTEP CA, or one of its ancestors, trusted. A renewal keeps the template and EKUs of the certificate it renews, and its SubjectAltName when the CSR carries none (v2.252)' },
           { label: 'Kerberos in Docker (v2.251)', text: 'The Docker images ship the Kerberos backend of pyspnego, so the Kerberos binding works in a container as it does in the DEB and RPM installs' },
         ]
       },
@@ -1578,6 +1581,7 @@ export const helpContent = {
           { label: 'Require client certificate', text: 'Optionally make mTLS mandatory for the web UI, changing mTLS settings requires a service restart' },
           { label: 'Same serial, other CA (v2.251)', text: 'An enrolment is identified by its issuer and serial number, so a client certificate can be enrolled, imported or assigned when another CA\'s enrolled certificate has the same serial' },
           { label: 'Reverse proxy headers (v2.252)', text: 'Behind a proxy that forwards the client certificate as headers, send the issuer DN (X-SSL-Client-I-DN) with the serial, read as hexadecimal, or the certificate itself (X-SSL-Client-Cert). A serial without its issuer opens no enrolment that recorded one, and a presented certificate cannot be enrolled without it' },
+          { label: 'Revoked issuer', text: 'A client certificate issued under a revoked CA, at any level of its chain, opens no session and can be neither enrolled nor imported (v2.252)' },
           { label: 'Generated keys (v2.251)', text: 'A user mTLS certificate generated by UCM gets a key at the issuing CA\'s strength, RSA or a NIST curve browsers accept, moved to the closest type the policies allow, instead of RSA-2048 always' },
         ]
       },

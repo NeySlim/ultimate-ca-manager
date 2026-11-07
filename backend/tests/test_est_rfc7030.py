@@ -1,6 +1,5 @@
 """RFC 7030 interoperability tests for the EST protocol endpoints."""
 import base64
-import builtins
 from datetime import datetime, timedelta, timezone
 from email import policy
 from email.parser import BytesParser
@@ -169,7 +168,7 @@ def _unpad_aes_cbc(ciphertext, key, iv):
 class TestSimpleEnroll:
     def test_reenroll_san_match_ignores_order_and_allows_missing(self):
         # RFC 7030 identity match must not depend on GeneralName order or
-        # extension criticality; a CSR without SAN is issued as-is (pre-2.200)
+        # extension criticality; a CSR without SAN renews the certificate's own
         from cryptography import x509
         from api.est_protocol import _reenroll_san_matches
 
@@ -297,19 +296,7 @@ class TestSimpleReenroll:
 
 
 class TestCsrAttrs:
-    @pytest.mark.parametrize('without_pyasn1', [False, True])
-    def test_is_public_and_returns_valid_csrattrs(self, client, est_config, monkeypatch,
-                                                  without_pyasn1):
-        if without_pyasn1:
-            original_import = builtins.__import__
-
-            def import_without_pyasn1(name, *args, **kwargs):
-                if name == 'pyasn1' or name.startswith('pyasn1.'):
-                    raise ImportError('pyasn1 deliberately unavailable')
-                return original_import(name, *args, **kwargs)
-
-            monkeypatch.setattr(builtins, '__import__', import_without_pyasn1)
-
+    def test_is_public_and_returns_valid_csrattrs(self, client, est_config):
         response = client.get(f'{EST_BASE}/csrattrs')
         assert response.status_code == 200
         assert response.headers['Content-Type'].startswith('application/csrattrs')
@@ -317,12 +304,9 @@ class TestCsrAttrs:
         der = base64.b64decode(response.data)
         attrs, trailing = der_decoder.decode(der)
         assert trailing == b''
-        # challengePassword is not asked for: UCM does not verify one (#405)
-        assert len(attrs) == 1
-        assert str(attrs[0][0]) == '1.2.840.113549.1.9.14'
-        assert {str(oid) for oid in attrs[0][1]} == {
-            '2.5.29.15', '2.5.29.17', '2.5.29.37'
-        }
+        # challengePassword is not asked for: tls-unique linking is optional (#405);
+        # the extensions are bare OIDs (RFC 9908 §5.2)
+        assert [str(oid) for oid in attrs] == ['2.5.29.15', '2.5.29.17', '2.5.29.37']
 
 
 class TestCaCerts:

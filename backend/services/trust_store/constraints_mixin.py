@@ -12,6 +12,10 @@ from .validation_helpers import _name_value, _name_matches_subtree
 
 logger = logging.getLogger(__name__)
 
+
+class CsrRefused(ValueError):
+    """A refusal the request itself caused, whose text may go back to the client."""
+
 # Hostname-shaped CN: optional wildcard label then dotted DNS labels. A CN
 # like "John Doe" or "Fileserver Backup Key" is a display name, not a DNS
 # identity — mapping it to DNSName made client certs fail DNS-permitted
@@ -76,7 +80,7 @@ def _validate_against_cert(ca_cert, names_to_check):
             + ", ".join(outside_permitted_names)
         )
     if errors:
-        raise ValueError("; ".join(errors))
+        raise CsrRefused("; ".join(errors))
 
 
 def _chain_certs_above(ca_cert):

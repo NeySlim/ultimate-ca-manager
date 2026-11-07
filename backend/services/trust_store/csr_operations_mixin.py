@@ -21,7 +21,7 @@ from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.leaf_key_usage import builder_key_usage, constrain_builder_key_usage, key_usage_notice
 from .constants import hash_algorithm
 from .key_operations_mixin import KeyOperationsMixin
-from .constraints_mixin import ConstraintsMixin
+from .constraints_mixin import ConstraintsMixin, CsrRefused
 from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
@@ -372,7 +372,7 @@ def _filter_csr_ekus(eku_oids, cert_type, allow_sensitive_ekus, renewal_of=None)
         # MORE than a CSR requesting nothing. Fall back to the type's profile.
         kept = _default_ekus_for_cert_type(cert_type)
         if not kept:
-            raise ValueError(
+            raise CsrRefused(
                 "CSR requests only Extended Key Usages that are not permitted "
                 f"for certificate type {cert_type!r}"
             )
@@ -403,7 +403,7 @@ def _capped_basic_constraints(csr_constraints, ca_cert):
         return csr_constraints
 
     if parent_limit <= 0:
-        raise ValueError(
+        raise CsrRefused(
             "Issuing CA has pathLenConstraint 0 and may not issue a subordinate CA"
         )
 
@@ -635,7 +635,8 @@ class CSROperationsMixin:
         not_after: Optional[datetime] = None,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
-        signing renews — its names are graced by NameConstraints validation.
+        signing renews — its names are graced by NameConstraints validation,
+        and stand for the SAN of a CSR that carries none.
         ``allow_sensitive_ekus``: keep OCSPSigning/timeStamping from the CSR —
         reserved for the admin Sign-CSR path (an operator explicitly signing a
         delegated responder/TSA CSR); protocol enrollees never get them.
@@ -697,9 +698,9 @@ class CSROperationsMixin:
         from utils.key_type import validate_enrollment_csr
         key_err = validate_enrollment_csr(csr)
         if key_err:
-            raise ValueError(f"CSR public key rejected: {key_err}")
+            raise CsrRefused(f"CSR public key rejected: {key_err}")
         if require_pop and not csr.is_signature_valid:
-            raise ValueError("CSR has invalid signature")
+            raise CsrRefused("CSR has invalid signature")
         related_a = _verified_related_certificate(csr, cert_type)
 
         # Effective subject: an override (if any) wins outright; otherwise
@@ -732,6 +733,14 @@ class CSROperationsMixin:
             csr_sans = None
             has_csr_san = False
 
+        if override_san is None and not has_csr_san and renewal_of is not None:
+            # A renewal keeps its identity: the renewed certificate's names, or none,
+            # never a name built from the CN (RFC 7030 §4.2.2)
+            try:
+                override_san = list(renewal_of.extensions.get_extension_for_class(
+                    x509.SubjectAlternativeName).value)
+            except x509.ExtensionNotFound:
+                override_san = []
         if override_san is not None:
             effective_sans = override_san
         elif has_csr_san:
@@ -836,7 +845,7 @@ class CSROperationsMixin:
             and csr_basic_constraints is not None
             and not csr_basic_constraints.value.ca
         ):
-            raise ValueError(
+            raise CsrRefused(
                 "Intermediate CA CSR BasicConstraints must set ca=True"
             )
 
