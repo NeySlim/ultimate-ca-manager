@@ -53,6 +53,9 @@ logger = logging.getLogger(__name__)
 _CHALLENGE_PARENT_LEVELS = 2
 # Bound on the certificate fallback scan, one signed upstream call per candidate.
 _CERT_FALLBACK_SCAN_LIMIT = 25
+# Upstream authz reads for one challenge request the local cache cannot place:
+# each costs a request on the shared upstream account.
+_CHALLENGE_SCAN_LIMIT = 3
 
 
 class ProxyDns01OnlyError(ValueError):
@@ -1556,10 +1559,11 @@ class AcmeProxyService:
             for candidate in candidate_orders:
                 urls.extend(url for url in self._recorded_authz_urls(candidate)
                             if url not in urls and url not in candidate.deactivated_authz_list)
-            # Let's Encrypt nests a challenge under its authorization id: read that one first
+            # Let's Encrypt nests a challenge under its authorization id: read only that one
             parent_id = (urlsplit(chall_url).path.rstrip('/').split('/')[-2:-1] or [None])[0]
-            urls.sort(key=lambda url: urlsplit(url).path.rstrip('/').rsplit('/', 1)[-1] != parent_id)
-            urls = urls[:_CERT_FALLBACK_SCAN_LIMIT]
+            named = [url for url in urls
+                     if urlsplit(url).path.rstrip('/').rsplit('/', 1)[-1] == parent_id]
+            urls = (named or urls)[:_CHALLENGE_SCAN_LIMIT]
         for url in urls:
             resp = self._post_with_account(url, "")
             if resp.status_code != 200:

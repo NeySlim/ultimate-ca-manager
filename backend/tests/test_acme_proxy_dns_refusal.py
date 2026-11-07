@@ -472,8 +472,17 @@ class TestAuthorizationReads:
             row = _order(upstream_authz_urls=json.dumps(urls))
             svc, calls = _svc(monkeypatch, {url: _Resp(_authz(chall=f'{url}/c')) for url in urls})
             with pytest.raises(proxy_mod.ProxyResourceNotFoundError):
-                svc._read_challenge(CHALL_URL, None, [row])
-            assert len(calls) == proxy_mod._CERT_FALLBACK_SCAN_LIMIT == 25
+                svc._read_challenge(f'{UPSTREAM}/acme/chall/unnamed/x', None, [row])
+            assert len(calls) == proxy_mod._CHALLENGE_SCAN_LIMIT == 3
+
+    def test_unknown_challenge_under_a_known_authorization_reads_only_it(self, app, monkeypatch):
+        urls = [f'{UPSTREAM}/acme/authz/7/{i}' for i in range(40)]
+        with app.app_context():
+            row = _order(upstream_authz_urls=json.dumps(urls))
+            svc, calls = _svc(monkeypatch, {url: _Resp(_authz(chall=f'{url}/c')) for url in urls})
+            with pytest.raises(proxy_mod.ProxyResourceNotFoundError):
+                svc._read_challenge(f'{UPSTREAM}/acme/chall/7/35/forged', None, [row])
+            assert calls == [(urls[35], '')]
 
     def test_scan_reads_first_the_authorization_named_in_the_challenge_url(self, app, monkeypatch):
         # Let's Encrypt nests the authorization id in the challenge URL
