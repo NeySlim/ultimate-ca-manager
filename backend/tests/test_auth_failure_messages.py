@@ -150,9 +150,12 @@ def test_a_wrong_ldap_password_says_nothing_more(
 
 def test_each_door_keeps_its_own_lockout_wording(client, local_user, ldap_provider,
                                                  monkeypatch):
+    # The password door has not checked the password yet: a locked account
+    # answers like an unknown name, or the status would reveal it exists.
     locked = local_user(locked=True)
-    assert _login(client, locked, '/api/v2/auth/login/password') == (
-        429, 'Account temporarily locked. Try again later.')
+    assert _login(client, locked, '/api/v2/auth/login/password') == \
+        _login(client, f'nobody-{uuid.uuid4().hex[:8]}', '/api/v2/auth/login/password') == \
+        (401, 'Invalid credentials')
 
     locked_ldap = local_user(locked=True)
     _bind_succeeds(monkeypatch, locked_ldap)

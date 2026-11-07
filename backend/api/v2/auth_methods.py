@@ -228,7 +228,17 @@ def login_password():
     # Check account lockout (using centralized settings)
     max_attempts, lockout_seconds = _get_2fa_lockout_settings()
     if user.locked_until and utc_now() < user.locked_until:
-        return error_response('Account temporarily locked. Try again later.', 429)
+        # Same answer as an unknown name: the password is not checked yet, so a
+        # distinct status would tell anyone the account exists.
+        AuditService.log_action(
+            action='login_failure',
+            resource_type='user',
+            resource_id=user.id,
+            details=f'Login refused for {username} (account locked)',
+            success=False,
+            username=username
+        )
+        return error_response('Invalid credentials', 401)
     if user.locked_until and utc_now() >= user.locked_until:
         user.locked_until = None
         user.failed_logins = 0

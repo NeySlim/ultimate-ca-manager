@@ -38,6 +38,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - TOTP: a code already accepted was accepted again within its window, at a second login or to disable 2FA. Each code is now accepted once and an older one after it is refused (RFC 6238 §5.2, migration 135).
 - Sessions: a login kept the session identifier presented before it, so an identifier planted in a browser became the victim's session. Every login, SSO and LDAP included, now issues a new identifier and drops the old one (RFC 6265 §8.4).
 - Sessions: changing or resetting a password, an admin 2FA reset and "revoke all sessions" left the account's other sessions signed in. They now end them; the session the user acted from stays, under a new identifier.
+- Login: a locked local account answered 429 before its password was checked, an unknown name 401, so the status told which accounts exist. A locked account now gets the same 401 "Invalid credentials", and the refusal is audited.
 - Dashboard: the Recent Activity feed returned the latest audit entries, other accounts' actions and names typed at a failed login included, to any signed-in account.
 
 - mTLS behind a proxy: a certificate presented by its serial number alone, without `X-SSL-Client-I-DN` or `X-SSL-Client-Cert`, opened the enrolment bearing that serial, even one of another CA. Such a serial now opens only an enrolment that recorded no issuer, and enrolling a presented certificate requires its issuer (RFC 5280 §4.1.2.2).
