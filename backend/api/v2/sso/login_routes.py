@@ -107,6 +107,7 @@ def _saml_logout_request(provider):
         if not logout_request.is_valid(data):
             return _reject_saml_logout(provider, logout_request.get_error() or 'invalid LogoutRequest')
         name_id = OneLogin_Saml2_Logout_Request.get_nameid(xml)
+        indexes = OneLogin_Saml2_Logout_Request.get_session_indexes(xml)
     except Exception as e:
         return _reject_saml_logout(provider, f'unreadable LogoutRequest ({e})')
 
@@ -116,7 +117,11 @@ def _saml_logout_request(provider):
         sso_provider_id=provider.id, sso_external_id=name_id)}
     SSOSession.query.filter_by(provider_id=provider.id, sso_name_id=name_id).delete()
     db.session.commit()
-    closed = session.get('auth_method') == 'sso' and session.get('user_id') in users
+    # With SessionIndex values only the sessions they name end (SAML Core §3.7.3.2);
+    # a session opened before its index was kept counts as named.
+    own_index = session.get('saml_session_index')
+    closed = (session.get('auth_method') == 'sso' and session.get('user_id') in users
+              and (not indexes or own_index is None or own_index in indexes))
     if closed:
         session.clear()
     AuditService.log_action(
@@ -591,6 +596,8 @@ def sso_callback(provider_type):
             session['username'] = user.username
             session['role'] = user.role
             session['auth_method'] = 'sso'
+            if saml_auth.get_session_index():
+                session['saml_session_index'] = saml_auth.get_session_index()
             session['login_time'] = _saml_now.isoformat()
             session['last_activity'] = _saml_now.isoformat()
             session.permanent = True

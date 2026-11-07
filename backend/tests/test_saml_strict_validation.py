@@ -761,7 +761,7 @@ def _authenticated(client):
     return bool((body.get('data') or {}).get('authenticated'))
 
 
-def _logout_request(key_pem, name_id, *, sign=True, issuer=IDP_ENTITY, encode=None):
+def _logout_request(key_pem, name_id, *, sign=True, issuer=IDP_ENTITY, encode=None, session_index='_s1'):
     from urllib.parse import quote_plus
     from cryptography.hazmat.primitives.asymmetric import padding
     quote_plus = encode or quote_plus
@@ -770,7 +770,9 @@ def _logout_request(key_pem, name_id, *, sign=True, issuer=IDP_ENTITY, encode=No
            f'xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{rid}" Version="2.0" '
            f'IssueInstant="{_ts()}" Destination="{SP_BASE}{ACS}"><saml:Issuer>{issuer}</saml:Issuer>'
            f'<saml:NameID Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">{name_id}'
-           f'</saml:NameID><samlp:SessionIndex>_s1</samlp:SessionIndex></samlp:LogoutRequest>')
+           f'</saml:NameID>'
+           + (f'<samlp:SessionIndex>{session_index}</samlp:SessionIndex>' if session_index else '')
+           + '</samlp:LogoutRequest>')
     encoded = OneLogin_Saml2_Utils.deflate_and_base64_encode(xml)
     query = f'SAMLRequest={quote_plus(encoded)}'
     if sign:
@@ -900,3 +902,13 @@ def test_a_parameter_outside_the_signed_query_is_refused(app, slo_url, idp_signe
     r = client.get(url, base_url=SP_BASE)
     assert r.headers['Location'] == '/login?error=saml_logout_rejected'
     assert _authenticated(client)
+
+
+@pytest.mark.parametrize('session_index, closed', [('_s1', True), (None, True), ('_other', False)])
+def test_logout_closes_only_the_session_it_names(app, slo_url, idp_signer, session_index, closed):
+    """SAML Core §3.7.3.2: with SessionIndex values, only those sessions end; without, all of them."""
+    client, name_id = _signed_in(app, idp_signer)
+    _, url = _logout_request(idp_signer[0], name_id, session_index=session_index)
+    r = client.get(url, base_url=SP_BASE)
+    assert r.headers['Location'].startswith(IDP_SLO + '?')
+    assert _authenticated(client) is not closed
