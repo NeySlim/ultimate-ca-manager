@@ -24,11 +24,15 @@ from tests.test_est_rfc7030 import (  # noqa: F401
 
 @pytest.fixture(autouse=True, scope='module')
 def _rows_stay_in_this_module(app):
+    from models import RevokedSerial
     with app.app_context():
         last_cert = db.session.query(db.func.max(Certificate.id)).scalar() or 0
         last_ca = db.session.query(db.func.max(CA.id)).scalar() or 0
+        last_revoked = db.session.query(db.func.max(RevokedSerial.id)).scalar() or 0
     yield
     with app.app_context():
+        # Certificate ids are reused once deleted: their revocation records go with them
+        RevokedSerial.query.filter(RevokedSerial.id > last_revoked).delete()
         Certificate.query.filter(Certificate.id > last_cert).delete()
         CA.query.filter(CA.id > last_ca).delete()
         db.session.commit()
