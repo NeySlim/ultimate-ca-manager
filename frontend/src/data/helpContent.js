@@ -666,6 +666,9 @@ export const helpContent = {
           { label: 'TXT cleanup (v2.252)', text: 'Cleanup removes only the TXT value of its order, so another order, or the wildcard and apex sharing the name, keep theirs. DuckDNS, Hurricane Electric and FreeDNS hold one value per name: they clear it only when no other order in progress uses the name' },
           { label: 'Unique names (v2.251)', text: 'A DNS provider or External CA Account name already in use is refused (409), on creation and on rename. The upgrade renamed earlier duplicates "name (2)", "name (3)", oldest first' },
           { label: 'Vercel team (v2.251)', text: 'The Vercel provider takes an optional Team ID for domains owned by a team' },
+          { label: 'RFC 2136 provider (v2.252)', text: 'The DNS server can be a host name. A filled-in Zone is used as is; an empty one is read from the SOA the configured server returns, then from the system resolver' },
+          { label: 'ARI renewal time (v2.252)', text: 'When the CA suggests a renewal window, each certificate renews at a random moment drawn once inside it, or at the next 6-hour pass when that moment comes before it (RFC 9773)' },
+          { label: 'CA errors (v2.252)', text: 'A CA error page that is not an ACME problem (an HTML 503) is reported with its HTTP status and Retry-After' },
           { label: 'RcodeZero token (v2.251)', text: 'RcodeZero needs an API token with zone read and write access, not one limited to the ACME permission' },
           { label: 'Checkdomain (v2.251)', text: 'Checkdomain removes a value by rewriting the zone\'s records without it, as its API documents, after reading every page. The SOA, the apex NS and the generated www copies are left out of that rewrite' },
         ]
@@ -698,6 +701,10 @@ export const helpContent = {
           { label: 'Prune replaced certificates', text: 'Opt-in toggle: when a proxy order finalizes, certificates previously imported by proxy orders for the exact same domain set are deleted. Revoked certificates are always kept; non-proxy certificates are never touched. Off by default' },
                   { label: 'Client pre-checks (v2.217)', text: 'The proxy also publishes the dns-01 TXT values computed with each client account key, so lego/Traefik/Caddy propagation pre-checks pass without being disabled, except on DuckDNS, Hurricane Electric and FreeDNS, which hold one value: disable the client pre-check there; a retried new-order returns the account still-pending order' },
           { label: 'Client compatibility (v2.246)', text: 'With EAB required, an onlyReturnExisting lookup and a new-account with a registered key return the existing account (cert-manager). The account URL answers reads, contact updates and deactivation, authorization deactivation is accepted (lego), and challenge responses carry Link rel="up"' },
+          { label: 'Upstream errors (v2.252)', text: 'An error of the upstream CA reaches the client with its type (rateLimited, badCSR, rejectedIdentifier, alreadyRevoked...), status, subproblems and Retry-After. Errors about the proxy\'s own upstream account stay serverInternal' },
+          { label: 'Profiles and validity (v2.252)', text: 'The directory lists the upstream CA\'s profiles. A profile, notBefore and notAfter requested by the client are passed upstream, and a profile the upstream CA does not offer is refused with invalidProfile' },
+          { label: 'Refused TXT record (v2.252)', text: 'When the DNS provider refuses the TXT record, the challenge is not submitted upstream: the order, its authorization and challenge turn invalid, and the provider\'s message is logged and kept on the order. TXT records of an invalid or deactivated order are removed' },
+          { label: 'Challenge reads (v2.252)', text: 'The proxy reads a challenge through its authorization, never with a POST-as-GET on the challenge, which starts the validation on some CAs before the TXT record exists. Key rollover is not offered by the proxy directory' },
         ]
       },
       {

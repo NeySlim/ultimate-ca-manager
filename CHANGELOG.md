@@ -22,9 +22,19 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
 - SCEP: a RenewalReq signed by a certificate issued through the same endpoint is authenticated by that certificate, so its challenge password is no longer compared and a rotated secret no longer blocks renewal; a certificate from another profile or protocol still needs the endpoint's challenge.
 - SCEP: every FAILURE reply now carries a failInfoText attribute giving the reason (RFC 8894 §3.2.1.4).
+- ACME proxy: the directory no longer advertises `keyChange`, which the proxy refuses, and a challenge none of the requesting account's orders lists is now answered 404 instead of 403.
 
 ### Fixed
 
+- ACME proxy: every upstream CA error reached the client as a 500 `serverInternal`, so a rate limit, a refused name or a refused CSR looked like a proxy failure. The upstream type, status, subproblems and Retry-After now reach the client, revocation included (RFC 8555 §6.6, §6.7).
+- ACME proxy: when the DNS provider refused the TXT record, the challenge was still submitted and failed on the shared upstream account. The order now turns invalid without any upstream request, and the TXT records of invalid or deactivated orders are removed.
+- ACME proxy: the directory listed the upstream profiles but `profile` and `notAfter` were never passed upstream, so a client got the default profile and validity. Both are now passed, and a profile the upstream CA does not offer is refused with `invalidProfile`.
+- ACME proxy: the challenge was read upstream with a POST-as-GET before the TXT record was published, which starts the validation on some CAs. It is now read through its authorization (RFC 8555 §7.5.1, erratum 5729).
+- ACME proxy: the upstream Retry-After of an order, authorization or finalization was dropped, and upstream requests carried the HTTP library's User-Agent. Both are now relayed and set (RFC 8555 §6.1, §7.1.3).
+- RFC 2136 DNS provider: a server given by host name always failed with an empty message, and a filled-in zone was overridden by the zone the system resolver saw. The name is now resolved, the configured zone is used as is, and an empty zone is read from the configured server's SOA.
+- ACME client: with ARI, a certificate renewed at the very start of the suggested window. It now renews at a random moment drawn once inside it (RFC 9773 §4.2).
+- ACME client: an HTML error page from the CA was reported as a JSON parse error, an RSA account key with an exponent other than 65537 got a padded JWK exponent, and an unquoted `rel=alternate` link was ignored. The status and Retry-After are now reported, the exponent is minimal (RFC 7518 §6.3.1.2) and every RFC 8288 form is read.
+- DNS providers: Cloudflare and OVH followed redirects with their credential headers, and a Cloudflare delete the API refused was reported as a success. Redirects are no longer followed and the refusal is reported.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: these providers hold one TXT value per name, so the cleanup of one order cleared the value another order was still validating. The name is now left alone while another order in progress uses it.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: an order for a domain and its wildcard could not hold both values and failed at validation, and the ACME proxy replaced the CA's value with its clients' own. Such an order, or on DuckDNS one naming two hosts under the same subdomain, is now refused at the request before the CA is asked, and the proxy publishes only the CA's value there.
 - ACME client: a CA refusal of `replaces` whose message merely contained "rateLimited" was taken for a rate limit and not retried. A rate limit is now recognised by its problem type or a 429 only (RFC 8555 §6.7).
