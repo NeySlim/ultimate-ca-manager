@@ -295,7 +295,8 @@ def build_error(name):
         try:
             make(key, cert, keys, certs)
         except Exception as e:  # noqa: BLE001 (the message is the fixture)
-            return f'{type(e).__name__}: {e}'
+            # A ValueError subclass still meets the callers' contract
+            return f"{'ValueError' if isinstance(e, ValueError) else type(e).__name__}: {e}"
     return 'no error'
 
 

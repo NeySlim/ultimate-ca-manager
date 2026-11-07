@@ -265,13 +265,13 @@ class TestKeyPackage:
 
     def test_a_signer_failure_answers_5xx_before_any_certificate_is_issued(
             self, app, client, est_ca, monkeypatch):
-        import utils.est_cms as est_cms
+        import utils.cms_signed as cms_signed
         est_ca('signing')
         transport, _, client_pem = _enrol_transport(client, 'transport-hsmfail.keygen.test')
 
         def failing_suite(_key):
             raise ValueError('The HSM returned a signature that does not verify')
-        monkeypatch.setattr(est_cms, '_signature_suite', failing_suite)
+        monkeypatch.setattr(cms_signed, 'signature_suite', failing_suite)
         cn = 'hsmfail.keygen.test'
         csr, _ = _make_csr(common_name=cn, extra_attributes=((ASYMMETRIC_ID, _ski(transport)),))
         r = _post_csr(client, 'serverkeygen', csr, client_cert_pem=client_pem)

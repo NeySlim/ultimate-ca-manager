@@ -7,22 +7,20 @@ from typing import Optional
 import asn1crypto.algos
 import asn1crypto.cms
 import asn1crypto.core
-import asn1crypto.crl
 import asn1crypto.x509
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed25519, rsa
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 import fips_mode
-from utils import key_algorithms
+from utils import cms_signed
 from utils.cms_envelope import (  # noqa: F401 (oaep_padding re-exported)
     OAEP_HASHES, oaep_algorithm, oaep_parameters, oaep_padding,
 )
 from utils.randomness import csp_bytes
-from utils.signing_hash import pss_algorithm_identifier, pss_padding, signs_pss
 
 
 AES128_CBC = "aes128_cbc"
@@ -60,38 +58,13 @@ _PWRI_PBKDF2_ITERATIONS = 100_000
 
 def create_degenerate_pkcs7(certs: list, crls: Optional[list] = None) -> bytes:
     """Build a degenerate PKCS#7 SignedData carrying certificates or CRLs."""
-    cert_ders = [
-        asn1crypto.x509.Certificate.load(
-            cert.public_bytes(serialization.Encoding.DER)
-        )
-        for cert in certs
-    ]
-    crl_ders = [
-        asn1crypto.crl.CertificateList.load(
-            crl.public_bytes(serialization.Encoding.DER)
-        )
-        for crl in (crls or [])
-    ]
+    return cms_signed.certs_only(certs, crls or ())
 
-    signed_data_fields = {
-        'version': 1,
-        'digest_algorithms': [],
-        'encap_content_info': {'content_type': 'data'},
-        'signer_infos': [],
-    }
-    if cert_ders:
-        signed_data_fields['certificates'] = cert_ders
-    if crl_ders:
-        signed_data_fields['crls'] = crl_ders
 
-    signed_data = asn1crypto.cms.SignedData(signed_data_fields)
-
-    content_info = asn1crypto.cms.ContentInfo({
-        'content_type': 'signed_data',
-        'content': signed_data,
-    })
-
-    return content_info.dump()
+# CertRep keeps its PKCS#7-era encoding: SHA-256 whatever the key (Ed25519: SHA-512),
+# NULL digest parameters, rsaEncryption for v1.5, DSA accepted, Ed448 and ML-DSA refused
+_CERTREP_SUITE = {'hsm_digest': False, 'null_digest_params': True, 'rsa_encryption': True,
+                  'accept': ('rsa', 'ec', 'dsa', 'ed25519')}
 
 
 def create_signed_pkcs7(
@@ -106,98 +79,13 @@ def create_signed_pkcs7(
     attribute. The signer certificate is included so recipients can identify
     and validate the signature.
     """
-    if isinstance(signer_key, ed25519.Ed25519PrivateKey):
-        digest_name = 'sha512'
-        digest_algorithm = hashes.SHA512()
-        signature_algorithm = {'algorithm': 'ed25519'}
-    else:
-        digest_name = 'sha256'
-        digest_algorithm = hashes.SHA256()
-        if signs_pss(signer_key):
-            signature_algorithm = pss_algorithm_identifier(digest_algorithm)
-        elif isinstance(signer_key, rsa.RSAPrivateKey):
-            signature_algorithm = {'algorithm': 'rsassa_pkcs1v15'}
-        elif isinstance(signer_key, ec.EllipticCurvePrivateKey):
-            signature_algorithm = {'algorithm': 'sha256_ecdsa'}
-        elif isinstance(signer_key, dsa.DSAPrivateKey):
-            signature_algorithm = {'algorithm': 'sha256_dsa'}
-        else:
-            label = key_algorithms.label_for_private_key(signer_key) or type(signer_key).__name__
-            raise ValueError(f"Unsupported CMS signer key type: {label}")
-
-    digest = hashes.Hash(digest_algorithm)
-    digest.update(data or b'')
-
-    attributes = asn1crypto.cms.CMSAttributes([
-        *(signed_attributes or []),
-        {'type': 'content_type', 'values': ['data']},
-        {
-            'type': 'message_digest',
-            'values': [asn1crypto.core.OctetString(digest.finalize())],
-        },
-        {
-            'type': 'signing_time',
-            'values': [asn1crypto.core.UTCTime(datetime.now(timezone.utc))],
-        },
-    ])
-
-    attributes_der = attributes.dump()
-    if attributes_der and attributes_der[0] == 0xA0:
-        attributes_for_signing = b'\x31' + attributes_der[1:]
-    else:
-        attributes_for_signing = attributes_der
-
-    if signs_pss(signer_key):
-        signature = signer_key.sign(attributes_for_signing, pss_padding(digest_algorithm),
-                                    digest_algorithm)
-    elif isinstance(signer_key, rsa.RSAPrivateKey):
-        signature = signer_key.sign(
-            attributes_for_signing,
-            asym_padding.PKCS1v15(),
-            digest_algorithm,
-        )
-    elif isinstance(signer_key, ec.EllipticCurvePrivateKey):
-        signature = signer_key.sign(
-            attributes_for_signing,
-            ec.ECDSA(digest_algorithm),
-        )
-    elif isinstance(signer_key, dsa.DSAPrivateKey):
-        signature = signer_key.sign(attributes_for_signing, digest_algorithm)
-    else:
-        signature = signer_key.sign(attributes_for_signing)
-    signer_cert_asn1 = asn1crypto.x509.Certificate.load(
-        signer_cert.public_bytes(serialization.Encoding.DER)
+    suite = cms_signed.signature_suite(signer_key, 'sha256', **_CERTREP_SUITE)
+    signing_time = {'type': 'signing_time',
+                    'values': [asn1crypto.core.UTCTime(datetime.now(timezone.utc))]}
+    return cms_signed.signed_data(
+        'data', data or b'', signer_key, signer_cert, suite=suite,
+        signed_attrs=[*(signed_attributes or []), signing_time], detached=data is None,
     )
-
-    signer_info = asn1crypto.cms.SignerInfo({
-        'version': 'v1',
-        'sid': {
-            'issuer_and_serial_number': {
-                'issuer': signer_cert_asn1.issuer,
-                'serial_number': signer_cert_asn1.serial_number,
-            }
-        },
-        'digest_algorithm': {'algorithm': digest_name},
-        'signed_attrs': attributes,
-        'signature_algorithm': signature_algorithm,
-        'signature': asn1crypto.core.OctetString(signature),
-    })
-
-    encap_content_info = {'content_type': 'data'}
-    if data is not None:
-        encap_content_info['content'] = asn1crypto.core.OctetString(data)
-
-    signed_data = asn1crypto.cms.SignedData({
-        'version': 'v1',
-        'digest_algorithms': [{'algorithm': digest_name}],
-        'encap_content_info': encap_content_info,
-        'certificates': [signer_cert_asn1],
-        'signer_infos': [signer_info],
-    })
-    return asn1crypto.cms.ContentInfo({
-        'content_type': 'signed_data',
-        'content': signed_data,
-    }).dump()
 
 
 def _encrypt_content(data: bytes, content_key: bytes, iv: bytes) -> bytes:
