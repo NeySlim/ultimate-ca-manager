@@ -373,3 +373,17 @@ def test_renewal_csr_without_san_keeps_the_certificate_names(client, app, wstep_
     san = renewed.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
     assert set(san.get_values_for_type(x509.DNSName)) == {'a.renew-names.test',
                                                            'b.renew-names.test'}
+
+
+def test_renew_refusal_gives_its_reason(client, app, wstep_renew_config, monkeypatch):
+    from utils.request_names import RequestRejected
+    cert, key = _issue_test_cert(app, wstep_renew_config, common_name='renew-reason.example.test')
+    signed = _build_signed_rst(cert, key, _renewal_csr(cert.subject, key),
+                               message_id='urn:uuid:renew-reason')
+
+    def refuse(**_kw):
+        raise RequestRejected('Invalid DNS name(s) in the request: marker')
+    monkeypatch.setattr(CAService, 'sign_csr_from_crypto', refuse)
+    r = client.post(RENEW_URL, data=signed)
+    assert r.status_code == 400
+    assert b'marker' in r.data

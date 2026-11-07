@@ -92,6 +92,15 @@ def _csr_challenge_password(csr_der: bytes):
     return None
 
 
+def _csr_san_names(csr):
+    """The CSR's SAN entries as sent, or None without the extension."""
+    try:
+        return list(csr_extensions(csr).get_extension_for_oid(
+            ExtensionOID.SUBJECT_ALTERNATIVE_NAME).value)
+    except x509.ExtensionNotFound:
+        return None
+
+
 class SCEPService:
     """SCEP Protocol Implementation (RFC 8894)."""
 
@@ -479,6 +488,18 @@ class SCEPService:
                     self.FAIL_BAD_REQUEST, 'Policy violation: ' + '; '.join(policy_violations),
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
                 ), 200
+            # Subject bounds and name syntax too: a manual approval must not queue what issuing refuses
+            from utils.request_names import RequestRejected, refuse_malformed_request
+            try:
+                refuse_malformed_request(
+                    csr.subject, _csr_san_names(csr),
+                    signer_cert if message_type == self.MSG_TYPE_RENEWAL_REQ else None)
+            except RequestRejected as e:
+                logger.warning("SCEP: request refused: %s", e)
+                return self._create_error_response(
+                    self.FAIL_BAD_REQUEST, str(e),
+                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                ), 200
 
             # ---- 6. Also check challengePassword in CSR attributes (scepclient) ----
             if not self._has_usable_challenge_password(challenge_pwd):
@@ -653,8 +674,11 @@ class SCEPService:
                                 "SCEP: Intune failure notification also failed: %s",
                                 notify_err,
                             )
+                    # A refusal for the request's content is the device's to read (RFC 8894 §3.2.1.4)
+                    from utils.request_names import RequestRejected
                     return self._create_error_response(
-                        self.FAIL_BAD_REQUEST, "Server error issuing certificate",
+                        self.FAIL_BAD_REQUEST,
+                        str(e) if isinstance(e, RequestRejected) else "Server error issuing certificate",
                         transaction_id=transaction_id, recipient_nonce=sender_nonce,
                     ), 200
 
@@ -1288,20 +1312,16 @@ class SCEPService:
         # (RFC 5280 §4.2.1.10). SCEP is unauthenticated beyond the challenge,
         # so a constrained CA must not be tricked into issuing out-of-scope
         # names here just as on the web/ACME/EST paths.
-        try:
-            _scep_sans = list(
-                csr_extensions(csr).get_extension_for_oid(
-                    ExtensionOID.SUBJECT_ALTERNATIVE_NAME
-                ).value
-            )
-        except x509.ExtensionNotFound:
-            _scep_sans = None
+        _scep_sans = _csr_san_names(csr)
         from services.trust_store.constraints_mixin import validate_name_constraints
         # renewal_of (the cert authenticating a RenewalReq) grants renewal at
         # par: an enrolled fleet must stay renewable even if the CA's
         # constraints tightened after enrollment.
         validate_name_constraints(self.ca_cert, csr.subject, _scep_sans,
                                   renewal_of=renewal_of)
+        # The bounds and name syntax every issuance path applies
+        from utils.request_names import refuse_malformed_request
+        refuse_malformed_request(csr.subject, _scep_sans, renewal_of)
 
         # Profile template (issue #228): its validity and KU/EKU govern
         # issuance for this endpoint — the operator bound this policy to the

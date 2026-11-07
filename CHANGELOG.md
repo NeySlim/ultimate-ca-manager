@@ -46,6 +46,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - TSA: tokens carry genTime in whole seconds with a declared accuracy of one second, and `/tsa` matches `application/timestamp-query` or `application/octet-stream` exactly, ignoring case, instead of any type containing `timestamp-query`.
 - CRL: with delta CRLs enabled, each complete CRL is now followed by a delta on it, so the shared CRL number advances by two per regeneration.
 - Approvals: a revocation request approved while its certificate is on hold now revokes it for good with the requested reason, instead of waiting for the hold to be lifted.
+- Sign CSR, EST, SCEP, WSTEP and ACME: a subject beyond the RFC 5280 bounds (CN over 64 characters, a country that is not two letters in a PrintableString) was signed as received; it is now refused with the reason, as on the issue form. An EST, SCEP, WSTEP or in-place renewal that keeps its certificate's subject is not affected; an ACME renewal is.
+- Sign CSR (single, bulk and approval): a request without Key Usage signed as client, code signing or S/MIME got none, so the key was unrestricted; it now gets its type's Key Usage, as on the issue form.
+- Certificates: on the issue form, Sign CSR, EST and WSTEP, a valid emailAddress in the subject is now also an rfc822Name in the SAN for every certificate type, not only email and combined (RFC 5280 §4.1.2.6); SCEP keeps the request's SAN as sent.
+- Certificates and ACME: a DNS name holding an underscore (`my_host.example`, `_sip._tcp.example.com`, also as the CN of a server or device certificate without SAN) or in IP-address form is now refused, as RFC 5280 §4.2.1.6 requires. An EST, SCEP, WSTEP or in-place renewal keeps the names its certificate already carries; an ACME order does not.
 
 ### Fixed
 
@@ -63,6 +67,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Password reset: the e-mailed link pointed at `https://localhost:8443`. It now uses the Base URL, else the server FQDN, never the request's Host; when neither is set, Forgot password is hidden and the reset is refused with a warning in the log.
 - OIDC: an ID token whose `azp` named another client was accepted when it had a single audience; it is now refused (OpenID Connect Core §3.1.3.7).
 - LDAP: a second factor the user had enrolled, even one Enforce 2FA required, was never asked at sign-in. LDAP sign-ins now ask for it, as local ones do.
+- Certificates: a DNS name with a space, a trailing dot, a wildcard past the first label, a lone `*`, an all-digit last label or an `xn--` label that is no A-label was issued by the form, the API, Sign CSR, EST and SCEP. Such names are now refused with the reason, a 400 or a SCEP failure naming them (RFC 5280 §4.2.1.6), and an internationalized name is issued as its A-label instead of answering 500 (RFC 9549).
+- Sign CSR and EST: a request without SAN got its CN as a DNS name whatever it held (`DNS:John Doe`, and on a sub-CA too), and a non-ASCII CN answered 500. Only a CN in DNS name syntax now gives a DNS name, one label only for a server or device certificate, a host-like server CN that gives none says so in a notice, and a sub-CA gets none.
+- Sign CSR: a refusal for a parent CA with pathLen 0, a name outside the CA name constraints or an unacceptable key answered 500 "Failed to sign CSR". It now answers 400 with the reason; an empty subject takes as CN the first SAN name that fits in 64 characters.
+- CAs: the error for a DNS name constraint with a leading dot suggested `.example.com`, the form it refuses.
 - Rate limiting: a 429 from a login route's own limit carried the general limit in `X-RateLimit-Limit` (30 instead of 5) and no `Retry-After`. It now names the limit that refused the request and when to retry.
 - ACME server: a body that was not JSON, a payload that was not an object or an unreadable date answered 500 `serverInternal`. They now answer 400 `malformed` (RFC 8555 §6.2, §7).
 - ACME server: a missing nonce answered `malformed` and a nonce outside base64url `badNonce`, the reverse of RFC 8555 §6.5; HEAD on newNonce answered 204 without a link to the directory. Both errors now carry the right type, and newNonce, on the server and the ACME proxy, answers 200 to HEAD and 204 to GET with `Link: rel="index"` (§7.2).
@@ -154,6 +162,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST and mTLS: a device or user that authenticates with a certificate revoked or expired on this server, or issued under a revoked CA, must be given a valid one.
 - EST: a client that puts a password in the CSR `challengePassword` keeps enrolling with `{"ignore_challenge_password": true}`.
 - EST: a CA label named after an operation no longer shows on the EST page and is dropped on its next save; give its clients a label under another name.
+- Certificates and ACME: rename the hosts whose DNS name holds an underscore and shorten any CN over 64 characters before their next renewal, since ACME orders (cert-manager, certbot, lego), Sign CSR requests and server certificates from the issue form carrying them are now refused.
+- SCEP and Intune: a profile whose SAN DNS is built from a device name holding spaces, apostrophes or underscores (such as `{{DeviceName}}` on iOS) must use a DNS-safe value before the upgrade, since each new enrollment carrying it is now refused with the reason.
 
 ## [2.251] - 2026-11-06
 

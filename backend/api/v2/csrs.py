@@ -16,6 +16,7 @@ from utils.response import success_response, error_response, created_response, n
 from utils import notices as notices_mod
 from utils.pagination import parse_request_pagination
 from utils.dn_validation import validate_dn_field
+from utils.request_names import RequestRejected
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.sanitize import sanitize_filename
 from models import db, Certificate, CA
@@ -224,6 +225,29 @@ def _policy_rule_refusal(ca, cert, template_id, validity_days, extra_dns=()):
             requested, validity_days,
             notices_mod.policy_validity_reason(capped_by, validity_days))
     return None, validity_days, notices_mod.collect(notice, advisories)
+
+
+def _malformed_request_refusal(cert, cert_type, template_id=None):
+    """The trunk's refusal of the request's subject and names, given before an
+    approval is queued for a signing that would fail."""
+    from models.certificate_template import CertificateTemplate
+    from services.template_service import allowed_san_types, san_type_of
+    from utils.request_names import cn_implied_names, refuse_malformed_request
+    csr_obj = x509.load_pem_x509_csr(base64.b64decode(cert.csr))
+    try:
+        names = list(csr_extensions(csr_obj).get_extension_for_class(
+            x509.SubjectAlternativeName).value)
+    except x509.ExtensionNotFound:
+        # As the trunk does, the names the CN implies pass the template's SAN types first
+        template = db.session.get(CertificateTemplate, template_id) if template_id else None
+        allowed = allowed_san_types(template) if template is not None else None
+        names = [n for n in cn_implied_names(csr_obj.subject, cert_type)
+                 if allowed is None or san_type_of(n) in allowed]
+    try:
+        refuse_malformed_request(csr_obj.subject, names)
+    except RequestRejected as e:
+        return str(e)
+    return None
 
 
 def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus, validity_notice=None,
@@ -1075,6 +1099,12 @@ def sign_csr(csr_id):
         return error_response(f'Invalid CSR: {e}', 400)
     if san_refusal:
         return error_response(san_refusal, 400)
+    try:
+        malformed = _malformed_request_refusal(cert, backend_cert_type, data.get('template_id'))
+    except (ValueError, TypeError) as e:
+        return error_response(f'Invalid CSR: {e}', 400)
+    if malformed:
+        return error_response(malformed, 400)
 
     refusal, validity_days, validity_notice = _policy_rule_refusal(
         ca, cert, data.get('template_id'), validity_days,
@@ -1162,7 +1192,7 @@ def sign_csr(csr_id):
         raise
     except PolicyViolation as e:
         return error_response(f'Policy violation: {e}', 400)
-    except TemplateConfigError as e:
+    except (TemplateConfigError, RequestRejected) as e:
         return error_response(str(e), 400)
     except ValueError as e:
         if 'another request' in str(e):
@@ -1240,7 +1270,9 @@ def bulk_sign_csrs():
                 results['failed'].append({'id': csr_id, 'error': 'Already signed'})
                 continue
             try:
-                refusal = _san_type_refusal(cert, data.get('template_id'))
+                refusal = (_san_type_refusal(cert, data.get('template_id'))
+                           or _malformed_request_refusal(cert, 'server_cert',
+                                                         data.get('template_id')))
             except (ValueError, TypeError) as e:
                 refusal = f'Invalid CSR: {e}'
             if refusal:
@@ -1275,7 +1307,7 @@ def bulk_sign_csrs():
             signed_notices += [f'CSR {csr_id}: {n}' for n in item_notices if n]
         except PolicyViolation as e:
             results['failed'].append({'id': csr_id, 'error': f'Policy violation: {e}'})
-        except (FipsRestricted, TemplateConfigError) as e:
+        except (FipsRestricted, TemplateConfigError, RequestRejected) as e:
             results['failed'].append({'id': csr_id, 'error': str(e)})
         except Exception as e:
             logger.error(f"Bulk sign: CSR {csr_id} failed (template {data.get('template_id')}): {e}", exc_info=True)

@@ -292,7 +292,7 @@ def _normalize_name_constraints(value, field):
             if not ok:
                 return None, (
                     f'{field} entry "{cval}" is not a valid {ctype} name constraint'
-                    + (' (e.g. example.com or .example.com)' if ctype == 'dns'
+                    + (' (e.g. example.com, which covers its subdomains)' if ctype == 'dns'
                        else ' (e.g. user@example.com, example.com, or .example.com)')
                 )
         cleaned.append({'type': ctype, 'value': cval})

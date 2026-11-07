@@ -10,9 +10,10 @@ unexamined into `AcmeClientOrder.domains` and into the DNS provider API as a
 record name, and was forwarded verbatim upstream. That is the difference this
 module removes: the rules are here, and both doors call them.
 
-The rules are the server's, unchanged. They are syntax, not policy: a name
-is refused for carrying a port, userinfo, a scheme, a path, whitespace, an
-over-long label or an empty one, never for pointing somewhere private.
+The label rule is the one certificates are issued under (RFC 5280 §4.2.1.6).
+It is syntax, not policy: a name is refused for carrying a port, userinfo, a
+scheme, a path, whitespace, an underscore, an over-long label or an empty one,
+never for pointing somewhere private.
 `localhost`, `host-1.internal.lan` and RFC1918 targets stay acceptable at
 order time -- UCM is deployed on LAN and those are the ordinary case. Whether
 a *challenge* may be fetched from a given address is a separate decision, made
@@ -23,10 +24,9 @@ later and with the deliberately permissive helpers in
 import re
 from typing import Any, Dict, Optional, Tuple
 
-# A DNS label: letters, digits, hyphen (never leading/trailing), plus underscore
-# for the deployments that use it. Deliberately excludes ':', '@', '/', '?', '#',
-# '%', '[', ']', '\' and whitespace.
-_DNS_LABEL_RE = re.compile(r'^(?!-)[A-Za-z0-9_-]{1,63}(?<!-)$')
+# The label rule certificates are issued under (utils.san_parse); a single
+# trailing root dot is still tolerated here, as before.
+from utils.san_parse import _HOSTNAME_LABEL_RE as _DNS_LABEL_RE
 
 
 def is_valid_dns_identifier(value: Any) -> bool:
@@ -48,7 +48,7 @@ def is_valid_dns_identifier(value: Any) -> bool:
         value = value[:-1]          # tolerate a single trailing root dot
     if not value:
         return False
-    return all(_DNS_LABEL_RE.match(label) for label in value.split('.'))
+    return all(_DNS_LABEL_RE.fullmatch(label) for label in value.split('.'))
 
 
 def validate_acme_identifier(identifier: Dict[str, Any]) -> Tuple[bool, Optional[str], Optional[str]]:
@@ -97,7 +97,7 @@ def validate_acme_identifier(identifier: Dict[str, Any]) -> Tuple[bool, Optional
 #
 # Ordering FROM an upstream CA is a different question from answering an order:
 # UCM chooses the names it asks for, so it applies the stricter public-CA shape
-# (at least two labels, no underscore, no trailing dot) and refuses upfront what
+# (at least two labels, no trailing dot) and refuses upfront what
 # Let's Encrypt would refuse anyway. That rule was written out twice — once in
 # the order route, once in the preflight report — and only the route carried the
 # length cap, so the preflight answered "Domain validation OK" for a name the
@@ -131,6 +131,6 @@ def normalize_client_identifier(value: Any) -> Tuple[Optional[str], bool, Option
         return None, False, (
             f'Invalid domain (>{CLIENT_MAX_DOMAIN_LENGTH} chars): {value[:60]}...'
         )
-    if not _CLIENT_FQDN_RE.match(value):
+    if not _CLIENT_FQDN_RE.fullmatch(value):  # `$` alone lets a final newline through
         return None, False, f'Invalid domain syntax: {value}'
     return value, False, None

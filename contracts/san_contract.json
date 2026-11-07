@@ -339,7 +339,7 @@
       },
       {
         "value": "trailing.dot.",
-        "valid": true
+        "valid": false
       },
       {
         "value": "UPPER.Example.COM",
@@ -363,11 +363,87 @@
       },
       {
         "value": "has space.com",
-        "valid": true
+        "valid": false
       },
       {
         "value": "double..dot.com",
+        "valid": false
+      },
+      {
+        "value": "bücher.example",
         "valid": true
+      },
+      {
+        "value": "*.bücher.example",
+        "valid": true
+      },
+      {
+        "value": "a.*.example",
+        "valid": false
+      },
+      {
+        "value": "*",
+        "valid": false
+      },
+      {
+        "value": "w*.example",
+        "valid": false
+      },
+      {
+        "value": "-a.example",
+        "valid": false
+      },
+      {
+        "value": "a-.example",
+        "valid": false
+      },
+      {
+        "value": "under_score.example",
+        "valid": false
+      },
+      {
+        "value": "_sip._tcp.example.com",
+        "valid": false
+      },
+      {
+        "value": "a\n.example",
+        "valid": false
+      },
+      {
+        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example",
+        "valid": false
+      },
+      {
+        "value": "xn--zz.example",
+        "valid": false
+      },
+      {
+        "value": "xn--bcher-kva.example",
+        "valid": true
+      },
+      {
+        "value": "256.1.1.1",
+        "valid": false
+      },
+      {
+        "value": "*.10.0.0.1",
+        "valid": false
+      },
+      {
+        "value": "host.123",
+        "valid": false
+      },
+      {
+        "value": "ü.example:443",
+        "valid": false
+      },
+      {
+        "value": "ü/x.example",
+        "valid": false
+      },
+      {
+        "value": "ü.example/path",
+        "valid": false
       }
     ],
     "upn": [

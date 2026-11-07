@@ -340,6 +340,7 @@ export const helpContent = {
           { label: 'Upload CSR', text: 'Accept PEM-encoded CSR files or paste PEM text' },
           { label: 'Review', text: 'Inspect subject, SANs, key type, and signature before signing' },
           { label: 'Sign', text: 'Select a CA, certificate type, set validity period, and issue the certificate' },
+          { label: 'Request checks', text: 'The subject and names of the request are held to the issue form\'s rules: CN at most 64 characters, C two letters, DNS names in RFC 5280 syntax (no space, underscore, trailing dot, IP address, all-digit last label, or wildcard past the first label). A CN in DNS name syntax gives a DNS name (a single label only for a server or device certificate); another gives none, with a notice when a server CN looks like a host. A sub-CA gets none, and a valid emailAddress in the subject is added to the SAN. Each refusal names its reason' },
           { label: 'Add names', text: 'When signing, add email, DNS, IP or URI names to those of the request, for instance the email address of an S/MIME certificate requested from a smart card. They pass the CA name constraints, issuance policies and approval like any other' },
           { label: 'Sign again', text: 'In History, put a signed request back in Pending to sign it once more with other EKUs, names or validity, without generating a new key' },
           { label: 'Download', text: 'Download the original CSR in PEM format' },
@@ -387,7 +388,7 @@ export const helpContent = {
         icon: Gear,
         items: [
           { label: 'Type', text: 'Web Server, Email, VPN Server or Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon or Custom. Sets the Key Usage, EKU and SAN defaults' },
-          { label: 'Subject Defaults', text: 'Pre-fill Organization, OU, Country, State, City and Email. On Email and combined certificates the Email also becomes a SAN' },
+          { label: 'Subject Defaults', text: 'Pre-fill Organization, OU, Country, State, City and Email. The Email also becomes a SAN, whatever the certificate type' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, etc.' },
           { label: 'Extended Key Usage', text: 'Any purpose the server knows: Server Auth, Client Auth, Code Signing, Email Protection, Smartcard Logon, Time Stamping, OCSP Signing, IPsec, Microsoft RDP and others' },
           { label: 'SAN types', text: 'The name types (DNS, IP, Email, URI, UPN) a request made with the template may carry. With "Enforce the allowed SAN types" on, the issue form, Sign CSR, the enrollment protocols, renewals and approvals refuse any other type, and a name only implied by the CN is left out. New templates have it on; older ones and the built-in ones have it off. None checked: every type is allowed' },
@@ -495,6 +496,7 @@ export const helpContent = {
           { label: 'Serve on plain HTTP', text: 'Off by default. Also answers SCEP on the HTTP protocol port (8080 by default), at http://your-server:8080/scep/pkiclient.exe and the profile URLs, for clients such as sscep that cannot use HTTPS. RFC 8894 §7.10: SCEP messages are already protected, the CMS envelope keeps the challenge password private' },
           { label: 'Challenge Password', text: 'Shared secret that devices use to authenticate enrollment. A renewal (RenewalReq) signed by a certificate that the same endpoint (profile or global) issued is authenticated by that certificate, so its challenge is not checked and rotating the secret does not stop enrolled devices from renewing (RFC 8894 §2.4). Any other certificate still needs the endpoint\'s challenge' },
           { label: 'Device keys (v2.248)', text: 'A device signs its request with an RSA, ECDSA, Ed25519 or ML-DSA key; an ML-DSA signature follows RFC 9882 (SHA-512 digest). Ed448 is refused, and ML-DSA too in FIPS mode' },
+          { label: 'Request names', text: 'A request whose subject or DNS names break RFC 5280 (a CN over 64 characters, a DNS name with a space, apostrophe or underscore, such as an iOS device name) is refused with its reason before it is queued; a renewal keeps the names its certificate carries. Build an Intune SAN DNS from a DNS-safe value' },
         ]
       },
       {

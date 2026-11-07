@@ -182,7 +182,7 @@ def test_the_fallback_scan_reads_only_rows_revoked_as_compromised(app, create_ce
     """The scan behind the two tables is not O(revoked): other reasons stay in the database."""
     import base64
     from cryptography.hazmat.primitives.asymmetric import ec
-    info = create_cert(cn=f'scan-{reason.strip()}.example.test')
+    info = create_cert(cn=f'scan-{reason.strip().replace("_", "-")}.example.test')
     with app.app_context():
         row = db.session.get(Certificate, info['id'])
         row.revoked, row.revoke_reason = True, reason
