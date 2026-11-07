@@ -78,3 +78,20 @@ def test_an_entry_that_cannot_be_written_goes_to_the_log_and_syslog(app, monkeyp
     assert any(r.levelno == logging.ERROR and 'unwritable_probe' in r.getMessage()
                for r in caplog.records)
     assert [e.action for e in sent] == ['unwritable_probe']
+
+
+def test_a_nul_in_a_field_keeps_the_entry(app, client):
+    run = uuid.uuid4().hex[:8]
+    r = client.post('/api/v2/auth/login', content_type='application/json',
+                    headers={'User-Agent': f'ua\x00{run}'},
+                    data=json.dumps({'username': f'nul-{run}', 'password': 'x'}))
+    assert r.status_code in (400, 401, 429), r.get_json()
+    with app.app_context():
+        entry = AuditLog.query.filter_by(action='login_failure', username=f'nul-{run}').first()
+        assert entry is not None and '\x00' not in entry.user_agent, entry and entry.user_agent
+        entry = AuditService.log_action('nul_probe', resource_type='system',
+                                        resource_name='a\x00b', details='c\x00d')
+        assert entry is not None
+        stored = db.session.get(AuditLog, entry.id)
+        assert '\x00' not in stored.resource_name + stored.details
+        assert AuditService.verify_integrity(start_id=entry.id)['valid']

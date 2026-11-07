@@ -37,11 +37,14 @@ _SYSLOG_FIELDS = ('timestamp', 'action', 'username', 'ip_address', 'resource_typ
 
 def fit_to_columns(entry):
     """Cut each bounded field to its column before sealing, so no INSERT is refused for
-    its length; a cut resource_id list stays whole in details."""
+    its length or a NUL (PostgreSQL TEXT); a cut resource_id list stays whole in details."""
     for name, column in AuditLog.__table__.columns.items():
         value = getattr(entry, name)
         if not isinstance(value, str):
             continue
+        if '\x00' in value:
+            value = value.replace('\x00', '\\0')
+            setattr(entry, name, value)
         cap = getattr(column.type, 'length', None) or _TEXT_CAPS.get(name)
         if cap and len(value) > cap:
             setattr(entry, name, value[:cap])
