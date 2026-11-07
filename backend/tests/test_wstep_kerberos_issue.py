@@ -110,7 +110,7 @@ def _build_rst(csr, message_id='urn:uuid:test-krb-rst-1'):
 
 def _issued_cert_from_rstr(response_bytes):
     root = etree.fromstring(response_bytes)
-    bst_el = root.find(f'.//{{{WSSE_NS}}}BinarySecurityToken')
+    bst_el = root.find(f'.//{{{WST_NS}}}RequestedSecurityToken/{{{WSSE_NS}}}BinarySecurityToken')
     assert bst_el is not None and bst_el.text
     return x509.load_der_x509_certificate(base64.b64decode(bst_el.text))
 

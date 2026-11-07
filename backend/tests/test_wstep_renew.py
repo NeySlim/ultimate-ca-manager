@@ -339,7 +339,7 @@ def test_renew_succeeds_and_reissues(client, app, wstep_renew_config):
     relates_to = root.find(f'.//{{{ADDRESSING_NS}}}RelatesTo')
     assert relates_to is not None and relates_to.text == 'urn:uuid:renew-happy'
 
-    bst_el = root.find(f'.//{{{WSSE_NS}}}BinarySecurityToken')
+    bst_el = root.find(f'.//{{{WST_NS}}}RequestedSecurityToken/{{{WSSE_NS}}}BinarySecurityToken')
     new_cert = x509.load_der_x509_certificate(base64.b64decode(bst_el.text))
     assert new_cert.subject == cert.subject
     assert new_cert.serial_number != cert.serial_number

@@ -156,16 +156,12 @@ def _request_id_for(cert):
 
 
 def _cmc_response_der_for(ca, cert, parsed):
-    """CMC full PKI response DER for build_issue_response's
-    cmc_response_der, or None when not applicable — see cmc_response.py
-    for why this is built at all. Only meaningful for CMC-wrapped
-    requests (parsed.was_pkcs7_wrapped); real Windows clients sending a
-    plain PKCS#10 BinarySecurityToken have no CMC bodyPartID to
-    reference, and haven't been observed needing this. Failure here
-    shouldn't fail the whole enrollment (the plain X509v3 token still
-    works standalone for those requests) — logged and skipped."""
-    if not parsed.was_pkcs7_wrapped:
-        return None
+    """CMC full PKI response DER for build_issue_response's cmc_response_der,
+    which MS-WSTEP 3.1.4.1.3.2 requires for every request. A plain PKCS#10 is a
+    Simple PKI Request, referenced by bodyPartID 1 (RFC 5272 6.1.1). Failure
+    here doesn't fail the enrollment (the X509v3 token still works alone):
+    logged and skipped."""
+    body_part_id = parsed.cmc_body_part_id if parsed.was_pkcs7_wrapped else 1
     try:
         chain_pems = CAService.get_certificate_chain(ca.refid) or []
         chain_ders = [
@@ -175,7 +171,7 @@ def _cmc_response_der_for(ca, cert, parsed):
             for pem in chain_pems
         ]
         return build_cmc_full_pki_response(
-            cert.public_bytes(Encoding.DER), chain_ders, parsed.cmc_body_part_id
+            cert.public_bytes(Encoding.DER), chain_ders, body_part_id
         )
     except Exception as e:
         logger.warning("WSTEP: failed to build CMC full PKI response: %s", e)
