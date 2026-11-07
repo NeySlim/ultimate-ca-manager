@@ -21,7 +21,7 @@ def test_nothing_imports_psycopg2():
     assert not found, found
 
 
-def test_the_guard_sees_an_import(tmp_path):
+def test_the_guard_sees_an_import():
     assert _PSYCOPG2.search('def f():\n    import psycopg2\n')
     assert _PSYCOPG2.search('from psycopg2 import errors\n')
     assert _PSYCOPG2.search('psycopg2.connect(url)\n')
