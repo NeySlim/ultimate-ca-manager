@@ -12,6 +12,10 @@ from cryptography.x509.oid import NameOID
 from models import db, CA
 from models.revoked_serial import RevokedSerial
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 
 def _revoke(auth_client, ca_id, reason='keyCompromise'):
     return auth_client.post(f'/api/v2/cas/{ca_id}/revoke', data=json.dumps({'reason': reason}),
