@@ -326,16 +326,19 @@ def _adoptable(user, provider):
     if (user.auth_source or 'local') == 'local':
         # SSO account from before migration 024 (which may have set its provider),
         # never converted back by an admin (unlink forces a password change).
-        return (user.password_hash == SSO_NO_PASSWORD and _same_provider_or_idp(user, provider)
-                and not user.force_password_change)
+        return (user.password_hash == SSO_NO_PASSWORD and not user.force_password_change
+                and _same_provider_or_idp(user, provider, legacy=True))
     return user.auth_source == provider.provider_type and _same_provider_or_idp(user, provider)
 
 
-def _same_provider_or_idp(user, provider):
-    """Linked to this provider, or unlinked from none or from a deleted one for this same IdP."""
+def _same_provider_or_idp(user, provider, legacy=False):
+    """Linked to this provider, or orphaned by a deleted provider for this same IdP.
+    An account with no recorded IdP is claimable only if it predates migration 024."""
     if user.sso_provider_id is not None:
         return user.sso_provider_id == provider.id
-    return user.sso_orphan_of is None or user.sso_orphan_of == provider.idp_key()
+    if user.sso_orphan_of is None:
+        return legacy
+    return user.sso_orphan_of == provider.idp_key()
 
 
 def _orphan_with_id(provider, external_id):
@@ -361,6 +364,14 @@ def _bound_by_dn(provider, external_data, external_id):
         return None
     return User.query.filter(User.sso_provider_id == provider.id,
                              func.lower(User.sso_external_id) == dn.lower()).first()
+
+
+def _email_unverified(provider, external_data):
+    """The OIDC IdP says the e-mail is not verified (some send the claim as a string)."""
+    if provider.provider_type != 'oauth2':
+        return False
+    flag = (external_data or {}).get('email_verified')
+    return flag is False or (isinstance(flag, str) and flag.strip().lower() == 'false')
 
 
 def _refuse_username_conflict(provider, username):
@@ -423,8 +434,9 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
             conflict, user = True, None
 
     # 3. An account an admin linked to this provider that owns this email but
-    #    whose username differs (#138). Never a local or already bound account.
-    if not user and email:
+    #    whose username differs (#138). Never a local or already bound account,
+    #    nor by an e-mail the OIDC IdP says is unverified.
+    if not user and email and not _email_unverified(provider, external_data):
         norm = email.strip().lower()
         candidates = User.query.filter(func.lower(User.email) == norm).all()
         user = next((u for u in candidates

@@ -174,6 +174,32 @@ def test_oidc_adopts_an_admin_linked_account_and_binds_its_sub(app, oidc):
             _cleanup(['tkdave'])
 
 
+@pytest.mark.parametrize('verified, opened', [
+    (False, False), ('false', False), (True, True), (None, True),  # None: claim absent
+])
+def test_oidc_email_match_needs_an_email_the_idp_did_not_mark_unverified(
+        app, oidc, verified, opened):
+    """Step 3 trusts the e-mail only when the IdP does not say it is unverified (OIDC Core §5.7)."""
+    with app.app_context():
+        _cleanup(['tkev', 'tkevx'])
+        db.session.add(User(username='tkev', email='ev@corp.test', full_name='E', role='admin',
+                            active=True, password_hash='hash', auth_source='oauth2',
+                            sso_provider_id=oidc.provider_id))
+        db.session.commit()
+    userinfo = {'sub': 'ev-sub', 'preferred_username': 'tkevx', 'email': 'ev@corp.test'}
+    if verified is not None:
+        userinfo['email_verified'] = verified
+    try:
+        _location, verify = oidc(userinfo)
+        assert ((verify.get('user') or {}).get('username') == 'tkev') is opened
+        with app.app_context():
+            bound = User.query.filter_by(username='tkev').one().sso_external_id
+            assert bound == ('ev-sub' if opened else None)
+    finally:
+        with app.app_context():
+            _cleanup(['tkev', 'tkevx'])
+
+
 @pytest.fixture
 def ldap(app, monkeypatch):
     from api.v2.sso import ldap_routes
@@ -606,6 +632,49 @@ def test_an_unbound_orphan_is_taken_back_by_a_provider_for_the_same_idp(app, aut
             _cleanup(['rvback'])
             db.session.delete(db.session.get(SSOProvider, b_id))
             db.session.commit()
+
+
+@pytest.mark.parametrize('userinfo', [
+    {'sub': 'att-null', 'preferred_username': 'rvnull'},                             # step 2
+    {'sub': 'att-null', 'preferred_username': 'rvnullx', 'email': 'rvnull@corp.test'},  # step 3
+])
+def test_an_unbound_account_with_no_recorded_idp_is_not_opened_by_name_or_email(
+        app, oidc, userinfo):
+    """Provider deleted before its IdP was recorded, or unlinked by a restore:
+    no provider may claim the account by a name or e-mail its IdP chose."""
+    with app.app_context():
+        _cleanup(['rvnull', 'rvnullx'])
+        db.session.add(User(username='rvnull', email='rvnull@corp.test', full_name='N', role='admin',
+                            active=True, password_hash='hash', auth_source='oauth2',
+                            sso_provider_id=None, sso_orphan_of=None))
+        db.session.commit()
+    try:
+        _location, verify = oidc(userinfo)
+        assert (verify.get('user') or {}).get('username') != 'rvnull'
+        with app.app_context():
+            u = User.query.filter_by(username='rvnull').one()
+            assert u.sso_provider_id is None and u.sso_external_id is None
+    finally:
+        with app.app_context():
+            _cleanup(['rvnull', 'rvnullx'])
+
+
+def test_a_pre_024_account_with_no_provider_is_still_adopted_by_name(app, ldap):
+    with app.app_context():
+        _cleanup(['tk024n'])
+        db.session.add(User(username='tk024n', email='n024@corp.test', full_name='M',
+                            role='operator', active=True, password_hash='!SSO_NO_PASSWORD!',
+                            auth_source='local', sso_provider_id=None))
+        db.session.commit()
+    try:
+        r = ldap('tk024n', dn='uid=tk024n,dc=example', uid='uuid-024n')
+        assert r.status_code == 200, r.get_json()
+        with app.app_context():
+            u = User.query.filter_by(username='tk024n').one()
+            assert (u.sso_provider_id, u.sso_external_id) == (ldap.provider_id, 'uuid-024n')
+    finally:
+        with app.app_context():
+            _cleanup(['tk024n'])
 
 
 def test_an_orphan_of_another_type_is_not_opened_by_its_id(app, oidc):
