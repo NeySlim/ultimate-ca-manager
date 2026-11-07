@@ -1719,6 +1719,9 @@ def _holds_authorizations_for(account_id: str, cert_obj) -> bool:
         value = str(ident.get('value', ''))
         if ident.get('type') == 'dns':
             value = value.lower().rstrip('.')
+            # An auto-approved name was granted without any challenge: it proves no control
+            if AcmeService._is_domain_auto_approved(value):
+                continue
         held.add((ident.get('type'), value, bool(row.wildcard)))
     return wanted <= held
 
@@ -1809,8 +1812,11 @@ def revoke_cert():
             ).first()
             if owning_order:
                 authorized = True
-            # RFC 8555 §7.6: so is an account holding authorizations for every identifier
-            elif _holds_authorizations_for(request_account_id, cert_obj):
+            # RFC 8555 §7.6: so is an account holding authorizations for every identifier,
+            # for a certificate this ACME server issued
+            elif ((cert.source == 'acme'
+                   or AcmeOrder.query.filter_by(certificate_id=cert.id).first() is not None)
+                  and _holds_authorizations_for(request_account_id, cert_obj)):
                 authorized = True
         
         if not authorized and jwk:

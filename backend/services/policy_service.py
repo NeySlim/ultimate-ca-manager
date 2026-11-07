@@ -334,7 +334,8 @@ class PolicyEvaluationService:
     def enforce_rules(policies: list, *, key_type=None, dns_name_count=None,
                       validity_days=None, digest=None, context=None, notify=True,
                       ca_id=None, signer=None, signer_scheme=None, signer_storage=None,
-                      signer_certification=None, not_after=None, tsa_signer=False, pq_hybrid=False, notices=None):
+                      signer_certification=None, not_after=None, not_before=None, tsa_signer=False,
+                      pq_hybrid=False, notices=None):
         """Apply the Rules of *policies* to a request (#335).
 
         Returns ``(violations, validity_days, capped_by)``: the
@@ -355,7 +356,8 @@ class PolicyEvaluationService:
         and key storage the rules read; *signer_scheme* and *signer_storage*
         say them when no signer exists yet (*signer_certification*: the
         certification declared for its HSM). The end of the certificate is
-        *not_after* (a date), else today plus the capped validity. *tsa_signer*
+        *not_after* (a date), else *not_before* (a datetime, default now) plus the
+        capped validity. *tsa_signer*
         marks a TSA signing certificate. The ``advisories`` of each policy are
         appended to *notices* (a list) and never refuse anything.
 
@@ -387,7 +389,7 @@ class PolicyEvaluationService:
         today = utc_now().date()
         end = not_after
         if end is None and effective_validity is not None:
-            end = (utc_now() + timedelta(days=effective_validity)).date()
+            end = ((not_before or utc_now()) + timedelta(days=effective_validity)).date()
         req = {'key_type': key_type, 'digest': digest, 'signer_scheme': signer_scheme,
                'signer_storage': signer_storage, 'signer_certification': signer_certification,
                'not_after': end, 'today': today,

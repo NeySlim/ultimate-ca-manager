@@ -34,16 +34,16 @@ def window_error(not_before: Optional[datetime], not_after: Optional[datetime],
                  validity_days: int, *, now: Optional[datetime] = None,
                  ca_window: Optional[tuple] = None, at_order: bool = False) -> Optional[str]:
     """Why the window cannot be issued, or None. ``at_order`` adds the newOrder-only
-    checks: a date already past, and a notBefore earlier than UCM's own backdating."""
+    check of a notBefore earlier than UCM's own backdating. The profile's days get
+    the same skew UCM's own certificates carry, for a client clock slightly ahead."""
     now = now or utc_now()
     if not_before and not_after and not_before >= not_after:
         return 'notBefore must be earlier than notAfter'
-    if at_order:
-        if not_after and not_after <= now:
-            return 'notAfter is in the past'
-        if not_before and not_before < now - CERT_NOT_BEFORE_SKEW:
-            return 'notBefore is in the past'
-    if not_after and not_after > (not_before or now) + timedelta(days=validity_days):
+    if not_after and not_after <= now:
+        return 'notAfter is in the past'
+    if at_order and not_before and not_before < now - CERT_NOT_BEFORE_SKEW:
+        return 'notBefore is in the past'
+    if not_after and not_after > (not_before or now) + timedelta(days=validity_days) + CERT_NOT_BEFORE_SKEW:
         return f'The requested validity exceeds the {validity_days} days this profile allows'
     if ca_window:
         ca_not_before, ca_not_after = ca_window

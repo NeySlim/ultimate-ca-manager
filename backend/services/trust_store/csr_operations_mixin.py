@@ -15,7 +15,7 @@ from cryptography.x509.oid import NameOID, ExtensionOID
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
-from utils.datetime_utils import utc_now, cert_not_before
+from utils.datetime_utils import CERT_NOT_BEFORE_SKEW, utc_now, cert_not_before
 from utils.ca_signing_window import check_issuer_window, clamp_not_after
 from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.leaf_key_usage import builder_key_usage, constrain_builder_key_usage, key_usage_notice
@@ -784,15 +784,19 @@ class CSROperationsMixin:
             key_type=key_label_for_public_key(csr.public_key()), context=policy_context,
             pq_hybrid=related_a is not None)
         if not_after is not None:
-            # A requested notAfter is issued as asked: the days are what the policies judge
+            # A requested notAfter is issued as asked: the days are what the policies judge,
+            # with the skew UCM's own certificates carry beyond their days
             validity_days = max(1, math.ceil(
-                (not_after - (not_before or utc_now())).total_seconds() / 86400))
+                (not_after - (not_before or utc_now()) - CERT_NOT_BEFORE_SKEW).total_seconds() / 86400))
         if policy_scope is not None:
             # Name count, validity ceiling and key horizons, for the protocols as for the form
             dns_count = sum(isinstance(n, x509.DNSName) for n in (effective_sans or []))
             limit_violations, capped, capped_by = PolicyEvaluationService.enforce_rules(
                 policies, key_type=key_label_for_public_key(csr.public_key()),
                 dns_name_count=dns_count, validity_days=validity_days,
+                # Key horizons judge the notAfter actually issued, requested dates included
+                not_after=not_after.date() if not_after is not None else None,
+                not_before=not_before,
                 context=policy_context, pq_hybrid=related_a is not None)
             violations = list(dict.fromkeys(list(violations) + limit_violations))
             if capped_by and not_after is not None:

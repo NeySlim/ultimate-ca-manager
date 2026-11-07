@@ -221,7 +221,9 @@ class TestRequestedValidity:
 
     def test_requested_window_is_issued(self, app, account, issuing_ca, no_caa):
         now = utc_now().replace(microsecond=0)
-        nb, na = now + timedelta(days=2), now + timedelta(days=5)
+        # Off whole days, so a notAfter recomputed from a day count cannot land on it
+        nb = now + timedelta(days=2, hours=3, minutes=11)
+        na = now + timedelta(days=5, hours=5, minutes=17)
         order_id = _ready_order(app, account, [{'type': 'dns', 'value': 'window.example'}],
                                 not_before=nb, not_after=na)
         ok, error, status, cert, _ = _finalize(
@@ -232,7 +234,7 @@ class TestRequestedValidity:
         assert cert.not_valid_after_utc.replace(tzinfo=None) == na
 
     def test_requested_not_after_alone_is_issued(self, app, account, issuing_ca, no_caa):
-        na = utc_now().replace(microsecond=0) + timedelta(days=3)
+        na = utc_now().replace(microsecond=0) + timedelta(days=3, hours=5, minutes=17)
         order_id = _ready_order(app, account, [{'type': 'dns', 'value': 'naonly.example'}], not_after=na)
         ok, error, _, cert, _ = _finalize(
             app, order_id, _csr_pem(rsa.generate_private_key(65537, 2048), dns=['naonly.example']),
@@ -284,16 +286,93 @@ class TestRequestedValidity:
         try:
             na = utc_now().replace(microsecond=0) + timedelta(days=30)
             order_id = _ready_order(app, account, [{'type': 'dns', 'value': 'capped.example'}], not_after=na)
-            ok, error, status, _, _ = _finalize(
+            ok, error, status, _, error_type = _finalize(
                 app, order_id, _csr_pem(rsa.generate_private_key(65537, 2048), dns=['capped.example']),
                 ca_refid)
             assert not ok
             assert 'acme-window-cap' in error
             assert status == 'invalid'
+            assert error_type == 'badCSR'  # a policy refusal, as every policy refusal at finalize
         finally:
             with app.app_context():
                 db.session.delete(db.session.get(CertificatePolicy, pid))
                 db.session.commit()
+
+    @staticmethod
+    def _policy_ca(app, create_ca, name, rules):
+        from models.policy import CertificatePolicy
+        ca = create_ca(cn=f'ACME conformance {name} CA')
+        with app.app_context():
+            pol = CertificatePolicy(name=name, policy_type='issuance', ca_id=ca['id'],
+                                    requires_approval=False, min_approvers=1, is_active=True, priority=100)
+            pol.set_rules(rules)
+            db.session.add(pol)
+            db.session.commit()
+            return db.session.get(CA, ca['id']).refid, pol.id
+
+    @staticmethod
+    def _drop_policy(app, pid):
+        from models.policy import CertificatePolicy
+        with app.app_context():
+            db.session.delete(db.session.get(CertificatePolicy, pid))
+            db.session.commit()
+
+    @pytest.mark.parametrize('dates', ['window', 'not_before_only', 'none', 'not_after_on_horizon'])
+    def test_key_horizon_judges_the_issued_not_after(self, app, account, create_ca, no_caa, dates):
+        now = utc_now().replace(microsecond=0)
+        horizon = (now + timedelta(days=100)).date().isoformat()
+        on_horizon = now + timedelta(days=10, hours=1)
+        if dates == 'not_after_on_horizon':
+            # Ends on the horizon day: a day count rounded up would land past it
+            horizon = on_horizon.date().isoformat()
+        ca_refid, pid = self._policy_ca(app, create_ca, f'acme-horizon-{dates}',
+                                        {'key_type_horizons': {'RSA-2048': horizon}})
+        kw = {'window': {'not_before': now + timedelta(days=200), 'not_after': now + timedelta(days=260)},
+              'not_before_only': {'not_before': now + timedelta(days=50)},
+              'none': {}, 'not_after_on_horizon': {'not_after': on_horizon}}[dates]
+        try:
+            order_id = _ready_order(app, account, [{'type': 'dns', 'value': 'horizon.example'}], **kw)
+            ok, error, status, _, _ = _finalize(
+                app, order_id, _csr_pem(rsa.generate_private_key(65537, 2048), dns=['horizon.example']),
+                ca_refid)
+            if dates in ('none', 'not_after_on_horizon'):
+                assert ok, error  # ends before or on the horizon
+            else:
+                assert not ok
+                assert f'acme-horizon-{dates}' in error
+                assert status == 'invalid'
+        finally:
+            self._drop_policy(app, pid)
+
+    def test_not_after_a_few_seconds_past_the_profile_is_accepted(self, app, client, account):
+        na = utc_now().replace(microsecond=0) + timedelta(days=90, seconds=5)
+        r = _signed(client, account, '/acme/new-order', {
+            'identifiers': [{'type': 'dns', 'value': 'skew.example'}], 'notAfter': _iso(na)})
+        assert r.status_code == 201, r.get_json()
+
+    def test_not_after_a_few_seconds_past_a_90_day_cap_is_issued(self, app, account, create_ca, no_caa):
+        ca_refid, pid = self._policy_ca(app, create_ca, 'acme-skew-cap', {'max_validity_days': 90})
+        na = utc_now().replace(microsecond=0) + timedelta(days=90, seconds=5)
+        try:
+            order_id = _ready_order(app, account, [{'type': 'dns', 'value': 'skewcap.example'}], not_after=na)
+            ok, error, _, cert, _ = _finalize(
+                app, order_id, _csr_pem(rsa.generate_private_key(65537, 2048), dns=['skewcap.example']),
+                ca_refid)
+            assert ok, error
+            assert cert.not_valid_after_utc.replace(tzinfo=None) == na
+        finally:
+            self._drop_policy(app, pid)
+
+    def test_not_after_past_by_finalize_is_malformed(self, app, account, issuing_ca, no_caa):
+        na = utc_now().replace(microsecond=0) - timedelta(hours=1)
+        order_id = _ready_order(app, account, [{'type': 'dns', 'value': 'lapsed.example'}], not_after=na)
+        ok, error, status, _, error_type = _finalize(
+            app, order_id, _csr_pem(rsa.generate_private_key(65537, 2048), dns=['lapsed.example']),
+            issuing_ca)
+        assert not ok
+        assert error == 'notAfter is in the past'
+        assert error_type == 'malformed'
+        assert status == 'invalid'
 
     @pytest.mark.parametrize('fields', [
         {'notAfter': 200},
@@ -319,14 +398,14 @@ class TestRequestedValidity:
 
 # --- revocation by the holder of the authorizations (RFC 8555 §7.6) ---
 
-def _issue_cert(app, ca_refid, dns=(), ips=()):
+def _issue_cert(app, ca_refid, dns=(), ips=(), source='acme'):
     from services.cert_service import CertificateService
     key = rsa.generate_private_key(65537, 2048)
     csr = _csr_pem(key, dns=dns, ips=ips)
     with app.app_context():
         row = Certificate(refid=f'rev-{x509.random_serial_number()}', descr='rev', caref=ca_refid,
                           csr=b64.b64encode(csr.encode()).decode(), cert_type='server_cert',
-                          source='acme', created_by='acme')
+                          source=source, created_by='acme')
         db.session.add(row)
         db.session.flush()
         signed = CertificateService.sign_csr(cert_id=row.id, caref=ca_refid, cert_type='server_cert',
@@ -372,6 +451,34 @@ class TestRevocationByAuthorizationHolder:
         assert r.status_code == 200, r.get_json()
         with app.app_context():
             assert db.session.get(Certificate, cert_id).revoked
+
+    def test_holder_cannot_revoke_a_certificate_issued_outside_acme(self, app, client, issuing_ca):
+        cert_id, der = _issue_cert(app, issuing_ca, dns=self.NAMES, ips=self.IPS, source='manual')
+        holder = _new_account(app)
+        _grant(app, holder, self._idents())
+        r = _signed(client, holder, '/acme/revoke-cert', {'certificate': _b64u(der), 'reason': 1})
+        assert r.status_code == 403, r.get_json()
+        with app.app_context():
+            assert not db.session.get(Certificate, cert_id).revoked
+
+    def test_auto_approved_authorizations_do_not_authorize(self, app, client, issuing_ca):
+        from models.acme_models import AcmeLocalDomain
+        cert_id, der = self._cert_of_other_account(app, issuing_ca)
+        with app.app_context():
+            ca_id = CA.query.filter_by(refid=issuing_ca).first().id
+            db.session.add(AcmeLocalDomain(domain='rev-holder.example', issuing_ca_id=ca_id, auto_approve=True))
+            db.session.commit()
+        try:
+            holder = _new_account(app)
+            _grant(app, holder, self._idents())
+            r = _signed(client, holder, '/acme/revoke-cert', {'certificate': _b64u(der), 'reason': 1})
+            assert r.status_code == 403, r.get_json()
+            with app.app_context():
+                assert not db.session.get(Certificate, cert_id).revoked
+        finally:
+            with app.app_context():
+                AcmeLocalDomain.query.filter_by(domain='rev-holder.example').delete()
+                db.session.commit()
 
     @pytest.mark.parametrize('case', ['missing_ip', 'missing_wildcard', 'expired'])
     def test_partial_or_expired_authorizations_do_not_authorize(self, app, client, issuing_ca, case):
