@@ -677,7 +677,9 @@
       "generateReport": "生成报告"
     },
     "expiresInDays": "{{count}} 天后到期",
-    "chainRepairSameKey": "共用密钥、证书不同（交叉证书？）"
+    "chainRepairSameKey": "共用密钥、证书不同（交叉证书？）",
+    "keyEncryptionOffTitle": "私钥未加密。",
+    "keyEncryptionOffDesc": "未加载主密钥，CA 和证书的私钥以未加密形式保存在数据库中。请在 设置 › 安全 中启用加密，或将主密钥放回原处并重启 UCM。"
   },
   "certificates": {
     "createCertificate": "创建证书",

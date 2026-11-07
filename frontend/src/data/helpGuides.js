@@ -195,7 +195,7 @@ A bar under the CA statistics lists records an older import left behind: a dupli
 CAs with a **key icon** (🔑) have a private key stored in UCM and can sign certificates. CAs without a key are trust-only: they validate chains but cannot issue.
 
 ### Key Storage
-Private keys are encrypted at rest in the UCM database. For higher security, consider using an HSM provider (see HSM page).
+Private keys are stored in the UCM database, encrypted under the master key that UCM creates at its first start (see Settings › Security). For higher security, consider using an HSM provider (see HSM page).
 
 ## Chain Repair
 
@@ -2031,6 +2031,7 @@ Require all users to enable two-factor authentication.
 
 ### Private Key Encryption
 Encrypt all private keys stored in the database with AES-256, protected by a master key file. The section shows the encryption status and the **encrypted / unencrypted** key counters. Two opt-in environment variables make missing keys fatal at startup: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (integration-secret encryption) and \`UCM_REQUIRE_KEY_ENCRYPTION\` (private-key encryption).
+A new installation creates the master key at its first start (in a container, only when \`/etc/ucm\` is a volume of its own); the Dashboard shows a banner while no key is loaded.
 
 > 💡 Security-sensitive settings (session, lockout, HSTS, public URL, password policy) require the **admin:settings** permission, the fields are locked for operators.
 
@@ -2804,7 +2805,8 @@ System-wide security configuration affecting all user accounts and access patter
 Encrypt all CA and certificate private keys stored in the database with AES-256, protected by a master key file kept outside the database.
 
 - **Status and counters**: The section shows whether encryption is enabled and how many keys are currently **encrypted** vs **unencrypted**
-- **Enable Encryption**: Generates the master key file and encrypts all stored private keys. Back up the key file immediately: without it, encrypted keys are permanently lost
+- **First start**: An installation without a master key creates \`/etc/ucm/master.key\` (mode 0600) at startup and encrypts the keys and secrets already stored. In a container this happens only when \`/etc/ucm\` is a named volume or a host directory, never an anonymous volume. It does not happen when \`KEY_ENCRYPTION_KEY\` is set, when the database already holds encrypted keys (safe mode), or with \`UCM_AUTO_MASTER_KEY=false\`. Back up the key file: UCM backups do not need it, but a copy of the database cannot be decrypted without it
+- **Enable Encryption**: Generates the master key file and encrypts all stored private keys, when no key was created at first start. Back up the key file immediately: without it, encrypted keys are permanently lost
 - **Disable Encryption**: Decrypts all private keys back to plaintext storage (confirmation required)
 - **Encrypt remaining keys**: Shown while encryption is enabled and some keys or secrets are still stored unencrypted; encrypts them, leaving those already encrypted as they are
 

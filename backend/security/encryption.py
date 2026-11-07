@@ -8,8 +8,8 @@ Key sources (in order of priority):
 """
 
 import os
-import stat
 import base64
+import tempfile
 import logging
 from pathlib import Path
 from typing import Optional, Tuple
@@ -220,22 +220,44 @@ class KeyEncryption:
         return base64.urlsafe_b64encode(csp_bytes(32)).decode('utf-8')
     
     @staticmethod
-    def write_key_file(key: str) -> None:
-        """Write encryption key to master.key file with secure permissions"""
+    def write_key_file(key: str, exclusive: bool = False) -> None:
+        """Write the master key file (0600), complete or not at all.
+
+        `exclusive` never replaces an existing file: FileExistsError instead.
+        """
         MASTER_KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
-        MASTER_KEY_PATH.write_text(key + '\n')
-        os.chmod(MASTER_KEY_PATH, stat.S_IRUSR | stat.S_IWUSR)  # 0600
-        # Set ownership to ucm user if it exists (service runs as ucm)
+        fd, tmp = tempfile.mkstemp(dir=MASTER_KEY_PATH.parent, prefix='.master.', suffix='.tmp')
         try:
-            import pwd
-            ucm_user = pwd.getpwnam('ucm')
-            os.chown(MASTER_KEY_PATH, ucm_user.pw_uid, ucm_user.pw_gid)
-        except (KeyError, OSError) as e:
-            # ucm user doesn't exist (dev mode) or chown failed — running
-            # as root with stricter file perms is fine, just less ideal.
-            logger.debug(f"chown master.key to ucm:ucm skipped: {e}")
+            with os.fdopen(fd, 'w') as handle:
+                handle.write(key + '\n')
+                handle.flush()
+                os.fsync(handle.fileno())
+            # Set ownership to ucm user if it exists (service runs as ucm)
+            try:
+                import pwd
+                ucm_user = pwd.getpwnam('ucm')
+                os.chown(tmp, ucm_user.pw_uid, ucm_user.pw_gid)
+            except (KeyError, OSError) as e:
+                # ucm user doesn't exist (dev mode) or chown failed — running
+                # as root with stricter file perms is fine, just less ideal.
+                logger.debug(f"chown master.key to ucm:ucm skipped: {e}")
+            if exclusive:
+                try:
+                    os.link(tmp, MASTER_KEY_PATH)
+                except FileExistsError:
+                    raise
+                except OSError:
+                    # A filesystem without hard links: O_EXCL keeps the file exclusive
+                    with os.fdopen(os.open(MASTER_KEY_PATH, os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+                                           0o600), 'w') as handle:
+                        handle.write(key + '\n')
+            else:
+                os.replace(tmp, MASTER_KEY_PATH)
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
         logger.info(f"🔑 Master key written to {MASTER_KEY_PATH}")
-    
+
     @staticmethod
     def remove_key_file() -> bool:
         """Remove master.key file. Returns True if file was removed."""

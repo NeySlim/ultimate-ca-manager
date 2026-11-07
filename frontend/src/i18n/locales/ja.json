@@ -677,7 +677,9 @@
       "generateReport": "レポートを生成"
     },
     "expiresInDays": "{{count}} 日後に期限切れ",
-    "chainRepairSameKey": "鍵が共通で証明書が異なる（クロス証明書？）"
+    "chainRepairSameKey": "鍵が共通で証明書が異なる（クロス証明書？）",
+    "keyEncryptionOffTitle": "秘密鍵が暗号化されていません。",
+    "keyEncryptionOffDesc": "マスターキーが読み込まれていないため、CA と証明書の秘密鍵は暗号化されずにデータベースに保存されています。設定 › セキュリティで暗号化を有効にするか、マスターキーを元の場所に戻して UCM を再起動してください。"
   },
   "certificates": {
     "createCertificate": "証明書を作成",

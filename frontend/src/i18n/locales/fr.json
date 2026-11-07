@@ -2060,7 +2060,9 @@
       "generateReport": "Générer un rapport"
     },
     "expiresInDays": "Expire dans {{count}} jours",
-    "chainRepairSameKey": "clés partagées, certificats distincts (certificat croisé ?)"
+    "chainRepairSameKey": "clés partagées, certificats distincts (certificat croisé ?)",
+    "keyEncryptionOffTitle": "Les clés privées ne sont pas chiffrées.",
+    "keyEncryptionOffDesc": "Aucune clé maître n'est chargée : les clés privées des CA et des certificats sont stockées sans chiffrement dans la base. Activez le chiffrement dans Paramètres › Sécurité, ou remettez la clé maître en place et redémarrez UCM."
   },
   "revocation": {
     "reasonHelpNoHold": "Le motif est publié dans la CRL du parent et ne peut plus être modifié ; la révocation d'une CA est définitive.",

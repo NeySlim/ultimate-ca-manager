@@ -68,29 +68,18 @@ def enable_encryption():
     and encrypts all existing private keys in the database.
     """
     try:
-        from security.encryption import (
-            KeyEncryption, key_encryption, encrypt_all_keys as do_encrypt
-        )
+        from security.encryption import KeyEncryption, key_encryption
+        from security.master_key_bootstrap import KeyActivationError, activate_new_master_key
 
         if key_encryption.is_enabled:
             return error_response("Encryption is already enabled", 400)
 
-        # Generate key and write to file
-        key = KeyEncryption.generate_key()
-        KeyEncryption.write_key_file(key)
-
-        # Reload singleton to pick up the new key
-        key_encryption.reload()
-
-        if not key_encryption.is_enabled:
-            KeyEncryption.remove_key_file()
+        try:
+            stats = activate_new_master_key(exclusive=False)
+        except KeyActivationError:
             return error_response("Failed to initialize encryption after key generation", 500)
-
-        # Encrypt all existing keys
-        encrypted, skipped, errors = do_encrypt(dry_run=False)
-
-        from services.file_regen_service import purge_private_key_files
-        purge_stats = purge_private_key_files()
+        encrypted, skipped, errors = stats['encrypted'], stats['skipped'], stats['errors']
+        purge_stats = stats['purge']
 
         # Read the freshly-written key so the caller can immediately download
         # a backup. This is the ONLY chance to surface it cleanly: if the
@@ -143,7 +132,10 @@ def enable_encryption():
         )
     except Exception as e:
         logger.error(f"Failed to enable encryption: {e}")
-        KeyEncryption.remove_key_file()
+        from security.encryption import KeyEncryption, key_encryption
+        # A key that loaded may already encrypt values: removing it would lose them
+        if not key_encryption.is_enabled:
+            KeyEncryption.remove_key_file()
         return error_response("Failed to enable encryption", 500)
 
 

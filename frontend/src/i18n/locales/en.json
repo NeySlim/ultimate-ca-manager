@@ -677,7 +677,9 @@
       "generateReport": "Generate Report"
     },
     "expiresInDays": "Expires in {{count}} days",
-    "chainRepairSameKey": "shared keys, distinct certificates (cross-certificate?)"
+    "chainRepairSameKey": "shared keys, distinct certificates (cross-certificate?)",
+    "keyEncryptionOffTitle": "Private keys are not encrypted.",
+    "keyEncryptionOffDesc": "No master key is loaded, so CA and certificate private keys are stored unencrypted in the database. Enable encryption in Settings › Security, or put the master key back and restart UCM."
   },
   "certificates": {
     "createCertificate": "Create Certificate",

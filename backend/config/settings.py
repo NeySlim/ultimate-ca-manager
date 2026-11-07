@@ -152,6 +152,8 @@ class Config:
     HTTPS_CERT_PATH = Path(os.getenv("HTTPS_CERT_PATH", _https_cert_default))
     HTTPS_KEY_PATH = Path(os.getenv("HTTPS_KEY_PATH", _https_key_default))
     HTTPS_AUTO_GENERATE = os.getenv("HTTPS_AUTO_GENERATE", "true").lower() == "true"
+    # Create the master key at first start (security.master_key_bootstrap)
+    AUTO_MASTER_KEY = os.getenv("UCM_AUTO_MASTER_KEY", "true").strip().lower() not in ("0", "false", "no", "off")
     
     # File Upload Limits (security)
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max (base64 inflates ~33%)
@@ -302,6 +304,8 @@ class TestingConfig(Config):
     # Inherit Config.SQLALCHEMY_ENGINE_OPTIONS when DATABASE_URL is set in the
     # environment (PG CI job) but force in-memory SQLite — pool_* args are invalid.
     SQLALCHEMY_ENGINE_OPTIONS = {"hide_parameters": True}
+    # The suite starts unencrypted; the tests of the first-start key turn it on
+    AUTO_MASTER_KEY = False
 
 
 # Configuration dictionary

@@ -677,7 +677,9 @@
       "generateReport": "Bericht erstellen"
     },
     "expiresInDays": "Läuft in {{count}} Tagen ab",
-    "chainRepairSameKey": "gemeinsame Schlüssel, verschiedene Zertifikate (Cross-Zertifikat?)"
+    "chainRepairSameKey": "gemeinsame Schlüssel, verschiedene Zertifikate (Cross-Zertifikat?)",
+    "keyEncryptionOffTitle": "Private Schlüssel sind nicht verschlüsselt.",
+    "keyEncryptionOffDesc": "Es ist kein Hauptschlüssel geladen, daher werden die privaten Schlüssel von CAs und Zertifikaten unverschlüsselt in der Datenbank gespeichert. Aktivieren Sie die Verschlüsselung unter Einstellungen › Sicherheit oder stellen Sie den Hauptschlüssel wieder bereit und starten Sie UCM neu."
   },
   "certificates": {
     "createCertificate": "Zertifikat erstellen",

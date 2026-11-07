@@ -630,6 +630,13 @@ def get_system_status():
         logger.debug('TSA status check failed', exc_info=True)
         status['tsa'] = {'status': 'warning', 'message': 'Status unavailable'}
 
+    # Without a loaded master key, private keys are written to the database unencrypted
+    from security.encryption import key_encryption
+    if key_encryption.is_enabled:
+        status['key_encryption'] = {'status': 'online', 'message': 'Private keys encrypted'}
+    else:
+        status['key_encryption'] = {'status': 'warning', 'message': 'No master key loaded'}
+
     # Core is online if we can respond
     status['core'] = {'status': 'online', 'message': 'Operational'}
 

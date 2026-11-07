@@ -677,7 +677,9 @@
       "generateReport": "Generar informe"
     },
     "expiresInDays": "Expira en {{count}} días",
-    "chainRepairSameKey": "claves compartidas, certificados distintos (¿certificado cruzado?)"
+    "chainRepairSameKey": "claves compartidas, certificados distintos (¿certificado cruzado?)",
+    "keyEncryptionOffTitle": "Las claves privadas no están cifradas.",
+    "keyEncryptionOffDesc": "No hay ninguna clave maestra cargada, así que las claves privadas de las CA y de los certificados se guardan sin cifrar en la base de datos. Active el cifrado en Configuración › Seguridad, o vuelva a colocar la clave maestra y reinicie UCM."
   },
   "certificates": {
     "createCertificate": "Crear certificado",

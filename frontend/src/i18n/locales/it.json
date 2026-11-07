@@ -677,7 +677,9 @@
       "generateReport": "Genera rapporto"
     },
     "expiresInDays": "Scade tra {{count}} giorni",
-    "chainRepairSameKey": "chiavi condivise, certificati distinti (certificato incrociato?)"
+    "chainRepairSameKey": "chiavi condivise, certificati distinti (certificato incrociato?)",
+    "keyEncryptionOffTitle": "Le chiavi private non sono cifrate.",
+    "keyEncryptionOffDesc": "Nessuna chiave master è caricata: le chiavi private delle CA e dei certificati sono salvate senza cifratura nel database. Attiva la crittografia in Impostazioni › Sicurezza, oppure rimetti al suo posto la chiave master e riavvia UCM."
   },
   "certificates": {
     "createCertificate": "Crea certificato",

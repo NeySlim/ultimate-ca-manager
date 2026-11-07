@@ -204,7 +204,8 @@ EXPOSE 8053/tcp
 # key in the database. If the container is recreated without this volume
 # bind-mounted, master.key is destroyed and ALL encrypted CAs / certs / ACME
 # / SSH-CA private keys in the DB become unrecoverable. ALWAYS bind-mount
-# /etc/ucm to a host path or named volume before enabling encryption.
+# /etc/ucm to a host path or named volume: UCM creates master.key at first
+# start only then, never in this anonymous volume.
 # /opt/ucm/data holds the SQLite DB, CA files, sessions, backups.
 VOLUME ["/etc/ucm", "/opt/ucm/data"]
 
