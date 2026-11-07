@@ -20,7 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
-- EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the `EST key generator` certificate the SignedData carries, which chains to the issuing CA from `/cacerts`. Migration 132 adds the `est_signer_certs` table that holds these certificates; backups leave it out, as they are issued again on demand.
+- EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the `EST key generator` certificate the SignedData carries, which chains to the issuing CA from `/cacerts` and is listed, and revoked when needed, with the CA's certificates like a delegated OCSP responder; the next encrypted request then gets a new one. Migration 132 adds the `est_signer_certs` table that names the current one; backups carry the certificate but not that table, so a restored installation issues a new one on first use.
 - EST: `serverkeygen` without `AsymmetricDecryptKeyIdentifier` now returns the key unencrypted, without the Basic password, and over mTLS the key type is chosen as over Basic, ML-DSA under an ML-DSA CA included.
 
 ## [2.251] - 2026-11-06
