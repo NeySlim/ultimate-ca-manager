@@ -339,7 +339,13 @@ def test_enrolling_from_headers_needs_the_issuer(app, auth_client, same_serial):
     _serial, pem_a, _pem_b = same_serial
     r = auth_client.post('/api/v2/mtls/enroll', json={}, headers=_proxy_headers(pem_a))
     assert r.status_code == 400, r.get_json()
+    assert r.get_json()['message'].startswith('The client certificate issuer is missing')
     assert 'X-SSL-Client-I-DN' in r.get_json()['message']
+    r = auth_client.post('/api/v2/mtls/enroll', json={},
+                         headers=_proxy_headers(pem_a, **{'X-SSL-Client-I-DN': 'CN=Evil,notAnAttribute=x'}))
+    assert r.status_code == 400, r.get_json()
+    assert r.get_json()['message'].startswith('The client certificate issuer cannot be read')
+    assert 'RFC 4514' in r.get_json()['message']
     assert _enrolments(app) == 0
     r = auth_client.post('/api/v2/mtls/enroll', json={},
                          headers=_proxy_headers(pem_a, **{'X-SSL-Client-I-DN': _info(pem_a)['issuer_dn']}))
