@@ -23,6 +23,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- WSTEP: the template a request named (szOID_CERTIFICATE_TEMPLATE by OID, szOID_ENROLL_CERTTYPE by name) was ignored and the template chosen by EKU, so of two templates with the same EKUs the oldest always won, and a template the CA does not offer was issued anyway. The named template is now issued, an unknown, inactive or conflicting one is refused, and a request naming none is still matched by its EKUs.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: these providers hold one TXT value per name, so the cleanup of one order cleared the value another order was still validating. The name is now left alone while another order in progress uses it.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: an order for a domain and its wildcard could not hold both values and failed at validation, and the ACME proxy replaced the CA's value with its clients' own. Such an order, or on DuckDNS one naming two hosts under the same subdomain, is now refused at the request before the CA is asked, and the proxy publishes only the CA's value there.
 - ACME client: a CA refusal of `replaces` whose message merely contained "rateLimited" was taken for a rate limit and not retried. A rate limit is now recognised by its problem type or a 429 only (RFC 8555 §6.7).

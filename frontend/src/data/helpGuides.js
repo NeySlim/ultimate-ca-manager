@@ -2241,6 +2241,8 @@ A template with an **ML-DSA** key type is announced by its key algorithm OID, wi
 
 An **ECDSA** template is announced in policy schema 3 with its curve (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) as a signature key and a request hash, the stronger of the template digest and the one matching the curve; RSA templates outside FIPS mode stay schema 2. The request key must fit the template it is issued under: the same curve or ML-DSA set, or an RSA key at least as long (v2.251).
 
+A request that names its template, by OID (\`szOID_CERTIFICATE_TEMPLATE\`) or by name (\`szOID_ENROLL_CERTTYPE\`), is issued under that template; a template the CA does not offer or that is inactive, two names for two templates, or EKUs the template does not issue are refused. A request naming none, as Windows CertEnroll often sends, is matched to a template by its EKUs.
+
 ### Kerberos / SPNEGO
 
 Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoenrollment, so machines and users are authenticated by their Kerberos ticket instead of a credential prompt:

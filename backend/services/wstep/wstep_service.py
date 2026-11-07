@@ -262,14 +262,14 @@ def _load_csr(csr_der):
 
 
 def _match_template(ca, csr, principal=None):
-    """Best-effort match of the CSR's requested EKU against the CA's
-    advertised templates (the same set XCEP's GetPolicies exposed).
+    """The template a request is issued under: the one it names (``_named_template``),
+    else the best match of its requested EKUs against the CA's advertised
+    templates (the same set XCEP's GetPolicies exposed).
 
-    There is no explicit "which template did you pick" signal in the RST
-    or CSR to key off instead: a real captured Windows request's CMC
-    control_sequence was empty and the CSR carried no separate
-    CertificateTemplateName attribute. So this infers the template from
-    what the CSR itself asks for (its EKU set).
+    Windows CertEnroll requests captured on Server 2025 name no template (their
+    CMC control sequence is empty, the CSR carries EKU, key usage and SKI only),
+    so the EKU match stays the fallback: it infers the template from what the
+    CSR itself asks for (its EKU set).
 
     This is a real limitation, not a corner case: two templates can
     legitimately want the same EKU (e.g. "Web Server" and "VPN Server"
@@ -292,6 +292,10 @@ def _match_template(ca, csr, principal=None):
     carries no Certificate Template extension — and its own configured
     EKUs (``_template_extra_ekus``) as ``extra_ekus``.
     """
+    named, refusal, has_name = _named_template(ca, csr)
+    if has_name:
+        return named, refusal
+
     try:
         from models import CertificateTemplate
         from services.xcep.policy_builder import _resolve_templates_for_ca
@@ -324,6 +328,71 @@ def _match_template(ca, csr, principal=None):
         return None, (f"Template '{other.name}' issues {_template_key_label(other)} keys, "
                       f'not {csr_label}')
     return None, None
+
+
+# szOID_ENROLL_CERTTYPE_EXTENSION (MS-WCCE 2.2.2.7.7.1): the template's name
+_ENROLL_CERTTYPE_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2')
+
+
+def _template_identifiers(csr):
+    """``(OID, name)`` of the template the request names, each None when absent;
+    ValueError for an unreadable one."""
+    from asn1crypto import core as asn1_core
+
+    extensions = extensions_of(csr)
+    oid = name = None
+    try:
+        oid = extensions.get_extension_for_class(x509.MSCertificateTemplate).value.template_id.dotted_string
+    except x509.ExtensionNotFound:
+        pass
+    try:
+        raw = extensions.get_extension_for_oid(_ENROLL_CERTTYPE_OID).value.value
+    except x509.ExtensionNotFound:
+        return oid, None
+    value = asn1_core.load(raw)
+    if not isinstance(value, (asn1_core.BMPString, asn1_core.UTF8String)) or not value.native.strip():
+        raise ValueError('certificate template name')
+    return oid, value.native.strip()
+
+
+def _named_template(ca, csr):
+    """``(template, refusal, named)`` for the template the request names by OID or
+    name (MS-WCCE 3.2.2.6.2.1.4.1): an identifier this CA does not offer, two that
+    disagree, or EKUs or a key the template does not issue are refused."""
+    from services.xcep.policy_builder import _policy_oid_for_template
+
+    try:
+        oid, name = _template_identifiers(csr)
+    except (TypeError, ValueError):
+        return None, 'Invalid certificate template extension in the request', True
+    if oid is None and name is None:
+        return None, None, False
+    offered = _ca_templates(ca)
+    found = []
+    if oid is not None:
+        by_oid = [t for t in offered if _policy_oid_for_template(ca, t) == oid]
+        if not by_oid:
+            return None, f'Certificate template {oid} is not offered by this CA', True
+        found.append(by_oid[0])
+    if name is not None:
+        by_name = [t for t in offered if (t.name or '').casefold() == name.casefold()]
+        if not by_name:
+            return None, f"Certificate template '{name}' is not offered by this CA", True
+        if len(by_name) > 1:
+            return None, f"Certificate template name '{name}' is ambiguous", True
+        found.append(by_name[0])
+    if len({t.id for t in found}) > 1:
+        return None, 'The request names two different certificate templates', True
+    template = found[0]
+    csr_label = _csr_key_label(csr)
+    if not _template_takes_key(template, csr_label):
+        return None, (f"Template '{template.name}' issues {_template_key_label(template)} keys, "
+                      f'not {csr_label}'), True
+    allowed = set(_template_configured_ekus(template))
+    if allowed and (_eku_oids(csr) or set()) - allowed:
+        return None, (f"Template '{template.name}' does not issue the Extended Key Usages "
+                      'the request asks for'), True
+    return template, None, True
 
 
 def _eku_oids(cert_or_csr):
@@ -651,16 +720,12 @@ def _user_ad_derivation_enabled(ca):
     """Whether any template resolvable for ``ca`` has opted into
     AD-derived user subjects (``CertificateTemplate.ad_derived_subject``).
 
-    Deliberately independent of ``_match_template``'s EKU-based
-    scoring above: a naked CSR (the only kind this ever applies to — see
-    ``issue()``) carries no EKU extension, so it scores negative against
-    any candidate template that declares EKUs at all, meaning EKU-based
-    matching alone would almost always find nothing and this feature would
-    silently never fire. This only asks "did an admin opt any template
-    into AD-derivation for this CA," mirroring how the machine branch below
-    has no template dependency either — MS-WSTEP's wire protocol has no
-    template-selection signal to check instead (see ``_match_template``'s
-    docstring).
+    Deliberately independent of ``_match_template``: a naked CSR (the only
+    kind this applies to without a matched template, see ``_directory_subject``)
+    usually names no template and carries no EKU extension, so it scores
+    negative against any candidate template that declares EKUs at all. This
+    only asks "did an admin opt any template into AD-derivation for this CA,"
+    mirroring how the machine branch has no template dependency either.
     """
     try:
         from models import CertificateTemplate
