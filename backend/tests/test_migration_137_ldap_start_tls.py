@@ -24,6 +24,21 @@ def test_sqlite_adds_the_column_off_and_is_idempotent():
     assert conn.execute(f"SELECT ldap_start_tls FROM {TABLE}").fetchone() == (0,)
 
 
+def test_sqlite_turns_a_missing_or_unknown_default_role_into_viewer():
+    """Before this release a NULL or unknown default role meant viewer."""
+    conn = sqlite3.connect(':memory:')
+    conn.execute(f"CREATE TABLE {TABLE} (id INTEGER PRIMARY KEY, name VARCHAR(100), "
+                 "provider_type VARCHAR(50), ldap_use_ssl BOOLEAN, default_role VARCHAR(50))")
+    conn.executemany(f"INSERT INTO {TABLE} VALUES (?, ?, 'oauth2', 0, ?)",
+                     [(1, 'a', None), (2, 'b', 'root'), (3, 'c', 'auditor'), (4, 'd', '')])
+    _migration().upgrade(conn)
+    rows = conn.execute(f"SELECT id, default_role FROM {TABLE} ORDER BY id").fetchall()
+    assert rows == [(1, 'viewer'), (2, 'viewer'), (3, 'auditor'), (4, 'viewer')]
+    conn.execute(f"UPDATE {TABLE} SET default_role = NULL WHERE id = 3")
+    _migration().upgrade(conn)  # a later explicit choice survives a rerun
+    assert conn.execute(f"SELECT default_role FROM {TABLE} WHERE id = 3").fetchone() == (None,)
+
+
 def test_sqlite_without_the_table_is_a_no_op():
     conn = sqlite3.connect(':memory:')
     _migration().upgrade(conn)
@@ -47,14 +62,16 @@ def _postgres_round():
         conn.execute(text(f"CREATE SCHEMA {schema}"))
         conn.execute(text(f"SET search_path TO {schema}"))
         conn.execute(text(f"CREATE TABLE {TABLE} (id SERIAL PRIMARY KEY, name VARCHAR(100), "
-                          "provider_type VARCHAR(50), ldap_use_ssl BOOLEAN)"))
-        conn.execute(text(f"INSERT INTO {TABLE} (name, provider_type, ldap_use_ssl) "
-                          "VALUES ('dir', 'ldap', FALSE)"))
+                          "provider_type VARCHAR(50), ldap_use_ssl BOOLEAN, default_role VARCHAR(50))"))
+        conn.execute(text(f"INSERT INTO {TABLE} (name, provider_type, ldap_use_ssl, default_role) "
+                          "VALUES ('dir', 'ldap', FALSE, NULL), ('x', 'ldap', FALSE, 'root'), "
+                          "('y', 'ldap', FALSE, 'auditor')"))
         _migration().upgrade(conn)
         _migration().upgrade(conn)
         columns = {c['name']: c for c in inspect(conn).get_columns(TABLE, schema=schema)}
         assert columns['ldap_start_tls']['nullable'] is False
-        assert conn.execute(text(f"SELECT ldap_start_tls FROM {TABLE}")).fetchall() == [(False,)]
+        assert conn.execute(text(f"SELECT ldap_start_tls, default_role FROM {TABLE} ORDER BY id")
+                            ).fetchall() == [(False, 'viewer'), (False, 'viewer'), (False, 'auditor')]
     finally:
         conn.rollback()
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
