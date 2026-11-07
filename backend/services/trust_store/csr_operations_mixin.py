@@ -2,8 +2,9 @@
 CSR operations mixin for TrustStoreService
 """
 import ipaddress
+import math
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 from cryptography import x509
@@ -630,6 +631,8 @@ class CSROperationsMixin:
         qualification_template=None,
         notices: Optional[list] = None,
         custom_extensions: Optional[list] = None,
+        not_before: Optional[datetime] = None,
+        not_after: Optional[datetime] = None,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
         signing renews — its names are graced by NameConstraints validation.
@@ -780,6 +783,10 @@ class CSROperationsMixin:
             explicit=bool((policy_scope or {}).get('digest_explicit', policy_scope is None)),
             key_type=key_label_for_public_key(csr.public_key()), context=policy_context,
             pq_hybrid=related_a is not None)
+        if not_after is not None:
+            # A requested notAfter is issued as asked: the days are what the policies judge
+            validity_days = max(1, math.ceil(
+                (not_after - (not_before or utc_now())).total_seconds() / 86400))
         if policy_scope is not None:
             # Name count, validity ceiling and key horizons, for the protocols as for the form
             dns_count = sum(isinstance(n, x509.DNSName) for n in (effective_sans or []))
@@ -788,7 +795,10 @@ class CSROperationsMixin:
                 dns_name_count=dns_count, validity_days=validity_days,
                 context=policy_context, pq_hybrid=related_a is not None)
             violations = list(dict.fromkeys(list(violations) + limit_violations))
-            if capped_by:
+            if capped_by and not_after is not None:
+                violations.append(f"The requested validity exceeds the {capped} days "
+                                  f"allowed by policy '{capped_by}'")
+            elif capped_by:
                 logger.info(f"Validity capped to {capped} days by policy '{capped_by}'")
                 validity_days = capped
         if violations:
@@ -800,10 +810,12 @@ class CSROperationsMixin:
         builder = builder.issuer_name(ca_cert.subject)
         builder = builder.public_key(csr.public_key())
         builder = builder.serial_number(x509.random_serial_number())
-        builder = builder.not_valid_before(cert_not_before())
-        builder = builder.not_valid_after(
-            clamp_not_after(utc_now() + timedelta(days=validity_days), ca_cert)
-        )
+        start = not_before or cert_not_before()
+        if not_after is not None and clamp_not_after(not_after, ca_cert) != not_after:
+            raise ValueError('The requested notAfter is later than the issuing CA certificate expires')
+        builder = builder.not_valid_before(start)
+        builder = builder.not_valid_after(not_after if not_after is not None else clamp_not_after(
+            (not_before or utc_now()) + timedelta(days=validity_days), ca_cert))
 
         # Copy only extensions appropriate for the requested certificate role.
         # CA-only constraints from an enrollee CSR must never reach a leaf.

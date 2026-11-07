@@ -216,10 +216,13 @@ class IssuanceMixin:
                 # and the error is reported as serverInternal, not badCSR
                 self._last_finalize_error_type = 'serverInternal'
                 return False, error
-            self._last_finalize_error_type = 'badCSR'
+            from services.acme.requested_validity import RequestedValidityError
+            self._last_finalize_error_type = (
+                'malformed' if isinstance(self._last_signing_exception, RequestedValidityError)
+                else 'badCSR')
             order.status = "invalid"
             order.error = json.dumps({
-                "type": "urn:ietf:params:acme:error:badCSR",
+                "type": f"urn:ietf:params:acme:error:{self._last_finalize_error_type}",
                 "detail": error
             })
             try:
@@ -538,6 +541,7 @@ class IssuanceMixin:
             Tuple of (success, certificate_id, error_message)
         """
         from models import CA, Certificate
+        from cryptography import x509
         import secrets
         import base64
         
@@ -572,6 +576,24 @@ class IssuanceMixin:
             self._last_signing_exception = RuntimeError("CA is awaiting its certificate")
             return False, None, f"CA {ca.refid} is awaiting its certificate"
         
+        from services.acme import profiles as acme_profiles
+        params = acme_profiles.issuance_params(getattr(order, 'profile', None))
+
+        # RFC 8555 §7.4: the order's dates, within the profile and the CA, or no certificate
+        if order.not_before or order.not_after:
+            from services.acme.requested_validity import RequestedValidityError, window_error
+            from utils.ca_signing_window import issuer_window
+            try:
+                ca_cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+            except Exception:
+                ca_cert = None
+            refusal = window_error(
+                order.not_before, order.not_after, params['validity_days'],
+                ca_window=issuer_window(ca_cert) if ca_cert is not None else None)
+            if refusal:
+                self._last_signing_exception = RequestedValidityError(refusal)
+                return False, None, refusal
+
         # Extract CN from CSR for better description
         descr = f"ACME Certificate - Order {order.order_id}"
         try:
@@ -627,9 +649,6 @@ class IssuanceMixin:
             # historical ACME defaults (90 days, sha256, no template). A
             # profile may bind a certificate template whose KU/EKU then
             # govern the leaf (#327 follow-up).
-            from services.acme import profiles as acme_profiles
-            params = acme_profiles.issuance_params(getattr(order, 'profile', None))
-
             signed_cert = CertificateService.sign_csr(
                 cert_id=cert.id,
                 caref=ca.refid,
@@ -640,6 +659,8 @@ class IssuanceMixin:
                 digest_explicit=params.get('digest_explicit', True),
                 username='acme',
                 template_id=params.get('template_id'),
+                not_before=order.not_before,
+                not_after=order.not_after,
             )
             
             return True, signed_cert.id, None

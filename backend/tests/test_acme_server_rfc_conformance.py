@@ -241,7 +241,10 @@ class TestRequestedValidity:
         assert cert.not_valid_after_utc.replace(tzinfo=None) == na
 
     def test_not_after_beyond_the_issuing_ca_is_refused_at_finalize(
-            self, app, account, issuing_ca, no_caa):
+            self, app, account, issuing_ca, no_caa, monkeypatch):
+        from services.acme import profiles
+        real = profiles.issuance_params
+        monkeypatch.setattr(profiles, 'issuance_params', lambda name: {**real(name), 'validity_days': 9000})
         na = utc_now().replace(microsecond=0) + timedelta(days=20 * 365)
         order_id = _ready_order(app, account, [{'type': 'dns', 'value': 'pastca.example'}], not_after=na)
         ok, error, status, _, error_type = _finalize(
@@ -251,6 +254,46 @@ class TestRequestedValidity:
         assert 'notAfter' in error
         assert error_type == 'malformed'
         assert status == 'invalid'
+
+    def test_signer_never_moves_a_requested_not_after(self, app, issuing_ca):
+        from services.cert_service import CertificateService
+        key = rsa.generate_private_key(65537, 2048)
+        with app.app_context():
+            row = Certificate(refid=f'na-{x509.random_serial_number()}', descr='na', caref=issuing_ca,
+                              csr=b64.b64encode(_csr_pem(key, dns=['na.example']).encode()).decode(),
+                              cert_type='server_cert', source='acme', created_by='acme')
+            db.session.add(row)
+            db.session.flush()
+            with pytest.raises(ValueError, match='notAfter'):
+                CertificateService.sign_csr(cert_id=row.id, caref=issuing_ca, validity_days=90,
+                                            digest='sha256', username='acme',
+                                            not_after=utc_now() + timedelta(days=20 * 365))
+            db.session.rollback()
+
+    def test_window_a_policy_would_shorten_is_refused(self, app, account, create_ca, no_caa):
+        from models.policy import CertificatePolicy
+        ca = create_ca(cn='ACME conformance policy CA')
+        with app.app_context():
+            ca_refid = db.session.get(CA, ca['id']).refid
+            pol = CertificatePolicy(name='acme-window-cap', policy_type='issuance', ca_id=ca['id'],
+                                    requires_approval=False, min_approvers=1, is_active=True, priority=100)
+            pol.set_rules({'max_validity_days': 5})
+            db.session.add(pol)
+            db.session.commit()
+            pid = pol.id
+        try:
+            na = utc_now().replace(microsecond=0) + timedelta(days=30)
+            order_id = _ready_order(app, account, [{'type': 'dns', 'value': 'capped.example'}], not_after=na)
+            ok, error, status, _, _ = _finalize(
+                app, order_id, _csr_pem(rsa.generate_private_key(65537, 2048), dns=['capped.example']),
+                ca_refid)
+            assert not ok
+            assert 'acme-window-cap' in error
+            assert status == 'invalid'
+        finally:
+            with app.app_context():
+                db.session.delete(db.session.get(CertificatePolicy, pid))
+                db.session.commit()
 
     @pytest.mark.parametrize('fields', [
         {'notAfter': 200},

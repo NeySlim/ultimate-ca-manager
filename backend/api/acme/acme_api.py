@@ -3,7 +3,6 @@ ACME Protocol API Endpoints (RFC 8555)
 Implements the ACME server endpoints for automated certificate management
 """
 from flask import Blueprint, request, jsonify, make_response
-from datetime import datetime
 import json
 import base64
 from typing import Dict, Any, Tuple, Optional
@@ -1108,15 +1107,21 @@ def new_order():
             # whatever the default is by then
             profile = acme_profiles.get_default_profile() or None
 
-        # Parse optional dates
-        not_before = payload.get('notBefore')
-        not_after = payload.get('notAfter')
-        
-        if not_before:
-            not_before = datetime.fromisoformat(not_before.replace('Z', '+00:00'))
-        if not_after:
-            not_after = datetime.fromisoformat(not_after.replace('Z', '+00:00'))
-        
+        # RFC 8555 §7.4: the requested dates are issued as asked, or refused
+        from services.acme.requested_validity import (
+            RequestedValidityError, parse_order_time, window_error,
+        )
+        try:
+            not_before = parse_order_time(payload.get('notBefore'), 'notBefore')
+            not_after = parse_order_time(payload.get('notAfter'), 'notAfter')
+        except RequestedValidityError as e:
+            return acme_error('malformed', str(e))
+        refusal = window_error(not_before, not_after,
+                               acme_profiles.issuance_params(profile)['validity_days'],
+                               at_order=True)
+        if refusal:
+            return acme_error('malformed', refusal)
+
         # Create order
         order = service.create_order(
             account_id=account.account_id,
