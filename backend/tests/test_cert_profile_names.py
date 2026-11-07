@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import ExtensionOID, NameOID
 
 from models import Certificate, db
+from tests.test_est_rfc7030 import _basic_auth, _post_csr, est_config  # noqa: F401
 from services.trust_store.trust_store_service import TrustStoreService
 from utils.san_parse import (auto_san_buckets_from_cn, parse_cert_san_payload,
                              parse_csr_san_entries, validate_dns_san)
@@ -353,3 +354,11 @@ class TestScepPath:
     def test_a_valid_request_is_issued(self, app, create_ca):
         csr = _csr(_cn('scep.example.test'), [x509.DNSName('scep.example.test')])
         assert self._issue(app, create_ca, csr, 'profile-scep-ok')
+
+
+class TestEstPath:
+    def test_refusal_names_its_reason(self, client, est_config):
+        csr = _csr(_cn('est.example.test'), [x509.DNSName('bad name.example')])
+        r = _post_csr(client, 'simpleenroll', csr, headers=_basic_auth())
+        assert r.status_code == 400
+        assert b'bad name.example' in r.data
