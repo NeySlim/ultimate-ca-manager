@@ -324,8 +324,9 @@ def _adoptable(user, provider):
     if user.sso_external_id:
         return False
     if (user.auth_source or 'local') == 'local':
-        # SSO account from before migration 024, never converted back by an admin.
-        return (user.password_hash == SSO_NO_PASSWORD and not user.sso_provider_id
+        # SSO account from before migration 024 (which may have set its provider),
+        # never converted back by an admin (unlink forces a password change).
+        return (user.password_hash == SSO_NO_PASSWORD and user.sso_provider_id in (None, provider.id)
                 and not user.force_password_change)
     return user.auth_source == provider.provider_type and user.sso_provider_id in (None, provider.id)
 

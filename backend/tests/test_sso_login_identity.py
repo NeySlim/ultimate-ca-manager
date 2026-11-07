@@ -245,6 +245,25 @@ def test_ldap_adopts_a_pre_stable_id_account_of_the_same_provider(app, ldap):
             _cleanup(['tkold'])
 
 
+def test_ldap_adopts_a_pre_024_account_the_migration_tied_to_this_provider(app, ldap):
+    """Migration 024 could keep auth_source 'local' yet set the provider."""
+    with app.app_context():
+        _cleanup(['tk024'])
+        db.session.add(User(username='tk024', email='m024@corp.test', full_name='M',
+                            role='operator', active=True, password_hash='!SSO_NO_PASSWORD!',
+                            auth_source='local', sso_provider_id=ldap.provider_id))
+        db.session.commit()
+    try:
+        r = ldap('tk024', dn='uid=tk024,dc=example', uid='uuid-024')
+        assert r.status_code == 200, r.get_json()
+        with app.app_context():
+            u = User.query.filter_by(username='tk024').one()
+            assert (u.auth_source, u.sso_external_id) == ('ldap', 'uuid-024')
+    finally:
+        with app.app_context():
+            _cleanup(['tk024'])
+
+
 def test_bind_never_replaces_an_existing_external_id(app):
     from api.v2.sso.ldap_routes import _bind_external_id
     with app.app_context():
