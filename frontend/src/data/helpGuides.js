@@ -1752,7 +1752,7 @@ RBAC provides fine-grained permission management. Define custom roles with speci
 Four built-in roles that cannot be modified or deleted. The RBAC page shows each with the permissions UCM applies to it:
 
 - **Admin**: Full access to everything
-- **Operator**: Manage certificates, CAs, CSRs, templates. No access to system settings, users, or RBAC
+- **Operator**: Manage certificates, CAs, CSRs, ACME, SSH, groups and system settings; templates read-only. No access to users or RBAC
 - **Auditor**: Read-only access to all operational data (certificates, CAs, ACME, SCEP, HSM, audit logs, policies, groups) but not settings or user management
 - **Viewer**: Basic read-only access to certificates, CAs, CSRs, templates, and trust store
 
