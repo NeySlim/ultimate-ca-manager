@@ -1952,6 +1952,8 @@ Click **Verify Integrity** to check the audit log chain. UCM uses hash chaining 
 ## Syslog Forwarding
 
 Configure remote syslog forwarding in **Settings → Audit** to send log events to an external SIEM or syslog server in real-time.
+
+Every audit event is forwarded by default. Unchecking a category (Certificates, CAs, CSRs, Users, ACME, SCEP, System) stops only its events: ACME covers every ACME event, Users covers SSO logins. Events outside these categories, such as audit purges, API keys, roles, settings and policies, are always forwarded.
 `
   },
 

@@ -59,8 +59,28 @@ class SyslogForwarder:
             cls._instance._initialized = False
         return cls._instance
 
-    # All available event categories (resource_type values)
+    # The categories an operator can deselect; a resource type in none of them is always sent
     ALL_CATEGORIES = ['certificate', 'ca', 'csr', 'user', 'acme', 'scep', 'system']
+    _PREFIXES = (('acme_', 'acme'), ('scep_', 'scep'))
+    _ALIASES = {'sso': 'user', 'user_certificate': 'certificate',
+                'ssh_certificate': 'certificate', 'ssh_ca': 'ca'}
+
+    @classmethod
+    def category_of(cls, resource_type):
+        """The deselectable category a resource type belongs to, or None."""
+        if not resource_type:
+            return None
+        if resource_type in cls.ALL_CATEGORIES:
+            return resource_type
+        for prefix, category in cls._PREFIXES:
+            if resource_type.startswith(prefix):
+                return category
+        return cls._ALIASES.get(resource_type)
+
+    def _wanted(self, resource_type) -> bool:
+        # No box checked is read back from the database as all of them: same here
+        category = self.category_of(resource_type)
+        return not self._categories or category is None or category in self._categories
 
     def _initialize(self):
         self._enabled = False
@@ -228,9 +248,7 @@ class SyslogForwarder:
         if not self._enabled or not self._host:
             return False
 
-        # Filter by event category
-        resource_type = getattr(audit_log, 'resource_type', None) or ''
-        if self._categories and resource_type and resource_type not in self._categories:
+        if not self._wanted(getattr(audit_log, 'resource_type', None)):
             return False
 
         try:

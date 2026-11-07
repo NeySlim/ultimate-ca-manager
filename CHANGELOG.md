@@ -25,6 +25,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Rate limiting: a 429 from a login route's own limit carried the general limit in `X-RateLimit-Limit` (30 instead of 5) and no `Retry-After`. It now names the limit that refused the request and when to retry.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: these providers hold one TXT value per name, so the cleanup of one order cleared the value another order was still validating. The name is now left alone while another order in progress uses it.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: an order for a domain and its wildcard could not hold both values and failed at validation, and the ACME proxy replaced the CA's value with its clients' own. Such an order, or on DuckDNS one naming two hosts under the same subdomain, is now refused at the request before the CA is asked, and the proxy publishes only the CA's value there.
 - ACME client: a CA refusal of `replaces` whose message merely contained "rateLimited" was taken for a rate limit and not retried. A rate limit is now recognised by its problem type or a 429 only (RFC 8555 §6.7).
@@ -41,11 +42,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Remote syslog: only seven resource types were forwarded, so audit purges, API keys, roles, settings, policies and SSO login failures never reached the collector, and the ACME box matched almost no ACME event. Every audit event is now forwarded unless its category is unchecked, ACME covers every ACME event, and entries written inside a transaction, the audit purge included, leave once committed.
+- Audit log on PostgreSQL: an entry whose User-Agent, resource id list, resource name or username was longer than its column was dropped while the action went through, so a client could hide its own actions behind a long User-Agent. These columns are now TEXT, every field is cut to a bounded length before it is sealed, and an entry that still cannot be written is logged as an error and sent to syslog.
 - Certificate policies: a DNS pattern written `*.company.com`, as the form suggests, covered only that literal name, so approval and the policy's rules skipped `www.company.com`, while `company.com` also caught `evilcompany.com`. Patterns now match by DNS label, ignoring case and a final dot: `*.company.com` covers the names under company.com, `company.com` the domain as well (RFC 4343).
 - mTLS behind a proxy: a certificate presented by its serial number alone, without `X-SSL-Client-I-DN` or `X-SSL-Client-Cert`, opened the enrolment bearing that serial, even one of another CA. Such a serial now opens only an enrolment that recorded no issuer, and enrolling a presented certificate requires its issuer (RFC 5280 §4.1.2.2).
 
 ### Upgrade notes
 
+- Remote syslog: the collector now receives every audit event type, so expect more volume; unchecking a category still stops its own events. Migration 133 turns four `audit_logs` columns into TEXT on PostgreSQL without rewriting the table.
 - Certificate policies: a `*.x` DNS pattern now applies to the names under x, so requests issued directly until now may wait for approval or meet the policy's rules; an `x` pattern no longer applies to names such as `evilx` or `x.other.org`.
 - mTLS behind a proxy: a proxy that forwards the serial number without `X-SSL-Client-I-DN` (nginx `$ssl_client_i_dn`, Apache `SSL_CLIENT_I_DN`) or `X-SSL-Client-Cert` must now forward one of them, or certificate login fails with a warning in the log; the I-DN is read in RFC 4514, RFC 1779, OpenSSL one-line and legacy forms.
 - EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the `EST key generator` certificate the SignedData carries, which chains to the issuing CA from `/cacerts` and is listed, and revoked when needed, with the CA's certificates like a delegated OCSP responder; the next encrypted request then gets a new one. Migration 132 adds the `est_signer_certs` table that names the current one; backups carry the certificate but not that table, so a restored installation issues a new one on first use.
