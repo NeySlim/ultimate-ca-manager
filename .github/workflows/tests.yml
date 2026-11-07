@@ -135,7 +135,7 @@ jobs:
     name: Backend Tests (sequential)
     runs-on: ubuntu-latest
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && (github.ref_name == 'test' || github.ref_name == 'main'))
-    timeout-minutes: 90
+    timeout-minutes: 120
 
     steps:
       - name: Checkout code
@@ -160,6 +160,7 @@ jobs:
           pip install --no-deps pyjks==20.0.0
 
       - name: Run tests
+        id: deterministic
         env:
           SECRET_KEY: test-secret-key-for-ci
           UCM_ENV: test
@@ -174,8 +175,9 @@ jobs:
       # The same suite in random order on the nightly run: a report, not a gate.
       # The job summary gives the seed that replays the order locally.
       - name: Run tests in random order (report only)
-        if: ${{ !cancelled() && github.event_name == 'schedule' }}
+        if: ${{ !cancelled() && github.event_name == 'schedule' && steps.deterministic.outcome != 'skipped' }}
         continue-on-error: true
+        timeout-minutes: 45
         env:
           SECRET_KEY: test-secret-key-for-ci
           UCM_ENV: test
@@ -185,17 +187,19 @@ jobs:
           UCM_DEV_MODE: 'true'
         run: |
           pip install pytest-randomly==5.0.0
+          sha=$(git rev-parse HEAD)
           cd backend
           seed=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
           set +e
-          pytest -p randomly --randomly-seed="$seed" -q --tb=line -rfE > random-order.log 2>&1
+          # Inside the step timeout, so a slow run still writes its summary (exit 124).
+          timeout 40m pytest -p randomly --randomly-seed="$seed" -q --tb=line -rfE > random-order.log 2>&1
           status=$?
           set -e
           tail -n 60 random-order.log
           {
-            echo "### Random order: seed $seed, pytest exit $status"
+            echo "### Random order: seed $seed, commit $sha, pytest exit $status"
             echo
-            echo "Replay: \`cd backend && pytest -p randomly --randomly-seed=$seed\`"
+            echo "Replay: \`git checkout $sha && pip install pytest-randomly==5.0.0 && cd backend && pytest -p randomly --randomly-seed=$seed\`"
             echo
             echo "Files with failures or errors:"
             echo
