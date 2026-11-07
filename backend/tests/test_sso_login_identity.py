@@ -316,18 +316,24 @@ def test_bind_never_replaces_an_existing_external_id(app):
     from api.v2.sso.ldap_routes import _bind_external_id
     with app.app_context():
         _cleanup(['tkbound'])
+        provider = SSOProvider(name=f'tkbound-{uuid.uuid4().hex[:6]}', provider_type='oauth2',
+                               enabled=False)
+        db.session.add(provider)
+        db.session.commit()
+        pid = provider.id
         u = User(username='tkbound', email='b@corp.test', full_name='B', role='viewer',
                  active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='oauth2',
-                 sso_provider_id=1, sso_external_id='first')
+                 sso_provider_id=pid, sso_external_id='first')
         db.session.add(u)
         db.session.commit()
-        provider = SSOProvider(id=1, provider_type='oauth2')
         try:
             assert _bind_external_id(u, provider, 'second') is False
             assert u.sso_external_id == 'first'
         finally:
             db.session.rollback()
             _cleanup(['tkbound'])
+            SSOProvider.query.filter_by(id=pid).delete()
+            db.session.commit()
 
 
 # ── Unmapped users (role mapping rules are an admission list) ───────────────

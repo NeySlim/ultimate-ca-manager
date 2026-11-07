@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from api.acme import acme_proxy_api
-from models import db, AcmeAccount, AcmeClientOrder
+from models import db, AcmeAccount, AcmeClientOrder, DnsProvider
 from services.acme.acme_proxy_service import AcmeProxyService
 from services.acme.upstream_problem import UpstreamProblem
 
@@ -20,6 +20,7 @@ FINALIZE_URL = f'{ORDER_URL}/finalize'
 AUTHZ_URL = f'{UPSTREAM}/acme/authz/up/1'
 CHALL_URL = f'{UPSTREAM}/acme/chall/up/1/dns'
 DOMAIN = 'up-problem.example.com'
+PROVIDER = 'up-problem-provider'
 RATE_LIMITED = {
     'type': 'urn:ietf:params:acme:error:rateLimited',
     'detail': 'too many certificates (5) already issued',
@@ -69,16 +70,22 @@ def _svc(monkeypatch, upstream, **meta):
     svc.directory = _directory(**meta)
     svc.account = SimpleNamespace(id=None, preferred_chain='')
     monkeypatch.setattr(svc, '_post_with_account', upstream)
+    # A real row: the saved order references it, and PostgreSQL enforces the key.
     monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
-                        lambda *_a, **_k: {'provider': SimpleNamespace(id=1, provider_type='manual')})
+                        lambda *_a, **_k: {'provider': DnsProvider.query.filter_by(
+                            name=PROVIDER).one()})
     return svc
 
 
 @pytest.fixture(autouse=True)
 def _clean(app):
+    with app.app_context():
+        db.session.add(DnsProvider(name=PROVIDER, provider_type='manual', credentials='{}'))
+        db.session.commit()
     yield
     with app.app_context():
         AcmeClientOrder.query.filter_by(is_proxy_order=True).delete()
+        DnsProvider.query.filter_by(name=PROVIDER).delete()
         AcmeAccount.query.filter(AcmeAccount.jwk_thumbprint.like('up-%')).delete(
             synchronize_session=False)
         db.session.commit()
