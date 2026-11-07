@@ -20,6 +20,7 @@ def _table(pk, ts):
         id {pk},
         ca_id INTEGER NOT NULL REFERENCES certificate_authorities (id) ON DELETE CASCADE,
         certificate_id INTEGER NOT NULL REFERENCES certificates (id) ON DELETE CASCADE,
+        serial_number VARCHAR(100) NOT NULL,
         issuer_fingerprint VARCHAR(64) NOT NULL,
         created_at {ts}
     )"""

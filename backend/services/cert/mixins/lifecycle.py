@@ -558,6 +558,9 @@ class LifecycleMixin:
             cert_snapshots = request_snapshots(closed_cert)
             ApprovalRequest.query.filter(ApprovalRequest.certificate_id == cert_id).delete(
                 synchronize_session='fetch')
+            # SQLite runs no ON DELETE CASCADE: the EST key generator pointer goes explicitly
+            from models.est_signer_cert import EstSignerCert
+            EstSignerCert.query.filter_by(certificate_id=cert_id).delete(synchronize_session='fetch')
 
             binding_ids = [row.id for row in DeployBinding.query.filter_by(certificate_id=cert_id)]
             if binding_ids:

@@ -13,6 +13,8 @@ class EstSignerCert(db.Model):
                       nullable=False, unique=True, index=True)
     certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id', ondelete='CASCADE'),
                                nullable=False)
+    # Serial of that certificate: SQLite hands a deleted row's id to the next certificate
+    serial_number = db.Column(db.String(100), nullable=False)
     # SHA-256 of the CA certificate that issued it: a re-issued CA certificate gets a new delegate
     issuer_fingerprint = db.Column(db.String(64), nullable=False)
     created_at = db.Column(db.DateTime, default=utc_now)

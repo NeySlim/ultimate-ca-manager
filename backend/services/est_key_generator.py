@@ -128,7 +128,11 @@ def _usable(link, ca, fingerprint, ca_cert):
     if link is None or link.issuer_fingerprint != fingerprint:
         return None
     row = db.session.get(Certificate, link.certificate_id)
-    if row is None or row.caref != ca.refid or row.revoked or not row.crt or not row.prv:
+    # The id alone may name another certificate on SQLite: the row must be this delegate
+    if row is None or row.source != SOURCE or row.subject_cn != SUBJECT_CN \
+            or row.serial_number != link.serial_number or row.caref != ca.refid:
+        return None
+    if row.revoked or not row.crt or not row.prv:
         return None
     if row.valid_to is None or row.valid_to - utc_now() < timedelta(days=RENEW_DAYS):
         from utils.ca_signing_window import clamp_not_after
@@ -165,6 +169,8 @@ def key_generator(ca, ca_cert):
     cert, not_after = _issue(ca, ca_cert, key)
     previous_id = link.certificate_id if link is not None else None
     previous = db.session.get(Certificate, previous_id) if previous_id is not None else None
+    if previous is not None and (previous.source != SOURCE or previous.serial_number != link.serial_number):
+        previous = None  # a reused id: not ours to archive
     try:
         with db.session.begin_nested():
             row = _certificate_row(ca, cert, key, not_after)
@@ -172,9 +178,11 @@ def key_generator(ca, ca_cert):
             db.session.flush()
             if link is None:
                 db.session.add(EstSignerCert(ca_id=ca.id, certificate_id=row.id,
+                                             serial_number=row.serial_number,
                                              issuer_fingerprint=fingerprint, created_at=utc_now()))
             else:
                 link.certificate_id, link.issuer_fingerprint = row.id, fingerprint
+                link.serial_number = row.serial_number
                 link.created_at = utc_now()
             if previous is not None and previous.caref == ca.refid and not previous.revoked:
                 previous.archived = True  # still valid until it expires, as a renewed responder
@@ -189,6 +197,9 @@ def key_generator(ca, ca_cert):
     except IntegrityError:  # the savepoint is rolled back, the caller's transaction kept
         winner = EstSignerCert.query.filter_by(ca_id=ca.id).first()
         logger.info('EST key generator of CA %s made by a concurrent request', ca.id)
-        return _load(db.session.get(Certificate, winner.certificate_id))
+        usable = _usable(winner, ca, fingerprint, ca_cert)
+        if usable is None:
+            raise RuntimeError('the concurrent EST key generator is not usable')
+        return usable
     logger.info('EST key generator of CA %s issued, valid until %s', ca.id, not_after)
     return key, cert

@@ -228,7 +228,7 @@ class TestLifecycle:
                 cert_id = conn.execute(insert(Certificate.__table__).values(**values)
                                        ).inserted_primary_key[0]
                 conn.execute(insert(EstSignerCert.__table__).values(
-                    ca_id=ca.id, certificate_id=cert_id,
+                    ca_id=ca.id, certificate_id=cert_id, serial_number=row.serial_number,
                     issuer_fingerprint=est_key_generator._fingerprint(issuer), created_at=utc_now()))
             competitor['cert'] = other_cert
             competitor['ours'] = original(ca, issuer, key)
@@ -397,3 +397,81 @@ def test_under_a_ca_expiring_soon_the_delegate_never_outlives_it(app):
     assert delegate.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier).value \
         .key_identifier == ca_cert.extensions.get_extension_for_class(
             x509.SubjectKeyIdentifier).value.digest
+
+
+def _serial_of(row):
+    return x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number
+
+
+class TestPointerIdentity:
+    """SQLite runs no ON DELETE CASCADE and reuses a deleted certificate's id."""
+
+    def test_a_pointer_to_a_reused_id_never_signs_with_that_certificate(
+            self, app, client, use, cas, create_cert):
+        ca_id, _ = use('main')
+        _signer_serial(client, 'reuse-id-1.generator.test')
+        victim = create_cert(cn='victim.generator.test', ca_id=ca_id)
+        with app.app_context():
+            victim_serial = _serial_of(db.session.get(Certificate, victim['id']))
+            link = EstSignerCert.query.filter_by(ca_id=ca_id).one()
+            link.certificate_id = victim['id']  # what id reuse does to a dangling pointer
+            db.session.commit()
+        signer = _signer_serial(client, 'reuse-id-2.generator.test')
+        assert signer != victim_serial
+        with app.app_context():
+            assert db.session.get(Certificate, victim['id']).archived is not True
+            assert int(_delegate_row(ca_id).serial_number) == signer
+
+    def test_deleting_the_delegate_through_the_api_drops_its_pointer(
+            self, app, client, auth_client, use, create_cert):
+        ca_id, _ = use('main')
+        first = _signer_serial(client, 'deleted-1.generator.test')
+        with app.app_context():
+            row_id = _delegate_row(ca_id).id
+        assert auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'superseded'}
+                                ).status_code == 200
+        assert auth_client.delete(f'/api/v2/certificates/{row_id}').status_code in (200, 204)
+        assert _row(app, ca_id) == []
+        victim = create_cert(cn='after-delete.generator.test', ca_id=ca_id)
+        signer = _signer_serial(client, 'deleted-2.generator.test')
+        with app.app_context():
+            assert signer not in (first, _serial_of(db.session.get(Certificate, victim['id'])))
+            assert int(_delegate_row(ca_id).serial_number) == signer
+
+
+def test_no_expiry_alert_for_a_key_generator(app, use, client):
+    import json
+    from models.email_notification import NotificationConfig
+    from services.expiry_alert_service import get_expiring_certificates
+    from services.notification.scheduler import NotificationSchedulerMixin
+    ca_id, _ = use('main')
+    _signer_serial(client, 'alert.generator.test')
+    with app.app_context():
+        row = _delegate_row(ca_id)
+        row.valid_to = utc_now() + datetime.timedelta(hours=12)
+        db.session.commit()
+        row_id = row.id
+        assert row_id not in [c['id'] for c in get_expiring_certificates(days=30)]
+        config = NotificationConfig.query.filter_by(type='cert_expiring').first()
+        previous = None
+        if not config:
+            config = NotificationConfig(type='cert_expiring')
+            db.session.add(config)
+        else:
+            previous = (config.enabled, config.get_alert_days(), config.recipients)
+        config.enabled = True
+        config.set_alert_days([1, 7, 30])
+        config.include_revoked = False
+        config.recipients = json.dumps(['ops@example.test'])
+        db.session.commit()
+        try:
+            due = NotificationSchedulerMixin.check_expiring_certificates()
+            assert row_id not in [entry['cert'].id for entry in due]
+        finally:
+            if previous is None:
+                db.session.delete(config)
+            else:
+                config.enabled, days, config.recipients = previous
+                config.set_alert_days(days)
+            row.valid_to = utc_now() + datetime.timedelta(days=365)
+            db.session.commit()

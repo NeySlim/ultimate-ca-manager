@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, inspect, text
 
 TABLE = 'est_signer_certs'
 PG_URL = os.getenv('UCM_TEST_PG_URL')
-COLUMNS = {'id', 'ca_id', 'certificate_id', 'issuer_fingerprint', 'created_at'}
+COLUMNS = {'id', 'ca_id', 'certificate_id', 'serial_number', 'issuer_fingerprint', 'created_at'}
 
 
 def _migration():
@@ -24,10 +24,16 @@ def test_sqlite_creates_the_table_with_one_row_per_ca_and_is_idempotent():
     _migration().upgrade(conn)
     _migration().upgrade(conn)
     assert {row[1] for row in conn.execute(f'PRAGMA table_info({TABLE})')} == COLUMNS
-    insert = f"INSERT INTO {TABLE} (ca_id, certificate_id, issuer_fingerprint) VALUES (1, 1, 'f')"
+    insert = (f"INSERT INTO {TABLE} (ca_id, certificate_id, serial_number, issuer_fingerprint) "
+              "VALUES (1, 1, '7', 'f')")
     conn.execute(insert)
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute(insert)
+    # With foreign keys enforced, the pointer goes with its certificate
+    conn.commit()
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("DELETE FROM certificates WHERE id = 1")
+    assert conn.execute(f"SELECT count(*) FROM {TABLE}").fetchone()[0] == 0
 
 
 @pytest.mark.postgres
@@ -53,9 +59,14 @@ def _postgres_round():
         _migration().upgrade(conn)
         _migration().upgrade(conn)
         assert {c['name'] for c in inspect(conn).get_columns(TABLE, schema=schema)} == COLUMNS
-        conn.execute(text(f"INSERT INTO {TABLE} (ca_id, certificate_id, issuer_fingerprint) "
-                          "VALUES (1, 1, 'f')"))
+        insert = text(f"INSERT INTO {TABLE} (ca_id, certificate_id, serial_number, issuer_fingerprint) "
+                      "VALUES (1, 1, '7', 'f')")
+        conn.execute(insert)
         conn.execute(text("DELETE FROM certificate_authorities"))
+        assert conn.execute(text(f"SELECT count(*) FROM {TABLE}")).scalar() == 0
+        conn.execute(text("INSERT INTO certificate_authorities (id, refid) VALUES (1, 'ca-1')"))
+        conn.execute(insert)
+        conn.execute(text("DELETE FROM certificates"))
         assert conn.execute(text(f"SELECT count(*) FROM {TABLE}")).scalar() == 0
     finally:
         conn.rollback()
