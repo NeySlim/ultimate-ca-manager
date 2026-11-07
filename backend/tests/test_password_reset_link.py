@@ -58,3 +58,21 @@ def test_without_any_public_origin_the_reset_is_refused(app, mailbox, monkeypatc
     assert r.status_code == 503
     assert 'Base URL' in r.get_json()['message']
     assert mailbox == []
+
+
+@pytest.mark.parametrize('origin, shown', [('https://pki.example.test', True), (None, False)])
+def test_forgot_password_link_shown_only_when_the_reset_can_reach_ucm(app, monkeypatch, origin, shown):
+    from api.v2 import auth as auth_api
+    monkeypatch.setattr(auth_api, '_is_email_configured', lambda: True)
+    monkeypatch.setattr(auth_api, 'get_admin_canonical_origin', lambda: origin)
+    r = app.test_client().get('/api/v2/auth/email-configured')
+    assert r.get_json()['data']['configured'] is shown
+
+
+def test_a_reset_refused_for_lack_of_origin_is_logged(app, mailbox, monkeypatch, caplog):
+    import logging
+    from api.v2 import auth as auth_api
+    monkeypatch.setattr(auth_api, 'get_admin_canonical_origin', lambda: None)
+    with caplog.at_level(logging.WARNING):
+        assert _ask(app).status_code == 503
+    assert any('Base URL' in rec.getMessage() for rec in caplog.records if rec.levelno >= logging.WARNING)

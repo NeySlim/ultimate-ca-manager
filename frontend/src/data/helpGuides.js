@@ -1958,7 +1958,7 @@ System-wide configuration organized into tabs. Changes take effect immediately u
 ## General
 
 - **Syslog hostname**: Sent as HOSTNAME in forwarded syslog messages; the machine hostname when empty
-- **Base URL**: Canonical HTTPS URL of the admin interface and API; other hostnames and IPs redirect to it. Password reset e-mails link to it, else to the server FQDN (\`UCM_FQDN\`); with neither, the reset is refused
+- **Base URL**: Canonical HTTPS URL of the admin interface and API; other hostnames and IPs redirect to it. Password reset e-mails link to it, else to the server FQDN (\`UCM_FQDN\`); with neither, the login page hides Forgot password and the reset is refused
 - **Protocol Base URL**: Base URL written into CDP and OCSP addresses; use http:// to avoid TLS verification loops, or leave empty to use the Base URL
 - **HTTP Protocol Port**: Plain HTTP port that serves CDP and OCSP; 0 disables it, a change needs a restart
 - **Public ACME vhost**: Concrete hostname in ACME directory URLs (e.g. \`acme.ucm.example.com\`: not \`*.ucm.example.com\`). A wildcard \`*.ucm.example.com\` **TLS certificate SAN** covers both \`admin.ucm.example.com\` and \`acme.ucm.example.com\`. Configure DNS and TLS for the ACME vhost **before** saving: clients that re-read the directory switch URLs immediately.

@@ -193,6 +193,7 @@ def forgot_password():
     # the Host of this unauthenticated request, which the caller chooses.
     origin = get_admin_canonical_origin()
     if not origin:
+        logger.warning("Password reset refused: no Base URL nor server FQDN to build the link from")
         return error_response(
             'Password reset unavailable - set the Base URL in Settings so the link can reach UCM', 503)
 
@@ -310,5 +311,5 @@ def reset_password():
 
 @bp.route('/api/v2/auth/email-configured', methods=['GET'])
 def check_email_configured():
-    """Check if email is configured (for showing forgot password link)"""
-    return success_response(data={'configured': _is_email_configured()})
+    """Whether a reset e-mail can go out with a link that reaches UCM (shows Forgot password)."""
+    return success_response(data={'configured': bool(_is_email_configured() and get_admin_canonical_origin())})

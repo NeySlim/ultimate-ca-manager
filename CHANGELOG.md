@@ -27,7 +27,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - Approval e-mails: without a Base URL or server FQDN, the link to the request followed the Host header the requester sent; the e-mail now goes without a link.
-- Password reset: the e-mailed link pointed at `https://localhost:8443`. It now uses the Base URL, else the server FQDN, never the request's Host, and the reset is refused when neither is set.
+- Password reset: the e-mailed link pointed at `https://localhost:8443`. It now uses the Base URL, else the server FQDN, never the request's Host; when neither is set, Forgot password is hidden and the reset is refused with a warning in the log.
 - OIDC: an ID token whose `azp` named another client was accepted when it had a single audience; it is now refused (OpenID Connect Core §3.1.3.7).
 - LDAP: a second factor the user had enrolled, even one Enforce 2FA required, was never asked at sign-in. LDAP sign-ins now ask for it, as local ones do.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: these providers hold one TXT value per name, so the cleanup of one order cleared the value another order was still validating. The name is now left alone while another order in progress uses it.
