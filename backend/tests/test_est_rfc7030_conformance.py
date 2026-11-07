@@ -277,6 +277,16 @@ class TestBasicWithoutUsername:
             auth_client.patch('/api/v2/est/config', json={'allow_empty_username': False})
 
 
+@pytest.mark.parametrize('field', ['allow_empty_username', 'ignore_challenge_password',
+                                   'csrattrs_legacy_encoding'])
+@pytest.mark.parametrize('value', ['false', '0', 1, None])
+def test_security_flags_take_only_a_boolean(auth_client, field, value):
+    """A JSON string "false" is truthy: these flags turn a check off, so they take a boolean only."""
+    r = auth_client.patch('/api/v2/est/config', json={field: value})
+    assert r.status_code == 400, r.get_json()
+    assert auth_client.get('/api/v2/est/config').get_json()['data'][field] is False
+
+
 def test_a_key_revoked_as_compromised_is_not_certified_again(client, auth_client, other_ca_leaf,
                                                              app):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)

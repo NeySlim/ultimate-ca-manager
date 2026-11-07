@@ -88,6 +88,10 @@ def get_est_config():
 def update_est_config():
     """Update EST configuration in database"""
     data = request.json or {}
+    # These turn a check off: a JSON "false" is truthy, so only a boolean is taken
+    for field in ('csrattrs_legacy_encoding', 'allow_empty_username', 'ignore_challenge_password'):
+        if field in data and not isinstance(data[field], bool):
+            return error_response(f'{field} must be a boolean', 400)
 
     if 'enabled' in data:
         set_config('est_enabled', 'true' if data['enabled'] else 'false')

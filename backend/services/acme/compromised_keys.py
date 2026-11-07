@@ -9,14 +9,13 @@ from sqlalchemy.orm import load_only
 
 from models import Certificate, RevokedSerial
 from models.compromised_key import CompromisedKeyRecord
-from utils.revocation_reasons import normalize_revocation_reason, reason_spellings
+from utils.revocation_reasons import normalize_revocation_reason
 from utils.spki_digest import public_key_sha256
 
 logger = logging.getLogger(__name__)
 
 COMPROMISED_CSR = 'The key of this CSR was revoked as compromised: submit a new CSR'
 _SPKI = (serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
-_COMPROMISE_SPELLINGS = reason_spellings('keyCompromise')
 
 
 class CompromisedKey(Exception):
@@ -49,9 +48,10 @@ def key_revoked_as_compromised(public_key) -> bool:
         return True
     rows = Certificate.query.options(load_only(Certificate.id, Certificate.crt, Certificate.revoked,
                                                Certificate.revoke_reason))
-    # Only the rows revoked as compromised, in SQL: the scan runs on every EST and ACME request
-    reason = func.lower(func.trim(Certificate.revoke_reason))
-    for row in rows.filter(Certificate.revoked.is_(True), reason.in_(_COMPROMISE_SPELLINGS)).all():
+    # Pre-filter in SQL, as the scan runs on every EST and ACME request; LIKE, not TRIM,
+    # since TRIM keeps the tabs and newlines that str.strip() drops in revoked_as_compromised
+    reason = func.lower(Certificate.revoke_reason)
+    for row in rows.filter(Certificate.revoked.is_(True), reason.like('%key%compromise%')).all():
         if not row.crt or not revoked_as_compromised(row):
             continue
         try:

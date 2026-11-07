@@ -21,7 +21,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Dependencies: SQLAlchemy 2.1 is accepted, now that every PostgreSQL URL reaches psycopg 3.
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
 - EST: `/csrattrs` lists keyUsage, subjectAltName and extKeyUsage as bare OIDs instead of inside an extensionRequest, a form RFC 9908 §5.2 declares incorrect; the `csrattrs_legacy_encoding` setting of `PATCH /api/v2/est/config` restores the former shape.
-- EST: refusals are sent as `text/plain` with the reason, such as a body that is not base64 or not a PKCS#10 CSR, a CA name constraint or the rate limit, instead of an HTML page saying "Enrollment failed" or JSON (RFC 8951 §5).
+- EST: enrollment refusals are sent as `text/plain` with the reason, such as a body that is not base64 or not a PKCS#10 CSR, a CA name constraint or the rate limit, instead of an HTML page saying "Enrollment failed" or JSON (RFC 8951 §5).
 - EST: `simplereenroll` without a client certificate answers 403 instead of a 401 offering Basic authentication, which that route refuses (RFC 7030 §3.2.3), and `/fullcmc` answers 501 instead of 405 (RFC 7030 §3.2.2).
 - EST: a CSR whose `challengePassword` is not the `tls-unique` value of its TLS 1.2 connection to UCM, or that arrives over TLS 1.3 or through a proxy where none can be checked, is refused with 400 on `simpleenroll`, `simplereenroll` and `serverkeygen` instead of being certified unchecked (RFC 7030 §3.5).
 
@@ -42,6 +42,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - mTLS behind a proxy: a certificate presented by its serial number alone, without `X-SSL-Client-I-DN` or `X-SSL-Client-Cert`, opened the enrolment bearing that serial, even one of another CA. Such a serial now opens only an enrolment that recorded no issuer, and enrolling a presented certificate requires its issuer (RFC 5280 §4.1.2.2).
 - EST: a client certificate that another CA of this server had revoked, even as compromised, still authenticated `/simpleenroll` and `/serverkeygen` and obtained certificates for any name. It is now refused once it, or a CA above it, is revoked, or once it has expired, whichever CA of the server issued it, and `/api/v2/mtls/enroll` no longer enrols such a certificate (RFC 7030 §3.3.2, RFC 5280 §6.1.3).
 - EST: a CSR whose key was revoked as compromised was certified again. It is now refused with 400, as on the ACME client.
+- mTLS: a certificate issued under a sub-CA whose parent was revoked still opened a session and could be enrolled through `/api/v2/mtls/enroll-import`. Both are now refused, as on `/api/v2/mtls/enroll` (RFC 5280 §6.1.3).
 
 ### Upgrade notes
 
@@ -49,7 +50,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the `EST key generator` certificate the SignedData carries, which chains to the issuing CA from `/cacerts` and is listed, and revoked when needed, with the CA's certificates like a delegated OCSP responder; the next encrypted request then gets a new one. Migration 132 adds the `est_signer_certs` table that names the current one; backups carry the certificate but not that table, so a restored installation issues a new one on first use.
 - EST: `serverkeygen` without `AsymmetricDecryptKeyIdentifier` now returns the key unencrypted, without the Basic password, and over mTLS the key type is chosen as over Basic, ML-DSA under an ML-DSA CA included.
 - PostgreSQL: on DEB and RPM the upgrade's pip install pulls psycopg 3, compiled against the system libpq under `UCM_FIPS_BUILD=1` with the build tools it already requires; Docker images need nothing. A `postgresql+psycopg2://` URL keeps working unchanged. psycopg 3 prepares a statement after five executions on a connection, so behind a transaction-mode pooler without prepared statements (older PgBouncer, some managed poolers) set `UCM_PG_PREPARE_THRESHOLD=0`.
-- EST: a FortiGate or other client that stops enrolling after the `/csrattrs` change gets the former answer back with `{"csrattrs_legacy_encoding": true}` on `PATCH /api/v2/est/config`. A device that authenticates with a certificate revoked or expired on this server must be given a valid one. A client that puts a password in the CSR `challengePassword` keeps enrolling with `{"ignore_challenge_password": true}`.
+- EST: a FortiGate or other client that stops enrolling after the `/csrattrs` change gets the former answer back with `{"csrattrs_legacy_encoding": true}` on `PATCH /api/v2/est/config`.
+- EST and mTLS: a device or user that authenticates with a certificate revoked or expired on this server, or issued under a revoked CA, must be given a valid one.
+- EST: a client that puts a password in the CSR `challengePassword` keeps enrolling with `{"ignore_challenge_password": true}`.
 
 ## [2.251] - 2026-11-06
 

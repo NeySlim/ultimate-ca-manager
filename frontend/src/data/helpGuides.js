@@ -1380,7 +1380,7 @@ Username and password authentication over HTTPS. Configured in EST Settings.
 - **Use when** mTLS infrastructure is not available
 - **Password only**: with \`allow_empty_username\` set through \`PATCH /api/v2/est/config\`, a client may send an empty username with the password (RFC 7030 §3.2.3, v2.252)
 
-A CSR whose key was revoked as compromised is refused with 400, and every refusal, rate limiting included, comes as a plain-text message saying why (RFC 8951 §5, v2.252).
+A CSR whose key was revoked as compromised is refused with 400, and every enrollment refusal, rate limiting included, comes as a plain-text message saying why (RFC 8951 §5, v2.252).
 
 ## EST Endpoints
 
@@ -2881,6 +2881,7 @@ Let users log in with a client certificate instead of a password:
 - **Trusted CA**: The CA whose client certificates are accepted at login, and the default issuer when a user generates one. Any CA whose certificate is not revoked can be chosen, keyless or offline included: such a CA issues nothing, so its users upload certificates issued elsewhere (v2.248)
 - **Require client certificate**: Optionally make mTLS mandatory for the web UI
 - Changing mTLS settings requires a service restart
+- **Revoked issuer**: A client certificate issued under a revoked CA, at any level of its chain, opens no session and can be neither enrolled nor imported (v2.252)
 
 ## Required Permissions
 

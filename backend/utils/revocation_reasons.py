@@ -82,11 +82,6 @@ def normalize_revocation_reason(value) -> Optional[str]:
     return _CANONICAL.get(key)
 
 
-def reason_spellings(name) -> list:
-    """Every lower-case spelling ``normalize_revocation_reason`` maps to ``name``."""
-    return sorted(k for k, v in _CANONICAL.items() if v == name)
-
-
 def invalid_reason_message(value) -> str:
     return (
         f"Invalid revocation reason {value!r}; accepted values: "
