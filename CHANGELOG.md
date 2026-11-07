@@ -17,6 +17,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- ACME server: revokeCert refused an account other than the one that ordered the certificate even when it held valid authorizations for all its identifiers. Such an account may now revoke a certificate this ACME server issued, as RFC 8555 §7.6 requires; an authorization granted by auto-approval does not count.
+- ACME server: the `notBefore` and `notAfter` of a newOrder were echoed, then ignored, so the certificate got the profile's 90 days. They are now issued exactly: a window longer than the profile allows, outside the issuing CA's, already past or unreadable is refused as `malformed`, one a policy forbids as `badCSR` at finalize (RFC 8555 §7.4).
 - PostgreSQL: UCM connects with psycopg 3, which sends values apart from the statement, so a database error that quotes the statement no longer carries them. psycopg2 is no longer shipped, and a `postgresql+psycopg2://` URL now uses psycopg 3.
 - Dependencies: SQLAlchemy 2.1 is accepted, now that every PostgreSQL URL reaches psycopg 3.
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
@@ -26,6 +28,16 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - Rate limiting: a 429 from a login route's own limit carried the general limit in `X-RateLimit-Limit` (30 instead of 5) and no `Retry-After`. It now names the limit that refused the request and when to retry.
+- ACME server: a body that was not JSON, a payload that was not an object or an unreadable date answered 500 `serverInternal`. They now answer 400 `malformed` (RFC 8555 §6.2, §7).
+- ACME server: a missing nonce answered `malformed` and a nonce outside base64url `badNonce`, the reverse of RFC 8555 §6.5; HEAD on newNonce answered 204 without a link to the directory. Both errors now carry the right type, and newNonce, on the server and the ACME proxy, answers 200 to HEAD and 204 to GET with `Link: rel="index"` (§7.2).
+- ACME server: every response stored a nonce that was never deleted, so the nonce table only grew. The 6-hourly ACME purge now also deletes expired and consumed nonces.
+- ACME server: a CSR whose common name is one of the order's IP addresses, as lego v4 and the UCM ACME client send for an IP order, was refused as `badCSR`. Such a CN is now matched against the IP identifiers (RFC 8738).
+- ACME server: the directory advertised the public host as `caaIdentities` even when CAA identifiers were configured, while finalize checked CAA against the configured ones. Both now use the same list (RFC 8555 §7.1.1).
+- ACME server: an order past its expiry, or one whose valid authorization had expired, could still be finalized. Finalize now answers 403 `orderNotReady` and the order becomes invalid, and an expired valid authorization reads `expired` (RFC 8555 §7.1.6, §7.4).
+- ACME server: an account created with External Account Binding was returned without its `externalAccountBinding` field. The new account object, on the server and the ACME proxy, now carries it with the value of the request (RFC 8555 §7.3.4).
+- ACME server: a POST-as-GET on a challenge started its validation, so a client reading the challenge before preparing its response, the ACME proxy included, lost the order. An empty payload now only reads the challenge, and only a response object such as `{}` starts the validation (RFC 8555 §6.3, §7.5.1).
+- ACME server: an order accepted with `replaces` did not show it in the order object, and the finalize response lacked the profile. Every order object (newOrder, read, finalize) now carries `replaces`, `profile` and the requested dates (RFC 9773 §5).
+- ACME server: tls-alpn-01 accepted a validation certificate whatever its subjectAltName. The SAN must now hold exactly the identifier being validated, one dNSName or one iPAddress (RFC 8737 §3, RFC 8738 §6).
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: these providers hold one TXT value per name, so the cleanup of one order cleared the value another order was still validating. The name is now left alone while another order in progress uses it.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: an order for a domain and its wildcard could not hold both values and failed at validation, and the ACME proxy replaced the CA's value with its clients' own. Such an order, or on DuckDNS one naming two hosts under the same subdomain, is now refused at the request before the CA is asked, and the proxy publishes only the CA's value there.
 - ACME client: a CA refusal of `replaces` whose message merely contained "rateLimited" was taken for a rate limit and not retried. A rate limit is now recognised by its problem type or a 429 only (RFC 8555 §6.7).

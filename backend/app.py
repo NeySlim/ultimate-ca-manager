@@ -606,7 +606,7 @@ def create_app(config_name=None):
                 name="acme_order_purge",
                 func=scheduled_purge,
                 interval=21600,
-                description="Purge expired local ACME orders, authorizations and challenges"
+                description="Purge expired local ACME orders, authorizations, challenges and spent nonces"
             )
         except ImportError:
             pass
