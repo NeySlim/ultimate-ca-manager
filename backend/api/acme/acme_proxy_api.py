@@ -901,6 +901,8 @@ def cert(cert_id, slug=None):
         if link_header:
             resp.headers['Link'] = link_header
         return resp
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except PermissionError as e:
         return proxy_error("unauthorized", str(e), 403)
     except ProxyResourceNotFoundError as e:

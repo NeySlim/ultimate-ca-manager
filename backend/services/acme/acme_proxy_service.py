@@ -2128,6 +2128,8 @@ class AcmeProxyService:
             order, requester_account_id, requester_thumbprint,
             resource='Certificate')
         resp = self._post_with_account(cert_url, "")
+        if resp.status_code != 200:
+            raise UpstreamProblem.from_response(resp)
 
         # Never forward the upstream Link header: its rel="alternate" entries
         # point directly at the real CA and can only be authenticated with our

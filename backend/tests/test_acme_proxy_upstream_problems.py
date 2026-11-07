@@ -202,6 +202,23 @@ class TestUpstreamProblemRelayed:
         assert response.headers['Retry-After'] == '30'
         assert response.get_json()['type'] == 'urn:ietf:params:acme:error:serverInternal'
 
+    @pytest.mark.parametrize('answer', [
+        _Resp(RATE_LIMITED, 429, {'Retry-After': '60'}),
+        _Resp(None, 503, {'Content-Type': 'text/html'}, text='<html>busy</html>')])
+    def test_certificate_download_failure_is_not_a_200(self, app, client, route,
+                                                       monkeypatch, answer):
+        cert_url = f'{UPSTREAM}/acme/cert/up/1'
+        with app.app_context():
+            row = _order_row()
+            row.certificate_url = cert_url
+            db.session.commit()
+            svc = _svc(monkeypatch, _Upstream({cert_url: answer}))
+            response = route(client, f'/acme/proxy/cert/{_b64(cert_url)}', svc, '')
+
+        assert response.status_code == answer.status_code
+        assert response.headers['Content-Type'] == 'application/problem+json'
+        assert response.get_json()['type'].startswith('urn:ietf:params:acme:error:')
+
     @pytest.mark.parametrize('status, name', [(400, 'badNonce'), (403, 'unauthorized')])
     def test_proxy_account_problem_is_not_blamed_on_the_client(self, status, name):
         problem = UpstreamProblem(status, {'type': f'urn:ietf:params:acme:error:{name}',

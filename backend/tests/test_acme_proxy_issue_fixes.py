@@ -18,6 +18,7 @@ import pytest
 from models import Certificate, db
 from tests.seeded_rows import ensure_acme_account
 from models.acme_models import AcmeClientOrder
+from services.acme.upstream_problem import UpstreamProblem
 
 UPSTREAM = 'https://acme-stub.example'
 
@@ -278,8 +279,10 @@ class TestGetCertificateResponsePath:
                 headers={'Link': f'<{UPSTREAM}/x>;rel="alternate"', 'Content-Type': 'application/problem+json'},
             )
             monkeypatch.setattr(svc, '_post_with_account', lambda *_a, **_k: err_resp)
-            _body, _ct, link_header = svc.get_certificate(_b64(f'{UPSTREAM}/cert/err'))
-            assert link_header is None
+            # Relayed as a problem document: neither the body nor the Link header is served
+            with pytest.raises(UpstreamProblem) as exc:
+                svc.get_certificate(_b64(f'{UPSTREAM}/cert/err'))
+            assert exc.value.status == 404
 
 
 class TestBgCleanupDnsRecords:
