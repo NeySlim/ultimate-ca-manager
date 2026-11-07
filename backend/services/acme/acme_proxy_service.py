@@ -1426,7 +1426,7 @@ class AcmeProxyService:
 
         chall_url = self._decode_proxy_id(chall_id_b64)
 
-        order, domain, local_authz_url = self._resolve_challenge_order(
+        order, _domain, authz_url = self._resolve_challenge_order(
             chall_url, requester_account_id, requester_thumbprint,
         )
         if order:
@@ -1434,44 +1434,39 @@ class AcmeProxyService:
                 order, requester_account_id, requester_thumbprint,
                 resource='Challenge',
             )
-            if local_authz_url and local_authz_url in order.deactivated_authz_list:
+            if authz_url and authz_url in order.deactivated_authz_list:
                 raise ProxyAuthzStateError("Authorization is deactivated, not pending")
 
-        # Fetch the challenge to get token and status
-        resp = self._post_with_account(chall_url, "")
-        if resp.status_code != 200:
-            raise RuntimeError(f"Failed to fetch challenge: {resp.text}")
-
-        challenge_data = resp.json()
-        token = challenge_data.get('token')
-        challenge_type = challenge_data.get('type')
-        status = challenge_data.get('status')
-
-        link_authz_url = self._upstream_authz_url_from_link(resp.headers.get('Link'))
-        authz_url = local_authz_url or link_authz_url
-        up_link = self._get_authz_link(resp.headers.get('Link'), authz_url)
-        if not order:
-            if not link_authz_url:
-                raise ProxyResourceNotFoundError(
-                    'Challenge not found: no local order tracks it and the '
-                    'upstream response has no Link rel="up" to its authorization')
+        # Read through the authorization: a POST-as-GET on the challenge starts
+        # its validation on some servers, before the TXT record exists.
+        authz_url, authz, challenge_data = self._read_challenge(
+            chall_url, authz_url, [order] if order else self._requester_orders(
+                requester_account_id, requester_thumbprint))
+        if order is None:
             order = self._find_order_by_authz_url(
-                link_authz_url, requester_account_id, requester_thumbprint,
-            )
+                authz_url, requester_account_id, requester_thumbprint)
             if order is None:
                 raise ProxyResourceNotFoundError("Challenge not found")
             self._require_owner(
                 order, requester_account_id, requester_thumbprint,
                 resource='Challenge',
             )
-            if link_authz_url in order.deactivated_authz_list:
+            if authz_url in order.deactivated_authz_list:
                 raise ProxyAuthzStateError("Authorization is deactivated, not pending")
-            domain = _single_domain(order)
-            _challenge_order_cache.put(
-                self._challenge_cache_key(chall_url, requester_account_id,
-                                          requester_thumbprint),
-                (order.id, domain, link_authz_url),
-            )
+        domain = self._authz_identifier(order, authz)
+        _challenge_order_cache.put(
+            self._challenge_cache_key(chall_url, requester_account_id,
+                                      requester_thumbprint),
+            (order.id, domain, authz_url),
+        )
+        token = challenge_data.get('token')
+        challenge_type = challenge_data.get('type')
+        status = challenge_data.get('status')
+        up_link = self._get_authz_link(None, authz_url)
+
+        if status == 'pending' and self._dns_refused(order, chall_url):
+            challenge_data.update(status='invalid', error=dict(_DNS_REFUSED_PROBLEM))
+            status = 'invalid'
 
         if status != 'pending':
             # Already processing or finished: read-only pass-through whatever
@@ -1504,8 +1499,6 @@ class AcmeProxyService:
         if not token:
             raise RuntimeError("Challenge has no token")
 
-        if domain is None:
-            domain = self._challenge_identifier(order, authz_url)
         provider_info = find_provider_for_domain(domain)
         if not provider_info:
             raise RuntimeError(f"No DNS provider configured for domain: {domain}")
@@ -1540,25 +1533,56 @@ class AcmeProxyService:
 
         return challenge_data, up_link
 
-    def _challenge_identifier(self, order, authz_url):
-        """Identifier a challenge of a multi-domain order validates, read on the
-        real upstream authorization before any DNS write."""
-        single = _single_domain(order)
-        if single:
-            return single
-        if not authz_url:
-            raise ProxyChallengeIdentifierError(
-                "Cannot determine which identifier this challenge validates: "
-                "the upstream authorization URL is unknown")
-        resp = self._post_with_account(authz_url, "")
-        if resp.status_code != 200:
-            raise ProxyChallengeIdentifierError(
-                "Cannot determine which identifier this challenge validates: "
-                f"upstream authorization fetch returned HTTP {resp.status_code}")
-        try:
-            value = (resp.json().get('identifier') or {}).get('value')
-        except (AttributeError, TypeError, ValueError):
-            value = None
+    def _requester_orders(self, requester_account_id=None, requester_thumbprint=None):
+        """Recent pending proxy orders of the requester, and unbound ones."""
+        from models import AcmeClientOrder
+
+        unbound = and_(
+            or_(AcmeClientOrder.account_id.is_(None), AcmeClientOrder.account_id == ''),
+            or_(AcmeClientOrder.client_jwk_thumbprint.is_(None),
+                AcmeClientOrder.client_jwk_thumbprint == ''),
+        )
+        identity = ((AcmeClientOrder.account_id, requester_account_id),
+                    (AcmeClientOrder.client_jwk_thumbprint, requester_thumbprint))
+        owned = [column == value for column, value in identity if value]
+        return (AcmeClientOrder.query
+                .filter(AcmeClientOrder.is_proxy_order.is_(True),
+                        AcmeClientOrder.status == 'pending',
+                        or_(unbound, *owned))
+                .order_by(AcmeClientOrder.id.desc())
+                .limit(_CERT_FALLBACK_SCAN_LIMIT)
+                .all())
+
+    def _read_challenge(self, chall_url, authz_url, candidate_orders):
+        """(authz URL, authz, challenge) read with POST-as-GET on the authorization.
+
+        Without a known authz URL, the authorizations recorded on the candidate
+        orders are read until one lists this exact challenge URL (bounded)."""
+        if authz_url:
+            urls = [authz_url]
+        else:
+            urls = []
+            for candidate in candidate_orders:
+                urls.extend(url for url in self._recorded_authz_urls(candidate)
+                            if url not in urls and url not in candidate.deactivated_authz_list)
+            urls = urls[:_CERT_FALLBACK_SCAN_LIMIT]
+        for url in urls:
+            resp = self._post_with_account(url, "")
+            if resp.status_code != 200:
+                if authz_url:
+                    raise UpstreamProblem.from_response(resp)
+                continue
+            authz = resp.json()
+            for chall in (authz.get('challenges') or []) if isinstance(authz, dict) else []:
+                if isinstance(chall, dict) and chall.get('url') == chall_url:
+                    self.retry_after = retry_after_of(resp)
+                    return url, authz, dict(chall)
+        raise ProxyResourceNotFoundError("Challenge not found")
+
+    @staticmethod
+    def _authz_identifier(order, authz):
+        """Identifier the authorization validates, refused when the order does not cover it."""
+        value = (authz.get('identifier') or {}).get('value')
         if not value:
             raise ProxyChallengeIdentifierError(
                 "Cannot determine which identifier this challenge validates: "

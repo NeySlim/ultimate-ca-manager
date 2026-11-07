@@ -279,27 +279,46 @@ class TestExactResolution:
 
     def test_no_approximate_fallback_for_an_unknown_challenge(
             self, app, monkeypatch, no_threads):
-        """A pending order of the same requester on the same host is no match."""
+        """A pending order of the same requester whose authorization does not
+        list the challenge is no match."""
         with app.app_context():
             _order(account_id='c1-alice')
-            upstream = _Upstream({CHALL_URL: _Resp(
-                {'type': 'dns-01', 'url': CHALL_URL, 'status': 'pending', 'token': 't'})})
+            upstream = _Upstream({AUTHZ_URL: _pending_authz(
+                chall_url=f'{UPSTREAM}/acme/chall-v3/111/Other')})
             svc = _svc(monkeypatch, upstream)
-            with pytest.raises(ProxyResourceNotFoundError, match='Link'):
+            with pytest.raises(ProxyResourceNotFoundError):
                 svc.respond_challenge(_b64(CHALL_URL), requester_account_id='c1-alice')
+            assert upstream.calls == [AUTHZ_URL]
             assert no_threads == []
 
+    def test_unknown_challenge_found_on_the_requester_authorization(
+            self, app, monkeypatch, no_threads):
+        """Cold cache: the requester's recorded authorizations are read, never
+        the challenge URL itself."""
+        with app.app_context():
+            _order(account_id='c1-alice')
+            _order(account_id='c1-bob', order_url=f'{ORDER_URL}b',
+                   upstream_order_url=f'{ORDER_URL}b',
+                   upstream_authz_urls=json.dumps([f'{UPSTREAM}/acme/authz-v3/bob']))
+            upstream = _Upstream({AUTHZ_URL: _pending_authz()})
+            svc = _svc(monkeypatch, upstream)
+            monkeypatch.setattr(svc, '_get_account_thumbprint', lambda: 'up')
+            monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
+                                lambda *_a, **_k: {'provider': object()})
+            data, link = svc.respond_challenge(_b64(CHALL_URL), requester_account_id='c1-alice')
+            assert data['status'] == 'processing'
+            assert upstream.calls == [AUTHZ_URL]
+            assert _b64(AUTHZ_URL) in link
+
     def test_stale_cache_entry_is_ignored(self, app, monkeypatch, no_threads):
-        """An entry whose order is gone is dropped whole: the Link fallback
-        decides the order and the authorization."""
+        """An entry whose order is gone is dropped whole: the requester's
+        recorded authorizations decide the order."""
         with app.app_context():
             row = _order(account_id='c1-alice')
             key = AcmeProxyService._challenge_cache_key(CHALL_URL, 'c1-alice', None)
             proxy_mod._challenge_order_cache.put(
                 key, (row.id + 1000, 'stale.example.org', f'{UPSTREAM}/acme/authz-v3/stale'))
-            upstream = _Upstream({CHALL_URL: _Resp(
-                {'type': 'dns-01', 'url': CHALL_URL, 'status': 'pending', 'token': 't'},
-                headers={'Link': f'<{AUTHZ_URL}>;rel="up"'})})
+            upstream = _Upstream({AUTHZ_URL: _pending_authz()})
             svc = _svc(monkeypatch, upstream)
             monkeypatch.setattr(svc, '_get_account_thumbprint', lambda: 'up')
             monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
@@ -334,17 +353,17 @@ class TestLinkHeader:
 class TestChallengeIdentifier:
     _MULTI = json.dumps(['one.res-c1.example.com', 'two.res-c1.example.com'])
 
-    def _pending_challenge(self, link=True):
-        headers = {'Link': f'<{AUTHZ_URL}>;rel="up"'} if link else {}
-        return _Resp({'type': 'dns-01', 'url': CHALL_URL, 'status': 'pending',
-                      'token': 'tok'}, headers=headers)
+    @staticmethod
+    def _anonymous_authz():
+        """An authorization that lists the challenge but names no identifier."""
+        return _Resp({'status': 'pending', 'challenges': [
+            {'type': 'dns-01', 'url': CHALL_URL, 'status': 'pending', 'token': 'tok'}]})
 
     def test_multi_domain_reads_the_upstream_authorization(
             self, app, monkeypatch, no_threads):
         with app.app_context():
             _order(domains=self._MULTI)
             upstream = _Upstream({
-                CHALL_URL: self._pending_challenge(),
                 AUTHZ_URL: _pending_authz('two.res-c1.example.com'),
             })
             svc = _svc(monkeypatch, upstream)
@@ -354,7 +373,7 @@ class TestChallengeIdentifier:
             data, _link = svc.respond_challenge(_b64(CHALL_URL))
 
             assert data['status'] == 'processing'
-            assert upstream.calls == [CHALL_URL, AUTHZ_URL]
+            assert upstream.calls == [AUTHZ_URL]
             assert [args[3] for _t, args in no_threads] == ['two.res-c1.example.com']
 
     def test_foreign_identifier_on_the_authorization_is_not_found(
@@ -362,7 +381,6 @@ class TestChallengeIdentifier:
         with app.app_context():
             row = _order(domains=self._MULTI)
             upstream = _Upstream({
-                CHALL_URL: self._pending_challenge(),
                 AUTHZ_URL: _pending_authz('victim.example.org'),
             })
             svc = _svc(monkeypatch, upstream)
@@ -377,8 +395,7 @@ class TestChallengeIdentifier:
             self, app, monkeypatch, no_threads):
         with app.app_context():
             row = _order(domains=self._MULTI)
-            svc = _svc(monkeypatch, _Upstream({
-                CHALL_URL: self._pending_challenge(link=False)}))
+            svc = _svc(monkeypatch, _Upstream({AUTHZ_URL: self._anonymous_authz()}))
             monkeypatch.setattr(svc, '_resolve_challenge_order',
                                 lambda *_a, **_k: (row, None, None))
             monkeypatch.setattr(svc, '_get_account_thumbprint', lambda: 'up')
@@ -390,8 +407,7 @@ class TestChallengeIdentifier:
             self, app, client, monkeypatch, no_threads):
         with app.app_context():
             row_id = _order(domains=self._MULTI).id
-            svc = _svc(monkeypatch, _Upstream({
-                CHALL_URL: self._pending_challenge(link=False)}))
+            svc = _svc(monkeypatch, _Upstream({AUTHZ_URL: self._anonymous_authz()}))
             monkeypatch.setattr(
                 svc, '_resolve_challenge_order',
                 lambda *_a, **_k: (db.session.get(AcmeClientOrder, row_id), None, None))

@@ -2,6 +2,7 @@
 or onboarded domain) carries no pending dns-01 challenge. The proxy must pass
 it through instead of failing with the dns-01-only error, while a pending
 authorization without dns-01 is still refused."""
+import copy
 import json
 
 import pytest
@@ -143,7 +144,7 @@ class TestPrevalidatedAuthorization:
             svc = AcmeProxyService('https://ucm.example/acme/proxy')
             monkeypatch.setattr(svc, 'upstream_directory_url', 'https://ca.example/acme/directory')
             monkeypatch.setattr(svc, '_post_with_account',
-                                lambda url, *_a, **_k: _Resp(dict(challenge) if url == chall_url else upstream_authz))
+                                lambda url, *_a, **_k: _Resp(copy.deepcopy(upstream_authz)))
             svc.get_authz(svc._proxy_id(authz_url),
                           requester_account_id='acct-pv', requester_thumbprint='thumb-pv')
             data, _link = svc.respond_challenge(

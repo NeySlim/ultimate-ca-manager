@@ -113,10 +113,14 @@ class TestChallengeUpLinkFallback:
         )
         resp = SimpleNamespace(
             status_code=200, headers=upstream_headers, text='',
-            json=lambda: {'type': 'dns-01', 'url': self.CHALL,
-                          'status': status, 'token': 't'},
+            json=lambda: {'status': 'pending' if status == 'pending' else 'valid',
+                          'identifier': {'type': 'dns', 'value': 'proxy-fix.test'},
+                          'challenges': [{'type': 'dns-01', 'url': self.CHALL,
+                                          'status': status, 'token': 't'}]},
         )
-        monkeypatch.setattr(svc, '_post_with_account', lambda *_a, **_k: resp)
+        self.calls = []
+        monkeypatch.setattr(svc, '_post_with_account',
+                            lambda url, *_a, **_k: self.calls.append(url) or resp)
         return svc.respond_challenge(
             _b64(self.CHALL), requester_account_id='acct-up',
             requester_thumbprint='thumb-up')
@@ -127,12 +131,14 @@ class TestChallengeUpLinkFallback:
             _data, link = self._respond(app, monkeypatch, {}, status=status)
         assert link == f'<https://ucm.example/acme/proxy/authz/{_b64(self.AUTHZ)}>;rel="up"'
 
-    def test_upstream_link_wins_over_known_authz(self, app, monkeypatch):
-        other = f'{UPSTREAM}/authZ/other'
+    @pytest.mark.parametrize('status', ['valid', 'pending'])
+    def test_challenge_is_read_on_its_authorization_only(self, app, monkeypatch, status):
+        """A POST-as-GET on a pending challenge starts its validation on some
+        servers (RFC 8555 erratum 5729): the proxy never sends one upstream."""
         with app.app_context():
-            _data, link = self._respond(
-                app, monkeypatch, {'Link': f'<{other}>;rel="up"'})
-        assert link == f'<https://ucm.example/acme/proxy/authz/{_b64(other)}>;rel="up"'
+            _data, link = self._respond(app, monkeypatch, {}, status=status)
+        assert self.calls == [self.AUTHZ]
+        assert link == f'<https://ucm.example/acme/proxy/authz/{_b64(self.AUTHZ)}>;rel="up"'
 
 
 class TestCertificateUrlPersistence:

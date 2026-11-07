@@ -311,23 +311,22 @@ class TestSharedUpstreamAuthz:
 
 
 class TestChallengeOwnership:
-    """The owning order is resolved through the authz URL upstream returns in
-    Link rel="up" — challenge and authz URLs live in disjoint namespaces, so
-    the URL itself can never be matched against the stored authz URLs."""
+    """The owning order is resolved by reading the authorizations recorded on
+    the requester's own orders: challenge and authz URLs live in disjoint
+    namespaces, and the challenge itself is never read upstream."""
 
     def _upstream_challenge(self, status='valid'):
-        return _FakeResp(
-            {'type': 'dns-01', 'url': CHALL_URL, 'status': status, 'token': 't'},
-            headers={'Link': f'<{AUTHZ_URL}>;rel="up"'},
-        )
+        return _FakeResp({
+            'status': status, 'identifier': {'type': 'dns', 'value': 'owned.example.com'},
+            'challenges': [{'type': 'dns-01', 'url': CHALL_URL, 'status': status,
+                            'token': 't'}]})
 
     def test_cross_account_denied(self, app, monkeypatch):
+        """Another account's orders are not read: the challenge is unknown to it."""
         with app.app_context():
             _seed_order()
-            svc = _make_svc(
-                app, monkeypatch, upstream_response=self._upstream_challenge(),
-            )
-            with pytest.raises(PermissionError):
+            svc = _make_svc(app, monkeypatch)
+            with pytest.raises(ProxyResourceNotFoundError):
                 svc.respond_challenge(
                     _b64(CHALL_URL),
                     requester_account_id='acct-intruder',
@@ -556,7 +555,7 @@ class TestEndpointOwnership:
         assert r_alice.status_code == 200
         assert r_alice.get_json()['status'] == 'valid'
 
-    def test_challenge_cross_account_403_owner_200(
+    def test_challenge_cross_account_404_owner_200(
         self, app, client, monkeypatch, proxy_upstream_stub,
     ):
         alice_key, alice_jwk = _generate_rsa_key_and_jwk()
@@ -565,10 +564,7 @@ class TestEndpointOwnership:
         bob_kid = _register_account(client, bob_key, bob_jwk)
         self._seed_alice_order(app, alice_kid)
 
-        upstream = _FakeResp(
-            {'type': 'dns-01', 'url': CHALL_URL, 'status': 'valid', 'token': 't'},
-            headers={'Link': f'<{AUTHZ_URL}>;rel="up"'},
-        )
+        upstream = TestChallengeOwnership()._upstream_challenge()
         monkeypatch.setattr(
             AcmeProxyService, '_post_with_account',
             lambda self, *_a, **_k: upstream,
@@ -576,8 +572,8 @@ class TestEndpointOwnership:
 
         path = f'/acme/proxy/challenge/{_b64(CHALL_URL)}'
         r_bob = self._post_as_get(client, path, bob_key, bob_kid)
-        assert r_bob.status_code == 403
-        assert 'unauthorized' in r_bob.get_json()['type']
+        assert r_bob.status_code == 404
+        assert r_bob.get_json()['status'] == 404
 
         r_alice = self._post_as_get(client, path, alice_key, alice_kid)
         assert r_alice.status_code == 200
