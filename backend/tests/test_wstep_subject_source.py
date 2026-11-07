@@ -248,3 +248,11 @@ def test_a_template_with_a_supplied_subject_and_no_eku_is_refused(app, subject_c
     assert cert is None
     assert err == ("Template 'Subject source no eku CA Any' lets the request name its subject "
                    'but configures no Extended Key Usage')
+
+
+def test_a_naked_request_under_a_template_without_eku_is_still_derived(app, subject_ca, directory):
+    """The directory names it, so the template's missing EKUs cannot lend it a chosen name."""
+    ca_id = subject_ca('Subject source naked no eku CA', {'Any': ('usr_cert', [], False, 'RSA-2048')})
+    cert, err = _issue(app, ca_id, _csr(), MACHINE)
+    assert err is None, err
+    assert cert.subject.rfc4514_string() == 'CN=win11.example.test'

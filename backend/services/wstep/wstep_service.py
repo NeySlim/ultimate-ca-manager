@@ -961,7 +961,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         if refusal:
             return None, refusal
         # Without EKUs the default profile would give serverAuth to the name the request chose
-        if (matched_template is not None and _subject_source(matched_template) == 'request'
+        if (override_subject is None and matched_template is not None
+                and _subject_source(matched_template) == 'request'
                 and not _template_extra_ekus(matched_template)):
             return None, (f"Template '{matched_template.name}' lets the request name its subject "
                           'but configures no Extended Key Usage')
