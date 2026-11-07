@@ -13,6 +13,7 @@ from auth.unified import AuthManager, require_auth, require_permission
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.trusted_proxy import client_ip
+from utils.public_endpoints import get_admin_canonical_origin
 from models import User, db
 from security.password_policy import validate_password
 
@@ -188,6 +189,13 @@ def forgot_password():
     if not _is_email_configured():
         return error_response('Password reset unavailable - email not configured', 503)
     
+    # The link goes to the operator's public origin (Base URL, else FQDN), never to
+    # the Host of this unauthenticated request, which the caller chooses.
+    origin = get_admin_canonical_origin()
+    if not origin:
+        return error_response(
+            'Password reset unavailable - set the Base URL in Settings so the link can reach UCM', 503)
+
     data = request.get_json() or {}
     email = data.get('email', '').strip().lower()
     
@@ -209,7 +217,7 @@ def forgot_password():
         # Send email
         try:
             from services.notification_service import NotificationService
-            reset_url = f"{current_app.config.get('BASE_URL', 'https://localhost:8443')}/reset-password?token={token}"
+            reset_url = f"{origin.rstrip('/')}/reset-password?token={token}"
             
             NotificationService.send_email(
                 to=user.email,
