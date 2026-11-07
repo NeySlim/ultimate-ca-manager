@@ -40,6 +40,7 @@ from services.scep.crypto_helpers import (
     select_response_key_transport,
 )
 from services.scep.message_parser import (
+    UnsupportedScepAlgorithm,
     decrypt_scep_envelope,
     extract_scep_attributes,
     extract_signer_certificate,
@@ -383,7 +384,7 @@ class SCEPService:
                 message_data = decrypt_scep_envelope(
                     encrypted_bytes, self.ca_key, self.ca_cert
                 )
-            except FipsRestricted as e:
+            except (FipsRestricted, UnsupportedScepAlgorithm) as e:
                 return self._create_error_response(
                     self.FAIL_BAD_ALG, str(e),
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
@@ -1087,8 +1088,8 @@ class SCEPService:
                         SUPERSEDED: "Renewal: signer certificate has been superseded by a newer one",
                     }.get(status, "Renewal: signer certificate is not recognized"),
                 )
-            # RFC 8894 §2.5: a renewal keeps the identity -- the SAN set
-            # as well as the subject (EST and WSTEP already compared both)
+            # UCM policy, not an RFC 8894 rule: a renewal keeps the identity,
+            # SAN set as well as subject, as EST and WSTEP require
             if not san_identity_matches(signer_cert, csr):
                 logger.warning(
                     f"SCEP renewal: SAN mismatch (serial={signer_cert.serial_number})"

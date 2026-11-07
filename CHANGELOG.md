@@ -34,6 +34,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - SCEP: a challenge password sent in the CSR as a BMPString or UniversalString was read as UTF-8 and refused. Every DirectoryString type is now decoded by its type (RFC 2985 §5.4.1).
 - SCEP: GetNextCACert served as the rollover certificate any CA sharing the current CA's display name, even one with another subject and key, or a revoked or offline one. It now serves only a CA with the same parent and subject DN that is usable and expires later, and answers 404 otherwise.
 - In-app help: the SCEP URL was given as `/scep`, which serves the web interface, and HTTPS was said to protect the challenge password. The help now gives `/scep/pkiclient.exe` and the profile URLs, and says the CMS envelope protects the challenge.
+- SCEP: a request enveloped with single DES or an unknown cipher or key transport failed as badMessageCheck, and no failure said why. It now fails as badAlg, and every failure carries its reason in failInfoText, the administrator's rejection reason included (RFC 8894 §3.2.1.4, §3.3.2.2).
+- SCEP: a POST without `operation` was answered with the capabilities. It is now processed as the PKIOperation it must be (RFC 8894 §4.3).
 
 ### Security
 

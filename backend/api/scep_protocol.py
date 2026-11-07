@@ -243,7 +243,9 @@ def scep_endpoint(profile_slug=None):
     )
 
     if not operation:
-        # Return capabilities by default (common client behavior)
+        # RFC 8894 §4.3: a POST can only be PKIOperation; a bare GET gets the capabilities
+        if request.method == 'POST':
+            return handle_pki_operation(profile_slug)
         return handle_get_ca_caps(profile_slug)
     elif operation == 'GetCACaps':
         return handle_get_ca_caps(profile_slug)
