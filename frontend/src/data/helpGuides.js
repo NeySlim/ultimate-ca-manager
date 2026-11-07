@@ -2728,7 +2728,7 @@ Map IDP SAML attributes to UCM user fields:
 - \`groups\` → UCM group membership (optional)
 
 ### Single Logout
-When the IdP ends a session, it sends a signed **LogoutRequest** through the browser to the SLO URL. UCM checks the IdP signature, issuer, Destination and validity, closes the UCM session of that NameID in this browser (when the request carries SessionIndex values, only a session they name), then sends a **LogoutResponse** to the IdP's SLO URL, signed with the SP key; an SP certificate that is not RSA sends it unsigned, which a strict IdP such as AD FS refuses. Without an IdP SLO URL, the browser returns to the UCM login page. An unsigned or forged LogoutRequest is refused and the session stays open.
+When the IdP ends a session, it sends a signed **LogoutRequest** through the browser to the SLO URL. UCM checks the IdP signature, issuer, Destination (required), IssueInstant (within the clock window) and that the request was not used before, closes the UCM session of that NameID in this browser (when the request carries SessionIndex values, only a session they name), then sends a **LogoutResponse** to the IdP's SLO URL, signed with the SP key; an SP certificate that is not RSA sends it unsigned, which a strict IdP such as AD FS refuses. Without an IdP SLO URL, the browser returns to the UCM login page. An unsigned or forged LogoutRequest is refused and the session stays open.
 
 ### IdP-initiated login
 A login started from the IdP portal reaches UCM without a request from UCM. **Allow IdP-initiated login** accepts it, with the same signature, audience, Destination, validity and replay checks. Providers created before 2.243 keep it on; new providers have it off. Turn it on only if users start from the IdP portal.
@@ -2753,9 +2753,9 @@ When enabled, a new UCM user account is automatically created on first SSO login
 ## Who can sign in
 
 ### Identity matching
-A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator). A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. To merge a local account into an SSO identity, use **Link to SSO** on that user first; its next sign-in through that provider binds the IdP identifier.
+A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator); an email the OIDC IdP marks unverified (`email_verified` false) matches none. A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. To merge a local account into an SSO identity, use **Link to SSO** on that user first; its next sign-in through that provider binds the IdP identifier.
 
-When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise use **Unlink** then **Link to SSO** on each account.
+When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for users a restore left without a provider, use **Unlink** then **Link to SSO** on each account.
 
 ### Role mapping rules
 - **At least one rule**: a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), whether the account is new or already exists; a passkey or certificate sign-in is not checked
