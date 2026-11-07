@@ -42,10 +42,8 @@ from lxml import etree
 from .soap_envelope import ACTION_RSTRC, WSSE_NS, WST_NS, WSTEP_NS, build_envelope
 
 TOKEN_TYPE_X509V3 = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3'
-# Same ValueType suffix real Windows clients use on their own PKCS#7/CMC
-# BinarySecurityToken in the *request* (rst_parser.py's
-# _PKCS7_VALUE_TYPE_SUFFIX) — mirrored here for the response's CMC token
-# rather than guessing at a different URI.
+# The ValueType real Windows clients put on their own PKCS#7/CMC request
+# token, mirrored for the response's CMC token.
 VALUE_TYPE_PKCS7 = (
     'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#PKCS7'
 )

@@ -22,10 +22,9 @@ from .soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS
 TOKEN_TYPE_X509V3 = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3'
 REQUEST_TYPE_ISSUE = 'http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue'
 VALUE_TYPE_PKCS10 = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10'
-# For a "Full PKCS#7" request, the BinarySecurityToken's ValueType ends
-# in "#PKCS7", not "#PKCS10" -- the CSR arrives wrapped in a signed CMS
-# envelope, not as bare PKCS#10 DER.
-_PKCS7_VALUE_TYPE_SUFFIX = '#PKCS7'
+# MS-WCCE 2.2.2.6 allows a PKCS#10, CMS or CMC request under either ValueType
+# (the MS-WSTEP 4.1.1.1 example sends a bare PKCS#10 as "#PKCS7"): the DER decides.
+_OBJECT_IDENTIFIER_TAG = 0x06
 
 # id-cct-PKIData (RFC 5272, CMC -- Certificate Management over CMS). Real
 # Windows clients wrap a CMC PKIData structure as the PKCS#7 SignedData's
@@ -130,6 +129,16 @@ def _text(element):
     return element.text.strip() if element is not None and element.text else None
 
 
+def _is_content_info(der_bytes):
+    """Whether the DER SEQUENCE opens with an OID (CMS ContentInfo) rather than
+    a SEQUENCE (PKCS#10 CertificationRequestInfo)."""
+    if len(der_bytes) < 2 or der_bytes[0] != 0x30:
+        return False
+    first = der_bytes[1]
+    offset = 2 + (first & 0x7f if first & 0x80 else 0)
+    return len(der_bytes) > offset and der_bytes[offset] == _OBJECT_IDENTIFIER_TAG
+
+
 def _unwrap_pkcs7_csr(der_bytes):
     """Extract a PKCS#10 CertificationRequest's raw DER from a PKCS#7
     SignedData envelope, per the "Full PKCS#7 request" format real
@@ -181,9 +190,9 @@ def parse_rst(envelope_bytes):
     or unexpected ``TokenType``/ValueType, matching EST's compatibility-
     first stance (``_require_pkcs10_content_type`` warns rather than
     rejects) — real-world clients have historically been loose about
-    declaring exact MIME/ValueType strings. The one ValueType that *is*
-    inspected is the CSR BinarySecurityToken's, since PKCS#10 vs PKCS#7
-    changes how the bytes must be decoded (see ``_unwrap_pkcs7_csr``).
+    declaring exact MIME/ValueType strings. Whether the CSR token is a bare
+    PKCS#10 or a CMS envelope (see ``_unwrap_pkcs7_csr``) is read from its
+    DER, not from its ValueType.
     """
     try:
         root = safe_fromstring(envelope_bytes)
@@ -208,8 +217,7 @@ def parse_rst(envelope_bytes):
     except Exception as e:
         raise RSTParseError(f'Invalid base64 in BinarySecurityToken: {e}')
 
-    value_type = bst_el.get('ValueType') or ''
-    was_pkcs7_wrapped = value_type.endswith(_PKCS7_VALUE_TYPE_SUFFIX)
+    was_pkcs7_wrapped = _is_content_info(raw_der)
     if was_pkcs7_wrapped:
         csr_der, cmc_body_part_id, outer_signed_data = _unwrap_pkcs7_csr(raw_der)
     else:

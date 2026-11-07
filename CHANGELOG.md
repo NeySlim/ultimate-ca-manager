@@ -23,6 +23,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- WSTEP: a PKCS#10 request sent under the `#PKCS7` ValueType, as in the MS-WSTEP example, was refused as a malformed CMS envelope. The request format is now read from its content, whatever the ValueType says.
 - WSTEP: a plain PKCS#10 request got no CMC Full PKI Response in its answer, which MS-WSTEP requires for every request; it now gets one, as a CMC request does.
 - WSTEP: the template a request named (szOID_CERTIFICATE_TEMPLATE by OID, szOID_ENROLL_CERTTYPE by name) was ignored and the template chosen by EKU, so of two templates with the same EKUs the oldest always won, and a template the CA does not offer was issued anyway. The named template is now issued, an unknown, inactive or conflicting one is refused, and a request naming none is still matched by its EKUs.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: these providers hold one TXT value per name, so the cleanup of one order cleared the value another order was still validating. The name is now left alone while another order in progress uses it.
