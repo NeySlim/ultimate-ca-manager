@@ -7,6 +7,7 @@ from flask import request, g
 import logging
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
+from auth.session_start import keep_own_session
 from utils.response import success_response, error_response, created_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
@@ -368,6 +369,7 @@ def update_user(user_id):
         user.totp_exempt = bool(data['totp_exempt'])
 
     # Update password if provided
+    password_changed = False
     if 'password' in data and data['password']:
         # SECURITY: Validate password strength
         is_valid, error_msg = validate_password_strength(data['password'])
@@ -380,9 +382,12 @@ def update_user(user_id):
             if not current or not user.check_password(current):
                 return error_response('Current password is required', 400)
         user.set_password(data['password'])
+        password_changed = True
 
     try:
         db.session.commit()
+        if password_changed:
+            keep_own_session(user)
         AuditService.log_action(
             action='user_update',
             resource_type='user',

@@ -10,12 +10,16 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from models import db
 
+from security.master_key_bootstrap import OPT_OUT_KEY
+
 from .errors import BackupExportError
 
 logger = logging.getLogger(__name__)
 
 CONFIG_KEY = 'backup_installation_id'
 METADATA_KEY = 'installation_id'
+# Settings about this installation itself: never exported, never restored
+LOCAL_SETTINGS = frozenset((CONFIG_KEY, OPT_OUT_KEY))
 
 
 def installation_id(create: bool = False) -> Optional[str]:

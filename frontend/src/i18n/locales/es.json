@@ -677,7 +677,9 @@
       "generateReport": "Generar informe"
     },
     "expiresInDays": "Expira en {{count}} días",
-    "chainRepairSameKey": "claves compartidas, certificados distintos (¿certificado cruzado?)"
+    "chainRepairSameKey": "claves compartidas, certificados distintos (¿certificado cruzado?)",
+    "keyEncryptionOffTitle": "Las claves privadas no están cifradas.",
+    "keyEncryptionOffDesc": "No hay ninguna clave maestra cargada, así que las claves privadas de las CA y de los certificados se guardan sin cifrar en la base de datos. Active el cifrado en Configuración › Seguridad, o vuelva a colocar la clave maestra y reinicie UCM."
   },
   "certificates": {
     "createCertificate": "Crear certificado",
@@ -2821,7 +2823,7 @@
     "saveSettings": "Guardar configuración",
     "securitySubtitle": "Contraseña, 2FA, cifrado y configuración de sesión",
     "keyEncryption": "Cifrado de claves privadas",
-    "encryptionDesc": "Cifra todas las claves privadas almacenadas en la base de datos usando AES-256. Protegidas por una clave maestra en /etc/ucm/master.key. Cuando está activado, UCM deja de conservar archivos de clave en texto plano en su directorio privado y elimina los existentes. Use hooks de despliegue para colocar claves donde las necesite un servicio.",
+    "encryptionDesc": "Cifra todas las claves privadas almacenadas en la base de datos usando AES-128 (Fernet, con HMAC-SHA256). Protegidas por una clave maestra en /etc/ucm/master.key. Cuando está activado, UCM deja de conservar archivos de clave en texto plano en su directorio privado y elimina los existentes. Use hooks de despliegue para colocar claves donde las necesite un servicio.",
     "enableEncryption": "Activar cifrado",
     "disableEncryption": "Desactivar cifrado",
     "encryptRemainingKeys": "Cifrar claves restantes ({{count}})",
@@ -4272,6 +4274,8 @@
     "title": "Modo seguro",
     "description": "UCM detectó claves privadas cifradas pero falta la clave de cifrado.",
     "step1Title": "Coloque su archivo de clave maestra en:",
+    "mismatchDescription": "La clave maestra configurada no descifra las claves privadas almacenadas: no es la clave con la que se cifraron. No se puede acceder a las claves privadas hasta restaurar la clave maestra anterior.",
+    "mismatchStep1Title": "Vuelva a colocar el archivo de la clave maestra anterior en:",
     "step2Title": "Luego reinicie el servicio:",
     "lostKeyHint": "Si perdió la clave maestra, restaure desde una copia de seguridad.",
     "polling": "Verificando..."
@@ -5460,11 +5464,13 @@
     "selectCA": "Seleccione una CA para la firma de marcas de tiempo",
     "policyOid": "OID de política",
     "policyOidHelp": "OID que identifica la política TSA bajo la cual se emiten las marcas de tiempo",
+    "policyPlaceholderWarning": "1.2.3.4.1 es el OID de política de ejemplo de OpenSSL, no asignado a nadie. En producción, use un OID del arco de su organización o de su CP/CPS.",
     "requireDedicatedCert": "Requerir un certificado TSA dedicado",
     "requireDedicatedCertDesc": "Rechazar la firma de marcas de tiempo con el propio certificado de la CA. Requiere un certificado de firma dedicado (entidad final) con una EKU timeStamping crítica (RFC 3161).",
     "requireDedicatedCertBlocked": "Seleccione primero un certificado de firma dedicado utilizable arriba; de lo contrario, todas las solicitudes de sellado fallarían.",
     "signingCert": "Certificado de firma",
     "signingCertDesc": "Elija qué firma los tokens de sellado de tiempo. El certificado de la CA es el valor histórico; un certificado final dedicado con la EKU timeStamping es la recomendación de la RFC 3161.",
+    "caSignerWarning": "El certificado de la CA firma los sellos de tiempo. Los verificadores estrictos como openssl ts -verify y jarsigner rechazan estos tokens: la RFC 3161 exige un firmante dedicado con un EKU timeStamping crítico y exclusivo. Seleccione o genere abajo un certificado de firma dedicado.",
     "signingCertHelp": "Solo se listan certificados cuya clave privada posee UCM y que llevan la EKU timeStamping. Las renovaciones se siguen automáticamente.",
     "signingCertCa": "Certificado de la CA (por defecto)",
     "signerExpires": "Caduca",

@@ -14,6 +14,10 @@ from .validation_helpers import _name_value, _name_matches_subtree
 
 logger = logging.getLogger(__name__)
 
+
+# One refusal class for every path, so a handler catching either name sees all
+CsrRefused = RequestRejected
+
 # Hostname-shaped CN: optional wildcard label then dotted DNS labels. A CN
 # like "John Doe" or "Fileserver Backup Key" is a display name, not a DNS
 # identity — mapping it to DNSName made client certs fail DNS-permitted

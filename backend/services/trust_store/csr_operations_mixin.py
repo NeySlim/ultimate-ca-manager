@@ -379,7 +379,7 @@ def _filter_csr_ekus(eku_oids, cert_type, allow_sensitive_ekus, renewal_of=None)
         # MORE than a CSR requesting nothing. Fall back to the type's profile.
         kept = _default_ekus_for_cert_type(cert_type)
         if not kept:
-            raise ValueError(
+            raise RequestRejected(
                 "CSR requests only Extended Key Usages that are not permitted "
                 f"for certificate type {cert_type!r}"
             )
@@ -620,7 +620,8 @@ class CSROperationsMixin:
         not_after: Optional[datetime] = None,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
-        signing renews — its names are graced by NameConstraints validation.
+        signing renews — its names are graced by NameConstraints validation,
+        and stand for the SAN of a CSR that carries none.
         ``allow_sensitive_ekus``: keep OCSPSigning/timeStamping from the CSR —
         reserved for the admin Sign-CSR path (an operator explicitly signing a
         delegated responder/TSA CSR); protocol enrollees never get them.
@@ -642,8 +643,8 @@ class CSROperationsMixin:
         CSR's own (empty) one — applying it later would let a CA's
         NameConstraints be silently bypassed by whatever subject was
         derived server-side.
-        ``override_san``: replaces the auto-synthesized SAN outright when
-        given, instead of deriving it from ``override_subject``'s CN via
+        ``override_san``: replaces the CSR's SAN or the auto-synthesized one
+        outright when given, instead of deriving it from ``override_subject``'s CN via
         ``_synthesize_san_from_subject``. Needed for AD-derived user
         subjects: a user's directory-path CN (e.g. "Roy Hagland") isn't a
         DNS name or email address, so synthesis would build a nonsensical
@@ -684,7 +685,7 @@ class CSROperationsMixin:
         if key_err:
             raise RequestRejected(f"CSR public key rejected: {key_err}")
         if require_pop and not csr.is_signature_valid:
-            raise ValueError("CSR has invalid signature")
+            raise RequestRejected("CSR has invalid signature")
         related_a = _verified_related_certificate(csr, cert_type)
 
         # Effective subject: an override (if any) wins outright; otherwise
@@ -717,6 +718,14 @@ class CSROperationsMixin:
             csr_sans = None
             has_csr_san = False
 
+        if override_san is None and not has_csr_san and renewal_of is not None:
+            # A renewal keeps its identity: the renewed certificate's names, or none,
+            # never a name built from the CN (RFC 7030 §4.2.2)
+            try:
+                override_san = list(renewal_of.extensions.get_extension_for_class(
+                    x509.SubjectAlternativeName).value)
+            except x509.ExtensionNotFound:
+                override_san = []
         san_rebuilt = bool(extra_san)
         if override_san is not None:
             effective_sans = override_san
@@ -743,8 +752,8 @@ class CSROperationsMixin:
                                  effective_sans, renewal_of)
         if san_template is not None:
             from services.template_service import allowed_san_types, check_san_types, san_type_of
-            # The names that land: the CSR's own SAN when it has one, else the override
-            requested = list(csr_sans or []) if has_csr_san or override_san is None else override_san
+            # The names that land: the override when given, else the CSR's own SAN
+            requested = override_san if override_san is not None else list(csr_sans or [])
             check_san_types(san_template, list(requested) + list(extra_san or []))
             allowed = allowed_san_types(san_template)
             if allowed is not None and override_san is None and not has_csr_san:
@@ -830,7 +839,7 @@ class CSROperationsMixin:
             and csr_basic_constraints is not None
             and not csr_basic_constraints.value.ca
         ):
-            raise ValueError(
+            raise RequestRejected(
                 "Intermediate CA CSR BasicConstraints must set ca=True"
             )
 
@@ -915,6 +924,8 @@ class CSROperationsMixin:
                 builder = builder.add_extension(x509.TLSFeature(features), critical=False)
                 continue
             if extension.oid == ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
+                if override_san is not None:
+                    continue  # replaced by the override, added below
                 # RFC 5280 §4.2.1.6: SAN MUST be critical when the subject
                 # is empty -- the CSR's flag cannot override that.
                 san_value = (x509.SubjectAlternativeName(effective_sans)
@@ -929,7 +940,7 @@ class CSROperationsMixin:
         # effective_sans, already computed above for NameConstraints, so
         # what got constraint-checked and what actually lands on the
         # certificate can't drift apart.
-        if not has_csr_san and effective_sans:
+        if (not has_csr_san or override_san is not None) and effective_sans:
             builder = builder.add_extension(
                 x509.SubjectAlternativeName(effective_sans),
                 critical=len(subject) == 0,
@@ -1024,14 +1035,16 @@ class CSROperationsMixin:
             # on top, as on the issue form. Renewal at par does not apply:
             # the template is the policy, prior EKUs outside it are not
             # resurrected. A template whose every EKU was refused imposes
-            # the cert_type default profile, never the CSR's request.
-            if not tpl_ekus:
+            # the cert_type default profile, never the CSR's request, unless
+            # extra_ekus already give the leaf its purposes.
+            if not tpl_ekus and not extra_oids:
                 logger.warning(
                     "sign_csr: every template EKU was refused for certificate "
                     "type %r; issuing its default profile instead", cert_type,
                 )
             merged = merge_eku_lists(
-                tpl_ekus or _default_ekus_for_cert_type(cert_type), extra_oids
+                tpl_ekus or ([] if extra_oids else _default_ekus_for_cert_type(cert_type)),
+                extra_oids,
             )
             if merged:
                 builder = builder.add_extension(

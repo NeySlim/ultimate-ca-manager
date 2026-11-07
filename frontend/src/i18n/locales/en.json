@@ -677,7 +677,9 @@
       "generateReport": "Generate Report"
     },
     "expiresInDays": "Expires in {{count}} days",
-    "chainRepairSameKey": "shared keys, distinct certificates (cross-certificate?)"
+    "chainRepairSameKey": "shared keys, distinct certificates (cross-certificate?)",
+    "keyEncryptionOffTitle": "Private keys are not encrypted.",
+    "keyEncryptionOffDesc": "No master key is loaded, so CA and certificate private keys are stored unencrypted in the database. Enable encryption in Settings › Security, or put the master key back and restart UCM."
   },
   "certificates": {
     "createCertificate": "Create Certificate",
@@ -2822,7 +2824,7 @@
     "saveSettings": "Save Settings",
     "securitySubtitle": "Password, 2FA, encryption and session configuration",
     "keyEncryption": "Private Key Encryption",
-    "encryptionDesc": "Encrypt all private keys stored in the database using AES-256. Keys are protected by a master key stored at /etc/ucm/master.key. When enabled, UCM stops keeping plaintext key files in its private directory; existing ones are removed. Use deploy hooks to place keys where a service needs them.",
+    "encryptionDesc": "Encrypt all private keys stored in the database using AES-128 (Fernet, with HMAC-SHA256). Keys are protected by a master key stored at /etc/ucm/master.key. When enabled, UCM stops keeping plaintext key files in its private directory; existing ones are removed. Use deploy hooks to place keys where a service needs them.",
     "enableEncryption": "Enable Encryption",
     "disableEncryption": "Disable Encryption",
     "encryptRemainingKeys": "Encrypt remaining keys ({{count}})",
@@ -4275,6 +4277,8 @@
     "title": "Safe Mode",
     "description": "UCM detected encrypted private keys but the encryption key is missing. Private keys cannot be accessed until the master key is restored.",
     "step1Title": "Place your master key file at:",
+    "mismatchDescription": "The configured master key does not decrypt the stored private keys: it is not the key they were encrypted with. Private keys cannot be accessed until the previous master key is restored.",
+    "mismatchStep1Title": "Put the previous master key file back at:",
     "step2Title": "Then restart the service:",
     "lostKeyHint": "If you lost the master key, restore from a backup to recover your private keys.",
     "polling": "Checking for resolution..."
@@ -5463,11 +5467,13 @@
     "selectCA": "Select a CA for timestamp signing",
     "policyOid": "Policy OID",
     "policyOidHelp": "OID identifying the TSA policy under which timestamps are issued",
+    "policyPlaceholderWarning": "1.2.3.4.1 is OpenSSL's example policy OID, assigned to no one. Use an OID from your organization's arc or your CP/CPS in production.",
     "requireDedicatedCert": "Require a dedicated TSA certificate",
     "requireDedicatedCertDesc": "Refuse to sign timestamps with the CA certificate itself. Requires a dedicated end-entity signing certificate with a critical timeStamping EKU (RFC 3161).",
     "requireDedicatedCertBlocked": "Select a usable dedicated signing certificate above before enabling this, otherwise every timestamp request would fail.",
     "signingCert": "Signing certificate",
     "signingCertDesc": "Choose what signs the timestamp tokens. The CA certificate is the historical default; a dedicated end-entity certificate carrying the timeStamping EKU is the RFC 3161 recommendation.",
+    "caSignerWarning": "The CA certificate signs the timestamps. Strict verifiers such as openssl ts -verify and jarsigner reject these tokens: RFC 3161 requires a dedicated signer with a critical, exclusive timeStamping EKU. Select or generate a dedicated signing certificate below.",
     "signingCertHelp": "Only certificates whose private key UCM holds and that carry the timeStamping EKU are listed. Renewals are followed automatically.",
     "signingCertCa": "CA certificate (default)",
     "signerExpires": "Expires",

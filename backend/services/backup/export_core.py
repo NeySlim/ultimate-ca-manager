@@ -59,8 +59,8 @@ class ExportCoreMixin:
         # Get all system config entries
         system_configs = SystemConfig.query.all()
         for sc in system_configs:
-            if sc.key == installation.CONFIG_KEY:
-                continue    # the database's own, carried in the metadata
+            if sc.key in installation.LOCAL_SETTINGS:
+                continue    # the installation's own; its id is carried in the metadata
             val = sc.value
             # A setting is secret either because the row says so or because
             # its value is ciphertext (the scheduled-backup password is stored

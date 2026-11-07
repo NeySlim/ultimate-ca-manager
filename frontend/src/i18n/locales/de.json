@@ -677,7 +677,9 @@
       "generateReport": "Bericht erstellen"
     },
     "expiresInDays": "Läuft in {{count}} Tagen ab",
-    "chainRepairSameKey": "gemeinsame Schlüssel, verschiedene Zertifikate (Cross-Zertifikat?)"
+    "chainRepairSameKey": "gemeinsame Schlüssel, verschiedene Zertifikate (Cross-Zertifikat?)",
+    "keyEncryptionOffTitle": "Private Schlüssel sind nicht verschlüsselt.",
+    "keyEncryptionOffDesc": "Es ist kein Hauptschlüssel geladen, daher werden die privaten Schlüssel von CAs und Zertifikaten unverschlüsselt in der Datenbank gespeichert. Aktivieren Sie die Verschlüsselung unter Einstellungen › Sicherheit oder stellen Sie den Hauptschlüssel wieder bereit und starten Sie UCM neu."
   },
   "certificates": {
     "createCertificate": "Zertifikat erstellen",
@@ -2821,7 +2823,7 @@
     "saveSettings": "Einstellungen speichern",
     "securitySubtitle": "Passwort, 2FA, Verschlüsselung und Sitzungskonfiguration",
     "keyEncryption": "Verschlüsselung privater Schlüssel",
-    "encryptionDesc": "Verschlüsselt alle in der Datenbank gespeicherten privaten Schlüssel mit AES-256. Geschützt durch einen Hauptschlüssel in /etc/ucm/master.key. Wenn aktiviert, speichert UCM keine Klartext-Schlüsseldateien mehr im privaten Verzeichnis und entfernt vorhandene Dateien. Verwenden Sie Deploy-Hooks, um Schlüssel dort abzulegen, wo ein Dienst sie benötigt.",
+    "encryptionDesc": "Verschlüsselt alle in der Datenbank gespeicherten privaten Schlüssel mit AES-128 (Fernet, mit HMAC-SHA256). Geschützt durch einen Hauptschlüssel in /etc/ucm/master.key. Wenn aktiviert, speichert UCM keine Klartext-Schlüsseldateien mehr im privaten Verzeichnis und entfernt vorhandene Dateien. Verwenden Sie Deploy-Hooks, um Schlüssel dort abzulegen, wo ein Dienst sie benötigt.",
     "enableEncryption": "Verschlüsselung aktivieren",
     "disableEncryption": "Verschlüsselung deaktivieren",
     "encryptRemainingKeys": "Verbleibende Schlüssel verschlüsseln ({{count}})",
@@ -4272,6 +4274,8 @@
     "title": "Abgesicherter Modus",
     "description": "UCM hat verschlüsselte private Schlüssel erkannt, aber der Verschlüsselungsschlüssel fehlt.",
     "step1Title": "Platzieren Sie Ihre Hauptschlüsseldatei unter:",
+    "mismatchDescription": "Der konfigurierte Hauptschlüssel entschlüsselt die gespeicherten privaten Schlüssel nicht: Sie wurden mit einem anderen Schlüssel verschlüsselt. Die privaten Schlüssel bleiben unzugänglich, bis der vorherige Hauptschlüssel wiederhergestellt ist.",
+    "mismatchStep1Title": "Legen Sie die vorherige Hauptschlüsseldatei wieder ab unter:",
     "step2Title": "Dann starten Sie den Dienst neu:",
     "lostKeyHint": "Wenn Sie den Hauptschlüssel verloren haben, stellen Sie aus einem Backup wieder her.",
     "polling": "Überprüfung läuft..."
@@ -5460,11 +5464,13 @@
     "selectCA": "CA für Zeitstempelsignierung auswählen",
     "policyOid": "Richtlinien-OID",
     "policyOidHelp": "OID zur Identifizierung der TSA-Richtlinie, unter der Zeitstempel ausgestellt werden",
+    "policyPlaceholderWarning": "1.2.3.4.1 ist die Beispiel-Richtlinien-OID von OpenSSL und niemandem zugewiesen. Verwenden Sie in der Produktion eine OID aus dem Bereich Ihrer Organisation oder aus Ihrer CP/CPS.",
     "requireDedicatedCert": "Dediziertes TSA-Zertifikat erforderlich",
     "requireDedicatedCertDesc": "Das Signieren von Zeitstempeln mit dem CA-Zertifikat selbst ablehnen. Erfordert ein dediziertes End-Entity-Signaturzertifikat mit kritischer timeStamping-EKU (RFC 3161).",
     "requireDedicatedCertBlocked": "Wählen Sie oben zuerst ein verwendbares dediziertes Signaturzertifikat aus, sonst würde jede Zeitstempel-Anfrage fehlschlagen.",
     "signingCert": "Signaturzertifikat",
     "signingCertDesc": "Wählen Sie, womit die Zeitstempel-Token signiert werden. Das CA-Zertifikat ist der historische Standard; ein dediziertes End-Entity-Zertifikat mit timeStamping-EKU ist die RFC-3161-Empfehlung.",
+    "caSignerWarning": "Das CA-Zertifikat signiert die Zeitstempel. Strenge Prüfer wie openssl ts -verify und jarsigner lehnen diese Token ab: RFC 3161 verlangt einen dedizierten Signierer mit einer kritischen, exklusiven timeStamping-EKU. Wählen oder erzeugen Sie unten ein dediziertes Signaturzertifikat.",
     "signingCertHelp": "Es werden nur Zertifikate angeboten, deren privaten Schlüssel UCM hält und die die timeStamping-EKU tragen. Erneuerungen werden automatisch übernommen.",
     "signingCertCa": "CA-Zertifikat (Standard)",
     "signerExpires": "Läuft ab",

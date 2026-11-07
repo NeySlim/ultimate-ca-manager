@@ -25,6 +25,9 @@ import { TSA_LABELS, findAlgorithm, groupedOptions, listAlgorithms } from '../li
 import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 
+// OpenSSL's example policy OID, assigned to no one
+const DEFAULT_POLICY_OID = '1.2.3.4.1'
+
 // The signer request names its key as the issue API does: the registry row's `issue` pair
 function signerKey(label) {
   const [key_type, key_size] = findAlgorithm(label)?.issue || [label]
@@ -41,7 +44,7 @@ export default function TSAPage() {
   const [config, setConfig] = useState({})
   const [cas, setCas] = useState([])
   const [signerCandidates, setSignerCandidates] = useState([])
-  const [stats, setStats] = useState({ total_requests: 0 })
+  const [stats, setStats] = useState({ total: 0 })
   const [activeTab, setActiveTab] = useState('settings')
   const [saving, setSaving] = useState(false)
   const [generateOpen, setGenerateOpen] = useState(false)
@@ -65,7 +68,7 @@ export default function TSAPage() {
       ])
       setConfig(configRes.data || {})
       setCas(casRes.data || [])
-      setStats(statsRes.data || { total_requests: 0 })
+      setStats(statsRes.data || { total: 0 })
       setSignerCandidates(candidatesRes.data || [])
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.tsa'))
@@ -144,6 +147,11 @@ export default function TSAPage() {
   // dedicated signer is saved: without one, /tsa would 503 every request.
   const dedicatedSignerReady = Boolean(signerStatus?.usable)
 
+  // Saved state: without a dedicated signer the CA certificate signs, which strict
+  // verifiers refuse (RFC 3161 §2.3 wants a critical, exclusive timeStamping EKU)
+  const caCertificateSigns = !config.signer?.configured
+  const placeholderPolicy = (config.policy_oid || DEFAULT_POLICY_OID) === DEFAULT_POLICY_OID
+
   const copyToClipboard = async (text) => {
     if (await copy(text)) showInfo(t('tsa.copied'))
   }
@@ -156,7 +164,7 @@ export default function TSAPage() {
   ], [t])
 
   const headerStats = useMemo(() => [
-    { icon: ChartBar, label: t('tsa.totalRequests'), value: stats.total_requests },
+    { icon: ChartBar, label: t('tsa.totalRequests'), value: stats.total },
     { icon: CheckCircle, label: t('common.status'), value: config.enabled ? t('common.enabled') : t('common.disabled'), variant: config.enabled ? 'success' : 'default' },
   ], [stats, config.enabled, t])
 
@@ -234,12 +242,20 @@ export default function TSAPage() {
 
             <Input
               label={t('tsa.policyOid')}
-              value={config.policy_oid || '1.2.3.4.1'}
+              value={config.policy_oid || DEFAULT_POLICY_OID}
               onChange={(e) => setConfig({ ...config, policy_oid: e.target.value })}
               disabled={!config.enabled}
               helperText={t('tsa.policyOidHelp')}
-              placeholder="1.2.3.4.1"
+              placeholder={DEFAULT_POLICY_OID}
             />
+            {placeholderPolicy && (
+              <div className="p-3 rounded-lg text-xs border status-warning-bg status-warning-border" role="alert">
+                <div className="flex items-start gap-2">
+                  <Warning size={16} className="status-warning-text flex-shrink-0 mt-0.5" />
+                  <p className="status-warning-text">{t('tsa.policyPlaceholderWarning')}</p>
+                </div>
+              </div>
+            )}
           </Card>
 
           <Card className="p-4 space-y-4">
@@ -248,6 +264,14 @@ export default function TSAPage() {
               {t('tsa.signingCert')}
             </h3>
             <p className="text-xs text-text-secondary">{t('tsa.signingCertDesc')}</p>
+            {caCertificateSigns && (
+              <div className="p-3 rounded-lg text-xs border status-warning-bg status-warning-border" role="alert">
+                <div className="flex items-start gap-2">
+                  <Warning size={16} className="status-warning-text flex-shrink-0 mt-0.5" />
+                  <p className="status-warning-text">{t('tsa.caSignerWarning')}</p>
+                </div>
+              </div>
+            )}
 
             <Select
               label={t('tsa.signingCert')}
@@ -462,7 +486,7 @@ export default function TSAPage() {
               <div className="p-3 bg-bg-tertiary rounded-lg">
                 <p className="text-xs font-medium text-text-primary mb-2">{t('tsa.usageCreateRequest')}</p>
                 <code className="text-xs font-mono text-text-secondary break-all block">
-                  openssl ts -query -data file.pdf -sha256 -out request.tsq
+                  openssl ts -query -data file.pdf -sha256 -cert -out request.tsq
                 </code>
               </div>
               <div className="p-3 bg-bg-tertiary rounded-lg">

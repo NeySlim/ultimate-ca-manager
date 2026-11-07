@@ -111,9 +111,9 @@ def test_password_lockout_sends_one_alert(client, sent, user):
     alerts = _alerts_for(sent, user)
     assert len(alerts) == 1
     assert alerts[0]['recipients'] == ['sec@example.test']
-    # Further attempts hit the lock and do not re-alert.
+    # Further attempts hit the lock, answer like a wrong password and do not re-alert.
     r = client.post('/api/v2/auth/login/password', json={'username': user, 'password': 'wrong'})
-    assert r.status_code == 429
+    assert r.status_code == 401
     assert len(_alerts_for(sent, user)) == 1
 
 

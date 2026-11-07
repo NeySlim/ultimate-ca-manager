@@ -1,13 +1,14 @@
 import logging
 
 from flask import request, g
-from models import db, UserSession, AuditLog
+from models import db, User, UserSession, AuditLog
 from services.audit_service import AuditService
 from utils.pagination import parse_request_pagination
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
 from auth.unified import require_auth
+from auth.session_start import keep_current_session
 
 from . import bp
 
@@ -68,19 +69,21 @@ def revoke_session(session_id):
 @bp.route('/api/v2/account/sessions/revoke-all', methods=['POST'])
 @require_auth(session_only=True)
 def revoke_all_sessions():
-    """Revoke all sessions except current"""
-    current_session_id = request.cookies.get('session_id')
-
-    # Delete all sessions except current
-    UserSession.query.filter(
-        UserSession.user_id == g.current_user.id,
-        UserSession.id != current_session_id
-    ).delete(synchronize_session=False)
-
+    """Close every other session of the account; this one stays."""
+    user = db.session.get(User, g.current_user.id)
+    user.end_sessions()
     ok, _err = safe_commit(logger, "Failed to revoke other sessions")
     if not ok:
         return _err
+    keep_current_session(user)
 
+    AuditService.log_action(
+        action='session_revoke_all',
+        resource_type='session',
+        resource_name=user.username,
+        details=f'Other sessions closed by user: {user.username}',
+        success=True
+    )
     return success_response(message='All other sessions revoked')
 
 

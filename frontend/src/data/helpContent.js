@@ -30,7 +30,7 @@ export const helpContent = {
           { label: 'Status Distribution', text: 'Pie chart breakdown: valid / expiring / expired / revoked' },
           { label: 'Next Expiry', text: 'Certificates expiring within 30 days; the configured dedicated TSA signer is tagged with a "TSA signer" chip (v2.218)' },
           { label: 'System Status', text: 'Service health: ACME, SCEP, EST, OCSP, CRL/CDP, TSA (v2.218), auto-renewal, SMTP and webhooks. Badges show a distinct amber warning state (near-expiry TSA signer, SMTP configured but disabled) and their status message on hover' },
-          { label: 'Recent Activity', text: 'Latest operations across the system' },
+          { label: 'Recent Activity', text: 'Latest operations across the system with read:audit; without it, your own events only' },
           { label: 'Recent Certificates', text: 'Recently issued or imported certificates' },
           { label: 'Certificate Authorities', text: 'CA list with chain information' },
           { label: 'ACME Accounts', text: 'Registered ACME client accounts' },
@@ -158,7 +158,7 @@ export const helpContent = {
     warnings: [
       'An ML-DSA CA cannot be exported as PKCS#12 or JKS yet: export the certificate and the private key as PEM. Clients without ML-DSA support (OpenSSL before 3.5, most browsers today) cannot verify what it signs',
       'Deleting a CA will NOT revoke certificates it has issued: revoke them first',
-      'Private keys are stored encrypted; losing the database means losing the keys',
+      'Private keys are stored encrypted under the master key; losing the database, or the master key without a UCM backup, means losing the keys',
       'Offline-mode passwords are NOT recoverable: store them in your password manager / vault before confirming',
       'A cross-certificate never replaces a CA\'s own certificate: an intermediate that would be re-certified under another issuer is refused (409) unless you attach it as a cross certificate or replace the current one; a root rollover under the same issuer name replaces it',
       'A self-signed root that was overwritten or deleted is not recovered by Convert to cross-certificate: restore it from a backup, or give its certificate to Restore as primary',
@@ -411,7 +411,7 @@ export const helpContent = {
         icon: WindowsLogo,
         items: [
           { label: 'Allow autoenrollment', text: 'Advertise the template as autoEnroll=true in Certificate Enrollment Policy so GPO/Kerberos clients request it automatically at logon. Off by default, manual enrollment stays possible without it' },
-          { label: 'Build subject from Active Directory', text: 'Derive the subject and SAN from the requester\'s AD object (via the AD Connector) instead of requiring the client to supply one, for unattended GPO autoenrollment' },
+          { label: 'Build subject from Active Directory', text: 'Derive the subject and SAN from the requester\'s AD object (via the AD Connector) instead of requiring the client to supply one, for unattended GPO autoenrollment. On the Kerberos endpoints a subject named in the request is ignored and computer accounts are refused; machine templates always take the computer\'s DNS name' },
           { label: 'Restrict enrollment to AD group', text: 'Only members of the configured AD group (nested membership included) may enroll over the Kerberos endpoint. Blank = any authenticated principal. Not enforced on the Username/Password endpoint' },
           { label: 'Pinned subject fields', text: 'Force C/ST/L/O/OU values onto every certificate issued over WSTEP, overriding the CSR or AD derivation for those fields. CN and SAN are never affected, leave a field blank to keep it dynamic' },
         ]
@@ -542,8 +542,10 @@ export const helpContent = {
         icon: ShieldCheck,
         items: [
           { label: 'mTLS (Mutual TLS)', text: 'Client presents a certificate during TLS handshake, strongest authentication method' },
-          { label: 'HTTP Basic Auth', text: 'Username/password fallback when mTLS is not available' },
-          { label: 'Presented certificate', text: 'For /simpleenroll and /serverkeygen over mTLS, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2); a certificate from another authority the TLS layer trusts is still accepted' },
+          { label: 'HTTP Basic Auth', text: 'Username/password fallback when mTLS is not available. With allow_empty_username set through PATCH /api/v2/est/config, a client may also send an empty username with the password (RFC 7030 §3.2.3, v2.252)' },
+          { label: 'Presented certificate', text: 'For /simpleenroll and /serverkeygen over mTLS, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2). A certificate another CA of this server issued is refused once it or a CA above it is revoked, or once expired (v2.252); one from an authority this server does not hold is left to the TLS layer' },
+          { label: 'tls-unique linking', text: 'A CSR with a challengePassword must carry the tls-unique value of its TLS 1.2 connection to UCM (RFC 7030 §3.5); it is refused with 400 when the value differs or cannot be verified (TLS 1.3, a proxy in front). /csrattrs does not ask for one. ignore_challenge_password, set through PATCH /api/v2/est/config, skips the check for a client that puts a password there (v2.252)' },
+          { label: 'Compromised keys', text: 'A CSR whose key was revoked as compromised (keyCompromise) is refused with 400 (v2.252)' },
         ]
       },
       {
@@ -552,8 +554,9 @@ export const helpContent = {
         items: [
           { label: '/cacerts', text: 'Retrieve the CA certificate chain (no authentication required)' },
           { label: '/simpleenroll', text: 'Submit a CSR and receive a signed certificate' },
-          { label: '/simplereenroll', text: 'Renew an existing certificate (requires mTLS)' },
-          { label: '/csrattrs', text: 'Get CSR attributes recommended by the server' },
+          { label: '/simplereenroll', text: 'Renew an existing certificate (requires mTLS; without a client certificate: 403). A CSR without SubjectAltName renews the certificate\'s own names, or none when it had none, instead of a name built from the CN (RFC 7030 §4.2.2, v2.252)' },
+          { label: '/csrattrs', text: 'Get CSR attributes recommended by the server: keyUsage, subjectAltName and extKeyUsage as bare OIDs (RFC 9908 §5.2, v2.252). csrattrs_legacy_encoding, set through PATCH /api/v2/est/config, serves the former shape (the OIDs inside an extensionRequest) for a client that needs it' },
+          { label: 'Errors', text: 'Enrollment refusals, rate limiting included, come as a plain-text message (text/plain, RFC 8951 §5) saying why, such as a body that is not base64 or not a PKCS#10 CSR, or the CA\'s name constraints (v2.252)' },
           { label: '/serverkeygen', text: 'Server generates a key pair and returns certificate + key. The key takes the issuing CA\'s strength, in the family of the request\'s key when RSA or EC (its size or curve is ignored), else the CA\'s, moved to the closest type the policies allow. The key comes as unencrypted PKCS#8 under TLS; a CSR naming the mTLS certificate\'s key (AsymmetricDecryptKeyIdentifier) gets it encrypted to that certificate, by key transport for RSA of 2048 bits or more (keyEncipherment) or key agreement for EC (keyAgreement), with the algorithms the CSR\'s SMIMECapabilities list, in a key package signed by an EST key generator certificate that the issuing CA issues for this purpose (Ed25519 under an Ed448 CA, v2.252)' },
         ]
       },
@@ -589,8 +592,8 @@ export const helpContent = {
         title: 'Configuration',
         icon: Gear,
         items: [
-          { label: 'Signing CA', text: 'The CA whose private key signs timestamp tokens, must be a valid, non-expired CA' },
-          { label: 'Policy OID', text: 'Object Identifier for the TSA policy (e.g., 1.2.3.4.1): included in every timestamp response' },
+          { label: 'Signing CA', text: 'The CA whose own certificate signs timestamp tokens when no dedicated signing certificate is set. A CA outside its validity period does not sign: /tsa answers 503. Strict verifiers (openssl ts -verify, jarsigner) refuse tokens signed by a CA certificate, and the page warns while the CA signs' },
+          { label: 'Policy OID', text: 'Object Identifier for the TSA policy, included in every timestamp response. The default 1.2.3.4.1 is OpenSSL\'s example OID, a placeholder the page warns about: use an OID from your organization\'s arc' },
           { label: 'Enable/Disable', text: 'Toggle the TSA endpoint on or off without losing configuration' },
           { label: 'Require dedicated certificate', text: 'Opt-in: refuse to sign timestamps with the CA certificate itself, requires a dedicated end-entity signing certificate with a critical timeStamping EKU (RFC 3161)' },
                   { label: 'Signing certificate (v2.217)', text: 'Sign tokens with a dedicated end-entity certificate picked from issued certificates (timeStamping EKU, RSA, ECDSA or ML-DSA key held by UCM; Ed25519 and Ed448 certificates are not offered, nor ML-DSA in FIPS mode). Renewals are followed automatically; an expired or revoked signer fails requests with 503 and never falls back to the CA certificate' },
@@ -601,20 +604,23 @@ export const helpContent = {
         title: 'Usage',
         icon: Clock,
         items: [
-          { label: 'Create Request', text: 'openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq' },
+          { label: 'Create Request', text: 'openssl ts -query -data file.txt -sha256 -cert -out request.tsq (-cert asks for the signer certificate in the response, which openssl ts -verify needs)' },
           { label: 'Send to TSA', text: 'curl -H "Content-Type: application/timestamp-query" --data-binary @request.tsq https://your-server/tsa -o response.tsr' },
-          { label: 'Verify', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem (RSA and ECDSA signers). An ML-DSA token fails openssl ts -verify: check its signature with openssl cms -verify (OpenSSL 3.5 or later), then compare the message imprint with the hash of the file' },
+          { label: 'Verify', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem (dedicated RSA or ECDSA signer; a token signed by the CA certificate fails with "unsuitable certificate purpose"). An ML-DSA token fails openssl ts -verify: check its signature with openssl cms -verify (OpenSSL 3.5 or later), then compare the message imprint with the hash of the file' },
         ]
       },
     ],
     tips: [
       'TSA timestamps are used in code signing to ensure signatures remain valid after certificate expiry',
-      'The TSA endpoint accepts HTTP POST with Content-Type: application/timestamp-query',
+      'The TSA endpoint accepts HTTP POST with Content-Type: application/timestamp-query (or application/octet-stream)',
+      'A request carrying any extension is refused with unacceptedExtension, and a malformed one with badDataFormat (RFC 3161 §2.4.1)',
+      'Tokens carry genTime in whole seconds with a declared accuracy of 1 second, and the request message imprint copied as sent',
       'Use SHA-256 or stronger hash algorithms when creating timestamp requests',
       'No authentication is required: the TSA endpoint is publicly accessible like CRL/OCSP',
     ],
     warnings: [
       'A valid signing CA must be configured before enabling TSA',
+      'openssl ts -verify and jarsigner refuse tokens signed by the CA certificate: RFC 3161 requires a dedicated signer with a critical, exclusive timeStamping EKU. Generate one on the Settings tab',
       'The TSA endpoint is a public protocol endpoint: do not put sensitive data in timestamp requests',
     ],
     related: ['CAs', 'Certificates', 'CRL & OCSP']
@@ -857,7 +863,7 @@ export const helpContent = {
           { label: 'Create User', text: 'Add a new user with username, email, and initial password' },
           { label: 'Roles', text: 'Assign system or custom roles to control permissions' },
           { label: 'Status', text: 'Enable or disable user accounts' },
-          { label: 'Password Reset', text: 'Reset a user\'s password (admin action)' },
+          { label: 'Password Reset', text: 'Reset a user\'s password (admin action). The user\'s open sessions are signed out, as they are by a 2FA reset' },
           { label: 'API Keys', text: 'In a user\'s details, list their API keys and revoke a leaked or unused one: it stops working at once, and a revoked or expired key can then be deleted. Owners create their keys on their Account page' },
           { label: 'Source', text: 'Shows where each user comes from: Local (managed in UCM) or LDAP / OAuth2 / SAML (provisioned by an SSO provider). The badge displays the originating provider name.' },
         ]
@@ -906,6 +912,7 @@ export const helpContent = {
           { label: 'Permission Matrix', text: 'Check/uncheck permissions by category (CAs, Certs, Private Keys, etc.)' },
           { label: 'Coverage', text: 'Visual percentage of total permissions granted to the role' },
           { label: 'User Count', text: 'See how many users are assigned to each role' },
+          { label: 'System role permissions', text: 'A system role shows the permissions UCM applies to it; Admin shows every permission of the matrix' },
           { label: 'SSH CA permissions (v2.248)', text: 'read:ssh_cas, write:ssh_cas and delete:ssh_cas govern SSH CAs, so write:ssh no longer creates or edits them. Roles, groups and API keys holding an SSH permission received the matching one on upgrade' },
         ]
       },
@@ -1171,7 +1178,7 @@ export const helpContent = {
           { label: 'ML-DSA templates (v2.248)', text: 'Announced by their key algorithm OID with the Microsoft Software Key Storage Provider, not yet tested with a real Windows client, and hidden in FIPS mode. Certificate-based renewal cannot use an ML-DSA certificate (XML-DSig has no ML-DSA signature): enroll a new one' },
           { label: 'ECDSA templates (v2.251)', text: 'Announced in policy schema 3 with their curve (ECDSA_P256, ECDSA_P384, ECDSA_P521) as a signature key and a request hash, the stronger of the template digest and the one matching the curve. RSA templates outside FIPS mode stay schema 2' },
           { label: 'Template and key (v2.251)', text: 'The request key must fit the template it is issued under: the same curve or ML-DSA set, or an RSA key at least as long, so a P-384 request is no longer issued under a P-256 template sharing its EKU. The request envelope Windows signs with an ECDSA key is accepted' },
-          { label: 'Renewal from Windows (v2.248)', text: 'certreq ... Renew authenticates with the certificate being renewed as TLS client certificate: it needs mTLS enabled with the WSTEP CA, or one of its ancestors, trusted. A renewal keeps the template and EKUs of the certificate it renews' },
+          { label: 'Renewal from Windows (v2.248)', text: 'certreq ... Renew authenticates with the certificate being renewed as TLS client certificate: it needs mTLS enabled with the WSTEP CA, or one of its ancestors, trusted. A renewal keeps the template and EKUs of the certificate it renews, and its SubjectAltName when the CSR carries none (v2.252)' },
           { label: 'Kerberos in Docker (v2.251)', text: 'The Docker images ship the Kerberos backend of pyspnego, so the Kerberos binding works in a container as it does in the DEB and RPM installs' },
         ]
       },
@@ -1221,8 +1228,8 @@ export const helpContent = {
         title: 'Security',
         icon: Lock,
         items: [
-          { label: 'Password', text: 'Change your current password' },
-          { label: '2FA (TOTP)', text: 'Enable time-based one-time passwords via authenticator app. Enabling it again while it is on is refused: disable it first' },
+          { label: 'Password', text: 'Change your current password. Your other sessions are signed out; this one stays' },
+          { label: '2FA (TOTP)', text: 'Enable time-based one-time passwords via authenticator app. Enabling it again while it is on is refused: disable it first. Each code works once: after using one, wait for the next to confirm another action' },
           { label: 'Security Keys', text: 'Register WebAuthn/FIDO2 keys (YubiKey, fingerprint, etc.)' },
           { label: 'mTLS', text: 'Manage client certificates for mutual TLS authentication' },
           { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first-boot admin with the default changeme123, can do nothing else until it changes it, API and WebSocket included; the prompt offers Log out instead of Skip. A password set through INITIAL_ADMIN_PASSWORD does not have to be changed' },
@@ -1233,7 +1240,7 @@ export const helpContent = {
         icon: Key,
         items: [
           { label: 'Create Key', text: 'Generate a new API key with optional expiration' },
-          { label: 'Permissions', text: 'A key carries the scope chosen at creation, never more than your own permissions. A key can create or regenerate only a key whose permissions it holds itself' },
+          { label: 'Permissions', text: 'A key carries the scope chosen at creation, never more than your own permissions. A key can create or regenerate only a key whose permissions it holds itself, expiring no later than itself. Regenerating keeps the key\'s lifetime; a revoked or expired key cannot be regenerated' },
           { label: 'Revoke', text: 'Immediately invalidate an API key' },
           { label: 'Deactivated users', text: 'API keys belonging to a deactivated user are rejected even if the key itself is still valid' },
           { label: 'Interactive session only', text: 'API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: sign in interactively' },
@@ -1527,7 +1534,8 @@ export const helpContent = {
         icon: Lock,
         items: [
           { label: 'Status & counters', text: 'Shows whether encryption is enabled and how many stored private keys are encrypted vs unencrypted' },
-          { label: 'Enable / Disable', text: 'Encrypt all CA and certificate private keys with AES-256 under a master key file. Enabling also removes plaintext key mirrors, while disabling recreates them' },
+          { label: 'Enable / Disable', text: 'Encrypt all CA and certificate private keys with AES-128 (Fernet, with HMAC-SHA256) under a master key file. Enabling also removes plaintext key mirrors, while disabling recreates them' },
+          { label: 'First start', text: 'Without a master key, UCM creates /etc/ucm/master.key (0600) at startup and encrypts the keys already stored. A container does so only when /etc/ucm is a named volume or a host directory. Skipped with KEY_ENCRYPTION_KEY set, with encrypted keys or a keyed audit chain already in the database, after encryption was disabled here, or with UCM_AUTO_MASTER_KEY=false. At each start a loaded key also encrypts the values still stored unencrypted, and a key that does not decrypt them puts UCM in safe mode. Back up the key file' },
           { label: 'Key files on disk', text: 'Shows how many plaintext key mirrors remain; use deploy hooks when another service needs a key file' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Opt-in environment variable: refuse to start without an explicit database encryption key' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: 'Opt-in environment variable: refuse to start unless private-key encryption is enabled' },
@@ -1570,10 +1578,11 @@ export const helpContent = {
         title: 'mTLS Authentication',
         icon: ShieldCheck,
         items: [
-          { label: 'Trusted CA', text: 'The CA whose client certificates are accepted at login, and the default issuer when a user generates one. Any CA whose certificate is not revoked can be chosen, keyless or offline included: such a CA issues nothing, so its users upload certificates issued elsewhere (v2.248)' },
+          { label: 'Trusted CA', text: 'The CA whose client certificates are accepted at login, and the default issuer when a user generates one. Any CA whose certificate is not revoked can be chosen, keyless or offline included: such a CA issues nothing, so its users upload certificates issued elsewhere (v2.248). It is the only trust anchor of the HTTPS port: a client certificate from its parent or from a sibling CA is refused at the TLS handshake, so trust a root to accept its whole hierarchy (v2.252)' },
           { label: 'Require client certificate', text: 'Optionally make mTLS mandatory for the web UI, changing mTLS settings requires a service restart' },
           { label: 'Same serial, other CA (v2.251)', text: 'An enrolment is identified by its issuer and serial number, so a client certificate can be enrolled, imported or assigned when another CA\'s enrolled certificate has the same serial' },
           { label: 'Reverse proxy headers (v2.252)', text: 'Behind a proxy that forwards the client certificate as headers, send the issuer DN (X-SSL-Client-I-DN) with the serial, read as hexadecimal, or the certificate itself (X-SSL-Client-Cert). A serial without its issuer opens no enrolment that recorded one, and a presented certificate cannot be enrolled without it' },
+          { label: 'Revoked issuer', text: 'A client certificate issued under a revoked CA, at any level of its chain, opens no session and can be neither enrolled nor imported (v2.252)' },
           { label: 'Generated keys (v2.251)', text: 'A user mTLS certificate generated by UCM gets a key at the issuing CA\'s strength, RSA or a NIST curve browsers accept, moved to the closest type the policies allow, instead of RSA-2048 always' },
         ]
       },
@@ -2002,9 +2011,9 @@ export const helpContent = {
         items: [
           { label: 'Key ID', text: 'Identifier sshd logs for the holder. The CA sets it to principals@CA name, unless it lets requesters choose it.' },
           { label: 'Principals', text: 'Usernames (user cert) or hostnames (host cert) this certificate is valid for. Comma-separated.' },
-          { label: 'Validity', text: 'Certificate lifetime. Choose a preset (1h, 8h, 24h, 7d, 30d, 90d, 365d) or set custom seconds.' },
+          { label: 'Validity', text: 'Certificate lifetime. Choose a preset (1h, 8h, 24h, 7d, 30d, 90d, 365d) or set custom seconds. Valid from 5 minutes before issuance, for servers whose clock lags (v2.252).' },
           { label: 'Extensions', text: 'SSH extensions like permit-pty, permit-agent-forwarding. Only applicable to user certificates.' },
-          { label: 'Critical Options', text: 'Restrictions like force-command or source-address to limit certificate usage.' },
+          { label: 'Critical Options', text: 'User certificates only: force-command, source-address (addresses or CIDR networks, comma-separated) and verify-required, plus vendor options named name@domain. Host certificates carry none, and any other option is refused (v2.252).' },
         ]
       },
       {
@@ -2019,7 +2028,7 @@ export const helpContent = {
         title: 'Management',
         icon: ArrowClockwise,
         items: [
-          { label: 'Revoke', text: 'Add a certificate to the CA\'s Key Revocation List (KRL). Servers must be configured to check the KRL.' },
+          { label: 'Revoke', text: 'Add a certificate to the CA\'s Key Revocation List (KRL). Servers must be configured to check the KRL. A revoked certificate stays in the KRL and cannot be deleted until it expires (v2.252).' },
           { label: 'Download', text: 'Download the certificate, public key, or private key (generate mode only).' },
         ]
       },

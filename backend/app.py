@@ -927,23 +927,13 @@ def create_app(config_name=None):
     # Register blueprints
     register_blueprints(app)
     
-    # ===== SAFE MODE DETECTION =====
-    # If DB has encrypted keys but no master key, enter safe mode
+    # ===== MASTER KEY AND SAFE MODE =====
+    # A new installation gets its master key here; encrypted keys without one
+    # put the API in safe mode
     try:
         with app.app_context():
-            from security.encryption import key_encryption, has_encrypted_keys_in_db
-            key_encryption.reload()
-            enabled = key_encryption.is_enabled
-            has_enc = has_encrypted_keys_in_db()
-            app.logger.info(f"🔐 Encryption check: enabled={enabled}, has_encrypted_keys={has_enc}, key_source={key_encryption.key_source}")
-            if not enabled and has_enc:
-                app.config['SAFE_MODE'] = True
-                app.logger.error(
-                    "🔒 SAFE MODE: Encrypted private keys found but no encryption key available. "
-                    "Place your master.key file at /etc/ucm/master.key and restart UCM."
-                )
-            else:
-                app.config['SAFE_MODE'] = False
+            from security.master_key_bootstrap import check_master_key_at_start
+            check_master_key_at_start(app)
     except Exception as e:
         app.config['SAFE_MODE'] = False
         app.logger.warning(f"Safe mode check skipped: {e}")
@@ -1920,6 +1910,8 @@ def main():
                     
                     try:
                         ssl_context.load_verify_locations(ca_cert_path)
+                        from boot_config import anchor_client_verification
+                        anchor_client_verification(ssl_context)
                         print(f"  mTLS CA: {ca.descr}")
                         print(f"  mTLS CA file: {ca_cert_path}")
                     except Exception as e:

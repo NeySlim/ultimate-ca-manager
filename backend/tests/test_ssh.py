@@ -756,7 +756,7 @@ class TestGetSSHCertificate:
 class TestDeleteSSHCertificate:
     """DELETE /api/v2/ssh/certificates/<id>"""
 
-    def test_delete_certificate(self, auth_client):
+    def test_delete_certificate(self, app, auth_client):
         ca = _create_ssh_ca(auth_client, descr='Delete Cert CA')
         pub_key = _generate_test_ssh_key()
         r = post_json(auth_client, '/api/v2/ssh/certificates', {
@@ -765,10 +765,14 @@ class TestDeleteSSHCertificate:
         })
         cert = assert_success(r, status=201)
 
-        # A valid certificate cannot be deleted: it is revoked first
-        revoked = post_json(auth_client, f'/api/v2/ssh/certificates/{cert["id"]}/revoke',
-                            {'reason': 'unspecified'})
-        assert_success(revoked)
+        # A certificate is deleted once expired, revoked or not (the KRL needs it until then)
+        from datetime import timedelta
+        from models import db
+        from models.ssh import SSHCertificate
+        from utils.datetime_utils import utc_now
+        with app.app_context():
+            db.session.get(SSHCertificate, cert['id']).valid_to = utc_now() - timedelta(seconds=1)
+            db.session.commit()
         r = auth_client.delete(f'/api/v2/ssh/certificates/{cert["id"]}')
         assert r.status_code == 204
 

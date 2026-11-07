@@ -78,7 +78,7 @@ vi.mock('../../services/tsa.service', () => ({
       },
     }),
     updateConfig: vi.fn().mockResolvedValue({ data: {} }),
-    getStats: vi.fn().mockResolvedValue({ data: { total_requests: 0 } }),
+    getStats: vi.fn().mockResolvedValue({ data: { total: 0 } }),
     getSignerCandidates: vi.fn().mockResolvedValue({
       data: [
         {
