@@ -62,6 +62,43 @@ def container_dir_is_persistent(directory, mountinfo: str = None):
     return True, ''
 
 
+# Set when encryption is disabled from the UI, so a later start creates no key
+OPT_OUT_KEY = 'security.auto_master_key'
+
+
+def auto_master_key_allowed(app) -> bool:
+    if not app.config.get('AUTO_MASTER_KEY'):
+        return False
+    from models import SystemConfig
+    row = SystemConfig.query.filter_by(key=OPT_OUT_KEY).first()
+    return not (row and row.value == 'false')
+
+
+def record_operator_choice(auto: bool) -> None:
+    """Stage the operator's choice from enable/disable encryption; the caller commits."""
+    from models import db, SystemConfig
+    row = SystemConfig.query.filter_by(key=OPT_OUT_KEY).first()
+    if auto:
+        if row:
+            db.session.delete(row)
+    elif row:
+        row.value = 'false'
+    else:
+        db.session.add(SystemConfig(key=OPT_OUT_KEY, value='false',
+                                    description='Encryption disabled by an administrator'))
+
+
+def _master_key_was_used() -> bool:
+    """Something in the database or beside the key was made with a master key now missing."""
+    if _encryption.has_encrypted_keys_in_db():
+        return True
+    from models import AuditLog
+    from services.audit.chain import KEYED_CHAIN, keyring_path
+    if keyring_path().exists():
+        return True
+    return AuditLog.query.filter(AuditLog.hash_version == KEYED_CHAIN).first() is not None
+
+
 class KeyActivationError(RuntimeError):
     """The new key file was written but does not load; it has been removed."""
 
@@ -92,12 +129,17 @@ def bootstrap_master_key(app) -> str:
     path = _encryption.MASTER_KEY_PATH
     if key_encryption.is_enabled:
         return 'present'
-    if not app.config.get('AUTO_MASTER_KEY'):
+    if not auto_master_key_allowed(app):
         return 'disabled'
     # A key that exists but does not load is reported, never replaced
     if path.exists() or os.getenv('KEY_ENCRYPTION_KEY'):
-        return 'configured'
-    if _encryption.has_encrypted_keys_in_db():
+        # It may have been written by another process since the start reload
+        key_encryption.reload()
+        return 'present' if key_encryption.is_enabled else 'configured'
+    if _master_key_was_used():
+        logger.error(
+            "🔓 No master key created: encrypted values or a keyed audit chain need the "
+            "previous one. Restore %s and restart UCM.", path)
         return 'lost'
     if in_container():
         persistent, reason = container_dir_is_persistent(path.parent)
@@ -144,6 +186,8 @@ def check_master_key_at_start(app) -> None:
         f"🔐 Encryption check: enabled={key_encryption.is_enabled}, has_encrypted_keys={has_enc}, "
         f"key_source={key_encryption.key_source}, first_start={outcome}")
     app.config['SAFE_MODE'] = not key_encryption.is_enabled and has_enc
+    if not key_encryption.is_enabled and not has_enc and outcome in ('disabled', 'configured'):
+        _encryption.log_encryption_disabled()
     if app.config['SAFE_MODE']:
         app.logger.error(
             "🔒 SAFE MODE: Encrypted private keys found but no encryption key available. "

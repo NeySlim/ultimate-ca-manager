@@ -39,6 +39,16 @@ def key_encryption_required() -> bool:
     return val in ('1', 'true', 'yes', 'on')
 
 
+def log_encryption_disabled() -> None:
+    logger.error(
+        "🔓 Private-key encryption is DISABLED, no %s and no "
+        "KEY_ENCRYPTION_KEY. CA and certificate private keys will be "
+        "stored UNENCRYPTED at rest. Configure a key, and set "
+        "UCM_REQUIRE_KEY_ENCRYPTION=true to refuse startup without one.",
+        MASTER_KEY_PATH,
+    )
+
+
 class KeyEncryption:
     """
     Handles encryption/decryption of private keys stored in database.
@@ -97,13 +107,12 @@ class KeyEncryption:
                     f'but no key is configured. Provide {MASTER_KEY_PATH} or set '
                     'KEY_ENCRYPTION_KEY.'
                 )
-            logger.error(
-                "🔓 Private-key encryption is DISABLED, no %s and no "
-                "KEY_ENCRYPTION_KEY. CA and certificate private keys will be "
-                "stored UNENCRYPTED at rest. Configure a key, and set "
-                "UCM_REQUIRE_KEY_ENCRYPTION=true to refuse startup without one.",
-                MASTER_KEY_PATH,
-            )
+            from config.settings import Config
+            if Config.AUTO_MASTER_KEY:
+                # The start check creates the key or logs the final state
+                logger.info("🔓 No master key loaded yet (%s)", MASTER_KEY_PATH)
+            else:
+                log_encryption_disabled()
             self._enabled = False
             self._key_source = None
             return
@@ -220,37 +229,43 @@ class KeyEncryption:
         return base64.urlsafe_b64encode(csp_bytes(32)).decode('utf-8')
     
     @staticmethod
+    def _fill_key_file(fd: int, key: str) -> None:
+        """Write `key` to the open file `fd`, sync it and give it to the ucm user."""
+        with os.fdopen(fd, 'w') as handle:
+            handle.write(key + '\n')
+            handle.flush()
+            os.fsync(handle.fileno())
+            try:
+                import pwd
+                ucm_user = pwd.getpwnam('ucm')
+                os.fchown(handle.fileno(), ucm_user.pw_uid, ucm_user.pw_gid)
+            except (KeyError, OSError) as e:
+                # No ucm user (dev mode): a root-owned 0600 file still works
+                logger.debug(f"chown master.key to ucm:ucm skipped: {e}")
+
+    @staticmethod
     def write_key_file(key: str, exclusive: bool = False) -> None:
         """Write the master key file (0600), complete or not at all.
 
         `exclusive` never replaces an existing file: FileExistsError instead.
+        Without hard links it creates the file with O_EXCL and removes it if the write fails.
         """
         MASTER_KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
         fd, tmp = tempfile.mkstemp(dir=MASTER_KEY_PATH.parent, prefix='.master.', suffix='.tmp')
         try:
-            with os.fdopen(fd, 'w') as handle:
-                handle.write(key + '\n')
-                handle.flush()
-                os.fsync(handle.fileno())
-            # Set ownership to ucm user if it exists (service runs as ucm)
-            try:
-                import pwd
-                ucm_user = pwd.getpwnam('ucm')
-                os.chown(tmp, ucm_user.pw_uid, ucm_user.pw_gid)
-            except (KeyError, OSError) as e:
-                # ucm user doesn't exist (dev mode) or chown failed — running
-                # as root with stricter file perms is fine, just less ideal.
-                logger.debug(f"chown master.key to ucm:ucm skipped: {e}")
+            KeyEncryption._fill_key_file(fd, key)
             if exclusive:
                 try:
                     os.link(tmp, MASTER_KEY_PATH)
                 except FileExistsError:
                     raise
                 except OSError:
-                    # A filesystem without hard links: O_EXCL keeps the file exclusive
-                    with os.fdopen(os.open(MASTER_KEY_PATH, os.O_WRONLY | os.O_CREAT | os.O_EXCL,
-                                           0o600), 'w') as handle:
-                        handle.write(key + '\n')
+                    fd = os.open(MASTER_KEY_PATH, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                    try:
+                        KeyEncryption._fill_key_file(fd, key)
+                    except BaseException:
+                        MASTER_KEY_PATH.unlink(missing_ok=True)
+                        raise
             else:
                 os.replace(tmp, MASTER_KEY_PATH)
         finally:

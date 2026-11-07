@@ -79,6 +79,9 @@ def enable_encryption():
         except KeyActivationError:
             return error_response("Failed to initialize encryption after key generation", 500)
         encrypted, skipped, errors = stats['encrypted'], stats['skipped'], stats['errors']
+        from security.master_key_bootstrap import record_operator_choice
+        record_operator_choice(auto=True)
+        db.session.commit()
         purge_stats = stats['purge']
 
         # Read the freshly-written key so the caller can immediately download
@@ -247,6 +250,11 @@ def disable_encryption():
                 f"Failed to decrypt some keys: {', '.join(errors[:3])}. "
                 "Encryption NOT disabled to prevent data loss.", 500
             )
+
+        # Nothing is encrypted any more: without this the next start would create a key
+        from security.master_key_bootstrap import record_operator_choice
+        record_operator_choice(auto=False)
+        db.session.commit()
 
         # Remove key file
         KeyEncryption.remove_key_file()

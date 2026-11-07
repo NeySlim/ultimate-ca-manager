@@ -256,3 +256,167 @@ def test_exclusive_write_never_replaces_a_key(no_key):
     assert path.read_text() == 'first\n'
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
     assert [p.name for p in path.parent.iterdir()] == ['master.key']
+
+
+def test_disabled_encryption_stays_disabled_after_restart(app, auth_client, create_ca, no_key):
+    """Disabling from the UI leaves nothing encrypted: the next start must not take it for a new installation."""
+    from security.master_key_bootstrap import bootstrap_master_key, check_master_key_at_start
+
+    ca = create_ca()
+    with app.app_context():
+        check_master_key_at_start(app)
+    assert no_key.key_encryption.is_enabled
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert r.status_code == 200, r.data
+    assert not no_key.MASTER_KEY_PATH.exists()
+
+    no_key.key_encryption.reload()
+    with app.app_context():
+        assert bootstrap_master_key(app) == 'disabled'
+        check_master_key_at_start(app)
+    assert not no_key.MASTER_KEY_PATH.exists()
+    assert not no_key.key_encryption.is_enabled
+    assert not no_key.key_encryption.is_encrypted(_ca_prv(app, ca['id']))
+
+    # Enabling again from the UI lifts the choice
+    r = auth_client.post('/api/v2/system/security/enable-encryption')
+    assert r.status_code == 200, r.data
+    from security.master_key_bootstrap import auto_master_key_allowed
+    with app.app_context():
+        assert auto_master_key_allowed(app)
+
+
+def test_key_written_by_another_process_is_loaded(app, no_key):
+    """The key can appear between the start reload and the bootstrap: load it, never run without it."""
+    from security.master_key_bootstrap import bootstrap_master_key
+
+    no_key.KeyEncryption.write_key_file(no_key.KeyEncryption.generate_key(), exclusive=True)
+    assert not no_key.key_encryption.is_enabled
+    with app.app_context():
+        assert bootstrap_master_key(app) == 'present'
+    assert no_key.key_encryption.is_enabled
+
+
+def _without_hard_links(monkeypatch):
+    def no_link(*_args):
+        raise PermissionError(1, 'Operation not permitted')
+    monkeypatch.setattr(os, 'link', no_link)
+
+
+def test_exclusive_write_without_hard_links_is_synced_and_owned(no_key, monkeypatch):
+    import pwd
+    from types import SimpleNamespace
+
+    path = no_key.MASTER_KEY_PATH
+    _without_hard_links(monkeypatch)
+    synced, owned = [], []
+    real_fsync = os.fsync
+    monkeypatch.setattr(os, 'fsync', lambda fd: (synced.append(os.fstat(fd).st_ino), real_fsync(fd)))
+    monkeypatch.setattr(os, 'fchown', lambda fd, uid, gid: owned.append(os.fstat(fd).st_ino))
+    monkeypatch.setattr(pwd, 'getpwnam',
+                        lambda name: SimpleNamespace(pw_uid=os.getuid(), pw_gid=os.getgid()))
+
+    no_key.KeyEncryption.write_key_file('only', exclusive=True)
+    assert path.read_text() == 'only\n'
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
+    assert path.stat().st_ino in synced and path.stat().st_ino in owned
+    assert [p.name for p in path.parent.iterdir()] == ['master.key']
+
+
+def test_failed_exclusive_write_without_hard_links_leaves_no_key_file(no_key, monkeypatch):
+    path = no_key.MASTER_KEY_PATH
+    _without_hard_links(monkeypatch)
+    real_fsync = os.fsync
+
+    def fsync(fd):
+        if path.exists() and os.fstat(fd).st_ino == path.stat().st_ino:
+            raise OSError(28, 'No space left on device')
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, 'fsync', fsync)
+    with pytest.raises(OSError):
+        no_key.KeyEncryption.write_key_file('lost', exclusive=True)
+    assert list(path.parent.iterdir()) == []
+
+
+def test_keyed_audit_chain_without_a_key_gets_no_new_key(app, no_key, monkeypatch):
+    """Audit entries sealed under a master key would no longer verify under a new one."""
+    from security.master_key_bootstrap import bootstrap_master_key
+    from services.audit_service import AuditService
+
+    with monkeypatch.context() as patch:
+        patch.setenv('KEY_ENCRYPTION_KEY', Fernet.generate_key().decode('ascii'))
+        no_key.key_encryption.reload()
+        with app.app_context():
+            AuditService.log_action(action='test_keyed', resource_type='system',
+                                    resource_name='x', details='sealed', success=True)
+    no_key.key_encryption.reload()
+    from services.audit.chain import keyring_path
+    keyring_path().unlink(missing_ok=True)
+
+    with app.app_context():
+        assert not no_key.has_encrypted_keys_in_db()
+        assert bootstrap_master_key(app) == 'lost'
+    assert not no_key.MASTER_KEY_PATH.exists()
+
+
+def test_audit_keyring_without_a_key_gets_no_new_key(app, no_key):
+    from security.master_key_bootstrap import bootstrap_master_key
+    from services.audit.chain import keyring_path
+
+    keyring_path().parent.mkdir(parents=True, exist_ok=True)
+    keyring_path().write_text('{"current": "abc", "history": ["abc"]}')
+    with app.app_context():
+        assert bootstrap_master_key(app) == 'lost'
+    assert not no_key.MASTER_KEY_PATH.exists()
+
+
+def test_first_start_logs_no_disabled_error_before_creating_the_key(app, no_key, caplog):
+    import logging
+    from security.master_key_bootstrap import check_master_key_at_start
+
+    caplog.set_level(logging.INFO)
+    no_key.key_encryption.reload()
+    with app.app_context():
+        check_master_key_at_start(app)
+    assert no_key.key_encryption.is_enabled
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR], caplog.text
+
+
+def test_opt_out_still_logs_the_disabled_error(app, no_key, caplog):
+    import logging
+    from security.master_key_bootstrap import check_master_key_at_start
+
+    app.config['AUTO_MASTER_KEY'] = False
+    caplog.set_level(logging.INFO)
+    with app.app_context():
+        check_master_key_at_start(app)
+    assert any(r.levelno >= logging.ERROR and 'UNENCRYPTED' in r.getMessage()
+               for r in caplog.records), caplog.text
+
+
+def test_dashboard_key_status_is_for_system_admins_only(app, create_user, no_key):
+    create_user(username='kviewer', role='viewer')
+    client = app.test_client()
+    r = client.post('/api/v2/auth/login', data=json.dumps(
+        {'username': 'kviewer', 'password': 'TestPass123!'}), content_type='application/json')
+    assert r.status_code == 200, r.data
+    r = client.get('/api/v2/dashboard/system-status')
+    assert r.status_code == 200
+    assert 'key_encryption' not in json.loads(r.data)['data']
+
+
+def test_enable_encryption_writes_the_key_file_0600(app, auth_client, no_key):
+    r = auth_client.post('/api/v2/system/security/enable-encryption')
+    assert r.status_code == 200, r.data
+    assert stat.S_IMODE(no_key.MASTER_KEY_PATH.stat().st_mode) == 0o600
+
+
+def test_replacing_write_keeps_the_key_file_0600(no_key):
+    path = no_key.MASTER_KEY_PATH
+    path.parent.mkdir(parents=True)
+    path.write_text('old\n')
+    os.chmod(path, 0o644)
+    no_key.KeyEncryption.write_key_file('new')
+    assert path.read_text() == 'new\n'
+    assert stat.S_IMODE(path.stat().st_mode) == 0o600
