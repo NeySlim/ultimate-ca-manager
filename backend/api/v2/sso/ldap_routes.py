@@ -124,6 +124,11 @@ def ldap_login():
     )
 
     if not user:
+        # The password is proved by now, so the refusal may say why.
+        if error_code == USERNAME_CONFLICT:
+            return error_response(
+                "Sign-in refused: a local account, or one linked to another identity, "
+                "already uses this name. An administrator can link the accounts.", 403)
         # Generic message — don't disclose whether the LDAP user exists or whether
         # auto-provisioning is on/off. Details go to logs only.
         if error_code == 'auto_create_disabled':
@@ -255,10 +260,14 @@ def _extract_external_id(provider, external_data):
 
 
 def _bind_external_id(user, provider, external_id):
-    """Bind the stable id to the account (TOFU), unless another account already
-    owns it for this provider (guards against id theft)."""
+    """Bind the stable id to the account (TOFU). Never replaces an id already
+    bound, nor takes one another account of this provider owns. True if bound."""
     if not external_id or user.sso_external_id == external_id:
-        return
+        return True
+    if user.sso_external_id:
+        logger.warning(
+            f"SSO external id of '{user.username}' is already bound; not replacing it")
+        return False
     taken = User.query.filter(
         User.sso_provider_id == provider.id,
         User.sso_external_id == external_id,
@@ -268,8 +277,42 @@ def _bind_external_id(user, provider, external_id):
         logger.warning(
             f"SSO external id {external_id!r} already bound to '{taken.username}'; "
             f"not rebinding to '{user.username}'")
-        return
+        return False
     user.sso_external_id = external_id
+    return True
+
+
+SSO_NO_PASSWORD = '!SSO_NO_PASSWORD!'
+USERNAME_CONFLICT = 'sso_username_conflict'
+
+
+def _adoptable(user, provider):
+    """Whether an identity whose stable id matches nobody may claim ``user``:
+    an account of this provider (provisioned, or linked by an admin) not bound yet.
+    A local account, or one bound to another identity, is never claimed (OIDC Core §5.7)."""
+    if user.sso_external_id:
+        return False
+    if (user.auth_source or 'local') == 'local':
+        # SSO account from before migration 024, never converted back by an admin.
+        return (user.password_hash == SSO_NO_PASSWORD and not user.sso_provider_id
+                and not user.force_password_change)
+    return user.auth_source == provider.provider_type and user.sso_provider_id in (None, provider.id)
+
+
+def _refuse_username_conflict(provider, username):
+    logger.warning(
+        f"SSO login refused for '{username}' via {provider.name}: the name belongs to a "
+        f"local account or to one bound to another identity")
+    AuditService.log_action(
+        action='login_failure',
+        resource_type='sso',
+        resource_name=username,
+        details=(f"SSO login via {provider.name} refused: the name {username!r} belongs to a "
+                 f"local account or to one bound to another identity (link it with Link to SSO)"),
+        success=False,
+        username=username,
+    )
+    return None, USERNAME_CONFLICT
 
 
 def _get_or_create_sso_user(provider, username, email, fullname, external_data):
@@ -287,21 +330,23 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         user = User.query.filter_by(
             sso_provider_id=provider.id, sso_external_id=external_id).first()
 
-    # 2. Legacy / not-yet-bound: match by username (the historical SSO link).
+    # 2. Not bound yet (legacy, or linked by an admin): match by username, but
+    #    only an account this identity may claim.
+    conflict = False
     if not user:
         user = User.query.filter_by(username=username).first()
+        if user and not _adoptable(user, provider):
+            conflict, user = True, None
 
-    # 3. An account an admin deliberately linked (auth_source != local) that owns
-    #    this email but whose username differs (#138). Only *linked* accounts are
-    #    eligible — a purely local account is never matched by email (takeover).
+    # 3. An account an admin linked to this provider that owns this email but
+    #    whose username differs (#138). Never a local or already bound account.
     if not user and email:
         norm = email.strip().lower()
         candidates = User.query.filter(func.lower(User.email) == norm).all()
-        user = (
-            next((u for u in candidates
-                  if u.sso_provider_id == provider.id and (u.auth_source or 'local') != 'local'), None)
-            or next((u for u in candidates if (u.auth_source or 'local') != 'local'), None)
-        )
+        user = next((u for u in candidates if _adoptable(u, provider)), None)
+
+    if not user and conflict:
+        return _refuse_username_conflict(provider, username)
 
     if user and not user.active:
         # A disabled account is a refused login: every caller checks it a
@@ -315,13 +360,11 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         # Backfill auth_source/sso_provider_id for users created before
         # migration 024 — useful when several providers share a directory
         # and the migration could not infer the right one.
-        if (user.auth_source or 'local') == 'local' and user.password_hash == '!SSO_NO_PASSWORD!':
+        if (user.auth_source or 'local') == 'local' and user.password_hash == SSO_NO_PASSWORD:
             user.auth_source = provider.provider_type
             user.sso_provider_id = provider.id
-        elif user.sso_provider_id != provider.id and user.auth_source != 'local':
-            # User logged in through a different SSO provider — record latest.
+        elif user.sso_provider_id is None:
             user.sso_provider_id = provider.id
-            user.auth_source = provider.provider_type
 
         # Bind the stable id (trust-on-first-use) for future stable matching.
         _bind_external_id(user, provider, external_id)
@@ -441,7 +484,7 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         user.custom_role_source = 'sso'
 
     # SSO users don't have a password — use sentinel that cannot match any hash
-    user.password_hash = '!SSO_NO_PASSWORD!'
+    user.password_hash = SSO_NO_PASSWORD
 
     db.session.add(user)
     try:

@@ -227,6 +227,28 @@ def test_role_sync_follows_the_groups_on_the_next_login(app, mapped_provider, id
         assert User.query.filter_by(sso_external_id=name_id).one().role == 'admin'
 
 
+def test_a_signed_name_id_does_not_open_the_local_account_of_that_name(app, provider, idp_signer):
+    """OIDC Core §5.7 by analogy: only the IdP's own subject identifies the user."""
+    with app.app_context():
+        User.query.filter_by(username='samltkadmin').delete()
+        db.session.add(User(username='samltkadmin', email='samltk@corp.test', full_name='A',
+                            role='admin', active=True, password_hash='hash', auth_source='local'))
+        db.session.commit()
+    try:
+        client = app.test_client()
+        request_id = _start_login(client)
+        resp = _response(idp_signer, in_response_to=request_id, name_id='samltkadmin')
+        assert _post(client, resp) == '/login?error=sso_username_conflict'
+        assert not (client.get('/api/v2/auth/verify').get_json().get('data') or {}).get('authenticated')
+        with app.app_context():
+            admin = User.query.filter_by(username='samltkadmin').one()
+            assert admin.sso_external_id is None and admin.auth_source == 'local'
+    finally:
+        with app.app_context():
+            User.query.filter_by(username='samltkadmin').delete()
+            db.session.commit()
+
+
 def _cookie_headers(r):
     return [h for h in r.headers.getlist('Set-Cookie') if h.startswith(saml_sp.REQUEST_COOKIE)]
 

@@ -396,10 +396,12 @@ class TestSSOUserProvisioning:
 
     def _ensure_user(self, app, username='sso.alice', role='admin'):
         from models import db, User
+        # An account of this provider not bound yet: the only kind a name matches.
         u = User.query.filter_by(username=username).first()
         if u:
             u.role = role
-            u.password_hash = '!sso-no-password!'
+            u.password_hash = '!SSO_NO_PASSWORD!'
+            u.auth_source, u.sso_provider_id, u.sso_external_id = 'oauth2', None, None
             db.session.commit()
             return u
         u = User(
@@ -408,7 +410,8 @@ class TestSSOUserProvisioning:
             full_name='Alice',
             role=role,
             active=True,
-            password_hash='!sso-no-password!',
+            password_hash='!SSO_NO_PASSWORD!',
+            auth_source='oauth2',
         )
         db.session.add(u)
         db.session.commit()
