@@ -129,12 +129,10 @@ def _validate_csr(csr, require_pop=True, allow_naked_subject=False):
       SubjectAlternativeName instead (SAN-only identity is standard
       modern TLS practice).
 
-    ``allow_naked_subject``: skip the "must have CN or SAN" check -- only
-    set by ``issue()`` when it has *already* independently derived a
-    replacement subject via the AD Connector for a Kerberos machine
-    principal. Every other check (PoP, key strength) still applies
-    unconditionally regardless of this flag; a naked CSR never gets a free
-    pass on those.
+    ``allow_naked_subject``: skip the "must have CN or SAN" check -- set by
+    ``issue()``, which refuses a naked CSR itself once it knows whether the
+    AD Connector built a subject. Every other check (PoP, key strength)
+    still applies unconditionally regardless of this flag.
 
     Returns an error string, or None if the CSR is acceptable.
     """
