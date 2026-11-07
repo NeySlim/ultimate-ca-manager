@@ -187,6 +187,7 @@ def test_proxy_revoke_relays_upstream_status_and_revokes_local(
 @pytest.mark.parametrize('held_as, code, local', [
     ('certificateHold', 1, 'keyCompromise'),
     ('certificateHold', 6, None),
+    ('certificateHold', 8, None),
     ('superseded', 1, None),
 ])
 def test_proxy_revoke_makes_a_local_hold_final_only(

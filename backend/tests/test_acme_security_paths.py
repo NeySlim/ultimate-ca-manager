@@ -1561,6 +1561,16 @@ class TestRevocationByAForgedCertificate:
         r = self._revoke_with(client, key, cert, reason=4)
         assert r.status_code == 400 and 'alreadyRevoked' in r.get_json()['type']
 
+    def test_remove_from_crl_never_ends_a_hold(self, app, client):
+        # RFC 5280 §5.3.1: removeFromCRL is a delta CRL entry, not a final reason
+        from models import Certificate
+        cert_id, key, cert = self._victim(app)
+        assert self._revoke_with(client, key, cert, reason=6).status_code == 200
+        r = self._revoke_with(client, key, cert, reason=8)
+        assert r.status_code == 400 and 'alreadyRevoked' in r.get_json()['type']
+        with app.app_context():
+            assert db.session.get(Certificate, cert_id).revoke_reason == 'certificateHold'
+
     def test_the_key_of_the_stored_certificate_still_revokes_it(self, app, client):
         from models import Certificate
         cert_id, key, cert = self._victim(app)
