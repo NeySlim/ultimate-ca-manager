@@ -77,7 +77,7 @@ def _saml_logout_request(provider):
 
     The LogoutRequest must carry a valid IdP signature; this browser's session is
     closed when it belongs to the NameID, and a LogoutResponse goes back to the
-    IdP's SLO URL (signed when request signing is on).
+    IdP's SLO URL, signed whenever the SP has an RSA key (§4.4.4.2).
     """
     from onelogin.saml2.auth import OneLogin_Saml2_Auth
     from onelogin.saml2.logout_request import OneLogin_Saml2_Logout_Request
@@ -86,7 +86,7 @@ def _saml_logout_request(provider):
 
     base = saml_sp.sp_base_url(request)
     sp_cert = sp_key = None
-    if provider.saml_sign_requests and provider.saml_slo_url:
+    if provider.saml_slo_url:  # the responder MUST authenticate its LogoutResponse
         try:
             sp_cert, sp_key = saml_sp.load_sp_credentials(provider, with_key=True)
         except Exception as e:

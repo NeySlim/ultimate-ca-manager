@@ -811,11 +811,14 @@ def test_signed_logout_request_closes_the_session_and_answers_the_idp(app, slo_u
         assert SSOSession.query.filter_by(sso_name_id=name_id).count() == 0
 
 
-def test_logout_response_is_signed_when_request_signing_is_on(app, slo_url, provider, idp_signer,
-                                                              https_identity):
+@pytest.mark.parametrize('sign_requests', [True, False])
+def test_logout_response_is_signed_with_an_rsa_sp_key(app, slo_url, provider, idp_signer,
+                                                      https_identity, sign_requests):
+    """SAML Profiles §4.4.4.2: the responder MUST authenticate the LogoutResponse,
+    whatever request signing says."""
     from urllib.parse import parse_qs, urlsplit
     https_identity('rsa')
-    _configure(app, provider, saml_sign_requests=True)
+    _configure(app, provider, saml_sign_requests=sign_requests)
     try:
         client, name_id = _signed_in(app, idp_signer)
         _, url = _logout_request(idp_signer[0], name_id)
@@ -824,6 +827,18 @@ def test_logout_response_is_signed_when_request_signing_is_on(app, slo_url, prov
         assert answer['SigAlg'] == [K.RSA_SHA256] and answer.get('Signature')
     finally:
         _configure(app, provider, saml_sign_requests=False)
+
+
+def test_logout_response_without_an_rsa_sp_key_goes_unsigned(app, slo_url, idp_signer,
+                                                             https_identity, caplog):
+    from urllib.parse import parse_qs, urlsplit
+    https_identity('ec')
+    client, name_id = _signed_in(app, idp_signer)
+    _, url = _logout_request(idp_signer[0], name_id)
+    r = client.get(url, base_url=SP_BASE)
+    answer = parse_qs(urlsplit(r.headers['Location']).query)
+    assert 'Signature' not in answer and answer.get('SAMLResponse')
+    assert 'LogoutResponse sent unsigned' in caplog.text
 
 
 def test_signature_is_checked_on_the_query_as_the_idp_encoded_it(app, slo_url, idp_signer):
