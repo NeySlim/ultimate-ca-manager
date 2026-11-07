@@ -223,3 +223,29 @@ def test_no_box_checked_is_saved_and_shown_as_all(app, auth_client, collector, f
     r = _put_syslog(auth_client, collector, categories=[])
     assert r.status_code == 200, r.get_json()
     assert r.get_json()['data']['categories'] == SyslogForwarder.ALL_CATEGORIES
+
+
+def test_security_system_events_ignore_the_system_box(app, collector, forwarding):
+    forwarding(categories=[c for c in SyslogForwarder.ALL_CATEGORIES if c != 'system'])
+    from services.audit import AuditService
+    actions = ('master_key_downloaded', 'encryption_disabled', 'system_restore', 'database_reset',
+               'settings_update')
+    with app.app_context():
+        for action in actions:
+            AuditService.log_action(action=action, resource_type='system', details='probe')
+        assert not syslog_forwarder.send(_entry('system', 'system_optimize'))
+    packets = _received(collector)
+    for action in actions:
+        assert any(action in p for p in packets), (action, packets)
+
+
+def test_a_new_collector_receives_its_own_setup(app, auth_client, collector, forwarding,
+                                                 saved_syslog_rows):
+    syslog_forwarder.configure(enabled=False, host='', port=514, protocol='udp')
+    r = _put_syslog(auth_client, collector)
+    assert r.status_code == 200, r.get_json()
+    packets = [p for p in _received(collector) if 'syslog_config_updated' in p]
+    assert len(packets) == 1 and 'enabled' in packets[0], packets
+    r = _put_syslog(auth_client, collector, categories=['certificate', 'ca'])
+    assert r.status_code == 200, r.get_json()
+    assert len([p for p in _received(collector) if 'syslog_config_updated' in p]) == 1

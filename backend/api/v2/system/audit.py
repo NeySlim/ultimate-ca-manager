@@ -12,6 +12,7 @@ from services.audit_service import AuditService
 from services.retention_service import (
     RetentionPolicy, RetentionSettingError, cleanup_audit_logs as do_cleanup)
 from services.syslog_service import syslog_forwarder
+from services.audit.staging import forward_to_syslog, syslog_copy
 from api.v2.settings import set_config
 import logging
 
@@ -126,7 +127,7 @@ def update_syslog_config():
         # Logged as settings (never filtered) and before reconfiguring, so the
         # collector that is being narrowed or turned off still hears of it
         old = syslog_forwarder.config
-        AuditService.log_action(
+        entry = AuditService.log_action(
             action='syslog_config_updated',
             resource_type='settings',
             resource_name='syslog',
@@ -142,6 +143,11 @@ def update_syslog_config():
             protocol=protocol, tls=tls, tls_verify=tls_verify,
             framing=framing, categories=categories
         )
+        # A collector that was not the one being told also receives its own setup
+        new = syslog_forwarder.config
+        if entry is not None and enabled and any(
+                old[k] != new[k] for k in ('enabled', 'host', 'port', 'protocol', 'tls')):
+            forward_to_syslog(syslog_copy(entry))
 
         return success_response(
             message='Syslog configuration updated',

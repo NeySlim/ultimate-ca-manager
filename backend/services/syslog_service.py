@@ -67,12 +67,19 @@ class SyslogForwarder:
 
     # Under Users only sign-in activity can be muted: account changes (role, password, MFA) always leave
     _USER_ACTIVITY = ('login', 'logout')
+    # Under System, key, encryption, restore, database and settings changes always leave too
+    _SYSTEM_ALWAYS = frozenset({
+        'master_key_downloaded', 'encryption_enabled', 'encryption_disabled', 'system_encrypt',
+        'system_restore', 'database_reset', 'database.switch', 'settings_update',
+        'private_key_files_purged', 'backup_delete', 'log_bundle_downloaded'})
 
     @classmethod
     def category_of(cls, resource_type, action=None):
         """The deselectable category an event belongs to, or None."""
         category = cls._category_of_type(resource_type)
         if category == 'user' and not str(action or '').startswith(cls._USER_ACTIVITY):
+            return None
+        if category == 'system' and action in cls._SYSTEM_ALWAYS:
             return None
         return category
 
