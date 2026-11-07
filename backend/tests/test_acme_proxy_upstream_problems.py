@@ -201,6 +201,7 @@ class TestUpstreamProblemRelayed:
         assert response.status_code == 503
         assert response.headers['Retry-After'] == '30'
         assert response.get_json()['type'] == 'urn:ietf:params:acme:error:serverInternal'
+        assert response.get_json()['detail'] == 'The upstream CA answered HTTP 503'
 
     @pytest.mark.parametrize('answer', [
         _Resp(RATE_LIMITED, 429, {'Retry-After': '60'}),
@@ -226,6 +227,7 @@ class TestUpstreamProblemRelayed:
         body, status = problem.client_problem()
         assert status == 500
         assert body['type'] == 'urn:ietf:params:acme:error:serverInternal'
+        assert body['detail'] == f'The upstream CA refused the request (HTTP {problem.status}, {name})'
 
     def test_revocation_already_revoked_is_typed(self, app, client, route, monkeypatch):
         already = {'type': 'urn:ietf:params:acme:error:alreadyRevoked',

@@ -63,10 +63,12 @@ class UpstreamProblem(Exception):
         if name is None or name in _PROXY_SIDE_TYPES:
             if name is not None:
                 status = 500
+            # Without a problem document (an outage page) the CA refused nothing
+            detail = (f'The upstream CA refused the request (HTTP {self.status}, {name})'
+                      if name else f'The upstream CA answered HTTP {self.status}')
             return {
                 'type': f'{ACME_ERROR_PREFIX}serverInternal',
-                'detail': f'The upstream CA refused the request (HTTP {self.status}'
-                          + (f', {name}' if name else '') + ')',
+                'detail': detail,
                 'status': status,
             }, status
         relayed = {key: self.problem[key] for key in ('type', 'detail', 'subproblems')
