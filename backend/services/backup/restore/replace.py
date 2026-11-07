@@ -41,6 +41,7 @@ PROTECTED = {
 # Sections a replacing restore merges and never prunes, and why.
 MERGED_ONLY: Dict[str, str] = {
     'compromised_keys': 'a block list: a key known here as compromised stays refused, archived or not',
+    'crl_number_counters': 'a CRL number published here stays used, archived or not (RFC 5280 §5.2.3)',
 }
 
 # Which section a table belongs to, and which sections each one points into.

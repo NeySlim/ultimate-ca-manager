@@ -764,6 +764,11 @@ The CRL schedule (per CA) sets how long each published CRL remains valid. Option
 - **Offline CAs** (typically a Root that cannot re-sign CRLs on schedule) are the intended use case for the long options: 90d up to 5y
 - A warning is shown past one year: relying parties may keep stale revocation data for the whole validity window
 
+### CRL Numbers
+Every CRL carries a CRL number (RFC 5280 §5.2.3). A CA's base and delta CRLs share one increasing sequence, and no number is ever given to two CRLs, even when a revocation and the scheduler generate one at the same time.
+
+The highest number reached is kept for each CA name and key, outside the CA itself, and is carried by backups. A CA restored on another server, or deleted and imported again, continues from it instead of starting over at 1.
+
 ### CRL Distribution Point (CDP)
 The CDP URL is embedded in certificates so clients know where to download the CRL. Copy the URL from the CRL details.
 

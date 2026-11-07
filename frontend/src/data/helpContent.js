@@ -443,6 +443,7 @@ export const helpContent = {
           { label: 'Signature digest', text: 'SHA-256, SHA-384 or SHA-512 for an RSA or EC CA. An Ed25519, Ed448 or ML-DSA CA signs without one: a digest stored for it earlier is shown as ignored, with a Clear button' },
           { label: 'Default digest (v2.251)', text: 'Without a digest set, a P-384 or P-521 CA signs its CRLs with SHA-384 or SHA-512. CRLs already issued keep theirs: the next one follows' },
           { label: 'External CRL', text: 'Key-less/offline CAs cannot self-sign a CRL, upload one generated next to the offline key from the CA detail view; it is validated (signature, issuer, monotonicity) and served at the same CDP URL (v2.215)' },
+          { label: 'CRL number', text: 'Base and delta CRLs of a CA share one increasing number, never given to two CRLs, even when two generations run at once. The highest number reached is kept per CA name and key and travels in backups, so a CA restored on another server, or deleted and imported again, continues from it' },
         ]
       },
       {

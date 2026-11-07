@@ -125,6 +125,12 @@ SECTIONS: Dict[str, Section] = {
         identity=('public_key_sha256',),
         exclude={**_SURROGATE},
     ),
+    # The CRL number reached by each issuer: a restore continues from it
+    'crl_number_counters': Section(
+        model='models.crl:CRLNumberCounter',
+        identity=('issuer_key',),
+        exclude={**_SURROGATE, 'updated_at': 'bookkeeping, last_number is the fact'},
+    ),
     'groups': Section(
         model='models.group:Group',
         identity=('name',),
@@ -510,7 +516,7 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'acme_proxy_dns_challenges': ('expected TXT values of in-flight proxy orders, valid for at most 24 hours; '
                                   'rebuilt when the client fetches the authorization'),
     'crls': 'regenerated from the CAs and their revocation records',
-    'crl_metadata': 'regenerated with the CRLs',
+    'crl_metadata': 'regenerated with the CRLs; their numbering travels in crl_number_counters',
     'ocsp_responses': 'a response cache, rebuilt on demand',
     'est_signer_certs': 'which certificate signs EST key packages; a new one is issued on first use',
     'notification_log': 'delivery history, not configuration',

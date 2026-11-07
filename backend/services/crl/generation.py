@@ -16,6 +16,7 @@ from utils.datetime_utils import utc_now
 from services.cert.serial_resolution import resolve_record_serial
 from utils.x509_aki import authority_key_identifier_from_issuer
 from ._constants import REASON_MAP
+from .numbering import allocate_crl_number
 from .query import CRLQueryMixin, _dedupe_live_records, _not_expired
 
 logger = logging.getLogger(__name__)
@@ -220,11 +221,6 @@ class CRLGenerationMixin:
         _run_housekeeping(ca_id)
         revoked_certs = CRLQueryMixin.get_revoked_certificates(ca_id)
 
-        last_crl = CRLMetadata.query.filter_by(ca_id=ca_id).order_by(
-            CRLMetadata.crl_number.desc()
-        ).first()
-        crl_number = 1 if not last_crl else last_crl.crl_number + 1
-
         now = utc_now()
         builder = x509.CertificateRevocationListBuilder()
         builder = builder.issuer_name(ca_cert.subject)
@@ -247,42 +243,39 @@ class CRLGenerationMixin:
             builder = builder.add_revoked_certificate(revoked_builder.build())
             entries += 1
 
-        builder = builder.add_extension(x509.CRLNumber(crl_number), critical=False)
-        builder = builder.add_extension(
-            _authority_key_identifier_for_crl(ca_cert), critical=False
-        )
-        # RFC 5280 §5.2.4: base and delta MUST both omit IDP or carry identical IDP.
-        # UCM issues unpartitioned CRLs — omit IDP on both full and delta.
-        builder = _add_freshest_crl(builder, ca)
-
-        crl_hash = signing_hash_for(ca_private_key, _crl_signature_hash(ca))
-        crl = builder.sign(ca_private_key, crl_hash, default_backend(),
-                           rsa_padding=rsa_padding_for(ca_private_key, crl_hash))
-
-        crl_pem = crl.public_bytes(serialization.Encoding.PEM).decode('utf-8')
-        crl_der = crl.public_bytes(serialization.Encoding.DER)
-
-        crl_metadata = CRLMetadata(
-            ca_id=ca_id,
-            crl_number=crl_number,
-            this_update=now,
-            next_update=now + timedelta(days=validity_days),
-            crl_pem=crl_pem,
-            crl_der=crl_der,
-            revoked_count=entries,
-            generated_by=username,
-            is_delta=False,
-            base_crl_number=None
-        )
-
-        db.session.add(crl_metadata)
-
+        # From the allocation to the commit the lock is held: a failure in
+        # between releases it and gives the number back.
         try:
+            crl_number = allocate_crl_number(ca, ca_cert)
+            builder = builder.add_extension(x509.CRLNumber(crl_number), critical=False)
+            builder = builder.add_extension(
+                _authority_key_identifier_for_crl(ca_cert), critical=False
+            )
+            # RFC 5280 §5.2.4: base and delta MUST both omit IDP or carry identical IDP.
+            # UCM issues unpartitioned CRLs — omit IDP on both full and delta.
+            builder = _add_freshest_crl(builder, ca)
+            crl_hash = signing_hash_for(ca_private_key, _crl_signature_hash(ca))
+            crl = builder.sign(ca_private_key, crl_hash, default_backend(),
+                               rsa_padding=rsa_padding_for(ca_private_key, crl_hash))
+
+            crl_metadata = CRLMetadata(
+                ca_id=ca_id,
+                crl_number=crl_number,
+                this_update=now,
+                next_update=now + timedelta(days=validity_days),
+                crl_pem=crl.public_bytes(serialization.Encoding.PEM).decode('utf-8'),
+                crl_der=crl.public_bytes(serialization.Encoding.DER),
+                revoked_count=entries,
+                generated_by=username,
+                is_delta=False,
+                base_crl_number=None
+            )
+            db.session.add(crl_metadata)
             db.session.commit()
         except Exception as _commit_err:
             db.session.rollback()
             logger.error(
-                f"Commit failed in services/crl/generation.py: {_commit_err}",
+                f"CRL generation failed for CA {ca_id}: {_commit_err}",
                 exc_info=True,
             )
             raise
@@ -380,11 +373,6 @@ class CRLGenerationMixin:
         revoked_certs = revoked_certs + CRLQueryMixin._filter_orphan_serials(
             persisted, revoked_certs)
 
-        last_crl = CRLMetadata.query.filter_by(ca_id=ca_id).order_by(
-            CRLMetadata.crl_number.desc()
-        ).first()
-        crl_number = 1 if not last_crl else last_crl.crl_number + 1
-
         builder = x509.CertificateRevocationListBuilder()
         builder = builder.issuer_name(ca_cert.subject)
         builder = builder.last_update(now)
@@ -406,30 +394,28 @@ class CRLGenerationMixin:
             builder = builder.add_revoked_certificate(revoked_builder.build())
             entries += 1
 
-        builder = builder.add_extension(x509.CRLNumber(crl_number), critical=False)
-        builder = builder.add_extension(
-            x509.DeltaCRLIndicator(base_crl.crl_number), critical=True
-        )
-        # No IssuingDistributionPoint — must match the base CRL (both omit).
-        builder = builder.add_extension(
-            _authority_key_identifier_for_crl(ca_cert), critical=False
-        )
-
-        crl_hash = signing_hash_for(ca_private_key, _crl_signature_hash(ca))
-        crl = builder.sign(ca_private_key, crl_hash, default_backend(),
-                           rsa_padding=rsa_padding_for(ca_private_key, crl_hash))
-
-        crl_pem = crl.public_bytes(serialization.Encoding.PEM).decode('utf-8')
-        crl_der = crl.public_bytes(serialization.Encoding.DER)
-
+        # Same numbering as the base, same lock (see generate_crl)
         try:
+            crl_number = allocate_crl_number(ca, ca_cert)
+            builder = builder.add_extension(x509.CRLNumber(crl_number), critical=False)
+            builder = builder.add_extension(
+                x509.DeltaCRLIndicator(base_crl.crl_number), critical=True
+            )
+            # No IssuingDistributionPoint — must match the base CRL (both omit).
+            builder = builder.add_extension(
+                _authority_key_identifier_for_crl(ca_cert), critical=False
+            )
+            crl_hash = signing_hash_for(ca_private_key, _crl_signature_hash(ca))
+            crl = builder.sign(ca_private_key, crl_hash, default_backend(),
+                               rsa_padding=rsa_padding_for(ca_private_key, crl_hash))
+
             crl_metadata = CRLMetadata(
                 ca_id=ca_id,
                 crl_number=crl_number,
                 this_update=now,
                 next_update=now + timedelta(hours=validity_hours),
-                crl_pem=crl_pem,
-                crl_der=crl_der,
+                crl_pem=crl.public_bytes(serialization.Encoding.PEM).decode('utf-8'),
+                crl_der=crl.public_bytes(serialization.Encoding.DER),
                 revoked_count=entries,
                 generated_by=username,
                 is_delta=True,

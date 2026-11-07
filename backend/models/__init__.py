@@ -22,7 +22,7 @@ from models.acme_client_account import AcmeClientAccount
 from models.acme_dns_update import AcmeDnsUpdateKey, AcmeProxyDnsChallenge
 from models.api_key import APIKey
 from models.auth_certificate import AuthCertificate
-from models.crl import CRLMetadata
+from models.crl import CRLMetadata, CRLNumberCounter
 from models.ocsp import OCSPResponse
 from models.webauthn import WebAuthnCredential, WebAuthnChallenge
 from models.hsm import HsmProvider, HsmKey
@@ -52,7 +52,7 @@ from utils.datetime_utils import utc_now, utc_isoformat
 __all__ = [
     "db", "User", "UserSession", "SystemConfig", "CA", "Certificate",
     "CRL", "SCEPRequest", "AuditLog",
-    "CRLMetadata", "OCSPResponse", "CertificateTemplate",
+    "CRLMetadata", "CRLNumberCounter", "OCSPResponse", "CertificateTemplate",
     "AcmeAccount", "AcmeOrder", "AcmeAuthorization", "AcmeChallenge", "AcmeNonce",
     "DnsProvider", "AcmeClientOrder", "AcmeDomain", "AcmeLocalDomain", "AcmeEabCredential",
     "AcmeClientAccount", "AcmeDnsUpdateKey", "AcmeProxyDnsChallenge",

@@ -39,6 +39,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - SCEP: a request enveloped with single DES or an unknown cipher or key transport failed as badMessageCheck, and no failure said why. It now fails as badAlg, and every failure carries its reason in failInfoText, the administrator's rejection reason included (RFC 8894 §3.2.1.4, §3.3.2.2).
 - SCEP: a POST without `operation` was answered with the capabilities. It is now processed as the PKIOperation it must be (RFC 8894 §4.3).
 
+- CRL: two generations running at once, such as a revocation and the scheduler, could sign two different CRLs under the same number, and installations not upgraded through migration 004 lacked the unique index. The number is now allocated under a lock and the index exists everywhere; migration 134 removes the older duplicates (RFC 5280 §5.2.3).
+- CRL: a CA restored on another server, or deleted and imported again, restarted its CRL numbers at 1 below those already published. The highest number of each CA name and key is now kept apart from the CA, carried by backups and never lowered by a restore.
+
 ### Security
 
 - mTLS behind a proxy: a certificate presented by its serial number alone, without `X-SSL-Client-I-DN` or `X-SSL-Client-Cert`, opened the enrolment bearing that serial, even one of another CA. Such a serial now opens only an enrolment that recorded no issuer, and enrolling a presented certificate requires its issuer (RFC 5280 §4.1.2.2).

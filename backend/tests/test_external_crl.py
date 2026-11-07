@@ -228,6 +228,17 @@ class TestMonotonicity:
         assert_success(_upload_pem(auth_client, ca['id'], crl_pem))
         assert_error(_upload_pem(auth_client, ca['id'], crl_pem), 409)
 
+    def test_reject_a_second_crl_under_the_same_number(self, auth_client, keyless_ca):
+        # RFC 5280 §5.2.3: two CRLs with different thisUpdate MUST have different numbers
+        root_key, root_cert, ca = keyless_ca
+        now = datetime.now(timezone.utc)
+        assert_success(_upload_pem(auth_client, ca['id'], _build_crl(
+            root_key, root_cert, number=3, this_update=now - timedelta(hours=1))))
+        r = _upload_pem(auth_client, ca['id'], _build_crl(
+            root_key, root_cert, number=3, this_update=now))
+        assert_error(r, 409)
+        assert 'number 3' in get_json(r)['message']
+
     def test_no_crl_number_extension(self, auth_client, keyless_ca):
         # openssl `ca -gencrl` omits CRLNumber unless configured — the internal
         # counter keeps ordering monotonic.

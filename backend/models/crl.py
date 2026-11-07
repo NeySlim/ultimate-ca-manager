@@ -10,6 +10,8 @@ from utils.datetime_utils import utc_now, utc_isoformat
 class CRLMetadata(db.Model):
     """Certificate Revocation List metadata and storage"""
     __tablename__ = "crl_metadata"
+    # RFC 5280 §5.2.3: two CRLs of one issuer never share a number
+    __table_args__ = (db.Index('uix_crl_ca_number', 'ca_id', 'crl_number', unique=True),)
     
     id = db.Column(db.Integer, primary_key=True)
     ca_id = db.Column(db.Integer, db.ForeignKey("certificate_authorities.id"), nullable=False, index=True)
@@ -83,3 +85,18 @@ class CRLMetadata(db.Model):
             data["crl_pem"] = self.crl_pem
             # crl_der is binary, don't include in JSON by default
         return data
+
+
+class CRLNumberCounter(db.Model):
+    """Highest CRL number an issuer has published, keyed by its name and key.
+
+    No foreign key: it outlives the CA row, so a CA deleted then imported again,
+    or restored elsewhere, continues its numbering (RFC 5280 §5.2.3).
+    """
+    __tablename__ = "crl_number_counters"
+
+    id = db.Column(db.Integer, primary_key=True)
+    # services/crl/numbering.py: SHA-256 of the subject DER and the SPKI DER
+    issuer_key = db.Column(db.String(64), nullable=False, unique=True, index=True)
+    last_number = db.Column(db.Integer, nullable=False, default=0)
+    updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
