@@ -27,6 +27,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- ACME server: a CSR whose common name is one of the order's IP addresses, as lego v4 and the UCM ACME client send for an IP order, was refused as `badCSR`. Such a CN is now matched against the IP identifiers (RFC 8738).
 - ACME server: the directory advertised the public host as `caaIdentities` even when CAA identifiers were configured, while finalize checked CAA against the configured ones. Both now use the same list (RFC 8555 §7.1.1).
 - ACME server: an order past its expiry, or one whose valid authorization had expired, could still be finalized. Finalize now answers 403 `orderNotReady` and the order becomes invalid, and an expired valid authorization reads `expired` (RFC 8555 §7.1.6, §7.4).
 - ACME server: an account created with External Account Binding was returned without its `externalAccountBinding` field. The new account object now carries it, with the value of the request (RFC 8555 §7.3.4).

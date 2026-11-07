@@ -1,4 +1,5 @@
 """Certificate issuance mixin for ACME service"""
+import ipaddress
 import json
 import logging
 from typing import Optional, Tuple, List
@@ -9,6 +10,14 @@ from utils.datetime_utils import utc_now
 from utils.csr_extensions import csr_extensions
 
 logger = logging.getLogger(__name__)
+
+
+def _is_ip_text(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False
 
 
 class IssuanceMixin:
@@ -383,6 +392,8 @@ class IssuanceMixin:
         for attr in subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME):
             cn = str(attr.value)
             cn_norm = cn.lower().rstrip('.')
+            if _is_ip_text(cn):
+                cn_norm = str(ipaddress.ip_address(cn))
             if (
                 cn_norm in allowed_domains
                 or cn_norm in allowed_ips
@@ -421,10 +432,12 @@ class IssuanceMixin:
         
         domains = []
         
-        # Get CN from subject
+        # Get CN from subject; an IP in the CN is an IP identifier, judged by
+        # _validate_csr_subject (RFC 8738 orders, lego v4 puts it there)
         try:
             cn = csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value
-            domains.append(cn)
+            if not _is_ip_text(cn):
+                domains.append(cn)
         except Exception:
             pass
         
