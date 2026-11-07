@@ -820,7 +820,10 @@
     "checkEmailDescAfter": ", vous recevrez un lien de réinitialisation sous peu.",
     "accountDisabled": "Ce compte a été désactivé",
     "samlValidationFailed": "L'authentification SAML a échoué",
-    "samlLoginExpired": "Cette connexion a expiré ou a été lancée dans un autre onglet ou navigateur. Recommencez depuis cette page."
+    "samlLoginExpired": "Cette connexion a expiré ou a été lancée dans un autre onglet ou navigateur. Recommencez depuis cette page.",
+    "ssoUsernameConflict": "Cette connexion correspond à un compte existant, local ou lié à une autre identité. Demandez à un administrateur de lier les comptes.",
+    "ssoUnmapped": "Accès refusé : aucune règle de correspondance des rôles de ce fournisseur ne reconnaît votre compte. Contactez votre administrateur.",
+    "samlLogoutRejected": "La demande de déconnexion du fournisseur d'identité n'a pas pu être vérifiée ; vous êtes toujours connecté."
   },
   "cas": {
     "chainRevoked": "Révoquée en amont",
@@ -3690,14 +3693,21 @@
     "defaultRoleHelp": "Appliqué uniquement à la création automatique d'un utilisateur lors de sa première connexion.",
     "accountStatusAttrHelp": "Attribut LDAP qui indique si un compte est désactivé. Valeurs courantes : 'description', 'userAccountControl', 'accountStatus'. Laisser vide pour désactiver cette vérification.",
     "enforce2fa": "Imposer la 2FA",
-    "enforce2faHelp": "Obliger les utilisateurs authentifiés via ce fournisseur à configurer la 2FA TOTP.",
+    "enforce2faHelp": "Obliger les utilisateurs de ce fournisseur à enrôler un second facteur. Les connexions LDAP le demandent ensuite ; les connexions OIDC et SAML s'appuient sur la MFA du fournisseur d'identité.",
     "oidcIssuer": "Émetteur OIDC (issuer)",
     "oidcIssuerHelp": "Requis quand la vérification de l'ID token est active. La découverte utilise <issuer>/.well-known/openid-configuration.",
     "oidcJwksUri": "URI JWKS (optionnel)",
     "oidcJwksUriHelp": "Laisser vide pour découvrir les clés de signature via l'issuer.",
     "idTokenVerify": "Vérifier la signature de l'ID token (recommandé)",
     "idTokenVerifyWarning": "Désactiver la vérification de signature affaiblit la sécurité de connexion. À n'utiliser que temporairement pour compatibilité.",
-    "idTokenVerifyIssuerMissing": "La vérification est active mais aucun issuer n'est défini : les connexions OIDC échoueront tant que l'issuer n'est pas configuré."
+    "idTokenVerifyIssuerMissing": "La vérification est active mais aucun issuer n'est défini : les connexions OIDC échoueront tant que l'issuer n'est pas configuré.",
+    "defaultRoleNone": "Aucun : refuser les utilisateurs qu'aucune règle ne reconnaît",
+    "provisioningRulesNotice": "Des règles de correspondance des rôles existent : un utilisateur qu'aucune règle ne reconnaît est refusé à la connexion.",
+    "provisioningNoRulesNotice": "Aucune règle de correspondance des rôles : tout utilisateur authentifié par ce fournisseur peut se connecter, et les nouveaux comptes reçoivent le rôle {{role}}.",
+    "provisioningNobodyNotice": "Aucune règle de correspondance des rôles et aucun rôle par défaut : personne ne peut se connecter par ce fournisseur.",
+    "ldapStartTls": "Utiliser StartTLS",
+    "ldapStartTlsHelp": "Passer la connexion LDAP en clair en TLS avant toute authentification",
+    "ldapPlainWarning": "LDAP en clair : les mots de passe du compte de service et des utilisateurs circulent sans chiffrement. Activez SSL/TLS ou StartTLS."
   },
   "templates": {
     "template": "Modèle",

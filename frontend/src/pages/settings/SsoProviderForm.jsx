@@ -11,8 +11,8 @@ import { secretInputProps, secretRequiredForTarget } from '../../lib/secretTarge
 const SECRET_TARGETS = {
   oauth2: ['oauth2_client_secret', ['oauth2_client_id', 'oauth2_auth_url', 'oauth2_token_url',
     'oauth2_userinfo_url', 'oauth2_issuer', 'oauth2_jwks_uri', 'oauth2_verify_ssl', 'oauth2_ca_bundle']],
-  ldap: ['ldap_bind_password', ['ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_bind_dn',
-    'ldap_verify_ssl', 'ldap_ca_bundle']],
+  ldap: ['ldap_bind_password', ['ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_start_tls',
+    'ldap_bind_dn', 'ldap_verify_ssl', 'ldap_ca_bundle']],
 }
 import SsoLdapFields from './sso/SsoLdapFields'
 import SsoOAuth2Fields from './sso/SsoOAuth2Fields'
@@ -39,7 +39,8 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     provider_type: providerType,
     enabled: provider?.enabled ?? false,
     is_default: provider?.is_default ?? false,
-    default_role: provider?.default_role || 'viewer',
+    // Empty: users no mapping rule matches are refused.
+    default_role: provider ? (provider.default_role ?? '') : 'viewer',
     auto_create_users: provider?.auto_create_users ?? true,
     auto_update_users: provider?.auto_update_users ?? true,
     sync_role_on_login: provider?.sync_role_on_login ?? false,
@@ -50,6 +51,7 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     ldap_server: provider?.ldap_server || '',
     ldap_port: provider?.ldap_port || 389,
     ldap_use_ssl: provider?.ldap_use_ssl ?? false,
+    ldap_start_tls: provider?.ldap_start_tls ?? false,
     ldap_verify_ssl: provider?.ldap_verify_ssl ?? true,
     ldap_ca_bundle: '',
     ldap_bind_dn: provider?.ldap_bind_dn || '',
@@ -275,7 +277,9 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
   const isOauth2 = formData.provider_type === 'oauth2'
   const isSaml = formData.provider_type === 'saml'
 
-  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, customRoles, handleTestConnection,
+  const defaultRoleOptions = [{ value: '', label: t('sso.defaultRoleNone') }, ...roleOptions]
+
+  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, defaultRoleOptions, customRoles, handleTestConnection,
     secretProps: secretTarget ? secretInputProps(t, secretTarget) : {} }
 
   return (

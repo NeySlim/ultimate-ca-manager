@@ -600,7 +600,10 @@
     "checkEmailDescAfter": " existiert, erhalten Sie in Kürze einen Link zum Zurücksetzen.",
     "accountDisabled": "Dieses Konto wurde deaktiviert",
     "samlValidationFailed": "SAML-Authentifizierung fehlgeschlagen",
-    "samlLoginExpired": "Diese Anmeldung ist abgelaufen oder wurde in einem anderen Tab oder Browser gestartet. Starten Sie sie auf dieser Seite erneut."
+    "samlLoginExpired": "Diese Anmeldung ist abgelaufen oder wurde in einem anderen Tab oder Browser gestartet. Starten Sie sie auf dieser Seite erneut.",
+    "ssoUsernameConflict": "Diese Anmeldung entspricht einem bestehenden Konto, das lokal oder mit einer anderen Identität verknüpft ist. Bitten Sie einen Administrator, die Konten zu verknüpfen.",
+    "ssoUnmapped": "Zugriff verweigert: Keine Rollenzuordnungsregel dieses Anmeldeanbieters erkennt Ihr Konto. Wenden Sie sich an Ihren Administrator.",
+    "samlLogoutRejected": "Die Abmeldeanforderung des Identitätsanbieters konnte nicht überprüft werden; Sie sind weiterhin angemeldet."
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",
@@ -3865,14 +3868,21 @@
     "defaultRoleHelp": "Wird nur angewendet, wenn ein Benutzer bei der ersten Anmeldung automatisch angelegt wird.",
     "accountStatusAttrHelp": "LDAP-Attribut, das angibt, ob ein Konto deaktiviert ist. Häufige Werte: 'description', 'userAccountControl', 'accountStatus'. Leer lassen, um diese Prüfung zu deaktivieren.",
     "enforce2fa": "2FA erzwingen",
-    "enforce2faHelp": "Benutzer, die sich über diesen Anbieter anmelden, zur Einrichtung der TOTP-Zwei-Faktor-Authentifizierung verpflichten.",
+    "enforce2faHelp": "Benutzer dieses Anbieters müssen einen zweiten Faktor einrichten. LDAP-Anmeldungen fragen ihn dann ab; OIDC- und SAML-Anmeldungen verlassen sich auf die MFA des Identitätsanbieters.",
     "oidcIssuer": "OIDC-Issuer",
     "oidcIssuerHelp": "Erforderlich, wenn die ID-Token-Prüfung aktiv ist. Discovery nutzt <issuer>/.well-known/openid-configuration.",
     "oidcJwksUri": "JWKS-URI (optional)",
     "oidcJwksUriHelp": "Leer lassen, um die Signaturschlüssel über den Issuer zu ermitteln.",
     "idTokenVerify": "ID-Token-Signatur prüfen (empfohlen)",
     "idTokenVerifyWarning": "Das Deaktivieren der Signaturprüfung schwächt die Anmeldesicherheit. Nur als vorübergehende Kompatibilitätsmaßnahme verwenden.",
-    "idTokenVerifyIssuerMissing": "Die Prüfung ist aktiv, aber kein Issuer gesetzt: OIDC-Anmeldungen schlagen fehl, bis der Issuer konfiguriert ist."
+    "idTokenVerifyIssuerMissing": "Die Prüfung ist aktiv, aber kein Issuer gesetzt: OIDC-Anmeldungen schlagen fehl, bis der Issuer konfiguriert ist.",
+    "defaultRoleNone": "Keine: Benutzer ohne passende Regel ablehnen",
+    "provisioningRulesNotice": "Rollenzuordnungsregeln sind festgelegt: Ein Benutzer, den keine Regel erkennt, wird bei der Anmeldung abgelehnt.",
+    "provisioningNoRulesNotice": "Keine Rollenzuordnungsregel: Jeder von diesem Anbieter authentifizierte Benutzer kann sich anmelden, und neue Konten erhalten die Rolle {{role}}.",
+    "provisioningNobodyNotice": "Keine Rollenzuordnungsregel und keine Standardrolle: Niemand kann sich über diesen Anbieter anmelden.",
+    "ldapStartTls": "StartTLS verwenden",
+    "ldapStartTlsHelp": "Die unverschlüsselte LDAP-Verbindung vor jedem Bind auf TLS umstellen",
+    "ldapPlainWarning": "Unverschlüsseltes LDAP: Bind- und Benutzerpasswörter werden unverschlüsselt übertragen. Aktivieren Sie SSL/TLS oder StartTLS."
   },
   "notifications": {
     "certificateIssued": "Zertifikat ausgestellt: {{name}}",

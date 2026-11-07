@@ -3,6 +3,7 @@ import { Plugs, MagnifyingGlass, UsersThree, UserPlus, Play, ShieldWarning } fro
 import { Button, Input, Select, Badge, LoadingSpinner, CompactSection } from '../../../components'
 import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import RoleMappingEditor from '../RoleMappingEditor'
+import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
 
 export default function SsoLdapFields({
   formData,
@@ -17,6 +18,7 @@ export default function SsoLdapFields({
   handleTestConnection,
   handleTestMapping,
   roleOptions,
+  defaultRoleOptions,
   customRoles,
   setFormData,
   secretProps,
@@ -96,7 +98,19 @@ export default function SsoLdapFields({
             label={t('sso.ldapUseSsl')}
             size="sm"
           />
-          {formData.ldap_use_ssl && (
+          {!formData.ldap_use_ssl && (
+            <ToggleSwitch
+              checked={formData.ldap_start_tls}
+              onChange={(val) => handleChange('ldap_start_tls', val)}
+              label={t('sso.ldapStartTls')}
+              description={t('sso.ldapStartTlsHelp')}
+              size="sm"
+            />
+          )}
+          {!formData.ldap_use_ssl && !formData.ldap_start_tls && (
+            <p className="text-xs text-amber-500">{t('sso.ldapPlainWarning')}</p>
+          )}
+          {(formData.ldap_use_ssl || formData.ldap_start_tls) && (
             <>
               <ToggleSwitch
                 checked={formData.ldap_verify_ssl}
@@ -205,7 +219,7 @@ export default function SsoLdapFields({
             label={t('sso.defaultRole')}
             value={formData.default_role}
             onChange={value => handleChange('default_role', value)}
-            options={roleOptions}
+            options={defaultRoleOptions}
           />
           <div className="pt-1">
             <p className="text-xs font-medium text-text-secondary mb-2">{t('sso.roleMapping')}</p>
@@ -280,8 +294,9 @@ export default function SsoLdapFields({
       </CompactSection>
 
       {/* Provisioning */}
-      <CompactSection title={t('sso.provisioningSection')} icon={UserPlus} collapsible defaultOpen={false}>
+      <CompactSection title={t('sso.provisioningSection')} icon={UserPlus} collapsible defaultOpen={!hasRoleRules(formData.role_mapping)}>
         <div className="space-y-2">
+          <ProvisioningNotice formData={formData} />
           <ToggleSwitch checked={formData.auto_create_users} onChange={(val) => handleChange('auto_create_users', val)} label={t('sso.autoCreateUsers')} />
           <ToggleSwitch checked={formData.auto_update_users} onChange={(val) => handleChange('auto_update_users', val)} label={t('sso.autoUpdateUsers')} />
           <ToggleSwitch checked={formData.sync_role_on_login} onChange={(val) => handleChange('sync_role_on_login', val)} label={t('sso.syncRoleOnLogin')} description={t('sso.syncRoleOnLoginHelp')} />

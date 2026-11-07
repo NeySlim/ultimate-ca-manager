@@ -11,17 +11,23 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
+- LDAP: a StartTLS option switches a plain LDAP connection to TLS before the service and user binds, with the existing certificate verification; it was documented but never sent, so passwords crossed in clear (RFC 4513 §3, migration 137).
+- SAML: the Single Logout endpoint announced in the SP metadata ignored LogoutRequests. A LogoutRequest signed by the IdP now closes the session of its NameID in that browser and gets a LogoutResponse, signed when request signing is on (SAML Profiles §4.4).
 - Deployment: a deploy target can be an HTTP API instead of an SSH host, with a URL, a method, encrypted request headers and a body template rendered from the certificate (`{{cert_pem|json}}`, `{{fullchain_pem}}`, `{{cn}}`, `{{serial}}`...), through the same delivery queue; the private key is sent only with an explicit opt-in over verified HTTPS, with an optional pasted trust anchor for a self-signed appliance (discussion #428, requested by @gjarassier, migration 131).
 - EST: the encrypted `serverkeygen` key can now go to an EC client certificate by key agreement (ephemeral-static ECDH, RFC 5753), and the key transport or key agreement and the content cipher follow the CSR's SMIMECapabilities in the client's order of preference, with AES-CBC when no listed content cipher is available. A list naming only key transport or agreement algorithms UCM lacks is refused with the supported ones named, as is an RSA client key under 2048 bits (RFC 7030 section 4.4.2).
 
 ### Changed
 
+- SSO providers: an unknown `default_role` is refused instead of being stored as viewer, and an empty one, "None" in the form, gives no implicit role. The User Provisioning section opens with a warning when the provider has no role mapping rule.
 - PostgreSQL: UCM connects with psycopg 3, which sends values apart from the statement, so a database error that quotes the statement no longer carries them. psycopg2 is no longer shipped, and a `postgresql+psycopg2://` URL now uses psycopg 3.
 - Dependencies: SQLAlchemy 2.1 is accepted, now that every PostgreSQL URL reaches psycopg 3.
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
 
 ### Fixed
 
+- Password reset: the e-mailed link pointed at `https://localhost:8443`. It now uses the Base URL, else the server FQDN, never the request's Host, and the reset is refused when neither is set.
+- OIDC: an ID token whose `azp` named another client was accepted when it had a single audience; it is now refused (OpenID Connect Core §3.1.3.7).
+- LDAP with Enforce 2FA: users had to enrol a second factor that sign-in never asked for. LDAP sign-ins now ask for it, as local ones do.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: these providers hold one TXT value per name, so the cleanup of one order cleared the value another order was still validating. The name is now left alone while another order in progress uses it.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: an order for a domain and its wildcard could not hold both values and failed at validation, and the ACME proxy replaced the CA's value with its clients' own. Such an order, or on DuckDNS one naming two hosts under the same subdomain, is now refused at the request before the CA is asked, and the proxy publishes only the CA's value there.
 - ACME client: a CA refusal of `replaces` whose message merely contained "rateLimited" was taken for a rate limit and not retried. A rate limit is now recognised by its problem type or a 429 only (RFC 8555 §6.7).
@@ -32,11 +38,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- SSO: with role mapping rules set, a user no rule matched still signed in with the default role, viewer unless changed. Such a user is now refused at every sign-in, with an audit entry; without rules the default role still applies.
 - SSO: an OIDC, SAML or LDAP identity whose username, or e-mail local part, matched an existing account signed into it, the local administrator included, and rebound that account to itself. A name or e-mail now matches only an account of the same provider not yet bound to an identity; a local account or one bound to another identity is refused at sign-in, with an audit entry (OpenID Connect Core §5.7).
 - mTLS behind a proxy: a certificate presented by its serial number alone, without `X-SSL-Client-I-DN` or `X-SSL-Client-Cert`, opened the enrolment bearing that serial, even one of another CA. Such a serial now opens only an enrolment that recorded no issuer, and enrolling a presented certificate requires its issuer (RFC 5280 §4.1.2.2).
 
 ### Upgrade notes
 
+- SSO: a provider with role mapping rules now refuses the users none of them matches; add a rule for a group every allowed user is in, or remove the rules to fall back to the default role.
 - SSO: a local account is no longer merged into an SSO identity of the same name at sign-in; an administrator links it with Link to SSO first.
 - mTLS behind a proxy: a proxy that forwards the serial number without `X-SSL-Client-I-DN` (nginx `$ssl_client_i_dn`, Apache `SSL_CLIENT_I_DN`) or `X-SSL-Client-Cert` must now forward one of them, or certificate login fails with a warning in the log; the I-DN is read in RFC 4514, RFC 1779, OpenSSL one-line and legacy forms.
 - EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the `EST key generator` certificate the SignedData carries, which chains to the issuing CA from `/cacerts` and is listed, and revoked when needed, with the CA's certificates like a delegated OCSP responder; the next encrypted request then gets a new one. Migration 132 adds the `est_signer_certs` table that names the current one; backups carry the certificate but not that table, so a restored installation issues a new one on first use.

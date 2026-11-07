@@ -73,6 +73,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [totpCode, setTotpCode] = useState('')
   const [twoFactorMethods, setTwoFactorMethods] = useState(['totp'])
+  // Which door asked for the second factor: 'password' or 'ldap'
+  const twoFactorFrom = useRef('password')
   const [loading, setLoading] = useState(false)
   const [authMethod, setAuthMethod] = useState(null)
   const [userMethods, setUserMethods] = useState(null)
@@ -99,6 +101,11 @@ export default function LoginPage() {
   const saveAuthMethod = (method, providerId = null) => {
     try { localStorage.setItem(STORAGE_AUTH_METHOD_KEY, JSON.stringify({ method, providerId })) } catch {}
   }
+  const saveTwoFactorMethod = () => {
+    if (twoFactorFrom.current === 'ldap') saveAuthMethod('ldap', selectedLdapProvider?.id)
+    else saveAuthMethod('password')
+  }
+
   const getSavedAuthMethod = () => {
     try { return JSON.parse(localStorage.getItem(STORAGE_AUTH_METHOD_KEY) || '{}').method || null } catch { return null }
   }
@@ -252,6 +259,9 @@ export default function LoginPage() {
         'account_disabled': t('auth.accountDisabled'),
         'saml_validation_failed': t('auth.samlValidationFailed'),
         'saml_login_expired': t('auth.samlLoginExpired'),
+        'sso_username_conflict': t('auth.ssoUsernameConflict'),
+        'sso_unmapped': t('auth.ssoUnmapped'),
+        'saml_logout_rejected': t('auth.samlLogoutRejected'),
       }
       showError(errorMessages[error] || t('auth.ssoError'))
     }
@@ -339,6 +349,7 @@ export default function LoginPage() {
     try {
       const userData = await authMethodsService.loginPassword(username, password)
       if (userData.requires_2fa) {
+        twoFactorFrom.current = 'password'
         setStep('2fa')
         setTwoFactorMethods(userData.methods || ['totp'])
         setTotpCode('')
@@ -377,7 +388,7 @@ export default function LoginPage() {
     try {
       const userData = await authMethodsService.login2FA(totpCode)
       saveUsername(username)
-      saveAuthMethod('password')
+      saveTwoFactorMethod()
       await login(username, password, userData)
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate('/dashboard')
@@ -394,7 +405,7 @@ export default function LoginPage() {
     try {
       const userData = await authMethodsService.login2FAWebAuthn()
       saveUsername(username)
-      saveAuthMethod('password')
+      saveTwoFactorMethod()
       await login(username, password, userData)
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate('/dashboard')
@@ -431,6 +442,14 @@ export default function LoginPage() {
     try {
       const data = await authService.ldapLogin(username, password, selectedLdapProvider?.id)
       const responseData = data.data || data
+      // The provider enforces 2FA: the enrolled code is asked next.
+      if (responseData.requires_2fa) {
+        twoFactorFrom.current = 'ldap'
+        setStep('2fa')
+        setTwoFactorMethods(responseData.methods || ['totp'])
+        setTotpCode('')
+        return
+      }
 
       saveUsername(username)
       saveAuthMethod('ldap', selectedLdapProvider?.id)
