@@ -1766,6 +1766,7 @@ class AcmeProxyService:
         if not any(o.status == 'pending' and authz_url not in o.deactivated_authz_list
                    for o in users or [order]):
             logger.info("[ACME Proxy BG] Order %s failed meanwhile: %s not submitted", order.id, domain)
+            self._abandon_challenge(order, chall_url)
             self._release_order_records(order)
             return
 
@@ -1785,6 +1786,18 @@ class AcmeProxyService:
             challenges_data[chall_url] = entry
             order.set_challenges_dict(challenges_data)
             db.session.commit()
+
+    @staticmethod
+    def _abandon_challenge(order, chall_url):
+        """Clear the initiated flag of a challenge left unsubmitted: a later order
+        reusing the still-pending authorization must start its own automation."""
+        challenges_data = order.challenges_dict
+        if (challenges_data.get(chall_url) or {}).get('status') != 'initiated':
+            return
+        challenges_data[chall_url] = {'status': 'abandoned',
+                                      'abandoned_at': datetime.now().isoformat()}
+        order.set_challenges_dict(challenges_data)
+        db.session.commit()
 
     def _fail_dns_automation(self, order, chall_url, domain, message):
         """Fail the order locally after a refused TXT write; the upstream challenge is left alone."""

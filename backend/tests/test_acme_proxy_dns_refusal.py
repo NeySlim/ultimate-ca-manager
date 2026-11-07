@@ -339,6 +339,25 @@ class TestRefusalOnAnotherNameOfTheOrder:
             svc._run_dns01_automation(CHALL_B, 'tok.up', OTHER, order_id, AUTHZ_B)
             assert calls == [(CHALL_B, {})]
 
+    def test_retry_restarts_the_automation_the_dead_order_gave_up(self, app, monkeypatch):
+        provider = _provider(monkeypatch, (True, 'ok'))
+        provider.create_txt_record.side_effect = [(False, 'zone not found'), (True, 'ok')]
+        with app.app_context():
+            row = _two_names(client_jwk_thumbprint='T')
+            row.set_challenges_dict({CHALL_URL: {'status': 'initiated'},
+                                     CHALL_B: {'status': 'initiated'}})
+            db.session.commit()
+            svc, calls = _svc(monkeypatch, {AUTHZ_B: _Resp(_authz(domain=OTHER, chall=CHALL_B))})
+            svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
+            svc._run_dns01_automation(CHALL_B, 'tok.up', OTHER, row.id, AUTHZ_B)
+            assert calls == []
+
+            # The CA hands the same pending authorizations to the client's next order
+            retry = _two_names(client_jwk_thumbprint='T', order_url=f'{ORDER_URL}b',
+                               upstream_order_url=f'{ORDER_URL}b')
+            svc.get_authz(_b64(AUTHZ_B), requester_thumbprint='T')
+            assert _automation_orders() == [retry.id]
+
     def test_refusal_releases_the_records_of_the_other_name(self, app, monkeypatch):
         _provider(monkeypatch, (False, 'zone not found'))
         records = [{'domain': OTHER, 'record_name': f'_acme-challenge.{OTHER}',
