@@ -58,7 +58,7 @@ vi.mock('../../services/tsa.service', () => ({
   tsaService: {
     getConfig: vi.fn(),
     updateConfig: vi.fn().mockResolvedValue({ data: {} }),
-    getStats: vi.fn().mockResolvedValue({ data: { total_requests: 0 } }),
+    getStats: vi.fn().mockResolvedValue({ data: { total: 0 } }),
     getSignerCandidates: vi.fn(),
   },
 }))
@@ -100,7 +100,7 @@ describe('TSAPage — dedicated signer certificate (#312)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     tsaService.updateConfig.mockResolvedValue({ data: {} })
-    tsaService.getStats.mockResolvedValue({ data: { total_requests: 0 } })
+    tsaService.getStats.mockResolvedValue({ data: { total: 0 } })
     tsaService.getSignerCandidates.mockResolvedValue({ data: CANDIDATES })
     setConfig()
   })

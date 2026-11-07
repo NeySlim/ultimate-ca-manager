@@ -1502,7 +1502,7 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 
 1. **Client creates a timestamp request**: hashes a file with SHA-256/SHA-512 and creates a \`TimeStampReq\` (ASN.1 DER-encoded)
 2. **Client sends request to TSA**: HTTP POST to the \`/tsa\` endpoint with \`Content-Type: application/timestamp-query\`
-3. **UCM signs the timestamp**: the configured CA signs the hash + current time into a \`TimeStampResp\`
+3. **UCM signs the timestamp**: the dedicated signing certificate, or the configured CA's own certificate when none is set, signs the hash + current time into a \`TimeStampResp\`
 4. **Client receives and stores the response**: the \`.tsr\` file can later prove the document existed at that time
 
 ## Configuration
@@ -1511,7 +1511,7 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 
 1. **Enable TSA**: Toggle the TSA server on or off
 2. **Signing CA**: Select which Certificate Authority signs timestamp tokens
-3. **Policy OID**: Object Identifier for the TSA policy (e.g., \`1.2.3.4.1\`), included in every timestamp response
+3. **Policy OID**: Object Identifier for the TSA policy, included in every timestamp response
 4. **Require a dedicated TSA certificate**: Opt-in: refuse to sign timestamps with the CA certificate itself. When enabled, a dedicated end-entity signing certificate with a **critical timeStamping EKU** (RFC 3161) is required
 
 ### Choosing a Signing CA
@@ -1519,15 +1519,15 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 The signing CA's private key is used to sign every timestamp token. Best practices:
 
 - Use a **dedicated sub-CA** for timestamping rather than your root CA
-- The CA certificate should include the **id-kp-timeStamping** Extended Key Usage (OID 1.3.6.1.5.5.7.3.8)
-- Ensure the CA certificate has **sufficient validity**: timestamps must remain verifiable for years
+- RFC 3161 §2.3 requires a signer whose only, critical EKU is **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), which a CA certificate cannot carry without losing its other uses. Tokens signed by the CA certificate are refused by strict verifiers: \`openssl ts -verify\` fails with "unsuitable certificate purpose" and jarsigner with "Certificate is not valid for timestamping". The Settings tab warns while the CA certificate signs: **generate a dedicated signing certificate** there for these clients
+- Ensure the CA certificate has **sufficient validity**: timestamps must remain verifiable for years. A CA outside its validity period does not sign: \`/tsa\` answers 503 and the dashboard shows the TSA offline
 - Enable **Require a dedicated timestamping certificate** to enforce this at signing time instead of relying on convention
 
 ### Policy OID
 
 The Policy OID identifies the TSA policy under which timestamps are issued. It is embedded in every \`TimeStampResp\`.
 
-- Default: \`1.2.3.4.1\` (placeholder)
+- Default: \`1.2.3.4.1\` (placeholder: OpenSSL's example OID, assigned to no one; the Settings tab warns while it is in use)
 - For production, register an OID under your organization's arc or use one from your CP/CPS
 
 ## Information Tab
@@ -1536,15 +1536,15 @@ The Information tab displays:
 
 - **TSA Endpoint URL**: Copy-paste ready URL for client configuration
 - **Usage Examples**: OpenSSL commands for creating requests, sending them, and verifying responses
-- **Statistics**: Total timestamp requests processed (successful and failed)
+- **Statistics**: Total timestamp requests processed (successful and failed); every rejected request is audited as \`tsa.timestamp_rejected\` with its failure code
 
 ## Usage Examples
 
 ### Create a Timestamp Request
 
 \`\`\`bash
-# Hash a file and create a timestamp request
-openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq
+# Hash a file and create a timestamp request (-cert: embed the signer certificate)
+openssl ts -query -data file.txt -sha256 -cert -out request.tsq
 \`\`\`
 
 ### Send Request to TSA
@@ -1564,11 +1564,11 @@ openssl ts -verify -data file.txt -in response.tsr \\
   -CAfile ca-chain.pem
 \`\`\`
 
-\`openssl ts -verify\` checks RSA and ECDSA tokens only. An ML-DSA token verifies with \`openssl cms -verify\` (OpenSSL 3.5 or later); then compare its message imprint with the hash of the file.
+\`openssl ts -verify\` needs a dedicated signing certificate (a token signed by the CA certificate fails) and checks RSA and ECDSA tokens only. An ML-DSA token verifies with \`openssl cms -verify\` (OpenSSL 3.5 or later); then compare its message imprint with the hash of the file.
 
 ### Code Signing with Timestamps
 
-When signing code, add the TSA URL to ensure signatures remain valid after certificate expiry:
+When signing code, add the TSA URL to ensure signatures remain valid after certificate expiry. Configure a dedicated signing certificate first: jarsigner refuses a token signed by the CA certificate ("Certificate is not valid for timestamping").
 
 \`\`\`bash
 # Sign with timestamp (osslsigncode)
@@ -1601,15 +1601,19 @@ curl -s -H "Content-Type: application/timestamp-query" \\
 | Endpoint | \`/tsa\` (POST) |
 | Content-Type | \`application/timestamp-query\` |
 | Response Type | \`application/timestamp-reply\` |
-| Hash Algorithms | SHA-256, SHA-384, SHA-512, SHA-1 (legacy) |
+| Hash Algorithms | SHA-256, SHA-384, SHA-512 (SHA-1 and MD5 refused with badAlg) |
+| Request extensions | None accepted: any extension, critical or not, is refused with unacceptedExtension |
+| Malformed request | badDataFormat (trailing bytes included) |
+| genTime / accuracy | Whole seconds, accuracy 1 second |
+| Message imprint | Copied from the request as sent |
 | Authentication | None (public endpoint) |
 | Transport | HTTP or HTTPS |
 
 ## Security Considerations
 
 - The TSA endpoint is **public**: no authentication is required (same as CRL/OCSP)
-- Each timestamp response is **signed** by the CA key: clients verify the signature to ensure authenticity
-- Use **SHA-256 or stronger** hash algorithms when creating requests (SHA-1 is accepted but discouraged)
+- Each timestamp response is **signed** by the dedicated signer or the CA key: clients verify the signature to ensure authenticity
+- Use **SHA-256 or stronger** hash algorithms when creating requests (SHA-1 is refused)
 - The TSA does **not** see the original document: only the hash is transmitted
 - Consider **rate limiting** if the TSA endpoint is exposed to the internet
 
