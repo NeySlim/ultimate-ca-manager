@@ -588,8 +588,8 @@ export const helpContent = {
         title: 'Configuration',
         icon: Gear,
         items: [
-          { label: 'Signing CA', text: 'The CA whose private key signs timestamp tokens, must be a valid, non-expired CA' },
-          { label: 'Policy OID', text: 'Object Identifier for the TSA policy (e.g., 1.2.3.4.1): included in every timestamp response' },
+          { label: 'Signing CA', text: 'The CA whose own certificate signs timestamp tokens when no dedicated signing certificate is set. A CA outside its validity period does not sign: /tsa answers 503. Strict verifiers (openssl ts -verify, jarsigner) refuse tokens signed by a CA certificate, and the page warns while the CA signs' },
+          { label: 'Policy OID', text: 'Object Identifier for the TSA policy, included in every timestamp response. The default 1.2.3.4.1 is OpenSSL\'s example OID, a placeholder the page warns about: use an OID from your organization\'s arc' },
           { label: 'Enable/Disable', text: 'Toggle the TSA endpoint on or off without losing configuration' },
           { label: 'Require dedicated certificate', text: 'Opt-in: refuse to sign timestamps with the CA certificate itself, requires a dedicated end-entity signing certificate with a critical timeStamping EKU (RFC 3161)' },
                   { label: 'Signing certificate (v2.217)', text: 'Sign tokens with a dedicated end-entity certificate picked from issued certificates (timeStamping EKU, RSA, ECDSA or ML-DSA key held by UCM; Ed25519 and Ed448 certificates are not offered, nor ML-DSA in FIPS mode). Renewals are followed automatically; an expired or revoked signer fails requests with 503 and never falls back to the CA certificate' },
@@ -600,20 +600,23 @@ export const helpContent = {
         title: 'Usage',
         icon: Clock,
         items: [
-          { label: 'Create Request', text: 'openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq' },
+          { label: 'Create Request', text: 'openssl ts -query -data file.txt -sha256 -cert -out request.tsq (-cert asks for the signer certificate in the response, which openssl ts -verify needs)' },
           { label: 'Send to TSA', text: 'curl -H "Content-Type: application/timestamp-query" --data-binary @request.tsq https://your-server/tsa -o response.tsr' },
-          { label: 'Verify', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem (RSA and ECDSA signers). An ML-DSA token fails openssl ts -verify: check its signature with openssl cms -verify (OpenSSL 3.5 or later), then compare the message imprint with the hash of the file' },
+          { label: 'Verify', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem (dedicated RSA or ECDSA signer; a token signed by the CA certificate fails with "unsuitable certificate purpose"). An ML-DSA token fails openssl ts -verify: check its signature with openssl cms -verify (OpenSSL 3.5 or later), then compare the message imprint with the hash of the file' },
         ]
       },
     ],
     tips: [
       'TSA timestamps are used in code signing to ensure signatures remain valid after certificate expiry',
-      'The TSA endpoint accepts HTTP POST with Content-Type: application/timestamp-query',
+      'The TSA endpoint accepts HTTP POST with Content-Type: application/timestamp-query (or application/octet-stream)',
+      'A request carrying any extension is refused with unacceptedExtension, and a malformed one with badDataFormat (RFC 3161 §2.4.1)',
+      'Tokens carry genTime in whole seconds with a declared accuracy of 1 second, and the request message imprint copied as sent',
       'Use SHA-256 or stronger hash algorithms when creating timestamp requests',
       'No authentication is required: the TSA endpoint is publicly accessible like CRL/OCSP',
     ],
     warnings: [
       'A valid signing CA must be configured before enabling TSA',
+      'openssl ts -verify and jarsigner refuse tokens signed by the CA certificate: RFC 3161 requires a dedicated signer with a critical, exclusive timeStamping EKU. Generate one on the Settings tab',
       'The TSA endpoint is a public protocol endpoint: do not put sensitive data in timestamp requests',
     ],
     related: ['CAs', 'Certificates', 'CRL & OCSP']
