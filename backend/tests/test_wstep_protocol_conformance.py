@@ -1,0 +1,139 @@
+"""MS-WSTEP message handling: CMC response, token format, RequestType, wsu:Timestamp, faults."""
+import base64
+import datetime
+
+from asn1crypto import cms
+from cryptography import x509
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.serialization import Encoding
+from lxml import etree
+
+from services.wstep.cmc_response import ID_CCT_PKIRESPONSE, ID_CMC_STATUSINFOV2, _CMCStatusInfoV2, _PKIResponse
+from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS, WSU_NS
+from tests.test_wstep_issue import ISSUE_URL, _basic_auth, _build_rst, _make_csr, wstep_config  # noqa: F401
+from tests.test_wstep_renew_tls import _cmc_renewal
+
+PKCS7 = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#PKCS7'
+PKCS10 = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10'
+ISSUE = 'http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue'
+
+
+def _rst(token_der, value_type=PKCS10, request_type=ISSUE, timestamp=None, message_id='urn:uuid:conf-1'):
+    """``timestamp``: (created, expires) datetimes for a wsu:Timestamp in wsse:Security."""
+    envelope = etree.fromstring(_build_rst(_make_csr()[0], message_id=message_id))
+    rst = envelope.find(f'.//{{{WST_NS}}}RequestSecurityToken')
+    bst = rst.find(f'{{{WSSE_NS}}}BinarySecurityToken')
+    bst.set('ValueType', value_type)
+    bst.text = base64.b64encode(token_der).decode()
+    rt = rst.find(f'{{{WST_NS}}}RequestType')
+    if request_type is None:
+        rst.remove(rt)
+    else:
+        rt.text = request_type
+    if timestamp is not None:
+        header = envelope.find(f'{{{SOAP_NS}}}Header')
+        security = etree.SubElement(header, f'{{{WSSE_NS}}}Security')
+        ts = etree.SubElement(security, f'{{{WSU_NS}}}Timestamp')
+        for tag, when in zip(('Created', 'Expires'), timestamp):
+            etree.SubElement(ts, f'{{{WSU_NS}}}{tag}').text = (
+                when if isinstance(when, str) else when.strftime('%Y-%m-%dT%H:%M:%SZ'))
+    return etree.tostring(envelope, xml_declaration=True, encoding='UTF-8')
+
+
+def _post(client, body):
+    return client.post(ISSUE_URL, data=body, headers=_basic_auth())
+
+
+def _rstr_tokens(data):
+    root = etree.fromstring(data)
+    rstr = root.find(f'.//{{{WST_NS}}}RequestSecurityTokenResponse')
+    issued = rstr.find(f'{{{WST_NS}}}RequestedSecurityToken/{{{WSSE_NS}}}BinarySecurityToken')
+    cmc = [b for b in rstr.findall(f'{{{WSSE_NS}}}BinarySecurityToken') if b.get('ValueType') == PKCS7]
+    return x509.load_der_x509_certificate(base64.b64decode(issued.text)), cmc
+
+
+def _fault(data):
+    root = etree.fromstring(data)
+    fault = root.find(f'.//{{{SOAP_NS}}}Fault')
+    assert fault is not None
+    relates = root.find(f'.//{{{ADDRESSING_NS}}}RelatesTo')
+    subcode = fault.find(f'{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Subcode/{{{SOAP_NS}}}Value')
+    return (fault.find(f'.//{{{SOAP_NS}}}Text').text, relates.text if relates is not None else None,
+            subcode.text if subcode is not None else None)
+
+
+def test_a_pkcs10_request_gets_a_cmc_full_pki_response(client, wstep_config):
+    """MS-WSTEP 3.1.4.1.3.2 MUST; RFC 5272 6.1.1: bodyList is 1 for a Simple PKI Request."""
+    csr, _key = _make_csr('conf-cmc.example.test')
+    r = _post(client, _rst(csr.public_bytes(Encoding.DER)))
+    assert r.status_code == 200, r.data
+    cert, cmc_tokens = _rstr_tokens(r.data)
+    assert len(cmc_tokens) == 1
+    content_info = cms.ContentInfo.load(base64.b64decode(cmc_tokens[0].text))
+    signed = content_info['content']
+    assert signed['encap_content_info']['content_type'].dotted == ID_CCT_PKIRESPONSE
+    response = _PKIResponse.load(signed['encap_content_info']['content'].native)
+    control = response['control_sequence'][0]
+    assert control['attr_type'].dotted == ID_CMC_STATUSINFOV2
+    status = _CMCStatusInfoV2.load(control['attr_values'][0].dump())
+    assert status['cmc_status'].native == 0
+    assert [p.native for p in status['body_list']] == [1]
+    assert cert.public_bytes(Encoding.DER) in [c.dump() for c in signed['certificates']]
+
+
+def test_a_pkcs10_request_under_the_pkcs7_value_type_is_issued(client, wstep_config):
+    """The MS-WSTEP 4.1.1.1 example sends a bare PKCS#10 under ValueType #PKCS7."""
+    csr, key = _make_csr('conf-p10-as-p7.example.test')
+    r = _post(client, _rst(csr.public_bytes(Encoding.DER), value_type=PKCS7))
+    assert r.status_code == 200, r.data
+    cert, _cmc = _rstr_tokens(r.data)
+    assert cert.public_key().public_numbers() == key.public_key().public_numbers()
+
+
+def test_a_cmc_request_under_the_pkcs10_value_type_is_unwrapped(client, wstep_config):
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    csr, _ = _make_csr('conf-p7-as-p10.example.test', key=key)
+    r = _post(client, _rst(_cmc_renewal(csr, [(key, None)]), value_type=PKCS10))
+    assert r.status_code == 200, r.data
+    cert, _cmc = _rstr_tokens(r.data)
+    assert cert.public_key().public_numbers() == key.public_key().public_numbers()
+
+
+def test_only_an_issue_request_type_is_served(client, wstep_config):
+    """MS-WSTEP 3.1.4.2.1: absent or any other value MUST get a SOAP fault."""
+    der = _make_csr('conf-rt.example.test')[0].public_bytes(Encoding.DER)
+    for request_type in (None, 'http://docs.oasis-open.org/ws-sx/ws-trust/200512/Renew',
+                         'http://schemas.microsoft.com/windows/pki/2009/01/enrollment/QueryTokenStatus',
+                         'urn:bogus'):
+        r = _post(client, _rst(der, request_type=request_type))
+        assert r.status_code == 400, request_type
+        reason, relates_to, _sub = _fault(r.data)
+        assert reason == 'Unsupported wst:RequestType: only Issue is served'
+        assert relates_to == 'urn:uuid:conf-1'
+
+
+def test_an_expired_message_is_refused(client, wstep_config):
+    """WSS 1.1 SOAP Message Security 10: wsu:MessageExpired, past a 5 minute skew."""
+    now = datetime.datetime.now(datetime.timezone.utc)
+    der = _make_csr('conf-ts.example.test')[0].public_bytes(Encoding.DER)
+    old = (datetime.datetime(2001, 1, 1, tzinfo=datetime.timezone.utc),
+           datetime.datetime(2001, 1, 1, 0, 5, tzinfo=datetime.timezone.utc))
+    r = _post(client, _rst(der, timestamp=old))
+    assert r.status_code == 400
+    reason, relates_to, subcode = _fault(r.data)
+    assert reason == 'The message has expired (wsu:Timestamp)'
+    assert subcode == 'wsse:MessageExpired' and relates_to == 'urn:uuid:conf-1'
+    within_skew = (now - datetime.timedelta(minutes=10), now - datetime.timedelta(minutes=2))
+    assert _post(client, _rst(der, timestamp=within_skew)).status_code == 200
+    assert _post(client, _rst(der, timestamp=(now, 'tomorrow'))).status_code == 400
+
+
+def test_a_malformed_request_fault_relates_to_its_message(client, wstep_config):
+    r = _post(client, _rst(b'\x30\x03\x02\x01\x00'))
+    assert r.status_code == 400
+    _reason, relates_to, _sub = _fault(r.data)
+    assert relates_to == 'urn:uuid:conf-1'
+    garbage = _rst(b'').replace(b'</wsse:BinarySecurityToken>', b'!!</wsse:BinarySecurityToken>')
+    _reason, relates_to, _sub = _fault(_post(client, garbage).data)
+    assert relates_to == 'urn:uuid:conf-1'
+

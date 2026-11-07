@@ -89,7 +89,9 @@ class _PKIData(asn1_core.Sequence):
 
 class RSTParseError(Exception):
     """Raised for any malformed/incomplete RST — the caller turns this
-    into a SOAP fault rather than a raw 500."""
+    into a SOAP fault rather than a raw 500. ``message_id``: the request's
+    a:MessageID when the envelope got that far, for the fault's RelatesTo."""
+    message_id = None
 
 
 @dataclass
@@ -200,6 +202,14 @@ def parse_rst(envelope_bytes):
         raise RSTParseError(f'Malformed XML: {e}')
 
     message_id = _text(root.find(f'.//{{{ADDRESSING_NS}}}MessageID'))
+    try:
+        return _parse_rst_body(root, message_id)
+    except RSTParseError as e:
+        e.message_id = message_id
+        raise
+
+
+def _parse_rst_body(root, message_id):
     security_header = root.find(f'.//{{{SOAP_NS}}}Header/{{{WSSE_NS}}}Security')
 
     rst_el = root.find(f'.//{{{WST_NS}}}RequestSecurityToken')

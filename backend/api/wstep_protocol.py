@@ -37,9 +37,9 @@ from services.kerberos import negotiate_auth
 from services.wstep import CES_CERTIFICATE_PATH, CES_KERBEROS_PATH, CES_USERNAME_PASSWORD_PATH
 from services.wstep import wstep_service
 from services.wstep.cmc_response import build_cmc_full_pki_response
-from services.wstep.rst_parser import RSTParseError, parse_rst
+from services.wstep.rst_parser import REQUEST_TYPE_ISSUE, RSTParseError, parse_rst
 from services.wstep.rstr_builder import build_issue_response
-from services.wstep.soap_envelope import DS_NS, build_soap_fault, extract_username_token
+from services.wstep.soap_envelope import DS_NS, build_soap_fault, extract_username_token, message_expired
 from utils.client_cert import trusted_client_cert
 from utils.db_transaction import safe_commit
 from utils.trusted_proxy import client_ip
@@ -139,10 +139,26 @@ def _validity_days():
         return 365
 
 
-def _fault_response(reason, status=500, relates_to=None):
+def _fault_response(reason, status=500, relates_to=None, subcode=None):
     (logger.error if status >= 500 else logger.debug)("WSTEP fault (status=%s): %s", status, reason)
-    body = build_soap_fault(reason, relates_to=relates_to)
+    body = build_soap_fault(reason, relates_to=relates_to, subcode=subcode)
     return Response(body, status=status, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
+
+
+def _parse_request(body):
+    """``(parsed, fault)``: the RST, or the fault answering it. MS-WSTEP 3.1.4.2.1
+    serves Issue only (renewal included); an expired wsu:Timestamp is refused."""
+    try:
+        parsed = parse_rst(body)
+    except RSTParseError as e:
+        return None, _fault_response(f'Malformed request: {e}', status=400, relates_to=e.message_id)
+    if parsed.request_type != REQUEST_TYPE_ISSUE:
+        return None, _fault_response('Unsupported wst:RequestType: only Issue is served',
+                                     status=400, relates_to=parsed.message_id)
+    if message_expired(parsed.security_header):
+        return None, _fault_response('The message has expired (wsu:Timestamp)', status=400,
+                                     relates_to=parsed.message_id, subcode='wsse:MessageExpired')
+    return parsed, None
 
 
 def _request_id_for(cert):
@@ -251,10 +267,9 @@ def issue_username_password():
     if err is not None:
         return err
 
-    try:
-        parsed = parse_rst(body)
-    except RSTParseError as e:
-        return _fault_response(f'Malformed request: {e}', status=400)
+    parsed, fault = _parse_request(body)
+    if fault is not None:
+        return fault
 
     authenticated, username = _authenticate_username_password(parsed.security_header)
     if not authenticated:
@@ -316,10 +331,9 @@ def issue_kerberos():
     if err is not None:
         return err
 
-    try:
-        parsed = parse_rst(body)
-    except RSTParseError as e:
-        return _fault_response(f'Malformed request: {e}', status=400)
+    parsed, fault = _parse_request(body)
+    if fault is not None:
+        return fault
 
     response = _issue_and_respond(
         ca, parsed, result.client_principal, kerberos_principal=result.client_principal,
@@ -359,10 +373,9 @@ def renew_certificate_bound():
     if err is not None:
         return err
 
-    try:
-        parsed = parse_rst(body)
-    except RSTParseError as e:
-        return _fault_response(f'Malformed request: {e}', status=400)
+    parsed, fault = _parse_request(body)
+    if fault is not None:
+        return fault
 
     audit = {}
     if _carries_xml_signature(parsed.security_header):

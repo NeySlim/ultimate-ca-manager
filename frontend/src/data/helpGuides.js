@@ -2243,6 +2243,8 @@ An **ECDSA** template is announced in policy schema 3 with its curve (\`ECDSA_P2
 
 A request that names its template, by OID (\`szOID_CERTIFICATE_TEMPLATE\`) or by name (\`szOID_ENROLL_CERTTYPE\`), is issued under that template; a template the CA does not offer or that is inactive, two names for two templates, or EKUs the template does not issue are refused. A request naming none, as Windows CertEnroll often sends, is matched to a template by its EKUs.
 
+WSTEP serves the Issue request type only, renewals included, and refuses a message whose \`wsu:Timestamp\` expired more than 5 minutes ago. A plain PKCS#10 or a CMC request is recognised by its content whatever its ValueType, and every answer carries the CMC Full PKI Response next to the certificate.
+
 ### Kerberos / SPNEGO
 
 Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoenrollment, so machines and users are authenticated by their Kerberos ticket instead of a credential prompt:

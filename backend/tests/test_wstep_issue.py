@@ -135,6 +135,7 @@ def _build_rst_with_username_token(csr, username, password, message_id='urn:uuid
     etree.SubElement(token, '{%s}Password' % WSSE_NS).text = password
     body = etree.SubElement(envelope, '{%s}Body' % SOAP_NS)
     rst = etree.SubElement(body, '{%s}RequestSecurityToken' % WST_NS)
+    etree.SubElement(rst, '{%s}RequestType' % WST_NS).text = 'http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue'
     bst = etree.SubElement(
         rst, '{%s}BinarySecurityToken' % WSSE_NS,
         ValueType='http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10',

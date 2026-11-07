@@ -97,6 +97,7 @@ def _build_signed_rst(signing_cert, signing_key, csr, message_id='urn:uuid:renew
     etree.SubElement(rst, '{%s}TokenType' % WST_NS).text = (
         'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-x509-token-profile-1.0#X509v3'
     )
+    etree.SubElement(rst, '{%s}RequestType' % WST_NS).text = 'http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue'
     bst = etree.SubElement(
         rst, '{%s}BinarySecurityToken' % WSSE_NS,
         ValueType=value_type or 'http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10',
@@ -158,6 +159,7 @@ def _build_signature_wrapping_attack_rst(signing_cert, signing_key, legit_csr, d
     # Decoy RST, sibling of Body, placed before it and never referenced
     # by the signature.
     decoy_rst = etree.SubElement(envelope, '{%s}RequestSecurityToken' % WST_NS)
+    etree.SubElement(decoy_rst, '{%s}RequestType' % WST_NS).text = 'http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue'
     decoy_bst = etree.SubElement(
         decoy_rst, '{%s}BinarySecurityToken' % WSSE_NS,
         ValueType='http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10',
@@ -174,6 +176,7 @@ def _build_signature_wrapping_attack_rst(signing_cert, signing_key, legit_csr, d
         EncodingType='base64',
     )
     bst.text = base64.b64encode(legit_csr.public_bytes(serialization.Encoding.DER)).decode()
+    etree.SubElement(rst, '{%s}RequestType' % WST_NS).text = 'http://docs.oasis-open.org/ws-sx/ws-trust/200512/Issue'
 
     sig_node = xmlsec.template.create(
         security, xmlsec.constants.TransformExclC14N, xmlsec.constants.TransformRsaSha256
