@@ -1,5 +1,6 @@
 """A policy's DNS pattern scopes it by DNS label, case-insensitively (RFC 4343)."""
 import json
+import uuid
 
 import pytest
 
@@ -62,3 +63,30 @@ def test_policy_dns_pattern_wildcard_scopes_subdomains(app, create_ca, create_us
     finally:
         _cleanup(app, pid, 'www.company.com')
         _cleanup(app, pid, 'evilcompany.com')
+
+
+@pytest.mark.parametrize('pattern', ['*.company.com, company.com', '*.company.com company.com',
+                                     'company.com,', ['*.company.com']])
+def test_a_list_in_the_dns_pattern_is_refused_on_save(app, auth_client, pattern):
+    from models import db
+    from models.policy import CertificatePolicy
+    name = f'dns-list-{uuid.uuid4().hex[:8]}'
+    rules = {'san_restrictions': {'dns_pattern': pattern}}
+    try:
+        r = auth_client.post('/api/v2/policies', content_type='application/json',
+                             data=json.dumps({'name': name, 'rules': rules}))
+        assert r.status_code == 400, r.get_json()
+        r = auth_client.post('/api/v2/policies', content_type='application/json', data=json.dumps(
+            {'name': name, 'rules': {'san_restrictions': {'dns_pattern': '*.company.com'}}}))
+        assert r.status_code in (200, 201), r.get_json()
+        pid = r.get_json()['data']['id']
+        r = auth_client.put(f'/api/v2/policies/{pid}', content_type='application/json',
+                            data=json.dumps({'rules': rules}))
+        assert r.status_code == 400, r.get_json()
+        with app.app_context():
+            stored = db.session.get(CertificatePolicy, pid).get_rules()
+            assert stored['san_restrictions']['dns_pattern'] == '*.company.com'
+    finally:
+        with app.app_context():
+            CertificatePolicy.query.filter_by(name=name).delete()
+            db.session.commit()
