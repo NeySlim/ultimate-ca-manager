@@ -345,6 +345,17 @@ def _orphan_with_id(provider, external_id):
     return orphans[0] if len(orphans) == 1 else None
 
 
+def _bound_by_dn(provider, external_data, external_id):
+    """An LDAP account of this provider bound by its DN fallback, now that the
+    directory returns a stable uid for the DN the user bind just proved."""
+    from sqlalchemy import func
+    dn = str((external_data or {}).get('dn') or '').strip()
+    if provider.provider_type != 'ldap' or not dn or dn == external_id:
+        return None
+    return User.query.filter(User.sso_provider_id == provider.id,
+                             func.lower(User.sso_external_id) == dn.lower()).first()
+
+
 def _refuse_username_conflict(provider, username):
     logger.warning(
         f"SSO login refused for '{username}' via {provider.name}: the name belongs to a "
@@ -386,9 +397,13 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
 
     # 1. Stable-identifier match — robust to username/email changes (primary).
     user = None
+    rebind = False
     if external_id:
         user = User.query.filter_by(
             sso_provider_id=provider.id, sso_external_id=external_id).first()
+        if not user:
+            user = _bound_by_dn(provider, external_data, external_id)
+            rebind = user is not None
         if not user:
             user = _orphan_with_id(provider, external_id)
 
@@ -434,7 +449,11 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         user.sso_orphan_of = None
 
         # Bind the stable id (trust-on-first-use) for future stable matching.
-        _bind_external_id(user, provider, external_id)
+        if rebind:
+            logger.info(f"SSO external id of '{user.username}' moves from its DN to the LDAP uid")
+            user.sso_external_id = external_id
+        else:
+            _bind_external_id(user, provider, external_id)
 
         # ── Userinfo sync (email, full name) ─────────────────────────────
         # Controlled by `auto_update_users`. Does NOT touch the role.

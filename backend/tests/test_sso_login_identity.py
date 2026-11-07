@@ -264,6 +264,28 @@ def test_ldap_adopts_a_pre_024_account_the_migration_tied_to_this_provider(app, 
             _cleanup(['tk024'])
 
 
+def test_ldap_account_bound_by_dn_moves_to_the_uid(app, ldap):
+    """An account bound by its DN fallback keeps working once a uid attribute is set."""
+    with app.app_context():
+        _cleanup(['tkdn'])
+        db.session.add(User(username='tkdn', email='dn@corp.test', full_name='D',
+                            role='operator', active=True, password_hash='!SSO_NO_PASSWORD!',
+                            auth_source='ldap', sso_provider_id=ldap.provider_id,
+                            sso_external_id='uid=tkdn,dc=example'))
+        db.session.commit()
+    try:
+        r = ldap('tkdn', dn='uid=tkdn,dc=example', uid='new-uuid')
+        assert r.status_code == 200, r.get_json()
+        with app.app_context():
+            assert User.query.filter_by(username='tkdn').one().sso_external_id == 'new-uuid'
+        # Another entry's DN does not move it.
+        r = ldap('tkdn', dn='uid=other,dc=example', uid='other-uuid')
+        assert r.status_code == 403
+    finally:
+        with app.app_context():
+            _cleanup(['tkdn'])
+
+
 def test_bind_never_replaces_an_existing_external_id(app):
     from api.v2.sso.ldap_routes import _bind_external_id
     with app.app_context():
