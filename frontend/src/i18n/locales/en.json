@@ -2822,7 +2822,7 @@
     "saveSettings": "Save Settings",
     "securitySubtitle": "Password, 2FA, encryption and session configuration",
     "keyEncryption": "Private Key Encryption",
-    "encryptionDesc": "Encrypt all private keys stored in the database using AES-256. Keys are protected by a master key stored at /etc/ucm/master.key. When enabled, UCM stops keeping plaintext key files in its private directory; existing ones are removed. Use deploy hooks to place keys where a service needs them.",
+    "encryptionDesc": "Encrypt all private keys stored in the database using AES-128 (Fernet, with HMAC-SHA256). Keys are protected by a master key stored at /etc/ucm/master.key. When enabled, UCM stops keeping plaintext key files in its private directory; existing ones are removed. Use deploy hooks to place keys where a service needs them.",
     "enableEncryption": "Enable Encryption",
     "disableEncryption": "Disable Encryption",
     "encryptRemainingKeys": "Encrypt remaining keys ({{count}})",

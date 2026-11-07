@@ -2030,7 +2030,7 @@ Limit the web interface and the management API to listed IP addresses and CIDR n
 Require all users to enable two-factor authentication.
 
 ### Private Key Encryption
-Encrypt all private keys stored in the database with AES-256, protected by a master key file. The section shows the encryption status and the **encrypted / unencrypted** key counters. Two opt-in environment variables make missing keys fatal at startup: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (integration-secret encryption) and \`UCM_REQUIRE_KEY_ENCRYPTION\` (private-key encryption).
+Encrypt all private keys stored in the database with AES-128 (Fernet, with HMAC-SHA256), protected by a master key file. The section shows the encryption status and the **encrypted / unencrypted** key counters. Two opt-in environment variables make missing keys fatal at startup: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (integration-secret encryption) and \`UCM_REQUIRE_KEY_ENCRYPTION\` (private-key encryption).
 A new installation creates the master key at its first start (in a container, only when \`/etc/ucm\` is a volume of its own); the Dashboard shows a banner while no key is loaded.
 
 > 💡 Security-sensitive settings (session, lockout, HSTS, public URL, password policy) require the **admin:settings** permission, the fields are locked for operators.
@@ -2802,7 +2802,7 @@ System-wide security configuration affecting all user accounts and access patter
 
 ## Private Key Encryption
 
-Encrypt all CA and certificate private keys stored in the database with AES-256, protected by a master key file kept outside the database.
+Encrypt all CA and certificate private keys stored in the database with AES-128 (Fernet, with HMAC-SHA256), protected by a master key file kept outside the database.
 
 - **Status and counters**: The section shows whether encryption is enabled and how many keys are currently **encrypted** vs **unencrypted**
 - **First start**: An installation without a master key creates \`/etc/ucm/master.key\` (mode 0600) at startup and encrypts the keys and secrets already stored. In a container this happens only when \`/etc/ucm\` is a named volume or a host directory, never an anonymous volume. It does not happen when \`KEY_ENCRYPTION_KEY\` is set, when the database already holds encrypted keys (safe mode) or an audit chain sealed under a previous key, after encryption was disabled here, or with \`UCM_AUTO_MASTER_KEY=false\`. It also removes the plaintext key copies under \`data/private\`. Back up the key file: UCM backups do not need it, but a copy of the database cannot be decrypted without it
