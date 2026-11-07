@@ -27,7 +27,7 @@ from services.deletion_blockers import (
 )
 from utils.response import success_response, error_response
 from utils.datetime_utils import utc_now
-from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
+from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ def bulk_revoke_certificates():
             if not cert:
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
                 continue
-            if cert.revoked:
+            if not revocable(cert, reason):
                 if cert_id in revoked_with_pair:
                     results['success'].append(cert_id)
                 else:

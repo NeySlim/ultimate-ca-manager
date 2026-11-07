@@ -107,3 +107,14 @@ REASON_CODES = {
 def reason_code(value) -> int:
     """The CRLReason code of a stored reason; 0 (unspecified) when it is not a known one."""
     return REASON_CODES.get(REASON_FLAGS.get(normalize_revocation_reason(value) or 'unspecified'), 0)
+
+
+HOLD_REASONS = ('certificateHold', 'certificate_hold')
+
+
+def revocable(cert, reason: Optional[str]) -> bool:
+    """Whether *cert* may be revoked with *reason*: not revoked yet, or on hold and
+    revoked for good (RFC 5280 §5.2.4 counts the reason change as a status change)."""
+    if not getattr(cert, 'revoked', False):
+        return True
+    return cert.revoke_reason in HOLD_REASONS and reason not in HOLD_REASONS

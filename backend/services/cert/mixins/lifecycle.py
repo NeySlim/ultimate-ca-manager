@@ -23,6 +23,7 @@ from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, clea
 from utils.datetime_utils import utc_now, to_naive_utc
 from utils.issuance_defaults import template_digest
 from utils.spki_digest import certificate_key_sha256
+from utils.revocation_reasons import revocable
 
 logger = logging.getLogger(__name__)
 
@@ -396,11 +397,13 @@ class LifecycleMixin:
         certificate = db.session.get(Certificate, cert_id)
         if not certificate:
             raise ValueError("Certificate not found")
-        if certificate.revoked:
+        if not revocable(certificate, reason):
             raise ValueError("Certificate already revoked")
 
         ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
         is_hold = reason in _HOLD_REASONS
+        # A hold made final: dated now, so the delta lists the change; invalid since the hold
+        held_since = certificate.revoked_at if certificate.revoked else None
         previous = {field: getattr(certificate, field) for field in _REVOCATION_FIELDS}
         now = utc_now()
         rejected_renewals = []
@@ -410,6 +413,8 @@ class LifecycleMixin:
             certificate.revoke_reason = reason
             if invalidity_at is not None:
                 certificate.invalidity_at = invalidity_at
+            elif held_since is not None and certificate.invalidity_at is None:
+                certificate.invalidity_at = held_since
 
             # A Microsoft certificate has no caref: nothing for a UCM CRL to publish
             if ca is not None:

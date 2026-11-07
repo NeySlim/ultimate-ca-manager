@@ -288,10 +288,23 @@ class TestUnholdRemoveFromCrl:
             row.revoked_at = base.this_update + timedelta(minutes=1)
             db.session.commit()
 
+            held_base = base.crl_number
+
         r = auth_client.post(f'/api/v2/certificates/{cert["id"]}/unhold')
         assert r.status_code == 200, r.data
 
-        delta = _load_crl(_fetch_crl_pem(auth_client, ca['id'], delta=True))
+        # The delta on the base that listed the hold carries removeFromCRL; the
+        # complete CRL regenerated after it then gets a delta of its own
+        with app.app_context():
+            from models.crl import CRLMetadata
+            on_held_base = CRLMetadata.query.filter_by(
+                ca_id=ca['id'], is_delta=True, base_crl_number=held_base
+            ).order_by(CRLMetadata.crl_number.desc()).first()
+            delta = _load_crl(on_held_base.crl_pem)
+        served = _load_crl(_fetch_crl_pem(auth_client, ca['id'], delta=True))
+        served_base = served.extensions.get_extension_for_class(x509.DeltaCRLIndicator).value.crl_number
+        assert served_base == _load_crl(_fetch_crl_pem(auth_client, ca['id'])).extensions \
+            .get_extension_for_class(x509.CRLNumber).value.crl_number
         reasons = [
             e.value.reason
             for entry in delta

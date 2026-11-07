@@ -153,10 +153,10 @@ def test_a_delta_continues_the_shared_numbering(app):
         ca = _ca_row(key, cert)
         ca.delta_crl_enabled = True
         db.session.commit()
-        assert CRLService.generate_crl(ca.id).crl_number == 1
+        assert CRLService.generate_crl(ca.id).crl_number == 1   # its delta takes 2
         delta = CRLService.generate_delta_crl(ca.id)
-        assert delta.crl_number == 2 and delta.base_crl_number == 1
-        assert CRLService.generate_crl(ca.id).crl_number == 3
+        assert delta.crl_number == 3 and delta.base_crl_number == 1
+        assert CRLService.generate_crl(ca.id).crl_number == 4
 
 
 # --------------------------------------------------------------------------

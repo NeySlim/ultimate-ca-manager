@@ -6,7 +6,7 @@ from auth.unified import require_auth
 from utils.datetime_utils import to_naive_utc, utc_now
 from utils.response import success_response, error_response, no_content_response
 from models import Certificate, CA, db
-from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
+from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
 from services.cert_service import CertificateService
 from services.approval_gate import (PairApprovalConflict, approval_payload, queue_revocation,
                                     revocation_policy_for)
@@ -83,7 +83,7 @@ def revoke_certificate(cert_id):
     if not cert:
         return error_response('Certificate not found', 404)
 
-    if cert.revoked:
+    if not revocable(cert, reason):
         return error_response('Certificate already revoked', 400)
 
     # The other member of a related pair falls with it unless the request says otherwise

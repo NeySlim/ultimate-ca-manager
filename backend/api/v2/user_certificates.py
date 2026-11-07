@@ -35,7 +35,7 @@ from utils.response import error_response, no_content_response, success_response
 from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
 from utils.datetime_utils import utc_now, utc_isoformat
-from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
+from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
 from utils.export_options import json_boolean, query_boolean
 
 logger = logging.getLogger(__name__)
@@ -519,13 +519,13 @@ def revoke_user_certificate(cert_id):
     if not cert:
         return error_response('Certificate data not found', 404)
 
-    if cert.revoked:
-        return error_response('Certificate already revoked', 400)
-
     data = request.json or {}
     reason = normalize_revocation_reason(data.get('reason', 'unspecified'))
     if reason is None:
         return error_response(invalid_reason_message(data.get('reason')), 400)
+
+    if not revocable(cert, reason):
+        return error_response('Certificate already revoked', 400)
 
     partner = mutual_partner(cert)
     try:

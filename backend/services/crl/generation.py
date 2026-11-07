@@ -310,6 +310,15 @@ class CRLGenerationMixin:
             meta={'actor': username},
         )
 
+        # A delta on the new base right away: the one served must never be older than it
+        if ca.delta_crl_enabled and ca.cdp_enabled:
+            try:
+                CRLGenerationMixin.generate_delta_crl(
+                    ca_id, validity_hours=min(720, (ca.delta_crl_interval or 4) * 2),
+                    username=username)
+            except Exception as e:
+                logger.warning(f"Delta CRL of CA {ca_id} not regenerated after its base: {e}")
+
         return crl_metadata
 
     @staticmethod

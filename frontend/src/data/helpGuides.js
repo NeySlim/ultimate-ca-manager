@@ -378,6 +378,10 @@ If a certificate was revoked with the **Certificate Hold** reason, it can be res
 
 > 💡 Certificate Hold is useful for temporary suspensions (e.g., lost device, pending investigation).
 
+### Revoking a Held Certificate for Good
+
+A certificate on hold can be revoked with another reason (for example Key Compromise once the investigation confirms it) from the same **Revoke** button, without being made valid in between. The CRL and OCSP give the new reason; unless an invalidity date is given, the start of the hold is recorded as the date the certificate became invalid.
+
 ### Revoke & Replace
 Combines revocation with immediate re-issuance. The new certificate inherits the same Subject and SANs.
 
@@ -791,7 +795,7 @@ OCSP provides real-time certificate status checking. Instead of downloading an e
 ### OCSP Status
 The OCSP section shows:
 - **Responder status**: Active or inactive per CA
-- **Total queries**: Number of OCSP requests processed
+- **Total queries**: Number of OCSP requests answered since the service started, and how many came from the cache
 - **Cache**: Response cache with automatic daily cleanup of expired entries
 
 ### OCSP Cache

@@ -343,6 +343,7 @@ export function FloatingDetailWindow({ windowInfo }) {
   const isUserCert = windowInfo.type === 'user_certificate'
   const isCA = windowInfo.type === 'ca'
   const hasPrivateKey = !!data?.has_private_key
+  const isOnHold = !!data?.revoked && (data.revoke_reason === 'certificateHold' || data.revoke_reason === 'certificate_hold')
   const actionBarProps = data ? {
     onExport: handleExport,
     hasPrivateKey,
@@ -360,11 +361,12 @@ export function FloatingDetailWindow({ windowInfo }) {
     onRequestKeyRecovery: (isCert || isUserCert) && hasPrivateKey && hasPermission('write:key_recovery') ? () => setKeyRecoveryOpen(true) : null,
     onRenew: isCert && canWrite('certificates') && !data.revoked && (data.has_private_key || data.source === 'msca') ? handleRenew : null,
     onRename: isCert && canWrite('certificates') ? handleRename : null,
-    onRevoke: ((isCert || isUserCert) && canWrite(resource) && !data.revoked)
+    // A certificate on hold can still be revoked for good (RFC 5280 §5.2.4)
+    onRevoke: ((isCert || isUserCert) && canWrite(resource) && (!data.revoked || isOnHold))
       // A CA is revoked by its parent, so it needs one held in UCM (#343)
       || (isCA && canWrite('cas') && !data.revoked && !data.revoked_in_chain && !data.pending && !data.is_root && data.type !== 'root' && !!data.parent_id)
       ? handleRevoke : null,
-    onUnhold: isCert && canWrite('certificates') && data.revoked && (data.revoke_reason === 'certificateHold' || data.revoke_reason === 'certificate_hold') ? handleUnhold : null,
+    onUnhold: isCert && canWrite('certificates') && isOnHold ? handleUnhold : null,
     // Offline needs the key in UCM's own store, and a revoked CA stays visibly revoked (#348, review)
     onOffline: isCA && canWrite('cas') && !data.offline && !data.pending && !data.revoked && data.has_private_key && !data.uses_hsm ? handleOffline : null,
     onRestore: isCA && canWrite('cas') && data.offline ? handleRestore : null,
@@ -437,7 +439,7 @@ export function FloatingDetailWindow({ windowInfo }) {
 
     {(isCert || isUserCert || isCA) && (
       <RevokeCertificateModal
-        allowHold={!isCA}
+        allowHold={!isCA && !isOnHold}
         open={revokeOpen}
         onClose={() => { setRevokeOpen(false); setDeleteAfterRevoke(false) }}
         onConfirm={handleRevokeConfirm}
