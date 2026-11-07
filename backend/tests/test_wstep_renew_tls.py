@@ -799,7 +799,7 @@ def test_template_without_ekus_keeps_the_renewal_within_the_old_ones(app, templa
 @pytest.mark.parametrize('twin', ['same', 'hex_serial', 'crlf_pem'])
 def test_two_live_duplicates_are_claimed_together(client, app, wstep_renew_config, twin):
     """A certificate held twice renews once, however the twin stores its serial or PEM."""
-    old_cert, old_key = _issue(app, wstep_renew_config['id'], f'tls-renew-two-live-{twin}.example.test')
+    old_cert, old_key = _issue(app, wstep_renew_config['id'], f"tls-renew-two-live-{twin.replace('_', '-')}.example.test")
     with app.app_context():
         original = Certificate.query.filter_by(serial_number=str(old_cert.serial_number)).one()
         columns = {c.name: getattr(original, c.name) for c in Certificate.__table__.columns

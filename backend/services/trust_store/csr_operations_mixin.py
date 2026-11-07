@@ -9,7 +9,8 @@ from typing import List, Optional, Tuple
 
 from cryptography import x509
 from utils.csr_extensions import csr_extensions
-from utils.request_names import RequestRejected, cn_implied_names, refuse_malformed_request
+from utils.request_names import (RequestRejected, cn_implied_names, cn_without_name_notice,
+                                 refuse_malformed_request, subject_email_names)
 from utils.eku_validation import add_ocsp_nocheck_if_responder
 from cryptography.x509.oid import NameOID, ExtensionOID
 from cryptography.hazmat.primitives import serialization
@@ -733,11 +734,7 @@ class CSROperationsMixin:
             effective_sans = csr_sans
             if cert_type != 'intermediate_ca':
                 # RFC 5280 §4.1.2.6: the subject's emailAddress is also an rfc822Name
-                missing = []
-                for attr in subject.get_attributes_for_oid(NameOID.EMAIL_ADDRESS):
-                    name = x509.RFC822Name(attr.value) if attr.value else None
-                    if name is not None and name not in csr_sans and name not in missing:
-                        missing.append(name)
+                missing = [n for n in subject_email_names(subject) if n not in csr_sans]
                 if san_template is not None and missing:
                     from services.template_service import allowed_san_types, san_type_of
                     allowed = allowed_san_types(san_template)
@@ -747,6 +744,9 @@ class CSROperationsMixin:
                     san_rebuilt = True
         else:
             effective_sans = _synthesize_san_from_subject(subject, cert_type)
+            cn_notice = cn_without_name_notice(subject, cert_type)
+            if cn_notice and notices is not None:
+                notices.append(cn_notice)
         if extra_san:
             effective_sans = list(effective_sans) + [
                 n for n in extra_san if n not in effective_sans]
