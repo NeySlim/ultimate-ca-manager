@@ -71,7 +71,7 @@ def test_an_authoritative_answer_is_cacheable_until_next_update(app, client, cre
             assert 0 < max_age <= min(3600, remaining + 1)
             assert parsedate_to_datetime(r.headers['Expires']) == parsed.next_update_utc.replace(microsecond=0)
             assert parsedate_to_datetime(r.headers['Last-Modified']) == parsed.this_update_utc.replace(microsecond=0)
-            assert r.headers['ETag'] == f'"{hashlib.sha1(r.data).hexdigest()}"'
+            assert r.headers['ETag'] == f'"{hashlib.sha1(r.data, usedforsecurity=False).hexdigest()}"'
 
 
 def test_a_nonce_answer_is_never_marked_no_store(app, client, create_ca, create_cert):
