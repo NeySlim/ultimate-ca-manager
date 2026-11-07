@@ -117,14 +117,18 @@ class SyslogForwarder:
             return self._hostname
 
         name = ''
+        read = True
         try:
             from models import SystemConfig
             cfg = SystemConfig.query.filter_by(key='system_name').first()
             name = _sanitize_hostname(cfg.value if cfg else '')
         except Exception:
-            pass
+            read = False
         if not name:
             name = _sanitize_hostname(safe_call(socket.gethostname))
+        if not read:
+            # A fallback taken because SQL was refused must not hide system_name for minutes
+            return name or '-'
 
         self._hostname = name or '-'
         self._hostname_resolved_at = now
@@ -226,7 +230,10 @@ class SyslogForwarder:
         pri = (facility_code * 8) + severity_code
 
         timestamp = audit_log.timestamp.strftime('%Y-%m-%dT%H:%M:%S.%fZ') if audit_log.timestamp else utc_now().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-        hostname = self._resolve_hostname()
+        # A staged entry carries the name resolved while SQL was still allowed
+        hostname = getattr(audit_log, 'syslog_hostname', None)
+        if not isinstance(hostname, str) or not hostname:
+            hostname = self._resolve_hostname()
 
         # Structured data
         sd_parts = []

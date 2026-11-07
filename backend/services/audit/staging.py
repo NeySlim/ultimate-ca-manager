@@ -78,14 +78,42 @@ def forward_to_syslog(entry):
 
 @event.listens_for(Session, 'after_commit')
 def _syslog_after_commit(session):
-    # A staged entry leaves for syslog once committed with the caller's work, never before
-    for entry in session.info.pop(_PENDING_SYSLOG, ()):
+    # A staged entry leaves for syslog once the outermost transaction commits, never at a RELEASE SAVEPOINT
+    if session.in_nested_transaction():
+        return
+    for _tx, entry in session.info.pop(_PENDING_SYSLOG, ()):
         forward_to_syslog(entry)
 
 
-@event.listens_for(Session, 'after_rollback')
-def _syslog_after_rollback(session):
-    session.info.pop(_PENDING_SYSLOG, None)
+def _within(tx, ended):
+    while tx is not None:
+        if tx is ended:
+            return True
+        tx = tx.parent
+    return False
+
+
+@event.listens_for(Session, 'after_soft_rollback')
+def _syslog_after_rollback(session, previous_transaction):
+    # A rolled-back savepoint drops only what was staged inside it
+    pending = session.info.get(_PENDING_SYSLOG)
+    if not pending:
+        return
+    if previous_transaction is None or previous_transaction.parent is None:
+        session.info.pop(_PENDING_SYSLOG, None)
+        return
+    pending[:] = [(tx, e) for tx, e in pending if not _within(tx, previous_transaction)]
+
+
+def _staged_copy(entry):
+    copy = syslog_copy(entry)
+    try:
+        from services.syslog_service import syslog_forwarder
+        if syslog_forwarder.is_enabled:
+            copy.syslog_hostname = syslog_forwarder._resolve_hostname()
+    except Exception:
+        logger.debug("Syslog HOSTNAME not resolved at staging", exc_info=True)
+    return copy
 
 
 def stage_audit_entry(purge_from=None, **fields):
@@ -109,7 +137,9 @@ def stage_audit_entry(purge_from=None, **fields):
 
         fit_to_columns(entry)
         staged = append_entry(entry, purge_from=purge_from)
-        db.session.info.setdefault(_PENDING_SYSLOG, []).append(syslog_copy(entry))
+        session = db.session()
+        tx = session.get_nested_transaction() or session.get_transaction()
+        session.info.setdefault(_PENDING_SYSLOG, []).append((tx, _staged_copy(entry)))
         return staged
     except Exception:
         logger.warning("An audit entry could not be staged", exc_info=True)
