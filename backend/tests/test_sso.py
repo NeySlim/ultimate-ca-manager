@@ -387,6 +387,7 @@ class TestSSOUserProvisioning:
         provider.sync_role_on_login = kwargs.get('sync_role_on_login', False)
         provider.default_role = kwargs.get('default_role', 'viewer')
         provider.role_mapping = kwargs.get('role_mapping', None)
+        provider.idp_key.return_value = kwargs.get('idp_key')
         return provider
 
     def _ensure_user(self, app, username='sso.alice', role='admin'):
@@ -690,6 +691,7 @@ class TestSamlStableMatch:
         p.id = kw.get('id', 1); p.provider_type = 'saml'
         p.auto_create_users = True; p.auto_update_users = True
         p.sync_role_on_login = False; p.default_role = 'viewer'; p.role_mapping = None
+        p.idp_key.return_value = None
         return p
 
     def test_saml_match_by_nameid(self, app):
