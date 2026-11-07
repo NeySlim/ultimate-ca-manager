@@ -132,3 +132,49 @@ def test_ec_renewal_without_any_password_is_refused(app, scep_ca):
                               auto_approve=True).process_pkcs_req(request, '127.0.0.1')
 
     assert _response_attributes(response)[PKI_STATUS_OID] == '2'
+
+
+def _enroll_via(ca, ca_cert, key, cn, profile_id, secret):
+    self_signed, _ = _client_identity(cn, key=key)
+    request = _message(ca_cert, self_signed, key, 19, _csr(key, cn, secret))
+    response, _ = SCEPService(ca.refid, challenge_password=secret, auto_approve=True,
+                              profile_id=profile_id).process_pkcs_req(request, '127.0.0.1')
+    assert _response_attributes(response)[PKI_STATUS_OID] == '0'
+    return pkcs7.load_der_pkcs7_certificates(_decrypt_response(response, key, self_signed))[0]
+
+
+@pytest.mark.parametrize('renew_profile, expected', [(9101, '0'), (9102, '2'), (None, '2')],
+                         ids=['same-profile', 'other-profile', 'global-endpoint'])
+def test_challenge_less_renewal_bound_to_the_issuing_endpoint(app, scep_ca, renew_profile,
+                                                              expected):
+    """Another endpoint's template is not granted without that endpoint's secret."""
+    ca, ca_cert = scep_ca
+    old_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    cn = f'renew-bound-{uuid.uuid4().hex[:6]}.example.test'
+    issued = _enroll_via(ca, ca_cert, old_key, cn, 9101, 'secret A')
+    request = _message(ca_cert, issued, old_key, 17,
+                       _csr(rsa.generate_private_key(public_exponent=65537, key_size=2048), cn))
+
+    response, _ = SCEPService(ca.refid, challenge_password='secret B', auto_approve=True,
+                              profile_id=renew_profile).process_pkcs_req(request, '127.0.0.1')
+
+    assert _response_attributes(response)[PKI_STATUS_OID] == expected
+
+
+def test_challenge_less_renewal_of_a_non_scep_cert_is_refused(app, scep_ca):
+    """A certificate of this CA issued outside SCEP still needs the challenge."""
+    ca, ca_cert = scep_ca
+    old_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    cn = f'renew-foreign-{uuid.uuid4().hex[:6]}.example.test'
+    issued = _enroll_via(ca, ca_cert, old_key, cn, None, ORIGINAL)
+    from models import SCEPRequest, db
+    SCEPRequest.query.filter(SCEPRequest.subject.contains(cn)).delete(
+        synchronize_session=False)
+    db.session.commit()
+    request = _message(ca_cert, issued, old_key, 17,
+                       _csr(rsa.generate_private_key(public_exponent=65537, key_size=2048), cn))
+
+    response, _ = SCEPService(ca.refid, challenge_password=ROTATED,
+                              auto_approve=True).process_pkcs_req(request, '127.0.0.1')
+
+    assert _response_attributes(response)[PKI_STATUS_OID] == '2'

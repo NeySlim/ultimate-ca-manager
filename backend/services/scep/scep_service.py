@@ -524,11 +524,12 @@ class SCEPService:
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
                 ), 200
 
-            # RFC 8894 §2.4: a RenewalReq is authenticated by the issued certificate
-            # that signs it (_validate_renewal, step 8), so its challenge is not
-            # compared; an EC client's password still keys the PWRI reply.
+            # RFC 8894 §2.4: a RenewalReq signed by a certificate this endpoint
+            # issued is authenticated by it (step 8), so its challenge is not
+            # compared; any other signer still needs this endpoint's secret.
             if (self.intune_client is None and self.challenge_password
-                    and message_type != self.MSG_TYPE_RENEWAL_REQ):
+                    and not (message_type == self.MSG_TYPE_RENEWAL_REQ
+                             and self._issued_through_this_endpoint(signer_cert))):
                 if not self._has_usable_challenge_password(
                     challenge_pwd
                 ) or not hmac.compare_digest(
@@ -1003,6 +1004,22 @@ class SCEPService:
             isinstance(challenge_password, (str, bytes))
             and len(challenge_password) > 0
         )
+
+    def _issued_through_this_endpoint(self, signer_cert: x509.Certificate) -> bool:
+        """True when a SCEP request of this profile (NULL: the global endpoint)
+        produced the signer certificate."""
+        from services.cert.issued_lookup import find_issued_rows
+        try:
+            refids = [r.refid for r in find_issued_rows(self.ca, signer_cert)]
+        except Exception as e:
+            logger.warning(f"SCEP renewal: signer lookup failed: {e}")
+            return False
+        if not refids:
+            return False
+        query = SCEPRequest.query.filter(SCEPRequest.cert_refid.in_(refids))
+        query = query.filter(SCEPRequest.profile_id.is_(None) if self.profile_id is None
+                             else SCEPRequest.profile_id == self.profile_id)
+        return query.first() is not None
 
     def _validate_renewal(self, signer_cert: x509.Certificate, csr) \
             -> Optional[Tuple[int, str]]:
