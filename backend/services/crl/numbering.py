@@ -1,7 +1,7 @@
 """CRL numbers: one increasing sequence per CRL issuer (RFC 5280 §5.2.3).
 
 The number is allocated under the lock of the issuer's counter row, held until
-the caller commits the CRL row, so two processes never sign two CRLs under one
+the caller commits the reservation, so two processes never sign two CRLs under one
 number. The counter is the floor, so the sequence survives a restore and a re-import.
 """
 from cryptography import x509
@@ -33,8 +33,8 @@ def _locked_counter(issuer_key: str) -> CRLNumberCounter:
 def allocate_crl_number(ca: CA, ca_cert: x509.Certificate) -> int:
     """The next number for this CA's CRLs, base and delta alike.
 
-    Taken under the lock and recorded in the caller's transaction: the caller
-    commits it with the CRL row, or rolls both back.
+    Taken under the lock and recorded in the caller's transaction: the caller reads
+    what the CRL lists, then commits before signing, so the lock never spans a signature.
     """
     counter = _locked_counter(crl_issuer_key(ca_cert))
     highest = db.session.execute(

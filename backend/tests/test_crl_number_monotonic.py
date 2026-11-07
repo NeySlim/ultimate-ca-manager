@@ -441,3 +441,63 @@ def test_the_schema_refuses_two_crls_under_one_number():
     with engine.connect() as conn:
         indexes = {r[1]: r[2] for r in conn.execute(text("PRAGMA index_list(crl_metadata)"))}
     assert indexes.get('uix_crl_ca_number') == 1
+
+
+def _write_while_signing(app, url, generate, monkeypatch):
+    """Another connection writes while the CRL is being signed (a remote HSM is slow)."""
+    import sqlite3
+    from services.crl import generation
+    from tests.test_backup_cross_installation import _bound_to
+
+    key, cert = _authority()
+    signing, written, outcome = threading.Event(), threading.Event(), {}
+    original = generation.rsa_padding_for
+
+    def slow_padding(*args, **kwargs):
+        if threading.current_thread().name == 'signer':
+            signing.set()
+            written.wait(5)
+        return original(*args, **kwargs)
+
+    def sign():
+        try:
+            with app.app_context():
+                generate(ca_id)
+                db.session.remove()
+        except Exception as exc:  # noqa: BLE001
+            outcome['signer'] = repr(exc)
+
+    with _bound_to(app, url), app.app_context():
+        ca = _ca_row(key, cert)
+        ca.delta_crl_enabled = True
+        db.session.commit()
+        ca_id = ca.id
+        CRLService.generate_crl(ca_id)
+        db.session.remove()
+        monkeypatch.setattr(generation, 'rsa_padding_for', slow_padding)
+        signer = threading.Thread(name='signer', target=sign)
+        signer.start()
+        try:
+            assert signing.wait(10)
+            other = sqlite3.connect(url.removeprefix('sqlite:///'), timeout=0.3)
+            try:
+                other.execute("UPDATE certificate_authorities SET descr = 'written' WHERE id = ?",
+                              (ca_id,))
+                other.commit()
+                outcome['writer'] = 'ok'
+            except sqlite3.OperationalError as exc:
+                outcome['writer'] = str(exc)
+            finally:
+                other.close()
+        finally:
+            written.set()
+            signer.join(30)
+    return outcome
+
+
+@pytest.mark.parametrize('kind', ['full', 'delta'])
+def test_the_database_is_not_locked_while_the_crl_is_signed(app, tmp_path, monkeypatch, kind):
+    generate = {'full': CRLService.generate_crl, 'delta': CRLService.generate_delta_crl}[kind]
+    outcome = _write_while_signing(app, f"sqlite:///{tmp_path / 'signing.db'}", generate,
+                                   monkeypatch)
+    assert outcome == {'writer': 'ok'}, outcome

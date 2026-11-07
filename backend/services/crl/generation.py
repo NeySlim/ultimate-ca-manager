@@ -220,9 +220,8 @@ class CRLGenerationMixin:
 
         _run_housekeeping(ca_id)
 
-        # The number first, then the list, under the lock held to the commit: a
-        # higher number always lists what a lower one did (RFC 5280 §5.2.3, §3.3).
-        # A failure in between releases the lock and gives the number back.
+        # Number and list under the lock, committed before signing: a higher number
+        # lists what a lower one did (RFC 5280 §5.2.3) and a slow HSM holds no lock.
         try:
             crl_number = allocate_crl_number(ca, ca_cert)
             revoked_certs = CRLQueryMixin.get_revoked_certificates(ca_id)
@@ -257,6 +256,7 @@ class CRLGenerationMixin:
             # UCM issues unpartitioned CRLs — omit IDP on both full and delta.
             builder = _add_freshest_crl(builder, ca)
             crl_hash = signing_hash_for(ca_private_key, _crl_signature_hash(ca))
+            db.session.commit()  # a failed signature leaves a gap, as §5.2.3 allows
             crl = builder.sign(ca_private_key, crl_hash, default_backend(),
                                rsa_padding=rsa_padding_for(ca_private_key, crl_hash))
 
@@ -352,7 +352,7 @@ class CRLGenerationMixin:
         from services.hsm.ca_key_loader import get_ca_signing_key
         ca_private_key = get_ca_signing_key(ca, allow_revoked=True)
 
-        # Number, base and list under one lock, as in generate_crl
+        # Number, base and list under one lock, released before signing as in generate_crl
         try:
             crl_number = allocate_crl_number(ca, ca_cert)
             base_crl = CRLMetadata.query.filter_by(
@@ -417,6 +417,8 @@ class CRLGenerationMixin:
                 _authority_key_identifier_for_crl(ca_cert), critical=False
             )
             crl_hash = signing_hash_for(ca_private_key, _crl_signature_hash(ca))
+            base_number = base_crl.crl_number
+            db.session.commit()
             crl = builder.sign(ca_private_key, crl_hash, default_backend(),
                                rsa_padding=rsa_padding_for(ca_private_key, crl_hash))
 
@@ -430,7 +432,7 @@ class CRLGenerationMixin:
                 revoked_count=entries,
                 generated_by=username,
                 is_delta=True,
-                base_crl_number=base_crl.crl_number
+                base_crl_number=base_number
             )
 
             db.session.add(crl_metadata)
@@ -443,14 +445,14 @@ class CRLGenerationMixin:
         from services.audit_service import AuditService
         AuditService.log_ca(
             'generate_delta_crl', ca,
-            f"Generated delta CRL #{crl_number} (base #{base_crl.crl_number}) "
+            f"Generated delta CRL #{crl_number} (base #{base_number}) "
             f"with {entries} new revocations",
             username=username,
         )
 
         logger.info(
             f"Generated delta CRL #{crl_number} for CA {ca.descr} "
-            f"(base #{base_crl.crl_number}, {entries} entries)"
+            f"(base #{base_number}, {entries} entries)"
         )
 
         return crl_metadata
