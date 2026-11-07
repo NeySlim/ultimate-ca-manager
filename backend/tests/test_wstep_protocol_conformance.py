@@ -44,6 +44,10 @@ def _post(client, body):
     return client.post(ISSUE_URL, data=body, headers=_basic_auth())
 
 
+def _fault_code(data):
+    return etree.fromstring(data).find(f'.//{{{SOAP_NS}}}Fault/{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text
+
+
 def _rstr_tokens(data):
     root = etree.fromstring(data)
     rstr = root.find(f'.//{{{WST_NS}}}RequestSecurityTokenResponse')
@@ -110,6 +114,7 @@ def test_only_an_issue_request_type_is_served(client, wstep_config):
         reason, relates_to, _sub = _fault(r.data)
         assert reason == 'Unsupported wst:RequestType: only Issue is served'
         assert relates_to == 'urn:uuid:conf-1'
+        assert _fault_code(r.data) == 's:Sender'
 
 
 def test_an_expired_message_is_refused(client, wstep_config):
@@ -123,6 +128,7 @@ def test_an_expired_message_is_refused(client, wstep_config):
     reason, relates_to, subcode = _fault(r.data)
     assert reason == 'The message has expired (wsu:Timestamp)'
     assert subcode == 'wsse:MessageExpired' and relates_to == 'urn:uuid:conf-1'
+    assert _fault_code(r.data) == 's:Sender'  # WSS 1.1 section 12: subcodes of env:Sender
     within_skew = (now - datetime.timedelta(minutes=10), now - datetime.timedelta(minutes=2))
     assert _post(client, _rst(der, timestamp=within_skew)).status_code == 200
     assert _post(client, _rst(der, timestamp=(now, 'tomorrow'))).status_code == 400
