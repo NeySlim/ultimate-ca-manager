@@ -1564,7 +1564,7 @@ export const helpContent = {
         title: 'mTLS Authentication',
         icon: ShieldCheck,
         items: [
-          { label: 'Trusted CA', text: 'The CA whose client certificates are accepted at login, and the default issuer when a user generates one. Any CA whose certificate is not revoked can be chosen, keyless or offline included: such a CA issues nothing, so its users upload certificates issued elsewhere (v2.248)' },
+          { label: 'Trusted CA', text: 'The CA whose client certificates are accepted at login, and the default issuer when a user generates one. Any CA whose certificate is not revoked can be chosen, keyless or offline included: such a CA issues nothing, so its users upload certificates issued elsewhere (v2.248). It is the only trust anchor of the HTTPS port: a client certificate from its parent or from a sibling CA is refused at the TLS handshake, so trust a root to accept its whole hierarchy (v2.252)' },
           { label: 'Require client certificate', text: 'Optionally make mTLS mandatory for the web UI, changing mTLS settings requires a service restart' },
           { label: 'Same serial, other CA (v2.251)', text: 'An enrolment is identified by its issuer and serial number, so a client certificate can be enrolled, imported or assigned when another CA\'s enrolled certificate has the same serial' },
           { label: 'Reverse proxy headers (v2.252)', text: 'Behind a proxy that forwards the client certificate as headers, send the issuer DN (X-SSL-Client-I-DN) with the serial, read as hexadecimal, or the certificate itself (X-SSL-Client-Cert). A serial without its issuer opens no enrolment that recorded one, and a presented certificate cannot be enrolled without it' },

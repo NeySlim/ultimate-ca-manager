@@ -1920,6 +1920,8 @@ def main():
                     
                     try:
                         ssl_context.load_verify_locations(ca_cert_path)
+                        from boot_config import anchor_client_verification
+                        anchor_client_verification(ssl_context)
                         print(f"  mTLS CA: {ca.descr}")
                         print(f"  mTLS CA file: {ca_cert_path}")
                     except Exception as e:
