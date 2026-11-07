@@ -79,3 +79,15 @@ def test_regenerate_keeps_the_original_lifetime(auth_client, keys):
     created.append(data['id'])
     lifetime = _expiry(data) - utc_now().replace(tzinfo=None)
     assert timedelta(days=6) < lifetime <= timedelta(days=7)
+
+
+def test_regenerate_through_a_key_is_capped_by_it(app, auth_client, keys):
+    make, created = keys
+    forever = make(expires_days=None)
+    parent = make(expires_days=1)
+    r = app.test_client().post(f"/api/v2/account/apikeys/{forever['id']}/regenerate",
+                               headers={'X-API-Key': parent['key']})
+    data = assert_success(r, 201)
+    created.append(data['id'])
+    assert _expiry(data) is not None
+    assert _expiry(data) <= _expiry(parent)

@@ -248,3 +248,44 @@ def test_ldap_login_issues_a_new_identifier(app, make_user, ldap_provider, monke
                 SSOSession.query.filter_by(user_id=user.id).delete()
                 db.session.delete(user)
                 db.session.commit()
+
+
+def test_a_pending_second_factor_ends_with_a_password_change(app, make_user):
+    uid, username, secret = make_user(totp=True)
+    pending = app.test_client()
+    assert _login(pending, username).status_code == 200
+    with app.app_context():
+        user = db.session.get(User, uid)
+        user.set_password(NEW_PASSWORD)
+        db.session.commit()
+    assert _post(pending, '/api/v2/auth/login/2fa', {'code': _code(secret)}).status_code == 401
+    assert not _authenticated(pending)
+
+
+@pytest.mark.parametrize('route, body', [
+    ('reset-password', {'new_password': NEW_PASSWORD, 'current_password': PASSWORD}),
+    ('', {'password': NEW_PASSWORD, 'current_password': PASSWORD}),
+])
+def test_an_admin_keeps_its_session_after_changing_its_own_password(app, make_user, route, body):
+    uid, username, _ = make_user(role='admin')
+    admin = _session(app, username)
+    before = _sid(admin)
+    url = f'/api/v2/users/{uid}/{route}'.rstrip('/')
+    send = admin.post if route else admin.put
+    r = send(url, data=json.dumps(body), content_type='application/json')
+    assert r.status_code == 200, r.data
+    assert _authenticated(admin)
+    assert _sid(admin) != before
+
+
+def test_a_locked_password_refusal_is_audited(app, make_user):
+    from models import AuditLog
+    uid, username, _ = make_user()
+    with app.app_context():
+        user = db.session.get(User, uid)
+        user.locked_until = utc_now() + timedelta(minutes=30)
+        db.session.commit()
+    assert _login(app.test_client(), username).status_code == 401
+    with app.app_context():
+        assert AuditLog.query.filter_by(action='login_failure', username=username).filter(
+            AuditLog.details.contains('account locked')).count() == 1
