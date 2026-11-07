@@ -931,6 +931,23 @@ def _validated_algorithm_rules(rules, *, fips_check=True):
     return _validated_certifications(rules, 'hsm_certifications')
 
 
+def _validated_dns_pattern(rules):
+    # One pattern per policy: a list would match no name and silently skip the policy
+    san = rules.get('san_restrictions')
+    if san is None:
+        return None
+    if not isinstance(san, dict):
+        return 'san_restrictions must be an object'
+    pattern = san.get('dns_pattern')
+    if pattern is None:
+        return None
+    if not isinstance(pattern, str):
+        return 'dns_pattern must be a string'
+    if ',' in pattern or any(c.isspace() for c in pattern.strip()):
+        return 'dns_pattern holds a single pattern: create one policy per domain'
+    return None
+
+
 def _validated_rules(rules):
     """``(rules, error)``: key-type, digest, scheme and date rules normalised,
     unknown values refused."""
@@ -938,7 +955,7 @@ def _validated_rules(rules):
     if not isinstance(rules, dict):
         return None, 'rules must be an object'
     rules = strip_dead_rules(rules)
-    error = _validated_algorithm_rules(rules)
+    error = _validated_algorithm_rules(rules) or _validated_dns_pattern(rules)
     for key in ('require_hsm_ca_key', 'pq_standalone'):
         if error is None and key in rules and not isinstance(rules[key], bool):
             error = f'{key} must be true or false'

@@ -6,6 +6,7 @@ from models import db, AuditLog
 from utils.datetime_utils import utc_now
 from utils.trusted_proxy import client_ip
 from .chain import append_entry, verify_chain
+from .staging import fit_to_columns, forward_to_syslog, syslog_copy
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ class AuditCoreLoggingMixin:
         user_id: Optional[int] = None,
         ip_address: Optional[str] = None,
     ) -> AuditLog:
+        audit_log = None
         try:
             in_request = has_request_context()
 
@@ -43,7 +45,7 @@ class AuditCoreLoggingMixin:
                 # spoofed XFF from arbitrary clients ending up in the audit
                 # trail as if it were the real source.
                 ip_address = client_ip()
-                user_agent = request.headers.get('User-Agent', '')[:500]
+                user_agent = request.headers.get('User-Agent', '')
 
             if explicit_ip:
                 ip_address = str(explicit_ip)[:45]
@@ -69,6 +71,7 @@ class AuditCoreLoggingMixin:
                 success=success
             )
 
+            fit_to_columns(audit_log)
             append_entry(audit_log)
             db.session.commit()
 
@@ -78,19 +81,17 @@ class AuditCoreLoggingMixin:
             else:
                 logger.warning(log_msg)
 
-            try:
-                from services.syslog_service import syslog_forwarder
-                if syslog_forwarder.is_enabled:
-                    syslog_forwarder.send(audit_log)
-            except Exception as e:
-                # Syslog forwarding must never break audit logging itself.
-                logger.warning(f"Syslog forward failed for audit_log id={audit_log.id}: {e}", exc_info=True)
-
+            forward_to_syslog(audit_log)
             return audit_log
 
         except Exception as e:
-            logger.error(f"Failed to create audit log: {e}")
+            # The action is already committed: its trace must still leave somewhere
+            unsaved = syslog_copy(audit_log) if audit_log is not None else None
+            logger.error(f"Failed to create audit log: {e}; lost entry: action={action} "
+                         f"resource={resource_type}:{resource_id} user={username} details={details}")
             db.session.rollback()
+            if unsaved is not None:
+                forward_to_syslog(unsaved)
             return None
 
     @staticmethod

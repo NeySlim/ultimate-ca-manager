@@ -15,14 +15,14 @@ class AuditLog(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     timestamp = db.Column(db.DateTime, default=utc_now, index=True)
-    username = db.Column(db.String(80), index=True)
+    username = db.Column(db.Text, index=True)
     action = db.Column(db.String(100), nullable=False)  # create_ca, revoke_cert, etc.
     resource_type = db.Column(db.String(50))  # ca, certificate, user, etc.
-    resource_id = db.Column(db.String(100))
-    resource_name = db.Column(db.String(255))  # Human-readable name (cert CN, user name, CA name)
+    resource_id = db.Column(db.Text)
+    resource_name = db.Column(db.Text)  # Human-readable name (cert CN, user name, CA name)
     details = db.Column(db.Text)
     ip_address = db.Column(db.String(45))
-    user_agent = db.Column(db.String(255))
+    user_agent = db.Column(db.Text)
     success = db.Column(db.Boolean, default=True)
     # Hash chain: each entry seals its content and the hash of the entry before it
     prev_hash = db.Column(db.String(64))

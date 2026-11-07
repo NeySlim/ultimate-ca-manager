@@ -59,8 +59,45 @@ class SyslogForwarder:
             cls._instance._initialized = False
         return cls._instance
 
-    # All available event categories (resource_type values)
+    # The categories an operator can deselect; a resource type in none of them is always sent
     ALL_CATEGORIES = ['certificate', 'ca', 'csr', 'user', 'acme', 'scep', 'system']
+    _PREFIXES = (('acme_', 'acme'), ('scep_', 'scep'))
+    _ALIASES = {'sso': 'user', 'user_certificate': 'certificate',
+                'ssh_certificate': 'certificate', 'ssh_ca': 'ca'}
+
+    # Under Users only sign-in activity can be muted: account changes (role, password, MFA) always leave
+    _USER_ACTIVITY = ('login', 'logout')
+    # Under System, key, encryption, restore, database and settings changes always leave too
+    _SYSTEM_ALWAYS = frozenset({
+        'master_key_downloaded', 'encryption_enabled', 'encryption_disabled', 'system_encrypt',
+        'system_restore', 'database_reset', 'database.switch', 'settings_update',
+        'private_key_files_purged', 'backup_delete', 'log_bundle_downloaded'})
+
+    @classmethod
+    def category_of(cls, resource_type, action=None):
+        """The deselectable category an event belongs to, or None."""
+        category = cls._category_of_type(resource_type)
+        if category == 'user' and not str(action or '').startswith(cls._USER_ACTIVITY):
+            return None
+        if category == 'system' and action in cls._SYSTEM_ALWAYS:
+            return None
+        return category
+
+    @classmethod
+    def _category_of_type(cls, resource_type):
+        if not resource_type:
+            return None
+        if resource_type in cls.ALL_CATEGORIES:
+            return resource_type
+        for prefix, category in cls._PREFIXES:
+            if resource_type.startswith(prefix):
+                return category
+        return cls._ALIASES.get(resource_type)
+
+    def _wanted(self, resource_type, action=None) -> bool:
+        # No box checked is read back from the database as all of them: same here
+        category = self.category_of(resource_type, action)
+        return not self._categories or category is None or category in self._categories
 
     def _initialize(self):
         self._enabled = False
@@ -87,14 +124,18 @@ class SyslogForwarder:
             return self._hostname
 
         name = ''
+        read = True
         try:
             from models import SystemConfig
             cfg = SystemConfig.query.filter_by(key='system_name').first()
             name = _sanitize_hostname(cfg.value if cfg else '')
         except Exception:
-            pass
+            read = False
         if not name:
             name = _sanitize_hostname(safe_call(socket.gethostname))
+        if not read:
+            # A fallback taken because SQL was refused must not hide system_name for minutes
+            return name or '-'
 
         self._hostname = name or '-'
         self._hostname_resolved_at = now
@@ -118,7 +159,7 @@ class SyslogForwarder:
         self._framing = framing.lower() if framing else default_framing
         if self._framing not in ('octet', 'line'):
             raise ValueError("Syslog framing must be 'octet' or 'line'")
-        self._categories = categories if categories is not None else list(self.ALL_CATEGORIES)
+        self._categories = list(categories) if categories else list(self.ALL_CATEGORIES)
         # Force re-resolution of the HOSTNAME field on next send
         self._hostname = ''
         self._hostname_resolved_at = 0.0
@@ -196,7 +237,10 @@ class SyslogForwarder:
         pri = (facility_code * 8) + severity_code
 
         timestamp = audit_log.timestamp.strftime('%Y-%m-%dT%H:%M:%S.%fZ') if audit_log.timestamp else utc_now().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
-        hostname = self._resolve_hostname()
+        # A staged entry carries the name resolved while SQL was still allowed
+        hostname = getattr(audit_log, 'syslog_hostname', None)
+        if not isinstance(hostname, str) or not hostname:
+            hostname = self._resolve_hostname()
 
         # Structured data
         sd_parts = []
@@ -228,9 +272,8 @@ class SyslogForwarder:
         if not self._enabled or not self._host:
             return False
 
-        # Filter by event category
-        resource_type = getattr(audit_log, 'resource_type', None) or ''
-        if self._categories and resource_type and resource_type not in self._categories:
+        if not self._wanted(getattr(audit_log, 'resource_type', None),
+                            getattr(audit_log, 'action', None)):
             return False
 
         try:
