@@ -555,16 +555,25 @@ class OrderMixin:
             order.error = json.dumps(fallback)
 
     def expire_order_if_needed(self, order: AcmeOrder) -> bool:
-        """Lazily invalidate an expired non-final order."""
-        if order.status not in ('pending', 'ready') or order.expires >= utc_now():
+        """Lazily invalidate a non-final order that expired, or whose valid
+        authorization did (RFC 8555 §7.1.6: the order then becomes invalid)."""
+        if order.status not in ('pending', 'ready'):
+            return False
+        now = utc_now()
+        lapsed = [a for a in order.authorizations if a.status == 'valid' and a.expires < now]
+        if order.expires >= now and not lapsed:
             return False
 
         order.status = 'invalid'
-        problem = self._problem_data('malformed', 'Order has expired')
+        detail = 'Order has expired' if order.expires < now else \
+            f'Authorization for {lapsed[0].identifier_value} has expired'
+        problem = self._problem_data('malformed', detail)
         order.error = json.dumps(problem)
         for authorization in order.authorizations:
             if authorization.status == 'pending':
                 self._expire_authorization(authorization, update_order=False)
+        for authorization in lapsed:
+            authorization.status = 'expired'
         self._set_order_authorization_error(order, problem)
         self._commit_state_change('expire ACME order')
         return True
@@ -598,11 +607,20 @@ class OrderMixin:
         self._commit_state_change('deactivate ACME authorization')
 
     def expire_authorization_if_needed(self, authorization: AcmeAuthorization) -> bool:
-        """Lazily invalidate an expired pending authorization."""
-        if authorization.status != 'pending' or authorization.expires >= utc_now():
+        """Lazily invalidate an expired pending authorization; a valid one
+        becomes ``expired`` and takes its open order with it (RFC 8555 §7.1.6)."""
+        if authorization.status not in ('pending', 'valid') or authorization.expires >= utc_now():
             return False
 
-        self._expire_authorization(authorization, update_order=True)
+        if authorization.status == 'valid':
+            authorization.status = 'expired'
+            order = authorization.order
+            if order is not None and order.status in ('pending', 'ready'):
+                order.status = 'invalid'
+                order.error = self._problem(
+                    'malformed', f'Authorization for {authorization.identifier_value} has expired')
+        else:
+            self._expire_authorization(authorization, update_order=True)
         self._commit_state_change('expire ACME authorization')
         return True
 

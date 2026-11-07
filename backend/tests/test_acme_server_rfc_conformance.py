@@ -506,6 +506,17 @@ class TestFinalizeAfterExpiry:
                 assert {a.status for a in order.authorizations} == {'expired'}
 
 
+    def test_reading_a_lapsed_valid_authorization_expires_it(self, app, client, account):
+        order_id = _ready_order(app, account, [{'type': 'dns', 'value': 'lapsed.example'}], expired_authz=True)
+        with app.app_context():
+            authz_id = AcmeOrder.query.filter_by(order_id=order_id).first().authorizations[0].authorization_id
+        r = _signed(client, account, f'/acme/authz/{authz_id}', None)
+        assert r.status_code == 200
+        assert r.get_json()['status'] == 'expired'
+        with app.app_context():
+            assert AcmeOrder.query.filter_by(order_id=order_id).first().status == 'invalid'
+
+
 # --- caaIdentities (RFC 8555 §7.1.1) ---
 
 class TestCaaIdentities:

@@ -1237,7 +1237,9 @@ def finalize_order(order_id: str):
         except ValueError as exc:
             return acme_error('malformed', str(exc))
         csr_pem = csr.public_bytes(serialization.Encoding.PEM).decode()
-        
+
+        # RFC 8555 §7.4: an order or authorization past its expiry is not ready
+        service.expire_order_if_needed(existing_order)
         if existing_order.status != 'ready':
             return acme_error(
                 'orderNotReady',
