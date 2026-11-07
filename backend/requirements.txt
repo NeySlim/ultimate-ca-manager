@@ -73,8 +73,6 @@ google-cloud-kms>=3.11.0
 # PostgreSQL support (for HA / multi-node deployments)
 # psycopg 3 binds parameters on the server: an error quoting the statement carries no value
 psycopg[binary]>=3.3,<4
-# Only for a URL that names postgresql+psycopg2://, removed in the next release
-psycopg2-binary>=2.9.9
 
 # Redis session store and Socket.IO message queue, used only when a Redis URL is set
 redis>=5.0.0

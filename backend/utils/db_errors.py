@@ -1,8 +1,7 @@
 """PostgreSQL errors without the values they quote.
 
 The server quotes the refused row (``Failing row contains``) and the refused
-input (class 22) whatever the driver and ``hide_parameters``; psycopg2, which
-binds on the client, also puts the values in the quoted statement (``LINE n:``).
+input (class 22) whatever ``hide_parameters`` says, private keys included.
 """
 import re
 
@@ -19,8 +18,8 @@ _QUOTED = re.compile(r'"[^"]*"')
 
 
 def sqlstate(orig):
-    """The SQLSTATE of a driver error: ``sqlstate`` on psycopg 3, ``pgcode`` on psycopg2."""
-    return getattr(orig, 'sqlstate', None) or getattr(orig, 'pgcode', None)
+    """The SQLSTATE of a psycopg error, None for any other."""
+    return getattr(orig, 'sqlstate', None)
 
 
 def scrub_postgres_message(message, pgcode=None):
@@ -58,7 +57,7 @@ def _scrub_error(context):
     clean = scrub_postgres_message(orig.args[0], sqlstate(orig))
     if clean == orig.args[0]:
         return None
-    # SQLSTATE and diag stay; psycopg2's pgerror keeps the raw text and nothing here reads it
+    # SQLSTATE and diag stay: diag keeps the raw text and nothing here reads it
     orig.args = (clean,)
     wrapped = context.sqlalchemy_exception
     if wrapped is not None and len(wrapped.args) == 1:

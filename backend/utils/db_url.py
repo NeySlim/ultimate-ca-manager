@@ -5,37 +5,32 @@ from typing import Optional
 
 from sqlalchemy.engine import make_url
 
-_POSTGRES_PREFIXES = ('postgresql://', 'postgres://')
-_PSYCOPG2_PREFIX = 'postgresql+psycopg2://'
+# postgresql+psycopg2:// is what older guides wrote: same database, the one driver UCM ships
+_POSTGRES_PREFIXES = ('postgresql://', 'postgres://', 'postgresql+psycopg2://')
 _TLS_SSLMODES = ('require', 'verify-ca', 'verify-full')
 
 logger = logging.getLogger(__name__)
-_warned_psycopg2 = []
+_normalised = []
 
 
 def sqlalchemy_url(url: str) -> str:
-    """Pin a PostgreSQL URL without a driver to psycopg 3, which binds parameters on the server.
+    """Pin a PostgreSQL URL to psycopg 3, which binds parameters on the server.
 
-    An explicit driver and non-PostgreSQL URLs are returned unchanged.
+    Any other explicit driver, and non-PostgreSQL URLs, are returned unchanged.
     """
     for prefix in _POSTGRES_PREFIXES:
         if url.startswith(prefix):
+            if prefix == 'postgresql+psycopg2://' and not _normalised:
+                _normalised.append(True)
+                logger.info('PostgreSQL URL scheme postgresql+psycopg2:// normalised to '
+                            'postgresql+psycopg://')
             return 'postgresql+psycopg://' + url[len(prefix):]
-    if url.startswith(_PSYCOPG2_PREFIX):
-        _warn_psycopg2()
     return url
-
-
-def _warn_psycopg2():
-    if not _warned_psycopg2:
-        _warned_psycopg2.append(True)
-        logger.warning('A PostgreSQL URL names the psycopg2 driver, deprecated and removed in '
-                       'the next release: write postgresql:// to use psycopg 3')
 
 
 def is_postgres_url(url: str) -> bool:
     """True for every PostgreSQL spelling: postgres://, postgresql://, postgresql+driver://."""
-    return (url or '').startswith(_POSTGRES_PREFIXES + ('postgresql+',))
+    return (url or '').startswith(('postgresql://', 'postgres://', 'postgresql+'))
 
 
 def _postgres_tcp_setting(url, name, env_name, environ):

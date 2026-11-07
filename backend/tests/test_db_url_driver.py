@@ -1,6 +1,5 @@
-"""A PostgreSQL URL without a driver is pinned to psycopg 3, which binds
-parameters on the server; an explicit psycopg2 is kept for one release, with a
-deprecation warning."""
+"""Every PostgreSQL URL reaches psycopg 3, which binds parameters on the
+server: postgresql+psycopg2://, from older guides, included."""
 import logging
 import os
 import subprocess
@@ -21,30 +20,30 @@ BACKEND = Path(__file__).resolve().parent.parent
     ('postgresql://u:p@db/ucm', 'postgresql+psycopg://u:p@db/ucm'),
     ('postgres://u:p@db/ucm', 'postgresql+psycopg://u:p@db/ucm'),
     ('postgresql+psycopg://u:p@db/ucm', 'postgresql+psycopg://u:p@db/ucm'),
-    # A driver the administrator chose is theirs to keep, for one release
-    ('postgresql+psycopg2://u:p@db/ucm', 'postgresql+psycopg2://u:p@db/ucm'),
+    ('postgresql+psycopg2://u:p@db/ucm', 'postgresql+psycopg://u:p@db/ucm'),
+    # Any other driver the administrator chose is theirs to keep
+    ('postgresql+pg8000://u:p@db/ucm', 'postgresql+pg8000://u:p@db/ucm'),
     ('sqlite:////opt/ucm/data/ucm.db', 'sqlite:////opt/ucm/data/ucm.db'),
 ])
 def test_the_driver_is_pinned(url, expected):
     assert sqlalchemy_url(url) == expected
 
 
-def test_an_explicit_psycopg2_is_deprecated_once(monkeypatch, caplog):
-    monkeypatch.setattr(db_url, '_warned_psycopg2', [])
-    with caplog.at_level(logging.WARNING, logger='utils.db_url'):
+def test_a_psycopg2_scheme_is_normalised_once_without_a_warning(monkeypatch, caplog):
+    monkeypatch.setattr(db_url, '_normalised', [])
+    with caplog.at_level(logging.INFO, logger='utils.db_url'):
         sqlalchemy_url('postgresql+psycopg2://u:p@db/ucm')
         sqlalchemy_url('postgresql+psycopg2://u:p@db/ucm')
-        sqlalchemy_url('postgresql://u:p@db/ucm')
-    warnings = [r for r in caplog.records if 'psycopg2 driver, deprecated' in r.getMessage()]
-    assert len(warnings) == 1
+    records = [r for r in caplog.records if r.name == 'utils.db_url']
+    assert [(r.levelno, 'normalised' in r.getMessage()) for r in records] == [(logging.INFO, True)]
 
 
-def test_a_bare_url_is_not_deprecated(monkeypatch, caplog):
-    monkeypatch.setattr(db_url, '_warned_psycopg2', [])
-    with caplog.at_level(logging.WARNING, logger='utils.db_url'):
+def test_a_bare_url_logs_nothing(monkeypatch, caplog):
+    monkeypatch.setattr(db_url, '_normalised', [])
+    with caplog.at_level(logging.DEBUG, logger='utils.db_url'):
         sqlalchemy_url('postgresql://u:p@db/ucm')
         sqlalchemy_url('postgresql+psycopg://u:p@db/ucm')
-    assert 'deprecated' not in caplog.text
+    assert not [r for r in caplog.records if r.name == 'utils.db_url']
 
 
 def _engine_urls(monkeypatch, module):
@@ -112,7 +111,7 @@ def test_the_connection_test_accepts_an_explicit_driver(url, monkeypatch):
 
     seen = _engine_urls(monkeypatch, status)
     status.test_connection(url)
-    assert seen and seen[0].drivername == url.split(':')[0]
+    assert seen and seen[0].drivername == 'postgresql+psycopg'
 
 
 @pytest.mark.parametrize('url', [
@@ -126,6 +125,30 @@ def test_every_postgresql_spelling_is_seen_as_postgresql(url, monkeypatch):
     assert migration_runner._is_postgres(url)
     monkeypatch.setenv('DATABASE_URL', url)
     assert 'DB backend: postgresql' in log_bundle._system_diagnostic()
+
+
+def test_a_psycopg2_url_starts_the_application_on_psycopg():
+    env = dict(os.environ, DATABASE_URL='postgresql+psycopg2://u:p@db.invalid/ucm')
+    out = subprocess.run(
+        [sys.executable, '-c',
+         'from config.settings import Config; print(Config.SQLALCHEMY_DATABASE_URI)'],
+        cwd=BACKEND, env=env, capture_output=True, text=True, check=True)
+    assert out.stdout.strip().splitlines()[-1] == 'postgresql+psycopg://u:p@db.invalid/ucm'
+
+
+@pytest.mark.postgres
+def test_a_psycopg2_url_connects_without_psycopg2():
+    url = os.environ.get('UCM_TEST_PG_URL', '')
+    if not url:
+        pytest.skip('UCM_TEST_PG_URL not set')
+    from sqlalchemy import create_engine, text
+    engine = create_engine(sqlalchemy_url(url.replace('postgresql://', 'postgresql+psycopg2://', 1)))
+    try:
+        with engine.connect() as conn:
+            assert conn.execute(text('SELECT 1')).scalar() == 1
+            assert engine.dialect.driver == 'psycopg'
+    finally:
+        engine.dispose()
 
 
 def test_a_postgres_url_is_a_postgresql_database():

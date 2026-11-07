@@ -146,6 +146,7 @@ class TestPostgresInstall:
     def test_wstep_is_read(self, postgres_install):
         assert wstep_enabled(postgres_install) is True
 
+    # +psycopg2 is read with psycopg 3, the one driver UCM ships
     @pytest.mark.parametrize('driver', ['psycopg', 'psycopg2'])
     def test_sqlalchemy_driver_suffix_is_accepted(self, postgres_install, monkeypatch, driver):
         scheme, _, rest = PG_URL.partition('://')
