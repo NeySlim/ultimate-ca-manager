@@ -1374,6 +1374,7 @@ The client presents a certificate during the TLS handshake. UCM validates the ce
 
 - **Strongest method**: cryptographic client identity
 - **Required for** \`/simplereenroll\`: the client must present its current certificate
+- **Port 8443**: when UCM terminates TLS, the handshake accepts certificates of the mTLS trusted CA (Settings → Security) and of the CAs below it only; to re-enroll certificates of an EST CA outside that branch, trust a CA above both (v2.252)
 - **Presented certificate**: for \`/simpleenroll\` and \`/serverkeygen\`, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2); a certificate from another trusted authority is still accepted
 - **Depends on** proper TLS termination config (reverse proxy must pass \`SSL_CLIENT_CERT\` to UCM)
 
