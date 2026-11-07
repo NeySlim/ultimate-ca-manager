@@ -227,16 +227,22 @@ def _policy_rule_refusal(ca, cert, template_id, validity_days, extra_dns=()):
     return None, validity_days, notices_mod.collect(notice, advisories)
 
 
-def _malformed_request_refusal(cert, cert_type):
+def _malformed_request_refusal(cert, cert_type, template_id=None):
     """The trunk's refusal of the request's subject and names, given before an
     approval is queued for a signing that would fail."""
+    from models.certificate_template import CertificateTemplate
+    from services.template_service import allowed_san_types, san_type_of
     from utils.request_names import cn_implied_names, refuse_malformed_request
     csr_obj = x509.load_pem_x509_csr(base64.b64decode(cert.csr))
     try:
         names = list(csr_extensions(csr_obj).get_extension_for_class(
             x509.SubjectAlternativeName).value)
     except x509.ExtensionNotFound:
-        names = cn_implied_names(csr_obj.subject, cert_type)
+        # As the trunk does, the names the CN implies pass the template's SAN types first
+        template = db.session.get(CertificateTemplate, template_id) if template_id else None
+        allowed = allowed_san_types(template) if template is not None else None
+        names = [n for n in cn_implied_names(csr_obj.subject, cert_type)
+                 if allowed is None or san_type_of(n) in allowed]
     try:
         refuse_malformed_request(csr_obj.subject, names)
     except RequestRejected as e:
@@ -1094,7 +1100,7 @@ def sign_csr(csr_id):
     if san_refusal:
         return error_response(san_refusal, 400)
     try:
-        malformed = _malformed_request_refusal(cert, backend_cert_type)
+        malformed = _malformed_request_refusal(cert, backend_cert_type, data.get('template_id'))
     except (ValueError, TypeError) as e:
         return error_response(f'Invalid CSR: {e}', 400)
     if malformed:
@@ -1265,7 +1271,8 @@ def bulk_sign_csrs():
                 continue
             try:
                 refusal = (_san_type_refusal(cert, data.get('template_id'))
-                           or _malformed_request_refusal(cert, 'server_cert'))
+                           or _malformed_request_refusal(cert, 'server_cert',
+                                                         data.get('template_id')))
             except (ValueError, TypeError) as e:
                 refusal = f'Invalid CSR: {e}'
             if refusal:

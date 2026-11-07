@@ -84,9 +84,10 @@ def create_certificate():
         if not is_valid:
             return error_response(error, 400)
 
-    from utils.san_parse import parse_cert_san_payload
+    from utils.san_parse import cn_dns_name_error, parse_cert_san_payload
 
     san_buckets, san_err = parse_cert_san_payload(data)
+    san_err = san_err or cn_dns_name_error(data.get('cn'), data.get('cert_type', 'server'))
     if san_err:
         return error_response(san_err, 400)
     for key, values in san_buckets.items():

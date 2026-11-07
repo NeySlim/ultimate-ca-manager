@@ -1,5 +1,6 @@
-"""What a request may put in a certificate's subject and SAN, whatever path
-it takes (issue form, Sign CSR, EST, SCEP, ACME, WSTEP)."""
+"""What a request may put in a certificate's subject and SAN on the CSR paths
+(Sign CSR, EST, SCEP, ACME, WSTEP); the issue form derives its names from the
+CN with utils.san_parse.auto_san_buckets_from_cn and shares the syntax checks."""
 from __future__ import annotations
 
 import re
@@ -26,6 +27,9 @@ _SUBJECT_BOUNDS = {
     NameOID.EMAIL_ADDRESS: ('emailAddress', 255),
 }
 _COUNTRY_RE = re.compile(r'[A-Za-z]{2}')
+# Trunk types whose CN names a host: the only ones a one-label CN becomes a DNS name for
+HOST_CERT_TYPES = frozenset({'server_cert', 'server', 'host', 'device_cert',
+                             'combined_cert', 'combined_server_client'})
 # A CN made of hostname characters only: meant as a host, so worth a word when it gives none
 _HOST_TOKEN_RE = re.compile(r'(\*\.)?[A-Za-z0-9_-]{1,63}(\.[A-Za-z0-9_-]{1,63})*\.?')
 
@@ -64,21 +68,25 @@ def _common_name(subject: x509.Name) -> str:
 
 
 def _cn_dns_name(cn: str) -> str | None:
-    """The dNSName a CN stands for: any name of the RFC 5280 syntax, one label
-    included, and a dotted name with an underscore, so that it is refused."""
-    from utils.san_parse import dns_name_syntax_error
+    """The dNSName a host CN stands for: any name of the RFC 5280 syntax, one
+    label included, and a dotted name with an underscore, so that it is refused."""
+    from utils.san_parse import dns_name_syntax_error, underscore_host_name
     name = cn[:-1] if cn.endswith('.') else cn
     if name and dns_name_syntax_error(name) is None:
         return name
-    if '.' in (name[2:] if name.startswith('*.') else name) and '_' in name \
-            and _HOST_TOKEN_RE.fullmatch(name):
-        return name
-    return None
+    return underscore_host_name(cn)
+
+
+def _non_host_cn_dns_name(cn: str) -> str | None:
+    """A client, S/MIME or code-signing CN names a host only when dotted and valid."""
+    from utils.san_parse import dns_name_syntax_error
+    name = cn[:-1] if cn.endswith('.') else cn
+    return name if '.' in name and dns_name_syntax_error(name) is None else None
 
 
 def cn_implied_names(subject: x509.Name, cert_type: str) -> list:
-    """SAN entries a subject implies: an IP, address or DNS name CN and every
-    valid emailAddress (RFC 5280 §4.1.2.6); none for a CA."""
+    """SAN entries a subject implies: an IP or address CN, a DNS name CN (one
+    label for a host type only) and every valid emailAddress; none for a CA."""
     from ipaddress import ip_address
 
     from utils.san_parse import cn_looks_like_email, cn_looks_like_ip
@@ -86,21 +94,22 @@ def cn_implied_names(subject: x509.Name, cert_type: str) -> list:
         return []
     names = []
     cn = _common_name(subject)
+    dns = _cn_dns_name(cn) if cert_type in HOST_CERT_TYPES else _non_host_cn_dns_name(cn)
     if cn_looks_like_ip(cn):
         names.append(x509.IPAddress(ip_address(cn)))
     elif cn_looks_like_email(cn):
         names.append(x509.RFC822Name(cn))
-    elif _cn_dns_name(cn):
-        names.append(x509.DNSName(_cn_dns_name(cn)))
+    elif dns:
+        names.append(x509.DNSName(dns))
     names += [n for n in subject_email_names(subject) if n not in names]
     return names
 
 
 def cn_without_name_notice(subject: x509.Name, cert_type: str) -> str | None:
-    """Notice for a CN shaped like a host name that gives no SAN entry."""
+    """Notice for a host certificate's CN shaped like a host name that gives no SAN entry."""
     from utils.san_parse import cn_looks_like_ip
     cn = _common_name(subject)
-    if (cert_type == 'intermediate_ca' or not _HOST_TOKEN_RE.fullmatch(cn)
+    if (cert_type not in HOST_CERT_TYPES or not _HOST_TOKEN_RE.fullmatch(cn)
             or cn_looks_like_ip(cn) or _cn_dns_name(cn)):
         return None
     return (f'CN {cn!r} is not a DNS name (RFC 5280 §4.2.1.6): '

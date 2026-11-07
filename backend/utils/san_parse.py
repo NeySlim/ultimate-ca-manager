@@ -294,6 +294,25 @@ def auto_san_buckets_from_cn(
     return buckets
 
 
+def underscore_host_name(cn: str) -> str | None:
+    """A CN shaped as a dotted host name holding an underscore, without its root
+    dot: meant as a DNS name, and one RFC 5280 §4.2.1.6 refuses."""
+    value = (cn or '').strip()
+    name = value[:-1] if value.endswith('.') else value
+    body = name[2:] if name.startswith('*.') else name
+    if '_' not in body or '.' not in body or not all(
+            re.fullmatch(r'[A-Za-z0-9_-]{1,63}', label) for label in body.split('.')):
+        return None
+    return name
+
+
+def cn_dns_name_error(cn: str, cert_type: str) -> str | None:
+    """The issue form refuses a server or combined CN Sign CSR would refuse,
+    rather than issue it without a DNS name."""
+    name = underscore_host_name(cn) if cert_type in ('server', 'combined') else None
+    return dns_name_syntax_error(name) if name else None
+
+
 def validate_typed_san_buckets(buckets: SanBuckets) -> str | None:
     """Reject values that do not match their declared SAN bucket (issue #167 parity)."""
     validators = {

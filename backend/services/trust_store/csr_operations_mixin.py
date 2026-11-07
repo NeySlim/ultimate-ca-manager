@@ -456,8 +456,8 @@ def _key_usage_with_ca_signing(usage, enabled):
 
 
 def _synthesize_san_from_subject(subject, cert_type='server_cert'):
-    """SAN entries a request without its own SAN gets from its subject: the
-    issue form's rule (utils.request_names), shared so the two cannot drift."""
+    """SAN entries a request without its own SAN gets from its subject, for
+    every CSR path (utils.request_names.cn_implied_names)."""
     return cn_implied_names(subject, cert_type)
 
 
@@ -750,9 +750,6 @@ class CSROperationsMixin:
         if extra_san:
             effective_sans = list(effective_sans) + [
                 n for n in extra_san if n not in effective_sans]
-        # The issue form's bounds and name syntax; an override subject is the caller's
-        refuse_malformed_request(subject if override_subject is None else None,
-                                 effective_sans, renewal_of)
         if san_template is not None:
             from services.template_service import allowed_san_types, check_san_types, san_type_of
             # The names that land: the override when given, else the CSR's own SAN
@@ -761,6 +758,9 @@ class CSROperationsMixin:
             allowed = allowed_san_types(san_template)
             if allowed is not None and override_san is None and not has_csr_san:
                 effective_sans = [n for n in effective_sans if san_type_of(n) in allowed]
+        # Subject bounds and the syntax of the names that land; an override subject is the caller's
+        refuse_malformed_request(subject if override_subject is None else None,
+                                 effective_sans, renewal_of)
 
         ConstraintsMixin._validate_name_constraints(
             ca_cert, subject, effective_sans if effective_sans else None, renewal_of=renewal_of

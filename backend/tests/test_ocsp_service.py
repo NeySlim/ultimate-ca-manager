@@ -627,7 +627,7 @@ class TestKeylessCASigning:
         with app.app_context():
             ca = create_ca(cn=f'Offline OCSP CA {offline_mode}')
             target = create_cert(
-                cn=f'offline-{offline_mode}.example.com', ca_id=ca['id'])
+                cn=f'offline-{offline_mode.replace("_", "-")}.example.com', ca_id=ca['id'])
             ca_obj = _ca_model(ca)
             serial = int(_cert_model(target).serial_number, 16)
             ca_obj.offline = True

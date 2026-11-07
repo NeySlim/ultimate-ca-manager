@@ -99,6 +99,21 @@ class TestDnsNameSyntax:
             assert r.status_code == 400, (bad, r.get_json())
             assert bad.strip() in r.get_json()['message']
 
+    @pytest.mark.parametrize('cert_type', ['server', 'combined'])
+    def test_form_refuses_an_underscore_host_cn(self, auth_client, create_ca, cert_type):
+        """As Sign CSR does, rather than a TLS certificate without a name."""
+        ca = create_ca(cn=f'Profile DNS form CN CA {cert_type}')
+        r = auth_client.post(CERTS, json={'ca_id': ca['id'], 'cn': 'my_host.example.com',
+                                          'cert_type': cert_type})
+        assert r.status_code == 400, r.get_json()
+        assert 'my_host.example.com' in r.get_json()['message']
+
+    def test_form_client_with_an_underscore_cn_is_issued(self, auth_client, create_ca):
+        ca = create_ca(cn='Profile DNS form CN client CA')
+        r = auth_client.post(CERTS, json={'ca_id': ca['id'], 'cn': 'svc_backup.corp.example',
+                                          'cert_type': 'client'})
+        assert r.status_code == 201, r.get_json()
+
     def test_form_issues_an_idn_as_an_a_label(self, app, auth_client, create_ca):
         ca = create_ca(cn='Profile IDN form CA')
         r = auth_client.post(CERTS, json={'ca_id': ca['id'], 'cn': 'idn.example.test',
@@ -201,6 +216,52 @@ class TestNameImpliedByTheCn:
             sub = db.session.get(CA, r.get_json()['data']['id'])
             cert = x509.load_pem_x509_certificate(base64.b64decode(sub.crt))
         assert _san(cert) == []
+
+    def test_a_one_label_person_cn_adds_no_dns_name_under_constraints(
+            self, app, auth_client, create_ca):
+        """#389: an S/MIME request CN=jdoe signed with its address gets no DNS:jdoe."""
+        ca = create_ca(cn='Profile CN smime NC CA', nameConstraintsPermitted=[
+            {'type': 'dns', 'value': 'example.com'}, {'type': 'email', 'value': 'example.com'}])
+        csr_id = _upload(auth_client, _csr(_cn('jdoe')))
+        r = _sign(auth_client, csr_id, ca['id'], cert_type='email', san_email=['jdoe@example.com'])
+        assert r.status_code == 200, r.get_json()
+        assert _san(_cert(app, csr_id)) == [x509.RFC822Name('jdoe@example.com')]
+
+    @pytest.mark.parametrize('cert_type,cn', [
+        ('client', 'jdoe'), ('email', 'jdoe'), ('code_signing', 'jdoe'),
+        ('client', 'svc_backup.corp.example'), ('code_signing', 'svc_backup.corp.example'),
+        ('client', 'fgt_01'),
+    ])
+    def test_a_non_host_cn_gives_no_dns_name_and_no_refusal(
+            self, app, auth_client, create_ca, cert_type, cn):
+        ca = create_ca(cn=f'Profile CN non host CA {cert_type} {len(cn)}')
+        csr_id = _upload(auth_client, _csr(_cn(cn)))
+        r = _sign(auth_client, csr_id, ca['id'], cert_type=cert_type)
+        assert r.status_code == 200, r.get_json()
+        assert not [n for n in _san(_cert(app, csr_id)) if isinstance(n, x509.DNSName)]
+        assert not (r.get_json().get('meta') or {}).get('notices'), r.get_json()
+
+    def test_a_non_host_dotted_cn_keeps_its_dns_name(self, app, auth_client, create_ca):
+        ca = create_ca(cn='Profile CN client host CA')
+        csr_id = _upload(auth_client, _csr(_cn('laptop.corp.example')))
+        assert _sign(auth_client, csr_id, ca['id'], cert_type='client').status_code == 200
+        assert _san(_cert(app, csr_id)) == [x509.DNSName('laptop.corp.example')]
+
+    def test_est_device_one_label_cn_keeps_its_dns_name(self, app):
+        """EST and FortiGate enrol device_cert with CN=intranet."""
+        from utils.request_names import cn_implied_names
+        assert cn_implied_names(x509.Name(_cn('intranet')), 'device_cert') == [
+            x509.DNSName('intranet')]
+
+    def test_a_name_the_template_drops_is_not_refused(self, app, auth_client, create_ca):
+        """The syntax check judges the names that land, after the template's SAN types."""
+        from tests.test_template_san_types import _template
+        tpl_id = _template(app, ['ip'])
+        ca = create_ca(cn='Profile CN template CA')
+        csr_id = _upload(auth_client, _csr(_cn('my_host.example.com')))
+        r = _sign(auth_client, csr_id, ca['id'], template_id=tpl_id)
+        assert r.status_code == 200, r.get_json()
+        assert not [n for n in _san(_cert(app, csr_id)) if isinstance(n, x509.DNSName)]
 
     def test_est_device_request_gets_no_dns_name_from_a_person_cn(self, app):
         """The trunk EST signs through (cert_type device_cert)."""
@@ -482,11 +543,96 @@ class TestScepPath:
         assert self._issue(app, create_ca, csr, 'profile-scep-ok')
 
 
+class TestScepReplies:
+    """The device is told why, and a malformed request is not queued."""
+
+    def _reply(self, app, create_ca, sans, auto_approve=True, **ca_kwargs):
+        import uuid
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import AttributeOID
+        from models import SCEPRequest
+        from services.scep.crypto_helpers import create_signed_pkcs7, encrypt_for_client
+        from services.scep.scep_service import SCEPService
+        from tests.test_scep_fail_info import FAIL_INFO_TEXT_OID
+        from tests.test_scep_rfc8894_operations import (
+            MESSAGE_TYPE_OID, PKI_STATUS_OID, SENDER_NONCE_OID, TRANSACTION_ID_OID,
+            _client_identity, _load_ca_material, _response_attributes)
+        import asn1crypto.core
+        ca_data = create_ca(cn=f'Profile SCEP reply CA {uuid.uuid4().hex[:8]}', **ca_kwargs)
+        txn = uuid.uuid4().hex
+        with app.app_context():
+            ca, ca_cert = _load_ca_material(ca_data['id'])[:2]
+            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            signer, _ = _client_identity('scep-reply.example.test', key=key)
+            csr = (x509.CertificateSigningRequestBuilder()
+                   .subject_name(x509.Name(_cn('scep-reply.example.test')))
+                   .add_extension(x509.SubjectAlternativeName(sans), critical=False)
+                   .add_attribute(AttributeOID.CHALLENGE_PASSWORD, b'sekret')
+                   .sign(key, hashes.SHA256()))
+            envelope = encrypt_for_client(csr.public_bytes(serialization.Encoding.DER), ca_cert)
+            message = create_signed_pkcs7(envelope, key, signer, signed_attributes=[
+                {'type': TRANSACTION_ID_OID, 'values': [asn1crypto.core.PrintableString(txn)]},
+                {'type': MESSAGE_TYPE_OID, 'values': [asn1crypto.core.PrintableString('19')]},
+                {'type': SENDER_NONCE_OID, 'values': [asn1crypto.core.OctetString(b'profile-nonce-16')]},
+            ])
+            response, _ = SCEPService(ca.refid, challenge_password='sekret',
+                                      auto_approve=auto_approve).process_pkcs_req(message, '127.0.0.1')
+            attrs = _response_attributes(response)
+            queued = SCEPRequest.query.filter_by(transaction_id=txn).count()
+        return attrs[PKI_STATUS_OID], attrs.get(FAIL_INFO_TEXT_OID), queued
+
+    def test_a_malformed_name_is_refused_with_its_reason(self, app, create_ca):
+        status, text, _ = self._reply(app, create_ca, [x509.DNSName('bad name.example')])
+        assert status == '2' and 'bad name.example' in (text or ''), text
+
+    def test_a_malformed_request_is_not_queued_for_approval(self, app, create_ca):
+        status, text, queued = self._reply(
+            app, create_ca, [x509.DNSName('bad name.example')], auto_approve=False)
+        assert status == '2' and 'bad name.example' in (text or ''), text
+        assert queued == 0
+
+    def test_a_refusal_at_issuance_gives_its_reason(self, app, create_ca):
+        """A name outside the CA's constraints is refused while issuing, not before."""
+        status, text, _ = self._reply(
+            app, create_ca, [x509.DNSName('other.test')],
+            nameConstraintsPermitted=[{'type': 'dns', 'value': 'example.test'}])
+        assert status == '2' and 'NameConstraints' in (text or ''), text
+
+
 class TestEstPath:
     def test_refusal_names_its_reason(self, client, est_config):
         csr = _csr(_cn('est.example.test'), [x509.DNSName('bad name.example')])
         r = _post_csr(client, 'simpleenroll', csr, headers=_basic_auth())
         assert r.status_code == 400
+        assert b'bad name.example' in r.data
+
+
+    def test_serverkeygen_refusal_names_its_reason(self, client, est_config):
+        csr = _csr(_cn('keygen.example.test'), [x509.DNSName('bad name.example')])
+        r = _post_csr(client, 'serverkeygen', csr, headers=_basic_auth())
+        assert r.status_code == 400
+        assert b'bad name.example' in r.data
+
+    def test_simplereenroll_refusal_names_its_reason(self, client, est_config, monkeypatch):
+        """A re-enrolment keeps names already issued, so the refusal is injected."""
+        from tests.test_est_rfc7030 import _make_csr
+        from cryptography.hazmat.primitives.serialization import pkcs7
+        from services.ca_service import CAService
+        from utils.request_names import RequestRejected
+        first, key = _make_csr(san_names=('reenroll.example.test',))
+        enrolled = _post_csr(client, 'simpleenroll', first, headers=_basic_auth())
+        assert enrolled.status_code == 200, enrolled.data
+        leaf = [c for c in pkcs7.load_der_pkcs7_certificates(base64.b64decode(enrolled.data))
+                if not c.extensions.get_extension_for_class(x509.BasicConstraints).value.ca][0]
+
+        def refuse(*args, **kwargs):
+            raise RequestRejected("Invalid DNS name(s) in the request: 'bad name.example'")
+        monkeypatch.setattr(CAService, 'sign_csr_from_crypto', staticmethod(refuse))
+        csr = x509.CertificateSigningRequestBuilder().subject_name(leaf.subject).sign(
+            key, hashes.SHA256())
+        r = _post_csr(client, 'simplereenroll', csr,
+                      client_cert_pem=leaf.public_bytes(serialization.Encoding.PEM).decode())
+        assert r.status_code == 400, r.data
         assert b'bad name.example' in r.data
 
 
