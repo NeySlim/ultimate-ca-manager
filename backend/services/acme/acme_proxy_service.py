@@ -34,6 +34,7 @@ from security.encryption import encrypt_text, decrypt_text
 from utils.datetime_utils import utc_isoformat
 from services.acme.acme_client_service import AcmeClientService
 from services.acme import outbound
+from services.acme.upstream_problem import UpstreamProblem, retry_after_of
 from services.acme.acme_proxy_account import (
     resolve_proxy_account,
     legacy_upstream_directory_url,
@@ -72,6 +73,10 @@ class ProxyAuthzStateError(ValueError):
 
 class ProxyOrderNotReadyError(ValueError):
     """The order cannot be finalized: one of its authorizations was deactivated."""
+
+
+class ProxyInvalidProfileError(ValueError):
+    """The requested profile is not one the upstream directory offers."""
 
 
 def _dns01_txt_value(key_authorization: str) -> str:
@@ -270,6 +275,8 @@ class AcmeProxyService:
         self._account_jwk = None
         self.verify_ssl = self._get_verify_ssl()
         self.directory = None
+        # Retry-After of the last upstream order/authz read, relayed to the client (RFC 8555 §7.1.3)
+        self.retry_after = None
         if not self.verify_ssl:
             logger.warning(
                 "ACME proxy upstream SSL verification disabled by settings "
@@ -804,6 +811,7 @@ class AcmeProxyService:
         not_after=None,
         client_thumbprint=None,
         replaces=None,
+        profile=None,
     ):
         """Proxy new-order with domain validation and RFC 9773 replacement."""
         from api.v2.acme_domains import find_provider_for_domain
@@ -814,6 +822,12 @@ class AcmeProxyService:
             raise ValueError("identifiers must be a non-empty list")
 
         self._ensure_directory()
+        # ACME profiles: only a profile the upstream directory offers is passed on
+        if profile is not None:
+            offered = (self.directory.get('meta') or {}).get('profiles')
+            if not isinstance(profile, str) or not isinstance(offered, dict) or profile not in offered:
+                raise ProxyInvalidProfileError(
+                    'The requested certificate profile is not offered by the upstream CA')
 
         # The proxy performs validation itself through configured DNS providers.
         # Never forward IP identifiers: RFC 8738 requires HTTP-01/TLS-ALPN-01,
@@ -854,7 +868,7 @@ class AcmeProxyService:
         # order back, like upstream CAs do, instead of opening a new upstream
         # order every time. Cross-account sharing is #310's job — the match is
         # strictly on this requester's own orders.
-        existing = self._find_reusable_pending_order(domains, client_thumbprint)
+        existing = self._find_reusable_pending_order(domains, client_thumbprint, profile)
         if existing is not None:
             return existing
 
@@ -862,7 +876,8 @@ class AcmeProxyService:
         payload = {
             "identifiers": identifiers,
             "notBefore": utc_isoformat(not_before),
-            "notAfter": utc_isoformat(not_after)
+            "notAfter": utc_isoformat(not_after),
+            "profile": profile,
         }
         # Filter None and forward RFC 9773 `replaces` only when supported.
         payload = {k: v for k, v in payload.items() if v is not None}
@@ -872,7 +887,7 @@ class AcmeProxyService:
         resp = self._post_with_account(self.directory['newOrder'], payload)
 
         if resp.status_code != 201:
-            raise Exception(f"Upstream error: {resp.text}")
+            raise UpstreamProblem.from_response(resp)
 
         upstream_order = resp.json()
         upstream_location = resp.headers['Location']
@@ -978,7 +993,7 @@ class AcmeProxyService:
             return []
         return values
 
-    def _find_reusable_pending_order(self, domains, client_thumbprint):
+    def _find_reusable_pending_order(self, domains, client_thumbprint, profile=None):
         """Return the rewritten still-pending order of this requester for the
         exact same identifier set, or None (#303 minor 4).
 
@@ -1010,6 +1025,8 @@ class AcmeProxyService:
                 logger.debug(f"Pending-order reuse: upstream fetch failed: {exc}")
                 continue
             if upstream_order.get('status') != 'pending':
+                continue
+            if profile is not None and upstream_order.get('profile') != profile:
                 continue
             logger.info(
                 "[ACME Proxy] Reusing pending order %s for %s (same account, "
@@ -1184,7 +1201,8 @@ class AcmeProxyService:
 
         if resp.status_code != 200:
             logger.error(f"Upstream authz fetch failed: {resp.status_code} {resp.text}")
-            return None
+            raise UpstreamProblem.from_response(resp)
+        self.retry_after = retry_after_of(resp)
 
         authz = resp.json()
 
@@ -1323,7 +1341,7 @@ class AcmeProxyService:
 
         resp = self._post_with_account(authz_url, "")
         if resp.status_code != 200:
-            raise RuntimeError(f"Upstream authz fetch failed: {resp.status_code}")
+            raise UpstreamProblem.from_response(resp)
         authz = resp.json()
         identifier = authz.get('identifier', {})
         if not _order_covers_identifier(order, strip_wildcard(identifier.get('value', ''))):
@@ -1344,8 +1362,7 @@ class AcmeProxyService:
         if status != 'deactivated' and not shared:
             resp = self._post_with_account(authz_url, {"status": "deactivated"})
             if resp.status_code != 200:
-                raise RuntimeError(
-                    f"Upstream authz deactivation failed: {resp.status_code} {resp.text}")
+                raise UpstreamProblem.from_response(resp)
             authz = resp.json()
             logger.info("[ACME Proxy] Authorization for %s deactivated upstream (order %s)",
                         identifier.get('value'), order.id)
@@ -1890,7 +1907,8 @@ class AcmeProxyService:
         self._require_owner(local_order, requester_account_id, requester_thumbprint)
         resp = self._post_with_account(order_url, "")
         if resp.status_code != 200:
-            raise Exception(f"Upstream error: {resp.text}")
+            raise UpstreamProblem.from_response(resp)
+        self.retry_after = retry_after_of(resp)
 
         order = resp.json()
         _finalize_url_cache.put(order_url, order.get('finalize'))
@@ -1935,7 +1953,7 @@ class AcmeProxyService:
         if not finalize_url:
             order_resp = self._post_with_account(order_url, "")
             if order_resp.status_code != 200:
-                raise Exception(f"Upstream error: {order_resp.text}")
+                raise UpstreamProblem.from_response(order_resp)
             finalize_url = order_resp.json().get('finalize')
             if not finalize_url:
                 raise Exception("Upstream order carries no finalize URL")
@@ -1945,7 +1963,8 @@ class AcmeProxyService:
         resp = self._post_with_account(finalize_url, payload)
 
         if resp.status_code != 200:
-            raise Exception(f"Upstream finalize error: {resp.text}")
+            raise UpstreamProblem.from_response(resp)
+        self.retry_after = retry_after_of(resp)
 
         order = resp.json()
         _finalize_url_cache.put(order_url, order.get('finalize'))
