@@ -242,7 +242,7 @@ class TestRevocation:
         assert _request(app, approval_id).status == 'rejected'
         assert not _cert(app, cid)['revoked']
 
-    def test_on_hold_the_approval_waits(self, app, auth_client, create_user, scoped):
+    def test_on_hold_the_approval_makes_the_hold_final(self, app, auth_client, create_user, scoped):
         ca, _pid = scoped('rv-hold')
         cid = scoped.cert(ca, 'rv-hold.example.test')
         operator, _ = _login(app, create_user)
@@ -251,9 +251,9 @@ class TestRevocation:
         assert _json(auth_client, 'post', f'/api/v2/certificates/{cid}/revoke',
                      {'reason': 'certificateHold'}).status_code == 200
         r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {})
-        assert r.get_json()['data']['certificate_issued'] is False
-        assert _request(app, approval_id).status == 'pending'
-        assert _cert(app, cid)['reason'] == 'certificateHold'
+        assert r.status_code == 200, r.get_json()
+        assert _request(app, approval_id).status == 'approved'
+        assert _cert(app, cid)['reason'] == 'keyCompromise'
 
     def test_a_direct_revocation_closes_the_request(self, app, auth_client, create_user, scoped):
         ca, _pid = scoped('rv-direct')

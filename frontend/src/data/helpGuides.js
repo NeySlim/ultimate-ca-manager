@@ -3030,7 +3030,7 @@ Administrators bypass the queue on every path.
 - A request whose target was **deleted or revoked** is closed as rejected; a certificate hold keeps the renewal request waiting for the unhold
 - Approving a request **already satisfied** closes it on the existing certificate; approving one of several requests for the same target closes the others as approved by you
 - Approving a request whose stored request, certificate or CA **no longer exists** closes it as rejected
-- A queued revocation whose certificate was **revoked directly** is closed as approved (cancelled when its requester revoked it); one whose certificate was **renewed** since is closed as rejected when approved; during a certificate hold it waits for the unhold
+- A queued revocation whose certificate was **revoked directly** is closed as approved (cancelled when its requester revoked it); one whose certificate was **renewed** since is closed as rejected when approved; approved during a certificate hold, it makes the hold final with its reason
 
 Webhooks are told of these closures as for a rejection.
 
