@@ -1,5 +1,6 @@
 """Every PostgreSQL URL reaches psycopg 3, which binds parameters on the
 server: postgresql+psycopg2://, from older guides, included."""
+import io
 import logging
 import os
 import subprocess
@@ -29,21 +30,61 @@ def test_the_driver_is_pinned(url, expected):
     assert sqlalchemy_url(url) == expected
 
 
-def test_a_psycopg2_scheme_is_normalised_once_without_a_warning(monkeypatch, caplog):
-    monkeypatch.setattr(db_url, '_normalised', [])
-    with caplog.at_level(logging.INFO, logger='utils.db_url'):
-        sqlalchemy_url('postgresql+psycopg2://u:p@db/ucm')
-        sqlalchemy_url('postgresql+psycopg2://u:p@db/ucm')
-    records = [r for r in caplog.records if r.name == 'utils.db_url']
-    assert [(r.levelno, 'normalised' in r.getMessage()) for r in records] == [(logging.INFO, True)]
+_UCM_FORMAT = '%(asctime)s [%(name)s] %(levelname)s %(message)s'
 
 
-def test_a_bare_url_logs_nothing(monkeypatch, caplog):
-    monkeypatch.setattr(db_url, '_normalised', [])
+class _Stop(Exception):
+    pass
+
+
+def _ucm_handlers():
+    return [h for h in logging.getLogger().handlers
+            if getattr(h.formatter, '_fmt', None) == _UCM_FORMAT]
+
+
+def test_create_app_writes_the_normalisation_through_its_own_handler(monkeypatch):
+    import app as app_module
+    monkeypatch.setenv('DATABASE_URL', 'postgresql+psycopg2://ucm:s3cret-pw@db.invalid/ucm')
+    root = logging.getLogger()
+    earlier = _ucm_handlers()  # left by other apps of the session
+    for handler in earlier:
+        root.removeHandler(handler)
+    written = []
+
+    def hook(url, log):
+        # Logging must already be up: the handler this create_app installed writes the line
+        handlers = _ucm_handlers()
+        assert handlers, 'the hook ran before create_app configured logging'
+        stream, handlers[0].stream = handlers[0].stream, io.StringIO()
+        try:
+            db_url.log_normalised_scheme(url, log)
+            written.append(handlers[0].stream.getvalue())
+        finally:
+            handlers[0].stream = stream
+        raise _Stop
+
+    monkeypatch.setattr(app_module, 'log_normalised_scheme', hook)
+    # The PostgreSQL harness would put its own DATABASE_URL in place; the hook stops before any database
+    create_app = getattr(app_module.create_app, '__wrapped__', app_module.create_app)
+    try:
+        with pytest.raises(_Stop):
+            create_app('testing')
+    finally:
+        for handler in _ucm_handlers():
+            root.removeHandler(handler)
+        for handler in earlier:
+            root.addHandler(handler)
+    assert len(written) == 1 and '[utils.db_url] INFO PostgreSQL URL scheme postgresql+psycopg2:// ' \
+        'normalised to postgresql+psycopg://' in written[0]
+    assert 's3cret-pw' not in written[0] and 'db.invalid' not in written[0]
+
+
+@pytest.mark.parametrize('url', ['postgresql://u:p@db/ucm', 'postgresql+psycopg://u:p@db/ucm',
+                                 'sqlite:////tmp/ucm.db', ''])
+def test_only_a_psycopg2_scheme_is_announced(url, caplog):
     with caplog.at_level(logging.DEBUG, logger='utils.db_url'):
-        sqlalchemy_url('postgresql://u:p@db/ucm')
-        sqlalchemy_url('postgresql+psycopg://u:p@db/ucm')
-    assert not [r for r in caplog.records if r.name == 'utils.db_url']
+        db_url.log_normalised_scheme(url, logging.getLogger('utils.db_url'))
+    assert not caplog.records
 
 
 def _engine_urls(monkeypatch, module):

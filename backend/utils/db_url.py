@@ -1,16 +1,13 @@
 """Database URLs as SQLAlchemy is given them."""
-import logging
 import os
 from typing import Optional
 
 from sqlalchemy.engine import make_url
 
 # postgresql+psycopg2:// is what older guides wrote: same database, the one driver UCM ships
-_POSTGRES_PREFIXES = ('postgresql://', 'postgres://', 'postgresql+psycopg2://')
+_PSYCOPG2_PREFIX = 'postgresql+psycopg2://'
+_POSTGRES_PREFIXES = ('postgresql://', 'postgres://', _PSYCOPG2_PREFIX)
 _TLS_SSLMODES = ('require', 'verify-ca', 'verify-full')
-
-logger = logging.getLogger(__name__)
-_normalised = []
 
 
 def sqlalchemy_url(url: str) -> str:
@@ -20,12 +17,14 @@ def sqlalchemy_url(url: str) -> str:
     """
     for prefix in _POSTGRES_PREFIXES:
         if url.startswith(prefix):
-            if prefix == 'postgresql+psycopg2://' and not _normalised:
-                _normalised.append(True)
-                logger.info('PostgreSQL URL scheme postgresql+psycopg2:// normalised to '
-                            'postgresql+psycopg://')
             return 'postgresql+psycopg://' + url[len(prefix):]
     return url
+
+
+def log_normalised_scheme(url, log):
+    """Say once logging is up that a postgresql+psycopg2:// URL runs on psycopg 3 (scheme only)."""
+    if (url or '').startswith(_PSYCOPG2_PREFIX):
+        log.info('PostgreSQL URL scheme postgresql+psycopg2:// normalised to postgresql+psycopg://')
 
 
 def is_postgres_url(url: str) -> bool:
