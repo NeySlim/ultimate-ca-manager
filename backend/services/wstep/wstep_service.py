@@ -599,8 +599,8 @@ def _required_enroll_acl_groups(ca, matched_template):
     rare edge case here -- it's what *every* naked CSR from real Windows
     GPO machine autoenrollment produces, since a naked CSR carries no EKU
     extension at all and therefore scores negative against any template
-    that declares EKUs (see ``_match_template``'s docstring), and MS-WSTEP
-    has no other per-request template-selection signal to fall back on.
+    that declares EKUs (see ``_match_template``'s docstring), and it names
+    no template either (311.21.7 or 311.20.2).
     Silently treating "no match" as "no gate" would mean the Enroll ACL
     never actually applies to unattended autoenrollment -- the primary
     scenario it exists to restrict -- so an unmatched naked CSR must
