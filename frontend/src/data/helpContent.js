@@ -667,7 +667,7 @@ export const helpContent = {
           { label: 'Unique names (v2.251)', text: 'A DNS provider or External CA Account name already in use is refused (409), on creation and on rename. The upgrade renamed earlier duplicates "name (2)", "name (3)", oldest first' },
           { label: 'Vercel team (v2.251)', text: 'The Vercel provider takes an optional Team ID for domains owned by a team' },
           { label: 'RFC 2136 provider (v2.252)', text: 'The DNS server can be a host name. A filled-in Zone is used for the names inside it; for other names, or when it is empty, the zone is read from the SOA the configured server returns, then from the system resolver' },
-          { label: 'ARI renewal time (v2.252)', text: 'When the CA suggests a renewal window, each certificate renews at a random moment drawn once inside it, or at the next 6-hour pass when that moment comes before it (RFC 9773)' },
+          { label: 'ARI renewal time (v2.252)', text: 'When the CA suggests a renewal window, each certificate renews at the last 6-hour pass before a random moment drawn once inside it (RFC 9773)' },
           { label: 'CA errors (v2.252)', text: 'A CA error page that is not an ACME problem (an HTML 503) is reported with its HTTP status and Retry-After' },
           { label: 'RcodeZero token (v2.251)', text: 'RcodeZero needs an API token with zone read and write access, not one limited to the ACME permission' },
           { label: 'Checkdomain (v2.251)', text: 'Checkdomain removes a value by rewriting the zone\'s records without it, as its API documents, after reading every page. The SOA, the apex NS and the generated www copies are left out of that rewrite' },
