@@ -403,3 +403,18 @@ def test_a_proxy_spelling_the_issuer_loosely_signs_in(app, auth_client, same_ser
         user, _found, err = _header_login(serial, _ORG.rfc4514_string())
         assert user is not None, err
         assert _header_login(serial, 'CN=Root CA, O=Other, C=FR')[2] == 'Certificate not enrolled'
+
+
+def test_an_unreadable_issuer_never_matches_an_enrolment_holding_its_certificate(app, auth_client, same_serial):
+    """The issuer of an enrolment that kept only its certificate is still a recorded issuer."""
+    from services.mtls_enrollment import enrolments_of
+    serial, pem_a, _pem_b = same_serial
+    r = _import(auth_client, pem_a)
+    assert r.status_code == 201, r.get_json()
+    with app.app_context():
+        row = db.session.get(AuthCertificate, r.get_json()['data']['id'])
+        row.cert_issuer = ''
+        db.session.commit()
+        assert enrolments_of(serial, 'CN=Evil,notAnAttribute=x') == []
+        assert [e.id for e in enrolments_of(serial, _info(pem_a)['issuer_dn'])] == [row.id]
+        assert [e.id for e in enrolments_of(serial)] == [row.id]

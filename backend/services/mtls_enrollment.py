@@ -267,9 +267,9 @@ def _serial_match(row, serial: int) -> Optional[int]:
 def _ranked(serial: int, issuer, pool=None) -> list:
     """(rank, row) of the enrolments that may be certificate (issuer, serial), best first.
 
-    An issuer read on both sides excludes another one; one recorded here but not
-    readable there only ranks lower; a presented one that cannot be read leaves
-    only the enrolments that recorded none.
+    An issuer read on both sides excludes another one; with no issuer given, or one
+    recorded here that cannot be read, the row only ranks lower. A given issuer that
+    cannot be read leaves only the enrolments that recorded none (``records_issuer``).
     """
     from models.auth_certificate import AuthCertificate
     forms = serial_variants(serial)
@@ -284,7 +284,7 @@ def _ranked(serial: int, issuer, pool=None) -> list:
         serial_rank = _serial_match(row, serial)
         if serial_rank is None:
             continue
-        if unreadable and row.cert_issuer:
+        if unreadable and records_issuer(row):
             continue      # an issuer that cannot be read is no recorded one
         same = _issuer_match(row, presented) if row.cert_issuer or row.cert_pem else None
         if same is False:
