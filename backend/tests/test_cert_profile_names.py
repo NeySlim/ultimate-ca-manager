@@ -66,13 +66,14 @@ class TestDnsNameSyntax:
         ('a' * 64) + '.example', '.'.join(['abcdefghi'] * 26),
         'under_score.example', 'host_.example', '_-x.example', '_.example',
         'a\n.example', '_sip._tcp.example.com', '_acme-challenge.example.com',
+        'xn--zz.example', 'xn--.example', '256.1.1.1', '0x.1.2.3', '*.10.0.0.1', 'host.123',
     ])
     def test_refused(self, value):
         assert validate_dns_san(value) is not None
 
     @pytest.mark.parametrize('value', [
         'www.example.com', '*.example.com', 'localhost',
-        'xn--bcher-kva.example', 'A-1.Example.COM',
+        'xn--bcher-kva.example', 'XN--BCHER-KVA.example', 'A-1.Example.COM', '1a.example',
     ])
     def test_accepted(self, value):
         assert validate_dns_san(value) is None
@@ -152,6 +153,31 @@ class TestNameImpliedByTheCn:
         assert r.status_code == 200, r.get_json()
         assert not [n for n in _san(_cert(app, csr_id)) if isinstance(n, x509.DNSName)]
 
+    @pytest.mark.parametrize('cn', ['intranet', 'localhost', 'fgt-01'])
+    def test_a_single_label_cn_gives_its_dns_name(self, app, auth_client, create_ca, cn):
+        """RFC 5280 §4.2.1.6 allows a one-label dNSName; the form's dot rule is its own."""
+        ca = create_ca(cn=f'Profile CN label CA {cn}')
+        csr_id = _upload(auth_client, _csr(_cn(cn)))
+        assert _sign(auth_client, csr_id, ca['id']).status_code == 200
+        assert _san(_cert(app, csr_id)) == [x509.DNSName(cn)]
+
+    def test_an_underscore_hostname_cn_is_refused(self, auth_client, create_ca):
+        ca = create_ca(cn='Profile CN underscore CA')
+        csr_id = _upload(auth_client, _csr(_cn('my_host.example.com')))
+        r = _sign(auth_client, csr_id, ca['id'])
+        assert r.status_code == 400, r.get_json()
+        assert 'my_host.example.com' in r.get_json()['message']
+
+    @pytest.mark.parametrize('cn', ['fgt_01', '12345678'])
+    def test_a_name_like_cn_without_dns_name_says_so(self, app, auth_client, create_ca, cn):
+        ca = create_ca(cn=f'Profile CN notice CA {cn}')
+        csr_id = _upload(auth_client, _csr(_cn(cn)))
+        r = _sign(auth_client, csr_id, ca['id'])
+        assert r.status_code == 200, r.get_json()
+        assert not _san(_cert(app, csr_id))
+        notices = (r.get_json().get('meta') or {}).get('notices') or []
+        assert any(cn in n and 'DNS' in n for n in notices), notices
+
     def test_a_hostname_cn_still_gives_its_dns_name(self, app, auth_client, create_ca):
         ca = create_ca(cn='Profile CN host CA')
         csr_id = _upload(auth_client, _csr(_cn('host.example.test')))
@@ -198,12 +224,28 @@ class TestNameImpliedByTheCn:
 class TestSubjectBounds:
     def test_cn_over_64_characters_is_refused(self, auth_client, create_ca):
         ca = create_ca(cn='Profile bounds CN CA')
-        long_cn = 'audit-' + 'y' * 80 + '.example.com'
+        long_cn = 'long-' + 'y' * 80 + '.example.com'
         csr_id = _upload(auth_client, _csr(
             [x509.NameAttribute(NameOID.COMMON_NAME, long_cn, _validate=False)]))
         r = _sign(auth_client, csr_id, ca['id'])
         assert r.status_code == 400, r.get_json()
         assert '64' in r.get_json()['message']
+
+    @pytest.mark.parametrize('country,asn1', [
+        ('FR\n', x509.name._ASN1Type.UTF8String), ('FR', x509.name._ASN1Type.UTF8String)])
+    def test_country_is_exactly_two_printable_letters(self, auth_client, create_ca, country, asn1):
+        """X520countryName is PrintableString SIZE(2) (RFC 5280 annex A)."""
+        ca = create_ca(cn=f'Profile bounds C CA {asn1.name} {len(country)}')
+        attrs = _cn('c.example.test') + [
+            x509.NameAttribute(NameOID.COUNTRY_NAME, country, _type=asn1, _validate=False)]
+        r = _sign(auth_client, _upload(auth_client, _csr(attrs)), ca['id'])
+        assert r.status_code == 400, r.get_json()
+        assert 'C ' in r.get_json()['message']
+
+    def test_country_with_a_final_newline_is_refused_whatever_its_type(self):
+        from utils.request_names import subject_bounds_error
+        name = x509.Name([x509.NameAttribute(NameOID.COUNTRY_NAME, 'FR\n', _validate=False)])
+        assert 'two-letter' in (subject_bounds_error(name) or '')
 
     def test_three_letter_country_is_refused(self, auth_client, create_ca):
         ca = create_ca(cn='Profile bounds C CA')
@@ -313,6 +355,18 @@ class TestSubjectEmailInTheSan:
         assert _san(_cert(app, csr_id)) == [x509.DNSName('box.example.test'),
                                             x509.RFC822Name('box@example.test')]
 
+    @pytest.mark.parametrize('email', ['not-an-email', 'jöe@exämple.com'])
+    def test_an_address_off_the_syntax_is_not_added(self, app, auth_client, create_ca, email):
+        """Only a valid ASCII address is an rfc822Name (RFC 5280 §4.2.1.6, RFC 8398)."""
+        ca = create_ca(cn=f'Profile email bad CA {len(email)}')
+        attrs = _cn('bad-mail.example.test') + [
+            x509.NameAttribute(NameOID.EMAIL_ADDRESS, email, _type=x509.name._ASN1Type.UTF8String)]
+        for sans in ([x509.DNSName('bad-mail.example.test')], ()):
+            csr_id = _upload(auth_client, _csr(attrs, sans))
+            r = _sign(auth_client, csr_id, ca['id'])
+            assert r.status_code == 200, r.get_json()
+            assert _san(_cert(app, csr_id)) == [x509.DNSName('bad-mail.example.test')]
+
     def test_sign_csr_server_cn_address_is_not_an_email_name(self, app, auth_client, create_ca):
         """Only the emailAddress attribute implies an rfc822Name (RFC 5280 §4.1.2.6)."""
         ca = create_ca(cn='Profile email CN CA')
@@ -326,7 +380,7 @@ class TestDefaultKeyUsage:
     @pytest.mark.parametrize('cert_type', ['client', 'code_signing', 'email'])
     def test_request_without_key_usage_gets_the_type_s(self, app, auth_client, create_ca, cert_type):
         ca = create_ca(cn=f'Profile KU {cert_type} CA')
-        csr_id = _upload(auth_client, _csr(_cn(f'ku-{cert_type}.example.test')))
+        csr_id = _upload(auth_client, _csr(_cn(f"ku-{cert_type.replace('_', '-')}.example.test")))
         assert _sign(auth_client, csr_id, ca['id'], cert_type=cert_type).status_code == 200
         ku = _cert(app, csr_id).extensions.get_extension_for_class(x509.KeyUsage)
         assert ku.critical and ku.value.digital_signature
@@ -434,3 +488,29 @@ class TestEstPath:
         r = _post_csr(client, 'simpleenroll', csr, headers=_basic_auth())
         assert r.status_code == 400
         assert b'bad name.example' in r.data
+
+
+class TestApprovalAfterTheChecks:
+    def test_a_malformed_request_is_refused_before_it_is_queued(
+            self, app, auth_client, create_ca, create_user):
+        """Nothing for an approver to vote on: the signing would refuse it."""
+        from models.policy import ApprovalRequest
+        from tests.test_approval_on_sign_and_renew import _drop_policy, _operator, _policy
+        ca = create_ca(cn='Profile approval CA')
+        pid = _policy(app, ca['id'], 'profile-malformed')
+        try:
+            csr_id = _upload(auth_client, _csr(_cn('ok.example.test'), [
+                x509.DNSName('bad name.example')]))
+            operator = _operator(app, create_user)
+            r = _sign(operator, csr_id, ca['id'])
+            assert r.status_code == 400, r.get_json()
+            assert 'bad name.example' in r.get_json()['message']
+            r = operator.post(f'{CSRS}/bulk/sign', json={
+                'ids': [csr_id], 'ca_id': ca['id'], 'validity_days': 30})
+            assert r.status_code == 200, r.get_json()
+            assert not r.get_json()['data'].get('pending_approval'), r.get_json()
+            assert 'bad name.example' in r.get_json()['data']['failed'][0]['error']
+            with app.app_context():
+                assert ApprovalRequest.query.filter_by(policy_id=pid).count() == 0
+        finally:
+            _drop_policy(app, pid)
