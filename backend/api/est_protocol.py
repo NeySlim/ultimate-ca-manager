@@ -7,6 +7,7 @@ from models import db, CA
 from services.ca_service import CAService
 from services.ca.ca_signing import AlreadySuperseded
 from services.policy_service import PolicyViolation
+from services.trust_store.constraints_mixin import CsrRefused
 from services.audit_service import AuditService
 from utils import key_algorithms
 from utils.client_cert import trusted_client_cert
@@ -449,6 +450,11 @@ def _presented_certificate_refusal(ca):
         issuer = issuing_ca_for(cert)
         if issuer is None:
             return None
+        # §6.1.3(a)(3) holds for every certificate of the path, not the leaf alone
+        if issuer.revoked_in_chain:
+            logger.warning('EST: client certificate issuer %s is revoked, serial=%s',
+                           issuer.descr, cert.serial_number)
+            return Response('Client certificate issuer has been revoked', status=403)
         _row, status = issued_certificate_status(issuer, cert)
         if status not in (REVOKED, EXPIRED, NOT_YET_VALID):
             return None
@@ -726,7 +732,7 @@ def simple_enroll(label=None):
     except PolicyViolation as e:
         logger.warning(f"EST simpleenroll refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
-    except ValueError as e:  # the signer's reason, for the operator (RFC 8951 §5.1)
+    except CsrRefused as e:  # what the request did wrong (RFC 8951 §5.1); CA faults stay generic
         logger.warning(f"EST simpleenroll refused: {e}")
         return Response(str(e), status=400)
     except Exception as e:
@@ -854,7 +860,7 @@ def simple_reenroll(label=None):
     except PolicyViolation as e:
         logger.warning(f"EST simplereenroll refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
-    except ValueError as e:  # the signer's reason, for the operator (RFC 8951 §5.1)
+    except CsrRefused as e:  # what the request did wrong (RFC 8951 §5.1); CA faults stay generic
         logger.warning(f"EST simplereenroll refused: {e}")
         return Response(str(e), status=400)
     except Exception as e:
@@ -940,6 +946,10 @@ def server_keygen(label=None):
         csr_der, csr, bad_csr = _load_est_csr(csr_data)
         if bad_csr is not None:
             return bad_csr
+        # §4.4.1 treats this CSR as any enrolment's: a tls-unique sent is verified (§3.5)
+        linking = _tls_unique_refusal(csr)
+        if linking is not None:
+            return linking
         key_identifiers = _server_keygen_identifiers(csr)
         mtls_cert_obj = None
         if auth_method == 'mtls':
@@ -1119,7 +1129,7 @@ Content-Transfer-Encoding: base64\r
     except PolicyViolation as e:
         logger.warning(f"EST serverkeygen refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
-    except ValueError as e:  # the signer's reason, for the operator (RFC 8951 §5.1)
+    except CsrRefused as e:  # what the request did wrong (RFC 8951 §5.1); CA faults stay generic
         logger.warning(f"EST serverkeygen refused: {e}")
         return Response(str(e), status=400)
     except Exception as e:

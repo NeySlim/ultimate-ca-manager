@@ -22,7 +22,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
 - EST: `/csrattrs` lists keyUsage, subjectAltName and extKeyUsage as bare OIDs instead of inside an extensionRequest, a form RFC 9908 §5.2 declares incorrect; the `csrattrs_legacy_encoding` setting of `PATCH /api/v2/est/config` restores the former shape.
 - EST: refusals are sent as `text/plain` with the reason, such as a body that is not base64 or not a PKCS#10 CSR, a CA name constraint or the rate limit, instead of an HTML page saying "Enrollment failed" or JSON (RFC 8951 §5).
-- EST: a CSR whose `challengePassword` is not the `tls-unique` value of its TLS 1.2 connection to UCM, or that arrives over TLS 1.3 or through a proxy where none can be checked, is refused with 400 instead of being certified unchecked (RFC 7030 §3.5).
+- EST: a CSR whose `challengePassword` is not the `tls-unique` value of its TLS 1.2 connection to UCM, or that arrives over TLS 1.3 or through a proxy where none can be checked, is refused with 400 on `simpleenroll`, `simplereenroll` and `serverkeygen` instead of being certified unchecked (RFC 7030 §3.5).
 
 ### Fixed
 
@@ -39,7 +39,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Security
 
 - mTLS behind a proxy: a certificate presented by its serial number alone, without `X-SSL-Client-I-DN` or `X-SSL-Client-Cert`, opened the enrolment bearing that serial, even one of another CA. Such a serial now opens only an enrolment that recorded no issuer, and enrolling a presented certificate requires its issuer (RFC 5280 §4.1.2.2).
-- EST: a client certificate that another CA of this server had revoked, even as compromised, still authenticated `/simpleenroll` and `/serverkeygen` and obtained certificates for any name. It is now refused once revoked or expired whichever CA of the server issued it, and `/api/v2/mtls/enroll` no longer enrols a revoked certificate (RFC 7030 §3.3.2).
+- EST: a client certificate that another CA of this server had revoked, even as compromised, still authenticated `/simpleenroll` and `/serverkeygen` and obtained certificates for any name. It is now refused once it, or a CA above it, is revoked, or once it has expired, whichever CA of the server issued it, and `/api/v2/mtls/enroll` no longer enrols such a certificate (RFC 7030 §3.3.2, RFC 5280 §6.1.3).
 - EST: a CSR whose key was revoked as compromised was certified again. It is now refused with 400, as on the ACME client.
 
 ### Upgrade notes

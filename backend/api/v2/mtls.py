@@ -522,6 +522,8 @@ def enroll_presented_certificate():
         from services.mtls_enrollment import issuing_ca_for
         presented = cx509.load_pem_x509_certificate(cert_info['cert_pem'].encode())
         issuer = issuing_ca_for(presented)
+        if issuer is not None and issuer.revoked_in_chain:  # RFC 5280 §6.1.3: the whole path
+            return error_response('This certificate issuer has been revoked', 400)
         if issuer is not None and issued_certificate_status(issuer, presented)[1] == REVOKED:
             return error_response('This certificate has been revoked', 400)
 

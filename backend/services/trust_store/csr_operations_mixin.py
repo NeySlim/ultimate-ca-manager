@@ -20,7 +20,7 @@ from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.leaf_key_usage import builder_key_usage, constrain_builder_key_usage, key_usage_notice
 from .constants import hash_algorithm
 from .key_operations_mixin import KeyOperationsMixin
-from .constraints_mixin import ConstraintsMixin
+from .constraints_mixin import ConstraintsMixin, CsrRefused
 from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
@@ -371,7 +371,7 @@ def _filter_csr_ekus(eku_oids, cert_type, allow_sensitive_ekus, renewal_of=None)
         # MORE than a CSR requesting nothing. Fall back to the type's profile.
         kept = _default_ekus_for_cert_type(cert_type)
         if not kept:
-            raise ValueError(
+            raise CsrRefused(
                 "CSR requests only Extended Key Usages that are not permitted "
                 f"for certificate type {cert_type!r}"
             )
@@ -402,7 +402,7 @@ def _capped_basic_constraints(csr_constraints, ca_cert):
         return csr_constraints
 
     if parent_limit <= 0:
-        raise ValueError(
+        raise CsrRefused(
             "Issuing CA has pathLenConstraint 0 and may not issue a subordinate CA"
         )
 
@@ -694,9 +694,9 @@ class CSROperationsMixin:
         from utils.key_type import validate_enrollment_csr
         key_err = validate_enrollment_csr(csr)
         if key_err:
-            raise ValueError(f"CSR public key rejected: {key_err}")
+            raise CsrRefused(f"CSR public key rejected: {key_err}")
         if require_pop and not csr.is_signature_valid:
-            raise ValueError("CSR has invalid signature")
+            raise CsrRefused("CSR has invalid signature")
         related_a = _verified_related_certificate(csr, cert_type)
 
         # Effective subject: an override (if any) wins outright; otherwise
@@ -820,7 +820,7 @@ class CSROperationsMixin:
             and csr_basic_constraints is not None
             and not csr_basic_constraints.value.ca
         ):
-            raise ValueError(
+            raise CsrRefused(
                 "Intermediate CA CSR BasicConstraints must set ca=True"
             )
 

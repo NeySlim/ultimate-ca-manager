@@ -397,16 +397,32 @@ class TestTlsUniqueLinking:
 class TestRefusalReasons:
     """RFC 8951 §5.1: a rejection says why."""
 
-    def test_signing_refusal_names_its_reason(self, client, monkeypatch):
+    def test_signing_refusal_names_its_reason(self, app, client, create_ca, est_config):
+        nc_ca = create_ca(cn='EST name-constrained CA', nameConstraintsExcluded=[
+            {'type': 'dns', 'value': 'blocked.example.test'}])
+        with app.app_context():
+            _set_config('est_ca_refid', db.session.get(CA, nc_ca['id']).refid)
+        try:
+            csr, _ = _make_csr('www.blocked.example.test',
+                               san_names=('www.blocked.example.test',))
+            r = _post_csr(client, 'simpleenroll', csr, headers=_basic_auth())
+        finally:
+            with app.app_context():
+                _set_config('est_ca_refid', db.session.get(CA, est_config['id']).refid)
+        assert r.status_code == 400
+        assert b'excluded by CA NameConstraints' in r.data
+
+    def test_operator_side_value_error_stays_generic(self, client, monkeypatch):
         from services.ca_service import CAService
 
-        def refuse(*_args, **_kwargs):
-            raise ValueError('Name constraints forbid refused.example.test')
-        monkeypatch.setattr(CAService, 'sign_csr_from_crypto', refuse)
-        csr, _ = _make_csr('refused.example.test')
+        def broken_key(*_args, **_kwargs):
+            raise ValueError('Stored private key for CA abc is malformed or encrypted '
+                             'with a different KEY_ENCRYPTION_KEY')
+        monkeypatch.setattr(CAService, 'sign_csr_from_crypto', broken_key)
+        csr, _ = _make_csr('broken-key.example.test')
         r = _post_csr(client, 'simpleenroll', csr, headers=_basic_auth())
         assert r.status_code == 400
-        assert b'Name constraints forbid' in r.data
+        assert b'KEY_ENCRYPTION_KEY' not in r.data
 
     def test_unexpected_failure_stays_generic(self, client, monkeypatch):
         from services.ca_service import CAService
@@ -447,3 +463,73 @@ def test_reenrolment_of_a_certificate_without_san_adds_none(app, client, est_con
     renewed = _issued(_post_csr(client, 'simplereenroll', renew_csr, client_cert_pem=_pem(leaf)))
     with pytest.raises(x509.ExtensionNotFound):
         renewed.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+
+
+@pytest.fixture
+def revoked_sub_ca_leaves(app, auth_client, create_ca, create_cert):
+    """Under a sub-CA UCM then revokes: a stored leaf and one minted with its key."""
+    from services.hsm.ca_key_loader import get_ca_signing_key
+
+    def _make(tag):
+        root = create_ca(cn=f'EST chain root {tag}')
+        sub = create_ca(cn=f'EST chain sub {tag}', type='intermediate', parentCAId=root['id'])
+        info = create_cert(cn=f'stored-{tag}.example.test', ca_id=sub['id'])
+        with app.app_context():
+            sub_row = db.session.get(CA, sub['id'])
+            sub_cert = x509.load_pem_x509_certificate(base64.b64decode(sub_row.crt))
+            stored = x509.load_pem_x509_certificate(
+                base64.b64decode(db.session.get(Certificate, info['id']).crt))
+            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            now = utc_now()
+            minted = x509.CertificateBuilder().subject_name(x509.Name(
+                [x509.NameAttribute(NameOID.COMMON_NAME, f'minted-{tag}.example.test')])
+            ).issuer_name(sub_cert.subject).public_key(key.public_key()).serial_number(
+                x509.random_serial_number()).not_valid_before(now - timedelta(minutes=5)
+            ).not_valid_after(now + timedelta(days=30)).sign(
+                get_ca_signing_key(sub_row), hashes.SHA256())
+        r = auth_client.post(f"/api/v2/cas/{sub['id']}/revoke",
+                             data=json.dumps({'reason': 'keyCompromise'}),
+                             content_type='application/json')
+        assert r.status_code == 200, r.data
+        return stored, minted
+
+    return _make
+
+
+class TestPresentedCertificateUnderARevokedCa:
+    """RFC 5280 §6.1.3(a)(3): every certificate of the path is checked, so a
+    leaf whose issuing CA UCM revoked does not authenticate."""
+
+    @pytest.mark.parametrize('which', [0, 1], ids=['stored', 'minted'])
+    def test_cannot_enrol(self, client, revoked_sub_ca_leaves, which):
+        leaf = revoked_sub_ca_leaves(f'enrol{which}')[which]
+        csr, _ = _make_csr('www.chain-victim.example.test',
+                           san_names=('www.chain-victim.example.test',))
+        r = _post_csr(client, 'simpleenroll', csr, client_cert_pem=_pem(leaf))
+        assert r.status_code == 403, r.data
+        assert b'issuer has been revoked' in r.data
+
+    def test_cannot_use_serverkeygen(self, client, revoked_sub_ca_leaves):
+        leaf = revoked_sub_ca_leaves('keygen')[1]
+        csr, _ = _make_csr('keygen-chain-victim.example.test')
+        r = _post_csr(client, 'serverkeygen', csr, client_cert_pem=_pem(leaf))
+        assert r.status_code == 403, r.data
+
+    @pytest.mark.parametrize('which', [0, 1], ids=['stored', 'minted'])
+    def test_cannot_be_enrolled_for_mtls(self, app, auth_client, revoked_sub_ca_leaves, which):
+        leaf = revoked_sub_ca_leaves(f'mtls{which}')[which]
+        r = auth_client.post('/api/v2/mtls/enroll', json={}, environ_overrides={
+            'peercert': leaf.public_bytes(serialization.Encoding.DER)})
+        assert r.status_code == 400, r.get_json()
+        assert 'issuer has been revoked' in r.get_json()['message']
+
+
+def test_serverkeygen_verifies_the_tls_unique_binding(client):
+    """RFC 7030 §3.5 and §4.4.1: serverkeygen checks the CSR's tls-unique too."""
+    csr = _csr_with_challenge('keygen-tls-unique.example.test', b'A' * 16)
+    body = base64.b64encode(csr.public_bytes(serialization.Encoding.DER))
+    r = client.post(f'{EST_BASE}/serverkeygen', data=body, headers=_basic_auth(),
+                    content_type='application/pkcs10',
+                    environ_overrides={'ucm.tls_unique': bytes(range(12))})
+    assert r.status_code == 400, r.data
+    assert b'does not match' in r.data
