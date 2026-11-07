@@ -605,9 +605,10 @@ def test_scheduled_purge_removes_expired_and_used_nonces(app):
 class TestMalformedRequests:
     @pytest.mark.parametrize('path', ['/acme/new-order', '/acme/revoke-cert', '/acme/key-change',
                                       '/acme/new-authz', '/acme/order/x/finalize', '/acme/challenge/x'])
-    def test_non_json_body_is_malformed(self, client, path):
-        r = client.post(path, data='{not json', content_type='application/jose+json')
-        assert r.status_code in (400, 404), r.get_data(as_text=True)
+    @pytest.mark.parametrize('body', ['{not json', '[1, 2]'])
+    def test_non_json_body_is_malformed(self, client, path, body):
+        r = client.post(path, data=body, content_type='application/jose+json')
+        assert r.status_code == 400, r.get_data(as_text=True)
         assert r.get_json()['type'] == 'urn:ietf:params:acme:error:malformed'
 
     @pytest.mark.parametrize('path', ['/acme/new-order', '/acme/revoke-cert'])

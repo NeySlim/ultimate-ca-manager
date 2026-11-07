@@ -634,7 +634,7 @@ def new_account():
         # invalid body returns None instead of raising 500.
         jws_data = request.get_json(force=True, silent=True)
 
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
         # Verify JWS
@@ -759,7 +759,7 @@ def account_info(account_id: str):
     
     # Verify JWS — RFC 8555 §6.3 requires POST-as-GET for read operations too
     jws_data = request.get_json(force=True, silent=True)
-    if not jws_data:
+    if not isinstance(jws_data, dict) or not jws_data:
         return acme_error('malformed', 'Request body must be JWS')
     
     expected_url = f"{service.base_url}/acme/acct/{account_id}"
@@ -812,7 +812,7 @@ def account_orders(account_id: str):
     
     # Verify JWS (POST-as-GET) — required, never optional
     jws_data = request.get_json(force=True, silent=True)
-    if not jws_data:
+    if not isinstance(jws_data, dict) or not jws_data:
         return acme_error('malformed', 'Request body must be JWS')
     
     expected_url = f"{service.base_url}/acme/acct/{account_id}/orders"
@@ -858,7 +858,7 @@ def new_authz():
     
     try:
         jws_data = request.get_json(force=True, silent=True)
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body required')
         
         expected_url = f"{service.base_url}/acme/new-authz"
@@ -970,7 +970,7 @@ def new_order():
     try:
         jws_data = request.get_json(force=True, silent=True)
         
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
         # Verify JWS
@@ -1172,7 +1172,7 @@ def order_info(order_id: str):
     
     # Verify JWS (POST-as-GET: empty payload)
     jws_data = request.get_json(force=True, silent=True)
-    if not jws_data:
+    if not isinstance(jws_data, dict) or not jws_data:
         return acme_error('malformed', 'Request body must be JWS')
 
     expected_url = f"{service.base_url}/acme/order/{order_id}"
@@ -1215,7 +1215,7 @@ def finalize_order(order_id: str):
     try:
         jws_data = request.get_json(force=True, silent=True)
         
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
         # Verify JWS
@@ -1356,7 +1356,7 @@ def authorization_info(authorization_id: str):
     
     # Verify JWS (POST-as-GET: empty payload)
     jws_data = request.get_json(force=True, silent=True)
-    if not jws_data:
+    if not isinstance(jws_data, dict) or not jws_data:
         return acme_error('malformed', 'Request body must be JWS')
 
     expected_url = f"{service.base_url}/acme/authz/{authorization_id}"
@@ -1454,7 +1454,7 @@ def respond_to_challenge(challenge_id: str):
     try:
         jws_data = request.get_json(force=True, silent=True)
         
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
         # Verify JWS
@@ -1557,7 +1557,7 @@ def respond_to_challenge(challenge_id: str):
 def _order_certificate_for_post_as_get(service, order_id, expected_url):
     """(Certificate, None) for an authenticated POST-as-GET on an order's certificate, else (None, error response)."""
     jws_data = request.get_json(force=True, silent=True)
-    if not jws_data:
+    if not isinstance(jws_data, dict) or not jws_data:
         return None, acme_error('malformed', 'Request body must be JWS')
 
     is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
@@ -1739,7 +1739,7 @@ def revoke_cert():
     try:
         jws_data = request.get_json(force=True, silent=True)
         
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
         expected_url = f"{service.base_url}/acme/revoke-cert"
@@ -1941,7 +1941,7 @@ def key_change():
     try:
         jws_data = request.get_json(force=True, silent=True)
         
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
         expected_url = f"{service.base_url}/acme/key-change"
