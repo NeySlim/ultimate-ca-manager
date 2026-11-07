@@ -254,16 +254,12 @@ def test_get_policies_returns_pinned_template(client, xcep_config):
     assert ca_reference_id is not None
     assert ca_reference.text == ca_reference_id.text
 
-    # Machine templates (web_server here) get the auto-derive-from-DNS-name
-    # subjectNameFlags, not the enrollee-supplies-subject one -- confirmed
-    # against the lab's real ADCS "Computer" template's own msPKI-Certificate-
-    # Name-Flag AD attribute (0x18000000). Required for unattended GPO
-    # autoenrollment to work at all: with enrollee-supplies-subject, Windows'
-    # background autoenrollment engine has no interactive session to ask for
-    # a subject and silently declines the template (see policy_builder.py's
-    # _MACHINE_SUBJECT_NAME_FLAGS docstring).
+    # The UsernamePassword binding has no AD identity to build a subject from:
+    # every template, machine ones included, announces a client-supplied
+    # subject there (0x00010001). The Kerberos binding announces 0x18000000
+    # for machine templates (test_wstep_subject_source).
     subject_name_flags = policies[0].find(f'.//{{{XCEP_NS}}}subjectNameFlags')
-    assert int(subject_name_flags.text) == (0x10000000 | 0x08000000)
+    assert int(subject_name_flags.text) == (0x00000001 | 0x00010000)
 
     # generalFlags/GeneralMachineType (0x40) must be set for a web_server
     # template -- real-client regression: leaving this nil made Windows

@@ -6,6 +6,7 @@ which does not use this module directly but follows the same shape) XCEP
 need the same WS-Addressing header pattern. Action URIs verified against
 the published MS-WSTEP specification (Microsoft Open Specifications).
 """
+import datetime
 import uuid
 
 from lxml import etree
@@ -104,13 +105,40 @@ def extract_username_token(security_header):
     return username, password
 
 
-def build_soap_fault(reason, code='s:Receiver', relates_to=None):
+# WSS 1.1 SOAP Message Security 10: the clock skew allowed past wsu:Expires
+TIMESTAMP_SKEW = datetime.timedelta(minutes=5)
+
+
+def message_expired(security_header, now=None):
+    """Whether ``wsse:Security/wsu:Timestamp/wsu:Expires`` lies more than
+    ``TIMESTAMP_SKEW`` in the past (an unreadable one counts as expired).
+    False without a Timestamp, which WSTEP does not require."""
+    if security_header is None:
+        return False
+    expires = security_header.find(f'{{{WSU_NS}}}Timestamp/{{{WSU_NS}}}Expires')
+    if expires is None:
+        return False
+    try:
+        when = datetime.datetime.fromisoformat((expires.text or '').strip())
+    except ValueError:
+        return True
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=datetime.timezone.utc)
+    now = now or datetime.datetime.now(datetime.timezone.utc)
+    return when + TIMESTAMP_SKEW < now
+
+
+def build_soap_fault(reason, code='s:Receiver', relates_to=None, subcode=None):
     """Build a SOAP 1.2 Fault response (not a plain-text error like EST
     uses) — XML/SOAP clients parse faults specifically, and a bare HTTP
-    error body would not be recognized as one."""
+    error body would not be recognized as one. ``subcode``: a qualified
+    name such as ``wsse:MessageExpired``."""
     fault = etree.Element('{%s}Fault' % SOAP_NS)
     code_el = etree.SubElement(fault, '{%s}Code' % SOAP_NS)
     etree.SubElement(code_el, '{%s}Value' % SOAP_NS).text = code
+    if subcode:
+        subcode_el = etree.SubElement(code_el, '{%s}Subcode' % SOAP_NS)
+        etree.SubElement(subcode_el, '{%s}Value' % SOAP_NS).text = subcode
     reason_el = etree.SubElement(fault, '{%s}Reason' % SOAP_NS)
     etree.SubElement(reason_el, '{%s}Text' % SOAP_NS, attrib={
         '{http://www.w3.org/XML/1998/namespace}lang': 'en'

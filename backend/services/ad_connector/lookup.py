@@ -7,10 +7,9 @@ Two things live here:
    -- a real Kerberos machine account principal from ``services/kerberos/
    negotiate_auth.py`` looks like ``WIN11$@HAGLAND.DOMAIN`` (confirmed
    against the lab); the trailing ``$`` on the pre-@ part is how AD marks a
-   computer account's sAMAccountName, and is the only signal available to
-   tell "this is a machine" apart from "this is a user" -- there is no
-   template selector anywhere in MS-WSTEP's wire protocol to key off instead
-   (see wstep_service.py's ``_match_template`` docstring).
+   computer account's sAMAccountName, and is how WSTEP tells a machine from a
+   user. The template comes from the request (311.21.7 or 311.20.2, else its
+   EKUs, see wstep_service.py's ``_match_template``), never the principal.
 
 2. The actual AD lookups (``lookup_computer_dns_hostname``,
    ``lookup_user_ad_identity``) MS-WSTEP's Kerberos issuance path uses to
