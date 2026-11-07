@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives.keywrap import aes_key_unwrap
 from cryptography.x509.name import _ASN1Type
 from cryptography.x509.oid import NameOID
 from pyasn1.codec.der import decoder as der_decoder, encoder as der_encoder
-from pyasn1.type import univ
+from pyasn1.type import tag, univ
 from pyasn1_alt_modules import rfc2986, rfc4055, rfc5280, rfc5652, rfc5751, rfc5753, rfc5958
 
 import fips_mode
@@ -32,7 +32,7 @@ SMIME_CAPABILITIES = '1.2.840.113549.1.9.15'
 
 
 def _hex(text):
-    return bytes.fromhex(text.replace(' ', ''))
+    return bytes.fromhex(''.join(text.split()))
 
 
 # RFC 3565 §5.1
@@ -55,6 +55,45 @@ OAEP_SHA384 = _oaep(rfc4055.rSAES_OAEP_SHA384_Identifier)
 OAEP_SHA512 = _oaep(rfc4055.rSAES_OAEP_SHA512_Identifier)
 
 
+def _oaep_mixed(hash_id, mgf_id):
+    """RSAES-OAEP with a hash and an MGF1 identifier of its own (RFC 4055 module, pyasn1)."""
+    params = rfc4055.RSAES_OAEP_params()
+    if hash_id is not None:
+        params['hashFunc'] = hash_id.subtype(explicitTag=tag.Tag(
+            tag.tagClassContext, tag.tagFormatConstructed, 0), cloneValueFlag=True)
+    if mgf_id is not None:
+        params['maskGenFunc'] = mgf_id.subtype(explicitTag=tag.Tag(
+            tag.tagClassContext, tag.tagFormatConstructed, 1), cloneValueFlag=True)
+    identifier = rfc5280.AlgorithmIdentifier()
+    identifier['algorithm'] = rfc4055.id_RSAES_OAEP
+    identifier['parameters'] = params
+    return der_encoder.encode(identifier)
+
+
+OAEP_SHA256_MGF1_SHA1 = _oaep_mixed(rfc4055.sha256Identifier, None)
+OAEP_SHA1_MGF1_SHA256 = _oaep_mixed(None, rfc4055.mgf1SHA256Identifier)
+# RFC 3560 §5, copied: rSAES-OAEP-SHA256-Identifier and -SHA384- as printed (no [0]/[1] tags)
+RFC3560_OAEP_SHA256 = _hex("""30 38 06 09 2A 86 48 86 F7 0D 01 01 07 30 2B 30
+    0D 06 09 60 86 48 01 65 03 04 02 01 05 00 30 1A 06 09 2A 86 48 86 F7 0D 01 01 08 30 0D 06 09 60
+    86 48 01 65 03 04 02 01 05 00""".replace('\n', ' '))
+RFC3560_OAEP_SHA384 = _hex("""30 38 06 09 2A 86 48 86 F7 0D 01 01 07 30 2B 30
+    0D 06 09 60 86 48 01 65 03 04 02 02 05 00 30 1A 06 09 2A 86 48 86 F7 0D 01 01 08 30 0D 06 09 60
+    86 48 01 65 03 04 02 02 05 00""".replace('\n', ' '))
+# RSAES-OAEP-params with a field the module lacks, at the top and inside hashFunc: not defaults
+OAEP_UNKNOWN_FIELD = _hex('30 10 06 09 2A 86 48 86 F7 0D 01 01 07 30 03 02 01 01')
+# RSAES-OAEP-params found by fuzzing that made the parser raise AttributeError (a REAL, an
+# ObjectDescriptor, an InstanceOf where an AlgorithmIdentifier part was expected)
+OAEP_GARBLED = [_hex('30 3c 06 09 2A 86 48 86 F7 0D 01 01 07') + _hex(h) for h in (
+    '302fa00f300d06096086480165030402010500091c301a06092a864886f70d010108300d06096086480165030402'
+    '0105a5',
+    '302fa00f300d06096086480165030402010500a11c301a06092a864886060d010108300d06096086480165030402'
+    '010700',
+    '302fa00f300d06026086480165030402010500a11c301a06092a864886f70d010108300d060960860c0165030402'
+    '013000')]
+OAEP_NESTED_EXTRA = _hex('30 21 06 09 2A 86 48 86 F7 0D 01 01 07 30 14 A0 12 30 10'
+                         '06 09 60 86 48 01 65 03 04 02 01 05 00 02 01 01')
+
+
 def _ka(scheme, wrap):
     """RFC 5753 §6 key agreement capability: scheme OID last arcs, wrap OID last arc."""
     arc, kdf = scheme
@@ -69,6 +108,12 @@ assert _ka((STD, SHA256), WRAP128) == _hex(
     '30 15 06 06 2b 81 04 01 0B 01 30 0b 06 09 60 86 48 01 65 03 04 01 05')
 assert _ka((STD, SHA256), WRAP256) == _hex(
     '30 15 06 06 2b 81 04 01 0B 01 30 0b 06 09 60 86 48 01 65 03 04 01 2D')
+
+
+def _ka_wrap_params(wrap, params):
+    """A key agreement capability whose KeyWrapAlgorithm carries *params*."""
+    return _hex(f'30 {0x15 + len(params):02x} 06 06 2b 81 04 01 0B 01 30 {0x0b + len(params):02x}'
+                f' 06 09 60 86 48 01 65 03 04 01 {wrap:02x}') + params
 
 _KDF_HASH = {'1.3.132.1.11.0': hashes.SHA224, '1.3.132.1.11.1': hashes.SHA256,
              '1.3.132.1.11.2': hashes.SHA384, '1.3.132.1.11.3': hashes.SHA512,
@@ -89,14 +134,15 @@ def _capabilities_der(capabilities):
     return der_encoder.encode(value)
 
 
-def _keygen_csr(cn, ski, capabilities=None, values=1, attributes=1):
-    """A serverkeygen CSR naming *ski*, with an SMIMECapabilities attribute unless None."""
+def _keygen_csr(cn, ski, capabilities=None, values=1, attributes=1, raw_value=None):
+    """A serverkeygen CSR naming *ski*, with an SMIMECapabilities attribute unless None;
+    *raw_value* is put as the attribute value instead of an encoded list."""
     key = rsa.generate_private_key(65537, 2048)
     builder = (x509.CertificateSigningRequestBuilder()
                .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
                .add_attribute(x509.ObjectIdentifier(ASYMMETRIC_ID), ski, _tag=_ASN1Type.OctetString))
     csr = builder.sign(key, hashes.SHA256())
-    if capabilities is None:
+    if capabilities is None and raw_value is None:
         return csr
     request, _ = der_decoder.decode(csr.public_bytes(serialization.Encoding.DER),
                                     asn1Spec=rfc2986.CertificationRequest())
@@ -105,7 +151,7 @@ def _keygen_csr(cn, ski, capabilities=None, values=1, attributes=1):
         attribute = info['attributes'].getComponentType().clone()
         attribute['type'] = rfc5751.smimeCapabilities
         for _ in range(values):
-            attribute['values'].append(_capabilities_der(capabilities))
+            attribute['values'].append(raw_value or _capabilities_der(capabilities))
         info['attributes'].append(attribute)
     tbs = der_encoder.encode(info)
     request['signature'] = univ.BitString.fromOctetString(
@@ -309,8 +355,23 @@ class TestKeyAgreement:
         # Unknown and RSA entries are passed over
         ([OAEP_SHA256, _hex('30 0a 06 08 2a 86 48 ce 3d 04 03 02'), _ka((STD, SHA384), WRAP192)],
          ('1.3.132.1.11.2', '2.16.840.1.101.3.4.1.25', '2.16.840.1.101.3.4.1.22')),
+        # RFC 8551 §2.5.2, the list is partial: no matching or usable content cipher, the
+        # AES-CBC of the key wrap size; no key agreement listed, the default one
+        ([_ka((STD, SHA256), WRAP128), AES256_CBC],
+         ('1.3.132.1.11.1', '2.16.840.1.101.3.4.1.5', '2.16.840.1.101.3.4.1.2')),
+        ([AES256_GCM, _ka((STD, SHA384), WRAP192)],
+         ('1.3.132.1.11.2', '2.16.840.1.101.3.4.1.25', '2.16.840.1.101.3.4.1.22')),
+        ([AES128_CBC], ('1.3.132.1.11.1', '2.16.840.1.101.3.4.1.45', '2.16.840.1.101.3.4.1.42')),
+        # KeyWrapAlgorithm parameters: NULL read as absent, any other value passes the entry over
+        ([_ka_wrap_params(WRAP128, b'\x05\x00')],
+         ('1.3.132.1.11.1', '2.16.840.1.101.3.4.1.5', '2.16.840.1.101.3.4.1.2')),
+        ([_ka_wrap_params(WRAP128, b'\x04\x00'), _ka((STD, SHA384), WRAP256)],
+         ('1.3.132.1.11.2', '2.16.840.1.101.3.4.1.45', '2.16.840.1.101.3.4.1.42')),
+        ([AES128_CBC, _ka((STD, SHA384), WRAP128), _ka((STD, SHA256), WRAP128)],
+         ('1.3.132.1.11.2', '2.16.840.1.101.3.4.1.5', '2.16.840.1.101.3.4.1.2')),
     ], ids=['kdf384-wrap128', 'kdf512-wrap256', 'cofactor-224-wrap192', 'content-first',
-            'gcm-skipped', 'others-skipped'])
+            'gcm-skipped', 'others-skipped', 'no-size-match', 'gcm-only', 'content-only',
+            'wrap-null-params', 'wrap-params-passed-over', 'ka-order-same-size'])
     def test_capabilities_pick_the_algorithms_in_the_client_order(
             self, client, est_ca, tmp_path, capabilities, expected):
         ca_cert = est_ca('signing')
@@ -345,8 +406,24 @@ class TestKeyTransport:
         ([RSA_ENCRYPTION, AES128_CBC], (('pkcs1v15',), '2.16.840.1.101.3.4.1.2')),
         ([_ka((STD, SHA256), WRAP256), AES256_GCM, AES128_CBC, OAEP_SHA256],
          (('oaep', 'sha256', 'sha256'), '2.16.840.1.101.3.4.1.2')),
+        ([OAEP_SHA256_MGF1_SHA1], (('oaep', 'sha256', 'sha1'), '2.16.840.1.101.3.4.1.42')),
+        ([OAEP_SHA1_MGF1_SHA256], (('oaep', 'sha1', 'sha256'), '2.16.840.1.101.3.4.1.42')),
+        # RFC 3560 §5 printed encodings, matched byte for byte
+        ([RFC3560_OAEP_SHA256], (('oaep', 'sha256', 'sha256'), '2.16.840.1.101.3.4.1.42')),
+        ([RFC3560_OAEP_SHA384], (('oaep', 'sha384', 'sha384'), '2.16.840.1.101.3.4.1.42')),
+        # Parameters with unknown fields are passed over, not read as the SHA-1 defaults
+        ([OAEP_UNKNOWN_FIELD, OAEP_SHA384], (('oaep', 'sha384', 'sha384'), '2.16.840.1.101.3.4.1.42')),
+        ([OAEP_NESTED_EXTRA, OAEP_SHA384], (('oaep', 'sha384', 'sha384'), '2.16.840.1.101.3.4.1.42')),
+        # RFC 8551 §2.5.2, the list is partial: AES-256-CBC, or the default transport
+        ([OAEP_SHA256, AES256_GCM], (('oaep', 'sha256', 'sha256'), '2.16.840.1.101.3.4.1.42')),
+        ([AES128_CBC], (('oaep', 'sha256', 'sha256'), '2.16.840.1.101.3.4.1.2')),
+        *[([garbled, OAEP_SHA384], (('oaep', 'sha384', 'sha384'), '2.16.840.1.101.3.4.1.42'))
+          for garbled in OAEP_GARBLED],
     ], ids=['defaults', 'sha512-aes192', 'sha384-aes128', 'oaep-default-sha1', 'oaep-over-v15',
-            'v15-alone', 'others-skipped'])
+            'v15-alone', 'others-skipped', 'sha256-mgf1-sha1', 'sha1-mgf1-sha256',
+            'rfc3560-sha256', 'rfc3560-sha384', 'unknown-field', 'nested-unknown-field',
+            'gcm-only', 'content-only', 'garbled-real', 'garbled-descriptor',
+            'garbled-instance-of'])
     def test_capabilities_pick_the_algorithms_in_the_client_order(
             self, client, est_ca, tmp_path, capabilities, expected):
         ca_cert = est_ca('signing')
@@ -370,11 +447,11 @@ class TestRefusals:
 
     @pytest.mark.parametrize('key_type,capabilities,expected', [
         ('ec', [OAEP_SHA256, AES256_CBC], 'key agreement dhSinglePass'),
-        ('ec', [_ka((STD, SHA256), WRAP128), AES256_CBC], 'of the key wrap size'),
         ('ec', [_ka((STD, SHA256), 0x30)], 'key agreement dhSinglePass'),  # id-aes256-wrap-pad
+        ('ec', [_ka_wrap_params(WRAP128, b'\x04\x00')], 'key agreement dhSinglePass'),
         ('rsa', [_ka((STD, SHA256), WRAP256)], 'RSAES-OAEP'),
-        ('rsa', [OAEP_SHA256, AES256_GCM], 'AES-128-CBC'),
-    ], ids=['ec-rsa-only', 'ec-size-mismatch', 'ec-unknown-wrap', 'rsa-ka-only', 'rsa-gcm-only'])
+        ('rsa', [OAEP_UNKNOWN_FIELD, AES128_CBC], 'RSAES-OAEP'),
+    ], ids=['ec-rsa-only', 'ec-unknown-wrap', 'ec-wrap-params', 'rsa-ka-only', 'rsa-unknown-field'])
     def test_capabilities_with_nothing_supported_are_refused(
             self, app, client, est_ca, key_type, capabilities, expected):
         est_ca('signing')
@@ -404,7 +481,8 @@ class TestRefusals:
         (lambda: rsa.generate_private_key(65537, 2048), 'sign', b'key transport'),
         (lambda: ec.generate_private_key(ec.SECP224R1()), 'encrypt', b'curve'),
         (ed25519.Ed25519PrivateKey.generate, None, b'Unsupported client key'),
-    ], ids=['ec-sign-only', 'rsa-sign-only', 'ec-p224', 'ed25519'])
+        (lambda: rsa.generate_private_key(65537, 1024), 'encrypt', b'under 2048 bits'),
+    ], ids=['ec-sign-only', 'rsa-sign-only', 'ec-p224', 'ed25519', 'rsa-1024'])
     def test_a_client_key_that_cannot_receive_is_refused(self, app, client, est_ca, key, usage,
                                                           expected):
         est_ca('signing')
@@ -421,6 +499,87 @@ class TestRefusals:
         r = _serverkeygen(client, cert, cn, [OAEP_SHA256, _ka((STD, SHA256), WRAP256)])
         assert r.status_code == 400 and expected in r.data, r.data
         assert _no_certificate_for(app, cn)
+
+
+    @needs_openssl
+    def test_an_rsassa_pss_key_is_refused(self, app, client, est_ca, tmp_path):
+        """RFC 4055 §1.2: an id-RSASSA-PSS subject key is for signatures only."""
+        est_ca('signing')
+        subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa-pss', '-pkeyopt',
+                        'rsa_keygen_bits:2048', '-nodes', '-keyout', 'pss.key', '-out', 'pss.pem',
+                        '-subj', '/CN=pss client', '-days', '2',
+                        '-addext', 'keyUsage=critical,digitalSignature,keyEncipherment'],
+                       check=True, capture_output=True, cwd=tmp_path)
+        cert = x509.load_pem_x509_certificate((tmp_path / 'pss.pem').read_bytes())
+        assert cert.public_key_algorithm_oid.dotted_string == '1.2.840.113549.1.1.10'
+        cn = 'refused-pss.keygen.test'
+        r = _serverkeygen(client, cert, cn, [OAEP_SHA256])
+        assert r.status_code == 400 and b'RSASSA-PSS' in r.data, r.data
+        assert _no_certificate_for(app, cn)
+
+    # Found by fuzzing the attribute: a REAL, an InstanceOf, an ObjectDescriptor where the
+    # parser expected another type
+    @pytest.mark.parametrize('value', [
+        '3064303c06092a864886f70d010107302fa00f300d06096086480165030402010500a11c301a06092a864886'
+        'a00d010108300d06096086480165030402010500301506062b8104010b01090b060960864801650304012d'
+        '300d06092a864886f70d01010730a1',
+        '3064303c06092a864886f70d010107302fa00f300d0609608648016503040201a100a181301a06092a8648'
+        '86f70d010108300d06096086480165030402010500301506062b8104f60b01300b06096086480165030401'
+        '2d300d06092a864886f70d0101078800',
+        '3064303c06092a864886f70d010109302fa00f300d06096086480165030402010500a11c301a06092a8648'
+        '86f70d010108304106096006480165030402010500301506062b8104010b01e70b06096086480165030401'
+        '2d300d06092a864886f70d0101073000',
+    ], ids=['real', 'instance-of', 'object-descriptor'])
+    def test_a_garbled_attribute_is_a_logged_400(self, app, client, est_ca, caplog, value):
+        est_ca('signing')
+        cn = f'garbled-{value[-6:]}.keygen.test'
+        cert = _client_certificate(ec.generate_private_key(ec.SECP256R1()))
+        csr = _keygen_csr(cn, _ski(cert), raw_value=bytes.fromhex(value))
+        with caplog.at_level('WARNING', logger='api.est_protocol'):
+            r = _post_csr(client, 'serverkeygen', csr,
+                          client_cert_pem=cert.public_bytes(serialization.Encoding.PEM).decode())
+        assert r.status_code == 400 and b'Server key generation failed' not in r.data, r.data
+        records = [rec for rec in caplog.records if rec.name == 'api.est_protocol']
+        assert records and all(rec.levelname == 'WARNING' for rec in records)
+        assert _no_certificate_for(app, cn)
+
+
+    # Found by fuzzing: entries whose parameters crash a re-encoding of the attribute; they are
+    # passed over as unsupported, the attribute itself is read
+    @pytest.mark.parametrize('value,status', [
+        ('3055303c06132a864886f70d0101073000a00f300d06096086480165030402010500a11c301a06092a8648'
+         '86f70d010108300d06096086480165030402010500301506062b8104010b01300b06096086480165030401'
+         '2d', 200),
+        ('3055303c06092a864886f70d010107302fa00f300d06076086480165030402010500a11c301a06092a8648'
+         '86f70d010108300d06096086480165030402010500301506062b8104010b01090b05096086480165030401'
+         '2d', 400),
+        ('3055303c06092a864886f70d010107302fa00f300d06096086480165030402010500a11c301a06a02a8648'
+         '86f70d010108300d06096086480165030402010500301506062b8104010b01ca0b06096086480165090401'
+         '2d', 400),
+    ], ids=['instance-of', 'real', 'none-subscript'])
+    def test_garbled_parameters_are_passed_over(self, app, client, est_ca, caplog, value, status):
+        est_ca('signing')
+        cn = f'garbled-params-{abs(hash(value)) % 10**8}.keygen.test'
+        cert = _client_certificate(ec.generate_private_key(ec.SECP256R1()))
+        csr = _keygen_csr(cn, _ski(cert), raw_value=bytes.fromhex(value))
+        with caplog.at_level('WARNING', logger='api.est_protocol'):
+            r = _post_csr(client, 'serverkeygen', csr,
+                          client_cert_pem=cert.public_bytes(serialization.Encoding.PEM).decode())
+        assert r.status_code == status and b'Malformed' not in r.data, r.data
+        assert all(rec.levelname == 'WARNING' for rec in caplog.records
+                   if rec.name == 'api.est_protocol')
+        if status == 400:
+            assert b'supported: ' in r.data and _no_certificate_for(app, cn)
+
+
+def test_an_oaep_hash_too_large_for_the_modulus_is_passed_over():
+    """RFC 8017 §7.1.1: SHA-512 OAEP needs k - 130 bytes for the CEK; RSA-1024 has k = 128."""
+    public_key = rsa.generate_private_key(65537, 1024).public_key()
+    sha512 = ('1.2.840.113549.1.1.7', der_encoder.encode(rfc4055.rSAES_OAEP_SHA512_Params))
+    sha256 = ('1.2.840.113549.1.1.7', der_encoder.encode(rfc4055.rSAES_OAEP_SHA256_Params))
+    assert choose_key_encryption(public_key, [sha512, sha256]).recipient.oaep_hash == 'sha256'
+    with pytest.raises(UnsupportedCapabilities):
+        choose_key_encryption(public_key, [sha512])
 
 
 class TestFips:

@@ -7,8 +7,8 @@ from cryptography import x509
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 import fips_mode
-from services.scep.crypto_helpers import oaep_parameters
 from utils import key_algorithms
+from utils.cms_envelope import OAEP_HASHES, oaep_parameters
 
 SMIME_CAPABILITIES_OID = '1.2.840.113549.1.9.15'
 RSAES_OAEP = '1.2.840.113549.1.1.7'
@@ -20,13 +20,7 @@ CONTENT_CIPHERS = {
     '2.16.840.1.101.3.4.1.22': ('aes192_cbc', 24),
     '2.16.840.1.101.3.4.1.42': ('aes256_cbc', 32),
 }
-# Content ciphers not usable in EnvelopedData here: AES-GCM/CCM (RFC 5084) need AuthEnvelopedData,
-# ChaCha20-Poly1305 likewise (RFC 8103), 3DES and RC2 are not offered
-_OTHER_CONTENT_CIPHERS = frozenset((
-    '2.16.840.1.101.3.4.1.6', '2.16.840.1.101.3.4.1.26', '2.16.840.1.101.3.4.1.46',
-    '2.16.840.1.101.3.4.1.7', '2.16.840.1.101.3.4.1.27', '2.16.840.1.101.3.4.1.47',
-    '1.2.840.113549.1.9.16.3.18', '1.2.840.113549.3.7', '1.2.840.113549.3.2',
-))
+AES256_CBC = '2.16.840.1.101.3.4.1.42'
 # RFC 3565 §2.3.2: id-aes*-wrap, parameters absent
 KEY_WRAPS = {
     '2.16.840.1.101.3.4.1.5': ('aes128_wrap', 16),
@@ -41,7 +35,29 @@ KEY_AGREEMENTS = {
     for n, h in enumerate(('sha224', 'sha256', 'sha384', 'sha512'))
 }
 STD_DH_SHA256 = '1.3.132.1.11.1'
-_OAEP_HASHES = ('sha1', 'sha224', 'sha256', 'sha384', 'sha512')
+# Key transport and agreement UCM recognises without using: sha1kdf ECDH, ECMQV, X25519/X448,
+# RFC 8418 HKDF; one listed means the client named its key encipherment
+_OTHER_KEY_ENCIPHERMENT = frozenset((
+    '1.3.133.16.840.63.0.2', '1.3.133.16.840.63.0.3', '1.3.133.16.840.63.0.16',
+    '1.3.132.1.15.0', '1.3.132.1.15.1', '1.3.132.1.15.2', '1.3.132.1.15.3',
+    '1.3.101.110', '1.3.101.111',
+    '1.2.840.113549.1.9.16.3.19', '1.2.840.113549.1.9.16.3.20', '1.2.840.113549.1.9.16.3.21',
+))
+_OAEP_FIELDS = frozenset(('hash_algorithm', 'mask_gen_algorithm', 'p_source_algorithm'))
+
+
+def _rfc3560_oaep(arc):
+    digest = f'300d0609608648016503040{arc}0500'
+    return bytes.fromhex(f'302b{digest}301a06092a864886f70d010108{digest}')
+
+
+# RFC 3560 §5 capability parameters as printed there, without the [0] and [1] tags of its
+# ASN.1 module; matched byte for byte (RFC 8551 §2.5.2)
+_RFC3560_OAEP = {
+    _rfc3560_oaep('201'): ('sha256', 'sha256'),
+    _rfc3560_oaep('202'): ('sha384', 'sha384'),
+    _rfc3560_oaep('203'): ('sha512', 'sha512'),
+}
 _KARI_CURVES = (ec.SECP256R1, ec.SECP384R1, ec.SECP521R1,
                 ec.BrainpoolP256R1, ec.BrainpoolP384R1, ec.BrainpoolP512R1)
 
@@ -51,6 +67,13 @@ class KeyTransport:
     """RSAES-OAEP with its hashes, or RSAES-PKCS1-v1_5 when ``oaep_hash`` is None."""
     oaep_hash: str | None = 'sha256'
     mgf_hash: str | None = 'sha256'
+
+    def fits(self, public_key, content_key_size):
+        """RFC 8017 §7.1.1 and §7.2.1: the CEK fits the modulus under this padding."""
+        k = (public_key.key_size + 7) // 8
+        if self.oaep_hash is None:
+            return content_key_size <= k - 11
+        return content_key_size <= k - 2 * OAEP_HASHES[self.oaep_hash].digest_size - 2
 
 
 @dataclass(frozen=True)
@@ -83,24 +106,30 @@ class UnsupportedCapabilities(ValueError):
 
 def smime_capabilities(csr_der):
     """[(capability OID, parameters DER or None)] of the CSR's SMIMECapabilities, None when absent.
-    ValueError when the attribute is repeated, multi-valued or not an SMIMECapabilities."""
-    info = asn1_csr.CertificationRequest.load(csr_der)['certification_request_info']
-    found = [a for a in info['attributes'] if a['type'].dotted == SMIME_CAPABILITIES_OID]
-    if not found:
-        return None
-    if len(found) > 1:
-        raise ValueError('more than one SMIMECapabilities attribute')
-    values = found[0]['values']
-    values = values.parse(_AnySet) if isinstance(values, core.Any) else values
-    if len(values) != 1:
-        raise ValueError('SMIMECapabilities must carry a single value')  # RFC 8551 §2.5.2
-    capabilities = cms.SMIMECapabilites.load(values[0].dump(force=True))
-    out = []
-    for capability in capabilities:
-        params = capability['parameters']
-        out.append((capability['capability_id'].dotted,
-                    None if isinstance(params, core.Void) else params.dump(force=True)))
-    return out
+    ValueError when the attribute is repeated, multi-valued or does not parse."""
+    try:
+        info = asn1_csr.CertificationRequest.load(csr_der)['certification_request_info']
+        found = [a for a in info['attributes'] if a['type'].dotted == SMIME_CAPABILITIES_OID]
+        if not found:
+            return None
+        if len(found) > 1:
+            raise ValueError('more than one SMIMECapabilities attribute')
+        values = found[0]['values']
+        values = values.parse(_AnySet) if isinstance(values, core.Any) else values
+        if len(values) != 1:
+            raise ValueError('SMIMECapabilities must carry a single value')  # RFC 8551 §2.5.2
+        capabilities = cms.SMIMECapabilites.load(values[0].dump(), strict=True)
+        out = []
+        for capability in capabilities:
+            params = capability['parameters']
+            # the client's own bytes: RFC 8551 §2.5.2 matches capabilities by binary comparison
+            out.append((capability['capability_id'].dotted,
+                        None if isinstance(params, core.Void) else params.dump()))
+        return out
+    except ValueError:
+        raise
+    except Exception as e:
+        raise ValueError(f'unreadable SMIMECapabilities: {e}') from e
 
 
 class _AnySet(core.SetOf):
@@ -114,10 +143,15 @@ def recipient_refusal(cert):
         usage = cert.extensions.get_extension_for_class(x509.KeyUsage).value
     except x509.ExtensionNotFound:
         usage = None
+    # RFC 4055 §1.2: an id-RSASSA-PSS key signs only
+    if cert.public_key_algorithm_oid.dotted_string == '1.2.840.113549.1.1.10':
+        return 'Requested asymmetric key is an RSASSA-PSS key, which does not allow key transport'
     public_key = cert.public_key()
     if isinstance(public_key, rsa.RSAPublicKey):
         if usage is not None and not usage.key_encipherment:
             return 'Requested asymmetric key does not allow key transport'
+        if public_key.key_size < 2048:
+            return 'Client RSA key under 2048 bits: key transport refused'
         return None
     if isinstance(public_key, ec.EllipticCurvePublicKey):
         if usage is not None and not usage.key_agreement:
@@ -136,14 +170,28 @@ def _key_transport(oid, params_der):
         return None if fips_mode.enabled() else KeyTransport(None, None)
     if oid != RSAES_OAEP:
         return None
+    if params_der in _RFC3560_OAEP:
+        return KeyTransport(*_RFC3560_OAEP[params_der])
     try:
-        params = algos.RSAESOAEPParams.load(params_der) if params_der else None
+        params = algos.RSAESOAEPParams.load(params_der, strict=True) if params_der else None
+        # Fields asn1crypto does not know show as numbered keys: not defaults to assume
+        if params is not None and not _known_fields(params.native, _OAEP_FIELDS):
+            return None
         hash_name, mgf_hash, label = oaep_parameters(params)
-    except (ValueError, TypeError, KeyError):
+    except Exception:
         return None
-    if label or hash_name not in _OAEP_HASHES or mgf_hash not in _OAEP_HASHES:
+    if label or hash_name not in OAEP_HASHES or mgf_hash not in OAEP_HASHES:
         return None
     return KeyTransport(hash_name, mgf_hash)
+
+
+def _known_fields(native, top):
+    if isinstance(native, dict):
+        if top is not None and not set(native) <= top:
+            return False
+        return all(not (isinstance(k, str) and k.isdigit()) and _known_fields(v, None)
+                   for k, v in native.items())
+    return True
 
 
 def _key_agreement(oid, params_der):
@@ -176,35 +224,42 @@ def supported_text(public_key):
     return f'supported: {transport}; {content}'
 
 
+def _aes_cbc(size):
+    return next(oid for oid, (_, s) in CONTENT_CIPHERS.items() if s == size)
+
+
 def choose_key_encryption(public_key, capabilities):
     """The KeyEncryption for *public_key* from *capabilities* (smime_capabilities output); the
-    defaults when they are None. UnsupportedCapabilities when the list has nothing usable."""
+    defaults when they are None. UnsupportedCapabilities when key transport or agreement entries
+    are listed and none is usable; content ciphers fall back to AES-CBC (RFC 8551 §2.5.2: partial)."""
     is_ec = isinstance(public_key, ec.EllipticCurvePublicKey)
     if capabilities is None:
-        return KeyEncryption('2.16.840.1.101.3.4.1.42', KeyAgreement() if is_ec else KeyTransport())
+        return KeyEncryption(AES256_CBC, KeyAgreement() if is_ec else KeyTransport())
 
-    listed_content = [oid for oid, _ in capabilities
-                      if oid in CONTENT_CIPHERS or oid in _OTHER_CONTENT_CIPHERS]
-    contents = [oid for oid in listed_content if oid in CONTENT_CIPHERS]
-    if listed_content and not contents:
-        raise UnsupportedCapabilities(
-            f'SMIMECapabilities list no supported content encryption; {supported_text(public_key)}')
-
+    contents = [oid for oid, _ in capabilities if oid in CONTENT_CIPHERS]
+    named = any(o in (RSA_ENCRYPTION, RSAES_OAEP) or o in KEY_AGREEMENTS
+                or o in _OTHER_KEY_ENCIPHERMENT for o, _ in capabilities)
     if is_ec:
         agreements = [a for a in (_key_agreement(o, p) for o, p in capabilities) if a]
+        if not agreements and not named:
+            agreements = [KeyAgreement()]
         # RFC 8551 §2.3: the key wrap and the content cipher have the same key size
-        for content in contents or [None]:
+        for content in contents:
             for agreement in agreements:
-                size = KEY_WRAPS[agreement.wrap][1]
-                chosen = content or next(o for o, (_, s) in CONTENT_CIPHERS.items() if s == size)
-                if CONTENT_CIPHERS[chosen][1] == size:
-                    return KeyEncryption(chosen, agreement)
+                if CONTENT_CIPHERS[content][1] == KEY_WRAPS[agreement.wrap][1]:
+                    return KeyEncryption(content, agreement)
+        if agreements:
+            return KeyEncryption(_aes_cbc(KEY_WRAPS[agreements[0].wrap][1]), agreements[0])
     else:
+        content = contents[0] if contents else AES256_CBC
         transports = [t for t in (_key_transport(o, p) for o, p in capabilities) if t]
+        if not transports and not named:
+            transports = [KeyTransport()]
+        transports = [t for t in transports if t.fits(public_key, CONTENT_CIPHERS[content][1])]
         # RSAES-PKCS1-v1_5 only when the client lists no OAEP UCM can use
         transport = next((t for t in transports if t.oaep_hash), transports[0] if transports else None)
         if transport is not None:
-            return KeyEncryption(contents[0] if contents else '2.16.840.1.101.3.4.1.42', transport)
+            return KeyEncryption(content, transport)
     raise UnsupportedCapabilities(
         f'SMIMECapabilities list no supported key encryption for this client key; '
         f'{supported_text(public_key)}')

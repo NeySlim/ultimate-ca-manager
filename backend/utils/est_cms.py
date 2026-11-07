@@ -1,8 +1,8 @@
 """CMS encoding helpers for RFC 7030 server-side key generation."""
 import hashlib
 
-from asn1crypto import algos, cms, core, keys, x509 as asn1_x509
-from cryptography.hazmat.primitives import hashes, serialization
+from asn1crypto import cms, core, keys, x509 as asn1_x509
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, padding as asym_padding, rsa
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.x963kdf import X963KDF
@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.keywrap import aes_key_wrap
 from cryptography.hazmat.primitives.padding import PKCS7
 
 from utils import key_algorithms
+from utils.cms_envelope import OAEP_HASHES, oaep_algorithm
 from utils.est_key_encryption import KEY_WRAPS, KeyAgreement, choose_key_encryption
 from utils.randomness import csp_bytes
 from utils.signing_hash import pss_algorithm_identifier, pss_padding, signing_hash_for, signs_pss
@@ -121,22 +122,9 @@ class _EccCmsSharedInfo(core.Sequence):
     ]
 
 
-_HASHES = {'sha1': hashes.SHA1, 'sha224': hashes.SHA224, 'sha256': hashes.SHA256,
-           'sha384': hashes.SHA384, 'sha512': hashes.SHA512}
-
-
 def _issuer_and_serial(cert):
     asn1 = asn1_x509.Certificate.load(cert.public_bytes(serialization.Encoding.DER))
     return {'issuer': asn1.issuer, 'serial_number': asn1.serial_number}
-
-
-def _oaep_identifier(transport):
-    """RFC 4055 §4.1 RSAES-OAEP-params; DER drops the SHA-1 defaults."""
-    return {'algorithm': 'rsaes_oaep', 'parameters': algos.RSAESOAEPParams({
-        'hash_algorithm': {'algorithm': transport.oaep_hash},
-        'mask_gen_algorithm': {'algorithm': 'mgf1',
-                               'parameters': {'algorithm': transport.mgf_hash}},
-    })}
 
 
 def _key_trans_recipient(content_key, recipient_cert, transport):
@@ -145,10 +133,10 @@ def _key_trans_recipient(content_key, recipient_cert, transport):
         encrypted_key = public_key.encrypt(content_key, asym_padding.PKCS1v15())
         algorithm = {'algorithm': 'rsaes_pkcs1v15', 'parameters': core.Null()}  # RFC 3370 §4.2.1
     else:
-        algorithm = _oaep_identifier(transport)
+        algorithm = oaep_algorithm(transport.oaep_hash, transport.mgf_hash)
         encrypted_key = public_key.encrypt(content_key, asym_padding.OAEP(
-            mgf=asym_padding.MGF1(_HASHES[transport.mgf_hash]()),
-            algorithm=_HASHES[transport.oaep_hash](), label=None))
+            mgf=asym_padding.MGF1(OAEP_HASHES[transport.mgf_hash]()),
+            algorithm=OAEP_HASHES[transport.oaep_hash](), label=None))
     return cms.RecipientInfo(name='ktri', value=cms.KeyTransRecipientInfo({
         'version': 'v0',
         'rid': {'issuer_and_serial_number': _issuer_and_serial(recipient_cert)},
@@ -168,7 +156,7 @@ def _key_agree_recipient(content_key, recipient_cert, agreement):
         'entity_u_info': ukm,
         'supp_pub_info': (kek_size * 8).to_bytes(4, 'big'),
     }).dump()
-    kek = X963KDF(algorithm=_HASHES[agreement.kdf_hash](), length=kek_size,
+    kek = X963KDF(algorithm=OAEP_HASHES[agreement.kdf_hash](), length=kek_size,
                   sharedinfo=shared_info).derive(ephemeral.exchange(ec.ECDH(), public_key))
     originator = keys.PublicKeyInfo.load(ephemeral.public_key().public_bytes(
         serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo))
