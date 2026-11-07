@@ -398,7 +398,6 @@ def master_key_values():
     """Yield (label, row, attribute, format) for every non-empty value stored
     under the master key. An empty column means no secret."""
     import importlib
-    from fnmatch import fnmatchcase
     from sqlalchemy.orm.attributes import InstrumentedAttribute
     from models import SystemConfig
 
@@ -414,9 +413,13 @@ def master_key_values():
                 yield f"{name} {label}", row, attribute, fmt
 
     for row in SystemConfig.query.filter(SystemConfig.key.like('acme.%')).all():
-        if row.value and any(fnmatchcase(row.key, pattern)
-                             for pattern in MASTER_KEY_CONFIG_KEYS):
+        if row.value and _is_master_key_config(row.key):
             yield f"SystemConfig {row.key}", row, 'value', 'text'
+
+
+def _is_master_key_config(key: str) -> bool:
+    from fnmatch import fnmatchcase
+    return any(fnmatchcase(key, pattern) for pattern in MASTER_KEY_CONFIG_KEYS)
 
 
 def encrypt_master_key_value(value: str, fmt: str) -> str:
@@ -451,6 +454,35 @@ def count_master_key_values() -> Tuple[int, int]:
         else:
             unencrypted += 1
     return encrypted, unencrypted
+
+
+def has_unencrypted_master_key_values() -> bool:
+    """True when a value under the master key is still stored unencrypted.
+
+    Columns are filtered in SQL on the base64 prefix every ENC: value starts with,
+    so a start with everything encrypted loads no row of them.
+    """
+    import importlib
+    from sqlalchemy.orm.attributes import InstrumentedAttribute
+    from models import db, SystemConfig
+
+    prefix = base64.b64encode(ENCRYPTED_MARKER).decode()[:5]
+    for module, name, attribute, _ in MASTER_KEY_COLUMNS:
+        model = getattr(importlib.import_module(module), name)
+        column = getattr(model, attribute)
+        if not isinstance(column, InstrumentedAttribute):
+            # A property over a wrapped column: only Python sees the value
+            values = (getattr(row, attribute) for row in model.query.all())
+            if any(v and not key_encryption.is_encrypted(v) for v in values):
+                return True
+            continue
+        # substr, not LIKE: SQLite's LIKE ignores case
+        if model.query.filter(column.isnot(None), column != '',
+                              db.func.substr(column, 1, len(prefix)) != prefix).first():
+            return True
+    return any(not key_encryption.is_encrypted(row.value)
+               for row in SystemConfig.query.filter(SystemConfig.key.like('acme.%')).all()
+               if row.value and _is_master_key_config(row.key))
 
 
 def decrypt_all_keys(dry_run: bool = True) -> tuple:

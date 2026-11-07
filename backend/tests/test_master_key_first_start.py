@@ -622,3 +622,47 @@ def test_audit_entries_restored_later_do_not_decide_the_key(app, no_key):
                                 success=True)
         assert bootstrap_master_key(app) == 'generated'
     assert no_key.MASTER_KEY_PATH.exists()
+
+
+def test_start_with_everything_encrypted_loads_no_stored_value(app, create_ca, no_key, monkeypatch, caplog):
+    """The leftover check runs at every start: it must not read every key row."""
+    import logging
+    from security import encryption as enc
+    from security import master_key_bootstrap as boot
+
+    create_ca()
+    with app.app_context():
+        assert boot.bootstrap_master_key(app) == 'generated'
+
+    def loads_every_row():
+        raise AssertionError('every stored value loaded')
+
+    calls = []
+    caplog.set_level(logging.WARNING)
+    with monkeypatch.context() as patch, app.app_context():
+        patch.setattr(enc, 'master_key_values', loads_every_row)
+        patch.setattr(enc, 'encrypt_all_keys', lambda dry_run=True: calls.append(1) or (0, 0, []))
+        boot._resume_encryption()
+    assert not calls
+    assert not [r for r in caplog.records if r.levelno >= logging.ERROR], caplog.text
+
+
+def test_leftover_check_finds_each_unencrypted_value(app, create_ca, no_key):
+    from models import db, CA, SystemConfig
+    from security import encryption as enc
+    from security.master_key_bootstrap import bootstrap_master_key
+
+    ca = create_ca()
+    with app.app_context():
+        assert bootstrap_master_key(app) == 'generated'
+        assert not enc.has_unencrypted_master_key_values()
+        row = CA.query.get(ca['id'])
+        encrypted = row.prv
+        # Same letters as the ENC: prefix, another case: SQLite's LIKE would take it for one
+        row.prv = encrypted[:5].lower() + encrypted[5:]
+        db.session.commit()
+        assert enc.has_unencrypted_master_key_values()
+        row.prv = encrypted
+        db.session.add(SystemConfig(key='acme.proxy.eab_hmac_key', value='plain'))
+        db.session.commit()
+        assert enc.has_unencrypted_master_key_values()

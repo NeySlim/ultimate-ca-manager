@@ -175,7 +175,7 @@ def _loaded_key_reads_the_database() -> bool:
 def _resume_encryption() -> None:
     """Encrypt what an interrupted first encryption left in the clear."""
     try:
-        if not _encryption.count_master_key_values()[1]:
+        if not _encryption.has_unencrypted_master_key_values():
             return
         encrypted, _, errors = _encryption.encrypt_all_keys(dry_run=False)
     except Exception as e:
