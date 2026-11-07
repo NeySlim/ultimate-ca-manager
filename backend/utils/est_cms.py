@@ -1,13 +1,17 @@
 """CMS encoding helpers for RFC 7030 server-side key generation."""
 import hashlib
 
-from asn1crypto import algos, cms, core, x509 as asn1_x509
-from cryptography.hazmat.primitives import hashes, serialization
+from asn1crypto import cms, core, keys, x509 as asn1_x509
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, padding as asym_padding, rsa
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.x963kdf import X963KDF
+from cryptography.hazmat.primitives.keywrap import aes_key_wrap
 from cryptography.hazmat.primitives.padding import PKCS7
 
 from utils import key_algorithms
+from utils.cms_envelope import OAEP_HASHES, oaep_algorithm
+from utils.est_key_encryption import KEY_WRAPS, KeyAgreement, choose_key_encryption
 from utils.randomness import csp_bytes
 from utils.signing_hash import pss_algorithm_identifier, pss_padding, signing_hash_for, signs_pss
 
@@ -109,74 +113,104 @@ def signed_key_package(private_key, signer_key, signer_cert, chain=()):
     })
 
 
-def _rsa_oaep_algorithm():
-    parameters = algos.RSAESOAEPParams({
-        'hash_algorithm': {'algorithm': 'sha256'},
-        'mask_gen_algorithm': {
-            'algorithm': 'mgf1',
-            'parameters': {'algorithm': 'sha256'},
+class _EccCmsSharedInfo(core.Sequence):
+    """RFC 5753 §7.2 ECC-CMS-SharedInfo, the X9.63 KDF input."""
+    _fields = [
+        ('key_info', cms.KeyEncryptionAlgorithm),
+        ('entity_u_info', core.OctetString, {'explicit': 0, 'optional': True}),
+        ('supp_pub_info', core.OctetString, {'explicit': 2}),
+    ]
+
+
+def _issuer_and_serial(cert):
+    asn1 = asn1_x509.Certificate.load(cert.public_bytes(serialization.Encoding.DER))
+    return {'issuer': asn1.issuer, 'serial_number': asn1.serial_number}
+
+
+def _key_trans_recipient(content_key, recipient_cert, transport):
+    public_key = recipient_cert.public_key()
+    if transport.oaep_hash is None:
+        encrypted_key = public_key.encrypt(content_key, asym_padding.PKCS1v15())
+        algorithm = {'algorithm': 'rsaes_pkcs1v15', 'parameters': core.Null()}  # RFC 3370 §4.2.1
+    else:
+        algorithm = oaep_algorithm(transport.oaep_hash, transport.mgf_hash)
+        encrypted_key = public_key.encrypt(content_key, asym_padding.OAEP(
+            mgf=asym_padding.MGF1(OAEP_HASHES[transport.mgf_hash]()),
+            algorithm=OAEP_HASHES[transport.oaep_hash](), label=None))
+    return cms.RecipientInfo(name='ktri', value=cms.KeyTransRecipientInfo({
+        'version': 'v0',
+        'rid': {'issuer_and_serial_number': _issuer_and_serial(recipient_cert)},
+        'key_encryption_algorithm': algorithm,
+        'encrypted_key': encrypted_key,
+    }))
+
+
+def _key_agree_recipient(content_key, recipient_cert, agreement):
+    """RFC 5753 §3.1 ephemeral-static ECDH: X9.63 KDF over ECC-CMS-SharedInfo, then AES key wrap."""
+    public_key = recipient_cert.public_key()
+    ephemeral = ec.generate_private_key(public_key.curve)
+    wrap_name, kek_size = KEY_WRAPS[agreement.wrap]
+    ukm = csp_bytes(32)  # RFC 5753 §3.1.1: originators SHOULD include the ukm
+    shared_info = _EccCmsSharedInfo({
+        'key_info': {'algorithm': wrap_name},
+        'entity_u_info': ukm,
+        'supp_pub_info': (kek_size * 8).to_bytes(4, 'big'),
+    }).dump()
+    kek = X963KDF(algorithm=OAEP_HASHES[agreement.kdf_hash](), length=kek_size,
+                  sharedinfo=shared_info).derive(ephemeral.exchange(ec.ECDH(), public_key))
+    originator = keys.PublicKeyInfo.load(ephemeral.public_key().public_bytes(
+        serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo))
+    return cms.RecipientInfo(name='kari', value=cms.KeyAgreeRecipientInfo({
+        'version': 'v3',
+        'originator': cms.OriginatorIdentifierOrKey(name='originator_key', value=originator),
+        'ukm': ukm,
+        # RFC 5753 §3.1.1: the key agreement OID, its parameters the KeyWrapAlgorithm
+        'key_encryption_algorithm': {
+            'algorithm': agreement.scheme,
+            'parameters': cms.KeyEncryptionAlgorithm({'algorithm': wrap_name}),
         },
-        'p_source_algorithm': {
-            'algorithm': 'p_specified',
-            'parameters': b'',
-        },
-    })
-    return {'algorithm': 'rsaes_oaep', 'parameters': parameters}
+        'recipient_encrypted_keys': [{
+            'rid': {'issuer_and_serial_number': _issuer_and_serial(recipient_cert)},
+            'encrypted_key': aes_key_wrap(kek, content_key),
+        }],
+    }))
 
 
-def build_server_generated_key_cms(private_key, signer_key, signer_cert, recipient_cert, chain=()):
-    """Wrap the generated key in a signed key package and RSA KeyTrans EnvelopedData.
+def build_server_generated_key_cms(private_key, signer_key, signer_cert, recipient_cert, chain=(),
+                                   key_encryption=None):
+    """The signed key package in EnvelopedData for *recipient_cert* (RFC 7030 §4.4.2).
 
-    The content is encrypted with AES-256-CBC. The content-encryption key is
-    transported with RSA-OAEP/SHA-256 under the authenticated EST client's
-    certificate, as required for the asymmetric RFC 7030 §4.4.2 response.
+    *key_encryption* (utils.est_key_encryption) picks the content cipher and the ktri (RSA) or
+    kari (EC) recipient; None gives the defaults for the recipient's key.
     """
     recipient_public_key = recipient_cert.public_key()
-    if not isinstance(recipient_public_key, rsa.RSAPublicKey):
-        raise ValueError(
-            'EST server-generated key transport requires an RSA client certificate'
-        )
+    if key_encryption is None:
+        key_encryption = choose_key_encryption(recipient_public_key, None)
+    agreement = isinstance(key_encryption.recipient, KeyAgreement)
+    if not isinstance(recipient_public_key,
+                      ec.EllipticCurvePublicKey if agreement else rsa.RSAPublicKey):
+        raise ValueError('EST server-generated key encryption does not match the client key')
 
-    signed_data = signed_key_package(private_key, signer_key, signer_cert, chain)
-    signed_der = signed_data.dump()
-
-    content_key = csp_bytes(32)
+    signed_der = signed_key_package(private_key, signer_key, signer_cert, chain).dump()
+    content_key = csp_bytes(key_encryption.content_key_size)
     iv = csp_bytes(16)
     padder = PKCS7(128).padder()
     padded = padder.update(signed_der) + padder.finalize()
     encryptor = Cipher(algorithms.AES(content_key), modes.CBC(iv)).encryptor()
     encrypted_content = encryptor.update(padded) + encryptor.finalize()
-    encrypted_key = recipient_public_key.encrypt(
-        content_key,
-        asym_padding.OAEP(
-            mgf=asym_padding.MGF1(algorithm=hashes.SHA256()),
-            algorithm=hashes.SHA256(),
-            label=None,
-        ),
-    )
 
-    recipient_der = recipient_cert.public_bytes(serialization.Encoding.DER)
-    recipient_asn1 = asn1_x509.Certificate.load(recipient_der)
-    recipient_info = cms.KeyTransRecipientInfo({
-        'version': 'v0',
-        'rid': {
-            'issuer_and_serial_number': {
-                'issuer': recipient_asn1.issuer,
-                'serial_number': recipient_asn1.serial_number,
-            }
-        },
-        'key_encryption_algorithm': _rsa_oaep_algorithm(),
-        'encrypted_key': encrypted_key,
-    })
+    if agreement:
+        recipient_info = _key_agree_recipient(content_key, recipient_cert, key_encryption.recipient)
+    else:
+        recipient_info = _key_trans_recipient(content_key, recipient_cert, key_encryption.recipient)
     enveloped_data = cms.EnvelopedData({
-        'version': 'v0',
-        'recipient_infos': [
-            cms.RecipientInfo(name='ktri', value=recipient_info)
-        ],
+        # RFC 5652 §6.1: 0 when every RecipientInfo is version 0, else 2 (kari is version 3)
+        'version': 'v2' if agreement else 'v0',
+        'recipient_infos': [recipient_info],
         'encrypted_content_info': {
             'content_type': 'signed_data',
             'content_encryption_algorithm': {
-                'algorithm': 'aes256_cbc',
+                'algorithm': key_encryption.content_name,
                 'parameters': iv,
             },
             'encrypted_content': encrypted_content,

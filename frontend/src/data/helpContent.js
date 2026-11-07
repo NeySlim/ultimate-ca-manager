@@ -552,7 +552,7 @@ export const helpContent = {
           { label: '/simpleenroll', text: 'Submit a CSR and receive a signed certificate' },
           { label: '/simplereenroll', text: 'Renew an existing certificate (requires mTLS)' },
           { label: '/csrattrs', text: 'Get CSR attributes recommended by the server' },
-          { label: '/serverkeygen', text: 'Server generates a key pair and returns certificate + key. The key takes the issuing CA\'s strength, in the family of the request\'s key when RSA or EC (its size or curve is ignored), else the CA\'s, moved to the closest type the policies allow. The key comes as unencrypted PKCS#8 under TLS; a CSR naming the mTLS certificate\'s key (AsymmetricDecryptKeyIdentifier) gets it encrypted to that certificate, which must assert keyEncipherment, in a key package signed by an EST key generator certificate that the issuing CA issues for this purpose (Ed25519 under an Ed448 CA, v2.252)' },
+          { label: '/serverkeygen', text: 'Server generates a key pair and returns certificate + key. The key takes the issuing CA\'s strength, in the family of the request\'s key when RSA or EC (its size or curve is ignored), else the CA\'s, moved to the closest type the policies allow. The key comes as unencrypted PKCS#8 under TLS; a CSR naming the mTLS certificate\'s key (AsymmetricDecryptKeyIdentifier) gets it encrypted to that certificate, by key transport for RSA of 2048 bits or more (keyEncipherment) or key agreement for EC (keyAgreement), with the algorithms the CSR\'s SMIMECapabilities list, in a key package signed by an EST key generator certificate that the issuing CA issues for this purpose (Ed25519 under an Ed448 CA, v2.252)' },
         ]
       },
     ],

@@ -18,6 +18,9 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 import fips_mode
 from utils import key_algorithms
+from utils.cms_envelope import (  # noqa: F401 (oaep_padding re-exported)
+    OAEP_HASHES, oaep_algorithm, oaep_parameters, oaep_padding,
+)
 from utils.randomness import csp_bytes
 from utils.signing_hash import pss_algorithm_identifier, pss_padding, signs_pss
 
@@ -30,60 +33,6 @@ RSAES_OAEP = "rsaes_oaep"
 # (algorithm, OAEP hash): a reply wraps its content key the way the request did.
 DEFAULT_KEY_TRANSPORT = (RSAES_PKCS1V15, None)
 
-_OAEP_HASHES = {
-    "sha1": hashes.SHA1,
-    "sha224": hashes.SHA224,
-    "sha256": hashes.SHA256,
-    "sha384": hashes.SHA384,
-    "sha512": hashes.SHA512,
-}
-
-
-def oaep_parameters(params) -> tuple[str, str, bytes]:
-    """(hash, MGF1 hash, label) of an RSAES-OAEP AlgorithmIdentifier.
-    Absent parameters mean the RFC 3560 defaults: SHA-1, MGF1 with SHA-1, no label."""
-    if params is None or not getattr(params, "contents", b""):
-        return "sha1", "sha1", b""
-    hash_name = params["hash_algorithm"]["algorithm"].native
-    mgf = params["mask_gen_algorithm"]
-    if mgf["algorithm"].native != "mgf1":
-        raise ValueError("Unsupported OAEP mask generation function")
-    if not getattr(mgf["parameters"], "contents", b""):
-        raise ValueError("OAEP MGF1 without a digest")
-    mgf_hash = mgf["parameters"]["algorithm"].native
-    source = params["p_source_algorithm"]
-    if source["algorithm"].native != "p_specified":
-        raise ValueError("Unsupported OAEP label source")
-    label = source["parameters"].native or b""
-    return hash_name, mgf_hash, label
-
-
-def oaep_padding(params) -> asym_padding.OAEP:
-    """The cryptography padding matching an RSAES-OAEP AlgorithmIdentifier."""
-    hash_name, mgf_hash, label = oaep_parameters(params)
-    if label:
-        raise ValueError("OAEP label is not supported")
-    try:
-        hash_cls, mgf_cls = _OAEP_HASHES[hash_name], _OAEP_HASHES[mgf_hash]
-    except KeyError as e:
-        raise ValueError(f"Unsupported OAEP digest: {e.args[0]}") from e
-    return asym_padding.OAEP(
-        mgf=asym_padding.MGF1(mgf_cls()), algorithm=hash_cls(), label=None
-    )
-
-
-def _oaep_algorithm(hash_name: str) -> dict:
-    return {
-        'algorithm': RSAES_OAEP,
-        'parameters': asn1crypto.algos.RSAESOAEPParams({
-            'hash_algorithm': {'algorithm': hash_name},
-            'mask_gen_algorithm': {
-                'algorithm': 'mgf1', 'parameters': {'algorithm': hash_name},
-            },
-        }),
-    }
-
-
 def select_response_key_transport(encrypted_bytes: bytes) -> tuple:
     """Key transport of the request's first RSA recipient, to reuse in the reply."""
     content_info = asn1crypto.cms.ContentInfo.load(encrypted_bytes)
@@ -95,7 +44,7 @@ def select_response_key_transport(encrypted_bytes: bytes) -> tuple:
         algorithm = recipient_info.chosen['key_encryption_algorithm']
         if algorithm['algorithm'].native == RSAES_OAEP:
             hash_name, _mgf_hash, _label = oaep_parameters(algorithm['parameters'])
-            if hash_name in _OAEP_HASHES:
+            if hash_name in OAEP_HASHES:
                 return (RSAES_OAEP, hash_name)
         if fips_mode.enabled():
             continue  # a v1.5 recipient is not ours: FIPS mode refused it inbound
@@ -268,14 +217,14 @@ def _key_transport_recipient_info(
     if algorithm != RSAES_OAEP:
         fips_mode.refuse('RSA PKCS#1 v1.5 key transport')
     if algorithm == RSAES_OAEP:
-        hash_cls = _OAEP_HASHES[hash_name]
+        hash_cls = OAEP_HASHES[hash_name]
         encrypted_key = recipient_cert.public_key().encrypt(
             content_key,
             asym_padding.OAEP(
                 mgf=asym_padding.MGF1(hash_cls()), algorithm=hash_cls(), label=None
             ),
         )
-        key_algorithm = _oaep_algorithm(hash_name)
+        key_algorithm = oaep_algorithm(hash_name)
     else:
         encrypted_key = recipient_cert.public_key().encrypt(
             content_key, asym_padding.PKCS1v15()
