@@ -347,3 +347,53 @@ def test_enrolling_from_headers_needs_the_issuer(app, auth_client, same_serial):
     with app.app_context():
         row = AuthCertificate.query.filter(AuthCertificate.cert_subject == f'CN={SUBJECT}').one()
         assert row.cert_issuer == _info(pem_a)['issuer_dn']
+
+
+_ORG = x509.Name([x509.NameAttribute(NameOID.COUNTRY_NAME, 'FR'),
+                  x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Org, Inc'),
+                  x509.NameAttribute(NameOID.COMMON_NAME, 'Root CA')])
+
+
+@pytest.mark.parametrize('text', [
+    'CN=Root CA, O=Org\\, Inc, C=FR',             # a space after the separator (Java, F5, IIS)
+    'CN=Root CA, O="Org, Inc", C=FR',             # RFC 1779 quoted value
+    'C = FR, O = "Org, Inc", CN = Root CA',       # OpenSSL XN_FLAG_ONELINE
+    'C = FR, O = Org\\, Inc, CN = Root CA',
+    'cn=Root CA,o=Org\\, Inc,c=FR',               # lowercase attribute types
+    'CN=Root CA; O=Org\\, Inc; C=FR',             # RFC 1779 semicolons
+    'OID.2.5.4.3=Root CA, 2.5.4.10=Org\\2C Inc, c=FR',
+    '/c=FR/o=Org, Inc/cn=Root CA',                # legacy, lowercase
+])
+def test_an_issuer_written_loosely_is_still_read(text):
+    from services.mtls_enrollment import dn_attributes
+    assert dn_attributes(text) == dn_attributes(_ORG) is not None
+
+
+@pytest.mark.parametrize('text', ['/CN=R+O=O1', 'CN=R + O=O1', 'cn = R + o = O1'])
+def test_a_multivalued_rdn_is_read_in_every_form(text):
+    from services.mtls_enrollment import dn_attributes
+    rdn = x509.Name([x509.RelativeDistinguishedName([x509.NameAttribute(NameOID.COMMON_NAME, 'R'),
+                                                     x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'O1')])])
+    assert dn_attributes(text) == dn_attributes(rdn) is not None
+
+
+@pytest.mark.parametrize('text', ['CN=Root CA, nonsense', 'CN="unterminated', 'CN="a" b', 'notAType=x', 'CN=a,,O=b'])
+def test_a_broken_issuer_is_still_unreadable(text):
+    from services.mtls_enrollment import dn_attributes
+    assert dn_attributes(text) is None
+
+
+def test_a_proxy_spelling_the_issuer_loosely_signs_in(app, auth_client, same_serial):
+    serial = same_serial[0] + 13
+    r = _import(auth_client, _named_leaf(_ORG, serial))
+    assert r.status_code == 201, r.get_json()
+    with app.app_context():
+        user, found, err = _header_login(serial, 'C = FR, O = "Org, Inc", CN = Root CA')
+        assert user is not None and found.id == r.get_json()['data']['id'], err
+        # An issuer stored as a proxy spelled it still matches one written otherwise
+        row = db.session.get(AuthCertificate, found.id)
+        row.cert_issuer, row.cert_pem = 'CN=Root CA, O=Org\\, Inc, C=FR', None
+        db.session.commit()
+        user, _found, err = _header_login(serial, _ORG.rfc4514_string())
+        assert user is not None, err
+        assert _header_login(serial, 'CN=Root CA, O=Other, C=FR')[2] == 'Certificate not enrolled'
