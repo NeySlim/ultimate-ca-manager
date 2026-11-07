@@ -1247,8 +1247,11 @@ Browse all certificate issuance orders:
 - Signing CA used
 - Issuance timestamp
 
+### Requested dates
+An order may carry \`notBefore\` and \`notAfter\` (cert-manager with a \`duration\`, lego \`--not-after\`). The certificate is issued with exactly those dates, or the request is refused as \`malformed\`: a window longer than the profile's validity, outside the issuing CA's validity, shortened by a policy, or already past. Without them the profile's validity applies.
+
 ### Revocation
-A client revokes with its account key or with the certificate's own key, and the certificate it sends must match the stored one byte for byte: a serial number alone is never enough. Only an RSA or EC P-256, P-384 or P-521 key can sign an ACME request, so an ML-DSA, EdDSA or Brainpool certificate is revoked with the account that ordered it; UCM says so in the refusal.
+A client revokes with its account key or with the certificate's own key, and the certificate it sends must match the stored one byte for byte: a serial number alone is never enough. An account holding valid, unexpired authorizations for every name and IP address of the certificate may revoke it too, whoever ordered it. Only an RSA or EC P-256, P-384 or P-521 key can sign an ACME request, so an ML-DSA, EdDSA or Brainpool certificate is revoked with the account that ordered it; UCM says so in the refusal.
 
 ## IP Address Certificates (RFC 8738)
 
@@ -1271,8 +1274,10 @@ Mixed DNS + IP orders are also supported.
 - **HTTP-01** connects directly to the IP (IPv6 literals are bracketed, e.g. \`http://[2001:db8::1]/...\`).
 - **TLS-ALPN-01** uses the reverse-DNS form of the IP (\`in-addr.arpa\` / \`ip6.arpa\`) as the SNI hostname.
 
+- **TLS-ALPN-01** requires the validation certificate's SubjectAltName to hold exactly the validated name or IP, nothing else.
+
 ### Issued certificate
-The signed certificate contains an **iPAddress** SubjectAltName entry for each validated IP.
+The signed certificate contains an **iPAddress** SubjectAltName entry for each validated IP. The CSR may also put one of the order's IP addresses in its common name.
 
 > 💡 Internal addresses (RFC1918, loopback) validate out of the box. UCM's primary deployment model. Cloud-metadata IPs remain blocked.
 
