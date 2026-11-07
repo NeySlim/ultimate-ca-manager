@@ -334,7 +334,8 @@ class PolicyEvaluationService:
     def enforce_rules(policies: list, *, key_type=None, dns_name_count=None,
                       validity_days=None, digest=None, context=None, notify=True,
                       ca_id=None, signer=None, signer_scheme=None, signer_storage=None,
-                      signer_certification=None, not_after=None, tsa_signer=False, pq_hybrid=False, notices=None):
+                      signer_certification=None, not_after=None, not_before=None, tsa_signer=False,
+                      pq_hybrid=False, notices=None):
         """Apply the Rules of *policies* to a request (#335).
 
         Returns ``(violations, validity_days, capped_by)``: the
@@ -355,7 +356,8 @@ class PolicyEvaluationService:
         and key storage the rules read; *signer_scheme* and *signer_storage*
         say them when no signer exists yet (*signer_certification*: the
         certification declared for its HSM). The end of the certificate is
-        *not_after* (a date), else today plus the capped validity. *tsa_signer*
+        *not_after* (a date), else *not_before* (a datetime, default now) plus the
+        capped validity. *tsa_signer*
         marks a TSA signing certificate. The ``advisories`` of each policy are
         appended to *notices* (a list) and never refuse anything.
 
@@ -387,7 +389,7 @@ class PolicyEvaluationService:
         today = utc_now().date()
         end = not_after
         if end is None and effective_validity is not None:
-            end = (utc_now() + timedelta(days=effective_validity)).date()
+            end = ((not_before or utc_now()) + timedelta(days=effective_validity)).date()
         req = {'key_type': key_type, 'digest': digest, 'signer_scheme': signer_scheme,
                'signer_storage': signer_storage, 'signer_certification': signer_certification,
                'not_after': end, 'today': today,
@@ -597,17 +599,23 @@ class PolicyEvaluationService:
         if not names:
             return False
         
-        # Check if any name matches the pattern
-        for name in names:
-            name = str(name)
-            if dns_pattern == '*.':
-                # Wildcard policy: matches if name starts with *.
-                if name.startswith('*.'):
-                    return True
-            elif name.startswith(dns_pattern) or name.endswith(dns_pattern):
-                return True
-        
-        return False
+        return any(PolicyEvaluationService._dns_pattern_covers(dns_pattern, str(name)) for name in names)
+
+    @staticmethod
+    def _dns_pattern_covers(pattern: str, name: str) -> bool:
+        """Label match, case and root dot ignored (RFC 4343): ``*.x`` and ``.x`` cover
+        the names under x, ``x`` covers x too; ``*.`` covers wildcard names only."""
+        if pattern.strip() in ('*.', '*'):
+            return name.strip().startswith('*.')
+        name = name.strip().lower().rstrip('.')
+        if name.startswith('dns:'):
+            name = name[4:].strip()
+        base = pattern.strip().lower().rstrip('.')
+        subdomains_only = base.startswith(('*.', '.'))
+        base = base[2:] if base.startswith('*.') else base.lstrip('.')
+        if not base:
+            return True
+        return name.endswith('.' + base) or (not subdomains_only and name == base)
 
     @staticmethod
     def create_approval_request(

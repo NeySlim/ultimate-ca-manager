@@ -1,6 +1,9 @@
 """
 User and UserSession Models
 """
+from sqlalchemy import func, select, update
+from sqlalchemy.orm.attributes import set_committed_value
+
 from utils.password_hash import hash_password, needs_rehash, verify_password
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
@@ -62,6 +65,8 @@ class User(db.Model):
     totp_secret = db.Column(db.String(32))  # Base32-encoded TOTP secret
     totp_confirmed = db.Column(db.Boolean, default=False)  # TOTP setup confirmed
     backup_codes = db.Column(db.Text)  # JSON array of backup codes (hashed)
+    # Last TOTP time step accepted: a code is good once (RFC 6238 §5.2).
+    totp_last_step = db.Column(db.BigInteger, nullable=True)
     # Per-user opt-out from forced 2FA enrolment (#141). Set on the initial
     # admin so global enforcement can never lock out the bootstrap account.
     totp_exempt = db.Column(db.Boolean, default=False)
@@ -79,6 +84,8 @@ class User(db.Model):
     login_count = db.Column(db.Integer, default=0)  # Total successful logins
     failed_logins = db.Column(db.Integer, default=0)  # Failed login attempts
     locked_until = db.Column(db.DateTime, nullable=True)  # Account lockout timestamp
+    # Copied into each session at login; bumped to close every session of the account.
+    session_version = db.Column(db.Integer, nullable=False, default=0, server_default='0')
 
     # User preferences (JSON-encoded; language, theme, density, etc.)
     # Persisted server-side so they follow the user across browsers/devices.
@@ -113,8 +120,26 @@ class User(db.Model):
         return [db.session.get(Group, m.group_id) for m in memberships if db.session.get(Group, m.group_id)]
     
     def set_password(self, password: str):
-        """Hash and set password, with the method pinned in utils.password_hash."""
+        """Hash and set password, with the method pinned in utils.password_hash.
+
+        Every session opened with the old password ends with it."""
         self.password_hash = hash_password(password)
+        self.end_sessions()
+
+    def end_sessions(self):
+        """Invalidate every session of this account; the caller commits.
+
+        Incremented in SQL so that concurrent bumps add up; ``_sessions_bump`` keeps
+        (replaced, new) for keep_current_session()."""
+        if self.id is None:
+            return  # not saved yet: no session to end
+        db.session.execute(
+            update(User).where(User.id == self.id)
+            .values(session_version=func.coalesce(User.session_version, 0) + 1)
+            .execution_options(synchronize_session=False))
+        new = db.session.execute(select(User.session_version).where(User.id == self.id)).scalar_one()
+        set_committed_value(self, 'session_version', new)
+        self._sessions_bump = (new - 1, new)
     
     def check_password(self, password: str) -> bool:
         """Verify password; a hash of an older method is replaced on success

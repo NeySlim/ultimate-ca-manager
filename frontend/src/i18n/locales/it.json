@@ -680,7 +680,9 @@
       "generateReport": "Genera rapporto"
     },
     "expiresInDays": "Scade tra {{count}} giorni",
-    "chainRepairSameKey": "chiavi condivise, certificati distinti (certificato incrociato?)"
+    "chainRepairSameKey": "chiavi condivise, certificati distinti (certificato incrociato?)",
+    "keyEncryptionOffTitle": "Le chiavi private non sono cifrate.",
+    "keyEncryptionOffDesc": "Nessuna chiave master è caricata: le chiavi private delle CA e dei certificati sono salvate senza cifratura nel database. Attiva la crittografia in Impostazioni › Sicurezza, oppure rimetti al suo posto la chiave master e riavvia UCM."
   },
   "certificates": {
     "createCertificate": "Crea certificato",
@@ -2063,6 +2065,8 @@
     "enrollmentRequest": "Richiesta di registrazione SCEP",
     "getCaCertChain": "Restituisci la catena completa in GetCACert",
     "getCaCertChainHelp": "Disattivato (predefinito): solo certificato CA, richiesto per client Apple/MDM. Attivato: PKCS#7 degenere con catena completa (RFC 8894).",
+    "plainHttp": "Servi anche su HTTP in chiaro",
+    "plainHttpHelp": "Rispondi a SCEP anche sulla porta di protocollo HTTP (8080 per impostazione predefinita), per client come sscep che non possono usare HTTPS. La busta CMS protegge già la richiesta e la sua password di challenge (RFC 8894 §7.10).",
     "enforceSigningTime": "Applica la tolleranza oraria signingTime",
     "timeSkewMinutes": "Tolleranza oraria (minuti)",
     "timeSkewMinutesHelp": "I dispositivi senza NTP derivano: fuori da questa finestra le richieste vengono rifiutate quando l'applicazione è attiva.",
@@ -2820,7 +2824,7 @@
     "saveSettings": "Salva impostazioni",
     "securitySubtitle": "Password, 2FA, crittografia e configurazione sessione",
     "keyEncryption": "Crittografia chiavi private",
-    "encryptionDesc": "Crittografa tutte le chiavi private nel database con AES-256. Protette da una chiave master in /etc/ucm/master.key. Quando è attiva, UCM non conserva più file di chiavi in chiaro nella directory privata e rimuove quelli esistenti. Usa gli hook di distribuzione per collocare le chiavi dove servono a un servizio.",
+    "encryptionDesc": "Crittografa tutte le chiavi private nel database con AES-128 (Fernet, con HMAC-SHA256). Protette da una chiave master in /etc/ucm/master.key. Quando è attiva, UCM non conserva più file di chiavi in chiaro nella directory privata e rimuove quelli esistenti. Usa gli hook di distribuzione per collocare le chiavi dove servono a un servizio.",
     "enableEncryption": "Attiva crittografia",
     "disableEncryption": "Disattiva crittografia",
     "encryptRemainingKeys": "Crittografa chiavi rimanenti ({{count}})",
@@ -4278,6 +4282,8 @@
     "title": "Modalità sicura",
     "description": "UCM ha rilevato chiavi private crittografate ma la chiave di crittografia è mancante.",
     "step1Title": "Posiziona il file chiave master in:",
+    "mismatchDescription": "La chiave master configurata non decifra le chiavi private archiviate: non è quella con cui sono state cifrate. Le chiavi private restano inaccessibili finché non viene ripristinata la chiave master precedente.",
+    "mismatchStep1Title": "Rimetti il file della chiave master precedente in:",
     "step2Title": "Poi riavvia il servizio:",
     "lostKeyHint": "Se hai perso la chiave master, ripristina da un backup.",
     "polling": "Verifica in corso..."
@@ -5466,11 +5472,13 @@
     "selectCA": "Seleziona una CA per la firma delle marche temporali",
     "policyOid": "OID della politica",
     "policyOidHelp": "OID che identifica la politica TSA sotto la quale vengono emesse le marche temporali",
+    "policyPlaceholderWarning": "1.2.3.4.1 è l'OID di policy di esempio di OpenSSL, non assegnato a nessuno. In produzione usate un OID dell'arco della vostra organizzazione o della vostra CP/CPS.",
     "requireDedicatedCert": "Richiedi un certificato TSA dedicato",
     "requireDedicatedCertDesc": "Rifiuta di firmare le marche temporali con il certificato della CA stessa. Richiede un certificato di firma dedicato (entità finale) con una EKU timeStamping critica (RFC 3161).",
     "requireDedicatedCertBlocked": "Seleziona prima un certificato di firma dedicato utilizzabile qui sopra, altrimenti ogni richiesta di marca temporale fallirebbe.",
     "signingCert": "Certificato di firma",
     "signingCertDesc": "Scegli cosa firma i token di marcatura temporale. Il certificato della CA è il default storico; un certificato finale dedicato con EKU timeStamping è la raccomandazione RFC 3161.",
+    "caSignerWarning": "Il certificato della CA firma le marche temporali. I verificatori rigorosi come openssl ts -verify e jarsigner rifiutano questi token: la RFC 3161 richiede un firmatario dedicato con un EKU timeStamping critico ed esclusivo. Selezionate o generate qui sotto un certificato di firma dedicato.",
     "signingCertHelp": "Sono elencati solo i certificati la cui chiave privata è detenuta da UCM e che portano l'EKU timeStamping. I rinnovi vengono seguiti automaticamente.",
     "signingCertCa": "Certificato della CA (predefinito)",
     "signerExpires": "Scade",

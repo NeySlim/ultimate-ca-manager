@@ -35,6 +35,7 @@ Since 2.233, SoftHSM tokens are stored in the data volume, under `/opt/ucm/data/
 ```bash
 docker run -d --name ucm -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
+  -v ucm-config:/etc/ucm \
   neyslim/ultimate-ca-manager:latest
 ```
 

@@ -3,7 +3,6 @@ ACME Protocol API Endpoints (RFC 8555)
 Implements the ACME server endpoints for automated certificate management
 """
 from flask import Blueprint, request, jsonify, make_response
-from datetime import datetime
 import json
 import base64
 from typing import Dict, Any, Tuple, Optional
@@ -18,6 +17,7 @@ from services.acme.account_requests import (
     consume_eab,
     require_valid_account,
 )
+from services.acme.caa_identities import caa_identities
 from services.acme.jws_problems import BAD_NONCE, UNKNOWN_ACCOUNT, jws_problem
 from models.acme_models import (
     AcmeAccount,
@@ -29,7 +29,7 @@ from config.settings import Config
 import logging
 import re
 from utils.datetime_utils import utc_now
-from utils.acme_public_url import get_acme_public_origin, get_acme_public_host, get_acme_expected_urls
+from utils.acme_public_url import get_acme_public_origin, get_acme_expected_urls
 
 logger = logging.getLogger(__name__)
 
@@ -240,6 +240,9 @@ ALLOWED_JWS_ALGS = frozenset({
 })
 
 
+_BASE64URL = re.compile(r'[A-Za-z0-9_-]+')
+
+
 def _decode_jws_protected(protected_b64: str) -> Dict[str, Any]:
     """Decode a base64url JWS protected header. Raises on anything malformed."""
     padded = protected_b64 + '=' * (-len(protected_b64) % 4)
@@ -382,9 +385,12 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
             return False, None, None, url_error
 
         # Verify nonce
+        # RFC 8555 §6.5: an absent nonce is badNonce; one outside base64url is malformed
         nonce = protected.get('nonce')
         if not nonce:
-            return False, None, None, "Missing nonce in protected header"
+            return False, None, None, BAD_NONCE
+        if not isinstance(nonce, str) or not _BASE64URL.fullmatch(nonce):
+            return False, None, None, "Nonce is not base64url-encoded (RFC 8555 §6.5.1)"
         
         service = get_acme_service()
         if not service.validate_nonce(nonce):
@@ -418,6 +424,9 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
             payload = json.loads(payload_json) if payload_json else {}
         else:
             payload = {}
+        # Every ACME request payload is a JSON object (RFC 8555 §7)
+        if not isinstance(payload, dict):
+            return False, None, None, "JWS payload must be a JSON object"
         
         # Resolve the key this layer is signed with, then hand it to the
         # shared gate (algorithm allowlist, key type, signature).
@@ -493,7 +502,7 @@ def directory():
     directory_data['meta'] = {
         'termsOfService': f'{service.base_url}/acme/terms',
         'website': 'https://github.com/NeySlim/ultimate-ca-manager',
-        'caaIdentities': [get_acme_public_host(request)],
+        'caaIdentities': caa_identities(request),
         'externalAccountRequired': eab_required
     }
 
@@ -591,10 +600,12 @@ def new_nonce():
     """
     service = get_acme_service()
     nonce = service.generate_nonce()
-    
-    response = make_response('', 204)
+
+    # RFC 8555 §7.2: HEAD answers 200, GET 204; §7.1: every resource links the directory
+    response = make_response('', 200 if request.method == 'HEAD' else 204)
     response.headers['Replay-Nonce'] = nonce
     response.headers['Cache-Control'] = 'no-store'
+    response.headers['Link'] = f'<{service.base_url}/acme/directory>;rel="index"'
     
     return response
 
@@ -623,7 +634,7 @@ def new_account():
         # invalid body returns None instead of raising 500.
         jws_data = request.get_json(force=True, silent=True)
 
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
         # Verify JWS
@@ -714,6 +725,9 @@ def new_account():
             "termsOfServiceAgreed": account.terms_of_service_agreed,
             "orders": f"{account_url}/orders"
         }
+        # RFC 8555 §7.3.4: the new account echoes the binding it was created with
+        if eab_data and is_new:
+            response_data["externalAccountBinding"] = eab_data
         
         response = acme_response(response_data, 201 if is_new else 200)
         response.headers['Location'] = account_url
@@ -745,7 +759,7 @@ def account_info(account_id: str):
     
     # Verify JWS — RFC 8555 §6.3 requires POST-as-GET for read operations too
     jws_data = request.get_json(force=True, silent=True)
-    if not jws_data:
+    if not isinstance(jws_data, dict) or not jws_data:
         return acme_error('malformed', 'Request body must be JWS')
     
     expected_url = f"{service.base_url}/acme/acct/{account_id}"
@@ -798,7 +812,7 @@ def account_orders(account_id: str):
     
     # Verify JWS (POST-as-GET) — required, never optional
     jws_data = request.get_json(force=True, silent=True)
-    if not jws_data:
+    if not isinstance(jws_data, dict) or not jws_data:
         return acme_error('malformed', 'Request body must be JWS')
     
     expected_url = f"{service.base_url}/acme/acct/{account_id}/orders"
@@ -843,8 +857,8 @@ def new_authz():
     service = get_acme_service()
     
     try:
-        jws_data = request.get_json()
-        if not jws_data:
+        jws_data = request.get_json(force=True, silent=True)
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body required')
         
         expected_url = f"{service.base_url}/acme/new-authz"
@@ -908,6 +922,35 @@ def new_authz():
         return acme_error('serverInternal', 'Internal server error', 500)
 
 
+def _order_wire_dict(service, order) -> Dict[str, Any]:
+    """The RFC 8555 §7.1.3 order object, the same for newOrder, a read and finalize."""
+    order_url = f"{service.base_url}/acme/order/{order.order_id}"
+    data = {
+        "status": order.status,
+        "expires": order.expires.isoformat() + 'Z',
+        "identifiers": json.loads(order.identifiers),
+        "authorizations": [
+            f"{service.base_url}/acme/authz/{auth.authorization_id}"
+            for auth in order.authorizations
+        ],
+        "finalize": f"{order_url}/finalize",
+    }
+    if order.not_before:
+        data["notBefore"] = order.not_before.isoformat() + 'Z'
+    if order.not_after:
+        data["notAfter"] = order.not_after.isoformat() + 'Z'
+    # RFC 9773 §5: an accepted replaces is reflected in every order object
+    if order.replaces:
+        data["replaces"] = order.replaces
+    if order.profile:
+        data["profile"] = order.profile
+    if order.error and order.status == 'invalid':
+        data["error"] = json.loads(order.error) if isinstance(order.error, str) else order.error
+    if order.certificate_url:
+        data["certificate"] = order.certificate_url
+    return data
+
+
 @acme_bp.route('/new-order', methods=['POST'])
 def new_order():
     """Create new certificate order (RFC 8555 Section 7.4)
@@ -925,9 +968,9 @@ def new_order():
     service = get_acme_service()
     
     try:
-        jws_data = request.get_json()
+        jws_data = request.get_json(force=True, silent=True)
         
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
         # Verify JWS
@@ -1079,15 +1122,21 @@ def new_order():
             # whatever the default is by then
             profile = acme_profiles.get_default_profile() or None
 
-        # Parse optional dates
-        not_before = payload.get('notBefore')
-        not_after = payload.get('notAfter')
-        
-        if not_before:
-            not_before = datetime.fromisoformat(not_before.replace('Z', '+00:00'))
-        if not_after:
-            not_after = datetime.fromisoformat(not_after.replace('Z', '+00:00'))
-        
+        # RFC 8555 §7.4: the requested dates are issued as asked, or refused
+        from services.acme.requested_validity import (
+            RequestedValidityError, parse_order_time, window_error,
+        )
+        try:
+            not_before = parse_order_time(payload.get('notBefore'), 'notBefore')
+            not_after = parse_order_time(payload.get('notAfter'), 'notAfter')
+        except RequestedValidityError as e:
+            return acme_error('malformed', str(e))
+        refusal = window_error(not_before, not_after,
+                               acme_profiles.issuance_params(profile)['validity_days'],
+                               at_order=True)
+        if refusal:
+            return acme_error('malformed', refusal)
+
         # Create order
         order = service.create_order(
             account_id=account.account_id,
@@ -1098,31 +1147,8 @@ def new_order():
             profile=profile,
         )
         
-        # Build response
         order_url = f"{service.base_url}/acme/order/{order.order_id}"
-        
-        # Get authorization URLs
-        authz_urls = [
-            f"{service.base_url}/acme/authz/{auth.authorization_id}"
-            for auth in order.authorizations
-        ]
-        
-        response_data = {
-            "status": order.status,
-            "expires": order.expires.isoformat() + 'Z',
-            "identifiers": json.loads(order.identifiers),
-            "authorizations": authz_urls,
-            "finalize": f"{order_url}/finalize"
-        }
-        
-        if order.not_before:
-            response_data["notBefore"] = order.not_before.isoformat() + 'Z'
-        if order.not_after:
-            response_data["notAfter"] = order.not_after.isoformat() + 'Z'
-        if order.profile:
-            response_data["profile"] = order.profile
-
-        response = acme_response(response_data, 201)
+        response = acme_response(_order_wire_dict(service, order), 201)
         response.headers['Location'] = order_url
 
         _audit_acme(
@@ -1146,7 +1172,7 @@ def order_info(order_id: str):
     
     # Verify JWS (POST-as-GET: empty payload)
     jws_data = request.get_json(force=True, silent=True)
-    if not jws_data:
+    if not isinstance(jws_data, dict) or not jws_data:
         return acme_error('malformed', 'Request body must be JWS')
 
     expected_url = f"{service.base_url}/acme/order/{order_id}"
@@ -1171,31 +1197,7 @@ def order_info(order_id: str):
 
     service.expire_order_if_needed(order)
     order_url = f"{service.base_url}/acme/order/{order.order_id}"
-    
-    # Get authorization URLs
-    authz_urls = [
-        f"{service.base_url}/acme/authz/{auth.authorization_id}"
-        for auth in order.authorizations
-    ]
-    
-    response_data = {
-        "status": order.status,
-        "expires": order.expires.isoformat() + 'Z',
-        "identifiers": json.loads(order.identifiers),
-        "authorizations": authz_urls,
-        "finalize": f"{order_url}/finalize"
-    }
-    
-    if order.profile:
-        response_data["profile"] = order.profile
-    if order.error and order.status == 'invalid':
-        response_data["error"] = (
-            json.loads(order.error) if isinstance(order.error, str) else order.error
-        )
-    if order.certificate_url:
-        response_data["certificate"] = order.certificate_url
-
-    response = acme_response(response_data)
+    response = acme_response(_order_wire_dict(service, order))
     response.headers['Location'] = order_url
     
     # Add Retry-After for pending/processing orders (RFC 8555 Section 7.4)
@@ -1211,9 +1213,9 @@ def finalize_order(order_id: str):
     service = get_acme_service()
     
     try:
-        jws_data = request.get_json()
+        jws_data = request.get_json(force=True, silent=True)
         
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
         # Verify JWS
@@ -1247,7 +1249,9 @@ def finalize_order(order_id: str):
         except ValueError as exc:
             return acme_error('malformed', str(exc))
         csr_pem = csr.public_bytes(serialization.Encoding.PEM).decode()
-        
+
+        # RFC 8555 §7.4: an order or authorization past its expiry is not ready
+        service.expire_order_if_needed(existing_order)
         if existing_order.status != 'ready':
             return acme_error(
                 'orderNotReady',
@@ -1332,23 +1336,7 @@ def finalize_order(order_id: str):
             details=f"status={order.status} cert={order.certificate_url or '(pending)'}",
         )
         
-        authz_urls = [
-            f"{service.base_url}/acme/authz/{auth.authorization_id}"
-            for auth in order.authorizations
-        ]
-        
-        response_data = {
-            "status": order.status,
-            "expires": order.expires.isoformat() + 'Z',
-            "identifiers": json.loads(order.identifiers),
-            "authorizations": authz_urls,
-            "finalize": f"{order_url}/finalize"
-        }
-        
-        if order.certificate_url:
-            response_data["certificate"] = order.certificate_url
-        
-        response = acme_response(response_data)
+        response = acme_response(_order_wire_dict(service, order))
         response.headers['Location'] = order_url
         
         return response
@@ -1368,7 +1356,7 @@ def authorization_info(authorization_id: str):
     
     # Verify JWS (POST-as-GET: empty payload)
     jws_data = request.get_json(force=True, silent=True)
-    if not jws_data:
+    if not isinstance(jws_data, dict) or not jws_data:
         return acme_error('malformed', 'Request body must be JWS')
 
     expected_url = f"{service.base_url}/acme/authz/{authorization_id}"
@@ -1464,9 +1452,9 @@ def respond_to_challenge(challenge_id: str):
     service = get_acme_service()
     
     try:
-        jws_data = request.get_json()
+        jws_data = request.get_json(force=True, silent=True)
         
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
         # Verify JWS
@@ -1515,8 +1503,12 @@ def respond_to_challenge(challenge_id: str):
         # passes, or force re-checks on an already-'valid' one. Return the
         # current state unchanged. Likewise refuse if the parent authorization
         # is no longer pending (expired / deactivated / revoked).
+        # RFC 8555 §6.3, §7.5.1 (erratum 5729): an empty payload is a read; only a
+        # response object asks for validation
+        post_as_get = jws_data.get('payload') == ''
+
         authz = challenge.authorization
-        if challenge.status in ('valid', 'invalid'):
+        if post_as_get or challenge.status in ('valid', 'invalid'):
             pass
         elif authz and authz.status != 'pending':
             return acme_error('malformed',
@@ -1565,7 +1557,7 @@ def respond_to_challenge(challenge_id: str):
 def _order_certificate_for_post_as_get(service, order_id, expected_url):
     """(Certificate, None) for an authenticated POST-as-GET on an order's certificate, else (None, error response)."""
     jws_data = request.get_json(force=True, silent=True)
-    if not jws_data:
+    if not isinstance(jws_data, dict) or not jws_data:
         return None, acme_error('malformed', 'Request body must be JWS')
 
     is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
@@ -1679,6 +1671,61 @@ def _jws_incapable_key_label(cert_obj) -> Optional[str]:
     return label if label != 'Unknown' else type(key).__name__
 
 
+def _certificate_identifiers(cert_obj) -> set:
+    """(type, value, wildcard) of every dNSName and iPAddress, and of a CN outside them."""
+    import ipaddress
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    idents = set()
+
+    def dns(value):
+        value = value.lower().rstrip('.')
+        wildcard = value.startswith('*.')
+        idents.add(('dns', value[2:] if wildcard else value, wildcard))
+
+    try:
+        san = cert_obj.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+    except x509.ExtensionNotFound:
+        san = []
+    for name in san:
+        if isinstance(name, x509.DNSName):
+            dns(name.value)
+        elif isinstance(name, x509.IPAddress):
+            idents.add(('ip', str(name.value), False))
+    for attr in cert_obj.subject.get_attributes_for_oid(NameOID.COMMON_NAME):
+        try:
+            idents.add(('ip', str(ipaddress.ip_address(str(attr.value))), False))
+        except ValueError:
+            dns(str(attr.value))
+    return idents
+
+
+def _holds_authorizations_for(account_id: str, cert_obj) -> bool:
+    """Whether the account holds a valid, unexpired authorization for each identifier."""
+    wanted = _certificate_identifiers(cert_obj)
+    if not wanted:
+        return False
+    held = set()
+    rows = AcmeAuthorization.query.outerjoin(
+        AcmeOrder, AcmeAuthorization.order_id == AcmeOrder.order_id,
+    ).filter(
+        (AcmeAuthorization.account_id == account_id)
+        | (AcmeAuthorization.account_id.is_(None) & (AcmeOrder.account_id == account_id)),
+        AcmeAuthorization.status == 'valid',
+        AcmeAuthorization.expires > utc_now(),
+    ).all()
+    for row in rows:
+        ident = row.identifier_obj
+        value = str(ident.get('value', ''))
+        if ident.get('type') == 'dns':
+            value = value.lower().rstrip('.')
+            # An auto-approved name was granted without any challenge: it proves no control
+            if AcmeService._is_domain_auto_approved(value):
+                continue
+        held.add((ident.get('type'), value, bool(row.wildcard)))
+    return wanted <= held
+
+
 @acme_bp.route('/revoke-cert', methods=['POST'])
 def revoke_cert():
     """Revoke certificate (RFC 8555 Section 7.6).
@@ -1687,13 +1734,15 @@ def revoke_cert():
       - JWS signed by an account that issued the cert (kid path), OR
       - JWS signed by the cert's own private key (jwk path, embedded JWK
         must match the cert's public key — proof of possession).
+      - JWS signed by an account holding valid authorizations for every
+        identifier of the certificate.
     """
     service = get_acme_service()
     
     try:
-        jws_data = request.get_json()
+        jws_data = request.get_json(force=True, silent=True)
         
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
         expected_url = f"{service.base_url}/acme/revoke-cert"
@@ -1762,6 +1811,12 @@ def revoke_cert():
                 account_id=request_account_id,
             ).first()
             if owning_order:
+                authorized = True
+            # RFC 8555 §7.6: so is an account holding authorizations for every identifier,
+            # for a certificate this ACME server issued
+            elif ((cert.source == 'acme'
+                   or AcmeOrder.query.filter_by(certificate_id=cert.id).first() is not None)
+                  and _holds_authorizations_for(request_account_id, cert_obj)):
                 authorized = True
         
         if not authorized and jwk:
@@ -1890,9 +1945,9 @@ def key_change():
     service = get_acme_service()
     
     try:
-        jws_data = request.get_json()
+        jws_data = request.get_json(force=True, silent=True)
         
-        if not jws_data:
+        if not isinstance(jws_data, dict) or not jws_data:
             return acme_error('malformed', 'Request body must be JWS')
         
         expected_url = f"{service.base_url}/acme/key-change"

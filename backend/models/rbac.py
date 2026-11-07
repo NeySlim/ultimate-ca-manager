@@ -34,19 +34,25 @@ class CustomRole(db.Model):
     
     def to_dict(self):
         from models import User
+        builtin = SYSTEM_ROLE_USERS.get(self.name) if self.is_system else None
         try:
-            builtin = SYSTEM_ROLE_USERS.get(self.name) if self.is_system else None
             query = (User.query.filter_by(role=builtin) if builtin
                      else User.query.filter_by(custom_role_id=self.id))
             user_count = query.count()
         except Exception:
             user_count = 0
+        if builtin:
+            # A built-in role grants what auth.permissions says, not its seeded row.
+            from auth.permissions import builtin_role_shown_permissions
+            permissions = all_permissions = builtin_role_shown_permissions(builtin)
+        else:
+            permissions, all_permissions = self.permissions or [], self.get_all_permissions()
         return {
             'id': self.id,
             'name': self.name,
             'description': self.description,
-            'permissions': self.permissions or [],
-            'all_permissions': self.get_all_permissions(),
+            'permissions': permissions,
+            'all_permissions': all_permissions,
             'inherits_from': self.inherits_from,
             'parent_name': self.parent.name if self.parent else None,
             'is_system': self.is_system,

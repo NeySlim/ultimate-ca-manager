@@ -448,6 +448,34 @@ def test_ldap_with_enforced_2fa_asks_the_enrolled_totp(app, ldap):
             _cleanup(['tkotp'])
 
 
+def test_ldap_second_factor_after_a_closed_session_starts_a_new_one(app, ldap):
+    """The pending step is bound to the account's session version under a new identifier."""
+    import pyotp
+    secret = pyotp.random_base32()
+    with app.app_context():
+        _cleanup(['tkotpver'])
+        db.session.add(User(username='tkotpver', email='otpver@corp.test', full_name='O', role='viewer',
+                            active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='ldap',
+                            sso_provider_id=ldap.provider_id, sso_external_id='uuid-otpver',
+                            totp_secret=secret, totp_confirmed=True, session_version=3))
+        db.session.commit()
+    try:
+        client = app.test_client()
+        with client.session_transaction() as planted_session:
+            planted_session['planted'] = True
+        planted = client.get_cookie('session').value
+        ldap('tkotpver', dn='uid=tkotpver,dc=example', uid='uuid-otpver')
+        r = client.post('/api/v2/sso/ldap/login',
+                        json={'username': 'tkotpver', 'password': 'pw', 'provider_id': ldap.provider_id})
+        assert r.get_json()['data'].get('requires_2fa') is True
+        assert client.get_cookie('session').value != planted
+        r = client.post('/api/v2/auth/login/2fa', json={'code': pyotp.TOTP(secret).now()})
+        assert r.status_code == 200, r.get_json()
+    finally:
+        with app.app_context():
+            _cleanup(['tkotpver'])
+
+
 def test_an_account_of_another_provider_is_not_opened(app, oidc, ldap):
     with app.app_context():
         _cleanup(['tkcross'])

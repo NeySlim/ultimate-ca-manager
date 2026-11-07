@@ -12,6 +12,7 @@ import logging
 import os
 import subprocess
 import tempfile
+import time
 
 from models.ssh import SSHCertificateAuthority, SSHCertificate
 from models import db
@@ -58,25 +59,17 @@ class SSHKRLService:
             with open(ca_pub_path, 'w') as f:
                 f.write(ca.public_key)
 
-            if not revoked_certs:
-                # Generate empty KRL (still valid, just revokes nothing)
-                with open(revoked_serials_path, 'w') as f:
-                    f.write('')
+            with open(revoked_serials_path, 'w') as f:
+                for cert in revoked_certs:
+                    f.write(f"serial: {cert.serial}\n")
 
-                result = subprocess.run(
-                    ['ssh-keygen', '-k', '-f', krl_path, '-s', ca_pub_path, revoked_serials_path],
-                    capture_output=True, text=True, timeout=30
-                )
-            else:
-                # Write revoked serial numbers
-                with open(revoked_serials_path, 'w') as f:
-                    for cert in revoked_certs:
-                        f.write(f"serial: {cert.serial}\n")
-
-                result = subprocess.run(
-                    ['ssh-keygen', '-k', '-f', krl_path, '-s', ca_pub_path, revoked_serials_path],
-                    capture_output=True, text=True, timeout=30
-                )
+            # PROTOCOL.krl: krl_version increases each time the KRL changes; every
+            # generation is a new KRL, so its time in milliseconds is used
+            result = subprocess.run(
+                ['ssh-keygen', '-k', '-z', str(time.time_ns() // 1_000_000),
+                 '-f', krl_path, '-s', ca_pub_path, revoked_serials_path],
+                capture_output=True, text=True, timeout=30
+            )
 
             if result.returncode != 0:
                 logger.error(f"ssh-keygen KRL generation failed: {result.stderr}")

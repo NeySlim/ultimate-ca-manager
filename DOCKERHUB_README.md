@@ -120,6 +120,7 @@ volumes:
 | `UCM_SECRET_KEY` | generated | Session secret |
 | `DATABASE_URL` | unset | PostgreSQL DSN; SQLite is used when unset |
 | `KEY_ENCRYPTION_KEY` | unset | Encrypts private keys at rest, in place of the `master.key` file |
+| `UCM_AUTO_MASTER_KEY` | `true` | Creates `master.key` at first start, only when `/etc/ucm` is a named volume or a host directory; `false` leaves private keys unencrypted until encryption is enabled |
 
 ---
 

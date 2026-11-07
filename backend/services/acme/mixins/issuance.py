@@ -1,4 +1,5 @@
 """Certificate issuance mixin for ACME service"""
+import ipaddress
 import json
 import logging
 from typing import Optional, Tuple, List
@@ -9,6 +10,14 @@ from utils.datetime_utils import utc_now
 from utils.csr_extensions import csr_extensions
 
 logger = logging.getLogger(__name__)
+
+
+def _is_ip_text(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False
 
 
 class IssuanceMixin:
@@ -140,24 +149,9 @@ class IssuanceMixin:
                 from utils.caa_checker import check_caa_for_domains
                 from models import SystemConfig
                 
-                caa_identifiers = []
-                try:
-                    caa_cfg = SystemConfig.query.filter_by(key='acme_caa_identifiers').first()
-                    if caa_cfg and caa_cfg.value:
-                        caa_identifiers = [v.strip() for v in caa_cfg.value.split(',') if v.strip()]
-                except Exception:
-                    pass
-                
-                if not caa_identifiers:
-                    # Default CAA identity = the public hostname the directory
-                    # advertises (configured acme_public_vhost, else request host)
-                    from flask import request as flask_request
-                    from utils.acme_public_url import get_acme_public_host
-                    try:
-                        caa_identifiers = [get_acme_public_host(flask_request)]
-                    except Exception:
-                        pass
-                
+                from services.acme.caa_identities import caa_identities
+                caa_identifiers = caa_identities()
+
                 # DNS lookup errors are soft-fail by default (pre-2.200
                 # behaviour): air-gapped/split-horizon deployments cannot
                 # resolve CAA and were fully broken by fail-closed. Setting
@@ -216,10 +210,13 @@ class IssuanceMixin:
                 # and the error is reported as serverInternal, not badCSR
                 self._last_finalize_error_type = 'serverInternal'
                 return False, error
-            self._last_finalize_error_type = 'badCSR'
+            from services.acme.requested_validity import RequestedValidityError
+            self._last_finalize_error_type = (
+                'malformed' if isinstance(self._last_signing_exception, RequestedValidityError)
+                else 'badCSR')
             order.status = "invalid"
             order.error = json.dumps({
-                "type": "urn:ietf:params:acme:error:badCSR",
+                "type": f"urn:ietf:params:acme:error:{self._last_finalize_error_type}",
                 "detail": error
             })
             try:
@@ -395,6 +392,8 @@ class IssuanceMixin:
         for attr in subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME):
             cn = str(attr.value)
             cn_norm = cn.lower().rstrip('.')
+            if _is_ip_text(cn):
+                cn_norm = str(ipaddress.ip_address(cn))
             if (
                 cn_norm in allowed_domains
                 or cn_norm in allowed_ips
@@ -433,10 +432,12 @@ class IssuanceMixin:
         
         domains = []
         
-        # Get CN from subject
+        # Get CN from subject; an IP in the CN is an IP identifier, judged by
+        # _validate_csr_subject (RFC 8738 orders, lego v4 puts it there)
         try:
             cn = csr.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value
-            domains.append(cn)
+            if not _is_ip_text(cn):
+                domains.append(cn)
         except Exception:
             pass
         
@@ -538,6 +539,7 @@ class IssuanceMixin:
             Tuple of (success, certificate_id, error_message)
         """
         from models import CA, Certificate
+        from cryptography import x509
         import secrets
         import base64
         
@@ -572,6 +574,26 @@ class IssuanceMixin:
             self._last_signing_exception = RuntimeError("CA is awaiting its certificate")
             return False, None, f"CA {ca.refid} is awaiting its certificate"
         
+        from services.acme import profiles as acme_profiles
+        params = acme_profiles.issuance_params(getattr(order, 'profile', None))
+
+        # RFC 8555 §7.4: the order's dates, within the profile and the CA, or no certificate
+        not_before = getattr(order, 'not_before', None)
+        not_after = getattr(order, 'not_after', None)
+        if not_before or not_after:
+            from services.acme.requested_validity import RequestedValidityError, window_error
+            from utils.ca_signing_window import issuer_window
+            try:
+                ca_cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+            except Exception:
+                ca_cert = None
+            refusal = window_error(
+                not_before, not_after, params['validity_days'],
+                ca_window=issuer_window(ca_cert) if ca_cert is not None else None)
+            if refusal:
+                self._last_signing_exception = RequestedValidityError(refusal)
+                return False, None, refusal
+
         # Extract CN from CSR for better description
         descr = f"ACME Certificate - Order {order.order_id}"
         try:
@@ -627,9 +649,6 @@ class IssuanceMixin:
             # historical ACME defaults (90 days, sha256, no template). A
             # profile may bind a certificate template whose KU/EKU then
             # govern the leaf (#327 follow-up).
-            from services.acme import profiles as acme_profiles
-            params = acme_profiles.issuance_params(getattr(order, 'profile', None))
-
             signed_cert = CertificateService.sign_csr(
                 cert_id=cert.id,
                 caref=ca.refid,
@@ -640,6 +659,8 @@ class IssuanceMixin:
                 digest_explicit=params.get('digest_explicit', True),
                 username='acme',
                 template_id=params.get('template_id'),
+                not_before=not_before,
+                not_after=not_after,
             )
             
             return True, signed_cert.id, None

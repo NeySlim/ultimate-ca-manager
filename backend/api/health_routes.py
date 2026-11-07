@@ -45,7 +45,8 @@ def health():
     }
     if current_app.config.get('SAFE_MODE'):
         result['safe_mode'] = True
-        result['safe_mode_reason'] = 'encryption_key_missing'
+        result['safe_mode_reason'] = current_app.config.get('SAFE_MODE_REASON',
+                                                            'encryption_key_missing')
     return jsonify(result)
 
 

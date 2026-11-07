@@ -10,6 +10,7 @@ from services.mtls_auth_service import MTLSAuthService
 import logging
 from utils.datetime_utils import utc_now
 from utils.admin_allowlist import is_exempt_path
+from auth.session_start import begin_session
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,7 @@ def process_client_certificate():
     user, auth_cert, error = MTLSAuthService.authenticate_certificate(cert_info)
 
     if user:
-        session.clear()
+        begin_session(user)
         session['user_id'] = user.id
         session['username'] = user.username
         session['role'] = user.role

@@ -971,7 +971,7 @@ class RestoreCoreMixin:
         # Settings naming a row by number wait for that row: see restore/setting_refs.py
         deferred = deferred_keys(configuration if isinstance(configuration, dict) else {})
         for key, value in config_data.items():
-            if key == installation.CONFIG_KEY or key in deferred:
+            if key in installation.LOCAL_SETTINGS or key in deferred:
                 continue    # this database's own, never the source's
             if key == admin_allowlist.CONFIG_KEY and admin_allowlist.restored_value_locks_out(value):
                 if admin_allowlist.disabled_by_env():
