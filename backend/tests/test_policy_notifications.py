@@ -462,3 +462,28 @@ def test_a_custom_role_granting_write_approvals_makes_an_approver(app, create_ca
             db.session.delete(db.session.get(Group, group_id))
             db.session.delete(db.session.get(CustomRole, role_id))
             db.session.commit()
+
+
+class TestApprovalLink:
+    """The approvers' link never follows the Host the requester sent."""
+
+    def test_it_uses_the_public_origin(self, app):
+        from models import SystemConfig
+        with app.app_context():
+            SystemConfig.query.filter_by(key='base_url').delete()
+            db.session.add(SystemConfig(key='base_url', value='https://pki.example.test'))
+            db.session.commit()
+        try:
+            with app.test_request_context(base_url='https://attacker.example'):
+                link = policy_notifications._approvals_link(7)
+            assert link.startswith('https://pki.example.test') and link.endswith('/approvals?id=7'), link
+        finally:
+            with app.app_context():
+                SystemConfig.query.filter_by(key='base_url').delete()
+                db.session.commit()
+
+    def test_without_a_public_origin_there_is_no_link(self, app, monkeypatch):
+        from utils import public_endpoints
+        monkeypatch.setattr(public_endpoints, 'get_admin_canonical_origin', lambda: None)
+        with app.test_request_context(base_url='https://attacker.example'):
+            assert policy_notifications._approvals_link(7) is None
