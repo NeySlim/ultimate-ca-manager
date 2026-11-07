@@ -424,46 +424,58 @@ class TestRefusals:
 
 
 class TestFips:
-    """FIPS mode: no SHA-1 in OAEP, no RSAES-PKCS1-v1_5, no Brainpool key agreement."""
+    """FIPS mode: RSAES-PKCS1-v1_5 and Brainpool key agreement are refused; OAEP with SHA-1 is
+    still served, as for SCEP (Windows CNG defaults to it, SP 800-131A non-signature use)."""
 
     @pytest.fixture
     def fips_on(self, monkeypatch):
         monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
 
     @pytest.mark.parametrize('capabilities', [
-        [OAEP_DEFAULT], [RSA_ENCRYPTION], [RSA_ENCRYPTION, OAEP_DEFAULT],
-        [OAEP_DEFAULT, AES128_CBC],
-    ], ids=['oaep-sha1', 'pkcs1v15', 'both', 'sha1-aes128'])
-    def test_sha1_oaep_and_pkcs1v15_are_refused(self, fips_on, capabilities):
+        [RSA_ENCRYPTION], [RSA_ENCRYPTION, AES128_CBC],
+    ], ids=['pkcs1v15', 'pkcs1v15-aes128'])
+    def test_pkcs1v15_is_refused(self, fips_on, capabilities):
         public_key = rsa.generate_private_key(65537, 2048).public_key()
         caps = smime_capabilities(_keygen_csr('fips.keygen.test', b'\x01', capabilities)
                                   .public_bytes(serialization.Encoding.DER))
         with pytest.raises(UnsupportedCapabilities) as refused:
             choose_key_encryption(public_key, caps)
-        assert 'SHA-1' not in str(refused.value) and 'PKCS1' not in str(refused.value)
+        assert 'PKCS1' not in str(refused.value) and 'RSAES-OAEP' in str(refused.value)
 
-    def test_sha1_oaep_is_passed_over_for_sha256(self, fips_on):
+    @pytest.mark.parametrize('capabilities', [
+        [OAEP_DEFAULT], [RSA_ENCRYPTION, OAEP_DEFAULT],
+    ], ids=['oaep-sha1', 'pkcs1v15-then-oaep-sha1'])
+    def test_sha1_oaep_is_served(self, fips_on, capabilities):
+        public_key = rsa.generate_private_key(65537, 2048).public_key()
+        caps = smime_capabilities(_keygen_csr('fips.keygen.test', b'\x01', capabilities)
+                                  .public_bytes(serialization.Encoding.DER))
+        chosen = choose_key_encryption(public_key, caps)
+        assert (chosen.recipient.oaep_hash, chosen.recipient.mgf_hash) == ('sha1', 'sha1')
+
+    def test_the_client_order_holds_among_oaep_hashes(self, fips_on):
         public_key = rsa.generate_private_key(65537, 2048).public_key()
         chosen = choose_key_encryption(public_key, [
-            ('1.2.840.113549.1.1.7', b'\x30\x00'), ('1.2.840.113549.1.1.1', b'\x05\x00'),
-            ('1.2.840.113549.1.1.7', der_encoder.encode(rfc4055.rSAES_OAEP_SHA256_Params))])
-        assert (chosen.recipient.oaep_hash, chosen.recipient.mgf_hash) == ('sha256', 'sha256')
-
-    def test_outside_fips_the_same_list_takes_sha1_first(self, monkeypatch):
-        monkeypatch.setattr(fips_mode, 'enabled', lambda: False)
-        public_key = rsa.generate_private_key(65537, 2048).public_key()
-        chosen = choose_key_encryption(public_key, [
-            ('1.2.840.113549.1.1.7', b'\x30\x00'),
+            ('1.2.840.113549.1.1.1', b'\x05\x00'), ('1.2.840.113549.1.1.7', b'\x30\x00'),
             ('1.2.840.113549.1.1.7', der_encoder.encode(rfc4055.rSAES_OAEP_SHA256_Params))])
         assert chosen.recipient.oaep_hash == 'sha1'
 
-    def test_the_route_refuses_sha1_oaep_before_issuing(self, fips_on, app, client, est_ca):
+    def test_the_route_refuses_pkcs1v15_before_issuing(self, fips_on, app, client, est_ca):
         est_ca('signing')
-        cn = 'fips-sha1.keygen.test'
+        cn = 'fips-v15.keygen.test'
         r = _serverkeygen(client, _client_certificate(rsa.generate_private_key(65537, 2048)), cn,
-                          [OAEP_DEFAULT])
-        assert r.status_code == 400 and b'SHA-256' in r.data and b'SHA-1' not in r.data, r.data
+                          [RSA_ENCRYPTION])
+        assert r.status_code == 400 and b'RSAES-OAEP' in r.data and b'PKCS1' not in r.data, r.data
         assert _no_certificate_for(app, cn)
+
+    def test_the_route_serves_sha1_oaep(self, fips_on, client, est_ca):
+        est_ca('signing')
+        key = rsa.generate_private_key(65537, 2048)
+        cert = _client_certificate(key)
+        parts = _assert_ok(_serverkeygen(client, cert, 'fips-sha1.keygen.test', [OAEP_DEFAULT]))
+        enveloped = _enveloped(parts)
+        transport, cek = _ktri_cek(enveloped, cert, key)
+        assert transport == ('oaep', 'sha1', 'sha1')
+        _content(enveloped, cek)
 
     def test_a_brainpool_client_key_is_refused(self, fips_on, app, client, est_ca):
         est_ca('signing')

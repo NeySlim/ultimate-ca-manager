@@ -132,9 +132,8 @@ def recipient_refusal(cert):
 
 def _key_transport(oid, params_der):
     """The KeyTransport a capability names, None when UCM cannot use it."""
-    fips = fips_mode.enabled()
     if oid == RSA_ENCRYPTION:
-        return None if fips else KeyTransport(None, None)
+        return None if fips_mode.enabled() else KeyTransport(None, None)
     if oid != RSAES_OAEP:
         return None
     try:
@@ -143,8 +142,6 @@ def _key_transport(oid, params_der):
     except (ValueError, TypeError, KeyError):
         return None
     if label or hash_name not in _OAEP_HASHES or mgf_hash not in _OAEP_HASHES:
-        return None
-    if fips and 'sha1' in (hash_name, mgf_hash):
         return None
     return KeyTransport(hash_name, mgf_hash)
 
@@ -172,9 +169,8 @@ def supported_text(public_key):
         return ('supported: key agreement dhSinglePass-stdDH or -cofactorDH with sha224kdf, '
                 'sha256kdf, sha384kdf or sha512kdf and id-aes128-wrap, id-aes192-wrap or '
                 f'id-aes256-wrap; {content} of the key wrap size')
-    hashes = 'SHA-224, SHA-256, SHA-384 or SHA-512' if fips_mode.enabled() else \
-        'SHA-1, SHA-224, SHA-256, SHA-384 or SHA-512'
-    transport = f'key transport RSAES-OAEP with {hashes}'
+    # SHA-1 OAEP stays in FIPS mode, as for SCEP (SP 800-131A: a non-signature use)
+    transport = 'key transport RSAES-OAEP with SHA-1, SHA-224, SHA-256, SHA-384 or SHA-512'
     if not fips_mode.enabled():
         transport += ', or RSAES-PKCS1-v1_5 when nothing else is listed'
     return f'supported: {transport}; {content}'
