@@ -9,7 +9,7 @@ from typing import Optional
 from datetime import timedelta
 from dotenv import load_dotenv
 
-from utils.db_url import is_postgres_url, sqlalchemy_url
+from utils.db_url import is_postgres_url, postgres_connect_args, sqlalchemy_url
 
 # Load environment variables FIRST (before using them)
 # Try multiple locations for .env files
@@ -187,6 +187,9 @@ class Config:
     # SQLAlchemy would otherwise quote bound values in its errors, private keys included.
     # PostgreSQL's DETAIL line stays: a duplicate key in full, or a refused row's columns up to 64 bytes
     SQLALCHEMY_ENGINE_OPTIONS["hide_parameters"] = True
+    # UCM_PG_PREPARE_THRESHOLD, for a transaction-mode pooler without prepared statements
+    if _db_url and postgres_connect_args(_db_url):
+        SQLALCHEMY_ENGINE_OPTIONS["connect_args"] = postgres_connect_args(_db_url)
     
     
     @classmethod

@@ -24,7 +24,7 @@ from typing import Dict, List, Tuple
 
 from sqlalchemy import create_engine, inspect, text
 
-from utils.db_url import sqlalchemy_url
+from utils.db_url import postgres_connect_args, sqlalchemy_url
 
 from .copy import (
     CopyError,
@@ -328,7 +328,8 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
     }
     target_engine = None
     try:
-        target_engine = create_engine(sqlalchemy_url(target_url), pool_pre_ping=True, hide_parameters=True)
+        target_engine = create_engine(sqlalchemy_url(target_url), pool_pre_ping=True, hide_parameters=True,
+                                      connect_args=postgres_connect_args(target_url))
         target_is_pg = target_url.startswith("postgresql")
 
         if _target_has_users(target_engine):
@@ -420,7 +421,8 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
 
     target_engine = None
     try:
-        target_engine = create_engine(sqlalchemy_url(target_url), pool_pre_ping=True, hide_parameters=True)
+        target_engine = create_engine(sqlalchemy_url(target_url), pool_pre_ping=True, hide_parameters=True,
+                                      connect_args=postgres_connect_args(target_url))
         target_is_pg = target_url.startswith("postgresql")
         if target_is_pg:
             # The schema the URL's search_path lands in: the one a reset must name

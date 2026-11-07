@@ -87,6 +87,54 @@ def test_only_a_psycopg2_scheme_is_announced(url, caplog):
     assert not caplog.records
 
 
+@pytest.mark.parametrize('value, expected', [
+    (None, {}), ('', {}), ('0', {'prepare_threshold': None}), ('none', {'prepare_threshold': None}),
+    ('OFF', {'prepare_threshold': None}), ('3', {'prepare_threshold': 3}),
+])
+def test_the_prepare_threshold_comes_from_the_environment(value, expected):
+    environ = {} if value is None else {'UCM_PG_PREPARE_THRESHOLD': value}
+    assert db_url.postgres_connect_args('postgresql://u:p@db/ucm', environ) == expected
+
+
+def test_the_prepare_threshold_leaves_sqlite_alone():
+    assert db_url.postgres_connect_args('sqlite:////tmp/ucm.db', {'UCM_PG_PREPARE_THRESHOLD': '0'}) == {}
+
+
+def test_a_malformed_prepare_threshold_is_refused():
+    with pytest.raises(ValueError, match='UCM_PG_PREPARE_THRESHOLD'):
+        db_url.postgres_connect_args('postgresql://u:p@db/ucm', {'UCM_PG_PREPARE_THRESHOLD': '-1'})
+
+
+@pytest.mark.parametrize('value, expected', [('0', 'None'), ('', 'absent')])
+def test_the_application_engine_takes_the_prepare_threshold(value, expected):
+    env = dict(os.environ, DATABASE_URL='postgresql://u:p@db.invalid/ucm', UCM_PG_PREPARE_THRESHOLD=value)
+    out = subprocess.run(
+        [sys.executable, '-c', 'from config.settings import Config; '
+         'args = Config.SQLALCHEMY_ENGINE_OPTIONS.get("connect_args"); '
+         'print("absent" if args is None else args["prepare_threshold"])'],
+        cwd=BACKEND, env=env, capture_output=True, text=True, check=True)
+    assert out.stdout.strip().splitlines()[-1] == expected
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize('value, prepared', [('', True), ('0', False)])
+def test_a_disabled_threshold_prepares_nothing_on_the_server(value, prepared):
+    url = os.environ.get('UCM_TEST_PG_URL', '')
+    if not url:
+        pytest.skip('UCM_TEST_PG_URL not set')
+    from sqlalchemy import create_engine, text
+    args = db_url.postgres_connect_args(url, {'UCM_PG_PREPARE_THRESHOLD': value})
+    engine = create_engine(sqlalchemy_url(url), connect_args=args)
+    try:
+        with engine.connect() as conn:
+            for _ in range(8):
+                conn.execute(text('SELECT 1 WHERE 1 = :x'), {'x': 1})
+            count = conn.execute(text('SELECT count(*) FROM pg_prepared_statements')).scalar()
+        assert (count > 0) is prepared
+    finally:
+        engine.dispose()
+
+
 def _engine_urls(monkeypatch, module):
     """Record the URL each create_engine call of `module` receives."""
     seen = []
