@@ -71,13 +71,12 @@ def postgres_install(tmp_path, monkeypatch):
     """A PostgreSQL install: DATABASE_URL set, no SQLite file anywhere."""
     if not PG_URL:
         pytest.skip('UCM_TEST_PG_URL not set')
-    import psycopg2
+    import psycopg
     monkeypatch.setenv('DATABASE_URL', PG_URL)
     from tests.conftest import pg_bench_exclusive
     # Tables in the shared bench's public schema, which other files reset
     with pg_bench_exclusive():
-        connection = psycopg2.connect(PG_URL)
-        connection.autocommit = True
+        connection = psycopg.connect(PG_URL, autocommit=True)
         cursor = connection.cursor()
         cursor.execute("DROP TABLE IF EXISTS system_config")
         cursor.execute("DROP TABLE IF EXISTS certificate_authorities")
@@ -147,9 +146,10 @@ class TestPostgresInstall:
     def test_wstep_is_read(self, postgres_install):
         assert wstep_enabled(postgres_install) is True
 
-    def test_sqlalchemy_driver_suffix_is_accepted(self, postgres_install, monkeypatch):
+    @pytest.mark.parametrize('driver', ['psycopg', 'psycopg2'])
+    def test_sqlalchemy_driver_suffix_is_accepted(self, postgres_install, monkeypatch, driver):
         scheme, _, rest = PG_URL.partition('://')
-        monkeypatch.setenv('DATABASE_URL', f'{scheme}+psycopg2://{rest}')
+        monkeypatch.setenv('DATABASE_URL', f'{scheme}+{driver}://{rest}')
         assert mtls_client_ca(postgres_install)[1] == 'Issuing CA'
 
 

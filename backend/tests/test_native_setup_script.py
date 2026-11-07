@@ -301,7 +301,7 @@ def _fake_python(tmp_path, pip_body):
           f'prev=""; for a in "$@"; do [ "$prev" = -r ] && cat "$a" >> {record}; prev=$a; done\n{GUNICORN}\n{pip_body}')
     _stub(templates / 'python', f'''case "${{1:-}}" in
   -c) exit 0 ;;
-  -) cat > /dev/null; echo "cryptography, hashlib and psycopg2 use the system OpenSSL" ;;
+  -) cat > /dev/null; echo "cryptography, hashlib, psycopg and psycopg2 use the system OpenSSL" ;;
   *) exec {BASH} "$@" ;;
 esac''')
     body = f'''if [ "$1" = -m ] && [ "$2" = venv ]; then
@@ -320,7 +320,8 @@ def _home(tmp_path):
     home = tmp_path / 'opt'
     (home / 'venv').mkdir(parents=True)
     (home / 'venv' / 'previous').write_text('old venv')
-    (home / 'requirements.txt').write_text('cryptography==50.0.2\npsycopg2-binary>=2.9.9\nxmlsec>=1.3.13\nlxml>=5.0\n')
+    (home / 'requirements.txt').write_text('cryptography==50.0.2\npsycopg[binary]>=3.3,<4\n'
+                                          'psycopg2-binary>=2.9.9\nxmlsec>=1.3.13\nlxml>=5.0\n')
     envfile = tmp_path / 'ucm.env'
     envfile.write_text('UCM_FIPS_BUILD=1\n')
     return home, envfile
@@ -335,8 +336,9 @@ def test_the_fips_build_compiles_from_source_with_rust_in_path(tmp_path):
                   _env(tmp_path, ALMA, {'PATH': str(bin_dir)}))
     assert result.returncode == 0, result.stderr
     calls = record.read_text()
-    assert 'ARGS install --no-binary cryptography,psycopg2,lxml,xmlsec -r ' in calls
+    assert 'ARGS install --no-binary cryptography,psycopg2,psycopg-c,lxml,xmlsec -r ' in calls
     assert 'psycopg2>=2.9.9' in calls and 'psycopg2-binary' not in calls
+    assert 'psycopg[c]>=3.3,<4' in calls and 'psycopg[binary]' not in calls
     assert 'xmlsec==1.3.13' in calls  # EL9 pin
     assert f'PATH {rust}:' in calls and f'RUSTC {rust}/rustc' in calls
     assert '--quiet -r' not in calls

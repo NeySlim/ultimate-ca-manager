@@ -5,7 +5,7 @@
 Flask==3.1.3
 Flask-RESTX==1.3.2
 Flask-SQLAlchemy==3.1.1
-# 2.1 resolves postgresql:// to psycopg 3 and has not been validated yet
+# 2.1 has not been validated yet
 SQLAlchemy>=2.0.45,<2.1
 Flask-Migrate==4.1.0
 Flask-CORS==6.0.2
@@ -71,7 +71,9 @@ azure-identity>=1.25
 google-cloud-kms>=3.11.0
 
 # PostgreSQL support (for HA / multi-node deployments)
-# Pre-built binary wheel — no compilation toolchain needed at install time.
+# psycopg 3 binds parameters on the server: an error quoting the statement carries no value
+psycopg[binary]>=3.3,<4
+# Only for a URL that names postgresql+psycopg2://, removed in the next release
 psycopg2-binary>=2.9.9
 
 # Redis session store and Socket.IO message queue, used only when a Redis URL is set

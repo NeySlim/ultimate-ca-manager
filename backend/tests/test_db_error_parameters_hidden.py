@@ -11,6 +11,8 @@ from config.settings import Config
 from models import db
 from services.database_admin import copy as copy_module
 from services.database_admin import migration
+from utils import db_errors
+from utils.db_errors import sqlstate
 
 
 class _Stop(Exception):
@@ -82,7 +84,26 @@ def test_a_postgresql_error_quotes_no_statement(app, caplog):
     assert _SECRET not in str(error) and _SECRET not in str(error.orig)
     assert _SECRET not in caplog.text and 'LINE 1' not in caplog.text
     assert str(error.orig).startswith('column "no_such_column" of relation "system_config" does not exist')
-    assert error.orig.pgcode == '42703'
+    assert sqlstate(error.orig) == '42703'
+
+
+def test_the_driver_puts_no_value_in_the_statement(app):
+    # Scrubber off: a server error quotes the statement as the driver sent it
+    _on_postgresql(app)
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
+    secret = b'ZZSECRET' * 512
+    event.remove(Engine, 'handle_error', db_errors._scrub)
+    try:
+        with app.app_context(), db.engine.connect() as conn, pytest.raises(SQLAlchemyError) as caught:
+            conn.execute(text('INSERT INTO system_config (nope, key) VALUES (:v, :k)'),
+                         {'v': secret, 'k': 'scrub-probe'})
+    finally:
+        db_errors.install()
+    shown = str(caught.value)
+    assert 'LINE 1: INSERT INTO system_config (nope, key) VALUES (' in shown
+    # The server shows a few bytes of a quoted value before cutting the line
+    assert secret[:4].hex() not in shown and 'ZZSE' not in shown
 
 
 def test_a_duplicate_key_keeps_its_detail(app):
@@ -94,7 +115,7 @@ def test_a_duplicate_key_keeps_its_detail(app):
         try:
             with db.engine.connect() as conn, pytest.raises(SQLAlchemyError) as caught:
                 conn.execute(text("INSERT INTO system_config (key, value) VALUES ('scrub-probe-dup', 'b')"))
-            assert caught.value.orig.pgcode == '23505'
+            assert sqlstate(caught.value.orig) == '23505'
             assert 'DETAIL:  Key (key)=(scrub-probe-dup) already exists.' in str(caught.value)
             assert caught.value.orig.diag.message_detail == 'Key (key)=(scrub-probe-dup) already exists.'
         finally:
@@ -120,7 +141,7 @@ def test_a_refused_row_or_input_is_not_quoted(app, statement, pgcode, primary):
     value = '1' if pgcode == '22003' else _SECRET
     with app.app_context(), db.engine.connect() as conn, pytest.raises(SQLAlchemyError) as caught:
         conn.execute(text(statement), {'v': value})
-    assert caught.value.orig.pgcode == pgcode
+    assert sqlstate(caught.value.orig) == pgcode
     shown = str(caught.value)
     assert _SECRET not in shown and '199999999999' not in shown and 'Failing row' not in shown
     assert 'DETAIL' not in shown and str(caught.value.orig).split('\n')[0] == primary

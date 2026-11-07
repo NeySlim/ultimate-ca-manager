@@ -97,6 +97,9 @@ if 'DATA_DIR' not in os.environ or _xdist_worker:
 # itself runs in memory. Pinned before settings.py loads one, like DATA_DIR above.
 if 'DATABASE_PATH' not in os.environ or _xdist_worker:
     os.environ['DATABASE_PATH'] = os.path.join(os.environ['DATA_DIR'], 'ucm.db')
+# Engines built from a bare postgresql:// get the driver sqlalchemy_url gives the application
+from sqlalchemy.dialects import registry as _sa_registry  # noqa: E402
+_sa_registry.register('postgresql', 'sqlalchemy.dialects.postgresql.psycopg', 'dialect')
 from tests import pg_app_harness as _pg_app  # noqa: E402
 
 if _pg_app.ENABLED:

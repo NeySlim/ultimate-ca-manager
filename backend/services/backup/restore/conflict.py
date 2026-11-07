@@ -7,6 +7,8 @@ Read from the failed statement: once a flush fails, the session holds nothing to
 import re
 from typing import Any, Dict, List, Optional
 
+from utils.db_errors import sqlstate
+
 from ..errors import BackupSchemaError
 from ..export_generic import load_model
 from ..manifest import SECTIONS
@@ -104,7 +106,7 @@ def _rows(exc, kind: str) -> List[Dict[str, Any]]:
 
 def _unique_violation_detail(orig):
     """PostgreSQL's DETAIL for a duplicate key; any other DETAIL can quote a whole row."""
-    if getattr(orig, 'pgcode', None) != _UNIQUE_VIOLATION:
+    if sqlstate(orig) != _UNIQUE_VIOLATION:
         return None
     return getattr(getattr(orig, 'diag', None), 'message_detail', None)
 
@@ -115,7 +117,7 @@ _STRING_TOO_LONG = '22001'
 
 def is_value_too_long(exc) -> bool:
     """A PostgreSQL refusal of a string longer than its column (SQLite stores it)."""
-    return getattr(getattr(exc, 'orig', None), 'pgcode', None) == _STRING_TOO_LONG
+    return sqlstate(getattr(exc, 'orig', None)) == _STRING_TOO_LONG
 
 
 def _overlong(table: str, rows: List[Dict[str, Any]]):

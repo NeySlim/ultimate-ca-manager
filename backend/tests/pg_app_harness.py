@@ -29,11 +29,9 @@ def app_url(schema=SCHEMA):
 
 
 def _connect():
-    import psycopg2
+    import psycopg
 
-    conn = psycopg2.connect(APP_PG_URL, application_name=f'{SCHEMA}_admin')
-    conn.autocommit = True
-    return conn
+    return psycopg.connect(APP_PG_URL, application_name=f'{SCHEMA}_admin', autocommit=True)
 
 
 def _sweep_abandoned(cur):

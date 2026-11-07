@@ -75,14 +75,17 @@ def open_boot_database(data_path: str):
     """A connection to the active database, or None when there is none yet."""
     url = database_url(data_path)
     if _is_postgres(url):
-        import psycopg2
-        # psycopg2 rejects SQLAlchemy's ``+driver`` suffix. The timeout is
-        # what keeps a blackholed server from hanging the gunicorn master,
-        # which reads this before any worker forks.
+        # libpq rejects SQLAlchemy's ``+driver`` suffix. The timeout is what
+        # keeps a blackholed server from hanging the gunicorn master, which
+        # reads this before any worker forks.
         scheme, _, rest = url.partition('://')
+        if scheme == 'postgresql+psycopg2':
+            import psycopg2 as driver
+        else:
+            import psycopg as driver
         return BootDatabase(
-            psycopg2.connect(scheme.split('+')[0] + '://' + rest,
-                             connect_timeout=CONNECT_TIMEOUT_SECONDS), '%s')
+            driver.connect('postgresql://' + rest,
+                           connect_timeout=CONNECT_TIMEOUT_SECONDS), '%s')
 
     path = url[len('sqlite:///'):] if url.startswith('sqlite:///') else url
     if not os.path.exists(path):

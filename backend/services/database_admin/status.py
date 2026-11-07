@@ -85,7 +85,7 @@ def test_connection(database_url: str) -> Tuple[bool, str]:
         return False, "DATABASE_URL is required"
 
     parsed = urlparse(database_url)
-    if parsed.scheme not in ("postgresql", "postgresql+psycopg2", "sqlite"):
+    if parsed.scheme not in ("postgresql", "postgresql+psycopg", "postgresql+psycopg2", "sqlite"):
         return False, f"Unsupported scheme: {parsed.scheme}"
 
     try:
