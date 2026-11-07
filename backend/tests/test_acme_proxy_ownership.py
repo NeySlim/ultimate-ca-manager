@@ -679,6 +679,7 @@ class TestSameAccountPendingOrderReuse:
         ({'notAfter': '2026-12-01T00:00:00.000Z'}, {'not_after': '2026-12-01T00:00:00Z'}, True),
         ({'notBefore': '2026-11-10T00:00:00Z'}, {'not_before': '2026-11-10T01:00:00+01:00'}, True),
         ({'notBefore': '2026-11-10T00:00:00Z'}, {}, True),
+        ({}, {'not_before': '2026-11-10T00:00:00Z'}, False),
     ])
     def test_reuse_honours_the_requested_dates(self, app, monkeypatch, upstream_dates,
                                                wanted, reused):
