@@ -4272,6 +4272,8 @@
     "title": "Abgesicherter Modus",
     "description": "UCM hat verschlüsselte private Schlüssel erkannt, aber der Verschlüsselungsschlüssel fehlt.",
     "step1Title": "Platzieren Sie Ihre Hauptschlüsseldatei unter:",
+    "mismatchDescription": "Der konfigurierte Hauptschlüssel entschlüsselt die gespeicherten privaten Schlüssel nicht: Sie wurden mit einem anderen Schlüssel verschlüsselt. Die privaten Schlüssel bleiben unzugänglich, bis der vorherige Hauptschlüssel wiederhergestellt ist.",
+    "mismatchStep1Title": "Legen Sie die vorherige Hauptschlüsseldatei wieder ab unter:",
     "step2Title": "Dann starten Sie den Dienst neu:",
     "lostKeyHint": "Wenn Sie den Hauptschlüssel verloren haben, stellen Sie aus einem Backup wieder her.",
     "polling": "Überprüfung läuft..."

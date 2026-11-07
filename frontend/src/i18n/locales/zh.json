@@ -4272,6 +4272,8 @@
     "title": "安全模式",
     "description": "UCM检测到加密的私钥，但加密密钥缺失。",
     "step1Title": "将主密钥文件放置在：",
+    "mismatchDescription": "配置的主密钥无法解密已存储的私钥：它不是加密这些私钥时使用的密钥。在恢复之前的主密钥之前，无法访问私钥。",
+    "mismatchStep1Title": "将之前的主密钥文件放回：",
     "step2Title": "然后重启服务：",
     "lostKeyHint": "如果丢失了主密钥，请从备份中恢复。",
     "polling": "正在检查..."

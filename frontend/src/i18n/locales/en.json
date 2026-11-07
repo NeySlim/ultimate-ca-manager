@@ -4275,6 +4275,8 @@
     "title": "Safe Mode",
     "description": "UCM detected encrypted private keys but the encryption key is missing. Private keys cannot be accessed until the master key is restored.",
     "step1Title": "Place your master key file at:",
+    "mismatchDescription": "The configured master key does not decrypt the stored private keys: it is not the key they were encrypted with. Private keys cannot be accessed until the previous master key is restored.",
+    "mismatchStep1Title": "Put the previous master key file back at:",
     "step2Title": "Then restart the service:",
     "lostKeyHint": "If you lost the master key, restore from a backup to recover your private keys.",
     "polling": "Checking for resolution..."

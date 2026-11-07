@@ -4272,6 +4272,8 @@
     "title": "Modalità sicura",
     "description": "UCM ha rilevato chiavi private crittografate ma la chiave di crittografia è mancante.",
     "step1Title": "Posiziona il file chiave master in:",
+    "mismatchDescription": "La chiave master configurata non decifra le chiavi private archiviate: non è quella con cui sono state cifrate. Le chiavi private restano inaccessibili finché non viene ripristinata la chiave master precedente.",
+    "mismatchStep1Title": "Rimetti il file della chiave master precedente in:",
     "step2Title": "Poi riavvia il servizio:",
     "lostKeyHint": "Se hai perso la chiave master, ripristina da un backup.",
     "polling": "Verifica in corso..."

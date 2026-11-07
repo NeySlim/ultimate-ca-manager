@@ -4275,6 +4275,8 @@
     "title": "Mode sans échec",
     "description": "UCM a détecté des clés privées chiffrées mais la clé de chiffrement est manquante. Les clés privées ne sont pas accessibles tant que la clé maître n'est pas restaurée.",
     "step1Title": "Placez votre fichier de clé maître dans :",
+    "mismatchDescription": "La clé maître configurée ne déchiffre pas les clés privées stockées : ce n'est pas celle qui les a chiffrées. Les clés privées restent inaccessibles tant que la clé maître précédente n'est pas restaurée.",
+    "mismatchStep1Title": "Remettez le fichier de la clé maître précédente dans :",
     "step2Title": "Puis redémarrez le service :",
     "lostKeyHint": "Si vous avez perdu la clé maître, restaurez à partir d'une sauvegarde pour récupérer vos clés privées.",
     "polling": "Vérification en cours..."
