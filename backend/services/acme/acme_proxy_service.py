@@ -100,6 +100,24 @@ def _dns_rows_hook(action, *args):
         return None
 
 
+# What the client reads on an order or challenge whose TXT record the DNS provider refused
+_DNS_REFUSED_PROBLEM = {
+    'type': 'urn:ietf:params:acme:error:serverInternal',
+    'detail': 'The proxy could not publish the dns-01 TXT record: the DNS provider refused it',
+}
+
+
+def _txt_written(provider, zone, record_name, value):
+    """(ok, message) of a TXT write; an exception is a refusal like a False result."""
+    try:
+        result = provider.create_txt_record(zone, record_name, value)
+    except Exception as exc:
+        return False, f"{type(exc).__name__}: {exc}"
+    if isinstance(result, tuple) and result:
+        return bool(result[0]), str(result[1]) if len(result) > 1 else ''
+    return bool(result), ''
+
+
 def _dns_failed_state(status) -> bool:
     """True for an RFC 8555 final state in which validation failed."""
     from services.acme.dns_update.records import is_failed_state
@@ -1228,6 +1246,8 @@ class AcmeProxyService:
         # the DNS record itself, while http-01/tls-alpn-01 need the upstream CA
         # to reach the client directly, which cannot work through a proxy.
         already_valid = authz.get('status') == 'valid'
+        if _dns_failed_state(authz.get('status')):
+            self._release_order_records(order)
         proxy_challenges = []
         closed_chall_urls = []
         for chall in authz.get('challenges', []):
@@ -1236,6 +1256,9 @@ class AcmeProxyService:
             chall_url = chall.get('url')
             if not chall_url:
                 continue
+            if chall.get('status') == 'pending' and self._dns_refused(order, chall_url):
+                chall.update(status='invalid', error=dict(_DNS_REFUSED_PROBLEM))
+                authz['status'] = 'invalid'
             if (_dns_failed_state(authz.get('status'))
                     or _dns_failed_state(chall.get('status'))):
                 closed_chall_urls.append(chall_url)
@@ -1380,6 +1403,7 @@ class AcmeProxyService:
             db.session.rollback()
             raise
         _dns_rows_hook('close_for_order', order.id)
+        self._release_order_records(order)
         return self._deactivated_view(authz), identifier
 
     def _deactivated_view(self, authz):
@@ -1668,7 +1692,11 @@ class AcmeProxyService:
         # possibly from two workers: read-merge-write must not interleave.
         db.session.commit()  # no transaction held while waiting for the lock
         with _txt_record_lock(txt_lock_name(provider, full_record_name)):
-            provider.create_txt_record(zone_name, full_record_name, txt_value)
+            ok, message = _txt_written(provider, zone_name, full_record_name, txt_value)
+            if not ok:
+                # Submitting anyway would fail the validation on the shared upstream account
+                self._fail_dns_automation(order, chall_url, domain, message)
+                return
             published = [txt_value]
 
             # Client-side pre-check support (#306/#307): lego/Caddy compute
@@ -1681,11 +1709,11 @@ class AcmeProxyService:
             extra_values = [] if holds_one_value(provider) else self._client_txt_values(
                 order, key_authz, txt_value, authz_url=authz_url)
             for extra_value in extra_values:
-                try:
-                    provider.create_txt_record(zone_name, full_record_name, extra_value)
+                ok, message = _txt_written(provider, zone_name, full_record_name, extra_value)
+                if ok:
                     published.append(extra_value)
-                except Exception as exc:
-                    logger.warning(f"[ACME Proxy BG] Client TXT value not published: {exc}")
+                else:
+                    logger.warning(f"[ACME Proxy BG] Client TXT value not published: {message}")
 
             # Store record info for cleanup, re-read: another authorization of the order may have added its own
             db.session.refresh(order)
@@ -1735,6 +1763,58 @@ class AcmeProxyService:
             challenges_data[chall_url] = entry
             order.set_challenges_dict(challenges_data)
             db.session.commit()
+
+    def _fail_dns_automation(self, order, chall_url, domain, message):
+        """Fail the order locally after a refused TXT write; the upstream challenge is left alone."""
+        logger.error("[ACME Proxy BG] DNS provider refused the TXT record for %s: %s", domain, message)
+        challenges_data = order.challenges_dict
+        challenges_data[chall_url] = {'status': 'failed', 'error': message,
+                                      'failed_at': datetime.now().isoformat()}
+        order.set_challenges_dict(challenges_data)
+        order.status = 'invalid'
+        order.error_message = f"DNS provider refused the TXT record for {domain}: {message}"
+        order.last_error_at = utc_now()
+        db.session.commit()
+        _dns_rows_hook('close_for_order', order.id)
+        self._release_order_records(order)
+
+    @staticmethod
+    def _dns_refused(order, chall_url=None):
+        """True when this order's TXT write was refused (for this challenge, if given)."""
+        for url, state in (order.challenges_dict or {}).items():
+            if (chall_url is None or url == chall_url) and (state or {}).get('status') == 'failed':
+                return True
+        return False
+
+    def _release_order_records(self, order):
+        """Remove in the background the TXT records of an order that can no longer issue.
+
+        Kept while another pending order shares one of its authorizations: the
+        record may be the value that order's validation reads."""
+        try:
+            records = json.loads(order.dns_records_created or '[]')
+        except (TypeError, ValueError):
+            return
+        if not records:
+            return
+        for authz_url in self._recorded_authz_urls(order):
+            if any(o.id != order.id and o.status == 'pending'
+                   for o in self._orders_by_authz_url(authz_url)):
+                return
+        order_id = order.id
+        order.dns_records_created = None
+        try:
+            db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            logger.warning("[ACME Proxy] TXT cleanup of order %s not recorded: %s", order_id, exc)
+            return
+        thread = threading.Thread(
+            target=self._bg_cleanup_dns_records,
+            args=(current_app._get_current_object(), records, order_id))
+        thread.name = "ACMEProxy-DNS-Cleanup"
+        thread.daemon = True
+        thread.start()
 
     @staticmethod
     def _delete_dns_record(provider, zone: str, record_name: str, value, order_id=None) -> None:
@@ -1915,6 +1995,11 @@ class AcmeProxyService:
         if (local_order.deactivated_authz_list
                 and order.get('status') in ('pending', 'ready')):
             order['status'] = 'invalid'
+        if self._dns_refused(local_order) and order.get('status') in ('pending', 'ready'):
+            order['status'] = 'invalid'
+            order.setdefault('error', dict(_DNS_REFUSED_PROBLEM))
+        if order.get('status') == 'invalid':
+            self._release_order_records(local_order)
         return self._rewrite_order_urls(order, order_url, order_id_b64)
 
     def finalize_order(self, order_id_b64, csr_pem, requester_account_id=None,
@@ -1941,6 +2026,9 @@ class AcmeProxyService:
         if local_order.deactivated_authz_list:
             raise ProxyOrderNotReadyError(
                 "Order is invalid: one of its authorizations was deactivated")
+        if self._dns_refused(local_order):
+            raise ProxyOrderNotReadyError(
+                "Order is invalid: the DNS provider refused its dns-01 record")
 
         from cryptography import x509
         csr = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())
