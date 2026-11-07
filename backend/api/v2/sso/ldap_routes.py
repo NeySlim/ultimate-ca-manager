@@ -331,12 +331,16 @@ def _adoptable(user, provider):
 
 
 def _orphan_with_id(provider, external_id):
-    """The one account of this provider type bound to ``external_id`` whose provider
-    was deleted; None when there is none, or several."""
-    orphans = [u for u in User.query.filter(
-                   User.sso_external_id == external_id,
-                   User.auth_source == provider.provider_type).all()
-               if u.sso_provider_id is None or db.session.get(SSOProvider, u.sso_provider_id) is None]
+    """The one account bound to ``external_id`` whose deleted provider served this
+    same IdP; None when there is none, or several (a stable id is per IdP)."""
+    key = provider.idp_key()
+    if not key:
+        return None
+    orphans = User.query.filter(
+        User.sso_external_id == external_id,
+        User.auth_source == provider.provider_type,
+        User.sso_provider_id.is_(None),
+        User.sso_orphan_of == key).limit(2).all()
     return orphans[0] if len(orphans) == 1 else None
 
 
@@ -426,6 +430,7 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
             user.sso_provider_id = provider.id
         elif user.sso_provider_id != provider.id:
             user.sso_provider_id = provider.id  # unlinked, or its provider was deleted
+        user.sso_orphan_of = None
 
         # Bind the stable id (trust-on-first-use) for future stable matching.
         _bind_external_id(user, provider, external_id)

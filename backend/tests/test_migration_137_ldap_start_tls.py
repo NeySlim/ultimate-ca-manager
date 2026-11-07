@@ -1,4 +1,5 @@
-"""Migration 137 adds pro_sso_providers.ldap_start_tls, off for existing providers."""
+"""Migration 137 adds pro_sso_providers.ldap_start_tls, off for existing providers,
+and users.sso_orphan_of; users of a deleted provider are unlinked."""
 import importlib
 import os
 import sqlite3
@@ -39,6 +40,23 @@ def test_sqlite_turns_a_missing_or_unknown_default_role_into_viewer():
     assert conn.execute(f"SELECT default_role FROM {TABLE} WHERE id = 3").fetchone() == (None,)
 
 
+def test_sqlite_unlinks_users_of_a_deleted_provider():
+    """SQLite never applied ON DELETE SET NULL: a provider created later with the
+    same id would have inherited these users."""
+    conn = sqlite3.connect(':memory:')
+    conn.execute(f"CREATE TABLE {TABLE} (id INTEGER PRIMARY KEY, name VARCHAR(100), "
+                 "provider_type VARCHAR(50), ldap_use_ssl BOOLEAN)")
+    conn.execute("CREATE TABLE users (id INTEGER PRIMARY KEY, username VARCHAR(80), "
+                 "sso_provider_id INTEGER, sso_external_id VARCHAR(255))")
+    conn.execute(f"INSERT INTO {TABLE} VALUES (1, 'kept', 'saml', 0)")
+    conn.executemany("INSERT INTO users VALUES (?, ?, ?, 'x')",
+                     [(1, 'kept', 1), (2, 'dangling', 7), (3, 'local', None)])
+    _migration().upgrade(conn)
+    _migration().upgrade(conn)
+    assert conn.execute("SELECT username, sso_provider_id, sso_orphan_of FROM users ORDER BY id"
+                        ).fetchall() == [('kept', 1, None), ('dangling', None, None), ('local', None, None)]
+
+
 def test_sqlite_without_the_table_is_a_no_op():
     conn = sqlite3.connect(':memory:')
     _migration().upgrade(conn)
@@ -66,8 +84,14 @@ def _postgres_round():
         conn.execute(text(f"INSERT INTO {TABLE} (name, provider_type, ldap_use_ssl, default_role) "
                           "VALUES ('dir', 'ldap', FALSE, NULL), ('x', 'ldap', FALSE, 'root'), "
                           "('y', 'ldap', FALSE, 'auditor')"))
+        conn.execute(text("CREATE TABLE users (id SERIAL PRIMARY KEY, username VARCHAR(80), "
+                          "sso_provider_id INTEGER)"))
+        conn.execute(text("INSERT INTO users (username, sso_provider_id) VALUES ('kept', 1), "
+                          "('dangling', 99)"))
         _migration().upgrade(conn)
         _migration().upgrade(conn)
+        assert conn.execute(text("SELECT username, sso_provider_id, sso_orphan_of FROM users ORDER BY id")
+                            ).fetchall() == [('kept', 1, None), ('dangling', None, None)]
         columns = {c['name']: c for c in inspect(conn).get_columns(TABLE, schema=schema)}
         assert columns['ldap_start_tls']['nullable'] is False
         assert conn.execute(text(f"SELECT ldap_start_tls, default_role FROM {TABLE} ORDER BY id")
@@ -84,4 +108,5 @@ def test_the_app_schema_carries_the_column(app):
     from models import db
     with app.app_context():
         columns = {c['name'] for c in inspect(db.engine).get_columns(TABLE)}
-    assert 'ldap_start_tls' in columns
+        ucols = {c['name'] for c in inspect(db.engine).get_columns('users')}
+    assert 'ldap_start_tls' in columns and 'sso_orphan_of' in ucols

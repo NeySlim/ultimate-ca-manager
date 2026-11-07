@@ -427,9 +427,10 @@ def delete_provider(provider_id):
     # Delete associated sessions first
     SSOSession.query.filter_by(provider_id=provider_id).delete()
     # Unlink its users on both backends (SQLite does not apply ON DELETE SET NULL),
-    # so a provider recreated for the same IdP finds them by their stable id.
+    # keeping its IdP so that only a provider recreated for that IdP takes them back.
     User.query.filter_by(sso_provider_id=provider_id).update(
-        {User.sso_provider_id: None}, synchronize_session=False)
+        {User.sso_provider_id: None, User.sso_orphan_of: provider.idp_key()},
+        synchronize_session=False)
 
     db.session.delete(provider)
     ok, _err = safe_commit(logger, "Failed to delete SSO provider")

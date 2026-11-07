@@ -109,6 +109,20 @@ class SSOProvider(db.Model):
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
     last_used_at = db.Column(db.DateTime)
     
+    def idp_key(self):
+        """The IdP this provider talks to, which scopes its users' stable ids
+        (OIDC Core §5.7: iss + sub); None when it cannot be told."""
+        if self.provider_type == 'oauth2':
+            val = (self.oauth2_issuer or self.oauth2_userinfo_url or '').strip().rstrip('/')
+        elif self.provider_type == 'saml':
+            val = (self.saml_entity_id or '').strip()
+        elif self.provider_type == 'ldap':
+            server = (self.ldap_server or '').strip().lower()
+            val = f"{server}|{(self.ldap_base_dn or '').strip().lower()}" if server else ''
+        else:
+            val = ''
+        return f"{self.provider_type}:{val}" if val else None
+
     # Encrypted property accessors for secrets
     @property
     def oauth2_client_secret(self):

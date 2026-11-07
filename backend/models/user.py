@@ -97,6 +97,9 @@ class User(db.Model):
     # LDAP entryUUID·objectGUID). Bound on first SSO login; the primary key used
     # to recognise the directory account across username/email changes.
     sso_external_id = db.Column(db.String(255), nullable=True)
+    # IdP of the deleted provider that last owned this account (SSOProvider.idp_key):
+    # only a provider for that same IdP may take it back by its stable id. Migration 137.
+    sso_orphan_of = db.Column(db.String(600), nullable=True)
 
     # Relationships
     custom_role = db.relationship('CustomRole', foreign_keys=[custom_role_id], lazy='select')

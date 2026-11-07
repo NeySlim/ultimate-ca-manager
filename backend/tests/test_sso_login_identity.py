@@ -401,19 +401,22 @@ def test_an_account_of_another_provider_is_not_opened(app, oidc, ldap):
 
 # ── A provider deleted then recreated keeps its users ───────────────────────
 
-def _orphan(app, username, sub, through_api=None):
-    """An OIDC account bound to ``sub`` whose provider is then deleted."""
+def _orphan(app, username, sub, through_api=None, issuer='https://idp.example/'):
+    """An OIDC account bound to ``sub`` whose provider (``issuer``) is then deleted,
+    through the API or, as before this release, by a bare row delete."""
     with app.app_context():
         _cleanup([username])
-        old = SSOProvider(name=f'gone-{uuid.uuid4().hex[:6]}', provider_type='oauth2', enabled=False)
+        old = SSOProvider(name=f'gone-{uuid.uuid4().hex[:6]}', provider_type='oauth2', enabled=False,
+                          oauth2_issuer=issuer)
         db.session.add(old)
         db.session.commit()
         old_id = old.id
         db.session.add(User(username=username, email=f'{username}@corp.test', full_name='C',
-                            role='operator', active=True, password_hash='!SSO_NO_PASSWORD!',
+                            role='admin', active=True, password_hash='!SSO_NO_PASSWORD!',
                             auth_source='oauth2', sso_provider_id=old_id, sso_external_id=sub))
         db.session.commit()
         if through_api is None:
+            User.query.filter_by(username=username).update({User.sso_provider_id: None})
             db.session.delete(db.session.get(SSOProvider, old_id))
             db.session.commit()
     if through_api is not None:
@@ -421,19 +424,20 @@ def _orphan(app, username, sub, through_api=None):
     return old_id
 
 
-def test_deleting_a_provider_unlinks_its_users(app, auth_client):
+def test_deleting_a_provider_unlinks_its_users_and_keeps_its_idp(app, auth_client):
     _orphan(app, 'rvdel', 'del-sub', through_api=auth_client)
     try:
         with app.app_context():
-            assert User.query.filter_by(username='rvdel').one().sso_provider_id is None
+            u = User.query.filter_by(username='rvdel').one()
+            assert u.sso_provider_id is None
+            assert u.sso_orphan_of == 'oauth2:https://idp.example'
     finally:
         with app.app_context():
             _cleanup(['rvdel'])
 
 
-@pytest.mark.parametrize('through_api', [False, True])
-def test_a_recreated_provider_opens_its_bound_users(app, auth_client, oidc, through_api):
-    _orphan(app, 'rvcarol', 'carol-sub', through_api=auth_client if through_api else None)
+def test_a_provider_recreated_for_the_same_idp_opens_its_bound_users(app, auth_client, oidc):
+    _orphan(app, 'rvcarol', 'carol-sub', through_api=auth_client)
     try:
         location, verify = oidc({'sub': 'carol-sub', 'preferred_username': 'rvcarol'})
         assert location.endswith('/login/sso-complete'), location
@@ -441,9 +445,61 @@ def test_a_recreated_provider_opens_its_bound_users(app, auth_client, oidc, thro
         with app.app_context():
             u = User.query.filter_by(username='rvcarol').one()
             assert u.sso_provider_id == oidc.provider_id and u.sso_external_id == 'carol-sub'
+            assert u.sso_orphan_of is None
     finally:
         with app.app_context():
             _cleanup(['rvcarol'])
+
+
+@pytest.mark.parametrize('issuer, through_api', [
+    ('https://other-idp.example', True),   # OIDC Core §5.7: a sub means nothing without its iss
+    ('https://idp.example', False),        # deleted before this release: the IdP is unknown
+])
+def test_an_orphan_is_not_opened_by_its_id_from_another_or_unknown_idp(
+        app, auth_client, oidc, issuer, through_api):
+    _orphan(app, 'rvorph', 'orph-sub', issuer=issuer, through_api=auth_client if through_api else None)
+    try:
+        location, verify = oidc({'sub': 'orph-sub', 'preferred_username': 'rvorph'})
+        assert location.endswith('/login?error=sso_username_conflict'), location
+        location, verify = oidc({'sub': 'orph-sub', 'preferred_username': 'rvorphx'})
+        assert verify['user']['username'] == 'rvorphx'  # a new account, not the orphan
+        with app.app_context():
+            assert User.query.filter_by(username='rvorph').one().sso_provider_id is None
+    finally:
+        with app.app_context():
+            _cleanup(['rvorph', 'rvorphx'])
+
+
+def test_a_saml_orphan_is_not_opened_by_another_idp(app, auth_client):
+    """A SAML NameID only means something for the IdP that issued it."""
+    from api.v2.sso.ldap_routes import _get_or_create_sso_user
+    email_fmt = 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress'
+    with app.app_context():
+        _cleanup(['rvorph2'])
+        rows = [SSOProvider(name=f'saml-{n}-{uuid.uuid4().hex[:6]}', provider_type='saml',
+                            enabled=False, saml_entity_id=f'https://{n}.example/idp',
+                            default_role='viewer') for n in ('a', 'b')]
+        db.session.add_all(rows)
+        db.session.commit()
+        a_id, b_id = rows[0].id, rows[1].id
+        db.session.add(User(username='rvorph2', email='alice@corp.example', full_name='A', role='admin',
+                            active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='saml',
+                            sso_provider_id=a_id, sso_external_id='alice@corp.example'))
+        db.session.commit()
+    assert auth_client.delete(f'/api/v2/sso/providers/{a_id}').status_code == 200
+    try:
+        with app.test_request_context():
+            user, err = _get_or_create_sso_user(
+                db.session.get(SSOProvider, b_id), 'rvorph2', 'alice@corp.example', 'A',
+                {'name_id': 'alice@corp.example', 'name_id_format': email_fmt})
+            assert user is None and err == 'sso_username_conflict'
+            db.session.rollback()
+            assert User.query.filter_by(username='rvorph2').one().sso_provider_id is None
+    finally:
+        with app.app_context():
+            _cleanup(['rvorph2'])
+            db.session.delete(db.session.get(SSOProvider, b_id))
+            db.session.commit()
 
 
 def test_an_orphan_of_another_type_is_not_opened_by_its_id(app, oidc):
