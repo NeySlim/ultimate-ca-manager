@@ -1368,7 +1368,7 @@ The client presents a certificate during the TLS handshake. UCM validates the ce
 - **Strongest method**: cryptographic client identity
 - **Required for** \`/simplereenroll\`: the client must present its current certificate
 - **Presented certificate**: for \`/simpleenroll\` and \`/serverkeygen\`, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2). A certificate another CA of this server issued is refused once revoked or expired (v2.252); one from an authority this server does not hold is left to the TLS layer
-- **No tls-unique check**: UCM does not verify a \`challengePassword\` carrying the TLS \`tls-unique\` value (RFC 7030 §3.5), and \`/csrattrs\` does not ask for one
+- **tls-unique linking**: a CSR with a \`challengePassword\` must carry the \`tls-unique\` value of its TLS 1.2 connection to UCM (RFC 7030 §3.5), and is refused with 400 when the value differs or cannot be verified (TLS 1.3, a proxy in front); \`/csrattrs\` does not ask for one. \`ignore_challenge_password\`, set through \`PATCH /api/v2/est/config\`, skips the check for a client that puts a password there (v2.252)
 - **Depends on** proper TLS termination config (reverse proxy must pass \`SSL_CLIENT_CERT\` to UCM)
 
 ### HTTP Basic Auth. Fallback
@@ -1380,7 +1380,7 @@ Username and password authentication over HTTPS. Configured in EST Settings.
 - **Use when** mTLS infrastructure is not available
 - **Password only**: with \`allow_empty_username\` set through \`PATCH /api/v2/est/config\`, a client may send an empty username with the password (RFC 7030 §3.2.3, v2.252)
 
-A CSR whose key was revoked as compromised is refused with 400, and every refusal comes as a plain-text message saying why (RFC 8951 §5, v2.252).
+A CSR whose key was revoked as compromised is refused with 400, and every refusal, rate limiting included, comes as a plain-text message saying why (RFC 8951 §5, v2.252).
 
 ## EST Endpoints
 
@@ -1410,7 +1410,7 @@ curl -k --user est-user:est-password \\
 \`\`\`
 
 ### POST /simplereenroll
-Renew an existing certificate. **Requires mTLS**: the client must present the certificate being renewed. A CSR without SubjectAltName renews the certificate's own names, not a name built from the CN (RFC 7030 §4.2.2, v2.252).
+Renew an existing certificate. **Requires mTLS**: the client must present the certificate being renewed. A CSR without SubjectAltName renews the certificate's own names, or none when it had none, not a name built from the CN (RFC 7030 §4.2.2, v2.252).
 
 \`\`\`bash
 curl -k --cert client.pem --key client.key \\

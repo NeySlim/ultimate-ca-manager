@@ -542,7 +542,7 @@ export const helpContent = {
           { label: 'mTLS (Mutual TLS)', text: 'Client presents a certificate during TLS handshake, strongest authentication method' },
           { label: 'HTTP Basic Auth', text: 'Username/password fallback when mTLS is not available. With allow_empty_username set through PATCH /api/v2/est/config, a client may also send an empty username with the password (RFC 7030 §3.2.3, v2.252)' },
           { label: 'Presented certificate', text: 'For /simpleenroll and /serverkeygen over mTLS, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2). A certificate another CA of this server issued is refused once revoked or expired (v2.252); one from an authority this server does not hold is left to the TLS layer' },
-          { label: 'No tls-unique check', text: 'UCM does not verify a challengePassword carrying the TLS tls-unique value (RFC 7030 §3.5), and /csrattrs does not ask for one: identity and proof of possession are not linked' },
+          { label: 'tls-unique linking', text: 'A CSR with a challengePassword must carry the tls-unique value of its TLS 1.2 connection to UCM (RFC 7030 §3.5); it is refused with 400 when the value differs or cannot be verified (TLS 1.3, a proxy in front). /csrattrs does not ask for one. ignore_challenge_password, set through PATCH /api/v2/est/config, skips the check for a client that puts a password there (v2.252)' },
           { label: 'Compromised keys', text: 'A CSR whose key was revoked as compromised (keyCompromise) is refused with 400 (v2.252)' },
         ]
       },
@@ -552,9 +552,9 @@ export const helpContent = {
         items: [
           { label: '/cacerts', text: 'Retrieve the CA certificate chain (no authentication required)' },
           { label: '/simpleenroll', text: 'Submit a CSR and receive a signed certificate' },
-          { label: '/simplereenroll', text: 'Renew an existing certificate (requires mTLS). A CSR without SubjectAltName renews the certificate\'s own names instead of a name built from the CN (RFC 7030 §4.2.2, v2.252)' },
+          { label: '/simplereenroll', text: 'Renew an existing certificate (requires mTLS). A CSR without SubjectAltName renews the certificate\'s own names, or none when it had none, instead of a name built from the CN (RFC 7030 §4.2.2, v2.252)' },
           { label: '/csrattrs', text: 'Get CSR attributes recommended by the server: keyUsage, subjectAltName and extKeyUsage as bare OIDs (RFC 9908 §5.2, v2.252). csrattrs_legacy_encoding, set through PATCH /api/v2/est/config, serves the former shape (the OIDs inside an extensionRequest) for a client that needs it' },
-          { label: 'Errors', text: 'Refusals come as a plain-text message (text/plain, RFC 8951 §5) saying why, such as a body that is not base64 or not a PKCS#10 CSR (v2.252)' },
+          { label: 'Errors', text: 'Refusals, rate limiting included, come as a plain-text message (text/plain, RFC 8951 §5) saying why, such as a body that is not base64 or not a PKCS#10 CSR, or the CA\'s name constraints (v2.252)' },
           { label: '/serverkeygen', text: 'Server generates a key pair and returns certificate + key. The key takes the issuing CA\'s strength, in the family of the request\'s key when RSA or EC (its size or curve is ignored), else the CA\'s, moved to the closest type the policies allow. The key comes as unencrypted PKCS#8 under TLS; a CSR naming the mTLS certificate\'s key (AsymmetricDecryptKeyIdentifier) gets it encrypted to that certificate, by key transport for RSA of 2048 bits or more (keyEncipherment) or key agreement for EC (keyAgreement), with the algorithms the CSR\'s SMIMECapabilities list, in a key package signed by an EST key generator certificate that the issuing CA issues for this purpose (Ed25519 under an Ed448 CA, v2.252)' },
         ]
       },

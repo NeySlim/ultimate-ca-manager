@@ -304,7 +304,7 @@ class TestCsrAttrs:
         der = base64.b64decode(response.data)
         attrs, trailing = der_decoder.decode(der)
         assert trailing == b''
-        # challengePassword is not asked for: UCM does not verify one (#405);
+        # challengePassword is not asked for: tls-unique linking is optional (#405);
         # the extensions are bare OIDs (RFC 9908 §5.2)
         assert [str(oid) for oid in attrs] == ['2.5.29.15', '2.5.29.17', '2.5.29.37']
 

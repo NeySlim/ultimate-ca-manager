@@ -305,8 +305,8 @@ def _ca_certificate(ca):
 
 
 # RFC 9908 §5.2: an OID asked for without a value stands on its own in CsrAttrs
-# (keyUsage, subjectAltName, extKeyUsage). No challengePassword: UCM does not
-# verify tls-unique (RFC 7030 §3.5), and FortiOS takes the OID as a request for it.
+# (keyUsage, subjectAltName, extKeyUsage). No challengePassword: tls-unique linking
+# is optional (RFC 7030 §3.5), and FortiOS takes the OID as a request for it.
 _CSRATTRS_DER = bytes.fromhex('300f' '0603551d0f' '0603551d11' '0603551d25')
 # The RFC 7030 §4.5.2 example's shape, which RFC 9908 §5.2 calls incorrect: the
 # OIDs as values of an extensionRequest. Served only with est_csrattrs_legacy_encoding.
@@ -511,6 +511,33 @@ _WEAK_CSR_HASH_ALGORITHMS = WEAK_CSR_HASH_ALGORITHMS
 _weak_csr_hash_algorithm = weak_csr_hash_algorithm
 
 
+def _tls_unique_refusal(csr):
+    """RFC 7030 §3.5: a challengePassword carries base64(tls-unique), which the
+    server MUST verify; a 400 when it differs or this connection has none to
+    compare (TLS 1.3, a proxy in front). est_ignore_challenge_password skips it."""
+    from cryptography.x509.oid import AttributeOID
+    try:
+        sent = csr.attributes.get_attribute_for_oid(AttributeOID.CHALLENGE_PASSWORD).value
+    except x509.AttributeNotFound:
+        return None
+    from models import SystemConfig
+    row = SystemConfig.query.filter_by(key='est_ignore_challenge_password').first()
+    if row and str(row.value).lower() == 'true':
+        return None
+    binding = request.environ.get('ucm.tls_unique')
+    if not binding:
+        logger.warning('EST: challengePassword sent but no tls-unique on this connection')
+        return Response(
+            'The CSR challengePassword links identity and proof of possession through '
+            'tls-unique (RFC 7030 §3.5), which this connection cannot verify (TLS 1.3 or '
+            'a proxy in front): send the CSR without challengePassword', status=400)
+    if not hmac.compare_digest(bytes(sent).strip(), base64.b64encode(binding)):
+        logger.warning('EST: challengePassword does not match the tls-unique of this connection')
+        return Response('The CSR challengePassword does not match the tls-unique value of '
+                        'this TLS connection (RFC 7030 §3.5)', status=400)
+    return None
+
+
 def _validate_est_csr(csr):
     """Common EST CSR validation.
 
@@ -562,6 +589,10 @@ def _validate_est_csr(csr):
     cn_attrs = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
     if not cn_attrs or not str(cn_attrs[0].value).strip():
         return False, Response('CSR subject must include a non-empty CN', status=400)
+
+    linking = _tls_unique_refusal(csr)
+    if linking is not None:
+        return False, linking
 
     from services.acme.compromised_keys import COMPROMISED_CSR, key_revoked_as_compromised
     try:
@@ -695,6 +726,9 @@ def simple_enroll(label=None):
     except PolicyViolation as e:
         logger.warning(f"EST simpleenroll refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
+    except ValueError as e:  # the signer's reason, for the operator (RFC 8951 §5.1)
+        logger.warning(f"EST simpleenroll refused: {e}")
+        return Response(str(e), status=400)
     except Exception as e:
         logger.error(f"EST simpleenroll failed: {e}")
         return Response("Enrollment failed", status=400)
@@ -791,7 +825,7 @@ def simple_reenroll(label=None):
         renewed_san = None
         if _subject_alt_name(csr) is None:
             san_ext = _subject_alt_name(client_cert_obj)
-            renewed_san = list(san_ext.value) if san_ext is not None else None
+            renewed_san = list(san_ext.value) if san_ext is not None else []
 
         cert_pem, serial = CAService.sign_csr_from_crypto(
             ca=ca, csr=csr, validity_days=days, source='est',
@@ -820,6 +854,9 @@ def simple_reenroll(label=None):
     except PolicyViolation as e:
         logger.warning(f"EST simplereenroll refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
+    except ValueError as e:  # the signer's reason, for the operator (RFC 8951 §5.1)
+        logger.warning(f"EST simplereenroll refused: {e}")
+        return Response(str(e), status=400)
     except Exception as e:
         logger.error(f"EST simplereenroll failed: {e}")
         return Response("Re-enrollment failed", status=400)
@@ -1082,6 +1119,9 @@ Content-Transfer-Encoding: base64\r
     except PolicyViolation as e:
         logger.warning(f"EST serverkeygen refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
+    except ValueError as e:  # the signer's reason, for the operator (RFC 8951 §5.1)
+        logger.warning(f"EST serverkeygen refused: {e}")
+        return Response(str(e), status=400)
     except Exception as e:
         logger.error(f"EST serverkeygen failed: {e}")
         return Response("Server key generation failed", status=400)

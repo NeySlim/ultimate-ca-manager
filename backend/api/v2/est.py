@@ -78,6 +78,7 @@ def get_est_config():
         'response_include_chain': get_config('est_response_include_chain', 'false') == 'true',
         'csrattrs_legacy_encoding': get_config('est_csrattrs_legacy_encoding', 'false') == 'true',
         'allow_empty_username': get_config('est_allow_empty_username', 'false') == 'true',
+        'ignore_challenge_password': get_config('est_ignore_challenge_password', 'false') == 'true',
         'labels': labels,
     })
 
@@ -132,7 +133,8 @@ def update_est_config():
                 f'validity_days must be between {MIN_VALIDITY_DAYS} and {MAX_VALIDITY_DAYS}',
                 400)
         set_config('est_validity_days', str(vd))
-    for field in ('response_include_chain', 'csrattrs_legacy_encoding', 'allow_empty_username'):
+    for field in ('response_include_chain', 'csrattrs_legacy_encoding', 'allow_empty_username',
+                  'ignore_challenge_password'):
         if field in data:
             set_config(f'est_{field}', 'true' if data[field] else 'false')
 

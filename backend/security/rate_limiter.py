@@ -447,11 +447,18 @@ def init_rate_limiter(app=None) -> RateLimiter:
                     success=False
                 )
                 
-                response = jsonify({
-                    'success': False,
-                    'error': 'Rate limit exceeded',
-                    'retry_after': info.get('retry_after', 60)
-                })
+                if request.path.startswith('/.well-known/est/'):
+                    # RFC 8951 §5: an EST error is a plain-text message
+                    from flask import Response
+                    response = Response('Rate limit exceeded, retry after '
+                                        f"{info.get('retry_after', 60)} seconds",
+                                        mimetype='text/plain')
+                else:
+                    response = jsonify({
+                        'success': False,
+                        'error': 'Rate limit exceeded',
+                        'retry_after': info.get('retry_after', 60)
+                    })
                 response.status_code = 429
                 response.headers['Retry-After'] = str(info.get('retry_after', 60))
                 response.headers['X-RateLimit-Limit'] = str(info.get('limit', 0))
