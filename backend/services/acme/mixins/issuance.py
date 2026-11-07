@@ -578,7 +578,9 @@ class IssuanceMixin:
         params = acme_profiles.issuance_params(getattr(order, 'profile', None))
 
         # RFC 8555 §7.4: the order's dates, within the profile and the CA, or no certificate
-        if order.not_before or order.not_after:
+        not_before = getattr(order, 'not_before', None)
+        not_after = getattr(order, 'not_after', None)
+        if not_before or not_after:
             from services.acme.requested_validity import RequestedValidityError, window_error
             from utils.ca_signing_window import issuer_window
             try:
@@ -586,7 +588,7 @@ class IssuanceMixin:
             except Exception:
                 ca_cert = None
             refusal = window_error(
-                order.not_before, order.not_after, params['validity_days'],
+                not_before, not_after, params['validity_days'],
                 ca_window=issuer_window(ca_cert) if ca_cert is not None else None)
             if refusal:
                 self._last_signing_exception = RequestedValidityError(refusal)
@@ -657,8 +659,8 @@ class IssuanceMixin:
                 digest_explicit=params.get('digest_explicit', True),
                 username='acme',
                 template_id=params.get('template_id'),
-                not_before=order.not_before,
-                not_after=order.not_after,
+                not_before=not_before,
+                not_after=not_after,
             )
             
             return True, signed_cert.id, None
