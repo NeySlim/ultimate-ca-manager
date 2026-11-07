@@ -97,3 +97,17 @@ def test_unusable_newer_successor_falls_back_to_a_usable_one(app, client, create
     response = client.get(URL)
     assert response.status_code == 200
     assert _served_serials(response) == [_serial(app, usable['id'])]
+
+
+@pytest.mark.parametrize('kind', ['ec', 'hsm'])
+def test_successor_unfit_for_scep_is_not_served(app, client, create_ca, current, monkeypatch,
+                                                kind):
+    """Clients encrypt to the next CA: it must be one SCEP can decrypt with."""
+    cn, _ca = current
+    if kind == 'ec':
+        create_ca(cn=cn, keyAlgo='EC', keySize='P-256', validityYears=10)
+    else:
+        successor = create_ca(cn=cn, validityYears=10)
+        monkeypatch.setattr(CA, 'uses_hsm', property(lambda row: row.id == successor['id']))
+
+    assert client.get(URL).status_code == 404

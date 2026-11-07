@@ -214,6 +214,11 @@ def get_scep_service(profile_slug=None):
     return service, None
 
 
+def _scep_can_decrypt(ca):
+    """SCEP decrypts the client's envelope with a local RSA key (RFC 8894 §3.4)."""
+    return not ca.uses_hsm and str(ca.key_type).startswith('RSA')
+
+
 @bp.route('/scep/pkiclient.exe', methods=['GET', 'POST'])
 @bp.route('/scep/<profile_slug>/pkiclient.exe', methods=['GET', 'POST'])
 def scep_endpoint(profile_slug=None):
@@ -349,12 +354,12 @@ def handle_get_next_ca_cert(profile_slug=None):
 
 def _rollover_certificate(ca, ca_cert):
     """The current CA's successor: same parent and subject DN, usable for
-    issuance, and taking over before the current certificate expires."""
+    SCEP issuance, and taking over before the current certificate expires."""
     same_parent = (CA.caref == ca.caref) if ca.caref else or_(CA.caref.is_(None), CA.caref == '')
     best = None
     for candidate in CA.query.filter(same_parent, CA.id != ca.id).all():
         if (not candidate.crt or candidate.offline or candidate.revoked_in_chain
-                or not candidate.has_private_key):
+                or not candidate.has_private_key or not _scep_can_decrypt(candidate)):
             continue
         try:
             cert = x509.load_pem_x509_certificate(base64.b64decode(candidate.crt), default_backend())
