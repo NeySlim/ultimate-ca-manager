@@ -43,6 +43,8 @@ AES256_GCM = _hex('30 0B 06 09 60 86 48 01 65 03 04 01 2E')
 # RFC 3560 §5: rSAES-OAEP-Default-Identifier (SHA-1, MGF1 with SHA-1)
 OAEP_DEFAULT = _hex('30 0D 06 09 2A 86 48 86 F7 0D 01 01 07 30 00')
 RSA_ENCRYPTION = _hex('30 0D 06 09 2A 86 48 86 F7 0D 01 01 01 05 00')
+# RFC 5990: id-rsa-kem, a key transport UCM does not offer
+RSA_KEM = _hex('30 0D 06 0B 2A 86 48 86 F7 0D 01 09 10 03 0E')
 
 
 def _oaep(identifier):
@@ -451,7 +453,9 @@ class TestRefusals:
         ('ec', [_ka_wrap_params(WRAP128, b'\x04\x00')], 'key agreement dhSinglePass'),
         ('rsa', [_ka((STD, SHA256), WRAP256)], 'RSAES-OAEP'),
         ('rsa', [OAEP_UNKNOWN_FIELD, AES128_CBC], 'RSAES-OAEP'),
-    ], ids=['ec-rsa-only', 'ec-unknown-wrap', 'ec-wrap-params', 'rsa-ka-only', 'rsa-unknown-field'])
+        ('rsa', [RSA_KEM, AES256_CBC, AES192_CBC], 'RSAES-OAEP'),
+    ], ids=['ec-rsa-only', 'ec-unknown-wrap', 'ec-wrap-params', 'rsa-ka-only', 'rsa-unknown-field',
+            'rsa-kem-only'])
     def test_capabilities_with_nothing_supported_are_refused(
             self, app, client, est_ca, key_type, capabilities, expected):
         est_ca('signing')

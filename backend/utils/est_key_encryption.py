@@ -36,8 +36,9 @@ KEY_AGREEMENTS = {
 }
 STD_DH_SHA256 = '1.3.132.1.11.1'
 # Key transport and agreement UCM recognises without using: sha1kdf ECDH, ECMQV, X25519/X448,
-# RFC 8418 HKDF; one listed means the client named its key encipherment
+# RFC 8418 HKDF, RSA-KEM (RFC 5990); one listed means the client named its key encipherment
 _OTHER_KEY_ENCIPHERMENT = frozenset((
+    '1.2.840.113549.1.9.16.3.14',
     '1.3.133.16.840.63.0.2', '1.3.133.16.840.63.0.3', '1.3.133.16.840.63.0.16',
     '1.3.132.1.15.0', '1.3.132.1.15.1', '1.3.132.1.15.2', '1.3.132.1.15.3',
     '1.3.101.110', '1.3.101.111',
