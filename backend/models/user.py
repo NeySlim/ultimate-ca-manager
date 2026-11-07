@@ -1,6 +1,9 @@
 """
 User and UserSession Models
 """
+from sqlalchemy import func, select, update
+from sqlalchemy.orm.attributes import set_committed_value
+
 from utils.password_hash import hash_password, needs_rehash, verify_password
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
@@ -121,10 +124,19 @@ class User(db.Model):
         self.end_sessions()
 
     def end_sessions(self):
-        """Invalidate every session of this account at the next commit."""
+        """Invalidate every session of this account; the caller commits.
+
+        Incremented in SQL so that concurrent bumps add up; ``_sessions_bump`` keeps
+        (replaced, new) for keep_current_session()."""
         if self.id is None:
             return  # not saved yet: no session to end
-        self.session_version = (self.session_version or 0) + 1
+        db.session.execute(
+            update(User).where(User.id == self.id)
+            .values(session_version=func.coalesce(User.session_version, 0) + 1)
+            .execution_options(synchronize_session=False))
+        new = db.session.execute(select(User.session_version).where(User.id == self.id)).scalar_one()
+        set_committed_value(self, 'session_version', new)
+        self._sessions_bump = (new - 1, new)
     
     def check_password(self, password: str) -> bool:
         """Verify password; a hash of an older method is replaced on success

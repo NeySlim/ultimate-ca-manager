@@ -23,10 +23,15 @@ def begin_session(user):
     _new_identifier()
 
 
-def keep_current_session(user):
-    """After ``user.end_sessions()``: this session stays, under a new identifier."""
-    session['session_version'] = user.session_version or 0
+def keep_current_session(user) -> bool:
+    """After ``user.end_sessions()``: this session stays, under a new identifier,
+    only if it held the version that bump replaced; a session already closed stays closed."""
+    replaced, new = getattr(user, '_sessions_bump', (None, None))
+    if replaced is None or session.get('session_version', 0) != replaced:
+        return False
+    session['session_version'] = new
     _new_identifier()
+    return True
 
 
 def keep_own_session(user):
