@@ -122,7 +122,7 @@ def test_dreamhost_deletes_one_value(monkeypatch):
 # --- Dynu -----------------------------------------------------------------------
 
 class FakeDynu(_RecordApi):
-    def __call__(self, method, url, headers=None, json=None, timeout=None):
+    def __call__(self, method, url, headers=None, json=None, timeout=None, allow_redirects=True):
         path = url.split('/v2', 1)[1]
         self.calls.append((method, path))
         if path == '/dns':

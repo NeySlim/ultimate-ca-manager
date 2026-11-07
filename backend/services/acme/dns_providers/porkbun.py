@@ -31,7 +31,9 @@ class PorkbunDnsProvider(BaseDnsProvider):
     def _request(self, path, data=None):
         body = self._auth_body(data)
         try:
-            resp = requests.post(f"{self.BASE_URL}{path}", json=body, timeout=30)
+            # A 307/308 to another host would resend the API keys in the body
+            resp = requests.post(f"{self.BASE_URL}{path}", json=body, timeout=30,
+                                 allow_redirects=False)
             result = resp.json()
             if result.get('status') == 'SUCCESS':
                 # A write to a domain not delegated to Porkbun succeeds and says so here.

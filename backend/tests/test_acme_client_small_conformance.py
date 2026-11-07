@@ -221,6 +221,10 @@ class TestHeaderCredentialProvidersDoNotFollowRedirects:
         ('tencentcloud', {'secret_id': 'i', 'secret_key': 's'},
          lambda p: p._post('DescribeDomainList', {})),
         ('rackspace', {'username': 'u', 'api_key': 'k'}, lambda p: p._authenticate()),
+        ('dynu', {'api_key': 'k'}, lambda p: p._request('GET', '/dns')),
+        ('porkbun', {'api_key': 'k', 'secret_api_key': 's'}, lambda p: p._request('/ping')),
+        ('netcup', {'customer_number': 'c', 'api_key': 'k', 'api_password': 'p'},
+         lambda p: p._rpc_call('login', {})),
     ])
     def test_provider_does_not_follow_redirects(self, monkeypatch, provider_type,
                                                 credentials, call):

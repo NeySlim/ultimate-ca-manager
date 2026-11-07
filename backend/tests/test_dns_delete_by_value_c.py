@@ -362,7 +362,7 @@ class FakeNetcup:
                          'priority': '', 'state': 'yes'}]
         self.updates = []
 
-    def __call__(self, url, json=None, timeout=None, headers=None):
+    def __call__(self, url, json=None, timeout=None, headers=None, allow_redirects=True):
         action, param = json['action'], json['param']
         ok = lambda data=None: _Resp(200, {'status': 'success', 'responsedata': data or {}})
         if action == 'login':
