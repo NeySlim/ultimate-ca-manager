@@ -36,7 +36,8 @@ _clock = time.monotonic  # tests replace _sleep, _spawn and _clock
 # The SCEP routes only; the view refuses them unless scep_plain_http is on.
 _SCEP_PATH = re.compile(r'^/(?:scep/(?:[^/]+/)?|cgi-bin/)pkiclient\.exe$')
 PLAIN_HTTP_ENVIRON_KEY = 'ucm.protocol_http_port'
-NOT_SERVED_MESSAGE = b'Only CDP/OCSP/AIA and ACME HTTP-01 endpoints are available on this port'
+NOT_SERVED_MESSAGE = (b'Only CDP/OCSP/AIA, ACME HTTP-01 and, when enabled, SCEP endpoints '
+                      b'are available on this port')
 
 
 class ProtocolOnlyMiddleware:
