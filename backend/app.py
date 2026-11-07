@@ -327,6 +327,11 @@ def create_app(config_name=None):
         except OSError as e:
             app.logger.warning("Could not tighten perms on %s: %s", sensitive_dir, e)
 
+    # Uploads spool under DATA_DIR/tmp: the system temp dir may be a small tmpfs
+    from utils.upload_spool import SpoolingRequest, prepare_spool_dir
+    app.config['UPLOAD_SPOOL_DIR'] = prepare_spool_dir(config.DATA_DIR)
+    app.request_class = SpoolingRequest
+
     # Initialize cache
     cache.init_app(app, config={
         'CACHE_TYPE': 'SimpleCache',  # In-memory cache
