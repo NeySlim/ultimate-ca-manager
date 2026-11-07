@@ -46,7 +46,7 @@ def allocate_crl_number(ca: CA, ca_cert: x509.Certificate) -> int:
     return number
 
 
-def record_crl_number(ca: CA, ca_cert: x509.Certificate, number: int) -> None:
+def raise_crl_number_floor(ca: CA, ca_cert: x509.Certificate, number: int) -> None:
     """Raise the floor to a number published outside this server (external CRL)."""
     counter = _locked_counter(crl_issuer_key(ca_cert))
     if number > (counter.last_number or 0):

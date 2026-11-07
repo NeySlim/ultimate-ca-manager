@@ -146,11 +146,11 @@ class ExternalCRLMixin:
         # No CRLNumber extension (e.g. plain `openssl ca -gencrl`): keep the
         # internal counter monotonic so ordering and future self-signed CRLs
         # (after a restore) stay consistent.
-        from .numbering import allocate_crl_number, record_crl_number
+        from .numbering import allocate_crl_number, raise_crl_number_floor
         if number is None:
             stored_number = allocate_crl_number(ca, ca_cert)
         else:
-            record_crl_number(ca, ca_cert, number)
+            raise_crl_number_floor(ca, ca_cert, number)
             if CRLMetadata.query.filter_by(ca_id=ca.id, crl_number=number).first() is not None:
                 db.session.rollback()
                 # RFC 5280 §5.2.3: two CRLs of one issuer MUST NOT share a number
