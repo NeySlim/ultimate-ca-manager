@@ -164,7 +164,7 @@ class FakeClouDns(_PerRecordFake):
                                if r['host'] == params['host'] and r['type'] == params['type']})
         return _Resp(200, {'status': 'Failed', 'statusDescription': 'Invalid request'})
 
-    def post(self, url, data=None, timeout=None):
+    def post(self, url, data=None, timeout=None, allow_redirects=True):
         path, _ = _split(url, self.BASE)
         if path == '/dns/add-record.json':
             self.add({'type': data['record-type'], 'host': data['host'], 'record': data['record']})

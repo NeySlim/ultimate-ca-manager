@@ -108,7 +108,8 @@ class FakeInwx:
         self.records = []
         self.deleted = []
 
-    def __call__(self, url, json=None, timeout=None, headers=None, cookies=None):
+    def __call__(self, url, json=None, timeout=None, headers=None, cookies=None,
+                 allow_redirects=True):
         method, params = json['method'], json['params']
         ok = lambda data=None: _Resp(200, {'code': 1000, 'resData': data or {}})
         if method in ('account.login', 'account.logout'):
