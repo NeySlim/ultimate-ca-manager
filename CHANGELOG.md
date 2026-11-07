@@ -23,6 +23,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: an order for a domain and its wildcard could not hold both values and failed at validation, and the ACME proxy replaced the CA's value with its clients' own. Such an order, or on DuckDNS one naming two hosts under the same subdomain, is now refused at the request before the CA is asked, and the proxy publishes only the CA's value there.
 - ACME client: a CA refusal of `replaces` whose message merely contained "rateLimited" was taken for a rate limit and not retried. A rate limit is now recognised by its problem type or a 429 only (RFC 8555 §6.7).
 - WSTEP: a certificate issued or renewed under a template did not record it, so the template's usage count left it out, the template could be deleted while in use, and its policies did not apply. The matched template is now recorded at issuance, so its approval policies cover revocation and renewal and an in-place renewal applies its SAN types, policy OIDs and custom extensions; certificates issued before are left as they are.
+- Uploads were spooled to the system temp directory, so a restore larger than a small `/tmp` tmpfs (100 MB in the production compose file) failed while the form was read, and a memory-backed `/tmp` held the archive in RAM. Uploads are now spooled under `DATA_DIR/tmp`, falling back to the system temp directory only when that is not writable.
 
 ### Upgrade notes
 
