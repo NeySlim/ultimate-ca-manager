@@ -107,6 +107,10 @@ def _validate_role_payload(data, *, partial=False, role_id=None, stored=()):
             parent = db.session.get(CustomRole, inh)
             if parent is None:
                 return None, error_response("Parent role not found", 404)
+            # A built-in role grants from auth.permissions, not its row: nothing to inherit.
+            kept = db.session.get(CustomRole, role_id).inherits_from if role_id is not None else None
+            if parent.is_system and inh != kept:
+                return None, error_response("A custom role cannot inherit from a built-in role", 400)
             if role_id is not None and role_id in {r.id for r in custom_role_chain(parent)}:
                 return None, error_response("A role cannot inherit from itself or a descendant", 400)
         cleaned['inherits_from'] = inh

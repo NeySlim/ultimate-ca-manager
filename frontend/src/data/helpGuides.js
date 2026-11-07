@@ -48,7 +48,7 @@ Shows the health of UCM services:
 - Service uptime
 
 ### Recent Activity
-A live feed of the latest operations: certificate issuance, revocations, imports, user logins. Updates in real-time via WebSocket.
+A live feed of the latest operations: certificate issuance, revocations, imports, user logins. Updates in real-time via WebSocket. The whole feed needs **read:audit**, as the Audit Logs page does; without it you see your own events only.
 
 ### Certificate Authorities
 Quick view of all CAs with their type (Root/Intermediate) and certificate count.
@@ -1763,10 +1763,10 @@ RBAC provides fine-grained permission management. Define custom roles with speci
 
 ## System Roles
 
-Four built-in roles that cannot be modified or deleted:
+Four built-in roles that cannot be modified or deleted. The RBAC page shows each with the permissions UCM applies to it:
 
 - **Admin**: Full access to everything
-- **Operator**: Manage certificates, CAs, CSRs, templates. No access to system settings, users, or RBAC
+- **Operator**: Manage certificates, CAs, CSRs, ACME, SSH, groups and system settings; templates read-only. No access to users or RBAC
 - **Auditor**: Read-only access to all operational data (certificates, CAs, ACME, SCEP, HSM, audit logs, policies, groups) but not settings or user management
 - **Viewer**: Basic read-only access to certificates, CAs, CSRs, templates, and trust store
 
@@ -2316,7 +2316,7 @@ Manage your personal profile, security settings, and API keys.
 ## Security
 
 ### Password Change
-Change your current password. Must comply with the system password policy (minimum length, complexity requirements).
+Change your current password. Must comply with the system password policy (minimum length, complexity requirements). Your other sessions are signed out; the one you changed it from stays. An admin password reset or 2FA reset signs out every session of the user.
 
 When UCM asks for a new password at login (the first-boot \`admin\` account, for instance), the change comes before anything else: until it is made, the server refuses every other request of that session, API included.
 
@@ -2331,6 +2331,8 @@ Add a time-based one-time password using any authenticator app:
 > ⚠ If you lose access to your authenticator and recovery codes, an admin must disable your 2FA.
 
 To move 2FA to a new authenticator, disable it first: enabling it again while it is on is refused.
+
+Each code is accepted once (RFC 6238): a code used to sign in cannot confirm another action or a second login, so wait for the next one.
 
 ### Security Keys (WebAuthn/FIDO2)
 Register hardware security keys or biometric authenticators:
@@ -2373,7 +2375,7 @@ X-API-Key: <your-api-key>
 Or send it as a bearer token: \`Authorization: Bearer <your-api-key>\`.
 
 ### Permissions
-Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. **Certificates Only** issues X.509 and SSH certificates and reads the CAs, SSH CAs and CRLs, but cannot create or change a CA. A key can create or regenerate only a key whose permissions it holds itself.
+Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. **Certificates Only** issues X.509 and SSH certificates and reads the CAs, SSH CAs and CRLs, but cannot create or change a CA. A key can create or regenerate only a key whose permissions it holds itself, and that key expires no later than the one asking. **Regenerate** keeps the key's permissions and lifetime; a revoked or expired key cannot be regenerated.
 
 API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: these need an interactive session.
 
@@ -2858,7 +2860,7 @@ Limit the number of simultaneous sessions per user. Additional logins will termi
 Limit failed login attempts per IP address within a time window. After exceeding the limit, the IP is temporarily blocked.
 
 ### Lockout Duration
-How long an IP is blocked after exceeding the login attempt limit.
+How long an IP is blocked after exceeding the login attempt limit. A locked account answers a password or LDAP login with the same "Invalid credentials" as an unknown name until the lockout ends, so the answer does not reveal that the account exists; the lock is recorded in the audit log.
 
 ## Admin Access Allowlist
 

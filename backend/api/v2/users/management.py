@@ -9,6 +9,7 @@ import io
 import logging
 
 from auth.unified import refuse_api_key_on_own_account, require_auth
+from auth.session_start import keep_own_session
 from utils.response import success_response, error_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
@@ -69,11 +70,12 @@ def reset_user_password(user_id):
     if not is_valid:
         return error_response(error_msg, 400)
 
-    # Update password
+    # Update password; the user's sessions end with the old one
     user.set_password(data['new_password'])
 
     try:
         db.session.commit()
+        keep_own_session(user)
 
         AuditService.log_action(
             action='password_change',
@@ -129,9 +131,11 @@ def reset_user_2fa(user_id):
     user.totp_secret = None
     user.backup_codes = None
     user.webauthn_2fa = False
+    user.end_sessions()
     ok, _err = safe_commit(logger, "Failed to reset user 2FA")
     if not ok:
         return _err
+    keep_own_session(user)
 
     AuditService.log_action(
         action='mfa_reset',

@@ -26,6 +26,14 @@ def _caller_can_grant(perm, owner_perms):
     return has_permission(perm, owner_perms) and has_permission(perm, caller_perms)
 
 
+def _caller_key_expiry():
+    """Expiry of the API key making the request: a key it creates cannot outlive it."""
+    if getattr(g, 'auth_method', None) != 'api_key' or not getattr(g, 'api_key_id', None):
+        return None
+    key = db.session.get(APIKey, g.api_key_id)
+    return key.expires_at if key else None
+
+
 @bp.route('/api/v2/account/apikeys', methods=['GET'])
 @require_auth()
 def list_api_keys():
@@ -147,7 +155,8 @@ def create_api_key():
             user_id=g.user_id,
             name=data['name'],
             permissions=data['permissions'],
-            expires_days=expires_days
+            expires_days=expires_days,
+            not_after=_caller_key_expiry(),
         )
 
         AuditService.log_action(
@@ -263,6 +272,8 @@ def regenerate_api_key(key_id):
 
     if not old_key:
         return error_response('API key not found', 404)
+    if not old_key.is_active or old_key.is_expired:
+        return error_response('A revoked or expired key cannot be regenerated: create a new one', 409)
 
     try:
         old_perms = json.loads(old_key.permissions)
@@ -274,7 +285,10 @@ def regenerate_api_key(key_id):
     if not all(_caller_can_grant(p, owner_perms) for p in old_perms):
         return error_response(_NARROW_CALLER, 403)
 
-    # Create new key with same settings
+    # Same permissions and lifetime as the old key (None: never expires)
+    lifetime_days = None
+    if old_key.expires_at and old_key.created_at:
+        lifetime_days = max(1, round((old_key.expires_at - old_key.created_at).total_seconds() / 86400))
     auth_manager = AuthManager()
 
     try:
@@ -282,7 +296,8 @@ def regenerate_api_key(key_id):
             user_id=g.user_id,
             name=old_key.name + ' (regenerated)',
             permissions=old_perms,
-            expires_days=365
+            expires_days=lifetime_days,
+            not_after=_caller_key_expiry(),
         )
 
         # Revoke old key

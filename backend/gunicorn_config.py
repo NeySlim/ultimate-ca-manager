@@ -211,6 +211,9 @@ else:
     errorlog = os.getenv('ERROR_LOG', '/var/log/ucm/error.log')
 loglevel = os.getenv('LOG_LEVEL', 'info')
 access_log_format = '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s"'
+# Reset tokens and OAuth codes travel in URLs: kept out of the access log.
+from utils.access_log import RedactingLogger  # noqa: E402
+logger_class = RedactingLogger
 
 # Process naming
 proc_name = 'ucm'
