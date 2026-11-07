@@ -32,7 +32,7 @@
 
 ### Protocols
 - **ACME** -- RFC 8555, auto-enrollment, auto-renewal, DNS-01/HTTP-01/TLS-ALPN-01 challenges, wildcard support, **IP identifiers (RFC 8738)**, **CAA checking with account/method binding (RFC 8657/8659)**, **External Account Binding (EAB, RFC 8555 §7.3.4)**, **Renewal Information (ARI, RFC 9773)**, **HTTP-01 challenge files served by UCM** (forward `/.well-known/acme-challenge/` from port 80, checked before submitting, renewed automatically), **DNS-01 resolver choice** (automatic, system only, or listed resolvers only, for networks without access to public resolvers) for split-horizon, ACME on internal/private IPs (incl. opt-in loopback upstream for a colocated CA), **multi-CA management** (per-request CA selection, pinned on order so renewals reuse the same CA: Let's Encrypt, Actalis, ZeroSSL, Google Trust Services, HARICA…), **external CSR and renewal key reuse**, **staging preflight dry-run**, **multi-CA proxy** (pre-validated upstream domains pass straight through, per-CA endpoints at `/acme/proxy/<slug>/directory`, incl. upstream revocation), **preferred certificate chain** (RFC 8555 §7.4.2 alternates, per CA account), **certificate profiles** (draft-ietf-acme-profiles: named issuance policies advertised in the directory and selectable per order, each optionally bound to a certificate template whose key usage and EKU then govern the issued certificate, plus a **default profile** and a default signing digest for orders that name none), **local server order management** (orders view with cleanup and a scheduled purge of expired orders); the proxy also publishes the client-side dns-01 TXT values so client propagation pre-checks (lego, Traefik, Caddy) pass as-is, and reuses an account's still-pending order on retries, and an optional **DNS UPDATE (RFC 2136) listener** lets standard rfc2136 solvers such as cert-manager's answer DNS-01 through the proxy with per-account TSIG keys
-- **SCEP** -- RFC 8894 device auto-enrollment with approval workflows, GetCert/GetCRL, signed GetNextCACert, AES-128 encryption with password-based (PBKDF2) fallback for non-RSA clients; a request approved by hand issues with the template of the profile it came through, exactly as auto-approval does; named profiles validate **Microsoft Intune** challenges against the tenant's Intune API, and Windows (RSAES-OAEP key transport) and Apple devices enroll through them, see [docs/integrations/intune-scep.md](docs/integrations/intune-scep.md)
+- **SCEP** -- RFC 8894 device auto-enrollment with approval workflows, GetCert/GetCRL, signed GetNextCACert, optionally on the plain HTTP port for clients such as sscep, renewals authenticated by the device's certificate, AES-128 encryption with password-based (PBKDF2) fallback for non-RSA clients; a request approved by hand issues with the template of the profile it came through, exactly as auto-approval does; named profiles validate **Microsoft Intune** challenges against the tenant's Intune API, and Windows (RSAES-OAEP key transport) and Apple devices enroll through them, see [docs/integrations/intune-scep.md](docs/integrations/intune-scep.md)
 - **EST** -- RFC 7030 Enrollment over Secure Transport, incl. server-side key generation (CMS §4.4) and **CA labels** (§3.2.2: serve several CAs from one endpoint)
 - **OCSP** -- RFC 6960 real-time certificate status, multi-certificate requests, nonce support, delegated responder validation with automatic renewal of the responder certificate, configurable response validity
 - **TSA (RFC 3161)** -- timestamp authority with configurable policy OID; signs with the CA certificate (refused by strict verifiers such as `openssl ts -verify` and jarsigner) or a **dedicated end-entity signing certificate**, required by those verifiers, picked from issued certificates or generated in one click (critical, exclusive timeStamping EKU); renewals followed automatically, issuer chain embedded in tokens, strict dedicated-signer mode, signer health and expiry surfaced on the dashboard
@@ -41,7 +41,7 @@
 
 ### Integrations
 - **Microsoft ADCS** -- Full lifecycle over AD CS: CSR signing, template discovery, EOBO (Enroll On Behalf Of), renew/revoke through the connector, and an optional WinRM admin channel for CRL revocation sync, CA inventory import, and pending-request approve/deny with a CA health panel
-- **Windows autoenrollment & Active Directory Connector** -- MS-XCEP/WSTEP policy and enrollment for domain-joined machines and users; a subject-less request from GPO autoenrollment is completed from Active Directory (the computer's DNS host name, or the user's DN and UPN), across several domain controllers with failover and a scheduled health check per DC, never with an anonymous bind
+- **Windows autoenrollment & Active Directory Connector** -- MS-XCEP/WSTEP policy and enrollment for domain-joined machines and users under the template the request names; on the Kerberos binding, machine and AD-derived templates take the subject from Active Directory (the computer's DNS host name, or the user's DN and UPN), across several domain controllers with failover and a scheduled health check per DC, never with an anonymous bind
 - **Microsoft Intune** -- SCEP challenge validation for Intune-managed devices, Entra app registrations defined once under SCEP › Intune app registrations and picked per profile, with a step-by-step guide in `docs/integrations/intune-scep.md`
 - **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS, OpenBao/Vault Transit; **HSM-backed CAs** with non-exportable signing keys, RSA-PSS and Brainpool on PKCS#11, and a declared device certification (Common Criteria, EUCC, FIPS 140-3) checked by the EU compliance profile; a connection test shows what a PKCS#11 module reports (library, manufacturer, firmware)
 - **Kubernetes / cert-manager** -- Reference manifests for ClusterIssuer (HTTP-01 + DNS-01 with EAB), sample Certificate, Secret template under `examples/kubernetes/cert-manager/`
@@ -50,11 +50,11 @@
 
 ### Security & Access
 - **Authentication** -- Password, WebAuthn/FIDO2 (also as the second factor, next to or instead of TOTP), TOTP 2FA, mTLS, API keys (`X-API-Key` or `Authorization: Bearer`)
-- **SSO** -- LDAP, OAuth2 (Azure/Google/GitHub), SAML single sign-on with role mapping to built-in and **custom roles** (SAML groups read from the assertion, Entra ID and AD FS claims included) and a configurable NameID format; **per-user `auth_source` tracking** and opt-in role sync on login
+- **SSO** -- LDAP (LDAPS or StartTLS), OAuth2 (Azure/Google/GitHub), SAML single sign-on with Single Logout, role mapping to built-in and **custom roles** (SAML groups read from the assertion, Entra ID and AD FS claims included) and a configurable NameID format; **per-user `auth_source` tracking** and opt-in role sync on login
 - **RBAC** -- 4 built-in roles (Admin, Operator, Auditor, Viewer) plus custom roles with granular permissions; **groups grant additional permissions** on top of a user's role (never administrator)
 - **Policies & Approvals** -- Certificate issuance policies with approval workflows and enforced rules (allowed key types and signature hashes, DNS SAN cap, validity cap, scoped by CA, template or DNS pattern), binding **every operator path** (the issue form, signing a stored request alone or in bulk, and renewal) and, for key types and hashes, ACME, SCEP, EST, WSTEP and CA creation too; a policy can also put **revocations and renewals** under approval; a queued request is closed on its own when its target is signed, renewed, deleted or revoked meanwhile
 - **Audit Logs** -- Action logging with integrity verification, remote syslog forwarding and an opt-in retention period
-- **Private Key Encryption** -- AES-128 (Fernet, HMAC-SHA256) at rest under a master key created at first start (or `KEY_ENCRYPTION_KEY`), covering CA and certificate keys, SSH CA and deployment target keys, ACME account and EAB keys, SCEP challenges and LDAP bind passwords, with **Encrypt remaining keys** for secrets stored before it was enabled; with encryption enabled no plaintext key file is kept on disk (existing mirrors are removed at enable time and at startup, public certificate files stay), and key files are recreated when it is disabled
+- **Private Key Encryption** -- AES-128 (Fernet, HMAC-SHA256) at rest under a master key created at first start (in a container, when `/etc/ucm` is a volume) or given as `KEY_ENCRYPTION_KEY`, covering CA and certificate keys, SSH CA and deployment target keys, ACME account and EAB keys, SCEP challenges and LDAP bind passwords, with **Encrypt remaining keys** for secrets stored before it was enabled; with encryption enabled no plaintext key file is kept on disk (existing mirrors are removed at enable time and at startup, public certificate files stay), and key files are recreated when it is disabled
 - **FIPS mode (preview)** -- `-fips` Docker image carrying the OpenSSL FIPS Provider 3.1.2 (CMVP certificate #4985); with `UCM_FIPS=1` UCM starts only on the active, self-tested provider, generates keys through it and refuses what it does not approve (Ed25519, MD5, 3DES, scrypt, Argon2id, legacy PKCS#12, NTLM), and a readiness check lists beforehand what an instance would lose. On RHEL 9 and Ubuntu 24.04 Pro, the DEB and RPM packages built with `UCM_FIPS_BUILD=1` run on the host's FIPS module instead. UCM itself is not FIPS validated
 - **Compliance profiles** -- per-CA policies aligned with ANSSI PG-083, BSI TR-02102-1 and the ECCG agreed cryptographic mechanisms (key types, hashes, signature schemes, validity horizons, HSM-held CA keys, EC timestamp signer), refusals where the text imposes and notices where it recommends, with a read-only preflight before a profile is attached to an existing CA; UCM is not certified or qualified by any of these bodies
 - **Hardening** -- Operator-configurable HSTS (Settings → Security or env override), trusted-proxy gating of client-cert headers, API key permissions capped to the creator's own; trusted proxies can be given as CIDR networks and, once proxy support is on, `X-Forwarded-*` headers are honoured only from them, so a client reaching the backend directly cannot spoof its address; the web interface and management API can be **restricted to listed IP addresses and networks** while PKI protocol endpoints stay reachable
@@ -78,7 +78,7 @@
 ### Platform
 - **6 Themes** -- 3 color schemes (Gray, Purple Night, Orange Sunset) × Light/Dark; **per-user preferences persisted server-side** (language, theme, mode)
 - **i18n** -- 9 languages (EN, FR, DE, ES, IT, PT, UK, ZH, JA)
-- **Persisted UI state** -- Filter selections persist across reloads on every list page
+- **Persisted UI state** -- Filter selections persist across reloads on the main list pages (certificates, CAs, templates, policies, audit logs, trust store, users, SSH)
 - **Database** -- SQLite (default) or **native PostgreSQL backend** with bidirectional migration UI
 - **Responsive UI** -- React 18 + Radix UI, mobile-friendly
 - **Real-time** -- WebSocket live updates: a change made by another operator refreshes the lists that show it, and a reconnection after an outage reloads them rather than leaving stale rows on screen
@@ -139,7 +139,6 @@ See [Installation Guide](docs/installation/README.md) for all methods including 
 | Microsoft Intune SCEP | [docs/integrations/intune-scep.md](docs/integrations/intune-scep.md) |
 | ACME proxy clients | [docs/integrations/acme-proxy-clients.md](docs/integrations/acme-proxy-clients.md) |
 | API Reference | [docs/API_REFERENCE.md](docs/API_REFERENCE.md) |
-| API Explorer | `/api/docs` on a running server (live, versioned with the build) |
 | Security | [docs/SECURITY.md](docs/SECURITY.md) |
 | Upgrade Guide | [UPGRADE.md](UPGRADE.md) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
@@ -152,7 +151,7 @@ See [Installation Guide](docs/installation/README.md) for all methods including 
 |-----------|------------|
 | Frontend | React 18, Vite, Radix UI, Recharts |
 | Backend | Python 3.11+, Flask, SQLAlchemy |
-| Database | SQLite |
+| Database | SQLite or PostgreSQL |
 | Server | Gunicorn + gevent WebSocket |
 | Crypto | pyOpenSSL, cryptography |
 | Auth | Session cookies, WebAuthn/FIDO2, TOTP, mTLS |
@@ -220,7 +219,7 @@ Docker: data at `/opt/ucm/data/` (mount as volume), config via environment varia
 - [x] **Native PostgreSQL backend**: Bidirectional migration UI with safety checks *(v2.127)*
 - [x] **PostgreSQL feature parity**: Database stats, optimize, integrity check, certificate activity chart all work natively on PostgreSQL *(v2.135)*
 - [x] **Custom Extra EKU OIDs**: Microsoft RDP, smartcard logon, document signing, IPsec, Kerberos PKINIT… (RFC 5280 §4.2.1.12) *(v2.128)*
-- [x] **Persisted UI filters**: Filter selections survive reloads on every list page *(v2.128)*
+- [x] **Persisted UI filters**: Filter selections survive reloads on the main list pages *(v2.128)*
 - [x] **User preferences server-side**: Language/theme follow the user across browsers *(v2.128)*
 - [x] **Windows SSH CA setup script (`.ps1`)**: One-command trust setup for Windows OpenSSH Server *(v2.128/v2.134)*
 - [x] **SSH Certificates**: SSH CA management, host/user certificate signing, import, setup scripts *(v2.112)*
@@ -229,7 +228,7 @@ Docker: data at `/opt/ucm/data/` (mount as volume), config via environment varia
 - [x] **OCSP Delegated Responder (RFC 5019)**: Per-CA delegated responder assignment with EKU validation *(v2.109)*
 - [x] **Certificate Practice Statement (CPS)**: Per-CA CPS URI and Policy OID in CertificatePolicies extension *(v2.109)*
 - [x] **Multiple CDP/OCSP/AIA URLs**: Multiple distribution points and access descriptions per CA *(v2.109)*
-- [x] **RFC 3161 Timestamp Authority (TSA)**: Time stamping server with configurable policy, hash algorithms, and accuracy *(v2.109)*
+- [x] **RFC 3161 Timestamp Authority (TSA)**: Time stamping server with a configurable policy OID *(v2.109)*
 - [x] **In-App Help Translations**: 208 help files across 8 languages for all 26 sections *(v2.109)*
 - [x] **ACME Auto-Supersede**: Automatically revoke old certificates on ACME renewal *(v2.110)*
 - [x] **Universal Format Detection**: DER/PEM detection by content across all file uploads *(v2.110)*
