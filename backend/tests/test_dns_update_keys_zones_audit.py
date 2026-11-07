@@ -641,7 +641,7 @@ def test_B1_credential_query_selects_only_referenced_pos(env):
     stmts = _eab_statements(env, lambda: store.lookup(_n(k.name)))
     assert len(stmts) == 1
     assert 'IN' in stmts[0][0]
-    params = stmts[0][1]  # a tuple for sqlite3, a dict for psycopg2
+    params = stmts[0][1]  # a tuple for sqlite3, a dict for psycopg
     assert list(params.values() if isinstance(params, dict) else params) == [cred_id]
     assert store.scope(k.id).allows(k.acme_client_account_id, 'acct-x')
     assert not store.scope(k.id).allows(k.acme_client_account_id, 'other')

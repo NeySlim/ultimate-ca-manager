@@ -217,7 +217,7 @@ def _copy_one(source, dst, entry, *, source_is_pg: bool, target_is_pg: bool,
         f'INSERT INTO "{entry.name}" ({column_list}) VALUES ({placeholders})')
 
     # stream_results asks the driver for a server-side cursor where it has
-    # one (psycopg2); where it does not (pysqlite), the cursor is already
+    # one (psycopg); where it does not (pysqlite), the cursor is already
     # lazy and this is simply ignored.
     cursor = source.execution_options(
         stream_results=True, max_row_buffer=BATCH_SIZE,

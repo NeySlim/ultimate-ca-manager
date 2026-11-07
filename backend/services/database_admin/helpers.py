@@ -254,7 +254,7 @@ def _pg_dump_env(url) -> dict:
     for attr, var in _PG_CONNECTION_ENV:
         value = getattr(url, attr, None)
         if attr == "host" and not value:
-            # psycopg2 URLs may carry a socket directory as ?host=
+            # libpq URLs may carry a socket directory as ?host=
             query_host = url.query.get("host")
             value = query_host if isinstance(query_host, str) else None
         if value is None or value == "":

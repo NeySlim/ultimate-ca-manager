@@ -27,6 +27,7 @@ from models import db, User, SystemConfig
 from websocket import socketio, init_websocket
 from utils.datetime_utils import utc_now
 from utils.key_codec import private_key_to_pem
+from utils.db_url import log_normalised_scheme
 
 # Initialize cache globally
 cache = Cache()
@@ -151,6 +152,8 @@ def create_app(config_name=None):
 
     app.logger.setLevel(_log_level)
     # ─────────────────────────────────────────────────────────────
+    # Here, not where settings read the URL: logging did not exist yet
+    log_normalised_scheme(os.getenv('DATABASE_URL', ''), _logging.getLogger('utils.db_url'))
     
     # Reverse proxy support (handles X-Forwarded-* headers).
     #

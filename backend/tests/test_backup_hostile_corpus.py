@@ -63,7 +63,7 @@ TARGET = {
 
 # What must never come back to the caller, whatever it is refusing.
 LEAKED_INTERNALS = ('Traceback', 'File "', 'sqlite3', 'sqlalchemy',
-                    'psycopg2', '/root/', 'site-packages')
+                    'psycopg', '/root/', 'site-packages')
 
 
 def _service():

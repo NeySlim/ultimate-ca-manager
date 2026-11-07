@@ -1,9 +1,7 @@
 """PostgreSQL errors without the values they quote.
 
-psycopg2 binds parameters on the client, so a server error that quotes the
-statement (``LINE n:`` with its caret, ``QUERY:``, ``CONTEXT:``), the refused
-row (``Failing row contains``) or the refused input (class 22) carries the
-bound values, private keys included, whatever ``hide_parameters`` says.
+The server quotes the refused row (``Failing row contains``) and the refused
+input (class 22) whatever ``hide_parameters`` says, private keys included.
 """
 import re
 
@@ -17,6 +15,11 @@ _KEPT = ('DETAIL', 'HINT')
 _ROW_DETAIL = re.compile(r'^DETAIL:\s+Failing row contains')
 # Data exceptions (class 22) quote the input on their primary line and in their DETAIL
 _QUOTED = re.compile(r'"[^"]*"')
+
+
+def sqlstate(orig):
+    """The SQLSTATE of a psycopg error, None for any other."""
+    return getattr(orig, 'sqlstate', None)
 
 
 def scrub_postgres_message(message, pgcode=None):
@@ -51,10 +54,10 @@ def _scrub_error(context):
     orig = context.original_exception
     if len(getattr(orig, 'args', ())) != 1 or not isinstance(orig.args[0], str):
         return None
-    clean = scrub_postgres_message(orig.args[0], getattr(orig, 'pgcode', None))
+    clean = scrub_postgres_message(orig.args[0], sqlstate(orig))
     if clean == orig.args[0]:
         return None
-    # SQLSTATE and diag stay; pgerror keeps the raw text and nothing here reads it
+    # SQLSTATE and diag stay: diag keeps the raw text and nothing here reads it
     orig.args = (clean,)
     wrapped = context.sqlalchemy_exception
     if wrapped is not None and len(wrapped.args) == 1:

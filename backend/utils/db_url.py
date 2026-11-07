@@ -4,25 +4,47 @@ from typing import Optional
 
 from sqlalchemy.engine import make_url
 
-_POSTGRES_PREFIXES = ('postgresql://', 'postgres://')
+# postgresql+psycopg2:// is what older guides wrote: same database, the one driver UCM ships
+_PSYCOPG2_PREFIX = 'postgresql+psycopg2://'
+_POSTGRES_PREFIXES = ('postgresql://', 'postgres://', _PSYCOPG2_PREFIX)
 _TLS_SSLMODES = ('require', 'verify-ca', 'verify-full')
+_PREPARE_OFF = ('0', 'none', 'off', 'disable')
 
 
 def sqlalchemy_url(url: str) -> str:
-    """Pin a PostgreSQL URL without a driver to psycopg2, the one UCM ships.
+    """Pin a PostgreSQL URL to psycopg 3, which binds parameters on the server.
 
-    SQLAlchemy 2.1 resolves a bare postgresql:// to psycopg 3. An explicit
-    driver and non-PostgreSQL URLs are returned unchanged.
+    Any other explicit driver, and non-PostgreSQL URLs, are returned unchanged.
     """
     for prefix in _POSTGRES_PREFIXES:
         if url.startswith(prefix):
-            return 'postgresql+psycopg2://' + url[len(prefix):]
+            return 'postgresql+psycopg://' + url[len(prefix):]
     return url
+
+
+def log_normalised_scheme(url, log):
+    """Say once logging is up that a postgresql+psycopg2:// URL runs on psycopg 3 (scheme only)."""
+    if (url or '').startswith(_PSYCOPG2_PREFIX):
+        log.info('PostgreSQL URL scheme postgresql+psycopg2:// normalised to postgresql+psycopg://')
+
+
+def postgres_connect_args(url, environ=None) -> dict:
+    """psycopg connection arguments for a PostgreSQL URL: UCM_PG_PREPARE_THRESHOLD sets
+    prepare_threshold, and 0, none, off or disable turn prepared statements off."""
+    environ = os.environ if environ is None else environ
+    raw = (environ.get('UCM_PG_PREPARE_THRESHOLD') or '').strip().lower()
+    if not raw or not is_postgres_url(url):
+        return {}
+    if raw in _PREPARE_OFF:
+        return {'prepare_threshold': None}
+    if not raw.isdigit():
+        raise ValueError(f'UCM_PG_PREPARE_THRESHOLD must be a positive integer or 0, not {raw!r}')
+    return {'prepare_threshold': int(raw)}
 
 
 def is_postgres_url(url: str) -> bool:
     """True for every PostgreSQL spelling: postgres://, postgresql://, postgresql+driver://."""
-    return sqlalchemy_url(url or '').startswith(('postgresql://', 'postgresql+'))
+    return (url or '').startswith(('postgresql://', 'postgres://', 'postgresql+'))
 
 
 def _postgres_tcp_setting(url, name, env_name, environ):

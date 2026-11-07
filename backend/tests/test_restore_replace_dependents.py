@@ -625,7 +625,7 @@ def test_a_compromised_key_known_here_survives_a_replacement(target):
 class _Orig(Exception):
     def __init__(self, message, pgcode, detail):
         super().__init__(message)
-        self.pgcode = pgcode
+        self.sqlstate = pgcode
         self.diag = type('Diag', (), {'message_detail': detail})()
 
 
