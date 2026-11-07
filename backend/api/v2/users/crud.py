@@ -369,6 +369,7 @@ def update_user(user_id):
         user.totp_exempt = bool(data['totp_exempt'])
 
     # Update password if provided
+    password_changed = False
     if 'password' in data and data['password']:
         # SECURITY: Validate password strength
         is_valid, error_msg = validate_password_strength(data['password'])
@@ -381,10 +382,12 @@ def update_user(user_id):
             if not current or not user.check_password(current):
                 return error_response('Current password is required', 400)
         user.set_password(data['password'])
+        password_changed = True
 
     try:
         db.session.commit()
-        keep_own_session(user)
+        if password_changed:
+            keep_own_session(user)
         AuditService.log_action(
             action='user_update',
             resource_type='user',
