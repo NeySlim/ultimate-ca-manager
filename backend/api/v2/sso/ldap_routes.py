@@ -326,9 +326,16 @@ def _adoptable(user, provider):
     if (user.auth_source or 'local') == 'local':
         # SSO account from before migration 024 (which may have set its provider),
         # never converted back by an admin (unlink forces a password change).
-        return (user.password_hash == SSO_NO_PASSWORD and user.sso_provider_id in (None, provider.id)
+        return (user.password_hash == SSO_NO_PASSWORD and _same_provider_or_idp(user, provider)
                 and not user.force_password_change)
-    return user.auth_source == provider.provider_type and user.sso_provider_id in (None, provider.id)
+    return user.auth_source == provider.provider_type and _same_provider_or_idp(user, provider)
+
+
+def _same_provider_or_idp(user, provider):
+    """Linked to this provider, or unlinked from none or from a deleted one for this same IdP."""
+    if user.sso_provider_id is not None:
+        return user.sso_provider_id == provider.id
+    return user.sso_orphan_of is None or user.sso_orphan_of == provider.idp_key()
 
 
 def _orphan_with_id(provider, external_id):

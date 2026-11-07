@@ -543,6 +543,71 @@ def test_a_saml_orphan_is_not_opened_by_another_idp(app, auth_client):
             db.session.commit()
 
 
+@pytest.mark.parametrize('login_name', ['rvlink', 'rvlinkx'])  # step 2 (username), step 3 (email)
+@pytest.mark.parametrize('legacy', [False, True])  # admin-linked, or pre-024 local SSO account
+def test_an_unbound_orphan_is_not_opened_by_name_or_email_from_another_idp(
+        app, auth_client, login_name, legacy):
+    """Linked to provider A, no stable id yet, A deleted: a provider for another
+    IdP must not claim it by a name or e-mail that IdP chose (OIDC Core §5.7)."""
+    from api.v2.sso.ldap_routes import _get_or_create_sso_user
+    with app.app_context():
+        _cleanup(['rvlink', 'rvlinkx'])
+        rows = [SSOProvider(name=f'saml-{n}-{uuid.uuid4().hex[:6]}', provider_type='saml',
+                            enabled=False, saml_entity_id=f'https://{n}.example/idp',
+                            default_role='viewer') for n in ('a', 'b')]
+        db.session.add_all(rows)
+        db.session.commit()
+        a_id, b_id = rows[0].id, rows[1].id
+        db.session.add(User(username='rvlink', email='rvlink@corp.example', full_name='L', role='admin',
+                            active=True, password_hash='!SSO_NO_PASSWORD!' if legacy else 'hash',
+                            auth_source='local' if legacy else 'saml', sso_provider_id=a_id))
+        db.session.commit()
+    assert auth_client.delete(f'/api/v2/sso/providers/{a_id}').status_code == 200
+    try:
+        with app.test_request_context():
+            assert User.query.filter_by(username='rvlink').one().sso_orphan_of == 'saml:https://a.example/idp'
+            user, _err = _get_or_create_sso_user(
+                db.session.get(SSOProvider, b_id), login_name, 'rvlink@corp.example', 'M',
+                {'name_id': 'mallory-at-b'})
+            assert user is None or user.username != 'rvlink'
+            db.session.rollback()
+            u = User.query.filter_by(username='rvlink').one()
+            assert u.sso_provider_id is None and u.sso_external_id is None
+    finally:
+        with app.app_context():
+            _cleanup(['rvlink', 'rvlinkx'])
+            db.session.delete(db.session.get(SSOProvider, b_id))
+            db.session.commit()
+
+
+def test_an_unbound_orphan_is_taken_back_by_a_provider_for_the_same_idp(app, auth_client):
+    from api.v2.sso.ldap_routes import _get_or_create_sso_user
+    with app.app_context():
+        _cleanup(['rvback'])
+        rows = [SSOProvider(name=f'saml-{n}-{uuid.uuid4().hex[:6]}', provider_type='saml',
+                            enabled=False, saml_entity_id='https://same.example/idp',
+                            default_role='viewer') for n in ('old', 'new')]
+        db.session.add_all(rows)
+        db.session.commit()
+        a_id, b_id = rows[0].id, rows[1].id
+        db.session.add(User(username='rvback', email='rvback@corp.example', full_name='B', role='admin',
+                            active=True, password_hash='hash', auth_source='saml', sso_provider_id=a_id))
+        db.session.commit()
+    assert auth_client.delete(f'/api/v2/sso/providers/{a_id}').status_code == 200
+    try:
+        with app.test_request_context():
+            user, err = _get_or_create_sso_user(
+                db.session.get(SSOProvider, b_id), 'rvback', 'rvback@corp.example', 'B',
+                {'name_id': 'back-id'})
+            assert err is None and user.username == 'rvback' and user.sso_external_id == 'back-id'
+            db.session.rollback()
+    finally:
+        with app.app_context():
+            _cleanup(['rvback'])
+            db.session.delete(db.session.get(SSOProvider, b_id))
+            db.session.commit()
+
+
 def test_an_orphan_of_another_type_is_not_opened_by_its_id(app, oidc):
     with app.app_context():
         _cleanup(['rvsaml'])
