@@ -1379,6 +1379,7 @@ The client presents a certificate during the TLS handshake. UCM validates the ce
 
 - **Strongest method**: cryptographic client identity
 - **Required for** \`/simplereenroll\`: the client must present its current certificate
+- **Port 8443**: when UCM terminates TLS, the handshake accepts certificates of the mTLS trusted CA (Settings → Security) and of the CAs below it only; to re-enroll certificates of an EST CA outside that branch, trust a CA above both (v2.252)
 - **Presented certificate**: for \`/simpleenroll\` and \`/serverkeygen\`, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2); a certificate from another trusted authority is still accepted
 - **Depends on** proper TLS termination config (reverse proxy must pass \`SSL_CLIENT_CERT\` to UCM)
 
@@ -2888,7 +2889,7 @@ Require all users to enable 2FA. Users who haven't set up 2FA will be prompted o
 
 Let users log in with a client certificate instead of a password:
 
-- **Trusted CA**: The CA whose client certificates are accepted at login, and the default issuer when a user generates one. Any CA whose certificate is not revoked can be chosen, keyless or offline included: such a CA issues nothing, so its users upload certificates issued elsewhere (v2.248)
+- **Trusted CA**: The CA whose client certificates are accepted at login, and the default issuer when a user generates one. Any CA whose certificate is not revoked can be chosen, keyless or offline included: such a CA issues nothing, so its users upload certificates issued elsewhere (v2.248). It is the only trust anchor of the HTTPS port: a client certificate from its parent or from a sibling CA is refused at the TLS handshake, so trust a root to accept its whole hierarchy (v2.252)
 - **Require client certificate**: Optionally make mTLS mandatory for the web UI
 - Changing mTLS settings requires a service restart
 
@@ -3644,6 +3645,8 @@ Choose a preset or set custom duration:
 
 Short-lived certificates (8h–24h) are recommended for human users. Longer validity is acceptable for automated service accounts.
 
+A certificate is valid from 5 minutes before it is issued, so a server whose clock lags slightly behind accepts it at once; the lifetime still counts from issuance (v2.252).
+
 ### Extensions (User Certificates Only)
 
 | Extension | Description |
@@ -3654,12 +3657,15 @@ Short-lived certificates (8h–24h) are recommended for human users. Longer vali
 | permit-port-forwarding | Allow TCP port forwarding |
 | permit-user-rc | Allow execution of ~/.ssh/rc on login |
 
-### Critical Options
+### Critical Options (User Certificates Only)
 
 | Option | Description |
 |--------|-------------|
 | force-command | Restrict the certificate to a single command |
-| source-address | Restrict to specific source IP addresses/CIDRs |
+| source-address | Restrict to source addresses or CIDR networks, comma-separated (\`10.0.0.0/8,2001:db8::/32\`) |
+| verify-required | Require a FIDO key that verified the user (PIN or biometric), no value |
+
+A server refuses a certificate carrying a critical option it does not know, so UCM signs only these and vendor options named \`name@domain\`. OpenSSH defines no critical option for host certificates: a host request carrying one is refused (v2.252).
 
 **Example:** A certificate with \`force-command=ls\` and \`source-address=10.0.0.0/8\` can only run \`ls\` and only from the 10.x.x.x network.
 
@@ -3696,6 +3702,8 @@ On clients, add the Host CA to known_hosts:
 2. Click **Revoke** in the detail panel
 3. The certificate is added to the CA's Key Revocation List (KRL)
 4. Download and deploy the updated KRL to servers (from SSH CAs page)
+
+A revoked certificate stays in the KRL, and in the list, until it expires: deleting it earlier is refused, since the KRL is built from these records and the certificate would be accepted again. Each KRL download carries a higher version number (v2.252).
 
 > ⚠ Revocation only takes effect when servers check the KRL via \`RevokedKeys\` in sshd_config.
 

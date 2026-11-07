@@ -91,9 +91,9 @@ class TestSqliteInstall:
     def test_url_falls_back_to_the_data_directory(self, sqlite_install):
         assert database_url(sqlite_install).endswith('/ucm.db')
 
-    def test_chain_is_leaf_then_root(self, sqlite_install):
-        chain, name, required = mtls_client_ca(sqlite_install)
-        assert chain == _pem('LEAF') + _pem('ROOT')
+    def test_only_the_trusted_ca_is_read(self, sqlite_install):
+        pem, name, required = mtls_client_ca(sqlite_install)
+        assert pem == _pem('LEAF')
         assert name == 'Issuing CA'
         assert required is True
 
@@ -137,9 +137,9 @@ class TestSqliteInstall:
 @pytest.mark.postgres
 @pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
 class TestPostgresInstall:
-    def test_chain_is_read(self, postgres_install):
-        chain, name, required = mtls_client_ca(postgres_install)
-        assert chain == _pem('LEAF') + _pem('ROOT')
+    def test_only_the_trusted_ca_is_read(self, postgres_install):
+        pem, name, required = mtls_client_ca(postgres_install)
+        assert pem == _pem('LEAF')
         assert name == 'Issuing CA'
         assert required is True
 
@@ -154,8 +154,8 @@ class TestPostgresInstall:
         assert mtls_client_ca(postgres_install)[1] == 'Issuing CA'
 
 
-class TestChainWalk:
-    def test_a_cycle_does_not_hang(self, tmp_path, monkeypatch):
+class TestAnchor:
+    def test_a_parent_cycle_is_never_walked(self, tmp_path, monkeypatch):
         import sqlite3
         monkeypatch.delenv('DATABASE_URL', raising=False)
         monkeypatch.delenv('DATABASE_PATH', raising=False)
@@ -173,5 +173,5 @@ class TestChainWalk:
         connection.commit()
         connection.close()
 
-        chain, _name, _required = mtls_client_ca(str(tmp_path))
-        assert chain == _pem('LEAF') + _pem('ROOT')
+        pem, _name, _required = mtls_client_ca(str(tmp_path))
+        assert pem == _pem('LEAF')

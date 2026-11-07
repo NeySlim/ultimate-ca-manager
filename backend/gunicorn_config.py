@@ -84,6 +84,7 @@ def ssl_context(conf, default_ssl_context_factory):
     if WSTEP_TLS12_CAP_NEEDED:
         ctx.maximum_version = ssl.TLSVersion.TLSv1_2
     if conf.ca_certs:
+        anchor_client_verification(ctx)
         try:
             import ctypes
             libssl = ctypes.CDLL('libssl.so.3')
@@ -114,7 +115,7 @@ def ssl_context(conf, default_ssl_context_factory):
     return ctx
 
 
-from boot_config import mtls_client_ca, wstep_enabled
+from boot_config import anchor_client_verification, mtls_client_ca, wstep_enabled
 
 # Drives the TLS 1.2 cap in ssl_context().
 WSTEP_TLS12_CAP_NEEDED = wstep_enabled(data_path)
@@ -168,7 +169,7 @@ def _load_mtls_config():
         if not found:
             _remember_mtls_mode(False)
             return
-        full_chain, ca_name, required = found
+        ca_pem, ca_name, required = found
 
         # Write CA cert atomically (temp file + rename) with restricted permissions
         import tempfile
@@ -177,7 +178,7 @@ def _load_mtls_config():
         fd, temp_path = tempfile.mkstemp(dir=data_path, prefix='.mtls_ca_', suffix='.tmp')
         try:
             with os.fdopen(fd, 'w') as f:
-                f.write(full_chain)
+                f.write(ca_pem)
             os.chmod(temp_path, stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP)
             os.rename(temp_path, ca_file_path)
         except Exception as e:
