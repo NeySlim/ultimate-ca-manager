@@ -604,6 +604,8 @@ def enroll_import_certificate():
             'Certificate was not issued by a CA of this server and cannot be enrolled',
             400,
         )
+    if issuing_ca.revoked_in_chain:  # RFC 5280 §6.1.3(a)(3): the whole path, as /enroll
+        return error_response('This certificate issuer has been revoked', 400)
 
     serial = str(cert_obj.serial_number)
     subject_dn = cert_obj.subject.rfc4514_string()

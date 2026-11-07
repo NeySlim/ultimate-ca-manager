@@ -524,6 +524,49 @@ class TestPresentedCertificateUnderARevokedCa:
         assert 'issuer has been revoked' in r.get_json()['message']
 
 
+class TestMtlsUnderARevokedCaAboveTheIssuer:
+    """RFC 5280 §6.1.3(a)(3): a CA revoked above the leaf's issuer closes the
+    mTLS login and /enroll-import, as it closes /enroll."""
+
+    @pytest.fixture
+    def chain(self, app, auth_client, create_ca, create_cert):
+        root = create_ca(cn='mTLS chain root')
+        mid = create_ca(cn='mTLS chain L1', type='intermediate', parentCAId=root['id'])
+        low = create_ca(cn='mTLS chain L2', type='intermediate', parentCAId=mid['id'])
+
+        def leaf(cn):
+            info = create_cert(cn=cn, ca_id=low['id'])
+            with app.app_context():
+                return base64.b64decode(db.session.get(Certificate, info['id']).crt).decode()
+
+        def revoke_l1():
+            r = auth_client.post(f"/api/v2/cas/{mid['id']}/revoke",
+                                 data=json.dumps({'reason': 'cACompromise'}),
+                                 content_type='application/json')
+            assert r.status_code == 200, r.data
+        return leaf, revoke_l1
+
+    def test_login_is_refused(self, app, auth_client, chain):
+        leaf, revoke_l1 = chain
+        pem = leaf('mtls-chain-login@example.test')
+        r = auth_client.post('/api/v2/mtls/enroll-import', json={'pem': pem, 'name': 'chain'})
+        assert r.status_code == 201, r.get_json()
+        der = x509.load_pem_x509_certificate(pem.encode()).public_bytes(serialization.Encoding.DER)
+        login = app.test_client()
+        assert login.post('/api/v2/auth/login/mtls', environ_overrides={'peercert': der}).status_code == 200
+        revoke_l1()
+        r = app.test_client().post('/api/v2/auth/login/mtls', environ_overrides={'peercert': der})
+        assert r.status_code == 401, r.get_json()
+
+    def test_enroll_import_is_refused(self, auth_client, chain):
+        leaf, revoke_l1 = chain
+        pem = leaf('mtls-chain-import@example.test')
+        revoke_l1()
+        r = auth_client.post('/api/v2/mtls/enroll-import', json={'pem': pem, 'name': 'chain'})
+        assert r.status_code == 400, r.get_json()
+        assert 'issuer has been revoked' in r.get_json()['message']
+
+
 def test_serverkeygen_verifies_the_tls_unique_binding(client):
     """RFC 7030 §3.5 and §4.4.1: serverkeygen checks the CSR's tls-unique too."""
     csr = _csr_with_challenge('keygen-tls-unique.example.test', b'A' * 16)

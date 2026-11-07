@@ -98,6 +98,9 @@ class MTLSAuthService:
                     from utils.cert_issuer import self_signed_first
                     issuer = next(iter(self_signed_first(
                         _CA.query.filter(_CA.subject == auth_cert.cert_issuer).order_by(_CA.id).all())), None)
+                if issuer is not None and issuer.revoked_in_chain:  # RFC 5280 §6.1.3(a)(3): the whole path
+                    logger.warning(f"Certificate issuer revoked: serial={serial}, user_id={auth_cert.user_id}")
+                    return None, None, "Certificate issuer has been revoked"
                 if issuer is not None and enrolled is not None:
                     # The row may be gone (certificate deleted after its
                     # revocation): the persistent revocation record remains
