@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'CSRを送信して署名済み証明書を受け取る' },
           { label: '/simplereenroll', text: '既存の証明書を更新（mTLSが必要）' },
           { label: '/csrattrs', text: 'サーバーが推奨するCSR属性を取得' },
-          { label: '/serverkeygen', text: 'サーバーがキーペアを生成し、証明書と鍵を返します。鍵は発行 CA の強度に合わせ、RSA または EC のリクエスト鍵がある場合はそのファミリー（サイズや曲線は無視されます）、そうでなければ CA のファミリーとなり、ポリシーが許可する最も近いタイプに変更されます。mTLS 経由では RSA または EC です (v2.251)' },
+          { label: '/serverkeygen', text: 'サーバーがキーペアを生成し、証明書と鍵を返します。鍵は発行 CA の強度に合わせ、RSA または EC のリクエスト鍵がある場合はそのファミリー（サイズや曲線は無視されます）、そうでなければ CA のファミリーとなり、ポリシーが許可する最も近いタイプに変更されます。鍵は TLS 下で暗号化されない PKCS#8 として返されます。mTLS 証明書の鍵（AsymmetricDecryptKeyIdentifier）を指定した CSR には、その証明書宛てに暗号化されて返されます。2048 ビット以上の RSA は鍵トランスポート（keyEncipherment）、EC は鍵合意（keyAgreement）で、アルゴリズムは CSR の SMIMECapabilities に列挙されたものを使い、発行 CA がこの目的で発行する EST key generator 証明書で署名された鍵パッケージに格納されます（Ed448 の CA の下では Ed25519、v2.252）' },
         ]
       },
     ],
@@ -125,7 +125,9 @@ curl -k --cert client.pem --key client.key \\
 ### POST /serverkeygen
 サーバーがキーペアを生成し、証明書と秘密鍵を返します。クライアントがローカルで鍵を生成できない場合に便利です。
 
-生成される鍵は発行 CA の強度に合わせます。RSA または EC のリクエスト鍵がある場合はそのファミリー（サイズや曲線は無視されます）、そうでなければ CA のファミリーとなり、ポリシーが許可する最も近いタイプに変更されます。mTLS 経由では RSA または EC で、CMS 鍵トランスポートが扱える鍵タイプです (v2.251)。
+生成される鍵は発行 CA の強度に合わせます。RSA または EC のリクエスト鍵がある場合はそのファミリー（サイズや曲線は無視されます）、そうでなければ CA のファミリーとなり、ポリシーが許可する最も近いタイプに変更されます。
+
+秘密鍵は、TLS で保護された暗号化されない PKCS#8（\`application/pkcs8\`）として返されます。暗号化して受け取るには、mTLS で認証し、クライアント証明書の鍵識別子を CSR に入れます（AsymmetricDecryptKeyIdentifier）。すると鍵は、その証明書宛てにエンベロープされた RFC 5958 の鍵パッケージで届きます。keyEncipherment を持つ 2048 ビット以上の RSA 証明書には鍵トランスポート、keyAgreement を持つ EC 証明書には鍵合意（ECDH）が使われ、鍵トランスポートまたは鍵合意とコンテンツのアルゴリズムは、クライアントの順序で CSR の SMIMECapabilities から選ばれます。パッケージは、発行 CA が初回使用時に発行し自動で更新する「EST key generator」証明書で署名されます。この証明書は \`/cacerts\` が返す CA にチェーンし、CA と同じ鍵ファミリーを持ち、Ed448 の CA の下では Ed25519 です (v2.252)。
 
 ## 情報タブ
 

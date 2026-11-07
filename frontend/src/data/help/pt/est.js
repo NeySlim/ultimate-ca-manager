@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'Enviar um CSR e receber um certificado assinado' },
           { label: '/simplereenroll', text: 'Renovar um certificado existente (requer mTLS)' },
           { label: '/csrattrs', text: 'Obter atributos de CSR recomendados pelo servidor' },
-          { label: '/serverkeygen', text: 'O servidor gera um par de chaves e retorna certificado + chave. A chave tem a força da CA emissora, na família da chave do pedido quando RSA ou EC (o seu tamanho ou curva é ignorado), senão a da CA, movida para o tipo mais próximo que as políticas permitem; via mTLS é RSA ou EC (v2.251)' },
+          { label: '/serverkeygen', text: 'O servidor gera um par de chaves e retorna certificado + chave. A chave tem a força da CA emissora, na família da chave do pedido quando RSA ou EC (o seu tamanho ou curva é ignorado), senão a da CA, movida para o tipo mais próximo que as políticas permitem. A chave vem como PKCS#8 não cifrado sob TLS; um CSR que indique a chave do certificado mTLS (AsymmetricDecryptKeyIdentifier) recebe-a cifrada para esse certificado, por transporte de chave para RSA de 2048 bits ou mais (keyEncipherment) ou por acordo de chave para EC (keyAgreement), com os algoritmos que as SMIMECapabilities do CSR listam, num pacote de chave assinado por um certificado EST key generator que a CA emissora emite para esse fim (Ed25519 sob uma CA Ed448, v2.252)' },
         ]
       },
     ],
@@ -125,7 +125,9 @@ Obter os atributos de CSR (OIDs) recomendados pelo servidor.
 ### POST /serverkeygen
 Servidor gera um par de chaves e retorna o certificado junto com a chave privada. Útil quando o cliente não pode gerar chaves localmente.
 
-A chave gerada tem a força da CA emissora: a família da chave do pedido quando é RSA ou EC (o seu tamanho ou curva é ignorado), senão a da CA, movida para o tipo mais próximo que as políticas permitem. Via mTLS é RSA ou EC, os tipos de chave que o seu transporte de chave CMS suporta (v2.251).
+A chave gerada tem a força da CA emissora: a família da chave do pedido quando é RSA ou EC (o seu tamanho ou curva é ignorado), senão a da CA, movida para o tipo mais próximo que as políticas permitem.
+
+A chave privada vem como PKCS#8 não cifrado (\`application/pkcs8\`), protegida pelo TLS. Para a receber cifrada, autentique-se com mTLS e coloque o identificador de chave do certificado de cliente no CSR (AsymmetricDecryptKeyIdentifier): a chave chega então num pacote de chave RFC 5958 envelopado para esse certificado, por transporte de chave para um certificado RSA de 2048 bits ou mais que declare keyEncipherment ou por acordo de chave (ECDH) para um certificado EC que declare keyAgreement, com os algoritmos de transporte ou acordo de chave e de conteúdo tirados das SMIMECapabilities do CSR, pela ordem do cliente. O pacote é assinado por um certificado "EST key generator" que a CA emissora emite na primeira utilização e renova sozinha; encadeia com a CA que \`/cacerts\` serve e tem a família de chave da CA, Ed25519 sob uma CA Ed448 (v2.252).
 
 ## Aba Informações
 

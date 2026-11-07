@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: '提交 CSR 并接收签名证书' },
           { label: '/simplereenroll', text: '续期已有证书（需要 mTLS）' },
           { label: '/csrattrs', text: '获取服务器推荐的 CSR 属性' },
-          { label: '/serverkeygen', text: '服务器生成密钥对并返回证书 + 密钥。密钥采用签发 CA 的强度：请求密钥为 RSA 或 EC 时沿用其类型（其大小或曲线被忽略），否则沿用 CA 的类型，并调整为策略允许的最接近类型；通过 mTLS 时为 RSA 或 EC (v2.251)' },
+          { label: '/serverkeygen', text: '服务器生成密钥对并返回证书 + 密钥。密钥采用签发 CA 的强度：请求密钥为 RSA 或 EC 时沿用其类型（其大小或曲线被忽略），否则沿用 CA 的类型，并调整为策略允许的最接近类型。密钥在 TLS 下以未加密的 PKCS#8 返回；若 CSR 指明了 mTLS 证书的密钥 (AsymmetricDecryptKeyIdentifier)，则会加密给该证书：2048 位及以上的 RSA 使用密钥传输 (keyEncipherment)，EC 使用密钥协商 (keyAgreement)，算法取自 CSR 的 SMIMECapabilities 所列，并放入由签发 CA 为此签发的 EST key generator 证书签名的密钥包中（Ed448 CA 下为 Ed25519，v2.252）' },
         ]
       },
     ],
@@ -125,7 +125,9 @@ curl -k --cert client.pem --key client.key \\
 ### POST /serverkeygen
 服务器生成密钥对并返回证书和私钥。适用于客户端无法在本地生成密钥的场景。
 
-生成的密钥采用签发 CA 的强度：请求密钥为 RSA 或 EC 时沿用其类型（其大小或曲线被忽略），否则沿用 CA 的类型，并调整为策略允许的最接近类型。通过 mTLS 时为 RSA 或 EC，即其 CMS 密钥传输所承载的密钥类型 (v2.251)。
+生成的密钥采用签发 CA 的强度：请求密钥为 RSA 或 EC 时沿用其类型（其大小或曲线被忽略），否则沿用 CA 的类型，并调整为策略允许的最接近类型。
+
+私钥以未加密的 PKCS#8 (\`application/pkcs8\`) 返回，由 TLS 保护。若要加密返回，请使用 mTLS 认证，并在 CSR 中写入客户端证书的密钥标识符 (AsymmetricDecryptKeyIdentifier)：密钥将以 RFC 5958 密钥包的形式封装给该证书，断言 keyEncipherment 的 2048 位及以上 RSA 证书使用密钥传输，断言 keyAgreement 的 EC 证书使用密钥协商 (ECDH)；密钥传输或密钥协商算法以及内容算法按客户端的顺序取自 CSR 的 SMIMECapabilities。该密钥包由“EST key generator”证书签名，该证书由签发 CA 在首次使用时签发并自动续期；它链接到 \`/cacerts\` 提供的 CA，并采用该 CA 的密钥族，Ed448 CA 下为 Ed25519 (v2.252)。
 
 ## 信息选项卡
 

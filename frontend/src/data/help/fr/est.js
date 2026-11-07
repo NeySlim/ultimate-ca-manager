@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'Soumettre une CSR et recevoir un certificat signé' },
           { label: '/simplereenroll', text: 'Renouveler un certificat existant (nécessite mTLS)' },
           { label: '/csrattrs', text: 'Obtenir les attributs CSR recommandés par le serveur' },
-          { label: '/serverkeygen', text: 'Le serveur génère une paire de clés et retourne le certificat + la clé. La clé prend la force de l\'AC émettrice, dans la famille de la clé de la requête si elle est RSA ou EC (sa taille ou sa courbe est ignorée), sinon celle de l\'AC, ramenée au type autorisé le plus proche par les politiques ; en mTLS, elle est RSA ou EC (v2.251)' },
+          { label: '/serverkeygen', text: 'Le serveur génère une paire de clés et retourne le certificat + la clé. La clé prend la force de l\'AC émettrice, dans la famille de la clé de la requête si elle est RSA ou EC (sa taille ou sa courbe est ignorée), sinon celle de l\'AC, ramenée au type autorisé le plus proche par les politiques. La clé est livrée en PKCS#8 non chiffré sous TLS ; une CSR qui nomme la clé du certificat mTLS (AsymmetricDecryptKeyIdentifier) la reçoit chiffrée vers ce certificat, par transport de clé pour une clé RSA de 2048 bits ou plus (keyEncipherment) ou par accord de clé pour une clé EC (keyAgreement), avec les algorithmes que liste la SMIMECapabilities de la CSR, dans un paquet de clé signé par un certificat « EST key generator » que l\'AC émettrice délivre à cet effet (Ed25519 sous une AC Ed448, v2.252)' },
         ]
       },
     ],
@@ -125,7 +125,9 @@ Obtenir les attributs CSR (OID) recommandés par le serveur.
 ### POST /serverkeygen
 Le serveur génère une paire de clés et retourne le certificat accompagné de la clé privée. Utile lorsque le client ne peut pas générer de clés localement.
 
-La clé générée prend la force de l'AC émettrice : la famille de la clé de la requête si elle est RSA ou EC (sa taille ou sa courbe est ignorée), sinon celle de l'AC, ramenée au type autorisé le plus proche par les politiques. En mTLS, elle est RSA ou EC, les types de clé que porte son transport de clé CMS (v2.251).
+La clé générée prend la force de l'AC émettrice : la famille de la clé de la requête si elle est RSA ou EC (sa taille ou sa courbe est ignorée), sinon celle de l'AC, ramenée au type autorisé le plus proche par les politiques. 
+
+La clé privée est livrée en PKCS#8 non chiffré (\`application/pkcs8\`), protégée par TLS. Pour l'obtenir chiffrée, authentifiez-vous en mTLS et placez l'identifiant de clé du certificat client dans la CSR (AsymmetricDecryptKeyIdentifier) : la clé arrive alors dans un paquet de clé RFC 5958 enveloppé pour ce certificat, par transport de clé pour un certificat RSA de 2048 bits ou plus déclarant keyEncipherment, ou par accord de clé (ECDH) pour un certificat EC déclarant keyAgreement, les algorithmes de transport ou d'accord de clé et de contenu étant tirés de la SMIMECapabilities de la CSR, dans l'ordre du client. Le paquet est signé par un certificat « EST key generator » que l'AC émettrice délivre à la première utilisation et renouvelle seule ; il se rattache à l'AC que sert \`/cacerts\` et a la famille de clé de l'AC, Ed25519 sous une AC Ed448 (v2.252).
 
 ## Onglet Informations
 

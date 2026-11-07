@@ -40,8 +40,8 @@ export default {
           { label: '续期时吊销 (v2.251)', text: '启用“续期后吊销旧证书”（本地 ACME › 续期策略）后，当本地原因为 keyCompromise、affiliationChanged、superseded 或 cessationOfOperation 时，CA 会收到该原因，否则不带原因。吊销失败时，续期任务会重试直到证书过期，并触发 acme_order.revocation_failed' },
           { label: '续期阈值 (v2.249)', text: '“到期前天数”在 CA 未建议续期窗口 (ARI) 时生效。有效期短于该阈值 1.5 倍的证书改为在其最后三分之一时段内续期' },
           { label: '长名称 (v2.249)', text: '超过 64 个字符的首个名称仅放入主题备用名称并标记为关键，而不会导致完成订单失败' },
-          { label: '域名与通配符 (v2.247)', text: '同时包含域名及其通配符的订单，在共用名称下每个授权获得一个 TXT 值，DNS 提供商会将每个值添加在其他值旁边。DuckDNS、Hurricane Electric 和 FreeDNS 每个名称只保留一个值，因此无法同时验证两者' },
-          { label: 'TXT 清理 (v2.251)', text: '清理只移除其订单的 TXT 值，因此其他订单，或共用该名称的通配符和根域名，会保留各自的值。DuckDNS、Hurricane Electric 和 FreeDNS 每个名称只保留一个值，仍会清除它，并在日志中给出警告，与提供商拒绝的任何清理相同' },
+          { label: '域名与通配符 (v2.252)', text: '同时包含域名及其通配符的订单，在共用名称下每个授权获得一个 TXT 值，DNS 提供商会将每个值添加在其他值旁边。DuckDNS、Hurricane Electric 和 FreeDNS 每个名称只保留一个值，因此这类订单会在询问 CA 之前被拒绝，在同一子域名下包含两个主机的 DuckDNS 订单也是如此：请分开提交，一个接一个' },
+          { label: 'TXT 清理 (v2.252)', text: '清理只移除其订单的 TXT 值，因此其他订单，或共用该名称的通配符和根域名，会保留各自的值。DuckDNS、Hurricane Electric 和 FreeDNS 每个名称只保留一个值：仅当没有其他进行中的订单使用该名称时才会清除' },
           { label: '名称唯一 (v2.251)', text: '创建和重命名时，已被使用的 DNS 提供商或外部 CA 账户名称会被拒绝 (409)。升级时，先前重复的名称按创建先后依次重命名为“名称 (2)”、“名称 (3)”' },
           { label: 'Vercel 团队 (v2.251)', text: 'Vercel 提供商可为团队所拥有的域名填写可选的 Team ID' },
           { label: 'RcodeZero 令牌 (v2.251)', text: 'RcodeZero 需要具有区域读写权限的 API 令牌，而不是仅限 ACME 权限的令牌' },
@@ -72,7 +72,7 @@ export default {
           { label: 'EAB凭据', text: '需要EAB的CA的External Account Binding凭据（如ZeroSSL、Google Trust），在“外部 CA 账户”中的 CA 账户上输入' },
           { label: 'DNS挑战', text: 'UCM使用配置的DNS提供商代表客户端处理DNS-01挑战' },
           { label: '清理被替换的证书', text: '可选开关：当代理订单 finalize 时，删除之前由代理订单为完全相同域名集合导入的证书。已吊销证书始终保留；非代理证书绝不受影响。默认关闭' },
-                  { label: '客户端预检 (v2.217)', text: '代理还会发布用每个客户端账户密钥计算的 dns-01 TXT 值：lego/Traefik/Caddy 的传播预检无需禁用即可通过；重试的 new-order 会返回该账户仍在等待的订单' },
+                  { label: '客户端预检 (v2.217)', text: '代理还会发布用每个客户端账户密钥计算的 dns-01 TXT 值：lego/Traefik/Caddy 的传播预检无需禁用即可通过，但 DuckDNS、Hurricane Electric 和 FreeDNS 例外，它们只保留一个值：请在这些提供商上禁用客户端预检；重试的 new-order 会返回该账户仍在等待的订单' },
                   { label: '客户端兼容性 (v2.246)', text: '要求 EAB 时，onlyReturnExisting 查询以及使用已注册密钥的 new-account 会返回现有账户 (cert-manager)。账户 URL 可响应读取、联系信息更新和停用，并接受授权停用 (lego)，challenge 响应带有 Link rel="up"' },
         ]
       },
@@ -267,7 +267,7 @@ ECDSA 密钥推荐用于现代部署:, 更小、更快且同样安全。
 
 每个提供商需要特定于该 DNS 服务的 API 凭据。
 
-清理只移除其订单的 TXT 值，因此其他订单，或共用该名称的通配符和根域名，会保留各自的值；DuckDNS、Hurricane Electric 和 FreeDNS 每个名称只保留一个值，仍会清除它。Vercel 可为团队所拥有的域名填写可选的 **Team ID**，RcodeZero 需要具有区域读写权限的令牌。已被使用的提供商名称会被拒绝 (v2.251)。
+清理只移除其订单的 TXT 值，因此其他订单，或共用该名称的通配符和根域名，会保留各自的值；DuckDNS、Hurricane Electric 和 FreeDNS 每个名称只保留一个值，因此仅当没有其他进行中的订单使用该名称时才会清除，并拒绝同时包含域名及其通配符的订单 (v2.252)。Vercel 可为团队所拥有的域名填写可选的 **Team ID**，RcodeZero 需要具有区域读写权限的令牌。已被使用的提供商名称会被拒绝 (v2.251)。
 
 #### 自定义命令提供商
 对于没有原生驱动的 DNS 服务，**自定义命令**提供商运行管理员配置的本地命令来创建/删除 TXT 记录。记录详情通过环境变量传递：

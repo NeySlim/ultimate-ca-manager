@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'Einen CSR einreichen und ein signiertes Zertifikat erhalten' },
           { label: '/simplereenroll', text: 'Ein bestehendes Zertifikat erneuern (erfordert mTLS)' },
           { label: '/csrattrs', text: 'Vom Server empfohlene CSR-Attribute abrufen' },
-          { label: '/serverkeygen', text: 'Server generiert ein Schlüsselpaar und gibt Zertifikat + Schlüssel zurück. Der Schlüssel übernimmt die Stärke der ausstellenden CA, in der Familie des Anfrageschlüssels bei RSA oder EC (dessen Größe oder Kurve wird ignoriert), sonst der der CA, auf den nächstliegenden Typ verschoben, den die Richtlinien erlauben; über mTLS ist er RSA oder EC (v2.251)' },
+          { label: '/serverkeygen', text: 'Server generiert ein Schlüsselpaar und gibt Zertifikat + Schlüssel zurück. Der Schlüssel übernimmt die Stärke der ausstellenden CA, in der Familie des Anfrageschlüssels bei RSA oder EC (dessen Größe oder Kurve wird ignoriert), sonst der der CA, auf den nächstliegenden Typ verschoben, den die Richtlinien erlauben. Der Schlüssel kommt unter TLS als unverschlüsseltes PKCS#8; eine CSR, die den Schlüssel des mTLS-Zertifikats nennt (AsymmetricDecryptKeyIdentifier), erhält ihn an dieses Zertifikat verschlüsselt, per Schlüsseltransport für RSA ab 2048 Bit (keyEncipherment) oder per Schlüsselvereinbarung für EC (keyAgreement), mit den Algorithmen aus den SMIMECapabilities der CSR, in einem Schlüsselpaket, das ein EST-key-generator-Zertifikat signiert, das die ausstellende CA dafür ausstellt (Ed25519 unter einer Ed448-CA, v2.252)' },
         ]
       },
     ],
@@ -125,7 +125,9 @@ Vom Server empfohlene CSR-Attribute (OIDs) abrufen.
 ### POST /serverkeygen
 Server generiert ein Schlüsselpaar und gibt das Zertifikat zusammen mit dem privaten Schlüssel zurück. Nützlich, wenn der Client keine Schlüssel lokal generieren kann.
 
-Der erzeugte Schlüssel übernimmt die Stärke der ausstellenden CA: die Familie des Anfrageschlüssels bei RSA oder EC (dessen Größe oder Kurve wird ignoriert), sonst die der CA, auf den nächstliegenden Typ verschoben, den die Richtlinien erlauben. Über mTLS ist er RSA oder EC, die Schlüsseltypen, die sein CMS-Schlüsseltransport trägt (v2.251).
+Der erzeugte Schlüssel übernimmt die Stärke der ausstellenden CA: die Familie des Anfrageschlüssels bei RSA oder EC (dessen Größe oder Kurve wird ignoriert), sonst die der CA, auf den nächstliegenden Typ verschoben, den die Richtlinien erlauben.
+
+Der private Schlüssel kommt als unverschlüsseltes PKCS#8 (\`application/pkcs8\`), durch TLS geschützt. Um ihn verschlüsselt zu erhalten, authentifizieren Sie sich per mTLS und tragen den Schlüsselbezeichner des Client-Zertifikats in die CSR ein (AsymmetricDecryptKeyIdentifier): Der Schlüssel kommt dann in einem RFC-5958-Schlüsselpaket, das für dieses Zertifikat umhüllt ist, per Schlüsseltransport für ein RSA-Zertifikat ab 2048 Bit mit keyEncipherment oder per Schlüsselvereinbarung (ECDH) für ein EC-Zertifikat mit keyAgreement; Schlüsseltransport bzw. Schlüsselvereinbarung und Inhaltsalgorithmen stammen aus den SMIMECapabilities der CSR in der Reihenfolge des Clients. Das Paket signiert ein Zertifikat „EST key generator“, das die ausstellende CA bei der ersten Nutzung ausstellt und selbst erneuert; es führt zu der CA, die \`/cacerts\` liefert, und hat deren Schlüsselfamilie, Ed25519 unter einer Ed448-CA (v2.252).
 
 ## Informations-Tab
 

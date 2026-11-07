@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'Enviar un CSR y recibir un certificado firmado' },
           { label: '/simplereenroll', text: 'Renovar un certificado existente (requiere mTLS)' },
           { label: '/csrattrs', text: 'Obtener los atributos de CSR recomendados por el servidor' },
-          { label: '/serverkeygen', text: 'El servidor genera un par de claves y devuelve el certificado + clave. La clave toma la fortaleza de la CA emisora, en la familia de la clave de la solicitud si es RSA o EC (su tamaño o curva se ignora), si no la de la CA, llevada al tipo más cercano que permitan las políticas; sobre mTLS es RSA o EC (v2.251)' },
+          { label: '/serverkeygen', text: 'El servidor genera un par de claves y devuelve el certificado + clave. La clave toma la fortaleza de la CA emisora, en la familia de la clave de la solicitud si es RSA o EC (su tamaño o curva se ignora), si no la de la CA, llevada al tipo más cercano que permitan las políticas. La clave se entrega como PKCS#8 sin cifrar bajo TLS; una CSR que nombre la clave del certificado mTLS (AsymmetricDecryptKeyIdentifier) la recibe cifrada para ese certificado, mediante transporte de clave para RSA de 2048 bits o más (keyEncipherment) o acuerdo de clave para EC (keyAgreement), con los algoritmos que enumera el SMIMECapabilities de la CSR, en un paquete de claves firmado por un certificado EST key generator que la CA emisora expide para este fin (Ed25519 bajo una CA Ed448, v2.252)' },
         ]
       },
     ],
@@ -125,7 +125,9 @@ Obtener los atributos de CSR (OID) recomendados por el servidor.
 ### POST /serverkeygen
 El servidor genera un par de claves y devuelve el certificado junto con la clave privada. Útil cuando el cliente no puede generar claves localmente.
 
-La clave generada toma la fortaleza de la CA emisora: la familia de la clave de la solicitud cuando es RSA o EC (su tamaño o curva se ignora), si no la de la CA, llevada al tipo más cercano que permitan las políticas. Sobre mTLS es RSA o EC, los tipos de clave que transporta su transporte de clave CMS (v2.251).
+La clave generada toma la fortaleza de la CA emisora: la familia de la clave de la solicitud cuando es RSA o EC (su tamaño o curva se ignora), si no la de la CA, llevada al tipo más cercano que permitan las políticas.
+
+La clave privada se entrega como PKCS#8 sin cifrar (\`application/pkcs8\`), protegida por TLS. Para recibirla cifrada, autentíquese con mTLS e incluya en la CSR el identificador de clave del certificado de cliente (AsymmetricDecryptKeyIdentifier): la clave llega entonces en un paquete de claves RFC 5958 envuelto para ese certificado, mediante transporte de clave para un certificado RSA de 2048 bits o más que declare keyEncipherment, o mediante acuerdo de clave (ECDH) para un certificado EC que declare keyAgreement, con los algoritmos de transporte o acuerdo de clave y de contenido tomados del SMIMECapabilities de la CSR en el orden del cliente. El paquete está firmado por un certificado "EST key generator" que la CA emisora expide en el primer uso y renueva por sí misma; encadena con la CA que sirve \`/cacerts\` y tiene la familia de claves de la CA, Ed25519 bajo una CA Ed448 (v2.252).
 
 ## Pestaña de Información
 
