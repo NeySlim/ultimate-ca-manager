@@ -12,6 +12,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Tuple
 
 import asn1crypto.cms
+import asn1crypto.csr
 import asn1crypto.x509
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
@@ -75,6 +76,19 @@ def _scep_allow_no_challenge() -> bool:
     another way (isolated network, mTLS front).
     """
     return os.environ.get('UCM_SCEP_ALLOW_NO_CHALLENGE', '').lower() in ('1', 'true', 'yes')
+
+
+def _csr_challenge_password(csr_der: bytes):
+    """The CSR's challengePassword, decoded by its DirectoryString type
+    (RFC 2985 §5.4.1: every string type MUST be processed), or None."""
+    try:
+        info = asn1crypto.csr.CertificationRequest.load(csr_der)['certification_request_info']
+        for attr in info['attributes']:
+            if attr['type'].dotted == '1.2.840.113549.1.9.7' and len(attr['values']):
+                return attr['values'][0].native
+    except Exception as e:
+        logger.debug(f"SCEP: Could not extract challenge from CSR: {e}")
+    return None
 
 
 class SCEPService:
@@ -467,19 +481,7 @@ class SCEPService:
 
             # ---- 6. Also check challengePassword in CSR attributes (scepclient) ----
             if not self._has_usable_challenge_password(challenge_pwd):
-                try:
-                    from cryptography.x509.oid import AttributeOID
-                    for attr in csr.attributes:
-                        if attr.oid == AttributeOID.CHALLENGE_PASSWORD:
-                            challenge_pwd = attr.value
-                            if isinstance(challenge_pwd, bytes):
-                                try:
-                                    challenge_pwd = challenge_pwd.decode("utf-8")
-                                except UnicodeDecodeError:
-                                    pass
-                            break
-                except Exception as e:
-                    logger.debug(f"SCEP: Could not extract challenge from CSR: {e}")
+                challenge_pwd = _csr_challenge_password(csr_data)
 
             if self._recipient_requires_password(
                 signer_cert
@@ -521,7 +523,11 @@ class SCEPService:
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
                 ), 200
 
-            if self.intune_client is None and self.challenge_password:
+            # RFC 8894 §2.4: a RenewalReq is authenticated by the issued certificate
+            # that signs it (_validate_renewal, step 8), so its challenge is not
+            # compared; an EC client's password still keys the PWRI reply.
+            if (self.intune_client is None and self.challenge_password
+                    and message_type != self.MSG_TYPE_RENEWAL_REQ):
                 if not self._has_usable_challenge_password(
                     challenge_pwd
                 ) or not hmac.compare_digest(

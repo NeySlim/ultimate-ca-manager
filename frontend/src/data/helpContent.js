@@ -490,7 +490,7 @@ export const helpContent = {
         items: [
           { label: 'Signing CA', text: 'Select which CA signs SCEP-enrolled certificates. Devices encrypt their request to this CA, so it must hold an RSA key in software: EC, HSM-backed, keyless, offline and revoked CAs are not listed (v2.248)' },
           { label: 'Auto-Approve', text: 'Automatically approve requests with valid challenge passwords' },
-          { label: 'Challenge Password', text: 'Shared secret that devices use to authenticate enrollment' },
+          { label: 'Challenge Password', text: 'Shared secret that devices use to authenticate enrollment. A renewal (RenewalReq) signed by a certificate the CA issued is authenticated by that certificate, so its challenge is not checked and rotating the secret does not stop enrolled devices from renewing (RFC 8894 §2.4)' },
           { label: 'Device keys (v2.248)', text: 'A device signs its request with an RSA, ECDSA, Ed25519 or ML-DSA key; an ML-DSA signature follows RFC 9882 (SHA-512 digest). Ed448 is refused, and ML-DSA too in FIPS mode' },
         ]
       },

@@ -875,7 +875,9 @@ Point each device fleet, MDM profile, or tenant at its own profile URL. The unla
 Manage per-CA challenge passwords. Devices must include a valid challenge password in their enrollment request to authenticate.
 
 - **View password**: Show the current challenge for a CA
-- **Regenerate**: Create a new challenge password (invalidates the old one)
+- **Regenerate**: Create a new challenge password (invalidates the old one for new enrollments)
+
+A renewal (RenewalReq) signed by a certificate the CA issued is authenticated by that certificate: its challenge password is not checked, so a regenerated secret does not stop enrolled devices from renewing (RFC 8894 §2.4). An EC device still sends a password, which keys the encryption of its reply.
 
 ### Information
 Displays the SCEP endpoint URL and integration instructions.

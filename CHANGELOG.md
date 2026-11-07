@@ -29,6 +29,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST: the encrypted `serverkeygen` key came in a SignedData of type `data`, signed by the generated key itself and without signed attributes. It now comes in an RFC 5958 key package (`id-ct-KP-aKeyPackage`) with content-type and message-digest attributes, signed by an `EST key generator` certificate that the issuing CA issues on first use, HSM CAs included (RFC 7030 section 4.4.2, RFC 5652 section 5.3).
 - EST: without a requested encryption key, `serverkeygen` returned a PKCS#8 encrypted with the Basic password, or a CMS over mTLS. The key now comes as unencrypted `application/pkcs8` under TLS, and a request naming a key UCM does not hold, or a client certificate that does not allow key transport, is refused (RFC 7030 section 4.4.1).
 - Uploads were spooled to the system temp directory, so a restore larger than a small `/tmp` tmpfs (100 MB in the production compose file) failed while the form was read, and a memory-backed `/tmp` held the archive in RAM. Uploads are now spooled under `DATA_DIR/tmp`, falling back to the system temp directory only when that is not writable.
+- SCEP: a RenewalReq signed by a certificate the CA issued was refused unless it carried the current challenge password, so a client that omitted it, as RFC 8894 §2.4 recommends, or sent the original one after a rotation could not renew. The signing certificate now authenticates the renewal and the challenge is no longer compared.
+- SCEP: a challenge password sent in the CSR as a BMPString or UniversalString was read as UTF-8 and refused. Every DirectoryString type is now decoded by its type (RFC 2985 §5.4.1).
 
 ### Security
 
