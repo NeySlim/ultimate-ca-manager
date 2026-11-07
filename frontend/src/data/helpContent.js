@@ -489,8 +489,9 @@ export const helpContent = {
         icon: Gear,
         items: [
           { label: 'Signing CA', text: 'Select which CA signs SCEP-enrolled certificates. Devices encrypt their request to this CA, so it must hold an RSA key in software: EC, HSM-backed, keyless, offline and revoked CAs are not listed (v2.248)' },
-          { label: 'Auto-Approve', text: 'Automatically approve requests with valid challenge passwords' },
-          { label: 'Challenge Password', text: 'Shared secret that devices use to authenticate enrollment' },
+          { label: 'Auto-Approve', text: 'Automatically approve requests with valid challenge passwords, or renewals signed by a certificate the same endpoint issued' },
+          { label: 'Serve on plain HTTP', text: 'Off by default. Also answers SCEP on the HTTP protocol port (8080 by default), at http://your-server:8080/scep/pkiclient.exe and the profile URLs, for clients such as sscep that cannot use HTTPS. RFC 8894 §7.10: SCEP messages are already protected, the CMS envelope keeps the challenge password private' },
+          { label: 'Challenge Password', text: 'Shared secret that devices use to authenticate enrollment. A renewal (RenewalReq) signed by a certificate that the same endpoint (profile or global) issued is authenticated by that certificate, so its challenge is not checked and rotating the secret does not stop enrolled devices from renewing (RFC 8894 §2.4). Any other certificate still needs the endpoint\'s challenge' },
           { label: 'Device keys (v2.248)', text: 'A device signs its request with an RSA, ECDSA, Ed25519 or ML-DSA key; an ML-DSA signature follows RFC 9882 (SHA-512 digest). Ed448 is refused, and ML-DSA too in FIPS mode' },
         ]
       },
@@ -512,11 +513,11 @@ export const helpContent = {
     tips: [
       'Use unique challenge passwords per CA for better security auditing',
       'Auto-approve is convenient but review requests manually in high-security environments',
-      'SCEP URL format: https://your-server:port/scep',
+      'SCEP URL: https://your-server:8443/scep/pkiclient.exe for the configured CA, https://your-server:8443/scep/<profile>/pkiclient.exe for a profile',
       'Intune profiles need Auto-Approve on. Intune\'s enrollment is a synchronous validate-then-issue round trip with no approval queue on its side',
     ],
     warnings: [
-      'Challenge passwords are transmitted in the SCEP request: use HTTPS for transport security',
+      'The challenge password belongs in the CSR, which travels inside the CMS envelope encrypted to the CA (RFC 8894 §2.4), so plain HTTP does not expose it; a client that sends it as a signed attribute outside the envelope does, over HTTP and to anything that logs the request',
     ],
     related: ['Certificates', 'CAs']
   },

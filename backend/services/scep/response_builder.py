@@ -39,6 +39,7 @@ def build_cert_rep(
     ca_key,
     ca_cert: x509.Certificate,
     fail_info: Optional[int] = None,
+    fail_info_text: Optional[str] = None,
 ) -> bytes:
     """
     Build a signed CertRep PKCS#7 response (RFC 8894 §4).
@@ -51,6 +52,7 @@ def build_cert_rep(
         ca_key: CA RSA private key for signing
         ca_cert: CA certificate embedded in SignedData
         fail_info: Failure reason code (required when status == STATUS_FAILURE)
+        fail_info_text: Human-readable reason, sent as failInfoText on FAILURE
 
     Returns:
         DER-encoded ContentInfo/SignedData CertRep
@@ -78,6 +80,12 @@ def build_cert_rep(
             'type': '2.16.840.1.113733.1.9.4',     # failInfo
             'values': [asn1crypto.core.PrintableString(str(fail_info))],
         })
+        if fail_info_text:
+            # RFC 8894 §3.3.2.2: failInfoText, a UTF8String that expands on failInfo
+            scep_attrs.append({
+                'type': '1.3.6.1.5.5.7.24.1',
+                'values': [asn1crypto.core.UTF8String(fail_info_text[:255])],
+            })
 
     sender_nonce = secrets.token_bytes(16)
     scep_attrs.append({
@@ -180,5 +188,5 @@ def build_error_response(
     logger.warning(f"SCEP error response: failInfo={fail_info}, message={message}")
     return build_cert_rep(
         STATUS_FAILURE, b'', transaction_id, recipient_nonce, ca_key, ca_cert,
-        fail_info=fail_info,
+        fail_info=fail_info, fail_info_text=message,
     )

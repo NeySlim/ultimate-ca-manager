@@ -13,12 +13,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Deployment: a deploy target can be an HTTP API instead of an SSH host, with a URL, a method, encrypted request headers and a body template rendered from the certificate (`{{cert_pem|json}}`, `{{fullchain_pem}}`, `{{cn}}`, `{{serial}}`...), through the same delivery queue; the private key is sent only with an explicit opt-in over verified HTTPS, with an optional pasted trust anchor for a self-signed appliance (discussion #428, requested by @gjarassier, migration 131).
 - EST: the encrypted `serverkeygen` key can now go to an EC client certificate by key agreement (ephemeral-static ECDH, RFC 5753), and the key transport or key agreement and the content cipher follow the CSR's SMIMECapabilities in the client's order of preference, with AES-CBC when no listed content cipher is available. A list naming only key transport or agreement algorithms UCM lacks is refused with the supported ones named, as is an RSA client key under 2048 bits (RFC 7030 section 4.4.2).
+- SCEP: a "Serve on plain HTTP" setting, off by default, also answers SCEP on the HTTP protocol port (8080 by default) for clients such as sscep that cannot use HTTPS; RFC 8894 §7.10 needs no TLS, as the CMS envelope protects the messages.
 
 ### Changed
 
 - PostgreSQL: UCM connects with psycopg 3, which sends values apart from the statement, so a database error that quotes the statement no longer carries them. psycopg2 is no longer shipped, and a `postgresql+psycopg2://` URL now uses psycopg 3.
 - Dependencies: SQLAlchemy 2.1 is accepted, now that every PostgreSQL URL reaches psycopg 3.
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
+- SCEP: a RenewalReq signed by a certificate issued through the same endpoint is authenticated by that certificate, so its challenge password is no longer compared and a rotated secret no longer blocks renewal; a certificate from another profile or protocol still needs the endpoint's challenge.
+- SCEP: every FAILURE reply now carries a failInfoText attribute giving the reason (RFC 8894 §3.2.1.4).
 
 ### Fixed
 
@@ -29,6 +32,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST: the encrypted `serverkeygen` key came in a SignedData of type `data`, signed by the generated key itself and without signed attributes. It now comes in an RFC 5958 key package (`id-ct-KP-aKeyPackage`) with content-type and message-digest attributes, signed by an `EST key generator` certificate that the issuing CA issues on first use, HSM CAs included (RFC 7030 section 4.4.2, RFC 5652 section 5.3).
 - EST: without a requested encryption key, `serverkeygen` returned a PKCS#8 encrypted with the Basic password, or a CMS over mTLS. The key now comes as unencrypted `application/pkcs8` under TLS, and a request naming a key UCM does not hold, or a client certificate that does not allow key transport, is refused (RFC 7030 section 4.4.1).
 - Uploads were spooled to the system temp directory, so a restore larger than a small `/tmp` tmpfs (100 MB in the production compose file) failed while the form was read, and a memory-backed `/tmp` held the archive in RAM. Uploads are now spooled under `DATA_DIR/tmp`, falling back to the system temp directory only when that is not writable.
+- SCEP: a RenewalReq signed by a certificate the CA issued was refused unless it carried the current challenge password, so a client that omitted it, as RFC 8894 §2.4 recommends, or sent the original one after a rotation could not renew. A certificate issued through the same endpoint now authenticates the renewal without the challenge.
+- SCEP: a challenge password sent in the CSR as a BMPString or UniversalString was read as UTF-8 and refused. Every DirectoryString type is now decoded by its type (RFC 2985 §5.4.1).
+- SCEP: GetNextCACert served as the rollover certificate any CA sharing the current CA's display name, even one with another subject and key, or a revoked or offline one. It now serves only a CA with the same parent and subject DN that SCEP can use (software RSA key) and expires later, and answers 404 otherwise.
+- In-app help: the SCEP URL was given as `/scep`, which serves the web interface, and HTTPS was said to protect the challenge password. The help now gives `/scep/pkiclient.exe` and the profile URLs, and says the CMS envelope protects the challenge.
+- SCEP: a request enveloped with single DES or an unknown cipher or key transport failed as badMessageCheck, and no failure said why. It now fails as badAlg, and every failure carries its reason in failInfoText, the administrator's rejection reason included (RFC 8894 §3.2.1.4, §3.3.2.2).
+- SCEP: a POST without `operation` was answered with the capabilities. It is now processed as the PKIOperation it must be (RFC 8894 §4.3).
 
 ### Security
 

@@ -2060,6 +2060,8 @@
     "enrollmentRequest": "SCEP登録リクエスト",
     "getCaCertChain": "GetCACertで完全なチェーンを返す",
     "getCaCertChainHelp": "オフ（既定）：CA証明書単体: Apple/MDMクライアントに必要。オン：完全なチェーンを含む縮退PKCS#7（RFC 8894）。",
+    "plainHttp": "平文HTTPでも提供",
+    "plainHttpHelp": "HTTPプロトコルポート（既定は8080）でもSCEPに応答します。HTTPSを使えないsscepなどのクライアント向けです。要求とそのチャレンジパスワードはCMSエンベロープで既に保護されています（RFC 8894 §7.10）。",
     "enforceSigningTime": "signingTimeの時刻ずれを強制",
     "timeSkewMinutes": "許容する時刻ずれ（分）",
     "timeSkewMinutesHelp": "NTPのないデバイスは時刻がずれます。強制が有効な場合、この範囲外のリクエストは拒否されます。",
