@@ -36,8 +36,8 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir "pyspnego[kerberos]==$(pip show pyspnego | sed -n 's/^Version: //p')" && \
     pip install --no-cache-dir --no-deps pyjks==20.0.0
 
-# FIPS variant builder: same requirements, psycopg2-binary and psycopg[binary] swapped for
-# psycopg2 and psycopg[c], and every library that links OpenSSL or libxml2 compiled from source.
+# FIPS variant builder: same requirements, psycopg[binary] swapped for psycopg[c],
+# and every library that links OpenSSL or libxml2 compiled from source.
 FROM python:3.13-slim-trixie AS builder-1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -57,15 +57,13 @@ RUN python -m venv /opt/ucm/venv
 ENV PATH="/opt/ucm/venv/bin:$PATH"
 COPY backend/requirements.txt /tmp/requirements.txt
 RUN set -eu; \
-    test "$(grep -c '^psycopg2-binary' /tmp/requirements.txt)" = 1; \
     test "$(grep -c '^psycopg\[binary\]' /tmp/requirements.txt)" = 1; \
-    sed -e 's/^psycopg2-binary/psycopg2/' -e 's/^psycopg\[binary\]/psycopg[c]/' \
-        /tmp/requirements.txt > /tmp/requirements-fips.txt; \
-    ! grep -Eq '^psycopg2-binary|^psycopg\[binary\]' /tmp/requirements-fips.txt; \
-    test "$(diff /tmp/requirements.txt /tmp/requirements-fips.txt | grep -c '^[<>]')" = 4
+    sed 's/^psycopg\[binary\]/psycopg[c]/' /tmp/requirements.txt > /tmp/requirements-fips.txt; \
+    ! grep -q '^psycopg\[binary\]' /tmp/requirements-fips.txt; \
+    test "$(diff /tmp/requirements.txt /tmp/requirements-fips.txt | grep -c '^[<>]')" = 2
 RUN --mount=type=cache,target=/root/.cargo/registry \
     pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir --no-binary cryptography,psycopg2,psycopg-c,lxml,xmlsec \
+    pip install --no-cache-dir --no-binary cryptography,psycopg-c,lxml,xmlsec \
         -r /tmp/requirements-fips.txt && \
     pip install --no-cache-dir --no-binary gssapi \
         "pyspnego[kerberos]==$(pip show pyspnego | sed -n 's/^Version: //p')" && \
@@ -73,14 +71,12 @@ RUN --mount=type=cache,target=/root/.cargo/registry \
 # Fails the build if any of them still carries its own OpenSSL or libxml2
 RUN set -eu; \
     pip check | grep -v '^pyjks [0-9.]* requires twofish, which is not installed\.$' | { ! grep .; }; \
-    ! pip show psycopg2-binary >/dev/null 2>&1; \
     ! pip show psycopg-binary >/dev/null 2>&1; \
     python -c "import psycopg; assert psycopg.pq.__impl__ == 'c', psycopg.pq.__impl__"; \
     python -c "import ssl; from cryptography.hazmat.backends.openssl.backend import backend as b; \
 assert b.openssl_version_text() == ssl.OPENSSL_VERSION, (b.openssl_version_text(), ssl.OPENSSL_VERSION)"; \
     site=$(python -c 'import sysconfig; print(sysconfig.get_paths()["purelib"])'); \
     ldd "$site"/cryptography/hazmat/bindings/_rust.abi3.so | grep -q 'libcrypto\.so\.3 => /lib/'; \
-    ldd "$site"/psycopg2/_psycopg*.so | grep -q 'libpq\.so\.5 => /lib/'; \
     ldd "$site"/psycopg_c/pq*.so | grep -q 'libpq\.so\.5 => /lib/'; \
     ldd "$site"/xmlsec*.so | grep -q 'libxmlsec1-openssl\.so\.1 => /lib/'; \
     ldd "$site"/lxml/etree*.so | grep -q 'libxml2\.so\.2 => /lib/'; \
