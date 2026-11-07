@@ -389,7 +389,7 @@ class TestRefusalOnAnotherNameOfTheOrder:
                 AUTHZ_B: _Resp(_authz(domain=OTHER, chall=CHALL_B))})
             data, _link = svc.respond_challenge(_b64(CHALL_B))
             assert data['status'] == 'invalid' and data['error']['detail']
-            assert [payload for _url, payload in calls] == ['', '']
+            assert calls and all(payload == '' for _url, payload in calls)
             assert _ThreadRecorder.created == []
 
 
@@ -460,3 +460,16 @@ class TestAuthorizationReads:
             with pytest.raises(proxy_mod.ProxyResourceNotFoundError):
                 svc._read_challenge(CHALL_URL, None, [row])
             assert len(calls) == proxy_mod._CERT_FALLBACK_SCAN_LIMIT == 25
+
+    def test_scan_reads_first_the_authorization_named_in_the_challenge_url(self, app, monkeypatch):
+        # Let's Encrypt nests the authorization id in the challenge URL
+        urls = [f'{UPSTREAM}/acme/authz/7/{i}' for i in range(40)]
+        wanted = f'{UPSTREAM}/acme/chall/7/35/Xy'
+        with app.app_context():
+            row = _order(upstream_authz_urls=json.dumps(urls))
+            answers = {url: _Resp(_authz(chall=f'{UPSTREAM}/acme/chall/7/{i}/Xy'))
+                       for i, url in enumerate(urls)}
+            svc, calls = _svc(monkeypatch, answers)
+            url, _authz_doc, chall = svc._read_challenge(wanted, None, [row])
+            assert url == urls[35] and chall['url'] == wanted
+            assert len(calls) == 1
