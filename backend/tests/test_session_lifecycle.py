@@ -289,3 +289,111 @@ def test_a_locked_password_refusal_is_audited(app, make_user):
     with app.app_context():
         assert AuditLog.query.filter_by(action='login_failure', username=username).filter(
             AuditLog.details.contains('account locked')).count() == 1
+
+
+# --- RFC 6265 §8.4 at the other doors ---------------------------------------
+
+def _planted(app, make_user):
+    """A stored, unauthenticated session identifier (a login waiting on 2FA)."""
+    _uid, username, _ = make_user(totp=True)
+    c = app.test_client()
+    assert _login(c, username).status_code == 200
+    assert not _authenticated(c)
+    return _sid(c)
+
+
+def _victim(app, planted):
+    c = app.test_client()
+    c.set_cookie('session', planted)
+    return c
+
+
+def _cert_login(monkeypatch, app, uid):
+    from types import SimpleNamespace
+    from services.mtls_auth_service import MTLSAuthService
+
+    def _authenticate(cert_info):
+        return db.session.get(User, uid), SimpleNamespace(id=1, cert_serial='0a', name='client'), None
+    monkeypatch.setattr(MTLSAuthService, 'authenticate_certificate', staticmethod(_authenticate))
+
+
+def test_webauthn_login_issues_a_new_identifier(app, make_user, monkeypatch):
+    from services.webauthn_service import WebAuthnService
+    uid, username, _ = make_user()
+    planted = _planted(app, make_user)
+    monkeypatch.setattr(WebAuthnService, 'verify_authentication', staticmethod(
+        lambda user_id, response, host: (True, '', db.session.get(User, uid))))
+    victim = _victim(app, planted)
+    r = _post(victim, '/api/v2/auth/login/webauthn/verify', {'username': username, 'response': {'id': 'x'}})
+    assert r.status_code == 200, r.data
+    assert _sid(victim) != planted and _authenticated(victim)
+
+
+def test_mtls_login_issues_a_new_identifier(app, make_user, monkeypatch):
+    from services.certificate_parser import CertificateParser
+    uid, _username, _ = make_user()
+    planted = _planted(app, make_user)
+    monkeypatch.setattr(CertificateParser, 'extract_from_flask_native',
+                        staticmethod(lambda peercert: {'serial': '0a'}))
+    _cert_login(monkeypatch, app, uid)
+    victim = _victim(app, planted)
+    r = victim.post('/api/v2/auth/login/mtls', environ_base={'peercert': {'subject': ()}})
+    assert r.status_code == 200, r.data
+    assert _sid(victim) != planted and _authenticated(victim)
+
+
+def test_the_certificate_middleware_issues_a_new_identifier(app, make_user, monkeypatch):
+    import middleware.mtls_middleware as mtls_middleware
+    from services.mtls_auth_service import MTLSAuthService
+    uid, _username, _ = make_user()
+    planted = _planted(app, make_user)
+    monkeypatch.setattr(MTLSAuthService, 'is_mtls_enabled', staticmethod(lambda: True))
+    monkeypatch.setattr(mtls_middleware, '_extract_certificate', lambda: {'serial': '0a'})
+    _cert_login(monkeypatch, app, uid)
+    victim = _victim(app, planted)
+    victim.get('/api/v2/account/profile')
+    assert _sid(victim) != planted and _authenticated(victim)
+
+
+def test_oidc_login_issues_a_new_identifier(app, make_user, monkeypatch):
+    from types import SimpleNamespace
+    from api.v2.sso import login_routes
+    from models.sso import SSOProvider, SSOSession
+
+    username = f'oidcsess{uuid.uuid4().hex[:6]}'
+    with app.app_context():
+        others = [p.id for p in SSOProvider.query.filter_by(provider_type='oauth2', enabled=True)]
+        for pid in others:
+            db.session.get(SSOProvider, pid).enabled = False
+        provider = SSOProvider(
+            name=f'oidc-sess-{uuid.uuid4().hex[:6]}', provider_type='oauth2', enabled=True,
+            oauth2_client_id='ucm', oauth2_client_secret='secret',
+            oauth2_auth_url='https://idp.example.test/authorize',
+            oauth2_token_url='https://idp.example.test/token',
+            oauth2_userinfo_url='https://idp.example.test/userinfo',
+            id_token_verify=False, auto_create_users=True)
+        db.session.add(provider)
+        db.session.commit()
+        provider_id = provider.id
+    monkeypatch.setattr(login_routes, 'safe_request_post', lambda *a, **k: SimpleNamespace(
+        ok=True, text='', json=lambda: {'access_token': 'access'}))
+    monkeypatch.setattr(login_routes, 'safe_request_get', lambda *a, **k: SimpleNamespace(
+        ok=True, json=lambda: {'sub': username, 'preferred_username': username,
+                               'email': f'{username}@example.test'}))
+    victim = app.test_client()
+    with victim.session_transaction() as planted_session:
+        planted_session['sso_state'] = 'state'
+        planted_session['sso_pkce_verifier'] = 'verifier'
+    planted = _sid(victim)
+    try:
+        r = victim.get('/api/v2/sso/callback/oauth2?state=state&code=code')
+        assert r.status_code == 302 and 'error' not in r.headers['Location'], r.headers['Location']
+        assert _sid(victim) != planted and _authenticated(victim)
+    finally:
+        with app.app_context():
+            SSOSession.query.filter_by(provider_id=provider_id).delete()
+            User.query.filter_by(username=username).delete()
+            db.session.delete(db.session.get(SSOProvider, provider_id))
+            for pid in others:
+                db.session.get(SSOProvider, pid).enabled = True
+            db.session.commit()

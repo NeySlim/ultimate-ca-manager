@@ -715,3 +715,14 @@ def test_custom_role_follows_the_mapping_through_the_callback(app, mapped_provid
     with app.app_context():
         user = User.query.filter_by(sso_external_id=name_id).one()
         assert (user.role, user.custom_role_id, user.custom_role_source) == ('operator', role_id, 'sso')
+
+
+def test_a_saml_login_issues_a_new_session_identifier(app, provider, idp_signer):
+    # RFC 6265 §8.4: an identifier planted before the login never becomes the session
+    client = app.test_client()
+    with client.session_transaction(base_url=SP_BASE) as planted_session:
+        planted_session['planted'] = True
+    planted = client.get_cookie('session', domain='ucm.example.test').value
+    request_id = _start_login(client)
+    assert _post(client, _response(idp_signer, in_response_to=request_id)) == OK
+    assert client.get_cookie('session', domain='ucm.example.test').value != planted
