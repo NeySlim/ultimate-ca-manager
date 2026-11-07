@@ -1,9 +1,11 @@
 """OCSP HTTP profile (RFC 5019 §6.2, RFC 9110 §8.3.1), OCSP statistics, a hold
 revoked for good, and the delta CRL that follows its base (RFC 5280 §5.2.4)."""
+import base64
 import hashlib
 import json
 from datetime import datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
+from urllib.parse import quote
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -118,9 +120,11 @@ def test_statistics_count_requests_and_cache_hits(app, client, auth_client, crea
         _ask(client, cert, issuer)               # generated and cached
         _ask(client, cert, issuer)               # from the cache
         _ask(client, cert, issuer, nonce=True)   # never from the cache
+        encoded = base64.b64encode(_ocsp_request(cert, issuer)).decode()
+        assert client.get(f'/ocsp/{quote(encoded, safe="")}').status_code == 200  # cached, by GET
         after = stats()
-        assert after['total_requests'] - before['total_requests'] == 3
-        assert after['cache_hits'] - before['cache_hits'] == 1
+        assert after['total_requests'] - before['total_requests'] == 4
+        assert after['cache_hits'] - before['cache_hits'] == 2
 
 
 # --------------------------------------------------------------------------
