@@ -603,5 +603,22 @@ def test_enable_encryption_reports_success_when_only_the_mirror_purge_fails(
     data = json.loads(r.data)['data']
     assert data['master_key'] == no_key.MASTER_KEY_PATH.read_text().strip()
     with app.app_context():
-        assert SystemConfig.query.filter_by(key=OPT_OUT_KEY).first() is None
+        assert SystemConfig.query.filter_by(key=OPT_OUT_KEY).first().value == 'true'
         assert AuditLog.query.filter_by(action='encryption_enabled').count() == 1
+
+
+def test_audit_entries_restored_later_do_not_decide_the_key(app, no_key):
+    """The audit log decides once, at the first start of this version; a restore
+    appends another installation's entries afterwards."""
+    from models import SystemConfig
+    from security.master_key_bootstrap import OPT_OUT_KEY, auto_master_key_allowed, bootstrap_master_key
+    from services.audit_service import AuditService
+
+    with app.app_context():
+        assert auto_master_key_allowed(app)
+        assert SystemConfig.query.filter_by(key=OPT_OUT_KEY).first().value == 'true'
+        AuditService.log_action(action='encryption_disabled', resource_type='system',
+                                resource_name='Private Key Encryption', details='restored',
+                                success=True)
+        assert bootstrap_master_key(app) == 'generated'
+    assert no_key.MASTER_KEY_PATH.exists()

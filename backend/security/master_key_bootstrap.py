@@ -74,7 +74,7 @@ def ephemeral_key_dir_refusal():
             f"{directory} on a named volume or a host directory, or set KEY_ENCRYPTION_KEY")
 
 
-# Set when encryption is disabled from the UI, so a later start creates no key
+# 'false' once encryption is disabled from the UI, so a later start creates no key
 OPT_OUT_KEY = 'security.auto_master_key'
 
 
@@ -93,26 +93,24 @@ def auto_master_key_allowed(app) -> bool:
     row = SystemConfig.query.filter_by(key=OPT_OUT_KEY).first()
     if row:
         return row.value != 'false'
-    # Versions without the opt-out row recorded a disable in the audit log only
-    if _disabled_in_audit_log():
-        record_operator_choice(auto=False)
-        db.session.commit()
-        return False
-    return True
+    # Versions without the row recorded a disable in the audit log only. Read it once:
+    # audit entries a restore appends later come from another installation.
+    allowed = not _disabled_in_audit_log()
+    record_operator_choice(auto=allowed)
+    db.session.commit()
+    return allowed
 
 
 def record_operator_choice(auto: bool) -> None:
     """Stage the operator's choice from enable/disable encryption; the caller commits."""
     from models import db, SystemConfig
+    value = 'true' if auto else 'false'
     row = SystemConfig.query.filter_by(key=OPT_OUT_KEY).first()
-    if auto:
-        if row:
-            db.session.delete(row)
-    elif row:
-        row.value = 'false'
+    if row:
+        row.value = value
     else:
-        db.session.add(SystemConfig(key=OPT_OUT_KEY, value='false',
-                                    description='Encryption disabled by an administrator'))
+        db.session.add(SystemConfig(key=OPT_OUT_KEY, value=value,
+                                    description='Master key created automatically when true'))
 
 
 def _master_key_was_used() -> bool:
