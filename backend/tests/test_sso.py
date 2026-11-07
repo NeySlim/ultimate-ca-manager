@@ -374,6 +374,9 @@ class TestResolveRoleFromMapping:
 # ============================================================
 # SSO User Provisioning — _get_or_create_sso_user (#81)
 # ============================================================
+IDP_KEY = 'oauth2:https://idp.example.test'
+
+
 class TestSSOUserProvisioning:
     """Verify role/userinfo decoupling on SSO login (issue #81)."""
 
@@ -387,17 +390,18 @@ class TestSSOUserProvisioning:
         provider.sync_role_on_login = kwargs.get('sync_role_on_login', False)
         provider.default_role = kwargs.get('default_role', 'viewer')
         provider.role_mapping = kwargs.get('role_mapping', None)
-        provider.idp_key.return_value = kwargs.get('idp_key')
+        provider.idp_key.return_value = kwargs.get('idp_key', IDP_KEY)
         return provider
 
     def _ensure_user(self, app, username='sso.alice', role='admin'):
         from models import db, User
-        # An account of this provider not bound yet: the only kind a name matches.
+        # Not bound yet, orphaned by a deleted provider for this IdP: a kind a name matches.
         u = User.query.filter_by(username=username).first()
         if u:
             u.role = role
             u.password_hash = '!SSO_NO_PASSWORD!'
             u.auth_source, u.sso_provider_id, u.sso_external_id = 'oauth2', None, None
+            u.sso_orphan_of = IDP_KEY
             db.session.commit()
             return u
         u = User(
@@ -408,6 +412,7 @@ class TestSSOUserProvisioning:
             active=True,
             password_hash='!SSO_NO_PASSWORD!',
             auth_source='oauth2',
+            sso_orphan_of=IDP_KEY,
         )
         db.session.add(u)
         db.session.commit()
