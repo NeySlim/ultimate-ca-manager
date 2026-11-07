@@ -89,6 +89,13 @@ def test_two_names_for_two_templates_are_refused(app, subject_ca):
     assert err == 'The request names two different certificate templates'
 
 
+def test_a_name_two_templates_share_up_to_case_is_refused(app, subject_ca):
+    ca_id = subject_ca('Named case CA', {'User': TWINS['User'], 'USER': TWINS['VPNUser']})
+    cert, err = _issue(app, ca_id, _named_csr(name='Named case CA user'))
+    assert cert is None
+    assert err == "Certificate template name 'Named case CA user' is ambiguous"
+
+
 def test_a_named_template_does_not_widen_its_purposes(app, subject_ca):
     """The EKU match used to pick 'Web' here, with its own Enroll ACL."""
     ca_id = subject_ca('Named eku CA', TWINS)

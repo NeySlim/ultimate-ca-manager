@@ -169,6 +169,16 @@ def test_an_expired_message_is_refused(client, wstep_config):
     assert _post(client, _rst(der, timestamp=(now, 'tomorrow'))).status_code == 400
 
 
+def test_the_expiry_skew_is_five_minutes(client, wstep_config):
+    now = datetime.datetime.now(datetime.timezone.utc)
+    der = _make_csr('conf-skew.example.test')[0].public_bytes(Encoding.DER)
+    created = now - datetime.timedelta(minutes=20)
+    late = _post(client, _rst(der, timestamp=(created, now - datetime.timedelta(minutes=6))))
+    assert late.status_code == 400 and _fault(late.data)[2] == 'wsse:MessageExpired'
+    on_time = _post(client, _rst(der, timestamp=(created, now - datetime.timedelta(minutes=4))))
+    assert on_time.status_code == 200, on_time.data
+
+
 def test_a_malformed_request_fault_relates_to_its_message(client, wstep_config):
     r = _post(client, _rst(b'\x30\x03\x02\x01\x00'))
     assert r.status_code == 400
