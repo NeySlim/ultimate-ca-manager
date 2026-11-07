@@ -420,3 +420,78 @@ def test_replacing_write_keeps_the_key_file_0600(no_key):
     no_key.KeyEncryption.write_key_file('new')
     assert path.read_text() == 'new\n'
     assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
+def test_encryption_disabled_before_upgrade_stays_disabled(app, create_ca, no_key, monkeypatch, tmp_path):
+    """A version without the opt-out row recorded the choice in the audit log only."""
+    from config.settings import Config
+    from models import SystemConfig
+    from security.master_key_bootstrap import OPT_OUT_KEY, bootstrap_master_key
+    from services.audit_service import AuditService
+    from services.file_regen_service import regenerate_all_files
+
+    monkeypatch.setattr(Config, 'PRIVATE_DIR', tmp_path / 'private')
+    ca = create_ca()
+    with app.app_context():
+        AuditService.log_action(action='encryption_enabled', resource_type='system',
+                                resource_name='Private Key Encryption', details='on', success=True)
+        AuditService.log_action(action='encryption_disabled', resource_type='system',
+                                resource_name='Private Key Encryption', details='off', success=True)
+        regenerate_all_files()
+        mirrors = sorted(p.name for p in Config.PRIVATE_DIR.glob('*.key'))
+        assert mirrors
+        assert bootstrap_master_key(app) == 'disabled'
+        assert SystemConfig.query.filter_by(key=OPT_OUT_KEY).first().value == 'false'
+    assert not no_key.MASTER_KEY_PATH.exists()
+    assert sorted(p.name for p in Config.PRIVATE_DIR.glob('*.key')) == mirrors
+    assert not no_key.key_encryption.is_encrypted(_ca_prv(app, ca['id']))
+
+
+def test_encryption_enabled_after_a_disable_still_allows_the_key(app, no_key):
+    from security.master_key_bootstrap import auto_master_key_allowed
+    from services.audit_service import AuditService
+
+    with app.app_context():
+        for action in ('encryption_disabled', 'encryption_enabled'):
+            AuditService.log_action(action=action, resource_type='system',
+                                    resource_name='Private Key Encryption', details='', success=True)
+        assert auto_master_key_allowed(app)
+
+
+def test_interrupted_first_encryption_resumes_at_next_start(app, create_ca, no_key, monkeypatch, caplog):
+    import logging
+    from security import encryption as enc
+    from security.master_key_bootstrap import bootstrap_master_key
+
+    ca = create_ca()
+    real = enc.encrypt_all_keys
+    monkeypatch.setattr(enc, 'encrypt_all_keys', lambda dry_run=True: (0, 0, ['CA x: boom']))
+    caplog.set_level(logging.WARNING)
+    with app.app_context():
+        assert bootstrap_master_key(app) == 'generated'
+    assert any(r.name == 'security.master_key_bootstrap' and r.levelno >= logging.ERROR
+               and '1 value' in r.getMessage() for r in caplog.records), caplog.text
+    monkeypatch.setattr(enc, 'encrypt_all_keys', real)
+
+    no_key.key_encryption.reload()
+    with app.app_context():
+        assert no_key.count_master_key_values()[1] > 0
+        assert bootstrap_master_key(app) == 'present'
+        assert no_key.count_master_key_values()[1] == 0
+    assert no_key.key_encryption.is_encrypted(_ca_prv(app, ca['id']))
+
+
+def test_bootstrap_never_overwrites_a_key_another_process_wrote(app, no_key, monkeypatch):
+    """The guard runs before the write: a key written in between must survive."""
+    from security import master_key_bootstrap as boot
+
+    other = no_key.KeyEncryption.generate_key()
+
+    def written_meanwhile():
+        no_key.KeyEncryption.write_key_file(other, exclusive=True)
+        return False
+
+    monkeypatch.setattr(boot, '_master_key_was_used', written_meanwhile)
+    with app.app_context():
+        assert boot.bootstrap_master_key(app) == 'present'
+    assert no_key.MASTER_KEY_PATH.read_text().strip() == other

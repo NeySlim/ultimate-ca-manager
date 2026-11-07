@@ -66,12 +66,27 @@ def container_dir_is_persistent(directory, mountinfo: str = None):
 OPT_OUT_KEY = 'security.auto_master_key'
 
 
+def _disabled_in_audit_log() -> bool:
+    from models import AuditLog
+    latest = (AuditLog.query
+              .filter(AuditLog.action.in_(('encryption_enabled', 'encryption_disabled')))
+              .order_by(AuditLog.id.desc()).first())
+    return latest is not None and latest.action == 'encryption_disabled'
+
+
 def auto_master_key_allowed(app) -> bool:
     if not app.config.get('AUTO_MASTER_KEY'):
         return False
-    from models import SystemConfig
+    from models import db, SystemConfig
     row = SystemConfig.query.filter_by(key=OPT_OUT_KEY).first()
-    return not (row and row.value == 'false')
+    if row:
+        return row.value != 'false'
+    # Versions without the opt-out row recorded a disable in the audit log only
+    if _disabled_in_audit_log():
+        record_operator_choice(auto=False)
+        db.session.commit()
+        return False
+    return True
 
 
 def record_operator_choice(auto: bool) -> None:
@@ -123,11 +138,35 @@ def activate_new_master_key(exclusive: bool) -> dict:
     return {'encrypted': encrypted, 'skipped': skipped, 'errors': errors, 'purge': purge}
 
 
+def _log_remaining(errors: list) -> None:
+    if errors:
+        logger.error("🔓 %d value(s) still stored unencrypted under the master key, retried at "
+                     "the next start: %s", len(errors), '; '.join(errors[:5]))
+
+
+def _resume_encryption() -> None:
+    """Encrypt what an interrupted first encryption left in the clear."""
+    try:
+        if not _encryption.count_master_key_values()[1]:
+            return
+        encrypted, _, errors = _encryption.encrypt_all_keys(dry_run=False)
+    except Exception as e:
+        from models import db
+        db.session.rollback()
+        logger.error("🔓 Could not encrypt the values still stored unencrypted: %s", e)
+        return
+    logger.warning("🔑 %d keys and secrets left unencrypted by an earlier start are now encrypted",
+                   encrypted)
+    _log_remaining(errors)
+
+
 def bootstrap_master_key(app) -> str:
     """Create the master key when the installation never had one; returns what was done."""
     key_encryption = _encryption.key_encryption
     path = _encryption.MASTER_KEY_PATH
     if key_encryption.is_enabled:
+        if auto_master_key_allowed(app):
+            _resume_encryption()
         return 'present'
     if not auto_master_key_allowed(app):
         return 'disabled'
@@ -161,8 +200,10 @@ def bootstrap_master_key(app) -> str:
         return 'unwritable'
 
     logger.warning(
-        "🔑 Master key created at %s; %d keys and secrets encrypted. Back this file up: "
-        "without it a copy of the database cannot be decrypted.", path, stats['encrypted'])
+        "🔑 Master key created at %s; %d keys and secrets encrypted, %d errors. Back this file "
+        "up: without it a copy of the database cannot be decrypted.",
+        path, stats['encrypted'], len(stats['errors']))
+    _log_remaining(stats['errors'])
     from services.audit_service import AuditService
     AuditService.log_action(
         action='encryption_enabled',
