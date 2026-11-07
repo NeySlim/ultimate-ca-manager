@@ -397,3 +397,120 @@ def test_an_account_of_another_provider_is_not_opened(app, oidc, ldap):
     finally:
         with app.app_context():
             _cleanup(['tkcross'])
+
+
+# ── A provider deleted then recreated keeps its users ───────────────────────
+
+def _orphan(app, username, sub, through_api=None):
+    """An OIDC account bound to ``sub`` whose provider is then deleted."""
+    with app.app_context():
+        _cleanup([username])
+        old = SSOProvider(name=f'gone-{uuid.uuid4().hex[:6]}', provider_type='oauth2', enabled=False)
+        db.session.add(old)
+        db.session.commit()
+        old_id = old.id
+        db.session.add(User(username=username, email=f'{username}@corp.test', full_name='C',
+                            role='operator', active=True, password_hash='!SSO_NO_PASSWORD!',
+                            auth_source='oauth2', sso_provider_id=old_id, sso_external_id=sub))
+        db.session.commit()
+        if through_api is None:
+            db.session.delete(db.session.get(SSOProvider, old_id))
+            db.session.commit()
+    if through_api is not None:
+        assert through_api.delete(f'/api/v2/sso/providers/{old_id}').status_code == 200
+    return old_id
+
+
+def test_deleting_a_provider_unlinks_its_users(app, auth_client):
+    _orphan(app, 'rvdel', 'del-sub', through_api=auth_client)
+    try:
+        with app.app_context():
+            assert User.query.filter_by(username='rvdel').one().sso_provider_id is None
+    finally:
+        with app.app_context():
+            _cleanup(['rvdel'])
+
+
+@pytest.mark.parametrize('through_api', [False, True])
+def test_a_recreated_provider_opens_its_bound_users(app, auth_client, oidc, through_api):
+    _orphan(app, 'rvcarol', 'carol-sub', through_api=auth_client if through_api else None)
+    try:
+        location, verify = oidc({'sub': 'carol-sub', 'preferred_username': 'rvcarol'})
+        assert location.endswith('/login/sso-complete'), location
+        assert verify['user']['username'] == 'rvcarol'
+        with app.app_context():
+            u = User.query.filter_by(username='rvcarol').one()
+            assert u.sso_provider_id == oidc.provider_id and u.sso_external_id == 'carol-sub'
+    finally:
+        with app.app_context():
+            _cleanup(['rvcarol'])
+
+
+def test_an_orphan_of_another_type_is_not_opened_by_its_id(app, oidc):
+    with app.app_context():
+        _cleanup(['rvsaml'])
+        db.session.add(User(username='rvsaml', email='s@corp.test', full_name='S', role='admin',
+                            active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='saml',
+                            sso_provider_id=None, sso_external_id='shared-id'))
+        db.session.commit()
+    try:
+        location, verify = oidc({'sub': 'shared-id', 'preferred_username': 'rvsamlx'})
+        assert (verify.get('user') or {}).get('username') != 'rvsaml'
+        with app.app_context():
+            assert User.query.filter_by(username='rvsaml').one().sso_provider_id is None
+    finally:
+        with app.app_context():
+            _cleanup(['rvsaml', 'rvsamlx'])
+
+
+# ── An account from before migration 024 is never opened by email ──────────
+
+def test_a_legacy_sso_account_is_not_opened_by_email(app, oidc):
+    with app.app_context():
+        _cleanup(['rvleg', 'rvother'])
+        db.session.add(User(username='rvleg', email='leg@corp.test', full_name='L', role='operator',
+                            active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='local'))
+        db.session.commit()
+    try:
+        location, verify = oidc({'sub': 'att-x', 'preferred_username': 'rvother',
+                                 'email': 'leg@corp.test'})
+        assert (verify.get('user') or {}).get('username') != 'rvleg'
+        with app.app_context():
+            leg = User.query.filter_by(username='rvleg').one()
+            assert leg.sso_external_id is None and leg.auth_source == 'local'
+    finally:
+        with app.app_context():
+            _cleanup(['rvleg', 'rvother'])
+
+
+def test_ldap_without_rules_nor_default_role_says_so(app, ldap):
+    with app.app_context():
+        row = db.session.get(SSOProvider, ldap.provider_id)
+        row.role_mapping, row.default_role = None, None
+        db.session.commit()
+    try:
+        r = ldap('tkldapnorole', dn='uid=tkldapnorole,dc=example', uid='uuid-norole')
+        assert r.status_code == 403
+        assert 'default role' in r.get_json()['message']
+    finally:
+        with app.app_context():
+            _cleanup(['tkldapnorole'])
+
+
+def test_ldap_asks_a_totp_the_user_enrolled_without_enforcement(app, ldap):
+    import pyotp
+    with app.app_context():
+        _cleanup(['tkvolotp'])
+        assert db.session.get(SSOProvider, ldap.provider_id).enforce_2fa is not True
+        db.session.add(User(username='tkvolotp', email='vol@corp.test', full_name='V', role='viewer',
+                            active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='ldap',
+                            sso_provider_id=ldap.provider_id, sso_external_id='uuid-vol',
+                            totp_secret=pyotp.random_base32(), totp_confirmed=True))
+        db.session.commit()
+    try:
+        r = ldap('tkvolotp', dn='uid=tkvolotp,dc=example', uid='uuid-vol')
+        assert r.status_code == 200
+        assert r.get_json()['data'].get('requires_2fa') is True
+    finally:
+        with app.app_context():
+            _cleanup(['tkvolotp'])

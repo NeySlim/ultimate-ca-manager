@@ -130,6 +130,9 @@ def ldap_login():
                 "Sign-in refused: a local account, or one linked to another identity, "
                 "already uses this name. An administrator can link the accounts.", 403)
         if error_code == UNMAPPED:
+            if not _mapping_rules(provider):
+                return error_response(
+                    "Access denied: this provider has no default role and no role mapping rule", 403)
             return error_response(
                 "Access denied: no role mapping rule of this provider matches your account", 403)
         # Generic message — don't disclose whether the LDAP user exists or whether
@@ -175,9 +178,9 @@ def ldap_login():
     if not ok:
         return _err
 
-    # Enforced 2FA: an enrolled second factor is asked, as at the password door.
+    # An enrolled second factor is asked, as at the password door.
     from auth.twofa_enforcement import second_factor_methods
-    second_factors = second_factor_methods(user) if provider.enforce_2fa else []
+    second_factors = second_factor_methods(user)
     if second_factors:
         session.clear()
         session['pending_2fa_user_id'] = user.id
@@ -327,6 +330,16 @@ def _adoptable(user, provider):
     return user.auth_source == provider.provider_type and user.sso_provider_id in (None, provider.id)
 
 
+def _orphan_with_id(provider, external_id):
+    """The one account of this provider type bound to ``external_id`` whose provider
+    was deleted; None when there is none, or several."""
+    orphans = [u for u in User.query.filter(
+                   User.sso_external_id == external_id,
+                   User.auth_source == provider.provider_type).all()
+               if u.sso_provider_id is None or db.session.get(SSOProvider, u.sso_provider_id) is None]
+    return orphans[0] if len(orphans) == 1 else None
+
+
 def _refuse_username_conflict(provider, username):
     logger.warning(
         f"SSO login refused for '{username}' via {provider.name}: the name belongs to a "
@@ -371,6 +384,8 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
     if external_id:
         user = User.query.filter_by(
             sso_provider_id=provider.id, sso_external_id=external_id).first()
+        if not user:
+            user = _orphan_with_id(provider, external_id)
 
     # 2. Not bound yet (legacy, or linked by an admin): match by username, but
     #    only an account this identity may claim.
@@ -385,7 +400,8 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
     if not user and email:
         norm = email.strip().lower()
         candidates = User.query.filter(func.lower(User.email) == norm).all()
-        user = next((u for u in candidates if _adoptable(u, provider)), None)
+        user = next((u for u in candidates
+                     if (u.auth_source or 'local') != 'local' and _adoptable(u, provider)), None)
 
     if not user and conflict:
         return _refuse_username_conflict(provider, username)
@@ -408,8 +424,8 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         if (user.auth_source or 'local') == 'local' and user.password_hash == SSO_NO_PASSWORD:
             user.auth_source = provider.provider_type
             user.sso_provider_id = provider.id
-        elif user.sso_provider_id is None:
-            user.sso_provider_id = provider.id
+        elif user.sso_provider_id != provider.id:
+            user.sso_provider_id = provider.id  # unlinked, or its provider was deleted
 
         # Bind the stable id (trust-on-first-use) for future stable matching.
         _bind_external_id(user, provider, external_id)

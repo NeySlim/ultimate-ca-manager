@@ -3,7 +3,7 @@ from flask import g, request
 from auth.unified import has_permission, require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from models import db
+from models import db, User
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
 import json
@@ -181,7 +181,8 @@ def create_provider():
         provider.ldap_server = data.get('ldap_server')
         provider.ldap_port = data.get('ldap_port', 389)
         provider.ldap_use_ssl = data.get('ldap_use_ssl', False)
-        provider.ldap_start_tls = bool(data.get('ldap_start_tls', False))
+        # RFC 4513 §6.3.3: no clear text password by default, so StartTLS unless LDAPS.
+        provider.ldap_start_tls = bool(data.get('ldap_start_tls', not provider.ldap_use_ssl))
         provider.ldap_verify_ssl = data.get('ldap_verify_ssl', True)
         ca = data.get('ldap_ca_bundle')
         provider.ldap_ca_bundle = ca if isinstance(ca, str) and ca.strip() else None
@@ -425,6 +426,10 @@ def delete_provider(provider_id):
 
     # Delete associated sessions first
     SSOSession.query.filter_by(provider_id=provider_id).delete()
+    # Unlink its users on both backends (SQLite does not apply ON DELETE SET NULL),
+    # so a provider recreated for the same IdP finds them by their stable id.
+    User.query.filter_by(sso_provider_id=provider_id).update(
+        {User.sso_provider_id: None}, synchronize_session=False)
 
     db.session.delete(provider)
     ok, _err = safe_commit(logger, "Failed to delete SSO provider")

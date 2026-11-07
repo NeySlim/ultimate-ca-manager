@@ -227,3 +227,23 @@ def test_plain_ldap_without_starttls_is_unchanged(app, directory, clear_password
     with app.app_context():
         _ldap_authenticate_user(_provider(directory, ldap_start_tls=False), 'alice', USER_SECRET)
     assert directory.first_ops[0] == 0x60
+
+
+@pytest.mark.parametrize('body, expected', [
+    ({}, True),                              # RFC 4513 §6.3.3: no clear text password by default
+    ({'ldap_use_ssl': True}, False),         # LDAPS already protects the bind
+    ({'ldap_start_tls': False}, False),      # an explicit choice is kept
+])
+def test_a_new_ldap_provider_defaults_to_starttls(app, auth_client, body, expected):
+    from models import db
+    from models.sso import SSOProvider
+    r = auth_client.post('/api/v2/sso/providers', json=dict(
+        name=f'starttls-default-{len(body)}-{expected}', provider_type='ldap',
+        ldap_server='ldap.test', **body))
+    assert r.status_code in (200, 201), r.get_json()
+    pid = r.get_json()['data']['id']
+    try:
+        with app.app_context():
+            assert db.session.get(SSOProvider, pid).ldap_start_tls is expected
+    finally:
+        auth_client.delete(f'/api/v2/sso/providers/{pid}')
