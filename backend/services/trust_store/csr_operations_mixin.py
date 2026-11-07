@@ -1008,14 +1008,16 @@ class CSROperationsMixin:
             # on top, as on the issue form. Renewal at par does not apply:
             # the template is the policy, prior EKUs outside it are not
             # resurrected. A template whose every EKU was refused imposes
-            # the cert_type default profile, never the CSR's request.
-            if not tpl_ekus:
+            # the cert_type default profile, never the CSR's request, unless
+            # extra_ekus already give the leaf its purposes.
+            if not tpl_ekus and not extra_oids:
                 logger.warning(
                     "sign_csr: every template EKU was refused for certificate "
                     "type %r; issuing its default profile instead", cert_type,
                 )
             merged = merge_eku_lists(
-                tpl_ekus or _default_ekus_for_cert_type(cert_type), extra_oids
+                tpl_ekus or ([] if extra_oids else _default_ekus_for_cert_type(cert_type)),
+                extra_oids,
             )
             if merged:
                 builder = builder.add_extension(

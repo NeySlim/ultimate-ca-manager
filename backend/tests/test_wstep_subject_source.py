@@ -256,3 +256,17 @@ def test_a_naked_request_under_a_template_without_eku_is_still_derived(app, subj
     cert, err = _issue(app, ca_id, _csr(), MACHINE)
     assert err is None, err
     assert cert.subject.rfc4514_string() == 'CN=win11.example.test'
+
+
+SMARTCARD_LOGON = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2.2')
+
+
+@pytest.mark.parametrize('principal', [USER, MACHINE])
+def test_a_smartcard_logon_only_template_adds_no_default_profile(app, subject_ca, directory, principal):
+    """Smartcard Logon is kept out of the replacing EKUs, so the default profile must not fill in."""
+    ca_id = subject_ca(f'Subject source smartcard CA {principal[:3]}', {
+        'Smartcard': ('usr_cert', ['msSmartcardLogin'], False, 'RSA-2048')})
+    csr = _csr('www.bank.test', [x509.DNSName('www.bank.test')], [SMARTCARD_LOGON])
+    cert, err = _issue(app, ca_id, csr, principal)
+    assert err is None, err
+    assert wstep_service._eku_oids(cert) == {SMARTCARD_LOGON.dotted_string}
