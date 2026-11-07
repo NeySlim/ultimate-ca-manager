@@ -52,12 +52,14 @@ class InwxDnsProvider(BaseDnsProvider):
         }
         
         try:
+            # A 307/308 to another host would resend the login password in the body
             response = requests.post(
                 self._get_api_url(),
                 json=payload,
                 timeout=30,
                 headers={'Content-Type': 'application/json'},
-                cookies=self._cookies
+                cookies=self._cookies,
+                allow_redirects=False,
             )
             
             # Store cookies for session

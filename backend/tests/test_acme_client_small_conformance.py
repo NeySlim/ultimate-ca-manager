@@ -226,6 +226,9 @@ class TestHeaderCredentialProvidersDoNotFollowRedirects:
         ('porkbun', {'api_key': 'k', 'secret_api_key': 's'}, lambda p: p._request('/ping')),
         ('netcup', {'customer_number': 'c', 'api_key': 'k', 'api_password': 'p'},
          lambda p: p._rpc_call('login', {})),
+        ('cloudns', {'auth_id': 'i', 'auth_password': 'p'},
+         lambda p: p._post('/dns/add-record.json', {})),
+        ('inwx', {'username': 'u', 'password': 'p'}, lambda p: p._login()),
     ])
     def test_provider_does_not_follow_redirects(self, monkeypatch, provider_type,
                                                 credentials, call):
@@ -235,7 +238,7 @@ class TestHeaderCredentialProvidersDoNotFollowRedirects:
         def _capture(*_args, **kwargs):
             seen.append(kwargs.get('allow_redirects', True))
             return SimpleNamespace(status_code=400, reason='Bad', text='{}', headers={},
-                                   json=lambda: {}, content=b'{}')
+                                   json=lambda: {}, content=b'{}', cookies=None)
         monkeypatch.setattr('requests.request', _capture)
         monkeypatch.setattr('requests.post', _capture)
         call(create_provider(provider_type, credentials))
