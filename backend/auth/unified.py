@@ -272,7 +272,7 @@ class AuthManager:
             logger.warning(f"Failed to read session_max_lifetime from SystemConfig, using 24h default: {e}")
         return 86400  # 24 hours default
     
-    def create_api_key(self, user_id, name, permissions, expires_days=365):
+    def create_api_key(self, user_id, name, permissions, expires_days=365, not_after=None):
         """
         Create new API key
 
@@ -282,6 +282,7 @@ class AuthManager:
             permissions: List of permissions (e.g., ['read:cas', 'write:certificates'])
             expires_days: Days until expiration. Pass ``None`` or ``0`` for a
                 key that never expires.
+            not_after: Latest expiry allowed, e.g. that of the key asking.
 
         Returns:
             dict: API key info (key is shown ONLY ONCE!)
@@ -301,6 +302,8 @@ class AuthManager:
             expires_at = None
         else:
             expires_at = utc_now() + timedelta(days=int(expires_days))
+        if not_after is not None and (expires_at is None or expires_at > not_after):
+            expires_at = not_after
 
         # Create API key record
         api_key = APIKey(
@@ -418,6 +421,7 @@ def require_auth(permissions=None, session_only=False):
             g.auth_method = auth_result['auth_method']
             g.permissions = auth_result['permissions']
             g.user_id = auth_result['user_id']
+            g.api_key_id = auth_result.get('api_key_id')
 
             # Call the actual route function
             return f(*args, **kwargs)
