@@ -379,3 +379,21 @@ def test_ldap_with_enforced_2fa_asks_the_enrolled_totp(app, ldap):
     finally:
         with app.app_context():
             _cleanup(['tkotp'])
+
+
+def test_an_account_of_another_provider_is_not_opened(app, oidc, ldap):
+    with app.app_context():
+        _cleanup(['tkcross'])
+        db.session.add(User(username='tkcross', email='cross@corp.test', full_name='X', role='admin',
+                            active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='oauth2',
+                            sso_provider_id=oidc.provider_id))
+        db.session.commit()
+    try:
+        r = ldap('tkcross', dn='uid=tkcross,dc=example', uid='uuid-cross')
+        assert r.status_code == 403
+        with app.app_context():
+            u = User.query.filter_by(username='tkcross').one()
+            assert u.sso_provider_id == oidc.provider_id and u.sso_external_id is None
+    finally:
+        with app.app_context():
+            _cleanup(['tkcross'])
