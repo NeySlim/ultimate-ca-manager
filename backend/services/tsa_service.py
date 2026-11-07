@@ -11,10 +11,9 @@ from typing import Optional, Tuple
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, padding
 from cryptography.x509.oid import ExtendedKeyUsageOID, ExtensionOID
 
-from asn1crypto import tsp, cms, core, x509 as asn1_x509
+from asn1crypto import tsp, cms, core
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
@@ -38,6 +37,8 @@ HASH_OIDS = {
     '2.16.840.1.101.3.4.2.3': 'sha512',
 }
 
+TST_INFO_OID = '1.2.840.113549.1.9.16.1.4'
+
 HASH_CLASSES = {
     'sha256': hashes.SHA256,
     'sha384': hashes.SHA384,
@@ -47,7 +48,7 @@ HASH_CLASSES = {
 
 import fips_mode
 from utils import key_algorithms
-from utils.signing_hash import signing_hash_for
+from utils.cms_signed import signature_suite, signed_data
 
 # EdDSA stays out: UCM signs no RFC 8419 SignerInfo (Ed448 would need SHAKE256)
 TSA_SIGNER_FAMILIES = ('RSA', 'EC', 'ML-DSA')
@@ -285,126 +286,26 @@ class TSAService:
         problem = tsa_signer_key_problem(public_key)
         if problem:
             raise ValueError(problem)
-        pq_alg = key_algorithms.get(key_algorithms.label_for_public_key(public_key))
-        if pq_alg is not None and pq_alg.family == 'ML-DSA':
-            # RFC 9882 §3.3: SHA-512 digests the content; ML-DSA signs without one
-            signature_hash_name = 'sha512'
-            # Parsed from DER: asn1crypto would add the NULL parameters §3.3 says MUST be omitted
-            digest_algorithm = cms.DigestAlgorithm.load(bytes.fromhex('300b0609608648016503040203'))
-        else:
-            pq_alg = None
-            signature_hash_name = (
-                message_imprint_hash if message_imprint_hash in HASH_CLASSES else 'sha256'
-            )
-            # An HSM-resident signer may bind the digest to its key: the CMS digest
-            # algorithm and the signature then follow it (self-review of #347)
-            signature_hash = signing_hash_for(self.tsa_key, HASH_CLASSES[signature_hash_name]())
-            signature_hash_name = signature_hash.name
-            digest_algorithm = {'algorithm': signature_hash_name}
-
-        # Compute digest of TSTInfo content with the CMS signature digest.
-        content_digest = hashlib.new(signature_hash_name, tst_info_der).digest()
-
-        # Get certificate DER
+        # PKCS#1 v1.5 even under an RSA-PSS CA: `openssl ts -verify` goes through
+        # OpenSSL's PKCS7 code, which verifies v1.5 only. ML-DSA digests with SHA-512.
+        suite = signature_suite(
+            self.tsa_key, message_imprint_hash if message_imprint_hash in HASH_CLASSES else 'sha256',
+            pss=False, null_digest_params=True,
+        )
+        # RFC 3161 §2.4.2 + RFC 5035: ESSCertIDv2 binds the TSA certificate to the signature
         cert_der = self.tsa_cert.public_bytes(serialization.Encoding.DER)
-        cert_asn1 = asn1_x509.Certificate.load(cert_der)
-
-        # Build SignedAttributes (required per CMS when content type != data)
-        TST_INFO_OID = '1.2.840.113549.1.9.16.1.4'
-
-        # RFC 3161 §2.4.2 + RFC 5035: TSA SignerInfo MUST contain either
-        # ESSCertID (signing-certificate, SHA-1 only) or ESSCertIDv2
-        # (signing-certificate-v2, SHA-256+) to bind the TSA cert to the
-        # signature and prevent cert-substitution attacks. We use v2.
-        cert_sha256 = hashlib.sha256(cert_der).digest()
-        ess_cert_id_v2 = tsp.ESSCertIDv2({
+        signing_cert_v2 = tsp.SigningCertificateV2({'certs': [tsp.ESSCertIDv2({
             'hash_algorithm': {'algorithm': 'sha256'},
-            'cert_hash': cert_sha256,
-        })
-        signing_cert_v2 = tsp.SigningCertificateV2({
-            'certs': [ess_cert_id_v2],
-        })
-
-        signed_attrs = cms.CMSAttributes([
-            cms.CMSAttribute({
-                'type': 'content_type',
-                'values': [cms.ContentType(TST_INFO_OID)],
-            }),
-            cms.CMSAttribute({
-                'type': 'message_digest',
-                'values': [core.OctetString(content_digest)],
-            }),
-            cms.CMSAttribute({
-                'type': 'signing_certificate_v2',
-                'values': [signing_cert_v2],
-            }),
-        ])
-
-        # Sign the DER-encoded signed attributes (with SET OF tag 0x31)
-        signed_attrs_der = signed_attrs.dump()
-        # Per CMS, signature is over the DER with EXPLICIT SET tag (0x31)
-        # PKCS#1 v1.5 even under an RSA-PSS CA: `openssl ts -verify` goes
-        # through OpenSSL's PKCS7 code, which verifies v1.5 only
-        tsa_key = self.tsa_key
-        if pq_alg is not None:
-            # Pure ML-DSA, empty context, under the parameter set's OID with no parameters
-            raw_sig = tsa_key.sign(signed_attrs_der)
-            sig_alg = pq_alg.oid
-        elif isinstance(public_key, ec.EllipticCurvePublicKey):
-            raw_sig = tsa_key.sign(signed_attrs_der, ec.ECDSA(signature_hash))
-            sig_alg = f'{signature_hash_name}_ecdsa'
-        else:
-            raw_sig = tsa_key.sign(signed_attrs_der, padding.PKCS1v15(), signature_hash)
-            sig_alg = f'{signature_hash_name}_rsa'
-
-        # Build SignerInfo
-        issuer_and_serial = cms.IssuerAndSerialNumber({
-            'issuer': cert_asn1.issuer,
-            'serial_number': cert_asn1.serial_number,
-        })
-
-        signer_info = cms.SignerInfo({
-            'version': 'v1',
-            'sid': cms.SignerIdentifier({'issuer_and_serial_number': issuer_and_serial}),
-            'digest_algorithm': digest_algorithm,
-            'signed_attrs': signed_attrs,
-            'signature_algorithm': {'algorithm': sig_alg},
-            'signature': raw_sig,
-        })
-
-        # Build SignedData — version MUST be v3 per RFC 5652 §5.1
-        # because content type is not 'data'. This also fixes asn1crypto's
-        # EXPLICIT [0] tag handling for EncapsulatedContentInfo.
-        signed_data_value = cms.SignedData({
-            'version': 'v3',
-            'digest_algorithms': [digest_algorithm],
-            'encap_content_info': {
-                'content_type': TST_INFO_OID,
-                'content': core.ParsableOctetString(tst_info_der),
-            },
-            'signer_infos': [signer_info],
-        })
-
-        if include_certs:
-            # RFC 3161 §2.4.2: only carry certificates when the client asked
-            # (certReq). The signer leaf comes first; a dedicated signer also
-            # carries its issuer chain so strict verifiers can build a path
-            # (#312). With a CA-certificate signer chain_certs is empty and
-            # this is the single-element list it always was.
-            cert_choices = [cms.CertificateChoices({'certificate': cert_asn1})]
-            for chain_cert in self.chain_certs:
-                chain_der = chain_cert.public_bytes(serialization.Encoding.DER)
-                cert_choices.append(
-                    cms.CertificateChoices(
-                        {'certificate': asn1_x509.Certificate.load(chain_der)}
-                    )
-                )
-            signed_data_value['certificates'] = cert_choices
-
-        content_info = cms.ContentInfo({
-            'content_type': 'signed_data',
-            'content': signed_data_value,
-        })
+            'cert_hash': hashlib.sha256(cert_der).digest(),
+        })]})
+        # RFC 3161 §2.4.2: certificates only when the client asked (certReq), with a
+        # dedicated signer's issuer chain (#312)
+        token = signed_data(
+            TST_INFO_OID, tst_info_der, self.tsa_key, self.tsa_cert, suite=suite,
+            signed_attrs=[{'type': 'signing_certificate_v2', 'values': [signing_cert_v2]}],
+            extra_certs=self.chain_certs, include_certs=include_certs,
+        )
+        content_info = cms.ContentInfo.load(token)
 
         resp = tsp.TimeStampResp({
             'status': {'status': 'granted'},
