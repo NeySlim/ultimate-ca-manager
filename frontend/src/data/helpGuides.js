@@ -2805,9 +2805,9 @@ System-wide security configuration affecting all user accounts and access patter
 Encrypt all CA and certificate private keys stored in the database with AES-256, protected by a master key file kept outside the database.
 
 - **Status and counters**: The section shows whether encryption is enabled and how many keys are currently **encrypted** vs **unencrypted**
-- **First start**: An installation without a master key creates \`/etc/ucm/master.key\` (mode 0600) at startup and encrypts the keys and secrets already stored. In a container this happens only when \`/etc/ucm\` is a named volume or a host directory, never an anonymous volume. It does not happen when \`KEY_ENCRYPTION_KEY\` is set, when the database already holds encrypted keys (safe mode), or with \`UCM_AUTO_MASTER_KEY=false\`. Back up the key file: UCM backups do not need it, but a copy of the database cannot be decrypted without it
+- **First start**: An installation without a master key creates \`/etc/ucm/master.key\` (mode 0600) at startup and encrypts the keys and secrets already stored. In a container this happens only when \`/etc/ucm\` is a named volume or a host directory, never an anonymous volume. It does not happen when \`KEY_ENCRYPTION_KEY\` is set, when the database already holds encrypted keys (safe mode) or an audit chain sealed under a previous key, after encryption was disabled here, or with \`UCM_AUTO_MASTER_KEY=false\`. It also removes the plaintext key copies under \`data/private\`. Back up the key file: UCM backups do not need it, but a copy of the database cannot be decrypted without it
 - **Enable Encryption**: Generates the master key file and encrypts all stored private keys, when no key was created at first start. Back up the key file immediately: without it, encrypted keys are permanently lost
-- **Disable Encryption**: Decrypts all private keys back to plaintext storage (confirmation required)
+- **Disable Encryption**: Decrypts all private keys back to plaintext storage (confirmation required). UCM then creates no key at later starts, until encryption is enabled again
 - **Encrypt remaining keys**: Shown while encryption is enabled and some keys or secrets are still stored unencrypted; encrypts them, leaving those already encrypted as they are
 
 ### Startup Enforcement
