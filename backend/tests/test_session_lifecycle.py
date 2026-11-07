@@ -6,6 +6,7 @@ A password change or reset, a 2FA reset and "revoke all" close the other session
 """
 import hashlib
 import json
+import threading
 import time
 import uuid
 from datetime import timedelta
@@ -397,3 +398,111 @@ def test_oidc_login_issues_a_new_identifier(app, make_user, monkeypatch):
             for pid in others:
                 db.session.get(SSOProvider, pid).enabled = True
             db.session.commit()
+
+
+# --- concurrent bumps: a stale session never keeps itself ---------------------
+
+def _in_thread(fn):
+    """Run ``fn`` in a real second thread (its own app context) and return its result."""
+    out = {}
+    thread = threading.Thread(target=lambda: out.setdefault('result', fn()))
+    thread.start()
+    thread.join(30)
+    assert not thread.is_alive()
+    return out.get('result')
+
+
+def _change_password(c):
+    return _post(c, '/api/v2/account/password',
+                 {'current_password': PASSWORD, 'new_password': NEW_PASSWORD}).status_code
+
+
+def _revoke_all(c):
+    return _post(c, '/api/v2/account/sessions/revoke-all').status_code
+
+
+def test_a_revoke_all_during_a_password_change_keeps_no_stolen_session(app, make_user, monkeypatch):
+    import models.user as user_module
+    _uid, username, _ = make_user()
+    thief = _session(app, username)
+    victim = _session(app, username)
+    real_hash, thief_status = user_module.hash_password, []
+
+    def hash_while_the_thief_revokes(password):
+        if not thief_status:
+            thief_status.append(_in_thread(lambda: _revoke_all(thief)))
+        return real_hash(password)
+    monkeypatch.setattr(user_module, 'hash_password', hash_while_the_thief_revokes)
+
+    assert _change_password(victim) == 200
+    assert thief_status == [200]
+    assert not _authenticated(thief)
+
+
+def test_a_revoke_all_checked_before_a_password_change_keeps_no_stolen_session(app, make_user, monkeypatch):
+    _uid, username, _ = make_user()
+    thief = _session(app, username)
+    victim = _session(app, username)
+    real_end, victim_status = User.end_sessions, []
+
+    def change_before_the_thief_bumps(self):
+        if not victim_status:
+            victim_status.append(None)
+            victim_status[0] = _in_thread(lambda: _change_password(victim))
+        return real_end(self)
+    monkeypatch.setattr(User, 'end_sessions', change_before_the_thief_bumps)
+
+    _revoke_all(thief)
+    assert victim_status == [200]
+    assert not _authenticated(thief)
+    assert _authenticated(_session(app, username, NEW_PASSWORD))
+
+
+
+def test_a_revoke_all_keeps_the_version_it_wrote_not_a_later_one(app, make_user, monkeypatch):
+    import api.v2.account.sessions as sessions_module
+    uid, username, _ = make_user()
+    thief = _session(app, username)
+    real_commit = sessions_module.safe_commit
+
+    def reset_password():
+        with app.app_context():
+            db.session.get(User, uid).set_password(NEW_PASSWORD)
+            db.session.commit()
+
+    def commit_then_an_admin_resets(*args, **kwargs):
+        result = real_commit(*args, **kwargs)
+        _in_thread(reset_password)
+        return result
+    monkeypatch.setattr(sessions_module, 'safe_commit', commit_then_an_admin_resets)
+
+    assert _revoke_all(thief) == 200
+    assert not _authenticated(thief)
+
+# --- other credential-change details -----------------------------------------
+
+def test_a_self_edit_without_password_keeps_the_session_identifier(app, make_user):
+    uid, username, _ = make_user(role='admin')
+    admin = _session(app, username)
+    before = _sid(admin)
+    r = admin.put(f'/api/v2/users/{uid}', data=json.dumps({'full_name': 'Renamed'}),
+                  content_type='application/json')
+    assert r.status_code == 200, r.data
+    assert _sid(admin) == before
+    assert _authenticated(admin)
+
+
+def test_a_fullwidth_totp_code_is_accepted_like_pyotp_did(app, make_user):
+    _uid, username, secret = make_user(totp=True)
+    c = app.test_client()
+    _login(c, username)
+    fullwidth = _code(secret).translate({ord(d): 0xFF10 + int(d) for d in '0123456789'})
+    assert _post(c, '/api/v2/auth/login/2fa', {'code': fullwidth}).status_code == 200
+
+
+@pytest.mark.parametrize('code', ['123456é', 'éééééé', '12 34 56'])
+def test_a_non_ascii_or_non_digit_totp_code_is_refused(app, make_user, code):
+    _uid, username, _secret = make_user(totp=True)
+    c = app.test_client()
+    _login(c, username)
+    assert _post(c, '/api/v2/auth/login/2fa', {'code': code}).status_code == 401

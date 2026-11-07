@@ -43,3 +43,32 @@ def test_a_custom_role_is_shown_as_stored(auth_client):
         assert role['all_permissions'] == ['read:cas']
     finally:
         auth_client.delete(f"/api/v2/rbac/roles/{role['id']}")
+
+
+def test_a_custom_role_cannot_inherit_from_a_system_role(app, auth_client, system_roles):
+    with app.app_context():
+        operator = CustomRole.query.filter_by(name='Operator', is_system=True).first()
+        assert operator is not None
+        operator_id = operator.id
+    r = auth_client.post('/api/v2/rbac/roles', json={'name': 'Child Of Operator', 'permissions': [],
+                                                     'inherits_from': operator_id})
+    created = (r.get_json() or {}).get('data') or {}
+    if created.get('id'):
+        auth_client.delete(f"/api/v2/rbac/roles/{created['id']}")
+    assert r.status_code == 400, r.data
+
+
+def test_a_role_already_under_a_system_role_can_still_be_edited(app, auth_client, system_roles):
+    with app.app_context():
+        operator = CustomRole.query.filter_by(name='Operator', is_system=True).first()
+        child = CustomRole(name='Legacy Operator Child', description='', permissions=[],
+                           inherits_from=operator.id)
+        db.session.add(child)
+        db.session.commit()
+        child_id, operator_id = child.id, operator.id
+    try:
+        r = auth_client.put(f'/api/v2/rbac/roles/{child_id}',
+                            json={'description': 'kept', 'inherits_from': operator_id})
+        assert r.status_code == 200, r.data
+    finally:
+        auth_client.delete(f'/api/v2/rbac/roles/{child_id}')
