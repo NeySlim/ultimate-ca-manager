@@ -673,6 +673,41 @@ class TestSameAccountPendingOrderReuse:
             assert svc._find_reusable_pending_order(
                 ['reuse.example.com'], 'thumb-reuse') is None
 
+    @pytest.mark.parametrize('upstream_dates, wanted, reused', [
+        ({}, {'not_after': '2026-12-01T00:00:00Z'}, False),
+        ({'notAfter': '2026-12-02T00:00:00Z'}, {'not_after': '2026-12-01T00:00:00Z'}, False),
+        ({'notAfter': '2026-12-01T00:00:00.000Z'}, {'not_after': '2026-12-01T00:00:00Z'}, True),
+        ({'notBefore': '2026-11-10T00:00:00Z'}, {'not_before': '2026-11-10T01:00:00+01:00'}, True),
+        ({'notBefore': '2026-11-10T00:00:00Z'}, {}, True),
+    ])
+    def test_reuse_honours_the_requested_dates(self, app, monkeypatch, upstream_dates,
+                                               wanted, reused):
+        from datetime import datetime as _dt
+        with app.app_context():
+            self._seed(upstream='https://ca.example/acme/order/reuse-3')
+            svc = _make_svc(app, monkeypatch, upstream_response=_FakeResp({
+                'status': 'pending', **upstream_dates,
+                'authorizations': ['https://ca.example/acme/authz-v3/r3'],
+                'finalize': 'https://ca.example/acme/order/reuse-3/finalize',
+            }))
+            dates = {k: _dt.fromisoformat(v.replace('Z', '+00:00')) for k, v in wanted.items()}
+            result = svc._find_reusable_pending_order(
+                ['reuse.example.com'], 'thumb-reuse', **dates)
+            assert (result is not None) is reused
+
+    def test_reuse_honours_the_replaced_certificate(self, app, monkeypatch):
+        with app.app_context():
+            self._seed(upstream='https://ca.example/acme/order/reuse-4')
+            svc = _make_svc(app, monkeypatch, upstream_response=_FakeResp({
+                'status': 'pending', 'replaces': 'aYhba4dGQEHhs3uEe6CuLN4ByNQ.AIdlQyE',
+                'authorizations': [], 'finalize': 'https://ca.example/f'}))
+            svc.directory = {**(svc.directory or {}), 'renewalInfo': 'https://ca.example/ari'}
+            assert svc._find_reusable_pending_order(
+                ['reuse.example.com'], 'thumb-reuse', replaces='other.cert') is None
+            assert svc._find_reusable_pending_order(
+                ['reuse.example.com'], 'thumb-reuse',
+                replaces='aYhba4dGQEHhs3uEe6CuLN4ByNQ.AIdlQyE') is not None
+
 
 class TestClientTxtValues:
     """#306/#307: the proxy also publishes the dns-01 TXT values computed with

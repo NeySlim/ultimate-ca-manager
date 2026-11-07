@@ -6,8 +6,9 @@ ACME_ERROR_PREFIX = 'urn:ietf:params:acme:error:'
 
 # Problems about the proxy's own JWS or upstream account: relayed, they would
 # send the client after its nonce, key or account, none of which is at fault.
+# The proxy checks ownership itself, so an upstream unauthorized is its account's.
 _PROXY_SIDE_TYPES = frozenset({
-    'badNonce', 'badPublicKey', 'badSignatureAlgorithm', 'accountDoesNotExist',
+    'badNonce', 'badPublicKey', 'badSignatureAlgorithm', 'accountDoesNotExist', 'unauthorized',
     'externalAccountRequired', 'userActionRequired', 'invalidContact',
     'unsupportedContact',
 })

@@ -33,7 +33,8 @@ class RackspaceDnsProvider(BaseDnsProvider):
             'apiKey': self.credentials['api_key']
         }}}
         try:
-            resp = requests.post(self.AUTH_URL, json=data, timeout=30)
+            # A 307/308 to another host would resend the API key in the body
+            resp = requests.post(self.AUTH_URL, json=data, timeout=30, allow_redirects=False)
             if resp.status_code != 200:
                 return False, f"Auth failed: {resp.reason}"
             body = resp.json()
@@ -55,7 +56,9 @@ class RackspaceDnsProvider(BaseDnsProvider):
         url = f"{self._dns_endpoint}{path}"
         headers = {'X-Auth-Token': self._token, 'Content-Type': 'application/json'}
         try:
-            resp = requests.request(method=method, url=url, headers=headers, json=data, timeout=30)
+            resp = requests.request(method=method, url=url, headers=headers, json=data, timeout=30,
+                                    # requests keeps X-Auth-Token on a redirect to another host
+                                    allow_redirects=False)
             if resp.status_code >= 400:
                 return False, resp.reason
             return True, resp.json() if resp.text else None

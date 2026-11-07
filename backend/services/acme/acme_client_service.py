@@ -1499,11 +1499,7 @@ class AcmeClientService:
             listener.start()
             response = self._post(challenge['url'], {})
             if response.status_code != 200:
-                try:
-                    detail = response.json().get('detail', 'Unknown error')
-                except Exception:
-                    detail = 'Unknown error'
-                return False, f'Challenge submission failed: {detail}'
+                return False, f'Challenge submission failed: {self._problem_detail(response)}'
 
             result = response.json()
             challenge['status'] = result.get('status', 'processing')

@@ -36,7 +36,9 @@ class DnsMadeEasyDnsProvider(BaseDnsProvider):
     def _request(self, method, path, data=None):
         try:
             resp = requests.request(method, f"{self.BASE_URL}{path}",
-                headers=self._get_headers(), json=data, timeout=30)
+                headers=self._get_headers(), json=data, timeout=30,
+                # requests keeps the x-dnsme-* headers on a redirect to another host
+                allow_redirects=False)
             if resp.status_code >= 400:
                 return False, self._error(resp)
             return True, resp.json() if resp.text else None

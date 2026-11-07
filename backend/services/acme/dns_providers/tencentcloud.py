@@ -110,7 +110,8 @@ class TencentCloudDnsProvider(BaseDnsProvider):
         payload = json.dumps(params)
         headers = self._make_headers(action, payload)
         try:
-            resp = requests.post(self.BASE_URL, headers=headers, data=payload, timeout=30)
+            resp = requests.post(self.BASE_URL, headers=headers, data=payload, timeout=30,
+                                 allow_redirects=False)
             data = resp.json()
             if "Error" in data.get("Response", {}):
                 err = data["Response"]["Error"]

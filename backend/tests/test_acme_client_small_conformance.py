@@ -190,3 +190,61 @@ class TestFinalizeHtmlError:
                 db.session.rollback()
                 db.session.delete(db.session.get(AcmeClientOrder, order.id))
                 db.session.commit()
+
+
+class TestTlsAlpnSubmissionError:
+    def test_html_503_names_the_status(self):
+        from services.acme.acme_client_service import AcmeClientService
+        svc = AcmeClientService.__new__(AcmeClientService)
+        resp = SimpleNamespace(status_code=503, headers={'Retry-After': '60'}, text='<html/>')
+        resp.json = MagicMock(side_effect=ValueError('Expecting value'))
+        svc._post = MagicMock(return_value=resp)
+        svc._create_tls_alpn_listener = MagicMock()
+        order = SimpleNamespace(challenges_dict={'a.example': {
+            'url': 'https://ca.example/chall/1', 'key_authorization': 'k'}})
+        ok, message = svc._verify_tls_alpn_challenge(order, 'a.example')
+        assert not ok
+        assert 'HTTP 503' in message and '60' in message
+
+
+class TestHeaderCredentialProvidersDoNotFollowRedirects:
+    """requests drops only Authorization on a cross-host redirect: API keys sent in
+    other headers or in the body would follow it."""
+
+    @pytest.mark.parametrize('provider_type, credentials, call', [
+        ('bunny', {'api_key': 'k'}, lambda p: p._request('GET', '/dnszone')),
+        ('dnsmadeeasy', {'api_key': 'k', 'secret_key': 's'},
+         lambda p: p._request('GET', '/dns/managed')),
+        ('ionos', {'public_prefix': 'p', 'api_key': 'k'}, lambda p: p._request('GET', '/zones')),
+        ('ns1', {'api_key': 'k'}, lambda p: p._request('GET', '/zones')),
+        ('scaleway', {'api_token': 't'}, lambda p: p._request('GET', '/dns-zones')),
+        ('tencentcloud', {'secret_id': 'i', 'secret_key': 's'},
+         lambda p: p._post('DescribeDomainList', {})),
+        ('rackspace', {'username': 'u', 'api_key': 'k'}, lambda p: p._authenticate()),
+    ])
+    def test_provider_does_not_follow_redirects(self, monkeypatch, provider_type,
+                                                credentials, call):
+        from services.acme.dns_providers import create_provider
+        seen = []
+
+        def _capture(*_args, **kwargs):
+            seen.append(kwargs.get('allow_redirects', True))
+            return SimpleNamespace(status_code=400, reason='Bad', text='{}', headers={},
+                                   json=lambda: {}, content=b'{}')
+        monkeypatch.setattr('requests.request', _capture)
+        monkeypatch.setattr('requests.post', _capture)
+        call(create_provider(provider_type, credentials))
+        assert seen and all(value is False for value in seen)
+
+    def test_rackspace_dns_call_does_not_follow_redirects(self, monkeypatch):
+        from services.acme.dns_providers import create_provider
+        seen = {}
+
+        def _capture(*_args, **kwargs):
+            seen.update(kwargs)
+            return SimpleNamespace(status_code=400, reason='Bad', text='', json=lambda: {})
+        monkeypatch.setattr('requests.request', _capture)
+        provider = create_provider('rackspace', {'username': 'u', 'api_key': 'k'})
+        provider._token, provider._dns_endpoint = 't', 'https://dns.example'
+        provider._request('GET', '/domains')
+        assert seen['allow_redirects'] is False

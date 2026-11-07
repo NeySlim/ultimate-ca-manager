@@ -48,7 +48,8 @@ class _Handler(socketserver.BaseRequestHandler):
         if not self.server.answer_soa or not qname.is_subdomain(zone):
             response.set_rcode(dns.rcode.REFUSED)
             return
-        response.flags |= dns.flags.AA
+        if self.server.authoritative:
+            response.flags |= dns.flags.AA
         soa = dns.rrset.from_text(zone, 300, 'IN', 'SOA',
                                   f'ns.{ZONE}. admin.{ZONE}. 1 3600 600 86400 300')
         (response.answer if qname == zone else response.authority).append(soa)
@@ -70,6 +71,7 @@ def nameserver():
     server.daemon_threads = True
     server.updates = []
     server.answer_soa = True
+    server.authoritative = True
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     yield server
@@ -153,3 +155,45 @@ class TestZone:
             f'host.{ZONE}', NAME, 'value')
         assert ok, message
         assert nameserver.updates == [f'{ZONE}.']
+
+    def test_non_authoritative_soa_answer_is_ignored(self, nameserver, public_parent_zone):
+        nameserver.authoritative = False
+        ok, message = _provider('127.0.0.1', nameserver.server_address[1]).create_txt_record(
+            f'host.{ZONE}', NAME, 'value')
+        assert ok, message
+        assert nameserver.updates == ['example.test.']
+
+    def test_configured_zone_is_not_used_for_a_name_outside_it(self, nameserver,
+                                                               public_parent_zone):
+        ok, message = _provider('127.0.0.1', nameserver.server_address[1], ZONE).create_txt_record(
+            'host.example.test', '_acme-challenge.host.example.test', 'value')
+        assert ok, message
+        assert nameserver.updates == ['example.test.']
+
+    def test_configured_zone_is_used_for_the_zone_apex(self, nameserver, public_parent_zone):
+        nameserver.answer_soa = False
+        ok, message = _provider('127.0.0.1', nameserver.server_address[1], ZONE).create_txt_record(
+            ZONE, f'_acme-challenge.{ZONE}', 'value')
+        assert ok, message
+        assert nameserver.updates == [f'{ZONE}.']
+
+
+class TestAddressFallback:
+    def test_timeout_on_the_first_address_tries_the_next(self, nameserver, monkeypatch):
+        import dns.exception
+        import dns.query
+        real_tcp = dns.query.tcp
+        timeouts = []
+
+        def _tcp(message, address, *args, timeout=None, **kwargs):
+            timeouts.append(timeout)
+            if address == '192.0.2.1':
+                raise dns.exception.Timeout()
+            return real_tcp(message, address, *args, timeout=timeout, **kwargs)
+        monkeypatch.setattr(dns.query, 'tcp', _tcp)
+        provider = _provider('ns.example.test', nameserver.server_address[1], ZONE)
+        monkeypatch.setattr(provider, '_addresses', lambda: ['192.0.2.1', '127.0.0.1'])
+        ok, message = provider.create_txt_record(f'host.{ZONE}', NAME, 'value')
+        assert ok, message
+        assert nameserver.updates == [f'{ZONE}.']
+        assert sum(timeouts) <= 30

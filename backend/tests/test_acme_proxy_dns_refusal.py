@@ -227,3 +227,217 @@ class TestRecordsOfDeadOrdersAreRemoved:
             svc.deactivate_authz(_b64(AUTHZ_URL))
             [(_app, records, _order_id)] = self._cleanups()
             assert records == self.RECORDS
+
+
+OTHER = 'other.example.com'
+AUTHZ_B = f'{UPSTREAM}/acme/authz/dns/2'
+CHALL_B = f'{UPSTREAM}/acme/chall/dns/2/x'
+
+
+def _authz(status='pending', domain=DOMAIN, chall=CHALL_URL, chall_status='pending'):
+    return {'status': status, 'identifier': {'type': 'dns', 'value': domain},
+            'challenges': [{'type': 'dns-01', 'url': chall, 'status': chall_status,
+                            'token': 'tok'}]}
+
+
+def _refused(**overrides):
+    row = _order(status='invalid', **overrides)
+    row.set_challenges_dict({CHALL_URL: {'status': 'failed', 'error': 'x'}})
+    db.session.commit()
+    return row
+
+
+def _two_names(**overrides):
+    return _order(domains=json.dumps([DOMAIN, OTHER]),
+                  upstream_authz_urls=json.dumps([AUTHZ_URL, AUTHZ_B]), **overrides)
+
+
+@pytest.fixture
+def _quiet_rows(monkeypatch):
+    monkeypatch.setattr(proxy_mod, '_dns_rows_hook', lambda *_a, **_k: None)
+    monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
+                        lambda *_a, **_k: {'provider': object()})
+
+
+def _automation_orders():
+    return [args[4] for target, args in _ThreadRecorder.created
+            if getattr(target, '__name__', '') == '_bg_respond_challenge']
+
+
+def _cleanups():
+    return [args for target, args in _ThreadRecorder.created
+            if getattr(target, '__name__', '') == '_bg_cleanup_dns_records']
+
+
+@pytest.mark.usefixtures('_quiet_rows')
+class TestRetryAfterARefusal:
+    """The upstream CA hands the still-pending authorization (and order) of the
+    refused order to the client's next order: that new order is the one served."""
+
+    def test_next_order_on_the_same_authorization_is_served(self, app, monkeypatch):
+        with app.app_context():
+            _refused(client_jwk_thumbprint='T')
+            live = _order(client_jwk_thumbprint='T', order_url=f'{ORDER_URL}b',
+                          upstream_order_url=f'{ORDER_URL}b')
+            svc, _calls = _svc(monkeypatch, {AUTHZ_URL: _Resp(_authz())})
+            authz, _ident = svc.get_authz(_b64(AUTHZ_URL), requester_thumbprint='T')
+            assert authz['status'] == 'pending'
+            assert authz['challenges'][0]['status'] == 'pending'
+            assert _automation_orders() == [live.id]
+
+    def test_next_order_on_the_same_upstream_order_is_served(self, app, monkeypatch):
+        with app.app_context():
+            _refused(client_jwk_thumbprint='T')
+            _order(client_jwk_thumbprint='T')
+            svc, _calls = _svc(monkeypatch, {ORDER_URL: _Resp(
+                {'status': 'pending', 'authorizations': [AUTHZ_URL],
+                 'finalize': f'{ORDER_URL}/finalize'})})
+            order = svc.get_order(_b64(ORDER_URL), requester_thumbprint='T')
+            assert order['status'] == 'pending' and 'error' not in order
+
+
+@pytest.mark.usefixtures('_quiet_rows')
+class TestRefusalOnAnotherNameOfTheOrder:
+    def test_record_of_the_other_name_is_not_submitted(self, app, monkeypatch):
+        provider = _provider(monkeypatch, (True, 'ok'))
+        with app.app_context():
+            row = _two_names()
+            svc, calls = _svc(monkeypatch, {CHALL_B: _Resp({'status': 'processing'})})
+            order_id = row.id
+
+            def _refuse_the_first_name(*_a, **_k):
+                # The other authorization's thread is refused while this one writes
+                svc._fail_dns_automation(db.session.get(AcmeClientOrder, order_id),
+                                         CHALL_URL, DOMAIN, 'refused')
+                return True, 'ok'
+            provider.create_txt_record.side_effect = _refuse_the_first_name
+
+            svc._run_dns01_automation(CHALL_B, 'tok.up', OTHER, order_id, AUTHZ_B)
+
+            assert calls == []
+            [(_app, records, cleaned_id)] = _cleanups()
+            assert cleaned_id == order_id
+            assert {r['record_name'] for r in records} == {f'_acme-challenge.{OTHER}'}
+            db.session.refresh(row)
+            assert not json.loads(row.dns_records_created or '[]')
+
+    def test_shared_authorization_is_still_submitted_for_a_live_order(self, app, monkeypatch):
+        provider = _provider(monkeypatch, (True, 'ok'))
+        with app.app_context():
+            row = _two_names()
+            _order(domains=json.dumps([OTHER]), upstream_authz_urls=json.dumps([AUTHZ_B]),
+                   order_url=f'{ORDER_URL}b', upstream_order_url=f'{ORDER_URL}b')
+            svc, calls = _svc(monkeypatch, {CHALL_B: _Resp({'status': 'processing'})})
+            order_id = row.id
+
+            def _refuse_the_first_name(*_a, **_k):
+                svc._fail_dns_automation(db.session.get(AcmeClientOrder, order_id),
+                                         CHALL_URL, DOMAIN, 'refused')
+                return True, 'ok'
+            provider.create_txt_record.side_effect = _refuse_the_first_name
+
+            svc._run_dns01_automation(CHALL_B, 'tok.up', OTHER, order_id, AUTHZ_B)
+            assert calls == [(CHALL_B, {})]
+
+    def test_refusal_releases_the_records_of_the_other_name(self, app, monkeypatch):
+        _provider(monkeypatch, (False, 'zone not found'))
+        records = [{'domain': OTHER, 'record_name': f'_acme-challenge.{OTHER}',
+                    'value': 'v2', 'provider_id': 5}]
+        with app.app_context():
+            row = _two_names(dns_records_created=json.dumps(records))
+            svc, calls = _svc(monkeypatch)
+            svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
+            assert calls == []
+            [(_app, released, _order_id)] = _cleanups()
+            assert released == records
+
+    def test_other_authorization_starts_no_automation(self, app, monkeypatch):
+        with app.app_context():
+            _refused(domains=json.dumps([DOMAIN, OTHER]),
+                     upstream_authz_urls=json.dumps([AUTHZ_URL, AUTHZ_B]))
+            svc, _calls = _svc(monkeypatch, {AUTHZ_B: _Resp(_authz(domain=OTHER, chall=CHALL_B))})
+            authz, _ident = svc.get_authz(_b64(AUTHZ_B))
+            assert authz['status'] == 'invalid'
+            assert authz['challenges'][0]['status'] == 'invalid'
+            assert _ThreadRecorder.created == []
+
+    def test_other_challenge_starts_no_automation(self, app, monkeypatch):
+        with app.app_context():
+            _refused(domains=json.dumps([DOMAIN, OTHER]),
+                     upstream_authz_urls=json.dumps([AUTHZ_URL, AUTHZ_B]))
+            svc, calls = _svc(monkeypatch, {
+                AUTHZ_URL: _Resp(_authz()),
+                AUTHZ_B: _Resp(_authz(domain=OTHER, chall=CHALL_B))})
+            data, _link = svc.respond_challenge(_b64(CHALL_B))
+            assert data['status'] == 'invalid' and data['error']['detail']
+            assert [payload for _url, payload in calls] == ['', '']
+            assert _ThreadRecorder.created == []
+
+
+@pytest.mark.usefixtures('_quiet_rows')
+class TestDeadOrdersSharingAnAuthorization:
+    RECORDS = [{'domain': DOMAIN, 'record_name': f'_acme-challenge.{DOMAIN}',
+                'value': 'v1', 'provider_id': 5}]
+
+    def test_invalid_authorization_releases_the_records(self, app, monkeypatch):
+        with app.app_context():
+            row = _order(dns_records_created=json.dumps(self.RECORDS))
+            svc, _calls = _svc(monkeypatch, {AUTHZ_URL: _Resp(
+                _authz(status='invalid', chall_status='invalid'))})
+            svc.get_authz(_b64(AUTHZ_URL))
+            [(_app, records, order_id)] = _cleanups()
+            assert records == self.RECORDS and order_id == row.id
+
+    def test_sibling_on_the_invalid_authorization_does_not_keep_them(self, app, monkeypatch):
+        with app.app_context():
+            first = _order(dns_records_created=json.dumps(self.RECORDS),
+                           client_jwk_thumbprint='T1')
+            second = _order(order_url=f'{ORDER_URL}b', upstream_order_url=f'{ORDER_URL}b',
+                            dns_records_created=json.dumps(self.RECORDS),
+                            client_jwk_thumbprint='T2')
+            svc, _calls = _svc(monkeypatch, {AUTHZ_URL: _Resp(
+                _authz(status='invalid', chall_status='invalid'))})
+            svc.get_authz(_b64(AUTHZ_URL), requester_thumbprint='T1')
+            [(_app, _records, order_id)] = _cleanups()
+            assert order_id == first.id
+            db.session.refresh(second)
+            assert second.status == 'invalid'
+
+    def test_non_pending_sibling_does_not_keep_them(self, app, monkeypatch):
+        with app.app_context():
+            row = _order(dns_records_created=json.dumps(self.RECORDS))
+            _order(order_url=f'{ORDER_URL}b', upstream_order_url=f'{ORDER_URL}b',
+                   status='invalid')
+            svc, _calls = _svc(monkeypatch)
+            svc._release_order_records(row)
+            [(_app, records, _order_id)] = _cleanups()
+            assert records == self.RECORDS
+
+    def test_invalid_upstream_order_marks_the_local_order(self, app, monkeypatch):
+        with app.app_context():
+            row = _order()
+            svc, _calls = _svc(monkeypatch, {ORDER_URL: _Resp(
+                {'status': 'invalid', 'finalize': f'{ORDER_URL}/finalize'})})
+            svc.get_order(_b64(ORDER_URL))
+            db.session.refresh(row)
+            assert row.status == 'invalid'
+
+
+@pytest.mark.usefixtures('_quiet_rows')
+class TestAuthorizationReads:
+    def test_authorization_retry_after_is_kept(self, app, monkeypatch):
+        with app.app_context():
+            _order()
+            svc, _calls = _svc(monkeypatch, {AUTHZ_URL: _Resp(
+                _authz(chall_status='processing'), headers={'Retry-After': '30'})})
+            svc.get_authz(_b64(AUTHZ_URL))
+            assert svc.retry_after == '30'
+
+    def test_challenge_scan_reads_at_most_the_limit(self, app, monkeypatch):
+        urls = [f'{UPSTREAM}/acme/authz/dns/scan/{i}' for i in range(40)]
+        with app.app_context():
+            row = _order(upstream_authz_urls=json.dumps(urls))
+            svc, calls = _svc(monkeypatch, {url: _Resp(_authz(chall=f'{url}/c')) for url in urls})
+            with pytest.raises(proxy_mod.ProxyResourceNotFoundError):
+                svc._read_challenge(CHALL_URL, None, [row])
+            assert len(calls) == proxy_mod._CERT_FALLBACK_SCAN_LIMIT == 25

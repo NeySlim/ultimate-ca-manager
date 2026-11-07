@@ -202,9 +202,10 @@ class TestUpstreamProblemRelayed:
         assert response.headers['Retry-After'] == '30'
         assert response.get_json()['type'] == 'urn:ietf:params:acme:error:serverInternal'
 
-    def test_proxy_account_problem_is_not_blamed_on_the_client(self):
-        problem = UpstreamProblem(400, {'type': 'urn:ietf:params:acme:error:badNonce',
-                                        'detail': 'bad nonce'})
+    @pytest.mark.parametrize('status, name', [(400, 'badNonce'), (403, 'unauthorized')])
+    def test_proxy_account_problem_is_not_blamed_on_the_client(self, status, name):
+        problem = UpstreamProblem(status, {'type': f'urn:ietf:params:acme:error:{name}',
+                                           'detail': 'Account is not valid, has status deactivated'})
         body, status = problem.client_problem()
         assert status == 500
         assert body['type'] == 'urn:ietf:params:acme:error:serverInternal'
@@ -316,3 +317,21 @@ class TestProfileAndNotAfter:
             svc.new_order([{'type': 'dns', 'value': DOMAIN}], client_thumbprint='up-thumb',
                           profile='shortlived')
             assert [url for url, _p in upstream.calls] == [ORDER_URL, NEW_ORDER_URL]
+
+    def test_reused_pending_order_must_carry_the_requested_not_after(self, app, monkeypatch):
+        from datetime import datetime as _dt, timezone as _tz
+        with app.app_context():
+            _order_row(thumbprint='up-thumb')
+            upstream = _Upstream({
+                ORDER_URL: _Resp({'status': 'pending', 'finalize': FINALIZE_URL}),
+                NEW_ORDER_URL: _Resp({'status': 'pending', 'authorizations': [AUTHZ_URL],
+                                      'finalize': FINALIZE_URL,
+                                      'notAfter': '2026-12-01T00:00:00Z'},
+                                     201, {'Location': f'{UPSTREAM}/acme/order/up/3'}),
+            })
+            svc = _svc(monkeypatch, upstream)
+            order, _order_id = svc.new_order(
+                [{'type': 'dns', 'value': DOMAIN}], client_thumbprint='up-thumb',
+                not_after=_dt(2026, 12, 1, tzinfo=_tz.utc))
+            assert [url for url, _p in upstream.calls] == [ORDER_URL, NEW_ORDER_URL]
+            assert order['notAfter'] == '2026-12-01T00:00:00Z'

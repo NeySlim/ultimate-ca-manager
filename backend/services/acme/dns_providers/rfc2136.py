@@ -66,13 +66,17 @@ class Rfc2136DnsProvider(BaseDnsProvider):
         return found
 
     def _send(self, message, timeout=30):
-        """TCP exchange with the configured server, trying each of its addresses."""
+        """TCP exchange with the configured server, trying each of its addresses
+        within one overall timeout (an unreachable AAAA times out, it does not refuse)."""
+        import dns.exception
         import dns.query
         failure = OSError(f"no address for {self.credentials['server']}")
-        for address in self._addresses():
+        addresses = self._addresses()
+        for address in addresses:
             try:
-                return dns.query.tcp(message, address, port=self._port(), timeout=timeout)
-            except OSError as exc:
+                return dns.query.tcp(message, address, port=self._port(),
+                                     timeout=timeout / len(addresses))
+            except (OSError, dns.exception.Timeout) as exc:
                 failure = exc
         raise failure
 
@@ -104,9 +108,11 @@ class Rfc2136DnsProvider(BaseDnsProvider):
         return None
 
     def _find_zone(self, domain: str) -> Optional[str]:
-        """The configured zone, else the one the configured server is authoritative for."""
-        configured = str(self.credentials.get('zone') or '').strip().rstrip('.')
-        if configured:
+        """The configured zone when it contains the name, else the one the configured
+        server is authoritative for (one provider may serve several zones)."""
+        configured = str(self.credentials.get('zone') or '').strip().rstrip('.').lower()
+        name = domain.rstrip('.').lower()
+        if configured and (name == configured or name.endswith('.' + configured)):
             return configured
         zone = self._zone_from_server(domain)
         if zone:

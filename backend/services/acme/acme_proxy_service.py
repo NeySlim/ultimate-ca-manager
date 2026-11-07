@@ -9,7 +9,7 @@ import logging
 import secrets
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple, Union
 from urllib.parse import urlsplit
 
@@ -103,7 +103,7 @@ def _dns_rows_hook(action, *args):
 # What the client reads on an order or challenge whose TXT record the DNS provider refused
 _DNS_REFUSED_PROBLEM = {
     'type': 'urn:ietf:params:acme:error:serverInternal',
-    'detail': 'The proxy could not publish the dns-01 TXT record: the DNS provider refused it',
+    'detail': 'The proxy could not publish a dns-01 TXT record of this order: the DNS provider refused it',
 }
 
 
@@ -116,6 +116,19 @@ def _txt_written(provider, zone, record_name, value):
     if isinstance(result, tuple) and result:
         return bool(result[0]), str(result[1]) if len(result) > 1 else ''
     return bool(result), ''
+
+
+def _same_instant(requested, upstream_value) -> bool:
+    """True when no date was requested or the upstream RFC 3339 date is that instant."""
+    if requested is None:
+        return True
+    try:
+        upstream = datetime.fromisoformat(str(upstream_value).replace('Z', '+00:00'))
+    except (TypeError, ValueError):
+        return False
+    upstream, requested = (dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+                           for dt in (upstream, requested))
+    return upstream == requested
 
 
 def _dns_failed_state(status) -> bool:
@@ -849,7 +862,10 @@ class AcmeProxyService:
         # order back, like upstream CAs do, instead of opening a new upstream
         # order every time. Cross-account sharing is #310's job — the match is
         # strictly on this requester's own orders.
-        existing = self._find_reusable_pending_order(domains, client_thumbprint, profile)
+        forwarded_replaces = replaces if self.directory.get('renewalInfo') else None
+        existing = self._find_reusable_pending_order(
+            domains, client_thumbprint, profile, not_before=not_before,
+            not_after=not_after, replaces=forwarded_replaces)
         if existing is not None:
             return existing
 
@@ -862,8 +878,8 @@ class AcmeProxyService:
         }
         # Filter None and forward RFC 9773 `replaces` only when supported.
         payload = {k: v for k, v in payload.items() if v is not None}
-        if replaces and self.directory.get('renewalInfo'):
-            payload['replaces'] = replaces
+        if forwarded_replaces:
+            payload['replaces'] = forwarded_replaces
 
         resp = self._post_with_account(self.directory['newOrder'], payload)
 
@@ -974,7 +990,8 @@ class AcmeProxyService:
             return []
         return values
 
-    def _find_reusable_pending_order(self, domains, client_thumbprint, profile=None):
+    def _find_reusable_pending_order(self, domains, client_thumbprint, profile=None,
+                                     not_before=None, not_after=None, replaces=None):
         """Return the rewritten still-pending order of this requester for the
         exact same identifier set, or None (#303 minor 4).
 
@@ -1008,6 +1025,12 @@ class AcmeProxyService:
             if upstream_order.get('status') != 'pending':
                 continue
             if profile is not None and upstream_order.get('profile') != profile:
+                continue
+            # RFC 8555 §7.4: an order without the requested dates would not honour them
+            if not (_same_instant(not_before, upstream_order.get('notBefore'))
+                    and _same_instant(not_after, upstream_order.get('notAfter'))):
+                continue
+            if replaces and upstream_order.get('replaces') != replaces:
                 continue
             logger.info(
                 "[ACME Proxy] Reusing pending order %s for %s (same account, "
@@ -1099,11 +1122,11 @@ class AcmeProxyService:
             return None
         if len(candidates) == 1:
             return candidates[0]
-        if authz_url:
-            # A client that deactivated the authz on one order and placed a new
-            # one getting the same upstream authz (#422) is served the new order.
-            candidates = sorted(
-                candidates, key=lambda c: authz_url in c.deactivated_authz_list)
+        # The CA hands a still-pending authz or order to the client's next order
+        # after a deactivation (#422) or a refused TXT record: the live order wins.
+        candidates = sorted(candidates, key=lambda c: (
+            bool(authz_url) and authz_url in c.deactivated_authz_list,
+            c.status != 'pending'))
         for candidate in candidates:
             if ((candidate.account_id
                  and candidate.account_id == requester_account_id)
@@ -1210,6 +1233,8 @@ class AcmeProxyService:
         # to reach the client directly, which cannot work through a proxy.
         already_valid = authz.get('status') == 'valid'
         if _dns_failed_state(authz.get('status')):
+            # RFC 8555 §7.1.6: every order using a failed authorization is invalid
+            self._mark_invalid(o for o in candidates if o.status == 'pending')
             self._release_order_records(order)
         proxy_challenges = []
         closed_chall_urls = []
@@ -1219,7 +1244,7 @@ class AcmeProxyService:
             chall_url = chall.get('url')
             if not chall_url:
                 continue
-            if chall.get('status') == 'pending' and self._dns_refused(order, chall_url):
+            if chall.get('status') == 'pending' and self._dns_refused(order):
                 chall.update(status='invalid', error=dict(_DNS_REFUSED_PROBLEM))
                 authz['status'] = 'invalid'
             if (_dns_failed_state(authz.get('status'))
@@ -1427,7 +1452,7 @@ class AcmeProxyService:
         status = challenge_data.get('status')
         up_link = self._get_authz_link(None, authz_url)
 
-        if status == 'pending' and self._dns_refused(order, chall_url):
+        if status == 'pending' and self._dns_refused(order):
             challenge_data.update(status='invalid', error=dict(_DNS_REFUSED_PROBLEM))
             status = 'invalid'
 
@@ -1734,6 +1759,16 @@ class AcmeProxyService:
         else:
             logger.info("[ACME Proxy BG] DNS TXT confirmed after %ss for %s", check['waited'], domain)
 
+        # A refusal on another authorization may have failed the order meanwhile;
+        # submit only while a pending order still uses this authorization
+        db.session.refresh(order)
+        users = self._orders_by_authz_url(authz_url) if authz_url else [order]
+        if not any(o.status == 'pending' and authz_url not in o.deactivated_authz_list
+                   for o in users or [order]):
+            logger.info("[ACME Proxy BG] Order %s failed meanwhile: %s not submitted", order.id, domain)
+            self._release_order_records(order)
+            return
+
         # Trigger upstream validation
         logger.info(f"[ACME Proxy BG] Triggering upstream validation for {domain}")
         payload = {}
@@ -1766,12 +1801,25 @@ class AcmeProxyService:
         self._release_order_records(order)
 
     @staticmethod
-    def _dns_refused(order, chall_url=None):
-        """True when this order's TXT write was refused (for this challenge, if given)."""
-        for url, state in (order.challenges_dict or {}).items():
-            if (chall_url is None or url == chall_url) and (state or {}).get('status') == 'failed':
-                return True
-        return False
+    def _dns_refused(order):
+        """True when one of this order's TXT writes was refused: none of its challenges is submitted."""
+        return any((state or {}).get('status') == 'failed'
+                   for state in (order.challenges_dict or {}).values())
+
+    @staticmethod
+    def _mark_invalid(orders):
+        """Record locally that these orders were read invalid upstream."""
+        changed = False
+        for order in orders:
+            order.status = 'invalid'
+            changed = True
+        if not changed:
+            return
+        try:
+            db.session.commit()
+        except Exception as exc:
+            db.session.rollback()
+            logger.warning("[ACME Proxy] Invalid order state not recorded: %s", exc)
 
     def _release_order_records(self, order):
         """Remove in the background the TXT records of an order that can no longer issue.
@@ -1986,6 +2034,7 @@ class AcmeProxyService:
             order['status'] = 'invalid'
             order.setdefault('error', dict(_DNS_REFUSED_PROBLEM))
         if order.get('status') == 'invalid':
+            self._mark_invalid([local_order] if local_order.status == 'pending' else [])
             self._release_order_records(local_order)
         return self._rewrite_order_urls(order, order_url, order_id_b64)
 
