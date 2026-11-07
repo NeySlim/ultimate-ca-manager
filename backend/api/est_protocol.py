@@ -11,7 +11,7 @@ from services.trust_store.constraints_mixin import CsrRefused
 from services.audit_service import AuditService
 from utils import key_algorithms
 from utils.client_cert import trusted_client_cert
-from utils.trusted_proxy import client_ip
+from utils.trusted_proxy import client_ip, is_request_from_trusted_proxy
 from utils.db_transaction import safe_commit
 from utils.est_cms import build_server_generated_key_cms
 from utils.est_key_encryption import (
@@ -517,19 +517,29 @@ _WEAK_CSR_HASH_ALGORITHMS = WEAK_CSR_HASH_ALGORITHMS
 _weak_csr_hash_algorithm = weak_csr_hash_algorithm
 
 
+# DER of the challengePassword attribute OID, 1.2.840.113549.1.9.7
+_CHALLENGE_PASSWORD_OID_DER = bytes.fromhex('06092a864886f70d010907')
+
+
 def _tls_unique_refusal(csr):
     """RFC 7030 §3.5: a challengePassword carries base64(tls-unique), which the
     server MUST verify; a 400 when it differs or this connection has none to
     compare (TLS 1.3, a proxy in front). est_ignore_challenge_password skips it."""
     from cryptography.x509.oid import AttributeOID
-    try:
-        sent = csr.attributes.get_attribute_for_oid(AttributeOID.CHALLENGE_PASSWORD).value
-    except x509.AttributeNotFound:
-        return None
     from models import SystemConfig
     row = SystemConfig.query.filter_by(key='est_ignore_challenge_password').first()
     if row and str(row.value).lower() == 'true':
         return None
+    try:
+        sent = csr.attributes.get_attribute_for_oid(AttributeOID.CHALLENGE_PASSWORD).value
+    except x509.AttributeNotFound:
+        return None
+    except ValueError:  # pyca reads no attribute once one is multi-valued
+        if _CHALLENGE_PASSWORD_OID_DER not in csr.public_bytes(_crypto_serialization.Encoding.DER):
+            return None
+        return Response('The CSR attributes cannot be read (an attribute holds several '
+                        'values), so its challengePassword cannot be verified against '
+                        'tls-unique (RFC 7030 §3.5)', status=400)
     binding = request.environ.get('ucm.tls_unique')
     if not binding:
         logger.warning('EST: challengePassword sent but no tls-unique on this connection')
@@ -539,6 +549,11 @@ def _tls_unique_refusal(csr):
             'a proxy in front): send the CSR without challengePassword', status=400)
     if not hmac.compare_digest(bytes(sent).strip(), base64.b64encode(binding)):
         logger.warning('EST: challengePassword does not match the tls-unique of this connection')
+        if is_request_from_trusted_proxy():  # the binding is then the proxy's hop
+            return Response('The CSR challengePassword does not match the tls-unique value of '
+                            'this TLS connection, which comes from a trusted proxy: behind a '
+                            'proxy the client value cannot be verified (RFC 7030 §3.5), send '
+                            'the CSR without challengePassword', status=400)
         return Response('The CSR challengePassword does not match the tls-unique value of '
                         'this TLS connection (RFC 7030 §3.5)', status=400)
     return None

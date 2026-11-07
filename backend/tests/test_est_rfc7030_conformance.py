@@ -358,12 +358,54 @@ def test_a_stored_operation_name_in_another_case_is_not_served(app, client, est_
             db.session.commit()
 
 
+def test_an_ignored_label_is_not_listed_and_the_config_saves_back(app, auth_client, est_config):
+    with app.app_context():
+        refid = db.session.get(CA, est_config['id']).refid
+        _set_config('est_labels', json.dumps({'SimpleEnroll': refid, 'served': refid}))
+    try:
+        labels = auth_client.get('/api/v2/est/config').get_json()['data']['labels']
+        assert set(labels) == {'served'}
+        r = auth_client.patch('/api/v2/est/config', json={'labels': labels})
+        assert r.status_code == 200, r.data
+    finally:
+        with app.app_context():
+            SystemConfig.query.filter_by(key='est_labels').delete()
+            db.session.commit()
+
+
 def _csr_with_challenge(cn, password):
     from cryptography.x509.oid import AttributeOID
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     return x509.CertificateSigningRequestBuilder().subject_name(
         x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
     ).add_attribute(AttributeOID.CHALLENGE_PASSWORD, password).sign(key, hashes.SHA256())
+
+
+def _csr_with_multi_valued_attribute(cn, with_password):
+    """A CSR whose attribute set holds one attribute with two values, which pyca
+    refuses to read; re-signed with pyasn1 so the signature stays valid."""
+    from pyasn1.codec.der import encoder as der_encoder
+    from pyasn1_alt_modules import rfc2986, rfc5280
+    from pyasn1.type import char
+    from cryptography.hazmat.primitives.asymmetric import padding
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    builder = x509.CertificateSigningRequestBuilder().subject_name(
+        x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
+    if with_password:
+        from cryptography.x509.oid import AttributeOID
+        builder = builder.add_attribute(AttributeOID.CHALLENGE_PASSWORD, b'A' * 16)
+    der = builder.sign(key, hashes.SHA256()).public_bytes(serialization.Encoding.DER)
+    req, _ = der_decoder.decode(der, asn1Spec=rfc2986.CertificationRequest())
+    info = req['certificationRequestInfo']
+    attr = rfc5280.Attribute()
+    attr['type'] = univ.ObjectIdentifier('1.3.6.1.4.1.99999.1')
+    for i, text in enumerate(('one', 'two')):
+        attr['values'][i] = der_encoder.encode(char.UTF8String(text))
+    info['attributes'].append(attr)
+    tbs = der_encoder.encode(info)
+    req['signature'] = univ.BitString.fromOctetString(
+        key.sign(tbs, padding.PKCS1v15(), hashes.SHA256()))
+    return x509.load_der_x509_csr(der_encoder.encode(req))
 
 
 def _post_with_binding(client, csr, binding=None):
@@ -391,6 +433,31 @@ class TestTlsUniqueLinking:
         r = _post_with_binding(client, csr, self.BINDING)
         assert r.status_code == 400, r.data
         assert b'does not match' in r.data
+
+    def test_wrong_binding_through_a_trusted_proxy_names_the_proxy(self, client, monkeypatch):
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', '127.0.0.1')
+        csr = _csr_with_challenge('tls-unique-proxy.example.test', b'A' * 16)
+        r = _post_with_binding(client, csr, self.BINDING)
+        assert r.status_code == 400, r.data
+        assert b'trusted proxy' in r.data
+
+    def test_wrong_binding_from_a_direct_client_names_no_proxy(self, client, monkeypatch):
+        monkeypatch.setenv('UCM_TRUSTED_PROXIES', '192.0.2.1')
+        csr = _csr_with_challenge('tls-unique-direct.example.test', b'A' * 16)
+        r = _post_with_binding(client, csr, self.BINDING)
+        assert r.status_code == 400, r.data
+        assert b'proxy' not in r.data
+
+    @pytest.mark.parametrize('with_password', [False, True])
+    def test_multi_valued_attribute(self, client, with_password):
+        csr = _csr_with_multi_valued_attribute('multi-attr.example.test', with_password)
+        r = _post_with_binding(client, csr, self.BINDING)
+        if with_password:
+            assert r.status_code == 400, r.data
+            assert r.mimetype == 'text/plain'
+            assert b'several values' in r.data
+        else:
+            _issued(r)
 
     def test_this_connection_binding_enrols(self, client):
         csr = _csr_with_challenge('tls-unique-ok.example.test', base64.b64encode(self.BINDING))

@@ -52,20 +52,15 @@ def get_est_config():
             ca_id = ca.id
             ca_name = ca.descr
 
-    # RFC 7030 §3.2.2 CA labels: {label: ca_refid}. Enriched with the CA name
-    # so the UI can show which authority each label serves.
+    # RFC 7030 §3.2.2 CA labels, with each CA's name; only those enrolment serves,
+    # since one it ignores would be listed here and then refused on save.
     labels = {}
-    try:
-        raw_labels = json.loads(get_config('est_labels', '') or '{}')
-        if isinstance(raw_labels, dict):
-            for label, refid in raw_labels.items():
-                ca_row = CA.query.filter_by(refid=refid).first()
-                labels[label] = {
-                    'ca_refid': refid,
-                    'ca_name': ca_row.descr if ca_row else None,
-                }
-    except (TypeError, ValueError):
-        logger.warning('Invalid est_labels configuration; reporting none')
+    for label, refid in _est_label_map().items():
+        ca_row = CA.query.filter_by(refid=refid).first()
+        labels[label] = {
+            'ca_refid': refid,
+            'ca_name': ca_row.descr if ca_row else None,
+        }
 
     return success_response(data={
         'enabled': get_config('est_enabled', 'false') == 'true',

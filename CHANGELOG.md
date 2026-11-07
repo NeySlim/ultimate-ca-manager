@@ -35,7 +35,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST: without a requested encryption key, `serverkeygen` returned a PKCS#8 encrypted with the Basic password, or a CMS over mTLS. The key now comes as unencrypted `application/pkcs8` under TLS, and a request naming a key UCM does not hold, or a client certificate that does not allow key transport, is refused (RFC 7030 section 4.4.1).
 - Uploads were spooled to the system temp directory, so a restore larger than a small `/tmp` tmpfs (100 MB in the production compose file) failed while the form was read, and a memory-backed `/tmp` held the archive in RAM. Uploads are now spooled under `DATA_DIR/tmp`, falling back to the system temp directory only when that is not writable.
 - EST `simplereenroll` and WSTEP renewal: a CSR without SubjectAltName got the renewed certificate a name built from the CN, so the device lost the names it served. The renewed certificate now keeps the SubjectAltName of the one being renewed, or none when it had none (RFC 7030 §4.2.2).
-- EST: a CA label named after an operation (`simpleenroll`, `cacerts`...) was accepted and served. Such a label is now refused when saved and ignored when read (RFC 7030 §3.2.2).
+- EST: a CA label named after an operation (`simpleenroll`, `cacerts`...) was accepted and served. Such a label is now refused when saved, and ignored and left out of `GET /api/v2/est/config` when already stored (RFC 7030 §3.2.2).
 
 ### Security
 
@@ -53,6 +53,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST: a FortiGate or other client that stops enrolling after the `/csrattrs` change gets the former answer back with `{"csrattrs_legacy_encoding": true}` on `PATCH /api/v2/est/config`.
 - EST and mTLS: a device or user that authenticates with a certificate revoked or expired on this server, or issued under a revoked CA, must be given a valid one.
 - EST: a client that puts a password in the CSR `challengePassword` keeps enrolling with `{"ignore_challenge_password": true}`.
+- EST: a CA label named after an operation no longer shows on the EST page and is dropped on its next save; give its clients a label under another name.
 
 ## [2.251] - 2026-11-06
 
