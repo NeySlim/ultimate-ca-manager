@@ -1,0 +1,7 @@
+{
+  "est_dsa": "ValueError: EST key package signing does not support this CA key type",
+  "scep_ed448": "ValueError: Unsupported CMS signer key type: ED448",
+  "scep_mldsa": "ValueError: Unsupported CMS signer key type: ML-DSA-65",
+  "tsa_ed25519": "ValueError: A TSA signer key must be RSA, ECDSA or ML-DSA, not ED25519 (EdDSA timestamps are not signed)",
+  "tsa_rsa_pss": "ValueError: This CA signs with RSA-PSS: refusing a PKCS#1 v1.5 signature"
+}
