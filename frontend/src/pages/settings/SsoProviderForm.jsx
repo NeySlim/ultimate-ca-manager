@@ -51,7 +51,8 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     ldap_server: provider?.ldap_server || '',
     ldap_port: provider?.ldap_port || 389,
     ldap_use_ssl: provider?.ldap_use_ssl ?? false,
-    ldap_start_tls: provider?.ldap_start_tls ?? false,
+    // RFC 4513 §6.3.3: a new provider never sends a clear text password by default.
+    ldap_start_tls: provider ? (provider.ldap_start_tls ?? false) : true,
     ldap_verify_ssl: provider?.ldap_verify_ssl ?? true,
     ldap_ca_bundle: '',
     ldap_bind_dn: provider?.ldap_bind_dn || '',

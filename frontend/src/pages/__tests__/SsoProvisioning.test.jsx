@@ -47,6 +47,14 @@ describe('LDAP transport', () => {
     expect(onSave.mock.calls[0][0].ldap_start_tls).toBe(true)
   })
 
+  it('defaults a new provider to StartTLS (RFC 4513 §6.3.3)', () => {
+    const onSave = vi.fn()
+    const { container } = render(<SsoProviderForm forcedType="ldap" onSave={onSave} onCancel={() => {}} />)
+    expect(screen.queryByText('sso.ldapPlainWarning')).not.toBeInTheDocument()
+    submit(container)
+    expect(onSave.mock.calls[0][0].ldap_start_tls).toBe(true)
+  })
+
   it('shows the plain LDAP warning without TLS', () => {
     render(<SsoProviderForm provider={LDAP} onSave={vi.fn()} onCancel={() => {}} />)
     expect(screen.getByText('sso.ldapPlainWarning')).toBeInTheDocument()
