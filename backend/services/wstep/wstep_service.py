@@ -368,7 +368,8 @@ def _named_template(ca, csr):
     offered = _ca_templates(ca)
     found = []
     if oid is not None:
-        by_oid = [t for t in offered if _policy_oid_for_template(ca, t) == oid]
+        cas = _policy_oid_cas(ca)
+        by_oid = [t for t in offered if oid in {_policy_oid_for_template(c, t) for c in cas}]
         if not by_oid:
             return None, f'Certificate template {oid} is not offered by this CA', True
         found.append(by_oid[0])
@@ -391,6 +392,14 @@ def _named_template(ca, csr):
         return None, (f"Template '{template.name}' does not issue the Extended Key Usages "
                       'the request asks for'), True
     return template, None, True
+
+
+def _policy_oid_cas(ca):
+    """The CAs whose policy OIDs a request may name: *ca*, and the XCEP CA when set apart."""
+    from models import CA, SystemConfig
+    row = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
+    xcep_ca = CA.query.filter_by(refid=row.value).first() if row and row.value != ca.refid else None
+    return [ca, xcep_ca] if xcep_ca is not None else [ca]
 
 
 def _eku_oids(cert_or_csr):

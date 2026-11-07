@@ -109,3 +109,23 @@ def test_an_unreadable_template_name_is_refused(app, subject_ca):
     cert, err = _issue(app, ca_id, _named_csr(name='User', name_type=asn1_core.IA5String))
     assert cert is None
     assert err == 'Invalid certificate template extension in the request'
+
+
+def test_an_oid_announced_by_a_separate_xcep_ca_is_issued(app, subject_ca, create_ca):
+    """XCEP and WSTEP may be set to two CAs: the client names the OID the XCEP policy gave."""
+    from models import SystemConfig
+    ca_id = subject_ca('Named split WSTEP CA', TWINS)
+    xcep_ca = create_ca(cn='Named split XCEP CA')
+    with app.app_context():
+        template = CertificateTemplate.query.filter_by(name='Named split WSTEP CA VPNUser').one()
+        oid = _policy_oid_for_template(db.session.get(CA, xcep_ca['id']), template)
+        db.session.add(SystemConfig(key='xcep_ca_refid', value=xcep_ca['refid']))
+        db.session.commit()
+    try:
+        cert, err = _issue(app, ca_id, _named_csr(oid=oid))
+    finally:
+        with app.app_context():
+            SystemConfig.query.filter_by(key='xcep_ca_refid').delete()
+            db.session.commit()
+    assert err is None, err
+    assert _template_oid(cert).dotted_string == _oid_of(app, ca_id, 'Named split WSTEP CA VPNUser')
