@@ -1,6 +1,7 @@
 """TOTP verification with one-time use (RFC 6238 §5.2)."""
 import hmac
 import time
+import unicodedata
 
 import pyotp
 from sqlalchemy import or_, update
@@ -18,9 +19,12 @@ def matched_step(secret, code, now=None):
         return None
     totp = pyotp.TOTP(secret)
     current = int((time.time() if now is None else now) // totp.interval)
-    code = str(code).strip()
+    # NFKC like pyotp (fullwidth digits); compare_digest needs ASCII, so compare bytes.
+    code = unicodedata.normalize('NFKC', str(code)).strip()
+    if not (code.isascii() and code.isdigit()):
+        return None
     for step in range(current - VALID_WINDOW, current + VALID_WINDOW + 1):
-        if hmac.compare_digest(totp.generate_otp(step), code):
+        if hmac.compare_digest(totp.generate_otp(step).encode(), code.encode()):
             return step
     return None
 
