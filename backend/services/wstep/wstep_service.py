@@ -283,12 +283,13 @@ def _match_template(ca, csr, principal=None):
     ``principal`` (Kerberos binding): the templates of its kind (a computer, or
     a user, generalFlags) are matched first, as a Windows client only offers those.
 
-    Callers use the matched row two ways: its policy OID (via
+    Callers use the matched row three ways: its policy OID (via
     ``policy_builder._policy_oid_for_template``) for the issued cert's
     ``ms_certificate_template_oid`` — a real Windows client fails
     CX509Enrollment::Enroll with CERTSRV_E_PROPERTY_EMPTY when the cert
     carries no Certificate Template extension — and its own configured
-    EKUs (``_template_extra_ekus``) as ``extra_ekus``.
+    EKUs (``_template_extra_ekus``) as both ``extra_ekus`` and the
+    ``template_ekus`` that replace the request's.
     """
     named, refusal, has_name = _named_template(ca, csr)
     if has_name:

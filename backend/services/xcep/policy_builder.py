@@ -150,11 +150,9 @@ _SUBJECT_NAME_FLAGS = 0x00000001 | 0x00010000
 # autoenrollment engine has no way to satisfy -- confirmed against the lab
 # that autoenrollment silently declines every other eligible machine template
 # with zero errors logged, while a manually-supplied-subject enrollment of the
-# same template type succeeds. These auto-derive bits tell Windows to build
-# CN/SAN from the computer's own DNS name itself, with no prompt needed --
-# unlike the user-template rationale above, this doesn't require UCM to
-# derive anything server-side; the machine already knows its own identity.
-# WSTEP builds that subject from AD on the Kerberos binding (wstep_service).
+# same template type succeeds. These bits make Windows send the request with
+# no prompt and no subject of its own; on the Kerberos binding WSTEP builds CN
+# and DNS SAN from the computer's AD dNSHostName, whatever the CSR names.
 _MACHINE_SUBJECT_NAME_FLAGS = 0x10000000 | 0x08000000
 
 # Per-template opt-in (CertificateTemplate.ad_derived_subject) gets its own
