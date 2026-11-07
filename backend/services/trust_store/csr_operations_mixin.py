@@ -654,8 +654,8 @@ class CSROperationsMixin:
         CSR's own (empty) one — applying it later would let a CA's
         NameConstraints be silently bypassed by whatever subject was
         derived server-side.
-        ``override_san``: replaces the auto-synthesized SAN outright when
-        given, instead of deriving it from ``override_subject``'s CN via
+        ``override_san``: replaces the CSR's SAN or the auto-synthesized one
+        outright when given, instead of deriving it from ``override_subject``'s CN via
         ``_synthesize_san_from_subject``. Needed for AD-derived user
         subjects: a user's directory-path CN (e.g. "Roy Hagland") isn't a
         DNS name or email address, so synthesis would build a nonsensical
@@ -746,8 +746,8 @@ class CSROperationsMixin:
                 n for n in extra_san if n not in effective_sans]
         if san_template is not None:
             from services.template_service import allowed_san_types, check_san_types, san_type_of
-            # The names that land: the CSR's own SAN when it has one, else the override
-            requested = list(csr_sans or []) if has_csr_san or override_san is None else override_san
+            # The names that land: the override when given, else the CSR's own SAN
+            requested = override_san if override_san is not None else list(csr_sans or [])
             check_san_types(san_template, list(requested) + list(extra_san or []))
             allowed = allowed_san_types(san_template)
             if allowed is not None and override_san is None and not has_csr_san:
@@ -905,6 +905,8 @@ class CSROperationsMixin:
                 builder = builder.add_extension(x509.TLSFeature(features), critical=False)
                 continue
             if extension.oid == ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
+                if override_san is not None:
+                    continue  # replaced by the override, added below
                 # RFC 5280 §4.2.1.6: SAN MUST be critical when the subject
                 # is empty -- the CSR's flag cannot override that.
                 san_value = (x509.SubjectAlternativeName(effective_sans)
@@ -919,7 +921,7 @@ class CSROperationsMixin:
         # effective_sans, already computed above for NameConstraints, so
         # what got constraint-checked and what actually lands on the
         # certificate can't drift apart.
-        if not has_csr_san and effective_sans:
+        if (not has_csr_san or override_san is not None) and effective_sans:
             builder = builder.add_extension(
                 x509.SubjectAlternativeName(effective_sans),
                 critical=len(subject) == 0,

@@ -8,16 +8,20 @@ Direct wstep_service.issue() calls, no SOAP/HTTP layer -- same pattern as
 test_wstep_template_eku.py, since the enforcement lives entirely in
 issue() and its helpers.
 """
+import contextlib
+
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.x509.oid import NameOID
 
-from models import CA, ADConnectorConfig, db
+from models import CA, ADConnectorConfig, CATemplatePin, db
+from models.certificate_template import CertificateTemplate
 from services.ad_connector import lookup as ad_lookup
 from services.trust_store.csr_operations_mixin import _SID_SECURITY_EXT_OID
 from services.wstep import wstep_service
+from tests.fixtures.templates import delete_templates
 
 _REAL_SID = 'S-1-5-21-1608104657-630783805-1473387121-1105'
 KERBEROS_MACHINE_PRINCIPAL = 'WIN11$@HAGLAND.DOMAIN'
@@ -51,6 +55,26 @@ def _clear_ad_connector(app):
     with app.app_context():
         ADConnectorConfig.query.delete()
         db.session.commit()
+
+
+@contextlib.contextmanager
+def _supplied_subject_template(app, ca_id):
+    """Pins to ``ca_id`` a template whose subject the client supplies (0x00010001):
+    a manual request keeps its own subject only under such a template."""
+    with app.app_context():
+        template = CertificateTemplate(name=f'Strong Mapping supplied subject {ca_id}',
+                                       template_type='usr_cert', extensions_template='{}', is_active=True)
+        db.session.add(template)
+        db.session.flush()
+        db.session.add(CATemplatePin(ca_id=ca_id, template_id=template.id))
+        db.session.commit()
+        template_id = template.id
+    try:
+        yield
+    finally:
+        with app.app_context():
+            delete_templates([template_id])
+            db.session.commit()
 
 
 def _sid_extension_value(cert):
@@ -92,7 +116,7 @@ class TestStrongCertMapping:
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam: _REAL_SID)
 
         csr, _key = _make_csr(common_name='win11-manual.hagland.domain')
-        with app.app_context():
+        with _supplied_subject_template(app, ca_data['id']), app.app_context():
             ca = db.session.get(CA, ca_data['id'])
             cert_pem, err = wstep_service.issue(
                 ca, csr.public_bytes(Encoding.DER), validity_days=30,
@@ -118,7 +142,7 @@ class TestStrongCertMapping:
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', _fail_if_called)
 
         csr, _key = _make_csr(common_name='win11-manual.hagland.domain')
-        with app.app_context():
+        with _supplied_subject_template(app, ca_data['id']), app.app_context():
             ca = db.session.get(CA, ca_data['id'])
             cert_pem, err = wstep_service.issue(
                 ca, csr.public_bytes(Encoding.DER), validity_days=30,

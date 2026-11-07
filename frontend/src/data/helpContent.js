@@ -410,7 +410,7 @@ export const helpContent = {
         icon: WindowsLogo,
         items: [
           { label: 'Allow autoenrollment', text: 'Advertise the template as autoEnroll=true in Certificate Enrollment Policy so GPO/Kerberos clients request it automatically at logon. Off by default, manual enrollment stays possible without it' },
-          { label: 'Build subject from Active Directory', text: 'Derive the subject and SAN from the requester\'s AD object (via the AD Connector) instead of requiring the client to supply one, for unattended GPO autoenrollment' },
+          { label: 'Build subject from Active Directory', text: 'Derive the subject and SAN from the requester\'s AD object (via the AD Connector) instead of requiring the client to supply one, for unattended GPO autoenrollment. On the Kerberos endpoints a subject named in the request is ignored and computer accounts are refused; machine templates always take the computer\'s DNS name' },
           { label: 'Restrict enrollment to AD group', text: 'Only members of the configured AD group (nested membership included) may enroll over the Kerberos endpoint. Blank = any authenticated principal. Not enforced on the Username/Password endpoint' },
           { label: 'Pinned subject fields', text: 'Force C/ST/L/O/OU values onto every certificate issued over WSTEP, overriding the CSR or AD derivation for those fields. CN and SAN are never affected, leave a field blank to keep it dynamic' },
         ]

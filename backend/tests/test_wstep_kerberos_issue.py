@@ -163,11 +163,16 @@ def test_issue_succeeds_with_authenticated_negotiation(client, app, wstep_kerber
     # earlier test in this file, so mock defensively regardless.
     monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
 
-    csr, key = _make_csr()
-    r = client.post(
-        ISSUE_URL, data=_build_rst(csr),
-        headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
-    )
+    # A template whose subject the client supplies: a machine template's comes from AD
+    _configure_acl_template(app, None, wstep_kerberos_config['id'])
+    try:
+        csr, key = _make_csr()
+        r = client.post(
+            ISSUE_URL, data=_build_rst(csr),
+            headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
+        )
+    finally:
+        _clear_acl_template(app)
     assert r.status_code == 200
     assert r.headers.get('WWW-Authenticate') == 'Negotiate bXV0dWFsLXRva2Vu'
 

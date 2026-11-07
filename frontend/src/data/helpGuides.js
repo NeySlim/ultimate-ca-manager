@@ -2270,7 +2270,7 @@ On **Kerberos-authenticated issuance**, UCM embeds the requester's AD SID in the
 
 ### AD-Derived Subjects
 
-A certificate template can opt into **Build subject from Active Directory** (Templates → Enrollment): for unattended GPO autoenrollment, the subject and SAN are derived from the requester's AD object via the AD Connector instead of requiring the client to supply one, matching how a real ADCS template is configured for autoenrollment. Independently, **Allow autoenrollment** advertises the template as \`autoEnroll=true\` in Certificate Enrollment Policy so GPO/Kerberos-authenticated clients request it automatically at logon.
+A certificate template can opt into **Build subject from Active Directory** (Templates → Enrollment): for unattended GPO autoenrollment, the subject and SAN are derived from the requester's AD object via the AD Connector instead of requiring the client to supply one, matching how a real ADCS template is configured for autoenrollment. On the Kerberos endpoints, the subject of such a template and of every machine template (Web Server, VPN, OCSP Signing types) always comes from Active Directory, whatever the request names: a machine template takes the computer's DNS name, is refused to a user account, and a "Build subject from Active Directory" template is refused to a computer. A template without either keeps the subject the client supplies, and so does every template on the Username/Password endpoints, which have no directory identity to build one from. Independently, **Allow autoenrollment** advertises the template as \`autoEnroll=true\` in Certificate Enrollment Policy so GPO/Kerberos-authenticated clients request it automatically at logon.
 
 ## About
 

@@ -154,6 +154,7 @@ _SUBJECT_NAME_FLAGS = 0x00000001 | 0x00010000
 # CN/SAN from the computer's own DNS name itself, with no prompt needed --
 # unlike the user-template rationale above, this doesn't require UCM to
 # derive anything server-side; the machine already knows its own identity.
+# WSTEP builds that subject from AD on the Kerberos binding (wstep_service).
 _MACHINE_SUBJECT_NAME_FLAGS = 0x10000000 | 0x08000000
 
 # Per-template opt-in (CertificateTemplate.ad_derived_subject) gets its own
@@ -186,6 +187,24 @@ _ENROLLMENT_FLAGS = 0
 # common GPO computer-autoenrollment pattern this targets.
 _GENERAL_MACHINE_TYPE = 0x00000040
 _MACHINE_TEMPLATE_TYPES = {'web_server', 'vpn_server', 'vpn_client', 'ocsp_signing'}
+
+CT_FLAG_ENROLLEE_SUPPLIES_SUBJECT = 0x00000001
+
+
+def is_machine_template(template):
+    return template.template_type in _MACHINE_TEMPLATE_TYPES
+
+
+def subject_name_flags(template, ad_identity=True):
+    """The subjectNameFlags announced for ``template``, which WSTEP issuance follows.
+    Without an AD identity (UsernamePassword binding) the client supplies every subject."""
+    if not ad_identity:
+        return _SUBJECT_NAME_FLAGS
+    if is_machine_template(template):
+        return _MACHINE_SUBJECT_NAME_FLAGS
+    if getattr(template, 'ad_derived_subject', False):
+        return _USER_AD_DERIVED_SUBJECT_NAME_FLAGS
+    return _SUBJECT_NAME_FLAGS
 
 # Stable namespace for deriving per-CA policy OIDs and policyIDs via uuid5,
 # which keeps derived values stable across requests -- matters both for a
@@ -364,7 +383,7 @@ def _build_extensions_element(attributes, extensions, oids):
         )
 
 
-def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=None):
+def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=None, ad_identity=True):
     """Build an MS-XCEP ``GetPoliciesResponse`` SOAP envelope.
 
     Args:
@@ -379,6 +398,8 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
             ``a:RelatesTo`` in the response header (see
             ``ACTION_GET_POLICIES_RESPONSE``'s comment for why this
             matters to a real client).
+        ad_identity: False on the UsernamePassword binding, whose requests
+            carry no AD identity to build a subject from (``subject_name_flags``).
 
     Returns:
         bytes: UTF-8 encoded, well-formed SOAP XML.
@@ -508,16 +529,10 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
 
         _nil_element(attributes, 'supersededPolicies')
         _nil_element(attributes, 'privateKeyFlags')
-        is_machine_template = template.template_type in _MACHINE_TEMPLATE_TYPES
-        if is_machine_template:
-            subject_name_flags = _MACHINE_SUBJECT_NAME_FLAGS
-        elif getattr(template, 'ad_derived_subject', False):
-            subject_name_flags = _USER_AD_DERIVED_SUBJECT_NAME_FLAGS
-        else:
-            subject_name_flags = _SUBJECT_NAME_FLAGS
-        etree.SubElement(attributes, '{%s}subjectNameFlags' % XCEP_NS).text = str(subject_name_flags)
+        etree.SubElement(attributes, '{%s}subjectNameFlags' % XCEP_NS).text = str(
+            subject_name_flags(template, ad_identity))
         etree.SubElement(attributes, '{%s}enrollmentFlags' % XCEP_NS).text = str(_ENROLLMENT_FLAGS)
-        if is_machine_template:
+        if is_machine_template(template):
             etree.SubElement(attributes, '{%s}generalFlags' % XCEP_NS).text = str(_GENERAL_MACHINE_TYPE)
         else:
             _nil_element(attributes, 'generalFlags')
