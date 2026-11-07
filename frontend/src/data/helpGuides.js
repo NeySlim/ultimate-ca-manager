@@ -903,6 +903,9 @@ https://your-server:8443/scep/<profile>/pkiclient.exe  (per-profile endpoint)
 
 Devices need the URL to enroll. Use a profile URL to target that profile's CA, template and challenge password.
 
+### CA rollover (GetNextCACert)
+GetNextCACert serves the successor of the endpoint's CA, signed by the current CA: another CA with the same parent and the same subject DN, not revoked, not offline, holding its key, and expiring later. A CA that only shares the display name is never served; without a successor the answer is 404.
+
 ## Approving/Rejecting Requests
 
 For pending requests (auto-approve disabled):

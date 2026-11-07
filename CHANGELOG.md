@@ -31,6 +31,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Uploads were spooled to the system temp directory, so a restore larger than a small `/tmp` tmpfs (100 MB in the production compose file) failed while the form was read, and a memory-backed `/tmp` held the archive in RAM. Uploads are now spooled under `DATA_DIR/tmp`, falling back to the system temp directory only when that is not writable.
 - SCEP: a RenewalReq signed by a certificate the CA issued was refused unless it carried the current challenge password, so a client that omitted it, as RFC 8894 §2.4 recommends, or sent the original one after a rotation could not renew. The signing certificate now authenticates the renewal and the challenge is no longer compared.
 - SCEP: a challenge password sent in the CSR as a BMPString or UniversalString was read as UTF-8 and refused. Every DirectoryString type is now decoded by its type (RFC 2985 §5.4.1).
+- SCEP: GetNextCACert served as the rollover certificate any CA sharing the current CA's display name, even one with another subject and key, or a revoked or offline one. It now serves only a CA with the same parent and subject DN that is usable and expires later, and answers 404 otherwise.
 
 ### Security
 

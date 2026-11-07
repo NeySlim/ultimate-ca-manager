@@ -9,7 +9,7 @@ import logging
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from flask import Blueprint, make_response, request
-from sqlalchemy import and_
+from sqlalchemy import or_
 
 from fips_mode import FipsRestricted
 from models import CA, SystemConfig, db
@@ -317,42 +317,8 @@ def handle_get_next_ca_cert(profile_slug=None):
         return refusal_response(error)
 
     try:
-        ca = service.ca
-
-        # Look for a newer CA cert that is part of the same chain (same parent)
-        # as the current CA, OR a self-renewed root with the same description.
-        #
-        # The previous code used a Python ternary inside a SQLAlchemy filter
-        # expression — Python evaluates it once at request time using the
-        # truthiness of CA.caref (a Column object, always truthy), so the
-        # ``CA.id != ca.id`` branch was dead code and the resulting SQL
-        # silently filtered on the wrong column. Use proper SQLAlchemy
-        # disjunction instead.
-        if ca.caref:
-            same_chain = CA.caref == ca.caref
-        else:
-            # Root CA: just look for siblings with the same descriptor.
-            same_chain = CA.descr == ca.descr
-
-        next_ca = (
-            CA.query
-            .filter(and_(same_chain, CA.id != ca.id, CA.descr == ca.descr))
-            .order_by(CA.id.desc())
-            .first()
-        )
-
-        if not next_ca or not next_ca.crt:
-            return make_error_response("No rollover CA certificate available", 404)
-
-        # Parse the next CA cert to verify it's actually newer.
-        try:
-            next_cert = x509.load_pem_x509_certificate(
-                base64.b64decode(next_ca.crt), default_backend()
-            )
-            if next_cert.not_valid_after_utc <= service.ca_cert.not_valid_after_utc:
-                return make_error_response("No rollover CA certificate available", 404)
-        except Exception as e:
-            logger.warning(f"SCEP rollover certificate is invalid: {e}")
+        next_cert = _rollover_certificate(service.ca, service.ca_cert)
+        if next_cert is None:
             return make_error_response("No rollover CA certificate available", 404)
 
         # RFC 8894 §4.7.1 requires an outer SignedData signed by the current
@@ -372,6 +338,29 @@ def handle_get_next_ca_cert(profile_slug=None):
     except Exception as e:
         logger.error(f"SCEP GetNextCACert error: {e}")
         return make_error_response("SCEP server error", 500)
+
+
+def _rollover_certificate(ca, ca_cert):
+    """The current CA's successor: same parent and subject DN, usable for
+    issuance, and taking over before the current certificate expires."""
+    same_parent = (CA.caref == ca.caref) if ca.caref else or_(CA.caref.is_(None), CA.caref == '')
+    best = None
+    for candidate in CA.query.filter(same_parent, CA.id != ca.id).all():
+        if (not candidate.crt or candidate.offline or candidate.revoked_in_chain
+                or not candidate.has_private_key):
+            continue
+        try:
+            cert = x509.load_pem_x509_certificate(base64.b64decode(candidate.crt), default_backend())
+        except Exception as e:
+            logger.warning(f"SCEP rollover candidate {candidate.id} is invalid: {e}")
+            continue
+        if (cert.subject != ca_cert.subject
+                or cert.not_valid_after_utc <= ca_cert.not_valid_after_utc
+                or cert.not_valid_before_utc > ca_cert.not_valid_after_utc):
+            continue
+        if best is None or cert.not_valid_after_utc > best.not_valid_after_utc:
+            best = cert
+    return best
 
 
 def handle_pki_operation(profile_slug=None):
