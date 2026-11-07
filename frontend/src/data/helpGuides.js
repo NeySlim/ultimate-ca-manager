@@ -2704,7 +2704,7 @@ https://your-ucm-host:8443/api/v2/sso/saml/metadata
 This URL returns a SAML 2.0 compliant XML document containing:
 - **Entity ID**: UCM's service provider identifier
 - **ACS URL**: Assertion Consumer Service endpoint (HTTP-POST)
-- **SLO URL**: Single Logout Service endpoint (HTTP-Redirect), see Single Logout below
+- **SLO URL**: IdP endpoint that takes the LogoutResponse by HTTP-Redirect; metadata import keeps the ResponseLocation of the HTTP-Redirect Single Logout Service, else its Location. See Single Logout below
 - **Signing Certificate**: UCM's HTTPS certificate for signing verification
 - **NameID Format**: The provider's **NameID format** setting (Unspecified, Persistent, Email address or Transient), also sent in each login request. Persistent gives a stable identifier; a transient NameID is never used to recognise the account
 
