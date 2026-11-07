@@ -10,14 +10,13 @@ from cryptography.hazmat.backends import default_backend
 
 from models import db, CA, Certificate
 from models.crl import CRLMetadata
-from utils.cert_issuer import same_key_refids
 from utils import notices
 from utils.datetime_utils import utc_now
 from services.cert.serial_resolution import resolve_record_serial
 from utils.x509_aki import authority_key_identifier_from_issuer
 from ._constants import REASON_MAP
 from .numbering import allocate_crl_number
-from .query import CRLQueryMixin, _dedupe_live_records, _not_expired
+from .query import CRLQueryMixin
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +91,13 @@ def _apply_revoke_reason(
         return revoked_builder
 
     return revoked_builder.add_extension(x509.CRLReason(reason), critical=False)
+
+
+def _entry_reason(entry: x509.RevokedCertificate) -> Optional[x509.ReasonFlags]:
+    try:
+        return entry.extensions.get_extension_for_class(x509.CRLReason).value.reason
+    except x509.ExtensionNotFound:
+        return None
 
 
 def _add_freshest_crl(builder: x509.CertificateRevocationListBuilder, ca: CA):
@@ -362,30 +368,12 @@ class CRLGenerationMixin:
                 raise ValueError(
                     f"No base CRL exists for CA {ca.descr}: generate a full CRL first")
 
-            now = utc_now()  # one instant for the filters below and the CRL dates
-            revoked_certs = Certificate.query.filter(
-                Certificate.caref.in_(same_key_refids(ca)),
-                Certificate.revoked == True,
-                _not_expired(Certificate.valid_to, now),
-                Certificate.revoked_at > base_crl.this_update).all()
-            # A revoked child CA, from its row, as the full CRL lists it
-            revoked_certs = revoked_certs + CA.query.filter(
-                CA.caref == ca.refid,
-                CA.revoked == True,
-                CA.revoked_at > base_crl.this_update,
-                _not_expired(CA.valid_to, now),
-            ).all()
-            # Persistent records revoked since the base: deleted or renewed serials
-            from models.revoked_serial import RevokedSerial
-            persisted = RevokedSerial.query.filter(
-                RevokedSerial.caref.in_(same_key_refids(ca)),
-                RevokedSerial.revoked_at > base_crl.this_update,
-                RevokedSerial.valid_to > now,
-            ).order_by(RevokedSerial.revoked_at, RevokedSerial.id).all()
-            revoked_certs = _dedupe_live_records(
-                sorted(revoked_certs, key=lambda r: (isinstance(r, CA), r.id)))
-            revoked_certs = revoked_certs + CRLQueryMixin._filter_orphan_serials(
-                persisted, revoked_certs)
+            now = utc_now()
+            # RFC 5280 §5.2.4: what changed since the base, read from the base itself,
+            # so a revocation dated before it but committed after it is not lost
+            on_base = {entry.serial_number: _entry_reason(entry)
+                       for entry in x509.load_der_x509_crl(base_crl.crl_der)}
+            revoked_certs = CRLQueryMixin.get_revoked_certificates(ca_id)
 
             builder = x509.CertificateRevocationListBuilder()
             builder = builder.issuer_name(ca_cert.subject)
@@ -405,7 +393,10 @@ class CRLGenerationMixin:
                     revoked_builder, cert.revoke_reason, is_delta=True
                 )
                 revoked_builder = _apply_invalidity_date(revoked_builder, cert)
-                builder = builder.add_revoked_certificate(revoked_builder.build())
+                entry = revoked_builder.build()
+                if serial_int in on_base and on_base[serial_int] == _entry_reason(entry):
+                    continue
+                builder = builder.add_revoked_certificate(entry)
                 entries += 1
 
             builder = builder.add_extension(x509.CRLNumber(crl_number), critical=False)
