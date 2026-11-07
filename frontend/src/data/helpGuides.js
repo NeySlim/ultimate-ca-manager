@@ -661,7 +661,7 @@ Certificate authorities are not made from templates: create them on the **CAs** 
 1. Click **Create Template**
 2. Enter a **name** and optional description
 3. Select the template **type**: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon or Custom. It sets the Key Usage, Extended Key Usage and SAN defaults, which you can then change
-4. Configure **Subject defaults** (O, OU, C, ST, L, CN, Email). On Email and combined certificates, the Email also becomes an email SAN
+4. Configure **Subject defaults** (O, OU, C, ST, L, CN, Email). The Email also becomes an email SAN, whatever the certificate type
 5. Select **Key Usage** flags
 6. Select **Extended Key Usage** values from the purposes the server knows (Smartcard Logon, Time Stamping, Microsoft RDP and others)
 7. Set the **Key Type** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384, EC-P521 or ML-DSA-44/65/87), the digest and the **default validity** period in days. The digest is the issuing CA's signing hash, so it still applies to an ML-DSA key under an RSA or EC CA; an ML-DSA CA ignores it
