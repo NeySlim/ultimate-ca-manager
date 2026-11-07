@@ -713,6 +713,9 @@ def new_account():
             "termsOfServiceAgreed": account.terms_of_service_agreed,
             "orders": f"{account_url}/orders"
         }
+        # RFC 8555 §7.3.4: the new account echoes the binding it was created with
+        if eab_data and is_new:
+            response_data["externalAccountBinding"] = eab_data
         
         response = acme_response(response_data, 201 if is_new else 200)
         response.headers['Location'] = account_url
