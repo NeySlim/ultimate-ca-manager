@@ -146,6 +146,12 @@ class KeyEncryption:
         self._key_source = None
         self._initialize()
     
+    def unload(self):
+        """Run as without a key, e.g. when the configured one is not the database's."""
+        self._fernet = None
+        self._key_bytes = None
+        self._enabled = False
+
     @property
     def is_enabled(self) -> bool:
         return self._enabled

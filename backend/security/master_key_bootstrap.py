@@ -62,6 +62,18 @@ def container_dir_is_persistent(directory, mountinfo: str = None):
     return True, ''
 
 
+def ephemeral_key_dir_refusal():
+    """Why a key written now would be lost with the container, or None."""
+    if not in_container():
+        return None
+    directory = _encryption.MASTER_KEY_PATH.parent
+    persistent, reason = container_dir_is_persistent(directory)
+    if persistent:
+        return None
+    return (f"{reason}, so a master key there would be lost with the container. Mount "
+            f"{directory} on a named volume or a host directory, or set KEY_ENCRYPTION_KEY")
+
+
 # Set when encryption is disabled from the UI, so a later start creates no key
 OPT_OUT_KEY = 'security.auto_master_key'
 
@@ -134,7 +146,12 @@ def activate_new_master_key(exclusive: bool) -> dict:
 
     encrypted, skipped, errors = _encryption.encrypt_all_keys(dry_run=False)
     from services.file_regen_service import purge_private_key_files
-    purge = purge_private_key_files()
+    try:
+        purge = purge_private_key_files()
+    except Exception as e:
+        # The key now encrypts the database: a failed cleanup must not hide it
+        logger.error("🔓 Could not remove the plaintext key copies: %s", e)
+        purge = {'removed': 0, 'kept_no_db_key': 0, 'errors': 1}
     return {'encrypted': encrypted, 'skipped': skipped, 'errors': errors, 'purge': purge}
 
 
@@ -142,6 +159,19 @@ def _log_remaining(errors: list) -> None:
     if errors:
         logger.error("🔓 %d value(s) still stored unencrypted under the master key, retried at "
                      "the next start: %s", len(errors), '; '.join(errors[:5]))
+
+
+def _loaded_key_reads_the_database() -> bool:
+    """False when the first encrypted value does not decrypt: the key is another one."""
+    for _, row, attribute, fmt in _encryption.master_key_values():
+        value = getattr(row, attribute)
+        if _encryption.key_encryption.is_encrypted(value):
+            try:
+                _encryption.decrypt_master_key_value(value, fmt)
+            except ValueError:
+                return False
+            return True
+    return True
 
 
 def _resume_encryption() -> None:
@@ -165,6 +195,10 @@ def bootstrap_master_key(app) -> str:
     key_encryption = _encryption.key_encryption
     path = _encryption.MASTER_KEY_PATH
     if key_encryption.is_enabled:
+        if not _loaded_key_reads_the_database():
+            # Running on would write new values under the wrong key: keep them as without one
+            key_encryption.unload()
+            return 'wrong_key'
         if auto_master_key_allowed(app):
             _resume_encryption()
         return 'present'
@@ -180,14 +214,11 @@ def bootstrap_master_key(app) -> str:
             "🔓 No master key created: encrypted values or a keyed audit chain need the "
             "previous one. Restore %s and restart UCM.", path)
         return 'lost'
-    if in_container():
-        persistent, reason = container_dir_is_persistent(path.parent)
-        if not persistent:
-            logger.error(
-                "🔓 No master key created: %s, so it would be lost with the container. "
-                "Mount %s on a named volume or a host directory, or set KEY_ENCRYPTION_KEY; "
-                "private keys stay unencrypted until then.", reason, path.parent)
-            return 'ephemeral'
+    refusal = ephemeral_key_dir_refusal()
+    if refusal:
+        logger.error("🔓 No master key created: %s; private keys stay unencrypted until then.",
+                     refusal)
+        return 'ephemeral'
     try:
         stats = activate_new_master_key(exclusive=True)
     except FileExistsError:
@@ -227,9 +258,16 @@ def check_master_key_at_start(app) -> None:
         f"🔐 Encryption check: enabled={key_encryption.is_enabled}, has_encrypted_keys={has_enc}, "
         f"key_source={key_encryption.key_source}, first_start={outcome}")
     app.config['SAFE_MODE'] = not key_encryption.is_enabled and has_enc
+    app.config['SAFE_MODE_REASON'] = ('encryption_key_mismatch' if outcome == 'wrong_key'
+                                      else 'encryption_key_missing')
     if not key_encryption.is_enabled and not has_enc and outcome in ('disabled', 'configured'):
         _encryption.log_encryption_disabled()
-    if app.config['SAFE_MODE']:
+    if app.config['SAFE_MODE'] and outcome == 'wrong_key':
+        app.logger.error(
+            "🔒 SAFE MODE: the configured master key does not decrypt the stored private keys. "
+            f"Restore the previous {_encryption.MASTER_KEY_PATH} (or KEY_ENCRYPTION_KEY) "
+            "and restart UCM.")
+    elif app.config['SAFE_MODE']:
         app.logger.error(
             "🔒 SAFE MODE: Encrypted private keys found but no encryption key available. "
             f"Place your master.key file at {_encryption.MASTER_KEY_PATH} and restart UCM.")

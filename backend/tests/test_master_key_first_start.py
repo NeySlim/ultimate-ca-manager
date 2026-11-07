@@ -232,12 +232,12 @@ def test_dashboard_warns_while_no_key_is_loaded(app, auth_client, no_key):
 def test_enable_encryption_keeps_a_key_that_already_encrypted_values(
         app, auth_client, create_ca, no_key, monkeypatch):
     """A failure after the keys were encrypted must not remove the only key that reads them."""
-    import services.file_regen_service as regen
+    from security import master_key_bootstrap as boot
 
-    def fail():
-        raise RuntimeError('purge failed')
+    def fail(auto):
+        raise RuntimeError('commit failed')
 
-    monkeypatch.setattr(regen, 'purge_private_key_files', fail)
+    monkeypatch.setattr(boot, 'record_operator_choice', fail)
     ca = create_ca()
     r = auth_client.post('/api/v2/system/security/enable-encryption')
     assert r.status_code == 500
@@ -269,6 +269,10 @@ def test_disabled_encryption_stays_disabled_after_restart(app, auth_client, crea
     r = auth_client.post('/api/v2/system/security/disable-encryption')
     assert r.status_code == 200, r.data
     assert not no_key.MASTER_KEY_PATH.exists()
+    from models import SystemConfig
+    from security.master_key_bootstrap import OPT_OUT_KEY
+    with app.app_context():
+        assert SystemConfig.query.filter_by(key=OPT_OUT_KEY).first().value == 'false'
 
     no_key.key_encryption.reload()
     with app.app_context():
@@ -495,3 +499,109 @@ def test_bootstrap_never_overwrites_a_key_another_process_wrote(app, no_key, mon
     with app.app_context():
         assert boot.bootstrap_master_key(app) == 'present'
     assert no_key.MASTER_KEY_PATH.read_text().strip() == other
+
+
+def test_a_key_that_does_not_read_the_database_enters_safe_mode(app, create_ca, no_key, monkeypatch):
+    """A database copied onto a new installation keeps the key it was encrypted under:
+    the key created there must neither run UCM nor encrypt what is left in the clear."""
+    from models import db, SystemConfig
+    from security.master_key_bootstrap import check_master_key_at_start
+
+    with app.app_context():
+        check_master_key_at_start(app)
+    path = no_key.MASTER_KEY_PATH
+    created = path.read_bytes()
+
+    old = Fernet.generate_key().decode('ascii')
+    aside = path.with_name('aside')
+    path.rename(aside)
+    with monkeypatch.context() as patch:
+        patch.setenv('KEY_ENCRYPTION_KEY', old)
+        no_key.key_encryption.reload()
+        ca = create_ca()
+    aside.rename(path)
+    with app.app_context():
+        db.session.add(SystemConfig(key='acme.proxy.eab_hmac_key', value='hmac-in-clear'))
+        db.session.commit()
+
+    no_key.key_encryption.reload()
+    assert no_key.key_encryption.is_enabled
+    try:
+        with app.app_context():
+            check_master_key_at_start(app)
+            secret = SystemConfig.query.filter_by(key='acme.proxy.eab_hmac_key').first().value
+        assert app.config['SAFE_MODE'] is True
+        health = json.loads(app.test_client().get('/api/health').data)
+        assert health['safe_mode_reason'] == 'encryption_key_mismatch'
+    finally:
+        app.config['SAFE_MODE'] = False
+        app.config.pop('SAFE_MODE_REASON', None)
+    assert secret == 'hmac-in-clear'
+    assert not no_key.key_encryption.is_enabled
+    assert path.read_bytes() == created
+    Fernet(old.encode()).decrypt(base64.b64decode(_ca_prv(app, ca['id']))[len(b'ENC:'):])
+
+
+def test_enable_encryption_refuses_a_container_without_a_volume_of_its_own(
+        app, auth_client, no_key, monkeypatch):
+    from security import master_key_bootstrap as boot
+
+    monkeypatch.setattr(boot, 'in_container', lambda: True)
+    monkeypatch.setattr(boot, '_read_mountinfo', lambda: ANONYMOUS_VOLUME)
+    r = auth_client.post('/api/v2/system/security/enable-encryption')
+    assert r.status_code == 409, r.data
+    assert 'lost with the container' in json.loads(r.data)['message']
+    assert not no_key.MASTER_KEY_PATH.exists()
+    assert not no_key.key_encryption.is_enabled
+
+
+def test_the_encryption_choice_stays_with_its_installation(app, no_key, monkeypatch):
+    """A backup taken where encryption was disabled must not disable it where it is restored."""
+    from types import SimpleNamespace
+    from models import db, SystemConfig
+    from security.master_key_bootstrap import OPT_OUT_KEY, record_operator_choice
+    from services.backup import BackupService, export_core
+    from services.backup.restore.settings import restore_encrypted_settings
+
+    with app.app_context():
+        record_operator_choice(auto=False)
+        db.session.commit()
+        row = SystemConfig.query.filter_by(key=OPT_OUT_KEY).first()
+        monkeypatch.setattr(export_core, 'SystemConfig', SimpleNamespace(
+            query=SimpleNamespace(all=lambda: [row])))
+        exported = BackupService()._export_configuration(True)
+        monkeypatch.undo()
+        assert OPT_OUT_KEY not in exported['settings']
+
+        db.session.delete(row)
+        db.session.commit()
+        configuration = {'settings': {OPT_OUT_KEY: 'false'}, 'encrypted_settings': [OPT_OUT_KEY]}
+        BackupService()._restore_settings({'configuration': configuration}, {'settings': 0})
+        restore_encrypted_settings(configuration, configuration['encrypted_settings'])
+        db.session.commit()
+        assert SystemConfig.query.filter_by(key=OPT_OUT_KEY).first() is None
+
+
+def test_enable_encryption_reports_success_when_only_the_mirror_purge_fails(
+        app, auth_client, create_ca, no_key, monkeypatch):
+    """The key encrypts the database: the operator must get it back to save it."""
+    import services.file_regen_service as regen
+    from models import AuditLog, SystemConfig
+    from security.master_key_bootstrap import OPT_OUT_KEY, record_operator_choice
+
+    def fail():
+        raise RuntimeError('purge failed')
+
+    with app.app_context():
+        record_operator_choice(auto=False)
+        from models import db
+        db.session.commit()
+    monkeypatch.setattr(regen, 'purge_private_key_files', fail)
+    create_ca()
+    r = auth_client.post('/api/v2/system/security/enable-encryption')
+    assert r.status_code == 200, r.data
+    data = json.loads(r.data)['data']
+    assert data['master_key'] == no_key.MASTER_KEY_PATH.read_text().strip()
+    with app.app_context():
+        assert SystemConfig.query.filter_by(key=OPT_OUT_KEY).first() is None
+        assert AuditLog.query.filter_by(action='encryption_enabled').count() == 1

@@ -69,10 +69,15 @@ def enable_encryption():
     """
     try:
         from security.encryption import KeyEncryption, key_encryption
-        from security.master_key_bootstrap import KeyActivationError, activate_new_master_key
+        from security.master_key_bootstrap import (
+            KeyActivationError, activate_new_master_key, ephemeral_key_dir_refusal,
+        )
 
         if key_encryption.is_enabled:
             return error_response("Encryption is already enabled", 400)
+        refusal = ephemeral_key_dir_refusal()
+        if refusal:
+            return error_response(f"Encryption not enabled: {refusal}.", 409)
 
         try:
             stats = activate_new_master_key(exclusive=False)
