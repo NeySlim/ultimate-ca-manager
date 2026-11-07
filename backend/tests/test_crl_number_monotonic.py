@@ -2,7 +2,8 @@
 
 The number continues after a restore on another installation and after the CA
 is deleted and imported again, and two generations running at once, in two
-processes as the web worker and the scheduler do, get two numbers.
+processes as the web worker and the scheduler do, get two numbers, the higher
+one listing what the lower one did.
 """
 import base64
 import multiprocessing
@@ -194,7 +195,7 @@ def _generate_in_child(app, url, ca_id, barrier, results):
     allocate = generation.allocate_crl_number
 
     def meet_then_allocate(*args, **kwargs):
-        # Both have read everything else and ask for a number at the same moment
+        # Both ask for a number at the same moment
         try:
             barrier.wait()
         except threading.BrokenBarrierError:
@@ -316,6 +317,113 @@ def test_a_second_allocation_waits_for_the_first_on_postgresql(app):
 
     with _a_schema_of_our_own('crl_number_held') as url:
         assert _second_waits_for_the_first(app, url, True) == {'first': 1, 'second': 2}
+
+
+def _leaf_of(ca_key, ca_cert, ca):
+    from models import Certificate
+    key = ec.generate_private_key(ec.SECP256R1())
+    now = datetime.now(timezone.utc)
+    leaf = (x509.CertificateBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'leaf')]))
+            .issuer_name(ca_cert.subject).public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=90))
+            .sign(ca_key, hashes.SHA256()))
+    row = Certificate(
+        refid=f'crl-race-{uuid.uuid4().hex[:10]}', descr='race', caref=ca.refid,
+        crt=base64.b64encode(leaf.public_bytes(serialization.Encoding.PEM)).decode(),
+        serial_number=format(leaf.serial_number, 'x'),
+        subject=leaf.subject.rfc4514_string(), issuer=leaf.issuer.rfc4514_string(),
+        valid_from=(now - timedelta(days=1)).replace(tzinfo=None),
+        valid_to=(now + timedelta(days=90)).replace(tzinfo=None))
+    db.session.add(row)
+    db.session.commit()
+    return row.id, leaf.serial_number
+
+
+def _revocation_between_read_and_number(app, url, is_postgresql, generate):
+    """A reads its revocations; B revokes a serial and publishes; A then publishes.
+
+    RFC 5280 §5.2.3 and §3.3: the CRL with the higher number is the newer one
+    and still lists what a lower one listed.
+    """
+    from models import Certificate
+    from services.crl.query import CRLQueryMixin
+    from tests.test_backup_cross_installation import _bound_to
+
+    key, cert = _authority()
+    a_read, b_done, errors = threading.Event(), threading.Event(), []
+    original = CRLQueryMixin._filter_orphan_serials
+
+    def read_then_wait(*args, **kwargs):
+        listed = original(*args, **kwargs)
+        if threading.current_thread().name == 'A':
+            a_read.set()
+            b_done.wait(1.5)  # held lock: B cannot publish meanwhile
+        return listed
+
+    def run(name, body):
+        try:
+            with app.app_context():
+                body()
+                db.session.remove()
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f'{name}: {exc!r}')
+
+    def b_body():
+        a_read.wait(10)
+        row = db.session.get(Certificate, cert_id)
+        row.revoked, row.revoke_reason = True, 'keyCompromise'
+        row.revoked_at = datetime.now(timezone.utc).replace(tzinfo=None)
+        db.session.commit()
+        generate(ca_id)
+        b_done.set()
+
+    with _bound_to(app, url, is_postgresql=is_postgresql), app.app_context():
+        ca = _ca_row(key, cert)
+        ca.delta_crl_enabled = generate is CRLService.generate_delta_crl
+        db.session.commit()
+        ca_id = ca.id
+        cert_id, serial = _leaf_of(key, cert, ca)
+        CRLService.generate_crl(ca_id)
+        db.session.remove()
+        CRLQueryMixin._filter_orphan_serials = staticmethod(read_then_wait)
+        try:
+            threads = [threading.Thread(name='A', target=run, args=('A', lambda: generate(ca_id))),
+                       threading.Thread(name='B', target=run, args=('B', b_body))]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(30)
+        finally:
+            CRLQueryMixin._filter_orphan_serials = staticmethod(original)
+        newest = (CRLMetadata.query.filter_by(ca_id=ca_id)
+                  .order_by(CRLMetadata.crl_number.desc()).first())
+        served = [newest] + CRLMetadata.query.filter_by(
+            ca_id=ca_id, crl_number=newest.base_crl_number).all()  # a delta is read with its base
+        listed = {entry.serial_number for row in served
+                  for entry in x509.load_der_x509_crl(row.crl_der)}
+        db.session.remove()
+    assert not errors, errors
+    return serial in listed
+
+
+@pytest.mark.parametrize('kind', ['full', 'delta'])
+def test_the_highest_number_lists_a_revocation_made_meanwhile_on_sqlite(app, tmp_path, kind):
+    generate = {'full': CRLService.generate_crl, 'delta': CRLService.generate_delta_crl}[kind]
+    assert _revocation_between_read_and_number(
+        app, f"sqlite:///{tmp_path / 'between.db'}", False, generate)
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+@pytest.mark.parametrize('kind', ['full', 'delta'])
+def test_the_highest_number_lists_a_revocation_made_meanwhile_on_postgresql(app, kind):
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    generate = {'full': CRLService.generate_crl, 'delta': CRLService.generate_delta_crl}[kind]
+    with _a_schema_of_our_own(f'crl_number_between_{kind}') as url:
+        assert _revocation_between_read_and_number(app, url, True, generate)
 
 
 def test_the_schema_refuses_two_crls_under_one_number():

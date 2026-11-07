@@ -219,34 +219,36 @@ class CRLGenerationMixin:
         ca_private_key = get_ca_signing_key(ca, allow_revoked=True)
 
         _run_housekeeping(ca_id)
-        revoked_certs = CRLQueryMixin.get_revoked_certificates(ca_id)
 
-        now = utc_now()
-        builder = x509.CertificateRevocationListBuilder()
-        builder = builder.issuer_name(ca_cert.subject)
-        builder = builder.last_update(now)
-        builder = builder.next_update(now + timedelta(days=validity_days))
-
-        entries = 0
-        for cert in revoked_certs:
-            serial_int = _parse_revoked_serial(cert, context='CRL')
-            if serial_int is None:
-                continue
-
-            revoked_builder = x509.RevokedCertificateBuilder()
-            revoked_builder = revoked_builder.serial_number(serial_int)
-            revoked_builder = revoked_builder.revocation_date(cert.revoked_at or now)
-            revoked_builder = _apply_revoke_reason(
-                revoked_builder, cert.revoke_reason, is_delta=False
-            )
-            revoked_builder = _apply_invalidity_date(revoked_builder, cert)
-            builder = builder.add_revoked_certificate(revoked_builder.build())
-            entries += 1
-
-        # From the allocation to the commit the lock is held: a failure in
-        # between releases it and gives the number back.
+        # The number first, then the list, under the lock held to the commit: a
+        # higher number always lists what a lower one did (RFC 5280 §5.2.3, §3.3).
+        # A failure in between releases the lock and gives the number back.
         try:
             crl_number = allocate_crl_number(ca, ca_cert)
+            revoked_certs = CRLQueryMixin.get_revoked_certificates(ca_id)
+
+            now = utc_now()
+            builder = x509.CertificateRevocationListBuilder()
+            builder = builder.issuer_name(ca_cert.subject)
+            builder = builder.last_update(now)
+            builder = builder.next_update(now + timedelta(days=validity_days))
+
+            entries = 0
+            for cert in revoked_certs:
+                serial_int = _parse_revoked_serial(cert, context='CRL')
+                if serial_int is None:
+                    continue
+
+                revoked_builder = x509.RevokedCertificateBuilder()
+                revoked_builder = revoked_builder.serial_number(serial_int)
+                revoked_builder = revoked_builder.revocation_date(cert.revoked_at or now)
+                revoked_builder = _apply_revoke_reason(
+                    revoked_builder, cert.revoke_reason, is_delta=False
+                )
+                revoked_builder = _apply_invalidity_date(revoked_builder, cert)
+                builder = builder.add_revoked_certificate(revoked_builder.build())
+                entries += 1
+
             builder = builder.add_extension(x509.CRLNumber(crl_number), critical=False)
             builder = builder.add_extension(
                 _authority_key_identifier_for_crl(ca_cert), critical=False
@@ -341,13 +343,6 @@ class CRLGenerationMixin:
         if validity_hours < 1 or validity_hours > 720:
             raise ValueError("validity_hours must be between 1 and 720")
 
-        base_crl = CRLMetadata.query.filter_by(
-            ca_id=ca_id, is_delta=False
-        ).order_by(CRLMetadata.crl_number.desc()).first()
-
-        if not base_crl:
-            raise ValueError(f"No base CRL exists for CA {ca.descr}: generate a full CRL first")
-
         if not ca.crt:
             raise ValueError(f"CA {ca.descr} is awaiting its certificate - cannot generate CRL")
 
@@ -357,55 +352,62 @@ class CRLGenerationMixin:
         from services.hsm.ca_key_loader import get_ca_signing_key
         ca_private_key = get_ca_signing_key(ca, allow_revoked=True)
 
-        now = utc_now()  # one instant for the filters below and the CRL dates
-        revoked_certs = Certificate.query.filter(
-            Certificate.caref.in_(same_key_refids(ca)),
-            Certificate.revoked == True,
-            _not_expired(Certificate.valid_to, now),
-            Certificate.revoked_at > base_crl.this_update).all()
-        # A revoked child CA, from its row, as the full CRL lists it
-        revoked_certs = revoked_certs + CA.query.filter(
-            CA.caref == ca.refid,
-            CA.revoked == True,
-            CA.revoked_at > base_crl.this_update,
-            _not_expired(CA.valid_to, now),
-        ).all()
-        # Persistent records revoked since the base: deleted or renewed serials
-        from models.revoked_serial import RevokedSerial
-        persisted = RevokedSerial.query.filter(
-            RevokedSerial.caref.in_(same_key_refids(ca)),
-            RevokedSerial.revoked_at > base_crl.this_update,
-            RevokedSerial.valid_to > now,
-        ).order_by(RevokedSerial.revoked_at, RevokedSerial.id).all()
-        revoked_certs = _dedupe_live_records(
-            sorted(revoked_certs, key=lambda r: (isinstance(r, CA), r.id)))
-        revoked_certs = revoked_certs + CRLQueryMixin._filter_orphan_serials(
-            persisted, revoked_certs)
-
-        builder = x509.CertificateRevocationListBuilder()
-        builder = builder.issuer_name(ca_cert.subject)
-        builder = builder.last_update(now)
-        builder = builder.next_update(now + timedelta(hours=validity_hours))
-
-        entries = 0
-        for cert in revoked_certs:
-            serial_int = _parse_revoked_serial(cert, context='Delta CRL')
-            if serial_int is None:
-                continue
-
-            revoked_builder = x509.RevokedCertificateBuilder()
-            revoked_builder = revoked_builder.serial_number(serial_int)
-            revoked_builder = revoked_builder.revocation_date(cert.revoked_at or now)
-            revoked_builder = _apply_revoke_reason(
-                revoked_builder, cert.revoke_reason, is_delta=True
-            )
-            revoked_builder = _apply_invalidity_date(revoked_builder, cert)
-            builder = builder.add_revoked_certificate(revoked_builder.build())
-            entries += 1
-
-        # Same numbering as the base, same lock (see generate_crl)
+        # Number, base and list under one lock, as in generate_crl
         try:
             crl_number = allocate_crl_number(ca, ca_cert)
+            base_crl = CRLMetadata.query.filter_by(
+                ca_id=ca_id, is_delta=False
+            ).order_by(CRLMetadata.crl_number.desc()).first()
+            if not base_crl:
+                raise ValueError(
+                    f"No base CRL exists for CA {ca.descr}: generate a full CRL first")
+
+            now = utc_now()  # one instant for the filters below and the CRL dates
+            revoked_certs = Certificate.query.filter(
+                Certificate.caref.in_(same_key_refids(ca)),
+                Certificate.revoked == True,
+                _not_expired(Certificate.valid_to, now),
+                Certificate.revoked_at > base_crl.this_update).all()
+            # A revoked child CA, from its row, as the full CRL lists it
+            revoked_certs = revoked_certs + CA.query.filter(
+                CA.caref == ca.refid,
+                CA.revoked == True,
+                CA.revoked_at > base_crl.this_update,
+                _not_expired(CA.valid_to, now),
+            ).all()
+            # Persistent records revoked since the base: deleted or renewed serials
+            from models.revoked_serial import RevokedSerial
+            persisted = RevokedSerial.query.filter(
+                RevokedSerial.caref.in_(same_key_refids(ca)),
+                RevokedSerial.revoked_at > base_crl.this_update,
+                RevokedSerial.valid_to > now,
+            ).order_by(RevokedSerial.revoked_at, RevokedSerial.id).all()
+            revoked_certs = _dedupe_live_records(
+                sorted(revoked_certs, key=lambda r: (isinstance(r, CA), r.id)))
+            revoked_certs = revoked_certs + CRLQueryMixin._filter_orphan_serials(
+                persisted, revoked_certs)
+
+            builder = x509.CertificateRevocationListBuilder()
+            builder = builder.issuer_name(ca_cert.subject)
+            builder = builder.last_update(now)
+            builder = builder.next_update(now + timedelta(hours=validity_hours))
+
+            entries = 0
+            for cert in revoked_certs:
+                serial_int = _parse_revoked_serial(cert, context='Delta CRL')
+                if serial_int is None:
+                    continue
+
+                revoked_builder = x509.RevokedCertificateBuilder()
+                revoked_builder = revoked_builder.serial_number(serial_int)
+                revoked_builder = revoked_builder.revocation_date(cert.revoked_at or now)
+                revoked_builder = _apply_revoke_reason(
+                    revoked_builder, cert.revoke_reason, is_delta=True
+                )
+                revoked_builder = _apply_invalidity_date(revoked_builder, cert)
+                builder = builder.add_revoked_certificate(revoked_builder.build())
+                entries += 1
+
             builder = builder.add_extension(x509.CRLNumber(crl_number), critical=False)
             builder = builder.add_extension(
                 x509.DeltaCRLIndicator(base_crl.crl_number), critical=True
