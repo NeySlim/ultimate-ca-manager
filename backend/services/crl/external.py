@@ -146,12 +146,22 @@ class ExternalCRLMixin:
         # No CRLNumber extension (e.g. plain `openssl ca -gencrl`): keep the
         # internal counter monotonic so ordering and future self-signed CRLs
         # (after a restore) stay consistent.
-        from .numbering import allocate_crl_number, raise_crl_number_floor
+        from .numbering import (allocate_crl_number, locked_crl_number_floor,
+                                raise_crl_number_floor)
         if number is None:
             stored_number = allocate_crl_number(ca, ca_cert)
         else:
+            # The counter outlives the served rows (restore, re-import): a number
+            # at or below it was already published, unless it is a row still here.
+            floor = locked_crl_number_floor(ca, ca_cert)
+            exists = CRLMetadata.query.filter_by(ca_id=ca.id, crl_number=number).first()
+            if number < floor or (number == floor and exists is None):
+                db.session.rollback()
+                raise ExternalCRLConflict(
+                    f"CRL number {number} is not above {floor}, the highest number this "
+                    "CA has published: numbers must increase monotonically")
             raise_crl_number_floor(ca, ca_cert, number)
-            if CRLMetadata.query.filter_by(ca_id=ca.id, crl_number=number).first() is not None:
+            if exists is not None:
                 db.session.rollback()
                 # RFC 5280 §5.2.3: two CRLs of one issuer MUST NOT share a number
                 raise ExternalCRLConflict(
