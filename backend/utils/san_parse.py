@@ -52,17 +52,43 @@ def _looks_like_ip(value: str) -> bool:
         return False
 
 
-def validate_dns_san(value: str) -> str | None:
-    if _looks_like_ip(value):
-        return (
-            f'Use IP type for IP addresses: {value}. '
+def dns_name_syntax_error(value: str) -> str | None:
+    """RFC 5280 §4.2.1.6 preferred name syntax (RFC 1034 §3.5, RFC 1123 §2.1):
+    LDH labels of 1 to 63, 253 in all, a wildcard only as the whole first label,
+    no trailing dot. An underscore only opens a service label (``_sip._tcp``)."""
+    v = value if isinstance(value, str) else ''
+    body = v[2:] if v.startswith('*.') else v
+    if (not body or len(v) > 253 or v.endswith('.')
+            or not all(_HOSTNAME_LABEL_RE.match(label) for label in body.split('.'))):
+        return (f'Invalid DNS name: {v!r} (letters, digits and hyphens in dot-separated '
+                'labels, a wildcard only as the first label, no trailing dot)')
+    return None
+
+
+def normalize_dns_san(value: str) -> Tuple[str, str | None]:
+    """(name to issue, error): a U-label becomes its A-label (RFC 9549 §1)."""
+    v = (value or '').strip()
+    if _looks_like_ip(v):
+        return v, (
+            f'Use IP type for IP addresses: {v}. '
             'DNS SAN is for hostnames and FQDNs only.'
         )
-    if '@' in value:
-        return f'Use Email type for addresses like {value}'
-    if '://' in value:
-        return f'Use URI type for URIs like {value}'
-    return None
+    if '@' in v:
+        return v, f'Use Email type for addresses like {v}'
+    if '://' in v:
+        return v, f'Use URI type for URIs like {v}'
+    if not v.isascii():
+        import idna
+        prefix, rest = ('*.', v[2:]) if v.startswith('*.') else ('', v)
+        try:
+            v = prefix + idna.encode(rest, uts46=True).decode('ascii')
+        except (idna.IDNAError, UnicodeError, ValueError):
+            return v, f'Invalid internationalized DNS name: {value!r}'
+    return v, dns_name_syntax_error(v)
+
+
+def validate_dns_san(value: str) -> str | None:
+    return normalize_dns_san(value)[1]
 
 
 def validate_ip_san(value: str) -> str | None:
@@ -161,10 +187,9 @@ def cn_looks_like_email(cn: str) -> bool:
     return is_valid_san_email((cn or '').strip())
 
 
-# A hostname label as UCM defines one everywhere else it judges a DNS name
-# (see services/acme/identifiers._DNS_LABEL_RE): letters, digits, hyphen never
-# at an edge, plus underscore for the deployments that use it.
-_HOSTNAME_LABEL_RE = re.compile(r'^(?!-)[A-Za-z0-9_-]{1,63}(?<!-)$')
+# An LDH label of 1 to 63 (RFC 1123 §2.1), hyphen never at an edge; a leading
+# underscore only, as service and attribute labels carry it (RFC 8552 §1.1).
+_HOSTNAME_LABEL_RE = re.compile(r'^(?=.{1,63}$)_?(?!-)[A-Za-z0-9-]+(?<!-)$')
 
 
 def looks_like_hostname(value: str) -> bool:
@@ -230,19 +255,19 @@ def auto_san_buckets_from_cn(
 
     if cert_type in ('server', 'combined'):
         if cn_looks_like_hostname(value):
-            buckets['san_dns'].append(value)
+            # The absolute form's root dot has no place in a dNSName (RFC 5280 §4.2.1.6)
+            buckets['san_dns'].append(value[:-1] if value.endswith('.') else value)
         elif cn_looks_like_ip(value):
             buckets['san_ip'].append(str(ip_address(value)))
 
     if cert_type in ('email', 'combined') and cn_looks_like_email(value):
         buckets['san_email'].append(value)
 
+    # RFC 5280 §4.1.2.6: an address in the subject is also an rfc822Name, whatever the type
     subj = (subject_email or '').strip()
     if (
-        cert_type in ('email', 'combined')
-        and subj
+        subj
         and cn_looks_like_email(subj)
-        and subj != value
         and subj not in buckets['san_email']
     ):
         buckets['san_email'].append(subj)
@@ -264,6 +289,8 @@ def validate_typed_san_buckets(buckets: SanBuckets) -> str | None:
             err = validate(value)
             if err:
                 return err
+    # The names issued are A-labels (RFC 9549 §1)
+    buckets['san_dns'] = [normalize_dns_san(v)[0] for v in buckets.get('san_dns') or []]
     return None
 
 
@@ -373,7 +400,7 @@ def parse_csr_san_entries(entries: List[str]) -> Tuple[SanBuckets, str | None]:
             val = re.sub(r'^DNS:\s*', '', entry, flags=re.IGNORECASE).strip()
             if not val:
                 continue
-            err = validate_dns_san(val)
+            val, err = normalize_dns_san(val)
             if err:
                 return buckets, err
             buckets['san_dns'].append(val)
@@ -389,6 +416,9 @@ def parse_csr_san_entries(entries: List[str]) -> Tuple[SanBuckets, str | None]:
         elif is_valid_upn(entry):
             buckets['san_upn'].append(entry)
         else:
-            buckets['san_dns'].append(entry)
+            val, err = normalize_dns_san(entry)
+            if err:
+                return buckets, err
+            buckets['san_dns'].append(val)
 
     return buckets, None

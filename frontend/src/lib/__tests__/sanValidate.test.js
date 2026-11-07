@@ -24,6 +24,19 @@ describe('sanValidate CN auto-SAN', () => {
     ])
   })
 
+  it('previews the subject email as a SAN for every type, as the server issues it', () => {
+    for (const certType of ['server', 'client', 'code_signing']) {
+      expect(getAutoSansFromCn({ cn: 'Jane Roe', certType, subjectEmail: 'jane@example.com' }))
+        .toEqual([{ type: 'email', value: 'jane@example.com' }])
+    }
+  })
+
+  it('drops the root dot of a hostname CN from its DNS SAN', () => {
+    expect(getAutoSansFromCn({ cn: 'www.example.com.', certType: 'server' })).toEqual([
+      { type: 'dns', value: 'www.example.com' },
+    ])
+  })
+
   it('classifies email vs hostname', () => {
     expect(isCnEmail('fred@fred.fr')).toBe(true)
     expect(isCnHostname('fred@fred.fr')).toBe(false)

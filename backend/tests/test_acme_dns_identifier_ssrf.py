@@ -232,6 +232,7 @@ def test_guard_returns_every_validated_address(dns_two_public):
     'x' * 250 + '.example.com',
     '-leading-hyphen.example.com',
     'a..example.com',
+    'under_score.example.com',   # an underscore only opens a service label
     None,
 ])
 def test_malformed_dns_identifier_is_rejected(value):

@@ -101,9 +101,9 @@ export function isCnEmail(cn) {
   return isValidEmail((cn || '').trim())
 }
 
-// A hostname label, as the backend defines one (utils/san_parse.py):
-// letters, digits, hyphen never at an edge, plus underscore.
-const HOSTNAME_LABEL = /^(?!-)[A-Za-z0-9_-]{1,63}(?<!-)$/
+// A hostname label, as the backend defines one (utils/san_parse.py): LDH,
+// hyphen never at an edge, an underscore only to open a service label.
+const HOSTNAME_LABEL = /^(?=.{1,63}$)_?(?!-)[A-Za-z0-9-]+(?<!-)$/
 
 /** Hostname shape — ASCII only, since x509.DNSName refuses a U-label. */
 export function looksLikeHostname(value) {
@@ -113,6 +113,27 @@ export function looksLikeHostname(value) {
   if (v.endsWith('.')) v = v.slice(0, -1)
   if (!v.includes('.')) return false
   return v.split('.').every((label) => HOSTNAME_LABEL.test(label))
+}
+
+// U-label to A-label, as the server issues it (RFC 9549); null when not convertible
+function toALabel(v) {
+  if (/^[\x00-\x7f]*$/.test(v)) return v
+  try {
+    return new URL(`http://${v}`).hostname
+  } catch {
+    return null
+  }
+}
+
+/** RFC 5280 §4.2.1.6 preferred name syntax, as backend dns_name_syntax_error. */
+export function isValidDnsName(value) {
+  const v = (value || '').trim()
+  const prefix = v.startsWith('*.') ? '*.' : ''
+  const ascii = toALabel(v.slice(prefix.length))
+  if (!ascii) return false
+  const name = prefix + ascii
+  if (name.length > 253 || name.endsWith('.')) return false
+  return ascii.split('.').every((label) => HOSTNAME_LABEL.test(label))
 }
 
 /** FQDN / wildcard — excludes email and literal IP.
@@ -144,7 +165,7 @@ export function getAutoSansFromCn({ cn, certType, subjectEmail }) {
 
   if (['server', 'combined'].includes(type)) {
     if (isCnHostname(value)) {
-      items.push({ type: 'dns', value })
+      items.push({ type: 'dns', value: value.endsWith('.') ? value.slice(0, -1) : value })
     } else if (isCnIp(value)) {
       items.push({ type: 'ip', value })
     }
@@ -153,12 +174,11 @@ export function getAutoSansFromCn({ cn, certType, subjectEmail }) {
     items.push({ type: 'email', value })
   }
 
+  // RFC 5280 §4.1.2.6: the subject's address is an email SAN for every type
   const subj = (subjectEmail || '').trim()
   if (
-    ['email', 'combined'].includes(type)
-    && subj
+    subj
     && isCnEmail(subj)
-    && subj !== value
     && !items.some((s) => s.type === 'email' && s.value === subj)
   ) {
     items.push({ type: 'email', value: subj })
@@ -194,6 +214,9 @@ export function getSanValidationError(type, value, options = {}) {
       }
       if (v.includes('@')) {
         return { key: key('sanEmailUseEmail'), params: { value: v } }
+      }
+      if (!isValidDnsName(v)) {
+        return { key: key('sanDnsInvalid'), params: { value: v } }
       }
       return null
     case 'Email':

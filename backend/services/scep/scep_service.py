@@ -1302,6 +1302,9 @@ class SCEPService:
         # constraints tightened after enrollment.
         validate_name_constraints(self.ca_cert, csr.subject, _scep_sans,
                                   renewal_of=renewal_of)
+        # The bounds and name syntax every issuance path applies
+        from utils.request_names import refuse_malformed_request
+        refuse_malformed_request(csr.subject, _scep_sans, renewal_of)
 
         # Profile template (issue #228): its validity and KU/EKU govern
         # issuance for this endpoint — the operator bound this policy to the

@@ -32,10 +32,11 @@ from utils.san_parse import auto_san_buckets_from_cn, cn_looks_like_hostname
     # The wildcard short-circuit used to accept this outright.
     ('*. ', False),
     ('*.', False),
-    # Real hostnames, including the shapes UCM tolerates elsewhere.
+    # Real hostnames; an underscore only opens a service label (RFC 8552).
     ('web.example.com', True),
     ('*.example.com', True),
-    ('host_name.example.com', True),
+    ('host_name.example.com', False),
+    ('_sip._tcp.example.com', True),
     ('srv-1.corp.example', True),
     ('3.5', True),
     ('example.com.', True),

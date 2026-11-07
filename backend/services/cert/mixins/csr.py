@@ -13,6 +13,7 @@ from models import db, CA, Certificate
 from services.file_regen_service import mirror_private_key
 from services.trust_store import TrustStoreService
 from utils.dn_parse import subject_common_name
+from utils.request_names import RequestRejected
 from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, ca_cert_path, ca_key_path
 
 logger = logging.getLogger(__name__)
@@ -282,9 +283,9 @@ class CSRMixin:
             from utils.key_type import unsignable_csr_key
             unsignable = unsignable_csr_key(csr_obj)
             if unsignable:
-                raise ValueError(f"CSR public key rejected: {unsignable}")
+                raise RequestRejected(f"CSR public key rejected: {unsignable}")
             if not csr_obj.is_signature_valid:
-                raise ValueError("CSR signature is invalid (proof-of-possession failed)")
+                raise RequestRejected("CSR signature is invalid (proof-of-possession failed)")
         except ValueError:
             raise
         except Exception as e:

@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple
 
 from cryptography import x509
 from utils.csr_extensions import csr_extensions
-from utils.san_parse import cn_looks_like_hostname
+from utils.request_names import RequestRejected, cn_implied_names, refuse_malformed_request
 from utils.eku_validation import add_ocsp_nocheck_if_responder
 from cryptography.x509.oid import NameOID, ExtensionOID
 from cryptography.hazmat.primitives import serialization
@@ -27,6 +27,13 @@ from utils.key_codec import private_key_to_pem
 logger = logging.getLogger(__name__)
 
 _MS_CERTIFICATE_TEMPLATE_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.21.7')
+
+# Trunk certificate types whose default Key Usage is the issue form's profile
+_PROFILE_FOR_CERT_TYPE = {
+    'usr_cert': 'client', 'client_cert': 'client', 'user': 'client',
+    'code_signing': 'code_signing', 'email_cert': 'email',
+    'combined_cert': 'combined', 'combined_server_client': 'combined',
+}
 
 
 from utils.signing_hash import signing_hash_for, rsa_padding_for
@@ -403,7 +410,7 @@ def _capped_basic_constraints(csr_constraints, ca_cert):
         return csr_constraints
 
     if parent_limit <= 0:
-        raise ValueError(
+        raise RequestRejected(
             "Issuing CA has pathLenConstraint 0 and may not issue a subordinate CA"
         )
 
@@ -447,32 +454,10 @@ def _key_usage_with_ca_signing(usage, enabled):
     )
 
 
-def _synthesize_san_from_subject(subject):
-    """SAN entries implied by a subject's CN/email attributes -- same
-    derivation ``sign_csr`` already applied when a CSR carries no SAN
-    extension of its own. Factored out so this can be computed once and
-    reused both for NameConstraints validation and for actually building the
-    certificate's SAN extension, so the two can't drift apart (see
-    ``sign_csr``'s ``override_subject`` handling)."""
-    san_names = []
-    for attr in subject:
-        if attr.oid == NameOID.COMMON_NAME:
-            cn_val = attr.value
-            try:
-                ip = ipaddress.ip_address(cn_val)
-                san_names.append(x509.IPAddress(ip))
-            except ValueError:
-                if '@' in cn_val:
-                    san_names.append(x509.RFC822Name(cn_val))
-                else:
-                    san_names.append(x509.DNSName(cn_val))
-            break
-    for attr in subject:
-        if attr.oid == NameOID.EMAIL_ADDRESS:
-            email_val = attr.value
-            if not any(isinstance(n, x509.RFC822Name) and n.value == email_val for n in san_names):
-                san_names.append(x509.RFC822Name(email_val))
-    return san_names
+def _synthesize_san_from_subject(subject, cert_type='server_cert'):
+    """SAN entries a request without its own SAN gets from its subject: the
+    issue form's rule (utils.request_names), shared so the two cannot drift."""
+    return cn_implied_names(subject, cert_type)
 
 
 def _verified_related_certificate(csr, cert_type):
@@ -697,7 +682,7 @@ class CSROperationsMixin:
         from utils.key_type import validate_enrollment_csr
         key_err = validate_enrollment_csr(csr)
         if key_err:
-            raise ValueError(f"CSR public key rejected: {key_err}")
+            raise RequestRejected(f"CSR public key rejected: {key_err}")
         if require_pop and not csr.is_signature_valid:
             raise ValueError("CSR has invalid signature")
         related_a = _verified_related_certificate(csr, cert_type)
@@ -710,11 +695,11 @@ class CSROperationsMixin:
             try:
                 san_ext = csr_exts.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
                 for name in san_ext.value:
-                    if isinstance(name, x509.DNSName):
-                        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name.value)])
-                        break
-                    elif isinstance(name, x509.IPAddress):
-                        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, str(name.value))])
+                    value = (name.value if isinstance(name, x509.DNSName)
+                             else str(name.value) if isinstance(name, x509.IPAddress) else None)
+                    # ub-common-name is 64: a longer name stays in the SAN only
+                    if value and len(value) <= 64:
+                        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, value)])
                         break
             except x509.ExtensionNotFound:
                 pass
@@ -732,21 +717,30 @@ class CSROperationsMixin:
             csr_sans = None
             has_csr_san = False
 
+        san_rebuilt = bool(extra_san)
         if override_san is not None:
             effective_sans = override_san
         elif has_csr_san:
             effective_sans = csr_sans
-        elif extra_san:
-            # The names the CN implies stay, but not a "DNS name" made of a
-            # person's name, which is what an S/MIME request's CN holds (#389)
-            effective_sans = [
-                n for n in _synthesize_san_from_subject(subject)
-                if not isinstance(n, x509.DNSName) or cn_looks_like_hostname(n.value)]
+            if cert_type != 'intermediate_ca':
+                # RFC 5280 §4.1.2.6: the subject's address is also an rfc822Name
+                missing = [n for n in cn_implied_names(subject, cert_type)
+                           if isinstance(n, x509.RFC822Name) and n not in csr_sans]
+                if san_template is not None and missing:
+                    from services.template_service import allowed_san_types, san_type_of
+                    allowed = allowed_san_types(san_template)
+                    missing = [n for n in missing if allowed is None or san_type_of(n) in allowed]
+                if missing:
+                    effective_sans = list(csr_sans) + missing
+                    san_rebuilt = True
         else:
-            effective_sans = _synthesize_san_from_subject(subject)
+            effective_sans = _synthesize_san_from_subject(subject, cert_type)
         if extra_san:
             effective_sans = list(effective_sans) + [
                 n for n in extra_san if n not in effective_sans]
+        # The issue form's bounds and name syntax; an override subject is the caller's
+        refuse_malformed_request(subject if override_subject is None else None,
+                                 effective_sans, renewal_of)
         if san_template is not None:
             from services.template_service import allowed_san_types, check_san_types, san_type_of
             # The names that land: the CSR's own SAN when it has one, else the override
@@ -924,7 +918,7 @@ class CSROperationsMixin:
                 # RFC 5280 §4.2.1.6: SAN MUST be critical when the subject
                 # is empty -- the CSR's flag cannot override that.
                 san_value = (x509.SubjectAlternativeName(effective_sans)
-                             if extra_san else extension.value)
+                             if san_rebuilt else extension.value)
                 builder = builder.add_extension(
                     san_value, extension.critical or len(subject) == 0
                 )
@@ -1000,6 +994,14 @@ class CSROperationsMixin:
                         key_agreement=False, key_cert_sign=False, crl_sign=False,
                         encipher_only=False, decipher_only=False,
                     ),
+                    critical=True,
+                )
+            elif cert_type in _PROFILE_FOR_CERT_TYPE:
+                # A client, code-signing or S/MIME leaf gets its type's usage too,
+                # as from the issue form; the key's algorithm trims it below
+                from utils.cert_profiles import profile_for
+                builder = builder.add_extension(
+                    x509.KeyUsage(**profile_for(_PROFILE_FOR_CERT_TYPE[cert_type])['ku']),
                     critical=True,
                 )
 

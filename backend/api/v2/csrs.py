@@ -16,6 +16,7 @@ from utils.response import success_response, error_response, created_response, n
 from utils import notices as notices_mod
 from utils.pagination import parse_request_pagination
 from utils.dn_validation import validate_dn_field
+from utils.request_names import RequestRejected
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.sanitize import sanitize_filename
 from models import db, Certificate, CA
@@ -1162,7 +1163,7 @@ def sign_csr(csr_id):
         raise
     except PolicyViolation as e:
         return error_response(f'Policy violation: {e}', 400)
-    except TemplateConfigError as e:
+    except (TemplateConfigError, RequestRejected) as e:
         return error_response(str(e), 400)
     except ValueError as e:
         if 'another request' in str(e):
@@ -1275,7 +1276,7 @@ def bulk_sign_csrs():
             signed_notices += [f'CSR {csr_id}: {n}' for n in item_notices if n]
         except PolicyViolation as e:
             results['failed'].append({'id': csr_id, 'error': f'Policy violation: {e}'})
-        except (FipsRestricted, TemplateConfigError) as e:
+        except (FipsRestricted, TemplateConfigError, RequestRejected) as e:
             results['failed'].append({'id': csr_id, 'error': str(e)})
         except Exception as e:
             logger.error(f"Bulk sign: CSR {csr_id} failed (template {data.get('template_id')}): {e}", exc_info=True)

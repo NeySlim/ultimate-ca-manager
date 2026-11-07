@@ -8,6 +8,8 @@ import re
 from cryptography import x509
 from cryptography.x509.oid import NameOID, ExtensionOID
 
+from utils.request_names import RequestRejected
+
 from .validation_helpers import _name_value, _name_matches_subtree
 
 logger = logging.getLogger(__name__)
@@ -76,7 +78,7 @@ def _validate_against_cert(ca_cert, names_to_check):
             + ", ".join(outside_permitted_names)
         )
     if errors:
-        raise ValueError("; ".join(errors))
+        raise RequestRejected("; ".join(errors))
 
 
 def _chain_certs_above(ca_cert):

@@ -23,10 +23,9 @@ later and with the deliberately permissive helpers in
 import re
 from typing import Any, Dict, Optional, Tuple
 
-# A DNS label: letters, digits, hyphen (never leading/trailing), plus underscore
-# for the deployments that use it. Deliberately excludes ':', '@', '/', '?', '#',
-# '%', '[', ']', '\' and whitespace.
-_DNS_LABEL_RE = re.compile(r'^(?!-)[A-Za-z0-9_-]{1,63}(?<!-)$')
+# The label rule certificates are issued under (utils.san_parse), so an order
+# never validates a name its finalization then refuses.
+from utils.san_parse import _HOSTNAME_LABEL_RE as _DNS_LABEL_RE
 
 
 def is_valid_dns_identifier(value: Any) -> bool:

@@ -339,7 +339,7 @@
       },
       {
         "value": "trailing.dot.",
-        "valid": true
+        "valid": false
       },
       {
         "value": "UPPER.Example.COM",
@@ -363,11 +363,51 @@
       },
       {
         "value": "has space.com",
-        "valid": true
+        "valid": false
       },
       {
         "value": "double..dot.com",
+        "valid": false
+      },
+      {
+        "value": "bücher.example",
         "valid": true
+      },
+      {
+        "value": "*.bücher.example",
+        "valid": true
+      },
+      {
+        "value": "a.*.example",
+        "valid": false
+      },
+      {
+        "value": "*",
+        "valid": false
+      },
+      {
+        "value": "w*.example",
+        "valid": false
+      },
+      {
+        "value": "-a.example",
+        "valid": false
+      },
+      {
+        "value": "a-.example",
+        "valid": false
+      },
+      {
+        "value": "under_score.example",
+        "valid": false
+      },
+      {
+        "value": "_sip._tcp.example.com",
+        "valid": true
+      },
+      {
+        "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example",
+        "valid": false
       }
     ],
     "upn": [
