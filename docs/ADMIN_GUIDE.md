@@ -404,7 +404,7 @@ pg_dump -U ucm -h db.example.com ucm > ucm-pg-backup.sql
 psql -U ucm -h db.example.com ucm < ucm-pg-backup.sql
 ```
 
-> ℹ The `psycopg2-binary` driver is bundled with the DEB/RPM packages and the Docker image. No extra install step is needed.
+> ℹ The psycopg 3 driver is bundled with the DEB/RPM packages and the Docker image. No extra install step is needed.
 
 ### Database Tables
 
