@@ -761,9 +761,10 @@ def _authenticated(client):
     return bool((body.get('data') or {}).get('authenticated'))
 
 
-def _logout_request(key_pem, name_id, *, sign=True, issuer=IDP_ENTITY):
+def _logout_request(key_pem, name_id, *, sign=True, issuer=IDP_ENTITY, encode=None):
     from urllib.parse import quote_plus
     from cryptography.hazmat.primitives.asymmetric import padding
+    quote_plus = encode or quote_plus
     rid = f'_lr{uuid.uuid4().hex}'
     xml = (f'<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" '
            f'xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{rid}" Version="2.0" '
@@ -771,14 +772,13 @@ def _logout_request(key_pem, name_id, *, sign=True, issuer=IDP_ENTITY):
            f'<saml:NameID Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">{name_id}'
            f'</saml:NameID><samlp:SessionIndex>_s1</samlp:SessionIndex></samlp:LogoutRequest>')
     encoded = OneLogin_Saml2_Utils.deflate_and_base64_encode(xml)
-    params = {'SAMLRequest': encoded}
+    query = f'SAMLRequest={quote_plus(encoded)}'
     if sign:
-        params['SigAlg'] = K.RSA_SHA256
-        signed = f'SAMLRequest={quote_plus(encoded)}&SigAlg={quote_plus(K.RSA_SHA256)}'.encode()
+        query += f'&SigAlg={quote_plus(K.RSA_SHA256)}'
         key = serialization.load_pem_private_key(key_pem.encode(), password=None)
-        params['Signature'] = base64.b64encode(
-            key.sign(signed, padding.PKCS1v15(), hashes.SHA256())).decode()
-    return rid, params
+        signature = base64.b64encode(key.sign(query.encode(), padding.PKCS1v15(), hashes.SHA256()))
+        query += f'&Signature={quote_plus(signature.decode())}'
+    return rid, f'{ACS}?{query}'
 
 
 def _signed_in(app, idp_signer):
@@ -800,8 +800,8 @@ def slo_url(app, provider):
 def test_signed_logout_request_closes_the_session_and_answers_the_idp(app, slo_url, idp_signer):
     from urllib.parse import parse_qs, urlsplit
     client, name_id = _signed_in(app, idp_signer)
-    rid, params = _logout_request(idp_signer[0], name_id)
-    r = client.get(ACS, base_url=SP_BASE, query_string=params)
+    rid, url = _logout_request(idp_signer[0], name_id)
+    r = client.get(url, base_url=SP_BASE)
     assert r.status_code == 302 and r.headers['Location'].startswith(IDP_SLO + '?')
     answer = parse_qs(urlsplit(r.headers['Location']).query)
     xml = OneLogin_Saml2_Utils.decode_base64_and_inflate(answer['SAMLResponse'][0]).decode()
@@ -818,42 +818,57 @@ def test_logout_response_is_signed_when_request_signing_is_on(app, slo_url, prov
     _configure(app, provider, saml_sign_requests=True)
     try:
         client, name_id = _signed_in(app, idp_signer)
-        _, params = _logout_request(idp_signer[0], name_id)
-        r = client.get(ACS, base_url=SP_BASE, query_string=params)
+        _, url = _logout_request(idp_signer[0], name_id)
+        r = client.get(url, base_url=SP_BASE)
         answer = parse_qs(urlsplit(r.headers['Location']).query)
         assert answer['SigAlg'] == [K.RSA_SHA256] and answer.get('Signature')
     finally:
         _configure(app, provider, saml_sign_requests=False)
 
 
+def test_signature_is_checked_on_the_query_as_the_idp_encoded_it(app, slo_url, idp_signer):
+    """AD FS percent-encodes in lower case: re-encoding the values would break its signature."""
+    import re
+    from urllib.parse import quote_plus
+
+    def lower(value):
+        return re.sub(r'%[0-9A-F]{2}', lambda m: m.group(0).lower(), quote_plus(value))
+    client, name_id = _signed_in(app, idp_signer)
+    _, url = _logout_request(idp_signer[0], name_id, encode=lower)
+    assert '%2b' in url or '%2f' in url or '%3d' in url
+    r = client.get(url, base_url=SP_BASE)
+    assert r.headers['Location'].startswith(IDP_SLO + '?')
+    assert not _authenticated(client)
+
+
 @pytest.mark.parametrize('forge', ['unsigned', 'other_key', 'other_issuer'])
 def test_forged_logout_request_is_refused_and_the_session_kept(app, slo_url, idp_signer, forge):
     client, name_id = _signed_in(app, idp_signer)
     if forge == 'unsigned':
-        _, params = _logout_request(idp_signer[0], name_id, sign=False)
+        _, url = _logout_request(idp_signer[0], name_id, sign=False)
     elif forge == 'other_key':
         other = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
             serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
             serialization.NoEncryption()).decode()
-        _, params = _logout_request(other, name_id)
+        _, url = _logout_request(other, name_id)
     else:
-        _, params = _logout_request(idp_signer[0], name_id, issuer='https://evil.example.test')
-    r = client.get(ACS, base_url=SP_BASE, query_string=params)
+        _, url = _logout_request(idp_signer[0], name_id, issuer='https://evil.example.test')
+    r = client.get(url, base_url=SP_BASE)
     assert r.headers['Location'] == '/login?error=saml_logout_rejected'
     assert _authenticated(client)
 
 
 def test_logout_of_another_name_id_leaves_this_session(app, slo_url, idp_signer):
     client, _ = _signed_in(app, idp_signer)
-    _, params = _logout_request(idp_signer[0], 'someone-else')
-    r = client.get(ACS, base_url=SP_BASE, query_string=params)
+    _, url = _logout_request(idp_signer[0], 'someone-else')
+    r = client.get(url, base_url=SP_BASE)
     assert r.headers['Location'].startswith(IDP_SLO + '?')
     assert _authenticated(client)
 
 
 def test_without_an_idp_slo_url_the_session_still_closes(app, provider, idp_signer):
     client, name_id = _signed_in(app, idp_signer)
-    _, params = _logout_request(idp_signer[0], name_id)
-    r = client.get(ACS, base_url=SP_BASE, query_string=params)
+    _, url = _logout_request(idp_signer[0], name_id)
+    r = client.get(url, base_url=SP_BASE)
     assert r.headers['Location'] == '/login'
     assert not _authenticated(client)

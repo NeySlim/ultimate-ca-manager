@@ -92,9 +92,12 @@ def _saml_logout_request(provider):
         except Exception as e:
             logger.warning("SAML LogoutResponse sent unsigned: SP key unusable (%s)", e)
     data = saml_sp.request_data(request, base)
-    auth = OneLogin_Saml2_Auth(
-        data, saml_sp.build_settings(provider, base, sp_cert, sp_key, want_messages_signed=True))
+    # The signature covers the query as the IdP encoded it (SAML Bindings §3.4.4.1).
+    data['query_string'] = request.query_string.decode('ascii', 'replace')
+    data['validate_signature_from_qs'] = True
     try:
+        auth = OneLogin_Saml2_Auth(
+            data, saml_sp.build_settings(provider, base, sp_cert, sp_key, want_messages_signed=True))
         logout_request = OneLogin_Saml2_Logout_Request(auth.get_settings(), data['get_data']['SAMLRequest'])
         xml = logout_request.get_xml()
         if not auth.validate_request_signature(data['get_data']):
