@@ -108,7 +108,7 @@ sudo systemctl status ucm
 
 ### FIPS hosts: DEB and RPM built against the system OpenSSL
 
-The packages install pre-built Python wheels, and the `cryptography`, `psycopg-binary` and `psycopg2-binary` wheels carry their own OpenSSL, which ignores the FIPS mode of the host. On RHEL 9 (or AlmaLinux and Rocky Linux 9) and on Ubuntu 24.04 (Ubuntu Pro for the FIPS module), `UCM_FIPS_BUILD=1` makes the package compile `cryptography`, `psycopg`, `psycopg2`, `lxml` and `xmlsec` against the system OpenSSL instead. Other distributions refuse the option.
+The packages install pre-built Python wheels, and the `cryptography` and `psycopg-binary` wheels carry their own OpenSSL, which ignores the FIPS mode of the host. On RHEL 9 (or AlmaLinux and Rocky Linux 9) and on Ubuntu 24.04 (Ubuntu Pro for the FIPS module), `UCM_FIPS_BUILD=1` makes the package compile `cryptography`, `psycopg`, `lxml` and `xmlsec` against the system OpenSSL instead. Other distributions refuse the option.
 
 1. Install the build tools.
 
