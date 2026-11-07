@@ -13,6 +13,9 @@ from utils.client_cert import trusted_client_cert
 from utils.trusted_proxy import client_ip
 from utils.db_transaction import safe_commit
 from utils.est_cms import build_server_generated_key_cms
+from utils.est_key_encryption import (
+    UnsupportedCapabilities, choose_key_encryption, recipient_refusal, smime_capabilities,
+)
 from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
 from utils.csr_extensions import csr_extensions, extensions_of
 import base64
@@ -279,21 +282,6 @@ def _certificate_key_identifier(cert):
 def _ca_certificate(ca):
     from services.ca.helpers import get_ca_cert_pem
     return x509.load_pem_x509_certificate(get_ca_cert_pem(ca))
-
-
-def _key_transport_refusal(recipient_cert):
-    """Why the key cannot go encrypted to *recipient_cert*, None when it can."""
-    from cryptography.hazmat.primitives.asymmetric import rsa
-    try:
-        usage = recipient_cert.extensions.get_extension_for_class(x509.KeyUsage).value
-    except x509.ExtensionNotFound:
-        usage = None
-    # RFC 7030 §4.4.1.2: key transport asserted or use unrestricted (kari is not offered)
-    if usage is not None and not usage.key_encipherment:
-        return 'Requested asymmetric key does not allow key transport'
-    if not isinstance(recipient_cert.public_key(), rsa.RSAPublicKey):
-        return 'Unsupported client key transport'
-    return None
 
 
 def _fallback_csrattrs_der():
@@ -834,8 +822,8 @@ def server_keygen(label=None):
     EST /serverkeygen - Server-side key generation (RFC 7030 §3.4).
     Generates key pair and certificate on server. The key is PKCS#8 in clear
     under TLS, or, when the CSR names the mTLS certificate's key, an RFC 5958
-    key package signed by the CA's EST key generator inside KeyTransRecipientInfo
-    EnvelopedData.
+    key package signed by the CA's EST key generator inside EnvelopedData (ktri for
+    RSA, kari for EC), with algorithms from the CSR's SMIMECapabilities.
     """
     # Defensive: cap body size before parsing. RSA keygen is the most
     # CPU-intensive EST endpoint, so reject obviously-bogus payloads
@@ -884,9 +872,8 @@ def server_keygen(label=None):
         # RFC 7030 §4.4.1 requires the request public key and signature to be
         # ignored. Only the requested subject, attributes, and extensions are
         # consumed before a fresh key pair is generated below.
-        csr = x509.load_der_x509_csr(
-            _decode_est_csr(csr_data), default_backend()
-        )
+        csr_der = _decode_est_csr(csr_data)
+        csr = x509.load_der_x509_csr(csr_der, default_backend())
         key_identifiers = _server_keygen_identifiers(csr)
         mtls_cert_obj = None
         if auth_method == 'mtls':
@@ -921,10 +908,20 @@ def server_keygen(label=None):
                     'authentication, no client certificate to encrypt to'
                 )
                 return Response('Requested asymmetric key is unavailable', status=400)
-            refusal = _key_transport_refusal(mtls_cert_obj)
+            refusal = recipient_refusal(mtls_cert_obj)
             if refusal is not None:
                 logger.warning(f'EST serverkeygen: {refusal}')
                 return Response(refusal, status=400)
+            # RFC 7030 §4.4.2: the key wrap is one the CSR's SMIMECapabilities list
+            try:
+                key_encryption = choose_key_encryption(
+                    mtls_cert_obj.public_key(), smime_capabilities(csr_der))
+            except UnsupportedCapabilities as e:
+                logger.warning(f'EST serverkeygen: {e}')
+                return Response(str(e), status=400)
+            except ValueError as e:
+                logger.warning(f'EST serverkeygen: malformed SMIMECapabilities: {e}')
+                return Response('Malformed SMIMECapabilities attribute', status=400)
             recipient_cert = mtls_cert_obj
 
         # RFC 7030 implies the subject in the CSR identifies the
@@ -991,7 +988,8 @@ def server_keygen(label=None):
                 ca_cert = _ca_certificate(ca)
                 signer_key, signer_cert = key_generator(ca, ca_cert)
                 key_der = build_server_generated_key_cms(
-                    key, signer_key, signer_cert, recipient_cert, chain=(ca_cert,)
+                    key, signer_key, signer_cert, recipient_cert, chain=(ca_cert,),
+                    key_encryption=key_encryption,
                 )
             except Exception as e:
                 logger.error(f"EST serverkeygen: the key package could not be signed: {e}")
