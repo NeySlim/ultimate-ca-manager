@@ -131,6 +131,6 @@ def normalize_client_identifier(value: Any) -> Tuple[Optional[str], bool, Option
         return None, False, (
             f'Invalid domain (>{CLIENT_MAX_DOMAIN_LENGTH} chars): {value[:60]}...'
         )
-    if not _CLIENT_FQDN_RE.match(value):
+    if not _CLIENT_FQDN_RE.fullmatch(value):  # `$` alone lets a final newline through
         return None, False, f'Invalid domain syntax: {value}'
     return value, False, None
