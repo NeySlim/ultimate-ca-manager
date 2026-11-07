@@ -966,22 +966,13 @@ def revoke_cert(slug=None):
                 status_code,
             )
 
-        if not cert.revoked:
+        from utils.revocation_reasons import REASON_BY_CODE, revocable
+        local_reason = REASON_BY_CODE[reason]
+        if revocable(cert, local_reason):  # a hold may be made final
             try:
                 CertificateService.revoke_certificate(
                     cert_id=cert.id,
-                    reason={
-                        0: 'unspecified',
-                        1: 'keyCompromise',
-                        2: 'cACompromise',
-                        3: 'affiliationChanged',
-                        4: 'superseded',
-                        5: 'cessationOfOperation',
-                        6: 'certificateHold',
-                        8: 'removeFromCRL',
-                        9: 'privilegeWithdrawn',
-                        10: 'aACompromise',
-                    }[reason],
+                    reason=local_reason,
                     username='acme_proxy',
                 )
             except Exception as exc:

@@ -109,6 +109,14 @@ def reason_code(value) -> int:
     return REASON_CODES.get(REASON_FLAGS.get(normalize_revocation_reason(value) or 'unspecified'), 0)
 
 
+# The CRLReason code an ACME client sends (RFC 8555 §7.6), as UCM stores it
+REASON_BY_CODE = {
+    0: 'unspecified', 1: 'keyCompromise', 2: 'cACompromise',
+    3: 'affiliationChanged', 4: 'superseded', 5: 'cessationOfOperation',
+    6: 'certificateHold', 8: 'removeFromCRL', 9: 'privilegeWithdrawn',
+    10: 'aACompromise',
+}
+
 HOLD_REASONS = ('certificateHold', 'certificate_hold')
 
 

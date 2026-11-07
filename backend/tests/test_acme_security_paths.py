@@ -1527,14 +1527,14 @@ class TestRevocationByAForgedCertificate:
             db.session.commit()
             return row.id, key, cert
 
-    def _revoke_with(self, client, key, cert):
+    def _revoke_with(self, client, key, cert, reason=1):
         pub = key.public_key().public_numbers()
         jwk = {'kty': 'RSA', 'n': _int_to_b64(pub.n), 'e': _int_to_b64(pub.e)}
         der = cert.public_bytes(serialization.Encoding.DER)
         path = '/acme/revoke-cert'
         return _post_jws(client, path, _build_jws(
             f'http://localhost{path}',
-            {'certificate': b64.urlsafe_b64encode(der).rstrip(b'=').decode(), 'reason': 1},
+            {'certificate': b64.urlsafe_b64encode(der).rstrip(b'=').decode(), 'reason': reason},
             key, jwk=jwk, nonce=_nonce(client)))
 
     def test_a_forged_certificate_with_the_same_serial_revokes_nothing(self, app, client):
@@ -1546,6 +1546,20 @@ class TestRevocationByAForgedCertificate:
         assert r.status_code == 404, r.get_json()
         with app.app_context():
             assert not db.session.get(Certificate, cert_id).revoked
+
+    def test_a_hold_is_made_final_once(self, app, client):
+        # RFC 5280 §5.2.4: certificateHold to a final reason is a status change
+        from models import Certificate
+        cert_id, key, cert = self._victim(app)
+        assert self._revoke_with(client, key, cert, reason=6).status_code == 200
+        r = self._revoke_with(client, key, cert, reason=6)
+        assert r.status_code == 400 and 'alreadyRevoked' in r.get_json()['type']
+        r = self._revoke_with(client, key, cert, reason=1)
+        assert r.status_code == 200, r.get_json()
+        with app.app_context():
+            assert db.session.get(Certificate, cert_id).revoke_reason == 'keyCompromise'
+        r = self._revoke_with(client, key, cert, reason=4)
+        assert r.status_code == 400 and 'alreadyRevoked' in r.get_json()['type']
 
     def test_the_key_of_the_stored_certificate_still_revokes_it(self, app, client):
         from models import Certificate
