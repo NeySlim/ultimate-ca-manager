@@ -166,6 +166,20 @@ class TestRefusedRecordIsNotSubmitted:
             with pytest.raises(ProxyOrderNotReadyError):
                 svc.finalize_order(_b64(ORDER_URL), 'unused')
 
+    def test_challenge_of_a_refused_record_reads_invalid(self, app, monkeypatch):
+        with app.app_context():
+            row = _order(status='invalid')
+            row.set_challenges_dict({CHALL_URL: {'status': 'failed', 'error': 'x'}})
+            db.session.commit()
+            svc, calls = _svc(monkeypatch, {AUTHZ_URL: _Resp({
+                'status': 'pending', 'identifier': {'type': 'dns', 'value': DOMAIN},
+                'challenges': [{'type': 'dns-01', 'url': CHALL_URL, 'status': 'pending',
+                                'token': 'tok'}]})})
+            data, _link = svc.respond_challenge(_b64(CHALL_URL))
+            assert data['status'] == 'invalid' and data['error']['detail']
+            assert calls == [(AUTHZ_URL, '')]
+            assert _ThreadRecorder.created == []
+
 
 class TestRecordsOfDeadOrdersAreRemoved:
     RECORDS = [{'domain': DOMAIN, 'record_name': f'_acme-challenge.{DOMAIN}',

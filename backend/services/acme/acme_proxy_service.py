@@ -1534,7 +1534,7 @@ class AcmeProxyService:
         return challenge_data, up_link
 
     def _requester_orders(self, requester_account_id=None, requester_thumbprint=None):
-        """Recent pending proxy orders of the requester, and unbound ones."""
+        """Recent unfinished proxy orders of the requester, and unbound ones."""
         from models import AcmeClientOrder
 
         unbound = and_(
@@ -1547,7 +1547,7 @@ class AcmeProxyService:
         owned = [column == value for column, value in identity if value]
         return (AcmeClientOrder.query
                 .filter(AcmeClientOrder.is_proxy_order.is_(True),
-                        AcmeClientOrder.status == 'pending',
+                        AcmeClientOrder.status.in_(('pending', 'invalid')),
                         or_(unbound, *owned))
                 .order_by(AcmeClientOrder.id.desc())
                 .limit(_CERT_FALLBACK_SCAN_LIMIT)
