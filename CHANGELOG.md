@@ -22,6 +22,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
 - SCEP: a RenewalReq signed by a certificate issued through the same endpoint is authenticated by that certificate, so its challenge password is no longer compared and a rotated secret no longer blocks renewal; a certificate from another profile or protocol still needs the endpoint's challenge.
 - SCEP: every FAILURE reply now carries a failInfoText attribute giving the reason (RFC 8894 §3.2.1.4).
+- TSA: a request carrying any extension, critical or not, is now refused with unacceptedExtension, and a malformed one, trailing bytes included, with badDataFormat instead of systemFailure (RFC 3161 §2.4.1).
+- TSA: tokens carry genTime in whole seconds with a declared accuracy of one second, and `/tsa` matches `application/timestamp-query` or `application/octet-stream` exactly, ignoring case, instead of any type containing `timestamp-query`.
 
 ### Fixed
 
@@ -39,6 +41,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - In-app help: the SCEP URL was given as `/scep`, which serves the web interface, and HTTPS was said to protect the challenge password. The help now gives `/scep/pkiclient.exe` and the profile URLs, and says the CMS envelope protects the challenge.
 - SCEP: a request enveloped with single DES or an unknown cipher or key transport failed as badMessageCheck, and no failure said why. It now fails as badAlg, and every failure carries its reason in failInfoText, the administrator's rejection reason included (RFC 8894 §3.2.1.4, §3.3.2.2).
 - SCEP: a POST without `operation` was answered with the capabilities. It is now processed as the PKIOperation it must be (RFC 8894 §4.3).
+- TSA: a CA certificate expired or not yet valid still signed timestamps no verifier accepts, and the dashboard showed the TSA online. `/tsa` now answers 503 and the dashboard shows it offline.
+- TSA: the token's messageImprint was rebuilt with NULL hash parameters, so a request sent without them got another imprint back. It is now copied from the request as sent (RFC 3161 §2.4.2).
+- TSA: rejected requests were never counted, so the failed statistic stayed at 0, and the page header showed no total. Rejections are now audited as `tsa.timestamp_rejected` and counted, and the header shows the total.
+- TSA: the README and in-app help promised `openssl ts -verify` and jarsigner with the default CA-certificate signer, which both refuse. The help now says these verifiers need a dedicated signer, and the TSA page warns while the CA certificate signs or the policy OID is still the `1.2.3.4.1` example.
 
 ### Security
 
