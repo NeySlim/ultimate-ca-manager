@@ -41,6 +41,8 @@ def _checked_critical_options(cert_type, options):
             entries = [entry.strip() for entry in value.split(',')]
             try:
                 for entry in entries:
+                    if '/' in entry and not entry.partition('/')[2].isdigit():
+                        raise ValueError(entry)     # OpenSSH reads prefix lengths only
                     ipaddress.ip_network(entry, strict=True)
             except ValueError:
                 raise ValueError(f"source-address must list addresses or networks "

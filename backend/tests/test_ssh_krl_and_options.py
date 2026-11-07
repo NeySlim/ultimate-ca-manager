@@ -125,6 +125,7 @@ class TestCriticalOptions:
         {'no-such-option': 'x'},
         {'source-address': '10.0.0.1/8'},         # ssh-keygen: inconsistent mask length
         {'source-address': '10.0.0.*'},
+        {'source-address': '10.0.0.0/255.0.0.0'},
         {'source-address': '10.0.0.0/8,'},
         {'force-command': ''},
         {'verify-required': 'yes'},
