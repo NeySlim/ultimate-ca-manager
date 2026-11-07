@@ -40,7 +40,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Sessions: changing or resetting a password, an admin 2FA reset and "revoke all sessions" left the account's other sessions signed in. They now end them; the session the user acted from stays, under a new identifier.
 - API keys: a key could create a key that never expires, and regenerating a revoked or expired key brought it back for a year. A key created or regenerated with an API key now expires no later than that key, regenerating keeps the original lifetime, and a dead key answers 409.
 - Access log: a password reset token and an OAuth `code` or `state` were written in clear with the request line and the Referer. Their values are now replaced by `[REDACTED]`.
-- Login: a locked local account answered 429 before its password was checked, an unknown name 401, so the status told which accounts exist. A locked account now gets the same 401 "Invalid credentials", and the refusal is audited.
+- Login: a locked account answered 429 before its password was checked, an unknown name 401, so the status told which accounts exist. A locked account now gets the same 401 "Invalid credentials" at the password and LDAP doors, and the refusal is audited.
 - Dashboard: the Recent Activity feed returned the latest audit entries, other accounts' actions and names typed at a failed login included, to any signed-in account.
 
 - mTLS behind a proxy: a certificate presented by its serial number alone, without `X-SSL-Client-I-DN` or `X-SSL-Client-Cert`, opened the enrolment bearing that serial, even one of another CA. Such a serial now opens only an enrolment that recorded no issuer, and enrolling a presented certificate requires its issuer (RFC 5280 §4.1.2.2).

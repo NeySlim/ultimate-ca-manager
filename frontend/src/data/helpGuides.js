@@ -2840,7 +2840,7 @@ Limit the number of simultaneous sessions per user. Additional logins will termi
 Limit failed login attempts per IP address within a time window. After exceeding the limit, the IP is temporarily blocked.
 
 ### Lockout Duration
-How long an IP is blocked after exceeding the login attempt limit. A locally locked account answers a password login with the same "Invalid credentials" as an unknown name until the lockout ends, so the answer does not reveal that the account exists; the lock is recorded in the audit log.
+How long an IP is blocked after exceeding the login attempt limit. A locked account answers a password or LDAP login with the same "Invalid credentials" as an unknown name until the lockout ends, so the answer does not reveal that the account exists; the lock is recorded in the audit log.
 
 ## Admin Access Allowlist
 

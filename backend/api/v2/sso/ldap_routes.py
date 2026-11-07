@@ -59,10 +59,6 @@ def ldap_login():
     if not username:
         return error_response("Username and password required", 400)
 
-    # Check account lockout before attempting LDAP auth
-    if _check_ldap_lockout(username):
-        return error_response("Account temporarily locked due to too many failed attempts", 429)
-
     # Find LDAP provider
     if provider_id:
         provider = db.session.get(SSOProvider, provider_id)
@@ -75,6 +71,17 @@ def ldap_login():
 
     if not provider.enabled:
         return error_response("LDAP provider is disabled", 400)
+
+    # Checked before the bind, so a locked account answers like a wrong password
+    if _check_ldap_lockout(username):
+        AuditService.log_action(
+            action='login_failure',
+            resource_type='user',
+            details=f'LDAP login refused for {username} (account locked)',
+            success=False,
+            username=username
+        )
+        return error_response("Invalid credentials", 401)
 
     # Authenticate via LDAP
     user_info, error = _ldap_authenticate_user(provider, username, password)
