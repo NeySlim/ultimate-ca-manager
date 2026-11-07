@@ -192,3 +192,22 @@ class TestDelete:
             with app.app_context():
                 db.session.delete(db.session.get(CertificatePolicy, pid))
                 db.session.commit()
+
+
+@pytest.mark.parametrize('revoked, reason, published', [
+    (True, 'certificateHold', 'certificateHold'),
+    (True, 'keyCompromise', 'keyCompromise'),
+    (False, None, None),
+])
+def test_a_user_certificate_says_why_it_is_revoked(app, revoked, reason, published):
+    """The screens offer Revoke on a certificate on hold: they need its reason."""
+    from types import SimpleNamespace
+    from api.v2.user_certificates import _build_cert_response
+    from utils.datetime_utils import utc_now
+    certificate = SimpleNamespace(
+        id=1, refid='r', descr='d', subject='CN=user', issuer='CN=ca', serial_number='01',
+        valid_from=utc_now(), valid_to=utc_now(), cert_type='usr_cert', revoked=revoked,
+        revoke_reason=reason, prv=None, caref='c')
+    auth_cert = SimpleNamespace(to_dict=lambda: {'id': 7}, name='user')
+    with app.app_context():
+        assert _build_cert_response(auth_cert, certificate)['revoke_reason'] == published

@@ -378,6 +378,10 @@ If a certificate was revoked with the **Certificate Hold** reason, it can be res
 
 > 💡 Certificate Hold is useful for temporary suspensions (e.g., lost device, pending investigation).
 
+### Revoking a Held Certificate for Good
+
+A certificate on hold can be revoked with another reason (for example Key Compromise once the investigation confirms it) from the same **Revoke** button, without being made valid in between. The CRL and OCSP give the new reason; unless an invalidity date is given, the start of the hold is recorded as the date the certificate became invalid.
+
 ### Revoke & Replace
 Combines revocation with immediate re-issuance. The new certificate inherits the same Subject and SANs.
 
@@ -764,6 +768,11 @@ The CRL schedule (per CA) sets how long each published CRL remains valid. Option
 - **Offline CAs** (typically a Root that cannot re-sign CRLs on schedule) are the intended use case for the long options: 90d up to 5y
 - A warning is shown past one year: relying parties may keep stale revocation data for the whole validity window
 
+### CRL Numbers
+Every CRL carries a CRL number (RFC 5280 §5.2.3). A CA's base and delta CRLs share one increasing sequence, and no number is ever given to two CRLs, even when a revocation and the scheduler generate one at the same time.
+
+The highest number reached is kept for each CA name and key, outside the CA itself, and is carried by backups. A CA restored on another server, or deleted and imported again, continues from it instead of starting over at 1.
+
 ### CRL Distribution Point (CDP)
 The CDP URL is embedded in certificates so clients know where to download the CRL. Copy the URL from the CRL details.
 
@@ -786,7 +795,7 @@ OCSP provides real-time certificate status checking. Instead of downloading an e
 ### OCSP Status
 The OCSP section shows:
 - **Responder status**: Active or inactive per CA
-- **Total queries**: Number of OCSP requests processed
+- **Total queries**: Number of OCSP requests answered since the service started, and how many came from the cache
 - **Cache**: Response cache with automatic daily cleanup of expired entries
 
 ### OCSP Cache
@@ -3067,7 +3076,7 @@ Administrators bypass the queue on every path.
 - A request whose target was **deleted or revoked** is closed as rejected; a certificate hold keeps the renewal request waiting for the unhold
 - Approving a request **already satisfied** closes it on the existing certificate; approving one of several requests for the same target closes the others as approved by you
 - Approving a request whose stored request, certificate or CA **no longer exists** closes it as rejected
-- A queued revocation whose certificate was **revoked directly** is closed as approved (cancelled when its requester revoked it); one whose certificate was **renewed** since is closed as rejected when approved; during a certificate hold it waits for the unhold
+- A queued revocation whose certificate was **revoked directly** is closed as approved (cancelled when its requester revoked it); one whose certificate was **renewed** since is closed as rejected when approved; approved during a certificate hold, it makes the hold final with its reason
 
 Webhooks are told of these closures as for a rejection.
 

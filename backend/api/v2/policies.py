@@ -18,6 +18,7 @@ import uuid
 import fips_mode
 from utils.datetime_utils import cert_not_before, utc_now
 from utils.leaf_key_usage import key_usage_for_key, key_usage_notice
+from utils.revocation_reasons import revocable
 from services.audit_service import AuditService
 from services.policy_notifications import validated_emails
 from security.encryption import encrypt_private_key
@@ -305,9 +306,6 @@ def _requester_name(approval, data):
     return data.get('requested_by') or 'system'
 
 
-_HOLD_REASONS = ('certificateHold', 'certificate_hold')
-
-
 def _approved_revocation_params(data):
     """``(reason, invalidity_at)`` stored with a revocation request, checked again."""
     from utils.revocation_reasons import normalize_revocation_reason
@@ -331,14 +329,13 @@ def _revoke_approved_certificate(approval, data):
         raise ValueError('The certificate to revoke no longer exists')
     if cert.serial_number != data.get('serial_number'):
         raise ValueError('The certificate was renewed since the request; request its revocation again')
-    if cert.revoked:
-        if cert.revoke_reason in _HOLD_REASONS and data.get('reason') not in _HOLD_REASONS:
-            raise ValueError('The certificate is on hold: approve its revocation once the hold is lifted')
+    reason, invalidity_at = _approved_revocation_params(data)
+    # On hold, a definitive reason makes the hold final (RFC 5280 §5.2.4)
+    if not revocable(cert, reason):
         # Revoked meanwhile: the approval is closed on the revoked certificate
         _link_approval(approval, cert.id)
         return {'id': cert.id, 'cn': data.get('cn'), 'serial_number': cert.serial_number,
                 'revoked': True, 'already_revoked': True}
-    reason, invalidity_at = _approved_revocation_params(data)
     duplicate_ids = _close_duplicate_requests(approval, 'certificate_id', cert.id)
     cert = CertificateService.revoke_certificate(
         cert_id=cert.id, reason=reason, username=_requester_name(approval, data),

@@ -23,7 +23,7 @@ import { showNotices } from '../lib/notices'
 import { certificatesService, casService, truststoreService } from '../services'
 import { useNotification, useMobile, useWindowManager } from '../contexts'
 import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
-import { extractCN, cn, certificateNames } from '../lib/utils'
+import { extractCN, cn, certificateNames, isOnHold } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { IssueCertificateForm } from './certificates/IssueCertificateForm'
@@ -510,7 +510,7 @@ export default function CertificatesPage() {
     ...(canWrite('certificates') && !row.revoked && (row.has_private_key || row.source === 'msca') ? [
       { label: t('common.renew'), icon: ArrowClockwise, onClick: () => handleRenew(row) }
     ] : []),
-    ...(canWrite('certificates') && !row.revoked ? [
+    ...(canWrite('certificates') && (!row.revoked || isOnHold(row)) ? [
       { label: t('common.revoke'), icon: X, variant: 'danger', onClick: () => handleRevoke(row.id) }
     ] : []),
     ...(canDelete('certificates') ? [
@@ -851,6 +851,7 @@ export default function CertificatesPage() {
       />
 
       <RevokeCertificateModal
+        allowHold={!isOnHold(revokingCert)}
         open={!!revokingCert}
         onClose={() => { setRevokingCert(null); setDeleteAfterRevoke(false) }}
         onConfirm={handleRevokeConfirm}

@@ -6,7 +6,7 @@ from auth.unified import require_auth
 from utils.datetime_utils import to_naive_utc, utc_now
 from utils.response import success_response, error_response, no_content_response
 from models import Certificate, CA, db
-from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
+from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
 from services.cert_service import CertificateService
 from services.approval_gate import (PairApprovalConflict, approval_payload, queue_revocation,
                                     revocation_policy_for)
@@ -83,7 +83,7 @@ def revoke_certificate(cert_id):
     if not cert:
         return error_response('Certificate not found', 404)
 
-    if cert.revoked:
+    if not revocable(cert, reason):
         return error_response('Certificate already revoked', 400)
 
     # The other member of a related pair falls with it unless the request says otherwise
@@ -92,7 +92,7 @@ def revoke_certificate(cert_id):
     except ValueError as e:
         return error_response(str(e), 400)
     partner = mutual_partner(cert)
-    partner_id = partner.id if partner is not None and not partner.revoked else None
+    partner_id = partner.id if partner is not None and revocable(partner, reason) else None
     refusal = _related_choice_refusal(cert, partner_id, revoke_related)
     if refusal:
         return error_response(*refusal)
@@ -136,7 +136,7 @@ def revoke_certificate(cert_id):
         cert_dict = cert.to_dict()
         partner = db.session.get(Certificate, partner_id) if revoke_related and partner_id else None
         message = 'Certificate revoked successfully'
-        if partner is not None and partner.revoked:
+        if partner is not None and not revocable(partner, reason):
             cert_dict['related_revoked'] = partner_id
         elif partner is not None:
             # This one stays revoked; the other member's failure is said, not hidden

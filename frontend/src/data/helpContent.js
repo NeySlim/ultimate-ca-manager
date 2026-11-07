@@ -204,6 +204,7 @@ export const helpContent = {
           { label: 'Rename', text: 'Set a display name independent from the CN (defaults to CN or first SAN DNS name for CN-less certificates)' },
           { label: 'Revoke', text: 'Mark as revoked with a reason, will appear in CRL' },
           { label: 'Remove Hold', text: 'Unhold a certificate revoked with "Certificate Hold" reason, restores it to valid status' },
+          { label: 'Revoke a held certificate', text: 'A certificate on hold can also be revoked for good with another reason, without passing through valid. The CRL and OCSP then give the new reason, and the invalidity date is the start of the hold unless one is given' },
           { label: 'Revoke & Replace', text: 'Revoke and immediately issue a replacement' },
           { label: 'Export', text: 'Download in PEM, DER, PKCS#12, or JKS format' },
           { label: 'PKCS#12 compatibility mode (v2.222)', text: 'The export dialogs offer a 3DES/SHA-1 profile for importers that reject the default AES-256 archive as a wrong password: Android 15 and earlier, macOS 14 and earlier, Windows Server 2016 and earlier, old Java. Off by default, it protects the file less well' },
@@ -271,7 +272,7 @@ export const helpContent = {
       'An RSA-PSS signature is shown with its hash and salt length, e.g. RSASSA-PSS SHA-256 (salt 32)',
     ],
     warnings: [
-      'Revocation is generally permanent: except for "Certificate Hold" which can be removed (unhold)',
+      'Revocation is generally permanent: except for "Certificate Hold" which can be removed (unhold) or made permanent with another reason',
       'A valid, non-revoked certificate cannot be deleted on its own: Delete explains why and offers "Revoke, then delete", so the revocation reaches CRL/OCSP; revocations survive deletion',
       'UCM signs with SHA-256, SHA-384 or SHA-512 only: SHA-224 and unknown hash names are refused instead of being replaced by SHA-256',
     ],
@@ -443,6 +444,8 @@ export const helpContent = {
           { label: 'Signature digest', text: 'SHA-256, SHA-384 or SHA-512 for an RSA or EC CA. An Ed25519, Ed448 or ML-DSA CA signs without one: a digest stored for it earlier is shown as ignored, with a Clear button' },
           { label: 'Default digest (v2.251)', text: 'Without a digest set, a P-384 or P-521 CA signs its CRLs with SHA-384 or SHA-512. CRLs already issued keep theirs: the next one follows' },
           { label: 'External CRL', text: 'Key-less/offline CAs cannot self-sign a CRL, upload one generated next to the offline key from the CA detail view; it is validated (signature, issuer, monotonicity) and served at the same CDP URL (v2.215)' },
+          { label: 'Delta CRL', text: 'When delta CRLs are enabled, a new delta is generated right after each complete CRL, so the delta served always refers to the latest base' },
+          { label: 'CRL number', text: 'Base and delta CRLs of a CA share one increasing number, never given to two CRLs, even when two generations run at once. The highest number reached is kept per CA name and key and travels in backups, so a CA restored on another server, or deleted and imported again, continues from it' },
         ]
       },
       {
@@ -452,7 +455,8 @@ export const helpContent = {
           { label: 'Status', text: 'Indicates whether the OCSP responder is active for each CA' },
           { label: 'AIA URL', text: 'Authority Information Access URLs, OCSP responder and CA Issuers certificate download endpoints embedded in issued certificates' },
           { label: 'Cache', text: 'Response cache with automatic daily cleanup of expired entries' },
-          { label: 'Total Queries', text: 'Number of OCSP requests processed' },
+          { label: 'Total Queries', text: 'Number of OCSP requests answered since the service started, and how many were served from the cache' },
+          { label: 'HTTP caching', text: 'An answer without a nonce can be kept by HTTP caches until its nextUpdate, an hour at most (RFC 5019 §6.2: Expires, Last-Modified, ETag); an answer with a nonce is not reused' },
           { label: 'Delegated Responder', text: 'Sign responses with a dedicated OCSPSigning certificate instead of the CA key, assign one per CA from the detail panel' },
           { label: 'Responder Auto-Renewal', text: 'A daily task re-issues the delegated responder certificate before expiry (same key pair, renewed at par) and rebinds it, enabled by default. The switch and its window (days before expiry, default 30) are in Settings › Security' },
         ]

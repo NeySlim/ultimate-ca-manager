@@ -136,7 +136,7 @@ GENERIC_SECTIONS = (
 
 RESTORED_SECTIONS = set(GENERIC_SECTIONS) | {
     'users', 'certificate_authorities', 'certificates', 'revoked_serials',
-    'acme_accounts', 'acme_eab_credentials', 'configuration', 'groups',
+    'crl_number_counters', 'acme_accounts', 'acme_eab_credentials', 'configuration', 'groups',
     'custom_roles', 'certificate_templates', 'trusted_certificates',
     'sso_providers', 'hsm_providers', 'hsm_keys', 'api_keys', 'smtp_config',
     'notification_config', 'certificate_policies', 'auth_certificates',
@@ -339,6 +339,7 @@ class RestoreCoreMixin:
             'acme_local_domains': 0,
             'https_server': 0,
             'revoked_serials': 0,
+            'crl_number_counters': 0,
             'sections_not_restored': not_restored,
             'sections_carried': carried,
             'renamed': renamed,
@@ -509,6 +510,7 @@ class RestoreCoreMixin:
         self._restore_cas(backup_data, results, master_key, plan)
         self._restore_certificates(backup_data, results, master_key, plan)
         self._restore_revoked_serials(backup_data, results, plan)
+        self._restore_crl_number_counters(backup_data, results)
         self._restore_acme_accounts(backup_data, results)
         self._restore_acme_eab_credentials(backup_data, results)
         self._restore_settings(backup_data, results)
@@ -748,6 +750,23 @@ class RestoreCoreMixin:
                 db.session.add(existing)
                 plan.place('revoked_serials', rs_data, existing)
             results['revoked_serials'] += 1
+
+    def _restore_crl_number_counters(self, backup_data: Dict, results: Dict) -> None:
+        """Each issuer's CRL number, never lowered: the higher of here and the archive."""
+        from models.crl import CRLNumberCounter
+        for position, row in enumerate(backup_data.get('crl_number_counters') or []):
+            issuer_key, number = row.get('issuer_key'), row.get('last_number')
+            if (not isinstance(issuer_key, str) or not isinstance(number, int)
+                    or isinstance(number, bool)):
+                raise BackupSchemaError(
+                    f"Invalid backup: CRL number counter {position} is malformed. "
+                    "Nothing has been changed.")
+            counter = CRLNumberCounter.query.filter_by(issuer_key=issuer_key).first()
+            if counter is None:
+                db.session.add(CRLNumberCounter(issuer_key=issuer_key, last_number=number))
+            elif number > (counter.last_number or 0):
+                counter.last_number = number
+            results['crl_number_counters'] += 1
 
     def _restore_cas(self, backup_data: Dict, results: Dict, master_key: bytes,
                      plan=None) -> None:

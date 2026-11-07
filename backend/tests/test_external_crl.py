@@ -228,6 +228,52 @@ class TestMonotonicity:
         assert_success(_upload_pem(auth_client, ca['id'], crl_pem))
         assert_error(_upload_pem(auth_client, ca['id'], crl_pem), 409)
 
+    def test_reject_a_second_crl_under_the_same_number(self, auth_client, keyless_ca):
+        # RFC 5280 §5.2.3: two CRLs with different thisUpdate MUST have different numbers
+        root_key, root_cert, ca = keyless_ca
+        now = datetime.now(timezone.utc)
+        assert_success(_upload_pem(auth_client, ca['id'], _build_crl(
+            root_key, root_cert, number=3, this_update=now - timedelta(hours=1))))
+        r = _upload_pem(auth_client, ca['id'], _build_crl(
+            root_key, root_cert, number=3, this_update=now))
+        assert_error(r, 409)
+        assert 'number 3' in get_json(r)['message']
+
+    @pytest.mark.parametrize('number', [3, 5])
+    def test_the_counter_refuses_a_number_published_before_the_rows_were_lost(
+            self, app, auth_client, keyless_ca, number):
+        # The served rows are gone (restore elsewhere, CA deleted and imported
+        # again): the issuer's counter still holds 5, so 3 and a new 5 are refused
+        from models import db
+        from models.crl import CRLMetadata
+        root_key, root_cert, ca = keyless_ca
+        now = datetime.now(timezone.utc)
+        assert_success(_upload_pem(auth_client, ca['id'], _build_crl(
+            root_key, root_cert, number=5, this_update=now - timedelta(hours=2))))
+        with app.app_context():
+            CRLMetadata.query.filter_by(ca_id=ca['id']).delete()
+            db.session.commit()
+        r = _upload_pem(auth_client, ca['id'], _build_crl(
+            root_key, root_cert, number=number, this_update=now))
+        assert_error(r, 409)
+        assert 'number' in get_json(r)['message'].lower()
+        assert_success(_upload_pem(auth_client, ca['id'], _build_crl(
+            root_key, root_cert, number=6, this_update=now)))
+
+    def test_an_uploaded_number_raises_the_floor_of_the_next_one(self, app, auth_client, keyless_ca):
+        from models import db
+        from models.crl import CRLMetadata
+        root_key, root_cert, ca = keyless_ca
+        now = datetime.now(timezone.utc)
+        assert_success(_upload_pem(auth_client, ca['id'], _build_crl(
+            root_key, root_cert, number=7, this_update=now - timedelta(hours=2))))
+        with app.app_context():
+            CRLMetadata.query.filter_by(ca_id=ca['id']).delete()
+            db.session.commit()
+        data = assert_success(_upload_pem(auth_client, ca['id'], _build_crl(
+            root_key, root_cert, with_number=False, this_update=now)))
+        assert data['crl_number'] == 8
+
     def test_no_crl_number_extension(self, auth_client, keyless_ca):
         # openssl `ca -gencrl` omits CRLNumber unless configured — the internal
         # counter keeps ordering monotonic.

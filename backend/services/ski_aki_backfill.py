@@ -87,7 +87,9 @@ def _merge_ca_group(db, cas_with_ski, stats):
 # (CRL history included: CRL numbers must not restart below the published ones)
 _DISCARDED_WITH_CA = {'ocsp_responses'}
 # Tables unique on (CA, column): the duplicate's rows the keeper already has are dropped
-_UNIQUE_PER_CA = {'ca_template_pins': 'template_id', 'crl_deploy_bindings': 'target_id'}
+# (a CRL number the keeper holds stays used: the highest number survives either way)
+_UNIQUE_PER_CA = {'ca_template_pins': 'template_id', 'crl_deploy_bindings': 'target_id',
+                  'crl_metadata': 'crl_number'}
 # Parent references declared without a foreign key
 _UNDECLARED_CAREF = (('certificate_authorities', 'caref'), ('crls', 'caref'),
                      ('ca_cross_certificates', 'issuer_caref'))

@@ -361,18 +361,41 @@ class TestDeltaCrl:
     def test_a_serial_replaced_after_the_base_is_on_the_delta(self, backend):
         """Scenario 7."""
         ca, ca_key, ca_cert = _make_ca(delta=True)
+        # Revoked before the base: on the base already, not repeated
+        _persist(ca, str(SERIAL_C), revoked_at=_now() - timedelta(hours=1))
         base = CRLService.generate_crl(ca.id)
         current = _store(ca, _issue(ca_key, ca_cert, SERIAL_B))
         _persist(ca, str(SERIAL_A), reason='superseded', certificate_id=current.id,
                  revoked_at=base.this_update + timedelta(seconds=1))
-        # Revoked before the base: on the base already, not repeated
-        _persist(ca, str(SERIAL_C), revoked_at=base.this_update - timedelta(hours=1))
 
         meta = CRLService.generate_delta_crl(ca.id)
         delta = x509.load_pem_x509_crl(meta.crl_pem.encode())
         entries = _entries(delta)
         assert set(entries) == {SERIAL_A}
         assert _reason(entries[SERIAL_A]) == x509.ReasonFlags.superseded
+
+    def test_a_revocation_the_base_missed_is_on_the_delta(self, backend):
+        # RFC 5280 §5.2.4: what the base lacks, whatever its revocation date
+        ca, ca_key, ca_cert = _make_ca(delta=True)
+        base = CRLService.generate_crl(ca.id)
+        _store(ca, _issue(ca_key, ca_cert, SERIAL_A), revoked=True,
+               revoked_at=base.this_update - timedelta(seconds=1))
+        meta = CRLService.generate_delta_crl(ca.id)
+        assert set(_entries(x509.load_pem_x509_crl(meta.crl_pem.encode()))) == {SERIAL_A}
+
+    def test_a_reason_changed_since_the_base_is_on_the_delta(self, backend):
+        ca, ca_key, ca_cert = _make_ca(delta=True)
+        row = _store(ca, _issue(ca_key, ca_cert, SERIAL_A), revoked=True,
+                     reason='certificateHold', revoked_at=_now() - timedelta(hours=1))
+        _store(ca, _issue(ca_key, ca_cert, SERIAL_B), revoked=True,
+               revoked_at=_now() - timedelta(hours=1))
+        CRLService.generate_crl(ca.id)
+        row.revoke_reason = 'keyCompromise'
+        db.session.commit()
+        meta = CRLService.generate_delta_crl(ca.id)
+        entries = _entries(x509.load_pem_x509_crl(meta.crl_pem.encode()))
+        assert set(entries) == {SERIAL_A}
+        assert _reason(entries[SERIAL_A]) == x509.ReasonFlags.key_compromise
 
     def test_the_delta_lists_a_serial_once(self, backend):
         ca, ca_key, ca_cert = _make_ca(delta=True)

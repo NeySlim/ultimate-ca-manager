@@ -184,6 +184,46 @@ def test_proxy_revoke_relays_upstream_status_and_revokes_local(
     )
 
 
+@pytest.mark.parametrize('held_as, code, local', [
+    ('certificateHold', 1, 'keyCompromise'),
+    ('certificateHold', 6, None),
+    ('certificateHold', 8, None),
+    ('superseded', 1, None),
+])
+def test_proxy_revoke_makes_a_local_hold_final_only(
+    app, client, proxy_revocation_rows, monkeypatch, held_as, code, local,
+):
+    from api.acme import acme_proxy_api
+
+    with app.app_context():
+        row = db.session.get(Certificate, proxy_revocation_rows['certificate_id'])
+        row.revoked, row.revoke_reason, row.revoked_at = True, held_as, datetime.utcnow()
+        db.session.commit()
+    payload = {'certificate': _b64url(proxy_revocation_rows['certificate_der']), 'reason': code}
+    service = MagicMock()
+    service.account.id = proxy_revocation_rows['account_id']
+    service.revoke_certificate.return_value.status_code = 200
+    local_revoke = MagicMock()
+    monkeypatch.setattr(acme_proxy_api, 'verify_proxy_jws', lambda: (True, payload, None, None))
+    monkeypatch.setattr(
+        acme_proxy_api, '_request_protected_header',
+        lambda: {'kid': 'https://ucm.example/acme/proxy/acct/internal-acme-account'})
+    monkeypatch.setattr(acme_proxy_api, 'get_proxy_service', lambda slug=None: service)
+    monkeypatch.setattr('services.cert_service.CertificateService.revoke_certificate', local_revoke)
+
+    response = client.post(
+        '/acme/proxy/revoke-cert',
+        data=json.dumps({'protected': 'stub', 'payload': 'stub', 'signature': 'stub'}),
+        content_type='application/jose+json')
+
+    assert response.status_code == 200
+    if local:
+        local_revoke.assert_called_once_with(
+            cert_id=proxy_revocation_rows['certificate_id'], reason=local, username='acme_proxy')
+    else:
+        local_revoke.assert_not_called()
+
+
 def test_proxy_revoke_rejects_invalid_reason(app, client, proxy_revocation_rows, monkeypatch):
     from api.acme import acme_proxy_api
 

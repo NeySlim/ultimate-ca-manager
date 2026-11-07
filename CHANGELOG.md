@@ -44,6 +44,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Access Control: the API no longer lets a custom role inherit from a built-in role, which the page never offered; a role that already does keeps its parent.
 - TSA: a request carrying any extension, critical or not, is now refused with unacceptedExtension, and a malformed one, trailing bytes included, with badDataFormat instead of systemFailure (RFC 3161 §2.4.1).
 - TSA: tokens carry genTime in whole seconds with a declared accuracy of one second, and `/tsa` matches `application/timestamp-query` or `application/octet-stream` exactly, ignoring case, instead of any type containing `timestamp-query`.
+- CRL: with delta CRLs enabled, each complete CRL is now followed by a delta on it, so the shared CRL number advances by two per regeneration.
+- Approvals: a revocation request approved while its certificate is on hold now revokes it for good with the requested reason, instead of waiting for the hold to be lifted.
 
 ### Fixed
 
@@ -98,6 +100,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - TSA: the token's messageImprint was rebuilt with NULL hash parameters, so a request sent without them got another imprint back. It is now copied from the request as sent (RFC 3161 §2.4.2).
 - TSA: rejected requests were never counted, so the failed statistic stayed at 0, and the page header showed no total. Rejections are now audited as `tsa.timestamp_rejected` and counted, and the header shows the total.
 - TSA: the README and in-app help promised `openssl ts -verify` and jarsigner with the default CA-certificate signer, which both refuse. The help now says these verifiers need a dedicated signer, and the TSA page warns while the CA certificate signs or the policy OID is still the `1.2.3.4.1` example.
+- CRL: two generations running at once, such as a revocation and the scheduler, could sign two different CRLs under the same number, and installations not upgraded through migration 004 lacked the unique index. The number is now allocated under a lock taken before the revocations are read, so a higher number always lists what a lower one did, and the index exists everywhere; migration 134 removes the older duplicates (RFC 5280 §5.2.3).
+- CRL: a CA restored on another server, or deleted and imported again, restarted its CRL numbers at 1 below those already published. The highest number of each CA name and key is now kept apart from the CA, carried by backups and never lowered by a restore, and an uploaded external CRL must carry a number above it.
+- CRL: after each revocation the delta CRL served still referred to the previous complete CRL until the next scheduled delta, hours later. A delta on the new base is now generated right after every complete CRL.
+- CRL: a revocation dated before the complete CRL but recorded after it was on neither that CRL nor its deltas. A delta now lists what its base lacks or lists under another reason (RFC 5280 §5.2.4).
+- Certificates: a certificate on hold could not be revoked for good, only released and then revoked, which made it valid in between. It can now be revoked with another reason from the Revoke button, the bulk action, ACME or an approved revocation request, its related certificate with it, the invalidity date defaulting to the start of the hold (RFC 5280 §5.2.4).
+- OCSP: the statistics gave the number of cached responses as both the requests and the cache hits, so the hit rate always read 100 %. They now count the requests answered since the service started and those served from the cache.
+- OCSP: an answer to a request with a nonce was sent with `Cache-Control: no-cache, no-store`, and the others with a fixed one-hour `Expires` that could outlive nextUpdate. Answers now follow RFC 5019 §6.2: no `no-cache` or `no-store`, `Expires` at nextUpdate, `max-age` never past it, `Last-Modified` and `ETag`.
+- OCSP: a POST whose Content-Type was `application/ocsp-request` in another case was answered malformedRequest. Media types are now compared without case (RFC 9110 §8.3.1).
 
 ### Security
 

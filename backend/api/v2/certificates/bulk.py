@@ -27,7 +27,7 @@ from services.deletion_blockers import (
 )
 from utils.response import success_response, error_response
 from utils.datetime_utils import utc_now
-from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
+from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -71,14 +71,14 @@ def bulk_revoke_certificates():
             if not cert:
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
                 continue
-            if cert.revoked:
+            if not revocable(cert, reason):
                 if cert_id in revoked_with_pair:
                     results['success'].append(cert_id)
                 else:
                     results['failed'].append({'id': cert_id, 'error': 'Already revoked'})
                 continue
             partner = mutual_partner(cert)
-            partner_id = partner.id if partner is not None and not partner.revoked else None
+            partner_id = partner.id if partner is not None and revocable(partner, reason) else None
             refusal = _related_choice_refusal(cert, partner_id, revoke_related)
             if refusal is not None:
                 results['failed'].append({'id': cert_id, 'error': refusal[0]})
@@ -105,7 +105,7 @@ def bulk_revoke_certificates():
                 cert_id=cert_id, reason=reason, username=username, revoke_related=revoke_related)
             if revoke_related and partner_id:
                 left = db.session.get(Certificate, partner_id)
-                if left is None or left.revoked:
+                if left is None or not revocable(left, reason):
                     revoked_with_pair.add(partner_id)
                 else:
                     results.setdefault('related_not_revoked', []).append(partner_id)

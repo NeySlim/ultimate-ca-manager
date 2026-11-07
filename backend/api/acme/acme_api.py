@@ -1796,7 +1796,9 @@ def revoke_cert():
             return acme_error('malformed', 'Certificate not found', 404)
         cert = rows[0]
         
-        if cert.revoked:
+        # A hold may be made final (RFC 5280 §5.2.4); anything else revoked stays as it is
+        from utils.revocation_reasons import REASON_BY_CODE, revocable
+        if not revocable(cert, REASON_BY_CODE.get(reason, 'unspecified')):
             return acme_error('alreadyRevoked', 'Certificate already revoked', 400)
         
         # Authorization check (RFC 8555 §7.6)
@@ -1887,19 +1889,10 @@ def revoke_cert():
         # Revoke certificate
         try:
             from services.cert_service import CertificateService
-            # Map the RFC 5280 CRLReason code the client sent to UCM's reason
-            # string. Preserves the client's intent (superseded, cessation…)
-            # instead of collapsing everything but keyCompromise to unspecified.
-            _acme_revoke_reasons = {
-                0: 'unspecified', 1: 'keyCompromise', 2: 'cACompromise',
-                3: 'affiliationChanged', 4: 'superseded', 5: 'cessationOfOperation',
-                6: 'certificateHold', 8: 'removeFromCRL', 9: 'privilegeWithdrawn',
-                10: 'aACompromise',
-            }
             # RFC 8555 §7.6 revokes the certificate presented, not its related one
             CertificateService.revoke_certificate(
                 cert_id=cert.id,
-                reason=_acme_revoke_reasons.get(reason, 'unspecified'),
+                reason=REASON_BY_CODE.get(reason, 'unspecified'),
                 username='acme',
                 revoke_related=False,
             )
