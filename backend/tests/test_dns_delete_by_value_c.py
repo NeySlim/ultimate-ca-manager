@@ -143,7 +143,8 @@ class FakeIonos:
         self.records = []
         self.deleted = []
 
-    def __call__(self, method, url, headers=None, json=None, params=None, timeout=None):
+    def __call__(self, method, url, headers=None, json=None, params=None, timeout=None,
+                 allow_redirects=True):
         path = url.removeprefix('https://api.hosting.ionos.com/dns/v1')
         if path == '/zones':
             return _Resp(200, [{'id': 'z1', 'name': 'example.com'}])

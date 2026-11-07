@@ -29,7 +29,7 @@ def _error_resp(code="AuthFailure", message="signature error"):
 
 def _requests_router(handlers):
     """Return a requests.post replacement dispatching on X-TC-Action header."""
-    def _fake_post(url, headers=None, data=None, timeout=None):
+    def _fake_post(url, headers=None, data=None, timeout=None, allow_redirects=True):
         action = headers.get("X-TC-Action")
         handler = handlers.get(url, {}).get(action)
         if handler is None:
