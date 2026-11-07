@@ -110,6 +110,18 @@ def test_rs256_id_token_is_verified(monkeypatch):
     assert claims['sub'] == 'user-123'
 
 
+def test_azp_naming_this_client_is_accepted(monkeypatch):
+    from services.oidc_id_token import verify_id_token
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    monkeypatch.setattr(
+        'services.oidc_id_token.safe_request_get',
+        lambda *_args, **_kwargs: _Response({'keys': [_rsa_jwk(key)]}),
+    )
+    for extra in ({'azp': 'ucm-client'}, {'aud': ['ucm-client', 'api'], 'azp': 'ucm-client'}):
+        claims = verify_id_token(_token(key, _claims(**extra)), _provider(), 'session-nonce', verify=True)
+        assert claims['azp'] == 'ucm-client'
+
+
 def test_es256_id_token_is_verified(monkeypatch):
     from services.oidc_id_token import verify_id_token
     key = ec.generate_private_key(ec.SECP256R1())
@@ -177,6 +189,7 @@ def test_bad_signature_forces_one_jwks_refresh_then_rejects(monkeypatch):
     {'aud': 'other-client'},
     {'aud': ['ucm-client', 'other-client']},
     {'aud': ['ucm-client', 'other-client'], 'azp': 'other-client'},
+    {'azp': 'other-client'},
     {'exp': int(time.time()) - 120},
     {'iat': int(time.time()) + 3600},
     {'nbf': int(time.time()) + 3600},
