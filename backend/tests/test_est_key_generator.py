@@ -173,9 +173,16 @@ class TestLifecycle:
         ca_id, _ = use('main')
         first = _signer_serial(client, 'unreadable-1.generator.test')
         with app.app_context():
-            _delegate_row(ca_id).prv = 'ENC:not-a-fernet-token'
+            row = _delegate_row(ca_id)
+            row_id, readable = row.id, row.prv
+            row.prv = 'ENC:not-a-fernet-token'
             db.session.commit()
-        assert _signer_serial(client, 'unreadable-2.generator.test') != first
+        try:
+            assert _signer_serial(client, 'unreadable-2.generator.test') != first
+        finally:  # the shared database is backed up by later tests
+            with app.app_context():
+                db.session.get(Certificate, row_id).prv = readable
+                db.session.commit()
 
     def test_listed_like_a_certificate_without_consuming_a_ca_serial(self, app, client, use):
         ca_id, _ = use('main')
