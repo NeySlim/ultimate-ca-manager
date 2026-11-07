@@ -3,6 +3,7 @@ from .helpers import (_get_ssl_verify, _cleanup_ssl_verify, _parse_json_field,
                       _extract_saml_groups, oidc_identity, saml_identity)
 from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
 from . import saml_sp
+from onelogin.saml2.constants import OneLogin_Saml2_Constants
 from flask import request, redirect, session, Response, after_this_request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
@@ -70,6 +71,74 @@ def _reject_saml_login(provider, reason, error='saml_validation_failed'):
         success=False
     )
     return redirect(f'/login?error={error}')
+
+def _saml_logout_request(provider):
+    """IdP-initiated Single Logout over HTTP-Redirect (SAML Profiles §4.4).
+
+    The LogoutRequest must carry a valid IdP signature; this browser's session is
+    closed when it belongs to the NameID, and a LogoutResponse goes back to the
+    IdP's SLO URL (signed when request signing is on).
+    """
+    from onelogin.saml2.auth import OneLogin_Saml2_Auth
+    from onelogin.saml2.logout_request import OneLogin_Saml2_Logout_Request
+    from onelogin.saml2.logout_response import OneLogin_Saml2_Logout_Response
+    from onelogin.saml2.utils import OneLogin_Saml2_Utils
+
+    base = saml_sp.sp_base_url(request)
+    sp_cert = sp_key = None
+    if provider.saml_sign_requests and provider.saml_slo_url:
+        try:
+            sp_cert, sp_key = saml_sp.load_sp_credentials(provider, with_key=True)
+        except Exception as e:
+            logger.warning("SAML LogoutResponse sent unsigned: SP key unusable (%s)", e)
+    data = saml_sp.request_data(request, base)
+    auth = OneLogin_Saml2_Auth(
+        data, saml_sp.build_settings(provider, base, sp_cert, sp_key, want_messages_signed=True))
+    try:
+        logout_request = OneLogin_Saml2_Logout_Request(auth.get_settings(), data['get_data']['SAMLRequest'])
+        xml = logout_request.get_xml()
+        if not auth.validate_request_signature(data['get_data']):
+            return _reject_saml_logout(provider, 'invalid or missing signature')
+        if not logout_request.is_valid(data):
+            return _reject_saml_logout(provider, logout_request.get_error() or 'invalid LogoutRequest')
+        name_id = OneLogin_Saml2_Logout_Request.get_nameid(xml)
+    except Exception as e:
+        return _reject_saml_logout(provider, f'unreadable LogoutRequest ({e})')
+
+    users = {u for (u,) in db.session.query(SSOSession.user_id).filter_by(
+        provider_id=provider.id, sso_name_id=name_id)}
+    users |= {u for (u,) in db.session.query(User.id).filter_by(
+        sso_provider_id=provider.id, sso_external_id=name_id)}
+    SSOSession.query.filter_by(provider_id=provider.id, sso_name_id=name_id).delete()
+    db.session.commit()
+    closed = session.get('auth_method') == 'sso' and session.get('user_id') in users
+    if closed:
+        session.clear()
+    AuditService.log_action(
+        action='logout', resource_type='sso', resource_name=name_id,
+        details=(f'SAML Single Logout from {provider.name}: '
+                 f'{"session closed" if closed else "no session of this NameID in this browser"}'),
+        success=True)
+
+    if not provider.saml_slo_url:
+        return redirect('/login')
+    builder = OneLogin_Saml2_Logout_Response(auth.get_settings())
+    builder.build(logout_request.id)
+    params = {'SAMLResponse': builder.get_response()}
+    if 'RelayState' in data['get_data']:
+        params['RelayState'] = data['get_data']['RelayState']
+    if sp_key:
+        auth.add_response_signature(params, OneLogin_Saml2_Constants.RSA_SHA256)
+    return redirect(OneLogin_Saml2_Utils.redirect(auth.get_slo_response_url(), params, request_data=data))
+
+
+def _reject_saml_logout(provider, reason):
+    logger.error("SAML LogoutRequest rejected for provider %s: %s", provider.name, reason)
+    AuditService.log_action(
+        action='logout', resource_type='sso',
+        details=f'SAML LogoutRequest from {provider.name} rejected: {reason}', success=False)
+    return redirect('/login?error=saml_logout_rejected')
+
 
 # ============ Public SSO Endpoints (no auth) ============
 
@@ -357,6 +426,8 @@ def sso_callback(provider_type):
             _cleanup_ssl_verify(verify)
 
     elif provider.provider_type == 'saml':
+        if request.method == 'GET' and 'SAMLRequest' in request.args:
+            return _saml_logout_request(provider)
         sp_base = saml_sp.sp_base_url(request)
 
         # Dropped once the request is used up or gone, never by a refused POST.

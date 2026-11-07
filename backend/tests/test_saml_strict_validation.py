@@ -208,15 +208,27 @@ def test_role_mapping_reads_the_attribute_mapped_to_groups(app, mapped_provider,
     assert role == 'operator'
 
 
-def test_unmatched_groups_get_the_default_role(app, mapped_provider, idp_signer):
+def test_unmatched_groups_are_refused_when_rules_exist(app, mapped_provider, idp_signer):
     mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}))
+    client = app.test_client()
+    request_id = _start_login(client)
+    name_id = f'saml-{uuid.uuid4().hex[:12]}'
+    resp = _response(idp_signer, in_response_to=request_id, name_id=name_id,
+                     attributes={'groups': ['someone-else']})
+    assert _post(client, resp) == '/login?error=sso_unmapped'
+    with app.app_context():
+        assert User.query.filter_by(sso_external_id=name_id).count() == 0
+
+
+def test_without_rules_users_get_the_default_role(app, mapped_provider, idp_signer):
     role, _ = _login_role(app, idp_signer, attributes={'groups': ['someone-else']})
     assert role == 'viewer'
 
 
 def test_role_sync_follows_the_groups_on_the_next_login(app, mapped_provider, idp_signer):
-    mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}), sync_role_on_login=True)
-    role, name_id = _login_role(app, idp_signer)
+    mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin', 'pki-users': 'viewer'}),
+                    sync_role_on_login=True)
+    role, name_id = _login_role(app, idp_signer, attributes={'groups': ['pki-users']})
     assert role == 'viewer'
     client = app.test_client()
     request_id = _start_login(client)
@@ -239,7 +251,7 @@ def test_a_signed_name_id_does_not_open_the_local_account_of_that_name(app, prov
         request_id = _start_login(client)
         resp = _response(idp_signer, in_response_to=request_id, name_id='samltkadmin')
         assert _post(client, resp) == '/login?error=sso_username_conflict'
-        assert not (client.get('/api/v2/auth/verify').get_json().get('data') or {}).get('authenticated')
+        assert not _authenticated(client)
         with app.app_context():
             admin = User.query.filter_by(username='samltkadmin').one()
             assert admin.sso_external_id is None and admin.auth_source == 'local'
@@ -737,3 +749,111 @@ def test_custom_role_follows_the_mapping_through_the_callback(app, mapped_provid
     with app.app_context():
         user = User.query.filter_by(sso_external_id=name_id).one()
         assert (user.role, user.custom_role_id, user.custom_role_source) == ('operator', role_id, 'sso')
+
+
+# ── IdP-initiated Single Logout (HTTP-Redirect, SAML Profiles §4.4) ──────────
+
+IDP_SLO = 'https://idp.example.test/slo'
+
+
+def _authenticated(client):
+    body = client.get('/api/v2/auth/verify', base_url=SP_BASE).get_json() or {}
+    return bool((body.get('data') or {}).get('authenticated'))
+
+
+def _logout_request(key_pem, name_id, *, sign=True, issuer=IDP_ENTITY):
+    from urllib.parse import quote_plus
+    from cryptography.hazmat.primitives.asymmetric import padding
+    rid = f'_lr{uuid.uuid4().hex}'
+    xml = (f'<samlp:LogoutRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" '
+           f'xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="{rid}" Version="2.0" '
+           f'IssueInstant="{_ts()}" Destination="{SP_BASE}{ACS}"><saml:Issuer>{issuer}</saml:Issuer>'
+           f'<saml:NameID Format="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">{name_id}'
+           f'</saml:NameID><samlp:SessionIndex>_s1</samlp:SessionIndex></samlp:LogoutRequest>')
+    encoded = OneLogin_Saml2_Utils.deflate_and_base64_encode(xml)
+    params = {'SAMLRequest': encoded}
+    if sign:
+        params['SigAlg'] = K.RSA_SHA256
+        signed = f'SAMLRequest={quote_plus(encoded)}&SigAlg={quote_plus(K.RSA_SHA256)}'.encode()
+        key = serialization.load_pem_private_key(key_pem.encode(), password=None)
+        params['Signature'] = base64.b64encode(
+            key.sign(signed, padding.PKCS1v15(), hashes.SHA256())).decode()
+    return rid, params
+
+
+def _signed_in(app, idp_signer):
+    client = app.test_client()
+    request_id = _start_login(client)
+    name_id = f'saml-{uuid.uuid4().hex[:12]}'
+    assert _post(client, _response(idp_signer, in_response_to=request_id, name_id=name_id)) == OK
+    assert _authenticated(client)
+    return client, name_id
+
+
+@pytest.fixture
+def slo_url(app, provider):
+    _configure(app, provider, saml_slo_url=IDP_SLO)
+    yield IDP_SLO
+    _configure(app, provider, saml_slo_url=None)
+
+
+def test_signed_logout_request_closes_the_session_and_answers_the_idp(app, slo_url, idp_signer):
+    from urllib.parse import parse_qs, urlsplit
+    client, name_id = _signed_in(app, idp_signer)
+    rid, params = _logout_request(idp_signer[0], name_id)
+    r = client.get(ACS, base_url=SP_BASE, query_string=params)
+    assert r.status_code == 302 and r.headers['Location'].startswith(IDP_SLO + '?')
+    answer = parse_qs(urlsplit(r.headers['Location']).query)
+    xml = OneLogin_Saml2_Utils.decode_base64_and_inflate(answer['SAMLResponse'][0]).decode()
+    assert f'InResponseTo="{rid}"' in xml and K.STATUS_SUCCESS in xml
+    assert not _authenticated(client)
+    with app.app_context():
+        assert SSOSession.query.filter_by(sso_name_id=name_id).count() == 0
+
+
+def test_logout_response_is_signed_when_request_signing_is_on(app, slo_url, provider, idp_signer,
+                                                              https_identity):
+    from urllib.parse import parse_qs, urlsplit
+    https_identity('rsa')
+    _configure(app, provider, saml_sign_requests=True)
+    try:
+        client, name_id = _signed_in(app, idp_signer)
+        _, params = _logout_request(idp_signer[0], name_id)
+        r = client.get(ACS, base_url=SP_BASE, query_string=params)
+        answer = parse_qs(urlsplit(r.headers['Location']).query)
+        assert answer['SigAlg'] == [K.RSA_SHA256] and answer.get('Signature')
+    finally:
+        _configure(app, provider, saml_sign_requests=False)
+
+
+@pytest.mark.parametrize('forge', ['unsigned', 'other_key', 'other_issuer'])
+def test_forged_logout_request_is_refused_and_the_session_kept(app, slo_url, idp_signer, forge):
+    client, name_id = _signed_in(app, idp_signer)
+    if forge == 'unsigned':
+        _, params = _logout_request(idp_signer[0], name_id, sign=False)
+    elif forge == 'other_key':
+        other = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption()).decode()
+        _, params = _logout_request(other, name_id)
+    else:
+        _, params = _logout_request(idp_signer[0], name_id, issuer='https://evil.example.test')
+    r = client.get(ACS, base_url=SP_BASE, query_string=params)
+    assert r.headers['Location'] == '/login?error=saml_logout_rejected'
+    assert _authenticated(client)
+
+
+def test_logout_of_another_name_id_leaves_this_session(app, slo_url, idp_signer):
+    client, _ = _signed_in(app, idp_signer)
+    _, params = _logout_request(idp_signer[0], 'someone-else')
+    r = client.get(ACS, base_url=SP_BASE, query_string=params)
+    assert r.headers['Location'].startswith(IDP_SLO + '?')
+    assert _authenticated(client)
+
+
+def test_without_an_idp_slo_url_the_session_still_closes(app, provider, idp_signer):
+    client, name_id = _signed_in(app, idp_signer)
+    _, params = _logout_request(idp_signer[0], name_id)
+    r = client.get(ACS, base_url=SP_BASE, query_string=params)
+    assert r.headers['Location'] == '/login'
+    assert not _authenticated(client)

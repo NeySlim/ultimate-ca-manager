@@ -144,10 +144,12 @@ def load_sp_credentials(provider, with_key=False):
                                        serialization.NoEncryption()).decode()
 
 
-def build_settings(provider, base, sp_cert=None, sp_key=None):
+def build_settings(provider, base, sp_cert=None, sp_key=None, want_messages_signed=False):
     """python3-saml settings: strict validation, SHA-1 refused.
 
     Requests are signed when the provider asks for it and `sp_key` is given.
+    `want_messages_signed` is for logout requests, which only their
+    redirect-binding signature authenticates (SAML Profiles §4.4.4.1).
     """
     endpoints = sp_endpoints(base)
     settings = {
@@ -168,7 +170,7 @@ def build_settings(provider, base, sp_cert=None, sp_key=None):
             # A valid signature on the Response or on the Assertion is always
             # required; demanding one place would refuse IdPs that sign the other.
             'wantAssertionsSigned': False,
-            'wantMessagesSigned': False,
+            'wantMessagesSigned': want_messages_signed,
             'authnRequestsSigned': bool(sp_key and provider.saml_sign_requests),
             'wantNameIdEncrypted': False,
             'wantAssertionsEncrypted': False,

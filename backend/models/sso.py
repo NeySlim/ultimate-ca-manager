@@ -57,6 +57,8 @@ class SSOProvider(db.Model):
     ldap_server = db.Column(db.String(500))
     ldap_port = db.Column(db.Integer, default=389)
     ldap_use_ssl = db.Column(db.Boolean, default=False)
+    # StartTLS on the plain port before any bind (ignored with LDAPS). Migration 137.
+    ldap_start_tls = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
     ldap_verify_ssl = db.Column(db.Boolean, default=True)
     ldap_ca_bundle = db.Column(db.Text)  # PEM content
     ldap_bind_dn = db.Column(db.String(500))
@@ -211,6 +213,7 @@ class SSOProvider(db.Model):
                 'ldap_server': self.ldap_server,
                 'ldap_port': self.ldap_port,
                 'ldap_use_ssl': self.ldap_use_ssl,
+                'ldap_start_tls': bool(self.ldap_start_tls),
                 'ldap_verify_ssl': self.ldap_verify_ssl if self.ldap_verify_ssl is not None else True,
                 'ldap_ca_bundle': self.ldap_ca_bundle or '',
                 'ldap_bind_dn': self.ldap_bind_dn,

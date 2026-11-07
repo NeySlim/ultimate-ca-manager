@@ -1,8 +1,9 @@
-"""An SSO identity never opens a local account, nor one bound to another identity.
+"""Which account an SSO login opens, and whether it may open one at all.
 
 OIDC Core 1.0 §5.7: only ``iss`` + ``sub`` identify the End-User; §5.1:
-``preferred_username`` "MUST NOT" be relied upon as unique. The doors are the
-real OAuth2 callback and the LDAP login; SAML is in test_saml_strict_validation.
+``preferred_username`` "MUST NOT" be relied upon as unique. With role mapping
+rules, a user none of them matches is refused. The doors are the real OAuth2
+callback and the LDAP login; SAML is in test_saml_strict_validation.
 """
 import uuid
 
@@ -57,6 +58,13 @@ def oidc(app, monkeypatch):
     monkeypatch.setattr(login_routes, 'verify_id_token',
                         lambda *_a, **_k: {'sub': answer.get('sub')})
 
+    def configure(**fields):
+        with app.app_context():
+            row = db.session.get(SSOProvider, pid)
+            for key, val in fields.items():
+                setattr(row, key, val)
+            db.session.commit()
+
     def login(userinfo):
         answer.clear()
         answer.update(userinfo)
@@ -71,6 +79,7 @@ def oidc(app, monkeypatch):
         return r.headers['Location'], (verify.get('data') or {})
 
     login.provider_id = pid
+    login.configure = configure
     yield login
     with app.app_context():
         SSOSession.query.filter_by(provider_id=pid).delete()
@@ -252,3 +261,121 @@ def test_bind_never_replaces_an_existing_external_id(app):
         finally:
             db.session.rollback()
             _cleanup(['tkbound'])
+
+
+# ── Unmapped users (role mapping rules are an admission list) ───────────────
+
+def _audited(app, needle):
+    from models import AuditLog
+    with app.app_context():
+        return AuditLog.query.filter(AuditLog.action == 'login_failure',
+                                     AuditLog.details.contains(needle)).count()
+
+
+def test_oidc_user_no_rule_matches_is_refused(app, oidc):
+    oidc.configure(role_mapping='{"pki-admins": "admin"}')
+    try:
+        location, verify = oidc({'sub': 'nomap-sub', 'preferred_username': 'tknomap',
+                                 'groups': ['staff']})
+        assert location.endswith('/login?error=sso_unmapped')
+        assert verify.get('authenticated') is not True
+        with app.app_context():
+            assert User.query.filter_by(username='tknomap').count() == 0
+        assert _audited(app, 'tknomap') >= 1
+        location, _ = oidc({'sub': 'map-sub', 'preferred_username': 'tkmap',
+                            'groups': ['pki-admins']})
+        assert location.endswith('/login/sso-complete')
+    finally:
+        with app.app_context():
+            _cleanup(['tknomap', 'tkmap'])
+
+
+def test_existing_user_dropped_from_every_mapped_group_is_refused(app, oidc):
+    oidc.configure(role_mapping='{"pki-users": "viewer"}')
+    try:
+        assert oidc({'sub': 'drop-sub', 'preferred_username': 'tkdrop',
+                     'groups': ['pki-users']})[0].endswith('/login/sso-complete')
+        location, verify = oidc({'sub': 'drop-sub', 'preferred_username': 'tkdrop', 'groups': []})
+        assert location.endswith('/login?error=sso_unmapped')
+        assert verify.get('authenticated') is not True
+    finally:
+        with app.app_context():
+            _cleanup(['tkdrop'])
+
+
+def test_without_rules_users_get_the_default_role(app, oidc):
+    oidc.configure(role_mapping=None, default_role='auditor')
+    try:
+        assert oidc({'sub': 'def-sub', 'preferred_username': 'tkdef'})[0].endswith('/login/sso-complete')
+        with app.app_context():
+            assert User.query.filter_by(username='tkdef').one().role == 'auditor'
+    finally:
+        with app.app_context():
+            _cleanup(['tkdef'])
+
+
+def test_an_empty_default_role_is_stored_and_admits_nobody(app, auth_client, oidc):
+    r = auth_client.put(f'/api/v2/sso/providers/{oidc.provider_id}',
+                        json={'default_role': '', 'role_mapping': {}})
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()['data']['default_role'] is None
+    try:
+        location, _ = oidc({'sub': 'none-sub', 'preferred_username': 'tknone'})
+        assert location.endswith('/login?error=sso_unmapped')
+        with app.app_context():
+            assert User.query.filter_by(username='tknone').count() == 0
+    finally:
+        with app.app_context():
+            _cleanup(['tknone'])
+
+
+def test_an_unknown_default_role_is_refused_not_turned_into_viewer(auth_client, oidc):
+    r = auth_client.put(f'/api/v2/sso/providers/{oidc.provider_id}', json={'default_role': 'root'})
+    assert r.status_code == 400
+    assert 'default_role' in r.get_json()['message']
+
+
+def test_ldap_user_no_rule_matches_is_refused(app, ldap):
+    with app.app_context():
+        db.session.get(SSOProvider, ldap.provider_id).role_mapping = '{"pki-admins": "admin"}'
+        db.session.commit()
+    try:
+        r = ldap('tkldapnomap', dn='uid=tkldapnomap,dc=example', uid='uuid-nomap', groups=['staff'])
+        assert r.status_code == 403
+        assert 'mapping' in r.get_json()['message']
+        with app.app_context():
+            assert User.query.filter_by(username='tkldapnomap').count() == 0
+    finally:
+        with app.app_context():
+            _cleanup(['tkldapnomap'])
+
+
+# ── Enforced 2FA on an LDAP provider asks the enrolled code ────────────────
+
+def test_ldap_with_enforced_2fa_asks_the_enrolled_totp(app, ldap):
+    import pyotp
+    secret = pyotp.random_base32()
+    with app.app_context():
+        _cleanup(['tkotp'])
+        db.session.get(SSOProvider, ldap.provider_id).enforce_2fa = True
+        db.session.add(User(username='tkotp', email='otp@corp.test', full_name='O', role='viewer',
+                            active=True, password_hash='!SSO_NO_PASSWORD!', auth_source='ldap',
+                            sso_provider_id=ldap.provider_id, sso_external_id='uuid-otp',
+                            totp_secret=secret, totp_confirmed=True))
+        db.session.commit()
+    try:
+        client = app.test_client()
+        ldap('tkotp', dn='uid=tkotp,dc=example', uid='uuid-otp')  # primes the directory answer
+        r = client.post('/api/v2/sso/ldap/login',
+                        json={'username': 'tkotp', 'password': 'pw', 'provider_id': ldap.provider_id})
+        assert r.status_code == 200
+        body = r.get_json()['data']
+        assert body.get('requires_2fa') is True and 'totp' in body['methods']
+        assert not (client.get('/api/v2/auth/verify').get_json().get('data') or {}).get('authenticated')
+        r = client.post('/api/v2/auth/login/2fa', json={'code': pyotp.TOTP(secret).now()})
+        assert r.status_code == 200, r.get_json()
+        verify = client.get('/api/v2/auth/verify').get_json()['data']
+        assert verify['authenticated'] is True and verify['user']['username'] == 'tkotp'
+    finally:
+        with app.app_context():
+            _cleanup(['tkotp'])

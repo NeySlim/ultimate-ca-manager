@@ -21,7 +21,7 @@ from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
 import ssl
 from . import saml_sp
-from .helpers import _check_ldap_lockout, _clear_ldap_failed_attempts, _record_ldap_failed_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password
+from .helpers import _check_ldap_lockout, _clear_ldap_failed_attempts, _record_ldap_failed_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password, sso_admission, _mapping_rules
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
 @limiter.limit("5/minute")
@@ -129,6 +129,9 @@ def ldap_login():
             return error_response(
                 "Sign-in refused: a local account, or one linked to another identity, "
                 "already uses this name. An administrator can link the accounts.", 403)
+        if error_code == UNMAPPED:
+            return error_response(
+                "Access denied: no role mapping rule of this provider matches your account", 403)
         # Generic message — don't disclose whether the LDAP user exists or whether
         # auto-provisioning is on/off. Details go to logs only.
         if error_code == 'auto_create_disabled':
@@ -171,6 +174,30 @@ def ldap_login():
     ok, _err = safe_commit(logger, "Failed to persist LDAP session")
     if not ok:
         return _err
+
+    # Enforced 2FA: an enrolled second factor is asked, as at the password door.
+    from auth.twofa_enforcement import second_factor_methods
+    second_factors = second_factor_methods(user) if provider.enforce_2fa else []
+    if second_factors:
+        session.clear()
+        session['pending_2fa_user_id'] = user.id
+        session['pending_2fa_username'] = user.username
+        session['pending_2fa_method'] = 'ldap'
+        session.permanent = True
+        AuditService.log_action(
+            action='login_2fa_required',
+            resource_type='user',
+            resource_id=user.id,
+            resource_name=user.username,
+            details=f'LDAP password verified via {provider.name}, 2FA required',
+            success=True,
+            username=user.username
+        )
+        return success_response(
+            data={'requires_2fa': True, 'methods': second_factors,
+                  'user': {'id': user.id, 'username': user.username}},
+            message='2FA verification required'
+        )
 
     # Establish Flask session (clear first to prevent session fixation)
     _ldap_now = utc_now()
@@ -284,6 +311,7 @@ def _bind_external_id(user, provider, external_id):
 
 SSO_NO_PASSWORD = '!SSO_NO_PASSWORD!'
 USERNAME_CONFLICT = 'sso_username_conflict'
+UNMAPPED = 'sso_unmapped'
 
 
 def _adoptable(user, provider):
@@ -313,6 +341,20 @@ def _refuse_username_conflict(provider, username):
         username=username,
     )
     return None, USERNAME_CONFLICT
+
+
+def _refuse_unmapped(provider, username):
+    reason = 'no role mapping rule matches it' if _mapping_rules(provider) else 'the provider has no default role'
+    logger.warning(f"SSO login refused for '{username}' via {provider.name}: {reason}")
+    AuditService.log_action(
+        action='login_failure',
+        resource_type='sso',
+        resource_name=username,
+        details=f"SSO login via {provider.name} refused for {username!r}: {reason}",
+        success=False,
+        username=username,
+    )
+    return None, UNMAPPED
 
 
 def _get_or_create_sso_user(provider, username, email, fullname, external_data):
@@ -355,6 +397,9 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         logger.warning(
             f"SSO sync skipped for '{username}': the local account is disabled")
         return user, None
+
+    if not sso_admission(provider, external_data):
+        return _refuse_unmapped(provider, username)
 
     if user:
         # Backfill auth_source/sso_provider_id for users created before

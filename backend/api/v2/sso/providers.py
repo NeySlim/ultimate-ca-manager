@@ -84,6 +84,16 @@ def _sp_signing_error(provider):
     return None
 
 
+def _default_role(value):
+    """Stored default role: a base role, or None (unmapped users refused). ValueError otherwise."""
+    if value in (None, ''):
+        return None
+    if value not in VALID_ROLES:
+        raise ValueError(f"Invalid default_role '{value}'. Must be one of: "
+                         f"{', '.join(sorted(VALID_ROLES))}, or empty to refuse unmapped users")
+    return value
+
+
 @bp.route('/api/v2/sso/providers', methods=['POST'])
 @require_auth(['write:sso'])
 def create_provider():
@@ -110,6 +120,10 @@ def create_provider():
     err = _validate_sso_outbound_urls(data)
     if err:
         return err
+    try:
+        default_role = _default_role(data.get('default_role', 'viewer'))
+    except ValueError as e:
+        return error_response(str(e), 400)
 
     provider = SSOProvider(
         name=data['name'],
@@ -118,7 +132,7 @@ def create_provider():
         icon=data.get('icon'),
         enabled=data.get('enabled', False),
         is_default=data.get('is_default', False),
-        default_role=data.get('default_role', 'viewer') if data.get('default_role') in VALID_ROLES else 'viewer',
+        default_role=default_role,
         auto_create_users=data.get('auto_create_users', True),
         auto_update_users=data.get('auto_update_users', True),
         sync_role_on_login=data.get('sync_role_on_login', False),
@@ -167,6 +181,7 @@ def create_provider():
         provider.ldap_server = data.get('ldap_server')
         provider.ldap_port = data.get('ldap_port', 389)
         provider.ldap_use_ssl = data.get('ldap_use_ssl', False)
+        provider.ldap_start_tls = bool(data.get('ldap_start_tls', False))
         provider.ldap_verify_ssl = data.get('ldap_verify_ssl', True)
         ca = data.get('ldap_ca_bundle')
         provider.ldap_ca_bundle = ca if isinstance(ca, str) and ca.strip() else None
@@ -224,8 +239,8 @@ _SSO_SECRET_TARGETS = {
     'oauth2': ('oauth2_client_secret', ('oauth2_client_id', 'oauth2_auth_url', 'oauth2_token_url',
                                         'oauth2_userinfo_url', 'oauth2_issuer', 'oauth2_jwks_uri',
                                         'oauth2_verify_ssl', 'oauth2_ca_bundle')),
-    'ldap': ('ldap_bind_password', ('ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_bind_dn',
-                                    'ldap_verify_ssl', 'ldap_ca_bundle')),
+    'ldap': ('ldap_bind_password', ('ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_start_tls',
+                                    'ldap_bind_dn', 'ldap_verify_ssl', 'ldap_ca_bundle')),
 }
 
 
@@ -239,7 +254,7 @@ def _sso_retarget_error(provider, data):
     for k in current:
         if k.endswith('_verify_ssl'):
             current[k] = current[k] is not False
-        elif k.endswith('_use_ssl'):
+        elif k.endswith('_use_ssl') or k == 'ldap_start_tls':
             current[k] = bool(current[k])
     if 'ldap_port' in current:
         current['ldap_port'] = current['ldap_port'] or 389
@@ -273,6 +288,11 @@ def update_provider(provider_id=None, provider_type_name=None):
     if err:
         return err
 
+    try:
+        default_role = _default_role(data.get('default_role'))
+    except ValueError as e:
+        return error_response(str(e), 400)
+
     # Update common fields
     if 'name' in data:
         # Check uniqueness
@@ -292,7 +312,7 @@ def update_provider(provider_id=None, provider_type_name=None):
         if provider.is_default:
             SSOProvider.query.filter(SSOProvider.id != provider.id).update({'is_default': False})
     if 'default_role' in data:
-        provider.default_role = data['default_role'] if data['default_role'] in VALID_ROLES else 'viewer'
+        provider.default_role = default_role
     if 'auto_create_users' in data:
         provider.auto_create_users = data['auto_create_users']
     if 'auto_update_users' in data:
@@ -346,6 +366,8 @@ def update_provider(provider_id=None, provider_type_name=None):
                       'ldap_fullname_attr', 'ldap_uid_attr', 'ldap_verify_ssl']:
             if field in data:
                 setattr(provider, field, data[field])
+        if 'ldap_start_tls' in data:
+            provider.ldap_start_tls = bool(data['ldap_start_tls'])
         # ldap_required_groups: normalize list/CSV string → JSON string (empty = clear)
         if 'ldap_required_groups' in data:
             required = _parse_group_list(data['ldap_required_groups'])
