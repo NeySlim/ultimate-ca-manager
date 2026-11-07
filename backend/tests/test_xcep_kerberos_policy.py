@@ -151,6 +151,9 @@ def test_kerberos_get_policies_succeeds_and_echoes_mutual_auth_token(client, xce
     auth_values = _cauri_auth_values(r.data)
     assert '2' in auth_values  # AUTH_KERBEROS
     assert '4' in auth_values  # AUTH_USERNAME_PASSWORD, still advertised too
+    # The CA builds a machine template's subject from AD on this binding
+    flags = etree.fromstring(r.data).find(f'.//{{{XCEP_NS}}}subjectNameFlags')
+    assert int(flags.text) == 0x18000000
 
 
 def _basic_auth():

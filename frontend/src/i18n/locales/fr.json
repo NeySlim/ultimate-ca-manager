@@ -2060,7 +2060,9 @@
       "generateReport": "Générer un rapport"
     },
     "expiresInDays": "Expire dans {{count}} jours",
-    "chainRepairSameKey": "clés partagées, certificats distincts (certificat croisé ?)"
+    "chainRepairSameKey": "clés partagées, certificats distincts (certificat croisé ?)",
+    "keyEncryptionOffTitle": "Les clés privées ne sont pas chiffrées.",
+    "keyEncryptionOffDesc": "Aucune clé maître n'est chargée : les clés privées des CA et des certificats sont stockées sans chiffrement dans la base. Activez le chiffrement dans Paramètres › Sécurité, ou remettez la clé maître en place et redémarrez UCM."
   },
   "revocation": {
     "reasonHelpNoHold": "Le motif est publié dans la CRL du parent et ne peut plus être modifié ; la révocation d'une CA est définitive.",
@@ -2666,6 +2668,8 @@
     "enrollmentRequest": "Demande d'inscription SCEP",
     "getCaCertChain": "Renvoyer la chaîne complète dans GetCACert",
     "getCaCertChainHelp": "Désactivé (défaut) : certificat CA seul, requis pour les clients Apple/MDM. Activé : PKCS#7 dégénéré avec la chaîne complète (RFC 8894).",
+    "plainHttp": "Servir aussi en HTTP simple",
+    "plainHttpHelp": "Répondre aussi à SCEP sur le port de protocole HTTP (8080 par défaut), pour les clients comme sscep qui ne savent pas utiliser HTTPS. L'enveloppe CMS protège déjà la requête et son mot de passe de défi (RFC 8894 §7.10).",
     "enforceSigningTime": "Imposer la tolérance d'horloge signingTime",
     "timeSkewMinutes": "Tolérance d'horloge (minutes)",
     "timeSkewMinutesHelp": "Les équipements sans NTP dérivent : hors de cette fenêtre, les requêtes sont rejetées quand l'application est active.",
@@ -2914,7 +2918,7 @@
     "emailSubtitle": "Configuration du serveur SMTP pour les notifications",
     "securitySubtitle": "Mot de passe, 2FA, chiffrement et sessions",
     "keyEncryption": "Chiffrement des clés privées",
-    "encryptionDesc": "Chiffre toutes les clés privées stockées en base de données avec AES-256. Les clés sont protégées par une clé maître stockée dans /etc/ucm/master.key. Lorsqu'il est activé, UCM ne conserve plus de fichiers de clé en clair dans son répertoire privé et supprime ceux qui existent. Utilisez les hooks de déploiement pour placer les clés là où un service en a besoin.",
+    "encryptionDesc": "Chiffre toutes les clés privées stockées en base de données avec AES-128 (Fernet, avec HMAC-SHA256). Les clés sont protégées par une clé maître stockée dans /etc/ucm/master.key. Lorsqu'il est activé, UCM ne conserve plus de fichiers de clé en clair dans son répertoire privé et supprime ceux qui existent. Utilisez les hooks de déploiement pour placer les clés là où un service en a besoin.",
     "enableEncryption": "Activer le chiffrement",
     "disableEncryption": "Désactiver le chiffrement",
     "encryptRemainingKeys": "Chiffrer les clés restantes ({{count}})",
@@ -4271,6 +4275,8 @@
     "title": "Mode sans échec",
     "description": "UCM a détecté des clés privées chiffrées mais la clé de chiffrement est manquante. Les clés privées ne sont pas accessibles tant que la clé maître n'est pas restaurée.",
     "step1Title": "Placez votre fichier de clé maître dans :",
+    "mismatchDescription": "La clé maître configurée ne déchiffre pas les clés privées stockées : ce n'est pas celle qui les a chiffrées. Les clés privées restent inaccessibles tant que la clé maître précédente n'est pas restaurée.",
+    "mismatchStep1Title": "Remettez le fichier de la clé maître précédente dans :",
     "step2Title": "Puis redémarrez le service :",
     "lostKeyHint": "Si vous avez perdu la clé maître, restaurez à partir d'une sauvegarde pour récupérer vos clés privées.",
     "polling": "Vérification en cours..."
@@ -5459,11 +5465,13 @@
     "selectCA": "Sélectionnez une CA pour la signature d'horodatage",
     "policyOid": "OID de politique",
     "policyOidHelp": "OID identifiant la politique TSA sous laquelle les horodatages sont émis",
+    "policyPlaceholderWarning": "1.2.3.4.1 est l'OID de politique d'exemple d'OpenSSL, attribué à personne. En production, utilisez un OID de l'arc de votre organisation ou de votre PC/DPC.",
     "requireDedicatedCert": "Exiger un certificat TSA dédié",
     "requireDedicatedCertDesc": "Refuser de signer les horodatages avec le certificat de la CA elle-même. Nécessite un certificat de signature dédié (entité finale) avec une EKU timeStamping critique (RFC 3161).",
     "requireDedicatedCertBlocked": "Sélectionnez d'abord un certificat de signature dédié utilisable ci-dessus, sinon toutes les requêtes d'horodatage échoueraient.",
     "signingCert": "Certificat de signature",
     "signingCertDesc": "Choisissez ce qui signe les jetons d'horodatage. Le certificat de la CA est le défaut historique ; un certificat final dédié portant l'EKU timeStamping est la recommandation RFC 3161.",
+    "caSignerWarning": "Le certificat de la CA signe les horodatages. Les vérificateurs stricts comme openssl ts -verify et jarsigner refusent ces jetons : la RFC 3161 exige un signataire dédié portant un EKU timeStamping critique et exclusif. Choisissez ou générez ci-dessous un certificat de signature dédié.",
     "signingCertHelp": "Seuls les certificats dont UCM détient la clé privée et portant l'EKU timeStamping sont listés. Les renouvellements sont suivis automatiquement.",
     "signingCertCa": "Certificat de la CA (défaut)",
     "signerExpires": "Expire",

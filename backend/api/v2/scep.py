@@ -63,6 +63,7 @@ def get_scep_config():
         'enforce_signing_time': get_config('scep_enforce_signing_time', 'false') == 'true',
         'time_skew_minutes': int(get_config('scep_time_skew_minutes', '10') or 10),
         'getcacert_chain': get_config('scep_getcacert_chain', 'false') == 'true',
+        'plain_http': get_config('scep_plain_http', 'false') == 'true',
     })
 
 
@@ -118,6 +119,8 @@ def update_scep_config():
     if 'getcacert_chain' in data:
         set_config('scep_getcacert_chain',
                    'true' if data['getcacert_chain'] else 'false')
+    if 'plain_http' in data:
+        set_config('scep_plain_http', 'true' if data['plain_http'] else 'false')
     
     ok, _err = safe_commit(logger, "Failed to update SCEP configuration")
     if not ok:

@@ -92,5 +92,8 @@ def purge_expired_orders(limit: int = BATCH_LIMIT) -> dict:
 
 
 def scheduled_purge():
-    """Scheduler entry point."""
-    return purge_expired_orders()
+    """Scheduler entry point: expired orders, then spent nonces."""
+    stats = purge_expired_orders()
+    from services.acme.mixins.nonce import purge_nonces
+    stats['nonces'] = purge_nonces()
+    return stats

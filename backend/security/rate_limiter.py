@@ -420,6 +420,21 @@ def get_rate_limiter() -> RateLimiter:
     return _rate_limiter
 
 
+def _describe_route_limit(response):
+    try:
+        from app import limiter
+        current = limiter.current_limit
+        if current is None or not current.breached:
+            return
+        response.headers['X-RateLimit-Limit'] = str(current.limit.amount)
+        response.headers['X-RateLimit-Remaining'] = '0'
+        response.headers['X-RateLimit-Reset'] = str(current.reset_at)
+        if 'Retry-After' not in response.headers:
+            response.headers['Retry-After'] = str(max(1, current.reset_at - int(time.time())))
+    except Exception:
+        logger.debug("Route rate limit not described", exc_info=True)
+
+
 def init_rate_limiter(app=None) -> RateLimiter:
     """Initialize rate limiter and optionally register middleware"""
     global _rate_limiter
@@ -470,6 +485,10 @@ def init_rate_limiter(app=None) -> RateLimiter:
         
         @app.after_request
         def add_rate_limit_headers(response):
+            if response.status_code == 429:
+                # Refused by the per-route Flask-Limiter layer: describe its limit, not this one's
+                _describe_route_limit(response)
+                return response
             if hasattr(g, 'rate_limit_info') and g.rate_limit_info.get('allowed'):
                 info = g.rate_limit_info
                 response.headers['X-RateLimit-Limit'] = str(info.get('limit', 0))

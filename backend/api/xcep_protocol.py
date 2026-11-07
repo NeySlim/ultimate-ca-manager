@@ -123,12 +123,13 @@ def _resolve_xcep_ca():
     return ca, None
 
 
-def _handle_get_policies(parsed):
+def _handle_get_policies(parsed, ad_identity):
     """Shared GetPoliciesResponse construction for every CEP binding, once
     that binding's own auth check has already succeeded. Not itself
     binding-specific: the CAURI collection it builds advertises every
     configured WSTEP CES endpoint regardless of which CEP endpoint a client
-    happened to poll, exactly like real ADCS.
+    happened to poll, exactly like real ADCS. ``ad_identity``: whether the
+    binding authenticates an AD principal (Kerberos), see ``subject_name_flags``.
     """
     ca, ca_error = _resolve_xcep_ca()
     if ca_error:
@@ -162,6 +163,7 @@ def _handle_get_policies(parsed):
             enrollment_uris.append((AUTH_KERBEROS, f'{base}{CES_KERBEROS_PATH}', False))
         xml_body = build_get_policies_response(
             ca, templates, enrollment_uris=enrollment_uris, message_id=parsed.message_id,
+            ad_identity=ad_identity,
         )
         return Response(xml_body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
     except Exception as e:
@@ -211,7 +213,7 @@ def get_policies():
             status=400, content_type=f'{SOAP_XML_MIME}; charset=utf-8',
         )
 
-    return _handle_get_policies(parsed)
+    return _handle_get_policies(parsed, ad_identity=False)
 
 
 @bp.route('/ADPolicyProvider_CEP_Kerberos/service.svc', methods=['GET', 'POST', 'HEAD'])
@@ -266,7 +268,7 @@ def get_policies_kerberos():
             status=400, content_type=f'{SOAP_XML_MIME}; charset=utf-8',
         )
 
-    response = _handle_get_policies(parsed)
+    response = _handle_get_policies(parsed, ad_identity=True)
     if result.response_token_b64:
         response.headers['WWW-Authenticate'] = f'Negotiate {result.response_token_b64}'
     return response

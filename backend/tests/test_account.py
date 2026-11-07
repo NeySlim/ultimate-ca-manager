@@ -24,13 +24,24 @@ def post_json(client, url, data):
     return client.post(url, data=json.dumps(data), content_type=CONTENT_JSON)
 
 
+_LAST_STEP = {}
+
+
 def _totp_code(secret):
-    """The current code, taken at least 2 s before its 30 s window ends: the
-    server verifies without a tolerance window, so one taken later may be refused."""
+    """A code the server has not accepted yet, one time step after the last one.
+
+    The server accepts one step either side of now, each step once (RFC 6238
+    §5.2): a secret gives three codes, the previous, current and next step.
+    Taken at least 2 s before the step ends, so the server sees the same window.
+    """
     left = 30 - time.time() % 30
     if left < 2:
         time.sleep(left + 0.05)
-    return pyotp.TOTP(secret).now()
+    now = int(time.time() // 30)
+    step = max(_LAST_STEP.get(secret, now - 2) + 1, now - 1)
+    assert step <= now + 1, 'more than three codes asked of one secret'
+    _LAST_STEP[secret] = step
+    return pyotp.TOTP(secret).generate_otp(step)
 
 
 def patch_json(client, url, data):

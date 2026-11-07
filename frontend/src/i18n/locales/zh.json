@@ -677,7 +677,9 @@
       "generateReport": "生成报告"
     },
     "expiresInDays": "{{count}} 天后到期",
-    "chainRepairSameKey": "共用密钥、证书不同（交叉证书？）"
+    "chainRepairSameKey": "共用密钥、证书不同（交叉证书？）",
+    "keyEncryptionOffTitle": "私钥未加密。",
+    "keyEncryptionOffDesc": "未加载主密钥，CA 和证书的私钥以未加密形式保存在数据库中。请在 设置 › 安全 中启用加密，或将主密钥放回原处并重启 UCM。"
   },
   "certificates": {
     "createCertificate": "创建证书",
@@ -2060,6 +2062,8 @@
     "enrollmentRequest": "SCEP注册请求",
     "getCaCertChain": "在 GetCACert 中返回完整链",
     "getCaCertChainHelp": "关闭（默认）：仅返回 CA 证书: Apple/MDM 客户端需要。开启：包含完整链的退化 PKCS#7（RFC 8894）。",
+    "plainHttp": "同时通过明文 HTTP 提供",
+    "plainHttpHelp": "同时在 HTTP 协议端口（默认 8080）上响应 SCEP，供 sscep 等无法使用 HTTPS 的客户端使用。CMS 信封已保护请求及其质询密码（RFC 8894 §7.10）。",
     "enforceSigningTime": "强制校验 signingTime 时钟偏移",
     "timeSkewMinutes": "允许的时钟偏移（分钟）",
     "timeSkewMinutesHelp": "无 NTP 的设备会漂移：启用强制校验时，超出此窗口的请求将被拒绝。",
@@ -2817,7 +2821,7 @@
     "saveSettings": "保存设置",
     "securitySubtitle": "密码、双因素认证、加密和会话配置",
     "keyEncryption": "私钥加密",
-    "encryptionDesc": "使用AES-256加密数据库中存储的所有私钥。由/etc/ucm/master.key中的主密钥保护。启用后，UCM 不再在私有目录中保留明文密钥文件，并会删除现有文件。请使用部署钩子将密钥放置到服务所需的位置。",
+    "encryptionDesc": "使用AES-128（Fernet，带 HMAC-SHA256）加密数据库中存储的所有私钥。由/etc/ucm/master.key中的主密钥保护。启用后，UCM 不再在私有目录中保留明文密钥文件，并会删除现有文件。请使用部署钩子将密钥放置到服务所需的位置。",
     "enableEncryption": "启用加密",
     "disableEncryption": "禁用加密",
     "encryptRemainingKeys": "加密剩余密钥（{{count}}）",
@@ -4268,6 +4272,8 @@
     "title": "安全模式",
     "description": "UCM检测到加密的私钥，但加密密钥缺失。",
     "step1Title": "将主密钥文件放置在：",
+    "mismatchDescription": "配置的主密钥无法解密已存储的私钥：它不是加密这些私钥时使用的密钥。在恢复之前的主密钥之前，无法访问私钥。",
+    "mismatchStep1Title": "将之前的主密钥文件放回：",
     "step2Title": "然后重启服务：",
     "lostKeyHint": "如果丢失了主密钥，请从备份中恢复。",
     "polling": "正在检查..."
@@ -5456,11 +5462,13 @@
     "selectCA": "选择用于时间戳签名的CA",
     "policyOid": "策略OID",
     "policyOidHelp": "标识时间戳发行所依据的TSA策略的OID",
+    "policyPlaceholderWarning": "1.2.3.4.1 是 OpenSSL 的示例策略 OID，未分配给任何人。生产环境中请使用您组织 OID 分支或 CP/CPS 中的 OID。",
     "requireDedicatedCert": "要求使用专用TSA证书",
     "requireDedicatedCertDesc": "拒绝使用CA证书本身签署时间戳。需要具有关键timeStamping EKU的专用终端实体签名证书（RFC 3161）。",
     "requireDedicatedCertBlocked": "请先在上方选择一个可用的专用签名证书，否则所有时间戳请求都会失败。",
     "signingCert": "签名证书",
     "signingCertDesc": "选择用什么来签署时间戳令牌。CA 证书是历史默认值；带有 timeStamping EKU 的专用终端实体证书是 RFC 3161 的建议。",
+    "caSignerWarning": "时间戳由 CA 证书签名。openssl ts -verify 和 jarsigner 等严格的验证程序会拒绝这些令牌：RFC 3161 要求使用带有关键且唯一的 timeStamping EKU 的专用签名者。请在下方选择或生成专用签名证书。",
     "signingCertHelp": "仅列出 UCM 持有其私钥且带有 timeStamping EKU 的证书。续期会被自动跟随。",
     "signingCertCa": "CA 证书（默认）",
     "signerExpires": "到期",

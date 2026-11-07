@@ -3,6 +3,7 @@ import json
 import hashlib
 import base64
 import logging
+from typing import Optional
 
 from models import db
 from models.acme_models import AcmeChallenge, AcmeAuthorization
@@ -512,6 +513,13 @@ class ChallengeMixin:
                             actual_hash = ext_value
                         
                         if actual_hash == expected_hash:
+                            san_error = self._tls_alpn_san_error(
+                                cert, identifier_type, identifier_value)
+                            if san_error:
+                                self._invalidate_challenge(
+                                    challenge, 'incorrectResponse', san_error)
+                                db.session.commit()
+                                return False
                             challenge.status = "valid"
                             challenge.validated = utc_now()
                             self._update_authorization_status(auth)
@@ -532,6 +540,28 @@ class ChallengeMixin:
                 raise
             return False
     
+    @staticmethod
+    def _tls_alpn_san_error(cert, identifier_type: str, identifier_value: str) -> Optional[str]:
+        """RFC 8737 §3, RFC 8738 §6: the SAN holds the identifier and nothing else."""
+        import ipaddress
+        from cryptography import x509 as x509_mod
+        try:
+            names = list(cert.extensions.get_extension_for_class(
+                x509_mod.SubjectAlternativeName).value)
+        except x509_mod.ExtensionNotFound:
+            names = []
+        if len(names) == 1:
+            name = names[0]
+            if identifier_type == 'ip':
+                if isinstance(name, x509_mod.IPAddress) and \
+                        name.value == ipaddress.ip_address(identifier_value):
+                    return None
+            elif isinstance(name, x509_mod.DNSName) and \
+                    name.value.lower().rstrip('.') == identifier_value.lower().rstrip('.'):
+                return None
+        return (f'Validation certificate subjectAltName must be exactly the identifier '
+                f'{identifier_value} (RFC 8737 §3)')
+
     def _invalidate_challenge(
         self,
         challenge: AcmeChallenge,

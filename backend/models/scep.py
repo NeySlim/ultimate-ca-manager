@@ -167,9 +167,9 @@ class ScepProfile(db.Model):
 class SCEPRequest(db.Model):
     """SCEP enrollment request tracking.
 
-    The ``transaction_id`` alone is not unique: per RFC 8894 §3.2.1.1 it is
-    derived from the requester's public key, so the same client enrolling
-    against two different CAs hosted on the same UCM instance would collide.
+    The ``transaction_id`` alone is not unique: RFC 8894 §3.2.1.1 only asks
+    the client for a unique value, often derived from its public key, so the
+    same client enrolling against two CAs hosted here would collide.
     The natural key is therefore ``(transaction_id, ca_refid)``.
     """
 

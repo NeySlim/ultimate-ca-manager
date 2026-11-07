@@ -1521,7 +1521,7 @@ class TestAcmeProxyProtocol:
     def test_new_nonce(self, client):
         """GET /acme/proxy/new-nonce returns nonce header."""
         r = client.get('/acme/proxy/new-nonce')
-        assert r.status_code == 200
+        assert r.status_code == 204  # RFC 8555 §7.2: GET 204, HEAD 200
         assert 'Replay-Nonce' in r.headers
 
     def test_new_account_creates_persistent_account(self, client):
@@ -1701,7 +1701,7 @@ class TestAcmeProxyFreshInstall:
     def test_new_nonce_without_account(self, client):
         """GET /acme/proxy/new-nonce returns a nonce when no CA account exists."""
         r = client.get('/acme/proxy/new-nonce')
-        assert r.status_code == 200
+        assert r.status_code == 204  # RFC 8555 §7.2: GET 204, HEAD 200
         assert 'Replay-Nonce' in r.headers
 
 

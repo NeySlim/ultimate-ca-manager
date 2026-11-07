@@ -19,6 +19,15 @@ bp = Blueprint('tsa', __name__)
 # multi-megabyte garbage being ASN.1-parsed.
 MAX_TSA_BODY_BYTES = 64 * 1024
 
+# RFC 3161 §3.4 query type, plus the generic type some clients send
+ACCEPTED_MEDIA_TYPES = ('application/timestamp-query', 'application/octet-stream')
+
+
+def _plain(text, status):
+    response = make_response(text, status)
+    response.headers['Content-Type'] = 'text/plain'
+    return response
+
 
 @bp.route('/tsa', methods=['POST'])
 def timestamp_request():
@@ -27,33 +36,28 @@ def timestamp_request():
     Accepts: application/timestamp-query (DER-encoded TimeStampReq)
     Returns: application/timestamp-reply (DER-encoded TimeStampResp)
     """
-    # Validate content type
-    content_type = request.content_type or ''
-    if 'timestamp-query' not in content_type and 'application/octet-stream' not in content_type:
-        response = make_response('Invalid content type', 400)
-        return response
+    # Media types compare without case (RFC 9110 §8.3.1); mimetype is lowercased
+    if request.mimetype not in ACCEPTED_MEDIA_TYPES:
+        return _plain('Invalid content type', 400)
 
     # Cap body size up-front
     cl = request.content_length
     if cl is not None and cl > MAX_TSA_BODY_BYTES:
-        response = make_response('Request body too large', 413)
-        return response
+        return _plain('Request body too large', 413)
 
     tsp_request = request.get_data(cache=False)
     if len(tsp_request) > MAX_TSA_BODY_BYTES:
-        response = make_response('Request body too large', 413)
-        return response
+        return _plain('Request body too large', 413)
     if not tsp_request:
-        response = make_response('Empty request', 400)
-        return response
+        return _plain('Empty request', 400)
     
     try:
         from cryptography import x509
         from cryptography.hazmat.backends import default_backend
         from cryptography.hazmat.primitives.serialization import load_pem_private_key
         from services.tsa_service import (
-            TSAConfigurationError, TSAService, load_configured_signer,
-            tsa_is_enabled, tsa_signer_key_problem,
+            TSAConfigurationError, TSAService, certificate_validity_problem,
+            load_configured_signer, tsa_is_enabled, tsa_signer_key_problem,
         )
         from models import SystemConfig
 
@@ -134,6 +138,13 @@ def timestamp_request():
             signer_cert = x509.load_pem_x509_certificate(
                 base64.b64decode(ca.crt), default_backend()
             )
+            # A token dated outside the signer's validity verifies nowhere
+            validity = certificate_validity_problem(signer_cert)
+            if validity:
+                logger.error("TSA request refused: CA '%s' certificate %s", ca.descr, validity)
+                response = make_response('TSA configuration invalid', 503)
+                response.headers['Content-Type'] = 'text/plain'
+                return response
             key_problem = tsa_signer_key_problem(signer_cert.public_key())
             if key_problem:
                 logger.error("TSA request refused: CA '%s': %s", ca.descr, key_problem)
@@ -164,6 +175,16 @@ def timestamp_request():
 
         response_der, status_code = service.process_request(tsp_request)
         metadata = service.issued_token_metadata(response_der)
+        if metadata is None and service.last_rejection is not None:
+            fail_info, reason = service.last_rejection
+            AuditService.log_action(
+                action='tsa.timestamp_rejected',
+                resource_type='tsa',
+                resource_name=fail_info or 'rejection',
+                details=(f"TSA timestamp rejected: fail={fail_info}; reason={reason}; "
+                         f"ip={client_ip()}"),
+                success=False,
+            )
         if metadata is not None:
             ip_address = client_ip()
             AuditService.log_action(

@@ -8,14 +8,11 @@ socket that never asked for a client certificate.
 """
 import base64
 import os
+import ssl
 import sys
 
 PEM_HEADER = '-----BEGIN CERTIFICATE-----'
 PEM_FOOTER = '-----END CERTIFICATE-----'
-
-# Same bound as utils/ca_chain.walk_ca_chain, restated here because no
-# application module is importable yet.
-MAX_CHAIN_DEPTH = 64
 
 # The master blocks on this read, so it must not wait on a dead server.
 CONNECT_TIMEOUT_SECONDS = 5
@@ -123,12 +120,11 @@ def _decoded_pem(stored):
     return pem if PEM_HEADER in pem and PEM_FOOTER in pem else None
 
 
-def client_ca_chain(database, ca_refid):
-    """The trusted CA's PEM followed by its ancestors, or None.
+def client_ca_anchor(database, ca_refid):
+    """``(pem, name)`` of the trusted CA alone, or ``(None, None)``.
 
-    ``caref`` carries no foreign key, so a repaired hierarchy can point back
-    at a CA already visited; an unguarded walk here means the service never
-    starts.
+    It is the only trust anchor (RFC 5280 §6.1): with its ancestors in the
+    store, a certificate from a sibling intermediate passed the handshake.
     """
     row = database.one(
         "SELECT crt, descr FROM certificate_authorities WHERE refid = ?",
@@ -137,44 +133,22 @@ def client_ca_chain(database, ca_refid):
         print("mTLS: trusted CA not found in database", file=sys.stderr)
         return None, None
 
-    chain = _decoded_pem(row[0])
-    if chain is None:
+    pem = _decoded_pem(row[0])
+    if pem is None:
         print(f"mTLS: CA cert for {ca_refid} is not valid PEM format",
               file=sys.stderr)
         return None, None
+    return pem, row[1] or ca_refid
 
-    seen = {ca_refid}
-    current = ca_refid
-    while len(seen) <= MAX_CHAIN_DEPTH:
-        parent = database.one(
-            "SELECT caref FROM certificate_authorities WHERE refid = ?",
-            (current,))
-        if not parent or not parent[0]:
-            break
-        parent_refid = parent[0]
-        if parent_refid in seen:
-            print(f"mTLS: CA chain of {ca_refid} loops at {parent_refid}; "
-                  "serving the chain collected so far", file=sys.stderr)
-            break
-        seen.add(parent_refid)
-        parent_row = database.one(
-            "SELECT crt FROM certificate_authorities WHERE refid = ?",
-            (parent_refid,))
-        if not parent_row or not parent_row[0]:
-            break
-        parent_pem = _decoded_pem(parent_row[0])
-        if parent_pem is None:
-            break
-        if not chain.endswith('\n'):
-            chain += '\n'
-        chain += parent_pem
-        current = parent_refid
 
-    return chain, row[1] or ca_refid
+def anchor_client_verification(ctx):
+    """Let an intermediate trusted CA end the path: Python 3.13 sets this
+    flag by default, older interpreters would refuse every client."""
+    ctx.verify_flags |= ssl.VERIFY_X509_PARTIAL_CHAIN
 
 
 def mtls_client_ca(data_path: str):
-    """``(pem_chain, ca_name, required)`` when mTLS is on, else None."""
+    """``(ca_pem, ca_name, required)`` when mTLS is on, else None."""
     database = open_boot_database(data_path)
     if database is None:
         return None
@@ -186,7 +160,7 @@ def mtls_client_ca(data_path: str):
         ca_refid = config.get('mtls_trusted_ca_id')
         if not ca_refid:
             return None
-        chain, name = client_ca_chain(database, ca_refid)
-        if chain is None:
+        pem, name = client_ca_anchor(database, ca_refid)
+        if pem is None:
             return None
-        return chain, name, config.get('mtls_required') == 'true'
+        return pem, name, config.get('mtls_required') == 'true'

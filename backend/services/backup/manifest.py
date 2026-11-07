@@ -90,6 +90,8 @@ SECTIONS: Dict[str, Section] = {
             'last_login': 'usage statistic',
             'password_reset_token': 'short-lived, and a restore must not carry a usable reset',
             'password_reset_expires': 'goes with the reset token',
+            'totp_last_step': 'live replay guard of the TOTP codes',
+            'session_version': 'live session state: an older value would reopen sessions closed since the backup',
         },
         secrets=('totp_secret', 'backup_codes'),
         references={'custom_role_id': 'custom_roles', 'sso_provider_id': 'sso_providers'},

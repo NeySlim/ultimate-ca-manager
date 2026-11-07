@@ -48,7 +48,7 @@ Shows the health of UCM services:
 - Service uptime
 
 ### Recent Activity
-A live feed of the latest operations: certificate issuance, revocations, imports, user logins. Updates in real-time via WebSocket.
+A live feed of the latest operations: certificate issuance, revocations, imports, user logins. Updates in real-time via WebSocket. The whole feed needs **read:audit**, as the Audit Logs page does; without it you see your own events only.
 
 ### Certificate Authorities
 Quick view of all CAs with their type (Root/Intermediate) and certificate count.
@@ -195,7 +195,7 @@ A bar under the CA statistics lists records an older import left behind: a dupli
 CAs with a **key icon** (🔑) have a private key stored in UCM and can sign certificates. CAs without a key are trust-only: they validate chains but cannot issue.
 
 ### Key Storage
-Private keys are encrypted at rest in the UCM database. For higher security, consider using an HSM provider (see HSM page).
+Private keys are stored in the UCM database, encrypted under the master key that UCM creates at its first start (see Settings › Security). For higher security, consider using an HSM provider (see HSM page).
 
 ## Chain Repair
 
@@ -671,7 +671,7 @@ When issuing a certificate or signing a CSR, select a template from the dropdown
 Templates carry three opt-in flags used by the Windows autoenrollment protocols (XCEP/WSTEP, configured under **Settings → Windows Autoenrollment**):
 
 - **Allow autoenrollment**: Advertise the template as \`autoEnroll=true\` in Certificate Enrollment Policy, so GPO/Kerberos-authenticated clients request it automatically at logon with no user action. Off by default: like real ADCS, a template can still be enrolled manually (MMC "Request New Certificate", \`certreq\`) without this, since Enroll and Autoenroll are separate permissions.
-- **Build subject from Active Directory**: For unattended GPO autoenrollment: derive the certificate's subject and SAN from the requester's AD object (via the AD Connector) instead of requiring the client to supply one.
+- **Build subject from Active Directory**: For unattended GPO autoenrollment: derive the certificate's subject and SAN from the requester's AD object (via the AD Connector) instead of requiring the client to supply one. On the Kerberos endpoints a subject named in the request is ignored and computer accounts are refused; machine templates always take the computer's DNS name.
 - **Restrict enrollment to AD group**: Only principals belonging to the configured Active Directory group (nested membership included) may enroll against this template over the Kerberos-authenticated endpoint. Enter a group name or full DN; leave blank to allow any authenticated principal, matching real ADCS's default. Not enforced on the Username/Password endpoint, which has no per-request identity to check.
 
 Templates with these flags show **AD**, **Auto**, and **ACL** badges in the template list.
@@ -853,7 +853,8 @@ View all SCEP enrollment requests:
 Configure the SCEP server:
 - **Enable/Disable**: Toggle the SCEP service
 - **Signing CA**: Select which CA signs SCEP-enrolled certificates. Devices encrypt their request to this CA, so it must hold an RSA key in software: EC, HSM-backed, keyless, offline and revoked CAs are not listed (v2.248)
-- **Auto-Approve**: Automatically approve requests with valid challenge passwords
+- **Auto-Approve**: Automatically approve requests with valid challenge passwords, or renewals signed by a certificate the same endpoint issued
+- **Serve on plain HTTP**: off by default. Also answers SCEP on the HTTP protocol port (8080 by default) for clients that cannot use HTTPS, such as sscep. RFC 8894 §7.10: SCEP messages are already protected, so TLS is not required; the CMS envelope keeps the challenge password private
 
 ### Profiles
 Named enrollment endpoints, each served at its own URL:
@@ -875,7 +876,9 @@ Point each device fleet, MDM profile, or tenant at its own profile URL. The unla
 Manage per-CA challenge passwords. Devices must include a valid challenge password in their enrollment request to authenticate.
 
 - **View password**: Show the current challenge for a CA
-- **Regenerate**: Create a new challenge password (invalidates the old one)
+- **Regenerate**: Create a new challenge password (invalidates the old one for new enrollments)
+
+A renewal (RenewalReq) signed by a certificate that the same endpoint (profile or global) issued is authenticated by that certificate: its challenge password is not checked, so a regenerated secret does not stop enrolled devices from renewing (RFC 8894 §2.4). A certificate issued elsewhere, by another profile, ACME, EST or the UI, still needs the endpoint's challenge. An EC device still sends a password, which keys the encryption of its reply.
 
 ### Information
 Displays the SCEP endpoint URL and integration instructions.
@@ -895,11 +898,16 @@ The device signs its PKCSReq with its own key: RSA, ECDSA, Ed25519 or ML-DSA. An
 ## SCEP URLs
 
 \`\`\`
-https://your-server:8443/scep                          (global endpoint)
+https://your-server:8443/scep/pkiclient.exe            (configured CA)
 https://your-server:8443/scep/<profile>/pkiclient.exe  (per-profile endpoint)
+https://your-server:8443/cgi-bin/pkiclient.exe         (configured CA, legacy path)
+http://your-server:8080/scep/pkiclient.exe             (with Serve on plain HTTP)
 \`\`\`
 
-Devices need the URL to enroll. Use a profile URL to target that profile's CA, template and challenge password.
+Devices need the URL to enroll; \`/scep\` alone is the web interface, not a SCEP endpoint. Use a profile URL to target that profile's CA, template and challenge password.
+
+### CA rollover (GetNextCACert)
+GetNextCACert serves the successor of the endpoint's CA, signed by the current CA: another CA with the same parent and the same subject DN, not revoked, not offline, holding a software RSA key, and expiring later. A CA that only shares the display name is never served; without a successor the answer is 404.
 
 ## Approving/Rejecting Requests
 
@@ -910,20 +918,20 @@ For pending requests (auto-approve disabled):
 
 A request that came through a profile is issued with that profile's template (validity, key usages), exactly as auto-approval would.
 
-> ⚠ Challenge passwords are transmitted in the SCEP request. Always use HTTPS for the SCEP endpoint.
+> The challenge password belongs in the CSR, which travels inside the CMS envelope encrypted to the CA (RFC 8894 §2.4), so plain HTTP does not expose it. A client that sends it as a signed attribute outside the envelope exposes it: keep such clients on HTTPS.
 
 ## Device Integration
 
 ### Cisco IOS
 \`\`\`
 crypto pki trustpoint UCM
-  enrollment url https://your-server:8443/scep
+  enrollment url https://your-server:8443/scep/pkiclient.exe
   password <challenge-password>
 \`\`\`
 
 ### JAMF
 Configure the SCEP profile with:
-- Server URL: \`https://your-server:8443/scep\`
+- Server URL: \`https://your-server:8443/scep/pkiclient.exe\`, or a profile's \`/scep/<profile>/pkiclient.exe\`
 - Challenge: the password from UCM
 
 ### Microsoft Intune
@@ -1239,8 +1247,11 @@ Browse all certificate issuance orders:
 - Signing CA used
 - Issuance timestamp
 
+### Requested dates
+An order may carry \`notBefore\` and \`notAfter\` (cert-manager with a \`duration\`, lego \`--not-after\`). The certificate is issued with exactly those dates, or the request is refused as \`malformed\`: a window longer than the profile's validity (15 minutes of clock skew aside), outside the issuing CA's validity, or already past. A window a policy forbids, longer than its maximum validity or past a key type horizon, is refused at finalize as \`badCSR\`. Without them the profile's validity applies.
+
 ### Revocation
-A client revokes with its account key or with the certificate's own key, and the certificate it sends must match the stored one byte for byte: a serial number alone is never enough. Only an RSA or EC P-256, P-384 or P-521 key can sign an ACME request, so an ML-DSA, EdDSA or Brainpool certificate is revoked with the account that ordered it; UCM says so in the refusal.
+A client revokes with its account key or with the certificate's own key, and the certificate it sends must match the stored one byte for byte: a serial number alone is never enough. An account holding valid, unexpired authorizations for every name and IP address of a certificate this ACME server issued may revoke it too, whoever ordered it; authorizations granted by auto-approval do not count. Only an RSA or EC P-256, P-384 or P-521 key can sign an ACME request, so an ML-DSA, EdDSA or Brainpool certificate is revoked with the account that ordered it; UCM says so in the refusal.
 
 ## IP Address Certificates (RFC 8738)
 
@@ -1263,8 +1274,10 @@ Mixed DNS + IP orders are also supported.
 - **HTTP-01** connects directly to the IP (IPv6 literals are bracketed, e.g. \`http://[2001:db8::1]/...\`).
 - **TLS-ALPN-01** uses the reverse-DNS form of the IP (\`in-addr.arpa\` / \`ip6.arpa\`) as the SNI hostname.
 
+- **TLS-ALPN-01** requires the validation certificate's SubjectAltName to hold exactly the validated name or IP, nothing else.
+
 ### Issued certificate
-The signed certificate contains an **iPAddress** SubjectAltName entry for each validated IP.
+The signed certificate contains an **iPAddress** SubjectAltName entry for each validated IP. The CSR may also put one of the order's IP addresses in its common name.
 
 > 💡 Internal addresses (RFC1918, loopback) validate out of the box. UCM's primary deployment model. Cloud-metadata IPs remain blocked.
 
@@ -1367,6 +1380,7 @@ The client presents a certificate during the TLS handshake. UCM validates the ce
 
 - **Strongest method**: cryptographic client identity
 - **Required for** \`/simplereenroll\`: the client must present its current certificate
+- **Port 8443**: when UCM terminates TLS, the handshake accepts certificates of the mTLS trusted CA (Settings → Security) and of the CAs below it only; to re-enroll certificates of an EST CA outside that branch, trust a CA above both (v2.252)
 - **Presented certificate**: for \`/simpleenroll\` and \`/serverkeygen\`, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2). A certificate another CA of this server issued is refused once it or a CA above it is revoked, or once expired (v2.252); one from an authority this server does not hold is left to the TLS layer
 - **tls-unique linking**: a CSR with a \`challengePassword\` must carry the \`tls-unique\` value of its TLS 1.2 connection to UCM (RFC 7030 §3.5), and is refused with 400 when the value differs or cannot be verified (TLS 1.3, a proxy in front); \`/csrattrs\` does not ask for one. \`ignore_challenge_password\`, set through \`PATCH /api/v2/est/config\`, skips the check for a client that puts a password there (v2.252)
 - **Depends on** proper TLS termination config (reverse proxy must pass \`SSL_CLIENT_CERT\` to UCM)
@@ -1499,7 +1513,7 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 
 1. **Client creates a timestamp request**: hashes a file with SHA-256/SHA-512 and creates a \`TimeStampReq\` (ASN.1 DER-encoded)
 2. **Client sends request to TSA**: HTTP POST to the \`/tsa\` endpoint with \`Content-Type: application/timestamp-query\`
-3. **UCM signs the timestamp**: the configured CA signs the hash + current time into a \`TimeStampResp\`
+3. **UCM signs the timestamp**: the dedicated signing certificate, or the configured CA's own certificate when none is set, signs the hash + current time into a \`TimeStampResp\`
 4. **Client receives and stores the response**: the \`.tsr\` file can later prove the document existed at that time
 
 ## Configuration
@@ -1508,7 +1522,7 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 
 1. **Enable TSA**: Toggle the TSA server on or off
 2. **Signing CA**: Select which Certificate Authority signs timestamp tokens
-3. **Policy OID**: Object Identifier for the TSA policy (e.g., \`1.2.3.4.1\`), included in every timestamp response
+3. **Policy OID**: Object Identifier for the TSA policy, included in every timestamp response
 4. **Require a dedicated TSA certificate**: Opt-in: refuse to sign timestamps with the CA certificate itself. When enabled, a dedicated end-entity signing certificate with a **critical timeStamping EKU** (RFC 3161) is required
 
 ### Choosing a Signing CA
@@ -1516,15 +1530,15 @@ Time Stamp Authority (TSA) implements **RFC 3161** to provide trusted timestamps
 The signing CA's private key is used to sign every timestamp token. Best practices:
 
 - Use a **dedicated sub-CA** for timestamping rather than your root CA
-- The CA certificate should include the **id-kp-timeStamping** Extended Key Usage (OID 1.3.6.1.5.5.7.3.8)
-- Ensure the CA certificate has **sufficient validity**: timestamps must remain verifiable for years
+- RFC 3161 §2.3 requires a signer whose only, critical EKU is **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), which a CA certificate cannot carry without losing its other uses. Tokens signed by the CA certificate are refused by strict verifiers: \`openssl ts -verify\` fails with "unsuitable certificate purpose" and jarsigner with "Certificate is not valid for timestamping". The Settings tab warns while the CA certificate signs: **generate a dedicated signing certificate** there for these clients
+- Ensure the CA certificate has **sufficient validity**: timestamps must remain verifiable for years. A CA outside its validity period does not sign: \`/tsa\` answers 503 and the dashboard shows the TSA offline
 - Enable **Require a dedicated timestamping certificate** to enforce this at signing time instead of relying on convention
 
 ### Policy OID
 
 The Policy OID identifies the TSA policy under which timestamps are issued. It is embedded in every \`TimeStampResp\`.
 
-- Default: \`1.2.3.4.1\` (placeholder)
+- Default: \`1.2.3.4.1\` (placeholder: OpenSSL's example OID, assigned to no one; the Settings tab warns while it is in use)
 - For production, register an OID under your organization's arc or use one from your CP/CPS
 
 ## Information Tab
@@ -1533,15 +1547,15 @@ The Information tab displays:
 
 - **TSA Endpoint URL**: Copy-paste ready URL for client configuration
 - **Usage Examples**: OpenSSL commands for creating requests, sending them, and verifying responses
-- **Statistics**: Total timestamp requests processed (successful and failed)
+- **Statistics**: Total timestamp requests processed (successful and failed); every rejected request is audited as \`tsa.timestamp_rejected\` with its failure code
 
 ## Usage Examples
 
 ### Create a Timestamp Request
 
 \`\`\`bash
-# Hash a file and create a timestamp request
-openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq
+# Hash a file and create a timestamp request (-cert: embed the signer certificate)
+openssl ts -query -data file.txt -sha256 -cert -out request.tsq
 \`\`\`
 
 ### Send Request to TSA
@@ -1561,11 +1575,11 @@ openssl ts -verify -data file.txt -in response.tsr \\
   -CAfile ca-chain.pem
 \`\`\`
 
-\`openssl ts -verify\` checks RSA and ECDSA tokens only. An ML-DSA token verifies with \`openssl cms -verify\` (OpenSSL 3.5 or later); then compare its message imprint with the hash of the file.
+\`openssl ts -verify\` needs a dedicated signing certificate (a token signed by the CA certificate fails) and checks RSA and ECDSA tokens only. An ML-DSA token verifies with \`openssl cms -verify\` (OpenSSL 3.5 or later); then compare its message imprint with the hash of the file.
 
 ### Code Signing with Timestamps
 
-When signing code, add the TSA URL to ensure signatures remain valid after certificate expiry:
+When signing code, add the TSA URL to ensure signatures remain valid after certificate expiry. Configure a dedicated signing certificate first: jarsigner refuses a token signed by the CA certificate ("Certificate is not valid for timestamping").
 
 \`\`\`bash
 # Sign with timestamp (osslsigncode)
@@ -1598,15 +1612,19 @@ curl -s -H "Content-Type: application/timestamp-query" \\
 | Endpoint | \`/tsa\` (POST) |
 | Content-Type | \`application/timestamp-query\` |
 | Response Type | \`application/timestamp-reply\` |
-| Hash Algorithms | SHA-256, SHA-384, SHA-512, SHA-1 (legacy) |
+| Hash Algorithms | SHA-256, SHA-384, SHA-512 (SHA-1 and MD5 refused with badAlg) |
+| Request extensions | None accepted: any extension, critical or not, is refused with unacceptedExtension |
+| Malformed request | badDataFormat (trailing bytes included) |
+| genTime / accuracy | Whole seconds, accuracy 1 second |
+| Message imprint | Copied from the request as sent |
 | Authentication | None (public endpoint) |
 | Transport | HTTP or HTTPS |
 
 ## Security Considerations
 
 - The TSA endpoint is **public**: no authentication is required (same as CRL/OCSP)
-- Each timestamp response is **signed** by the CA key: clients verify the signature to ensure authenticity
-- Use **SHA-256 or stronger** hash algorithms when creating requests (SHA-1 is accepted but discouraged)
+- Each timestamp response is **signed** by the dedicated signer or the CA key: clients verify the signature to ensure authenticity
+- Use **SHA-256 or stronger** hash algorithms when creating requests (SHA-1 is refused)
 - The TSA does **not** see the original document: only the hash is transmitted
 - Consider **rate limiting** if the TSA endpoint is exposed to the internet
 
@@ -1754,10 +1772,10 @@ RBAC provides fine-grained permission management. Define custom roles with speci
 
 ## System Roles
 
-Four built-in roles that cannot be modified or deleted:
+Four built-in roles that cannot be modified or deleted. The RBAC page shows each with the permissions UCM applies to it:
 
 - **Admin**: Full access to everything
-- **Operator**: Manage certificates, CAs, CSRs, templates. No access to system settings, users, or RBAC
+- **Operator**: Manage certificates, CAs, CSRs, ACME, SSH, groups and system settings; templates read-only. No access to users or RBAC
 - **Auditor**: Read-only access to all operational data (certificates, CAs, ACME, SCEP, HSM, audit logs, policies, groups) but not settings or user management
 - **Viewer**: Basic read-only access to certificates, CAs, CSRs, templates, and trust store
 
@@ -1949,6 +1967,8 @@ Click **Verify Integrity** to check the audit log chain. UCM uses hash chaining 
 ## Syslog Forwarding
 
 Configure remote syslog forwarding in **Settings → Audit** to send log events to an external SIEM or syslog server in real-time.
+
+Every audit event is forwarded by default. Unchecking a category (Certificates, CAs, CSRs, Users, ACME, SCEP, System) stops only its events: ACME covers every ACME event, Users covers sign-ins and logouts, SSO included. Leaving every box unchecked forwards every event. Account changes (creation, role, password, MFA, activation), changes to syslog forwarding itself, audit purges, API keys, roles, settings and policies are always forwarded. Under System, master key downloads, encryption changes, restores, database resets and switches, update settings, backup deletions and log bundle downloads are always forwarded too. A syslog change is sent with the previous configuration, so the collector being narrowed or turned off receives it, and a newly configured collector receives it as well.
 `
   },
 
@@ -1965,7 +1985,7 @@ System-wide configuration organized into tabs. Changes take effect immediately u
 - **Syslog hostname**: Sent as HOSTNAME in forwarded syslog messages; the machine hostname when empty
 - **Base URL**: Canonical HTTPS URL of the admin interface and API; other hostnames and IPs redirect to it
 - **Protocol Base URL**: Base URL written into CDP and OCSP addresses; use http:// to avoid TLS verification loops, or leave empty to use the Base URL
-- **HTTP Protocol Port**: Plain HTTP port that serves CDP and OCSP; 0 disables it, a change needs a restart
+- **HTTP Protocol Port**: Plain HTTP port that serves CDP and OCSP, and SCEP when its Serve on plain HTTP option is on; 0 disables it, a change needs a restart
 - **Public ACME vhost**: Concrete hostname in ACME directory URLs (e.g. \`acme.ucm.example.com\`: not \`*.ucm.example.com\`). A wildcard \`*.ucm.example.com\` **TLS certificate SAN** covers both \`admin.ucm.example.com\` and \`acme.ucm.example.com\`. Configure DNS and TLS for the ACME vhost **before** saving: clients that re-read the directory switch URLs immediately.
 
 ## Appearance
@@ -2027,7 +2047,8 @@ Limit the web interface and the management API to listed IP addresses and CIDR n
 Require all users to enable two-factor authentication.
 
 ### Private Key Encryption
-Encrypt all private keys stored in the database with AES-256, protected by a master key file. The section shows the encryption status and the **encrypted / unencrypted** key counters. Two opt-in environment variables make missing keys fatal at startup: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (integration-secret encryption) and \`UCM_REQUIRE_KEY_ENCRYPTION\` (private-key encryption).
+Encrypt all private keys stored in the database with AES-128 (Fernet, with HMAC-SHA256), protected by a master key file. The section shows the encryption status and the **encrypted / unencrypted** key counters. Two opt-in environment variables make missing keys fatal at startup: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (integration-secret encryption) and \`UCM_REQUIRE_KEY_ENCRYPTION\` (private-key encryption).
+A new installation creates the master key at its first start (in a container, only when \`/etc/ucm\` is a volume of its own); the Dashboard shows a banner while no key is loaded.
 
 > 💡 Security-sensitive settings (session, lockout, HSTS, public URL, password policy) require the **admin:settings** permission, the fields are locked for operators.
 
@@ -2246,6 +2267,10 @@ A template with an **ML-DSA** key type is announced by its key algorithm OID, wi
 
 An **ECDSA** template is announced in policy schema 3 with its curve (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) as a signature key and a request hash, the stronger of the template digest and the one matching the curve; RSA templates outside FIPS mode stay schema 2. The request key must fit the template it is issued under: the same curve or ML-DSA set, or an RSA key at least as long (v2.251).
 
+A request that names its template, by OID (\`szOID_CERTIFICATE_TEMPLATE\`) or by name (\`szOID_ENROLL_CERTTYPE\`), is issued under that template; a template the CA does not offer or that is inactive, two names for two templates, or EKUs the template does not issue are refused. A request naming none, as Windows CertEnroll often sends, is matched to a template by its EKUs. The certificate carries the EKUs of its template, not the ones the request asks for.
+
+WSTEP serves the Issue request type only, renewals included, and refuses a message whose \`wsu:Timestamp\` expired more than 5 minutes ago. A plain PKCS#10 or a CMC request is recognised by its content whatever its ValueType, and every answer carries the CMC Full PKI Response next to the certificate.
+
 ### Kerberos / SPNEGO
 
 Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoenrollment, so machines and users are authenticated by their Kerberos ticket instead of a credential prompt:
@@ -2275,7 +2300,7 @@ On **Kerberos-authenticated issuance**, UCM embeds the requester's AD SID in the
 
 ### AD-Derived Subjects
 
-A certificate template can opt into **Build subject from Active Directory** (Templates → Enrollment): for unattended GPO autoenrollment, the subject and SAN are derived from the requester's AD object via the AD Connector instead of requiring the client to supply one, matching how a real ADCS template is configured for autoenrollment. Independently, **Allow autoenrollment** advertises the template as \`autoEnroll=true\` in Certificate Enrollment Policy so GPO/Kerberos-authenticated clients request it automatically at logon.
+A certificate template can opt into **Build subject from Active Directory** (Templates → Enrollment): for unattended GPO autoenrollment, the subject and SAN are derived from the requester's AD object via the AD Connector instead of requiring the client to supply one, matching how a real ADCS template is configured for autoenrollment. On the Kerberos endpoints, the subject of such a template and of every machine template (Web Server, VPN, OCSP Signing types) always comes from Active Directory, whatever the request names: a machine template takes the computer's DNS name, is refused to a user account, and a "Build subject from Active Directory" template is refused to a computer. A template without either keeps the subject the client supplies, provided it configures its EKUs, and so does every template on the Username/Password endpoints, which have no directory identity to build one from. On the Kerberos endpoints a request matching no template gets its subject from Active Directory too: a computer's DNS name, a user's only when a template opted in, otherwise it is refused. Independently, **Allow autoenrollment** advertises the template as \`autoEnroll=true\` in Certificate Enrollment Policy so GPO/Kerberos-authenticated clients request it automatically at logon.
 
 ## About
 
@@ -2301,7 +2326,7 @@ Manage your personal profile, security settings, and API keys.
 ## Security
 
 ### Password Change
-Change your current password. Must comply with the system password policy (minimum length, complexity requirements).
+Change your current password. Must comply with the system password policy (minimum length, complexity requirements). Your other sessions are signed out; the one you changed it from stays. An admin password reset or 2FA reset signs out every session of the user.
 
 When UCM asks for a new password at login (the first-boot \`admin\` account, for instance), the change comes before anything else: until it is made, the server refuses every other request of that session, API included.
 
@@ -2316,6 +2341,8 @@ Add a time-based one-time password using any authenticator app:
 > ⚠ If you lose access to your authenticator and recovery codes, an admin must disable your 2FA.
 
 To move 2FA to a new authenticator, disable it first: enabling it again while it is on is refused.
+
+Each code is accepted once (RFC 6238): a code used to sign in cannot confirm another action or a second login, so wait for the next one.
 
 ### Security Keys (WebAuthn/FIDO2)
 Register hardware security keys or biometric authenticators:
@@ -2358,7 +2385,7 @@ X-API-Key: <your-api-key>
 Or send it as a bearer token: \`Authorization: Bearer <your-api-key>\`.
 
 ### Permissions
-Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. **Certificates Only** issues X.509 and SSH certificates and reads the CAs, SSH CAs and CRLs, but cannot create or change a CA. A key can create or regenerate only a key whose permissions it holds itself.
+Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. **Certificates Only** issues X.509 and SSH certificates and reads the CAs, SSH CAs and CRLs, but cannot create or change a CA. A key can create or regenerate only a key whose permissions it holds itself, and that key expires no later than the one asking. **Regenerate** keeps the key's permissions and lifetime; a revoked or expired key cannot be regenerated.
 
 API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: these need an interactive session.
 
@@ -2798,11 +2825,12 @@ System-wide security configuration affecting all user accounts and access patter
 
 ## Private Key Encryption
 
-Encrypt all CA and certificate private keys stored in the database with AES-256, protected by a master key file kept outside the database.
+Encrypt all CA and certificate private keys stored in the database with AES-128 (Fernet, with HMAC-SHA256), protected by a master key file kept outside the database.
 
 - **Status and counters**: The section shows whether encryption is enabled and how many keys are currently **encrypted** vs **unencrypted**
-- **Enable Encryption**: Generates the master key file and encrypts all stored private keys. Back up the key file immediately: without it, encrypted keys are permanently lost
-- **Disable Encryption**: Decrypts all private keys back to plaintext storage (confirmation required)
+- **First start**: An installation without a master key creates \`/etc/ucm/master.key\` (mode 0600) at startup and encrypts the keys and secrets already stored. In a container this happens only when \`/etc/ucm\` is a named volume or a host directory, never an anonymous volume. It does not happen when \`KEY_ENCRYPTION_KEY\` is set, when the database already holds encrypted keys (safe mode) or an audit chain sealed under a previous key, after encryption was disabled here, or with \`UCM_AUTO_MASTER_KEY=false\`. It also removes the plaintext key copies under \`data/private\`. At each start a loaded key also encrypts the values still stored unencrypted, and a key that does not decrypt them puts UCM in safe mode until the previous one is restored. Back up the key file: UCM backups do not need it, but a copy of the database cannot be decrypted without it
+- **Enable Encryption**: Generates the master key file and encrypts all stored private keys, when no key was created at first start; refused in a container whose \`/etc/ucm\` would not outlive it. Back up the key file immediately: without it, encrypted keys are permanently lost
+- **Disable Encryption**: Decrypts all private keys back to plaintext storage (confirmation required). UCM then creates no key at later starts, until encryption is enabled again
 - **Encrypt remaining keys**: Shown while encryption is enabled and some keys or secrets are still stored unencrypted; encrypts them, leaving those already encrypted as they are
 
 ### Startup Enforcement
@@ -2843,7 +2871,7 @@ Limit the number of simultaneous sessions per user. Additional logins will termi
 Limit failed login attempts per IP address within a time window. After exceeding the limit, the IP is temporarily blocked.
 
 ### Lockout Duration
-How long an IP is blocked after exceeding the login attempt limit.
+How long an IP is blocked after exceeding the login attempt limit. A locked account answers a password or LDAP login with the same "Invalid credentials" as an unknown name until the lockout ends, so the answer does not reveal that the account exists; the lock is recorded in the audit log.
 
 ## Admin Access Allowlist
 
@@ -2878,7 +2906,7 @@ Require all users to enable 2FA. Users who haven't set up 2FA will be prompted o
 
 Let users log in with a client certificate instead of a password:
 
-- **Trusted CA**: The CA whose client certificates are accepted at login, and the default issuer when a user generates one. Any CA whose certificate is not revoked can be chosen, keyless or offline included: such a CA issues nothing, so its users upload certificates issued elsewhere (v2.248)
+- **Trusted CA**: The CA whose client certificates are accepted at login, and the default issuer when a user generates one. Any CA whose certificate is not revoked can be chosen, keyless or offline included: such a CA issues nothing, so its users upload certificates issued elsewhere (v2.248). It is the only trust anchor of the HTTPS port: a client certificate from its parent or from a sibling CA is refused at the TLS handshake, so trust a root to accept its whole hierarchy (v2.252)
 - **Require client certificate**: Optionally make mTLS mandatory for the web UI
 - Changing mTLS settings requires a service restart
 - **Revoked issuer**: A client certificate issued under a revoked CA, at any level of its chain, opens no session and can be neither enrolled nor imported (v2.252)
@@ -2938,7 +2966,7 @@ Restrict which key algorithms and sizes can be used:
 
 ### SAN Restrictions
 - **Max DNS Names**: Limit the number of Subject Alternative Names
-- **DNS Pattern**: Restrict to specific domain patterns (e.g. \`*.company.com\`)
+- **DNS Pattern**: Scopes the policy to the requests whose CN or DNS SANs match, label by label and ignoring case: \`*.company.com\` covers the names under company.com, \`company.com\` covers company.com as well. Other names are not refused: the policy does not apply to them
 
 ## Approval Workflows
 
@@ -3635,6 +3663,8 @@ Choose a preset or set custom duration:
 
 Short-lived certificates (8h–24h) are recommended for human users. Longer validity is acceptable for automated service accounts.
 
+A certificate is valid from 5 minutes before it is issued, so a server whose clock lags slightly behind accepts it at once; the lifetime still counts from issuance (v2.252).
+
 ### Extensions (User Certificates Only)
 
 | Extension | Description |
@@ -3645,12 +3675,15 @@ Short-lived certificates (8h–24h) are recommended for human users. Longer vali
 | permit-port-forwarding | Allow TCP port forwarding |
 | permit-user-rc | Allow execution of ~/.ssh/rc on login |
 
-### Critical Options
+### Critical Options (User Certificates Only)
 
 | Option | Description |
 |--------|-------------|
 | force-command | Restrict the certificate to a single command |
-| source-address | Restrict to specific source IP addresses/CIDRs |
+| source-address | Restrict to source addresses or CIDR networks, comma-separated (\`10.0.0.0/8,2001:db8::/32\`) |
+| verify-required | Require a FIDO key that verified the user (PIN or biometric), no value |
+
+A server refuses a certificate carrying a critical option it does not know, so UCM signs only these and vendor options named \`name@domain\`. OpenSSH defines no critical option for host certificates: a host request carrying one is refused (v2.252).
 
 **Example:** A certificate with \`force-command=ls\` and \`source-address=10.0.0.0/8\` can only run \`ls\` and only from the 10.x.x.x network.
 
@@ -3687,6 +3720,8 @@ On clients, add the Host CA to known_hosts:
 2. Click **Revoke** in the detail panel
 3. The certificate is added to the CA's Key Revocation List (KRL)
 4. Download and deploy the updated KRL to servers (from SSH CAs page)
+
+A revoked certificate stays in the KRL, and in the list, until it expires: deleting it earlier is refused, since the KRL is built from these records and the certificate would be accepted again. Each KRL download carries a higher version number (v2.252).
 
 > ⚠ Revocation only takes effect when servers check the KRL via \`RevokedKeys\` in sshd_config.
 

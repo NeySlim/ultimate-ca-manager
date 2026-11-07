@@ -151,7 +151,7 @@ export default function DashboardPage() {
   const { t } = useTranslation()
   const { showError } = useNotification()
   const navigate = useNavigate()
-  const { canWrite } = usePermission()
+  const { canWrite, hasPermission } = usePermission()
   
   const [stats, setStats] = useState(null)
   const [recentCerts, setRecentCerts] = useState([])
@@ -484,6 +484,22 @@ export default function DashboardPage() {
             </div>
           )}
         </div>
+
+        {/* Private keys are stored unencrypted while no master key is loaded */}
+        {systemStatus?.key_encryption?.status === 'warning' && (
+          <div role="alert" className="shrink-0 mb-1.5 flex items-center gap-3 rounded-lg border status-warning-bg status-warning-border px-4 py-2 text-xs">
+            <Warning size={16} weight="duotone" className="text-status-warning shrink-0" />
+            <div className="flex-1 min-w-0">
+              <span className="font-semibold text-text-primary">{t('dashboard.keyEncryptionOffTitle')}</span>{' '}
+              <span className="text-text-secondary">{t('dashboard.keyEncryptionOffDesc')}</span>
+            </div>
+            {hasPermission('admin:system') && (
+              <Button type="button" size="sm" variant="secondary" onClick={() => navigate('/settings?tab=security')}>
+                {t('settings.tabs.security')}
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Grid Layout — flex-1 fills remaining space on desktop, natural flow on mobile.
             overflow-y-auto: the dynamic rowHeight is calibrated to fit 15 rows, but when
