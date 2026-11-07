@@ -25,17 +25,23 @@ def prepare_spool_dir(data_dir):
         with tempfile.TemporaryFile(dir=path):
             pass
     except OSError as exc:
-        logger.warning("Uploads spool to the system temp dir: %s is not writable (%s)",
+        logger.warning("Uploads spool to the system temp dir: %s is not usable (%s)",
                        path, exc)
         return None
     return os.path.realpath(path)
 
 
 class SpoolingRequest(Request):
-    """Spools each uploaded file to an anonymous file in the configured directory."""
+    """Spools each uploaded file above 500 KiB to an anonymous file in the configured directory."""
 
     def _get_file_stream(self, total_content_length, content_type,
                          filename=None, content_length=None):
+        spool = current_app.config.get('UPLOAD_SPOOL_DIR')
+        if spool:
+            # Recreated if removed while running; this request falls back otherwise
+            try:
+                os.makedirs(spool, 0o700, exist_ok=True)
+            except OSError:
+                spool = None
         return tempfile.SpooledTemporaryFile(
-            max_size=SPOOL_IN_MEMORY_BYTES, mode='rb+',
-            dir=current_app.config.get('UPLOAD_SPOOL_DIR'))
+            max_size=SPOOL_IN_MEMORY_BYTES, mode='rb+', dir=spool)

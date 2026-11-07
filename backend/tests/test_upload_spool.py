@@ -73,6 +73,20 @@ def test_an_upload_is_released_when_the_request_fails(auth_client, seen):
     assert set(os.listdir(_spool_dir())) == before
 
 
+def test_a_spool_dir_removed_while_running_is_recreated(auth_client, seen, monkeypatch):
+    import shutil
+    from services.backup_service import BackupService
+    monkeypatch.setattr(BackupService, 'restore_backup',
+                        lambda self, blob, password, **kw: {'sections_carried': []})
+    shutil.rmtree(_spool_dir())
+
+    response = _restore(auth_client)
+
+    assert response.status_code == 200, response.get_json()
+    assert seen and seen[0]['dir'] == _spool_dir()
+    assert os.path.isdir(_spool_dir())
+
+
 def test_an_unwritable_data_dir_falls_back_to_the_system_temp_dir(tmp_path, caplog):
     from utils.upload_spool import prepare_spool_dir
     not_a_dir = tmp_path / 'data'
@@ -83,16 +97,19 @@ def test_an_unwritable_data_dir_falls_back_to_the_system_temp_dir(tmp_path, capl
 
     warnings = [r for r in caplog.records if r.name == 'utils.upload_spool']
     assert len(warnings) == 1 and 'system temp' in warnings[0].getMessage()
+    assert 'not usable' in warnings[0].getMessage()
 
 
 def test_without_a_spool_dir_uploads_use_the_system_temp_dir(app, monkeypatch):
     import tempfile
     from flask import request
+    from utils.upload_spool import SpoolingRequest
     monkeypatch.setitem(app.config, 'UPLOAD_SPOOL_DIR', None)
     data = {'file': (io.BytesIO(b'\0' * TWO_MIB), 'r.bin')}
 
     with app.test_request_context('/', method='POST', data=data,
                                   content_type='multipart/form-data'):
+        assert isinstance(request._get_current_object(), SpoolingRequest)
         fd = request.files['file'].stream.fileno()
         target = os.readlink(f'/proc/self/fd/{fd}').removesuffix(' (deleted)')
 
