@@ -10,6 +10,10 @@ from sqlalchemy import create_engine, text
 
 from models import AuditLog, CA, db
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 
 
