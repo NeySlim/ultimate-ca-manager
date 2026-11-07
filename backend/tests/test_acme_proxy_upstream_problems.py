@@ -286,6 +286,15 @@ class TestProfileAndNotAfter:
         assert response.get_json()['type'] == 'urn:ietf:params:acme:error:invalidProfile'
         assert upstream.calls == []
 
+    def test_non_string_not_after_is_malformed(self, app, client, route, monkeypatch, account):
+        with app.app_context():
+            svc = _svc(monkeypatch, _Upstream({}))
+            response = route(client, '/acme/proxy/new-order', svc, {
+                'identifiers': [{'type': 'dns', 'value': DOMAIN}], 'notAfter': 12,
+            }, kid=_kid(account))
+        assert response.status_code == 400
+        assert response.get_json()['type'] == 'urn:ietf:params:acme:error:malformed'
+
     def test_directory_advertises_only_the_upstream_profiles(self, app, monkeypatch):
         with app.app_context():
             svc = _svc(monkeypatch, _Upstream({}), profiles={'classic': 'default'})

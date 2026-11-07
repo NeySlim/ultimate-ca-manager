@@ -222,6 +222,15 @@ def _requester_identity(jwk=None):
 
 
 # Payload decoding helpers.
+def _order_date(value):
+    """An RFC 3339 order date (RFC 8555 §7.4), None when absent; ValueError otherwise."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ValueError("notBefore and notAfter must be RFC 3339 date strings")
+    return datetime.fromisoformat(value.replace('Z', '+00:00'))
+
+
 def _decode_b64url(value):
     """Strictly decode an unpadded base64url value."""
     if not isinstance(value, str) or not value:
@@ -643,9 +652,7 @@ def new_order(slug=None):
             )
 
     try:  # malformed dates and upstream failures are mapped below
-        not_before, not_after = (
-            datetime.fromisoformat(value.replace('Z', '+00:00')) if value else None
-            for value in (payload.get('notBefore'), payload.get('notAfter')))
+        not_before, not_after = (_order_date(payload.get(field)) for field in ('notBefore', 'notAfter'))
 
         replaces = payload.get('replaces')
         if replaces is not None and (
