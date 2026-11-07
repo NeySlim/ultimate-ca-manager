@@ -57,6 +57,44 @@ def test_sqlite_unlinks_users_of_a_deleted_provider():
                         ).fetchall() == [('kept', 1, None), ('dangling', None, None), ('local', None, None)]
 
 
+STALE_ROWS = [  # username, auth_source, password_hash, sso_provider_id, id kept
+    ('merged', 'local', 'pw', None, False),
+    ('nosource', None, 'pw', None, False),
+    ('legacy', 'local', '!SSO_NO_PASSWORD!', None, True),
+    ('linked', 'saml', 'pw', 1, True),
+    ('orphan', 'saml', 'pw', None, True),
+]
+
+
+def _stale_users_sql(serial):
+    values = ', '.join(f"('{n}', {'NULL' if a is None else repr(a)}, '{h}', "
+                       f"{'NULL' if p is None else p}, 'id-{n}')" for n, a, h, p, _ in STALE_ROWS)
+    return (f"CREATE TABLE users (id {serial} PRIMARY KEY, username VARCHAR(80), "
+            "auth_source VARCHAR(20), password_hash VARCHAR(255), sso_provider_id INTEGER, "
+            "sso_external_id VARCHAR(255))",
+            "INSERT INTO users (username, auth_source, password_hash, sso_provider_id, "
+            f"sso_external_id) VALUES {values}")
+
+
+def _expected_ids():
+    return [(n, f'id-{n}' if kept else None) for n, _a, _h, _p, kept in STALE_ROWS]
+
+
+def test_sqlite_drops_the_external_id_left_on_local_accounts():
+    """Older releases bound a same-named identity onto local accounts; Link to SSO
+    must not inherit that id. Pre-024 SSO accounts and SSO accounts keep theirs."""
+    conn = sqlite3.connect(':memory:')
+    conn.execute(f"CREATE TABLE {TABLE} (id INTEGER PRIMARY KEY, name VARCHAR(100), "
+                 "provider_type VARCHAR(50), ldap_use_ssl BOOLEAN)")
+    conn.execute(f"INSERT INTO {TABLE} VALUES (1, 'kept', 'saml', 0)")
+    for statement in _stale_users_sql('INTEGER'):
+        conn.execute(statement)
+    _migration().upgrade(conn)
+    _migration().upgrade(conn)
+    assert conn.execute("SELECT username, sso_external_id FROM users ORDER BY id"
+                        ).fetchall() == _expected_ids()
+
+
 def test_sqlite_without_the_table_is_a_no_op():
     conn = sqlite3.connect(':memory:')
     _migration().upgrade(conn)
@@ -92,6 +130,12 @@ def _postgres_round():
         _migration().upgrade(conn)
         assert conn.execute(text("SELECT username, sso_provider_id, sso_orphan_of FROM users ORDER BY id")
                             ).fetchall() == [('kept', 1, None), ('dangling', None, None)]
+        conn.execute(text("DROP TABLE users"))
+        for statement in _stale_users_sql('SERIAL'):
+            conn.execute(text(statement))
+        _migration().upgrade(conn)
+        assert conn.execute(text("SELECT username, sso_external_id FROM users ORDER BY id")
+                            ).fetchall() == _expected_ids()
         columns = {c['name']: c for c in inspect(conn).get_columns(TABLE, schema=schema)}
         assert columns['ldap_start_tls']['nullable'] is False
         assert conn.execute(text(f"SELECT ldap_start_tls, default_role FROM {TABLE} ORDER BY id")

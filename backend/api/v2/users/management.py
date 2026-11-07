@@ -233,8 +233,10 @@ def link_user_sso(user_id):
         return error_response('SSO provider not found', 404)
 
     # Keep the username; the SSO login is matched to this account by email.
+    # An external id left by older releases is dropped: the first sign-in binds it.
     user.auth_source = provider.provider_type
     user.sso_provider_id = provider.id
+    user.sso_external_id = None
     user.sso_orphan_of = None
 
     ok, err = safe_commit(logger, f"Failed to link user {user_id} to SSO")

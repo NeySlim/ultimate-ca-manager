@@ -42,6 +42,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - SSO: with role mapping rules set, a user no rule matched still signed in with the default role, viewer unless changed. Such a user is now refused at every SSO sign-in, with an audit entry; without rules the default role still applies.
 - SSO: an OIDC, SAML or LDAP identity whose username, or e-mail local part, matched an existing account signed into it, the local administrator included, and rebound that account to itself. A name or e-mail now matches only an account of the same provider not yet bound to an identity; a local account or one bound to another identity is refused at sign-in, with an audit entry (OpenID Connect Core §5.7).
+- SSO: an identity that older releases bound to a local account of the same name kept that binding through Link to SSO, so it opened the account and the real user was refused. Link to SSO and migration 137 now drop it, and the next sign-in binds the account.
 - mTLS behind a proxy: a certificate presented by its serial number alone, without `X-SSL-Client-I-DN` or `X-SSL-Client-Cert`, opened the enrolment bearing that serial, even one of another CA. Such a serial now opens only an enrolment that recorded no issuer, and enrolling a presented certificate requires its issuer (RFC 5280 §4.1.2.2).
 
 ### Upgrade notes

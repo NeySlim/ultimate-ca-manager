@@ -676,3 +676,38 @@ def test_ldap_asks_a_totp_the_user_enrolled_without_enforcement(app, ldap):
     finally:
         with app.app_context():
             _cleanup(['tkvolotp'])
+
+
+def test_link_to_sso_drops_an_external_id_left_on_a_local_account(app, auth_client):
+    """Older releases bound the id of any same-named identity onto local accounts:
+    after Link to SSO, the first sign-in of the provider binds the id again."""
+    from api.v2.sso.ldap_routes import _get_or_create_sso_user
+    with app.app_context():
+        _cleanup(['rvstale', 'rvstalex'])
+        p = SSOProvider(name=f'saml-stale-{uuid.uuid4().hex[:6]}', provider_type='saml',
+                        enabled=False, saml_entity_id='https://stale.example/idp',
+                        default_role='viewer')
+        db.session.add(p)
+        db.session.add(User(username='rvstale', email='rvstale@corp.example', full_name='S',
+                            role='admin', active=True, password_hash='hash', auth_source='local',
+                            sso_external_id='stale-attacker-id'))
+        db.session.commit()
+        pid, uid = p.id, User.query.filter_by(username='rvstale').one().id
+    r = auth_client.post(f'/api/v2/users/{uid}/link-sso', json={'provider_id': pid})
+    assert r.status_code == 200
+    try:
+        with app.test_request_context():
+            provider = db.session.get(SSOProvider, pid)
+            user, _err = _get_or_create_sso_user(provider, 'rvstalex', 'rvstalex@corp.example', 'M',
+                                                 {'name_id': 'stale-attacker-id'})
+            assert user is None or user.username != 'rvstale'
+            db.session.rollback()
+            user, err = _get_or_create_sso_user(provider, 'rvstale', 'rvstale@corp.example', 'S',
+                                                {'name_id': 'real-id'})
+            assert err is None and user.username == 'rvstale' and user.sso_external_id == 'real-id'
+            db.session.rollback()
+    finally:
+        with app.app_context():
+            _cleanup(['rvstale', 'rvstalex'])
+            db.session.delete(db.session.get(SSOProvider, pid))
+            db.session.commit()
