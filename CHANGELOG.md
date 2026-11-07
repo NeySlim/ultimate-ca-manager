@@ -22,6 +22,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
 - SCEP: a RenewalReq signed by a certificate issued through the same endpoint is authenticated by that certificate, so its challenge password is no longer compared and a rotated secret no longer blocks renewal; a certificate from another profile or protocol still needs the endpoint's challenge.
 - SCEP: every FAILURE reply now carries a failInfoText attribute giving the reason (RFC 8894 §3.2.1.4).
+- Private keys: in a container whose `/etc/ucm` is not a volume of its own (anonymous, tmpfs or emptyDir), Settings › Security now refuses to enable encryption (409) rather than write a key the next recreation would lose. Once a master key is created at start, the plaintext key copies under `data/private` are removed.
 
 ### Fixed
 
@@ -46,7 +47,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
-- Private keys: an installation that never enabled encryption creates `/etc/ucm/master.key` at its next start (in a container, only when `/etc/ucm` is a named volume or a host directory) and removes the plaintext copies under `data/private`, so back that file up and give any service that reads a copy a deployment target; `UCM_AUTO_MASTER_KEY=false`, or disabling encryption in Settings › Security, keeps the previous behaviour. Every start with a key now encrypts the values still stored unencrypted, and a key that does not decrypt the stored ones enters safe mode.
+- Private keys: an installation that never enabled encryption creates `/etc/ucm/master.key` at its next start (in a container, only when `/etc/ucm` is a named volume or a host directory) and removes the plaintext copies under `data/private`, so back that file up and give any service that reads a copy a deployment target; a container without such a volume gets no key, and enabling encryption there is refused until `/etc/ucm` is mounted; `UCM_AUTO_MASTER_KEY=false`, or disabling encryption in Settings › Security, keeps the previous behaviour. Every start with a key now encrypts the values still stored unencrypted, and a key that does not decrypt the stored ones enters safe mode.
 - mTLS behind a proxy: a proxy that forwards the serial number without `X-SSL-Client-I-DN` (nginx `$ssl_client_i_dn`, Apache `SSL_CLIENT_I_DN`) or `X-SSL-Client-Cert` must now forward one of them, or certificate login fails with a warning in the log; the I-DN is read in RFC 4514, RFC 1779, OpenSSL one-line and legacy forms.
 - EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the `EST key generator` certificate the SignedData carries, which chains to the issuing CA from `/cacerts` and is listed, and revoked when needed, with the CA's certificates like a delegated OCSP responder; the next encrypted request then gets a new one. Migration 132 adds the `est_signer_certs` table that names the current one; backups carry the certificate but not that table, so a restored installation issues a new one on first use.
 - EST: `serverkeygen` without `AsymmetricDecryptKeyIdentifier` now returns the key unencrypted, without the Basic password, and over mTLS the key type is chosen as over Basic, ML-DSA under an ML-DSA CA included.
