@@ -94,11 +94,27 @@ def test_success_and_pending_carry_no_fail_info_text(app, scep_ca):
     assert FAIL_INFO_TEXT_OID not in _response_attributes(response)
 
 
+def _put_config(key, value):
+    """Set (None: delete) a setting and return its previous value."""
+    row = SystemConfig.query.filter_by(key=key).first()
+    previous = row.value if row else None
+    if value is None:
+        if row:
+            db.session.delete(row)
+    elif row is None:
+        db.session.add(SystemConfig(key=key, value=value))
+    else:
+        row.value = value
+    db.session.commit()
+    return previous
+
+
 def test_post_without_operation_is_a_pki_operation(app, client, create_ca):
     ca = create_ca(cn=f'SCEP POST no operation CA {uuid.uuid4().hex[:8]}')
     with app.app_context():
-        db.session.add(SystemConfig(key='scep_ca_id', value=str(ca['id'])))
-        db.session.commit()
+        # Upsert: another file may have left these settings behind
+        saved = {k: _put_config(k, v) for k, v in
+                 (('scep_ca_id', str(ca['id'])), ('scep_auto_approve', 'false'))}
         _ca, ca_cert = _load_ca_material(ca['id'])[:2]
         body = _request(ca_cert)
     try:
@@ -111,5 +127,5 @@ def test_post_without_operation_is_a_pki_operation(app, client, create_ca):
         assert b'SCEPStandard' in client.get('/scep/pkiclient.exe').data
     finally:
         with app.app_context():
-            db.session.delete(SystemConfig.query.filter_by(key='scep_ca_id').first())
-            db.session.commit()
+            for key, value in saved.items():
+                _put_config(key, value)
