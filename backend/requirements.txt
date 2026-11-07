@@ -5,8 +5,8 @@
 Flask==3.1.3
 Flask-RESTX==1.3.2
 Flask-SQLAlchemy==3.1.1
-# 2.1 has not been validated yet
-SQLAlchemy>=2.0.45,<2.1
+# Validated up to 2.1; the next minor gets the same check before the bound moves
+SQLAlchemy>=2.0.45,<2.2
 Flask-Migrate==4.1.0
 Flask-CORS==6.0.2
 Flask-Limiter==4.1.1
