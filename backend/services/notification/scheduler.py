@@ -44,6 +44,8 @@ class NotificationSchedulerMixin:
             query = query.filter(Certificate.revoked.isnot(True))
         if config.exclude_acme:
             query = query.filter(Certificate.source.is_distinct_from('acme'))
+        # EST key generators renew by themselves; a replaced one stays archived until it expires
+        query = query.filter(Certificate.source.is_distinct_from('est_key_generator'))
 
         expiring = []
         for cert in query.all():

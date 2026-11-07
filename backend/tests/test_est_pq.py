@@ -173,3 +173,68 @@ def test_cacerts_of_an_mldsa_ca_reads_with_openssl(client, est_ca, tmp_path):
     assert out.returncode == 0, out.stderr
     printed = x509.load_pem_x509_certificates(out.stdout.encode())
     assert ca_cert in printed
+
+
+def _mtls_transport(client):
+    """An RSA transport certificate the current EST CA issued."""
+    from tests.test_est_rfc7030 import _make_csr
+    csr, key = _make_csr(common_name='transport.pq.example.test')
+    r = _post(client, 'simpleenroll', csr.public_bytes(serialization.Encoding.DER))
+    assert r.status_code == 200, r.data
+    (cert,) = pkcs7.load_der_pkcs7_certificates(base64.b64decode(r.data))
+    return cert, key
+
+
+def _ed25519_csr(cn, extra_attributes=()):
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from cryptography.x509.name import _ASN1Type
+    from cryptography.x509.oid import NameOID
+    builder = x509.CertificateSigningRequestBuilder().subject_name(
+        x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
+    for oid, value in extra_attributes:
+        builder = builder.add_attribute(x509.ObjectIdentifier(oid), value, _tag=_ASN1Type.OctetString)
+    return builder.sign(ed25519.Ed25519PrivateKey.generate(), None)
+
+
+def test_mtls_serverkeygen_under_an_mldsa_ca_follows_the_ca_like_basic(client, est_ca):
+    """The generated key signs nothing any more: mTLS gets the CA's family, as Basic does."""
+    from tests.test_est_rfc7030 import _multipart_parts, _post_csr
+    est_ca('mldsa')
+    transport, _ = _mtls_transport(client)
+    r = _post_csr(client, 'serverkeygen', _ed25519_csr('mtls-keygen.pq.example.test'),
+                  client_cert_pem=transport.public_bytes(serialization.Encoding.PEM).decode())
+    assert r.status_code == 200, r.data
+    parts = _multipart_parts(r)
+    assert parts[1].get_content_type() == 'application/pkcs8'
+    key = serialization.load_der_private_key(parts[1].get_payload(decode=True), password=None)
+    assert key_algorithms.label_for_private_key(key) == 'ML-DSA-65'
+
+
+@needs_openssl_35
+def test_an_mldsa_ca_signs_the_encrypted_key_package(client, est_ca, tmp_path):
+    from asn1crypto import cms
+    from tests.test_est_rfc7030 import _multipart_parts, _post_csr
+    from tests.test_est_serverkeygen_cms import expected_key_package_signer, openssl_verify_signed_by
+    ca_cert = est_ca('mldsa')
+    transport, client_key = _mtls_transport(client)
+    ski = x509.SubjectKeyIdentifier.from_public_key(transport.public_key()).digest
+    csr = _ed25519_csr('mtls-cms.pq.example.test', ((('1.2.840.113549.1.9.16.2.54', ski)),))
+    r = _post_csr(client, 'serverkeygen', csr,
+                  client_cert_pem=transport.public_bytes(serialization.Encoding.PEM).decode())
+    assert r.status_code == 200, r.data
+    (tmp_path / 'key.p7').write_bytes(_multipart_parts(r)[1].get_payload(decode=True))
+    (tmp_path / 'client.pem').write_bytes(transport.public_bytes(serialization.Encoding.PEM))
+    (tmp_path / 'client.key').write_bytes(client_key.private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
+    subprocess.run([OPENSSL, 'cms', '-decrypt', '-inform', 'DER', '-in', 'key.p7', '-recip',
+                    'client.pem', '-inkey', 'client.key', '-binary', '-out', 'signed.der'],
+                   check=True, capture_output=True, cwd=tmp_path)
+    signed = cms.SignedData.load((tmp_path / 'signed.der').read_bytes())
+    (tmp_path / 'signed.p7').write_bytes(
+        cms.ContentInfo({'content_type': 'signed_data', 'content': signed}).dump())
+    cacerts = client.get(f'{EST_BASE}/cacerts')
+    (tmp_path / 'cacerts.p7').write_bytes(base64.b64decode(cacerts.data))
+    subprocess.run([OPENSSL, 'pkcs7', '-inform', 'DER', '-in', 'cacerts.p7', '-print_certs',
+                    '-out', 'anchor.pem'], check=True, cwd=tmp_path)
+    openssl_verify_signed_by(tmp_path / 'signed.p7', tmp_path / 'anchor.pem',
+                             expected_key_package_signer(client.application, ca_cert), tmp_path)

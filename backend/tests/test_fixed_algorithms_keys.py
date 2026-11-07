@@ -123,15 +123,14 @@ def test_serverkeygen_follows_a_policy_refusing_rsa_2048(app, client, est_ca, es
 
 
 def test_cms_key_package_is_signed_by_an_ec_key():
-    from utils.est_cms import _signed_private_key
+    from utils.est_cms import signed_key_package
     key = ec.generate_private_key(ec.SECP384R1())
     cert = _cert_for(key)
-    pkcs8 = key.private_bytes(serialization.Encoding.DER, serialization.PrivateFormat.PKCS8,
-                              serialization.NoEncryption())
-    signed = cms.SignedData.load(_signed_private_key(key, cert, pkcs8).dump())
+    signed = cms.SignedData.load(signed_key_package(key, key, cert).dump())
     info = signed['signer_infos'][0]
     assert info['signature_algorithm']['algorithm'].native == 'sha384_ecdsa'
-    key.public_key().verify(info['signature'].native, pkcs8, ec.ECDSA(hashes.SHA384()))
+    key.public_key().verify(info['signature'].native, b'\x31' + info['signed_attrs'].dump()[1:],
+                            ec.ECDSA(hashes.SHA384()))
 
 
 def _cert_for(key):
