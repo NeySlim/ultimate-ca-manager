@@ -85,3 +85,15 @@ def test_a_failed_name_lookup_is_not_cached(app, forwarding, system_name, monkey
         assert syslog_forwarder._resolve_hostname() != system_name
         monkeypatch.undo()
         assert syslog_forwarder._resolve_hostname() == system_name
+
+
+def test_an_entry_staged_before_a_close_is_never_sent(app, collector, forwarding):
+    run = uuid.uuid4().hex[:8]
+    with app.app_context():
+        _stage(f'{run}ghost')
+        db.session.close()
+        _stage(f'{run}kept')
+        db.session.commit()
+    packets = _received(collector)
+    assert any(f'stg_{run}kept' in p for p in packets), packets
+    assert not any(f'stg_{run}ghost' in p for p in packets), packets

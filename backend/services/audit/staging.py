@@ -108,6 +108,13 @@ def _syslog_after_rollback(session, previous_transaction):
     pending[:] = [(tx, e) for tx, e in pending if not _within(tx, previous_transaction)]
 
 
+@event.listens_for(Session, 'after_transaction_end')
+def _syslog_after_transaction_end(session, transaction):
+    # A root transaction that ends without a commit (close() fires no rollback event) drops the rest
+    if transaction.parent is None and not transaction.nested:
+        session.info.pop(_PENDING_SYSLOG, None)
+
+
 def _staged_copy(entry):
     copy = syslog_copy(entry)
     try:
