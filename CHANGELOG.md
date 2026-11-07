@@ -27,6 +27,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- ACME server: a POST-as-GET on a challenge started its validation, so a client reading the challenge before preparing its response, the ACME proxy included, lost the order. An empty payload now only reads the challenge, and only a response object such as `{}` starts the validation (RFC 8555 §6.3, §7.5.1).
 - ACME server: an order accepted with `replaces` did not show it in the order object, and the finalize response lacked the profile. Every order object (newOrder, read, finalize) now carries `replaces`, `profile` and the requested dates (RFC 9773 §5).
 - ACME server: tls-alpn-01 accepted a validation certificate whatever its subjectAltName. The SAN must now hold exactly the identifier being validated, one dNSName or one iPAddress (RFC 8737 §3, RFC 8738 §6).
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: these providers hold one TXT value per name, so the cleanup of one order cleared the value another order was still validating. The name is now left alone while another order in progress uses it.

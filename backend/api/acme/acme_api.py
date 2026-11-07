@@ -1486,8 +1486,14 @@ def respond_to_challenge(challenge_id: str):
         # passes, or force re-checks on an already-'valid' one. Return the
         # current state unchanged. Likewise refuse if the parent authorization
         # is no longer pending (expired / deactivated / revoked).
+        # RFC 8555 §6.3, §7.5.1 (erratum 5729): an empty payload is a read; only a
+        # response object asks for validation
+        post_as_get = jws_data.get('payload') == ''
+        if not post_as_get and not isinstance(payload, dict):
+            return acme_error('malformed', 'A challenge response must be a JSON object')
+
         authz = challenge.authorization
-        if challenge.status in ('valid', 'invalid'):
+        if post_as_get or challenge.status in ('valid', 'invalid'):
             pass
         elif authz and authz.status != 'pending':
             return acme_error('malformed',
