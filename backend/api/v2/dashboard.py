@@ -275,15 +275,20 @@ def get_activity_log():
         'renew': 'Renewed',
     }
     
+    # The whole trail needs read:audit, as /audit/logs does; anyone else sees
+    # their own events only (never the names typed at someone's failed login).
+    from auth.unified import has_permission
+    own_only = not has_permission('read:audit', g.permissions or [])
     try:
         results = db.session.execute(
-            text("""
+            text(f"""
                 SELECT action, resource_type, resource_id, username, timestamp, details
-                FROM audit_logs 
-                ORDER BY timestamp DESC 
+                FROM audit_logs
+                {'WHERE username = :username' if own_only else ''}
+                ORDER BY timestamp DESC
                 LIMIT :limit
             """),
-            {'limit': limit}
+            {'limit': limit, 'username': g.current_user.username}
         ).fetchall()
         
         activity = []
