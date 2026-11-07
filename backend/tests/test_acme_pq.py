@@ -238,7 +238,7 @@ class TestRevokeMldsaCertificate:
         """An ML-DSA key cannot sign an ACME request: a jwk requester is told so; another
         account, which never tried the key, gets the plain refusal."""
         leaf, cert_id, _ = self._issue(app, client, rsa_account, signing_ca, rsa_ca,
-                                       tmp_path, f'stranger-{by}.pq.example.com')
+                                       tmp_path, f"stranger-{by.replace('_', '-')}.pq.example.com")
         payload = {'certificate': _b64u(leaf.public_bytes(serialization.Encoding.DER))}
         if by == 'jwk':
             key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
