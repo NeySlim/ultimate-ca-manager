@@ -79,7 +79,7 @@ def signature_suite(signer_key, digest=None, *, pss=True, hsm_digest=True,
     if hsm_digest:
         algorithm = signing_hash_for(signer_key, digest and HASH_BY_NAME[digest]())
     else:
-        algorithm = HASH_BY_NAME[digest]()
+        algorithm = HASH_BY_NAME[digest or key_algorithms.default_digest_for_key(signer_key)]()
     name = algorithm.name
     if kind == 'ec':
         return suite(name, {'algorithm': f'{name}_ecdsa'},
@@ -105,8 +105,8 @@ def _content_info(signed):
 def signed_data(content_type, content, signer_key, signer_cert, *, suite=None, signed_attrs=(),
                 extra_certs=(), include_certs=True, detached=False):
     """ContentInfo DER of a SignedData over *content*: signedAttrs hold content-type,
-    message-digest and *signed_attrs* (RFC 5652 §5.3), certificates *signer_cert* then
-    *extra_certs*, and the version is 1 for id-data, else 3 (§5.1)."""
+    message-digest and *signed_attrs* (RFC 5652 §5.3), certificates hold *signer_cert* and
+    *extra_certs* (a SET OF, DER-sorted), and the version is 1 for id-data, else 3 (§5.1)."""
     suite = suite or signature_suite(signer_key)
     attrs = cms.CMSAttributes([
         {'type': 'content_type', 'values': [content_type]},

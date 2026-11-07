@@ -298,8 +298,8 @@ class TSAService:
             'hash_algorithm': {'algorithm': 'sha256'},
             'cert_hash': hashlib.sha256(cert_der).digest(),
         })]})
-        # RFC 3161 §2.4.2: certificates only when the client asked (certReq); the leaf
-        # first, then a dedicated signer's issuer chain (#312)
+        # RFC 3161 §2.4.2: certificates only when the client asked (certReq), with a
+        # dedicated signer's issuer chain (#312)
         token = signed_data(
             TST_INFO_OID, tst_info_der, self.tsa_key, self.tsa_cert, suite=suite,
             signed_attrs=[{'type': 'signing_certificate_v2', 'values': [signing_cert_v2]}],

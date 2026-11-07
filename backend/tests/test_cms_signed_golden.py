@@ -86,3 +86,10 @@ def test_openssl_verifies_the_output(name, tmp_path):
         (tmp_path / 'empty').write_bytes(b'')
         args += ['-content', tmp_path / 'empty']
     _run(*args)
+
+
+def test_a_fixed_digest_suite_without_digest_takes_the_key_default():
+    from utils.cms_signed import signature_suite
+    keys = cms_golden.material()[0]
+    assert signature_suite(keys['rsa'], hsm_digest=False).digest == 'sha256'
+    assert signature_suite(keys['ec384'], hsm_digest=False).digest == 'sha384'
