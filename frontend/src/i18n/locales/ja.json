@@ -2821,7 +2821,7 @@
     "saveSettings": "設定を保存",
     "securitySubtitle": "パスワード、2FA、暗号化、セッション設定",
     "keyEncryption": "秘密鍵の暗号化",
-    "encryptionDesc": "データベースに保存されたすべての秘密鍵をAES-256で暗号化します。/etc/ucm/master.keyのマスターキーで保護されます。有効にすると、UCM は private ディレクトリに平文の鍵ファイルを保持せず、既存のファイルも削除します。サービスが鍵を必要とする場所にはデプロイフックを使用してください。",
+    "encryptionDesc": "データベースに保存されたすべての秘密鍵をAES-128（Fernet、HMAC-SHA256付き）で暗号化します。/etc/ucm/master.keyのマスターキーで保護されます。有効にすると、UCM は private ディレクトリに平文の鍵ファイルを保持せず、既存のファイルも削除します。サービスが鍵を必要とする場所にはデプロイフックを使用してください。",
     "enableEncryption": "暗号化を有効化",
     "disableEncryption": "暗号化を無効化",
     "encryptRemainingKeys": "残りのキーを暗号化 ({{count}})",

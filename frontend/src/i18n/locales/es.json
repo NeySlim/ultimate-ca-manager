@@ -2821,7 +2821,7 @@
     "saveSettings": "Guardar configuración",
     "securitySubtitle": "Contraseña, 2FA, cifrado y configuración de sesión",
     "keyEncryption": "Cifrado de claves privadas",
-    "encryptionDesc": "Cifra todas las claves privadas almacenadas en la base de datos usando AES-256. Protegidas por una clave maestra en /etc/ucm/master.key. Cuando está activado, UCM deja de conservar archivos de clave en texto plano en su directorio privado y elimina los existentes. Use hooks de despliegue para colocar claves donde las necesite un servicio.",
+    "encryptionDesc": "Cifra todas las claves privadas almacenadas en la base de datos usando AES-128 (Fernet, con HMAC-SHA256). Protegidas por una clave maestra en /etc/ucm/master.key. Cuando está activado, UCM deja de conservar archivos de clave en texto plano en su directorio privado y elimina los existentes. Use hooks de despliegue para colocar claves donde las necesite un servicio.",
     "enableEncryption": "Activar cifrado",
     "disableEncryption": "Desactivar cifrado",
     "encryptRemainingKeys": "Cifrar claves restantes ({{count}})",

@@ -2821,7 +2821,7 @@
     "saveSettings": "保存设置",
     "securitySubtitle": "密码、双因素认证、加密和会话配置",
     "keyEncryption": "私钥加密",
-    "encryptionDesc": "使用AES-256加密数据库中存储的所有私钥。由/etc/ucm/master.key中的主密钥保护。启用后，UCM 不再在私有目录中保留明文密钥文件，并会删除现有文件。请使用部署钩子将密钥放置到服务所需的位置。",
+    "encryptionDesc": "使用AES-128（Fernet，带 HMAC-SHA256）加密数据库中存储的所有私钥。由/etc/ucm/master.key中的主密钥保护。启用后，UCM 不再在私有目录中保留明文密钥文件，并会删除现有文件。请使用部署钩子将密钥放置到服务所需的位置。",
     "enableEncryption": "启用加密",
     "disableEncryption": "禁用加密",
     "encryptRemainingKeys": "加密剩余密钥（{{count}}）",

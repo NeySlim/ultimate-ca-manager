@@ -2821,7 +2821,7 @@
     "saveSettings": "Einstellungen speichern",
     "securitySubtitle": "Passwort, 2FA, Verschlüsselung und Sitzungskonfiguration",
     "keyEncryption": "Verschlüsselung privater Schlüssel",
-    "encryptionDesc": "Verschlüsselt alle in der Datenbank gespeicherten privaten Schlüssel mit AES-256. Geschützt durch einen Hauptschlüssel in /etc/ucm/master.key. Wenn aktiviert, speichert UCM keine Klartext-Schlüsseldateien mehr im privaten Verzeichnis und entfernt vorhandene Dateien. Verwenden Sie Deploy-Hooks, um Schlüssel dort abzulegen, wo ein Dienst sie benötigt.",
+    "encryptionDesc": "Verschlüsselt alle in der Datenbank gespeicherten privaten Schlüssel mit AES-128 (Fernet, mit HMAC-SHA256). Geschützt durch einen Hauptschlüssel in /etc/ucm/master.key. Wenn aktiviert, speichert UCM keine Klartext-Schlüsseldateien mehr im privaten Verzeichnis und entfernt vorhandene Dateien. Verwenden Sie Deploy-Hooks, um Schlüssel dort abzulegen, wo ein Dienst sie benötigt.",
     "enableEncryption": "Verschlüsselung aktivieren",
     "disableEncryption": "Verschlüsselung deaktivieren",
     "encryptRemainingKeys": "Verbleibende Schlüssel verschlüsseln ({{count}})",

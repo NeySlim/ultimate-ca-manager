@@ -2821,7 +2821,7 @@
     "saveSettings": "Salva impostazioni",
     "securitySubtitle": "Password, 2FA, crittografia e configurazione sessione",
     "keyEncryption": "Crittografia chiavi private",
-    "encryptionDesc": "Crittografa tutte le chiavi private nel database con AES-256. Protette da una chiave master in /etc/ucm/master.key. Quando è attiva, UCM non conserva più file di chiavi in chiaro nella directory privata e rimuove quelli esistenti. Usa gli hook di distribuzione per collocare le chiavi dove servono a un servizio.",
+    "encryptionDesc": "Crittografa tutte le chiavi private nel database con AES-128 (Fernet, con HMAC-SHA256). Protette da una chiave master in /etc/ucm/master.key. Quando è attiva, UCM non conserva più file di chiavi in chiaro nella directory privata e rimuove quelli esistenti. Usa gli hook di distribuzione per collocare le chiavi dove servono a un servizio.",
     "enableEncryption": "Attiva crittografia",
     "disableEncryption": "Disattiva crittografia",
     "encryptRemainingKeys": "Crittografa chiavi rimanenti ({{count}})",

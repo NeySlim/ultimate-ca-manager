@@ -2918,7 +2918,7 @@
     "emailSubtitle": "Configuration du serveur SMTP pour les notifications",
     "securitySubtitle": "Mot de passe, 2FA, chiffrement et sessions",
     "keyEncryption": "Chiffrement des clés privées",
-    "encryptionDesc": "Chiffre toutes les clés privées stockées en base de données avec AES-256. Les clés sont protégées par une clé maître stockée dans /etc/ucm/master.key. Lorsqu'il est activé, UCM ne conserve plus de fichiers de clé en clair dans son répertoire privé et supprime ceux qui existent. Utilisez les hooks de déploiement pour placer les clés là où un service en a besoin.",
+    "encryptionDesc": "Chiffre toutes les clés privées stockées en base de données avec AES-128 (Fernet, avec HMAC-SHA256). Les clés sont protégées par une clé maître stockée dans /etc/ucm/master.key. Lorsqu'il est activé, UCM ne conserve plus de fichiers de clé en clair dans son répertoire privé et supprime ceux qui existent. Utilisez les hooks de déploiement pour placer les clés là où un service en a besoin.",
     "enableEncryption": "Activer le chiffrement",
     "disableEncryption": "Désactiver le chiffrement",
     "encryptRemainingKeys": "Chiffrer les clés restantes ({{count}})",
