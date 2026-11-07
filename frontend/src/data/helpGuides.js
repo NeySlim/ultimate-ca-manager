@@ -2755,9 +2755,12 @@ When enabled, a new UCM user account is automatically created on first SSO login
 ### Identity matching
 A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator). A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. To merge a local account into an SSO identity, use **Link to SSO** on that user first.
 
+When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise use **Unlink** then **Link to SSO** on each account.
+
 ### Role mapping rules
-- **At least one rule**: a user no rule matches is refused at every sign-in, whether the account is new or already exists
+- **At least one rule**: a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), whether the account is new or already exists; a passkey or certificate sign-in is not checked
 - **No rule**: every user the provider authenticates can sign in; new accounts get the **Default Role**
+- A rule that gives only a custom role: a new account gets the **Default Role** as its base role (viewer when None)
 - **Default Role: None** with no rule: nobody can sign in through the provider
 
 The **User Provisioning** section opens by itself and shows a warning when the provider has no rule.
@@ -2772,7 +2775,7 @@ The **User Provisioning** section opens by itself and shows a warning when the p
 5. Enter the **Bind DN** and **Bind Password** (service account credentials)
 6. Enter the **Base DN** (search base for user lookups)
 7. Configure the **User Filter** (e.g., \`(uid={username})\` or \`(sAMAccountName={username})\` for AD)
-8. Map LDAP attributes: **username**, **email**, **full name**
+8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Unlink** then **Link to SSO**
 9. Click **Test Connection** to verify, then **Save** and **Enable**
 
 ### Active Directory
