@@ -34,7 +34,9 @@ def expected_key_package_signer(app, ca_cert):
     CA's EST key generator, issued by it with digitalSignature only."""
     from models.est_signer_cert import EstSignerCert
     with app.app_context():
-        rows = [x509.load_pem_x509_certificate(r.crt.encode()) for r in EstSignerCert.query.all()]
+        rows = [x509.load_pem_x509_certificate(base64.b64decode(c.crt))
+                for c in (db.session.get(Certificate, r.certificate_id) for r in EstSignerCert.query.all())
+                if c is not None and not c.revoked]
     (delegate,) = [c for c in rows if c.issuer == ca_cert.subject and _issued_by(c, ca_cert)]
     usage = delegate.extensions.get_extension_for_class(x509.KeyUsage)
     assert usage.critical and usage.value.digital_signature

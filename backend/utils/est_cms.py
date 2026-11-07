@@ -40,7 +40,7 @@ def asymmetric_key_package(private_key):
 
 
 def _signature_suite(signer_key):
-    """(digest name, signature AlgorithmIdentifier, sign(tbs)) for the CA key, HSM included."""
+    """(digest name, signature AlgorithmIdentifier, sign(tbs)) for *signer_key*, HSM included."""
     family = key_algorithms.family_for_public_key(signer_key.public_key())
     if family == 'ML-DSA':
         # RFC 9882 §3.3: SHA-512 digests the content, pure ML-DSA signs the attributes
@@ -72,7 +72,7 @@ def _content_digest(name, content):
 def signed_key_package(private_key, signer_key, signer_cert, chain=()):
     """CMS SignedData over the RFC 5958 package of *private_key*, signed by *signer_key*.
 
-    certificates carries *signer_cert* then *chain*, so a client builds the path to its anchor.
+    certificates carries *signer_cert* and *chain* (a SET OF, sorted in DER) for the path to the anchor.
 
     eContentType is id-ct-KP-aKeyPackage, so signedAttrs carry content-type and
     message-digest (RFC 5652 §5.3) and the version is 3 (§5.1).

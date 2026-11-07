@@ -178,7 +178,7 @@ def _archived_identities(section_name: str, section, row: Dict[str, Any],
 DEPENDENT_TABLES: Dict[str, str] = {
     'crl_metadata': 'regenerated from the authorities',
     'ocsp_responses': 'a response cache',
-    'est_signer_certs': 'EST key generators, issued again by their CA on first use',
+    'est_signer_certs': 'which certificate signs EST key packages; a new one is issued on first use',
     'user_sessions': 'live sessions, revoked after every restore anyway',
     'pro_sso_sessions': 'live SSO sessions',
     'webauthn_challenges': 'single-use challenges',

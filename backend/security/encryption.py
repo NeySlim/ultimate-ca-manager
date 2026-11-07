@@ -339,7 +339,6 @@ MASTER_KEY_COLUMNS = (
     ('models.scep', 'ScepProfile', 'challenge_password', 'text'),
     ('models.sso', 'SSOProvider', 'ldap_bind_password', 'text'),
     ('models.acme_models', 'AcmeClientOrder', '_pending_key', 'b64'),
-    ('models.est_signer_cert', 'EstSignerCert', 'prv', 'b64'),
 )
 # SystemConfig values stored under the master key, as fnmatch patterns
 MASTER_KEY_CONFIG_KEYS = (

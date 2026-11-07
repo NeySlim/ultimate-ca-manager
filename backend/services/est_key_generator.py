@@ -1,8 +1,12 @@
 """The EST key generator certificate of a CA (RFC 7030 §4.4.2: the party that generated the
 key signs the package). Issued by the CA with digitalSignature only, so it works under a root
-whose own keyUsage is keyCertSign and cRLSign; made on first use and replaced in place."""
+whose own keyUsage is keyCertSign and cRLSign. Like a delegated OCSP responder it is an ordinary
+certificate row, listed, audited and revocable; a revoked, expiring or unreadable one is replaced
+on the next encrypted request."""
+import base64
 import hashlib
 import logging
+import uuid
 from datetime import timedelta
 
 from cryptography import x509
@@ -11,7 +15,7 @@ from cryptography.x509.oid import NameOID
 from sqlalchemy.exc import IntegrityError
 
 import fips_mode
-from models import db
+from models import Certificate, db
 from models.est_signer_cert import EstSignerCert
 from utils import key_algorithms
 from utils.datetime_utils import cert_not_before, utc_now
@@ -19,6 +23,7 @@ from utils.datetime_utils import cert_not_before, utc_now
 logger = logging.getLogger(__name__)
 
 SUBJECT_CN = 'EST key generator'
+SOURCE = 'est_key_generator'
 LIFETIME_DAYS = 365
 RENEW_DAYS = 30
 
@@ -42,6 +47,17 @@ def delegate_key_label(ca_public_key):
     return label
 
 
+def delegate_subject(ca_subject):
+    """Every RDN of the CA subject but its CN, in order, then the CN: dirName constraints hold."""
+    rdns = []
+    for rdn in ca_subject.rdns:
+        kept = [a for a in rdn if a.oid != NameOID.COMMON_NAME]
+        if kept:
+            rdns.append(x509.RelativeDistinguishedName(kept))
+    rdns.append(x509.RelativeDistinguishedName([x509.NameAttribute(NameOID.COMMON_NAME, SUBJECT_CN)]))
+    return x509.Name(rdns)
+
+
 def _issue(ca, ca_cert, key):
     """A certificate for *key* signed by *ca* through its signing key, HSM included."""
     from services.ca.ca_signing import CASigningMixin
@@ -54,12 +70,10 @@ def _issue(ca, ca_cert, key):
     CASigningMixin._check_ca_offline(ca)
     check_issuer_window(ca_cert)
     ca_key = get_ca_signing_key(ca)
-    names = [*ca_cert.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME),
-             x509.NameAttribute(NameOID.COMMON_NAME, SUBJECT_CN)]
     not_after = clamp_not_after(utc_now() + timedelta(days=LIFETIME_DAYS), ca_cert)
     builder = (
         x509.CertificateBuilder()
-        .subject_name(x509.Name(names))
+        .subject_name(delegate_subject(ca_cert.subject))
         .issuer_name(ca_cert.subject)
         .public_key(key.public_key())
         .serial_number(x509.random_serial_number())
@@ -84,52 +98,97 @@ def _issue(ca, ca_cert, key):
     return cert, not_after
 
 
+def _certificate_row(ca, cert, key, not_after):
+    """The Certificate row of a new delegate, built as the OCSP responder renewal builds its own."""
+    from utils.key_codec import store_pem_bytes
+    pem = cert.public_bytes(serialization.Encoding.PEM)
+    return Certificate(
+        refid=str(uuid.uuid4())[:8],
+        descr=f'{SUBJECT_CN} ({ca.descr})',
+        caref=ca.refid,
+        crt=base64.b64encode(pem).decode(),
+        prv=store_pem_bytes(key.private_bytes(serialization.Encoding.PEM,
+                                              serialization.PrivateFormat.PKCS8,
+                                              serialization.NoEncryption())),
+        cert_type='usr_cert',
+        subject=cert.subject.rfc4514_string(),
+        subject_cn=SUBJECT_CN,
+        issuer=cert.issuer.rfc4514_string(),
+        serial_number=str(cert.serial_number),
+        valid_from=cert.not_valid_before_utc.replace(tzinfo=None),
+        valid_to=not_after,
+        source=SOURCE,
+        created_by='system:est-key-generator',
+    )
+
+
+def _usable(link, ca, fingerprint, ca_cert):
+    """(key, certificate) of the current delegate, or None when it must be replaced: another CA
+    certificate, gone, revoked, expiring while a renewal would gain time, or unreadable."""
+    if link is None or link.issuer_fingerprint != fingerprint:
+        return None
+    row = db.session.get(Certificate, link.certificate_id)
+    if row is None or row.caref != ca.refid or row.revoked or not row.crt or not row.prv:
+        return None
+    if row.valid_to is None or row.valid_to - utc_now() < timedelta(days=RENEW_DAYS):
+        from utils.ca_signing_window import clamp_not_after
+        if row.valid_to is None or \
+                clamp_not_after(utc_now() + timedelta(days=LIFETIME_DAYS), ca_cert) > row.valid_to:
+            return None
+    try:
+        return _load(row)
+    except Exception as e:  # e.g. the master key changed without rotation
+        logger.warning('EST key generator %s of CA %s unreadable, replacing it: %s', row.id, ca.id, e)
+        return None
+
+
 def _load(row):
     from utils.key_codec import load_pem_bytes
     key = serialization.load_pem_private_key(
-        load_pem_bytes(row.prv, context=f'EST key generator of CA {row.ca_id}'), password=None)
-    return key, x509.load_pem_x509_certificate(row.crt.encode())
-
-
-def _current(row, fingerprint, ca_cert):
-    """Whether *row* may keep signing: same CA certificate, and a renewal would not gain time."""
-    if row is None or row.issuer_fingerprint != fingerprint:
-        return False
-    if row.not_after - utc_now() >= timedelta(days=RENEW_DAYS):
-        return True
-    from utils.ca_signing_window import clamp_not_after
-    return clamp_not_after(utc_now() + timedelta(days=LIFETIME_DAYS), ca_cert) <= row.not_after
+        load_pem_bytes(row.prv, context=f'EST key generator certificate {row.id}'), password=None)
+    return key, x509.load_pem_x509_certificate(base64.b64decode(row.crt))
 
 
 def key_generator(ca, ca_cert):
     """(private key, certificate) of the CA's key generator, issued or re-issued as needed.
 
-    Two first requests at once insert one row: the loser of the unique ca_id reads the winner's.
+    Two first requests at once insert one pointer: the loser of the unique ca_id reads the
+    winner's, and its own certificate row goes with its savepoint.
     """
-    from utils.key_codec import store_pem_bytes
+    from services.audit.staging import stage_audit_entry
     fingerprint = _fingerprint(ca_cert)
-    row = EstSignerCert.query.filter_by(ca_id=ca.id).first()
-    if _current(row, fingerprint, ca_cert):
-        return _load(row)
+    link = EstSignerCert.query.filter_by(ca_id=ca.id).first()
+    current = _usable(link, ca, fingerprint, ca_cert)
+    if current is not None:
+        return current
     key = key_algorithms.generate(delegate_key_label(ca_cert.public_key()))
     cert, not_after = _issue(ca, ca_cert, key)
-    values = dict(
-        crt=cert.public_bytes(serialization.Encoding.PEM).decode(),
-        prv=store_pem_bytes(key.private_bytes(serialization.Encoding.PEM,
-                                              serialization.PrivateFormat.PKCS8,
-                                              serialization.NoEncryption())),
-        issuer_fingerprint=fingerprint, not_after=not_after, created_at=utc_now())
+    previous_id = link.certificate_id if link is not None else None
+    previous = db.session.get(Certificate, previous_id) if previous_id is not None else None
     try:
         with db.session.begin_nested():
-            if row is None:
-                db.session.add(EstSignerCert(ca_id=ca.id, **values))
+            row = _certificate_row(ca, cert, key, not_after)
+            db.session.add(row)
+            db.session.flush()
+            if link is None:
+                db.session.add(EstSignerCert(ca_id=ca.id, certificate_id=row.id,
+                                             issuer_fingerprint=fingerprint, created_at=utc_now()))
             else:
-                for name, value in values.items():
-                    setattr(row, name, value)
+                link.certificate_id, link.issuer_fingerprint = row.id, fingerprint
+                link.created_at = utc_now()
+            if previous is not None and previous.caref == ca.refid and not previous.revoked:
+                previous.archived = True  # still valid until it expires, as a renewed responder
+            db.session.flush()  # a concurrent pointer fails here, before the audit entry is staged
+            stage_audit_entry(
+                action='est_key_generator.issued' if link is None else 'est_key_generator.reissued',
+                resource_type='ca', resource_id=ca.id, resource_name=ca.descr,
+                details=(f'EST key generator certificate {row.id} (serial {cert.serial_number}) '
+                         f'issued, valid to {not_after}'
+                         + (f', replacing certificate {previous_id}' if previous_id else '')))
         db.session.commit()
     except IntegrityError:  # the savepoint is rolled back, the caller's transaction kept
         winner = EstSignerCert.query.filter_by(ca_id=ca.id).first()
         logger.info('EST key generator of CA %s made by a concurrent request', ca.id)
-        return _load(winner)
+        return _load(db.session.get(Certificate, winner.certificate_id))
     logger.info('EST key generator of CA %s issued, valid until %s', ca.id, not_after)
     return key, cert

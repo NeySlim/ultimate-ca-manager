@@ -1,7 +1,7 @@
-"""Migration 132: est_signer_certs, the EST key generator certificate of each CA.
+"""Migration 132: est_signer_certs, which certificate is the EST key generator of each CA.
 
-It signs the key packages of encrypted serverkeygen answers (RFC 7030 §4.4.2) in place of the
-CA, whose certificate may lack digitalSignature. One row per CA, made on first use.
+That certificate signs the key packages of encrypted serverkeygen answers (RFC 7030 §4.4.2) in
+place of the CA, whose certificate may lack digitalSignature. One row per CA, made on first use.
 """
 import logging
 import sqlite3
@@ -19,10 +19,8 @@ def _table(pk, ts):
     CREATE TABLE IF NOT EXISTS {TABLE} (
         id {pk},
         ca_id INTEGER NOT NULL REFERENCES certificate_authorities (id) ON DELETE CASCADE,
-        crt TEXT NOT NULL,
-        prv TEXT NOT NULL,
+        certificate_id INTEGER NOT NULL REFERENCES certificates (id) ON DELETE CASCADE,
         issuer_fingerprint VARCHAR(64) NOT NULL,
-        not_after {ts} NOT NULL,
         created_at {ts}
     )"""
 

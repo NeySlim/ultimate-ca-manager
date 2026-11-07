@@ -512,7 +512,7 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'crls': 'regenerated from the CAs and their revocation records',
     'crl_metadata': 'regenerated with the CRLs',
     'ocsp_responses': 'a response cache, rebuilt on demand',
-    'est_signer_certs': 'EST key generator certificates, issued again by their CA on first use',
+    'est_signer_certs': 'which certificate signs EST key packages; a new one is issued on first use',
     'notification_log': 'delivery history, not configuration',
     'webhook_deliveries': 'delivery queue and history; endpoints are exported',
     'deploy_deliveries': 'delivery queue and history; targets and bindings are exported',

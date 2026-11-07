@@ -79,6 +79,18 @@ def _row(app, ca_id):
         return EstSignerCert.query.filter_by(ca_id=ca_id).all()
 
 
+def _delegate_row(ca_id):
+    """The Certificate row the CA's pointer names (inside an app context)."""
+    link = EstSignerCert.query.filter_by(ca_id=ca_id).one()
+    return db.session.get(Certificate, link.certificate_id)
+
+
+def _reset(app, ca_id):
+    with app.app_context():
+        EstSignerCert.query.filter_by(ca_id=ca_id).delete()
+        db.session.commit()
+
+
 class TestLifecycle:
 
     def test_made_on_the_first_encrypted_request_only(self, app, client, use):
@@ -88,12 +100,20 @@ class TestLifecycle:
         assert _post_csr(client, 'serverkeygen', csr, headers=_basic_auth()).status_code == 200
         assert _row(app, ca_id) == []
         serial = _signer_serial(client, 'first.generator.test')
-        (row,) = _row(app, ca_id)
-        delegate = x509.load_pem_x509_certificate(row.crt.encode())
-        assert delegate.serial_number == serial
+        with app.app_context():
+            row = _delegate_row(ca_id)
+            delegate = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+            assert int(row.serial_number) == serial == delegate.serial_number
+            assert row.source == 'est_key_generator' and row.subject_cn == 'EST key generator'
+            assert not row.prv.startswith('-----')
+            from models import AuditLog
+            assert AuditLog.query.filter_by(action='est_key_generator.issued',
+                                            resource_id=str(ca_id)).count() == 1
         delegate.verify_directly_issued_by(ca_cert)
-        assert delegate.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value == 'EST key generator'
-        assert row.prv.startswith('ENC:') or not row.prv.startswith('-----')
+        # RFC 5280 §4.2.1.1: the AKI names the CA key
+        assert delegate.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier).value \
+            .key_identifier == ca_cert.extensions.get_extension_for_class(
+                x509.SubjectKeyIdentifier).value.digest
 
     def test_reused_across_requests(self, app, client, use):
         ca_id, _ = use('main')
@@ -105,55 +125,75 @@ class TestLifecycle:
         ca_id, _ = use('main')
         first = _signer_serial(client, 'near-1.generator.test')
         with app.app_context():
-            row = EstSignerCert.query.filter_by(ca_id=ca_id).one()
-            row.not_after = utc_now() + datetime.timedelta(days=10)
+            row = _delegate_row(ca_id)
+            row.valid_to = utc_now() + datetime.timedelta(days=10)
             db.session.commit()
+            old_id = row.id
         second = _signer_serial(client, 'near-2.generator.test')
         assert second != first
-        (row,) = _row(app, ca_id)
-        assert row.not_after - utc_now() > datetime.timedelta(days=300)
+        with app.app_context():
+            assert _delegate_row(ca_id).valid_to - utc_now() > datetime.timedelta(days=300)
+            assert db.session.get(Certificate, old_id).archived is True
+            from models import AuditLog
+            assert AuditLog.query.filter_by(action='est_key_generator.reissued',
+                                            resource_id=str(ca_id)).count() >= 1
 
     def test_reissued_when_the_ca_certificate_changed(self, app, client, use):
         ca_id, _ = use('main')
         first = _signer_serial(client, 'ca-1.generator.test')
         with app.app_context():
-            row = EstSignerCert.query.filter_by(ca_id=ca_id).one()
-            real = row.issuer_fingerprint
-            row.issuer_fingerprint = '0' * 64
+            link = EstSignerCert.query.filter_by(ca_id=ca_id).one()
+            real = link.issuer_fingerprint
+            link.issuer_fingerprint = '0' * 64
             db.session.commit()
         assert _signer_serial(client, 'ca-2.generator.test') != first
-        (row,) = _row(app, ca_id)
-        assert row.issuer_fingerprint == real
+        (link,) = _row(app, ca_id)
+        assert link.issuer_fingerprint == real
 
-    def test_neither_a_certificate_row_nor_a_ca_serial(self, app, client, use):
+    def test_a_revoked_delegate_is_replaced_and_listed_as_revoked(self, app, client, use):
+        from services.crl_service import CRLService
+        from services.ocsp_service import OCSPService
         ca_id, _ = use('main')
+        first = _signer_serial(client, 'revoked-1.generator.test')
         with app.app_context():
-            EstSignerCert.query.filter_by(ca_id=ca_id).delete()
+            ca = db.session.get(CA, ca_id)
+            assert OCSPService._status_for_serial(ca, first)[1] == 'good'
+            row = _delegate_row(ca_id)
+            row.revoked, row.revoked_at, row.revoke_reason = True, utc_now(), 'keyCompromise'
             db.session.commit()
+            assert OCSPService._status_for_serial(ca, first)[1] == 'revoked'
+            crl = x509.load_pem_x509_crl(CRLService.generate_crl(ca_id).crl_pem.encode())
+            assert crl.get_revoked_certificate_by_serial_number(first) is not None
+        second = _signer_serial(client, 'revoked-2.generator.test')
+        assert second != first
+        with app.app_context():
+            assert OCSPService._status_for_serial(db.session.get(CA, ca_id), second)[1] == 'good'
+
+    def test_an_unreadable_key_is_replaced(self, app, client, use):
+        ca_id, _ = use('main')
+        first = _signer_serial(client, 'unreadable-1.generator.test')
+        with app.app_context():
+            _delegate_row(ca_id).prv = 'ENC:not-a-fernet-token'
+            db.session.commit()
+        assert _signer_serial(client, 'unreadable-2.generator.test') != first
+
+    def test_listed_like_a_certificate_without_consuming_a_ca_serial(self, app, client, use):
+        ca_id, _ = use('main')
+        _reset(app, ca_id)
+        with app.app_context():
             before = db.session.get(CA, ca_id).serial
         _signer_serial(client, 'uncounted.generator.test')
         with app.app_context():
-            # The transport and the generated key's certificate count; the delegate neither
-            # counts nor shows in the inventory
-            assert db.session.get(CA, ca_id).serial == (before or 0) + 2
-            assert Certificate.query.filter(Certificate.subject_cn == 'EST key generator').count() == 0
-
-    def test_the_delegate_key_follows_master_key_rotation(self, app, client, use):
-        """encrypt-all-keys and the key removal walk MASTER_KEY_COLUMNS: the delegate key is one."""
-        from security.encryption import master_key_values
-        ca_id, _ = use('main')
-        _signer_serial(client, 'rotation.generator.test')
-        with app.app_context():
-            (row,) = EstSignerCert.query.filter_by(ca_id=ca_id).all()
-            found = [(attribute, fmt) for _label, value_row, attribute, fmt in master_key_values()
-                     if isinstance(value_row, EstSignerCert) and value_row.id == row.id]
-        assert found == [('prv', 'b64')]
+            # The transport and the generated key's certificate count; the delegate, like a
+            # renewed OCSP responder, does not
+            ca = db.session.get(CA, ca_id)
+            assert ca.serial == (before or 0) + 2
+            assert Certificate.query.filter_by(caref=ca.refid, subject_cn='EST key generator',
+                                               archived=False, revoked=False).count() >= 1
 
     def test_a_failed_issuance_answers_5xx_and_issues_nothing(self, app, client, use):
         ca_id, _ = use('main')
-        with app.app_context():
-            EstSignerCert.query.filter_by(ca_id=ca_id).delete()
-            db.session.commit()
+        _reset(app, ca_id)
         transport, _, client_pem = _enrol_transport(client, 'transport-fail.generator.test')
         cn = 'fail.generator.test'
         csr, _ = _make_csr(common_name=cn, extra_attributes=((ASYMMETRIC_ID, _ski(transport)),))
@@ -164,53 +204,58 @@ class TestLifecycle:
             assert Certificate.query.filter(Certificate.subject_cn == cn).count() == 0
         assert _row(app, ca_id) == []
 
-    def test_two_first_requests_at_once_keep_one_row(self, app, use):
+    def test_two_first_requests_at_once_keep_one_pointer(self, app, use):
         ca_id, ca_cert = use('main')
         original = est_key_generator._issue
         competitor = {}
 
         def racing_issue(ca, issuer, key):
-            # Another worker inserts and commits its delegate between our read and our insert
+            # Another worker stores its delegate and pointer between our read and our insert
             other_key = key_algorithms.generate('RSA-3072')
             other_cert, not_after = original(ca, issuer, other_key)
-            from utils.key_codec import store_pem_bytes
             from sqlalchemy import insert
+            row = est_key_generator._certificate_row(ca, other_cert, other_key, not_after)
             with db.engine.begin() as conn:
+                values = {c.name: getattr(row, c.name) for c in Certificate.__table__.columns
+                          if getattr(row, c.name) is not None}
+                cert_id = conn.execute(insert(Certificate.__table__).values(**values)
+                                       ).inserted_primary_key[0]
                 conn.execute(insert(EstSignerCert.__table__).values(
-                    ca_id=ca.id, crt=other_cert.public_bytes(serialization.Encoding.PEM).decode(),
-                    prv=store_pem_bytes(other_key.private_bytes(
-                        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
-                        serialization.NoEncryption())),
-                    issuer_fingerprint=est_key_generator._fingerprint(issuer),
-                    not_after=not_after, created_at=utc_now()))
+                    ca_id=ca.id, certificate_id=cert_id,
+                    issuer_fingerprint=est_key_generator._fingerprint(issuer), created_at=utc_now()))
             competitor['cert'] = other_cert
-            return original(ca, issuer, key)
+            competitor['ours'] = original(ca, issuer, key)
+            return competitor['ours']
 
+        _reset(app, ca_id)
         with app.app_context():
-            EstSignerCert.query.filter_by(ca_id=ca_id).delete()
-            db.session.commit()
             ca = db.session.get(CA, ca_id)
             with patch.object(est_key_generator, '_issue', side_effect=racing_issue):
                 _key, cert = est_key_generator.key_generator(ca, ca_cert)
             assert cert == competitor['cert']
             assert EstSignerCert.query.filter_by(ca_id=ca_id).count() == 1
+            # The loser's certificate row went with its savepoint
+            ours = competitor['ours'][0]
+            assert Certificate.query.filter_by(serial_number=str(ours.serial_number)).count() == 0
 
 
-def _ca_like(key, *, hsm_key_id=None):
+def _ca_like(key, *, hsm_key_id=None, name=None, days=3650, extensions=()):
     from utils.key_codec import store_pem_bytes
-    name = x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Generator Org'),
-                      x509.NameAttribute(NameOID.COMMON_NAME, 'Generator test CA')])
+    name = name or x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Generator Org'),
+                              x509.NameAttribute(NameOID.COMMON_NAME, 'Generator test CA')])
     now = datetime.datetime.now(datetime.timezone.utc)
     digest = hashes.SHA256() if key_algorithms.needs_digest(key) else None
     cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
             .public_key(key.public_key()).serial_number(x509.random_serial_number())
             .not_valid_before(now - datetime.timedelta(days=1))
-            .not_valid_after(now + datetime.timedelta(days=3650))
+            .not_valid_after(now + datetime.timedelta(days=days))
             .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
             .add_extension(x509.KeyUsage(False, False, False, False, False, True, True, False, False),
                            critical=True)
-            .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
-            .sign(key, digest))
+            .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False))
+    for extension in extensions:
+        cert = cert.add_extension(extension, critical=True)
+    cert = cert.sign(key, digest)
     prv = None if hsm_key_id else store_pem_bytes(key.private_bytes(
         serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption()))
     ca = SimpleNamespace(id=0, refid='generator-test', descr='Generator test CA', offline=False,
@@ -295,12 +340,53 @@ def test_an_offline_ca_issues_no_delegate(app):
         est_key_generator._issue(ca, ca_cert, key_algorithms.generate('RSA-3072'))
 
 
-def test_deleting_the_ca_deletes_its_key_generator(app, auth_client, create_ca):
+def test_the_delegate_is_revoked_and_deleted_like_any_certificate_before_its_ca(
+        app, auth_client, create_ca):
     ca_data = create_ca(cn='EST generator deleted root')
     with app.app_context():
         ca = db.session.get(CA, ca_data['id'])
         est_key_generator.key_generator(ca, x509.load_pem_x509_certificate(base64.b64decode(ca.crt)))
-        assert EstSignerCert.query.filter_by(ca_id=ca.id).count() == 1
+        row_id = _delegate_row(ca.id).id
+    # Like a delegated OCSP responder: the issued certificate holds the CA back until removed
+    assert auth_client.delete(f"/api/v2/cas/{ca_data['id']}").status_code == 409
+    with app.app_context():
+        row = db.session.get(Certificate, row_id)
+        row.revoked, row.revoked_at = True, utc_now()
+        db.session.delete(row)
+        db.session.commit()
     assert auth_client.delete(f"/api/v2/cas/{ca_data['id']}").status_code in (200, 204)
     with app.app_context():
         assert EstSignerCert.query.filter_by(ca_id=ca_data['id']).count() == 0
+
+
+def test_the_subject_keeps_every_ca_rdn_so_dirname_constraints_hold(app, tmp_path):
+    """A CA C=FR, O=Generator Org with permitted dirName C=FR, O=Generator Org (RFC 5280 §4.2.1.10)."""
+    from tests.test_acme_pq import OPENSSL
+    if not OPENSSL:
+        pytest.skip('needs the openssl command')
+    base = x509.Name([x509.NameAttribute(NameOID.COUNTRY_NAME, 'FR'),
+                      x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Generator Org')])
+    ca, ca_cert = _ca_like(
+        rsa.generate_private_key(65537, 2048), name=base,
+        extensions=(x509.NameConstraints(permitted_subtrees=[x509.DirectoryName(base)],
+                                         excluded_subtrees=None),))
+    with app.app_context():
+        delegate, _ = est_key_generator._issue(ca, ca_cert, key_algorithms.generate('RSA-3072'))
+    assert delegate.subject == x509.Name([*base, x509.NameAttribute(NameOID.COMMON_NAME,
+                                                                     'EST key generator')])
+    (tmp_path / 'ca.pem').write_bytes(ca_cert.public_bytes(serialization.Encoding.PEM))
+    (tmp_path / 'delegate.pem').write_bytes(delegate.public_bytes(serialization.Encoding.PEM))
+    import subprocess
+    verify = subprocess.run([OPENSSL, 'verify', '-CAfile', str(tmp_path / 'ca.pem'),
+                             str(tmp_path / 'delegate.pem')], capture_output=True, text=True)
+    assert verify.returncode == 0, verify.stdout + verify.stderr
+
+
+def test_under_a_ca_expiring_soon_the_delegate_never_outlives_it(app):
+    ca, ca_cert = _ca_like(rsa.generate_private_key(65537, 2048), days=45)
+    with app.app_context():
+        delegate, _ = est_key_generator._issue(ca, ca_cert, key_algorithms.generate('RSA-3072'))
+    assert delegate.not_valid_after_utc <= ca_cert.not_valid_after_utc
+    assert delegate.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier).value \
+        .key_identifier == ca_cert.extensions.get_extension_for_class(
+            x509.SubjectKeyIdentifier).value.digest
