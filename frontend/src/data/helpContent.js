@@ -341,6 +341,7 @@ export const helpContent = {
           { label: 'Upload CSR', text: 'Accept PEM-encoded CSR files or paste PEM text' },
           { label: 'Review', text: 'Inspect subject, SANs, key type, and signature before signing' },
           { label: 'Sign', text: 'Select a CA, certificate type, set validity period, and issue the certificate' },
+          { label: 'Request checks', text: 'The subject and names of the request are held to the issue form\'s rules: CN at most 64 characters, C two letters, DNS names in RFC 5280 syntax (no space, trailing dot, wildcard past the first label, or underscore outside a service label such as _sip._tcp). A CN that is not a hostname gives no DNS name, a sub-CA gets none, and an emailAddress in the subject is added to the SAN. Each refusal names its reason' },
           { label: 'Add names', text: 'When signing, add email, DNS, IP or URI names to those of the request, for instance the email address of an S/MIME certificate requested from a smart card. They pass the CA name constraints, issuance policies and approval like any other' },
           { label: 'Sign again', text: 'In History, put a signed request back in Pending to sign it once more with other EKUs, names or validity, without generating a new key' },
           { label: 'Download', text: 'Download the original CSR in PEM format' },

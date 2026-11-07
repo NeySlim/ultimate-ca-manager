@@ -327,7 +327,7 @@ Central management for all X.509 certificates. Issue new certificates, import ex
 1. Click **Issue Certificate**
 2. Select the **Signing CA** (must have a private key)
 3. Fill in the Subject (CN is required, other fields optional)
-4. Add Subject Alternative Names (SANs): DNS names, IPs, emails
+4. Add Subject Alternative Names (SANs): DNS names, IPs, emails. A DNS name follows RFC 5280: dot-separated labels, a wildcard only as the first label, no space or trailing dot; an internationalized name is issued as its A-label. An email address in the subject also goes into the SAN, whatever the type
 5. Choose key type and size
 6. Set validity period
 7. Optionally apply a **Template** to pre-fill settings
@@ -572,6 +572,14 @@ Click a CSR to view:
 The resulting certificate appears in the Certificates page.
 
 > 💡 A request generated on a smart card often carries only a CN. For an S/MIME certificate, choose the Email type and add the address: it becomes the certificate's subject alternative name. Added names pass the CA name constraints, issuance policies and approval like any other, and the approver sees them.
+
+What a request may carry is checked as on the issue form, and a refusal names its reason:
+- **Subject**: CN, O and OU at most 64 characters, L and ST 128, C a two-letter country code (RFC 5280 appendix A)
+- **DNS names**: letters, digits and hyphens in dot-separated labels, an underscore only to open a service label (\`_sip._tcp\`), a wildcard only as the whole first label, no trailing dot. An internationalized name typed in the form is issued as its A-label (\`xn--\`)
+- **Names from the CN**: a request without SAN gets a DNS name from its CN only when the CN is a hostname (never \`John Doe\`), and a sub-CA gets none
+- **Email in the subject**: an emailAddress is also added to the SAN as an email name, for every certificate type
+- **Key Usage**: a request without Key Usage gets its type's, as on the issue form (client, code signing and email included)
+- A parent CA with pathLen 0, or a name outside the CA name constraints, is refused with that reason
 
 ### Microsoft CA Signing
 

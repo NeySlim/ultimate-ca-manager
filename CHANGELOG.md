@@ -24,9 +24,17 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
 - SCEP: a RenewalReq signed by a certificate issued through the same endpoint is authenticated by that certificate, so its challenge password is no longer compared and a rotated secret no longer blocks renewal; a certificate from another profile or protocol still needs the endpoint's challenge.
 - SCEP: every FAILURE reply now carries a failInfoText attribute giving the reason (RFC 8894 §3.2.1.4).
+- Sign CSR, EST, SCEP and ACME: a subject beyond the RFC 5280 bounds (CN over 64 characters, a country that is not two letters) was signed as received; it is now refused with the reason, as on the issue form. A renewal that keeps the subject of the certificate it renews is not affected.
+- Sign CSR and the enrollment protocols: a request without Key Usage signed as client, code signing or S/MIME got none, so the key was unrestricted; it now gets its type's Key Usage, as on the issue form.
+- Certificates: an emailAddress in the subject is now also an rfc822Name in the SAN for every certificate type, not only email and combined (RFC 5280 §4.1.2.6).
+- Certificates and ACME: an underscore in a DNS name is now accepted only at the start of a service label (`_sip._tcp.example.com`); `my_host.example` is refused, as RFC 1123 §2.1 requires. A renewal keeps the names its certificate already carries.
 
 ### Fixed
 
+- Certificates: a DNS name with a space, a trailing dot, a wildcard past the first label or a lone `*` was issued by the form, the API, Sign CSR, EST and SCEP. Such names are now refused with a 400 naming them (RFC 5280 §4.2.1.6), and an internationalized name is issued as its A-label instead of answering 500 (RFC 9549).
+- Sign CSR and EST: a request without SAN got its CN as a DNS name whatever it held (`DNS:John Doe`, and on a sub-CA too), and a non-ASCII CN answered 500. Only a hostname CN now gives a DNS name, as on the issue form, and a sub-CA gets none.
+- Sign CSR: a refusal for a parent CA with pathLen 0, a name outside the CA name constraints or an unacceptable key answered 500 "Failed to sign CSR". It now answers 400 with the reason; an empty subject takes as CN the first SAN name that fits in 64 characters.
+- CAs: the error for a DNS name constraint with a leading dot suggested `.example.com`, the form it refuses.
 - Rate limiting: a 429 from a login route's own limit carried the general limit in `X-RateLimit-Limit` (30 instead of 5) and no `Retry-After`. It now names the limit that refused the request and when to retry.
 - ACME server: a body that was not JSON, a payload that was not an object or an unreadable date answered 500 `serverInternal`. They now answer 400 `malformed` (RFC 8555 §6.2, §7).
 - ACME server: a missing nonce answered `malformed` and a nonce outside base64url `badNonce`, the reverse of RFC 8555 §6.5; HEAD on newNonce answered 204 without a link to the directory. Both errors now carry the right type, and newNonce, on the server and the ACME proxy, answers 200 to HEAD and 204 to GET with `Link: rel="index"` (§7.2).
