@@ -22,6 +22,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
 - EST: `/csrattrs` lists keyUsage, subjectAltName and extKeyUsage as bare OIDs instead of inside an extensionRequest, a form RFC 9908 §5.2 declares incorrect; the `csrattrs_legacy_encoding` setting of `PATCH /api/v2/est/config` restores the former shape.
 - EST: refusals are sent as `text/plain` with the reason, such as a body that is not base64 or not a PKCS#10 CSR, a CA name constraint or the rate limit, instead of an HTML page saying "Enrollment failed" or JSON (RFC 8951 §5).
+- EST: `simplereenroll` without a client certificate answers 403 instead of a 401 offering Basic authentication, which that route refuses (RFC 7030 §3.2.3), and `/fullcmc` answers 501 instead of 405 (RFC 7030 §3.2.2).
 - EST: a CSR whose `challengePassword` is not the `tls-unique` value of its TLS 1.2 connection to UCM, or that arrives over TLS 1.3 or through a proxy where none can be checked, is refused with 400 on `simpleenroll`, `simplereenroll` and `serverkeygen` instead of being certified unchecked (RFC 7030 §3.5).
 
 ### Fixed

@@ -533,3 +533,20 @@ def test_serverkeygen_verifies_the_tls_unique_binding(client):
                     environ_overrides={'ucm.tls_unique': bytes(range(12))})
     assert r.status_code == 400, r.data
     assert b'does not match' in r.data
+
+
+@pytest.mark.parametrize('path', ['fullcmc', 'arbitrary-label/fullcmc'])
+def test_fullcmc_is_not_implemented(client, path):
+    """RFC 7030 §3.2.2: Full CMC is optional; its absence is answered 501, not 405 HTML."""
+    r = client.post(f'{EST_BASE}/{path}', data=b'MAo=', content_type='application/pkcs7-mime')
+    assert r.status_code == 501, r.data
+    assert r.mimetype == 'text/plain'
+
+
+def test_reenroll_without_certificate_offers_no_basic(client):
+    """RFC 7030 §3.2.3: WWW-Authenticate offers Basic; simplereenroll takes none."""
+    csr, _ = _make_csr('reenroll-no-cert.example.test')
+    r = _post_csr(client, 'simplereenroll', csr, headers=_basic_auth())
+    assert r.status_code == 403, r.data
+    assert 'WWW-Authenticate' not in r.headers
+    assert r.mimetype == 'text/plain'

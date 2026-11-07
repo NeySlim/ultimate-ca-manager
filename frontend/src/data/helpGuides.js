@@ -1410,7 +1410,7 @@ curl -k --user est-user:est-password \\
 \`\`\`
 
 ### POST /simplereenroll
-Renew an existing certificate. **Requires mTLS**: the client must present the certificate being renewed. A CSR without SubjectAltName renews the certificate's own names, or none when it had none, not a name built from the CN (RFC 7030 §4.2.2, v2.252).
+Renew an existing certificate. **Requires mTLS**: the client must present the certificate being renewed, or gets 403. A CSR without SubjectAltName renews the certificate's own names, or none when it had none, not a name built from the CN (RFC 7030 §4.2.2, v2.252).
 
 \`\`\`bash
 curl -k --cert client.pem --key client.key \\

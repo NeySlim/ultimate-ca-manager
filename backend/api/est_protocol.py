@@ -754,14 +754,11 @@ def simple_reenroll(label=None):
     if bad_content_type is not None:
         return bad_content_type
 
-    # Re-enrollment requires mTLS only (RFC 7030 §3.3.2)
+    # Re-enrollment requires mTLS only (RFC 7030 §3.3.2): no WWW-Authenticate,
+    # which would offer a Basic scheme this route refuses (§3.2.3)
     client_cert = _trusted_client_cert()
     if not client_cert:
-        return Response(
-            'Client certificate required for re-enrollment',
-            status=401,
-            headers={'WWW-Authenticate': 'Basic realm="EST"'}
-        )
+        return Response('Client certificate required for re-enrollment', status=403)
     
     ca, ca_error = _resolve_est_ca(label)
     if ca_error:
@@ -859,6 +856,12 @@ def simple_reenroll(label=None):
     except Exception as e:
         logger.error(f"EST simplereenroll failed: {e}")
         return Response("Re-enrollment failed", status=400)
+
+
+@_labelled_route('/fullcmc', methods=['POST'], endpoint='full_cmc')
+def full_cmc(label=None):
+    """RFC 7030 §3.2.2: Full CMC is optional and not offered."""
+    return Response('Full CMC is not supported by this server', status=501)
 
 
 @_labelled_route('/csrattrs', methods=['GET'], endpoint='get_csr_attrs')
