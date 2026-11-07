@@ -16,6 +16,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- WSTEP: a certificate issued under a template carries that template's EKUs instead of the ones the request asks for, as on renewal and in AD CS.
 - XCEP: the Username/Password policy endpoint announces a client-supplied subject for every template, machine templates included, since that binding carries no directory identity to build one from.
 - PostgreSQL: UCM connects with psycopg 3, which sends values apart from the statement, so a database error that quotes the statement no longer carries them. psycopg2 is no longer shipped, and a `postgresql+psycopg2://` URL now uses psycopg 3.
 - Dependencies: SQLAlchemy 2.1 is accepted, now that every PostgreSQL URL reaches psycopg 3.
@@ -37,12 +38,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
-- WSTEP: on the Kerberos binding, a machine template or a "Build subject from Active Directory" template kept the subject and SAN of a request that named its own, so any domain account could obtain a certificate for any name, and a user could enroll on a machine template. The subject and SAN now come from Active Directory whatever the request asks, and such a template refuses the other kind of account.
+- WSTEP: on the Kerberos binding, a machine template, a "Build subject from Active Directory" template or a request matching no template kept the subject and SAN the request named, and a template keeping them issued the EKUs the request asked for, so any domain account could obtain a server certificate for any name. The subject and SAN now come from Active Directory unless the matched template lets the client supply them, that template issues only its own EKUs, and a template refuses the other kind of account.
 - mTLS behind a proxy: a certificate presented by its serial number alone, without `X-SSL-Client-I-DN` or `X-SSL-Client-Cert`, opened the enrolment bearing that serial, even one of another CA. Such a serial now opens only an enrolment that recorded no issuer, and enrolling a presented certificate requires its issuer (RFC 5280 §4.1.2.2).
 
 ### Upgrade notes
 
-- WSTEP Kerberos binding: a request naming its own subject under a machine or "Build subject from Active Directory" template now gets the subject from Active Directory, and is refused when the AD Connector cannot resolve the requester. A script that chooses the subject must use a template whose subject the client supplies, or the Username/Password binding.
+- WSTEP Kerberos binding: a request naming its own subject under a machine or "Build subject from Active Directory" template, or under no template, now gets the subject from Active Directory, and is refused when the AD Connector cannot resolve the requester. A script that chooses the subject must use a template whose subject the client supplies, which must configure its EKUs, or the Username/Password binding.
 - mTLS behind a proxy: a proxy that forwards the serial number without `X-SSL-Client-I-DN` (nginx `$ssl_client_i_dn`, Apache `SSL_CLIENT_I_DN`) or `X-SSL-Client-Cert` must now forward one of them, or certificate login fails with a warning in the log; the I-DN is read in RFC 4514, RFC 1779, OpenSSL one-line and legacy forms.
 - EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the `EST key generator` certificate the SignedData carries, which chains to the issuing CA from `/cacerts` and is listed, and revoked when needed, with the CA's certificates like a delegated OCSP responder; the next encrypted request then gets a new one. Migration 132 adds the `est_signer_certs` table that names the current one; backups carry the certificate but not that table, so a restored installation issues a new one on first use.
 - EST: `serverkeygen` without `AsymmetricDecryptKeyIdentifier` now returns the key unencrypted, without the Basic password, and over mTLS the key type is chosen as over Basic, ML-DSA under an ML-DSA CA included.

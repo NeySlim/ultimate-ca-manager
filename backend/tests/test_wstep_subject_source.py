@@ -213,3 +213,38 @@ def test_each_policy_binding_announces_what_its_issuance_does(app, subject_ca):
     name = 'Subject source flags CA'
     assert kerberos == {f'{name} Web': 0x18000000, f'{name} User': 0x00010001, f'{name} Mail': 0x82000000}
     assert password == {f'{name} Web': 0x00010001, f'{name} User': 0x00010001, f'{name} Mail': 0x00010001}
+
+
+CODE_SIGNING = ExtendedKeyUsageOID.CODE_SIGNING
+PINNED = {'Web': MIXED['Web'], 'User': MIXED['User']}
+
+
+@pytest.mark.parametrize('ekus', [(), (CODE_SIGNING,)], ids=['no-eku', 'code-signing'])
+def test_a_request_matching_no_template_never_keeps_its_subject(app, subject_ca, directory, ekus):
+    """The CA offering a template with a supplied subject does not lend it to a request naming none."""
+    ca_id = subject_ca(f'Subject source unmatched supplied CA {len(ekus)}', PINNED)
+    csr = _csr('www.bank.test', [x509.DNSName('www.bank.test')], ekus)
+    cert, err = _issue(app, ca_id, csr, MACHINE)
+    assert err is None, err
+    assert cert.subject.rfc4514_string() == 'CN=win11.example.test'
+    assert _sans(cert) == [x509.DNSName('win11.example.test')]
+    cert, err = _issue(app, ca_id, csr, USER)
+    assert cert is None
+    assert err == 'The request matches no certificate template whose subject it may supply'
+
+
+def test_a_template_with_a_supplied_subject_issues_only_its_own_ekus(app, subject_ca, directory):
+    ca_id = subject_ca('Subject source supplied ekus CA', PINNED)
+    csr = _csr('www.bank.test', [x509.DNSName('www.bank.test')], [SERVER_AUTH, CLIENT_AUTH])
+    cert, err = _issue(app, ca_id, csr, USER)
+    assert err is None, err
+    assert wstep_service._eku_oids(cert) == {CLIENT_AUTH.dotted_string}
+
+
+def test_a_template_with_a_supplied_subject_and_no_eku_is_refused(app, subject_ca, directory):
+    """Its default profile would be serverAuth for whatever name the request gives."""
+    ca_id = subject_ca('Subject source no eku CA', {'Web': MIXED['Web'], 'Any': ('usr_cert', [], False, 'RSA-2048')})
+    cert, err = _issue(app, ca_id, _csr('www.bank.test', [x509.DNSName('www.bank.test')]), USER)
+    assert cert is None
+    assert err == ("Template 'Subject source no eku CA Any' lets the request name its subject "
+                   'but configures no Extended Key Usage')

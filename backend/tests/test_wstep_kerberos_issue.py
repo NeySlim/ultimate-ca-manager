@@ -69,9 +69,12 @@ def wstep_kerberos_config(app, create_ca):
 
 
 def _make_csr(common_name='machine.hagland.domain'):
+    """A manual request asking for clientAuth, the EKU of the Enroll ACL template."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     csr = x509.CertificateSigningRequestBuilder().subject_name(
         x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+    ).add_extension(
+        x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False,
     ).sign(key, hashes.SHA256())
     return csr, key
 
@@ -492,7 +495,7 @@ def _clear_acl_template(app):
         db.session.commit()
 
 
-def _configure_acl_template(app, allowed_ad_group, ca_id, extended_key_usage=None):
+def _configure_acl_template(app, allowed_ad_group, ca_id, extended_key_usage=('clientAuth',)):
     """An active template with an Enroll ACL group set, PINNED to ``ca_id``.
 
     Pinning matters here specifically: ``_resolve_templates_for_ca`` falls
@@ -506,13 +509,11 @@ def _configure_acl_template(app, allowed_ad_group, ca_id, extended_key_usage=Non
     lower id would silently win the tie-break instead of this one --
     exactly the failure mode this pin closes off.
 
-    ``extended_key_usage=None`` (empty EKU) matches a plain populated CSR
-    with score 0 -- see _match_template -- exercising the confident-match
-    branch of the ACL gate. A non-empty ``extended_key_usage`` (e.g.
-    ``['clientAuth']``) instead makes this template score negative against
-    both a populated no-EKU CSR and a naked CSR, so _match_template returns
-    None for either -- exercising the CA-wide fallback branch instead (see
-    _required_enroll_acl_groups).
+    The clientAuth template matches ``_make_csr``'s clientAuth request (the
+    confident-match branch of the ACL gate) and scores negative against a
+    naked CSR, which then takes the CA-wide fallback branch (see
+    _required_enroll_acl_groups). A template whose subject the request names
+    must configure its EKUs, or issuance is refused.
 
     Also clears 'Test AD User Template' (used by the derivation tests
     above), since an empty-EKU variant of it would otherwise tie-break
@@ -524,7 +525,7 @@ def _configure_acl_template(app, allowed_ad_group, ca_id, extended_key_usage=Non
     _clear_ad_derived_templates(app)
     _clear_acl_template(app)
     with app.app_context():
-        extensions = {'extended_key_usage': extended_key_usage} if extended_key_usage else {}
+        extensions = {'extended_key_usage': list(extended_key_usage)}
         template = CertificateTemplate(
             name='Test Enroll ACL Template', template_type='client_auth',
             extensions_template=json.dumps(extensions), is_active=True,

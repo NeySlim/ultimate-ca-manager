@@ -14,7 +14,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import Encoding
-from cryptography.x509.oid import NameOID
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from models import CA, ADConnectorConfig, CATemplatePin, db
 from models.certificate_template import CertificateTemplate
@@ -30,13 +30,13 @@ KERBEROS_MACHINE_PRINCIPAL = 'WIN11$@HAGLAND.DOMAIN'
 def _make_csr(common_name=None):
     """A naked (no CN, no SAN) CSR when common_name is None -- what real
     Windows GPO machine autoenrollment submits -- else a normal CSR with
-    its own subject, e.g. a manually-typed certmgr.msc/certreq request."""
+    its own subject and clientAuth, e.g. a manually-typed certmgr.msc/certreq request."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     attrs = [x509.NameAttribute(NameOID.COMMON_NAME, common_name)] if common_name else []
-    csr = x509.CertificateSigningRequestBuilder().subject_name(
-        x509.Name(attrs)
-    ).sign(key, hashes.SHA256())
-    return csr, key
+    builder = x509.CertificateSigningRequestBuilder().subject_name(x509.Name(attrs))
+    if common_name:
+        builder = builder.add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False)
+    return builder.sign(key, hashes.SHA256()), key
 
 
 def _configure_ad_connector(app, enabled=True):
@@ -63,7 +63,8 @@ def _supplied_subject_template(app, ca_id):
     a manual request keeps its own subject only under such a template."""
     with app.app_context():
         template = CertificateTemplate(name=f'Strong Mapping supplied subject {ca_id}',
-                                       template_type='usr_cert', extensions_template='{}', is_active=True)
+                                       template_type='usr_cert', is_active=True,
+                                       extensions_template='{"extended_key_usage": ["clientAuth"]}')
         db.session.add(template)
         db.session.flush()
         db.session.add(CATemplatePin(ca_id=ca_id, template_id=template.id))

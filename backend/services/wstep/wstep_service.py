@@ -757,9 +757,9 @@ def _directory_subject(ca, template, csr, principal, sam_account_name):
 
     A template whose subject is built by the CA (MS-WCCE 3.2.2.6.2.1.4.5.9: the CA
     MUST ignore the request's subject) takes it from AD, never from the CSR, and
-    only for its kind of principal. A naked CSR is built from AD whatever the
-    template; a request matching no template keeps its subject only when the CA
-    offers a template announcing a client-supplied one."""
+    only for its kind of principal. A naked CSR, or one matching no template, is
+    built from AD too: only a matched template announcing a client-supplied
+    subject keeps the request's."""
     from services.ad_connector import lookup
 
     is_machine = lookup.is_machine_principal(principal)
@@ -770,9 +770,7 @@ def _directory_subject(ca, template, csr, principal, sam_account_name):
         return None, None, f"Template '{template.name}' is issued to users, not computers"
 
     naked = _is_naked_csr(csr)
-    built_by_ca = source in ('machine', 'directory') or (
-        source is None and not naked
-        and not any(_subject_source(t) == 'request' for t in _ca_templates(ca)))
+    built_by_ca = source in ('machine', 'directory') or (source is None and not naked)
     if not (naked or built_by_ca):
         return None, None, None
 
@@ -787,6 +785,8 @@ def _directory_subject(ca, template, csr, principal, sam_account_name):
         subject, san = _user_directory_subject(sam_account_name)
 
     if subject is None and built_by_ca and not naked:
+        if template is None and sam_account_name and not is_machine:
+            return None, None, 'The request matches no certificate template whose subject it may supply'
         return None, None, ('The certificate subject is built from Active Directory, '
                             'which could not resolve the requester')
     return subject, san, None
@@ -838,12 +838,12 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     and that DNS name as SAN, a "Build subject from Active Directory"
     template the user's directory-path DN plus its ``userPrincipalName``
     (and ``mail`` when valid) as SAN, whatever the CSR asks, and each refuses
-    the other kind of principal. A naked CSR (see ``_is_naked_csr``) is
-    built the same way whatever the template, as GPO autoenrollment expects;
+    the other kind of principal. A naked CSR (see ``_is_naked_csr``), or one
+    matching no template, is built the same way, as GPO autoenrollment expects;
     a user's only when a template opted in (``_user_ad_derivation_enabled``).
-    A template announcing a client-supplied subject keeps the CSR's.
+    Only a matched template announcing a client-supplied subject keeps the CSR's.
     Derivation never fails open: a naked CSR falls through to the normal
-    rejection, a populated one under a CA-built template is refused.
+    rejection, a populated one under a CA-built template or none is refused.
 
     Enroll ACL: see ``_required_enroll_acl_groups`` for exactly which
     template's ``allowed_ad_group`` applies (the matched template's own,
@@ -951,6 +951,11 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             ca, matched_template, csr, kerberos_principal, kerberos_sam_account_name)
         if refusal:
             return None, refusal
+        # Without EKUs the default profile would give serverAuth to the name the request chose
+        if (matched_template is not None and _subject_source(matched_template) == 'request'
+                and not _template_extra_ekus(matched_template)):
+            return None, (f"Template '{matched_template.name}' lets the request name its subject "
+                          'but configures no Extended Key Usage')
     if override_subject is None and _is_naked_csr(csr):
         return None, 'CSR subject must include a non-empty CN or a SubjectAltName'
 
@@ -1007,6 +1012,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             # extension, whatever cert_type is — extra_ekus is the only
             # way a Smartcard Logon template still issues correctly.
             extra_ekus=_template_extra_ekus(matched_template),
+            # As in AD CS and on renewal, the template's EKUs replace the request's
+            template_ekus=_template_extra_ekus(matched_template) or None,
             policy_template_id=getattr(matched_template, 'id', None),
             template_id=getattr(matched_template, 'id', None),
         )
