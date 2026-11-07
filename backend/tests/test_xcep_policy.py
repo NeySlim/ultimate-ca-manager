@@ -7,6 +7,7 @@ from lxml import etree
 
 from models import CA, CATemplatePin, CertificateTemplate, db
 from models.system_config import SystemConfig
+from tests.fixtures.templates import delete_templates
 from services.wstep.soap_envelope import SOAP_NS
 
 
@@ -61,17 +62,11 @@ def xcep_config(app, create_ca):
         db.session.add(pin)
         db.session.commit()
         template_id = template.id
-        pin_id = pin.id
 
     yield {'ca': ca_data, 'template_id': template_id}
 
     with app.app_context():
-        pin_row = db.session.get(CATemplatePin, pin_id)
-        if pin_row:
-            db.session.delete(pin_row)
-        tmpl = db.session.get(CertificateTemplate, template_id)
-        if tmpl:
-            db.session.delete(tmpl)
+        delete_templates([template_id])
         db.session.commit()
         for key, value in previous.items():
             row = SystemConfig.query.filter_by(key=key).first()
@@ -350,9 +345,7 @@ def test_get_policies_falls_back_to_active_templates_when_unpinned(client, app, 
         assert 'XCEP Fallback Template' in names
     finally:
         with app.app_context():
-            tmpl = db.session.get(CertificateTemplate, template_id)
-            if tmpl:
-                db.session.delete(tmpl)
+            delete_templates([template_id])
             db.session.commit()
             if previous_value is None:
                 row = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
@@ -410,10 +403,7 @@ def test_get_policies_autoenroll_reflects_per_template_flag(client, app, create_
         assert manual_permission.find(f'{{{XCEP_NS}}}autoEnroll').text == 'false'
     finally:
         with app.app_context():
-            for tid in (auto_id, manual_id):
-                tmpl = db.session.get(CertificateTemplate, tid)
-                if tmpl:
-                    db.session.delete(tmpl)
+            delete_templates([auto_id, manual_id])
             db.session.commit()
             if previous_value is None:
                 row = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
@@ -488,10 +478,7 @@ def test_get_policies_template_oid_arcs_fit_uint32(client, app, create_ca):
                 pin_row = db.session.get(CATemplatePin, pid)
                 if pin_row:
                     db.session.delete(pin_row)
-            for tid in template_ids:
-                tmpl = db.session.get(CertificateTemplate, tid)
-                if tmpl:
-                    db.session.delete(tmpl)
+            delete_templates(template_ids)
             db.session.commit()
             if previous_value is None:
                 row = SystemConfig.query.filter_by(key='xcep_ca_refid').first()

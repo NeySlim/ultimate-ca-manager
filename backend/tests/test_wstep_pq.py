@@ -12,6 +12,7 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 from models import CA, CATemplatePin, db
 from models.certificate_template import CertificateTemplate
+from tests.fixtures.templates import delete_templates
 from services.ca_service import CAService
 from services.wstep import wstep_service, ws_security
 from services.wstep.rst_parser import parse_rst
@@ -132,8 +133,7 @@ def pinned_templates(app, create_ca):
         return db.session.get(CA, ca_data['id']), ids
     yield _pin
     with app.app_context():
-        CATemplatePin.query.filter(CATemplatePin.template_id.in_(made)).delete(synchronize_session=False)
-        CertificateTemplate.query.filter(CertificateTemplate.id.in_(made)).delete(synchronize_session=False)
+        delete_templates(made)
         db.session.commit()
 
 

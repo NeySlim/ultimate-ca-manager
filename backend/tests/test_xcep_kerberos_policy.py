@@ -16,6 +16,7 @@ from lxml import etree
 
 from models import CA, CATemplatePin, CertificateTemplate, db
 from models.system_config import SystemConfig
+from tests.fixtures.templates import delete_templates
 from services.kerberos import negotiate_auth
 from services.wstep.soap_envelope import SOAP_NS
 
@@ -70,17 +71,11 @@ def xcep_kerberos_config(app, create_ca):
         db.session.add(pin)
         db.session.commit()
         template_id = template.id
-        pin_id = pin.id
 
     yield {'ca': ca_data}
 
     with app.app_context():
-        pin_row = db.session.get(CATemplatePin, pin_id)
-        if pin_row:
-            db.session.delete(pin_row)
-        tmpl = db.session.get(CertificateTemplate, template_id)
-        if tmpl:
-            db.session.delete(tmpl)
+        delete_templates([template_id])
         db.session.commit()
         for key, value in previous.items():
             row = SystemConfig.query.filter_by(key=key).first()
