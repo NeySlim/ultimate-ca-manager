@@ -540,6 +540,9 @@ class TestMtlsUnderARevokedCaAboveTheIssuer:
 
     @pytest.fixture
     def chain(self, app, auth_client, create_ca, create_cert):
+        from models.auth_certificate import AuthCertificate
+        with app.app_context():
+            last = db.session.query(db.func.max(AuthCertificate.id)).scalar() or 0
         root = create_ca(cn='mTLS chain root')
         mid = create_ca(cn='mTLS chain L1', type='intermediate', parentCAId=root['id'])
         low = create_ca(cn='mTLS chain L2', type='intermediate', parentCAId=mid['id'])
@@ -554,7 +557,10 @@ class TestMtlsUnderARevokedCaAboveTheIssuer:
                                  data=json.dumps({'reason': 'cACompromise'}),
                                  content_type='application/json')
             assert r.status_code == 200, r.data
-        return leaf, revoke_l1
+        yield leaf, revoke_l1
+        with app.app_context():  # an admin enrolment would change later mTLS settings tests
+            AuthCertificate.query.filter(AuthCertificate.id > last).delete()
+            db.session.commit()
 
     def test_login_is_refused(self, app, auth_client, chain):
         leaf, revoke_l1 = chain
