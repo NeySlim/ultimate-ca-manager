@@ -47,7 +47,9 @@ class NetcupDnsProvider(BaseDnsProvider):
                 self.BASE_URL,
                 json=payload,
                 timeout=30,
-                headers={'Content-Type': 'application/json'}
+                headers={'Content-Type': 'application/json'},
+                # A 307/308 to another host would resend the API password in the body
+                allow_redirects=False,
             )
             
             if response.status_code >= 400:

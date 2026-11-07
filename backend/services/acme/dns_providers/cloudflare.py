@@ -77,7 +77,9 @@ class CloudflareDnsProvider(BaseDnsProvider):
                 headers=self._get_headers(),
                 json=data,
                 params=params,
-                timeout=30
+                timeout=30,
+                # requests keeps X-Auth-Key on a redirect to another host
+                allow_redirects=False,
             )
             
             result = response.json()
@@ -158,15 +160,19 @@ class CloudflareDnsProvider(BaseDnsProvider):
         if not records:
             return True, "Record not found (already deleted?)"
         
-        deleted = 0
+        deleted, refused = 0, []
         for record in records:
             if not self.txt_matches(record.get('content'), record_value):
                 continue
-            success, _ = self._request('DELETE', f'/zones/{zone_id}/dns_records/{record["id"]}')
+            success, result = self._request('DELETE', f'/zones/{zone_id}/dns_records/{record["id"]}')
             if success:
                 deleted += 1
-        
+            else:
+                refused.append(str(result))
+
         logger.info(f"Cloudflare: Deleted {deleted} TXT record(s) for {record_name}")
+        if refused:
+            return False, f"Failed to delete record: {'; '.join(refused)}"
         return True, f"Deleted {deleted} record(s)"
     
     def test_connection(self) -> Tuple[bool, str]:

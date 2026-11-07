@@ -99,7 +99,9 @@ class OvhDnsProvider(BaseDnsProvider):
                 url=url,
                 headers=headers,
                 data=body if body else None,
-                timeout=30
+                timeout=30,
+                # requests keeps the X-Ovh-* credentials on a redirect to another host
+                allow_redirects=False,
             )
             
             if response.status_code >= 400:

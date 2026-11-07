@@ -50,7 +50,9 @@ class ClouDnsDnsProvider(BaseDnsProvider):
         if params:
             p.update(params)
         try:
-            resp = requests.post(f"{self.BASE_URL}{path}", data=p, timeout=30)
+            # A 307/308 to another host would resend auth-password in the body
+            resp = requests.post(f"{self.BASE_URL}{path}", data=p, timeout=30,
+                                 allow_redirects=False)
             data = resp.json()
             if isinstance(data, dict) and data.get('status') == 'Failed':
                 return False, data.get('statusDescription', 'Unknown error')

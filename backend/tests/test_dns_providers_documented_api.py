@@ -903,7 +903,7 @@ class FakePorkbun:
         self.next_id = 101
         self.fail = None
 
-    def post(self, url, json=None, timeout=None, headers=None):
+    def post(self, url, json=None, timeout=None, headers=None, allow_redirects=True):
         path, _ = _split(url, self.BASE)
         if (json or {}).get('apikey') != 'k' or json.get('secretapikey') != 's':
             return _Resp(403, {'status': 'ERROR', 'code': 'INVALID_API_KEY', 'message': 'Invalid API key.'})

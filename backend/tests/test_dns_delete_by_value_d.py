@@ -41,7 +41,7 @@ class FakeOvh:
         assert url.endswith('/auth/time')
         return _Resp(200, text='0')
 
-    def request(self, method, url, headers=None, data=None, timeout=None):
+    def request(self, method, url, headers=None, data=None, timeout=None, allow_redirects=True):
         parts = urlsplit(url)
         path = parts.path.split('/1.0', 1)[1]
         query = parse_qs(parts.query)
@@ -94,11 +94,11 @@ class FakeRackspace:
         self.next_id = 1
         self.deleted = []
 
-    def post(self, url, json=None, timeout=None):
+    def post(self, url, json=None, timeout=None, allow_redirects=True):
         return _Resp(200, {'access': {'token': {'id': 'tok'}, 'serviceCatalog': [
             {'name': 'cloudDNS', 'endpoints': [{'publicURL': self.ENDPOINT}]}]}})
 
-    def request(self, method, url, headers=None, json=None, timeout=None):
+    def request(self, method, url, headers=None, json=None, timeout=None, allow_redirects=True):
         parts = urlsplit(url[len(self.ENDPOINT):])
         query = parse_qs(parts.query)
         if method == 'GET' and parts.path == '/domains':
@@ -139,7 +139,8 @@ class FakeScaleway:
         self.next_id = 1
         self.patches = []
 
-    def request(self, method, url, headers=None, json=None, params=None, timeout=None):
+    def request(self, method, url, headers=None, json=None, params=None, timeout=None,
+                allow_redirects=True):
         path = url.split('/domain/v2beta1', 1)[1]
         if method == 'GET' and path == '/dns-zones':
             return _Resp(200, {'dns_zones': [{'domain': 'example.com'}]})

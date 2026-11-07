@@ -24,7 +24,7 @@ class FakeNs1:
         self.calls = []
         self.get_status = None
 
-    def __call__(self, method, url, headers=None, json=None, timeout=None):
+    def __call__(self, method, url, headers=None, json=None, timeout=None, allow_redirects=True):
         path = url.removeprefix(Ns1DnsProvider.BASE_URL)
         self.calls.append((method, path, json))
         if method == 'GET' and path == '/zones':

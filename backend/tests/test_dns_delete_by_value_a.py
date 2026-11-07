@@ -122,7 +122,7 @@ def test_bookmyname_removes_the_exact_value(monkeypatch):
 class FakeBunny(_PerRecordFake):
     value_key = 'Value'
 
-    def __call__(self, method, url, headers=None, json=None, timeout=None):
+    def __call__(self, method, url, headers=None, json=None, timeout=None, allow_redirects=True):
         path, _ = _split(url, 'https://api.bunny.net')
         if method == 'GET' and path == '/dnszone':
             return _Resp(200, {'Items': [{'Id': 3, 'Domain': 'example.com'}]})
@@ -164,7 +164,7 @@ class FakeClouDns(_PerRecordFake):
                                if r['host'] == params['host'] and r['type'] == params['type']})
         return _Resp(200, {'status': 'Failed', 'statusDescription': 'Invalid request'})
 
-    def post(self, url, data=None, timeout=None):
+    def post(self, url, data=None, timeout=None, allow_redirects=True):
         path, _ = _split(url, self.BASE)
         if path == '/dns/add-record.json':
             self.add({'type': data['record-type'], 'host': data['host'], 'record': data['record']})
@@ -247,7 +247,7 @@ def test_dnsimple_deletes_one_value(monkeypatch):
 # --- DNS Made Easy --------------------------------------------------------------
 
 class FakeDnsMadeEasy(_PerRecordFake):
-    def __call__(self, method, url, headers=None, json=None, timeout=None):
+    def __call__(self, method, url, headers=None, json=None, timeout=None, allow_redirects=True):
         path, query = _split(url, 'https://api.dnsmadeeasy.com/V2.0')
         if method == 'GET' and path == '/dns/managed/':
             return _Resp(200, {'data': [{'id': 6, 'name': 'example.com'}]})

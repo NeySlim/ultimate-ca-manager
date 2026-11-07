@@ -86,7 +86,8 @@ class FakeCloudflare:
         self.records = []
         self.next_id = 1
 
-    def __call__(self, method, url, headers=None, json=None, params=None, timeout=None):
+    def __call__(self, method, url, headers=None, json=None, params=None, timeout=None,
+                 allow_redirects=True):
         path = url.split('/client/v4', 1)[1]
         ok = lambda result: _Resp(200, {'success': True, 'result': result})
         if path == '/zones':

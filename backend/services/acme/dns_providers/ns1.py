@@ -26,7 +26,9 @@ class Ns1DnsProvider(BaseDnsProvider):
     def _request(self, method: str, path: str, data: Optional[Dict] = None) -> Tuple[bool, Any]:
         url = f"{self.BASE_URL}{path}"
         try:
-            resp = requests.request(method=method, url=url, headers=self._get_headers(), json=data, timeout=30)
+            resp = requests.request(method=method, url=url, headers=self._get_headers(), json=data, timeout=30,
+                                # requests keeps X-NSONE-Key on a redirect to another host
+                                allow_redirects=False)
             if resp.status_code >= 400:
                 try:
                     error_msg = resp.json().get('message', resp.reason)

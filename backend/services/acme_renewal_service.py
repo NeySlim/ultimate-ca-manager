@@ -5,6 +5,7 @@ Automatically renews Let's Encrypt certificates before expiry.
 import base64
 import json
 import logging
+import random
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
@@ -59,6 +60,23 @@ class RenewalBlocked(Exception):
 # The scheduler is process-local, so this is sufficient to prevent repeated
 # polling on each scheduler tick without adding persistent schema state.
 _ARI_CACHE = {}
+# Interval of the scheduled renewal pass (acme_auto_renewal task)
+RENEWAL_PASS_SECONDS = 21600
+# RFC 9773 §4.2: the renewal instant drawn per certificate, kept while its window is unchanged
+_ARI_PICKS = {}
+_ARI_MIN_RETRY = timedelta(minutes=1)
+_ARI_MAX_RETRY = timedelta(days=1)
+
+
+def _renewal_instant(cache_key, window):
+    """A uniform random instant of the suggested window, drawn once per window."""
+    bounds = (window['start'], window['end'])
+    picked = _ARI_PICKS.get(cache_key)
+    if picked and picked[0] == bounds:
+        return picked[1]
+    instant = bounds[0] + (bounds[1] - bounds[0]) * random.random()
+    _ARI_PICKS[cache_key] = (bounds, instant)
+    return instant
 
 
 def renewal_client(order):
@@ -75,16 +93,23 @@ def renewal_client(order):
 def _cached_renewal_info(order, certificate, now):
     """Return upstream ARI data while honoring Retry-After."""
     cache_key = (order.acme_client_account_id, certificate.id)
+    # RFC 9773 §4.3: an expired certificate's RenewalInfo is never checked
+    valid_to = getattr(certificate, 'valid_to', None)
+    if valid_to is not None and valid_to < now:
+        _ARI_CACHE.pop(cache_key, None)
+        return None
     cached = _ARI_CACHE.get(cache_key)
     if cached and cached.get('retry_after') and now < cached['retry_after']:
         return cached['info']
 
     client = renewal_client(order)
     info = client.get_renewal_info(certificate)
-    if info and info.get('retry_after') and info['retry_after'] > now:
+    if info and info.get('retry_after'):
+        # RFC 9773 §4.3.2: the checking interval is kept between one minute and one day
+        retry_after = min(max(info['retry_after'], now + _ARI_MIN_RETRY), now + _ARI_MAX_RETRY)
         _ARI_CACHE[cache_key] = {
             'info': info,
-            'retry_after': info['retry_after'],
+            'retry_after': retry_after,
         }
     else:
         _ARI_CACHE.pop(cache_key, None)
@@ -98,8 +123,10 @@ def _order_is_due(order, now, fallback_threshold):
         try:
             info = _cached_renewal_info(order, certificate, now)
             if info:
-                window = info['suggested_window']
-                return now >= window['start']
+                # RFC 9773 §4.2 step 5: an instant before the next pass is renewed now
+                instant = _renewal_instant((order.acme_client_account_id, certificate.id),
+                                           info['suggested_window'])
+                return instant <= now + timedelta(seconds=RENEWAL_PASS_SECONDS)
         except Exception as exc:
             logger.warning(
                 "Could not retrieve upstream renewal information for order %s: %s",

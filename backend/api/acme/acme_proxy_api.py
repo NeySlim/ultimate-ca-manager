@@ -21,6 +21,7 @@ from services.acme.acme_proxy_service import (
     AcmeProxyService,
     ProxyChallengeIdentifierError,
     ProxyDns01OnlyError,
+    ProxyInvalidProfileError,
     ProxySingleTxtValueError,
     ProxyOrderNotReadyError,
     ProxyResourceNotFoundError,
@@ -44,6 +45,7 @@ from services.acme.jws_problems import jws_problem
 from services.acme.identifiers import validate_acme_identifier
 from services.acme.jwk_thumbprint import jwk_thumbprint_or_none
 from services.acme.requested_validity import parse_order_time
+from services.acme.upstream_problem import UpstreamProblem
 from utils.acme_csr import decode_csr_b64
 from utils.acme_public_url import get_acme_public_origin, get_acme_proxy_public_base
 
@@ -112,6 +114,26 @@ def proxy_error(error_type, detail, status_code=400):
     resp = make_response(jsonify(error_data), status_code)
     resp.headers['Content-Type'] = 'application/problem+json'
     resp.headers['Replay-Nonce'] = _get_nonce()
+    return resp
+
+
+def upstream_problem_error(exc):
+    """The upstream CA's problem, status and Retry-After as the client sees them."""
+    logger.warning("ACME proxy upstream refusal: %s", exc)
+    body, status = exc.client_problem()
+    resp = make_response(jsonify(body), status)
+    resp.headers['Content-Type'] = 'application/problem+json'
+    resp.headers['Replay-Nonce'] = _get_nonce()
+    if exc.retry_after:
+        resp.headers['Retry-After'] = exc.retry_after
+    return resp
+
+
+def _relay_retry_after(resp, svc):
+    """Copy the upstream Retry-After of the last order or authz read (RFC 8555 §7.1.3)."""
+    value = getattr(svc, 'retry_after', None)
+    if isinstance(value, str) and value:
+        resp.headers['Retry-After'] = value
     return resp
 
 
@@ -627,7 +649,8 @@ def new_order(slug=None):
             )
 
     try:  # malformed dates and upstream failures are mapped below
-        not_before = parse_order_time(payload.get('notBefore'), 'notBefore')
+        not_before, not_after = (parse_order_time(payload.get(field), field)
+                                 for field in ('notBefore', 'notAfter'))
 
         replaces = payload.get('replaces')
         if replaces is not None and (
@@ -641,9 +664,11 @@ def new_order(slug=None):
         svc = get_proxy_service(slug)
         order_data, order_id = svc.new_order(
             identifiers,
-            not_before,
+            not_before=not_before,
+            not_after=not_after,
             client_thumbprint=client_thumbprint,
             replaces=replaces,
+            profile=payload.get('profile'),
         )
 
         order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
@@ -655,10 +680,14 @@ def new_order(slug=None):
         return proxy_error('unsupportedIdentifier', str(e), 400)
     except ProxySingleTxtValueError as e:
         return proxy_error('rejectedIdentifier', str(e), 400)
+    except ProxyInvalidProfileError as e:
+        return proxy_error('invalidProfile', str(e), 400)
     except ValueError as e:
         return proxy_error("malformed", str(e))
     except ProxyEndpointNotConfiguredError as e:
         return proxy_error("malformed", str(e), 404)
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except RuntimeError as e:
         logger.warning(f"ACME proxy new-order: {e}")
         return proxy_error("serverInternal", "Failed to create order", 500)
@@ -694,7 +723,9 @@ def authz(authz_id, slug=None):
             return proxy_error("malformed", "Authorization not found", 404)
 
         data, _ = result
-        return proxy_response(data)
+        return _relay_retry_after(proxy_response(data), svc)
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except PermissionError as e:
         return proxy_error("unauthorized", str(e), 403)
     except ProxyResourceNotFoundError as e:
@@ -729,7 +760,9 @@ def challenge(chall_id, slug=None):
         resp = proxy_response(data)
         if link_header:
             resp.headers['Link'] = link_header
-        return resp
+        return _relay_retry_after(resp, svc)
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except PermissionError as e:
         return proxy_error("unauthorized", str(e), 403)
     except ProxyResourceNotFoundError as e:
@@ -771,7 +804,9 @@ def get_order(order_id, slug=None):
         order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
         resp = proxy_response(data)
         resp.headers['Location'] = order_url
-        return resp
+        return _relay_retry_after(resp, svc)
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except PermissionError as e:
         return proxy_error("unauthorized", str(e), 403)
     except ProxyResourceNotFoundError as e:
@@ -823,7 +858,9 @@ def finalize(order_id, slug=None):
         order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
         resp = proxy_response(data)
         resp.headers['Location'] = order_url
-        return resp
+        return _relay_retry_after(resp, svc)
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except PermissionError as e:
         return proxy_error("unauthorized", str(e), 403)
     except ProxyResourceNotFoundError as e:
@@ -862,6 +899,8 @@ def cert(cert_id, slug=None):
         if link_header:
             resp.headers['Link'] = link_header
         return resp
+    except UpstreamProblem as e:
+        return upstream_problem_error(e)
     except PermissionError as e:
         return proxy_error("unauthorized", str(e), 403)
     except ProxyResourceNotFoundError as e:
@@ -960,15 +999,7 @@ def revoke_cert(slug=None):
         upstream_response = svc.revoke_certificate(cert_obj, reason)
         status_code = upstream_response.status_code
         if not 200 <= status_code < 300:
-            logger.warning(
-                "ACME proxy upstream revocation failed with HTTP %s",
-                status_code,
-            )
-            return proxy_error(
-                "serverInternal",
-                "Upstream certificate revocation failed",
-                status_code,
-            )
+            return upstream_problem_error(UpstreamProblem.from_response(upstream_response))
 
         if not cert.revoked:
             try:

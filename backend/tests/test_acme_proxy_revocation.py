@@ -239,4 +239,6 @@ def test_proxy_revoke_relays_upstream_failure_status(
     )
 
     assert response.status_code == 403
-    assert response.get_json()['detail'] == 'Upstream certificate revocation failed'
+    problem = response.get_json()
+    assert problem['type'] == 'urn:ietf:params:acme:error:serverInternal'
+    assert 'HTTP 403' in problem['detail']

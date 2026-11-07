@@ -108,7 +108,8 @@ class FakeInwx:
         self.records = []
         self.deleted = []
 
-    def __call__(self, url, json=None, timeout=None, headers=None, cookies=None):
+    def __call__(self, url, json=None, timeout=None, headers=None, cookies=None,
+                 allow_redirects=True):
         method, params = json['method'], json['params']
         ok = lambda data=None: _Resp(200, {'code': 1000, 'resData': data or {}})
         if method in ('account.login', 'account.logout'):
@@ -143,7 +144,8 @@ class FakeIonos:
         self.records = []
         self.deleted = []
 
-    def __call__(self, method, url, headers=None, json=None, params=None, timeout=None):
+    def __call__(self, method, url, headers=None, json=None, params=None, timeout=None,
+                 allow_redirects=True):
         path = url.removeprefix('https://api.hosting.ionos.com/dns/v1')
         if path == '/zones':
             return _Resp(200, [{'id': 'z1', 'name': 'example.com'}])
@@ -361,7 +363,7 @@ class FakeNetcup:
                          'priority': '', 'state': 'yes'}]
         self.updates = []
 
-    def __call__(self, url, json=None, timeout=None, headers=None):
+    def __call__(self, url, json=None, timeout=None, headers=None, allow_redirects=True):
         action, param = json['action'], json['param']
         ok = lambda data=None: _Resp(200, {'status': 'success', 'responsedata': data or {}})
         if action == 'login':

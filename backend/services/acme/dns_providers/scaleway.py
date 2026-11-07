@@ -56,7 +56,9 @@ class ScalewayDnsProvider(BaseDnsProvider):
                 headers=self._get_headers(),
                 json=data,
                 params=params,
-                timeout=30
+                timeout=30,
+                # requests keeps X-Auth-Token on a redirect to another host
+                allow_redirects=False,
             )
             
             if response.status_code >= 400:

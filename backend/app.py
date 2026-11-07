@@ -678,11 +678,11 @@ def create_app(config_name=None):
         
         # Register ACME auto-renewal task (runs every 6 hours)
         try:
-            from services.acme_renewal_service import scheduled_acme_renewal
+            from services.acme_renewal_service import RENEWAL_PASS_SECONDS, scheduled_acme_renewal
             scheduler.register_task(
                 name="acme_auto_renewal",
                 func=scheduled_acme_renewal,
-                interval=21600,  # 6 hours
+                interval=RENEWAL_PASS_SECONDS,  # 6 hours
                 description="Auto-renew Let's Encrypt certificates"
             )
             app.logger.info("Registered ACME auto-renewal task (every 6 hours)")
