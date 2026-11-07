@@ -26,6 +26,8 @@ from utils import ssrf_protection
 logger = logging.getLogger(__name__)
 
 BAD_NONCE = 'urn:ietf:params:acme:error:badNonce'
+# RFC 8555 §6.1: name and version of the ACME software, sent on every request
+USER_AGENT = 'UCM-ACME-Client/2.1'
 
 # A pooled nonce is single-use and short-lived: spending a stale one costs the
 # badNonce round-trip the pool exists to avoid.

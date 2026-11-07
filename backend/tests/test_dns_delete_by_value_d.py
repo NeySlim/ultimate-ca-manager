@@ -41,7 +41,7 @@ class FakeOvh:
         assert url.endswith('/auth/time')
         return _Resp(200, text='0')
 
-    def request(self, method, url, headers=None, data=None, timeout=None):
+    def request(self, method, url, headers=None, data=None, timeout=None, allow_redirects=True):
         parts = urlsplit(url)
         path = parts.path.split('/1.0', 1)[1]
         query = parse_qs(parts.query)

@@ -6,7 +6,6 @@ import base64
 import copy
 import json
 import logging
-import re
 import secrets
 import threading
 import time
@@ -34,6 +33,7 @@ from security.encryption import encrypt_text, decrypt_text
 from utils.datetime_utils import utc_isoformat
 from services.acme.acme_client_service import AcmeClientService
 from services.acme import outbound
+from services.acme.link_header import link_values as _link_values
 from services.acme.upstream_problem import UpstreamProblem, retry_after_of
 from services.acme.acme_proxy_account import (
     resolve_proxy_account,
@@ -238,45 +238,6 @@ def _single_domain(order) -> Optional[str]:
     if len(domains) == 1 and isinstance(domains[0], str) and domains[0]:
         return strip_wildcard(domains[0])
     return None
-
-
-_LINK_PARAM_RE = re.compile(
-    r';\s*([^\s=;,]+)\s*(?:=\s*("[^"]*"|\'[^\']*\'|[^;]*))?'
-)
-
-
-def _link_values(header: str):
-    """Yield (url, params) for each value of an RFC 8288 Link header, repeated
-    headers joined by commas included."""
-    position, length = 0, len(header)
-    while position < length:
-        start = header.find('<', position)
-        if start < 0:
-            return
-        end = header.find('>', start + 1)
-        if end < 0:
-            return
-        url = header[start + 1:end].strip()
-        cursor, quote = end + 1, None
-        while cursor < length:
-            char = header[cursor]
-            if quote:
-                if char == quote:
-                    quote = None
-            elif char in '"\'':
-                quote = char
-            elif char == ',':
-                break
-            cursor += 1
-        params = {}
-        for match in _LINK_PARAM_RE.finditer(header[end + 1:cursor]):
-            name = match.group(1).lower()
-            value = (match.group(2) or '').strip()
-            if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'':
-                value = value[1:-1]
-            params.setdefault(name, value)
-        yield url, params
-        position = cursor + 1
 
 
 class AcmeProxyService:
@@ -629,6 +590,7 @@ class AcmeProxyService:
                     allow_loopback=acme_allow_loopback_upstream(),
                     timeout=self._http_timeout(),
                     verify=self.verify_ssl,
+                    headers={'User-Agent': outbound.USER_AGENT},
                 )
                 resp.raise_for_status()
                 self.directory = resp.json()
@@ -657,6 +619,7 @@ class AcmeProxyService:
             self.directory['newNonce'],
             timeout=self._http_timeout(),
             verify=self.verify_ssl,
+            headers={'User-Agent': outbound.USER_AGENT},
         )
 
     def _sign_and_post(self, url: str, payload, nonce: str, kid: str = None) -> requests.Response:
@@ -686,7 +649,7 @@ class AcmeProxyService:
             "signature": base64.urlsafe_b64encode(sig).rstrip(b'=').decode('utf-8')
         }
 
-        headers = {"Content-Type": "application/jose+json"}
+        headers = {"Content-Type": "application/jose+json", "User-Agent": outbound.USER_AGENT}
         self._validate_outbound_acme_url(url)
         resp = ssrf_protection.safe_request_post(
             url,
@@ -796,7 +759,7 @@ class AcmeProxyService:
             "newAccount": f"{self.base_url}/new-account",
             "newOrder": f"{self.base_url}/new-order",
             "revokeCert": f"{self.base_url}/revoke-cert",
-            "keyChange": f"{self.base_url}/key-change",
+            # No keyChange: the proxy refuses key rollover (501), so it is not advertised
             "meta": meta,
         }
         # Advertise ARI (RFC 9773) when the upstream does. Served locally

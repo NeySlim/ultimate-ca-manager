@@ -417,10 +417,8 @@ def test_R4_respond_challenge_closes_only_failed_rows(app, env, monkeypatch,
         _seed_rows(a, b)
         svc = proxy_mod.AcmeProxyService('https://ucm.example/acme/proxy')
         svc.upstream_directory_url = f'{UPSTREAM}/directory'
-        chall = {'type': 'dns-01', 'url': CHALL_URL, 'status': chall_status,
-                 'token': TOKEN}
-        resp = _FakeResp(chall)
-        resp.headers = {'Link': f'<{AUTHZ_URL}>;rel="up"'}
+        status = chall_status if chall_status != 'processing' else 'pending'
+        resp = _FakeResp(_authz(status=status, chall_status=chall_status))
         monkeypatch.setattr(svc, '_post_with_account', lambda *_a, **_k: resp)
         svc.respond_challenge(_b64(CHALL_URL), requester_account_id='acct-a',
                               requester_thumbprint='thumb-a')

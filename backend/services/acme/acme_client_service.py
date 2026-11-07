@@ -208,7 +208,7 @@ class AcmeClientService:
 
         self.verify_ssl = self._get_verify_ssl()
         self.session = create_session(verify_ssl=self.verify_ssl)
-        self.session.headers['User-Agent'] = 'UCM-ACME-Client/2.1'
+        self.session.headers['User-Agent'] = outbound.USER_AGENT
         if not self.verify_ssl:
             logger.warning(
                 "ACME client SSL verification disabled by settings "
@@ -519,7 +519,7 @@ class AcmeClientService:
             allow_loopback=acme_allow_loopback_upstream(),
             timeout=self._http_timeout(),
             verify=self.verify_ssl,
-            headers={'User-Agent': self.session.headers.get('User-Agent', 'UCM-ACME-Client/2.1')},
+            headers={'User-Agent': self.session.headers.get('User-Agent', outbound.USER_AGENT)},
         )
         resp.raise_for_status()
         self.directory = resp.json()
@@ -652,7 +652,8 @@ class AcmeClientService:
             n_bytes = (numbers.n.bit_length() + 7) // 8
             return {
                 "kty": "RSA",
-                "e": b64url(numbers.e.to_bytes(3, byteorder='big')),
+                # RFC 7518 §6.3.1.2: minimum number of octets
+                "e": b64url(numbers.e.to_bytes((numbers.e.bit_length() + 7) // 8, byteorder='big')),
                 "n": b64url(numbers.n.to_bytes(n_bytes, byteorder='big')),
             }
         elif isinstance(key, ec.EllipticCurvePrivateKey):
@@ -864,6 +865,18 @@ class AcmeClientService:
         return parsed
 
     @staticmethod
+    def _problem_detail(resp) -> str:
+        """Detail of an error response; a body that is no problem document is named by its status."""
+        try:
+            body = resp.json()
+        except Exception:
+            body = None
+        if isinstance(body, dict) and body.get('detail'):
+            return str(body['detail'])
+        retry = (getattr(resp, 'headers', None) or {}).get('Retry-After')
+        return f"HTTP {resp.status_code}" + (f" (Retry-After: {retry})" if retry else '')
+
+    @staticmethod
     def _parse_retry_after(value: Optional[str]) -> Optional[datetime]:
         if not value:
             return None
@@ -1026,8 +1039,7 @@ class AcmeClientService:
                  logger.info(f"ACME account {status}: {account_url}")
                  return True, f"Account {status} successfully", account_url
             else:
-                error = resp.json()
-                return False, f"Account registration failed: {error.get('detail', 'Unknown error')}", None
+                return False, f"Account registration failed: {self._problem_detail(resp)}", None
                 
         except Exception as e:
             logger.error(f"Account registration error: {e}")
@@ -1209,8 +1221,7 @@ class AcmeClientService:
                     resp = self._post(directory['newOrder'], payload)
 
             if resp.status_code not in [200, 201]:
-                error = resp.json()
-                return False, f"Order creation failed: {error.get('detail', 'Unknown error')}", None
+                return False, f"Order creation failed: {self._problem_detail(resp)}", None
             
             order_data = resp.json()
             order_url = resp.headers.get('Location')
@@ -1446,8 +1457,7 @@ class AcmeClientService:
                 
                 return True, f"Challenge submitted: {result.get('status')}"
             else:
-                error = resp.json()
-                detail = error.get('detail', 'Unknown error')
+                detail = self._problem_detail(resp)
                 if 'invalid' in detail.lower():
                     return False, f'{AUTHZ_INVALID_USER_MSG} ({detail})'
                 return False, f"Challenge submission failed: {detail}"
@@ -1730,8 +1740,7 @@ class AcmeClientService:
 
                 resp = self._post(order.finalize_url, {"csr": csr_b64})
                 if resp.status_code not in [200, 201]:
-                    error = resp.json()
-                    return False, f"Finalization failed: {error.get('detail', 'Unknown error')}", None
+                    return False, f"Finalization failed: {self._problem_detail(resp)}", None
                 order_data = resp.json()
                 self.write_order_status(order, order_data.get('status', 'processing'))
                 db.session.commit()
