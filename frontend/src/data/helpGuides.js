@@ -1248,10 +1248,10 @@ Browse all certificate issuance orders:
 - Issuance timestamp
 
 ### Requested dates
-An order may carry \`notBefore\` and \`notAfter\` (cert-manager with a \`duration\`, lego \`--not-after\`). The certificate is issued with exactly those dates, or the request is refused as \`malformed\`: a window longer than the profile's validity, outside the issuing CA's validity, shortened by a policy, or already past. Without them the profile's validity applies.
+An order may carry \`notBefore\` and \`notAfter\` (cert-manager with a \`duration\`, lego \`--not-after\`). The certificate is issued with exactly those dates, or the request is refused as \`malformed\`: a window longer than the profile's validity (15 minutes of clock skew aside), outside the issuing CA's validity, or already past. A window a policy forbids, longer than its maximum validity or past a key type horizon, is refused at finalize as \`badCSR\`. Without them the profile's validity applies.
 
 ### Revocation
-A client revokes with its account key or with the certificate's own key, and the certificate it sends must match the stored one byte for byte: a serial number alone is never enough. An account holding valid, unexpired authorizations for every name and IP address of the certificate may revoke it too, whoever ordered it. Only an RSA or EC P-256, P-384 or P-521 key can sign an ACME request, so an ML-DSA, EdDSA or Brainpool certificate is revoked with the account that ordered it; UCM says so in the refusal.
+A client revokes with its account key or with the certificate's own key, and the certificate it sends must match the stored one byte for byte: a serial number alone is never enough. An account holding valid, unexpired authorizations for every name and IP address of a certificate this ACME server issued may revoke it too, whoever ordered it; authorizations granted by auto-approval do not count. Only an RSA or EC P-256, P-384 or P-521 key can sign an ACME request, so an ML-DSA, EdDSA or Brainpool certificate is revoked with the account that ordered it; UCM says so in the refusal.
 
 ## IP Address Certificates (RFC 8738)
 
