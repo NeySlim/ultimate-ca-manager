@@ -15,6 +15,7 @@ Architecture:
 from flask import Blueprint, request, jsonify, session, current_app, g
 from auth.unified import AuthManager
 from auth.session_payload import auth_session_payload
+from auth.session_start import begin_session
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils import trusted_proxy
@@ -272,7 +273,7 @@ def login_password():
     from auth.twofa_enforcement import second_factor_methods
     second_factors = second_factor_methods(user)
     if second_factors:
-        session.clear()
+        begin_session(user)
         session['pending_2fa_user_id'] = user.id
         session['pending_2fa_username'] = user.username
         session['pending_2fa_method'] = 'password'
@@ -303,7 +304,7 @@ def login_password():
     from auth.twofa_enforcement import must_enroll_2fa, ENROLL_SESSION_KEY
     if must_enroll_2fa(user, auth_method='password'):
         now = utc_now()
-        session.clear()
+        begin_session(user)
         session['user_id'] = user.id
         session['username'] = user.username
         session['auth_method'] = 'password'
@@ -335,7 +336,7 @@ def login_password():
 
     # No 2FA - create full session
     now = utc_now()
-    session.clear()
+    begin_session(user)
     session['user_id'] = user.id
     session['username'] = user.username
     session['auth_method'] = 'password'
@@ -385,7 +386,6 @@ def login_2fa():
 
     Requires a pending 2FA session (from password login)
     """
-    import pyotp
     from services.audit_service import AuditService
 
     # Pending 2FA session, with brute-force protection (SEC-03)
@@ -409,10 +409,14 @@ def login_2fa():
     if not code or len(code) < 6:
         return error_response('Invalid verification code format', 400)
 
-    # Verify TOTP code (a key-only account has none to check)
-    totp_ok = bool(user.totp_confirmed and user.totp_secret) and \
-        pyotp.TOTP(user.totp_secret).verify(str(code), valid_window=1)
-    if not totp_ok:
+    # Verify TOTP code (a key-only account has none to check), once only
+    from auth.totp import consume_totp
+    totp_ok = bool(user.totp_confirmed and user.totp_secret) and consume_totp(user, code)
+    if totp_ok:
+        ok, _err = safe_commit(logger, "Failed to record the TOTP step")
+        if not ok:
+            return _err
+    else:
         # Check recovery codes - atomic verify-and-consume to prevent
         # double-spend (two parallel logins replaying the same code).
         from utils.backup_codes import consume_code, count_remaining
@@ -453,7 +457,8 @@ def _pending_2fa_user():
     if _check_2fa_lockout(lockout_key, _2fa_failed_attempts):
         return None, None, error_response('Too many failed attempts. Try again later.', 429)
     user = db.session.get(User, pending_user_id)
-    if not user or not user.active:
+    from auth.session_start import session_is_current
+    if not user or not user.active or not session_is_current(user):
         session.clear()
         return None, None, error_response('Invalid credentials', 401)
     return user, lockout_key, None
@@ -465,7 +470,7 @@ def _complete_2fa_login(user, auth_method, details):
     from services.audit_service import AuditService
 
     now = utc_now()
-    session.clear()
+    begin_session(user)
     session['user_id'] = user.id
     session['username'] = user.username
     session['auth_method'] = auth_method
@@ -621,7 +626,7 @@ def login_mtls():
 
     # Create session
     now = utc_now()
-    session.clear()
+    begin_session(user)
     session['user_id'] = user.id
     session['username'] = user.username
     session['auth_method'] = 'mtls'
@@ -795,7 +800,7 @@ def webauthn_verify():
 
         # Create session
         now = utc_now()
-        session.clear()
+        begin_session(user)
         session['user_id'] = user.id
         session['username'] = user.username
         session['auth_method'] = 'webauthn'

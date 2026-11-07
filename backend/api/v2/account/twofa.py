@@ -18,6 +18,7 @@ from auth.twofa_enforcement import (
     enforcement_active_for, has_security_key, lock_for_factor_change, lock_user,
 )
 import pyotp
+from auth.totp import consume_totp
 import qrcode
 
 from . import bp
@@ -48,6 +49,7 @@ def enable_2fa():
 
     # Store secret temporarily (will be confirmed with code)
     user.totp_secret = secret  # Store unconfirmed
+    user.totp_last_step = None  # steps of the old secret say nothing about this one
     ok, _err = safe_commit(logger, "Failed to initialize 2FA")
     if not ok:
         return _err
@@ -85,9 +87,8 @@ def confirm_2fa():
     if not user or not user.totp_secret:
         return error_response('2FA setup not initiated', 400)
 
-    # Verify code
-    totp = pyotp.TOTP(user.totp_secret)
-    if not totp.verify(code):
+    # Verify code, once only
+    if not consume_totp(user, code):
         return error_response('Invalid verification code', 400)
 
     # Generate backup codes
@@ -150,8 +151,7 @@ def disable_2fa():
     if code:
         if not user.totp_secret:
             return error_response('2FA not enabled', 400)
-        totp = pyotp.TOTP(user.totp_secret)
-        if not totp.verify(code):
+        if not consume_totp(user, code):
             return error_response('Invalid verification code', 400)
     # Or verify with backup code
     elif backup_code:
@@ -253,9 +253,8 @@ def regenerate_recovery_codes():
     if not user or not user.totp_confirmed:
         return error_response('2FA not enabled', 400)
 
-    # Verify code
-    totp = pyotp.TOTP(user.totp_secret)
-    if not totp.verify(code):
+    # Verify code, once only
+    if not consume_totp(user, code):
         return error_response('Invalid verification code', 400)
 
     # Generate new backup codes

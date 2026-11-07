@@ -48,7 +48,7 @@ Shows the health of UCM services:
 - Service uptime
 
 ### Recent Activity
-A live feed of the latest operations: certificate issuance, revocations, imports, user logins. Updates in real-time via WebSocket.
+A live feed of the latest operations: certificate issuance, revocations, imports, user logins. Updates in real-time via WebSocket. The whole feed needs **read:audit**, as the Audit Logs page does; without it you see your own events only.
 
 ### Certificate Authorities
 Quick view of all CAs with their type (Root/Intermediate) and certificate count.
@@ -1749,7 +1749,7 @@ RBAC provides fine-grained permission management. Define custom roles with speci
 
 ## System Roles
 
-Four built-in roles that cannot be modified or deleted:
+Four built-in roles that cannot be modified or deleted. The RBAC page shows each with the permissions UCM applies to it:
 
 - **Admin**: Full access to everything
 - **Operator**: Manage certificates, CAs, CSRs, templates. No access to system settings, users, or RBAC
@@ -2296,7 +2296,7 @@ Manage your personal profile, security settings, and API keys.
 ## Security
 
 ### Password Change
-Change your current password. Must comply with the system password policy (minimum length, complexity requirements).
+Change your current password. Must comply with the system password policy (minimum length, complexity requirements). Your other sessions are signed out; the one you changed it from stays. An admin password reset or 2FA reset signs out every session of the user.
 
 When UCM asks for a new password at login (the first-boot \`admin\` account, for instance), the change comes before anything else: until it is made, the server refuses every other request of that session, API included.
 
@@ -2311,6 +2311,8 @@ Add a time-based one-time password using any authenticator app:
 > ⚠ If you lose access to your authenticator and recovery codes, an admin must disable your 2FA.
 
 To move 2FA to a new authenticator, disable it first: enabling it again while it is on is refused.
+
+Each code is accepted once (RFC 6238): a code used to sign in cannot confirm another action or a second login, so wait for the next one.
 
 ### Security Keys (WebAuthn/FIDO2)
 Register hardware security keys or biometric authenticators:

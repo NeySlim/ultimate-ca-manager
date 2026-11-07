@@ -5,6 +5,7 @@ from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
 from . import saml_sp
 from flask import request, redirect, session, Response, after_this_request
 from auth.unified import require_auth
+from auth.session_start import begin_session
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, User
@@ -306,9 +307,9 @@ def sso_callback(provider_type):
             if not ok:
                 return redirect('/login?error=callback_error')
 
-            # Establish Flask session (clear first to prevent session fixation)
+            # Establish Flask session under a new identifier (no session fixation)
             _sso_now = utc_now()
-            session.clear()
+            begin_session(user)
             session['user_id'] = user.id
             session['username'] = user.username
             session['role'] = user.role
@@ -494,9 +495,9 @@ def sso_callback(provider_type):
             if not ok:
                 return redirect('/login?error=callback_error')
 
-            # Establish Flask session (clear first to prevent session fixation)
+            # Establish Flask session under a new identifier (no session fixation)
             _saml_now = utc_now()
-            session.clear()
+            begin_session(user)
             session['user_id'] = user.id
             session['username'] = user.username
             session['role'] = user.role

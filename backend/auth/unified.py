@@ -189,7 +189,13 @@ class AuthManager:
         user = db.session.get(User, user_id)
         if not user or not user.active:
             return None
-        
+
+        from auth.session_start import session_is_current
+        if not session_is_current(user):
+            logger.info(f"Session closed by a credential change: user={user.username}")
+            session.clear()
+            return None
+
         now = utc_now()
         
         # Check absolute session lifetime (default 24h)

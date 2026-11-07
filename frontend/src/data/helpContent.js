@@ -30,7 +30,7 @@ export const helpContent = {
           { label: 'Status Distribution', text: 'Pie chart breakdown: valid / expiring / expired / revoked' },
           { label: 'Next Expiry', text: 'Certificates expiring within 30 days; the configured dedicated TSA signer is tagged with a "TSA signer" chip (v2.218)' },
           { label: 'System Status', text: 'Service health: ACME, SCEP, EST, OCSP, CRL/CDP, TSA (v2.218), auto-renewal, SMTP and webhooks. Badges show a distinct amber warning state (near-expiry TSA signer, SMTP configured but disabled) and their status message on hover' },
-          { label: 'Recent Activity', text: 'Latest operations across the system' },
+          { label: 'Recent Activity', text: 'Latest operations across the system with read:audit; without it, your own events only' },
           { label: 'Recent Certificates', text: 'Recently issued or imported certificates' },
           { label: 'Certificate Authorities', text: 'CA list with chain information' },
           { label: 'ACME Accounts', text: 'Registered ACME client accounts' },
@@ -850,7 +850,7 @@ export const helpContent = {
           { label: 'Create User', text: 'Add a new user with username, email, and initial password' },
           { label: 'Roles', text: 'Assign system or custom roles to control permissions' },
           { label: 'Status', text: 'Enable or disable user accounts' },
-          { label: 'Password Reset', text: 'Reset a user\'s password (admin action)' },
+          { label: 'Password Reset', text: 'Reset a user\'s password (admin action). The user\'s open sessions are signed out, as they are by a 2FA reset' },
           { label: 'API Keys', text: 'In a user\'s details, list their API keys and revoke a leaked or unused one: it stops working at once, and a revoked or expired key can then be deleted. Owners create their keys on their Account page' },
           { label: 'Source', text: 'Shows where each user comes from: Local (managed in UCM) or LDAP / OAuth2 / SAML (provisioned by an SSO provider). The badge displays the originating provider name.' },
         ]
@@ -899,6 +899,7 @@ export const helpContent = {
           { label: 'Permission Matrix', text: 'Check/uncheck permissions by category (CAs, Certs, Private Keys, etc.)' },
           { label: 'Coverage', text: 'Visual percentage of total permissions granted to the role' },
           { label: 'User Count', text: 'See how many users are assigned to each role' },
+          { label: 'System role permissions', text: 'A system role shows the permissions UCM applies to it; Admin shows every permission of the matrix' },
           { label: 'SSH CA permissions (v2.248)', text: 'read:ssh_cas, write:ssh_cas and delete:ssh_cas govern SSH CAs, so write:ssh no longer creates or edits them. Roles, groups and API keys holding an SSH permission received the matching one on upgrade' },
         ]
       },
@@ -1214,8 +1215,8 @@ export const helpContent = {
         title: 'Security',
         icon: Lock,
         items: [
-          { label: 'Password', text: 'Change your current password' },
-          { label: '2FA (TOTP)', text: 'Enable time-based one-time passwords via authenticator app. Enabling it again while it is on is refused: disable it first' },
+          { label: 'Password', text: 'Change your current password. Your other sessions are signed out; this one stays' },
+          { label: '2FA (TOTP)', text: 'Enable time-based one-time passwords via authenticator app. Enabling it again while it is on is refused: disable it first. Each code works once: after using one, wait for the next to confirm another action' },
           { label: 'Security Keys', text: 'Register WebAuthn/FIDO2 keys (YubiKey, fingerprint, etc.)' },
           { label: 'mTLS', text: 'Manage client certificates for mutual TLS authentication' },
           { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first-boot admin with the default changeme123, can do nothing else until it changes it, API and WebSocket included; the prompt offers Log out instead of Skip. A password set through INITIAL_ADMIN_PASSWORD does not have to be changed' },

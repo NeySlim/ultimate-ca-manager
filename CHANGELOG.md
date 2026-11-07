@@ -19,9 +19,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - PostgreSQL: UCM connects with psycopg 3, which sends values apart from the statement, so a database error that quotes the statement no longer carries them. psycopg2 is no longer shipped, and a `postgresql+psycopg2://` URL now uses psycopg 3.
 - Dependencies: SQLAlchemy 2.1 is accepted, now that every PostgreSQL URL reaches psycopg 3.
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
+- Dashboard: the Recent Activity feed shows the whole audit trail only with `read:audit`, as the Audit Logs page does; without it, a user sees their own events.
+- TOTP: the account actions that ask for a code (confirm, disable, regenerate recovery codes) accept one time step of clock drift either way, as the login does.
 
 ### Fixed
 
+- Access Control: the built-in roles showed the permissions seeded at installation (12 for Operator, which is granted 41) and Administrator's `*` as ignored. They now show what UCM applies to them.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: these providers hold one TXT value per name, so the cleanup of one order cleared the value another order was still validating. The name is now left alone while another order in progress uses it.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: an order for a domain and its wildcard could not hold both values and failed at validation, and the ACME proxy replaced the CA's value with its clients' own. Such an order, or on DuckDNS one naming two hosts under the same subdomain, is now refused at the request before the CA is asked, and the proxy publishes only the CA's value there.
 - ACME client: a CA refusal of `replaces` whose message merely contained "rateLimited" was taken for a rate limit and not retried. A rate limit is now recognised by its problem type or a 429 only (RFC 8555 §6.7).
@@ -32,10 +35,16 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- TOTP: a code already accepted was accepted again within its window, at a second login or to disable 2FA. Each code is now accepted once and an older one after it is refused (RFC 6238 §5.2, migration 135).
+- Sessions: a login kept the session identifier presented before it, so an identifier planted in a browser became the victim's session. Every login, SSO and LDAP included, now issues a new identifier and drops the old one (RFC 6265 §8.4).
+- Sessions: changing or resetting a password, an admin 2FA reset and "revoke all sessions" left the account's other sessions signed in. They now end them; the session the user acted from stays, under a new identifier.
+- Dashboard: the Recent Activity feed returned the latest audit entries, other accounts' actions and names typed at a failed login included, to any signed-in account.
+
 - mTLS behind a proxy: a certificate presented by its serial number alone, without `X-SSL-Client-I-DN` or `X-SSL-Client-Cert`, opened the enrolment bearing that serial, even one of another CA. Such a serial now opens only an enrolment that recorded no issuer, and enrolling a presented certificate requires its issuer (RFC 5280 §4.1.2.2).
 
 ### Upgrade notes
 
+- Sessions: migration 135 adds `users.totp_last_step` and `users.session_version`; sessions open at the upgrade stay valid. A script that signs in with a TOTP code must not reuse a code within its 30 s step.
 - mTLS behind a proxy: a proxy that forwards the serial number without `X-SSL-Client-I-DN` (nginx `$ssl_client_i_dn`, Apache `SSL_CLIENT_I_DN`) or `X-SSL-Client-Cert` must now forward one of them, or certificate login fails with a warning in the log; the I-DN is read in RFC 4514, RFC 1779, OpenSSL one-line and legacy forms.
 - EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the `EST key generator` certificate the SignedData carries, which chains to the issuing CA from `/cacerts` and is listed, and revoked when needed, with the CA's certificates like a delegated OCSP responder; the next encrypted request then gets a new one. Migration 132 adds the `est_signer_certs` table that names the current one; backups carry the certificate but not that table, so a restored installation issues a new one on first use.
 - EST: `serverkeygen` without `AsymmetricDecryptKeyIdentifier` now returns the key unencrypted, without the Basic password, and over mTLS the key type is chosen as over Basic, ML-DSA under an ML-DSA CA included.
