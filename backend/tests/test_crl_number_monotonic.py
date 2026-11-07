@@ -127,6 +127,27 @@ def test_a_restore_never_lowers_the_number_reached_here(app, tmp_path):
         db.session.remove()
 
 
+def test_a_replacing_restore_keeps_the_number_of_an_issuer_the_archive_lacks(app, tmp_path):
+    """An archive older than the CA prunes the CA, never the number it published."""
+    from tests.test_backup_cross_installation import Keys, PASSWORD, _installation, _service
+
+    keys = Keys(tmp_path, 'older')
+    key, cert = _authority()
+    with _installation(app, f"sqlite:///{tmp_path / 'older.db'}", keys), app.app_context():
+        _an_admin()
+        blob = _service().create_backup(PASSWORD)
+        ca = _ca_row(key, cert)
+        for _ in range(3):
+            CRLService.generate_crl(ca.id)
+        refid = ca.refid
+        _service().restore_backup(blob, PASSWORD)
+        db.session.expunge_all()
+        assert CA.query.filter_by(refid=refid).first() is None
+        again = _ca_row(key, cert)
+        assert CRLService.generate_crl(again.id).crl_number == 4
+        db.session.remove()
+
+
 # --------------------------------------------------------------------------
 # Deleted, then imported again
 # --------------------------------------------------------------------------
