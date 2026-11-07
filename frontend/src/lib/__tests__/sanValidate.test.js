@@ -31,6 +31,20 @@ describe('sanValidate CN auto-SAN', () => {
     }
   })
 
+  it('refuses what the URL parser would strip before the A-label conversion', () => {
+    for (const v of ['ü.example:443', 'ü/x.example', 'ü.example/path', 'ü.example?q', 'u@ü.example']) {
+      expect(getSanValidationError('DNS', v)).not.toBeNull()
+    }
+    expect(getSanValidationError('DNS', 'ü.example')).toBeNull()
+  })
+
+  it('refuses a fake A-label and an all-digit last label', () => {
+    for (const v of ['xn--zz.example', '256.1.1.1', '*.10.0.0.1', 'host.123']) {
+      expect(getSanValidationError('DNS', v)).not.toBeNull()
+    }
+    expect(getSanValidationError('DNS', 'XN--BCHER-KVA.example')).toBeNull()
+  })
+
   it('drops the root dot of a hostname CN from its DNS SAN', () => {
     expect(getAutoSansFromCn({ cn: 'www.example.com.', certType: 'server' })).toEqual([
       { type: 'dns', value: 'www.example.com' },

@@ -55,7 +55,7 @@ def _looks_like_ip(value: str) -> bool:
 def dns_name_syntax_error(value: str) -> str | None:
     """RFC 5280 §4.2.1.6 preferred name syntax (RFC 1034 §3.5, RFC 1123 §2.1):
     LDH labels of 1 to 63, 253 in all, a wildcard only as the whole first label,
-    no trailing dot, never the #.#.#.# form of an IP address."""
+    no trailing dot, a last label not all digits, an `xn--` label a valid A-label."""
     v = value if isinstance(value, str) else ''
     body = v[2:] if v.startswith('*.') else v
     if (not body or len(v) > 253 or v.endswith('.')
@@ -64,7 +64,25 @@ def dns_name_syntax_error(value: str) -> str | None:
                 'labels, a wildcard only as the first label, no trailing dot)')
     if _looks_like_ip(v):
         return f'Invalid DNS name: {v!r} is an IP address, which goes in an IP SAN'
+    labels = body.split('.')
+    if labels[-1].isdigit():
+        return f'Invalid DNS name: {v!r} (the last label is never all digits, RFC 1123 §2.1)'
+    bad_a_label = next((label for label in labels if not _is_a_label_or_ldh(label)), None)
+    if bad_a_label is not None:
+        return f'Invalid DNS name: {v!r} ({bad_a_label!r} is not a valid A-label, RFC 5890 §2.3.2.1)'
     return None
+
+
+def _is_a_label_or_ldh(label: str) -> bool:
+    """An `xn--` label must decode to a valid U-label; any other LDH label passes."""
+    if label[:4].lower() != 'xn--':
+        return True
+    import idna
+    try:
+        idna.decode(label)
+        return True
+    except (idna.IDNAError, UnicodeError, ValueError):
+        return False
 
 
 def normalize_dns_san(value: str) -> Tuple[str, str | None]:

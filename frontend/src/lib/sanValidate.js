@@ -115,9 +115,11 @@ export function looksLikeHostname(value) {
   return v.split('.').every((label) => HOSTNAME_LABEL.test(label))
 }
 
-// U-label to A-label, as the server issues it (RFC 9549); null when not convertible
+// U-label to A-label, as the server issues it (RFC 9549); null when not convertible.
+// A port, path or userinfo is refused first: URL would drop it from the hostname.
 function toALabel(v) {
-  if (/^[\x00-\x7f]*$/.test(v)) return v
+  if (/[:/?#%@\\\s]/.test(v)) return null
+  if (/^[\x00-\x7f]*$/.test(v) && !/(^|\.)xn--/i.test(v)) return v
   try {
     return new URL(`http://${v}`).hostname
   } catch {
@@ -133,7 +135,10 @@ export function isValidDnsName(value) {
   if (!ascii) return false
   const name = prefix + ascii
   if (name.length > 253 || name.endsWith('.')) return false
-  return ascii.split('.').every((label) => HOSTNAME_LABEL.test(label))
+  const labels = ascii.split('.')
+  // RFC 1123 §2.1: the last label is never all digits
+  if (/^\d+$/.test(labels[labels.length - 1])) return false
+  return labels.every((label) => HOSTNAME_LABEL.test(label))
 }
 
 /** FQDN / wildcard — excludes email and literal IP.

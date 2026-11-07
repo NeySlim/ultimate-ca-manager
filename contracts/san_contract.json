@@ -412,6 +412,38 @@
       {
         "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.example",
         "valid": false
+      },
+      {
+        "value": "xn--zz.example",
+        "valid": false
+      },
+      {
+        "value": "xn--bcher-kva.example",
+        "valid": true
+      },
+      {
+        "value": "256.1.1.1",
+        "valid": false
+      },
+      {
+        "value": "*.10.0.0.1",
+        "valid": false
+      },
+      {
+        "value": "host.123",
+        "valid": false
+      },
+      {
+        "value": "ü.example:443",
+        "valid": false
+      },
+      {
+        "value": "ü/x.example",
+        "valid": false
+      },
+      {
+        "value": "ü.example/path",
+        "valid": false
       }
     ],
     "upn": [
