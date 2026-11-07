@@ -94,6 +94,14 @@ def _read_est_body_text():
         return None, Response('Invalid request body encoding', status=400)
 
 
+@bp.after_request
+def _plain_text_errors(response):
+    """RFC 8951 §5: an EST error is a human-readable message, sent as text/plain."""
+    if response.status_code >= 400 and response.mimetype == 'text/html':
+        response.mimetype = 'text/plain'
+    return response
+
+
 @bp.before_request
 def _enforce_est_enabled():
     """RFC 7030: when EST is administratively disabled, every endpoint
@@ -157,6 +165,18 @@ def _decode_est_csr(csr_data):
         return base64.b64decode(''.join(lines), validate=True)
     normalized = ''.join(csr_text.split())
     return base64.b64decode(normalized, validate=True)
+
+
+def _load_est_csr(csr_data):
+    """``(csr_der, csr, None)`` or ``(None, None, 400 response)`` naming what is wrong."""
+    try:
+        csr_der = _decode_est_csr(csr_data)
+    except ValueError:
+        return None, None, Response('Request body is not valid base64', status=400)
+    try:
+        return csr_der, x509.load_der_x509_csr(csr_der, default_backend()), None
+    except ValueError:
+        return None, None, Response('Request body is not a PKCS#10 CSR', status=400)
 
 
 def _certs_only_base64(cert):
@@ -230,7 +250,7 @@ def _san_values(cert_or_csr):
 def _reenroll_san_matches(client_cert_obj, csr):
     """RFC 7030 §4.2.2: re-enroll must keep the same identity. Compare SANs
     as sets (clients reorder entries and toggle criticality when regenerating
-    CSRs); a CSR without SAN is accepted — pre-2.200 issued it as-is."""
+    CSRs); a CSR without SAN is accepted and renews the certificate's own SAN."""
     csr_sans = _san_values(csr)
     if csr_sans is None:
         return True
@@ -284,36 +304,22 @@ def _ca_certificate(ca):
     return x509.load_pem_x509_certificate(get_ca_cert_pem(ca))
 
 
-def _fallback_csrattrs_der():
-    """Return a valid DER CsrAttrs when pyasn1 is unavailable."""
-    # An extensionRequest Attribute whose SET holds the requested extension OIDs.
-    return bytes.fromhex(
-        '301e'
-        '301c06092a864886f70d01090e310f'
-        '0603551d0f0603551d110603551d25'
-    )
+# RFC 9908 §5.2: an OID asked for without a value stands on its own in CsrAttrs
+# (keyUsage, subjectAltName, extKeyUsage). No challengePassword: UCM does not
+# verify tls-unique (RFC 7030 §3.5), and FortiOS takes the OID as a request for it.
+_CSRATTRS_DER = bytes.fromhex('300f' '0603551d0f' '0603551d11' '0603551d25')
+# The RFC 7030 §4.5.2 example's shape, which RFC 9908 §5.2 calls incorrect: the
+# OIDs as values of an extensionRequest. Served only with est_csrattrs_legacy_encoding.
+_LEGACY_CSRATTRS_DER = bytes.fromhex(
+    '301e' '301c06092a864886f70d01090e310f' '0603551d0f0603551d110603551d25'
+)
 
 
 def _build_csrattrs_der():
-    try:
-        from pyasn1.type import univ
-        from pyasn1.codec.der import encoder as der_encoder
-    except ImportError:
-        return _fallback_csrattrs_der()
-
-    # No challengePassword: UCM never checks one, and clients such as FortiOS
-    # take the OID as a request for tls-unique proof-of-possession.
-    attrs = univ.SequenceOf(componentType=univ.Any())
-    extension_request = univ.Sequence()
-    extension_request.setComponentByPosition(
-        0, univ.ObjectIdentifier('1.2.840.113549.1.9.14')
-    )
-    requested_extensions = univ.SetOf(componentType=univ.ObjectIdentifier())
-    for oid in ('2.5.29.17', '2.5.29.15', '2.5.29.37'):
-        requested_extensions.append(univ.ObjectIdentifier(oid))
-    extension_request.setComponentByPosition(1, requested_extensions)
-    attrs.append(univ.Any(der_encoder.encode(extension_request)))
-    return der_encoder.encode(attrs)
+    from models import SystemConfig
+    row = SystemConfig.query.filter_by(key='est_csrattrs_legacy_encoding').first()
+    legacy = bool(row and str(row.value).lower() == 'true')
+    return _LEGACY_CSRATTRS_DER if legacy else _CSRATTRS_DER
 
 
 def _est_enabled():
@@ -325,6 +331,9 @@ def _est_enabled():
 
 _EST_LABELS_KEY = 'est_labels'
 _LABEL_RE = re.compile(r'^[A-Za-z0-9._-]{1,64}$')
+# RFC 7030 §3.2.2: a CA label MUST NOT be an operation path segment
+EST_OPERATIONS = frozenset({'cacerts', 'simpleenroll', 'simplereenroll', 'fullcmc',
+                            'serverkeygen', 'csrattrs'})
 
 
 def _est_label_map():
@@ -351,6 +360,7 @@ def _est_label_map():
     return {
         label: refid for label, refid in parsed.items()
         if isinstance(label, str) and _LABEL_RE.match(label)
+        and label.lower() not in EST_OPERATIONS
         and isinstance(refid, str) and refid
     }
 
@@ -404,9 +414,9 @@ def _trusted_client_cert():
 
 
 def _presented_certificate_refusal(ca):
-    """A 403 when the certificate the TLS layer presented is not one ``ca``
-    issued and still holds (revoked, expired, unknown): the TLS layer only
-    proved the client holds a key, not that the certificate may still act."""
+    """A 403 when the certificate the TLS layer presented may no longer act:
+    one ``ca`` signed that it no longer holds as valid, or one another CA of
+    this server revoked or holds as expired. TLS only proved the key."""
     client_cert = _trusted_client_cert()
     if not client_cert:
         return None
@@ -420,23 +430,28 @@ def _presented_certificate_refusal(ca):
     except Exception as exc:
         logger.warning('EST: presented client certificate unreadable: %s', exc)
         return Response('Invalid client certificate', status=400)
-    # RFC 7030 §3.3.2: the TLS layer may accept a certificate from another
-    # authority (a manufacturer certificate for bootstrap); that decision
-    # stands. Only a certificate this CA signed is held to this CA's
-    # records: revoked, expired, not yet valid, superseded or deleted, it
-    # may not enroll again
     from utils.cert_issuer import certificate_signed_by
     try:
         ca_cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend())
         signed_here = certificate_signed_by(cert, ca_cert)
     except Exception:
         signed_here = False
-    if not signed_here:
-        return None
     from services.cert.issued_lookup import (
         OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
     )
-    _row, status = issued_certificate_status(ca, cert)
+    if signed_here:
+        _row, status = issued_certificate_status(ca, cert)
+    else:
+        # RFC 7030 §3.3.2 → RFC 5280 §6.1.3: another CA of this server answers for
+        # its own certificate's revocation and validity; an authority unknown here
+        # (a manufacturer certificate for bootstrap) stays judged by the TLS layer
+        from services.mtls_enrollment import issuing_ca_for
+        issuer = issuing_ca_for(cert)
+        if issuer is None:
+            return None
+        _row, status = issued_certificate_status(issuer, cert)
+        if status not in (REVOKED, EXPIRED, NOT_YET_VALID):
+            return None
     if status == OK:
         return None
     logger.warning('EST: client certificate refused (%s), serial=%s', status, cert.serial_number)
@@ -466,20 +481,26 @@ def _authenticate_est_client():
         from models import SystemConfig
         est_username = SystemConfig.query.filter_by(key='est_username').first()
         est_password = SystemConfig.query.filter_by(key='est_password').first()
-        
-        if est_username and est_password and est_username.value and est_password.value:
+        allow_empty = SystemConfig.query.filter_by(key='est_allow_empty_username').first()
+        # RFC 7030 §3.2.3: an empty username goes with a password tied to no name, opt-in
+        usernames = [v for v in (est_username.value if est_username else None,) if v]
+        if allow_empty and str(allow_empty.value).lower() == 'true':
+            usernames.append('')
+
+        if usernames and est_password and est_password.value:
             from utils.password_hash import HASH_PREFIXES, verify_password
             # auth.username/password may be None for malformed headers
             if auth.username is None or auth.password is None:
                 return False, None
-            username_match = hmac.compare_digest(auth.username, est_username.value)
+            username_match = any([hmac.compare_digest(auth.username.encode(), name.encode())
+                                  for name in usernames])
             # Support both hashed and legacy plaintext passwords
             if est_password.value.startswith(HASH_PREFIXES):
                 password_match = verify_password(est_password.value, auth.password)
             else:
                 password_match = hmac.compare_digest(auth.password, est_password.value)
             if username_match and password_match:
-                return True, auth.username
+                return True, auth.username or 'est-basic'
     
     return False, None
 
@@ -541,6 +562,16 @@ def _validate_est_csr(csr):
     cn_attrs = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
     if not cn_attrs or not str(cn_attrs[0].value).strip():
         return False, Response('CSR subject must include a non-empty CN', status=400)
+
+    from services.acme.compromised_keys import COMPROMISED_CSR, key_revoked_as_compromised
+    try:
+        request_key = csr.public_key()
+    except Exception:  # an algorithm pyca cannot load: no record can hold it either
+        request_key = None
+    if request_key is not None and key_revoked_as_compromised(request_key):
+        logger.warning("EST: CSR key was revoked as compromised (subject=%s)",
+                       csr.subject.rfc4514_string())
+        return False, Response(COMPROMISED_CSR, status=400)
 
     return True, None
 
@@ -622,11 +653,9 @@ def simple_enroll(label=None):
         if err is not None:
             return err
 
-        from cryptography import x509
-        from cryptography.hazmat.backends import default_backend
-        csr = x509.load_der_x509_csr(
-            _decode_est_csr(csr_data), default_backend()
-        )
+        _csr_der, csr, bad_csr = _load_est_csr(csr_data)
+        if bad_csr is not None:
+            return bad_csr
 
         ok, deny = _validate_est_csr(csr)
         if not ok:
@@ -704,11 +733,9 @@ def simple_reenroll(label=None):
         if err is not None:
             return err
 
-        from cryptography import x509
-        from cryptography.hazmat.backends import default_backend
-        csr = x509.load_der_x509_csr(
-            _decode_est_csr(csr_data), default_backend()
-        )
+        _csr_der, csr, bad_csr = _load_est_csr(csr_data)
+        if bad_csr is not None:
+            return bad_csr
 
         ok, deny = _validate_est_csr(csr)
         if not ok:
@@ -759,10 +786,17 @@ def simple_reenroll(label=None):
         validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
         days = int(validity_days.value) if validity_days else 365
         
+        # RFC 7030 §4.2.2: the SubjectAltName stays the renewed certificate's, never
+        # one rebuilt from the CN because the CSR left it out
+        renewed_san = None
+        if _subject_alt_name(csr) is None:
+            san_ext = _subject_alt_name(client_cert_obj)
+            renewed_san = list(san_ext.value) if san_ext is not None else None
+
         cert_pem, serial = CAService.sign_csr_from_crypto(
             ca=ca, csr=csr, validity_days=days, source='est',
             renewal_of=client_cert_obj, cert_type='device_cert',
-            supersedes=renewed_row,
+            supersedes=renewed_row, override_san=renewed_san,
         )
 
         from services.audit.staging import stage_audit_entry
@@ -799,13 +833,7 @@ def get_csr_attrs(label=None):
     DER-encoded CsrAttrs sequence, base64-encoded.
     """
     # RFC 7030 §4.5 recommends serving CSR attributes without requiring
-    # client authentication.
-    # Build ASN.1 DER-encoded CsrAttrs per RFC 7030 §4.5.2
-    # CsrAttrs ::= SEQUENCE SIZE (1..MAX) OF AttrOrOID
-    # AttrOrOID ::= CHOICE { oid OBJECT IDENTIFIER, attribute Attribute }
-    #
-    # Request the descriptive certificate extensions as values of an
-    # extensionRequest Attribute.
+    # client authentication. CsrAttrs ::= SEQUENCE SIZE (0..MAX) OF AttrOrOID.
     der_bytes = _build_csrattrs_der()
     b64_content = _b64_body(der_bytes)
     return Response(
@@ -872,8 +900,9 @@ def server_keygen(label=None):
         # RFC 7030 §4.4.1 requires the request public key and signature to be
         # ignored. Only the requested subject, attributes, and extensions are
         # consumed before a fresh key pair is generated below.
-        csr_der = _decode_est_csr(csr_data)
-        csr = x509.load_der_x509_csr(csr_der, default_backend())
+        csr_der, csr, bad_csr = _load_est_csr(csr_data)
+        if bad_csr is not None:
+            return bad_csr
         key_identifiers = _server_keygen_identifiers(csr)
         mtls_cert_obj = None
         if auth_method == 'mtls':

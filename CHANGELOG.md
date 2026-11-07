@@ -13,12 +13,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Deployment: a deploy target can be an HTTP API instead of an SSH host, with a URL, a method, encrypted request headers and a body template rendered from the certificate (`{{cert_pem|json}}`, `{{fullchain_pem}}`, `{{cn}}`, `{{serial}}`...), through the same delivery queue; the private key is sent only with an explicit opt-in over verified HTTPS, with an optional pasted trust anchor for a self-signed appliance (discussion #428, requested by @gjarassier, migration 131).
 - EST: the encrypted `serverkeygen` key can now go to an EC client certificate by key agreement (ephemeral-static ECDH, RFC 5753), and the key transport or key agreement and the content cipher follow the CSR's SMIMECapabilities in the client's order of preference, with AES-CBC when no listed content cipher is available. A list naming only key transport or agreement algorithms UCM lacks is refused with the supported ones named, as is an RSA client key under 2048 bits (RFC 7030 section 4.4.2).
+- EST: with the `allow_empty_username` setting of `PATCH /api/v2/est/config`, Basic authentication accepts an empty username and the password alone (RFC 7030 §3.2.3).
 
 ### Changed
 
 - PostgreSQL: UCM connects with psycopg 3, which sends values apart from the statement, so a database error that quotes the statement no longer carries them. psycopg2 is no longer shipped, and a `postgresql+psycopg2://` URL now uses psycopg 3.
 - Dependencies: SQLAlchemy 2.1 is accepted, now that every PostgreSQL URL reaches psycopg 3.
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
+- EST: `/csrattrs` lists keyUsage, subjectAltName and extKeyUsage as bare OIDs instead of inside an extensionRequest, a form RFC 9908 §5.2 declares incorrect; the `csrattrs_legacy_encoding` setting of `PATCH /api/v2/est/config` restores the former shape.
+- EST: refusals are sent as `text/plain` with the reason, such as a body that is not base64 or not a PKCS#10 CSR, instead of an HTML page saying "Enrollment failed" (RFC 8951 §5).
 
 ### Fixed
 
@@ -29,10 +32,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST: the encrypted `serverkeygen` key came in a SignedData of type `data`, signed by the generated key itself and without signed attributes. It now comes in an RFC 5958 key package (`id-ct-KP-aKeyPackage`) with content-type and message-digest attributes, signed by an `EST key generator` certificate that the issuing CA issues on first use, HSM CAs included (RFC 7030 section 4.4.2, RFC 5652 section 5.3).
 - EST: without a requested encryption key, `serverkeygen` returned a PKCS#8 encrypted with the Basic password, or a CMS over mTLS. The key now comes as unencrypted `application/pkcs8` under TLS, and a request naming a key UCM does not hold, or a client certificate that does not allow key transport, is refused (RFC 7030 section 4.4.1).
 - Uploads were spooled to the system temp directory, so a restore larger than a small `/tmp` tmpfs (100 MB in the production compose file) failed while the form was read, and a memory-backed `/tmp` held the archive in RAM. Uploads are now spooled under `DATA_DIR/tmp`, falling back to the system temp directory only when that is not writable.
+- EST: `simplereenroll` with a CSR without SubjectAltName issued the renewed certificate with a name built from the CN, so the device lost the names it served. The renewed certificate now keeps the SubjectAltName of the one being renewed (RFC 7030 §4.2.2).
+- EST: a CA label named after an operation (`simpleenroll`, `cacerts`...) was accepted and served. Such a label is now refused when saved and ignored when read (RFC 7030 §3.2.2).
 
 ### Security
 
 - mTLS behind a proxy: a certificate presented by its serial number alone, without `X-SSL-Client-I-DN` or `X-SSL-Client-Cert`, opened the enrolment bearing that serial, even one of another CA. Such a serial now opens only an enrolment that recorded no issuer, and enrolling a presented certificate requires its issuer (RFC 5280 §4.1.2.2).
+- EST: a client certificate that another CA of this server had revoked, even as compromised, still authenticated `/simpleenroll` and `/serverkeygen` and obtained certificates for any name. It is now refused once revoked or expired whichever CA of the server issued it, and `/api/v2/mtls/enroll` no longer enrols a revoked certificate (RFC 7030 §3.3.2).
+- EST: a CSR whose key was revoked as compromised was certified again. It is now refused with 400, as on the ACME client.
 
 ### Upgrade notes
 
@@ -40,6 +47,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST: a client that reads the encrypted `serverkeygen` answer must take the key from the RFC 5958 package and verify it with the `EST key generator` certificate the SignedData carries, which chains to the issuing CA from `/cacerts` and is listed, and revoked when needed, with the CA's certificates like a delegated OCSP responder; the next encrypted request then gets a new one. Migration 132 adds the `est_signer_certs` table that names the current one; backups carry the certificate but not that table, so a restored installation issues a new one on first use.
 - EST: `serverkeygen` without `AsymmetricDecryptKeyIdentifier` now returns the key unencrypted, without the Basic password, and over mTLS the key type is chosen as over Basic, ML-DSA under an ML-DSA CA included.
 - PostgreSQL: on DEB and RPM the upgrade's pip install pulls psycopg 3, compiled against the system libpq under `UCM_FIPS_BUILD=1` with the build tools it already requires; Docker images need nothing. A `postgresql+psycopg2://` URL keeps working unchanged. psycopg 3 prepares a statement after five executions on a connection, so behind a transaction-mode pooler without prepared statements (older PgBouncer, some managed poolers) set `UCM_PG_PREPARE_THRESHOLD=0`.
+- EST: a FortiGate or other client that stops enrolling after the `/csrattrs` change gets the former answer back with `{"csrattrs_legacy_encoding": true}` on `PATCH /api/v2/est/config`. A device that authenticates with a certificate revoked or expired on this server must be given a valid one.
 
 ## [2.251] - 2026-11-06
 

@@ -108,7 +108,8 @@ class CASigningMixin:
             override_subject: forwarded to TrustStoreService.sign_csr — see
                 its docstring. Only WSTEP's Kerberos binding passes this.
             override_san: forwarded to TrustStoreService.sign_csr — see its
-                docstring. Only WSTEP's Kerberos binding passes this.
+                docstring. WSTEP's Kerberos binding passes this, and EST
+                re-enrolment the renewed SAN for a CSR without one.
             requester_sid: forwarded to TrustStoreService.sign_csr — see its
                 docstring. Only WSTEP's Kerberos binding passes this.
             cert_type: Signing profile for TrustStoreService.sign_csr —

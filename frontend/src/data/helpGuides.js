@@ -1351,6 +1351,7 @@ Enrollment over Secure Transport (EST) is defined in **RFC 7030** and provides c
 2. **Signing CA**: Select which Certificate Authority signs EST-enrolled certificates
 3. **Authentication**: Configure HTTP Basic Auth credentials (username and password)
 4. **Certificate Validity**: Default validity period for EST-issued certificates (in days)
+5. **CA labels**: serve other CAs under \`/.well-known/est/<label>/\`. An operation name (\`cacerts\`, \`simpleenroll\`, \`simplereenroll\`, \`fullcmc\`, \`serverkeygen\`, \`csrattrs\`) cannot be a label (RFC 7030 §3.2.2, v2.252)
 
 ### Saving Configuration
 
@@ -1366,7 +1367,8 @@ The client presents a certificate during the TLS handshake. UCM validates the ce
 
 - **Strongest method**: cryptographic client identity
 - **Required for** \`/simplereenroll\`: the client must present its current certificate
-- **Presented certificate**: for \`/simpleenroll\` and \`/serverkeygen\`, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2); a certificate from another trusted authority is still accepted
+- **Presented certificate**: for \`/simpleenroll\` and \`/serverkeygen\`, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2). A certificate another CA of this server issued is refused once revoked or expired (v2.252); one from an authority this server does not hold is left to the TLS layer
+- **No tls-unique check**: UCM does not verify a \`challengePassword\` carrying the TLS \`tls-unique\` value (RFC 7030 §3.5), and \`/csrattrs\` does not ask for one
 - **Depends on** proper TLS termination config (reverse proxy must pass \`SSL_CLIENT_CERT\` to UCM)
 
 ### HTTP Basic Auth. Fallback
@@ -1376,6 +1378,9 @@ Username and password authentication over HTTPS. Configured in EST Settings.
 - **Simpler to set up**: no client certificate needed
 - **Less secure**: credentials transmitted per request (protected by HTTPS)
 - **Use when** mTLS infrastructure is not available
+- **Password only**: with \`allow_empty_username\` set through \`PATCH /api/v2/est/config\`, a client may send an empty username with the password (RFC 7030 §3.2.3, v2.252)
+
+A CSR whose key was revoked as compromised is refused with 400, and every refusal comes as a plain-text message saying why (RFC 8951 §5, v2.252).
 
 ## EST Endpoints
 
@@ -1405,7 +1410,7 @@ curl -k --user est-user:est-password \\
 \`\`\`
 
 ### POST /simplereenroll
-Renew an existing certificate. **Requires mTLS**: the client must present the certificate being renewed.
+Renew an existing certificate. **Requires mTLS**: the client must present the certificate being renewed. A CSR without SubjectAltName renews the certificate's own names, not a name built from the CN (RFC 7030 §4.2.2, v2.252).
 
 \`\`\`bash
 curl -k --cert client.pem --key client.key \\
@@ -1415,7 +1420,7 @@ curl -k --cert client.pem --key client.key \\
 \`\`\`
 
 ### GET /csrattrs
-Get the CSR attributes (OIDs) recommended by the server.
+Get the CSR attributes recommended by the server: keyUsage, subjectAltName and extKeyUsage as bare OIDs, the form RFC 9908 §5.2 gives for an OID asked for without a value (v2.252). A client that needs the former shape (the OIDs inside an extensionRequest attribute) gets it back with \`csrattrs_legacy_encoding\` set through \`PATCH /api/v2/est/config\`.
 
 ### POST /serverkeygen
 Server generates a key pair and returns the certificate along with the private key. Useful when the client cannot generate keys locally.
