@@ -25,23 +25,24 @@ export const helpContent = {
         title: 'Widgets',
         icon: ListChecks,
         items: [
-          { label: 'Statistics', text: 'Total CAs, active certificates, pending CSRs, and expiring soon counts' },
-          { label: 'Certificate Trend', text: 'Issuance history chart over time' },
+          { label: 'Statistics', text: 'Total certificates (expired and revoked included), CAs, pending CSRs and ACME accounts, plus SSH certificates when an SSH CA exists' },
+          { label: 'Certificate Activity', text: 'Issued, revoked and expired certificates per day over the chosen period' },
           { label: 'Status Distribution', text: 'Pie chart breakdown: valid / expiring / expired / revoked' },
-          { label: 'Next Expiry', text: 'Certificates expiring within 30 days; the configured dedicated TSA signer is tagged with a "TSA signer" chip (v2.218)' },
+          { label: 'Next Expiry', text: 'The six valid certificates that expire soonest, whatever their date; the configured dedicated TSA signer is tagged with a "TSA signer" chip (v2.218)' },
           { label: 'System Status', text: 'Service health: ACME, SCEP, EST, OCSP, CRL/CDP, TSA (v2.218), auto-renewal, SMTP and webhooks. Badges show a distinct amber warning state (near-expiry TSA signer, SMTP configured but disabled) and their status message on hover' },
           { label: 'Recent Activity', text: 'Latest operations across the system with read:audit; without it, your own events only' },
           { label: 'Recent Certificates', text: 'Recently issued or imported certificates' },
-          { label: 'Certificate Authorities', text: 'CA list with chain information' },
+          { label: 'Certificate Authorities', text: 'Latest CAs, each marked Root or Sub' },
           { label: 'ACME Accounts', text: 'Registered ACME client accounts' },
+          { label: 'Trust Store Expiry', text: 'Trusted certificates that expire soonest' },
         ]
       },
     ],
     tips: [
-      'Drag widgets to rearrange your dashboard layout',
-      'Click the eye icon in the header to show/hide specific widgets',
+      'Click Edit layout in the header, then drag widgets to rearrange them',
+      'Click the Customize button (sliders icon) in the header, then the eye next to a widget to show or hide it',
       'The dashboard updates in real-time via WebSocket, no manual refresh needed',
-      'Layout is saved per-user and persists across sessions',
+      'The layout is saved in this browser, for every account that signs in from it',
     ],
     related: ['Certificates', 'CAs', 'Settings']
   },
@@ -56,28 +57,26 @@ export const helpContent = {
         title: 'Views',
         icon: TreeStructure,
         items: [
-          { label: 'Tree View', text: 'Hierarchical display showing parent-child CA relationships' },
-          { label: 'List View', text: 'Flat table view with sorting and filtering' },
-          { label: 'Org View', text: 'Grouped by organization for multi-tenant setups' },
+          { label: 'Organigramme view', text: 'Hierarchy drawn as a chart, each CA under its parent' },
+          { label: 'Columns view', text: 'Hierarchy browsed level by level, one column per level' },
+          { label: 'List view', text: 'Flat table view with sorting and filtering' },
         ]
       },
       {
         title: 'Actions',
         icon: Certificate,
         items: [
-          { label: 'Create Root CA', text: 'Self-signed top-level authority' },
-          { label: 'Create Intermediate', text: 'CA signed by a parent CA in the chain' },
+          { label: 'Create CA', text: 'One button; the dialog chooses a self-signed root, an intermediate signed by a parent CA, or a CA signed by an external CA (CSR)' },
           { label: 'Import CA', text: 'Import existing CA certificate (with or without private key)' },
           { label: 'Export', text: 'PEM, DER, or PKCS#12 (P12/PFX) with password protection' },
-          { label: 'Renew CA', text: 'Re-issue the CA certificate with a new validity period' },
           { label: 'Revoke', text: 'Revoke an intermediate CA from its parent: published on the parent\'s CRL and OCSP, and the CA can no longer sign (permanent)' },
           { label: 'Chain Repair', text: 'Fix broken parent-child relationships automatically' },
           { label: 'Import private key', text: 'Attach the private key of a CA that holds only its certificate, so it can sign' },
           { label: 'Key and validity', text: 'RSA-3072 by default, local or HSM. Validity of 1, 2, 3, 5, 10, 15 or 20 years, or Custom (days) up to 50 years. An RSA-2048 CA that would outlive 2030 is flagged: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026' },
-          { label: 'Post-quantum (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 or ML-DSA-87 (FIPS 204, NIST levels 2, 3 and 5), generated in software or on an HSM provider that holds ML-DSA, and hidden in FIPS mode. An ML-DSA key signs without a separate digest, so the CA, its CRLs and its OCSP responses have no digest to choose. An ML-DSA CA can sign RSA or EC certificates, and an RSA or EC CA can sign an ML-DSA intermediate. Renewal keeps the same level' },
+          { label: 'Post-quantum (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 or ML-DSA-87 (FIPS 204, NIST levels 2, 3 and 5), generated in software or on an HSM provider that holds ML-DSA, and hidden in FIPS mode. An ML-DSA key signs without a separate digest, so the CA, its CRLs and its OCSP responses have no digest to choose. An ML-DSA CA can sign RSA or EC certificates, and an RSA or EC CA can sign an ML-DSA intermediate' },
           { label: 'EdDSA (Ed25519, Ed448)', text: 'Ed25519 or Ed448 keys for a root, intermediate or external CA, in software only (no HSM provider signs EdDSA) and hidden in FIPS mode. Like ML-DSA, an EdDSA key signs without a digest, and the hierarchy can mix with RSA, EC or ML-DSA. Browsers, Windows (CryptoAPI/CNG) and SCEP clients do not accept what an EdDSA CA signs, whatever the leaf key: reserve it for OpenSSL, Go or Java 15+ consumers. SCEP and XCEP refuse such a CA' },
           { label: 'EdDSA import (v2.251)', text: 'An Ed25519 or Ed448 CA key can be imported with its certificate, or afterwards with Import private key' },
-          { label: 'Default digest (v2.251)', text: 'Under a P-384 or P-521 CA, what is signed without a chosen digest (EST, SCEP, WSTEP, Sign CSR, the issue form, ACME orders without one, CRLs) uses SHA-384 or SHA-512, still bounded by the policies. CRLs already issued are unchanged: the next one follows' },
+          { label: 'Default digest (v2.251)', text: 'Under a P-384 or P-521 CA, what is signed without a chosen digest (EST, SCEP, WSTEP, Sign CSR, the issue form, ACME orders without one, CRLs) uses SHA-384 or SHA-512; the policies bound the certificates, not the CRLs. CRLs already issued are unchanged: the next one follows' },
           { label: 'No private key (v2.247)', text: 'A CA held without its private key is marked No private key, with an Import private key action. The CA pickers say how many CAs they leave out because they cannot sign' },
           { label: 'Name constraints', text: 'Advanced Constraints (RFC 5280): permitted and excluded subtrees (DNS, IP range, email) limit the names the CA may certify. For an externally-signed CA they are set by the signing CA' },
           { label: 'RSA signature scheme', text: 'PKCS#1 v1.5 by default, or RSA-PSS (salt as long as the hash) for an RSA CA with a local, PKCS#11 or OpenBao key. It applies to the certificates, CRLs, OCSP responses and SCEP replies the CA signs; timestamps stay PKCS#1 v1.5, the scheme openssl ts -verify checks. "Sign with RSA-PSS" in the CA details switches an existing CA either way: certificates already issued keep their signature' },
@@ -117,7 +116,7 @@ export const helpContent = {
         title: 'HSM-backed CAs',
         icon: Key,
         items: [
-          { label: 'Key Storage', text: 'Choose Local (encrypted in DB) or HSM at CA creation time' },
+          { label: 'Key Storage', text: 'Choose Local (in the database, encrypted under the master key) or HSM at CA creation time' },
           { label: 'Generate new key', text: 'Create a fresh signing key on the selected HSM provider' },
           { label: 'Use existing key', text: 'Bind the CA to an unused signing key already on the HSM' },
           { label: 'No private key export', text: 'HSM-backed keys never leave the HSM, PKCS#12, JKS and key-only exports are disabled' },
@@ -128,11 +127,11 @@ export const helpContent = {
         title: 'Offline Mode',
         icon: ShieldWarning,
         items: [
-          { label: 'Purpose', text: 'Protect a CA private key (typically a Root) from runtime use while keeping the certificate, chain, CRL and OCSP available' },
+          { label: 'Purpose', text: 'Protect a CA private key (typically a Root) from runtime use while keeping its certificate, chain and last CRL available' },
           { label: 'Password protected', text: 'Key is wrapped with a user-supplied password (PKCS#8) and stays in the database. Restore by entering the password.' },
           { label: 'File exported', text: 'Key is exported as a password-protected PEM download and removed from the database. Restore by re-uploading the file with the password.' },
           { label: 'Password policy', text: 'The password follows the UCM password complexity rules (length and character classes). Lose it and the key is unrecoverable.' },
-          { label: 'Effect on signing', text: 'CSR signing, certificate issuance and CA renewal are blocked while offline. CRL and OCSP keep working from cached signatures.' },
+          { label: 'Effect on signing', text: 'CSR signing, certificate issuance and renewal are blocked while offline. The last CRL stays served until you upload a new one signed next to the key; OCSP answers through a delegated responder, otherwise only from responses already cached, until their nextUpdate.' },
           { label: 'Sub-CAs', text: 'Both Root and Intermediate CAs can be taken offline independently' },
         ]
       },
@@ -157,7 +156,7 @@ export const helpContent = {
     ],
     warnings: [
       'An ML-DSA CA cannot be exported as PKCS#12 or JKS yet: export the certificate and the private key as PEM. Clients without ML-DSA support (OpenSSL before 3.5, most browsers today) cannot verify what it signs',
-      'Deleting a CA will NOT revoke certificates it has issued: revoke them first',
+      'A CA cannot be deleted while it has intermediate CAs or issued certificates: revoke and delete them first',
       'Private keys are stored encrypted under the master key; losing the database, or the master key without a UCM backup, means losing the keys',
       'Offline-mode passwords are NOT recoverable: store them in your password manager / vault before confirming',
       'A cross-certificate never replaces a CA\'s own certificate: an intermediate that would be re-certified under another issuer is refused (409) unless you attach it as a cross certificate or replace the current one; a root rollover under the same issuer name replaces it',
@@ -205,12 +204,11 @@ export const helpContent = {
           { label: 'Revoke', text: 'Mark as revoked with a reason, will appear in CRL' },
           { label: 'Remove Hold', text: 'Unhold a certificate revoked with "Certificate Hold" reason, restores it to valid status' },
           { label: 'Revoke a held certificate', text: 'A certificate on hold can also be revoked for good with another reason, without passing through valid. The CRL and OCSP then give the new reason, and the invalidity date is the start of the hold unless one is given' },
-          { label: 'Revoke & Replace', text: 'Revoke and immediately issue a replacement' },
           { label: 'Export', text: 'Download in PEM, DER, PKCS#12, or JKS format' },
           { label: 'PKCS#12 compatibility mode (v2.222)', text: 'The export dialogs offer a 3DES/SHA-1 profile for importers that reject the default AES-256 archive as a wrong password: Android 15 and earlier, macOS 14 and earlier, Windows Server 2016 and earlier, old Java. Off by default, it protects the file less well' },
           { label: 'Compare', text: 'Side-by-side comparison of two certificates' },
           { label: 'Other extensions (v2.251)', text: 'The certificate and CA details list the extensions UCM has no section for under Other extensions, with their OID, name when known, criticality and raw value. The issue form can add custom extensions on top of the template\'s' },
-          { label: 'Compromised keys (v2.251)', text: 'A key revoked as keyCompromise stays known after its certificate is deleted, whatever CA issued it, Let\'s Encrypt included: a request, renewal or finalization with that key is refused' },
+          { label: 'Compromised keys (v2.251)', text: 'A key revoked as keyCompromise stays known after its certificate is deleted, whatever CA issued it, Let\'s Encrypt included: the ACME client refuses it at the request, the renewal and the finalization, and EST refuses a CSR carrying it. The other issuance paths do not consult this list' },
           { label: 'ACME client certificates (v2.251)', text: 'A certificate obtained by the ACME client is renewed in place too, keeping its id and refid. The copies earlier renewals imported as new rows stay in the inventory until archived or deleted' },
         ]
       },
@@ -219,7 +217,7 @@ export const helpContent = {
         icon: ShieldCheck,
         content: 'The Issue Certificate form and the Sign CSR modal expose an "Extra EKUs" multi-select that lets you add Extended Key Usage OIDs on top of the cert type defaults:',
         items: [
-          { label: 'Catalog', text: '18 well-known EKUs in a dropdown: Microsoft RDP (1.3.6.1.4.1.311.54.1.2), smartcard logon, document signing, IPsec, Kerberos PKINIT, etc.' },
+          { label: 'Catalog', text: '26 well-known EKUs in a dropdown: Microsoft RDP (1.3.6.1.4.1.311.54.1.2), smartcard logon, document signing, IPsec, Kerberos PKINIT, etc.' },
           { label: 'Free-text OIDs', text: 'Any well-formed dotted OID matching ^[0-2](?:\\.(?:0|[1-9]\\d*)){1,15}$' },
           { label: 'Limit', text: 'Up to 16 OIDs total per certificate' },
           { label: 'Merged, never replaced', text: 'The cert type\'s default EKUs (e.g. serverAuth) stay locked-in as chips, extras are added on top' },
@@ -266,7 +264,7 @@ export const helpContent = {
     tips: [
       'Star ⭐ important certificates to add them to your favorites list',
       'Use filters to quickly find certificates by status, CA, or search text: your selection is persisted across reloads',
-      'Renewing keeps the same record (id, refid, creation date): UCM-held keys are re-keyed, protocol-enrolled certificates (SCEP/EST/ACME) keep their client-side key',
+      'Renewing keeps the same record (id, refid, creation date). Renew from the page generates a new key; the automatic renewal keeps the key. A certificate whose key UCM does not hold (SCEP, EST, WSTEP or ACME enrolment, import without the key) is refused (409): renew it through its protocol or sign a new request',
       'Need a non-standard EKU (Microsoft RDP, smartcard logon, document signing)? Add it via "Extra EKUs" instead of editing templates',
       'When a policy or the issuing CA\'s expiry shortens the requested validity, the result says so: "Issued for N day(s) instead of the M requested", with the reason',
       'An RSA-PSS signature is shown with its hash and salt length, e.g. RSASSA-PSS SHA-256 (salt 32)',
@@ -309,9 +307,9 @@ export const helpContent = {
         icon: ShieldCheck,
         items: [
           { label: 'Viewers', text: 'Can see only their own certificates' },
-          { label: 'Operators', text: 'Can view, export, and revoke all user certificates' },
-          { label: 'Admins', text: 'Full access including delete' },
-          { label: 'Auditors', text: 'Can view certificates but cannot export' },
+          { label: 'Operators', text: 'Can view, export, revoke and delete all user certificates; exporting the private key of another user\'s certificate needs read:private_keys, which the role lacks' },
+          { label: 'Admins', text: 'Full access, private keys included' },
+          { label: 'Auditors', text: 'Can view and export certificates, without their private key' },
         ]
       },
     ],
@@ -359,7 +357,7 @@ export const helpContent = {
     ],
     tips: [
       'CSRs preserve the requester\'s private key: it never leaves their system',
-      'You can add a private key to a CSR after signing if needed for PKCS#12 export',
+      'Upload Key attaches a private key to a pending CSR, so the signed certificate can be exported as PKCS#12',
       'A certificate imported for a CSR generated in UCM completes that CSR: the record keeps its private key, so the certificate exports with it',
       'Use Microsoft CA mode to sign CSRs via AD CS when connected to a Windows PKI',
       'A certificate for an ML-DSA key keeps only signature bits: keyEncipherment, dataEncipherment and keyAgreement asked by the template are removed, and the result says so',
@@ -397,12 +395,12 @@ export const helpContent = {
           { label: 'Duplicate', text: 'Clone an existing template and modify it' },
           { label: 'Show system', text: 'Hide the built-in templates to work with your own only. Remembered per browser' },
           { label: 'Deactivate', text: 'A deactivated template, built-in ones included, is no longer offered by the Issue Certificate form nor to Windows autoenrollment, and shows an Inactive badge. Activate brings it back. A built-in template can be deactivated, not edited: duplicate it to change it' },
-          { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances, one template or several in one file' },
+          { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances: the page exports one template at a time, and an import file may hold one or several' },
           { label: 'qcStatements', text: 'Optional ETSI EN 319 412-5 statements added to every certificate issued from the template: QcCompliance, QcType (signature, seal or website), QcSSCD, QcPDS (HTTPS URL and two-letter language), QcRetentionPeriod, QcLimitValue, QcCClegislation (for a certificate qualified under a non-EU legal framework) and the semantics identifier. Not applied to EST, WSTEP or mTLS issuance, and a qcStatements extension in a CSR is ignored. QcIdentMethod, QcQSCDlegislation and PSD2 statements are not supported' },
           { label: 'Policy OIDs', text: 'Extra certificate policy OIDs (for example the ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd and QCP-w policies), added after the CA\'s own policy' },
           { label: 'Custom extensions', text: 'Extensions UCM does not model, each an OID, a critical flag and the DER value in hex, added as given to every certificate issued from the template (issue form, Sign CSR, ACME, SCEP, WSTEP, approvals; renewals keep them). The issue form can add more or replace one of the same OID. Extensions UCM sets itself are refused: use their own settings. A client that does not recognise a critical extension rejects the certificate' },
           { label: 'Key Type', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 or EC-P521, with a SHA-256, SHA-384 or SHA-512 digest, or ML-DSA-44, ML-DSA-65 or ML-DSA-87. The digest is the issuing CA\'s signing hash, not the leaf key\'s: it still applies to an ML-DSA leaf under an RSA or EC CA, and an ML-DSA CA ignores it' },
-          { label: 'Digest preference (v2.251)', text: 'Every path that issues from the template (issue form, Sign CSR, ACME, EST, SCEP, WSTEP, TSA signer) signs with its digest, raised to the one matching the CA key: SHA-384 for P-384, SHA-512 for P-521. When a policy forbids it, the closest stronger digest allowed signs instead, and the result says "Signature digest X replaced by Y by policy"' },
+          { label: 'Digest preference (v2.251)', text: 'Every path that issues from the template (issue form, Sign CSR, ACME, SCEP, WSTEP, TSA signer; EST uses no template) signs with its digest, raised to the one matching the CA key: SHA-384 for P-384, SHA-512 for P-521. When a policy forbids it, the closest stronger digest allowed signs instead, and the result says "Signature digest X replaced by Y by policy"' },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 and EC-BP512 (RFC 5639, listed under Brainpool in key type lists, hidden in FIPS mode). OpenSSL and Windows read their chains and signatures, but Chrome, Firefox, Go, rustls, GnuTLS and Java without Bouncy Castle refuse them for TLS, and Windows Schannel does not enable them by default. On an HSM, only PKCS#11 providers hold them' },
         ]
       },
@@ -437,7 +435,7 @@ export const helpContent = {
         items: [
           { label: 'Auto-Regeneration', text: 'Toggle automatic CRL regeneration per CA' },
           { label: 'Manual Regenerate', text: 'Force CRL regeneration immediately' },
-          { label: 'Download CRL', text: 'Download the CRL file in DER or PEM format' },
+          { label: 'Download CRL', text: 'Download the CRL as PEM (.crl file); the DER form is served at the CDP URL' },
           { label: 'CRL deployment', text: 'Attach an SSH/SFTP target to push every regenerated CRL automatically. Each binding selects PEM or DER, its destination path, optional parent CRLs and its own reload command' },
           { label: 'CDP URL', text: 'CRL Distribution Point URL to embed in certificates' },
           { label: 'Validity', text: 'Per-CA CRL validity from 1 day up to 5 years (90d/180d/1y/3y/5y for offline CAs that cannot re-sign on schedule). A warning appears past one year, relying parties may keep stale revocation data for the whole window' },
@@ -484,7 +482,7 @@ export const helpContent = {
           { label: 'Configuration', text: 'SCEP server settings: CA selection, auto-approve' },
           { label: 'Profiles', text: 'Named enrollment endpoints, each with its own URL, CA, template and challenge' },
           { label: 'Intune app registrations', text: 'Entra app registrations (tenant ID, client ID, client secret) shared by the profiles that validate Intune challenges; an empty secret on edit keeps the current one, Test connection requests a token and discovers the service without consuming any challenge, and an app still used by a profile cannot be deleted' },
-          { label: 'Challenge Passwords', text: 'Manage per-CA challenge passwords for device enrollment' },
+          { label: 'Challenges', text: 'View and regenerate the challenge passwords for device enrollment' },
           { label: 'Information', text: 'SCEP endpoint URLs and integration instructions' },
         ]
       },
@@ -537,7 +535,7 @@ export const helpContent = {
         icon: ListChecks,
         items: [
           { label: 'Settings', text: 'Enable EST, select signing CA, configure authentication credentials and certificate validity' },
-          { label: 'Information', text: 'EST endpoint URLs for integration, enrollment statistics, and usage examples' },
+          { label: 'EST Endpoints', text: 'EST endpoint URLs for integration and enrollment statistics' },
         ]
       },
       {
@@ -568,7 +566,7 @@ export const helpContent = {
       'EST is the modern replacement for SCEP: prefer EST for new deployments',
       'Use mTLS authentication for highest security. Basic Auth is a fallback',
       'The /simplereenroll endpoint requires the client to present its current certificate via mTLS',
-      'Copy endpoint URLs from the Information tab to configure your EST clients',
+      'Copy endpoint URLs from the EST Endpoints tab to configure your EST clients',
     ],
     warnings: [
       'EST requires HTTPS: the client must trust the UCM server certificate or CA',
@@ -588,7 +586,7 @@ export const helpContent = {
         icon: ListChecks,
         items: [
           { label: 'Settings', text: 'Enable TSA, select the signing CA, and configure the TSA policy OID' },
-          { label: 'Information', text: 'TSA endpoint URL, usage examples with OpenSSL, and request statistics' },
+          { label: 'TSA Endpoint', text: 'TSA endpoint URL, usage examples with OpenSSL, and request statistics' },
         ]
       },
       {
@@ -713,7 +711,7 @@ export const helpContent = {
           { label: 'Reset Account', text: 'Clear the upstream registration of the selected CA account to force a new registration' },
           { label: 'EAB Credentials', text: 'External Account Binding credentials for CAs that require them (e.g., ZeroSSL, Google Trust), entered on the CA account in External CA Accounts' },
           { label: 'DNS Challenges', text: 'UCM handles DNS-01 challenges on behalf of clients using configured DNS providers' },
-          { label: 'Prune replaced certificates', text: 'Opt-in toggle: when a proxy order finalizes, certificates previously imported by proxy orders for the exact same domain set are deleted. Revoked certificates are always kept; non-proxy certificates are never touched. Off by default' },
+          { label: 'Purge replaced certificates', text: 'Opt-in toggle: when a proxy order finalizes, certificates previously imported by proxy orders for the exact same domain set are deleted. Revoked certificates are always kept; non-proxy certificates are never touched. Off by default' },
                   { label: 'Client pre-checks (v2.217)', text: 'The proxy also publishes the dns-01 TXT values computed with each client account key, so lego/Traefik/Caddy propagation pre-checks pass without being disabled, except on DuckDNS, Hurricane Electric and FreeDNS, which hold one value: disable the client pre-check there; a retried new-order returns the account still-pending order' },
           { label: 'Client compatibility (v2.246)', text: 'With EAB required, an onlyReturnExisting lookup and a new-account with a registered key return the existing account (cert-manager). The account URL answers reads, contact updates and deactivation, authorization deactivation is accepted (lego), and challenge responses carry Link rel="up"' },
           { label: 'Upstream errors (v2.252)', text: 'An error of the upstream CA reaches the client with its type (rateLimited, badCSR, rejectedIdentifier, alreadyRevoked...), status, subproblems and Retry-After. Errors about the proxy\'s own upstream account stay serverInternal' },
@@ -742,7 +740,7 @@ export const helpContent = {
           { label: 'Issue', text: 'Generate a new kid + HMAC key pair from ACME → EAB Credentials' },
           { label: 'Distribute', text: 'Hand the kid + HMAC to the client (cert-manager, certbot, acme.sh)' },
           { label: 'Bind', text: 'The client signs a JWS over the MAC key on newAccount to bind its ACME account' },
-          { label: 'Rotate / Revoke', text: 'Revoke a kid at any time, existing accounts continue to work, new bindings are refused' },
+          { label: 'Revoke', text: 'Revoke a kid at any time, existing accounts continue to work, new bindings are refused. To rotate, create a new kid and revoke the old one' },
           { label: 'Audit', text: 'Issuance, rotation and revocation are audited under the operator who performed them' },
           { label: 'Domain restrictions', text: 'Limit a credential to the domains it may request: * (any), *.example.com (all sub-domains), or an explicit list, an empty list blocks issuance entirely. Enforced on new-order/new-authz, server and proxy; only meaningful when EAB is required' },
         ]
@@ -796,7 +794,7 @@ export const helpContent = {
         content: 'The local ACME server can validate domains through a persistent TXT record bound to the ACME account (draft-ietf-acme-dns-persist): clients renew without writing DNS records. Opt-in, off by default.',
         items: [
           { label: 'Record', text: 'Create _validation-persist.<domain> TXT "<issuer-domain>; accounturi=<account URL>", the challenge object advertises both expected values' },
-          { label: 'Enable', text: 'ACME → Configuration → Persistent DNS Validation (dns-persist-01)' },
+          { label: 'Enable', text: 'ACME → Local ACME → Persistent DNS Validation (dns-persist-01)' },
           { label: 'Wildcard / subdomains', text: 'Append policy=wildcard to also authorize wildcard certificates and subdomains of the validated name' },
           { label: 'persistUntil', text: 'Optional persistUntil=<unix timestamp> stops new validations after that time' },
           { label: 'Security', text: 'The record grants the account key issuance capability for as long as it exists, delete the TXT record to revoke' },
@@ -827,7 +825,7 @@ export const helpContent = {
   truststore: {
     title: 'Trust Store',
     subtitle: 'Manage trusted certificates',
-    overview: 'Import and manage trusted root and intermediate CA certificates. The trust store is used for chain validation and can be synchronized with the operating system trust store.',
+    overview: 'Keep trusted root and intermediate CA certificates. A certificate\'s chain view and its exports complete the chain with a trust store certificate whose subject matches the issuer name. The store can be filled from the operating system trust store or from the CAs UCM manages.',
     sections: [
       {
         title: 'Certificate Types',
@@ -835,8 +833,9 @@ export const helpContent = {
         definitions: [
           { term: 'Root CA', description: 'Self-signed top-level trust anchor' },
           { term: 'Intermediate', description: 'CA certificate signed by a root or another intermediate' },
-          { term: 'Client Auth', description: 'Certificate used for client authentication (mTLS)' },
+          { term: 'System', description: 'Imported from the operating system trust store' },
           { term: 'Code Signing', description: 'Certificate used for code signature verification' },
+          { term: 'Email', description: 'Certificate used for S/MIME' },
           { term: 'Custom', description: 'Manually categorized trusted certificate' },
         ]
       },
@@ -844,10 +843,8 @@ export const helpContent = {
         title: 'Actions',
         icon: CloudArrowUp,
         items: [
-          { label: 'Import File', text: 'Upload PEM, DER, or PKCS#7 certificate files' },
-          { label: 'Import URL', text: 'Fetch a certificate from a remote URL' },
-          { label: 'Add PEM', text: 'Paste PEM-encoded certificate text directly' },
-          { label: 'Sync from System', text: 'Import OS trusted CAs into UCM' },
+          { label: 'Add', text: 'Add certificates of the CAs UCM manages. An external certificate is added through the API (POST /api/v2/truststore with PEM, or /api/v2/truststore/import with a PEM or DER file)' },
+          { label: 'Sync from System', text: 'Import OS trusted CAs into UCM, up to the chosen count (500 by default, 1000 at most)' },
           { label: 'Export', text: 'Download trusted certificates individually' },
           { label: 'Delete selected', text: 'Select several certificates and remove them together, for instance the system CAs filtered as expired; only the rows the current filters show are removed' },
         ]
@@ -909,7 +906,7 @@ export const helpContent = {
         icon: ShieldCheck,
         definitions: [
           { term: 'Admin', description: 'Full access to all features and settings' },
-          { term: 'Operator', description: 'Can manage certificates and CAs but not system settings' },
+          { term: 'Operator', description: 'Can manage certificates, CAs, CSRs, ACME, SSH and the settings an admin does not reserve; templates and groups read-only, no access to users or RBAC' },
           { term: 'Auditor', description: 'Read-only access to all operational data for compliance and audit' },
           { term: 'Viewer', description: 'Basic read-only access to certificates, CAs, and templates' },
         ]
@@ -920,7 +917,7 @@ export const helpContent = {
         items: [
           { label: 'Create Role', text: 'Define a new role with a name and description' },
           { label: 'Permission Matrix', text: 'Check/uncheck permissions by category (CAs, Certs, Private Keys, etc.)' },
-          { label: 'Coverage', text: 'Visual percentage of total permissions granted to the role' },
+          { label: 'Coverage', text: 'A bar and an n/N count of the permissions granted to the role' },
           { label: 'User Count', text: 'See how many users are assigned to each role' },
           { label: 'System role permissions', text: 'A system role shows the permissions UCM applies to it; Admin shows every permission of the matrix' },
           { label: 'SSH CA permissions (v2.248)', text: 'read:ssh_cas, write:ssh_cas and delete:ssh_cas govern SSH CAs, so write:ssh no longer creates or edits them. Roles, groups and API keys holding an SSH permission received the matching one on upgrade' },
@@ -1075,7 +1072,7 @@ export const helpContent = {
         content: "Automatic, encrypted database backups on a configurable cadence with retention.",
         items: [
           { label: "Cadence", text: "Daily / weekly / monthly" },
-          { label: "Retention", text: "Keep the N most recent backups; older ones are pruned" },
+          { label: "Retention", text: "Backups older than the set number of days (30 by default) are pruned" },
           { label: "Encryption", text: "Backups are encrypted with the configured backup password" },
           { label: "Key derivation", text: "Automatic (Argon2id when available, PBKDF2 in FIPS mode), PBKDF2-HMAC-SHA256 or Argon2id. Archives written with Argon2id cannot be restored on an instance in FIPS mode" },
         ]
@@ -1121,7 +1118,7 @@ export const helpContent = {
           { label: 'General', text: 'Syslog hostname (sent as HOSTNAME in forwarded syslog messages), base URLs, and system-wide defaults' },
           { label: 'Appearance', text: 'Theme selection (light/dark/system), accent color, desktop mode' },
           { label: 'Email (SMTP)', text: 'SMTP server, credentials, email template editor, and expiry alert notifications. Supports OAuth2 (XOAUTH2) for Gmail, Outlook.com & Microsoft 365 in addition to legacy password auth' },
-          { label: 'Security', text: 'Password policies, session timeout, rate limiting, admin access allowlist' },
+          { label: 'Security', text: 'Password policy, session duration, admin access allowlist, mTLS, private key encryption; the inactivity timeout and account lockout are under General' },
           { label: 'SSO', text: 'SAML 2.0, OAuth2/OIDC, and LDAP single sign-on integration' },
           { label: 'Backup', text: 'Manual and scheduled database backups' },
           { label: 'Audit', text: 'Log retention, syslog forwarding, integrity verification' },
@@ -1249,7 +1246,7 @@ export const helpContent = {
         title: 'API Keys',
         icon: Key,
         items: [
-          { label: 'Create Key', text: 'Generate a new API key with optional expiration' },
+          { label: 'Create Key', text: 'Generate a new API key, optionally expiring after a number of days' },
           { label: 'Permissions', text: 'A key carries the scope chosen at creation, never more than your own permissions. A key can create or regenerate only a key whose permissions it holds itself, expiring no later than itself. Regenerating keeps the key\'s lifetime; a revoked or expired key cannot be regenerated' },
           { label: 'Revoke', text: 'Immediately invalidate an API key' },
           { label: 'Deactivated users', text: 'API keys belonging to a deactivated user are rejected even if the key itself is still valid' },
@@ -1269,10 +1266,10 @@ export const helpContent = {
     ],
     tips: [
       'Enable at least one second factor (TOTP or Security Key) for admin accounts',
-      'API keys can be scoped with an expiration date for short-lived integrations',
+      'API keys can expire after a set number of days for short-lived integrations',
       'API keys can also be created with no expiration for long-running automation',
       'Scan the QR code with any TOTP app: Google Authenticator, Authy, 1Password, etc.',
-      'Filter selections on every list page (Certificates, CAs, Audit, etc.) are persisted across reloads automatically',
+      'Filter selections on the main list pages (Certificates, CAs, Templates, Audit, Policies, Trust Store and others) are persisted across reloads; CSRs, Approvals, Key Recovery, Discovery and System Logs start unfiltered',
     ],
     related: ['Settings', 'Users & Groups']
   },
@@ -1281,14 +1278,14 @@ export const helpContent = {
   importExport: {
     title: 'Import & Export',
     subtitle: 'Data migration and backup',
-    overview: 'Import certificates from external sources and export your PKI data. Smart Import auto-detects file types. OPNsense integration allows direct sync with your firewall.',
+    overview: 'Import certificates from external sources and export your PKI data. Smart Import auto-detects file types. The OPNsense integration imports the certificates and CAs of a firewall on demand.',
     sections: [
       {
         title: 'Import',
         icon: CloudArrowUp,
         items: [
           { label: 'Smart Import', text: 'Upload any certificate file, UCM auto-detects format (PEM, DER, P12, P7B)' },
-          { label: 'OPNsense Sync', text: 'Connect to OPNsense firewall and import its certificates and CAs' },
+          { label: 'OPNsense import', text: 'Connect to an OPNsense firewall and import its certificates and CAs, once per run (no ongoing sync)' },
         ]
       },
       {
@@ -1303,7 +1300,7 @@ export const helpContent = {
         title: 'OPNsense Integration',
         icon: Globe,
         items: [
-          { label: 'Connection', text: 'Provide OPNsense URL, API key, and API secret' },
+          { label: 'Connection', text: 'Provide the OPNsense host and port, API key, and API secret' },
           { label: 'Test Connection', text: 'Verify connectivity before importing' },
           { label: 'Select Items', text: 'Choose which certificates and CAs to import' },
         ]
@@ -1328,9 +1325,9 @@ export const helpContent = {
         title: 'Available Tools',
         icon: Wrench,
         items: [
-          { label: 'SSL Checker', text: 'Connect to a remote host and inspect its SSL/TLS certificate chain' },
+          { label: 'SSL Checker', text: 'Connect to a remote host and inspect the certificate it presents (the leaf only, not the chain)' },
           { label: 'CSR Decoder', text: 'Paste a CSR in PEM format to view its subject, SANs, and key info' },
-          { label: 'Certificate Decoder', text: 'Paste a certificate in PEM format to inspect all fields' },
+          { label: 'Certificate Decoder', text: 'Paste a certificate in PEM format to inspect its subject, issuer, validity, key, SANs, key usages and fingerprints; CDP, AIA and policies are not shown' },
           { label: 'Key Matcher', text: 'Verify that a certificate, CSR, and private key belong together' },
           { label: 'Converter', text: 'Convert between PEM, DER, PKCS#12, and PKCS#7 formats' },
         ]
@@ -1387,7 +1384,7 @@ export const helpContent = {
       'Use the resource chips to quickly switch between resource types',
       'The inline search and filters (Status, CA) let you narrow down items without leaving the toolbar',
       'Switch between Table and Basket (transfer panel) view modes on desktop',
-      'Preview changes before confirming bulk operations',
+      'Revoke, renew, sign and delete ask for confirmation before they run; an export starts at once',
     ],
     warnings: [
       'Bulk delete is irreversible: always create a backup first',
@@ -1505,7 +1502,7 @@ export const helpContent = {
         items: [
           { label: 'Identity matching', text: 'A login opens the account bound to the IdP identifier (OIDC sub, SAML persistent NameID, LDAP entryUUID or objectGUID). A username or email only matches an account of the same provider not bound yet; a local account, or one bound to another identity, is refused at sign-in. To merge a local account, use Link to SSO in Users first: its next sign-in through that provider binds the identifier.' },
           { label: 'Default Role', text: 'Given to accounts created at first SSO login when the provider has no role mapping rule, and as the base role of a new account whose matching rule gives only a custom role (viewer when None). None: nobody signs in without a rule. Role changes made later in UCM are preserved.' },
-          { label: 'Role Mapping', text: 'Map external groups (Azure AD, Okta, LDAP) → UCM roles (admin / operator / viewer). With at least one rule, a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), new account or existing one; a passkey or certificate sign-in is not checked. Used at user creation, and at every login when role sync is enabled. When several groups match, the highest-privilege role wins (admin > operator > auditor > viewer): entry order does not matter (#221). Each group can also name a custom role (chosen from the existing custom roles): it is added to the base role, or used alone. If several matching groups give a custom role, the first one in the list wins. With role sync on, a custom role set by SSO is removed when no group gives one; a custom role assigned by hand in UCM is never touched. System roles cannot be used as the custom role.' },
+          { label: 'Role Mapping', text: 'Map external groups (Azure AD, Okta, LDAP) → UCM roles (admin / operator / auditor / viewer) or custom roles. With at least one rule, a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), new account or existing one; a passkey or certificate sign-in is not checked. Used at user creation, and at every login when role sync is enabled. When several groups match, the highest-privilege role wins (admin > operator > auditor > viewer): entry order does not matter (#221). Each group can also name a custom role (chosen from the existing custom roles): it is added to the base role, or used alone. If several matching groups give a custom role, the first one in the list wins. With role sync on, a custom role set by SSO is removed when no group gives one; a custom role assigned by hand in UCM is never touched. System roles cannot be used as the custom role.' },
           { label: 'Sync role on each login', text: 'OFF (default): SSO never overrides UCM-managed roles. ON: role is re-synced from role_mapping at every login; a matching rule that gives no base role keeps the stored one (default_role is never re-applied).' },
           { label: 'Enforce 2FA', text: 'Users of this provider must enrol a second factor. LDAP sign-ins ask for an enrolled TOTP code or security key, as local sign-ins do, with or without this option; OIDC and SAML sign-ins only require the enrolment and rely on the identity provider for MFA.' },
           { label: 'Auto-update users', text: 'Updates email and full name on each login. Does NOT touch the role.' },
@@ -1561,18 +1558,17 @@ export const helpContent = {
         title: 'Password Policy',
         icon: Lock,
         items: [
-          { label: 'Minimum Length', text: 'Minimum number of characters required' },
-          { label: 'Complexity', text: 'Require uppercase, lowercase, numbers, special characters' },
-          { label: 'Expiry', text: 'Force password change after a set number of days' },
-          { label: 'History', text: 'Prevent reuse of previous passwords' },
+          { label: 'Minimum Length', text: 'Minimum number of characters required, 6 to 32' },
+          { label: 'Complexity', text: 'Require uppercase letters, numbers and special characters, each switched on separately' },
         ]
       },
       {
         title: 'Session & Access',
         icon: Fingerprint,
         items: [
-          { label: 'Session Timeout', text: 'Auto-logout after inactivity period' },
-          { label: 'Rate Limiting', text: 'Limit login attempts to prevent brute force attacks' },
+          { label: 'Session Timeout', text: 'Auto-logout after inactivity period (Settings › General)' },
+          { label: 'Session Duration', text: 'Maximum session length in hours, whatever the activity' },
+          { label: 'Account lockout', text: 'Max Login Attempts and Lockout Duration (Settings › General) lock an account after repeated failures. Request rate limits per IP are set by the RATE_LIMIT_* environment variables, not on this page' },
           { label: 'Admin access allowlist', text: 'Limit the web interface and the management API to listed IP addresses and networks' },
           { label: '2FA Enforcement', text: 'Require two-factor authentication for all users' },
         ]
@@ -1637,7 +1633,7 @@ export const helpContent = {
           { label: 'Max Validity', text: 'Maximum certificate lifetime in days' },
           { label: 'Allowed Key Types', text: 'Restrict which key algorithms and sizes can be used, ML-DSA-44, ML-DSA-65 and ML-DSA-87 included; FIPS mode removes ML-DSA' },
           { label: 'Allowed Signature Schemes', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA or SLH-DSA, matched against the signing CA\'s key. Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest' },
-          { label: 'SAN Restrictions', text: 'Limit the number of SANs; one DNS pattern per policy (*.company.com, or company.com to include the domain itself) scopes the policy to the matching names' },
+          { label: 'SAN Restrictions', text: 'Limit the number of DNS names (other SAN types are not counted); one DNS pattern per policy (*.company.com, or company.com to include the domain itself) scopes the policy to the matching names' },
           { label: 'Allowed Signature Hashes', text: 'SHA-256, SHA-384 or SHA-512; none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes' },
         ]
       },
@@ -1652,7 +1648,7 @@ export const helpContent = {
       },
     ],
     tips: [
-      'Lower priority number = higher precedence. Use 1–10 for critical policies.',
+      'Lower priority number = higher precedence for the approval. The rules of every policy in scope apply together, the strictest winning.',
       'Scope policies to specific CAs for granular control.',
       'Enable notifications to catch policy violations early.',
     ],
@@ -1704,7 +1700,7 @@ export const helpContent = {
     tips: [
       'Any single rejection immediately stops the approval: this is intentional for security.',
       'While a renewal awaits approval, the scheduler leaves the certificate to that decision, as long as it can come before the certificate expires; under a renewal policy it never renews without one.',
-      'Approval comments are logged in the audit trail for compliance.',
+      'Each decision and its comment are kept in the request\'s approval timeline; the audit log records approvals, not the comment, a queued request or a rejection.',
     ],
     related: ['Policies', 'Certificates', 'Audit Logs']
   },
@@ -1720,7 +1716,7 @@ export const helpContent = {
         icon: ClockCounterClockwise,
         items: [
           { label: 'Request', text: 'A user requests recovery of a specific certificate\'s archived key, with a reason' },
-          { label: 'Approve (four-eyes)', text: 'A second authorised operator reviews and approves, the requester cannot approve their own request' },
+          { label: 'Approve (four-eyes)', text: 'An administrator reviews and approves; with dual control on (the default), the requester cannot approve their own request' },
           { label: 'Download', text: 'Once approved, the key is released as a password-protected PKCS#12 bundle' },
           { label: 'Certificate replaced (v2.251)', text: 'Approval and recovery answer 410 unless the request\'s certificate is still the one it was opened on. A replacing restore cancels the open requests on the certificates it removes' },
         ]
@@ -1730,13 +1726,13 @@ export const helpContent = {
         icon: Key,
         items: [
           { label: 'Archived key', text: 'The certificate\'s private key must be stored in the database, recovery cannot reconstruct a key that was never archived' },
-          { label: 'Dual control', text: 'Request and approval are separate actions by different people; every step is written to the audit trail' },
+          { label: 'Dual control', text: 'On by default: request and approval are separate actions by different people. Requests, approvals and downloads are written to the audit trail; a refused approval or download is not' },
         ]
       },
     ],
     tips: [
       'Key Recovery is for keys that were not exported when the certificate was issued; it is not a replacement for restricting key export at issuance time.',
-      'Every request, approval and download is recorded in the audit trail for compliance.',
+      'Every request, approval and download is recorded in the audit trail; refusals are not.',
     ],
     warnings: [
       'A certificate whose private key was never archived cannot be recovered: there is nothing to release.',
@@ -1757,8 +1753,8 @@ export const helpContent = {
           { label: 'Certificate Inventory', text: 'Complete list of all certificates with status' },
           { label: 'Expiring Certificates', text: 'Certificates expiring within a specified time window' },
           { label: 'CA Hierarchy', text: 'Certificate Authority structure and statistics' },
-          { label: 'Audit Summary', text: 'Security events and user activity summary' },
-          { label: 'Compliance Status', text: 'Policy compliance and violation summary' },
+          { label: 'Audit Summary', text: 'The most frequent actions and the most active users over the period' },
+          { label: 'Compliance Status', text: 'Three checks: active certificates, expired CAs, and certificates expiring within 30 days; certificate policies are not read' },
           { label: 'Revoked Certificates', text: 'Certificates revoked during the period, with date and reason' },
         ]
       },
@@ -1808,11 +1804,11 @@ export const helpContent = {
         icon: Globe,
         items: [
           { label: 'Quick Scan', text: 'Ad-hoc scan without saving a profile, enter targets and ports, results stream live' },
-          { label: 'Targets', text: 'One per line: hostname, IP, CIDR subnet (192.168.1.0/24), or host:port (10.0.0.1:8443)' },
+          { label: 'Targets', text: 'Entered as tags, one per target: hostname, IP, CIDR subnet (192.168.1.0/24), or host:port (10.0.0.1:8443)' },
           { label: 'Ports', text: 'Comma-separated TCP ports (e.g. 443, 8443, 636), or the common-ports preset' },
           { label: 'Advanced options', text: 'Reverse DNS resolution (PTR records), timeout, and concurrency' },
           { label: 'Schedule', text: 'Profiles run manually or automatically every 1h / 6h / 12h / 24h / 7d' },
-          { label: 'Notifications', text: 'Email alerts on new certificates, certificate changes, or upcoming expiry' },
+          { label: 'Notifications', text: 'Email alerts on new certificates, certificate changes, or upcoming expiry. A certificate found through SNI on an IP target is counted as new at every scan' },
         ]
       },
       {
@@ -1821,18 +1817,18 @@ export const helpContent = {
         items: [
           { label: 'Managed', text: 'The certificate\'s SHA-256 fingerprint matches a certificate in UCM\'s inventory' },
           { label: 'Unmanaged', text: 'Found on the network but not in the inventory, a candidate for bringing under management' },
-          { label: 'Error', text: 'The endpoint could not be scanned, the error hint distinguishes refused, DNS, timeout, and TLS/SNI failures; retry individually or all at once' },
+          { label: 'Error', text: 'The endpoint answered but its TLS handshake or certificate failed (SNI rejected, unreadable certificate). A refused connection, a timeout, a DNS or network failure leaves no row. Retry a row, or Retry all errors on the current page' },
           { label: 'Changed', text: 'An endpoint presenting a different certificate than the previous scan is flagged with a Last changed timestamp' },
         ]
       },
     ],
     tips: [
-      'Filter results with the status pills: Managed, Unmanaged, Error, Expired, Expiring Soon',
-      'Export discovered certificates as CSV or JSON: active filters apply to the export',
+      'Filter results with the status pills: All, Managed, Unmanaged, Error',
+      'Export downloads every discovered certificate as CSV, whatever the filters',
       'Schedule a daily scan of your server subnets with the new-certificate notification enabled',
     ],
     warnings: [
-      'Running scans and managing profiles requires admin permissions; subnets are capped at 1024 addresses (/22)',
+      'Running scans and managing profiles requires admin permissions; a profile subnet is capped at 1024 addresses (/22), a CIDR entered as a target at 65,536 hosts',
     ],
     related: ['Certificates', 'CAs', 'Reports']
   },
@@ -1859,7 +1855,7 @@ export const helpContent = {
           { label: 'Template Selection', text: 'Choose from available certificate templates on the MS CA' },
           { label: 'Auto-Approved', text: 'Templates with autoenroll return the certificate immediately' },
           { label: 'Manager Approval', text: 'Some templates require manager approval, UCM tracks the pending request' },
-          { label: 'Status Polling', text: 'Check pending request status from the CSR detail panel' },
+          { label: 'Pending requests', text: 'A request the CA holds for its manager stays Pending in UCM, and the page offers no status check: once it is issued on the CA, import the certificate, or let Inventory sync over the WinRM admin channel import the certificates UCM does not know yet' },
         ]
       },
       {
@@ -1888,7 +1884,7 @@ export const helpContent = {
           { label: 'Purpose', text: 'Runs management operations on the Windows CA (revoke, unrevoke, publish CRL, inventory, approve/deny) via PowerShell remoting + certutil, things AD CS Web Enrollment cannot do.' },
           { label: 'Transport', text: 'NTLM or Kerberos over HTTP/HTTPS. Kerberos + HTTPS recommended; Kerberos reuses the connection\'s keytab.' },
           { label: 'Credentials', text: 'Reuses the connection\'s own by default. mTLS-enrolled connections must set a dedicated WinRM account (least-privilege "Issue and Manage Certificates" officer).' },
-          { label: 'Requirement', text: 'WinRM enabled on the CA and the optional pywinrm package installed. Management operations require admin:system.' },
+          { label: 'Requirement', text: 'WinRM enabled on the CA and the optional pywinrm package installed. Management operations require admin:system; propagating a revocation or a hold release to the CA follows the certificate\'s write:certificates.' },
         ]
       },
       {
@@ -1904,7 +1900,7 @@ export const helpContent = {
         title: 'CA Inventory & Control Panel',
         icon: HardDrive,
         items: [
-          { label: 'Inventory sync', text: 'Imports certificates issued directly on the CA that UCM doesn\'t know yet (incremental by request id, with reconciliation).' },
+          { label: 'Inventory sync', text: 'Imports certificates issued directly on the CA that UCM doesn\'t know yet (incremental by request id); reconciliation is available through the API.' },
           { label: 'Pending requests', text: 'List, approve (resubmit + auto-import) or deny requests awaiting CA manager approval.' },
           { label: 'CA health', text: 'CA service status, CA certificate expiry, CRL next-update and pending count at a glance.' },
         ]
@@ -1951,7 +1947,7 @@ export const helpContent = {
         title: 'Server Configuration',
         icon: HardDrive,
         items: [
-          { label: 'Linux/macOS Setup Script', text: 'Download a POSIX shell script (.sh) that auto-configures sshd to trust this CA. Quick install: curl -fsSL <url> | bash' },
+          { label: 'Linux/macOS Setup Script', text: 'Download a POSIX shell script (.sh) that auto-configures sshd to trust this CA. Quick install: curl -sSL <url> | sudo bash' },
           { label: 'Windows Setup Script', text: 'Download a PowerShell script (.ps1) that configures Windows OpenSSH Server (writes the CA pubkey to %ProgramData%\\ssh, locks down ACLs, adds TrustedUserCAKeys / HostCertificate to sshd_config, validates with sshd -T, restarts sshd). Quick install: iwr <url> | iex' },
           { label: 'Diagnostic block', text: 'On Add-WindowsCapability failure (WSUS / domain-joined), the script prints a labelled block explaining the policy state and three remediation paths, it never modifies WSUS / WU policy itself' },
           { label: 'Dry-run', text: 'Both scripts support a -DryRun / --dry-run flag to preview changes without applying them' },
@@ -2000,7 +1996,7 @@ export const helpContent = {
       'Download the setup script for easy server configuration: it handles backup and validation automatically.',
     ],
     warnings: [
-      'Deleting a CA does not revoke certificates it has signed: revoke them first or update server trust.',
+      'A CA cannot be deleted while certificates it signed remain: delete them first, and update server trust.',
       'If the CA private key is compromised, all certificates signed by it must be considered untrusted.',
     ],
     related: ['SSH Certificates', 'Settings']
