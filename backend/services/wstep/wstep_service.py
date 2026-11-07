@@ -26,6 +26,7 @@ from utils.datetime_utils import utc_now
 from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
 from utils import key_algorithms
 from utils.key_type import validate_enrollment_csr
+from utils.request_names import RequestRejected
 from utils.san_parse import is_valid_san_email
 from utils.serial_format import serial_variants
 from utils.upn_san import build_upn_other_name
@@ -1031,6 +1032,9 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     except PolicyViolation as e:
         logger.warning('WSTEP issue refused by policy: %s', e)
         return None, f'Policy violation: {e}'
+    except RequestRejected as e:
+        logger.warning('WSTEP issue refused: %s', e)
+        return None, str(e)
     except Exception as e:
         logger.error('WSTEP issue failed: %s', e)
         return None, 'Certificate issuance failed'
@@ -1245,6 +1249,9 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
     except PolicyViolation as e:
         logger.warning('WSTEP renew refused by policy: %s', e)
         return None, f'Policy violation: {e}'
+    except RequestRejected as e:
+        logger.warning('WSTEP renew refused: %s', e)
+        return None, str(e)
     except Exception as e:
         logger.error('WSTEP renew failed: %s', e)
         return None, 'Certificate renewal failed'

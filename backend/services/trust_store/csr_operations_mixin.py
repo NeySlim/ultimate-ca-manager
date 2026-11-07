@@ -732,9 +732,12 @@ class CSROperationsMixin:
         elif has_csr_san:
             effective_sans = csr_sans
             if cert_type != 'intermediate_ca':
-                # RFC 5280 §4.1.2.6: the subject's address is also an rfc822Name
-                missing = [n for n in cn_implied_names(subject, cert_type)
-                           if isinstance(n, x509.RFC822Name) and n not in csr_sans]
+                # RFC 5280 §4.1.2.6: the subject's emailAddress is also an rfc822Name
+                missing = []
+                for attr in subject.get_attributes_for_oid(NameOID.EMAIL_ADDRESS):
+                    name = x509.RFC822Name(attr.value) if attr.value else None
+                    if name is not None and name not in csr_sans and name not in missing:
+                        missing.append(name)
                 if san_template is not None and missing:
                     from services.template_service import allowed_san_types, san_type_of
                     allowed = allowed_san_types(san_template)

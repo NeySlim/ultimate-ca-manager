@@ -65,16 +65,23 @@ class TestDnsNameSyntax:
         'a-.example', 'a..example', '.example', 'w*.example', ' ',
         ('a' * 64) + '.example', '.'.join(['abcdefghi'] * 26),
         'under_score.example', 'host_.example', '_-x.example', '_.example',
+        'a\n.example', '_sip._tcp.example.com', '_acme-challenge.example.com',
     ])
     def test_refused(self, value):
         assert validate_dns_san(value) is not None
 
     @pytest.mark.parametrize('value', [
         'www.example.com', '*.example.com', 'localhost',
-        '_sip._tcp.example.com', '_acme-challenge.example.com', '_25._tcp.mx.example', 'xn--bcher-kva.example', 'A-1.Example.COM',
+        'xn--bcher-kva.example', 'A-1.Example.COM',
     ])
     def test_accepted(self, value):
         assert validate_dns_san(value) is None
+
+    @pytest.mark.parametrize('value', ['a\n.example.com', '_sip._tcp.example.com',
+                                       'my_host.example.com'])
+    def test_acme_identifier_follows_the_same_rule(self, value):
+        from services.acme.identifiers import is_valid_dns_identifier
+        assert is_valid_dns_identifier(value) is False
 
     def test_u_label_becomes_an_a_label(self):
         buckets, err = parse_cert_san_payload({'san_dns': ['bücher.example', '*.bücher.example']})
@@ -112,6 +119,24 @@ class TestDnsNameSyntax:
         r = _sign(auth_client, csr_id, ca['id'])
         assert r.status_code == 400, r.get_json()
         assert 'bad name.example' in r.get_json()['message']
+
+    @pytest.mark.parametrize('bad', ['evil\n.example.test', 'end.example.test\n', '10.0.0.1'])
+    def test_sign_csr_refuses_what_the_form_refuses(self, auth_client, create_ca, bad):
+        ca = create_ca(cn=f'Profile DNS trunk CA {len(bad)}')
+        csr_id = _upload(auth_client, _csr(_cn('ok.example.test'), [
+            x509.DNSName('ok.example.test'), x509.DNSName(bad)]))
+        r = _sign(auth_client, csr_id, ca['id'])
+        assert r.status_code == 400, r.get_json()
+
+    def test_bulk_sign_gives_the_reason(self, auth_client, create_ca):
+        ca = create_ca(cn='Profile DNS bulk CA')
+        csr_id = _upload(auth_client, _csr(_cn('ok.example.test'), [
+            x509.DNSName('bad name.example')]))
+        r = auth_client.post(f'{CSRS}/bulk/sign', json={
+            'ids': [csr_id], 'ca_id': ca['id'], 'validity_days': 30})
+        assert r.status_code == 200, r.get_json()
+        failed = r.get_json()['data']['failed']
+        assert failed and 'bad name.example' in failed[0]['error'], failed
 
 
 class TestNameImpliedByTheCn:
@@ -189,6 +214,45 @@ class TestSubjectBounds:
         assert r.status_code == 400, r.get_json()
         assert 'C' in r.get_json()['message']
 
+    @pytest.mark.parametrize('oid,bound', [
+        (NameOID.ORGANIZATION_NAME, 64), (NameOID.ORGANIZATIONAL_UNIT_NAME, 64),
+        (NameOID.LOCALITY_NAME, 128), (NameOID.STATE_OR_PROVINCE_NAME, 128),
+        (NameOID.SERIAL_NUMBER, 64), (NameOID.EMAIL_ADDRESS, 255),
+    ])
+    def test_each_bound_is_enforced(self, auth_client, create_ca, oid, bound):
+        ca = create_ca(cn=f'Profile bounds {oid._name} CA')
+        # Not one repeated letter, which the CSR list's bounded search tests look for
+        size = bound - len('@example.test') if oid == NameOID.EMAIL_ADDRESS else bound
+        filler = ('bound-' * bound)[:size]
+        ok = filler + '@example.test' if oid == NameOID.EMAIL_ADDRESS else filler
+        attrs = _cn('b.example.test') + [x509.NameAttribute(oid, ok, _validate=False)]
+        assert _sign(auth_client, _upload(auth_client, _csr(attrs)), ca['id']).status_code == 200
+        over = 'y' + ok
+        attrs = _cn('b.example.test') + [x509.NameAttribute(oid, over, _validate=False)]
+        r = _sign(auth_client, _upload(auth_client, _csr(attrs)), ca['id'])
+        assert r.status_code == 400, r.get_json()
+        assert str(bound) in r.get_json()['message']
+
+    def test_an_override_subject_is_the_caller_s(self, app):
+        """WSTEP builds the subject from the directory: the trunk does not re-check it."""
+        key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name(_cn('Profile override CA'))
+        now = datetime.now(timezone.utc)
+        ca_cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+                   .public_key(key.public_key()).serial_number(x509.random_serial_number())
+                   .not_valid_before(now - timedelta(days=1))
+                   .not_valid_after(now + timedelta(days=365))
+                   .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                   .sign(key, hashes.SHA256()))
+        directory = x509.Name([x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, 'dir-' * 18,
+                                                  _validate=False)] + _cn('ad.example.test'))
+        with app.app_context():
+            pem = TrustStoreService.sign_csr(
+                csr_pem=_csr(_cn('ad.example.test')).public_bytes(serialization.Encoding.PEM),
+                ca_cert=ca_cert, ca_private_key=key, validity_days=30, cert_type='server_cert',
+                override_subject=directory)
+        assert x509.load_pem_x509_certificate(pem).subject == directory
+
     def test_empty_subject_takes_a_cn_that_fits(self, app, auth_client, create_ca):
         ca = create_ca(cn='Profile bounds empty CA')
         long_name = ('a' * 60) + '.example.test'
@@ -248,6 +312,14 @@ class TestSubjectEmailInTheSan:
         assert _sign(auth_client, csr_id, ca['id']).status_code == 200
         assert _san(_cert(app, csr_id)) == [x509.DNSName('box.example.test'),
                                             x509.RFC822Name('box@example.test')]
+
+    def test_sign_csr_server_cn_address_is_not_an_email_name(self, app, auth_client, create_ca):
+        """Only the emailAddress attribute implies an rfc822Name (RFC 5280 §4.1.2.6)."""
+        ca = create_ca(cn='Profile email CN CA')
+        csr_id = _upload(auth_client, _csr(_cn('ops@example.test'),
+                                           [x509.DNSName('srv.example.test')]))
+        assert _sign(auth_client, csr_id, ca['id']).status_code == 200
+        assert _san(_cert(app, csr_id)) == [x509.DNSName('srv.example.test')]
 
 
 class TestDefaultKeyUsage:

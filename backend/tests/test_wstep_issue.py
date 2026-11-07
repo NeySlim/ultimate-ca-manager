@@ -297,3 +297,15 @@ def test_issue_ignores_enroll_acl_on_username_password_path(client, app, wstep_c
         with app.app_context():
             delete_templates(template_ids_named('Test UsernamePassword ACL Template'))
             db.session.commit()
+
+
+def test_issue_refusal_gives_its_reason(client, wstep_config):
+    """A request the trunk refuses for its names tells the client why."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    csr = x509.CertificateSigningRequestBuilder().subject_name(
+        x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'reason.example.test')])
+    ).add_extension(x509.SubjectAlternativeName([x509.DNSName('bad name.example')]),
+                    critical=False).sign(key, hashes.SHA256())
+    r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
+    assert r.status_code == 400
+    assert b'bad name.example' in r.data
