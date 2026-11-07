@@ -22,6 +22,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST, SCEP and TSA share one CMS SignedData builder; no wire change.
 - SCEP: a RenewalReq signed by a certificate issued through the same endpoint is authenticated by that certificate, so its challenge password is no longer compared and a rotated secret no longer blocks renewal; a certificate from another profile or protocol still needs the endpoint's challenge.
 - SCEP: every FAILURE reply now carries a failInfoText attribute giving the reason (RFC 8894 §3.2.1.4).
+- CRL: with delta CRLs enabled, each complete CRL is now followed by a delta on it, so the shared CRL number advances by two per regeneration.
+- Approvals: a revocation request approved while its certificate is on hold now revokes it for good with the requested reason, instead of waiting for the hold to be lifted.
 
 ### Fixed
 
