@@ -938,23 +938,25 @@ class AcmeProxyService:
 
         _finalize_url_cache.put(upstream_location, upstream_order.get('finalize'))
         # Rewrite URLs in response to point to Proxy
-        return self._rewrite_order_response(upstream_order, upstream_location)
+        return self._rewrite_order_response(upstream_order, upstream_location, order)
 
-    def _rewrite_order_response(self, upstream_order, upstream_location):
+    def _rewrite_order_response(self, upstream_order, upstream_location, local_order=None):
         """Rewrite upstream URLs (authorizations, finalize) to proxy URLs."""
         order_id = self._proxy_id(upstream_location)
-        return self._rewrite_order_urls(upstream_order, upstream_location, order_id), order_id
+        return self._rewrite_order_urls(
+            upstream_order, upstream_location, order_id, local_order), order_id
 
     def _proxy_url(self, kind: str, upstream_url: str) -> str:
         """Proxy URL of an upstream resource of the given kind (authz, cert...)."""
         return f"{self.base_url}/{kind}/{self._proxy_id(upstream_url)}"
 
-    def _rewrite_order_urls(self, order, upstream_order_url, order_id):
+    def _rewrite_order_urls(self, order, upstream_order_url, order_id, local_order=None):
         """Point finalize, certificate and authorizations of an upstream order
-        at the proxy; a certificate URL is persisted on the way."""
+        at the proxy; a certificate URL is persisted on the local order served."""
         order['finalize'] = f"{self.base_url}/order/{order_id}/finalize"
         if 'certificate' in order:
-            self._persist_certificate_url(upstream_order_url, order['certificate'])
+            if local_order is not None:
+                self._persist_certificate_url(local_order, order['certificate'])
             order['certificate'] = self._proxy_url('cert', order['certificate'])
         if 'authorizations' in order:
             order['authorizations'] = [
@@ -1038,7 +1040,7 @@ class AcmeProxyService:
                 "same identifiers)", order.id, ', '.join(wanted),
             )
             _finalize_url_cache.put(upstream_url, upstream_order.get('finalize'))
-            return self._rewrite_order_response(upstream_order, upstream_url)
+            return self._rewrite_order_response(upstream_order, upstream_url, order)
         return None
 
     @staticmethod
@@ -1906,18 +1908,12 @@ class AcmeProxyService:
             finally:
                 db.session.remove()
 
-    def _persist_certificate_url(self, order_url: str, cert_url: str):
-        """Persist the upstream certificate URL on the local proxy order row.
-
-        Lets _find_order_for_certificate resolve the order with an indexed
-        query instead of a live upstream scan (#219).
-        """
-        from models import AcmeClientOrder
+    def _persist_certificate_url(self, row, cert_url: str):
+        """Persist the upstream certificate URL on the local order served, not on
+        a dead row sharing its upstream URL, so _find_order_for_certificate finds
+        it with an indexed query (#219)."""
         try:
-            row = AcmeClientOrder.query.filter_by(
-                is_proxy_order=True, upstream_order_url=order_url
-            ).first()
-            if row and row.certificate_url != cert_url:
+            if row.certificate_url != cert_url:
                 row.certificate_url = cert_url
                 db.session.commit()
         except Exception as exc:
@@ -1968,7 +1964,7 @@ class AcmeProxyService:
                 logger.debug(f"Certificate lookup: upstream order fetch failed: {exc}")
                 continue
             if isinstance(upstream_order, dict) and upstream_order.get('certificate') == cert_url:
-                self._persist_certificate_url(candidate.upstream_order_url, cert_url)
+                self._persist_certificate_url(candidate, cert_url)
                 return candidate
         return None
 
@@ -2053,7 +2049,7 @@ class AcmeProxyService:
         if order.get('status') == 'invalid':
             self._mark_invalid([local_order] if local_order.status == 'pending' else [])
             self._release_order_records(local_order)
-        return self._rewrite_order_urls(order, order_url, order_id_b64)
+        return self._rewrite_order_urls(order, order_url, order_id_b64, local_order)
 
     def finalize_order(self, order_id_b64, csr_pem, requester_account_id=None,
                        requester_thumbprint=None):
@@ -2109,7 +2105,7 @@ class AcmeProxyService:
 
         order = resp.json()
         _finalize_url_cache.put(order_url, order.get('finalize'))
-        return self._rewrite_order_urls(order, order_url, order_id_b64)
+        return self._rewrite_order_urls(order, order_url, order_id_b64, local_order)
 
     def get_certificate(self, cert_id_b64, requester_account_id=None, requester_thumbprint=None):
         """Proxy certificate download with DNS cleanup and storage.

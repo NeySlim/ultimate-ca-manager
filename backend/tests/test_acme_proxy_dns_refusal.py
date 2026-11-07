@@ -295,6 +295,20 @@ class TestRetryAfterARefusal:
             order = svc.get_order(_b64(ORDER_URL), requester_thumbprint='T')
             assert order['status'] == 'pending' and 'error' not in order
 
+    def test_certificate_of_the_retry_lands_on_the_live_order(self, app, monkeypatch):
+        cert_url = f'{UPSTREAM}/acme/cert/dns/1'
+        with app.app_context():
+            dead = _refused(client_jwk_thumbprint='T')
+            live = _order(client_jwk_thumbprint='T')
+            svc, _calls = _svc(monkeypatch, {ORDER_URL: _Resp(
+                {'status': 'valid', 'authorizations': [AUTHZ_URL],
+                 'finalize': f'{ORDER_URL}/finalize', 'certificate': cert_url})})
+            svc.get_order(_b64(ORDER_URL), requester_thumbprint='T')
+            db.session.refresh(dead)
+            db.session.refresh(live)
+            assert (dead.certificate_url, live.certificate_url) == (None, cert_url)
+            assert svc._find_order_for_certificate(cert_url, requester_thumbprint='T').id == live.id
+
 
 @pytest.mark.usefixtures('_quiet_rows')
 class TestRefusalOnAnotherNameOfTheOrder:

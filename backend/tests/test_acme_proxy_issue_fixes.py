@@ -149,7 +149,7 @@ class TestCertificateUrlPersistence:
         with app.app_context():
             svc = _make_service(app)
             order = _seed_proxy_order(upstream_order_url=f'{UPSTREAM}/order/1')
-            svc._persist_certificate_url(f'{UPSTREAM}/order/1', f'{UPSTREAM}/cert/abc')
+            svc._persist_certificate_url(order, f'{UPSTREAM}/cert/abc')
             assert db.session.get(AcmeClientOrder, order.id).certificate_url == f'{UPSTREAM}/cert/abc'
 
     def test_find_order_fast_path_no_upstream_calls(self, app, monkeypatch):
