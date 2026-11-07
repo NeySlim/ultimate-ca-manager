@@ -8,7 +8,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import Encoding
 from lxml import etree
 
-from services.wstep.cmc_response import ID_CCT_PKIRESPONSE, ID_CMC_STATUSINFOV2, _CMCStatusInfoV2, _PKIResponse
+from services.wstep.cmc_response import ID_CCT_PKIRESPONSE, _CMCStatusInfoV2, _PKIResponse
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS, WSU_NS
 from tests.test_wstep_issue import ISSUE_URL, _basic_auth, _build_rst, _make_csr, wstep_config  # noqa: F401
 from tests.test_wstep_renew_tls import _cmc_renewal
@@ -74,7 +74,7 @@ def test_a_pkcs10_request_gets_a_cmc_full_pki_response(client, wstep_config):
     assert signed['encap_content_info']['content_type'].dotted == ID_CCT_PKIRESPONSE
     response = _PKIResponse.load(signed['encap_content_info']['content'].native)
     control = response['control_sequence'][0]
-    assert control['attr_type'].dotted == ID_CMC_STATUSINFOV2
+    assert control['attr_type'].dotted == '1.3.6.1.5.5.7.7.25'  # id-cmc-statusInfoV2, id-cmc = id-pkix 7
     status = _CMCStatusInfoV2.load(control['attr_values'][0].dump())
     assert status['cmc_status'].native == 0
     assert [p.native for p in status['body_list']] == [1]

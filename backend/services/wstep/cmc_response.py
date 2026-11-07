@@ -26,8 +26,8 @@ from asn1crypto import x509 as asn1_x509
 
 # RFC 5272 SS4.2 -- id-pkix.id-cct(12).3
 ID_CCT_PKIRESPONSE = '1.3.6.1.5.5.7.12.3'
-# RFC 5272 SS6.1.1 -- id-cmc(1.2.840.113549.1.9.16.6).25
-ID_CMC_STATUSINFOV2 = '1.2.840.113549.1.9.16.6.25'
+# RFC 5272 SS6.1.1 -- id-cmc-statusInfoV2 = {id-cmc 25}, id-cmc = {id-pkix 7}
+ID_CMC_STATUSINFOV2 = '1.3.6.1.5.5.7.7.25'
 CMC_STATUS_SUCCESS = 0
 
 # id-signedData (RFC 5652)
