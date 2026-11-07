@@ -171,6 +171,38 @@ jobs:
           cd backend
           pytest -v --tb=short --durations=30
 
+      # The same suite in random order on the nightly run: a report, not a gate.
+      # The job summary gives the seed that replays the order locally.
+      - name: Run tests in random order (report only)
+        if: ${{ !cancelled() && github.event_name == 'schedule' }}
+        continue-on-error: true
+        env:
+          SECRET_KEY: test-secret-key-for-ci
+          UCM_ENV: test
+          HTTP_REDIRECT: 'false'
+          INITIAL_ADMIN_PASSWORD: changeme123
+          CSRF_DISABLED: 'true'
+          UCM_DEV_MODE: 'true'
+        run: |
+          pip install pytest-randomly==5.0.0
+          cd backend
+          seed=$(od -An -N4 -tu4 /dev/urandom | tr -d ' ')
+          set +e
+          pytest -p randomly --randomly-seed="$seed" -q --tb=line -rfE > random-order.log 2>&1
+          status=$?
+          set -e
+          tail -n 60 random-order.log
+          {
+            echo "### Random order: seed $seed, pytest exit $status"
+            echo
+            echo "Replay: \`cd backend && pytest -p randomly --randomly-seed=$seed\`"
+            echo
+            echo "Files with failures or errors:"
+            echo
+            grep -E '^(FAILED|ERROR) ' random-order.log | sed -E 's/^(FAILED|ERROR) ([^: ]+).*/\2/' | sort | uniq -c | sort -rn | sed 's/^/    /' || true
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
+
   test-backend-postgres:
     name: Backend Tests (PostgreSQL)
     runs-on: ubuntu-latest
