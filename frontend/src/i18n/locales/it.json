@@ -677,7 +677,9 @@
       "generateReport": "Genera rapporto"
     },
     "expiresInDays": "Scade tra {{count}} giorni",
-    "chainRepairSameKey": "chiavi condivise, certificati distinti (certificato incrociato?)"
+    "chainRepairSameKey": "chiavi condivise, certificati distinti (certificato incrociato?)",
+    "keyEncryptionOffTitle": "Le chiavi private non sono cifrate.",
+    "keyEncryptionOffDesc": "Nessuna chiave master è caricata: le chiavi private delle CA e dei certificati sono salvate senza cifratura nel database. Attiva la crittografia in Impostazioni › Sicurezza, oppure rimetti al suo posto la chiave master e riavvia UCM."
   },
   "certificates": {
     "createCertificate": "Crea certificato",
@@ -2819,7 +2821,7 @@
     "saveSettings": "Salva impostazioni",
     "securitySubtitle": "Password, 2FA, crittografia e configurazione sessione",
     "keyEncryption": "Crittografia chiavi private",
-    "encryptionDesc": "Crittografa tutte le chiavi private nel database con AES-256. Protette da una chiave master in /etc/ucm/master.key. Quando è attiva, UCM non conserva più file di chiavi in chiaro nella directory privata e rimuove quelli esistenti. Usa gli hook di distribuzione per collocare le chiavi dove servono a un servizio.",
+    "encryptionDesc": "Crittografa tutte le chiavi private nel database con AES-128 (Fernet, con HMAC-SHA256). Protette da una chiave master in /etc/ucm/master.key. Quando è attiva, UCM non conserva più file di chiavi in chiaro nella directory privata e rimuove quelli esistenti. Usa gli hook di distribuzione per collocare le chiavi dove servono a un servizio.",
     "enableEncryption": "Attiva crittografia",
     "disableEncryption": "Disattiva crittografia",
     "encryptRemainingKeys": "Crittografa chiavi rimanenti ({{count}})",
@@ -4270,6 +4272,8 @@
     "title": "Modalità sicura",
     "description": "UCM ha rilevato chiavi private crittografate ma la chiave di crittografia è mancante.",
     "step1Title": "Posiziona il file chiave master in:",
+    "mismatchDescription": "La chiave master configurata non decifra le chiavi private archiviate: non è quella con cui sono state cifrate. Le chiavi private restano inaccessibili finché non viene ripristinata la chiave master precedente.",
+    "mismatchStep1Title": "Rimetti il file della chiave master precedente in:",
     "step2Title": "Poi riavvia il servizio:",
     "lostKeyHint": "Se hai perso la chiave master, ripristina da un backup.",
     "polling": "Verifica in corso..."

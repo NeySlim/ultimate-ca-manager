@@ -677,7 +677,9 @@
       "generateReport": "Generate Report"
     },
     "expiresInDays": "Expires in {{count}} days",
-    "chainRepairSameKey": "shared keys, distinct certificates (cross-certificate?)"
+    "chainRepairSameKey": "shared keys, distinct certificates (cross-certificate?)",
+    "keyEncryptionOffTitle": "Private keys are not encrypted.",
+    "keyEncryptionOffDesc": "No master key is loaded, so CA and certificate private keys are stored unencrypted in the database. Enable encryption in Settings › Security, or put the master key back and restart UCM."
   },
   "certificates": {
     "createCertificate": "Create Certificate",
@@ -2820,7 +2822,7 @@
     "saveSettings": "Save Settings",
     "securitySubtitle": "Password, 2FA, encryption and session configuration",
     "keyEncryption": "Private Key Encryption",
-    "encryptionDesc": "Encrypt all private keys stored in the database using AES-256. Keys are protected by a master key stored at /etc/ucm/master.key. When enabled, UCM stops keeping plaintext key files in its private directory; existing ones are removed. Use deploy hooks to place keys where a service needs them.",
+    "encryptionDesc": "Encrypt all private keys stored in the database using AES-128 (Fernet, with HMAC-SHA256). Keys are protected by a master key stored at /etc/ucm/master.key. When enabled, UCM stops keeping plaintext key files in its private directory; existing ones are removed. Use deploy hooks to place keys where a service needs them.",
     "enableEncryption": "Enable Encryption",
     "disableEncryption": "Disable Encryption",
     "encryptRemainingKeys": "Encrypt remaining keys ({{count}})",
@@ -4273,6 +4275,8 @@
     "title": "Safe Mode",
     "description": "UCM detected encrypted private keys but the encryption key is missing. Private keys cannot be accessed until the master key is restored.",
     "step1Title": "Place your master key file at:",
+    "mismatchDescription": "The configured master key does not decrypt the stored private keys: it is not the key they were encrypted with. Private keys cannot be accessed until the previous master key is restored.",
+    "mismatchStep1Title": "Put the previous master key file back at:",
     "step2Title": "Then restart the service:",
     "lostKeyHint": "If you lost the master key, restore from a backup to recover your private keys.",
     "polling": "Checking for resolution..."

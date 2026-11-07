@@ -677,7 +677,9 @@
       "generateReport": "Bericht erstellen"
     },
     "expiresInDays": "Läuft in {{count}} Tagen ab",
-    "chainRepairSameKey": "gemeinsame Schlüssel, verschiedene Zertifikate (Cross-Zertifikat?)"
+    "chainRepairSameKey": "gemeinsame Schlüssel, verschiedene Zertifikate (Cross-Zertifikat?)",
+    "keyEncryptionOffTitle": "Private Schlüssel sind nicht verschlüsselt.",
+    "keyEncryptionOffDesc": "Es ist kein Hauptschlüssel geladen, daher werden die privaten Schlüssel von CAs und Zertifikaten unverschlüsselt in der Datenbank gespeichert. Aktivieren Sie die Verschlüsselung unter Einstellungen › Sicherheit oder stellen Sie den Hauptschlüssel wieder bereit und starten Sie UCM neu."
   },
   "certificates": {
     "createCertificate": "Zertifikat erstellen",
@@ -2819,7 +2821,7 @@
     "saveSettings": "Einstellungen speichern",
     "securitySubtitle": "Passwort, 2FA, Verschlüsselung und Sitzungskonfiguration",
     "keyEncryption": "Verschlüsselung privater Schlüssel",
-    "encryptionDesc": "Verschlüsselt alle in der Datenbank gespeicherten privaten Schlüssel mit AES-256. Geschützt durch einen Hauptschlüssel in /etc/ucm/master.key. Wenn aktiviert, speichert UCM keine Klartext-Schlüsseldateien mehr im privaten Verzeichnis und entfernt vorhandene Dateien. Verwenden Sie Deploy-Hooks, um Schlüssel dort abzulegen, wo ein Dienst sie benötigt.",
+    "encryptionDesc": "Verschlüsselt alle in der Datenbank gespeicherten privaten Schlüssel mit AES-128 (Fernet, mit HMAC-SHA256). Geschützt durch einen Hauptschlüssel in /etc/ucm/master.key. Wenn aktiviert, speichert UCM keine Klartext-Schlüsseldateien mehr im privaten Verzeichnis und entfernt vorhandene Dateien. Verwenden Sie Deploy-Hooks, um Schlüssel dort abzulegen, wo ein Dienst sie benötigt.",
     "enableEncryption": "Verschlüsselung aktivieren",
     "disableEncryption": "Verschlüsselung deaktivieren",
     "encryptRemainingKeys": "Verbleibende Schlüssel verschlüsseln ({{count}})",
@@ -4270,6 +4272,8 @@
     "title": "Abgesicherter Modus",
     "description": "UCM hat verschlüsselte private Schlüssel erkannt, aber der Verschlüsselungsschlüssel fehlt.",
     "step1Title": "Platzieren Sie Ihre Hauptschlüsseldatei unter:",
+    "mismatchDescription": "Der konfigurierte Hauptschlüssel entschlüsselt die gespeicherten privaten Schlüssel nicht: Sie wurden mit einem anderen Schlüssel verschlüsselt. Die privaten Schlüssel bleiben unzugänglich, bis der vorherige Hauptschlüssel wiederhergestellt ist.",
+    "mismatchStep1Title": "Legen Sie die vorherige Hauptschlüsseldatei wieder ab unter:",
     "step2Title": "Dann starten Sie den Dienst neu:",
     "lostKeyHint": "Wenn Sie den Hauptschlüssel verloren haben, stellen Sie aus einem Backup wieder her.",
     "polling": "Überprüfung läuft..."

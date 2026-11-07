@@ -677,7 +677,9 @@
       "generateReport": "Generar informe"
     },
     "expiresInDays": "Expira en {{count}} días",
-    "chainRepairSameKey": "claves compartidas, certificados distintos (¿certificado cruzado?)"
+    "chainRepairSameKey": "claves compartidas, certificados distintos (¿certificado cruzado?)",
+    "keyEncryptionOffTitle": "Las claves privadas no están cifradas.",
+    "keyEncryptionOffDesc": "No hay ninguna clave maestra cargada, así que las claves privadas de las CA y de los certificados se guardan sin cifrar en la base de datos. Active el cifrado en Configuración › Seguridad, o vuelva a colocar la clave maestra y reinicie UCM."
   },
   "certificates": {
     "createCertificate": "Crear certificado",
@@ -2819,7 +2821,7 @@
     "saveSettings": "Guardar configuración",
     "securitySubtitle": "Contraseña, 2FA, cifrado y configuración de sesión",
     "keyEncryption": "Cifrado de claves privadas",
-    "encryptionDesc": "Cifra todas las claves privadas almacenadas en la base de datos usando AES-256. Protegidas por una clave maestra en /etc/ucm/master.key. Cuando está activado, UCM deja de conservar archivos de clave en texto plano en su directorio privado y elimina los existentes. Use hooks de despliegue para colocar claves donde las necesite un servicio.",
+    "encryptionDesc": "Cifra todas las claves privadas almacenadas en la base de datos usando AES-128 (Fernet, con HMAC-SHA256). Protegidas por una clave maestra en /etc/ucm/master.key. Cuando está activado, UCM deja de conservar archivos de clave en texto plano en su directorio privado y elimina los existentes. Use hooks de despliegue para colocar claves donde las necesite un servicio.",
     "enableEncryption": "Activar cifrado",
     "disableEncryption": "Desactivar cifrado",
     "encryptRemainingKeys": "Cifrar claves restantes ({{count}})",
@@ -4270,6 +4272,8 @@
     "title": "Modo seguro",
     "description": "UCM detectó claves privadas cifradas pero falta la clave de cifrado.",
     "step1Title": "Coloque su archivo de clave maestra en:",
+    "mismatchDescription": "La clave maestra configurada no descifra las claves privadas almacenadas: no es la clave con la que se cifraron. No se puede acceder a las claves privadas hasta restaurar la clave maestra anterior.",
+    "mismatchStep1Title": "Vuelva a colocar el archivo de la clave maestra anterior en:",
     "step2Title": "Luego reinicie el servicio:",
     "lostKeyHint": "Si perdió la clave maestra, restaure desde una copia de seguridad.",
     "polling": "Verificando..."

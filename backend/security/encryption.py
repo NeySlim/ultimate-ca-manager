@@ -8,8 +8,8 @@ Key sources (in order of priority):
 """
 
 import os
-import stat
 import base64
+import tempfile
 import logging
 from pathlib import Path
 from typing import Optional, Tuple
@@ -37,6 +37,16 @@ def key_encryption_required() -> bool:
     """
     val = os.getenv('UCM_REQUIRE_KEY_ENCRYPTION', '').strip().lower()
     return val in ('1', 'true', 'yes', 'on')
+
+
+def log_encryption_disabled() -> None:
+    logger.error(
+        "🔓 Private-key encryption is DISABLED, no %s and no "
+        "KEY_ENCRYPTION_KEY. CA and certificate private keys will be "
+        "stored UNENCRYPTED at rest. Configure a key, and set "
+        "UCM_REQUIRE_KEY_ENCRYPTION=true to refuse startup without one.",
+        MASTER_KEY_PATH,
+    )
 
 
 class KeyEncryption:
@@ -97,13 +107,12 @@ class KeyEncryption:
                     f'but no key is configured. Provide {MASTER_KEY_PATH} or set '
                     'KEY_ENCRYPTION_KEY.'
                 )
-            logger.error(
-                "🔓 Private-key encryption is DISABLED, no %s and no "
-                "KEY_ENCRYPTION_KEY. CA and certificate private keys will be "
-                "stored UNENCRYPTED at rest. Configure a key, and set "
-                "UCM_REQUIRE_KEY_ENCRYPTION=true to refuse startup without one.",
-                MASTER_KEY_PATH,
-            )
+            from config.settings import Config
+            if Config.AUTO_MASTER_KEY:
+                # The start check creates the key or logs the final state
+                logger.info("🔓 No master key loaded yet (%s)", MASTER_KEY_PATH)
+            else:
+                log_encryption_disabled()
             self._enabled = False
             self._key_source = None
             return
@@ -137,6 +146,12 @@ class KeyEncryption:
         self._key_source = None
         self._initialize()
     
+    def unload(self):
+        """Run as without a key, e.g. when the configured one is not the database's."""
+        self._fernet = None
+        self._key_bytes = None
+        self._enabled = False
+
     @property
     def is_enabled(self) -> bool:
         return self._enabled
@@ -220,22 +235,50 @@ class KeyEncryption:
         return base64.urlsafe_b64encode(csp_bytes(32)).decode('utf-8')
     
     @staticmethod
-    def write_key_file(key: str) -> None:
-        """Write encryption key to master.key file with secure permissions"""
+    def _fill_key_file(fd: int, key: str) -> None:
+        """Write `key` to the open file `fd`, sync it and give it to the ucm user."""
+        with os.fdopen(fd, 'w') as handle:
+            handle.write(key + '\n')
+            handle.flush()
+            os.fsync(handle.fileno())
+            try:
+                import pwd
+                ucm_user = pwd.getpwnam('ucm')
+                os.fchown(handle.fileno(), ucm_user.pw_uid, ucm_user.pw_gid)
+            except (KeyError, OSError) as e:
+                # No ucm user (dev mode): a root-owned 0600 file still works
+                logger.debug(f"chown master.key to ucm:ucm skipped: {e}")
+
+    @staticmethod
+    def write_key_file(key: str, exclusive: bool = False) -> None:
+        """Write the master key file (0600), complete or not at all.
+
+        `exclusive` never replaces an existing file: FileExistsError instead.
+        Without hard links it creates the file with O_EXCL and removes it if the write fails.
+        """
         MASTER_KEY_PATH.parent.mkdir(parents=True, exist_ok=True)
-        MASTER_KEY_PATH.write_text(key + '\n')
-        os.chmod(MASTER_KEY_PATH, stat.S_IRUSR | stat.S_IWUSR)  # 0600
-        # Set ownership to ucm user if it exists (service runs as ucm)
+        fd, tmp = tempfile.mkstemp(dir=MASTER_KEY_PATH.parent, prefix='.master.', suffix='.tmp')
         try:
-            import pwd
-            ucm_user = pwd.getpwnam('ucm')
-            os.chown(MASTER_KEY_PATH, ucm_user.pw_uid, ucm_user.pw_gid)
-        except (KeyError, OSError) as e:
-            # ucm user doesn't exist (dev mode) or chown failed — running
-            # as root with stricter file perms is fine, just less ideal.
-            logger.debug(f"chown master.key to ucm:ucm skipped: {e}")
+            KeyEncryption._fill_key_file(fd, key)
+            if exclusive:
+                try:
+                    os.link(tmp, MASTER_KEY_PATH)
+                except FileExistsError:
+                    raise
+                except OSError:
+                    fd = os.open(MASTER_KEY_PATH, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                    try:
+                        KeyEncryption._fill_key_file(fd, key)
+                    except BaseException:
+                        MASTER_KEY_PATH.unlink(missing_ok=True)
+                        raise
+            else:
+                os.replace(tmp, MASTER_KEY_PATH)
+        finally:
+            if os.path.exists(tmp):
+                os.unlink(tmp)
         logger.info(f"🔑 Master key written to {MASTER_KEY_PATH}")
-    
+
     @staticmethod
     def remove_key_file() -> bool:
         """Remove master.key file. Returns True if file was removed."""
@@ -355,7 +398,6 @@ def master_key_values():
     """Yield (label, row, attribute, format) for every non-empty value stored
     under the master key. An empty column means no secret."""
     import importlib
-    from fnmatch import fnmatchcase
     from sqlalchemy.orm.attributes import InstrumentedAttribute
     from models import SystemConfig
 
@@ -371,9 +413,13 @@ def master_key_values():
                 yield f"{name} {label}", row, attribute, fmt
 
     for row in SystemConfig.query.filter(SystemConfig.key.like('acme.%')).all():
-        if row.value and any(fnmatchcase(row.key, pattern)
-                             for pattern in MASTER_KEY_CONFIG_KEYS):
+        if row.value and _is_master_key_config(row.key):
             yield f"SystemConfig {row.key}", row, 'value', 'text'
+
+
+def _is_master_key_config(key: str) -> bool:
+    from fnmatch import fnmatchcase
+    return any(fnmatchcase(key, pattern) for pattern in MASTER_KEY_CONFIG_KEYS)
 
 
 def encrypt_master_key_value(value: str, fmt: str) -> str:
@@ -408,6 +454,35 @@ def count_master_key_values() -> Tuple[int, int]:
         else:
             unencrypted += 1
     return encrypted, unencrypted
+
+
+def has_unencrypted_master_key_values() -> bool:
+    """True when a value under the master key is still stored unencrypted.
+
+    Columns are filtered in SQL on the base64 prefix every ENC: value starts with,
+    so a start with everything encrypted loads no row of them.
+    """
+    import importlib
+    from sqlalchemy.orm.attributes import InstrumentedAttribute
+    from models import db, SystemConfig
+
+    prefix = base64.b64encode(ENCRYPTED_MARKER).decode()[:5]
+    for module, name, attribute, _ in MASTER_KEY_COLUMNS:
+        model = getattr(importlib.import_module(module), name)
+        column = getattr(model, attribute)
+        if not isinstance(column, InstrumentedAttribute):
+            # A property over a wrapped column: only Python sees the value
+            values = (getattr(row, attribute) for row in model.query.all())
+            if any(v and not key_encryption.is_encrypted(v) for v in values):
+                return True
+            continue
+        # substr, not LIKE: SQLite's LIKE ignores case
+        if model.query.filter(column.isnot(None), column != '',
+                              db.func.substr(column, 1, len(prefix)) != prefix).first():
+            return True
+    return any(not key_encryption.is_encrypted(row.value)
+               for row in SystemConfig.query.filter(SystemConfig.key.like('acme.%')).all()
+               if row.value and _is_master_key_config(row.key))
 
 
 def decrypt_all_keys(dry_run: bool = True) -> tuple:

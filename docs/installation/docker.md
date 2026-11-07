@@ -29,6 +29,7 @@ docker run -d \
   -p 8443:8443 \
   -p 8080:8080 \
   -v ucm-data:/opt/ucm/data \
+  -v ucm-config:/etc/ucm \
   --restart unless-stopped \
   neyslim/ultimate-ca-manager:latest
 ```
@@ -156,7 +157,8 @@ See full list in [docker-compose.yml](../../docker-compose.yml). SMTP, ACME, the
 
 ```bash
 docker volume create ucm-data
-docker run -v ucm-data:/opt/ucm/data ...
+docker volume create ucm-config
+docker run -v ucm-data:/opt/ucm/data -v ucm-config:/etc/ucm ...
 ```
 
 ### Using Bind Mounts
@@ -223,9 +225,12 @@ docker run -d \
   -p 8443:8443 \
   -p 8080:8080 \
   -v ucm-data:/opt/ucm/data \
+  -v ucm-config:/etc/ucm \
   --restart unless-stopped \
   neyslim/ultimate-ca-manager:latest
 ```
+
+`/etc/ucm` holds `master.key`. If the old container ran without a volume there, copy the key out before `docker rm` (`docker cp ucm:/etc/ucm/master.key ./master.key`) and into the new container afterwards.
 
 **With Docker Compose:**
 ```bash
@@ -236,17 +241,17 @@ docker-compose up -d
 ### Backup Data
 
 ```bash
-# Backup volume to tarball
-docker run --rm -v ucm-data:/data -v $(pwd):/backup \
-  alpine tar czf /backup/ucm-backup-$(date +%Y%m%d).tar.gz -C /data .
+# Backup both volumes to a tarball
+docker run --rm -v ucm-data:/data -v ucm-config:/config -v $(pwd):/backup \
+  alpine tar czf /backup/ucm-backup-$(date +%Y%m%d).tar.gz -C / data config
 ```
 
 ### Restore Data
 
 ```bash
 # Restore from tarball
-docker run --rm -v ucm-data:/data -v $(pwd):/backup \
-  alpine tar xzf /backup/ucm-backup-20260109.tar.gz -C /data
+docker run --rm -v ucm-data:/data -v ucm-config:/config -v $(pwd):/backup \
+  alpine tar xzf /backup/ucm-backup-20260109.tar.gz -C /
 ```
 
 ---

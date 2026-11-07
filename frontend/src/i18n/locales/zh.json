@@ -677,7 +677,9 @@
       "generateReport": "生成报告"
     },
     "expiresInDays": "{{count}} 天后到期",
-    "chainRepairSameKey": "共用密钥、证书不同（交叉证书？）"
+    "chainRepairSameKey": "共用密钥、证书不同（交叉证书？）",
+    "keyEncryptionOffTitle": "私钥未加密。",
+    "keyEncryptionOffDesc": "未加载主密钥，CA 和证书的私钥以未加密形式保存在数据库中。请在 设置 › 安全 中启用加密，或将主密钥放回原处并重启 UCM。"
   },
   "certificates": {
     "createCertificate": "创建证书",
@@ -2819,7 +2821,7 @@
     "saveSettings": "保存设置",
     "securitySubtitle": "密码、双因素认证、加密和会话配置",
     "keyEncryption": "私钥加密",
-    "encryptionDesc": "使用AES-256加密数据库中存储的所有私钥。由/etc/ucm/master.key中的主密钥保护。启用后，UCM 不再在私有目录中保留明文密钥文件，并会删除现有文件。请使用部署钩子将密钥放置到服务所需的位置。",
+    "encryptionDesc": "使用AES-128（Fernet，带 HMAC-SHA256）加密数据库中存储的所有私钥。由/etc/ucm/master.key中的主密钥保护。启用后，UCM 不再在私有目录中保留明文密钥文件，并会删除现有文件。请使用部署钩子将密钥放置到服务所需的位置。",
     "enableEncryption": "启用加密",
     "disableEncryption": "禁用加密",
     "encryptRemainingKeys": "加密剩余密钥（{{count}}）",
@@ -4270,6 +4272,8 @@
     "title": "安全模式",
     "description": "UCM检测到加密的私钥，但加密密钥缺失。",
     "step1Title": "将主密钥文件放置在：",
+    "mismatchDescription": "配置的主密钥无法解密已存储的私钥：它不是加密这些私钥时使用的密钥。在恢复之前的主密钥之前，无法访问私钥。",
+    "mismatchStep1Title": "将之前的主密钥文件放回：",
     "step2Title": "然后重启服务：",
     "lostKeyHint": "如果丢失了主密钥，请从备份中恢复。",
     "polling": "正在检查..."

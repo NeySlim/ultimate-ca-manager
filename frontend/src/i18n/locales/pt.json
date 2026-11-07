@@ -677,7 +677,9 @@
       "generateReport": "Gerar relatório"
     },
     "expiresInDays": "Expira em {{count}} dias",
-    "chainRepairSameKey": "chaves partilhadas, certificados distintos (certificado cruzado?)"
+    "chainRepairSameKey": "chaves partilhadas, certificados distintos (certificado cruzado?)",
+    "keyEncryptionOffTitle": "As chaves privadas não estão cifradas.",
+    "keyEncryptionOffDesc": "Nenhuma chave mestra está carregada, por isso as chaves privadas das CAs e dos certificados são guardadas sem criptografia na base de dados. Ative a criptografia em Definições › Segurança, ou reponha a chave mestra e reinicie o UCM."
   },
   "certificates": {
     "createCertificate": "Criar certificado",
@@ -2819,7 +2821,7 @@
     "saveSettings": "Salvar configurações",
     "securitySubtitle": "Senha, 2FA, criptografia e configuração de sessão",
     "keyEncryption": "Criptografia de chaves privadas",
-    "encryptionDesc": "Criptografa todas as chaves privadas no banco de dados com AES-256. Protegidas por uma chave mestra em /etc/ucm/master.key. Quando ativada, a UCM deixa de manter arquivos de chave em texto claro no diretório privado e remove os existentes. Use hooks de implantação para colocar as chaves onde um serviço precisa delas.",
+    "encryptionDesc": "Criptografa todas as chaves privadas no banco de dados com AES-128 (Fernet, com HMAC-SHA256). Protegidas por uma chave mestra em /etc/ucm/master.key. Quando ativada, a UCM deixa de manter arquivos de chave em texto claro no diretório privado e remove os existentes. Use hooks de implantação para colocar as chaves onde um serviço precisa delas.",
     "enableEncryption": "Ativar criptografia",
     "disableEncryption": "Desativar criptografia",
     "encryptRemainingKeys": "Criptografar chaves restantes ({{count}})",
@@ -4270,6 +4272,8 @@
     "title": "Modo seguro",
     "description": "UCM detectou chaves privadas criptografadas mas a chave de criptografia está ausente.",
     "step1Title": "Coloque seu arquivo de chave mestra em:",
+    "mismatchDescription": "A chave mestra configurada não descriptografa as chaves privadas armazenadas: não é a chave com que foram criptografadas. As chaves privadas ficam inacessíveis até que a chave mestra anterior seja restaurada.",
+    "mismatchStep1Title": "Coloque de volta o arquivo da chave mestra anterior em:",
     "step2Title": "Em seguida, reinicie o serviço:",
     "lostKeyHint": "Se perdeu a chave mestra, restaure a partir de um backup.",
     "polling": "Verificando..."
