@@ -94,6 +94,8 @@ def _saml_logout_request(provider):
     data = saml_sp.request_data(request, base)
     # The signature covers the query as the IdP encoded it (SAML Bindings §3.4.4.1).
     data['query_string'] = request.query_string.decode('ascii', 'replace')
+    if not _slo_query_is_unambiguous(request.args, data['query_string']):
+        return _reject_saml_logout(provider, 'repeated or re-encoded SAML parameter')
     data['validate_signature_from_qs'] = True
     try:
         auth = OneLogin_Saml2_Auth(
@@ -133,6 +135,20 @@ def _saml_logout_request(provider):
     if sp_key:
         auth.add_response_signature(params, OneLogin_Saml2_Constants.RSA_SHA256)
     return redirect(OneLogin_Saml2_Utils.redirect(auth.get_slo_response_url(), params, request_data=data))
+
+
+_SLO_PARAMS = ('SAMLRequest', 'RelayState', 'SigAlg', 'Signature')
+
+
+def _slo_query_is_unambiguous(args, query_string):
+    """Each parameter appears at most once and spelled as the signed query keeps it,
+    so the values acted on are the bytes the signature covers."""
+    parts = query_string.split('&')
+    for key in _SLO_PARAMS:
+        raw = sum(1 for part in parts if part.startswith(key + '='))
+        if raw > 1 or len(args.getlist(key)) != raw:
+            return False
+    return True
 
 
 def _reject_saml_logout(provider, reason):

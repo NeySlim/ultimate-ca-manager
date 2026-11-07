@@ -887,3 +887,16 @@ def test_without_an_idp_slo_url_the_session_still_closes(app, provider, idp_sign
     r = client.get(url, base_url=SP_BASE)
     assert r.headers['Location'] == '/login'
     assert not _authenticated(client)
+
+
+@pytest.mark.parametrize('smuggled', ['%53AMLRequest', '%52elayState'])
+def test_a_parameter_outside_the_signed_query_is_refused(app, slo_url, idp_signer, smuggled):
+    """The values acted on must be the bytes the IdP signed, not a re-encoded twin."""
+    client, name_id = _signed_in(app, idp_signer)
+    forged = _logout_request(idp_signer[0], name_id, sign=False)[1].split('SAMLRequest=', 1)[1]
+    _, signed = _logout_request(idp_signer[0], 'attacker-own-nameid')
+    value = forged if smuggled == '%53AMLRequest' else 'https://evil.example.test/'
+    url = f'{ACS}?{smuggled}={value}&{signed.split("?", 1)[1]}'
+    r = client.get(url, base_url=SP_BASE)
+    assert r.headers['Location'] == '/login?error=saml_logout_rejected'
+    assert _authenticated(client)
