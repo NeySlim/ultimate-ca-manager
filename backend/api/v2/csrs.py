@@ -227,6 +227,23 @@ def _policy_rule_refusal(ca, cert, template_id, validity_days, extra_dns=()):
     return None, validity_days, notices_mod.collect(notice, advisories)
 
 
+def _malformed_request_refusal(cert, cert_type):
+    """The trunk's refusal of the request's subject and names, given before an
+    approval is queued for a signing that would fail."""
+    from utils.request_names import cn_implied_names, refuse_malformed_request
+    csr_obj = x509.load_pem_x509_csr(base64.b64decode(cert.csr))
+    try:
+        names = list(csr_extensions(csr_obj).get_extension_for_class(
+            x509.SubjectAlternativeName).value)
+    except x509.ExtensionNotFound:
+        names = cn_implied_names(csr_obj.subject, cert_type)
+    try:
+        refuse_malformed_request(csr_obj.subject, names)
+    except RequestRejected as e:
+        return str(e)
+    return None
+
+
 def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus, validity_notice=None,
                       extra_san=None, custom_extensions=None):
     """Queue the signing for approval when a policy requires it: ``(policy,
@@ -1076,6 +1093,12 @@ def sign_csr(csr_id):
         return error_response(f'Invalid CSR: {e}', 400)
     if san_refusal:
         return error_response(san_refusal, 400)
+    try:
+        malformed = _malformed_request_refusal(cert, backend_cert_type)
+    except (ValueError, TypeError) as e:
+        return error_response(f'Invalid CSR: {e}', 400)
+    if malformed:
+        return error_response(malformed, 400)
 
     refusal, validity_days, validity_notice = _policy_rule_refusal(
         ca, cert, data.get('template_id'), validity_days,
@@ -1241,7 +1264,8 @@ def bulk_sign_csrs():
                 results['failed'].append({'id': csr_id, 'error': 'Already signed'})
                 continue
             try:
-                refusal = _san_type_refusal(cert, data.get('template_id'))
+                refusal = (_san_type_refusal(cert, data.get('template_id'))
+                           or _malformed_request_refusal(cert, 'server_cert'))
             except (ValueError, TypeError) as e:
                 refusal = f'Invalid CSR: {e}'
             if refusal:
