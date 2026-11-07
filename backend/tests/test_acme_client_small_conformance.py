@@ -49,6 +49,43 @@ class TestAriRenewalInstant:
         assert self._due(self.NOW + timedelta(days=1), self.NOW + timedelta(days=2), 0.0) is False
 
 
+class TestAriPollingLimits:
+    """RFC 9773 §4.3: no ARI check of an expired certificate, and a bounded
+    Retry-After (§4.3.2)."""
+    NOW = datetime(2026, 11, 7, 12, 0)
+
+    @pytest.fixture(autouse=True)
+    def _fresh(self):
+        renew_mod._ARI_CACHE.clear()
+        yield
+        renew_mod._ARI_CACHE.clear()
+
+    def _fetch(self, monkeypatch, valid_to, retry_after=None):
+        client = MagicMock()
+        client.get_renewal_info.return_value = {
+            'suggested_window': {'start': self.NOW, 'end': self.NOW}, 'retry_after': retry_after}
+        monkeypatch.setattr(renew_mod, 'renewal_client', lambda _order: client)
+        order = SimpleNamespace(acme_client_account_id=1)
+        certificate = SimpleNamespace(id=9, valid_to=valid_to)
+        info = renew_mod._cached_renewal_info(order, certificate, self.NOW)
+        return client, info, renew_mod._ARI_CACHE.get((1, 9))
+
+    def test_expired_certificate_is_not_checked(self, monkeypatch):
+        client, info, _cached = self._fetch(monkeypatch, self.NOW - timedelta(seconds=1))
+        assert info is None
+        client.get_renewal_info.assert_not_called()
+
+    @pytest.mark.parametrize('retry_after, kept', [
+        (timedelta(days=30), timedelta(days=1)),
+        (timedelta(seconds=5), timedelta(minutes=1)),
+        (timedelta(hours=6), timedelta(hours=6)),
+    ])
+    def test_retry_after_is_bounded(self, monkeypatch, retry_after, kept):
+        _client, _info, cached = self._fetch(
+            monkeypatch, self.NOW + timedelta(days=60), self.NOW + retry_after)
+        assert cached['retry_after'] == self.NOW + kept
+
+
 class TestReadableErrors:
     def test_html_503_on_new_order_names_the_status(self):
         from services.acme.acme_client_service import AcmeClientService

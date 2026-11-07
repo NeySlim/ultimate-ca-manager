@@ -64,6 +64,8 @@ _ARI_CACHE = {}
 RENEWAL_PASS_SECONDS = 21600
 # RFC 9773 §4.2: the renewal instant drawn per certificate, kept while its window is unchanged
 _ARI_PICKS = {}
+_ARI_MIN_RETRY = timedelta(minutes=1)
+_ARI_MAX_RETRY = timedelta(days=1)
 
 
 def _renewal_instant(cache_key, window):
@@ -91,16 +93,23 @@ def renewal_client(order):
 def _cached_renewal_info(order, certificate, now):
     """Return upstream ARI data while honoring Retry-After."""
     cache_key = (order.acme_client_account_id, certificate.id)
+    # RFC 9773 §4.3: an expired certificate's RenewalInfo is never checked
+    valid_to = getattr(certificate, 'valid_to', None)
+    if valid_to is not None and valid_to < now:
+        _ARI_CACHE.pop(cache_key, None)
+        return None
     cached = _ARI_CACHE.get(cache_key)
     if cached and cached.get('retry_after') and now < cached['retry_after']:
         return cached['info']
 
     client = renewal_client(order)
     info = client.get_renewal_info(certificate)
-    if info and info.get('retry_after') and info['retry_after'] > now:
+    if info and info.get('retry_after'):
+        # RFC 9773 §4.3.2: the checking interval is kept between one minute and one day
+        retry_after = min(max(info['retry_after'], now + _ARI_MIN_RETRY), now + _ARI_MAX_RETRY)
         _ARI_CACHE[cache_key] = {
             'info': info,
-            'retry_after': info['retry_after'],
+            'retry_after': retry_after,
         }
     else:
         _ARI_CACHE.pop(cache_key, None)
