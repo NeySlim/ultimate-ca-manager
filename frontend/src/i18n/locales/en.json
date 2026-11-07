@@ -2993,7 +2993,7 @@
     "syslogTestSuccess": "Test message sent successfully",
     "syslogTestFailed": "Failed to send test message",
     "syslogCategories": "Event types to forward",
-    "syslogCategoriesHelp": "Uncheck a category to stop sending its events. Audit purges, API keys, roles, settings and other events outside these categories are always sent.",
+    "syslogCategoriesHelp": "Uncheck a category to stop sending its events; leaving every box unchecked sends them all. Users covers sign-ins only: account, role, password and MFA changes, syslog changes, audit purges, API keys and other events outside these categories are always sent.",
     "syslogCatCertificates": "Certificates",
     "syslogCatCAs": "Certificate Authorities",
     "syslogCatCSRs": "Signing Requests",

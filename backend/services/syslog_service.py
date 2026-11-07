@@ -65,9 +65,19 @@ class SyslogForwarder:
     _ALIASES = {'sso': 'user', 'user_certificate': 'certificate',
                 'ssh_certificate': 'certificate', 'ssh_ca': 'ca'}
 
+    # Under Users only sign-in activity can be muted: account changes (role, password, MFA) always leave
+    _USER_ACTIVITY = ('login', 'logout')
+
     @classmethod
-    def category_of(cls, resource_type):
-        """The deselectable category a resource type belongs to, or None."""
+    def category_of(cls, resource_type, action=None):
+        """The deselectable category an event belongs to, or None."""
+        category = cls._category_of_type(resource_type)
+        if category == 'user' and not str(action or '').startswith(cls._USER_ACTIVITY):
+            return None
+        return category
+
+    @classmethod
+    def _category_of_type(cls, resource_type):
         if not resource_type:
             return None
         if resource_type in cls.ALL_CATEGORIES:
@@ -77,9 +87,9 @@ class SyslogForwarder:
                 return category
         return cls._ALIASES.get(resource_type)
 
-    def _wanted(self, resource_type) -> bool:
+    def _wanted(self, resource_type, action=None) -> bool:
         # No box checked is read back from the database as all of them: same here
-        category = self.category_of(resource_type)
+        category = self.category_of(resource_type, action)
         return not self._categories or category is None or category in self._categories
 
     def _initialize(self):
@@ -138,7 +148,7 @@ class SyslogForwarder:
         self._framing = framing.lower() if framing else default_framing
         if self._framing not in ('octet', 'line'):
             raise ValueError("Syslog framing must be 'octet' or 'line'")
-        self._categories = categories if categories is not None else list(self.ALL_CATEGORIES)
+        self._categories = list(categories) if categories else list(self.ALL_CATEGORIES)
         # Force re-resolution of the HOSTNAME field on next send
         self._hostname = ''
         self._hostname_resolved_at = 0.0
@@ -248,7 +258,8 @@ class SyslogForwarder:
         if not self._enabled or not self._host:
             return False
 
-        if not self._wanted(getattr(audit_log, 'resource_type', None)):
+        if not self._wanted(getattr(audit_log, 'resource_type', None),
+                            getattr(audit_log, 'action', None)):
             return False
 
         try:

@@ -44,10 +44,10 @@ def forwarding(collector):
     syslog_forwarder._socket = None
 
 
-def _entry(resource_type):
+def _entry(resource_type, action=None):
     log = Mock()
     log.timestamp = None
-    log.action, log.username, log.ip_address = f'probe_{resource_type}', 'tester', None
+    log.action, log.username, log.ip_address = action or f'probe_{resource_type}', 'tester', None
     log.resource_type, log.resource_id, log.resource_name = resource_type, None, None
     log.success, log.details = True, 'probe'
     return log
@@ -78,10 +78,19 @@ def test_acme_box_covers_every_acme_type(app, collector, forwarding):
 def test_sso_login_failures_follow_the_users_box(app, collector, forwarding):
     forwarding(categories=['user'])
     with app.app_context():
-        assert syslog_forwarder.send(_entry('sso'))
+        assert syslog_forwarder.send(_entry('sso', 'login_failure'))
     forwarding(categories=['certificate'])
     with app.app_context():
-        assert not syslog_forwarder.send(_entry('sso'))
+        assert not syslog_forwarder.send(_entry('sso', 'login_failure'))
+        assert not syslog_forwarder.send(_entry('user', 'logout'))
+
+
+def test_account_changes_ignore_the_users_box(app, collector, forwarding):
+    forwarding(categories=['certificate'])
+    with app.app_context():
+        for action in ('user_update', 'user_create', 'role_change', 'password_change',
+                       'password_reset', 'mfa_disable', 'mfa_reset', 'user_activate'):
+            assert syslog_forwarder.send(_entry('user', action)), action
 
 
 def test_types_outside_the_boxes_are_never_dropped(app, collector, forwarding):
@@ -160,3 +169,57 @@ def test_syslog_forwards_audit_cleanup_and_api_key_events(app, auth_client, coll
             from models.api_key import APIKey
             APIKey.query.filter_by(name='syslog-probe').delete()
             db.session.commit()
+
+
+@pytest.fixture
+def saved_syslog_rows(app):
+    """The syslog_* settings the PUT route writes, restored afterwards."""
+    from models import SystemConfig, db
+    with app.app_context():
+        rows = {r.key: r.value for r in SystemConfig.query.filter(SystemConfig.key.like('syslog_%'))}
+    yield
+    with app.app_context():
+        for row in SystemConfig.query.filter(SystemConfig.key.like('syslog_%')):
+            if row.key in rows:
+                row.value = rows[row.key]
+            else:
+                db.session.delete(row)
+        db.session.commit()
+
+
+def _put_syslog(auth_client, collector, **fields):
+    body = {'enabled': True, 'host': '127.0.0.1', 'port': collector.getsockname()[1],
+            'protocol': 'udp', **fields}
+    return auth_client.put('/api/v2/system/audit/syslog', content_type='application/json',
+                           data=json.dumps(body))
+
+
+def test_narrowing_the_categories_reaches_the_collector(app, auth_client, create_user, collector,
+                                                         forwarding, saved_syslog_rows):
+    r = _put_syslog(auth_client, collector, categories=['certificate', 'ca', 'csr', 'acme', 'scep'])
+    assert r.status_code == 200, r.get_json()
+    packets = [p for p in _received(collector) if 'syslog_config_updated' in p]
+    assert len(packets) == 1, packets
+    assert 'resource_type="settings"' in packets[0]
+    assert 'system' in packets[0] and 'user' in packets[0], packets[0]
+
+    user = create_user(username=f'sl-{uuid.uuid4().hex[:8]}')
+    r = auth_client.put(f"/api/v2/users/{user['id']}", content_type='application/json',
+                        data=json.dumps({'role': 'admin'}))
+    assert r.status_code == 200, r.get_json()
+    assert any('user_update' in p for p in _received(collector))
+
+
+def test_disabling_forwarding_is_the_last_packet_sent(app, auth_client, collector, forwarding,
+                                                       saved_syslog_rows):
+    r = _put_syslog(auth_client, collector, enabled=False)
+    assert r.status_code == 200, r.get_json()
+    packets = [p for p in _received(collector) if 'syslog_config_updated' in p]
+    assert len(packets) == 1 and 'disabled' in packets[0], packets
+
+
+def test_no_box_checked_is_saved_and_shown_as_all(app, auth_client, collector, forwarding,
+                                                   saved_syslog_rows):
+    r = _put_syslog(auth_client, collector, categories=[])
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()['data']['categories'] == SyslogForwarder.ALL_CATEGORIES
