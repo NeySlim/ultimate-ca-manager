@@ -2,7 +2,7 @@ from . import bp
 from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from .helpers import _get_ssl_verify, _cleanup_ssl_verify, _build_ldap_tls, _decrypt_ldap_password, _encrypt_ldap_password, _parse_json_field, _parse_group_list
+from .helpers import ldap_auto_bind, ldap_bind, _get_ssl_verify, _cleanup_ssl_verify, _build_ldap_tls, _decrypt_ldap_password, _encrypt_ldap_password, _parse_json_field, _parse_group_list
 import ldap3
 from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
@@ -91,7 +91,7 @@ def _test_ldap_connection(provider):
             server,
             user=provider.ldap_bind_dn,
             password=_decrypt_ldap_password(provider),
-            auto_bind=True
+            auto_bind=ldap_auto_bind(provider)
         )
 
         # Test search with escaped filter
@@ -141,7 +141,7 @@ def _ldap_authenticate_user(provider, username, password):
             server,
             user=provider.ldap_bind_dn,
             password=_decrypt_ldap_password(provider),
-            auto_bind=True,
+            auto_bind=ldap_auto_bind(provider),
             check_names=False,
         )
 
@@ -181,7 +181,7 @@ def _ldap_authenticate_user(provider, username, password):
             password=password
         )
 
-        if not user_conn.bind():
+        if not ldap_bind(user_conn, provider):
             return None, "Invalid credentials"
 
         user_conn.unbind()
@@ -197,7 +197,7 @@ def _ldap_authenticate_user(provider, username, password):
                         server,
                         user=provider.ldap_bind_dn,
                         password=_decrypt_ldap_password(provider),
-                        auto_bind=True
+                        auto_bind=ldap_auto_bind(provider)
                     )
                     safe_dn = escape_filter_chars(user_dn)
                     memberof_conn.search(
@@ -229,7 +229,7 @@ def _ldap_authenticate_user(provider, username, password):
                         server,
                         user=provider.ldap_bind_dn,
                         password=_decrypt_ldap_password(provider),
-                        auto_bind=True
+                        auto_bind=ldap_auto_bind(provider)
                     )
                     group_base = get_parent_dn(provider.ldap_base_dn) or provider.ldap_base_dn
                     # Ensure group_filter has parentheses

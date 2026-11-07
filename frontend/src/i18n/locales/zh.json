@@ -600,7 +600,10 @@
     "checkEmailDescAfter": " 关联的账户，您将很快收到密码重置链接。",
     "accountDisabled": "此帐户已被禁用",
     "samlValidationFailed": "SAML 身份验证失败",
-    "samlLoginExpired": "此次登录已过期，或是在其他标签页或浏览器中发起的。请从此页面重新开始。"
+    "samlLoginExpired": "此次登录已过期，或是在其他标签页或浏览器中发起的。请从此页面重新开始。",
+    "ssoUsernameConflict": "此次登录与一个已有账户匹配，该账户为本地账户或已关联到其他身份。请联系管理员关联这些账户。",
+    "ssoUnmapped": "访问被拒绝：此登录提供方的角色映射规则均不匹配您的账户。请联系管理员。",
+    "samlLogoutRejected": "无法验证身份提供方的注销请求；您仍处于登录状态。"
   },
   "dashboard": {
     "goodMorning": "早上好",
@@ -3869,14 +3872,21 @@
     "defaultRoleHelp": "仅在首次登录时自动创建用户时应用。",
     "accountStatusAttrHelp": "指示帐户是否被禁用的 LDAP 属性。常见值：'description'、'userAccountControl'、'accountStatus'。留空以禁用此检查。",
     "enforce2fa": "强制双重验证",
-    "enforce2faHelp": "要求通过此提供程序进行身份验证的用户注册 TOTP 双重身份验证。",
+    "enforce2faHelp": "要求此提供方的用户注册第二因素。LDAP 登录随后会要求输入；OIDC 和 SAML 登录依赖身份提供方的 MFA。",
     "oidcIssuer": "OIDC 颁发者 (issuer)",
     "oidcIssuerHelp": "启用 ID 令牌验证时必填。发现机制使用 <issuer>/.well-known/openid-configuration。",
     "oidcJwksUri": "JWKS URI（可选）",
     "oidcJwksUriHelp": "留空则通过颁发者自动发现签名密钥。",
     "idTokenVerify": "验证 ID 令牌签名（推荐）",
     "idTokenVerifyWarning": "禁用签名验证会削弱登录安全性。仅作为临时兼容性措施使用。",
-    "idTokenVerifyIssuerMissing": "已启用验证但未设置颁发者：在配置颁发者之前 OIDC 登录将失败。"
+    "idTokenVerifyIssuerMissing": "已启用验证但未设置颁发者：在配置颁发者之前 OIDC 登录将失败。",
+    "defaultRoleNone": "无：拒绝没有匹配规则的用户",
+    "provisioningRulesNotice": "已设置角色映射规则：没有任何规则匹配的用户在登录时会被拒绝。",
+    "provisioningNoRulesNotice": "没有角色映射规则：此提供方认证的所有用户都可以登录，新账户获得 {{role}} 角色。",
+    "provisioningNobodyNotice": "没有角色映射规则，也没有默认角色：任何人都无法通过此提供方登录。",
+    "ldapStartTls": "使用 StartTLS",
+    "ldapStartTlsHelp": "在任何绑定之前将明文 LDAP 连接升级为 TLS",
+    "ldapPlainWarning": "明文 LDAP：绑定密码和用户密码以未加密方式在网络上传输。请启用 SSL/TLS 或 StartTLS。"
   },
   "notifications": {
     "certificateIssued": "证书已颁发：{{name}}",

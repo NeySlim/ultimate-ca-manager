@@ -3,6 +3,7 @@ from .helpers import (_get_ssl_verify, _cleanup_ssl_verify, _parse_json_field,
                       _extract_saml_groups, oidc_identity, saml_identity)
 from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
 from . import saml_sp
+from onelogin.saml2.constants import OneLogin_Saml2_Constants
 from flask import request, redirect, session, Response, after_this_request
 from auth.unified import require_auth
 from auth.session_start import begin_session
@@ -71,6 +72,109 @@ def _reject_saml_login(provider, reason, error='saml_validation_failed'):
         success=False
     )
     return redirect(f'/login?error={error}')
+
+def _saml_logout_request(provider):
+    """IdP-initiated Single Logout over HTTP-Redirect (SAML Profiles §4.4).
+
+    The LogoutRequest must carry a valid IdP signature; this browser's session is
+    closed when it belongs to the NameID, and a LogoutResponse goes back to the
+    IdP's SLO URL, signed whenever the SP has an RSA key (§4.4.4.2).
+    """
+    from onelogin.saml2.auth import OneLogin_Saml2_Auth
+    from onelogin.saml2.logout_request import OneLogin_Saml2_Logout_Request
+    from onelogin.saml2.logout_response import OneLogin_Saml2_Logout_Response
+    from onelogin.saml2.utils import OneLogin_Saml2_Utils
+    from onelogin.saml2.xml_utils import OneLogin_Saml2_XML
+
+    base = saml_sp.sp_base_url(request)
+    sp_cert = sp_key = None
+    if provider.saml_slo_url:  # the responder MUST authenticate its LogoutResponse
+        try:
+            sp_cert, sp_key = saml_sp.load_sp_credentials(provider, with_key=True)
+        except Exception as e:
+            logger.warning("SAML LogoutResponse sent unsigned: SP key unusable (%s)", e)
+    data = saml_sp.request_data(request, base)
+    # The signature covers the query as the IdP encoded it (SAML Bindings §3.4.4.1).
+    data['query_string'] = request.query_string.decode('ascii', 'replace')
+    if not _slo_query_is_unambiguous(request.args, data['query_string']):
+        return _reject_saml_logout(provider, 'repeated or re-encoded SAML parameter')
+    data['validate_signature_from_qs'] = True
+    try:
+        auth = OneLogin_Saml2_Auth(
+            data, saml_sp.build_settings(provider, base, sp_cert, sp_key, want_messages_signed=True))
+        logout_request = OneLogin_Saml2_Logout_Request(auth.get_settings(), data['get_data']['SAMLRequest'])
+        xml = logout_request.get_xml()
+        if not auth.validate_request_signature(data['get_data']):
+            return _reject_saml_logout(provider, 'invalid or missing signature')
+        if not logout_request.is_valid(data):
+            return _reject_saml_logout(provider, logout_request.get_error() or 'invalid LogoutRequest')
+        # A signed message MUST name its Destination (SAML Bindings §3.4.5.2); the
+        # library checks it only when present. Fresh and used once, or a replay ends a later session.
+        root = OneLogin_Saml2_XML.to_etree(xml)
+        if not root.get('Destination'):
+            return _reject_saml_logout(provider, 'signed LogoutRequest without Destination')
+        issued = OneLogin_Saml2_Utils.parse_SAML_to_time(root.get('IssueInstant'))
+        if not saml_sp.logout_request_fresh(issued):
+            return _reject_saml_logout(provider, 'IssueInstant outside the clock window')
+        if not saml_sp.consume_logout_request(logout_request.id, provider.id, issued):
+            return _reject_saml_logout(provider, 'LogoutRequest already used')
+        name_id = OneLogin_Saml2_Logout_Request.get_nameid(xml)
+        indexes = OneLogin_Saml2_Logout_Request.get_session_indexes(xml)
+    except Exception as e:
+        return _reject_saml_logout(provider, f'unreadable LogoutRequest ({e})')
+
+    users = {u for (u,) in db.session.query(SSOSession.user_id).filter_by(
+        provider_id=provider.id, sso_name_id=name_id)}
+    users |= {u for (u,) in db.session.query(User.id).filter_by(
+        sso_provider_id=provider.id, sso_external_id=name_id)}
+    SSOSession.query.filter_by(provider_id=provider.id, sso_name_id=name_id).delete()
+    db.session.commit()
+    # With SessionIndex values only the sessions they name end (SAML Core §3.7.3.2);
+    # a session opened before its index was kept counts as named.
+    own_index = session.get('saml_session_index')
+    closed = (session.get('auth_method') == 'sso' and session.get('user_id') in users
+              and (not indexes or own_index is None or own_index in indexes))
+    if closed:
+        session.clear()
+    AuditService.log_action(
+        action='logout', resource_type='sso', resource_name=name_id,
+        details=(f'SAML Single Logout from {provider.name}: '
+                 f'{"session closed" if closed else "no session of this NameID in this browser"}'),
+        success=True)
+
+    if not provider.saml_slo_url:
+        return redirect('/login')
+    builder = OneLogin_Saml2_Logout_Response(auth.get_settings())
+    builder.build(logout_request.id)
+    params = {'SAMLResponse': builder.get_response()}
+    if 'RelayState' in data['get_data']:
+        params['RelayState'] = data['get_data']['RelayState']
+    if sp_key:
+        auth.add_response_signature(params, OneLogin_Saml2_Constants.RSA_SHA256)
+    return redirect(OneLogin_Saml2_Utils.redirect(auth.get_slo_response_url(), params, request_data=data))
+
+
+_SLO_PARAMS = ('SAMLRequest', 'RelayState', 'SigAlg', 'Signature')
+
+
+def _slo_query_is_unambiguous(args, query_string):
+    """Each parameter appears at most once and spelled as the signed query keeps it,
+    so the values acted on are the bytes the signature covers."""
+    parts = query_string.split('&')
+    for key in _SLO_PARAMS:
+        raw = sum(1 for part in parts if part.startswith(key + '='))
+        if raw > 1 or len(args.getlist(key)) != raw:
+            return False
+    return True
+
+
+def _reject_saml_logout(provider, reason):
+    logger.error("SAML LogoutRequest rejected for provider %s: %s", provider.name, reason)
+    AuditService.log_action(
+        action='logout', resource_type='sso',
+        details=f'SAML LogoutRequest from {provider.name} rejected: {reason}', success=False)
+    return redirect('/login?error=saml_logout_rejected')
+
 
 # ============ Public SSO Endpoints (no auth) ============
 
@@ -358,6 +462,8 @@ def sso_callback(provider_type):
             _cleanup_ssl_verify(verify)
 
     elif provider.provider_type == 'saml':
+        if request.method == 'GET' and 'SAMLRequest' in request.args:
+            return _saml_logout_request(provider)
         sp_base = saml_sp.sp_base_url(request)
 
         # Dropped once the request is used up or gone, never by a refused POST.
@@ -502,6 +608,8 @@ def sso_callback(provider_type):
             session['username'] = user.username
             session['role'] = user.role
             session['auth_method'] = 'sso'
+            if saml_auth.get_session_index():
+                session['saml_session_index'] = saml_auth.get_session_index()
             session['login_time'] = _saml_now.isoformat()
             session['last_activity'] = _saml_now.isoformat()
             session.permanent = True

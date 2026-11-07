@@ -69,7 +69,7 @@ class TestTheRoleChangeIsRecordedAfterItIsMade:
         with app.app_context():
             existing = User(username='role-order-probe-user',
                             email='probe@example.test', role='viewer',
-                            active=True, auth_source='sso')
+                            active=True, auth_source='ldap')
             existing.set_password('unused-by-sso-logins')
             existing.sso_provider_id = provider_id
             db.session.add(existing)
@@ -115,7 +115,7 @@ class TestTheRoleChangeIsRecordedAfterItIsMade:
         with app.app_context():
             existing = User(username='role-order-refused',
                             email='refused@example.test', role='viewer',
-                            active=True, auth_source='sso')
+                            active=True, auth_source='ldap')
             existing.set_password('unused-by-sso-logins')
             existing.sso_provider_id = provider_id
             db.session.add(existing)
@@ -179,7 +179,7 @@ class TestADisabledAccountIsNotSynchronised:
             disabled = User(username='disabled-sso-user',
                             email='old@example.test', role='viewer',
                             full_name='Old Name', active=False,
-                            auth_source='sso')
+                            auth_source='ldap')
             disabled.set_password('unused-by-sso-logins')
             disabled.sso_provider_id = provider_id
             db.session.add(disabled)

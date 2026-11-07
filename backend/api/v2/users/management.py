@@ -237,8 +237,11 @@ def link_user_sso(user_id):
         return error_response('SSO provider not found', 404)
 
     # Keep the username; the SSO login is matched to this account by email.
+    # An external id left by older releases is dropped: the first sign-in binds it.
     user.auth_source = provider.provider_type
     user.sso_provider_id = provider.id
+    user.sso_external_id = None
+    user.sso_orphan_of = None
 
     ok, err = safe_commit(logger, f"Failed to link user {user_id} to SSO")
     if not ok:
@@ -278,6 +281,7 @@ def unlink_user_sso(user_id):
     user.auth_source = 'local'
     user.sso_provider_id = None
     user.sso_external_id = None
+    user.sso_orphan_of = None
     # An account that never had a local password must set one before it can log in.
     needs_password = user.password_hash == SSO_NO_PASSWORD
     if needs_password:

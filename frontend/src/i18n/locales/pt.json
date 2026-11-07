@@ -600,7 +600,10 @@
     "checkEmailDescAfter": ", você receberá um link para redefinir em breve.",
     "accountDisabled": "Esta conta foi desativada",
     "samlValidationFailed": "A autenticação SAML falhou",
-    "samlLoginExpired": "Este login expirou ou foi iniciado em outra aba ou navegador. Comece novamente a partir desta página."
+    "samlLoginExpired": "Este login expirou ou foi iniciado em outra aba ou navegador. Comece novamente a partir desta página.",
+    "ssoUsernameConflict": "Este início de sessão corresponde a uma conta existente, local ou ligada a outra identidade. Peça a um administrador para ligar as contas.",
+    "ssoUnmapped": "Acesso negado: nenhuma regra de mapeamento de funções deste fornecedor reconhece a sua conta. Contacte o seu administrador.",
+    "samlLogoutRejected": "Não foi possível verificar o pedido de fim de sessão do fornecedor de identidade; continua com sessão iniciada."
   },
   "dashboard": {
     "goodMorning": "Bom dia",
@@ -3869,14 +3872,21 @@
     "defaultRoleHelp": "Aplicado apenas quando um usuário é criado automaticamente no primeiro login.",
     "accountStatusAttrHelp": "Atributo LDAP que indica se uma conta está desativada. Valores comuns: 'description', 'userAccountControl', 'accountStatus'. Deixe vazio para desativar esta verificação.",
     "enforce2fa": "Exigir 2FA",
-    "enforce2faHelp": "Exigir que os utilizadores que se autenticam através deste fornecedor configurem a autenticação de dois fatores TOTP.",
+    "enforce2faHelp": "Exigir que os utilizadores deste fornecedor registem um segundo fator. Os inícios de sessão LDAP pedem-no depois; os de OIDC e SAML confiam na MFA do fornecedor de identidade.",
     "oidcIssuer": "Emissor OIDC (issuer)",
     "oidcIssuerHelp": "Obrigatório quando a verificação do ID token está ativada. A descoberta usa <issuer>/.well-known/openid-configuration.",
     "oidcJwksUri": "URI JWKS (opcional)",
     "oidcJwksUriHelp": "Deixe vazio para descobrir as chaves de assinatura através do emissor.",
     "idTokenVerify": "Verificar a assinatura do ID token (recomendado)",
     "idTokenVerifyWarning": "Desativar a verificação de assinatura enfraquece a segurança do login. Use apenas como medida temporária de compatibilidade.",
-    "idTokenVerifyIssuerMissing": "A verificação está ativada mas nenhum emissor está definido: os logins OIDC falharão até configurá-lo."
+    "idTokenVerifyIssuerMissing": "A verificação está ativada mas nenhum emissor está definido: os logins OIDC falharão até configurá-lo.",
+    "defaultRoleNone": "Nenhuma: recusar utilizadores que nenhuma regra reconhece",
+    "provisioningRulesNotice": "Existem regras de mapeamento de funções: um utilizador que nenhuma regra reconhece é recusado ao iniciar sessão.",
+    "provisioningNoRulesNotice": "Nenhuma regra de mapeamento de funções: qualquer utilizador autenticado por este fornecedor pode iniciar sessão, e as novas contas recebem a função {{role}}.",
+    "provisioningNobodyNotice": "Nenhuma regra de mapeamento de funções nem função predefinida: ninguém pode iniciar sessão através deste fornecedor.",
+    "ldapStartTls": "Usar StartTLS",
+    "ldapStartTlsHelp": "Passar a ligação LDAP sem cifra para TLS antes de qualquer bind",
+    "ldapPlainWarning": "LDAP sem cifra: as palavras-passe de bind e dos utilizadores circulam sem cifra. Ative SSL/TLS ou StartTLS."
   },
   "notifications": {
     "certificateIssued": "Certificado emitido: {{name}}",

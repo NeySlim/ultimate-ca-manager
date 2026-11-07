@@ -57,6 +57,8 @@ class SSOProvider(db.Model):
     ldap_server = db.Column(db.String(500))
     ldap_port = db.Column(db.Integer, default=389)
     ldap_use_ssl = db.Column(db.Boolean, default=False)
+    # StartTLS on the plain port before any bind (ignored with LDAPS). Migration 137.
+    ldap_start_tls = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
     ldap_verify_ssl = db.Column(db.Boolean, default=True)
     ldap_ca_bundle = db.Column(db.Text)  # PEM content
     ldap_bind_dn = db.Column(db.String(500))
@@ -107,6 +109,20 @@ class SSOProvider(db.Model):
     updated_at = db.Column(db.DateTime, default=utc_now, onupdate=utc_now)
     last_used_at = db.Column(db.DateTime)
     
+    def idp_key(self):
+        """The IdP this provider talks to, which scopes its users' stable ids
+        (OIDC Core §5.7: iss + sub); None when it cannot be told."""
+        if self.provider_type == 'oauth2':
+            val = (self.oauth2_issuer or self.oauth2_userinfo_url or '').strip().rstrip('/')
+        elif self.provider_type == 'saml':
+            val = (self.saml_entity_id or '').strip()
+        elif self.provider_type == 'ldap':
+            server = (self.ldap_server or '').strip().lower()
+            val = f"{server}|{(self.ldap_base_dn or '').strip().lower()}" if server else ''
+        else:
+            val = ''
+        return f"{self.provider_type}:{val}" if val else None
+
     # Encrypted property accessors for secrets
     @property
     def oauth2_client_secret(self):
@@ -211,6 +227,7 @@ class SSOProvider(db.Model):
                 'ldap_server': self.ldap_server,
                 'ldap_port': self.ldap_port,
                 'ldap_use_ssl': self.ldap_use_ssl,
+                'ldap_start_tls': bool(self.ldap_start_tls),
                 'ldap_verify_ssl': self.ldap_verify_ssl if self.ldap_verify_ssl is not None else True,
                 'ldap_ca_bundle': self.ldap_ca_bundle or '',
                 'ldap_bind_dn': self.ldap_bind_dn,
@@ -271,7 +288,8 @@ class SSOSession(db.Model):
 
 
 class SAMLMessageId(db.Model):
-    """AuthnRequest ids awaiting a response, and assertion ids already consumed.
+    """AuthnRequest ids awaiting a response, and assertion and LogoutRequest ids
+    already consumed.
 
     Shared by every worker; a row lives until `expires_at`, the unique key is
     what refuses a second use.
@@ -281,6 +299,7 @@ class SAMLMessageId(db.Model):
 
     KIND_REQUEST = 'request'
     KIND_ASSERTION = 'assertion'
+    KIND_LOGOUT = 'logout'
 
     id = db.Column(db.Integer, primary_key=True)
     kind = db.Column(db.String(16), nullable=False)

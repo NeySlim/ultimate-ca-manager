@@ -5,6 +5,7 @@ import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import CopyableUrl from '../CopyableUrl'
 import MappingEditor from '../MappingEditor'
 import RoleMappingEditor from '../RoleMappingEditor'
+import ProvisioningNotice, { hasRoleRules } from './ProvisioningNotice'
 
 export default function SsoOAuth2Fields({
   formData,
@@ -15,6 +16,7 @@ export default function SsoOAuth2Fields({
   oauth2Preset,
   applyOAuth2Preset,
   roleOptions,
+  defaultRoleOptions,
   customRoles,
   oauthCallbackUrl,
   handleTestConnection,
@@ -146,9 +148,10 @@ export default function SsoOAuth2Fields({
       </CompactSection>
 
       {/* Provisioning */}
-      <CompactSection title={t('sso.provisioningSection')} icon={UserPlus} collapsible defaultOpen={false}>
+      <CompactSection title={t('sso.provisioningSection')} icon={UserPlus} collapsible defaultOpen={!hasRoleRules(formData.role_mapping)}>
         <div className="space-y-3">
-          <Select label={t('sso.defaultRole')} value={formData.default_role} onChange={value => handleChange('default_role', value)} options={roleOptions} />
+          <ProvisioningNotice formData={formData} />
+          <Select label={t('sso.defaultRole')} value={formData.default_role} onChange={value => handleChange('default_role', value)} options={defaultRoleOptions} />
           <ToggleSwitch checked={formData.auto_create_users} onChange={(val) => handleChange('auto_create_users', val)} label={t('sso.autoCreateUsers')} />
           <ToggleSwitch checked={formData.auto_update_users} onChange={(val) => handleChange('auto_update_users', val)} label={t('sso.autoUpdateUsers')} />
           <ToggleSwitch checked={formData.sync_role_on_login} onChange={(val) => handleChange('sync_role_on_login', val)} label={t('sso.syncRoleOnLogin')} description={t('sso.syncRoleOnLoginHelp')} />

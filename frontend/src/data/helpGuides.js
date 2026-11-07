@@ -1983,7 +1983,7 @@ System-wide configuration organized into tabs. Changes take effect immediately u
 ## General
 
 - **Syslog hostname**: Sent as HOSTNAME in forwarded syslog messages; the machine hostname when empty
-- **Base URL**: Canonical HTTPS URL of the admin interface and API; other hostnames and IPs redirect to it
+- **Base URL**: Canonical HTTPS URL of the admin interface and API; other hostnames and IPs redirect to it. Password reset e-mails link to it, else to the server FQDN (\`UCM_FQDN\`); with neither, the login page hides Forgot password and the reset is refused
 - **Protocol Base URL**: Base URL written into CDP and OCSP addresses; use http:// to avoid TLS verification loops, or leave empty to use the Base URL
 - **HTTP Protocol Port**: Plain HTTP port that serves CDP and OCSP, and SCEP when its Serve on plain HTTP option is on; 0 disables it, a change needs a restart
 - **Public ACME vhost**: Concrete hostname in ACME directory URLs (e.g. \`acme.ucm.example.com\`: not \`*.ucm.example.com\`). A wildcard \`*.ucm.example.com\` **TLS certificate SAN** covers both \`admin.ucm.example.com\` and \`acme.ucm.example.com\`. Configure DNS and TLS for the ACME vhost **before** saving: clients that re-read the directory switch URLs immediately.
@@ -2736,7 +2736,7 @@ https://your-ucm-host:8443/api/v2/sso/saml/metadata
 This URL returns a SAML 2.0 compliant XML document containing:
 - **Entity ID**: UCM's service provider identifier
 - **ACS URL**: Assertion Consumer Service endpoint (HTTP-POST)
-- **SLO URL**: Single Logout Service endpoint
+- **SLO URL**: IdP endpoint that takes the LogoutResponse by HTTP-Redirect; metadata import keeps the ResponseLocation of the HTTP-Redirect Single Logout Service, else its Location. See Single Logout below
 - **Signing Certificate**: UCM's HTTPS certificate for signing verification
 - **NameID Format**: The provider's **NameID format** setting (Unspecified, Persistent, Email address or Transient), also sent in each login request. Persistent gives a stable identifier; a transient NameID is never used to recognise the account
 
@@ -2759,6 +2759,9 @@ Map IDP SAML attributes to UCM user fields:
 - \`email\` → UCM email (required)
 - \`groups\` → UCM group membership (optional)
 
+### Single Logout
+When the IdP ends a session, it sends a signed **LogoutRequest** through the browser to the SLO URL. UCM checks the IdP signature, issuer, Destination (required), IssueInstant (within the clock window) and that the request was not used before, closes the UCM session of that NameID in this browser (when the request carries SessionIndex values, only a session they name), then sends a **LogoutResponse** to the IdP's SLO URL, signed with the SP key; an SP certificate that is not RSA sends it unsigned, which a strict IdP such as AD FS refuses. Without an IdP SLO URL, the browser returns to the UCM login page. An unsigned or forged LogoutRequest is refused and the session stays open.
+
 ### IdP-initiated login
 A login started from the IdP portal reaches UCM without a request from UCM. **Allow IdP-initiated login** accepts it, with the same signature, audience, Destination, validity and replay checks. Providers created before 2.243 keep it on; new providers have it off. Turn it on only if users start from the IdP portal.
 
@@ -2777,7 +2780,22 @@ A login started from the IdP portal reaches UCM without a request from UCM. **Al
 10. Click **Save** and **Enable**
 
 ### Auto-Create Users
-When enabled, a new UCM user account is automatically created on first SSO login, using the IDP-provided attributes. The default role is assigned.
+When enabled, a new UCM user account is automatically created on first SSO login, using the IDP-provided attributes, with the role its mapping rule gives, else the default role.
+
+## Who can sign in
+
+### Identity matching
+A login opens the account bound to the IdP identifier: OIDC \`sub\`, SAML persistent NameID, LDAP \`entryUUID\` or \`objectGUID\`. A username or email matches only an account of the same provider that is not bound yet (created before stable identifiers, or linked by an administrator); an email the OIDC IdP marks unverified (\`email_verified\` false) matches none. A local account, or one bound to another identity, is never opened by an SSO login: the login is refused and recorded in the audit log. To merge a local account into an SSO identity, use **Link to SSO** on that user first; its next sign-in through that provider binds the IdP identifier.
+
+When a provider is deleted, its users are kept: a provider created again for the same IdP (same issuer, entity ID, or LDAP server and base DN) takes them back at their next sign-in. Otherwise, and for users a restore left without a provider, use **Unlink** then **Link to SSO** on each account.
+
+### Role mapping rules
+- **At least one rule**: a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), whether the account is new or already exists; a passkey or certificate sign-in is not checked
+- **No rule**: every user the provider authenticates can sign in; new accounts get the **Default Role**
+- A rule that gives only a custom role: a new account gets the **Default Role** as its base role (viewer when None)
+- **Default Role: None** with no rule: nobody can sign in through the provider
+
+The **User Provisioning** section opens by itself and shows a warning when the provider has no rule.
 
 ## LDAP
 
@@ -2785,11 +2803,11 @@ When enabled, a new UCM user account is automatically created on first SSO login
 1. In UCM, go to **Settings → SSO**
 2. Click **Add Provider** → LDAP
 3. Enter the **LDAP Server** hostname and **Port** (389 for LDAP, 636 for LDAPS)
-4. Enable **Use SSL** for encrypted connections
+4. Enable **Use SSL/TLS** (LDAPS, port 636) or, on port 389, **Use StartTLS**: the connection switches to TLS before any bind, with the same certificate verification. Without either, the bind and user passwords cross the network in clear
 5. Enter the **Bind DN** and **Bind Password** (service account credentials)
 6. Enter the **Base DN** (search base for user lookups)
 7. Configure the **User Filter** (e.g., \`(uid={username})\` or \`(sAMAccountName={username})\` for AD)
-8. Map LDAP attributes: **username**, **email**, **full name**
+8. Map LDAP attributes: **username**, **email**, **full name**, and the **unique ID attribute** (\`entryUUID\`, \`objectGUID\`). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until **Unlink** then **Link to SSO**
 9. Click **Test Connection** to verify, then **Save** and **Enable**
 
 ### Active Directory

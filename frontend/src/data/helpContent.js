@@ -1471,9 +1471,10 @@ export const helpContent = {
           { label: 'Entity ID', text: 'UCM service provider entity identifier' },
           { label: 'ACS URL', text: 'Assertion Consumer Service callback URL' },
           { label: 'Attribute Mapping', text: 'Left column: the attribute name sent by the IdP. Right column: the UCM field it fills (username, email, fullname or groups). Example: user.userprincipalname → username.' },
-          { label: 'Groups for role mapping', text: 'Read from the attributes mapped to groups, else from groups and the Microsoft Entra ID / AD FS group and role claims. When Entra ID sends groups.link instead of the groups (users in more than 150 groups), a warning is logged and the default role applies: emit only the groups assigned to the application, or app roles.' },
+          { label: 'Groups for role mapping', text: 'Read from the attributes mapped to groups, else from groups and the Microsoft Entra ID / AD FS group and role claims. When Entra ID sends groups.link instead of the groups (users in more than 150 groups), a warning is logged and, when role mapping rules exist, the user is refused: emit only the groups assigned to the application, or app roles.' },
           { label: 'IdP-initiated login', text: 'Accepts logins started from the IdP portal, checked like any other response. On for providers created before 2.243, off for new ones: turn it on only if users start from the IdP portal.' },
           { label: 'NameID format', text: 'Unspecified (IdP default), Persistent, Email address or Transient: sent in each login request and published in the SP metadata. Persistent gives a stable identifier; a transient NameID is never used to recognise the account.' },
+          { label: 'Single Logout', text: 'A LogoutRequest signed by the IdP and sent to the SLO URL of the SP metadata (HTTP-Redirect) closes the UCM session of that NameID in this browser, unless its SessionIndex names another session. A LogoutResponse goes back to the IdP SLO URL, signed with the SP key (unsigned when the SP certificate is not RSA, which a strict IdP refuses); without an IdP SLO URL the browser returns to the login page. An unsigned, forged, stale or replayed request, or one without Destination, is refused.' },
         ]
       },
       {
@@ -1491,9 +1492,11 @@ export const helpContent = {
         title: 'Role Provisioning (#81)',
         icon: UserPlus,
         items: [
-          { label: 'Default Role', text: 'Applied ONLY when a user is auto-created on first SSO login. Role changes made later in UCM are preserved.' },
-          { label: 'Role Mapping', text: 'Map external groups (Azure AD, Okta, LDAP) → UCM roles (admin / operator / viewer). Used at user creation, and at every login when role sync is enabled. When several groups match, the highest-privilege role wins (admin > operator > auditor > viewer): entry order does not matter (#221). Each group can also name a custom role (chosen from the existing custom roles): it is added to the base role, or used alone. If several matching groups give a custom role, the first one in the list wins. With role sync on, a custom role set by SSO is removed when no group gives one; a custom role assigned by hand in UCM is never touched. System roles cannot be used as the custom role.' },
-          { label: 'Sync role on each login', text: 'OFF (default): SSO never overrides UCM-managed roles. ON: role is re-synced from role_mapping at every login; users without a mapping match keep their stored role (default_role is never re-applied).' },
+          { label: 'Identity matching', text: 'A login opens the account bound to the IdP identifier (OIDC sub, SAML persistent NameID, LDAP entryUUID or objectGUID). A username or email only matches an account of the same provider not bound yet; a local account, or one bound to another identity, is refused at sign-in. To merge a local account, use Link to SSO in Users first: its next sign-in through that provider binds the identifier.' },
+          { label: 'Default Role', text: 'Given to accounts created at first SSO login when the provider has no role mapping rule, and as the base role of a new account whose matching rule gives only a custom role (viewer when None). None: nobody signs in without a rule. Role changes made later in UCM are preserved.' },
+          { label: 'Role Mapping', text: 'Map external groups (Azure AD, Okta, LDAP) → UCM roles (admin / operator / viewer). With at least one rule, a user no rule matches is refused at every SSO sign-in (OIDC, SAML, LDAP), new account or existing one; a passkey or certificate sign-in is not checked. Used at user creation, and at every login when role sync is enabled. When several groups match, the highest-privilege role wins (admin > operator > auditor > viewer): entry order does not matter (#221). Each group can also name a custom role (chosen from the existing custom roles): it is added to the base role, or used alone. If several matching groups give a custom role, the first one in the list wins. With role sync on, a custom role set by SSO is removed when no group gives one; a custom role assigned by hand in UCM is never touched. System roles cannot be used as the custom role.' },
+          { label: 'Sync role on each login', text: 'OFF (default): SSO never overrides UCM-managed roles. ON: role is re-synced from role_mapping at every login; a matching rule that gives no base role keeps the stored one (default_role is never re-applied).' },
+          { label: 'Enforce 2FA', text: 'Users of this provider must enrol a second factor. LDAP sign-ins ask for an enrolled TOTP code or security key, as local sign-ins do, with or without this option; OIDC and SAML sign-ins only require the enrolment and rely on the identity provider for MFA.' },
           { label: 'Auto-update users', text: 'Updates email and full name on each login. Does NOT touch the role.' },
         ]
       },
@@ -1501,11 +1504,13 @@ export const helpContent = {
         title: 'LDAP',
         icon: Database,
         items: [
-          { label: 'Server', text: 'LDAP server hostname and port (389 or 636 for SSL)' },
+          { label: 'Server', text: 'LDAP server hostname and port (389, or 636 for LDAPS)' },
+          { label: 'StartTLS', text: 'On a plain LDAP port, upgrades the connection to TLS before any bind, with the same certificate verification as LDAPS. On by default for a new provider without SSL/TLS. Without SSL/TLS or StartTLS, the bind and user passwords cross the network in clear.' },
           { label: 'Bind DN', text: 'Distinguished name for LDAP bind authentication' },
           { label: 'Base DN', text: 'Search base for user lookups' },
           { label: 'User Filter', text: 'LDAP filter to match users (e.g., (uid={username}))' },
           { label: 'Attribute Mapping', text: 'Map LDAP attributes to username, email, full name' },
+          { label: 'Unique ID attribute', text: 'Immutable id that recognises the account (entryUUID, objectGUID). An account bound by its DN moves to this id at its next sign-in; changing it from one id attribute to another refuses every bound user until Unlink then Link to SSO.' },
         ]
       },
     ],

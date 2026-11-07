@@ -289,15 +289,11 @@ def _render(policy, kind, details):
 
 
 def _approvals_link(approval_id):
+    """Link for the approvers, None without a Base URL or FQDN: the request's
+    Host is the requester's choice, never a link target."""
     try:
         from utils.public_endpoints import get_admin_canonical_origin
         origin = get_admin_canonical_origin()
     except Exception:
         origin = None
-    if not origin:
-        try:
-            from flask import has_request_context, request
-            origin = request.host_url.rstrip('/') if has_request_context() else None
-        except Exception:
-            origin = None
-    return f"{origin or ''}/approvals?id={int(approval_id)}"
+    return f"{origin}/approvals?id={int(approval_id)}" if origin else None

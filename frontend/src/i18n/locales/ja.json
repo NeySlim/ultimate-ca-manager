@@ -600,7 +600,10 @@
     "checkEmailDescAfter": "のアカウントが存在する場合、パスワードリセットリンクが送信されます。",
     "accountDisabled": "このアカウントは無効化されています",
     "samlValidationFailed": "SAML認証に失敗しました",
-    "samlLoginExpired": "このサインインは期限切れか、別のタブまたはブラウザーで開始されました。このページからやり直してください。"
+    "samlLoginExpired": "このサインインは期限切れか、別のタブまたはブラウザーで開始されました。このページからやり直してください。",
+    "ssoUsernameConflict": "このサインインは、ローカルまたは別の ID にリンクされた既存のアカウントと一致します。管理者にアカウントのリンクを依頼してください。",
+    "ssoUnmapped": "アクセスが拒否されました。このサインインプロバイダーのロールマッピングルールのいずれもあなたのアカウントに一致しません。管理者に連絡してください。",
+    "samlLogoutRejected": "ID プロバイダーからのサインアウト要求を検証できませんでした。サインインしたままです。"
   },
   "dashboard": {
     "goodMorning": "おはようございます",
@@ -3872,14 +3875,21 @@
     "defaultRoleHelp": "初回ログイン時にユーザーが自動作成される場合にのみ適用されます。",
     "accountStatusAttrHelp": "アカウントが無効化されているかどうかを示すLDAP属性。一般的な値： 'description'、 'userAccountControl'、 'accountStatus'。このチェックを無効にするには空白にしてください。",
     "enforce2fa": "2FAを強制する",
-    "enforce2faHelp": "このプロバイダーで認証するユーザーにTOTP二要素認証の登録を必須にします。",
+    "enforce2faHelp": "このプロバイダーのユーザーに第 2 要素の登録を必須にします。LDAP のサインインではその後に要求され、OIDC と SAML のサインインは ID プロバイダーの MFA に依存します。",
     "oidcIssuer": "OIDC発行者 (issuer)",
     "oidcIssuerHelp": "IDトークン検証が有効な場合に必須。<issuer>/.well-known/openid-configuration でディスカバリーを行います。",
     "oidcJwksUri": "JWKS URI（任意）",
     "oidcJwksUriHelp": "空欄の場合は発行者から署名鍵を自動取得します。",
     "idTokenVerify": "IDトークンの署名を検証（推奨）",
     "idTokenVerifyWarning": "署名検証を無効にするとログインの安全性が低下します。互換性のための一時的な措置としてのみ使用してください。",
-    "idTokenVerifyIssuerMissing": "検証が有効ですが発行者が未設定です。設定されるまでOIDCログインは失敗します。"
+    "idTokenVerifyIssuerMissing": "検証が有効ですが発行者が未設定です。設定されるまでOIDCログインは失敗します。",
+    "defaultRoleNone": "なし: どのルールにも一致しないユーザーを拒否",
+    "provisioningRulesNotice": "ロールマッピングルールが設定されています。どのルールにも一致しないユーザーはサインイン時に拒否されます。",
+    "provisioningNoRulesNotice": "ロールマッピングルールがありません。このプロバイダーで認証されたすべてのユーザーがサインインでき、新しいアカウントには {{role}} ロールが付与されます。",
+    "provisioningNobodyNotice": "ロールマッピングルールもデフォルトロールもありません。このプロバイダーでは誰もサインインできません。",
+    "ldapStartTls": "StartTLS を使用",
+    "ldapStartTlsHelp": "バインドの前に平文の LDAP 接続を TLS に切り替えます",
+    "ldapPlainWarning": "平文の LDAP: バインドとユーザーのパスワードが暗号化されずにネットワークを流れます。SSL/TLS または StartTLS を有効にしてください。"
   },
   "notifications": {
     "certificateIssued": "証明書が発行されました：{{name}}",

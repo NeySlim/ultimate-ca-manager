@@ -11,6 +11,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
+- LDAP: a StartTLS option switches a plain LDAP connection to TLS before the service and user binds, with the existing certificate verification; it was documented but never sent, so passwords crossed in clear (RFC 4513 §3, migration 137).
+- SAML: the Single Logout endpoint announced in the SP metadata ignored LogoutRequests. A LogoutRequest signed by the IdP, naming its Destination, issued within the clock window and not seen before, now closes the session of its NameID in that browser and gets a LogoutResponse signed with the SP RSA key, unsigned with a warning when the SP key is not RSA (SAML Profiles §4.4).
 - Deployment: a deploy target can be an HTTP API instead of an SSH host, with a URL, a method, encrypted request headers and a body template rendered from the certificate (`{{cert_pem|json}}`, `{{fullchain_pem}}`, `{{cn}}`, `{{serial}}`...), through the same delivery queue; the private key is sent only with an explicit opt-in over verified HTTPS, with an optional pasted trust anchor for a self-signed appliance (discussion #428, requested by @gjarassier, migration 131).
 - EST: the encrypted `serverkeygen` key can now go to an EC client certificate by key agreement (ephemeral-static ECDH, RFC 5753), and the key transport or key agreement and the content cipher follow the CSR's SMIMECapabilities in the client's order of preference, with AES-CBC when no listed content cipher is available. A list naming only key transport or agreement algorithms UCM lacks is refused with the supported ones named, as is an RSA client key under 2048 bits (RFC 7030 section 4.4.2).
 - EST: with the `allow_empty_username` setting of `PATCH /api/v2/est/config`, Basic authentication accepts an empty username and the password alone (RFC 7030 §3.2.3).
@@ -18,6 +20,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- SSO providers: an unknown `default_role` is refused instead of being stored as viewer, and an empty one, "None" in the form, gives no implicit role; an existing provider whose default role is empty or unknown keeps viewer (migration 137).
+- LDAP: a new provider without SSL/TLS uses StartTLS by default, so passwords do not cross in clear (RFC 4513 §6.3.3); existing providers keep their setting.
 - ACME server: revokeCert refused an account other than the one that ordered the certificate even when it held valid authorizations for all its identifiers. Such an account may now revoke a certificate this ACME server issued, as RFC 8555 §7.6 requires; an authorization granted by auto-approval does not count.
 - ACME server: the `notBefore` and `notAfter` of a newOrder were echoed, then ignored, so the certificate got the profile's 90 days. They are now issued exactly: a window longer than the profile allows, outside the issuing CA's, already past or unreadable is refused as `malformed`, one a policy forbids as `badCSR` at finalize (RFC 8555 §7.4).
 - WSTEP: a certificate issued under a template carries that template's EKUs instead of the ones the request asks for, as on renewal and in AD CS.
@@ -41,6 +45,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Approval e-mails: without a Base URL or server FQDN, the link to the request followed the Host header the requester sent; the e-mail now goes without a link.
+- Password reset: the e-mailed link pointed at `https://localhost:8443`. It now uses the Base URL, else the server FQDN, never the request's Host; when neither is set, Forgot password is hidden and the reset is refused with a warning in the log.
+- OIDC: an ID token whose `azp` named another client was accepted when it had a single audience; it is now refused (OpenID Connect Core §3.1.3.7).
+- LDAP: a second factor the user had enrolled, even one Enforce 2FA required, was never asked at sign-in. LDAP sign-ins now ask for it, as local ones do.
 - Rate limiting: a 429 from a login route's own limit carried the general limit in `X-RateLimit-Limit` (30 instead of 5) and no `Retry-After`. It now names the limit that refused the request and when to retry.
 - ACME server: a body that was not JSON, a payload that was not an object or an unreadable date answered 500 `serverInternal`. They now answer 400 `malformed` (RFC 8555 §6.2, §7).
 - ACME server: a missing nonce answered `malformed` and a nonce outside base64url `badNonce`, the reverse of RFC 8555 §6.5; HEAD on newNonce answered 204 without a link to the directory. Both errors now carry the right type, and newNonce, on the server and the ACME proxy, answers 200 to HEAD and 204 to GET with `Link: rel="index"` (§7.2).
@@ -81,6 +89,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- SSO: with role mapping rules set, a user no rule matched still signed in with the default role, viewer unless changed. Such a user is now refused at every SSO sign-in, with an audit entry; without rules the default role still applies.
+- SSO: an OIDC, SAML or LDAP identity whose username, or e-mail local part, matched an existing account signed into it, the local administrator included, and rebound that account to itself. A name or e-mail now matches only an account of the same provider not yet bound to an identity, never by an e-mail the OIDC IdP marks unverified; a local account or one bound to another identity is refused at sign-in, with an audit entry (OpenID Connect Core §5.7).
+- SSO: an identity that older releases bound to a local account of the same name kept that binding through Link to SSO, so it opened the account and the real user was refused. Link to SSO and migration 137 now drop it, and the next sign-in binds the account.
 - Remote syslog: only seven resource types were forwarded, so audit purges, API keys, roles, settings, policies and SSO login failures never reached the collector, and the ACME box matched almost no ACME event. Every audit event is now forwarded unless its category is unchecked, ACME covers every ACME event, and entries written inside a transaction, the audit purge included, leave once committed.
 - Remote syslog: narrowing the forwarded categories or turning forwarding off was recorded under System once the change applied, so the collector never heard of it, and unchecking Users also muted role, password and MFA changes. The change now reaches both the previous and the new collector, and account changes and the System events that touch keys, encryption, restores, the database or update settings are always forwarded.
 - Audit log on PostgreSQL: an entry whose User-Agent, resource id list, resource name or username was longer than its column, or held a NUL character, was dropped while the action went through, so a client could hide its own actions behind a long User-Agent. These columns are now TEXT, every field is cut to a bounded length and its NUL characters escaped before it is sealed, and an entry that still cannot be written is logged as an error and sent to syslog.
@@ -102,6 +113,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- SSO: a provider with role mapping rules now refuses the users none of them matches; add a rule for a group every allowed user is in, or remove the rules to fall back to the default role.
+- SSO: a local account is no longer merged into an SSO identity of the same name at sign-in; an administrator links it with Link to SSO first. An account also belongs to one provider: a user who signed in through two providers under the same name (LDAP and OIDC, for example) is refused on the second one.
+- SSO: an identity whose stable identifier changes is refused instead of being linked again, for example an LDAP entry that moves in a directory without entryUUID or objectGUID, a change of the LDAP unique ID attribute, or a SAML NameID in emailAddress or unspecified format that changes; use Unlink then Link to SSO on the account.
+- SSO: the users of a provider deleted before this release are not taken back by a new provider; use Unlink then Link to SSO on each account. After this release, a provider created again for the same IdP takes them back.
 - Remote syslog: the collector now receives every audit event type, so expect more volume; unchecking a category still stops its own events. Migration 133 turns four `audit_logs` columns into TEXT on PostgreSQL without rewriting the table.
 - Remote syslog: the Users box now mutes sign-ins and logouts only, the System box no longer mutes key, encryption, restore, database and update settings changes, and `syslog_config_updated` is recorded with resource type `settings` and the previous configuration in its details; leaving every box unchecked is saved as every box.
 - Certificate policies: a `*.x` DNS pattern now applies to the names under x, so requests issued directly until now may wait for approval or meet the policy's rules; an `x` pattern no longer applies to names such as `evilx` or `x.other.org`. A pattern holding a comma or a space, which matched nothing, is now refused when the policy is saved: create one policy per domain.
