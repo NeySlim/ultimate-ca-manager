@@ -25,16 +25,24 @@ from tests.test_est_rfc7030 import (  # noqa: F401
 @pytest.fixture(autouse=True, scope='module')
 def _rows_stay_in_this_module(app):
     from models import RevokedSerial
+    from models.compromised_key import CompromisedKeyRecord
+    from tests.seeded_rows import delete_cas
+
+    def last(model):
+        return db.session.query(db.func.max(model.id)).scalar() or 0
     with app.app_context():
-        last_cert = db.session.query(db.func.max(Certificate.id)).scalar() or 0
-        last_ca = db.session.query(db.func.max(CA.id)).scalar() or 0
-        last_revoked = db.session.query(db.func.max(RevokedSerial.id)).scalar() or 0
+        last_cert, last_ca, last_revoked = last(Certificate), last(CA), last(RevokedSerial)
+        last_compromised = last(CompromisedKeyRecord)
+        keys = {row.key for row in SystemConfig.query.with_entities(SystemConfig.key)}
     yield
     with app.app_context():
-        # Certificate ids are reused once deleted: their revocation records go with them
+        # A bulk delete skips the cascades: delete_cas removes the CRLs and serials that would dangle
+        delete_cas(CA.query.filter(CA.id > last_ca))
         RevokedSerial.query.filter(RevokedSerial.id > last_revoked).delete()
-        Certificate.query.filter(Certificate.id > last_cert).delete()
-        CA.query.filter(CA.id > last_ca).delete()
+        for cert in Certificate.query.filter(Certificate.id > last_cert):
+            db.session.delete(cert)
+        CompromisedKeyRecord.query.filter(CompromisedKeyRecord.id > last_compromised).delete()
+        SystemConfig.query.filter(SystemConfig.key.notin_(keys)).delete(synchronize_session=False)
         db.session.commit()
 
 
