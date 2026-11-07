@@ -1,9 +1,27 @@
 """Access Control shows the built-in roles with what auth.permissions enforces for them."""
+import pytest
+
 from auth.permissions import CUSTOM_ROLE_GRANTABLE_PERMISSIONS, ROLE_PERMISSIONS
-from models.rbac import SYSTEM_ROLE_USERS
+from models import db
+from models.rbac import SYSTEM_ROLE_USERS, CustomRole
 
 
-def test_system_roles_show_the_enforced_permissions(auth_client):
+@pytest.fixture
+def system_roles(app):
+    """The seeded roles, put back if a database reset earlier in the run dropped them."""
+    with app.app_context():
+        missing = [name for name in SYSTEM_ROLE_USERS
+                   if CustomRole.query.filter_by(name=name).first() is None]
+        for name in missing:
+            db.session.add(CustomRole(name=name, description='', permissions=[], is_system=True))
+        db.session.commit()
+    yield
+    with app.app_context():
+        CustomRole.query.filter(CustomRole.name.in_(missing)).delete(synchronize_session=False)
+        db.session.commit()
+
+
+def test_system_roles_show_the_enforced_permissions(auth_client, system_roles):
     r = auth_client.get('/api/v2/rbac/roles')
     assert r.status_code == 200
     system = {role['name']: role for role in r.get_json()['data'] if role['is_system']}
