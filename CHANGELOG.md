@@ -25,6 +25,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- ACME server: an order accepted with `replaces` did not show it in the order object, and the finalize response lacked the profile. Every order object (newOrder, read, finalize) now carries `replaces`, `profile` and the requested dates (RFC 9773 §5).
 - ACME server: tls-alpn-01 accepted a validation certificate whatever its subjectAltName. The SAN must now hold exactly the identifier being validated, one dNSName or one iPAddress (RFC 8737 §3, RFC 8738 §6).
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: these providers hold one TXT value per name, so the cleanup of one order cleared the value another order was still validating. The name is now left alone while another order in progress uses it.
 - ACME DNS-01 on DuckDNS, Hurricane Electric and FreeDNS: an order for a domain and its wildcard could not hold both values and failed at validation, and the ACME proxy replaced the CA's value with its clients' own. Such an order, or on DuckDNS one naming two hosts under the same subdomain, is now refused at the request before the CA is asked, and the proxy publishes only the CA's value there.

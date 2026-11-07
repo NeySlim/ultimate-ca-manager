@@ -908,6 +908,35 @@ def new_authz():
         return acme_error('serverInternal', 'Internal server error', 500)
 
 
+def _order_wire_dict(service, order) -> Dict[str, Any]:
+    """The RFC 8555 §7.1.3 order object, the same for newOrder, a read and finalize."""
+    order_url = f"{service.base_url}/acme/order/{order.order_id}"
+    data = {
+        "status": order.status,
+        "expires": order.expires.isoformat() + 'Z',
+        "identifiers": json.loads(order.identifiers),
+        "authorizations": [
+            f"{service.base_url}/acme/authz/{auth.authorization_id}"
+            for auth in order.authorizations
+        ],
+        "finalize": f"{order_url}/finalize",
+    }
+    if order.not_before:
+        data["notBefore"] = order.not_before.isoformat() + 'Z'
+    if order.not_after:
+        data["notAfter"] = order.not_after.isoformat() + 'Z'
+    # RFC 9773 §5: an accepted replaces is reflected in every order object
+    if order.replaces:
+        data["replaces"] = order.replaces
+    if order.profile:
+        data["profile"] = order.profile
+    if order.error and order.status == 'invalid':
+        data["error"] = json.loads(order.error) if isinstance(order.error, str) else order.error
+    if order.certificate_url:
+        data["certificate"] = order.certificate_url
+    return data
+
+
 @acme_bp.route('/new-order', methods=['POST'])
 def new_order():
     """Create new certificate order (RFC 8555 Section 7.4)
@@ -1098,31 +1127,8 @@ def new_order():
             profile=profile,
         )
         
-        # Build response
         order_url = f"{service.base_url}/acme/order/{order.order_id}"
-        
-        # Get authorization URLs
-        authz_urls = [
-            f"{service.base_url}/acme/authz/{auth.authorization_id}"
-            for auth in order.authorizations
-        ]
-        
-        response_data = {
-            "status": order.status,
-            "expires": order.expires.isoformat() + 'Z',
-            "identifiers": json.loads(order.identifiers),
-            "authorizations": authz_urls,
-            "finalize": f"{order_url}/finalize"
-        }
-        
-        if order.not_before:
-            response_data["notBefore"] = order.not_before.isoformat() + 'Z'
-        if order.not_after:
-            response_data["notAfter"] = order.not_after.isoformat() + 'Z'
-        if order.profile:
-            response_data["profile"] = order.profile
-
-        response = acme_response(response_data, 201)
+        response = acme_response(_order_wire_dict(service, order), 201)
         response.headers['Location'] = order_url
 
         _audit_acme(
@@ -1171,31 +1177,7 @@ def order_info(order_id: str):
 
     service.expire_order_if_needed(order)
     order_url = f"{service.base_url}/acme/order/{order.order_id}"
-    
-    # Get authorization URLs
-    authz_urls = [
-        f"{service.base_url}/acme/authz/{auth.authorization_id}"
-        for auth in order.authorizations
-    ]
-    
-    response_data = {
-        "status": order.status,
-        "expires": order.expires.isoformat() + 'Z',
-        "identifiers": json.loads(order.identifiers),
-        "authorizations": authz_urls,
-        "finalize": f"{order_url}/finalize"
-    }
-    
-    if order.profile:
-        response_data["profile"] = order.profile
-    if order.error and order.status == 'invalid':
-        response_data["error"] = (
-            json.loads(order.error) if isinstance(order.error, str) else order.error
-        )
-    if order.certificate_url:
-        response_data["certificate"] = order.certificate_url
-
-    response = acme_response(response_data)
+    response = acme_response(_order_wire_dict(service, order))
     response.headers['Location'] = order_url
     
     # Add Retry-After for pending/processing orders (RFC 8555 Section 7.4)
@@ -1332,23 +1314,7 @@ def finalize_order(order_id: str):
             details=f"status={order.status} cert={order.certificate_url or '(pending)'}",
         )
         
-        authz_urls = [
-            f"{service.base_url}/acme/authz/{auth.authorization_id}"
-            for auth in order.authorizations
-        ]
-        
-        response_data = {
-            "status": order.status,
-            "expires": order.expires.isoformat() + 'Z',
-            "identifiers": json.loads(order.identifiers),
-            "authorizations": authz_urls,
-            "finalize": f"{order_url}/finalize"
-        }
-        
-        if order.certificate_url:
-            response_data["certificate"] = order.certificate_url
-        
-        response = acme_response(response_data)
+        response = acme_response(_order_wire_dict(service, order))
         response.headers['Location'] = order_url
         
         return response
