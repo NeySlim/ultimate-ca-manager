@@ -92,7 +92,7 @@ def revoke_certificate(cert_id):
     except ValueError as e:
         return error_response(str(e), 400)
     partner = mutual_partner(cert)
-    partner_id = partner.id if partner is not None and not partner.revoked else None
+    partner_id = partner.id if partner is not None and revocable(partner, reason) else None
     refusal = _related_choice_refusal(cert, partner_id, revoke_related)
     if refusal:
         return error_response(*refusal)
@@ -136,7 +136,7 @@ def revoke_certificate(cert_id):
         cert_dict = cert.to_dict()
         partner = db.session.get(Certificate, partner_id) if revoke_related and partner_id else None
         message = 'Certificate revoked successfully'
-        if partner is not None and partner.revoked:
+        if partner is not None and not revocable(partner, reason):
             cert_dict['related_revoked'] = partner_id
         elif partner is not None:
             # This one stays revoked; the other member's failure is said, not hidden

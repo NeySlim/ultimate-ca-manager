@@ -78,7 +78,7 @@ def bulk_revoke_certificates():
                     results['failed'].append({'id': cert_id, 'error': 'Already revoked'})
                 continue
             partner = mutual_partner(cert)
-            partner_id = partner.id if partner is not None and not partner.revoked else None
+            partner_id = partner.id if partner is not None and revocable(partner, reason) else None
             refusal = _related_choice_refusal(cert, partner_id, revoke_related)
             if refusal is not None:
                 results['failed'].append({'id': cert_id, 'error': refusal[0]})
@@ -105,7 +105,7 @@ def bulk_revoke_certificates():
                 cert_id=cert_id, reason=reason, username=username, revoke_related=revoke_related)
             if revoke_related and partner_id:
                 left = db.session.get(Certificate, partner_id)
-                if left is None or left.revoked:
+                if left is None or not revocable(left, reason):
                     revoked_with_pair.add(partner_id)
                 else:
                     results.setdefault('related_not_revoked', []).append(partner_id)

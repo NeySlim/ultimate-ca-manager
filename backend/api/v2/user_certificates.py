@@ -532,7 +532,7 @@ def revoke_user_certificate(cert_id):
         policy, approval = queue_revocation(user, cert, reason=reason,
                                             comment=data.get('approval_comment'),
                                             auth_certificate_id=auth_cert.id,
-                                            partner=partner if partner is not None and not partner.revoked else None)
+                                            partner=partner if partner is not None and revocable(partner, reason) else None)
     except PairApprovalConflict as e:
         return error_response(str(e), 409)
     except Exception as e:
