@@ -8,6 +8,7 @@ import base64
 import multiprocessing
 import os
 import threading
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -169,17 +170,17 @@ def _generate_in_child(app, url, ca_id, barrier, results):
 
     engine = create_engine(url)
     db._app_engines[app][None] = engine
-    signing_hash_for = generation.signing_hash_for
+    allocate = generation.allocate_crl_number
 
-    def meet_then_sign(*args, **kwargs):
-        # Both meet here, after the number is chosen, unless a lock keeps one out
+    def meet_then_allocate(*args, **kwargs):
+        # Both have read everything else and ask for a number at the same moment
         try:
             barrier.wait()
         except threading.BrokenBarrierError:
             pass
-        return signing_hash_for(*args, **kwargs)
+        return allocate(*args, **kwargs)
 
-    generation.signing_hash_for = meet_then_sign
+    generation.allocate_crl_number = meet_then_allocate
     try:
         with app.app_context():
             db.session.remove()
@@ -240,6 +241,60 @@ def test_two_processes_never_publish_the_same_number_on_postgresql(app):
         numbers, stored = _two_processes(app, url, True)
     assert sorted(numbers) == [2, 3], numbers
     assert stored == [1, 2, 3]
+
+
+def _second_waits_for_the_first(app, url, is_postgresql):
+    """The first allocation holds its number uncommitted while the second asks for one."""
+    from tests.test_backup_cross_installation import _bound_to
+    from services.crl.numbering import allocate_crl_number
+
+    key, cert = _authority()
+    locked, asked, result = threading.Event(), threading.Event(), {}
+
+    def allocate(name, before=None, after=None):
+        try:
+            with app.app_context():
+                ca = db.session.get(CA, ca_id)
+                if before:
+                    before.wait(10)
+                number = allocate_crl_number(ca, cert)
+                if after:
+                    after.set()
+                    asked.wait(10)
+                    time.sleep(0.5)  # the second is now inside its allocation
+                now = datetime(2026, 1, 1)
+                db.session.add(CRLMetadata(ca_id=ca_id, crl_number=number, this_update=now,
+                                           next_update=now, crl_pem='x', crl_der=b'x'))
+                db.session.commit()
+                result[name] = number
+                db.session.remove()
+        except Exception as exc:  # noqa: BLE001
+            result[name] = repr(exc)
+
+    with _bound_to(app, url, is_postgresql=is_postgresql), app.app_context():
+        ca_id = _ca_row(key, cert).id
+        db.session.remove()
+        first = threading.Thread(target=allocate, args=('first',), kwargs={'after': locked})
+        second = threading.Thread(target=lambda: (locked.wait(10), asked.set(), allocate('second')))
+        first.start()
+        second.start()
+        first.join(30)
+        second.join(30)
+    return result
+
+
+def test_a_second_allocation_waits_for_the_first_on_sqlite(app, tmp_path):
+    assert _second_waits_for_the_first(app, f"sqlite:///{tmp_path / 'held.db'}", False) \
+        == {'first': 1, 'second': 2}
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_a_second_allocation_waits_for_the_first_on_postgresql(app):
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    with _a_schema_of_our_own('crl_number_held') as url:
+        assert _second_waits_for_the_first(app, url, True) == {'first': 1, 'second': 2}
 
 
 def test_the_schema_refuses_two_crls_under_one_number():
