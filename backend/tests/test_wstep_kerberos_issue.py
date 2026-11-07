@@ -482,14 +482,9 @@ class TestNakedCsrSubjectDerivation:
 
 
 def _clear_acl_template(app):
-    from models import CATemplatePin
-
     with app.app_context():
-        existing = CertificateTemplate.query.filter_by(name='Test Enroll ACL Template').first()
-        if existing:
-            CATemplatePin.query.filter_by(template_id=existing.id).delete()
-            db.session.delete(existing)
-            db.session.commit()
+        delete_templates(template_ids_named('Test Enroll ACL Template'))
+        db.session.commit()
 
 
 def _configure_acl_template(app, allowed_ad_group, ca_id, extended_key_usage=None):
