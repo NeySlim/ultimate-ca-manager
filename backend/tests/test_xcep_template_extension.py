@@ -77,7 +77,6 @@ def test_each_policy_announces_its_template_extension(app, subject_ca):
         assert (value['major'].native, value['minor'].native) == policy['revision'] == (100, 0)
 
 
-
 def test_a_template_of_capped_ekus_only_is_not_announced(app, subject_ca):
     """WSTEP refuses it: Windows is not offered a template it cannot enroll under."""
     ca_id = subject_ca('Tplext capped CA', {**TWINS, 'OCSP': ('ocsp', ['ocspSigning'], False, 'RSA-2048')})
