@@ -1085,7 +1085,8 @@ class AcmeProxyService:
         order['finalize'] = f"{self.base_url}/order/{order_id}/finalize"
         if 'certificate' in order:
             if local_order is not None:
-                self._persist_certificate_url(local_order, order['certificate'])
+                self._persist_certificate_url(local_order, order['certificate'],
+                                              issued=order.get('status') == 'valid')
             order['certificate'] = self._proxy_url('cert', order['certificate'])
         if 'authorizations' in order:
             order['authorizations'] = [
@@ -2267,13 +2268,19 @@ class AcmeProxyService:
             finally:
                 db.session.remove()
 
-    def _persist_certificate_url(self, row, cert_url: str):
+    def _persist_certificate_url(self, row, cert_url: str, issued: bool = False):
         """Persist the upstream certificate URL on the local order served, not on
         a dead row sharing its upstream URL, so _find_order_for_certificate finds
-        it with an indexed query (#219)."""
+        it with an indexed query (#219). An order the CA ``issued`` turns valid here,
+        downloaded or not: valid is final (RFC 8555 §7.1.6), a later deactivation included."""
         try:
-            if row.certificate_url != cert_url:
-                row.certificate_url = cert_url
+            changed = row.certificate_url != cert_url
+            row.certificate_url = cert_url
+            # A deactivation or a local failure has already set a pending row invalid
+            if issued and row.status == 'pending':
+                row.status = 'valid'
+                changed = True
+            if changed:
                 db.session.commit()
         except Exception as exc:
             db.session.rollback()
@@ -2323,7 +2330,8 @@ class AcmeProxyService:
                 logger.debug(f"Certificate lookup: upstream order fetch failed: {exc}")
                 continue
             if isinstance(upstream_order, dict) and upstream_order.get('certificate') == cert_url:
-                self._persist_certificate_url(candidate, cert_url)
+                self._persist_certificate_url(candidate, cert_url,
+                                              issued=upstream_order.get('status') == 'valid')
                 return candidate
         return None
 

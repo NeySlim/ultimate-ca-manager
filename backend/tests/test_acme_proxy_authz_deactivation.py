@@ -3,7 +3,8 @@
 The proxy shares one upstream authorization between the orders of several
 clients (#307). A deactivation is passed upstream only when no other pending
 local order uses that authorization; otherwise only the requester's order sees
-it deactivated. Either way the requester's order is invalid from then on.
+it deactivated. Either way the requester's order, if pending, is invalid from then
+on; an order the CA already issued stays valid (§7.1.6).
 """
 import json
 
@@ -511,9 +512,11 @@ def _self_signed_pem():
 
 class TestIssuedOrderThenDeactivated:
     """RFC 8555 §7.5.2 lets the client deactivate the authorization of an issued order;
-    valid is final (§7.1.6): the order and its certificate are still served."""
+    valid is final (§7.1.6): the order and its certificate are still served, whether
+    the certificate was downloaded first or the client only read the order valid."""
 
-    def test_issued_order_stays_valid_with_its_certificate(self, app, svc):
+    @pytest.mark.parametrize('downloaded', [True, False], ids=['downloaded', 'read-valid-only'])
+    def test_issued_order_stays_valid_with_its_certificate(self, app, svc, downloaded):
         from models import Certificate
         pem = _self_signed_pem()
 
@@ -534,9 +537,15 @@ class TestIssuedOrderThenDeactivated:
         from types import SimpleNamespace
         svc.account = SimpleNamespace(id=None, preferred_chain='', label='test')
         with app.app_context():
-            mine = _seed(status='valid')
-            db.session.get(AcmeClientOrder, mine).certificate_url = CERT_URL
-            db.session.commit()
+            if downloaded:
+                mine = _seed(status='valid')
+                db.session.get(AcmeClientOrder, mine).certificate_url = CERT_URL
+                db.session.commit()
+            else:
+                mine = _seed()
+                first = svc.get_order(_b64(ORDER_URL), requester_account_id='acct-a',
+                                      requester_thumbprint='thumb-a')
+                assert first['status'] == 'valid' and 'certificate' in first
             view, _ = _deactivate(svc)
             assert view['status'] == 'deactivated'
             assert db.session.get(AcmeClientOrder, mine).status == 'valid'
