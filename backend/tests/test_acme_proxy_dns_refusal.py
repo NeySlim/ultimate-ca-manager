@@ -496,3 +496,122 @@ class TestAuthorizationReads:
             url, _authz_doc, chall = svc._read_challenge(wanted, None, [row])
             assert url == urls[35] and chall['url'] == wanted
             assert len(calls) == 1
+
+
+BAD_NONCE = {'type': 'urn:ietf:params:acme:error:badNonce', 'detail': 'JWS has an invalid anti-replay nonce'}
+
+
+class _FailingPost:
+    """Upstream challenge POST that answers ``answer`` or raises it."""
+
+    def __init__(self, answer):
+        self.answer = answer
+        self.calls = []
+
+    def __call__(self, url, payload=None, *_a, **_k):
+        self.calls.append((url, payload))
+        if isinstance(self.answer, Exception):
+            raise self.answer
+        return self.answer
+
+
+@pytest.mark.usefixtures('_quiet_rows')
+class TestChallengeSubmissionFailure:
+    """The upstream POST of the challenge fails: the order fails locally, its TXT
+    records are released and the next order on the authorization starts afresh."""
+
+    @pytest.mark.parametrize('answer', [
+        _Resp(BAD_NONCE, 400, {'Replay-Nonce': 'n'}),
+        _Resp({'type': 'urn:ietf:params:acme:error:serverInternal', 'detail': 'boom'}, 500),
+        ConnectionError('upstream unreachable'),
+    ])
+    def test_failed_post_fails_the_order_and_releases_its_records(self, app, monkeypatch,
+                                                                  answer):
+        _provider(monkeypatch, (True, 'ok'))
+        with app.app_context():
+            row = _order(client_jwk_thumbprint='T')
+            row.set_challenges_dict({CHALL_URL: {'status': 'initiated'}})
+            db.session.commit()
+            svc, _calls = _svc(monkeypatch)
+            post = _FailingPost(answer)
+            monkeypatch.setattr(svc, '_post_with_account', post)
+            svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
+
+            assert post.calls == [(CHALL_URL, {})]
+            db.session.refresh(row)
+            assert row.status == 'invalid'
+            assert row.challenges_dict[CHALL_URL]['status'] == 'failed'
+            assert row.error_message
+            assert row.dns_records_created is None
+            [(_app, released, order_id)] = _cleanups()
+            assert order_id == row.id
+            assert {r['record_name'] for r in released} == {f'_acme-challenge.{DOMAIN}'}
+
+    def test_client_reads_the_failure_and_its_next_order_is_served(self, app, monkeypatch):
+        _provider(monkeypatch, (True, 'ok'))
+        with app.app_context():
+            row = _order(client_jwk_thumbprint='T')
+            row.set_challenges_dict({CHALL_URL: {'status': 'initiated'}})
+            db.session.commit()
+            svc, _calls = _svc(monkeypatch)
+            monkeypatch.setattr(svc, '_post_with_account', _FailingPost(_Resp(
+                {'type': 'urn:ietf:params:acme:error:rateLimited', 'detail': 'slow down'}, 429)))
+            svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
+
+            svc, _calls = _svc(monkeypatch, {
+                ORDER_URL: _Resp({'status': 'pending', 'authorizations': [AUTHZ_URL],
+                                  'finalize': f'{ORDER_URL}/finalize'}),
+                AUTHZ_URL: _Resp(_authz())})
+            order = svc.get_order(_b64(ORDER_URL), requester_thumbprint='T')
+            assert order['status'] == 'invalid'
+            assert order['error']['type'] == 'urn:ietf:params:acme:error:rateLimited'
+            authz, _ident = svc.get_authz(_b64(AUTHZ_URL), requester_thumbprint='T')
+            assert authz['challenges'][0]['status'] == 'invalid'
+            with pytest.raises(ProxyOrderNotReadyError):
+                svc.finalize_order(_b64(ORDER_URL), 'unused', requester_thumbprint='T')
+
+            retry = _order(client_jwk_thumbprint='T', order_url=f'{ORDER_URL}b',
+                           upstream_order_url=f'{ORDER_URL}b')
+            _ThreadRecorder.created = []
+            svc, _calls = _svc(monkeypatch, {AUTHZ_URL: _Resp(_authz())})
+            svc.get_authz(_b64(AUTHZ_URL), requester_thumbprint='T')
+            assert _automation_orders() == [retry.id]
+
+
+class TestBadNonceRetries:
+    """RFC 8555 §6.5: each badNonce answer carries the nonce of the next attempt."""
+
+    def _svc(self, monkeypatch, answers):
+        svc = AcmeProxyService.__new__(AcmeProxyService)
+        sent = []
+
+        def _sign_and_post(url, payload, nonce, kid=None):
+            sent.append(nonce)
+            return answers[len(sent) - 1]
+
+        monkeypatch.setattr(svc, '_get_nonce', lambda: 'n0')
+        monkeypatch.setattr(svc, '_sign_and_post', _sign_and_post)
+        return svc, sent
+
+    def test_two_bad_nonces_in_a_row_are_retried(self, monkeypatch):
+        answers = [_Resp(BAD_NONCE, 400, {'Replay-Nonce': 'n1'}),
+                   _Resp(BAD_NONCE, 400, {'Replay-Nonce': 'n2'}),
+                   _Resp({'status': 'processing'})]
+        svc, sent = self._svc(monkeypatch, answers)
+        resp = svc._post_jws(CHALL_URL, {}, kid='k')
+        assert resp.status_code == 200
+        assert sent == ['n0', 'n1', 'n2']
+
+    def test_retries_are_bounded(self, monkeypatch):
+        answers = [_Resp(BAD_NONCE, 400, {'Replay-Nonce': f'n{i + 1}'}) for i in range(10)]
+        svc, sent = self._svc(monkeypatch, answers)
+        resp = svc._post_jws(CHALL_URL, {}, kid='k')
+        assert resp.status_code == 400
+        assert len(sent) == 1 + proxy_mod._BAD_NONCE_RETRIES
+
+    def test_other_400_is_not_retried(self, monkeypatch):
+        answers = [_Resp({'type': 'urn:ietf:params:acme:error:malformed'}, 400,
+                         {'Replay-Nonce': 'n1'})]
+        svc, sent = self._svc(monkeypatch, answers)
+        assert svc._post_jws(CHALL_URL, {}, kid='k').status_code == 400
+        assert sent == ['n0']

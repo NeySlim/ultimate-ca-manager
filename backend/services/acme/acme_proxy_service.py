@@ -56,6 +56,9 @@ _CERT_FALLBACK_SCAN_LIMIT = 25
 # Upstream authz reads for one challenge request the local cache cannot place:
 # each costs a request on the shared upstream account.
 _CHALLENGE_SCAN_LIMIT = 3
+# Fresh-nonce retries after a badNonce answer (RFC 8555 §6.5); some CAs refuse two in a row.
+_BAD_NONCE_RETRIES = 3
+_BAD_NONCE = 'urn:ietf:params:acme:error:badNonce'
 
 
 class ProxyDns01OnlyError(ValueError):
@@ -80,6 +83,10 @@ class ProxyOrderNotReadyError(ValueError):
 
 class ProxyInvalidProfileError(ValueError):
     """The requested profile is not one the upstream directory offers."""
+
+
+class ProxyBadCsrError(ValueError):
+    """The CSR does not name exactly the identifiers of the order (RFC 8555 §7.4)."""
 
 
 def _dns01_txt_value(key_authorization: str) -> str:
@@ -108,6 +115,19 @@ _DNS_REFUSED_PROBLEM = {
     'type': 'urn:ietf:params:acme:error:serverInternal',
     'detail': 'The proxy could not publish a dns-01 TXT record of this order: the DNS provider refused it',
 }
+
+
+def _bad_nonce_replay(resp):
+    """The Replay-Nonce of a badNonce answer (RFC 8555 §6.5), else None."""
+    if resp.status_code != 400:
+        return None
+    try:
+        problem = resp.json()
+    except ValueError:
+        return None
+    if not isinstance(problem, dict) or problem.get('type') != _BAD_NONCE:
+        return None
+    return (getattr(resp, 'headers', None) or {}).get('Replay-Nonce') or None
 
 
 def _txt_written(provider, zone, record_name, value):
@@ -246,6 +266,46 @@ def _order_covers_identifier(order, identifier) -> bool:
     if not wanted:
         return False
     return any(_normalized_identifier(d) == wanted for d in order.domains_list or [])
+
+
+def _csr_identifiers(csr):
+    """(type, value) pairs a CSR requests: CN and SAN names, IPs apart (RFC 8555 §7.4, RFC 8738)."""
+    import ipaddress
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    from utils.csr_extensions import csr_extensions
+
+    def _named(value):
+        try:
+            return 'ip', str(ipaddress.ip_address(value))
+        except ValueError:
+            return 'dns', value.strip().rstrip('.').lower()
+
+    found = {_named(attr.value) for attr in csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+             if isinstance(attr.value, str)}
+    try:
+        san = csr_extensions(csr).get_extension_for_class(x509.SubjectAlternativeName).value
+    except x509.ExtensionNotFound:
+        san = []
+    except ValueError as exc:
+        raise ProxyBadCsrError(f'CSR extensions cannot be read: {exc}') from exc
+    for name in san:
+        if isinstance(name, x509.DNSName):
+            found.add(_named(name.value))
+        elif isinstance(name, x509.IPAddress):
+            found.add(('ip', str(name.value)))
+    return found
+
+
+def _require_csr_matches_order(csr, order):
+    """RFC 8555 §7.4: the CSR names exactly the order identifiers (wildcards kept)."""
+    wanted = {('dns', d.strip().rstrip('.').lower())
+              for d in order.domains_list or [] if isinstance(d, str)}
+    requested = _csr_identifiers(csr)
+    if requested != wanted:
+        raise ProxyBadCsrError(
+            f"CSR identifiers {sorted(v for _t, v in requested)} do not match "
+            f"the order identifiers {sorted(v for _t, v in wanted)}")
 
 
 def _single_domain(order) -> Optional[str]:
@@ -691,20 +751,13 @@ class AcmeProxyService:
         """
         nonce = self._get_nonce()
         resp = self._sign_and_post(url, payload, nonce, kid=kid)
-
-        # RFC 8555 §6.5: retry once on badNonce using the fresh nonce
-        # returned in the error response's Replay-Nonce header.
-        if resp.status_code == 400:
-            try:
-                err = resp.json()
-                if err.get('type') == 'urn:ietf:params:acme:error:badNonce':
-                    fresh_nonce = resp.headers.get('Replay-Nonce')
-                    if fresh_nonce:
-                        logger.warning(f"Upstream rejected nonce on {url}, retrying with fresh nonce")
-                        resp = self._sign_and_post(url, payload, fresh_nonce, kid=kid)
-            except (json.JSONDecodeError, ValueError):
-                pass
-
+        # RFC 8555 §6.5: retry with the Replay-Nonce of each badNonce answer, a bounded number of times
+        for _attempt in range(_BAD_NONCE_RETRIES):
+            fresh_nonce = _bad_nonce_replay(resp)
+            if not fresh_nonce:
+                break
+            logger.warning(f"Upstream rejected nonce on {url}, retrying with fresh nonce")
+            resp = self._sign_and_post(url, payload, fresh_nonce, kid=kid)
         return resp
 
     def _post_with_account(self, url: str, payload) -> requests.Response:
@@ -1250,8 +1303,9 @@ class AcmeProxyService:
             chall_url = chall.get('url')
             if not chall_url:
                 continue
-            if chall.get('status') == 'pending' and self._dns_refused(order):
-                chall.update(status='invalid', error=dict(_DNS_REFUSED_PROBLEM))
+            failure = self._local_failure(order) if chall.get('status') == 'pending' else None
+            if failure:
+                chall.update(status='invalid', error=failure)
                 authz['status'] = 'invalid'
             if (_dns_failed_state(authz.get('status'))
                     or _dns_failed_state(chall.get('status'))):
@@ -1458,8 +1512,9 @@ class AcmeProxyService:
         status = challenge_data.get('status')
         up_link = self._get_authz_link(None, authz_url)
 
-        if status == 'pending' and self._dns_refused(order):
-            challenge_data.update(status='invalid', error=dict(_DNS_REFUSED_PROBLEM))
+        failure = self._local_failure(order) if status == 'pending' else None
+        if failure:
+            challenge_data.update(status='invalid', error=failure)
             status = 'invalid'
 
         if status != 'pending':
@@ -1782,11 +1837,16 @@ class AcmeProxyService:
 
         # Trigger upstream validation
         logger.info(f"[ACME Proxy BG] Triggering upstream validation for {domain}")
-        payload = {}
-        resp = self._post_with_account(chall_url, payload)
-
+        try:
+            resp = self._post_with_account(chall_url, {})
+        except Exception as exc:
+            logger.error("[ACME Proxy BG] Upstream challenge POST for %s failed: %s", domain, exc)
+            self._fail_challenge_submission(order, chall_url, domain, None)
+            return
         if resp.status_code != 200:
             logger.error(f"[ACME Proxy BG] Upstream challenge validation error: {resp.text}")
+            self._fail_challenge_submission(
+                order, chall_url, domain, UpstreamProblem.from_response(resp))
         else:
             logger.info(f"[ACME Proxy BG] Upstream challenge validation triggered successfully for {domain}")
             challenges_data = order.challenges_dict
@@ -1812,22 +1872,43 @@ class AcmeProxyService:
     def _fail_dns_automation(self, order, chall_url, domain, message):
         """Fail the order locally after a refused TXT write; the upstream challenge is left alone."""
         logger.error("[ACME Proxy BG] DNS provider refused the TXT record for %s: %s", domain, message)
+        self._fail_locally(order, chall_url, message,
+                           f"DNS provider refused the TXT record for {domain}: {message}")
+
+    def _fail_challenge_submission(self, order, chall_url, domain, upstream):
+        """Fail the order whose challenge POST the upstream CA never accepted: no
+        automation is left to submit it, and a later order on the authorization starts its own."""
+        if upstream is None:
+            problem = {'type': 'urn:ietf:params:acme:error:serverInternal',
+                       'detail': f'The upstream CA could not be reached to validate {domain}'}
+        else:
+            problem = upstream.client_problem()[0]
+        self._fail_locally(order, chall_url, problem['detail'],
+                           f"Upstream challenge submission failed for {domain}: {problem['detail']}",
+                           problem)
+
+    def _fail_locally(self, order, chall_url, error, message, problem=None):
+        """Record a challenge that will never be submitted, fail the order and release its TXT records."""
+        state = {'status': 'failed', 'error': error, 'failed_at': datetime.now().isoformat()}
+        if problem:
+            state['problem'] = problem
         challenges_data = order.challenges_dict
-        challenges_data[chall_url] = {'status': 'failed', 'error': message,
-                                      'failed_at': datetime.now().isoformat()}
+        challenges_data[chall_url] = state
         order.set_challenges_dict(challenges_data)
         order.status = 'invalid'
-        order.error_message = f"DNS provider refused the TXT record for {domain}: {message}"
+        order.error_message = message
         order.last_error_at = utc_now()
         db.session.commit()
         _dns_rows_hook('close_for_order', order.id)
         self._release_order_records(order)
 
     @staticmethod
-    def _dns_refused(order):
-        """True when one of this order's TXT writes was refused: none of its challenges is submitted."""
-        return any((state or {}).get('status') == 'failed'
-                   for state in (order.challenges_dict or {}).values())
+    def _local_failure(order):
+        """Problem of a challenge this order failed locally (TXT refused, POST failed), else None."""
+        for state in (order.challenges_dict or {}).values():
+            if (state or {}).get('status') == 'failed':
+                return dict(state.get('problem') or _DNS_REFUSED_PROBLEM)
+        return None
 
     @staticmethod
     def _mark_invalid(orders):
@@ -2047,9 +2128,10 @@ class AcmeProxyService:
         if (local_order.deactivated_authz_list
                 and order.get('status') in ('pending', 'ready')):
             order['status'] = 'invalid'
-        if self._dns_refused(local_order) and order.get('status') in ('pending', 'ready'):
+        failure = self._local_failure(local_order)
+        if failure and order.get('status') in ('pending', 'ready'):
             order['status'] = 'invalid'
-            order.setdefault('error', dict(_DNS_REFUSED_PROBLEM))
+            order.setdefault('error', failure)
         if order.get('status') == 'invalid':
             self._mark_invalid([local_order] if local_order.status == 'pending' else [])
             self._release_order_records(local_order)
@@ -2079,12 +2161,14 @@ class AcmeProxyService:
         if local_order.deactivated_authz_list:
             raise ProxyOrderNotReadyError(
                 "Order is invalid: one of its authorizations was deactivated")
-        if self._dns_refused(local_order):
-            raise ProxyOrderNotReadyError(
-                "Order is invalid: the DNS provider refused its dns-01 record")
+        failure = self._local_failure(local_order)
+        if failure:
+            raise ProxyOrderNotReadyError(f"Order is invalid: {failure['detail']}")
 
         from cryptography import x509
         csr = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())
+        # Checked here: the upstream CA may answer a mismatch with unauthorized, the proxy's own fault
+        _require_csr_matches_order(csr, local_order)
         csr_der = csr.public_bytes(serialization.Encoding.DER)
         csr_b64 = base64.urlsafe_b64encode(csr_der).rstrip(b'=').decode()
 

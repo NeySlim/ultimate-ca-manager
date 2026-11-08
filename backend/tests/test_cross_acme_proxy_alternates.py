@@ -34,9 +34,10 @@ def proxy_route(app, monkeypatch):
         db.session.commit()
 
 
-def test_the_proxy_response_carries_no_link_and_no_alternate(client, proxy_route):
+def test_the_proxy_response_carries_only_its_index_link(client, proxy_route):
     r = client.post(f'/acme/proxy/cert/{_b64(CERT_URL)}', data='{}', content_type='application/jose+json')
     assert r.status_code == 200, r.data
-    assert r.headers.getlist('Link') == []
+    # Only the proxy's own directory link (RFC 8555 §7.1), nothing of the upstream ones
+    assert r.headers.getlist('Link') == ['<http://localhost/acme/proxy/directory>;rel="index"']
     assert '/alt/' not in r.get_data(as_text=True)
     assert proxy_route.strip() in r.get_data(as_text=True)

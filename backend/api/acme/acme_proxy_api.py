@@ -19,6 +19,7 @@ from models import db, AcmeClientOrder, Certificate
 from services.acme.acme_client_service import AcmeClientService
 from services.acme.acme_proxy_service import (
     AcmeProxyService,
+    ProxyBadCsrError,
     ProxyChallengeIdentifierError,
     ProxyDns01OnlyError,
     ProxyInvalidProfileError,
@@ -29,6 +30,7 @@ from services.acme.acme_proxy_service import (
 from services.cert_service import CertificateService
 from services.acme.acme_proxy_account import (
     ProxyEndpointNotConfiguredError,
+    normalize_proxy_slug,
     resolve_proxy_by_slug,
 )
 from services.acme import AcmeService, ari
@@ -72,6 +74,27 @@ def _require_jose_content_type():
             415,
         )
     return None
+
+
+_DIRECTORY_ENDPOINTS = frozenset({'acme_proxy.proxy_directory', 'acme_proxy.proxy_directory_slug'})
+
+
+@acme_proxy_bp.after_request
+def _link_directory(response):
+    """RFC 8555 §7.1: every resource but the directory links it with rel="index",
+    problems included; links the view set (up, alternate) are kept."""
+    if request.endpoint in _DIRECTORY_ENDPOINTS:
+        return response
+    if any('rel="index"' in value for value in response.headers.getlist('Link')):
+        return response
+    slug = (request.view_args or {}).get('slug')
+    if slug is not None:
+        try:
+            slug = normalize_proxy_slug(slug)
+        except ValueError:
+            return response  # no directory to link, and the raw path never reaches a header
+    response.headers.add('Link', f'<{_proxy_base_url(slug)}/directory>;rel="index"')
+    return response
 
 
 # ==================== Helpers ====================
@@ -358,11 +381,10 @@ def new_nonce(slug=None):
     except RuntimeError as e:
         logger.error(f"ACME proxy new-nonce error: {e}")
         return proxy_error("serverInternal", "Failed to issue nonce", 500)
-    # RFC 8555 §7.2: HEAD answers 200, GET 204; §7.1: every resource links the directory
+    # RFC 8555 §7.2: HEAD answers 200, GET 204
     resp = make_response('', 200 if request.method == 'HEAD' else 204)
     resp.headers['Replay-Nonce'] = nonce
     resp.headers['Cache-Control'] = 'no-store'
-    resp.headers['Link'] = f'<{_proxy_base_url(slug)}/directory>;rel="index"'
     return resp
 
 
@@ -867,6 +889,8 @@ def finalize(order_id, slug=None):
         return proxy_error("malformed", str(e), 404)
     except ProxyOrderNotReadyError as e:
         return proxy_error("orderNotReady", str(e), 403)
+    except ProxyBadCsrError as e:
+        return proxy_error("badCSR", str(e), 400)
     except ValueError as e:
         return proxy_error("malformed", str(e), 400)
     except Exception as e:
@@ -1018,9 +1042,9 @@ def revoke_cert(slug=None):
                 )
 
         response = make_response('', status_code)
+        del response.headers['Content-Type']  # RFC 8555 §7.6: no body, no media type
         response.headers['Replay-Nonce'] = _get_nonce()
         response.headers['Cache-Control'] = 'no-store'
-        response.headers['Link'] = f'<{_proxy_base_url(slug)}/directory>;rel="index"'
         return response
     except ProxyEndpointNotConfiguredError as exc:
         return proxy_error("malformed", str(exc), 404)
