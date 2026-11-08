@@ -168,7 +168,9 @@ class TestChangePassword:
             'current_password': 'wrongpassword',
             'new_password': 'NewPass456!',
         })
-        assert r.status_code == 401, r.data
+        # 403 and not 401: a 401 makes the UI log the user out
+        assert r.status_code == 403, r.data
+        assert 'incorrect' in r.get_json()['message'].lower()
 
     def test_empty_body_returns_400(self, auth_client):
         r = auth_client.post('/api/v2/account/password',
