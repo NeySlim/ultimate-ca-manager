@@ -64,6 +64,12 @@ class TestProxy:
         _assert_problem(resp, 405, '/acme/proxy/directory')
         assert 'POST' in resp.headers['Allow']
 
+    def test_unconfigured_slug_is_not_found(self, client):
+        """No endpoint there, whatever the method: its views answer 404 too."""
+        resp = client.get('/acme/proxy/nosuch/new-order')
+        _assert_problem(resp, 404, '/acme/proxy/directory')
+        assert 'Allow' not in resp.headers
+
     def test_slug_endpoint_links_its_own_directory(self, client, slug_endpoint):
         _assert_problem(client.get(f'/acme/proxy/{slug_endpoint}/new-order'), 405,
                         f'/acme/proxy/{slug_endpoint}/directory')

@@ -16,6 +16,14 @@ def is_acme_path(path: str) -> bool:
     return path.startswith('/acme/')
 
 
+def _enabled_slug(segment: str):
+    """The enabled proxy endpoint slug this path segment names, else None."""
+    try:
+        return resolve_proxy_by_slug(segment).proxy_slug
+    except (ValueError, ProxyEndpointNotConfiguredError):
+        return None  # an endpoint name, or no enabled endpoint
+
+
 def _directory_url() -> str:
     """The directory of the server or proxy endpoint the path falls under."""
     path = request.path
@@ -23,25 +31,23 @@ def _directory_url() -> str:
         return f'{get_acme_public_origin(request)}/acme/directory'
     base = get_acme_proxy_public_base(request)
     segment = path[len(_PROXY_PREFIX):].split('/', 1)[0]
-    if segment:
-        try:
-            return f'{base}/{resolve_proxy_by_slug(segment).proxy_slug}/directory'
-        except (ValueError, ProxyEndpointNotConfiguredError):
-            pass  # an endpoint name, or no enabled endpoint: the default proxy
-    return f'{base}/directory'
+    slug = _enabled_slug(segment) if segment else None
+    return f'{base}/{slug}/directory' if slug else f'{base}/directory'
 
 
 def _routed_methods() -> list:
-    """Methods an ACME route serves at this path; the SPA catch-all does not count."""
+    """Methods an ACME route serves at this path; the SPA catch-all does not count, nor a
+    proxy route whose slug names no enabled endpoint (its view answers 404)."""
     adapter = current_app.url_map.bind_to_environ(request.environ)
     allowed = []
     for method in _METHODS:
         try:
-            endpoint, _args = adapter.match(request.path, method=method)
+            endpoint, args = adapter.match(request.path, method=method)
         except HTTPException:
             continue
-        if endpoint not in _SPA_ENDPOINTS:
-            allowed.append(method)
+        if endpoint in _SPA_ENDPOINTS or ('slug' in args and not _enabled_slug(args['slug'])):
+            continue
+        allowed.append(method)
     return allowed
 
 
