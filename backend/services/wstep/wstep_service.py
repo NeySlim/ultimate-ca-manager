@@ -599,10 +599,8 @@ def _template_extra_ekus(template):
     return oids
 
 
-_SERVER_AUTH = '1.3.6.1.5.5.7.3.1'
 _CLIENT_AUTH = '1.3.6.1.5.5.7.3.2'
 _SMARTCARD_LOGON = '1.3.6.1.4.1.311.20.2.2'
-_PERSON_EKUS = frozenset({'1.3.6.1.5.5.7.3.4', '1.3.6.1.4.1.311.10.3.4'})  # emailProtection, EFS
 
 
 def issues_only_capped_ekus(template):
@@ -628,17 +626,15 @@ def _template_profile(template, csr):
         csr_ku = True
     except x509.ExtensionNotFound:
         csr_ku = False
+    from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS
+    from utils.request_names import cert_type_for_ekus
     configured = None if csr_ku else (_template_configured_ku(template) or None)
-    ekus = set(_template_configured_ekus(template))
-    if not ekus or _SERVER_AUTH in ekus:
-        return 'server_cert', configured
-    if ekus & _PERSON_EKUS:
-        return 'email_cert', configured
-    if _SMARTCARD_LOGON in ekus and ekus <= {_CLIENT_AUTH, _SMARTCARD_LOGON}:
-        return 'client_cert', configured or (None if csr_ku else ['digitalSignature', 'keyEncipherment'])
-    if _CLIENT_AUTH in ekus:
-        return 'client_cert', configured
-    return 'server_cert', configured
+    # The EKUs the certificate gets (_template_extra_ekus), typed as SCEP types its own
+    ekus = set(_template_configured_ekus(template)) - (PROTOCOL_UNBINDABLE_EKU_OIDS - {_SMARTCARD_LOGON})
+    cert_type = cert_type_for_ekus(ekus)
+    if cert_type == 'client_cert' and _SMARTCARD_LOGON in ekus and ekus <= {_CLIENT_AUTH, _SMARTCARD_LOGON}:
+        return cert_type, configured or (None if csr_ku else ['digitalSignature', 'keyEncipherment'])
+    return cert_type, configured
 
 
 def _template_configured_ku(template):
