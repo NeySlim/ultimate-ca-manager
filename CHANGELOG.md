@@ -53,6 +53,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- mTLS: a static file request sent without the session cookie, as browsers fetch the favicon, opened a new certificate session and wrote a `login_success` audit event, several per page refresh. Static files no longer open a session, so a page load logs in once.
 - ACME proxy: every upstream CA error reached the client as a 500 `serverInternal`, so a rate limit, a refused name or a refused CSR looked like a proxy failure. The upstream type, status, subproblems and Retry-After now reach the client, revocation included (RFC 8555 §6.6, §6.7).
 - ACME proxy: when the DNS provider refused the TXT record, the challenge was still submitted and failed on the shared upstream account. The order now turns invalid without any upstream request, its other challenges are not submitted either, a retried order on the same authorizations is validated, and the TXT records of invalid or deactivated orders are removed.
 - ACME proxy: an upstream error on a certificate download reached the client as a 200 carrying the error body. It is now relayed as an ACME problem with its status.
