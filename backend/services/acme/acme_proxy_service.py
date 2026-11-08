@@ -2271,17 +2271,18 @@ class AcmeProxyService:
     def _persist_certificate_url(self, row, cert_url: str, issued: bool = False):
         """Persist the upstream certificate URL on the local order served, not on
         a dead row sharing its upstream URL, so _find_order_for_certificate finds
-        it with an indexed query (#219). An order the CA ``issued`` turns valid here,
-        downloaded or not: valid is final (RFC 8555 §7.1.6), a later deactivation included."""
+        it with an indexed query (#219). A pending row the CA ``issued`` turns valid:
+        valid is final (RFC 8555 §7.1.6), so a later deactivation leaves it valid."""
+        def _record(fresh):
+            fresh.certificate_url = cert_url
+            # Read under the row lock: a local failure or deactivation may have landed meanwhile
+            if (issued and fresh.status == 'pending' and not fresh.deactivated_authz_list
+                    and not self._local_failure(fresh)):
+                fresh.status = 'valid'
+
         try:
-            changed = row.certificate_url != cert_url
-            row.certificate_url = cert_url
-            # A deactivation or a local failure has already set a pending row invalid
-            if issued and row.status == 'pending':
-                row.status = 'valid'
-                changed = True
-            if changed:
-                db.session.commit()
+            if row.certificate_url != cert_url or (issued and row.status == 'pending'):
+                _update_order_row(row, _record)
         except Exception as exc:
             db.session.rollback()
             logger.warning(f"ACME proxy: failed to persist certificate URL: {exc}")

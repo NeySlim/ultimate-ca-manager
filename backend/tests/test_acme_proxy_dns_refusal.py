@@ -1538,3 +1538,45 @@ class TestLostDeferredDeletionIsSwept:
                       dns_records_created=json.dumps([fresh]))
         assert AcmeProxyService.release_lost_txt_deletions() == 0
         assert _ThreadRecorder.started == []
+
+
+class TestIssuedOrderRecordedUnderTheRowLock:
+    """An order read valid upstream turns valid locally only if no local failure landed
+    while its upstream read was in flight (RFC 8555 §7.1.6: invalid is final too)."""
+
+    CERT_URL = f'{UPSTREAM}/acme/cert/dns/1'
+
+    def _valid_order(self):
+        return _Resp({'status': 'valid', 'authorizations': [AUTHZ_URL],
+                      'finalize': f'{ORDER_URL}/finalize', 'certificate': self.CERT_URL})
+
+    def test_failure_during_the_upstream_read_keeps_the_order_invalid(self, app, monkeypatch):
+        from services.acme.acme_proxy_service import ProxyResourceNotFoundError
+        with app.app_context():
+            row = _order(client_jwk_thumbprint='T')
+            row_id = row.id
+            svc, _calls = _svc(monkeypatch)
+
+            def _fail_meanwhile():
+                fresh = db.session.get(AcmeClientOrder, row_id)
+                svc._fail_locally(fresh, CHALL_URL, 'refused', 'DNS provider refused the TXT')
+
+            def _post(url, payload=None, *_a, **_k):
+                if url == ORDER_URL:
+                    _in_another_thread(app, _fail_meanwhile)
+                    return self._valid_order()
+                raise AssertionError(f'unexpected upstream call to {url}')
+            monkeypatch.setattr(svc, '_post_with_account', _post)
+            svc.get_order(_b64(ORDER_URL), requester_thumbprint='T')
+            assert _fresh(row_id).status == 'invalid'
+            with pytest.raises(ProxyResourceNotFoundError):
+                svc.get_certificate(_b64(self.CERT_URL), requester_thumbprint='T')
+
+    def test_fallback_lookup_records_the_issued_order_valid(self, app, monkeypatch):
+        with app.app_context():
+            row = _order(client_jwk_thumbprint='T')
+            svc, _calls = _svc(monkeypatch, {ORDER_URL: self._valid_order()})
+            found = svc._find_order_for_certificate(self.CERT_URL, None, 'T')
+            assert found.id == row.id
+            fresh = _fresh(row.id)
+            assert (fresh.status, fresh.certificate_url) == ('valid', self.CERT_URL)
