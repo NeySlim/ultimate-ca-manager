@@ -261,8 +261,8 @@ class TestSidBytesToString:
 
 
 class TestLookupObjectSid:
-    """Mirrors TestLookupComputerDnsHostname's exact fail-closed shape --
-    every failure mode returns None, never raises."""
+    """Never raises: None when unconfigured or not found, the falsy UNREACHABLE when the
+    directory could not answer."""
 
     def test_not_configured_returns_none(self, app):
         with app.app_context():
@@ -275,11 +275,11 @@ class TestLookupObjectSid:
         with app.app_context():
             assert lookup.lookup_object_sid('WIN11$') is None
 
-    def test_bind_failure_returns_none(self, app, monkeypatch):
+    def test_bind_failure_is_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('bind failed')))
         with app.app_context():
-            assert lookup.lookup_object_sid('WIN11$') is None
+            assert lookup.lookup_object_sid('WIN11$') is lookup.UNREACHABLE
 
     def test_not_found_returns_none(self, app, monkeypatch):
         _configure(None, app, enabled=True)
@@ -306,14 +306,14 @@ class TestLookupObjectSid:
         with app.app_context():
             assert lookup.lookup_object_sid('WIN11$') is None
 
-    def test_search_exception_returns_none(self, app, monkeypatch):
+    def test_search_exception_is_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(
             lookup, '_connect',
             lambda config: _FakeConnection(search_raises=RuntimeError('search failed')),
         )
         with app.app_context():
-            assert lookup.lookup_object_sid('WIN11$') is None
+            assert lookup.lookup_object_sid('WIN11$') is lookup.UNREACHABLE
 
     def test_success_returns_sid_string(self, app, monkeypatch):
         """Reads raw_values (the real binary SID), not .value -- ldap3

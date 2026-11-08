@@ -1037,13 +1037,15 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         ad_config = ADConnectorConfig.get_singleton()
         if ad_config and ad_config.enabled:
             requester_sid = lookup.lookup_object_sid(kerberos_sam_account_name)
-            if requester_sid is None:
+            if not requester_sid:
                 logger.warning(
                     "WSTEP: could not resolve requester SID for %r via AD "
                     "Connector -- refusing issuance (strong certificate mapping)",
                     kerberos_sam_account_name,
                 )
-                return None, ServerError('Could not resolve requester identity for strong certificate mapping')
+                if requester_sid is lookup.UNREACHABLE:
+                    return None, ServerError('Could not resolve requester identity for strong certificate mapping')
+                return None, 'The requester was not found in the directory'
 
     err = _validate_csr(csr, require_pop=require_pop, allow_naked_subject=True)
     if err:

@@ -768,7 +768,7 @@ def test_an_unreachable_directory_is_a_receiver_fault(client, app, wstep_kerbero
     monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
     monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
                         lambda auth_header, connection_key: _authenticated_result())
-    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: None)
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: ad_lookup.UNREACHABLE)
     csr, _key = _make_csr()
     r = client.post(ISSUE_URL, data=_build_rst(csr),
                     headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
@@ -777,6 +777,22 @@ def test_an_unreachable_directory_is_a_receiver_fault(client, app, wstep_kerbero
     assert fault.find(f'.//{{{SOAP_NS}}}Text').text == (
         'Could not resolve requester identity for strong certificate mapping')
     assert fault.find(f'{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text == 's:Receiver'
+
+
+def test_a_requester_missing_from_the_directory_is_a_sender_fault(
+        client, app, wstep_kerberos_config, monkeypatch):
+    """The directory answered that the account does not exist: the request is refused (400)."""
+    _configure_ad_connector(app)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: None)
+    csr, _key = _make_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 400
+    assert _fault_text_and_code(r.data) == ('The requester was not found in the directory', 's:Sender')
 
 
 def _fault_text_and_code(data):

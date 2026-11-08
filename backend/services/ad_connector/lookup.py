@@ -28,9 +28,9 @@ Bind/search mechanics mirror ``api/v2/sso/connection_tests.py``'s
 ``ADConnectorConfig`` singleton -- not ``SSOProvider`` -- and fix a leaked
 temp CA-bundle file that exists in that code (no matching cleanup there).
 
-Every public lookup function here fails closed to ``None``/a structured
-failure result, never an exception: a broken AD Connector must degrade to
-"can't derive a subject" (the pre-existing naked-CSR rejection), not a 500.
+The public lookups never raise: they answer None (or False) when the connector is
+off or the object is not found, and the falsy ``UNREACHABLE`` when no DC binds or the
+search raises, so a caller can refuse the request or fault on its own side.
 """
 import logging
 import os
@@ -42,8 +42,9 @@ logger = logging.getLogger(__name__)
 
 
 class _Unreachable:
-    """The falsy answer of a lookup the directory could not give (no DC bound, or the
-    search failed), told apart from "not found" so a caller can fault on its own side."""
+    """The falsy answer of a lookup the directory could not give (no DC bound, or the search
+    raised), told apart from "not found". An LDAP error result without an exception reads as
+    no entry, since connections are opened without raise_exceptions."""
     __slots__ = ()
 
     def __bool__(self):
@@ -314,7 +315,7 @@ def lookup_computer_dns_hostname(sam_account_name):
 
     Returns ``None`` when the connector is not configured or disabled, the entry
     is not found or the attribute is empty/missing, and the falsy ``UNREACHABLE``
-    when no DC binds or the search fails. Never raises.
+    when no DC binds or the search raises. Never raises.
     """
     from ldap3.utils.conv import escape_filter_chars
 
@@ -396,14 +397,9 @@ def lookup_object_sid(sam_account_name):
     ``raw_values[0]`` (the real binary SID) and converts it via
     ``_sid_bytes_to_string``.
 
-    Returns ``None`` on every failure mode: connector not configured or
-    disabled, unreachable, bind failure, entry not found, or the attribute
-    is empty/malformed. Never raises. Callers needing to distinguish
-    "connector not configured" (skip this feature) from "configured but
-    this lookup failed" (deny, for strong mapping) must check
-    ``ADConnectorConfig`` themselves before calling this -- this function's
-    ``None`` return does not carry that distinction, matching every other
-    lookup in this module.
+    ``None`` when the connector is off, the entry is not found or its SID is empty or
+    malformed; the falsy ``UNREACHABLE`` when no DC binds or the search raises. Never raises.
+    A caller telling "connector off" from "not found" checks ``ADConnectorConfig`` first.
     """
     from ldap3.utils.conv import escape_filter_chars
 
@@ -417,7 +413,7 @@ def lookup_object_sid(sam_account_name):
         conn = _connect(config)
     except Exception as e:
         logger.warning("AD Connector: bind failed during SID lookup: %s", e)
-        return None
+        return UNREACHABLE
 
     try:
         safe_sam = escape_filter_chars(sam_account_name)
@@ -434,7 +430,7 @@ def lookup_object_sid(sam_account_name):
         return _sid_bytes_to_string(entry.objectSid.raw_values[0])
     except Exception as e:
         logger.warning("AD Connector: SID lookup failed: %s", e)
-        return None
+        return UNREACHABLE
     finally:
         try:
             conn.unbind()
@@ -455,7 +451,7 @@ def lookup_user_ad_identity(sam_account_name):
     'hagland'), ('DC', 'domain')]``), confirmed against a real ADCS-issued
     User certificate's subject in the lab. ``None`` when the connector is not
     configured/disabled, the entry is not found or has no ``userPrincipalName``;
-    the falsy ``UNREACHABLE`` when no DC binds or the search fails. Never raises.
+    the falsy ``UNREACHABLE`` when no DC binds or the search raises. Never raises.
 
     ``mail`` is deliberately optional (``None`` when unset), not a failure
     mode: real ADCS's own CT_FLAG_SUBJECT_REQUIRE_EMAIL hard-declines
@@ -533,10 +529,8 @@ def is_member_of_group(sam_account_name, group):
 
     Fails closed to ``False`` -- connector not configured/disabled, group not
     found, or account not found/not a member -- and to the falsy ``UNREACHABLE``
-    when no DC binds or the search fails. Never raises. Callers must treat
-    either as "deny", not "skip the check" -- this is a security gate,
-    unlike the subject-derivation lookups above which fail closed to a
-    softer "can't derive a subject, fall through to normal rejection".
+    when no DC binds or a search raises. Never raises. Callers must treat either as
+    "deny", never "skip the check": this is a security gate.
     """
     from ldap3.utils.conv import escape_filter_chars
 
