@@ -187,7 +187,7 @@ class Config:
         "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
     } if _db_url else {}
     # SQLAlchemy would otherwise quote bound values in its errors, private keys included.
-    # PostgreSQL's DETAIL line stays: a duplicate key in full, or a refused row's columns up to 64 bytes
+    # PostgreSQL's DETAIL stays for a duplicate or missing key; a refused row or input is dropped (utils/db_errors)
     SQLALCHEMY_ENGINE_OPTIONS["hide_parameters"] = True
     # UCM_PG_PREPARE_THRESHOLD, for a transaction-mode pooler without prepared statements
     if _db_url and postgres_connect_args(_db_url):
