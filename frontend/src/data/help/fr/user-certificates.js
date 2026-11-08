@@ -25,9 +25,9 @@ export default {
         title: 'Permissions',
         items: [
           { label: 'Viewers', text: 'Ne voient que leurs propres certificats' },
-          { label: 'Operators', text: 'Peuvent consulter, exporter et révoquer tous les certificats utilisateur' },
-          { label: 'Admins', text: 'Accès complet, suppression incluse' },
-          { label: 'Auditors', text: 'Peuvent consulter les certificats mais pas les exporter' },
+          { label: 'Operators', text: 'Peuvent consulter, exporter, révoquer et supprimer tous les certificats utilisateur ; exporter la clé privée du certificat d\'un autre utilisateur exige read:private_keys, que ce rôle n\'a pas' },
+          { label: 'Admins', text: 'Accès complet, clés privées incluses' },
+          { label: 'Auditors', text: 'Peuvent consulter et exporter les certificats, sans leur clé privée' },
         ]
       },
     ],
@@ -101,8 +101,8 @@ La suppression retire à la fois le certificat et l'association utilisateur-cert
 | Rôle | Consultation | Export | Révocation | Suppression |
 |------|--------------|--------|------------|-------------|
 | Admin | Tous | Tous | Tous | Tous |
-| Operator | Tous | Tous | Tous | Tous |
-| Auditor | Tous | ✗ | ✗ | ✗ |
+| Operator | Tous | Tous (la clé privée d'un autre utilisateur exige read:private_keys) | Tous | Tous |
+| Auditor | Tous | Certificat seul, sans clé privée | ✗ | ✗ |
 | Viewer | Les siens | Les siens | ✗ | ✗ |
 
 ### Permissions requises

@@ -11,7 +11,7 @@ export default {
           { label: 'Configuración', text: 'Ajustes del servidor SCEP: selección de CA, aprobación automática' },
           { label: 'Perfiles', text: 'Endpoints de inscripción con nombre, cada uno con su propia URL, CA, plantilla y desafío' },
           { label: 'Registros de aplicación de Intune', text: 'Registros de aplicación en Entra (ID de inquilino, ID de cliente, secreto de cliente) compartidos por los perfiles que validan desafíos de Intune; un secreto vacío al editar conserva el actual, Probar conexión solicita un token y descubre el servicio sin consumir ningún desafío, y una app aún usada por un perfil no puede eliminarse' },
-          { label: 'Contraseñas de desafío', text: 'Gestionar contraseñas de desafío por CA para la inscripción de dispositivos' },
+          { label: 'Desafíos', text: 'Ver y regenerar las contraseñas de desafío para la inscripción de dispositivos' },
           { label: 'Información', text: 'URL del endpoint SCEP e instrucciones de integración' },
         ]
       },
@@ -19,8 +19,9 @@ export default {
         title: 'Configuración',
         items: [
           { label: 'CA firmante', text: 'Seleccionar qué CA firma los certificados inscritos por SCEP. Los dispositivos cifran su solicitud para esta CA, por lo que debe tener una clave RSA en software: las CA EC, con HSM, sin clave, sin conexión y revocadas no aparecen en la lista (v2.248)' },
-          { label: 'Aprobación automática', text: 'Aprobar automáticamente solicitudes con contraseñas de desafío válidas' },
-          { label: 'Contraseña de desafío', text: 'Secreto compartido que los dispositivos usan para autenticar la inscripción' },
+          { label: 'Aprobación automática', text: 'Aprobar automáticamente solicitudes con contraseñas de desafío válidas, o renovaciones firmadas por un certificado que emitió el mismo endpoint' },
+          { label: 'Servir en HTTP plano', text: 'Desactivado por defecto. Responde también a SCEP en el puerto del protocolo HTTP (8080 por defecto), en http://su-servidor:8080/scep/pkiclient.exe y las URL de perfil, para clientes como sscep que no pueden usar HTTPS. RFC 8894 §7.10: los mensajes SCEP ya están protegidos, el sobre CMS mantiene privada la contraseña de desafío' },
+          { label: 'Contraseña de desafío', text: 'Secreto compartido que los dispositivos usan para autenticar la inscripción. Una renovación (RenewalReq) firmada por un certificado que emitió el mismo endpoint (perfil o global) se autentica con ese certificado, por lo que su desafío no se comprueba y rotar el secreto no impide renovar a los dispositivos inscritos (RFC 8894 §2.4). Cualquier otro certificado sigue necesitando el desafío del endpoint' },
           { label: 'Claves del dispositivo (v2.248)', text: 'Un dispositivo firma su solicitud con una clave RSA, ECDSA, Ed25519 o ML-DSA; una firma ML-DSA sigue la RFC 9882 (resumen SHA-512). Ed448 se rechaza, y ML-DSA también en modo FIPS' },
         ]
       },
@@ -67,7 +68,8 @@ Ver todas las solicitudes de inscripción SCEP:
 Configurar el servidor SCEP:
 - **Activar/Desactivar**: Alternar el servicio SCEP
 - **CA firmante**: Seleccionar qué CA firma los certificados inscritos por SCEP. Los dispositivos cifran su solicitud para esta CA, por lo que debe tener una clave RSA en software: las CA EC, con HSM, sin clave, sin conexión y revocadas no aparecen en la lista (v2.248)
-- **Aprobación automática**: Aprobar automáticamente solicitudes con contraseñas de desafío válidas
+- **Aprobación automática**: Aprobar automáticamente solicitudes con contraseñas de desafío válidas, o renovaciones firmadas por un certificado que emitió el mismo endpoint
+- **Servir en HTTP plano**: desactivado por defecto. Responde también a SCEP en el puerto del protocolo HTTP (8080 por defecto) para clientes que no pueden usar HTTPS, como sscep. RFC 8894 §7.10: los mensajes SCEP ya están protegidos, por lo que TLS no es obligatorio; el sobre CMS mantiene privada la contraseña de desafío
 
 ### Perfiles
 Endpoints de inscripción con nombre, cada uno servido en su propia URL:
@@ -86,7 +88,7 @@ Cada perfil está vinculado a:
 Apunte cada flota de dispositivos, perfil MDM o tenant a su propia URL de perfil. El endpoint \`/scep/pkiclient.exe\` sin etiqueta sigue sirviendo la configuración global sin cambios.
 
 ### Contraseñas de desafío
-Gestionar contraseñas de desafío por CA. Los dispositivos deben incluir una contraseña de desafío válida en su solicitud de inscripción para autenticarse.
+La pestaña **Desafíos** muestra las contraseñas de desafío. Los dispositivos deben incluir una contraseña de desafío válida en su solicitud de inscripción para autenticarse.
 
 - **Ver contraseña**: Mostrar el desafío actual para una CA
 - **Regenerar**: Crear una nueva contraseña de desafío (invalida la anterior)
@@ -109,16 +111,21 @@ El dispositivo firma su PKCSReq con su propia clave: RSA, ECDSA, Ed25519 o ML-DS
 ## URL SCEP
 
 \`\`\`
-https://su-servidor:8443/scep                          (endpoint global)
+https://su-servidor:8443/scep/pkiclient.exe            (CA configurada)
 https://su-servidor:8443/scep/<profile>/pkiclient.exe  (endpoint por perfil)
+https://su-servidor:8443/cgi-bin/pkiclient.exe         (CA configurada, ruta heredada)
+http://su-servidor:8080/scep/pkiclient.exe             (con Servir en HTTP plano)
 \`\`\`
 
-Los dispositivos necesitan la URL para inscribirse. Use una URL de perfil para apuntar a la CA, la plantilla y la contraseña de desafío de ese perfil.
+Los dispositivos necesitan la URL para inscribirse; \`/scep\` solo es la interfaz web, no un endpoint SCEP. Use una URL de perfil para apuntar a la CA, la plantilla y la contraseña de desafío de ese perfil.
+
+### Rotación de CA (GetNextCACert)
+GetNextCACert sirve el sucesor de la CA del endpoint, firmado por la CA actual: otra CA con el mismo padre y el mismo DN de sujeto, no revocada, no sin conexión, con una clave RSA en software y que expire más tarde. Una CA que solo comparte el nombre para mostrar nunca se sirve; sin sucesor la respuesta es 404.
 
 ## Aprobar/Rechazar solicitudes
 
 Para solicitudes pendientes (aprobación automática desactivada):
-1. Revise los detalles de la solicitud (asunto, tipo de clave, desafío)
+1. Revise los detalles de la solicitud (asunto, ID de transacción, estado, CSR)
 2. Haga clic en **Aprobar** para firmar y emitir el certificado
 3. O haga clic en **Rechazar** con un motivo
 

@@ -56,7 +56,7 @@ Administre cuentas de usuario, grupos y asignaciones de roles. Los usuarios se a
 Alterne el estado de un usuario sin eliminar su cuenta.
 
 ### Restablecer contraseña
-Los administradores pueden restablecer la contraseña de cualquier usuario. Se le pedirá al usuario que la cambie en el próximo inicio de sesión.
+Los administradores pueden restablecer la contraseña de cualquier usuario. No se le pide al usuario que la cambie en el próximo inicio de sesión: entréguele la nueva contraseña y pídale que la cambie en Mi cuenta.
 
 ### Llaves de seguridad
 En la ficha de un usuario, los administradores ven sus llaves de seguridad y pueden desactivar o eliminar una, normalmente una llave perdida, que de lo contrario aún permite iniciar sesión sin contraseña. Eliminar el último segundo factor de una cuenta que exige uno pide una segunda confirmación; el usuario registra entonces de nuevo un factor en el próximo inicio de sesión.
@@ -80,13 +80,14 @@ Cada usuario puede tener múltiples claves API para acceso programático. Las cl
 ### Permisos de grupo
 Los permisos efectivos de un usuario son la **unión** de:
 - Los permisos de su rol asignado directamente
+- Los permisos de su rol personalizado, si tiene alguno
 - Los permisos otorgados por cada grupo al que pertenece
 
 ## Roles
 
 ### Roles del sistema
 - **Admin**: Acceso completo a todas las funciones
-- **Operator**: Puede gestionar certificados, CAs, CSRs pero no la configuración del sistema
+- **Operator**: Puede gestionar certificados, CAs, CSRs, ACME, SSH y la configuración del sistema; plantillas y grupos de solo lectura, sin acceso a usuarios ni RBAC
 - **Auditor**: Acceso de solo lectura a todos los datos operativos para cumplimiento y auditoría
 - **Viewer**: Acceso de solo lectura a certificados, CAs y plantillas
 

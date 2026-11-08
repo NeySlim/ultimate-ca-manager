@@ -50,7 +50,7 @@ export default {
         content: "Backups automáticos e cifrados da base de dados, com cadência configurável e retenção.",
         items: [
           { label: "Cadência", text: "Diária / semanal / mensal" },
-          { label: "Retenção", text: "Manter os N backups mais recentes; os mais antigos são removidos" },
+          { label: "Retenção", text: "Os backups mais antigos que o número de dias definido (30 por padrão) são removidos" },
           { label: "Cifragem", text: "Os backups são cifrados com a palavra-passe de backup configurada" },
           { label: "Derivação de chave", text: "Automática (Argon2id quando disponível, PBKDF2 no modo FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Os arquivos gravados com Argon2id não podem ser restaurados numa instância em modo FIPS" },
         ]
@@ -94,7 +94,7 @@ export default {
           { label: 'Geral', text: 'Nome de host do syslog (enviado como HOSTNAME nas mensagens syslog encaminhadas), URLs base e padrões do sistema' },
           { label: 'Aparência', text: 'Seleção de tema (claro/escuro/sistema), cor de destaque, modo desktop' },
           { label: 'E-mail (SMTP)', text: 'Servidor SMTP, credenciais, editor de modelo de e-mail e notificações de alerta de expiração' },
-          { label: 'Segurança', text: 'Políticas de senha, tempo limite de sessão, limitação de taxa, lista de acesso administrativo' },
+          { label: 'Segurança', text: 'Política de senha, duração da sessão, lista de acesso administrativo, mTLS, criptografia de chaves privadas; o tempo limite de inatividade e o bloqueio de conta estão em Geral' },
           { label: 'SSO', text: 'Integração de login único SAML 2.0, OAuth2/OIDC e LDAP' },
           { label: 'Backup', text: 'Backups manuais e agendados do banco de dados' },
           { label: 'Auditoria', text: 'Retenção de logs, encaminhamento syslog, verificação de integridade' },
@@ -206,7 +206,6 @@ Configuração de todo o sistema organizada em abas. As alterações entram em v
 - **Tema**: Claro, Escuro ou Sistema (segue a preferência do SO)
 - **Cor de Destaque**: Cor principal usada para botões, links e destaques
 - **Forçar Modo Desktop**: Desativar layout responsivo móvel
-- **Comportamento da Barra Lateral**: Recolhida ou expandida por padrão
 
 ## E-mail (SMTP)
 
@@ -240,18 +239,14 @@ Quando o SMTP está configurado, ative alertas automáticos de expiração de ce
 ## Segurança
 
 ### Política de Senha
-- Comprimento mínimo (8-32 caracteres)
-- Exigir maiúsculas, minúsculas, números, caracteres especiais
-- Expiração de senha (dias)
-- Histórico de senha (impedir reutilização)
+- Comprimento mínimo (6-32 caracteres)
+- Exigir maiúsculas, números, caracteres especiais
 
 ### Gerenciamento de Sessão
-- Tempo limite de sessão (minutos de inatividade)
-- Máximo de sessões simultâneas por usuário
+- Duração da sessão (horas, qualquer que seja a atividade); o tempo limite de inatividade está em Geral
 
-### Limitação de Taxa
-- Limite de tentativas de login por IP
-- Duração do bloqueio após exceder o limite
+### Bloqueio de Conta
+- Máx. de tentativas de login e duração do bloqueio, em Geral: bloqueiam a conta, não o endereço IP
 
 ### Lista de Acesso Administrativo
 Limite a interface web e a API de gestão aos endereços IP e redes CIDR listados; os protocolos PKI continuam acessíveis de qualquer lugar. Veja o guia de Configurações de Segurança.
@@ -291,12 +286,12 @@ Criptografe todas as chaves privadas armazenadas no banco de dados com AES-256, 
 ## Backup
 
 ### Backup Manual
-Clique em **Criar Backup** para gerar um snapshot do banco de dados. Os backups incluem todos os certificados, CAs, chaves, configurações e logs de auditoria.
+Clique em **Criar Backup** para gerar um snapshot do banco de dados. Os backups incluem os certificados, CAs, chaves e configurações; o log de auditoria e outras tabelas de histórico não são incluídos.
 
 ### Backup Agendado
 Configure backups automáticos:
 - Frequência (diária, semanal, mensal)
-- Contagem de retenção (número de backups a manter)
+- Retenção em dias: os backups mais antigos são removidos (30 por padrão)
 - **Derivação de chave**: Automática (Argon2id quando disponível, PBKDF2 no modo FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Os arquivos gravados com Argon2id não podem ser restaurados numa instância em modo FIPS
 
 ### Restauração
@@ -314,7 +309,7 @@ Envie um arquivo de backup para restaurar o UCM a um estado anterior.
 
 - **Retenção de logs**: Limpeza automática de logs antigos após N dias
 - **Encaminhamento syslog**: Enviar eventos para um servidor syslog remoto (UDP/TCP/TLS)
-- **Verificação de integridade**: Ativar encadeamento de hash para detecção de adulteração
+- **Verificação de integridade**: Verificar a cadeia de hash que liga cada entrada de auditoria; a cadeia está sempre ativa, não há nada a ativar
 
 ## Banco de Dados
 
@@ -323,18 +318,17 @@ UCM suporta dois backends de banco de dados:
 - **SQLite** (padrão): baseado em arquivo, sem configuração, ideal para nó único
 - **PostgreSQL 13+**: recomendado para alta disponibilidade, multi-instância ou se você já opera um cluster PG gerenciado
 
-O backend ativo é selecionado pela variável de ambiente \`DATABASE_URL\`. Se não definida, o UCM usa SQLite em \`UCM_DATA_DIR/ucm.db\`.
+O backend ativo é selecionado pela variável de ambiente \`DATABASE_URL\`. Se não definida, o UCM usa SQLite em \`DATA_DIR/ucm.db\`.
 
 ### Painel de status
-- Backend ativo (sqlite / postgresql) e driver
+- Backend ativo (sqlite / postgresql) e a versão do seu motor
 - Tamanho do banco e número de tabelas
-- Versão de migração
 
 ### Testar conexão
 Valide uma \`DATABASE_URL\` (ex.: \`postgresql://user:pass@host:5432/ucm\`) antes de alternar. O teste abre uma conexão real e relata qualquer erro. Servidores PostgreSQL anteriores à versão 13 são rejeitados, o UCM requer PostgreSQL 13 ou mais recente.
 
 ### Alternar backend
-Persiste \`DATABASE_URL\` em \`/etc/ucm/ucm.env\` (DEB/RPM) e reinicia o UCM. **Nenhum dado é copiado**: use **Migrar** primeiro se quiser manter seus dados existentes.
+Persiste \`DATABASE_URL\` em \`/etc/ucm/ucm.env\` (DEB/RPM) e reinicia o UCM. Apenas as tabelas de contas, funções, SSO e MFA são copiadas para o novo backend, para que você ainda possa entrar; use **Migrar** primeiro se quiser manter seus outros dados.
 
 ### Migrar dados
 Copia todas as linhas do backend atual para o backend de destino. Funciona em ambas as direções (SQLite ↔ PostgreSQL):
@@ -342,13 +336,13 @@ Copia todas as linhas do backend atual para o backend de destino. Funciona em am
 1. O banco de origem é salvo em \`/opt/ucm/data/backups/db_migration/\`
 2. O esquema é criado no destino via SQLAlchemy
 3. Restrições de FK são desativadas durante a carga em massa
-4. As colunas origem/destino são interseccionadas (colunas legadas são ignoradas com aviso)
+4. As colunas são associadas pelo nome; só as colunas legadas conhecidas são descartadas, e qualquer outra coluna que o destino não tenha recusa a migração
 5. As sequências do PostgreSQL são reiniciadas após a carga
 6. O serviço reinicia automaticamente (DEB/RPM): no Docker, defina \`DATABASE_URL\` no seu arquivo compose e reinicie o container manualmente
 
 
 **Verificações de segurança (falha rápida, origem intacta):**
-- O destino deve estar vazio. Se \`users\`, \`cas\` ou \`certificates\` já contiverem linhas, a migração é recusada com HTTP 409 e uma dica de limpeza:
+- O destino deve estar vazio. Se alguma das suas tabelas já contiver linhas, a migração é recusada com HTTP 409 e uma dica de limpeza:
   - PostgreSQL: \`psql ... -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'\`
   - PostgreSQL num esquema diferente de \`public\` (um \`search_path\` na URL): a dica indica esse esquema, cujas sequências a migração realinha (v2.251)
   - SQLite: exclua o arquivo \`.db\` de destino
@@ -370,18 +364,22 @@ Gerencie o certificado TLS usado pela interface web do UCM:
 - Verificar novas versões do UCM nos releases do GitHub
 - Visualizar o changelog das atualizações disponíveis
 - Versão atual e informações de build
-- **Atualização automática**: em instalações suportadas (DEB/RPM), clique em **Atualizar Agora** para baixar e instalar a versão mais recente automaticamente
-- **Incluir pré-releases**: alterne para também verificar release candidates (rc)
+- **Atualização automática**: em instalações suportadas (DEB/RPM), clique em **Instalar Atualização** para baixar e instalar a versão mais recente automaticamente
+- **Canal de atualização**: estável, pré-release (release candidates) ou dev
 
 ## Webhooks
 
 Configure webhooks HTTP para notificar sistemas externos sobre eventos:
 
 ### Eventos Suportados
-- Certificado emitido, revogado, expirado, renovado
-- CA criada, excluída
-- Login e logout de usuário
-- Backup criado
+- Certificado emitido, revogado, renovado, prestes a expirar, expirado, importado, excluído
+- CA criada, atualizada, excluída
+- CSR enviado, aprovado, rejeitado
+- Modelo criado, atualizado
+- Preflight ACME, falha de renovação, falha de revogação
+- Atualização disponível, iniciada, instalada, com falha
+
+As importações de certificados e as alterações de modelos feitas pela interface web não emitem o seu evento.
 
 ### Autenticação
 
@@ -397,7 +395,7 @@ Os tokens são armazenados criptografados e nunca retornados na UI.
 
 ### Criando um Webhook
 1. Clique em **Adicionar Webhook**
-2. Insira a **URL** (deve ser HTTPS)
+2. Insira a **URL** (HTTPS recomendado; http:// é aceito)
 3. Selecione os **eventos** para se inscrever
 4. Escolha o **tipo de autenticação** e forneça as credenciais (opcional)
 5. Opcionalmente defina um **segredo** para verificação de assinatura HMAC
@@ -443,7 +441,7 @@ As definições de renovação automática comandam o agendador de renovação.
 Definições › Backup ativa backups automáticos.
 
 - Cadência **diária / semanal / mensal**
-- **Retenção**: manter os N mais recentes, remover os antigos
+- **Retenção**: os backups mais antigos que o número de dias definido são removidos
 - Backups **cifrados** com a palavra-passe de backup
 
 

@@ -16,6 +16,7 @@ export default {
           { label: '用于角色映射的组', text: '从映射到 groups 的属性中读取；否则从 groups 以及 Microsoft Entra ID / AD FS 的组和角色声明中读取。当 Entra ID 发送 groups.link 而不是组（用户属于超过 150 个组）时，会记录一条警告并应用默认角色：请只发出分配给该应用程序的组，或应用角色。' },
           { label: '由 IdP 发起的登录', text: '接受从 IdP 门户发起的登录，与其他响应一样进行校验。2.243 之前创建的提供商默认开启，新提供商默认关闭：仅当用户从 IdP 门户开始登录时才开启。' },
           { label: 'NameID 格式', text: '未指定（IdP 默认）、持久 (persistent)、电子邮件地址或临时 (transient)：随每个登录请求发送，并发布在 SP 元数据中。持久格式提供稳定的标识符；临时 NameID 绝不用于识别账户。' },
+          { label: '单点注销', text: '由 IdP 签名并发送到 SP 元数据中 SLO URL（HTTP-Redirect）的 LogoutRequest，会关闭此浏览器中该 NameID 的 UCM 会话，除非其 SessionIndex 指定了另一个会话。LogoutResponse 会返回到 IdP 的 SLO URL，使用 SP 密钥签名（SP 证书不是 RSA 时不签名，严格的 IdP 会拒绝）；没有 IdP SLO URL 时，浏览器返回登录页面。未签名、伪造、过期或重放的请求，或不带 Destination 的请求，都会被拒绝。' },
         ]
       },
       {
@@ -31,9 +32,11 @@ export default {
       {
         title: '角色配置 (#81)',
         items: [
-          { label: '默认角色', text: '仅在用户首次 SSO 登录被自动创建时应用。之后在 UCM 中所做的角色更改会被保留。' },
-          { label: '角色映射', text: '将外部组（Azure AD、Okta、LDAP）映射到 UCM 角色（admin / operator / viewer）。在用户创建时使用；启用角色同步后，每次登录时也会使用。多个组匹配时，权限最高的角色胜出（admin > operator > auditor > viewer），条目顺序无关紧要 (#221)。每个组还可以指定一个自定义角色（从现有自定义角色中选择）：它会添加到基础角色之上，或单独使用。如果多个匹配的组都指定了自定义角色，则以列表中第一个为准。启用角色同步后，若没有任何组指定自定义角色，则由 SSO 设置的自定义角色会被移除；在 UCM 中手动分配的自定义角色不会被改动。系统角色不能用作自定义角色。' },
-          { label: '每次登录时同步角色', text: '关闭（默认）：SSO 绝不覆盖由 UCM 管理的角色。开启：每次登录时从 role_mapping 重新同步角色；没有映射匹配的用户保留其已存储的角色（default_role 绝不会被重新应用）。' },
+          { label: '身份匹配', text: '登录会打开与 IdP 标识符绑定的账户（OIDC sub、SAML 持久 NameID、LDAP entryUUID 或 objectGUID）。用户名或邮箱只会匹配同一提供商中尚未绑定的账户；本地账户，或已绑定到其他身份的账户，会在登录时被拒绝。要合并本地账户，请先在用户中使用“关联到 SSO”：其下一次通过该提供商登录时会绑定该标识符。' },
+          { label: '默认角色', text: '在提供商没有角色映射规则时，授予首次 SSO 登录时创建的账户；也作为新账户的基础角色（其匹配规则只给出自定义角色时；无时为 viewer）。无：没有规则就没有人能登录。之后在 UCM 中所做的角色更改会被保留。' },
+          { label: '角色映射', text: '将外部组（Azure AD、Okta、LDAP）映射到 UCM 角色（admin / operator / auditor / viewer）或自定义角色。只要至少有一条规则，没有规则匹配的用户在每次 SSO 登录（OIDC、SAML、LDAP）时都会被拒绝，无论是新账户还是现有账户；通行密钥或证书登录不检查。在用户创建时使用；启用角色同步后，每次登录时也会使用。多个组匹配时，权限最高的角色胜出（admin > operator > auditor > viewer），条目顺序无关紧要 (#221)。每个组还可以指定一个自定义角色（从现有自定义角色中选择）：它会添加到基础角色之上，或单独使用。如果多个匹配的组都指定了自定义角色，则以列表中第一个为准。启用角色同步后，若没有任何组指定自定义角色，则由 SSO 设置的自定义角色会被移除；在 UCM 中手动分配的自定义角色不会被改动。系统角色不能用作自定义角色。' },
+          { label: '每次登录时同步角色', text: '关闭（默认）：SSO 绝不覆盖由 UCM 管理的角色。开启：每次登录时从 role_mapping 重新同步角色；匹配规则没有给出基础角色时保留其已存储的角色（default_role 绝不会被重新应用）。' },
+          { label: '强制 2FA', text: '此提供商的用户必须注册第二因素。LDAP 登录与本地登录一样，会要求已注册的 TOTP 代码或安全密钥，无论是否启用此选项；OIDC 和 SAML 登录仅要求完成注册，MFA 依赖身份提供商。' },
           { label: '自动更新用户', text: '每次登录时更新邮箱和全名。不会改动角色。' },
         ]
       },
@@ -41,10 +44,12 @@ export default {
         title: 'LDAP',
         items: [
           { label: '服务器', text: 'LDAP 服务器主机名和端口（389 或 636 用于 SSL）' },
+          { label: 'StartTLS', text: '在普通 LDAP 端口上，先将连接升级为 TLS 再进行任何绑定，证书验证与 LDAPS 相同。对未启用 SSL/TLS 的新提供商默认开启。没有 SSL/TLS 或 StartTLS 时，绑定和用户密码会以明文在网络上传输。' },
           { label: '绑定 DN', text: '用于 LDAP 绑定认证的可分辨名称' },
           { label: '基础 DN', text: '用户查找的搜索基础' },
           { label: '用户筛选器', text: '匹配用户的 LDAP 筛选器（例如 (uid={username})）' },
           { label: '属性映射', text: '将 LDAP 属性映射到 UCM 字段：用户名、邮箱、全名。' },
+          { label: '唯一 ID 属性', text: '用于识别账户的不可变 ID（entryUUID、objectGUID）。按 DN 绑定的账户会在下一次登录时迁移到此 ID；从一个 ID 属性改为另一个会拒绝所有已绑定的用户，直到执行解除 SSO 关联再关联到 SSO。' },
         ]
       },
     ],
@@ -100,7 +105,10 @@ https://your-ucm-host:8443/api/v2/sso/saml/metadata
 将 IDP SAML 属性映射到 UCM 用户字段：
 - \`username\` → UCM 用户名（必需）
 - \`email\` → UCM 邮箱（必需）
-- \`groups\` → UCM 组成员关系（可选）
+- \`groups\` → 由角色映射规则读取（可选）；不会使用户成为 UCM 组的成员
+
+### 单点注销
+IdP 结束会话时，会通过浏览器向 SLO URL 发送已签名的 **LogoutRequest**。UCM 检查 IdP 签名、签发者、Destination（必需）、IssueInstant（在时钟窗口内）以及该请求未被使用过，关闭此浏览器中该 NameID 的 UCM 会话（请求携带 SessionIndex 时，仅关闭其指定的会话），然后向 IdP 的 SLO URL 发送使用 SP 密钥签名的 **LogoutResponse**；SP 证书不是 RSA 时不签名，AD FS 等严格的 IdP 会拒绝。没有 IdP SLO URL 时，浏览器返回 UCM 登录页面。未签名或伪造的 LogoutRequest 会被拒绝，会话保持打开。
 
 ### 由 IdP 发起的登录
 从 IdP 门户发起的登录到达 UCM 时，并没有 UCM 发出的请求。**允许由 IdP 发起的登录** 会接受它，并同样校验签名、受众、Destination、有效期和防重放。2.243 之前创建的提供商保持开启；新提供商默认关闭。仅当用户从 IdP 门户开始登录时才开启。
@@ -121,6 +129,21 @@ https://your-ucm-host:8443/api/v2/sso/saml/metadata
 
 ### 自动创建用户
 启用后，首次 SSO 登录时会自动创建新的 UCM 用户账户，使用 IDP 提供的属性。分配默认角色。
+
+## 谁可以登录
+
+### 身份匹配
+登录会打开与 IdP 标识符绑定的账户：OIDC \`sub\`、SAML 持久 NameID、LDAP \`entryUUID\` 或 \`objectGUID\`。用户名或邮箱只会匹配同一提供商中尚未绑定的账户（在稳定标识符出现之前创建，或由管理员关联）；OIDC IdP 标记为未验证（\`email_verified\` 为 false）的邮箱不匹配任何账户。本地账户，或已绑定到其他身份的账户，绝不会被 SSO 登录打开：登录会被拒绝并记入审计日志。要将本地账户合并到 SSO 身份，请先对该用户使用**关联到 SSO**；其下一次通过该提供商登录时会绑定 IdP 标识符。
+
+删除提供商时，其用户会被保留：为同一 IdP（相同的签发者、Entity ID，或 LDAP 服务器和基础 DN）重新创建的提供商会在他们下次登录时接回他们。否则，以及对恢复后没有提供商的用户，请对每个账户先**解除 SSO 关联**再**关联到 SSO**。
+
+### 角色映射规则
+- **至少一条规则**: 没有规则匹配的用户在每次 SSO 登录（OIDC、SAML、LDAP）时都会被拒绝，无论账户是新建的还是已存在的；通行密钥或证书登录不检查
+- **没有规则**: 提供商认证的每个用户都可以登录；新账户获得**默认角色**
+- 只给出自定义角色的规则: 新账户以**默认角色**作为基础角色（无时为 viewer）
+- **默认角色：无**且没有规则: 没有人能通过该提供商登录
+
+提供商没有规则时，**用户配置**部分会自动展开并显示警告。
 
 ## LDAP
 

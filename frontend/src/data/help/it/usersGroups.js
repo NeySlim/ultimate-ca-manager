@@ -56,7 +56,7 @@ Gestisci gli account utente, i gruppi e le assegnazioni dei ruoli. Gli utenti si
 Cambia lo stato di un utente senza eliminare il suo account.
 
 ### Reset password
-Gli amministratori possono reimpostare la password di qualsiasi utente. L'utente verrà invitato a cambiarla al prossimo accesso.
+Gli amministratori possono reimpostare la password di qualsiasi utente. All'utente non viene chiesto di cambiarla al prossimo accesso: comunicagli la nuova password e chiedigli di cambiarla in Il mio account.
 
 ### Chiavi di sicurezza
 Nella scheda di un utente, gli amministratori vedono le sue chiavi di sicurezza e possono disattivarne o rimuoverne una, in genere una chiave smarrita, che altrimenti permette ancora di accedere senza password. Rimuovere l'ultimo secondo fattore di un account che ne richiede uno chiede una seconda conferma; l'utente registra poi di nuovo un fattore al prossimo accesso.
@@ -80,13 +80,14 @@ Ogni utente può avere più chiavi API per l'accesso programmatico. Le chiavi AP
 ### Permessi di gruppo
 I permessi effettivi di un utente sono l'**unione** di:
 - I permessi del ruolo assegnato direttamente
+- I permessi del suo ruolo personalizzato, se presente
 - I permessi concessi da ogni gruppo a cui appartiene
 
 ## Ruoli
 
 ### Ruoli di sistema
 - **Admin**: Accesso completo a tutte le funzionalità
-- **Operator**: Può gestire certificati, CA, CSR ma non le impostazioni di sistema
+- **Operator**: Può gestire certificati, CA, CSR, ACME, SSH e impostazioni di sistema; template e gruppi in sola lettura, nessun accesso a utenti o RBAC
 - **Auditor**: Accesso in sola lettura a tutti i dati operativi per conformità e audit
 - **Viewer**: Accesso in sola lettura a certificati, CA e template
 

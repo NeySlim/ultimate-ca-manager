@@ -52,6 +52,12 @@ def _extract_certificate():
     return None
 
 
+def _is_file_request(path):
+    """A static file (favicon, bundle, font): browsers may fetch these without the
+    session cookie, so a login there would open a session nobody keeps."""
+    return not path.startswith('/api/') and '.' in path.rsplit('/', 1)[-1]
+
+
 def process_client_certificate():
     """
     Process client certificate and auto-login if valid.
@@ -61,7 +67,7 @@ def process_client_certificate():
     """
     # Protocol and probe paths read client certificates themselves; touching the
     # session there would keep a cookie's inactivity clock running from anywhere.
-    if is_exempt_path(request.path):
+    if is_exempt_path(request.path) or _is_file_request(request.path):
         return
     # Already authenticated via certificate — skip
     if session.get('user_id') and session.get('auth_method') == 'certificate':

@@ -22,7 +22,7 @@ export default {
       {
         title: 'Configuración del servidor',
         items: [
-          { label: 'Script de configuración Linux/macOS', text: 'Descargue un script shell POSIX (.sh) que configura automáticamente sshd para confiar en esta CA. Instalación rápida: curl -fsSL <url> | bash' },
+          { label: 'Script de configuración Linux/macOS', text: 'Descargue un script shell POSIX (.sh) que configura automáticamente sshd para confiar en esta CA. Instalación rápida: curl -sSL <url> | sudo bash' },
           { label: 'Script de configuración Windows', text: 'Descargue un script PowerShell (.ps1) que configura Windows OpenSSH Server (escribe la clave pública de la CA en %ProgramData%\\ssh, restringe las ACL, añade TrustedUserCAKeys / HostCertificate a sshd_config, valida con sshd -T, reinicia sshd). Instalación rápida: iwr <url> | iex' },
           { label: 'Bloque de diagnóstico', text: 'Si Add-WindowsCapability falla (WSUS / equipo unido a dominio), el script imprime un bloque etiquetado que explica el estado de la directiva y tres vías de corrección, nunca modifica la directiva WSUS / WU por sí mismo' },
           { label: 'Dry-run', text: 'Ambos scripts admiten una opción -DryRun / --dry-run para previsualizar los cambios sin aplicarlos' },
@@ -67,7 +67,7 @@ export default {
       'Descargue el script de configuración para una puesta en marcha sencilla del servidor: gestiona la copia de seguridad y la validación automáticamente.',
     ],
     warnings: [
-      'Eliminar una CA no revoca los certificados que ha firmado: revóquelos primero o actualice la confianza del servidor.',
+      'Una CA no puede eliminarse mientras queden certificados que firmó: elimínelos primero y actualice la confianza del servidor.',
       'Si la clave privada de la CA se ve comprometida, todos los certificados firmados por ella deben considerarse no confiables.',
     ],
   },
@@ -203,7 +203,7 @@ RevokedKeys /etc/ssh/revoked_keys
 | CAs separadas | Use CAs distintas para certificados de usuario y de host |
 | Algoritmo de clave | Ed25519 para nuevos despliegues, RSA 4096 para compatibilidad con sistemas antiguos |
 | Duración de la CA | Mantenga las CAs con larga vigencia; use certificados efímeros en su lugar |
-| Copia de seguridad | Exporte y almacene la clave privada de la CA de forma segura |
+| Copia de seguridad | Conserve las copias de seguridad de UCM: la clave privada de la CA no puede exportarse por sí sola |
 | Asignación de principals | Asigne principals a nombres de usuario específicos, no a comodines |
 `
   }

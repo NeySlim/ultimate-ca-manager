@@ -34,12 +34,12 @@ export default {
           { label: 'Umbenennen', text: 'Einen vom CN unabhängigen Anzeigenamen festlegen (Standard: CN oder erster SAN-DNS-Name bei Zertifikaten ohne CN)' },
           { label: 'Widerrufen', text: 'Als widerrufen markieren mit einem Grund, erscheint in der CRL' },
           { label: 'Sperre aufheben', text: 'Ein mit dem Grund „Zertifikat gesperrt" widerrufenes Zertifikat entsperren, stellt den gültigen Status wieder her' },
-          { label: 'Widerrufen & Ersetzen', text: 'Widerrufen und sofort ein Ersatzzertifikat ausstellen' },
+          { label: 'Gesperrtes Zertifikat widerrufen', text: 'Ein gesperrtes Zertifikat kann auch mit einem anderen Grund endgültig widerrufen werden, ohne zwischendurch gültig zu werden. CRL und OCSP geben dann den neuen Grund an, und das Ungültigkeitsdatum ist der Beginn der Sperre, sofern keines angegeben wird' },
           { label: 'Exportieren', text: 'Im PEM-, DER- oder PKCS#12-Format herunterladen' },
           { label: 'PKCS#12-Kompatibilitätsmodus (v2.222)', text: 'Die Exportdialoge bieten ein 3DES/SHA-1-Profil für Importer, die das AES-256-Standardarchiv als falsches Passwort ablehnen: Android 15 und älter, macOS 14 und älter, Windows Server 2016 und älter, altes Java. Standardmäßig aus, schützt die Datei schwächer' },
           { label: 'Vergleichen', text: 'Zwei Zertifikate nebeneinander vergleichen' },
           { label: 'Weitere Erweiterungen (v2.251)', text: 'Die Zertifikats- und CA-Details listen die Erweiterungen, für die UCM keinen eigenen Abschnitt hat, unter Weitere Erweiterungen auf, mit OID, Name sofern bekannt, Kritikalität und Rohwert. Das Ausstellungsformular kann zusätzlich zu denen des Templates eigene Erweiterungen hinzufügen' },
-          { label: 'Kompromittierte Schlüssel (v2.251)', text: 'Ein als keyCompromise widerrufener Schlüssel bleibt nach dem Löschen seines Zertifikats bekannt, gleich welche CA es ausgestellt hat, Let\'s Encrypt eingeschlossen: Eine Anfrage, Erneuerung oder Finalisierung mit diesem Schlüssel wird abgelehnt' },
+          { label: 'Kompromittierte Schlüssel (v2.251)', text: 'Ein als keyCompromise widerrufener Schlüssel bleibt nach dem Löschen seines Zertifikats bekannt, gleich welche CA es ausgestellt hat, Let\'s Encrypt eingeschlossen: Der ACME-Client lehnt ihn bei Anfrage, Erneuerung und Finalisierung ab, und EST lehnt einen CSR ab, der ihn trägt. Die übrigen Ausstellungswege prüfen diese Liste nicht' },
           { label: 'ACME-Client-Zertifikate (v2.251)', text: 'Ein vom ACME-Client bezogenes Zertifikat wird ebenfalls am Ort erneuert und behält ID und refid. Die Kopien, die frühere Erneuerungen als neue Zeilen importiert haben, bleiben im Bestand, bis sie archiviert oder gelöscht werden' },
         ]
       },
@@ -47,7 +47,7 @@ export default {
         title: 'Benutzerdefinierte Extra-EKUs (RFC 5280 §4.2.1.12)',
         content: 'Das Zertifikatsausstellungsformular und der Sign-CSR-Dialog bieten eine "Extra EKUs"-Mehrfachauswahl, mit der Sie Extended-Key-Usage-OIDs zusätzlich zu den Standardwerten des Zertifikatstyps hinzufügen können:',
         items: [
-          { label: 'Katalog', text: '18 bekannte EKUs (Microsoft RDP 1.3.6.1.4.1.311.54.1.2, Smartcard-Anmeldung, Dokumentsignierung, IPsec, Kerberos PKINIT usw.)' },
+          { label: 'Katalog', text: '26 bekannte EKUs (Microsoft RDP 1.3.6.1.4.1.311.54.1.2, Smartcard-Anmeldung, Dokumentsignierung, IPsec, Kerberos PKINIT usw.)' },
           { label: 'Freitext-OID', text: 'Jede wohlgeformte gepunktete OID, die ^[0-2](?:\\.(?:0|[1-9]\\d*)){1,15}$ entspricht' },
           { label: 'Limit', text: 'Bis zu 16 OIDs insgesamt pro Zertifikat' },
           { label: 'Zusammengeführt, nie ersetzt', text: 'Die Standard-EKUs des Zertifikatstyps (z. B. serverAuth) bleiben fest verankert, Extras kommen oben drauf' },
@@ -92,7 +92,7 @@ export default {
     tips: [
       'Markieren Sie ⭐ wichtige Zertifikate, um sie zu Ihrer Favoritenliste hinzuzufügen',
       'Verwenden Sie Filter, um Zertifikate schnell nach Status, CA oder Suchtext zu finden. Ihre Auswahl wird über Reloads hinweg gespeichert',
-      'Beim Erneuern bleibt derselbe Datensatz erhalten (id, refid, Erstellungsdatum): von UCM gehaltene Schlüssel werden neu generiert, per Protokoll ausgestellte Zertifikate (SCEP/EST/ACME) behalten ihren clientseitigen Schlüssel',
+      'Beim Erneuern bleibt derselbe Datensatz erhalten (id, refid, Erstellungsdatum). Erneuern über die Seite erzeugt einen neuen Schlüssel; die automatische Erneuerung behält den Schlüssel. Ein Zertifikat, dessen Schlüssel UCM nicht hält (Registrierung per SCEP, EST, WSTEP oder ACME, Import ohne Schlüssel), wird abgelehnt (409): Erneuern Sie es über sein Protokoll oder signieren Sie eine neue Anfrage',
       'Brauchen Sie eine nicht-standardisierte EKU (Microsoft RDP, Smartcard-Anmeldung, Dokumentsignierung)? Fügen Sie sie über "Extra EKUs" hinzu, statt Templates zu bearbeiten',
       'Verkürzt eine Richtlinie oder das Ablaufdatum der ausstellenden CA die angeforderte Gültigkeit, nennt das Ergebnis dies samt Grund: "Issued for N day(s) instead of the M requested"',
       'Eine RSA-PSS-Signatur wird mit Hash und Salt-Länge angezeigt, z. B. RSASSA-PSS SHA-256 (salt 32)',
@@ -113,7 +113,7 @@ Zentrale Verwaltung aller X.509-Zertifikate. Stellen Sie neue Zertifikate aus, i
 ## Zertifikatsstatus
 
 - **Gültig**: Innerhalb des Gültigkeitszeitraums und nicht widerrufen
-- **Ablaufend**: Läuft innerhalb von 30 Tagen ab (konfigurierbar)
+- **Ablaufend**: Läuft innerhalb von 30 Tagen ab
 - **Abgelaufen**: Nach dem „Nicht nach"-Datum
 - **Widerrufen**: Explizit widerrufen, in CRL veröffentlicht
 - **Verwaist**: Ausstellende CA existiert nicht mehr in UCM
@@ -146,7 +146,8 @@ Unterstützte Formate:
 Seit v2.214 wird das Zertifikat bei der Erneuerung **in place** aktualisiert:
 - Gleicher Datensatz: **id, refid und Erstellungsdatum ändern sich nie**: Integrationen behalten ihre Referenzen
 - Gleicher Betreff und gleiche SANs; neue Seriennummer und neue Gültigkeitsdauer
-- Zertifikate, deren Schlüssel UCM hält, erhalten ein **neues Schlüsselpaar**; per Protokoll ausgestellte Zertifikate (SCEP/EST/ACME) werden mit ihrem vorhandenen öffentlichen Schlüssel erneut signiert
+- Erneuern über die Seite erzeugt einen **neuen Schlüssel**; die automatische Erneuerung behält den Schlüssel
+- Ein Zertifikat, dessen Schlüssel UCM nicht hält (Registrierung per SCEP, EST, WSTEP oder ACME, Import ohne Schlüssel), wird abgelehnt (409): Erneuern Sie es über sein Registrierungsprotokoll oder signieren Sie eine neue Anfrage
 - Die **ersetzte Seriennummer bleibt auf der CRL veröffentlicht** (Grund \`superseded\`) und antwortet über OCSP mit \`revoked\`, bis das ursprüngliche Ablaufdatum des alten Zertifikats erreicht ist
 - \`renewed_at\` / \`renewed_times\` protokollieren die Erneuerungshistorie
 - Ein widerrufenes Zertifikat kann nicht erneuert werden (409): stellen Sie stattdessen ein neues aus
@@ -175,8 +176,8 @@ Wenn ein Zertifikat mit dem Grund **Zertifikat gesperrt** widerrufen wurde, kann
 
 > 💡 Zertifikat gesperrt ist nützlich für vorübergehende Sperrungen (z.B. verlorenes Gerät, laufende Untersuchung).
 
-### Widerrufen & Ersetzen
-Kombiniert Widerruf mit sofortiger Neuausstellung. Das neue Zertifikat übernimmt denselben Betreff und dieselben SANs.
+### Ein gesperrtes Zertifikat endgültig widerrufen
+Ein gesperrtes Zertifikat kann über dieselbe Schaltfläche **Widerrufen** mit einem anderen Grund widerrufen werden (zum Beispiel Schlüsselkompromittierung, sobald die Untersuchung sie bestätigt), ohne zwischendurch gültig zu werden. CRL und OCSP geben den neuen Grund an; ist kein Ungültigkeitsdatum angegeben, wird der Beginn der Sperre als Datum erfasst, ab dem das Zertifikat ungültig wurde.
 
 ## Zertifikate exportieren
 
@@ -200,7 +201,7 @@ Ein hybrides Paar verknüpft ein klassisches Zertifikat (**A**, RSA oder EC) mit
 
 ## Favoriten
 
-Markieren Sie ⭐ wichtige Zertifikate als Lesezeichen. Favoriten erscheinen in gefilterten Ansichten zuerst und sind über den Favoriten-Filter zugänglich.
+Markieren Sie ⭐ wichtige Zertifikate als Lesezeichen. Favoriten werden in der Befehlspalette (Strg+K) aufgelistet.
 
 ## Zertifikate vergleichen
 
@@ -211,8 +212,8 @@ Wählen Sie zwei Zertifikate aus und klicken Sie auf **Vergleichen**, um einen V
 - **Statusfilter**: Gültig, Ablaufend, Abgelaufen, Widerrufen, Verwaist, Archiviert
 - **CA-Filter**: Zertifikate einer bestimmten CA anzeigen
 - **Quellenfilter**: Nach der Art filtern, wie das Zertifikat in UCM gelangt ist (ausgestellt, importiert, ACME, SCEP usw.)
-- **Vorlagenfilter**: Zertifikate finden, die **von der Vorlage abweichen**: aus einer Vorlage ausgestellt, aber mit bei der Anfrage explizit überschriebenem Schlüsseltyp, Gültigkeit oder Digest. Die abweichenden Felder werden in den Zertifikatdetails aufgelistet; der Datensatz ist ab der Ausstellung eingefroren
-- **Textsuche**: Nach CN, Seriennummer oder SAN suchen
+- **Vorlagenfilter**: Zertifikate finden, die **von der Vorlage abweichen**: aus einer Vorlage ausgestellt, aber mit bei der Anfrage explizit überschriebenem Schlüsseltyp oder Gültigkeit. Die abweichenden Felder werden in den Zertifikatdetails aufgelistet; der Datensatz ist ab der Ausstellung eingefroren
+- **Textsuche**: Nach Subject, Aussteller, Anzeigename oder Seriennummer suchen (SANs werden nicht durchsucht)
 - **Sortierung**: Nach Name, Ablaufdatum, Erstellungsdatum, Status
 ## Konformitätsprüfung
 

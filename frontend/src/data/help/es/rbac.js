@@ -8,7 +8,7 @@ export default {
         title: 'Roles del sistema',
         definitions: [
           { term: 'Admin', description: 'Acceso completo a todas las funciones y configuraciones' },
-          { term: 'Operator', description: 'Puede gestionar certificados y CA pero no la configuración del sistema' },
+          { term: 'Operator', description: 'Puede gestionar certificados, CA, CSR, ACME, SSH y los ajustes que un administrador no reserva; plantillas y grupos de solo lectura, sin acceso a usuarios ni RBAC' },
           { term: 'Auditor', description: 'Acceso de solo lectura a todos los datos operativos para cumplimiento y auditoría' },
           { term: 'Viewer', description: 'Acceso básico de solo lectura a certificados, CA y plantillas' },
         ]
@@ -18,8 +18,9 @@ export default {
         items: [
           { label: 'Crear rol', text: 'Definir un nuevo rol con nombre y descripción' },
           { label: 'Matriz de permisos', text: 'Marcar/desmarcar permisos por categoría (CA, Certificados, Claves privadas, etc.)' },
-          { label: 'Cobertura', text: 'Porcentaje visual del total de permisos otorgados al rol' },
+          { label: 'Cobertura', text: 'Una barra y un recuento n/N de los permisos otorgados al rol' },
           { label: 'Cantidad de usuarios', text: 'Ver cuántos usuarios están asignados a cada rol' },
+          { label: 'Permisos de roles del sistema', text: 'Un rol del sistema muestra los permisos que UCM le aplica; Admin muestra todos los permisos de la matriz' },
           { label: 'Permisos de CA SSH (v2.248)', text: 'read:ssh_cas, write:ssh_cas y delete:ssh_cas gobiernan las CA SSH, de modo que write:ssh ya no las crea ni las edita. Los roles, grupos y claves API con un permiso SSH recibieron el correspondiente al actualizar' },
         ]
       },
@@ -35,14 +36,14 @@ export default {
     content: `
 ## Descripción general
 
-RBAC proporciona una gestión de permisos granular. Defina roles personalizados con permisos específicos y asígnelos a usuarios o grupos.
+RBAC proporciona una gestión de permisos granular. Defina roles personalizados con permisos específicos y asígnelos a usuarios; un grupo otorga su propio conjunto de permisos a sus miembros.
 
 ## Roles del sistema
 
-Cuatro roles integrados que no se pueden modificar ni eliminar:
+Cuatro roles integrados que no se pueden modificar ni eliminar. La página RBAC muestra cada uno con los permisos que UCM le aplica:
 
 - **Admin**: Acceso completo a todo
-- **Operator**: Gestiona certificados, CA, CSR y plantillas. Sin acceso a configuración del sistema, usuarios ni RBAC
+- **Operator**: Gestiona certificados, CA, CSR, ACME, SSH y configuración del sistema; plantillas y grupos de solo lectura. Sin acceso a usuarios ni RBAC
 - **Auditor**: Acceso de solo lectura a todos los datos operativos (certificados, CA, ACME, SCEP, HSM, registros de auditoría, políticas, grupos) pero no a configuración ni gestión de usuarios
 - **Viewer**: Acceso básico de solo lectura a certificados, CA, CSR, plantillas y almacén de confianza
 
@@ -62,7 +63,7 @@ Los permisos están organizados por categoría:
 - **CSR**: Crear, leer, firmar, eliminar
 - **Plantillas**: Crear, leer, actualizar, eliminar
 - **Usuarios**: Leer (la gestión de cuentas está reservada a los administradores)
-- **Grupos**: Crear, leer, actualizar, eliminar
+- **Grupos**: Leer (crear, editar y eliminar grupos está reservado a los administradores)
 - **Configuración**: Leer, actualizar
 - **Auditoría**: Leer, exportar (la limpieza está reservada a los administradores)
 - **ACME**: Configurar, gestionar cuentas
@@ -80,7 +81,7 @@ Un rol personalizado puede conceder cualquier permiso que UCM comprueba, salvo l
 Haga clic en el encabezado de una categoría para activar/desactivar todos los permisos de esa categoría de una vez.
 
 ### Indicador de cobertura
-Una insignia de porcentaje muestra cuánto del conjunto total de permisos cubre el rol.
+Una barra y un recuento n/N muestran cuánto del conjunto total de permisos cubre el rol.
 
 ## Asignación de roles
 

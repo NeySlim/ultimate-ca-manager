@@ -7,27 +7,25 @@ export default {
       {
         title: 'Viste',
         items: [
-          { label: 'Vista ad albero', text: 'Visualizzazione gerarchica delle relazioni padre-figlio tra CA' },
+          { label: 'Vista organigramma', text: 'Gerarchia disegnata come diagramma, ogni CA sotto la sua CA padre' },
+          { label: 'Vista colonne', text: 'Gerarchia esplorata livello per livello, una colonna per livello' },
           { label: 'Vista elenco', text: 'Vista tabellare piatta con ordinamento e filtri' },
-          { label: 'Vista organizzazione', text: 'Raggruppata per organizzazione per configurazioni multi-tenant' },
         ]
       },
       {
         title: 'Azioni',
         items: [
-          { label: 'Crea CA Root', text: 'Autorità di livello superiore autofirmata' },
-          { label: 'Crea Intermedia', text: 'CA firmata da una CA padre nella catena' },
+          { label: 'Crea CA', text: 'Un solo pulsante; la finestra permette di scegliere una root autofirmata, un\'intermedia firmata da una CA padre o una CA firmata da una CA esterna (CSR)' },
           { label: 'Importa CA', text: 'Importa un certificato CA esistente (con o senza chiave privata)' },
           { label: 'Esporta', text: 'PEM, DER o PKCS#12 (P12/PFX) con protezione password' },
-          { label: 'Rinnova CA', text: 'Riemetti il certificato CA con un nuovo periodo di validità' },
           { label: 'Revoca', text: 'Revoca una CA intermedia dalla sua CA padre: pubblicata nella CRL e nell\'OCSP del padre, e la CA non può più firmare (permanente)' },
           { label: 'Ripara catena', text: 'Correggi automaticamente le relazioni padre-figlio interrotte' },
           { label: 'Importa chiave privata', text: 'Collegare la chiave privata di una CA che possiede solo il proprio certificato, perché possa firmare' },
           { label: 'Chiave e validità', text: 'RSA-3072 per impostazione predefinita, locale o HSM. Validità di 1, 2, 3, 5, 10, 15 o 20 anni, oppure Personalizzata (giorni) fino a 50 anni. Una CA RSA-2048 che sopravvivrebbe al 2030 viene segnalata: l\'ANSSI accetta RSA-2048 fino alla fine del 2030, ETSI TS 119 312 fino alla fine del 2026' },
-          { label: 'Post-quantistica (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 o ML-DSA-87 (FIPS 204, livelli NIST 2, 3 e 5), generate via software o su un provider HSM che supporta ML-DSA, e nascoste in modalità FIPS. Una chiave ML-DSA firma senza un digest separato, quindi per la CA, le sue CRL e le sue risposte OCSP non c\'è alcun digest da scegliere. Una CA ML-DSA può firmare certificati RSA o EC, e una CA RSA o EC può firmare una intermedia ML-DSA. Il rinnovo mantiene lo stesso livello' },
+          { label: 'Post-quantistica (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 o ML-DSA-87 (FIPS 204, livelli NIST 2, 3 e 5), generate via software o su un provider HSM che supporta ML-DSA, e nascoste in modalità FIPS. Una chiave ML-DSA firma senza un digest separato, quindi per la CA, le sue CRL e le sue risposte OCSP non c\'è alcun digest da scegliere. Una CA ML-DSA può firmare certificati RSA o EC, e una CA RSA o EC può firmare una intermedia ML-DSA.' },
           { label: 'EdDSA (Ed25519, Ed448)', text: 'Chiavi Ed25519 o Ed448 per una CA root, intermedia o esterna, solo via software (nessun provider HSM firma EdDSA) e nascoste in modalità FIPS. Come ML-DSA, una chiave EdDSA firma senza digest, e la gerarchia può essere mista con RSA, EC o ML-DSA. I browser, Windows (CryptoAPI/CNG) e i client SCEP non accettano ciò che firma una CA EdDSA, qualunque sia la chiave della foglia: riservala a consumatori OpenSSL, Go o Java 15+. SCEP e XCEP rifiutano una tale CA' },
           { label: 'Importazione EdDSA (v2.251)', text: 'Una chiave CA Ed25519 o Ed448 può essere importata con il suo certificato, o in seguito con Importa chiave privata' },
-          { label: 'Digest predefinito (v2.251)', text: 'Con una CA P-384 o P-521, ciò che viene firmato senza un digest scelto (EST, SCEP, WSTEP, Sign CSR, modulo di emissione, ordini ACME senza digest, CRL) usa SHA-384 o SHA-512, sempre entro i limiti delle policy. Le CRL già emesse non cambiano: la successiva lo segue' },
+          { label: 'Digest predefinito (v2.251)', text: 'Con una CA P-384 o P-521, ciò che viene firmato senza un digest scelto (EST, SCEP, WSTEP, Sign CSR, modulo di emissione, ordini ACME senza digest, CRL) usa SHA-384 o SHA-512; le policy limitano i certificati, non le CRL. Le CRL già emesse non cambiano: la successiva lo segue' },
           { label: 'Nessuna chiave privata (v2.247)', text: 'Una CA detenuta senza la sua chiave privata è marcata Nessuna chiave privata, con un\'azione Importa chiave privata. I selettori di CA indicano quante CA escludono perché non possono firmare' },
           { label: 'Vincoli sui nomi', text: 'Vincoli avanzati (RFC 5280): i sottoalberi consentiti ed esclusi (DNS, intervallo IP, email) limitano i nomi che la CA può certificare. Per una CA firmata esternamente sono impostati dalla CA firmataria' },
           { label: 'Schema di firma RSA', text: 'PKCS#1 v1.5 per impostazione predefinita, oppure RSA-PSS (salt lungo quanto l\'hash) per una CA RSA con chiave locale, PKCS#11 o OpenBao. Si applica ai certificati, alle CRL, alle risposte OCSP e alle risposte SCEP firmati dalla CA; le marche temporali restano in PKCS#1 v1.5, lo schema che openssl ts -verify controlla. "Firma con RSA-PSS" nei dettagli della CA fa passare una CA esistente da uno schema all\'altro: i certificati già emessi mantengono la loro firma' },
@@ -64,7 +62,7 @@ export default {
       {
         title: 'CA supportate da HSM',
         items: [
-          { label: 'Archiviazione chiave', text: 'Alla creazione della CA scegli Locale (cifrato in DB) o HSM' },
+          { label: 'Archiviazione chiave', text: 'Alla creazione della CA scegli Locale (nel database, cifrata con la chiave master) o HSM' },
           { label: 'Genera nuova chiave', text: 'Crea una nuova chiave di firma sul provider HSM selezionato' },
           { label: 'Usa chiave esistente', text: 'Collega la CA a una chiave di firma inutilizzata già presente sull\'HSM' },
           { label: 'Nessuna esportazione chiave privata', text: 'Le chiavi supportate da HSM non lasciano mai l\'HSM, le esportazioni PKCS#12, JKS e solo-chiave sono disabilitate' },
@@ -74,11 +72,11 @@ export default {
       {
         title: 'Modalità offline',
         items: [
-          { label: 'Scopo', text: "Proteggere la chiave privata di una CA (tipicamente una root) dall'uso a runtime mantenendo disponibili certificato, catena, CRL e OCSP" },
+          { label: 'Scopo', text: "Proteggere la chiave privata di una CA (tipicamente una root) dall'uso a runtime mantenendo disponibili il suo certificato, la catena e l'ultima CRL" },
           { label: 'Protetta da password', text: "La chiave è cifrata con una password fornita dall'utente (PKCS#8) e rimane nel database. Ripristino inserendo la password." },
           { label: 'Esportata su file', text: 'La chiave è esportata come PEM cifrato scaricabile una volta e rimossa dal database. Ripristino caricando nuovamente il file con la password.' },
           { label: 'Politica password', text: 'La password segue le regole di complessità UCM (lunghezza e classi di caratteri). Se persa, la chiave è irrecuperabile.' },
-          { label: 'Effetto sulla firma', text: "La firma di CSR, l'emissione di certificati e il rinnovo della CA sono bloccati offline. CRL e OCSP continuano a funzionare dalle firme in cache." },
+          { label: 'Effetto sulla firma', text: "La firma di CSR, l'emissione di certificati e il rinnovo sono bloccati offline. L'ultima CRL resta servita finché non ne carichi una nuova firmata altrove con la chiave; OCSP risponde tramite un responder delegato, altrimenti solo con risposte già in cache, fino al loro nextUpdate." },
           { label: 'Sub-CA', text: 'Sia le CA root che intermedie possono essere portate offline indipendentemente' },
         ]
       },
@@ -102,7 +100,7 @@ export default {
     ],
     warnings: [
       'Una CA ML-DSA non può ancora essere esportata come PKCS#12 o JKS: esporta il certificato e la chiave privata in PEM. I client senza supporto ML-DSA (OpenSSL prima della 3.5, la maggior parte dei browser oggi) non possono verificare ciò che firma',
-      'L\'eliminazione di una CA NON revoca i certificati che ha emesso: revocali prima',
+      'Una CA non può essere eliminata finché ha CA intermedie o certificati emessi: revocali ed eliminali prima',
       'Le chiavi private sono memorizzate crittografate; la perdita del database significa la perdita delle chiavi',
       'Le password della modalità offline NON sono recuperabili: conservale nel tuo password manager / vault prima di confermare',
       'Un certificato incrociato non sostituisce mai il certificato di una CA: una intermedia che verrebbe ricertificata sotto un altro emittente viene rifiutata (409) a meno che tu non la associ come certificato incrociato o sostituisca quello attuale; un cambio di root con lo stesso nome di emittente lo sostituisce',
@@ -129,27 +127,28 @@ Qualsiasi CA firmata da una CA Intermedia, creando livelli gerarchici più profo
 
 ## Viste
 
-### Vista ad albero
-Mostra la gerarchia completa delle CA come albero espandibile/comprimibile. Le relazioni padre-figlio sono visualizzate con indentazione e linee di collegamento.
+I tre pulsanti accanto al campo di ricerca permettono di passare tra:
+
+### Vista organigramma
+Disegna la gerarchia delle CA come diagramma, ogni CA sotto la sua CA padre.
+
+### Vista colonne
+Esplora la gerarchia livello per livello, una colonna per livello: seleziona una CA per vedere le CA sotto di essa.
 
 ### Vista elenco
-Tabella piatta con colonne ordinabili: Nome, Tipo, Stato, Certificati emessi, Data di scadenza.
-
-### Vista organizzazione
-Raggruppa le CA per il campo Organizzazione (O). Utile per configurazioni multi-tenant dove diversi dipartimenti gestiscono alberi CA separati.
+Tabella piatta con colonne ordinabili.
 
 ## Creazione di una CA
 
 ### Crea CA Root
-1. Clicca **Crea** → **CA Root**
+1. Clicca **Crea CA** e scegli il tipo root nella finestra
 2. Compila i campi del Soggetto (CN, O, OU, C, ST, L)
 3. Seleziona l'algoritmo della chiave (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87, EdDSA Ed25519/Ed448): RSA-3072 per impostazione predefinita
 4. Imposta il periodo di validità: 1, 2, 3, 5, 10, 15 o 20 anni, oppure **Personalizzata (giorni)** fino a 50 anni (tipicamente 10-20 anni per le CA Root)
-5. Facoltativamente seleziona un template di certificato
-6. Clicca **Crea**
+5. Clicca **Crea**
 
 ### Crea CA Intermedia
-1. Clicca **Crea** → **CA Intermedia**
+1. Clicca **Crea CA** e scegli il tipo intermedia nella finestra
 2. Seleziona la **CA padre** (deve avere una chiave privata)
 3. Compila i campi del Soggetto
 4. Imposta il periodo di validità (tipicamente 5-10 anni)
@@ -164,7 +163,6 @@ Il modulo segnala una CA RSA-2048 che sopravvivrebbe al 2030: l'ANSSI accetta RS
 
 - Una chiave ML-DSA firma senza un digest separato: il campo digest scompare e un digest inviato tramite l'API viene ignorato con un avviso. Le CRL e le risposte OCSP della CA seguono la stessa regola.
 - Le gerarchie possono essere miste: una root ML-DSA può firmare una intermedia RSA o EC, e una CA RSA o EC può firmare una intermedia ML-DSA, che usa poi il digest del padre.
-- Il rinnovo mantiene la chiave e il suo livello.
 - Una CA ML-DSA si esporta in PEM o DER, non in PKCS#12 o JKS. I client senza supporto ML-DSA (OpenSSL prima della 3.5, la maggior parte dei browser oggi) non possono verificare ciò che firma.
 
 ### CA EdDSA (Ed25519, Ed448)
@@ -237,12 +235,7 @@ Se le relazioni padre-figlio sono interrotte (es. dopo un'importazione), usa **R
 
 ## Rinnovo di una CA
 
-Il rinnovo riemette il certificato CA con:
-- Stesso soggetto e chiave
-- Nuovo periodo di validità
-- Nuovo numero di serie
-
-I certificati esistenti firmati dalla CA rimangono validi.
+UCM non riemette il certificato di una CA da esso firmata: per sostituire una CA vicina alla scadenza, crea una nuova CA ed emetti sotto di essa. Una CA firmata da una CA esterna si rinnova con **Rinnova tramite CSR**, che riemette una CSR dalla stessa chiave da far firmare alla CA esterna (vedi CA firmate esternamente).
 
 ## Revoca di una CA intermedia
 
@@ -262,9 +255,7 @@ Cosa succede dopo:
 
 ## Eliminazione di una CA
 
-> ⚠ L'eliminazione di una CA la rimuove da UCM ma NON revoca i certificati che ha emesso. Revoca prima i certificati se necessario.
-
-L'eliminazione è bloccata se la CA ha CA figlie. Elimina o riassegna le figlie prima.
+L'eliminazione è rifiutata (409) finché la CA ha CA intermedie, ha emesso certificati o è collegata a un profilo SCEP o a un altro servizio. Revoca ed elimina i suoi certificati ed elimina le sue figlie prima.
 
 ## CA supportate da HSM
 
@@ -296,7 +287,7 @@ UCM può memorizzare la chiave di firma di una CA su un modulo di sicurezza hard
 
 ## Modalità offline
 
-Togli la chiave di firma di una CA dall'uso a runtime senza eliminare la CA. Certificato, catena, CRL e OCSP continuano a funzionare: solo le operazioni di firma (firma CSR, emissione certificato, rinnovo CA) sono bloccate.
+Togli la chiave di firma di una CA dall'uso a runtime senza eliminare la CA. Il certificato, la catena e l'ultima CRL restano serviti; le operazioni di firma (firma CSR, emissione certificato, rinnovo, nuove CRL) sono bloccate. OCSP risponde tramite un responder delegato, altrimenti solo con risposte già in cache, fino al loro nextUpdate.
 
 Questo è il modo standard per proteggere una CA root tra cerimonie rare, mantenendo online la sua trust anchor e l'infrastruttura di revoca.
 
@@ -329,9 +320,9 @@ La password segue la politica di complessità standard UCM: lunghezza minima, mi
 |---|---|---|
 | Emetti certificato | Consentito | **Bloccato** |
 | Firma CSR | Consentito | **Bloccato** |
-| Rinnova CA | Consentito | **Bloccato** |
 | Rinnova certificato emesso | Consentito | **Bloccato** |
-| Servire CRL / OCSP | Consentito | Consentito (firma in cache) |
+| Servire l'ultima CRL | Consentito | Consentito (carica una nuova CRL firmata altrove con la chiave) |
+| OCSP | Consentito | Responder delegato, o risposte in cache fino al nextUpdate |
 | Esportare certificato / catena | Consentito | Consentito |
 | Elimina CA | Consentito | Consentito |
 

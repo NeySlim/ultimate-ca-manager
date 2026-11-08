@@ -9,6 +9,7 @@ export default {
         items: [
           { label: 'Stato e contatori', text: 'Mostra se la cifratura è abilitata e quante chiavi private memorizzate sono cifrate rispetto a quelle non cifrate' },
           { label: 'Abilita / Disabilita', text: 'Cifra tutte le chiavi private con AES-256. L’abilitazione rimuove le copie in chiaro e la disabilitazione le ricrea' },
+          { label: 'Primo avvio', text: 'Senza una chiave master, UCM crea /etc/ucm/master.key (0600) all\'avvio e cifra le chiavi già memorizzate. Un container lo fa solo quando /etc/ucm è un volume con nome o una directory dell\'host. Saltato con KEY_ENCRYPTION_KEY impostata, con chiavi cifrate o una catena di audit con chiave già nel database, dopo che la cifratura è stata disabilitata qui, o con UCM_AUTO_MASTER_KEY=false. A ogni avvio una chiave caricata cifra anche i valori ancora memorizzati in chiaro, e una chiave che non li decifra mette UCM in modalità sicura. Fai il backup del file della chiave' },
           { label: 'File di chiavi su disco', text: 'Mostra quante copie di chiavi in chiaro restano; usa gli hook di distribuzione quando un altro servizio necessita di un file di chiave' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Variabile d\'ambiente opt-in: rifiuta l\'avvio senza una chiave di cifratura del database esplicita' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: 'Variabile d\'ambiente opt-in: rifiuta l\'avvio se la cifratura delle chiavi private non è abilitata' },
@@ -18,17 +19,16 @@ export default {
       {
         title: 'Politica password',
         items: [
-          { label: 'Lunghezza minima', text: 'Numero minimo di caratteri richiesti' },
-          { label: 'Complessità', text: 'Richiedi maiuscole, minuscole, numeri, caratteri speciali' },
-          { label: 'Scadenza', text: 'Forza il cambio password dopo un numero stabilito di giorni' },
-          { label: 'Cronologia', text: 'Impedisci il riutilizzo delle password precedenti' },
+          { label: 'Lunghezza minima', text: 'Numero minimo di caratteri richiesti, da 6 a 32' },
+          { label: 'Complessità', text: 'Richiedi lettere maiuscole, numeri e caratteri speciali, ciascuno attivabile separatamente' },
         ]
       },
       {
         title: 'Sessione e accesso',
         items: [
-          { label: 'Timeout sessione', text: 'Disconnessione automatica dopo un periodo di inattività' },
-          { label: 'Limitazione frequenza', text: 'Limita i tentativi di accesso per prevenire attacchi di forza bruta' },
+          { label: 'Timeout sessione', text: 'Disconnessione automatica dopo un periodo di inattività (Impostazioni › Generale)' },
+          { label: 'Durata sessione', text: 'Durata massima della sessione in ore, qualunque sia l\'attività' },
+          { label: 'Blocco account', text: 'Tentativi di accesso massimi e Durata del blocco (Impostazioni › Generale) bloccano un account dopo ripetuti fallimenti. I limiti di frequenza delle richieste per IP sono impostati dalle variabili d\'ambiente RATE_LIMIT_*, non in questa pagina' },
           { label: 'Lista di accesso amministrativo', text: 'Limita l\'interfaccia web e l\'API di gestione agli indirizzi IP e alle reti elencati' },
           { label: 'Imposizione 2FA', text: 'Richiedi l\'autenticazione a due fattori per tutti gli utenti' },
         ]
@@ -51,6 +51,7 @@ export default {
           { label: 'Richiedi certificato client', text: 'Facoltativamente rendi l\'mTLS obbligatorio per l\'interfaccia web, la modifica delle impostazioni mTLS richiede un riavvio del servizio' },
           { label: 'Stesso seriale, altra CA (v2.251)', text: 'Un\'iscrizione è identificata dal suo emittente e dal numero di serie, quindi un certificato client può essere iscritto, importato o assegnato anche quando il certificato iscritto di un\'altra CA ha lo stesso seriale' },
           { label: 'Header del reverse proxy (v2.252)', text: 'Dietro un proxy che inoltra il certificato client come header, invia il DN dell\'emittente (X-SSL-Client-I-DN) con il seriale, letto come esadecimale, oppure il certificato stesso (X-SSL-Client-Cert). Un seriale senza il suo emittente non apre alcuna iscrizione che ne abbia registrato uno, e un certificato presentato non può essere iscritto senza di esso' },
+          { label: 'Emittente revocato', text: 'Un certificato client emesso sotto una CA revocata, a qualsiasi livello della sua catena, non apre alcuna sessione e non può essere né registrato né importato (v2.252)' },
           { label: 'Chiavi generate (v2.251)', text: 'Un certificato mTLS utente generato da UCM riceve una chiave della robustezza della CA emittente, RSA o una curva NIST accettata dai browser, portata al tipo consentito dalle policy più vicino, invece di sempre RSA-2048' },
         ]
       },
@@ -93,33 +94,32 @@ Entrambe accettano \`1\`/\`true\`/\`yes\`/\`on\`. Una chiave non valida è consi
 ## Politica password
 
 ### Requisiti di complessità
-- **Lunghezza minima**: Da 8 a 32 caratteri
+- **Lunghezza minima**: Da 6 a 32 caratteri (8 per impostazione predefinita)
 - **Richiedi maiuscole**: Almeno una lettera maiuscola
-- **Richiedi minuscole**: Almeno una lettera minuscola
 - **Richiedi numeri**: Almeno una cifra
 - **Richiedi caratteri speciali**: Almeno un simbolo
 
-### Scadenza password
-Forza gli utenti a cambiare la password dopo un numero stabilito di giorni. Imposta a 0 per disabilitare.
-
-### Cronologia password
-Impedisci il riutilizzo delle ultime N password. Gli utenti non possono impostare una password uguale a nessuna delle loro N password precedenti.
+UCM non ha impostazioni di scadenza né di cronologia delle password.
 
 ## Gestione delle sessioni
 
 ### Timeout sessione
-Disconnetti automaticamente gli utenti dopo N minuti di inattività. Si applica solo alle sessioni dell'interfaccia web, non alle chiavi API.
+In **Impostazioni › Generale**: disconnetti automaticamente gli utenti dopo N minuti di inattività. Si applica solo alle sessioni dell'interfaccia web, non alle chiavi API.
 
-### Sessioni simultanee
-Limita il numero di sessioni simultanee per utente. Accessi aggiuntivi termineranno la sessione più vecchia.
+### Durata sessione
+Durata massima della sessione in ore, qualunque sia l'attività. Il numero di sessioni simultanee per utente non è limitato.
 
-## Limitazione della frequenza
+## Protezione dell'accesso
 
-### Tentativi di accesso
-Limita i tentativi di accesso falliti per indirizzo IP entro una finestra temporale. Dopo aver superato il limite, l'IP viene temporaneamente bloccato.
+### Tentativi di accesso massimi
+In **Impostazioni › Generale**: il numero di accessi falliti dopo il quale l'**account** viene bloccato.
 
 ### Durata del blocco
-Per quanto tempo un IP viene bloccato dopo aver superato il limite di tentativi di accesso.
+Per quanto tempo l'account resta bloccato, in minuti.
+Un account bloccato risponde a un accesso con password o LDAP con lo stesso «Invalid credentials» di un nome sconosciuto fino alla fine del blocco, così la risposta non rivela che l'account esiste; il blocco è registrato nel log di audit.
+
+### Limiti di frequenza delle richieste
+Le richieste sono limitate anche per indirizzo IP del client, dalle variabili d'ambiente \`RATE_LIMIT_*\` (gruppi autenticazione, pesanti, standard e protocolli; i client di rete privata sono esentati con \`RATE_LIMIT_TRUST_LAN\`). Le route di accesso hanno un proprio limite, 5 tentativi al minuto, indicato con \`Retry-After\` nella risposta 429.
 
 ## Lista di accesso amministrativo
 

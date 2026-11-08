@@ -7,27 +7,25 @@ export default {
       {
         title: 'Ansichten',
         items: [
-          { label: 'Baumansicht', text: 'Hierarchische Darstellung der Eltern-Kind-CA-Beziehungen' },
+          { label: 'Organigramm-Ansicht', text: 'Hierarchie als Diagramm gezeichnet, jede CA unter ihrer übergeordneten CA' },
+          { label: 'Spaltenansicht', text: 'Hierarchie Ebene für Ebene durchsuchen, eine Spalte pro Ebene' },
           { label: 'Listenansicht', text: 'Flache Tabellenansicht mit Sortierung und Filterung' },
-          { label: 'Organisationsansicht', text: 'Gruppiert nach Organisation für Multi-Mandanten-Setups' },
         ]
       },
       {
         title: 'Aktionen',
         items: [
-          { label: 'Root-CA erstellen', text: 'Selbstsignierte Zertifizierungsstelle der obersten Ebene' },
-          { label: 'Intermediate erstellen', text: 'CA, die von einer übergeordneten CA in der Kette signiert wird' },
+          { label: 'CA erstellen', text: 'Eine Schaltfläche; der Dialog wählt eine selbstsignierte Root, eine von einer übergeordneten CA signierte Intermediate oder eine von einer externen CA signierte CA (CSR)' },
           { label: 'CA importieren', text: 'Vorhandenes CA-Zertifikat importieren (mit oder ohne privaten Schlüssel)' },
           { label: 'Exportieren', text: 'PEM, DER oder PKCS#12 (P12/PFX) mit Passwortschutz' },
-          { label: 'CA erneuern', text: 'Das CA-Zertifikat mit einer neuen Gültigkeitsdauer erneut ausstellen' },
           { label: 'Widerrufen', text: 'Eine Intermediate-CA bei ihrer übergeordneten CA widerrufen: Veröffentlichung in CRL und OCSP der übergeordneten CA, und die CA kann nicht mehr signieren (dauerhaft)' },
           { label: 'Kettenreparatur', text: 'Unterbrochene Eltern-Kind-Beziehungen automatisch reparieren' },
           { label: 'Privaten Schlüssel importieren', text: 'Den privaten Schlüssel einer CA anhängen, die nur ihr Zertifikat besitzt, damit sie signieren kann' },
           { label: 'Schlüssel und Gültigkeit', text: 'Standardmäßig RSA-3072, lokal oder HSM. Gültigkeit von 1, 2, 3, 5, 10, 15 oder 20 Jahren oder Benutzerdefiniert (Tage) bis zu 50 Jahren. Eine RSA-2048-CA, die 2030 überdauern würde, wird markiert: Die ANSSI akzeptiert RSA-2048 bis Ende 2030, ETSI TS 119 312 bis Ende 2026' },
-          { label: 'Post-Quanten (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 oder ML-DSA-87 (FIPS 204, NIST-Level 2, 3 und 5), in Software oder bei einem HSM-Anbieter erzeugt, der ML-DSA unterstützt, und im FIPS-Modus ausgeblendet. Ein ML-DSA-Schlüssel signiert ohne separaten Digest, daher gibt es für die CA, ihre CRLs und ihre OCSP-Antworten keinen Digest zu wählen. Eine ML-DSA-CA kann RSA- oder EC-Zertifikate signieren, und eine RSA- oder EC-CA kann eine ML-DSA-Intermediate signieren. Die Erneuerung behält dieselbe Stufe' },
+          { label: 'Post-Quanten (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 oder ML-DSA-87 (FIPS 204, NIST-Level 2, 3 und 5), in Software oder bei einem HSM-Anbieter erzeugt, der ML-DSA unterstützt, und im FIPS-Modus ausgeblendet. Ein ML-DSA-Schlüssel signiert ohne separaten Digest, daher gibt es für die CA, ihre CRLs und ihre OCSP-Antworten keinen Digest zu wählen. Eine ML-DSA-CA kann RSA- oder EC-Zertifikate signieren, und eine RSA- oder EC-CA kann eine ML-DSA-Intermediate signieren' },
           { label: 'EdDSA (Ed25519, Ed448)', text: 'Ed25519- oder Ed448-Schlüssel für eine Root-, Intermediate- oder externe CA, nur in Software (kein HSM-Anbieter signiert EdDSA) und im FIPS-Modus ausgeblendet. Wie bei ML-DSA signiert ein EdDSA-Schlüssel ohne Digest, und die Hierarchie kann mit RSA, EC oder ML-DSA gemischt sein. Browser, Windows (CryptoAPI/CNG) und SCEP-Clients akzeptieren nicht, was eine EdDSA-CA signiert, unabhängig vom Schlüssel des Endzertifikats: Reservieren Sie sie für Konsumenten mit OpenSSL, Go oder Java 15+. SCEP und XCEP lehnen eine solche CA ab' },
           { label: 'EdDSA-Import (v2.251)', text: 'Ein Ed25519- oder Ed448-CA-Schlüssel lässt sich mit seinem Zertifikat importieren oder nachträglich mit Privaten Schlüssel importieren' },
-          { label: 'Standard-Digest (v2.251)', text: 'Unter einer P-384- oder P-521-CA verwendet alles, was ohne gewählten Digest signiert wird (EST, SCEP, WSTEP, CSR signieren, das Ausstellungsformular, ACME-Orders ohne Digest, CRLs), SHA-384 oder SHA-512, weiterhin durch die Richtlinien begrenzt. Bereits ausgestellte CRLs bleiben unverändert: die nächste folgt' },
+          { label: 'Standard-Digest (v2.251)', text: 'Unter einer P-384- oder P-521-CA verwendet alles, was ohne gewählten Digest signiert wird (EST, SCEP, WSTEP, CSR signieren, das Ausstellungsformular, ACME-Orders ohne Digest, CRLs), SHA-384 oder SHA-512, die Richtlinien begrenzen die Zertifikate, nicht die CRLs. Bereits ausgestellte CRLs bleiben unverändert: die nächste folgt' },
           { label: 'Kein privater Schlüssel (v2.247)', text: 'Eine CA ohne ihren privaten Schlüssel ist als Kein privater Schlüssel markiert, mit der Aktion Privaten Schlüssel importieren. Die CA-Auswahllisten nennen, wie viele CAs sie auslassen, weil sie nicht signieren können' },
           { label: 'Name Constraints', text: 'Erweiterte Einschränkungen (RFC 5280): erlaubte und ausgeschlossene Teilbäume (DNS, IP-Bereich, E-Mail) begrenzen die Namen, die die CA zertifizieren darf. Bei einer extern signierten CA legt die signierende CA sie fest' },
           { label: 'RSA-Signaturverfahren', text: 'Standardmäßig PKCS#1 v1.5, oder RSA-PSS (Salt so lang wie der Hash) für eine RSA-CA mit lokalem, PKCS#11- oder OpenBao-Schlüssel. Es gilt für die Zertifikate, CRLs, OCSP-Antworten und SCEP-Antworten, die die CA signiert; Zeitstempel bleiben bei PKCS#1 v1.5, dem Verfahren, das openssl ts -verify prüft. „Mit RSA-PSS signieren" in den CA-Details stellt eine bestehende CA in beide Richtungen um: Bereits ausgestellte Zertifikate behalten ihre Signatur' },
@@ -64,7 +62,7 @@ export default {
       {
         title: 'HSM-gesicherte CAs',
         items: [
-          { label: 'Schlüsselspeicher', text: 'Bei der CA-Erstellung Lokal (in DB verschlüsselt) oder HSM wählen' },
+          { label: 'Schlüsselspeicher', text: 'Bei der CA-Erstellung Lokal (in der Datenbank, verschlüsselt mit dem Hauptschlüssel) oder HSM wählen' },
           { label: 'Neuen Schlüssel generieren', text: 'Neuen Signaturschlüssel auf dem ausgewählten HSM-Anbieter erstellen' },
           { label: 'Vorhandenen Schlüssel verwenden', text: 'CA an einen ungenutzten Signaturschlüssel auf dem HSM binden' },
           { label: 'Kein privater Schlüssel-Export', text: 'HSM-gesicherte Schlüssel verlassen das HSM nicht, PKCS#12-, JKS- und Nur-Schlüssel-Exporte sind deaktiviert' },
@@ -74,11 +72,11 @@ export default {
       {
         title: 'Offline-Modus',
         items: [
-          { label: 'Zweck', text: 'Privaten Schlüssel einer CA (typischerweise einer Root) vor Runtime-Nutzung schützen, während Zertifikat, Kette, CRL und OCSP verfügbar bleiben' },
+          { label: 'Zweck', text: 'Privaten Schlüssel einer CA (typischerweise einer Root) vor Runtime-Nutzung schützen, während ihr Zertifikat, die Kette und die letzte CRL verfügbar bleiben' },
           { label: 'Passwortgeschützt', text: 'Schlüssel wird mit einem benutzerdefinierten Passwort (PKCS#8) verschlüsselt und bleibt in der Datenbank. Wiederherstellung durch Passworteingabe.' },
           { label: 'Datei-exportiert', text: 'Schlüssel wird als passwortgeschützte PEM-Datei einmalig heruntergeladen und aus der Datenbank entfernt. Wiederherstellung durch erneutes Hochladen mit Passwort.' },
           { label: 'Passwort-Richtlinie', text: 'Das Passwort folgt der UCM-Komplexitätsrichtlinie (Länge und Zeichenklassen). Bei Verlust ist der Schlüssel unwiederbringlich.' },
-          { label: 'Auswirkung auf Signaturen', text: 'CSR-Signierung, Zertifikatausstellung und CA-Erneuerung sind offline blockiert. CRL und OCSP funktionieren weiter aus zwischengespeicherten Signaturen.' },
+          { label: 'Auswirkung auf Signaturen', text: 'CSR-Signierung, Zertifikatausstellung und Erneuerung sind offline blockiert. Die letzte CRL wird weiter ausgeliefert, bis Sie eine neue hochladen, die neben dem Schlüssel signiert wurde; OCSP antwortet über einen delegierten Responder, sonst nur aus bereits zwischengespeicherten Antworten, bis zu deren nextUpdate.' },
           { label: 'Sub-CAs', text: 'Root- und Intermediate-CAs können unabhängig offline genommen werden' },
         ]
       },
@@ -102,7 +100,7 @@ export default {
     ],
     warnings: [
       'Eine ML-DSA-CA lässt sich noch nicht als PKCS#12 oder JKS exportieren: exportieren Sie Zertifikat und privaten Schlüssel als PEM. Clients ohne ML-DSA-Unterstützung (OpenSSL vor 3.5, die meisten Browser heute) können nicht verifizieren, was sie signiert',
-      'Das Löschen einer CA widerruft NICHT die von ihr ausgestellten Zertifikate: widerrufen Sie diese zuerst',
+      'Eine CA kann nicht gelöscht werden, solange sie Intermediate-CAs oder ausgestellte Zertifikate hat: widerrufen und löschen Sie diese zuerst',
       'Private Schlüssel werden verschlüsselt gespeichert; der Verlust der Datenbank bedeutet den Verlust der Schlüssel',
       'Offline-Modus-Passwörter sind NICHT wiederherstellbar: bewahren Sie sie vor der Bestätigung in Ihrem Passwortmanager / Vault auf',
       'Ein Cross-Zertifikat ersetzt nie das eigene Zertifikat einer CA: Eine Intermediate, die unter einem anderen Aussteller neu zertifiziert würde, wird abgelehnt (409), es sei denn, Sie hängen sie als Cross-Zertifikat an oder ersetzen das aktuelle Zertifikat; eine Root-Ablösung unter demselben Ausstellernamen ersetzt es',
@@ -129,27 +127,28 @@ Jede CA, die von einer Intermediate-CA signiert wird und tiefere Hierarchieebene
 
 ## Ansichten
 
-### Baumansicht
-Zeigt die vollständige CA-Hierarchie als aufklappbaren Baum. Eltern-Kind-Beziehungen werden durch Einrückung und Verbindungslinien visualisiert.
+Die drei Schaltflächen neben dem Suchfeld wechseln zwischen:
+
+### Organigramm-Ansicht
+Zeichnet die CA-Hierarchie als Diagramm, jede CA unter ihrer übergeordneten CA.
+
+### Spaltenansicht
+Durchsucht die Hierarchie Ebene für Ebene, eine Spalte pro Ebene: Wählen Sie eine CA, um die CAs darunter zu sehen.
 
 ### Listenansicht
-Flache Tabelle mit sortierbaren Spalten: Name, Typ, Status, ausgestellte Zertifikate, Ablaufdatum.
-
-### Organisationsansicht
-Gruppiert CAs nach ihrem Organisation-Feld (O). Nützlich für Multi-Mandanten-Setups, bei denen verschiedene Abteilungen separate CA-Bäume verwalten.
+Flache Tabelle mit sortierbaren Spalten.
 
 ## Eine CA erstellen
 
 ### Root-CA erstellen
-1. Klicken Sie auf **Erstellen** → **Root-CA**
+1. Klicken Sie auf **CA erstellen** und wählen Sie im Dialog den Root-Typ
 2. Füllen Sie die Betreffsfelder aus (CN, O, OU, C, ST, L)
 3. Wählen Sie den Schlüsselalgorithmus (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87, EdDSA Ed25519/Ed448): standardmäßig RSA-3072
 4. Legen Sie die Gültigkeitsdauer fest: 1, 2, 3, 5, 10, 15 oder 20 Jahre oder **Benutzerdefiniert (Tage)** bis zu 50 Jahren (typischerweise 10-20 Jahre für Root-CAs)
-5. Wählen Sie optional ein Zertifikatstemplate
-6. Klicken Sie auf **Erstellen**
+5. Klicken Sie auf **Erstellen**
 
 ### Intermediate-CA erstellen
-1. Klicken Sie auf **Erstellen** → **Intermediate-CA**
+1. Klicken Sie auf **CA erstellen** und wählen Sie im Dialog den Intermediate-Typ
 2. Wählen Sie die **übergeordnete CA** (muss einen privaten Schlüssel haben)
 3. Füllen Sie die Betreffsfelder aus
 4. Legen Sie die Gültigkeitsdauer fest (typischerweise 5-10 Jahre)
@@ -164,7 +163,6 @@ Das Formular markiert eine RSA-2048-CA, die 2030 überdauern würde: Die ANSSI a
 
 - Ein ML-DSA-Schlüssel signiert ohne separaten Digest: Das Digest-Feld entfällt, und ein über die API gesendeter Digest wird mit einem Hinweis ignoriert. CRLs und OCSP-Antworten der CA folgen derselben Regel.
 - Hierarchien können gemischt sein: Eine ML-DSA-Root kann eine RSA- oder EC-Intermediate signieren, und eine RSA- oder EC-CA kann eine ML-DSA-Intermediate signieren, die dann den Digest ihrer übergeordneten CA verwendet.
-- Die Erneuerung behält den Schlüssel und seine Stufe.
 - Eine ML-DSA-CA wird als PEM oder DER exportiert, nicht als PKCS#12 oder JKS. Clients ohne ML-DSA-Unterstützung (OpenSSL vor 3.5, die meisten Browser heute) können nicht verifizieren, was sie signiert.
 
 ### EdDSA-CAs (Ed25519, Ed448)
@@ -237,12 +235,7 @@ Wenn Eltern-Kind-Beziehungen unterbrochen sind (z.B. nach einem Import), verwend
 
 ## Eine CA erneuern
 
-Die Erneuerung stellt das CA-Zertifikat mit folgenden Eigenschaften erneut aus:
-- Gleicher Betreff und Schlüssel
-- Neue Gültigkeitsdauer
-- Neue Seriennummer
-
-Vorhandene von der CA signierte Zertifikate bleiben gültig.
+UCM stellt das Zertifikat einer von ihm signierten CA nicht erneut aus: Um eine CA kurz vor ihrem Ablauf zu ersetzen, erstellen Sie eine neue CA und stellen darunter aus. Eine von einer externen CA signierte CA wird mit **Über CSR erneuern** erneuert, das einen CSR aus demselben Schlüssel erneut ausstellt, den die externe CA signiert (siehe Extern signierte CAs).
 
 ## Eine Intermediate-CA widerrufen
 
@@ -262,9 +255,7 @@ Was danach passiert:
 
 ## Eine CA löschen
 
-> ⚠ Das Löschen einer CA entfernt sie aus UCM, widerruft aber NICHT die von ihr ausgestellten Zertifikate. Widerrufen Sie Zertifikate bei Bedarf zuerst.
-
-Das Löschen wird blockiert, wenn die CA untergeordnete CAs hat. Löschen oder übertragen Sie untergeordnete CAs zuerst.
+Das Löschen wird abgelehnt (409), solange die CA Intermediate-CAs oder ausgestellte Zertifikate hat oder an ein SCEP-Profil oder einen anderen Dienst gebunden ist. Widerrufen und löschen Sie zuerst ihre Zertifikate und löschen Sie ihre untergeordneten CAs.
 
 ## HSM-gesicherte CAs
 
@@ -296,7 +287,7 @@ UCM kann den Signaturschlüssel einer CA auf einem externen Hardware-Sicherheits
 
 ## Offline-Modus
 
-Nehmen Sie den Signierschlüssel einer CA aus der Laufzeitnutzung, ohne die CA zu löschen. Zertifikat, Kette, CRL und OCSP funktionieren weiter: nur Signieroperationen (CSR signieren, Zertifikat ausstellen, CA erneuern) sind blockiert.
+Nehmen Sie den Signierschlüssel einer CA aus der Laufzeitnutzung, ohne die CA zu löschen. Das Zertifikat, die Kette und die letzte CRL werden weiter ausgeliefert; Signieroperationen (CSR signieren, Zertifikat ausstellen, Erneuerung, neue CRLs) sind blockiert. OCSP antwortet über einen delegierten Responder, sonst nur aus bereits zwischengespeicherten Antworten, bis zu deren nextUpdate.
 
 Dies ist der Standardweg, eine Root-CA zwischen seltenen Zeremonien zu schützen und gleichzeitig ihren Trust-Anchor und ihre Widerrufsinfrastruktur online zu halten.
 
@@ -329,9 +320,9 @@ Das Passwort folgt der Standard-UCM-Komplexitätsrichtlinie: Mindestlänge, Misc
 |---|---|---|
 | Zertifikat ausstellen | Erlaubt | **Blockiert** |
 | CSR signieren | Erlaubt | **Blockiert** |
-| CA erneuern | Erlaubt | **Blockiert** |
 | Ausgestelltes Zertifikat erneuern | Erlaubt | **Blockiert** |
-| CRL / OCSP bereitstellen | Erlaubt | Erlaubt (zwischengespeicherte Signatur) |
+| Letzte CRL ausliefern | Erlaubt | Erlaubt (neue CRL neben dem Schlüssel signiert hochladen) |
+| OCSP | Erlaubt | Delegierter Responder oder zwischengespeicherte Antworten bis nextUpdate |
 | Zertifikat / Kette exportieren | Erlaubt | Erlaubt |
 | CA löschen | Erlaubt | Erlaubt |
 

@@ -306,11 +306,16 @@ def underscore_host_name(cn: str) -> str | None:
     return name
 
 
-def cn_dns_name_error(cn: str, cert_type: str) -> str | None:
-    """The issue form refuses a server or combined CN Sign CSR would refuse,
-    rather than issue it without a DNS name."""
+def cn_dns_name_error(cn: str, cert_type: str, explicit: SanBuckets, template=None) -> str | None:
+    """Refusal of a server or combined CN with an underscore when, as on Sign CSR,
+    it would be the name: a request without SAN whose template allows DNS names."""
     name = underscore_host_name(cn) if cert_type in ('server', 'combined') else None
-    return dns_name_syntax_error(name) if name else None
+    if not name or any((explicit or {}).values()):
+        return None
+    from services.template_service import allowed_implicit_buckets
+    if not allowed_implicit_buckets(template, {'san_dns': [name]}).get('san_dns'):
+        return None
+    return dns_name_syntax_error(name)
 
 
 def validate_typed_san_buckets(buckets: SanBuckets) -> str | None:

@@ -40,7 +40,7 @@ export default {
     tips: [
       'Qualquer rejeição única interrompe imediatamente a aprovação: isso é intencional por segurança.',
       'Enquanto uma renovação aguarda aprovação, o agendador deixa o certificado a essa decisão, desde que ela possa ocorrer antes de o certificado expirar; sob uma política de renovação, nunca renova sem uma.',
-      'Os comentários de aprovação são registrados na trilha de auditoria para conformidade.',
+      'Cada decisão e o seu comentário ficam na linha do tempo de aprovação do pedido; o log de auditoria registra as aprovações, não o comentário, um pedido na fila nem uma rejeição.',
     ],
   },
   helpGuides: {
@@ -83,7 +83,7 @@ Os administradores ignoram a fila em todos os caminhos.
 - Aprovar uma solicitação cuja solicitação armazenada, certificado ou CA **não existe mais** encerra-a como rejeitada
 - Uma revogação na fila cujo certificado foi **revogado diretamente** é encerrada como aprovada (cancelada quando o seu solicitante a revogou); uma cujo certificado foi **renovado** desde então é encerrada como rejeitada quando aprovada; durante uma suspensão de certificado, aguarda a remoção da suspensão
 
-Os webhooks são notificados desses encerramentos como para uma rejeição.
+Um encerramento como rejeitado notifica os webhooks como uma rejeição; um encerramento como aprovado não envia webhook.
 
 ## Prazo
 Uma solicitação aguarda **sete dias** por uma decisão. Passado esse prazo, é encerrada como expirada, nunca é contada como pendente e o agendador de renovação retoma o seu certificado. Enquanto uma renovação aguarda aprovação, o agendador deixa o certificado a essa decisão, desde que ela possa ocorrer antes de o certificado expirar; sob uma política de renovação, nunca renova sem uma.
@@ -99,7 +99,7 @@ Uma solicitação aguarda **sete dias** por uma decisão. Passado esse prazo, é
 
 1. Clique em uma solicitação pendente para ver seus detalhes
 2. Clique em **Rejeitar**
-3. Insira um **motivo de rejeição** (obrigatório): isso é registrado para conformidade de auditoria
+3. Insira um **motivo de rejeição** (obrigatório): ele fica na linha do tempo do pedido; uma rejeição não grava entrada no log de auditoria
 4. A solicitação é imediatamente interrompida
 
 > ⚠ Qualquer rejeição única interrompe toda a solicitação. Isso é intencional: se qualquer revisor identificar um problema, a emissão não deve prosseguir.
@@ -111,7 +111,7 @@ Cada solicitação mantém uma linha do tempo completa de aprovação mostrando:
 - Quando a ação foi tomada (data/hora)
 - Comentário fornecido (se houver)
 
-Este histórico é imutável e faz parte da trilha de auditoria.
+Este histórico é guardado com o pedido, não no log de auditoria.
 
 ## Filtragem
 

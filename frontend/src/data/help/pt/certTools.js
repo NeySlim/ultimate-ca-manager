@@ -7,9 +7,9 @@ export default {
       {
         title: 'Ferramentas Disponíveis',
         items: [
-          { label: 'Verificador SSL', text: 'Conectar a um host remoto e inspecionar sua cadeia de certificados SSL/TLS' },
+          { label: 'Verificador SSL', text: 'Conectar a um host remoto e inspecionar o certificado que ele apresenta (apenas o certificado final, não a cadeia)' },
           { label: 'Decodificador de CSR', text: 'Cole um CSR em formato PEM para visualizar seu sujeito, SANs e informações de chave' },
-          { label: 'Decodificador de Certificado', text: 'Cole um certificado em formato PEM para inspecionar todos os campos' },
+          { label: 'Decodificador de Certificado', text: 'Cole um certificado em formato PEM para inspecionar seu sujeito, emissor, validade, chave, SANs, key usages e impressões digitais; CDP, AIA e políticas não são exibidos' },
           { label: 'Verificador de Correspondência', text: 'Verificar se um certificado, CSR e chave privada pertencem ao mesmo conjunto' },
           { label: 'Conversor', text: 'Converter entre formatos PEM, DER, PKCS#12 e PKCS#7' },
         ]
@@ -45,15 +45,16 @@ Inspecione o certificado SSL/TLS de um servidor remoto:
 
 1. Insira o **nome do host** (ex.: \`google.com\`)
 2. Opcionalmente altere a **porta** (padrão: 443)
-3. Clique em **Verificar**
+3. Clique em **Verificar SSL**
 
 Os resultados incluem:
 - Sujeito e emissor do certificado
 - Datas de validade
 - SANs (Nomes Alternativos do Sujeito)
 - Tipo e tamanho da chave
-- Cadeia completa de certificados
 - Versão do protocolo TLS
+
+Apenas o certificado que o servidor apresenta é lido, não o resto da sua cadeia.
 
 ## Decodificador de CSR
 
@@ -80,7 +81,7 @@ Verifique se um certificado, CSR e chave privada pertencem ao mesmo conjunto:
 1. Cole o **certificado** PEM
 2. Cole a **chave privada** PEM (opcionalmente criptografada: forneça a senha)
 3. Opcionalmente cole um **CSR** PEM
-4. Clique em **Verificar**
+4. Clique em **Verificar chaves**
 
 O UCM compara as chaves públicas (RSA, EC, EdDSA, ML-DSA). Uma correspondência confirma que formam um par válido. Uma chave privada ML-DSA deve conter a sua semente: um ficheiro de chave com apenas a forma expandida é recusado.
 

@@ -2,13 +2,13 @@ export default {
   helpContent: {
     title: 'Importation et exportation',
     subtitle: 'Migration de données et sauvegarde',
-    overview: 'Importez des certificats depuis des sources externes et exportez vos données PKI. L\'importation intelligente détecte automatiquement les types de fichiers. L\'intégration OPNsense permet la synchronisation directe avec votre pare-feu.',
+    overview: 'Importez des certificats depuis des sources externes et exportez vos données PKI. L\'importation intelligente détecte automatiquement les types de fichiers. L\'intégration OPNsense importe à la demande les certificats et CA d\'un pare-feu.',
     sections: [
       {
         title: 'Importation',
         items: [
           { label: 'Importation intelligente', text: 'Téléversez n\'importe quel fichier de certificat, UCM détecte automatiquement le format (PEM, DER, P12, P7B)' },
-          { label: 'Synchronisation OPNsense', text: 'Connectez-vous au pare-feu OPNsense et importez ses certificats et CA' },
+          { label: 'Import OPNsense', text: 'Connectez-vous à un pare-feu OPNsense et importez ses certificats et CA, une fois par exécution (pas de synchronisation continue)' },
         ]
       },
       {
@@ -21,7 +21,7 @@ export default {
       {
         title: 'Intégration OPNsense',
         items: [
-          { label: 'Connexion', text: 'Fournir l\'URL OPNsense, la clé API et le secret API' },
+          { label: 'Connexion', text: 'Fournir l\'hôte et le port OPNsense, la clé API et le secret API' },
           { label: 'Tester la connexion', text: 'Vérifier la connectivité avant l\'importation' },
           { label: 'Sélectionner les éléments', text: 'Choisir quels certificats et CA importer' },
         ]
@@ -64,26 +64,24 @@ Les certificats **ML-DSA** (FIPS 204) et **SLH-DSA** (FIPS 205) s'importent en P
 
 ## Intégration OPNsense
 
-Synchronisez les certificats et CA depuis un pare-feu OPNsense :
+Importez les certificats et CA d'un pare-feu OPNsense, à la demande (UCM ne les maintient pas synchronisés) :
 
 ### Configuration
 1. Dans OPNsense, créez une clé API (Système → Accès → Utilisateurs → Clés API)
-2. Dans UCM, entrez l'URL OPNsense, la clé API et le secret API
-3. Cliquez sur **Tester la connexion** pour vérifier
+2. Dans UCM, entrez l'hôte et le port OPNsense, la clé API et le secret API
+3. Cliquez sur **Tester la connexion** : cela vérifie la connexion et liste les certificats et CA disponibles
 
 ### Importation
-1. Cliquez sur **Connecter** pour récupérer les certificats et CA disponibles
-2. Sélectionnez les éléments que vous souhaitez importer
-3. Cliquez sur **Importer la sélection**
+1. Sélectionnez les éléments que vous souhaitez importer
+2. Cliquez sur **Importer la sélection**
 
 UCM importe les certificats avec leurs clés privées (si disponibles) et préserve la hiérarchie des CA.
 
 ## Exporter les certificats
 
 Exportation en masse de tous les certificats :
-- **PEM** : Fichiers PEM individuels
+- **PEM** : Tous les certificats dans un seul bundle PEM
 - **Bundle P7B** : Tous les certificats dans un seul fichier PKCS#7
-- **ZIP** : Tous les certificats en fichiers PEM individuels dans une archive ZIP
 
 ## Exporter les CA
 

@@ -19,7 +19,7 @@ export default {
           { label: 'Validez máxima', text: 'Duración máxima del certificado en días' },
           { label: 'Tipos de clave permitidos', text: 'Restringir qué algoritmos y tamaños de clave se pueden utilizar, incluidos ML-DSA-44, ML-DSA-65 y ML-DSA-87; el modo FIPS elimina ML-DSA' },
           { label: 'Esquemas de firma permitidos', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA o SLH-DSA, comparados con la clave de la CA firmante. Los hashes de firma permitidos no restringen a una CA ML-DSA, que firma sin un hash aparte' },
-          { label: 'Restricciones de SAN', text: 'Limitar el número de SAN y aplicar patrones de nombres DNS' },
+          { label: 'Restricciones de SAN', text: 'Limitar el número de nombres DNS (los demás tipos de SAN no se cuentan); un patrón DNS por política (*.company.com, o company.com para incluir también el dominio) limita la política a los nombres que coinciden' },
           { label: 'Hashes de firma permitidos', text: 'SHA-256, SHA-384 o SHA-512; si no se selecciona ninguno, se permite cualquiera. Cuando nadie ha elegido el hash, se aplica el predeterminado si está permitido y, si no, el más débil de los permitidos. El formulario de emisión ofrece solo los tipos de clave permitidos, y Crear CA solo los tipos de clave y hashes permitidos' },
         ]
       },
@@ -33,7 +33,7 @@ export default {
       },
     ],
     tips: [
-      'Un número de prioridad más bajo = mayor precedencia. Use 1–10 para políticas críticas.',
+      'Un número de prioridad más bajo = mayor precedencia para la aprobación. Las reglas de todas las políticas en alcance se aplican juntas, y gana la más estricta.',
       'Aplique políticas a CA específicas para un control granular.',
       'Active las notificaciones para detectar infracciones de políticas a tiempo.',
     ],
@@ -84,8 +84,8 @@ Restringir qué algoritmos y tamaños de clave se pueden utilizar:
 **Hashes de firma permitidos** restringe el hash de firma del mismo modo (SHA-256, SHA-384, SHA-512); si no se selecciona ninguno, se permite cualquiera. Cuando nadie ha elegido el hash, se aplica el predeterminado si está permitido y, si no, el más débil de los permitidos. El formulario de emisión ofrece solo los tipos de clave permitidos, y Crear CA solo los tipos de clave y hashes permitidos.
 
 ### Restricciones de SAN
-- **Máximo de nombres DNS**: Limitar el número de Subject Alternative Names
-- **Patrón DNS**: Restringir a patrones de dominio específicos (p. ej. \`*.company.com\`)
+- **Máximo de nombres DNS**: Limitar el número de nombres DNS en el SAN; las entradas IP, correo y URI no se cuentan
+- **Patrón DNS**: Limita la política a las solicitudes cuyo CN o SAN DNS coinciden, etiqueta por etiqueta y sin distinguir mayúsculas: \`*.company.com\` cubre los nombres bajo company.com, \`company.com\` cubre también company.com. Los demás nombres no se rechazan: la política no se les aplica
 
 ## Flujos de aprobación
 
@@ -105,7 +105,7 @@ Las políticas se evalúan en orden de prioridad. Los números más bajos tienen
 - **10–20**: Cumplimiento estándar (TLS público, PKI interna)
 - **20+**: Valores predeterminados permisivos
 
-Cuando varias políticas coinciden con una solicitud de certificado, la de mayor prioridad (número más bajo) prevalece.
+Cuando varias políticas coinciden con una solicitud de certificado, la de mayor prioridad (número más bajo) decide la aprobación; las reglas de todas las políticas coincidentes se aplican juntas (la validez máxima más pequeña, la intersección de los tipos de clave permitidos, etc.).
 
 ## Alcance
 
@@ -117,14 +117,7 @@ La política se aplica solo a certificados emitidos por la CA seleccionada. Úse
 
 ## Políticas predeterminadas
 
-UCM incluye 5 políticas integradas que reflejan las mejores prácticas de PKI del mundo real:
-- **Firma de código** (prioridad 5): Claves fuertes, aprobación requerida
-- **Certificados comodín** (prioridad 8): Aprobación requerida, máximo 10 SAN
-- **TLS para servidor web** (prioridad 10): Conforme al CA/B Forum, máximo 397 días
-- **Automatización de corta duración** (prioridad 15): Estilo ACME de 90 días
-- **PKI interna** (prioridad 20): 730 días, reglas flexibles
-
-> 💡 Personalice o desactive las políticas predeterminadas para adaptarlas a los requisitos de su organización.
+Una instalación nueva no tiene ninguna política: cree las que necesite su organización. Una instalación actualizada desde una versión anterior puede listar cinco políticas de ejemplo (Firma de código, Certificados comodín, TLS para servidor web, Automatización de corta duración, PKI interna), todas desactivadas.
 `
   }
 }

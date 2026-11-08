@@ -25,7 +25,7 @@ export default {
       {
         title: 'API-Schlüssel',
         items: [
-          { label: 'Schlüssel erstellen', text: 'Generieren Sie einen neuen API-Schlüssel mit optionalem Ablaufdatum' },
+          { label: 'Schlüssel erstellen', text: 'Generieren Sie einen neuen API-Schlüssel, optional mit Ablauf nach einer Anzahl Tagen' },
           { label: 'Berechtigungen', text: 'Ein Schlüssel trägt den bei der Erstellung gewählten Geltungsbereich, nie mehr als Ihre eigenen Berechtigungen. Ein Schlüssel kann nur einen Schlüssel erstellen oder neu erzeugen, dessen Berechtigungen er selbst besitzt' },
           { label: 'Widerrufen', text: 'Einen API-Schlüssel sofort ungültig machen' },
           { label: 'Deaktivierte Benutzer', text: 'API-Schlüssel eines deaktivierten Benutzers werden abgelehnt, selbst wenn der Schlüssel selbst noch gültig ist' },
@@ -45,10 +45,10 @@ export default {
     ],
     tips: [
       'Aktivieren Sie mindestens einen zweiten Faktor (TOTP oder Sicherheitsschlüssel) für Admin-Konten',
-      'API-Schlüssel können mit einem Ablaufdatum für kurzlebige Integrationen versehen werden',
+      'API-Schlüssel können nach einer festgelegten Anzahl Tage ablaufen, für kurzlebige Integrationen',
       'API-Keys können auch ohne Ablaufdatum für langlaufende Automatisierung erstellt werden',
       'Scannen Sie den QR-Code mit einer beliebigen TOTP-App: Google Authenticator, Authy, 1Password, usw.',
-      'Filterauswahl auf jeder Listenseite (Zertifikate, CAs, Audit usw.) wird automatisch über Reloads hinweg gespeichert',
+      'Filterauswahl auf den wichtigsten Listenseiten (Zertifikate, CAs, Templates, Audit, Richtlinien, Vertrauensspeicher und weitere) wird über Reloads hinweg gespeichert; CSRs, Genehmigungen, Schlüsselwiederherstellung, Discovery und Systemprotokolle starten ungefiltert',
     ],
   },
   helpGuides: {
@@ -61,7 +61,7 @@ Verwalten Sie Ihr persönliches Profil, Sicherheitseinstellungen und API-Schlüs
 ## Profil
 
 - **Vollständiger Name**: Ihr Anzeigename in UCM
-- **E-Mail**: Wird für Benachrichtigungen, Passwortwiederherstellung und ACME-Registrierung verwendet
+- **E-Mail**: Wird für Benachrichtigungen und Passwortwiederherstellung verwendet
 - **Kontoinformationen**: Erstellungsdatum, letzter Anmeldezeitpunkt, Gesamtanzahl der Anmeldungen
 
 ## Sicherheit
@@ -77,9 +77,9 @@ Fügen Sie ein zeitbasiertes Einmalpasswort mit einer beliebigen Authenticator-A
 1. Klicken Sie auf **2FA aktivieren**
 2. Scannen Sie den QR-Code mit Ihrer Authenticator-App (Google Authenticator, Authy, 1Password, usw.)
 3. Geben Sie den 6-stelligen Code zur Bestätigung ein
-4. Speichern Sie die **Wiederherstellungscodes**: sie werden nur einmal angezeigt
+4. Speichern Sie die **Backup-Codes**: sie werden nur einmal angezeigt
 
-> ⚠ Wenn Sie den Zugang zu Ihrem Authenticator und den Wiederherstellungscodes verlieren, muss ein Administrator Ihre 2FA deaktivieren.
+> ⚠ Wenn Sie den Zugang zu Ihrem Authenticator und den Backup-Codes verlieren, muss ein Administrator Ihre 2FA deaktivieren.
 
 Um 2FA auf einen neuen Authenticator zu übertragen, deaktivieren Sie sie zuerst: Erneutes Aktivieren, solange sie aktiv ist, wird abgelehnt.
 
@@ -90,7 +90,7 @@ Registrieren Sie Hardware-Sicherheitsschlüssel oder biometrische Authentifikato
 - Windows Hello
 - Touch ID
 
-1. Klicken Sie auf **Sicherheitsschlüssel registrieren**
+1. Klicken Sie auf **Schlüssel hinzufügen**
 2. Geben Sie einen Namen für den Schlüssel ein
 3. Folgen Sie der Browseraufforderung zur Authentifizierung
 4. Der Schlüssel erscheint in Ihrer Liste der registrierten Anmeldeinformationen
@@ -108,9 +108,9 @@ Verwalten Sie Client-Zertifikate für die gegenseitige TLS-Authentifizierung:
 ## API-Schlüssel
 
 ### API-Schlüssel erstellen
-1. Klicken Sie auf **API-Schlüssel erstellen**
+1. Klicken Sie auf **Schlüssel erstellen**
 2. Geben Sie einen **Namen** ein (beschreibend, z.B. „CI/CD-Pipeline")
-3. Setzen Sie optional ein **Ablaufdatum**
+3. Setzen Sie optional einen Ablauf in **Tagen**
 4. Klicken Sie auf **Erstellen**
 5. Kopieren Sie den Schlüssel sofort: er wird nur einmal angezeigt
 
@@ -129,9 +129,9 @@ Jeder Schlüssel trägt den bei der Erstellung gewählten Geltungsbereich (**Vol
 API-Schlüssel, auch mit Vollzugriff, können weder Ihr Profil, Passwort, 2FA, Sicherheitsschlüssel, mTLS-Zertifikate oder Sitzungen ändern noch über die Benutzerverwaltungsaktionen auf Ihr eigenes Konto zugreifen: dafür ist eine interaktive Sitzung nötig.
 
 ### Schlüssel widerrufen
-Klicken Sie auf **Löschen**, um einen API-Schlüssel sofort ungültig zu machen. Aktive Sitzungen, die den Schlüssel verwenden, werden beendet.
+Das erste **Löschen** widerruft einen API-Schlüssel sofort: Anfragen mit ihm werden ab dann abgelehnt. Ein zweites Löschen des widerrufenen Schlüssels entfernt ihn.
 
-> 💡 Verwenden Sie kurzlebige API-Schlüssel mit Ablaufdatum für CI/CD und Automatisierung.
+> 💡 Verwenden Sie kurzlebige API-Schlüssel für CI/CD und Automatisierung.
 `
   }
 }

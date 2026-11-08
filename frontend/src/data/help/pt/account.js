@@ -25,7 +25,7 @@ export default {
       {
         title: 'Chaves de API',
         items: [
-          { label: 'Criar Chave', text: 'Gerar uma nova chave de API com expiração opcional' },
+          { label: 'Criar Chave', text: 'Gerar uma nova chave de API, opcionalmente com expiração após um número de dias' },
           { label: 'Permissões', text: 'Uma chave tem o escopo escolhido na criação, nunca mais do que as suas próprias permissões. Uma chave só pode criar ou regenerar uma chave cujas permissões ela própria possui' },
           { label: 'Revogar', text: 'Invalidar imediatamente uma chave de API' },
           { label: 'Usuários desativados', text: 'Chaves de API pertencentes a um usuário desativado são rejeitadas mesmo que a própria chave ainda seja válida' },
@@ -45,10 +45,10 @@ export default {
     ],
     tips: [
       'Ative pelo menos um segundo fator (TOTP ou Chave de Segurança) para contas de administrador',
-      'As chaves de API podem ter uma data de expiração para integrações de curta duração',
+      'As chaves de API podem expirar após um número definido de dias para integrações de curta duração',
       'Chaves API também podem ser criadas sem expiração para automação de longo prazo',
       'Escaneie o QR code com qualquer aplicativo TOTP: Google Authenticator, Authy, 1Password, etc.',
-      'As seleções de filtro em cada página de lista (Certificados, CAs, Auditoria, etc.) são persistidas automaticamente entre recargas',
+      'As seleções de filtro nas principais páginas de lista (Certificados, CAs, Modelos, Auditoria, Políticas, Armazenamento de Confiança e outras) são persistidas entre recargas; CSRs, Aprovações, Recuperação de Chaves, Descoberta e Logs do Sistema começam sem filtro',
     ],
   },
   helpGuides: {
@@ -61,7 +61,7 @@ Gerencie seu perfil pessoal, configurações de segurança e chaves de API.
 ## Perfil
 
 - **Nome Completo**: Seu nome de exibição mostrado em todo o UCM
-- **E-mail**: Usado para notificações, recuperação de senha e registro ACME
+- **E-mail**: Usado para notificações e recuperação de senha
 - **Informações da Conta**: Data de criação, data do último login, total de logins
 
 ## Segurança
@@ -77,9 +77,9 @@ Adicione uma senha única baseada em tempo usando qualquer aplicativo autenticad
 1. Clique em **Ativar 2FA**
 2. Escaneie o QR code com seu aplicativo autenticador (Google Authenticator, Authy, 1Password, etc.)
 3. Digite o código de 6 dígitos para confirmar
-4. Salve os **códigos de recuperação**: eles são mostrados apenas uma vez
+4. Salve os **códigos de backup**: eles são mostrados apenas uma vez
 
-> ⚠ Se você perder acesso ao seu autenticador e códigos de recuperação, um administrador deverá desativar seu 2FA.
+> ⚠ Se você perder acesso ao seu autenticador e códigos de backup, um administrador deverá desativar seu 2FA.
 
 Para mover o 2FA para um novo autenticador, desative-o primeiro: ativá-lo de novo enquanto já está ativo é recusado.
 
@@ -90,12 +90,12 @@ Registre chaves de segurança de hardware ou autenticadores biométricos:
 - Windows Hello
 - Touch ID
 
-1. Clique em **Registrar Chave de Segurança**
+1. Clique em **Adicionar Chave**
 2. Digite um nome para a chave
 3. Siga o prompt do navegador para autenticar
 4. A chave aparece na sua lista de credenciais registradas
 
-Com 2FA ativada ou obrigatória, uma chave registrada também pode concluir a segunda etapa de um login com senha: escolha **Usar uma chave de segurança**.
+Com 2FA ativada ou obrigatória, uma chave registrada também pode concluir a segunda etapa de um login com senha: escolha **Usar chave de segurança**.
 
 Sem um aplicativo autenticador, ative **Chave de segurança como segundo fator** na seção de autenticação de dois fatores: cada login com senha passa a pedir uma das suas chaves, e a última chave não pode ser removida enquanto a opção estiver ativa.
 
@@ -108,9 +108,9 @@ Gerencie certificados de cliente para autenticação TLS mútua:
 ## Chaves de API
 
 ### Criando uma Chave de API
-1. Clique em **Criar Chave de API**
+1. Clique em **Criar Chave**
 2. Digite um **nome** (descritivo, ex.: "Pipeline CI/CD")
-3. Opcionalmente defina uma **data de expiração**
+3. Opcionalmente defina uma expiração em **dias**
 4. Clique em **Criar**
 5. Copie a chave imediatamente: ela é mostrada apenas uma vez
 
@@ -129,9 +129,9 @@ Cada chave tem o escopo escolhido na criação (**Acesso total**, **Somente leit
 As chaves de API, mesmo as de Acesso total, não podem alterar seu perfil, senha, 2FA, chaves de segurança, certificados mTLS ou sessões, nem alcançar sua própria conta pelas ações de administração de usuários: isso exige uma sessão interativa.
 
 ### Revogando Chaves
-Clique em **Excluir** para invalidar imediatamente uma chave de API. Sessões ativas usando a chave serão encerradas.
+O primeiro **Excluir** revoga uma chave de API na hora: as requisições com ela são recusadas a partir daí. Um segundo Excluir na chave revogada a remove.
 
-> 💡 Use chaves de API de curta duração com datas de expiração para CI/CD e automação.
+> 💡 Use chaves de API de curta duração para CI/CD e automação.
 `
   }
 }

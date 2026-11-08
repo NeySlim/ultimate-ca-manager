@@ -8,7 +8,8 @@ export default {
         title: 'Criptografia de Chaves Privadas',
         items: [
           { label: 'Status e contadores', text: 'Mostra se a criptografia está ativada e quantas chaves privadas armazenadas estão criptografadas vs não criptografadas' },
-          { label: 'Ativar / Desativar', text: 'Criptografa todas as chaves privadas com AES-256. Ao ativar remove as cópias em texto claro e ao desativar as recria' },
+          { label: 'Ativar / Desativar', text: 'Criptografa todas as chaves privadas de CA e de certificado com AES-128 (Fernet, com HMAC-SHA256) sob um arquivo de chave mestra. Ao ativar remove as cópias em texto claro das chaves e ao desativar as recria' },
+          { label: 'Primeiro início', text: 'Sem uma chave mestra, o UCM cria /etc/ucm/master.key (0600) na inicialização e criptografa as chaves já armazenadas. Um contêiner só o faz quando /etc/ucm é um volume nomeado ou um diretório do host. Ignorado com KEY_ENCRYPTION_KEY definida, com chaves criptografadas ou uma cadeia de auditoria com chave já no banco de dados, depois de a criptografia ter sido desativada aqui, ou com UCM_AUTO_MASTER_KEY=false. A cada início, uma chave carregada também criptografa os valores ainda armazenados sem criptografia, e uma chave que não os decifra coloca o UCM em modo seguro. Faça backup do arquivo de chave' },
           { label: 'Arquivos de chave no disco', text: 'Mostra quantas cópias de chaves em texto claro restam; use hooks de implantação quando outro serviço precisar de um arquivo de chave' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Variável de ambiente opcional: recusa iniciar sem uma chave de criptografia de banco de dados explícita' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: 'Variável de ambiente opcional: recusa iniciar a menos que a criptografia de chaves privadas esteja ativada' },
@@ -18,17 +19,16 @@ export default {
       {
         title: 'Política de Senha',
         items: [
-          { label: 'Comprimento Mínimo', text: 'Número mínimo de caracteres obrigatórios' },
-          { label: 'Complexidade', text: 'Exigir letras maiúsculas, minúsculas, números, caracteres especiais' },
-          { label: 'Expiração', text: 'Forçar alteração de senha após um número definido de dias' },
-          { label: 'Histórico', text: 'Impedir reutilização de senhas anteriores' },
+          { label: 'Comprimento Mínimo', text: 'Número mínimo de caracteres obrigatórios, de 6 a 32' },
+          { label: 'Complexidade', text: 'Exigir letras maiúsculas, números e caracteres especiais, cada um ativado separadamente' },
         ]
       },
       {
         title: 'Sessão e Acesso',
         items: [
-          { label: 'Tempo Limite de Sessão', text: 'Logout automático após período de inatividade' },
-          { label: 'Limitação de Taxa', text: 'Limitar tentativas de login para prevenir ataques de força bruta' },
+          { label: 'Tempo Limite de Sessão', text: 'Logout automático após período de inatividade (Configurações › Geral)' },
+          { label: 'Duração da Sessão', text: 'Duração máxima da sessão em horas, qualquer que seja a atividade' },
+          { label: 'Bloqueio de conta', text: 'Máx. de Tentativas de Login e Duração do Bloqueio (Configurações › Geral) bloqueiam uma conta após falhas repetidas. Os limites de requisições por IP são definidos pelas variáveis de ambiente RATE_LIMIT_*, não nesta página' },
           { label: 'Lista de acesso administrativo', text: 'Limitar a interface web e a API de gestão aos endereços IP e redes listados' },
           { label: 'Aplicação de 2FA', text: 'Exigir autenticação de dois fatores para todos os usuários' },
         ]
@@ -51,6 +51,7 @@ export default {
           { label: 'Exigir certificado de cliente', text: 'Opcionalmente tornar o mTLS obrigatório para a interface web, alterar configurações mTLS requer reinício do serviço' },
           { label: 'Mesmo número de série, outra CA (v2.251)', text: 'Uma inscrição é identificada pelo seu emissor e número de série, de modo que um certificado de cliente pode ser inscrito, importado ou atribuído quando o certificado inscrito de outra CA tem o mesmo número de série' },
           { label: 'Cabeçalhos do reverse proxy (v2.252)', text: 'Atrás de um proxy que reencaminha o certificado de cliente em cabeçalhos, envie o DN do emissor (X-SSL-Client-I-DN) com o número de série, lido como hexadecimal, ou o próprio certificado (X-SSL-Client-Cert). Um número de série sem o seu emissor não abre nenhuma inscrição que tenha registado um, e um certificado apresentado não pode ser inscrito sem ele' },
+          { label: 'Emissor revogado', text: 'Um certificado de cliente emitido sob uma CA revogada, em qualquer nível da sua cadeia, não abre sessão e não pode ser inscrito nem importado (v2.252)' },
           { label: 'Chaves geradas (v2.251)', text: 'Um certificado mTLS de utilizador gerado pelo UCM recebe uma chave com a força da CA emissora, RSA ou uma curva NIST que os navegadores aceitam, movida para o tipo mais próximo que as políticas permitem, em vez de sempre RSA-2048' },
         ]
       },
@@ -93,33 +94,32 @@ Ambas aceitam \`1\`/\`true\`/\`yes\`/\`on\`. Uma chave inválida é tratada como
 ## Política de Senha
 
 ### Requisitos de Complexidade
-- **Comprimento mínimo**: 8 a 32 caracteres
+- **Comprimento mínimo**: 6 a 32 caracteres (8 por padrão)
 - **Exigir maiúsculas**: Pelo menos uma letra maiúscula
-- **Exigir minúsculas**: Pelo menos uma letra minúscula
 - **Exigir números**: Pelo menos um dígito
 - **Exigir caracteres especiais**: Pelo menos um símbolo
 
-### Expiração de Senha
-Forçar usuários a alterar suas senhas após um número definido de dias. Defina como 0 para desativar.
-
-### Histórico de Senha
-Impedir reutilização das últimas N senhas. Os usuários não podem definir uma senha que corresponda a qualquer uma de suas N senhas anteriores.
+O UCM não tem expiração de senha nem configuração de histórico de senhas.
 
 ## Gerenciamento de Sessão
 
 ### Tempo Limite de Sessão
-Logout automático de usuários após N minutos de inatividade. Aplica-se apenas a sessões da interface web, não a chaves de API.
+Em **Configurações › Geral**: logout automático de usuários após N minutos de inatividade. Aplica-se apenas a sessões da interface web, não a chaves de API.
 
-### Sessões Simultâneas
-Limitar o número de sessões simultâneas por usuário. Logins adicionais encerrarão a sessão mais antiga.
+### Duração da Sessão
+Duração máxima da sessão em horas, qualquer que seja a atividade. O número de sessões simultâneas por usuário não é limitado.
 
-## Limitação de Taxa
+## Proteção de Login
 
-### Tentativas de Login
-Limitar tentativas de login com falha por endereço IP dentro de uma janela de tempo. Após exceder o limite, o IP é temporariamente bloqueado.
+### Máx. de Tentativas de Login
+Em **Configurações › Geral**: o número de logins com falha após o qual a **conta** é bloqueada.
 
 ### Duração do Bloqueio
-Por quanto tempo um IP fica bloqueado após exceder o limite de tentativas de login.
+Por quanto tempo a conta fica bloqueada, em minutos.
+Uma conta bloqueada responde a um login por senha ou LDAP com o mesmo "Invalid credentials" de um nome desconhecido até o fim do bloqueio, de modo que a resposta não revela que a conta existe; o bloqueio é registrado no log de auditoria.
+
+### Limites de Requisições
+As requisições também são limitadas por endereço IP do cliente, pelas variáveis de ambiente \`RATE_LIMIT_*\` (grupos de autenticação, pesado, padrão e protocolos; clientes de rede privada isentos com \`RATE_LIMIT_TRUST_LAN\`). As rotas de login têm o seu próprio limite, 5 tentativas por minuto, indicado com \`Retry-After\` na resposta 429.
 
 ## Lista de Acesso Administrativo
 

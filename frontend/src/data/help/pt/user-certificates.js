@@ -25,9 +25,9 @@ export default {
         title: 'Permissões',
         items: [
           { label: 'Viewers', text: 'Podem ver apenas seus próprios certificados' },
-          { label: 'Operators', text: 'Podem visualizar, exportar e revogar todos os certificados de usuário' },
-          { label: 'Admins', text: 'Acesso completo, incluindo exclusão' },
-          { label: 'Auditors', text: 'Podem visualizar certificados mas não podem exportar' },
+          { label: 'Operators', text: 'Podem visualizar, exportar, revogar e excluir todos os certificados de usuário; exportar a chave privada do certificado de outro usuário exige read:private_keys, que a função não possui' },
+          { label: 'Admins', text: 'Acesso completo, chaves privadas incluídas' },
+          { label: 'Auditors', text: 'Podem visualizar e exportar certificados, sem a chave privada' },
         ]
       },
     ],
@@ -101,8 +101,8 @@ A exclusão remove tanto o certificado quanto a associação usuário-certificad
 | Função | Visualizar | Exportar | Revogar | Excluir |
 |------|------|--------|--------|--------|
 | Admin | Todos | Todos | Todos | Todos |
-| Operator | Todos | Todos | Todos | Todos |
-| Auditor | Todos | ✗ | ✗ | ✗ |
+| Operator | Todos | Todos (a chave privada de outro usuário exige read:private_keys) | Todos | Todos |
+| Auditor | Todos | Só o certificado, sem chave privada | ✗ | ✗ |
 | Viewer | Apenas os próprios | Apenas os próprios | ✗ | ✗ |
 
 ### Permissões Necessárias

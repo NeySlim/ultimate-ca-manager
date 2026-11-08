@@ -18,7 +18,7 @@ export default {
           { label: 'Template-Auswahl', text: 'Aus verfügbaren Zertifikatstemplates der MS CA auswählen' },
           { label: 'Auto-genehmigt', text: 'Templates mit Autoenroll geben das Zertifikat sofort zurück' },
           { label: 'Manager-Genehmigung', text: 'Einige Templates erfordern eine Manager-Genehmigung, UCM verfolgt die ausstehende Anfrage' },
-          { label: 'Status-Abfrage', text: 'Status ausstehender Anfragen über das CSR-Detailpanel prüfen' },
+          { label: 'Ausstehende Anfragen', text: 'Eine Anfrage, die die CA für ihren Manager zurückhält, bleibt in UCM Ausstehend, und die Seite bietet keine Statusprüfung: Sobald sie auf der CA ausgestellt ist, importieren Sie das Zertifikat, oder lassen Sie den Inventar-Sync über den WinRM-Admin-Kanal die UCM noch unbekannten Zertifikate importieren' },
         ]
       },
       {
@@ -44,7 +44,7 @@ export default {
           { label: 'Zweck', text: 'Führt Verwaltungsoperationen auf der Windows-CA aus (Widerrufen, Widerruf aufheben, CRL veröffentlichen, Inventar, Genehmigen/Ablehnen) über PowerShell-Remoting + certutil, Dinge, die AD CS Web Enrollment nicht kann.' },
           { label: 'Transport', text: 'NTLM oder Kerberos über HTTP/HTTPS. Kerberos + HTTPS empfohlen; Kerberos verwendet die Keytab der Verbindung wieder.' },
           { label: 'Anmeldedaten', text: 'Verwendet standardmäßig die der Verbindung. mTLS-Verbindungen müssen ein dediziertes WinRM-Konto festlegen (Least-Privilege-Officer „Zertifikate ausstellen und verwalten").' },
-          { label: 'Voraussetzung', text: 'WinRM auf der CA aktiviert und das optionale Paket pywinrm installiert. Verwaltungsoperationen erfordern admin:system.' },
+          { label: 'Voraussetzung', text: 'WinRM auf der CA aktiviert und das optionale Paket pywinrm installiert. Verwaltungsoperationen erfordern admin:system; die Weitergabe eines Widerrufs oder einer Sperrfreigabe an die CA folgt dem write:certificates des Zertifikats.' },
         ]
       },
       {
@@ -58,7 +58,7 @@ export default {
       {
         title: 'CA-Inventar & Kontrollpanel',
         items: [
-          { label: 'Inventar-Sync', text: 'Importiert direkt auf der CA ausgestellte Zertifikate, die UCM noch nicht kennt (inkrementell nach Anfrage-ID, mit Abgleich).' },
+          { label: 'Inventar-Sync', text: 'Importiert direkt auf der CA ausgestellte Zertifikate, die UCM noch nicht kennt (inkrementell nach Anfrage-ID); der Abgleich ist über die API verfügbar.' },
           { label: 'Ausstehende Anfragen', text: 'Anfragen, die auf CA-Manager-Genehmigung warten, auflisten, genehmigen (erneut einreichen + Auto-Import) oder ablehnen.' },
           { label: 'CA-Zustand', text: 'CA-Dienststatus, Ablauf des CA-Zertifikats, nächste CRL-Aktualisierung und Anzahl ausstehender Anfragen auf einen Blick.' },
         ]
@@ -88,7 +88,7 @@ UCM integriert sich mit Microsoft Active Directory Certificate Services (AD CS),
 1. Gehen Sie zu **Einstellungen → Microsoft CA**
 2. Klicken Sie auf **Verbindung hinzufügen**
 3. Geben Sie den **Verbindungsnamen** und den **CA-Server-Hostnamen** ein
-4. Geben Sie optional den **CA Common Name** ein (automatisch erkannt, wenn leer)
+4. Geben Sie optional den **CA Common Name** ein (der Server-Hostname wird verwendet, wenn leer)
 5. Wählen Sie die **Authentifizierungsmethode**
 6. Geben Sie die Anmeldedaten für die gewählte Methode ein
 7. Klicken Sie auf **Verbindung testen** zur Überprüfung
@@ -124,7 +124,7 @@ UCM integriert sich mit Microsoft Active Directory Certificate Services (AD CS),
 Das Zertifikat wird sofort zurückgegeben und in UCM importiert.
 
 ### Manager-Genehmigungs-Templates
-UCM speichert die Anfrage als **Ausstehend** und verfolgt die MS CA-Anfrage-ID. Sobald die Genehmigung auf der Windows-CA erfolgt ist, prüfen Sie den Status über das CSR-Detailpanel, um das Zertifikat zu importieren.
+UCM speichert die Anfrage als **Ausstehend** und verfolgt die MS CA-Anfrage-ID. Die Seite bietet dafür keine Statusprüfung: Sobald es auf der Windows-CA ausgestellt ist, importieren Sie das Zertifikat, oder lassen Sie den **Inventar-Sync** über den WinRM-Admin-Kanal die UCM noch unbekannten Zertifikate importieren.
 
 ## Enroll on Behalf Of (EOBO)
 

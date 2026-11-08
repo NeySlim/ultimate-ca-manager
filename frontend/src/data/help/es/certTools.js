@@ -7,9 +7,9 @@ export default {
       {
         title: 'Herramientas disponibles',
         items: [
-          { label: 'SSL Checker', text: 'Conectar a un host remoto e inspeccionar su cadena de certificados SSL/TLS' },
+          { label: 'SSL Checker', text: 'Conectar a un host remoto e inspeccionar el certificado que presenta (solo el certificado final, no la cadena)' },
           { label: 'CSR Decoder', text: 'Pegar un CSR en formato PEM para ver su sujeto, SAN e información de clave' },
-          { label: 'Certificate Decoder', text: 'Pegar un certificado en formato PEM para inspeccionar todos los campos' },
+          { label: 'Certificate Decoder', text: 'Pegar un certificado en formato PEM para inspeccionar su sujeto, emisor, validez, clave, SAN, usos de clave y huellas; CDP, AIA y políticas no se muestran' },
           { label: 'Key Matcher', text: 'Verificar que un certificado, CSR y clave privada pertenecen al mismo conjunto' },
           { label: 'Converter', text: 'Convertir entre formatos PEM, DER, PKCS#12 y PKCS#7' },
         ]
@@ -45,15 +45,16 @@ Inspeccionar el certificado SSL/TLS de un servidor remoto:
 
 1. Introduzca el **nombre del host** (por ejemplo, \`google.com\`)
 2. Opcionalmente cambie el **puerto** (por defecto: 443)
-3. Haga clic en **Verificar**
+3. Haga clic en **Verificar SSL**
 
 Los resultados incluyen:
 - Sujeto y emisor del certificado
 - Fechas de validez
 - SAN (nombres alternativos del sujeto)
 - Tipo y tamaño de clave
-- Cadena completa de certificados
 - Versión del protocolo TLS
+
+Solo se lee el certificado que presenta el servidor, no el resto de su cadena.
 
 ## CSR Decoder
 
@@ -80,7 +81,7 @@ Verificar que un certificado, CSR y clave privada pertenecen al mismo conjunto:
 1. Pegue el **certificado** PEM
 2. Pegue la **clave privada** PEM (opcionalmente cifrada: proporcione la contraseña)
 3. Opcionalmente pegue un **CSR** PEM
-4. Haga clic en **Verificar correspondencia**
+4. Haga clic en **Comparar claves**
 
 UCM compara las claves públicas (RSA, EC, EdDSA, ML-DSA). Una coincidencia confirma que forman un par válido. Una clave privada ML-DSA debe incluir su semilla: un archivo de clave que solo contiene la forma expandida se rechaza.
 

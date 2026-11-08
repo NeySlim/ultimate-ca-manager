@@ -8,7 +8,7 @@ export default {
         title: 'Systemrollen',
         definitions: [
           { term: 'Admin', description: 'Vollständiger Zugriff auf alle Funktionen und Einstellungen' },
-          { term: 'Operator', description: 'Kann Zertifikate und CAs verwalten, aber keine Systemeinstellungen' },
+          { term: 'Operator', description: 'Kann Zertifikate, CAs, CSRs, ACME, SSH und die Einstellungen verwalten, die ein Admin nicht vorbehält; Templates und Gruppen nur lesend, kein Zugriff auf Benutzer oder RBAC' },
           { term: 'Auditor', description: 'Nur-Lese-Zugriff auf alle Betriebsdaten für Compliance und Audit' },
           { term: 'Viewer', description: 'Grundlegender Nur-Lese-Zugriff auf Zertifikate, CAs und Templates' },
         ]
@@ -18,8 +18,9 @@ export default {
         items: [
           { label: 'Rolle erstellen', text: 'Eine neue Rolle mit Name und Beschreibung definieren' },
           { label: 'Berechtigungsmatrix', text: 'Berechtigungen nach Kategorie aktivieren/deaktivieren (CAs, Zertifikate, Private Schlüssel, usw.)' },
-          { label: 'Abdeckung', text: 'Visuelle Prozentzahl der insgesamt gewährten Berechtigungen für die Rolle' },
+          { label: 'Abdeckung', text: 'Ein Balken und eine Anzahl n/N der der Rolle gewährten Berechtigungen' },
           { label: 'Benutzeranzahl', text: 'Sehen, wie viele Benutzer jeder Rolle zugewiesen sind' },
+          { label: 'Berechtigungen der Systemrollen', text: 'Eine Systemrolle zeigt die Berechtigungen, die UCM auf sie anwendet; Admin zeigt jede Berechtigung der Matrix' },
           { label: 'SSH-CA-Berechtigungen (v2.248)', text: 'read:ssh_cas, write:ssh_cas und delete:ssh_cas steuern SSH-CAs, sodass write:ssh sie nicht mehr anlegt oder bearbeitet. Rollen, Gruppen und API-Schlüssel mit einer SSH-Berechtigung haben beim Upgrade die entsprechende erhalten' },
         ]
       },
@@ -35,14 +36,14 @@ export default {
     content: `
 ## Übersicht
 
-RBAC bietet feingliedrige Berechtigungsverwaltung. Definieren Sie benutzerdefinierte Rollen mit spezifischen Berechtigungen und weisen Sie diese Benutzern oder Gruppen zu.
+RBAC bietet feingliedrige Berechtigungsverwaltung. Definieren Sie benutzerdefinierte Rollen mit spezifischen Berechtigungen und weisen Sie diese Benutzern zu; eine Gruppe gewährt ihren Mitgliedern ihren eigenen Berechtigungssatz.
 
 ## Systemrollen
 
 Vier integrierte Rollen, die nicht geändert oder gelöscht werden können:
 
 - **Admin**: Vollständiger Zugriff auf alles
-- **Operator**: Zertifikate, CAs, CSRs, Templates verwalten. Kein Zugriff auf Systemeinstellungen, Benutzer oder RBAC
+- **Operator**: Zertifikate, CAs, CSRs, ACME, SSH und Systemeinstellungen verwalten; Templates und Gruppen nur lesend. Kein Zugriff auf Benutzer oder RBAC
 - **Auditor**: Nur-Lese-Zugriff auf alle Betriebsdaten (Zertifikate, CAs, ACME, SCEP, HSM, Audit-Protokolle, Richtlinien, Gruppen), aber nicht auf Einstellungen oder Benutzerverwaltung
 - **Viewer**: Grundlegender Nur-Lese-Zugriff auf Zertifikate, CAs, CSRs, Templates und Vertrauensspeicher
 
@@ -62,7 +63,7 @@ Berechtigungen sind nach Kategorie organisiert:
 - **CSRs**: Erstellen, Lesen, Signieren, Löschen
 - **Templates**: Erstellen, Lesen, Aktualisieren, Löschen
 - **Benutzer**: Lesen (die Kontenverwaltung ist Administratoren vorbehalten)
-- **Gruppen**: Erstellen, Lesen, Aktualisieren, Löschen
+- **Gruppen**: Lesen (Erstellen, Bearbeiten und Löschen von Gruppen ist Administratoren vorbehalten)
 - **Einstellungen**: Lesen, Aktualisieren
 - **Audit**: Lesen, Exportieren (das Bereinigen ist Administratoren vorbehalten)
 - **ACME**: Konfigurieren, Konten verwalten
@@ -80,7 +81,7 @@ Eine benutzerdefinierte Rolle kann jede von UCM geprüfte Berechtigung gewähren
 Klicken Sie auf eine Kategorieüberschrift, um alle Berechtigungen in dieser Kategorie gleichzeitig zu aktivieren/deaktivieren.
 
 ### Abdeckungsindikator
-Ein Prozent-Badge zeigt, wie viel des gesamten Berechtigungssatzes die Rolle abdeckt.
+Ein Balken und eine Anzahl n/N zeigen, wie viel des gesamten Berechtigungssatzes die Rolle abdeckt.
 
 ## Rollen zuweisen
 

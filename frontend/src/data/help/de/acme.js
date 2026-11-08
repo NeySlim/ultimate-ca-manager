@@ -44,6 +44,9 @@ export default {
           { label: 'TXT-Bereinigung (v2.252)', text: 'Die Bereinigung entfernt nur den TXT-Wert ihrer Order, sodass eine andere Order oder die Wildcard und die Apex-Domain mit demselben Namen ihre Werte behalten. DuckDNS, Hurricane Electric und FreeDNS halten einen Wert pro Name: Sie leeren ihn nur, wenn keine andere laufende Order den Namen verwendet' },
           { label: 'Eindeutige Namen (v2.251)', text: 'Ein bereits verwendeter Name eines DNS-Anbieters oder externen CA-Kontos wird abgelehnt (409), beim Anlegen und beim Umbenennen. Das Upgrade hat frühere Duplikate in „Name (2)“, „Name (3)“ umbenannt, die ältesten zuerst' },
           { label: 'Vercel-Team (v2.251)', text: 'Der Vercel-Anbieter akzeptiert eine optionale Team-ID für Domains eines Teams' },
+          { label: 'RFC-2136-Anbieter (v2.252)', text: 'Der DNS-Server kann ein Hostname sein. Eine ausgefüllte Zone wird für die Namen darin verwendet; für andere Namen oder wenn sie leer ist, wird die Zone aus dem SOA gelesen, das der konfigurierte Server zurückgibt, dann vom System-Resolver' },
+          { label: 'ARI-Erneuerungszeitpunkt (v2.252)', text: 'Schlägt die CA ein Erneuerungsfenster vor, wird jedes Zertifikat beim letzten 6-Stunden-Durchlauf vor einem einmal im Fenster zufällig gezogenen Zeitpunkt erneuert. Das Fenster wird nach dem Retry-After der CA erneut geprüft, begrenzt auf eine Minute bis einen Tag, und nie mehr, wenn das Zertifikat abgelaufen ist (RFC 9773)' },
+          { label: 'CA-Fehler (v2.252)', text: 'Eine Fehlerseite der CA, die kein ACME-Problem ist (ein HTML-503), wird mit ihrem HTTP-Status und Retry-After gemeldet' },
           { label: 'RcodeZero-Token (v2.251)', text: 'RcodeZero benötigt ein API-Token mit Lese- und Schreibzugriff auf die Zone, nicht eines, das auf die ACME-Berechtigung beschränkt ist' },
           { label: 'Checkdomain (v2.251)', text: 'Checkdomain entfernt einen Wert, indem es die Einträge der Zone ohne ihn neu schreibt, wie seine API es dokumentiert, nach dem Lesen jeder Seite. SOA, Apex-NS und die erzeugten www-Kopien werden von diesem Neuschreiben ausgenommen' },
         ]
@@ -60,6 +63,11 @@ export default {
                   { label: 'Profile und Vorlagen (v2.221)', text: 'Zertifikatsprofile (draft-ietf-acme-profiles) werden im Directory veröffentlicht und vom Client pro Order gewählt. Jedes Profil legt Gültigkeit und Digest fest und kann eine Zertifikatsvorlage binden, deren KU/EKU dann das ausgestellte Zertifikat bestimmen' },
                   { label: 'Standardprofil', text: 'Die meisten Clients fordern kein Profil an. Das unter den Profilen gewählte Standardprofil gilt für ihre Bestellungen; ohne Standardprofil erhalten sie 90 Tage und den Standard-Digest' },
                   { label: 'Widerruf (v2.248)', text: 'Das Zertifikat, das ein Client zum Widerrufen sendet, muss Byte für Byte mit dem gespeicherten übereinstimmen. Nur ein RSA- oder EC-P-256-, P-384- oder P-521-Zertifikatsschlüssel kann die Anfrage selbst signieren: ein ML-DSA-, EdDSA- oder Brainpool-Zertifikat mit dem Konto widerrufen, das es bestellt hat' },
+                  { label: 'Widerruf durch Autorisierungen (v2.252)', text: 'Ein Konto mit gültigen, nicht abgelaufenen Autorisierungen für jeden Namen und jede IP-Adresse eines von diesem ACME-Server ausgestellten Zertifikats darf es widerrufen, auch wenn ein anderes Konto es bestellt hat (RFC 8555 §7.6). Durch Auto-Genehmigung erteilte Autorisierungen zählen nicht' },
+                  { label: 'Angeforderte Daten (v2.252)', text: 'Eine Order kann notBefore und notAfter anfordern (cert-manager duration, lego --not-after): Das Zertifikat trägt genau diese Daten. Ein Fenster, das länger als die Gültigkeit des Profils ist, außerhalb der der ausstellenden CA liegt, von einer Richtlinie verboten oder bereits vergangen ist, wird abgelehnt, statt mit anderen Daten ausgestellt zu werden' },
+                  { label: 'Ablauf (v2.252)', text: 'Eine Order nach ihrem Ablauf, oder deren gültige Autorisierung abgelaufen ist, kann nicht mehr finalisiert werden: Sie wird ungültig, und der Client legt eine neue Order an. Eine abgelaufene gültige Autorisierung liest sich als expired' },
+                  { label: 'Challenges (v2.252)', text: 'Das Lesen einer Challenge mit leerer Payload startet ihre Validierung nie: Dafür sendet der Client {}. Ein tls-alpn-01-Zertifikat muss genau den validierten Namen oder die validierte IP-Adresse als Subject Alternative Name tragen' },
+                  { label: 'CAA-Identitäten (v2.252)', text: 'Das Directory nennt die konfigurierten CAA-Kennungen als caaIdentities, sonst den öffentlichen ACME-Host, dieselbe Liste, gegen die finalize die CAA-Records prüft' },
         ]
       },
       {
@@ -74,6 +82,10 @@ export default {
           { label: 'Ersetzte Zertifikate bereinigen', text: 'Opt-in-Schalter: Beim Abschluss einer Proxy-Order werden Zertifikate gelöscht, die zuvor von Proxy-Orders für exakt denselben Domänensatz importiert wurden. Widerrufene Zertifikate bleiben immer erhalten; Nicht-Proxy-Zertifikate werden nie angetastet. Standardmäßig aus' },
                   { label: 'Client-Prechecks (v2.217)', text: 'Der Proxy veröffentlicht auch die mit dem Kontoschlüssel jedes Clients berechneten dns-01-TXT-Werte: die Propagation-Prechecks von lego/Traefik/Caddy bestehen, ohne deaktiviert zu werden, außer bei DuckDNS, Hurricane Electric und FreeDNS, die nur einen Wert halten: Deaktivieren Sie dort den Client-Precheck; ein wiederholtes new-order liefert die noch ausstehende Order des Kontos zurück' },
           { label: 'Client-Kompatibilität (v2.246)', text: 'Ist EAB erforderlich, liefern eine onlyReturnExisting-Abfrage und ein new-account mit einem registrierten Schlüssel das bestehende Konto zurück (cert-manager). Die Konto-URL beantwortet Lesezugriffe, Kontakt-Updates und Deaktivierung, die Deaktivierung von Autorisierungen wird akzeptiert (lego), und Challenge-Antworten tragen Link rel="up"' },
+          { label: 'Upstream-Fehler (v2.252)', text: 'Ein Fehler der Upstream-CA erreicht den Client mit seinem Typ (rateLimited, badCSR, rejectedIdentifier, alreadyRevoked...), Status, Subproblems und Retry-After. Fehler zum eigenen Upstream-Konto des Proxys bleiben serverInternal' },
+          { label: 'Profile und Gültigkeit (v2.252)', text: 'Das Directory listet die Profile der Upstream-CA. Ein vom Client angefordertes Profil, notBefore und notAfter werden an den Upstream weitergegeben, ein wiederholtes new-order verwendet eine ausstehende Order nur wieder, wenn es sie trägt, und ein Profil, das die Upstream-CA nicht anbietet, wird mit invalidProfile abgelehnt' },
+          { label: 'Abgelehnter TXT-Record (v2.252)', text: 'Lehnt der DNS-Anbieter den TXT-Record ab, wird die Challenge nicht an den Upstream übermittelt: Die Order, ihre Autorisierungen und Challenges werden ungültig, keine ihrer anderen Challenges wird übermittelt, und die Meldung des Anbieters wird protokolliert und an der Order gespeichert. TXT-Records einer ungültigen oder deaktivierten Order werden entfernt' },
+          { label: 'Challenge-Lesezugriffe (v2.252)', text: 'Der Proxy liest eine Challenge über ihre Autorisierung, nie mit einem POST-as-GET auf die Challenge, der die Validierung bei manchen CAs startet, bevor der TXT-Record existiert. Key Rollover bietet das Directory des Proxys nicht an' },
         ]
       },
       {
@@ -95,7 +107,7 @@ export default {
           { label: 'Ausstellen', text: 'Neues kid + HMAC-Schlüsselpaar unter ACME → EAB Credentials erzeugen' },
           { label: 'Verteilen', text: 'kid + HMAC an den Client weitergeben (cert-manager, certbot, acme.sh)' },
           { label: 'Binden', text: 'Der Client signiert ein JWS über den MAC-Schlüssel bei newAccount, um sein ACME-Konto zu binden' },
-          { label: 'Rotieren / Widerrufen', text: 'kid jederzeit widerrufen, bestehende Konten funktionieren weiter, neue Bindungen werden abgelehnt' },
+          { label: 'Widerrufen', text: 'kid jederzeit widerrufen, bestehende Konten funktionieren weiter, neue Bindungen werden abgelehnt. Zum Rotieren erstellen Sie eine neue kid und widerrufen die alte' },
           { label: 'Audit', text: 'Ausstellung, Rotation und Widerruf werden unter dem ausführenden Operator auditiert' },
           { label: 'Domäneneinschränkungen', text: 'Ein Credential auf die anforderbaren Domänen begrenzen: * (alle), *.example.com (alle Subdomains) oder eine explizite Liste, eine leere Liste blockiert die Ausstellung vollständig. Durchgesetzt bei new-order/new-authz, auf Server und Proxy; nur sinnvoll, wenn EAB erforderlich ist' },
         ]
@@ -144,7 +156,7 @@ export default {
         content: 'Der lokale ACME-Server kann Domains über einen persistenten TXT-Eintrag validieren, der an das ACME-Konto gebunden ist (draft-ietf-acme-dns-persist): Erneuerung ohne DNS-Schreibzugriffe. Opt-in, standardmäßig deaktiviert.',
         items: [
           { label: 'Eintrag', text: 'Erstellen Sie _validation-persist.<domain> TXT "<issuer-domain>; accounturi=<Konto-URL>", das Challenge-Objekt nennt beide erwarteten Werte' },
-          { label: 'Aktivierung', text: 'ACME → Konfiguration → Persistente DNS-Validierung (dns-persist-01)' },
+          { label: 'Aktivierung', text: 'ACME → Lokales ACME → Persistente DNS-Validierung (dns-persist-01)' },
           { label: 'Wildcard / Subdomains', text: 'Mit policy=wildcard werden auch Wildcard-Zertifikate und Subdomains des validierten Namens autorisiert' },
           { label: 'persistUntil', text: 'Optionales persistUntil=<Unix-Timestamp> stoppt neue Validierungen nach diesem Zeitpunkt' },
           { label: 'Sicherheit', text: 'Der Eintrag verleiht dem Kontoschlüssel Ausstellungsrechte, solange er existiert, TXT-Eintrag löschen, um sie zu entziehen' },
@@ -422,7 +434,7 @@ acme.sh --issue --dns dns_nsupdate --server https://ucm.example.com/acme/proxy/<
 ### Konfiguration
 - **Aktivieren/Deaktivieren**: Den integrierten ACME-Server umschalten
 - **Standard-CA**: Auswählen, welche CA Zertifikate standardmäßig signiert
-- **Nutzungsbedingungen**: Optionale ToS-URL für Clients
+- **Nutzungsbedingungen**: Optionaler Titel und Markdown-Text, von UCM bereitgestellt und im Directory verlinkt
 
 ### ACME-Directory-URL
 \`\`\`
@@ -465,11 +477,15 @@ Registrierte ACME-Client-Konten anzeigen:
 - Anzahl der Bestellungen
 
 ### Verlauf
-Alle Zertifikatsausstellungsaufträge durchsuchen:
-- Auftragsstatus (ausstehend, gültig, ungültig, bereit)
-- Angeforderte Domänennamen
-- Verwendete signierende CA
-- Ausstellungszeitpunkt
+Die über ACME ausgestellten Zertifikate durchsuchen:
+- Common Name
+- Status
+- Aussteller
+- Ablaufdatum
+- Quelle
+
+### Angeforderte Daten
+Eine Order kann \`notBefore\` und \`notAfter\` tragen (cert-manager mit \`duration\`, lego \`--not-after\`). Das Zertifikat wird mit genau diesen Daten ausgestellt, oder die Anfrage wird als \`malformed\` abgelehnt: ein Fenster, das länger als die Gültigkeit des Profils ist (15 Minuten Uhrenabweichung ausgenommen), außerhalb der Gültigkeit der ausstellenden CA liegt oder bereits vergangen ist. Ein Fenster, das eine Richtlinie verbietet, länger als ihre maximale Gültigkeit oder über einem Schlüsseltyp-Horizont, wird bei finalize als \`badCSR\` abgelehnt. Ohne sie gilt die Gültigkeit des Profils.
 
 ### Widerruf
 Ein Client widerruft mit seinem Konto-Schlüssel oder mit dem eigenen Schlüssel des Zertifikats, und das gesendete Zertifikat muss Byte für Byte mit dem gespeicherten übereinstimmen: eine Seriennummer allein genügt nie. Nur ein RSA- oder EC-P-256-, P-384- oder P-521-Schlüssel kann eine ACME-Anfrage signieren, daher wird ein ML-DSA-, EdDSA- oder Brainpool-Zertifikat mit dem Konto widerrufen, das es bestellt hat; UCM nennt das in der Ablehnung.
@@ -505,7 +521,7 @@ Das signierte Zertifikat enthält für jede validierte IP einen **iPAddress**-Su
 Der lokale ACME-Server unterstützt **dns-persist-01** (draft-ietf-acme-dns-persist): Validierung über einen **persistenten** TXT-Eintrag, der an das ACME-Konto gebunden ist, Erneuerungen erfordern keine DNS-Schreibzugriffe.
 
 ### Einrichtung
-1. Aktivieren Sie es unter **ACME → Konfiguration → Persistente DNS-Validierung** (standardmäßig deaktiviert).
+1. Aktivieren Sie es unter **ACME → Lokales ACME → Persistente DNS-Validierung** (standardmäßig deaktiviert).
 2. Erstellen Sie den Eintrag einmalig:
 \`\`\`
 _validation-persist.app.example.com. IN TXT "ca.example.com; accounturi=https://ca.example.com/acme/acct/<id>"
