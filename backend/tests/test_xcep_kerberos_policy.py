@@ -192,3 +192,15 @@ def test_kerberos_cauri_present_via_userpass_endpoint_when_configured(client, xc
     )
     assert r.status_code == 200
     assert '2' in _cauri_auth_values(r.data)  # AUTH_KERBEROS
+
+
+def test_kerberos_malformed_request_is_a_sender_fault(client, xcep_kerberos_config, monkeypatch):
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate', lambda auth_header, connection_key:
+                        negotiate_auth.NegotiateResult(status='authenticated', client_principal='HOST$@HAGLAND.DOMAIN'))
+    r = client.post(XCEP_KRB_URL, data=b'<s:Envelope', headers={
+        'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 400
+    fault = etree.fromstring(r.data).find(f'.//{{{SOAP_NS}}}Fault')
+    assert fault.find(f'{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text == 's:Sender'

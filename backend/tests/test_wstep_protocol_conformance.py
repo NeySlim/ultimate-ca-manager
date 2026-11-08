@@ -9,10 +9,14 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import Encoding
 from lxml import etree
 
+from services.ca_service import CAService
 from services.wstep.cmc_response import ID_CCT_PKIRESPONSE, _CMCStatusInfoV2, _PKIResponse
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS, WSU_NS
 from tests.test_wstep_issue import ISSUE_URL, _basic_auth, _build_rst, _make_csr, wstep_config  # noqa: F401
+from tests.test_wstep_renew import wstep_renew_config  # noqa: F401
 from tests.test_wstep_renew_tls import _cmc_renewal, _signer_info
+from tests.test_wstep_renew_tls import _issue as _ca_issued, _post as _post_renewal, _renewal_csr
+from tests.test_wstep_renew_tls import _rst as _renewal_rst
 
 PKCS7 = 'http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-secext-1.0.xsd#PKCS7'
 PKCS10 = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10'
@@ -188,3 +192,28 @@ def test_a_malformed_request_fault_relates_to_its_message(client, wstep_config):
     _reason, relates_to, _sub = _fault(_post(client, garbage).data)
     assert relates_to == 'urn:uuid:conf-1'
 
+
+
+def _failing_signature(monkeypatch):
+    def _sign(*_args, **_kwargs):
+        raise RuntimeError('HSM unreachable')
+    monkeypatch.setattr(CAService, 'sign_csr_from_crypto', staticmethod(_sign))
+
+
+def test_a_signing_failure_is_a_receiver_fault(client, wstep_config, monkeypatch):
+    """SOAP 1.2 HTTP binding: a failure on the CA side is env:Receiver, sent as 500."""
+    _failing_signature(monkeypatch)
+    r = _post(client, _rst(_make_csr('conf-hsm.example.test')[0].public_bytes(Encoding.DER)))
+    assert r.status_code == 500
+    assert _fault(r.data)[0] == 'Certificate issuance failed'
+    assert _fault_code(r.data) == 's:Receiver'
+
+
+def test_a_renewal_signing_failure_is_a_receiver_fault(client, app, wstep_renew_config, monkeypatch):
+    old_cert, old_key = _ca_issued(app, wstep_renew_config['id'], 'conf-renew-hsm.example.test')
+    _failing_signature(monkeypatch)
+    body = _renewal_rst(_cmc_renewal(_renewal_csr(old_cert, old_key), [(old_key, old_cert)]))
+    r = _post_renewal(client, body, tls_cert=old_cert)
+    assert r.status_code == 500
+    assert _fault(r.data)[0] == 'Certificate renewal failed'
+    assert _fault_code(r.data) == 's:Receiver'

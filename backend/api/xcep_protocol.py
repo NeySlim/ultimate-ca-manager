@@ -123,6 +123,13 @@ def _resolve_xcep_ca():
     return ca, None
 
 
+def _fault_response(reason, status, relates_to=None):
+    # SOAP 1.2 HTTP binding: env:Sender (the request is at fault) goes as 400, env:Receiver as 500
+    code = 's:Sender' if status < 500 else 's:Receiver'
+    return Response(build_soap_fault(reason, code=code, relates_to=relates_to),
+                    status=status, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
+
+
 def _handle_get_policies(parsed, ad_identity):
     """Shared GetPoliciesResponse construction for every CEP binding, once
     that binding's own auth check has already succeeded. Not itself
@@ -168,10 +175,7 @@ def _handle_get_policies(parsed, ad_identity):
         return Response(xml_body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
     except Exception as e:
         logger.error(f"XCEP GetPolicies failed: {e}")
-        return Response(
-            build_soap_fault('Internal server error', relates_to=parsed.message_id),
-            status=500, content_type=f'{SOAP_XML_MIME}; charset=utf-8',
-        )
+        return _fault_response('Internal server error', status=500, relates_to=parsed.message_id)
 
 
 @bp.route('/ADPolicyProvider_CEP_UsernamePassword/service.svc', methods=['GET', 'POST', 'HEAD'])
@@ -201,17 +205,11 @@ def get_policies():
     try:
         parsed = parse_get_policies(body)
     except GetPoliciesParseError as e:
-        return Response(
-            build_soap_fault(f'Malformed request: {e}'),
-            status=400, content_type=f'{SOAP_XML_MIME}; charset=utf-8',
-        )
+        return _fault_response(f'Malformed request: {e}', status=400)
 
     authenticated, _username = _authenticate_xcep_client(parsed.security_header)
     if not authenticated:
-        return Response(
-            build_soap_fault('Authentication failed', relates_to=parsed.message_id),
-            status=400, content_type=f'{SOAP_XML_MIME}; charset=utf-8',
-        )
+        return _fault_response('Authentication failed', status=400, relates_to=parsed.message_id)
 
     return _handle_get_policies(parsed, ad_identity=False)
 
@@ -263,10 +261,7 @@ def get_policies_kerberos():
     try:
         parsed = parse_get_policies(body)
     except GetPoliciesParseError as e:
-        return Response(
-            build_soap_fault(f'Malformed request: {e}'),
-            status=400, content_type=f'{SOAP_XML_MIME}; charset=utf-8',
-        )
+        return _fault_response(f'Malformed request: {e}', status=400)
 
     response = _handle_get_policies(parsed, ad_identity=True)
     if result.response_token_b64:

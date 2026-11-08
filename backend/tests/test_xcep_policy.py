@@ -483,3 +483,26 @@ def test_get_policies_template_oid_arcs_fit_uint32(client, app, create_ca):
                 db.session.commit()
             else:
                 _set_config('xcep_ca_refid', previous_value)
+
+
+def _fault_code(data):
+    return etree.fromstring(data).find(f'.//{{{SOAP_NS}}}Fault/{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text
+
+
+def test_client_faults_are_sender_faults(client, xcep_config):
+    """SOAP 1.2: a fault the request causes is env:Sender, which its HTTP binding sends as 400."""
+    for headers, body in (({}, b'<GetPolicies/>'), (_basic_auth(), b'<GetPolicies')):
+        r = client.post(XCEP_URL, data=body, headers=headers)
+        assert r.status_code == 400, body
+        assert _fault_code(r.data) == 's:Sender', body
+
+
+def test_a_server_failure_is_a_receiver_fault(client, xcep_config, monkeypatch):
+    from services.xcep import policy_builder
+
+    def _fail(*_args, **_kwargs):
+        raise RuntimeError('database unreachable')
+    monkeypatch.setattr(policy_builder, 'build_get_policies_response', _fail)
+    r = client.post(XCEP_URL, data=b'<GetPolicies/>', headers=_basic_auth())
+    assert r.status_code == 500
+    assert _fault_code(r.data) == 's:Receiver'
