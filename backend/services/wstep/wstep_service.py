@@ -421,7 +421,7 @@ _POLICY_OID_SHAPE = re.compile(r'1\.3\.6\.1\.4\.1\.311\.21\.8\.\d+\.\d+\.\d+\.\d
 
 
 def _template_id_of_policy_oid(oid):
-    """The template id a UCM policy OID ends with, whatever CA it was derived from; None otherwise."""
+    """The template id a UCM-shaped policy OID ends with, None otherwise; the prefix is not checked."""
     m = _POLICY_OID_SHAPE.fullmatch(oid or '')
     return int(m.group(1)) if m else None
 
@@ -476,10 +476,15 @@ def _renewal_template(ca, renewed_cert, csr):
             return None, [oid for oid in extra if oid in prior], _issuable_ekus(prior), None
         return matched, extra, extra, None
 
-    # The renewed certificate is this CA's: its OID names the template under whichever
-    # CA XCEP announced at issuance, even once xcep_ca_refid has changed
+    # The OID was derived from one of this instance's CAs (the XCEP CA of the time, which
+    # xcep_ca_refid may no longer name); another instance's prefix names no template here
+    from models import CA
+    from services.xcep.policy_builder import _policy_oid_for_template
     template_id = _template_id_of_policy_oid(template_oid)
     template = next((t for t in _ca_templates(ca) if t.id == template_id), None)
+    if template is not None and template_oid not in {
+            _policy_oid_for_template(c, template) for c in CA.query.all()}:
+        template = None
     if template is None:
         return None, [], None, ('The certificate template of the certificate being renewed '
                                 'is not offered by this CA')

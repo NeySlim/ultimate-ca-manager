@@ -223,3 +223,35 @@ def test_a_certificate_renews_after_the_xcep_ca_changes(app, split_xcep, create_
         vpn = CertificateTemplate.query.filter_by(name='Named split WSTEP CA VPNUser').one()
         now = _policy_oid_for_template(db.session.get(CA, other['id'] if other else ca_id), vpn)
     assert _template_oid(cert).dotted_string == now != oid
+
+
+def _foreign_oid_cert(app, ca_id, template_name, key):
+    """A certificate of this CA carrying the policy OID another UCM instance derives for the
+    template of the same id, as an imported certificate could."""
+    from types import SimpleNamespace
+    from services.ca_service import CAService
+    with app.app_context():
+        template = CertificateTemplate.query.filter_by(name=template_name).one()
+        foreign = _policy_oid_for_template(SimpleNamespace(refid='another-ucm-instance-ca'), template)
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'foreign.example.test')]))
+               .add_extension(x509.ExtendedKeyUsage([CLIENT_AUTH]), critical=False)
+               .sign(key, hashes.SHA256()))
+        pem, _serial = CAService.sign_csr_from_crypto(
+            ca=db.session.get(CA, ca_id), csr=csr, validity_days=30, source='wstep',
+            ms_certificate_template_oid=foreign, cert_type='client_cert',
+            extra_ekus=[CLIENT_AUTH.dotted_string], template_ekus=[CLIENT_AUTH.dotted_string])
+    cert = x509.load_pem_x509_certificate(pem.encode())
+    assert _template_oid(cert).dotted_string == foreign
+    return cert
+
+
+@pytest.mark.parametrize('path', ['tls', 'xml'])
+def test_a_template_oid_of_another_instance_does_not_renew(app, subject_ca, path):
+    """Only a prefix derived from one of this instance's CAs names a template here."""
+    ca_id = subject_ca(f'Named foreign {path} CA', TWINS)
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    old_cert = _foreign_oid_cert(app, ca_id, f'Named foreign {path} CA VPNUser', key)
+    cert, err = _renew(app, ca_id, path, old_cert, key, _eku_csr(old_cert, key, CLIENT_AUTH))
+    assert cert is None
+    assert err == 'The certificate template of the certificate being renewed is not offered by this CA'
