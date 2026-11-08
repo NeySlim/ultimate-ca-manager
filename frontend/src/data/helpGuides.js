@@ -582,7 +582,7 @@ What a request may carry is checked as on the issue form, and a refusal names it
 - **Names from the CN**: a request without SAN gets a DNS name from its CN only when the CN is in DNS name syntax (never \`John Doe\`); a single label such as \`intranet\` counts for a server or device certificate only, not for client, email or code signing, and an email (S/MIME) certificate gets none, even from a dotted CN such as \`john.doe\`; a host-like server CN that gives none is named in a notice, and a sub-CA gets none
 - **Email in the subject**: a valid emailAddress is also added to the SAN as an email name, for every certificate type
 - **Key Usage**: a request without Key Usage gets its type's, as on the issue form (client, code signing and email included)
-- A parent CA with pathLen 0, or a name outside the CA name constraints, is refused with that reason
+- A parent CA with pathLen 0, or a name outside the CA name constraints, is refused with that reason; the dotted CN of an email certificate is checked as a DNS name only when the certificate also carries Server Auth
 
 ### Microsoft CA Signing
 
