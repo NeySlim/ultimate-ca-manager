@@ -504,19 +504,25 @@ def test_a_bare_csr_is_not_issued_under_a_template_of_capped_ekus_only(client, a
     assert stamped != ocsp_oid
 
 
-def test_ocsp_signing_is_still_issued_to_a_request_carrying_its_eku(client, app, wstep_config):
+@pytest.mark.parametrize('named', [False, True])
+def test_a_template_of_capped_ekus_only_is_refused(client, app, wstep_config, named):
+    """OCSP Signing would be signed under the server profile, its only EKU dropped: the
+    request asking for it, or naming it, is refused as the client's fault."""
     from models import CA
     from services.xcep.policy_builder import _policy_oid_for_template
+    from tests.test_wstep_protocol_conformance import _fault, _fault_code
     with app.app_context():
         ca = db.session.get(CA, wstep_config['id'])
         ocsp_oid = _policy_oid_for_template(ca, CertificateTemplate.query.filter_by(name='OCSP Signing').first())
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    csr = (x509.CertificateSigningRequestBuilder()
-           .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'ocsp.example.test')]))
-           .add_extension(x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING]), critical=False)
-           .sign(key, hashes.SHA256()))
-    r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
-    assert r.status_code == 200, r.data
-    cert = _issued_cert_from_rstr(r.data)
-    assert cert.extensions.get_extension_for_class(
-        x509.MSCertificateTemplate).value.template_id.dotted_string == ocsp_oid
+    builder = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'ocsp.example.test')]))
+               .add_extension(x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING]), critical=False))
+    if named:
+        builder = builder.add_extension(
+            x509.MSCertificateTemplate(x509.ObjectIdentifier(ocsp_oid), 100, 0), critical=False)
+    r = client.post(ISSUE_URL, data=_build_rst(builder.sign(key, hashes.SHA256())), headers=_basic_auth())
+    assert r.status_code == 400, r.data
+    assert _fault(r.data)[0] == ("Template 'OCSP Signing' configures only Extended Key Usages "
+                                 'this service does not issue')
+    assert _fault_code(r.data) == 's:Sender'

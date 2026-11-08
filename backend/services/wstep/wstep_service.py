@@ -461,6 +461,8 @@ def _renewal_template(ca, renewed_cert, csr):
         matched, refusal = _match_template(ca, csr)
         if refusal:
             return None, [], None, refusal
+        if matched is not None and issues_only_capped_ekus(matched):
+            return None, [], None, _capped_only_refusal(matched)
         if matched is None and not _ca_templates(ca):
             return None, [], None, ServerError('This CA offers no certificate template')
         extra = _template_extra_ekus(matched)
@@ -488,6 +490,8 @@ def _renewal_template(ca, renewed_cert, csr):
     if template is None:
         return None, [], None, ('The certificate template of the certificate being renewed '
                                 'is not offered by this CA')
+    if issues_only_capped_ekus(template):
+        return None, [], None, _capped_only_refusal(template)
     if not _template_takes_key(template, _csr_key_label(csr)):
         return None, [], None, (f"Template '{template.name}' issues {_template_key_label(template)} "
                                 f'keys, not {_csr_key_label(csr)}')
@@ -526,7 +530,7 @@ def _best_eku_match(candidates, csr_eku):
         # it will really issue, whatever spelling it uses
         template_eku = set(_template_extra_ekus(template))
         # A template whose EKUs are all capped (OCSP Signing) would score 0 against a bare
-        # request: it is only matched by a request asking for one of them
+        # request: only a request asking for one of them matches it, and is then refused
         configured = set(_template_configured_ekus(template))
         if configured and not template_eku and not csr_eku & configured:
             continue
@@ -599,6 +603,19 @@ _SERVER_AUTH = '1.3.6.1.5.5.7.3.1'
 _CLIENT_AUTH = '1.3.6.1.5.5.7.3.2'
 _SMARTCARD_LOGON = '1.3.6.1.4.1.311.20.2.2'
 _PERSON_EKUS = frozenset({'1.3.6.1.5.5.7.3.4', '1.3.6.1.4.1.311.10.3.4'})  # emailProtection, EFS
+
+
+def issues_only_capped_ekus(template):
+    """Whether every EKU ``template`` configures is capped: signed, it would fall back to
+    the server profile, so it is neither announced nor issued under."""
+    from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS
+    configured = set(_template_configured_ekus(template))
+    return bool(configured) and configured <= PROTOCOL_UNBINDABLE_EKU_OIDS - {_SMARTCARD_LOGON}
+
+
+def _capped_only_refusal(template):
+    return (f"Template '{template.name}' configures only Extended Key Usages "
+            'this service does not issue')
 
 
 def _template_profile(template, csr):
@@ -1040,6 +1057,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     matched_template, refusal = _match_template(ca, csr, kerberos_principal)
     if refusal:
         return None, refusal
+    if matched_template is not None and issues_only_capped_ekus(matched_template):
+        return None, _capped_only_refusal(matched_template)
     # No active template offered (pins all off, or none active at all): nothing would carry an Enroll ACL
     if matched_template is None and not _ca_templates(ca):
         return None, ServerError('This CA offers no certificate template')

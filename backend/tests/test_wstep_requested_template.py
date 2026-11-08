@@ -225,14 +225,14 @@ def test_a_certificate_renews_after_the_xcep_ca_changes(app, split_xcep, create_
     assert _template_oid(cert).dotted_string == now != oid
 
 
-def _foreign_oid_cert(app, ca_id, template_name, key):
-    """A certificate of this CA carrying the policy OID another UCM instance derives for the
-    template of the same id, as an imported certificate could."""
+def _foreign_oid_cert(app, ca_id, template_name, key, refid='another-ucm-instance-ca'):
+    """A certificate of this CA carrying the policy OID the CA of ``refid`` derives for the
+    template: by default another UCM instance's, as an imported certificate could."""
     from types import SimpleNamespace
     from services.ca_service import CAService
     with app.app_context():
         template = CertificateTemplate.query.filter_by(name=template_name).one()
-        foreign = _policy_oid_for_template(SimpleNamespace(refid='another-ucm-instance-ca'), template)
+        foreign = _policy_oid_for_template(SimpleNamespace(refid=refid), template)
         csr = (x509.CertificateSigningRequestBuilder()
                .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'foreign.example.test')]))
                .add_extension(x509.ExtendedKeyUsage([CLIENT_AUTH]), critical=False)
@@ -255,3 +255,18 @@ def test_a_template_oid_of_another_instance_does_not_renew(app, subject_ca, path
     cert, err = _renew(app, ca_id, path, old_cert, key, _eku_csr(old_cert, key, CLIENT_AUTH))
     assert cert is None
     assert err == 'The certificate template of the certificate being renewed is not offered by this CA'
+
+
+@pytest.mark.parametrize('path', ['tls', 'xml'])
+def test_a_template_of_capped_ekus_only_does_not_renew(app, subject_ca, path):
+    """Its only EKU would be dropped and the server profile applied instead."""
+    ca_id = subject_ca(f'Named capped {path} CA', {**TWINS, 'OCSP': ('ocsp', ['ocspSigning'], False, 'RSA-2048')})
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    with app.app_context():
+        refid = db.session.get(CA, ca_id).refid
+    old_cert = _foreign_oid_cert(app, ca_id, f'Named capped {path} CA OCSP', key, refid=refid)
+    cert, err = _renew(app, ca_id, path, old_cert, key,
+                       _eku_csr(old_cert, key, x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING))
+    assert cert is None
+    assert err == (f"Template 'Named capped {path} CA OCSP' configures only Extended Key Usages "
+                   'this service does not issue')
