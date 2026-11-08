@@ -129,12 +129,12 @@ def test_a_duplicate_key_keeps_its_detail(app):
      'null value in column "key" of relation "system_config" violates not-null constraint'),
     # A refused input: the primary line quotes it
     ("INSERT INTO system_config (id, key) VALUES (CAST(:v AS integer), 'scrub-probe')", '22P02',
-     'invalid input syntax for type integer: "\u2026"'),
+     'invalid input value (SQLSTATE 22P02), not shown'),
     # Out of range: the value is quoted in the middle of the line
     ("SELECT CAST(:v || '99999999999' AS integer)", '22003',
-     'value "\u2026" is out of range for type integer'),
+     'invalid input value (SQLSTATE 22003), not shown'),
     # Malformed JSON: the DETAIL quotes the token
-    ('SELECT CAST(:v AS json)', '22P02', 'invalid input syntax for type json'),
+    ('SELECT CAST(:v AS json)', '22P02', 'invalid input value (SQLSTATE 22P02), not shown'),
 ])
 def test_a_refused_row_or_input_is_not_quoted(app, statement, pgcode, primary):
     _on_postgresql(app)
@@ -156,37 +156,149 @@ def test_sqlite_errors_are_left_as_they_are(tmp_path):
     engine.dispose()
 
 
-@pytest.mark.parametrize('message, scrubbed', [
-    ('column "x" does not exist\nLINE 1: SELECT x, \'s3cret\'\n               ^\n',
-     'column "x" does not exist\n'),
-    ('duplicate key value\nDETAIL:  Key (name)=(a) already exists.\n',
-     'duplicate key value\nDETAIL:  Key (name)=(a) already exists.\n'),
-    ('syntax error\nLINE 2: VALUES (\'s3cret\')\n        ^\nHINT:  Check it.\n',
-     'syntax error\nHINT:  Check it.\n'),
-    ('failed\nCONTEXT:  SQL statement "INSERT INTO t VALUES (\'s3cret\')"\nPL/pgSQL function f() line 3\n'
-     'QUERY:  SELECT \'s3cret\'\n', 'failed\n'),
+@pytest.mark.parametrize('fields, kept', [
+    (('column "x" does not exist',), 'column "x" does not exist'),
+    (('duplicate key value', 'Key (name)=(a) already exists.'),
+     'duplicate key value\nDETAIL:  Key (name)=(a) already exists.'),
+    (('syntax error', None, 'Check it.'), 'syntax error\nHINT:  Check it.'),
 ])
-def test_the_scrubber_keeps_the_message_detail_and_hint(message, scrubbed):
-    from utils.db_errors import scrub_postgres_message
-    assert scrub_postgres_message(message) == scrubbed
+def test_the_message_keeps_its_detail_and_hint(fields, kept):
+    from utils.db_errors import postgres_message
+    assert postgres_message(*fields) == kept
 
 
-@pytest.mark.parametrize('message, pgcode, scrubbed', [
-    ('null value in column "v"\nDETAIL:  Failing row contains (1, null, s3cret).\n', '23502',
-     'null value in column "v"\n'),
-    ('new row violates check constraint "c"\nDETAIL:  Failing row contains (-1, s3cret).\n', '23514',
-     'new row violates check constraint "c"\n'),
-    ('invalid input syntax for type timestamp: "s3cret"\n', '22007',
-     'invalid input syntax for type timestamp: "\u2026"\n'),
-    ('date/time field value out of range: "s3cret"\n', '22008',
-     'date/time field value out of range: "\u2026"\n'),
-    ('value "1234567890123" is out of range for type integer\n', '22003',
-     'value "\u2026" is out of range for type integer\n'),
-    ('invalid input syntax for type json\nDETAIL:  Token "s3cret" is invalid.\n'
-     'CONTEXT:  JSON data, line 1: s3cret\n', '22P02', 'invalid input syntax for type json\n'),
+@pytest.mark.parametrize('primary, detail, pgcode, kept', [
+    ('null value in column "v"', 'Failing row contains (1, null, s3cret).', '23502', 'null value in column "v"'),
+    ('new row violates check constraint "c"', 'Failing row contains (-1, s3cret).', '23514',
+     'new row violates check constraint "c"'),
+    ('new row violates check option for view "w"', 'Failing row contains (s3cret).', '44000',
+     'new row violates check option for view "w"'),
+    ('invalid input syntax for type timestamp: "s3cret"', None, '22007',
+     'invalid input value (SQLSTATE 22007), not shown'),
+    ('value "1234567890123" is out of range for type integer', None, '22003',
+     'invalid input value (SQLSTATE 22003), not shown'),
+    ('invalid input syntax for type json', 'Token "s3cret" is invalid.', '22P02',
+     'invalid input value (SQLSTATE 22P02), not shown'),
     # Outside class 22 a quoted name is an identifier, not an input
-    ('relation "s3cret_table" does not exist\n', '42P01', 'relation "s3cret_table" does not exist\n'),
+    ('relation "s3cret_table" does not exist', None, '42P01', 'relation "s3cret_table" does not exist'),
 ])
-def test_the_scrubber_drops_refused_rows_and_inputs(message, pgcode, scrubbed):
-    from utils.db_errors import scrub_postgres_message
-    assert scrub_postgres_message(message, pgcode) == scrubbed
+def test_the_message_drops_refused_rows_and_inputs(primary, detail, pgcode, kept):
+    from utils.db_errors import postgres_message
+    assert postgres_message(primary, detail, None, pgcode) == kept
+
+
+class _Diag:
+    def __init__(self, primary, detail=None, hint=None):
+        self.message_primary, self.message_detail, self.message_hint = primary, detail, hint
+
+
+class _ServerError(Exception):
+    """A psycopg error as the server sends it: its text as libpq labelled it, its fields."""
+    def __init__(self, text, pgcode, diag):
+        super().__init__(text)
+        self.sqlstate, self.diag = pgcode, diag
+
+
+def _scrubbed(error):
+    wrapped = Exception(f'(psycopg.errors.X) {error.args[0]}')
+    db_errors._scrub(SimpleNamespace(dialect=SimpleNamespace(name='postgresql'),
+                                     original_exception=error, sqlalchemy_exception=wrapped))
+    return error.args[0], wrapped.args[0]
+
+
+@pytest.mark.parametrize('text, pgcode, diag, kept', [
+    # Server and client labels both in French: nothing here is matched as text
+    ('la nouvelle ligne de la relation « t » viole la contrainte de vérification « c »\n'
+     'DÉTAIL : La ligne en échec contient (c, ZZSECRET, -1).', '23514',
+     _Diag('la nouvelle ligne de la relation « t » viole la contrainte de vérification « c »',
+           'La ligne en échec contient (c, ZZSECRET, -1).'),
+     'la nouvelle ligne de la relation « t » viole la contrainte de vérification « c »'),
+    ('une valeur NULL viole la contrainte NOT NULL de la colonne « v »\n'
+     'DÉTAIL : La ligne en échec contient (b, null, ZZSECRET).', '23502',
+     _Diag('une valeur NULL viole la contrainte NOT NULL de la colonne « v »',
+           'La ligne en échec contient (b, null, ZZSECRET).'),
+     'une valeur NULL viole la contrainte NOT NULL de la colonne « v »'),
+    ("syntaxe en entrée invalide pour le type integer : « ZZSECRET »\n"
+     "LIGNE 1 : select cast('ZZSECRET' as integer)\n                    ^", '22P02',
+     _Diag('syntaxe en entrée invalide pour le type integer : « ZZSECRET »'),
+     'invalid input value (SQLSTATE 22P02), not shown'),
+    ('syntaxe en entrée invalide pour le type json\nDÉTAIL : Token "ZZSECRET" is invalid.\n'
+     'CONTEXTE : données JSON, ligne 1 : {ZZSECRET', '22P02',
+     _Diag('syntaxe en entrée invalide pour le type json', 'Token "ZZSECRET" is invalid.'),
+     'invalid input value (SQLSTATE 22P02), not shown'),
+    ("la colonne « nope » n'existe pas\nLIGNE 1 : select nope from t where v='ZZSECRET'", '42703',
+     _Diag("la colonne « nope » n'existe pas"), "la colonne « nope » n'existe pas"),
+    ("la valeur d'une clé dupliquée rompt la contrainte unique « t_pkey »\n"
+     'DÉTAIL : La clé « (k)=(a) » existe déjà.', '23505',
+     _Diag("la valeur d'une clé dupliquée rompt la contrainte unique « t_pkey »",
+           'La clé « (k)=(a) » existe déjà.', 'Un conseil.'),
+     "la valeur d'une clé dupliquée rompt la contrainte unique « t_pkey »\n"
+     'DETAIL:  La clé « (k)=(a) » existe déjà.\nHINT:  Un conseil.'),
+])
+def test_the_message_is_rebuilt_from_its_fields_whatever_the_language(text, pgcode, diag, kept):
+    clean, wrapped = _scrubbed(_ServerError(text, pgcode, diag))
+    assert clean == kept and wrapped == f'({__name__}._ServerError) {kept}'
+    assert 'ZZSECRET' not in clean and 'LIGNE' not in clean and 'CONTEXTE' not in clean
+
+
+@pytest.mark.parametrize('pgcode', [None, '22P02'])
+def test_an_error_without_server_fields_is_left_as_it_is(pgcode):
+    text = 'connection failed: connection to server at "127.0.0.1", port 5432 failed\nsecond line'
+    clean, _ = _scrubbed(_ServerError(text, pgcode, _Diag(None)))
+    assert clean == text
+
+
+_FRENCH = 'fr_FR.UTF-8'
+
+
+@pytest.mark.postgres
+def test_a_server_speaking_french_quotes_no_value():
+    """A role whose lc_messages is French, on a real server; the superuser URL creates it."""
+    import os
+    import secrets
+    import psycopg
+    from sqlalchemy import create_engine
+    from sqlalchemy.engine import make_url
+    from utils.db_url import sqlalchemy_url
+
+    admin_url = os.environ.get('UCM_TEST_POSTGRES_URL')
+    if not admin_url:
+        pytest.skip('UCM_TEST_POSTGRES_URL not set')
+    role, password = f'ucm_lcfr_{secrets.token_hex(4)}', secrets.token_hex(16)
+    table = f'{role}_probe'
+    admin = psycopg.connect(admin_url, autocommit=True)
+    try:
+        if not admin.execute('SELECT rolsuper FROM pg_roles WHERE rolname = current_user').fetchone()[0]:
+            pytest.skip('setting lc_messages on a role takes a superuser')
+        admin.execute(f'CREATE ROLE "{role}" LOGIN PASSWORD \'{password}\'')
+        try:
+            admin.execute(f'ALTER ROLE "{role}" SET lc_messages = \'{_FRENCH}\'')
+        except psycopg.errors.InvalidParameterValue:
+            pytest.skip(f'the server has no {_FRENCH} locale')
+        # The admin owns the table: the role is left with nothing to drop
+        admin.execute(f'CREATE TABLE "{table}" (k text PRIMARY KEY, v text NOT NULL, n integer CHECK (n > 0))')
+        admin.execute(f'GRANT SELECT, INSERT ON "{table}" TO "{role}"')
+        url = make_url(sqlalchemy_url(admin_url)).set(username=role, password=password)
+        engine = create_engine(url, hide_parameters=True)
+        try:
+            with engine.connect() as conn:
+                for statement, params in [
+                        (f'INSERT INTO "{table}" VALUES (:k, NULL, 1)', {'k': _SECRET}),
+                        (f'INSERT INTO "{table}" VALUES (:k, :v, -1)', {'k': 'a', 'v': _SECRET}),
+                        ('SELECT CAST(:v AS integer)', {'v': _SECRET}),
+                        ('SELECT CAST(:v AS timestamp)', {'v': _SECRET}),
+                        ('SELECT CAST(:v AS json)', {'v': '{' + _SECRET}),
+                        (f'SELECT nope FROM "{table}" WHERE v = :v', {'v': _SECRET})]:
+                    with pytest.raises(SQLAlchemyError) as caught:
+                        conn.execute(text(statement), params)
+                    conn.rollback()
+                    diag = caught.value.orig.diag
+                    if diag.severity == diag.severity_nonlocalized:
+                        pytest.skip('the server has no French translation of its messages')
+                    assert _SECRET not in str(caught.value) and _SECRET not in str(caught.value.orig), statement
+        finally:
+            engine.dispose()
+    finally:
+        admin.execute(f'DROP TABLE IF EXISTS "{table}"')
+        admin.execute(f'DROP ROLE IF EXISTS "{role}"')
+        admin.close()

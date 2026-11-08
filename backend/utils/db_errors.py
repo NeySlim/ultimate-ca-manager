@@ -1,20 +1,14 @@
 """PostgreSQL errors without the values they quote.
 
 The server quotes the refused row (``Failing row contains``) and the refused
-input (class 22) whatever ``hide_parameters`` says, private keys included.
+input (class 22) whatever ``hide_parameters`` says, private keys included, and
+in its own language: the message is rebuilt from the error's fields, never parsed.
 """
-import re
-
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
 
-# Sections of a server message; continuation lines belong to the section above
-_SECTION = re.compile(r'^(LINE \d+|DETAIL|HINT|QUERY|CONTEXT|WHERE|STATEMENT):')
-_KEPT = ('DETAIL', 'HINT')
-# NOT NULL and CHECK refusals (23502, 23514) quote the whole row
-_ROW_DETAIL = re.compile(r'^DETAIL:\s+Failing row contains')
-# Data exceptions (class 22) quote the input on their primary line and in their DETAIL
-_QUOTED = re.compile(r'"[^"]*"')
+# NOT NULL, CHECK and WITH CHECK OPTION refusals quote the whole row in their DETAIL
+_ROW_DETAIL = ('23502', '23514', '44000')
 
 
 def sqlstate(orig):
@@ -22,21 +16,17 @@ def sqlstate(orig):
     return getattr(orig, 'sqlstate', None)
 
 
-def scrub_postgres_message(message, pgcode=None):
-    """The primary line, DETAIL and HINT of a server message, without the statement,
-    the refused row or, for a data exception (class 22), the refused input."""
-    data_exception = bool(pgcode) and pgcode.startswith('22')
-    lines = message.split('\n')
-    primary = _QUOTED.sub('"\u2026"', lines[0]) if data_exception else lines[0]
-    kept, keep = [primary], True
-    for line in lines[1:]:
-        section = _SECTION.match(line)
-        if section:
-            keep = (section.group(1) in _KEPT and not _ROW_DETAIL.match(line)
-                    and not (data_exception and section.group(1) == 'DETAIL'))
-        if keep and line:
-            kept.append(line)
-    return '\n'.join(kept) + ('\n' if message.endswith('\n') else '')
+def postgres_message(primary, detail=None, hint=None, pgcode=None):
+    """The primary line, DETAIL and HINT of a server error, without the refused row;
+    a data exception (class 22) quotes its input anywhere and keeps its SQLSTATE only."""
+    if pgcode and pgcode.startswith('22'):
+        return f'invalid input value (SQLSTATE {pgcode}), not shown'
+    lines = [primary]
+    if detail and pgcode not in _ROW_DETAIL:
+        lines.append(f'DETAIL:  {detail}')
+    if hint:
+        lines.append(f'HINT:  {hint}')
+    return '\n'.join(lines)
 
 
 def _scrub(context):
@@ -54,7 +44,11 @@ def _scrub_error(context):
     orig = context.original_exception
     if len(getattr(orig, 'args', ())) != 1 or not isinstance(orig.args[0], str):
         return None
-    clean = scrub_postgres_message(orig.args[0], sqlstate(orig))
+    diag = getattr(orig, 'diag', None)
+    primary = getattr(diag, 'message_primary', None)
+    if not primary:
+        return None  # not from a server result: a client-side or connection error
+    clean = postgres_message(primary, diag.message_detail, diag.message_hint, sqlstate(orig))
     if clean == orig.args[0]:
         return None
     # SQLSTATE and diag stay: diag keeps the raw text and nothing here reads it
