@@ -1519,6 +1519,7 @@ class AcmeProxyService:
                         "%d other order(s) share it", identifier.get('value'), order.id,
                         len(shared))
 
+        # Recorded for the authorization view; an order already valid stays valid (§7.1.6)
         order.mark_authz_deactivated(authz_url)
         if order.status == 'pending':
             order.status = 'invalid'
@@ -1527,8 +1528,9 @@ class AcmeProxyService:
         except Exception:
             db.session.rollback()
             raise
-        _dns_rows_hook('close_for_order', order.id)
-        self._release_order_records(order)
+        if order.status != 'valid':
+            _dns_rows_hook('close_for_order', order.id)
+            self._release_order_records(order)
         return self._deactivated_view(authz), identifier
 
     def _deactivated_view(self, authz):
@@ -2398,8 +2400,8 @@ class AcmeProxyService:
         order = resp.json()
         _finalize_url_cache.put(order_url, order.get('finalize'))
         # RFC 8555 §7.5.2: a deactivated authorization never issues, even once the shared
-        # upstream order is valid through another client's order: no certificate served.
-        if local_order.deactivated_authz_list:
+        # upstream order is valid through another client's order; valid is final (§7.1.6).
+        if local_order.deactivated_authz_list and local_order.status != 'valid':
             order['status'] = 'invalid'
             order.pop('certificate', None)
         # RFC 8555 §7.1.6: invalid is final, even when the upstream CA validates the order later
@@ -2492,7 +2494,8 @@ class AcmeProxyService:
             order, requester_account_id, requester_thumbprint,
             resource='Certificate')
         # The certificate of a shared upstream order belongs to the orders that may issue
-        if order.deactivated_authz_list or self._local_failure(order):
+        if order.status != 'valid' and (order.deactivated_authz_list
+                                        or self._local_failure(order)):
             raise ProxyResourceNotFoundError("Certificate not found")
         resp = self._post_with_account(cert_url, "")
         if resp.status_code != 200:
