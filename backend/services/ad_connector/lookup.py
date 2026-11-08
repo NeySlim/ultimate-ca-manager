@@ -29,8 +29,9 @@ Bind/search mechanics mirror ``api/v2/sso/connection_tests.py``'s
 temp CA-bundle file that exists in that code (no matching cleanup there).
 
 The public lookups never raise: they answer None (or False) when the connector is
-off or the object is not found, and the falsy ``UNREACHABLE`` when no DC binds or the
-search raises, so a caller can refuse the request or fault on its own side.
+off or the object is not found, and the falsy ``UNREACHABLE`` when no DC binds, the
+search raises or the enabled connector lacks a server or base DN, so a caller can refuse
+the request or fault on its own side.
 """
 import logging
 import os
@@ -41,20 +42,38 @@ import tempfile
 logger = logging.getLogger(__name__)
 
 
-class _Unreachable:
-    """The falsy answer of a lookup the directory could not give (no DC bound, or the search
-    raised), told apart from "not found". An LDAP error result without an exception reads as
-    no entry, since connections are opened without raise_exceptions."""
-    __slots__ = ()
+class _Falsy:
+    """A falsy lookup answer told apart from None ("not found") by identity."""
+    __slots__ = ('_name',)
+
+    def __init__(self, name):
+        self._name = name
 
     def __bool__(self):
         return False
 
     def __repr__(self):
-        return 'UNREACHABLE'
+        return self._name
 
 
-UNREACHABLE = _Unreachable()
+# No DC bound, the search raised, or the enabled connector has no server or base DN. An LDAP
+# error result without an exception reads as no entry (connections skip raise_exceptions).
+UNREACHABLE = _Falsy('UNREACHABLE')
+# The account exists but its objectSid is missing or malformed.
+UNUSABLE_SID = _Falsy('UNUSABLE_SID')
+
+
+def _enabled_config():
+    """(config, None) for a complete enabled connector; (None, None) when it is absent or
+    disabled; (None, UNREACHABLE) when it is enabled but has no server or base DN."""
+    from models import ADConnectorConfig
+
+    config = ADConnectorConfig.get_singleton()
+    if not config or not config.enabled:
+        return None, None
+    if not config.server or not config.base_dn:
+        return None, UNREACHABLE
+    return config, None
 
 
 def parse_kerberos_principal(principal):
@@ -319,11 +338,9 @@ def lookup_computer_dns_hostname(sam_account_name):
     """
     from ldap3.utils.conv import escape_filter_chars
 
-    from models import ADConnectorConfig
-
-    config = ADConnectorConfig.get_singleton()
-    if not config or not config.enabled or not config.server or not config.base_dn:
-        return None
+    config, fault = _enabled_config()
+    if config is None:
+        return fault
 
     try:
         conn = _connect(config)
@@ -397,17 +414,16 @@ def lookup_object_sid(sam_account_name):
     ``raw_values[0]`` (the real binary SID) and converts it via
     ``_sid_bytes_to_string``.
 
-    ``None`` when the connector is off, the entry is not found or its SID is empty or
-    malformed; the falsy ``UNREACHABLE`` when no DC binds or the search raises. Never raises.
-    A caller telling "connector off" from "not found" checks ``ADConnectorConfig`` first.
+    ``None`` when the connector is off or the entry is not found; the falsy ``UNUSABLE_SID``
+    when its SID is missing or malformed; the falsy ``UNREACHABLE`` when the directory cannot
+    answer. Never raises. A caller telling "connector off" from "not found" checks
+    ``ADConnectorConfig`` first.
     """
     from ldap3.utils.conv import escape_filter_chars
 
-    from models import ADConnectorConfig
-
-    config = ADConnectorConfig.get_singleton()
-    if not config or not config.enabled or not config.server or not config.base_dn:
-        return None
+    config, fault = _enabled_config()
+    if config is None:
+        return fault
 
     try:
         conn = _connect(config)
@@ -426,8 +442,8 @@ def lookup_object_sid(sam_account_name):
             return None
         entry = conn.entries[0]
         if 'objectSid' not in entry or not entry.objectSid.raw_values:
-            return None
-        return _sid_bytes_to_string(entry.objectSid.raw_values[0])
+            return UNUSABLE_SID
+        return _sid_bytes_to_string(entry.objectSid.raw_values[0]) or UNUSABLE_SID
     except Exception as e:
         logger.warning("AD Connector: SID lookup failed: %s", e)
         return UNREACHABLE
@@ -464,11 +480,9 @@ def lookup_user_ad_identity(sam_account_name):
     from ldap3.utils.conv import escape_filter_chars
     from ldap3.utils.dn import parse_dn
 
-    from models import ADConnectorConfig
-
-    config = ADConnectorConfig.get_singleton()
-    if not config or not config.enabled or not config.server or not config.base_dn:
-        return None
+    config, fault = _enabled_config()
+    if config is None:
+        return fault
 
     try:
         conn = _connect(config)
@@ -534,14 +548,12 @@ def is_member_of_group(sam_account_name, group):
     """
     from ldap3.utils.conv import escape_filter_chars
 
-    from models import ADConnectorConfig
-
     if not sam_account_name or not group:
         return False
 
-    config = ADConnectorConfig.get_singleton()
-    if not config or not config.enabled or not config.server or not config.base_dn:
-        return False
+    config, fault = _enabled_config()
+    if config is None:
+        return fault if fault is not None else False
 
     try:
         conn = _connect(config)

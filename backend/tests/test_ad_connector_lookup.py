@@ -222,6 +222,29 @@ class TestLookupUserAdIdentityUnreachable:
             assert lookup.lookup_user_ad_identity('alice') is lookup.UNREACHABLE
 
 
+class TestEnabledWithoutServer:
+    """An enabled connector the API saved without a server or base DN cannot answer:
+    UNREACHABLE (a server fault), never the None/False of "not found"."""
+
+    @staticmethod
+    def _configure_incomplete(app, server=None, base_dn='DC=hagland,DC=domain'):
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            config = ADConnectorConfig(server=server, base_dn=base_dn, bind_dn='svc-ucm', enabled=True)
+            config.bind_password = 'irrelevant'
+            db.session.add(config)
+            db.session.commit()
+
+    @pytest.mark.parametrize('server,base_dn', [(None, 'DC=hagland,DC=domain'), ('dc1.hagland.domain', None)])
+    def test_every_lookup_is_unreachable(self, app, server, base_dn):
+        self._configure_incomplete(app, server=server, base_dn=base_dn)
+        with app.app_context():
+            assert lookup.lookup_computer_dns_hostname('WIN11$') is lookup.UNREACHABLE
+            assert lookup.lookup_object_sid('WIN11$') is lookup.UNREACHABLE
+            assert lookup.lookup_user_ad_identity('alice') is lookup.UNREACHABLE
+            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is lookup.UNREACHABLE
+
+
 class TestSidBytesToString:
     """Pure-function coverage of _sid_bytes_to_string -- no DB/Flask app
     needed. The golden case is a REAL SID captured this session via a live
@@ -287,14 +310,14 @@ class TestLookupObjectSid:
         with app.app_context():
             assert lookup.lookup_object_sid('WIN11$') is None
 
-    def test_missing_attribute_returns_none(self, app, monkeypatch):
+    def test_missing_attribute_is_unusable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         entry = _FakeEntry({})
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry]))
         with app.app_context():
-            assert lookup.lookup_object_sid('WIN11$') is None
+            assert lookup.lookup_object_sid('WIN11$') is lookup.UNUSABLE_SID
 
-    def test_empty_raw_values_returns_none(self, app, monkeypatch):
+    def test_empty_raw_values_is_unusable(self, app, monkeypatch):
         # _FakeEntry wraps every dict value in _FakeAttr itself (see its
         # __init__) -- passing b'' here (not an already-built _FakeAttr)
         # lets _FakeAttr's own default (raw_values=[value] if value else
@@ -304,7 +327,15 @@ class TestLookupObjectSid:
         entry = _FakeEntry({'objectSid': b''})
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry]))
         with app.app_context():
-            assert lookup.lookup_object_sid('WIN11$') is None
+            assert lookup.lookup_object_sid('WIN11$') is lookup.UNUSABLE_SID
+
+    def test_malformed_sid_is_unusable_not_absent(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+        entry = _FakeEntry({'objectSid': b'\x01\x05\x00'})
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry]))
+        with app.app_context():
+            result = lookup.lookup_object_sid('WIN11$')
+            assert result is lookup.UNUSABLE_SID and not result
 
     def test_search_exception_is_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)

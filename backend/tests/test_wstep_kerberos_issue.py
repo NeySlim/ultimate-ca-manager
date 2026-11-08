@@ -795,6 +795,42 @@ def test_a_requester_missing_from_the_directory_is_a_sender_fault(
     assert _fault_text_and_code(r.data) == ('The requester was not found in the directory', 's:Sender')
 
 
+def test_an_enabled_connector_without_a_server_is_a_receiver_fault(
+        client, app, wstep_kerberos_config, monkeypatch):
+    """The API accepts an enabled connector with no server: a configuration fault (500), not 400."""
+    with app.app_context():
+        ADConnectorConfig.query.delete()
+        config = ADConnectorConfig(server=None, base_dn='DC=hagland,DC=domain', bind_dn='svc-ucm', enabled=True)
+        config.bind_password = 'irrelevant'
+        db.session.add(config)
+        db.session.commit()
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    csr, _key = _make_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 500
+    assert _fault_text_and_code(r.data) == (
+        'Could not resolve requester identity for strong certificate mapping', 's:Receiver')
+
+
+def test_a_requester_without_a_usable_sid_is_told_apart_from_a_missing_one(
+        client, app, wstep_kerberos_config, monkeypatch):
+    _configure_ad_connector(app)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: ad_lookup.UNUSABLE_SID)
+    csr, _key = _make_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 400
+    assert _fault_text_and_code(r.data) == ('The requester has no usable directory identity', 's:Sender')
+
+
 def _fault_text_and_code(data):
     fault = etree.fromstring(data).find(f'.//{{{SOAP_NS}}}Fault')
     return (fault.find(f'.//{{{SOAP_NS}}}Text').text,
