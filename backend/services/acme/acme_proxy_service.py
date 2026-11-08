@@ -55,7 +55,7 @@ _CHALLENGE_PARENT_LEVELS = 2
 _CERT_FALLBACK_SCAN_LIMIT = 25
 # Seconds the TXT of a challenge already submitted outlives a local failure of its order:
 # the upstream CA may still be reading it. The order lists it, flagged, until deleted; a
-# deletion a restart lost runs at the order's next read one delay later, never if it is not read.
+# deletion a restart lost runs at the order's next read or housekeeping pass one delay later.
 _SUBMITTED_RECORD_LINGER = 120
 # The dns-01 threads of one order run in the worker that started them: one lock per
 # order id (striped) orders their writes to the row, a row lock covers PostgreSQL too.
@@ -2069,6 +2069,37 @@ class AcmeProxyService:
             thread.name = "ACMEProxy-DNS-Cleanup"
             thread.daemon = True
             thread.start()
+
+    @classmethod
+    def release_lost_txt_deletions(cls) -> int:
+        """Release again the records of orders that can no longer issue whose deferred deletion
+        is overdue: a restart lost its thread and no client may read the order again."""
+        from models import AcmeClientOrder
+
+        stale = time.time() - _SUBMITTED_RECORD_LINGER
+        rows = (AcmeClientOrder.query
+                .filter(AcmeClientOrder.is_proxy_order.is_(True),
+                        AcmeClientOrder.status != 'pending',
+                        AcmeClientOrder.dns_records_created.contains('release_at',
+                                                                     autoescape=True))
+                .order_by(AcmeClientOrder.id.asc()).all())
+        due = []
+        for row in rows:
+            try:
+                records = json.loads(row.dns_records_created or '[]')
+            except (TypeError, ValueError):
+                continue
+            if any(isinstance(r, dict) and isinstance(r.get('release_at'), (int, float))
+                   and r['release_at'] < stale for r in records):
+                due.append(row)
+        if not due:
+            return 0
+        # Not __init__: it resolves, and may create, an upstream account; releasing reads none
+        service = cls.__new__(cls)
+        for row in due:
+            service._release_order_records(row)
+        logger.info("[ACME Proxy] Lost TXT deletions of %s order(s) dispatched again", len(due))
+        return len(due)
 
     @staticmethod
     def _value_still_needed(record_name, value, order_id):

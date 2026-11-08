@@ -52,11 +52,17 @@ def recover_interrupted_orders() -> int:
 
 
 def scheduled_order_recovery() -> dict:
-    """Scheduler task: an order a restart cut short resumes within about 15 minutes of its last activity."""
+    """Scheduler task: an order a restart cut short resumes within about 15 minutes of its last
+    activity, and the proxy TXT deletions a restart lost are dispatched again."""
+    from services.acme.acme_proxy_service import AcmeProxyService
     count = recover_interrupted_orders()
-    if not count:
+    released = AcmeProxyService.release_lost_txt_deletions()
+    if not count and not released:
         return {'status': 'skipped', 'reason': 'no_interrupted_order'}
-    return {'status': 'ok', 'reason': f'{count} order(s) set back to pending', 'recovered': count}
+    reason = '; '.join(part for part in (
+        count and f'{count} order(s) set back to pending',
+        released and f'TXT records of {released} proxy order(s) released') if part)
+    return {'status': 'ok', 'reason': reason, 'recovered': count, 'txt_released': released}
 
 
 def delete_order(order) -> list:

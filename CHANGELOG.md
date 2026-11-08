@@ -132,6 +132,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - OCSP: a POST whose Content-Type was `application/ocsp-request` in another case was answered malformedRequest. Media types are now compared without case (RFC 9110 §8.3.1).
 - ACME proxy: an order whose authorization the client deactivated was served valid, with its certificate, once another account's order completed the shared upstream order. It now stays invalid without a certificate, and that certificate is served only to an order that may issue (RFC 8555 §7.5.2).
 - ACME server and proxy: a URL or method no ACME route serves, a GET on a POST-only resource included, got a generic 404 without the directory link. It now gets a `malformed` problem document linking the directory, as 405 with `Allow` when another method is served (RFC 8555 §6.3, §7.1).
+- ACME proxy: a TXT record whose deferred deletion a restart interrupted stayed published for good when no client read its failed order again. The 15-minute order housekeeping task now deletes it, unless another pending order still needs the value.
 
 ### Security
 

@@ -618,7 +618,8 @@ def create_app(config_name=None):
                 name="acme_order_recovery",
                 func=scheduled_order_recovery,
                 interval=900,
-                description="Set ACME orders interrupted by a restart back to pending"
+                description="Set ACME orders interrupted by a restart back to pending, "
+                            "release proxy TXT records whose deletion a restart lost"
             )
         except ImportError:
             pass
