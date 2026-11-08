@@ -139,10 +139,16 @@ def _validity_days():
         return 365
 
 
-def _fault_response(reason, status=500, relates_to=None, subcode=None, code='s:Receiver'):
+def _fault_response(reason, status=500, relates_to=None, subcode=None):
+    # SOAP 1.2 HTTP binding: env:Sender (the request is at fault) goes as 400, env:Receiver as 500
+    code = 's:Sender' if status < 500 else 's:Receiver'
     (logger.error if status >= 500 else logger.debug)("WSTEP fault (status=%s): %s", status, reason)
     body = build_soap_fault(reason, code=code, relates_to=relates_to, subcode=subcode)
     return Response(body, status=status, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
+
+
+def _error_status(error):
+    return 500 if isinstance(error, wstep_service.ServerError) else 400
 
 
 def _parse_request(body):
@@ -154,12 +160,11 @@ def _parse_request(body):
         return None, _fault_response(f'Malformed request: {e}', status=400, relates_to=e.message_id)
     if parsed.request_type != REQUEST_TYPE_ISSUE:
         return None, _fault_response('Unsupported wst:RequestType: only Issue is served',
-                                     status=400, relates_to=parsed.message_id, code='s:Sender')
+                                     status=400, relates_to=parsed.message_id)
     # WSS 1.1 section 12: on SOAP 1.2 its fault codes are subcodes of env:Sender
     if message_expired(parsed.security_header):
         return None, _fault_response('The message has expired (wsu:Timestamp)', status=400,
-                                     relates_to=parsed.message_id, subcode='wsse:MessageExpired',
-                                     code='s:Sender')
+                                     relates_to=parsed.message_id, subcode='wsse:MessageExpired')
     return parsed, None
 
 
@@ -226,7 +231,7 @@ def _issue_and_respond(ca, parsed, username, action='certificate.issued', kerber
     )
     if error:
         logger.warning("WSTEP issuance rejected for %r: %s", username, error)
-        return _fault_response(error, status=400, relates_to=parsed.message_id)
+        return _fault_response(error, status=_error_status(error), relates_to=parsed.message_id)
 
     try:
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -401,7 +406,7 @@ def renew_certificate_bound():
         if old_serial is not None:
             _audit_issuance('certificate.renewed', None, username, success=False, details=(
                 f'WSTEP renewal refused from {client_ip()}: {error} (old serial {old_serial})'))
-        return _fault_response(error, status=400, relates_to=parsed.message_id)
+        return _fault_response(error, status=_error_status(error), relates_to=parsed.message_id)
 
     try:
         cert = x509.load_pem_x509_certificate(cert_pem.encode())

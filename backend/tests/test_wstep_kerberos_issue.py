@@ -270,6 +270,7 @@ class TestNakedCsrSubjectDerivation:
         self, client, app, wstep_kerberos_config, monkeypatch
     ):
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
         monkeypatch.setattr(
@@ -439,6 +440,7 @@ class TestNakedCsrSubjectDerivation:
         ...) means the naked CSR falls through to the pre-existing
         rejection, never a crash or a bypass."""
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         _configure_ad_derived_user_template(app)
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -464,6 +466,7 @@ class TestNakedCsrSubjectDerivation:
         + a successful lookup -- without any ad_derived_subject template,
         derivation must not fire even if AD would have resolved the user."""
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         _clear_ad_derived_templates(app)
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -487,6 +490,7 @@ class TestNakedCsrSubjectDerivation:
             headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
         )
         assert r.status_code == 400
+        assert b'CSR subject must include a non-empty CN or a SubjectAltName' in r.data, r.data
 
 
 def _clear_acl_template(app):
@@ -617,8 +621,8 @@ class TestEnrollAcl:
                 ISSUE_URL, data=_build_rst(csr),
                 headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
             )
-            assert r.status_code == 400
-            assert b'This CA offers no certificate template' in r.data, r.data
+            assert r.status_code == 500
+            assert _fault_text_and_code(r.data) == ('This CA offers no certificate template', 's:Receiver')
         finally:
             _clear_acl_template(app)
 
@@ -628,6 +632,7 @@ class TestEnrollAcl:
         propagates that as a denial, not a silent bypass, when the
         connector/DC is unreachable."""
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         _configure_acl_template(app, 'VPN-Enroll', wstep_kerberos_config['id'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -643,7 +648,11 @@ class TestEnrollAcl:
                 ISSUE_URL, data=_build_rst(csr),
                 headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
             )
-            assert r.status_code == 400
+            # Denied all the same, but as the server's failure (SOAP env:Receiver), not the requester's
+            assert r.status_code == 500
+            assert _fault_text_and_code(r.data) == (
+                'The directory could not be reached to check enrollment rights', 's:Receiver')
+            assert b'DC unreachable' not in r.data
         finally:
             _clear_acl_template(app)
 
@@ -691,6 +700,7 @@ class TestEnrollAcl:
         never be checked at all -- silently defeating the ACL for exactly
         the unattended-autoenrollment case it exists to restrict."""
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         _configure_acl_template(app, 'VPN-Enroll', wstep_kerberos_config['id'], extended_key_usage=['clientAuth'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -749,3 +759,98 @@ class TestEnrollAcl:
             assert cert.public_key().public_numbers() == key.public_key().public_numbers()
         finally:
             _clear_acl_template(app)
+
+
+def test_an_unreachable_directory_is_a_receiver_fault(client, app, wstep_kerberos_config, monkeypatch):
+    """The SID lookup failing is the server's fault (SOAP env:Receiver, HTTP 500), not the client's."""
+    _configure_ad_connector(app)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: ad_lookup.UNREACHABLE)
+    csr, _key = _make_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 500
+    fault = etree.fromstring(r.data).find(f'.//{{{SOAP_NS}}}Fault')
+    assert fault.find(f'.//{{{SOAP_NS}}}Text').text == (
+        'Could not resolve requester identity for strong certificate mapping')
+    assert fault.find(f'{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text == 's:Receiver'
+
+
+def test_a_requester_missing_from_the_directory_is_a_sender_fault(
+        client, app, wstep_kerberos_config, monkeypatch):
+    """The directory answered that the account does not exist: the request is refused (400)."""
+    _configure_ad_connector(app)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: None)
+    csr, _key = _make_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 400
+    assert _fault_text_and_code(r.data) == ('The requester was not found in the directory', 's:Sender')
+
+
+def test_an_enabled_connector_without_a_server_is_a_receiver_fault(
+        client, app, wstep_kerberos_config, monkeypatch):
+    """The API accepts an enabled connector with no server: a configuration fault (500), not 400."""
+    with app.app_context():
+        ADConnectorConfig.query.delete()
+        config = ADConnectorConfig(server=None, base_dn='DC=hagland,DC=domain', bind_dn='svc-ucm', enabled=True)
+        config.bind_password = 'irrelevant'
+        db.session.add(config)
+        db.session.commit()
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    csr, _key = _make_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 500
+    assert _fault_text_and_code(r.data) == (
+        'Could not resolve requester identity for strong certificate mapping', 's:Receiver')
+
+
+def test_a_requester_without_a_usable_sid_is_told_apart_from_a_missing_one(
+        client, app, wstep_kerberos_config, monkeypatch):
+    _configure_ad_connector(app)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: ad_lookup.UNUSABLE_SID)
+    csr, _key = _make_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 400
+    assert _fault_text_and_code(r.data) == ('The requester has no usable directory identity', 's:Sender')
+
+
+def _fault_text_and_code(data):
+    fault = etree.fromstring(data).find(f'.//{{{SOAP_NS}}}Fault')
+    return (fault.find(f'.//{{{SOAP_NS}}}Text').text,
+            fault.find(f'{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text)
+
+
+def test_a_naked_request_the_directory_cannot_answer_is_a_receiver_fault(
+        client, app, wstep_kerberos_config, monkeypatch):
+    """GPO autoenrollment with no DC bound: the CA, not the computer, failed to build the subject."""
+    _configure_ad_connector(app)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+    monkeypatch.setattr(ad_lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('DC unreachable')))
+    csr, _key = _make_naked_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 500
+    assert _fault_text_and_code(r.data) == (
+        'The directory that builds the certificate subject could not be reached', 's:Receiver')
+    assert b'DC unreachable' not in r.data

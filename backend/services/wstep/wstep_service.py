@@ -12,6 +12,7 @@ tech debt.
 """
 import base64
 import logging
+import re
 
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import Encoding
@@ -50,6 +51,10 @@ _DN_ATTR_OIDS = {
     'ST': NameOID.STATE_OR_PROVINCE_NAME,
     'C': NameOID.COUNTRY_NAME,
 }
+
+
+class ServerError(str):
+    """An error message for a failure on the CA's side, faulted as SOAP env:Receiver (HTTP 500)."""
 
 
 def _x509_name_from_dn_components(dn_components, email=None):
@@ -265,10 +270,8 @@ def _match_template(ca, csr, principal=None):
     else the best match of its requested EKUs against the CA's advertised
     templates (the same set XCEP's GetPolicies exposed).
 
-    Windows CertEnroll requests captured on Server 2025 name no template (their
-    CMC control sequence is empty, the CSR carries EKU, key usage and SKI only),
-    so the EKU match stays the fallback: it infers the template from what the
-    CSR itself asks for (its EKU set).
+    The EKU match is the fallback for requests naming no template; XCEP announces
+    each template's extension (1.3.6.1.4.1.311.21.7) so that CertEnroll names it.
 
     This is a real limitation, not a corner case: two templates can
     legitimately want the same EKU (e.g. "Web Server" and "VPN Server"
@@ -285,7 +288,7 @@ def _match_template(ca, csr, principal=None):
     a user, generalFlags) are matched first, as a Windows client only offers those.
 
     Callers use the matched row three ways: its policy OID (via
-    ``policy_builder._policy_oid_for_template``) for the issued cert's
+    ``_template_oid_for``) for the issued cert's
     ``ms_certificate_template_oid`` — a real Windows client fails
     CX509Enrollment::Enroll with CERTSRV_E_PROPERTY_EMPTY when the cert
     carries no Certificate Template extension — and its own configured
@@ -404,6 +407,33 @@ def _policy_oid_cas(ca):
     return [ca, xcep_ca] if xcep_ca is not None else [ca]
 
 
+def _template_oid_for(ca, template, wanted):
+    """The template OID a certificate carries: ``wanted`` when it is one of the template's,
+    else the one XCEP announces (another CA's on a split setup), which autoenrollment looks for."""
+    from services.xcep.policy_builder import _policy_oid_for_template
+    cas = _policy_oid_cas(ca)
+    if wanted is not None and wanted in {_policy_oid_for_template(c, template) for c in cas}:
+        return wanted
+    return _policy_oid_for_template(cas[-1], template)
+
+
+_POLICY_OID_SHAPE = re.compile(r'1\.3\.6\.1\.4\.1\.311\.21\.8\.\d+\.\d+\.\d+\.\d+\.1\.(\d+)')
+
+
+def _template_id_of_policy_oid(oid):
+    """The template id a UCM-shaped policy OID ends with, None otherwise; the prefix is not checked."""
+    m = _POLICY_OID_SHAPE.fullmatch(oid or '')
+    return int(m.group(1)) if m else None
+
+
+def _template_ext_oid(cert_or_csr):
+    try:
+        return extensions_of(cert_or_csr).get_extension_for_class(
+            x509.MSCertificateTemplate).value.template_id.dotted_string
+    except (x509.ExtensionNotFound, ValueError):
+        return None
+
+
 def _eku_oids(cert_or_csr):
     """Dotted EKU OIDs, or None without an ExtendedKeyUsage extension."""
     try:
@@ -431,8 +461,10 @@ def _renewal_template(ca, renewed_cert, csr):
         matched, refusal = _match_template(ca, csr)
         if refusal:
             return None, [], None, refusal
+        if matched is not None and issues_only_capped_ekus(matched):
+            return None, [], None, _capped_only_refusal(matched)
         if matched is None and not _ca_templates(ca):
-            return None, [], None, 'This CA offers no certificate template'
+            return None, [], None, ServerError('This CA offers no certificate template')
         extra = _template_extra_ekus(matched)
         prior = _eku_oids(renewed_cert)
         if prior is None:
@@ -446,12 +478,20 @@ def _renewal_template(ca, renewed_cert, csr):
             return None, [oid for oid in extra if oid in prior], _issuable_ekus(prior), None
         return matched, extra, extra, None
 
+    # The OID was derived from one of this instance's CAs (the XCEP CA of the time, which
+    # xcep_ca_refid may no longer name); another instance's prefix names no template here
+    from models import CA
     from services.xcep.policy_builder import _policy_oid_for_template
-    template = next((t for t in _ca_templates(ca)
-                     if _policy_oid_for_template(ca, t) == template_oid), None)
+    template_id = _template_id_of_policy_oid(template_oid)
+    template = next((t for t in _ca_templates(ca) if t.id == template_id), None)
+    if template is not None and template_oid not in {
+            _policy_oid_for_template(c, template) for c in CA.query.all()}:
+        template = None
     if template is None:
         return None, [], None, ('The certificate template of the certificate being renewed '
                                 'is not offered by this CA')
+    if issues_only_capped_ekus(template):
+        return None, [], None, _capped_only_refusal(template)
     if not _template_takes_key(template, _csr_key_label(csr)):
         return None, [], None, (f"Template '{template.name}' issues {_template_key_label(template)} "
                                 f'keys, not {_csr_key_label(csr)}')
@@ -489,6 +529,11 @@ def _best_eku_match(candidates, csr_eku):
         # Same resolver as issuance: the template is scored on the purposes
         # it will really issue, whatever spelling it uses
         template_eku = set(_template_extra_ekus(template))
+        # A template whose EKUs are all capped (OCSP Signing) would score 0 against a bare
+        # request: only a request asking for one of them matches it, and is then refused
+        configured = set(_template_configured_ekus(template))
+        if configured and not template_eku and not csr_eku & configured:
+            continue
         score = len(csr_eku & template_eku) - len(template_eku - csr_eku)
         if score > best_score or (score == best_score and best is not None and template.id < best.id):
             best, best_score = template, score
@@ -560,24 +605,52 @@ _SMARTCARD_LOGON = '1.3.6.1.4.1.311.20.2.2'
 _PERSON_EKUS = frozenset({'1.3.6.1.5.5.7.3.4', '1.3.6.1.4.1.311.10.3.4'})  # emailProtection, EFS
 
 
+def issues_only_capped_ekus(template):
+    """Whether every EKU ``template`` configures is capped: signed, it would fall back to
+    the server profile, so it is neither announced nor issued under."""
+    from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS
+    configured = set(_template_configured_ekus(template))
+    return bool(configured) and configured <= PROTOCOL_UNBINDABLE_EKU_OIDS - {_SMARTCARD_LOGON}
+
+
+def _capped_only_refusal(template):
+    return (f"Template '{template.name}' configures only Extended Key Usages "
+            'this service does not issue')
+
+
 def _template_profile(template, csr):
     """(cert_type, Key Usage names or None) the trunk signs ``csr`` under: as in AD CS,
     an S/MIME or EFS template and a Smartcard Logon one keep keyEncipherment, and a
-    user template's CN (jdoe) names no host. Templates with serverAuth stay server ones."""
+    user template's CN (jdoe) names no host. Templates with serverAuth stay server ones;
+    a request without Key Usage gets the one the template configures."""
+    try:
+        extensions_of(csr).get_extension_for_class(x509.KeyUsage)
+        csr_ku = True
+    except x509.ExtensionNotFound:
+        csr_ku = False
+    configured = None if csr_ku else (_template_configured_ku(template) or None)
     ekus = set(_template_configured_ekus(template))
     if not ekus or _SERVER_AUTH in ekus:
-        return 'server_cert', None
+        return 'server_cert', configured
     if ekus & _PERSON_EKUS:
-        return 'email_cert', None
-    if ekus <= {_CLIENT_AUTH}:
-        return 'client_cert', None
+        return 'email_cert', configured
     if _SMARTCARD_LOGON in ekus and ekus <= {_CLIENT_AUTH, _SMARTCARD_LOGON}:
-        try:
-            extensions_of(csr).get_extension_for_class(x509.KeyUsage)
-            return 'client_cert', None
-        except x509.ExtensionNotFound:
-            return 'client_cert', ['digitalSignature', 'keyEncipherment']
-    return 'server_cert', None
+        return 'client_cert', configured or (None if csr_ku else ['digitalSignature', 'keyEncipherment'])
+    if _CLIENT_AUTH in ekus:
+        return 'client_cert', configured
+    return 'server_cert', configured
+
+
+def _template_configured_ku(template):
+    """The Key Usage names ``template`` configures, [] when none."""
+    import json
+
+    try:
+        parsed = json.loads(getattr(template, 'extensions_template', None) or '{}')
+    except (TypeError, ValueError):
+        return []
+    names = parsed.get('key_usage') if isinstance(parsed, dict) else None
+    return [n for n in names if isinstance(n, str)] if isinstance(names, list) else []
 
 
 def _template_configured_ekus(template):
@@ -811,16 +884,22 @@ def _directory_subject(ca, template, csr, principal, sam_account_name):
     if not (naked or built_by_ca):
         return None, None, None
 
-    subject, san = None, None
+    subject, san, reached = None, None, True
     if sam_account_name and is_machine:
         dns_hostname = lookup.lookup_computer_dns_hostname(sam_account_name)
+        reached = dns_hostname is not lookup.UNREACHABLE
         if dns_hostname:
             subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, dns_hostname)])
             # MS-WCCE: the dNSHostName is the DNS SAN; a CSR without SAN gets it from the CN
             san = [x509.DNSName(dns_hostname)] if _san_values(csr) is not None else None
     elif sam_account_name and (source == 'directory' or _user_ad_derivation_enabled(ca)):
         subject, san = _user_directory_subject(sam_account_name)
+        if subject is lookup.UNREACHABLE:
+            reached, subject = False, None
 
+    # The requester is not at fault when the directory cannot answer: env:Receiver
+    if subject is None and not reached:
+        return None, None, ServerError('The directory that builds the certificate subject could not be reached')
     if subject is None and built_by_ca and not naked:
         if template is None and sam_account_name and not is_machine:
             return None, None, 'The request matches no certificate template whose subject it may supply'
@@ -830,10 +909,13 @@ def _directory_subject(ca, template, csr, principal, sam_account_name):
 
 
 def _user_directory_subject(sam_account_name):
-    """(subject, SAN) from the AD user object: its DN, its UPN, its mail when valid."""
+    """(subject, SAN) from the AD user object: its DN, its UPN, its mail when valid;
+    (``lookup.UNREACHABLE``, None) when the directory could not answer."""
     from services.ad_connector import lookup
 
     identity = lookup.lookup_user_ad_identity(sam_account_name)
+    if identity is lookup.UNREACHABLE:
+        return identity, None
     if not identity:
         return None, None
     # AD's mail attribute is optional -- validated (not just truthy) before use,
@@ -955,13 +1037,17 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         ad_config = ADConnectorConfig.get_singleton()
         if ad_config and ad_config.enabled:
             requester_sid = lookup.lookup_object_sid(kerberos_sam_account_name)
-            if requester_sid is None:
+            if not requester_sid:
                 logger.warning(
                     "WSTEP: could not resolve requester SID for %r via AD "
                     "Connector -- refusing issuance (strong certificate mapping)",
                     kerberos_sam_account_name,
                 )
-                return None, 'Could not resolve requester identity for strong certificate mapping'
+                if requester_sid is lookup.UNREACHABLE:
+                    return None, ServerError('Could not resolve requester identity for strong certificate mapping')
+                if requester_sid is lookup.UNUSABLE_SID:
+                    return None, 'The requester has no usable directory identity'
+                return None, 'The requester was not found in the directory'
 
     err = _validate_csr(csr, require_pop=require_pop, allow_naked_subject=True)
     if err:
@@ -975,13 +1061,14 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     matched_template, refusal = _match_template(ca, csr, kerberos_principal)
     if refusal:
         return None, refusal
+    if matched_template is not None and issues_only_capped_ekus(matched_template):
+        return None, _capped_only_refusal(matched_template)
     # No active template offered (pins all off, or none active at all): nothing would carry an Enroll ACL
     if matched_template is None and not _ca_templates(ca):
-        return None, 'This CA offers no certificate template'
+        return None, ServerError('This CA offers no certificate template')
     template_oid = None
     if matched_template is not None:
-        from services.xcep.policy_builder import _policy_oid_for_template
-        template_oid = _policy_oid_for_template(ca, matched_template)
+        template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(csr))
 
     if kerberos_principal:
         override_subject, override_san, refusal = _directory_subject(
@@ -992,8 +1079,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         if (override_subject is None and matched_template is not None
                 and _subject_source(matched_template) == 'request'
                 and not _template_extra_ekus(matched_template)):
-            return None, (f"Template '{matched_template.name}' lets the request name its subject "
-                          'but configures no Extended Key Usage')
+            return None, ServerError(f"Template '{matched_template.name}' lets the request name "
+                                     'its subject but configures no Extended Key Usage')
     if override_subject is None and _is_naked_csr(csr):
         return None, 'CSR subject must include a non-empty CN or a SubjectAltName'
 
@@ -1024,17 +1111,20 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # convenience lookup.
     if kerberos_principal:
         required_groups = _required_enroll_acl_groups(ca, matched_template)
-        if required_groups and (
-            not kerberos_sam_account_name
-            or not any(
-                lookup.is_member_of_group(kerberos_sam_account_name, group)
-                for group in required_groups
-            )
-        ):
+        allowed, unreachable = False, False
+        for group in (required_groups if kerberos_sam_account_name else []):
+            answer = lookup.is_member_of_group(kerberos_sam_account_name, group)
+            if answer:
+                allowed = True
+                break
+            unreachable = unreachable or answer is lookup.UNREACHABLE
+        if required_groups and not allowed:
             logger.warning(
                 "WSTEP Enroll ACL: principal %r denied (requires membership in one of %r)",
                 kerberos_principal, required_groups,
             )
+            if unreachable:
+                return None, ServerError('The directory could not be reached to check enrollment rights')
             return None, 'Requester is not authorized to enroll against this template'
 
     cert_type, template_ku = _template_profile(matched_template, csr)
@@ -1065,7 +1155,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         return None, str(e)
     except Exception as e:
         logger.error('WSTEP issue failed: %s', e)
-        return None, 'Certificate issuance failed'
+        return None, ServerError('Certificate issuance failed')
 
     return cert_pem, None
 
@@ -1257,8 +1347,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
         return None, refusal
     template_oid = None
     if matched_template is not None:
-        from services.xcep.policy_builder import _policy_oid_for_template
-        template_oid = _policy_oid_for_template(ca, matched_template)
+        template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(signing_cert))
 
     cert_type, template_ku = _template_profile(matched_template, csr)
     try:
@@ -1284,6 +1373,6 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
         return None, str(e)
     except Exception as e:
         logger.error('WSTEP renew failed: %s', e)
-        return None, 'Certificate renewal failed'
+        return None, ServerError('Certificate renewal failed')
 
     return cert_pem, None
