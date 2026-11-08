@@ -169,6 +169,34 @@ def test_the_client_retries_once_on_bad_nonce(app, monkeypatch, client_service):
     assert resp.status_code == 200
 
 
+def test_the_client_retries_bad_nonces_in_a_row_a_bounded_number_of_times(
+        app, monkeypatch, client_service):
+    """RFC 8555 §6.5: each badNonce carries the nonce of the next attempt."""
+    posts = []
+
+    def fake_post(url, **kwargs):
+        posts.append(kwargs.get('json'))
+        return _BadNonceResponse() if len(posts) < 3 else _HeadResponse('done')
+
+    from utils import ssrf_protection
+    monkeypatch.setattr(ssrf_protection, 'safe_request_post', fake_post)
+    monkeypatch.setattr(ssrf_protection, 'safe_request_head',
+                        lambda url, **kw: _HeadResponse('first-nonce'))
+    monkeypatch.setattr(
+        AcmeClientService, '_sign_jws',
+        lambda self, url, payload, use_jwk=False, nonce=None: {
+            'nonce': nonce or self._get_nonce()})
+
+    with app.app_context():
+        assert client_service._post(NONCE_URL, {'x': 1}).status_code == 200
+        assert len(posts) == 3
+        posts.clear()
+        monkeypatch.setattr(ssrf_protection, 'safe_request_post',
+                            lambda url, **kw: posts.append(1) or _BadNonceResponse())
+        assert client_service._post(NONCE_URL, {'x': 1}).status_code == 400
+    assert len(posts) == 1 + outbound.BAD_NONCE_RETRIES
+
+
 def test_bad_nonce_detection_ignores_other_problems():
     class _Other:
         status_code = 400

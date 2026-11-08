@@ -1918,8 +1918,9 @@ def revoke_cert():
             details=f"serial={serial_hex_lower} reason={reason} account={request_account_id or '(jwk)'}",
         )
 
-        # RFC 8555 §7.6: successful revocation returns 200 with proper headers
+        # RFC 8555 §7.6: 200 without a body, hence no media type
         response = make_response('', 200)
+        del response.headers['Content-Type']
         response.headers['Replay-Nonce'] = service.generate_nonce()
         response.headers['Cache-Control'] = 'no-store'
         response.headers['Link'] = f'<{service.base_url}/acme/directory>;rel="index"'

@@ -173,6 +173,10 @@ def test_proxy_revoke_relays_upstream_status_and_revokes_local(
     )
 
     assert response.status_code == 200
+    # RFC 8555 §7.6: 200 without a body, so no HTML media type
+    assert response.data == b'' and response.headers['Content-Length'] == '0'
+    assert 'Content-Type' not in response.headers
+    assert response.headers['Link'] == '<http://localhost/acme/proxy/directory>;rel="index"'
     service.revoke_certificate.assert_called_once()
     forwarded_cert, forwarded_reason = service.revoke_certificate.call_args.args
     assert forwarded_cert.public_bytes(serialization.Encoding.DER) == proxy_revocation_rows['certificate_der']

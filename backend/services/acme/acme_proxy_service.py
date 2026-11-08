@@ -53,6 +53,13 @@ logger = logging.getLogger(__name__)
 _CHALLENGE_PARENT_LEVELS = 2
 # Bound on the certificate fallback scan, one signed upstream call per candidate.
 _CERT_FALLBACK_SCAN_LIMIT = 25
+# Seconds the TXT of a challenge already submitted outlives a local failure of its order:
+# the upstream CA may still be reading it. The order lists it, flagged, until deleted; a
+# deletion a restart lost runs at the order's next read one delay later, never if it is not read.
+_SUBMITTED_RECORD_LINGER = 120
+# The dns-01 threads of one order run in the worker that started them: one lock per
+# order id (striped) orders their writes to the row, a row lock covers PostgreSQL too.
+_ORDER_ROW_LOCKS = tuple(threading.RLock() for _ in range(64))
 # Upstream authz reads for one challenge request the local cache cannot place:
 # each costs a request on the shared upstream account.
 _CHALLENGE_SCAN_LIMIT = 3
@@ -82,6 +89,10 @@ class ProxyInvalidProfileError(ValueError):
     """The requested profile is not one the upstream directory offers."""
 
 
+class ProxyBadCsrError(ValueError):
+    """The CSR does not name exactly the identifiers of the order (RFC 8555 §7.4)."""
+
+
 def _dns01_txt_value(key_authorization: str) -> str:
     """RFC 8555 section 8.4: TXT value = b64url(SHA-256(key authorization))."""
     import base64
@@ -108,6 +119,11 @@ _DNS_REFUSED_PROBLEM = {
     'type': 'urn:ietf:params:acme:error:serverInternal',
     'detail': 'The proxy could not publish a dns-01 TXT record of this order: the DNS provider refused it',
 }
+
+
+def _problem_text(problem):
+    """Detail of a problem document, else its type: RFC 7807 makes detail optional."""
+    return (problem or {}).get('detail') or (problem or {}).get('type') or 'upstream error'
 
 
 def _txt_written(provider, zone, record_name, value):
@@ -205,6 +221,23 @@ def reset_proxy_caches():
     outbound.reset_nonce_pool()
 
 
+def _update_order_row(order, change):
+    """Apply ``change(order)`` to the order row as stored now, commit, return its result.
+
+    Each writer merges its own keys onto a fresh read: a copy read before another
+    thread's commit would overwrite it."""
+    try:
+        db.session.commit()  # no transaction held while waiting for the lock
+        with _ORDER_ROW_LOCKS[order.id % len(_ORDER_ROW_LOCKS)]:
+            db.session.refresh(order, with_for_update=True)
+            result = change(order)
+            db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+    return result
+
+
 def _owner_fields(order):
     """(account_id, thumbprint) recorded on an order, empty values as None."""
     return (getattr(order, 'account_id', None) or None,
@@ -246,6 +279,46 @@ def _order_covers_identifier(order, identifier) -> bool:
     if not wanted:
         return False
     return any(_normalized_identifier(d) == wanted for d in order.domains_list or [])
+
+
+def _csr_identifiers(csr):
+    """(type, value) pairs a CSR requests: CN and SAN names, IPs apart (RFC 8555 §7.4, RFC 8738)."""
+    import ipaddress
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    from utils.csr_extensions import csr_extensions
+
+    def _named(value):
+        try:
+            return 'ip', str(ipaddress.ip_address(value))
+        except ValueError:
+            return 'dns', value.strip().rstrip('.').lower()
+
+    found = {_named(attr.value) for attr in csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+             if isinstance(attr.value, str)}
+    try:
+        san = csr_extensions(csr).get_extension_for_class(x509.SubjectAlternativeName).value
+    except x509.ExtensionNotFound:
+        san = []
+    except Exception as exc:  # DuplicateExtension, UnsupportedGeneralNameType: not ValueError
+        raise ProxyBadCsrError(f'CSR extensions cannot be read: {exc}') from exc
+    for name in san:
+        if isinstance(name, x509.DNSName):
+            found.add(_named(name.value))
+        elif isinstance(name, x509.IPAddress):
+            found.add(('ip', str(name.value)))
+    return found
+
+
+def _require_csr_matches_order(csr, order):
+    """RFC 8555 §7.4: the CSR names exactly the order identifiers (wildcards kept)."""
+    wanted = {('dns', d.strip().rstrip('.').lower())
+              for d in order.domains_list or [] if isinstance(d, str)}
+    requested = _csr_identifiers(csr)
+    if requested != wanted:
+        raise ProxyBadCsrError(
+            f"CSR identifiers {sorted(v for _t, v in requested)} do not match "
+            f"the order identifiers {sorted(v for _t, v in wanted)}")
 
 
 def _single_domain(order) -> Optional[str]:
@@ -687,25 +760,10 @@ class AcmeProxyService:
 
         Some upstream CAs (Pebble, HARICA, strict implementations) reject
         nonces that LE staging would accept. On badNonce, the server MUST
-        return a fresh nonce in Replay-Nonce and the client MUST retry.
+        return a fresh nonce in Replay-Nonce and the client SHOULD retry.
         """
-        nonce = self._get_nonce()
-        resp = self._sign_and_post(url, payload, nonce, kid=kid)
-
-        # RFC 8555 §6.5: retry once on badNonce using the fresh nonce
-        # returned in the error response's Replay-Nonce header.
-        if resp.status_code == 400:
-            try:
-                err = resp.json()
-                if err.get('type') == 'urn:ietf:params:acme:error:badNonce':
-                    fresh_nonce = resp.headers.get('Replay-Nonce')
-                    if fresh_nonce:
-                        logger.warning(f"Upstream rejected nonce on {url}, retrying with fresh nonce")
-                        resp = self._sign_and_post(url, payload, fresh_nonce, kid=kid)
-            except (json.JSONDecodeError, ValueError):
-                pass
-
-        return resp
+        return outbound.post_with_bad_nonce_retries(
+            lambda nonce: self._sign_and_post(url, payload, nonce, kid=kid), url, self._get_nonce())
 
     def _post_with_account(self, url: str, payload) -> requests.Response:
         """Post JWS with account KID, auto-re-registering if account is stale.
@@ -1130,8 +1188,11 @@ class AcmeProxyService:
             return candidates[0]
         # The CA hands a still-pending authz or order to the client's next order
         # after a deactivation (#422) or a refused TXT record: the live order wins.
+        # A locally failed order loses to one that did not fail: invalid is final for it only.
+        # Without an authz URL (order lookup), any deactivated authz ranks the order last.
         candidates = sorted(candidates, key=lambda c: (
-            bool(authz_url) and authz_url in c.deactivated_authz_list,
+            authz_url in c.deactivated_authz_list if authz_url else bool(c.deactivated_authz_list),
+            bool(AcmeProxyService._local_failure(c)),
             c.status != 'pending'))
         for candidate in candidates:
             if ((candidate.account_id
@@ -1242,6 +1303,12 @@ class AcmeProxyService:
             # RFC 8555 §7.1.6: every order using a failed authorization is invalid
             self._mark_invalid(o for o in candidates if o.status == 'pending')
             self._release_order_records(order)
+        # RFC 8555 §7.1.6: invalid is final, even when the upstream CA validates it later.
+        # The DNS UPDATE rows follow the upstream state: they are shared with other orders.
+        upstream_authz_status = authz.get('status')
+        failure = self._local_failure(order)
+        if failure:
+            authz['status'] = 'invalid'
         proxy_challenges = []
         closed_chall_urls = []
         for chall in authz.get('challenges', []):
@@ -1250,12 +1317,12 @@ class AcmeProxyService:
             chall_url = chall.get('url')
             if not chall_url:
                 continue
-            if chall.get('status') == 'pending' and self._dns_refused(order):
-                chall.update(status='invalid', error=dict(_DNS_REFUSED_PROBLEM))
-                authz['status'] = 'invalid'
-            if (_dns_failed_state(authz.get('status'))
+            if (_dns_failed_state(upstream_authz_status)
                     or _dns_failed_state(chall.get('status'))):
                 closed_chall_urls.append(chall_url)
+            upstream_chall_status = chall.get('status')
+            if failure:
+                chall.update(status='invalid', error=failure)
             chall_id = self._proxy_id(chall_url)
             _challenge_order_cache.put(
                 self._challenge_cache_key(chall_url, requester_account_id,
@@ -1269,8 +1336,8 @@ class AcmeProxyService:
             # or processing (RFC 8555 section 7.1.6: not final yet), so a
             # sibling order that fetches the authz after the automation
             # started still gets its row.
-            if (authz.get('status') == 'pending'
-                    and chall.get('status') in ('pending', 'processing')
+            if (upstream_authz_status == 'pending'
+                    and upstream_chall_status in ('pending', 'processing')
                     and not already_valid):
                 live = [o for o in candidates if o.status == 'pending'
                         and authz_url not in o.deactivated_authz_list]
@@ -1281,7 +1348,6 @@ class AcmeProxyService:
             # Check if we should trigger automation for this challenge
             # We trigger it as soon as the client fetches the authorization
             if chall.get('status') == 'pending' and not already_valid:
-                challenges_data = order.challenges_dict
                 if not self._challenge_automation_started(chall_url, candidates):
                     # Trigger automation in background
                     token = chall.get('token')
@@ -1301,14 +1367,11 @@ class AcmeProxyService:
                         thread.daemon = True
 
                         # Mark as initiated to avoid redundant threads
-                        challenges_data[chall_url] = {'status': 'initiated', 'started_at': datetime.now().isoformat()}
-                        order.set_challenges_dict(challenges_data)
                         try:
-                            db.session.commit()
-                            thread.start()
-                            logger.info(f"[ACME Proxy] Triggered auto-DNS for {domain} via authz fetch")
+                            if self._mark_initiated(order, chall_url):
+                                thread.start()
+                                logger.info(f"[ACME Proxy] Triggered auto-DNS for {domain} via authz fetch")
                         except Exception as e:
-                            db.session.rollback()
                             logger.error(f"Failed to start auto-DNS thread: {e}")
 
 
@@ -1327,7 +1390,7 @@ class AcmeProxyService:
                 f"Upstream CA does not offer dns-01 challenge for {identifier.get('value', '?')}. "
                 "The ACME proxy only supports dns-01 validation; tls-alpn-01 is not supported."
             )
-        if already_valid:
+        if already_valid and not failure:
             logger.info(
                 "[ACME Proxy] Upstream authorization for %s is already valid; "
                 "passed through without validation", domain,
@@ -1423,6 +1486,10 @@ class AcmeProxyService:
         order, _domain, authz_url = self._resolve_challenge_order(
             chall_url, requester_account_id, requester_thumbprint,
         )
+        if order is not None and order.status != 'pending' and authz_url:
+            # The cache may name a sibling that failed since: a live order on the authz wins
+            order = self._find_order_by_authz_url(
+                authz_url, requester_account_id, requester_thumbprint) or order
         if order:
             self._require_owner(
                 order, requester_account_id, requester_thumbprint,
@@ -1458,8 +1525,12 @@ class AcmeProxyService:
         status = challenge_data.get('status')
         up_link = self._get_authz_link(None, authz_url)
 
-        if status == 'pending' and self._dns_refused(order):
-            challenge_data.update(status='invalid', error=dict(_DNS_REFUSED_PROBLEM))
+        # The shared DNS UPDATE rows close on the upstream state, before the local failure
+        if _dns_failed_state(status):
+            _dns_rows_hook('close_for_challenge_urls', [chall_url])
+        failure = self._local_failure(order)  # final, whatever the upstream state (RFC 8555 §7.1.6)
+        if failure:
+            challenge_data.update(status='invalid', error=failure)
             status = 'invalid'
 
         if status != 'pending':
@@ -1467,8 +1538,6 @@ class AcmeProxyService:
             # the challenge type. A pre-validated authorization (#325) exposes
             # its already valid http-01/tls-alpn-01 challenge and a client may
             # poll it; nothing is triggered here.
-            if _dns_failed_state(status):
-                _dns_rows_hook('close_for_challenge_urls', [chall_url])
             challenge_data['url'] = f"{self.base_url}/challenge/{chall_id_b64}"
             return challenge_data, up_link
 
@@ -1481,7 +1550,6 @@ class AcmeProxyService:
         # If still pending, check if automation already started — for this order
         # in get_authz, or for a sibling order sharing this upstream challenge
         # when the authz is reused across downstream accounts (#307).
-        challenges_data = order.challenges_dict
         siblings = self._orders_by_authz_url(authz_url) if authz_url else [order]
         if self._challenge_automation_started(chall_url, siblings or [order]):
             # Already triggered, just return 'processing'
@@ -1511,15 +1579,10 @@ class AcmeProxyService:
         # Persist the initiated flag before the thread starts so a sibling order
         # sharing this upstream challenge (#307) does not launch a second one.
         # Mirror get_authz: only start the thread once the flag is committed.
-        challenges_data[chall_url] = {
-            'status': 'initiated', 'started_at': datetime.now().isoformat(),
-        }
-        order.set_challenges_dict(challenges_data)
         try:
-            db.session.commit()
-            thread.start()
+            if self._mark_initiated(order, chall_url):
+                thread.start()
         except Exception as exc:
-            db.session.rollback()
             logger.error(f"Failed to start dns-01 automation: {exc}")
 
         challenge_data['status'] = 'processing'
@@ -1714,7 +1777,15 @@ class AcmeProxyService:
         # possibly from two workers: read-merge-write must not interleave.
         db.session.commit()  # no transaction held while waiting for the lock
         with _txt_record_lock(txt_lock_name(provider, full_record_name)):
-            ok, message = _txt_written(provider, zone_name, full_record_name, txt_value)
+            # A value a sibling order already published is live: some providers refuse a duplicate
+            by_sibling = self._sibling_records(order, authz_url)
+
+            def _write(value):
+                if (full_record_name, value) in by_sibling:
+                    return True, 'already published for a sibling order'
+                return _txt_written(provider, zone_name, full_record_name, value)
+
+            ok, message = _write(txt_value)
             if not ok:
                 # Submitting anyway would fail the validation on the shared upstream account
                 self._fail_dns_automation(order, chall_url, domain, message)
@@ -1731,19 +1802,21 @@ class AcmeProxyService:
             extra_values = [] if holds_one_value(provider) else self._client_txt_values(
                 order, key_authz, txt_value, authz_url=authz_url)
             for extra_value in extra_values:
-                ok, message = _txt_written(provider, zone_name, full_record_name, extra_value)
+                ok, message = _write(extra_value)
                 if ok:
                     published.append(extra_value)
                 else:
                     logger.warning(f"[ACME Proxy BG] Client TXT value not published: {message}")
 
-            # Store record info for cleanup, re-read: another authorization of the order may have added its own
-            db.session.refresh(order)
-            records = json.loads(order.dns_records_created) if order.dns_records_created else []
-            records.extend({'domain': zone_name, 'record_name': full_record_name,
-                            'value': value, 'provider_id': provider_model.id} for value in published)
-            order.dns_records_created = json.dumps(records)
-            db.session.commit()
+            # Store record info for cleanup, merged: another authorization of the order may have added its own
+            added = [{'domain': zone_name, 'record_name': full_record_name,
+                      'value': value, 'provider_id': provider_model.id} for value in published]
+
+            def _add_records(row):
+                records = json.loads(row.dns_records_created) if row.dns_records_created else []
+                row.dns_records_created = json.dumps(records + added)
+
+            _update_order_row(order, _add_records)
 
         # Active DNS self-check instead of fixed sleep.
         timeout = dns_propagation_timeout('acme.client.dns_propagation_timeout')
@@ -1782,52 +1855,144 @@ class AcmeProxyService:
 
         # Trigger upstream validation
         logger.info(f"[ACME Proxy BG] Triggering upstream validation for {domain}")
-        payload = {}
-        resp = self._post_with_account(chall_url, payload)
-
-        if resp.status_code != 200:
-            logger.error(f"[ACME Proxy BG] Upstream challenge validation error: {resp.text}")
+        records = [[full_record_name, value] for value in published]
+        try:
+            resp = self._post_with_account(chall_url, {})
+        except Exception as exc:
+            logger.error("[ACME Proxy BG] Upstream challenge POST for %s failed: %s", domain, exc)
+            resp, refused = None, isinstance(exc, requests.exceptions.ConnectTimeout)
         else:
+            refused = 400 <= resp.status_code < 500
+        if resp is not None and resp.status_code == 200:
             logger.info(f"[ACME Proxy BG] Upstream challenge validation triggered successfully for {domain}")
-            challenges_data = order.challenges_dict
+            self._mark_submitted(order, chall_url, records)
+            return
+        if resp is not None:
+            logger.error(f"[ACME Proxy BG] Upstream challenge validation error: {resp.text}")
+        # No answer or a 5xx may hide a POST the CA received: its authorization tells
+        taken = None if refused else self._challenge_taken_upstream(chall_url, authz_url, order)
+        if taken:
+            logger.info("[ACME Proxy BG] Upstream took the challenge of %s despite the error", domain)
+            self._mark_submitted(order, chall_url, records)
+            return
+        # Unknown (authorization unread): the CA may be reading the record, it goes later
+        self._fail_challenge_submission(
+            order, chall_url, domain, None if resp is None else UpstreamProblem.from_response(resp),
+            linger=records if taken is None and not refused else ())
+
+    @staticmethod
+    def _mark_initiated(order, chall_url):
+        """Flag a challenge's automation as started; False when it already was."""
+        def _flag(row):
+            challenges_data = row.challenges_dict
+            if (challenges_data.get(chall_url) or {}).get('status') in ('initiated', 'submitted'):
+                return False
+            challenges_data[chall_url] = {'status': 'initiated',
+                                          'started_at': datetime.now().isoformat()}
+            row.set_challenges_dict(challenges_data)
+            return True
+
+        return _update_order_row(order, _flag)
+
+    @staticmethod
+    def _mark_submitted(order, chall_url, records):
+        """Record a challenge the upstream CA took, with the TXT records it reads."""
+        def _submitted(row):
+            challenges_data = row.challenges_dict
             entry = challenges_data.get(chall_url, {})
-            entry['status'] = 'submitted'
-            entry['submitted_at'] = datetime.now().isoformat()
+            entry.update(status='submitted', submitted_at=datetime.now().isoformat(), records=records)
             challenges_data[chall_url] = entry
-            order.set_challenges_dict(challenges_data)
-            db.session.commit()
+            row.set_challenges_dict(challenges_data)
+
+        _update_order_row(order, _submitted)
+
+    def _challenge_taken_upstream(self, chall_url, authz_url, order):
+        """Whether the upstream authorization shows the challenge past pending
+        (RFC 8555 §7.1.6), i.e. the CA received its POST; None when it cannot be read."""
+        try:
+            _url, authz, chall = self._read_challenge(chall_url, authz_url, [order])
+        except Exception as exc:
+            logger.warning("[ACME Proxy BG] Challenge state not read after a failed POST: %s", exc)
+            return None
+        return (chall.get('status') in ('processing', 'valid', 'invalid')
+                or authz.get('status') in ('valid', 'invalid'))
+
+    def _sibling_records(self, order, authz_url):
+        """(record name, value) pairs other orders on this authorization still hold,
+        those waiting for their deferred deletion included."""
+        found = set()
+        stale = time.time() - _SUBMITTED_RECORD_LINGER
+        for other in self._orders_by_authz_url(authz_url) if authz_url else []:
+            if other.id == order.id:
+                continue
+            try:
+                records = json.loads(other.dns_records_created or '[]')
+            except (TypeError, ValueError):
+                continue
+            found.update((r.get('record_name'), r.get('value'))
+                         for r in records if isinstance(r, dict)
+                         and (r.get('release_at') or stale) >= stale)
+        return found
 
     @staticmethod
     def _abandon_challenge(order, chall_url):
         """Clear the initiated flag of a challenge left unsubmitted: a later order
         reusing the still-pending authorization must start its own automation."""
-        challenges_data = order.challenges_dict
-        if (challenges_data.get(chall_url) or {}).get('status') != 'initiated':
-            return
-        challenges_data[chall_url] = {'status': 'abandoned',
-                                      'abandoned_at': datetime.now().isoformat()}
-        order.set_challenges_dict(challenges_data)
-        db.session.commit()
+        def _abandon(row):
+            challenges_data = row.challenges_dict
+            if (challenges_data.get(chall_url) or {}).get('status') != 'initiated':
+                return
+            challenges_data[chall_url] = {'status': 'abandoned',
+                                          'abandoned_at': datetime.now().isoformat()}
+            row.set_challenges_dict(challenges_data)
+
+        _update_order_row(order, _abandon)
 
     def _fail_dns_automation(self, order, chall_url, domain, message):
         """Fail the order locally after a refused TXT write; the upstream challenge is left alone."""
         logger.error("[ACME Proxy BG] DNS provider refused the TXT record for %s: %s", domain, message)
-        challenges_data = order.challenges_dict
-        challenges_data[chall_url] = {'status': 'failed', 'error': message,
-                                      'failed_at': datetime.now().isoformat()}
-        order.set_challenges_dict(challenges_data)
-        order.status = 'invalid'
-        order.error_message = f"DNS provider refused the TXT record for {domain}: {message}"
-        order.last_error_at = utc_now()
-        db.session.commit()
+        self._fail_locally(order, chall_url, message,
+                           f"DNS provider refused the TXT record for {domain}: {message}")
+
+    def _fail_challenge_submission(self, order, chall_url, domain, upstream, linger=()):
+        """Fail the order whose challenge POST the upstream CA refused (4xx), or did not
+        take (its authorization still pending or unreadable): a later order starts its own.
+        The ``linger`` records are removed later, like those of a submitted challenge."""
+        if upstream is None:
+            problem = {'type': 'urn:ietf:params:acme:error:serverInternal',
+                       'detail': f'The upstream CA did not answer the validation request for {domain}'}
+        else:
+            problem = upstream.client_problem()[0]
+        detail = _problem_text(problem)
+        self._fail_locally(order, chall_url, detail,
+                           f"Upstream challenge submission failed for {domain}: {detail}", problem,
+                           linger=linger)
+
+    def _fail_locally(self, order, chall_url, error, message, problem=None, linger=()):
+        """Record a challenge that will never be submitted, fail the order and release its TXT records."""
+        state = {'status': 'failed', 'error': error, 'failed_at': datetime.now().isoformat()}
+        if problem:
+            state['problem'] = problem
+
+        def _fail(row):
+            challenges_data = row.challenges_dict
+            challenges_data[chall_url] = state
+            row.set_challenges_dict(challenges_data)
+            row.status = 'invalid'
+            row.error_message = message
+            row.last_error_at = utc_now()
+
+        _update_order_row(order, _fail)
         _dns_rows_hook('close_for_order', order.id)
-        self._release_order_records(order)
+        self._release_order_records(order, linger={tuple(r) for r in linger})
 
     @staticmethod
-    def _dns_refused(order):
-        """True when one of this order's TXT writes was refused: none of its challenges is submitted."""
-        return any((state or {}).get('status') == 'failed'
-                   for state in (order.challenges_dict or {}).values())
+    def _local_failure(order):
+        """Problem of a challenge this order failed locally (TXT refused, POST failed), else None."""
+        for state in (order.challenges_dict or {}).values():
+            if (state or {}).get('status') == 'failed':
+                return dict(state.get('problem') or _DNS_REFUSED_PROBLEM)
+        return None
 
     @staticmethod
     def _mark_invalid(orders):
@@ -1844,35 +2009,113 @@ class AcmeProxyService:
             db.session.rollback()
             logger.warning("[ACME Proxy] Invalid order state not recorded: %s", exc)
 
-    def _release_order_records(self, order):
+    def _release_order_records(self, order, linger=()):
         """Remove in the background the TXT records of an order that can no longer issue.
 
         Kept while another pending order shares one of its authorizations: the
-        record may be the value that order's validation reads."""
-        try:
-            records = json.loads(order.dns_records_created or '[]')
-        except (TypeError, ValueError):
-            return
-        if not records:
-            return
-        for authz_url in self._recorded_authz_urls(order):
-            if any(o.id != order.id and o.status == 'pending'
-                   for o in self._orders_by_authz_url(authz_url)):
-                return
+        record may be the value that order's validation reads. The records of
+        submitted challenges and the ``linger`` (record name, value) pairs go later."""
+        def _take(row):
+            try:
+                records = json.loads(row.dns_records_created or '[]')
+            except (TypeError, ValueError):
+                return [], []
+            waiting = [r for r in records if isinstance(r, dict) and r.get('release_at')]
+            records = [r for r in records if r not in waiting]
+            # A deferred deletion lost to a restart is due now: siblings no longer count it.
+            # Its deletion stays guarded by the orders listing the value under the name's lock.
+            stale = time.time() - _SUBMITTED_RECORD_LINGER
+            overdue = [r for r in waiting if r['release_at'] < stale]
+            if overdue:
+                waiting = [r for r in waiting if r not in overdue]
+                row.dns_records_created = json.dumps(waiting + records) if waiting or records else None
+            if not records:
+                return overdue, []
+            for authz_url in self._recorded_authz_urls(row):
+                if any(o.id != row.id and o.status == 'pending'
+                       for o in self._orders_by_authz_url(authz_url)):
+                    return overdue, []
+            states = [state or {} for state in row.challenges_dict.values()]
+            # Read under the row lock: a challenge still initiated may have its POST in flight
+            if any(state.get('status') == 'initiated' for state in states):
+                deferred = None
+            else:
+                deferred = set(linger) | {tuple(record) for state in states
+                                          if state.get('status') == 'submitted'
+                                          for record in state.get('records') or []}
+            waits = [deferred is None or (r.get('record_name'), r.get('value')) in deferred
+                     for r in records]
+            release_at = time.time() + _SUBMITTED_RECORD_LINGER
+            now = overdue + [r for r, wait in zip(records, waits) if not wait]
+            later = [dict(r, release_at=release_at) for r, wait in zip(records, waits) if wait]
+            # Deferred records stay listed until deleted: a retry within the delay sees them live
+            row.dns_records_created = json.dumps(waiting + later) if waiting or later else None
+            return now, later
+
         order_id = order.id
-        order.dns_records_created = None
         try:
-            db.session.commit()
+            now, later = _update_order_row(order, _take)
         except Exception as exc:
-            db.session.rollback()
             logger.warning("[ACME Proxy] TXT cleanup of order %s not recorded: %s", order_id, exc)
             return
-        thread = threading.Thread(
-            target=self._bg_cleanup_dns_records,
-            args=(current_app._get_current_object(), records, order_id))
-        thread.name = "ACMEProxy-DNS-Cleanup"
-        thread.daemon = True
-        thread.start()
+        if not now and not later:
+            return
+        app = current_app._get_current_object()
+        for batch, args in ((now, (app, now, order_id)),
+                            (later, (app, later, order_id, _SUBMITTED_RECORD_LINGER))):
+            if not batch:
+                continue
+            thread = threading.Thread(target=self._bg_cleanup_dns_records, args=args)
+            thread.name = "ACMEProxy-DNS-Cleanup"
+            thread.daemon = True
+            thread.start()
+
+    @staticmethod
+    def _value_still_needed(record_name, value, order_id):
+        """Whether another pending order lists this (name, value) pair while the order
+        cleaning it up did not issue: the authorization they share is still pending."""
+        from models import AcmeClientOrder
+
+        own = db.session.get(AcmeClientOrder, order_id)
+        if own is not None and own.status == 'valid':
+            return False
+        rows = (AcmeClientOrder.query
+                .filter(AcmeClientOrder.is_proxy_order.is_(True),
+                        AcmeClientOrder.status == 'pending',
+                        AcmeClientOrder.id != order_id,
+                        AcmeClientOrder.dns_records_created.contains(value, autoescape=True))
+                .all())
+        for row in rows:
+            try:
+                records = json.loads(row.dns_records_created or '[]')
+            except (TypeError, ValueError):
+                continue
+            if any(isinstance(r, dict) and not r.get('release_at')
+                   and (r.get('record_name'), r.get('value')) == (record_name, value)
+                   for r in records):
+                return True
+        return False
+
+    @staticmethod
+    def _forget_released_record(order_id, record_name, value):
+        """Drop a deferred record from its order once its cleanup has run."""
+        from models import AcmeClientOrder
+
+        row = db.session.get(AcmeClientOrder, order_id)
+        if row is None or value not in (row.dns_records_created or ''):
+            return
+
+        def _drop(fresh):
+            try:
+                records = json.loads(fresh.dns_records_created or '[]')
+            except (TypeError, ValueError):
+                return
+            kept = [r for r in records if not (
+                isinstance(r, dict) and r.get('release_at')
+                and (r.get('record_name'), r.get('value')) == (record_name, value))]
+            fresh.dns_records_created = json.dumps(kept) if kept else None
+
+        _update_order_row(row, _drop)
 
     @staticmethod
     def _delete_dns_record(provider, zone: str, record_name: str, value, order_id=None) -> None:
@@ -1882,19 +2125,31 @@ class AcmeProxyService:
             return
         try:
             with _txt_record_lock(txt_lock_name(provider, record_name)):
-                if keep_for_another_order(provider, record_name, order_id):
-                    return
-                result = provider.delete_txt_record(zone, record_name, value)
+                # Under the name's lock: a sibling publishing the same value lists it first
+                try:
+                    if order_id is not None and AcmeProxyService._value_still_needed(
+                            record_name, value, order_id):
+                        logger.info("DNS cleanup of %s left to another order still validating it",
+                                    record_name)
+                        return
+                    if keep_for_another_order(provider, record_name, order_id):
+                        return
+                    result = provider.delete_txt_record(zone, record_name, value)
+                finally:
+                    if order_id is not None:
+                        AcmeProxyService._forget_released_record(order_id, record_name, value)
             if isinstance(result, tuple) and not result[0]:
                 logger.warning("Failed to cleanup DNS record %s (%s): %s", record_name, zone, result[1])
         except Exception as e:
             logger.warning("Failed to cleanup DNS record %s (%s): %s", record_name, zone, e)
 
-    def _bg_cleanup_dns_records(self, app, records, order_id=None):
-        """Background task: delete DNS-01 TXT records after cert issuance (#218)."""
+    def _bg_cleanup_dns_records(self, app, records, order_id=None, delay=0):
+        """Background task: delete DNS-01 TXT records after cert issuance (#218), after ``delay`` seconds."""
         from models import DnsProvider
         from services.acme.dns_providers import create_provider
 
+        if delay:
+            time.sleep(delay)
         with app.app_context():
             try:
                 for record in records:
@@ -2022,7 +2277,6 @@ class AcmeProxyService:
         rows = (AcmeClientOrder.query
                 .filter_by(upstream_order_url=order_url, is_proxy_order=True)
                 .order_by(AcmeClientOrder.id.asc()).all())
-        rows.sort(key=lambda row: bool(row.deactivated_authz_list))
         return self._select_owning_order(rows, requester_account_id, requester_thumbprint)
 
     def get_order(self, order_id_b64, requester_account_id=None, requester_thumbprint=None):
@@ -2047,9 +2301,12 @@ class AcmeProxyService:
         if (local_order.deactivated_authz_list
                 and order.get('status') in ('pending', 'ready')):
             order['status'] = 'invalid'
-        if self._dns_refused(local_order) and order.get('status') in ('pending', 'ready'):
+        # RFC 8555 §7.1.6: invalid is final, even when the upstream CA validates the order later
+        failure = self._local_failure(local_order)
+        if failure:
             order['status'] = 'invalid'
-            order.setdefault('error', dict(_DNS_REFUSED_PROBLEM))
+            order.setdefault('error', failure)
+            order.pop('certificate', None)
         if order.get('status') == 'invalid':
             self._mark_invalid([local_order] if local_order.status == 'pending' else [])
             self._release_order_records(local_order)
@@ -2079,12 +2336,14 @@ class AcmeProxyService:
         if local_order.deactivated_authz_list:
             raise ProxyOrderNotReadyError(
                 "Order is invalid: one of its authorizations was deactivated")
-        if self._dns_refused(local_order):
-            raise ProxyOrderNotReadyError(
-                "Order is invalid: the DNS provider refused its dns-01 record")
+        failure = self._local_failure(local_order)
+        if failure:
+            raise ProxyOrderNotReadyError(f"Order is invalid: {_problem_text(failure)}")
 
         from cryptography import x509
         csr = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())
+        # Checked here: the upstream CA may answer a mismatch with unauthorized, the proxy's own fault
+        _require_csr_matches_order(csr, local_order)
         csr_der = csr.public_bytes(serialization.Encoding.DER)
         csr_b64 = base64.urlsafe_b64encode(csr_der).rstrip(b'=').decode()
 

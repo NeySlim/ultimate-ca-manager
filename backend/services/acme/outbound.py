@@ -40,6 +40,9 @@ NONCE_POOL_TTL_SEC = 60
 # timeout would otherwise fail challenge submission, polling and finalization.
 NONCE_FETCH_ATTEMPTS = 3
 
+# Fresh-nonce retries after a badNonce answer (RFC 8555 §6.5); some CAs refuse two in a row.
+BAD_NONCE_RETRIES = 3
+
 _pool_lock = threading.Lock()
 # directory URL -> [(nonce, monotonic deposit time)], oldest first; guarded by _pool_lock.
 _nonce_pool: Dict[str, List[Tuple[str, float]]] = {}
@@ -135,8 +138,8 @@ def fetch_nonce(nonce_url: str, *, timeout: int, verify: bool,
 def bad_nonce_retry_value(resp) -> Optional[str]:
     """The fresh nonce to retry with when *resp* is a badNonce error, else None.
 
-    RFC 8555 §6.5: on badNonce the server MUST return a fresh nonce in
-    Replay-Nonce and the client MUST retry the request once with it.
+    RFC 8555 §6.5: a badNonce answer MUST carry a fresh nonce in Replay-Nonce,
+    and the client SHOULD retry the request with it.
     """
     if getattr(resp, 'status_code', None) != 400:
         return None
@@ -147,3 +150,16 @@ def bad_nonce_retry_value(resp) -> Optional[str]:
     if not isinstance(problem, dict) or problem.get('type') != BAD_NONCE:
         return None
     return resp.headers.get('Replay-Nonce') or None
+
+
+def post_with_bad_nonce_retries(send, url: str, nonce: Optional[str] = None):
+    """``send(nonce)`` once, then again with the Replay-Nonce of each badNonce
+    answer (RFC 8555 §6.5), at most BAD_NONCE_RETRIES times."""
+    resp = send(nonce)
+    for _attempt in range(BAD_NONCE_RETRIES):
+        fresh_nonce = bad_nonce_retry_value(resp)
+        if not fresh_nonce:
+            break
+        logger.warning(f'Upstream rejected nonce on {url}, retrying with fresh nonce')
+        resp = send(fresh_nonce)
+    return resp

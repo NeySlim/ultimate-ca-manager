@@ -450,6 +450,9 @@ class TestRevocationByAuthorizationHolder:
         _grant(app, holder, self._idents())
         r = _signed(client, holder, '/acme/revoke-cert', {'certificate': _b64u(der), 'reason': 4})
         assert r.status_code == 200, r.get_json()
+        # RFC 8555 §7.6: 200 without a body, so no HTML media type
+        assert r.data == b'' and r.headers['Content-Length'] == '0'
+        assert 'Content-Type' not in r.headers
         with app.app_context():
             assert db.session.get(Certificate, cert_id).revoked
 

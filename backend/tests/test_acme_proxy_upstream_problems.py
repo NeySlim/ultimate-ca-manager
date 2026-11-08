@@ -256,6 +256,95 @@ class TestUpstreamProblemRelayed:
         assert response.get_json()['type'] == already['type']
 
 
+def _csr_b64(cn=None, dns=(), ips=()):
+    import ipaddress
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+    builder = x509.CertificateSigningRequestBuilder().subject_name(x509.Name(
+        [x509.NameAttribute(NameOID.COMMON_NAME, cn)] if cn else []))
+    names = [x509.DNSName(d) for d in dns] + [x509.IPAddress(ipaddress.ip_address(i)) for i in ips]
+    if names:
+        builder = builder.add_extension(x509.SubjectAlternativeName(names), False)
+    csr = builder.sign(ec.generate_private_key(ec.SECP256R1()), hashes.SHA256())
+    return base64.urlsafe_b64encode(
+        csr.public_bytes(serialization.Encoding.DER)).rstrip(b'=').decode()
+
+
+class TestFinalizeCsrMatchesTheOrder:
+    """RFC 8555 §7.4: the CSR names exactly the order identifiers, else badCSR
+    before anything reaches the upstream CA."""
+
+    def _finalize(self, app, client, route, monkeypatch, csr_b64, domains=(DOMAIN,),
+                  finalize_answer=None):
+        with app.app_context():
+            row = _order_row()
+            row.domains = json.dumps(list(domains))
+            db.session.commit()
+            upstream = _Upstream({
+                ORDER_URL: _Resp({'status': 'ready', 'finalize': FINALIZE_URL}),
+                FINALIZE_URL: finalize_answer or _Resp(
+                    {'status': 'processing', 'finalize': FINALIZE_URL}),
+            })
+            svc = _svc(monkeypatch, upstream)
+            response = route(client, f'/acme/proxy/order/{_b64(ORDER_URL)}/finalize', svc,
+                             {'csr': csr_b64})
+        return response, upstream
+
+    @pytest.mark.parametrize('csr', [
+        dict(dns=['other.example.com']),
+        dict(dns=[DOMAIN, 'extra.example.com']),
+        dict(cn='other.example.com', dns=[DOMAIN]),
+        dict(dns=[DOMAIN], ips=['192.0.2.1']),
+        dict(),
+    ])
+    def test_mismatched_csr_is_bad_csr_without_upstream_call(self, app, client, route,
+                                                             monkeypatch, csr):
+        response, upstream = self._finalize(app, client, route, monkeypatch, _csr_b64(**csr))
+        assert response.status_code == 400
+        assert response.get_json()['type'] == 'urn:ietf:params:acme:error:badCSR'
+        assert FINALIZE_URL not in [url for url, _p in upstream.calls]
+
+    def test_csr_with_a_duplicate_extension_is_bad_csr(self, app, client, route, monkeypatch):
+        import asn1crypto.csr
+        der = base64.urlsafe_b64decode(_csr_b64(dns=[DOMAIN]) + '==')
+        request = asn1crypto.csr.CertificationRequest.load(der)
+        extensions = request['certification_request_info']['attributes'][0]['values'][0]
+        extensions.append(extensions[0].copy())
+        duplicated = base64.urlsafe_b64encode(request.dump(force=True)).rstrip(b'=').decode()
+        response, upstream = self._finalize(app, client, route, monkeypatch, duplicated)
+        assert response.status_code == 400
+        assert response.get_json()['type'] == 'urn:ietf:params:acme:error:badCSR'
+        assert FINALIZE_URL not in [url for url, _p in upstream.calls]
+
+    def test_wildcard_is_its_own_identifier(self, app, client, route, monkeypatch):
+        response, _up = self._finalize(app, client, route, monkeypatch,
+                                       _csr_b64(dns=['example.com']), domains=['*.example.com'])
+        assert response.get_json()['type'] == 'urn:ietf:params:acme:error:badCSR'
+
+    @pytest.mark.parametrize('csr, domains', [
+        (dict(dns=[DOMAIN.upper() + '.']), [DOMAIN]),
+        (dict(cn=DOMAIN), [DOMAIN]),
+        (dict(cn=DOMAIN, dns=[DOMAIN, '*.example.com']), [DOMAIN, '*.example.com']),
+    ])
+    def test_matching_csr_reaches_the_upstream(self, app, client, route, monkeypatch, csr,
+                                               domains):
+        response, upstream = self._finalize(app, client, route, monkeypatch, _csr_b64(**csr),
+                                            domains=domains)
+        assert response.status_code == 200, response.get_json()
+        assert upstream.calls[-1][0] == FINALIZE_URL
+
+    def test_upstream_unauthorized_on_a_matching_csr_stays_server_side(self, app, client,
+                                                                       route, monkeypatch):
+        refused = _Resp({'type': 'urn:ietf:params:acme:error:unauthorized',
+                         'detail': 'Account is not valid'}, 403)
+        response, _up = self._finalize(app, client, route, monkeypatch,
+                                       _csr_b64(dns=[DOMAIN]), finalize_answer=refused)
+        assert response.status_code == 500
+        assert response.get_json()['type'] == 'urn:ietf:params:acme:error:serverInternal'
+
+
 class TestRetryAfterOnSuccess:
     def test_processing_order_relays_retry_after(self, app, client, route, monkeypatch):
         with app.app_context():
@@ -376,3 +465,55 @@ class TestProfileAndNotAfter:
             svc.directory['renewalInfo'] = f'{UPSTREAM}/acme/renewal-info'
             svc.new_order([{'type': 'dns', 'value': DOMAIN}], client_thumbprint='up-thumb')
             assert [url for url, _p in upstream.calls] == [ORDER_URL, NEW_ORDER_URL]
+
+
+def _index_links(response):
+    return [v for v in response.headers.getlist('Link') if 'rel="index"' in v]
+
+
+class TestIndexLinkOnEveryResponse:
+    """RFC 8555 §7.1: every proxy resource but the directory links it with rel=index."""
+
+    def test_success_and_problem_responses_link_the_directory(self, app, client, route,
+                                                              monkeypatch):
+        with app.app_context():
+            _order_row()
+            svc = _svc(monkeypatch, _Upstream({ORDER_URL: _Resp(
+                {'status': 'pending', 'finalize': FINALIZE_URL})}))
+            ok = route(client, f'/acme/proxy/order/{_b64(ORDER_URL)}', svc, '')
+            svc = _svc(monkeypatch, _Upstream({ORDER_URL: _Resp(RATE_LIMITED, 429)}))
+            refused = route(client, f'/acme/proxy/order/{_b64(ORDER_URL)}', svc, '')
+        wrong_type = client.post('/acme/proxy/new-order', data='{}',
+                                 content_type='application/json')
+        for response, status in ((ok, 200), (refused, 429), (wrong_type, 415)):
+            assert response.status_code == status
+            assert _index_links(response) == ['<http://localhost/acme/proxy/directory>;rel="index"']
+
+    def test_slug_path_links_its_own_directory(self, app, client):
+        response = client.post('/acme/proxy/some-slug/new-order', data='{}',
+                               content_type='application/json')
+        assert _index_links(response) == [
+            '<http://localhost/acme/proxy/some-slug/directory>;rel="index"']
+
+    @pytest.mark.parametrize('slug', ['bad%0d%0aSet-Cookie:x', 'new-order'])
+    def test_invalid_slug_gets_no_link_and_no_header_injection(self, app, client, slug):
+        response = client.post(f'/acme/proxy/{slug}/new-order', data='{}',
+                               content_type='application/json')
+        assert response.status_code == 415
+        assert _index_links(response) == []
+        assert 'Set-Cookie' not in response.headers
+
+    def test_existing_link_is_kept_beside_the_index(self, app, client, route, monkeypatch):
+        svc = SimpleNamespace(respond_challenge=lambda *_a, **_k: (
+            {'status': 'processing'}, f'<http://localhost/acme/proxy/authz/{_b64(AUTHZ_URL)}>;rel="up"'),
+            retry_after=None)
+        response = route(client, f'/acme/proxy/challenge/{_b64(CHALL_URL)}', svc, {})
+        links = response.headers.getlist('Link')
+        assert any('rel="up"' in v for v in links)
+        assert len(_index_links(response)) == 1
+
+    def test_directory_carries_no_index_link(self, app, client, monkeypatch):
+        monkeypatch.setattr(acme_proxy_api, 'get_proxy_service', lambda slug=None: SimpleNamespace(
+            get_directory=lambda: {'newNonce': 'http://localhost/acme/proxy/new-nonce'}))
+        response = client.get('/acme/proxy/directory')
+        assert _index_links(response) == []
