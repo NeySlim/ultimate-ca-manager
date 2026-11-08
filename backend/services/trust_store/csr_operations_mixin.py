@@ -42,15 +42,18 @@ from utils.qc_statements import add_certificate_policies, add_qc_statements, tem
 from utils.custom_extensions import add_custom_extensions
 
 
-def _certificate_template_extension(template_oid, major=100, minor=0):
-    """Build the Microsoft CertificateTemplateOID extension (MS-CRTD):
+# Revision of every template, as XCEP announces it (100 is AD CS's first v2 revision)
+MS_TEMPLATE_MAJOR_VERSION = 100
+MS_TEMPLATE_MINOR_VERSION = 0
+
+
+def _certificate_template_extension(template_oid, major=MS_TEMPLATE_MAJOR_VERSION,
+                                    minor=MS_TEMPLATE_MINOR_VERSION):
+    """Build the Microsoft CertificateTemplateOID extension (MS-WCCE 2.2.2.7.7.2):
     ``SEQUENCE { templateID OBJECT IDENTIFIER, major INTEGER, minor
     INTEGER }``. ``cryptography`` has no native type for it, so it's
-    hand-built with asn1crypto and wrapped as UnrecognizedExtension —
-    same approach already used for CMC parsing in
-    services/wstep/rst_parser.py. major/minor are arbitrary (Windows
-    doesn't validate them against anything server-side); 100/0 mirrors
-    a typical real ADCS template's default major version."""
+    hand-built with asn1crypto and wrapped as UnrecognizedExtension.
+    XCEP announces the same value, which CertEnroll copies into its request."""
     from asn1crypto import core as asn1_core
 
     class _TemplateVersion(asn1_core.Integer):

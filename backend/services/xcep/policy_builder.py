@@ -328,10 +328,10 @@ def _policy_id_for_ca(ca):
     return str(derived)
 
 
-def _build_extensions_element(attributes, extensions, oids):
+def _build_extensions_element(attributes, extensions, oids, template_extension):
     """attributes/extensions -- real X.509 extensions (KeyUsage,
-    ExtendedKeyUsage) DER-encoded and referenced by OID, per the MS-XCEP
-    schema."""
+    ExtendedKeyUsage, the template's own) DER-encoded and referenced by OID,
+    per the MS-XCEP schema."""
     entries = []  # list of (oid, critical, der_bytes)
 
     eku_list = extensions.get('extended_key_usage')
@@ -364,9 +364,9 @@ def _build_extensions_element(attributes, extensions, oids):
         der = asn1_x509.KeyUsage(ku_bits).dump()
         entries.append((_EXT_KEY_USAGE_OID, True, der))
 
-    if not entries:
-        _nil_element(attributes, 'extensions')
-        return
+    # CertEnroll copies it into the request, which then names its template (MS-WCCE
+    # 2.2.2.7.7.2, schema 2 and later); WSTEP otherwise tells templates apart by EKU only
+    entries.append((template_extension.oid.dotted_string, False, template_extension.value))
 
     extensions_el = etree.SubElement(attributes, '{%s}extensions' % XCEP_NS)
     for oid, critical, der in entries:
@@ -402,6 +402,9 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
     Returns:
         bytes: UTF-8 encoded, well-formed SOAP XML.
     """
+    from services.trust_store.csr_operations_mixin import (
+        MS_TEMPLATE_MAJOR_VERSION, MS_TEMPLATE_MINOR_VERSION, _certificate_template_extension)
+
     oids = _OidTable()
     resolved_templates = _resolve_templates_for_ca(ca, templates)
 
@@ -521,9 +524,10 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         # hashAlgorithmOIDReference, rARequirements, keyArchivalAttributes,
         # extensions -- order matters (xs:sequence) and the nillable-but-
         # required tail elements must all be present, real value or nil.
+        # MS-XCEP 3.1.4.1.3.24: the versions the template extension and the issued certificate carry
         revision = etree.SubElement(attributes, '{%s}revision' % XCEP_NS)
-        etree.SubElement(revision, '{%s}majorRevision' % XCEP_NS).text = '1'
-        etree.SubElement(revision, '{%s}minorRevision' % XCEP_NS).text = '0'
+        etree.SubElement(revision, '{%s}majorRevision' % XCEP_NS).text = str(MS_TEMPLATE_MAJOR_VERSION)
+        etree.SubElement(revision, '{%s}minorRevision' % XCEP_NS).text = str(MS_TEMPLATE_MINOR_VERSION)
 
         _nil_element(attributes, 'supersededPolicies')
         _nil_element(attributes, 'privateKeyFlags')
@@ -543,7 +547,8 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         _nil_element(attributes, 'rARequirements')
         _nil_element(attributes, 'keyArchivalAttributes')
 
-        _build_extensions_element(attributes, extensions, oids)
+        _build_extensions_element(attributes, extensions, oids,
+                                  _certificate_template_extension(policy_oid))
 
     # PolicyCollection needs one policy: Windows refuses it empty (WS_E_INVALID_FORMAT), accepts nil.
     if len(policies) == 0:

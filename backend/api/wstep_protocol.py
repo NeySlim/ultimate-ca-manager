@@ -139,7 +139,9 @@ def _validity_days():
         return 365
 
 
-def _fault_response(reason, status=500, relates_to=None, subcode=None, code='s:Receiver'):
+def _fault_response(reason, status=500, relates_to=None, subcode=None):
+    # SOAP 1.2 HTTP binding: env:Sender (the request is at fault) goes as 400, env:Receiver as 500
+    code = 's:Sender' if status < 500 else 's:Receiver'
     (logger.error if status >= 500 else logger.debug)("WSTEP fault (status=%s): %s", status, reason)
     body = build_soap_fault(reason, code=code, relates_to=relates_to, subcode=subcode)
     return Response(body, status=status, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
@@ -154,12 +156,11 @@ def _parse_request(body):
         return None, _fault_response(f'Malformed request: {e}', status=400, relates_to=e.message_id)
     if parsed.request_type != REQUEST_TYPE_ISSUE:
         return None, _fault_response('Unsupported wst:RequestType: only Issue is served',
-                                     status=400, relates_to=parsed.message_id, code='s:Sender')
+                                     status=400, relates_to=parsed.message_id)
     # WSS 1.1 section 12: on SOAP 1.2 its fault codes are subcodes of env:Sender
     if message_expired(parsed.security_header):
         return None, _fault_response('The message has expired (wsu:Timestamp)', status=400,
-                                     relates_to=parsed.message_id, subcode='wsse:MessageExpired',
-                                     code='s:Sender')
+                                     relates_to=parsed.message_id, subcode='wsse:MessageExpired')
     return parsed, None
 
 
