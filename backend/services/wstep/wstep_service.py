@@ -872,7 +872,8 @@ def _directory_subject(ca, template, csr, principal, sam_account_name):
             san = [x509.DNSName(dns_hostname)] if _san_values(csr) is not None else None
     elif sam_account_name and (source == 'directory' or _user_ad_derivation_enabled(ca)):
         subject, san = _user_directory_subject(sam_account_name)
-        reached, subject = subject is not lookup.UNREACHABLE, subject or None
+        if subject is lookup.UNREACHABLE:
+            reached, subject = False, None
 
     # The requester is not at fault when the directory cannot answer: env:Receiver
     if subject is None and not reached:
