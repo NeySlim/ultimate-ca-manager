@@ -529,6 +529,7 @@ class TestChallengeSubmissionFailure:
         (requests.exceptions.ConnectTimeout('upstream unreachable'), False),
         (_Resp({'type': 'urn:ietf:params:acme:error:serverInternal', 'detail': 'boom'}, 500), True),
         (requests.exceptions.ReadTimeout('no answer'), True),
+        (requests.exceptions.ConnectionError('Connection aborted.', 'RemoteDisconnected'), True),
     ])
     def test_failed_post_fails_the_order_and_releases_its_records(self, app, monkeypatch,
                                                                   answer, rechecked):
@@ -549,9 +550,11 @@ class TestChallengeSubmissionFailure:
             assert row.challenges_dict[CHALL_URL]['status'] == 'failed'
             assert row.error_message
             assert row.dns_records_created is None
-            [(_app, released, order_id)] = _cleanups()
+            # An authorization left unread may hide a received POST: its record stays a while
+            [(_app, released, order_id, *delay)] = _cleanups()
             assert order_id == row.id
             assert {r['record_name'] for r in released} == {f'_acme-challenge.{DOMAIN}'}
+            assert delay == ([proxy_mod._SUBMITTED_RECORD_LINGER] if rechecked else [])
 
     def test_client_reads_the_failure_and_its_next_order_is_served(self, app, monkeypatch):
         _provider(monkeypatch, (True, 'ok'))
@@ -639,6 +642,9 @@ class TestAmbiguousSubmission:
     @pytest.mark.parametrize('authz', [
         _authz(status='valid', chall_status='valid'),
         _authz(chall_status='processing'),
+        _authz(chall_status='invalid'),
+        _authz(status='valid'),
+        _authz(status='invalid'),
     ])
     def test_challenge_the_ca_took_is_submitted(self, app, monkeypatch, answer, authz):
         with app.app_context():
@@ -658,8 +664,55 @@ class TestAmbiguousSubmission:
             assert upstream.calls == [(CHALL_URL, {}), (AUTHZ_URL, '')]
             assert row.status == 'invalid'
             assert row.challenges_dict[CHALL_URL]['status'] == 'failed'
+            assert 'did not answer' in row.challenges_dict[CHALL_URL]['problem']['detail']
             [(_app, released, _order_id)] = _cleanups()
             assert released
+
+    def test_unread_authorization_keeps_the_record_a_while(self, app, monkeypatch):
+        with app.app_context():
+            _provider(monkeypatch, (True, 'ok'))
+            row = _order(client_jwk_thumbprint='T')
+            row.set_challenges_dict({CHALL_URL: {'status': 'initiated'}})
+            db.session.commit()
+            svc, _calls = _svc(monkeypatch)
+            monkeypatch.setattr(svc, '_post_with_account', _Upstream({
+                CHALL_URL: requests.exceptions.ReadTimeout('read timed out'),
+                AUTHZ_URL: requests.exceptions.ReadTimeout('read timed out')}))
+            svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
+            db.session.refresh(row)
+            assert row.status == 'invalid'
+            [(_app, released, _order_id, delay)] = _cleanups()
+            assert _txt('tok.up') in [r['value'] for r in released]
+            assert delay == proxy_mod._SUBMITTED_RECORD_LINGER
+
+    @pytest.mark.parametrize('upstream_status', ['processing', 'valid'])
+    def test_finalize_of_an_order_finalized_upstream_names_its_status(
+            self, app, monkeypatch, upstream_status):
+        with app.app_context():
+            row = _order(client_jwk_thumbprint='T', status='invalid')
+            row.set_challenges_dict({CHALL_URL: {'status': 'failed', 'error': 'x', 'problem': {
+                'type': 'urn:ietf:params:acme:error:rateLimited', 'detail': 'slow down'}}})
+            db.session.commit()
+            svc, _calls = _svc(monkeypatch, {ORDER_URL: _Resp(
+                {'status': upstream_status, 'authorizations': [AUTHZ_URL],
+                 'finalize': f'{ORDER_URL}/finalize'})})
+            with pytest.raises(ProxyOrderNotReadyError) as err:
+                svc.finalize_order(_b64(ORDER_URL), _csr_pem(DOMAIN), requester_thumbprint='T')
+            assert upstream_status in str(err.value)
+            assert 'invalid' not in str(err.value) and 'rateLimited' not in str(err.value)
+
+    def test_finalize_after_a_local_failure_reads_the_order_once(self, app, monkeypatch):
+        with app.app_context():
+            row = _order(client_jwk_thumbprint='T', status='invalid')
+            row.set_challenges_dict({CHALL_URL: {'status': 'failed', 'error': 'x'}})
+            db.session.commit()
+            svc, calls = _svc(monkeypatch, {
+                ORDER_URL: _Resp({'status': 'ready', 'authorizations': [AUTHZ_URL],
+                                  'finalize': f'{ORDER_URL}/finalize'}),
+                f'{ORDER_URL}/finalize': _Resp({'status': 'processing',
+                                                'finalize': f'{ORDER_URL}/finalize'})})
+            svc.finalize_order(_b64(ORDER_URL), _csr_pem(DOMAIN), requester_thumbprint='T')
+            assert [url for url, _payload in calls] == [ORDER_URL, f'{ORDER_URL}/finalize']
 
     def test_upstream_ready_is_served_over_a_local_failure(self, app, monkeypatch):
         """The authorization read failed too: the upstream order decides."""
@@ -727,6 +780,39 @@ class TestSubmittedRecordOutlivesASiblingFailure:
             [(delay, kept)] = by_delay.items()
             assert kept == records[1:] and delay > 0
 
+    def test_lingering_record_is_deleted_only_after_the_wait(self, app, monkeypatch):
+        from models import DnsProvider
+        provider = _provider(monkeypatch, (True, 'ok'))
+        events = []
+        provider.delete_txt_record.side_effect = (
+            lambda _zone, name, _value: events.append(('delete', name)) or (True, 'ok'))
+        monkeypatch.setattr(proxy_mod.time, 'sleep', lambda seconds: events.append(('sleep', seconds)))
+        with app.app_context():
+            model = DnsProvider(name='linger-wait', provider_type='manual', credentials='{}')
+            db.session.add(model)
+            db.session.commit()
+            records = [{'domain': DOMAIN, 'record_name': f'_acme-challenge.{DOMAIN}',
+                        'value': 'v1', 'provider_id': model.id},
+                       {'domain': OTHER, 'record_name': f'_acme-challenge.{OTHER}',
+                        'value': 'v2', 'provider_id': model.id}]
+            row = _two_names(dns_records_created=json.dumps(records))
+            row.set_challenges_dict({
+                CHALL_B: {'status': 'submitted', 'records': [[f'_acme-challenge.{OTHER}', 'v2']]},
+                CHALL_URL: {'status': 'initiated'}})
+            db.session.commit()
+            svc, _calls = _svc(monkeypatch)
+            svc._fail_dns_automation(row, CHALL_URL, DOMAIN, 'refused')
+            try:
+                for target, args in _ThreadRecorder.created:
+                    target(*args)
+                    events.append(('done',))
+            finally:
+                db.session.delete(model)
+                db.session.commit()
+            assert events == [('delete', f'_acme-challenge.{DOMAIN}'), ('done',),
+                              ('sleep', proxy_mod._SUBMITTED_RECORD_LINGER),
+                              ('delete', f'_acme-challenge.{OTHER}'), ('done',)]
+
 
 @pytest.mark.usefixtures('_quiet_rows')
 class TestValueAlreadyPublishedBySibling:
@@ -783,3 +869,107 @@ class TestBadNonceRetries:
         svc, sent = self._svc(monkeypatch, answers)
         assert svc._post_jws(CHALL_URL, {}, kid='k').status_code == 400
         assert sent == ['n0']
+
+
+def _in_another_thread(app, fn):
+    """Run ``fn`` to completion in a real thread with its own app context and session
+    (threading.Thread is replaced by a recorder in this module)."""
+    import _thread
+    import threading
+    done, errors = threading.Event(), []
+
+    def body():
+        try:
+            with app.app_context():
+                try:
+                    fn()
+                finally:
+                    db.session.remove()
+        except BaseException as exc:  # noqa: BLE001 - re-raised in the test thread
+            errors.append(exc)
+        finally:
+            done.set()
+
+    _thread.start_new_thread(body, ())
+    assert done.wait(30)
+    if errors:
+        raise errors[0]
+
+
+def _fresh(order_id):
+    db.session.expire_all()
+    return db.session.get(AcmeClientOrder, order_id)
+
+
+@pytest.mark.usefixtures('_quiet_rows')
+class TestConcurrentChallengesOfOneOrder:
+    """Two dns-01 threads of one order: each writes its own challenge onto the
+    row as it is at that moment, never a copy read before the other's write."""
+
+    X_RECORD = {'domain': DOMAIN, 'record_name': f'_acme-challenge.{DOMAIN}',
+                'value': 'vx', 'provider_id': 5}
+
+    def _row(self, records=None):
+        row = _two_names(client_jwk_thumbprint='T',
+                         dns_records_created=json.dumps(records) if records else None)
+        row.set_challenges_dict({CHALL_URL: {'status': 'initiated'},
+                                 CHALL_B: {'status': 'initiated'}})
+        db.session.commit()
+        return row.id
+
+    def test_failure_during_a_sibling_post_fails_the_order(self, app, monkeypatch):
+        _provider(monkeypatch, (True, 'ok'))
+        with app.app_context():
+            order_id = self._row()
+
+            def fail_other():
+                other, _calls = _svc(monkeypatch)
+                other._fail_challenge_submission(
+                    db.session.get(AcmeClientOrder, order_id), CHALL_B, OTHER, None)
+
+            def post(url, payload=None, *_a, **_k):
+                assert url == CHALL_URL
+                _in_another_thread(app, fail_other)
+                return _Resp({'status': 'processing'})
+
+            svc, _calls = _svc(monkeypatch)
+            monkeypatch.setattr(svc, '_post_with_account', post)
+            svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, order_id, AUTHZ_URL)
+
+            row = _fresh(order_id)
+            assert {url: s['status'] for url, s in row.challenges_dict.items()} == {
+                CHALL_URL: 'submitted', CHALL_B: 'failed'}
+            assert row.status == 'invalid'
+            svc, _calls = _svc(monkeypatch, {ORDER_URL: _Resp(
+                {'status': 'pending', 'authorizations': [AUTHZ_URL, AUTHZ_B],
+                 'finalize': f'{ORDER_URL}/finalize'})})
+            order = svc.get_order(_b64(ORDER_URL), requester_thumbprint='T')
+            assert order['status'] == 'invalid' and order['error']['type'].endswith('serverInternal')
+
+    def test_submission_during_a_sibling_post_keeps_its_records(self, app, monkeypatch):
+        _provider(monkeypatch, (True, 'ok'))
+        submitted = [[self.X_RECORD['record_name'], self.X_RECORD['value']]]
+        with app.app_context():
+            order_id = self._row(records=[self.X_RECORD])
+
+            def submit_other():
+                other, _calls = _svc(monkeypatch)
+                other._mark_submitted(db.session.get(AcmeClientOrder, order_id), CHALL_URL, submitted)
+
+            def post(url, payload=None, *_a, **_k):
+                assert url == CHALL_B
+                _in_another_thread(app, submit_other)
+                return _Resp({'type': 'urn:ietf:params:acme:error:rateLimited', 'detail': 'slow'}, 429)
+
+            svc, _calls = _svc(monkeypatch)
+            monkeypatch.setattr(svc, '_post_with_account', post)
+            svc._run_dns01_automation(CHALL_B, 'tok.up', OTHER, order_id, AUTHZ_B)
+
+            row = _fresh(order_id)
+            assert row.challenges_dict[CHALL_URL]['status'] == 'submitted'
+            assert row.challenges_dict[CHALL_URL]['records'] == submitted
+            assert row.challenges_dict[CHALL_B]['status'] == 'failed'
+            by_delay = {(args[3] if len(args) > 3 else 0): args[1] for args in _cleanups()}
+            assert [r['value'] for r in by_delay.pop(proxy_mod._SUBMITTED_RECORD_LINGER)] == ['vx']
+            assert 'vx' not in [r['value'] for r in by_delay.pop(0, [])]
+            assert by_delay == {}
