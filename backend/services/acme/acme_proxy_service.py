@@ -909,7 +909,7 @@ class AcmeProxyService:
         from services.acme import ari
         try:
             retry_at = AcmeClientService._parse_retry_after(value)
-        except ValueError:
+        except (ValueError, OverflowError):  # a delta too large for a date is no answer either
             retry_at = None
         if retry_at is None:
             return ari.RETRY_AFTER_SECONDS

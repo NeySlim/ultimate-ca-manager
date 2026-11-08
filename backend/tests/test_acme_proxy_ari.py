@@ -393,3 +393,67 @@ class TestUpstreamRenewalInfoRelay:
         clock[0] += 61
         assert _served_locally(client.get(f'/acme/proxy/ari-test/renewal-info/{self._certid()}'))
         assert len(upstream.ari_calls) == 2
+
+    @pytest.fixture
+    def stored_twice(self, app, issued):
+        """A second download stored the certificate again and the order now names that row."""
+        from models import AcmeClientOrder
+        second = _import_cert_for_ari(app, self.AKI, self.SERIAL, real=True)
+        with app.app_context():
+            order = AcmeClientOrder.query.filter_by(certificate_id=issued).one()
+            order.certificate_id = second
+            db.session.commit()
+        yield issued, second
+        with app.app_context():
+            AcmeClientOrder.query.filter_by(certificate_id=second).update(
+                {AcmeClientOrder.certificate_id: issued}, synchronize_session=False)
+            Certificate.query.filter_by(id=second).delete()
+            db.session.commit()
+
+    def test_order_naming_a_later_row_is_still_relayed(self, client, stored_twice, monkeypatch):
+        upstream = self._upstream(monkeypatch)
+        r = client.get(f'/acme/proxy/ari-test/renewal-info/{self._certid()}')
+        assert r.get_json()['suggestedWindow'] == UPSTREAM_WINDOW
+        assert upstream.ari_calls == [self._certid()]
+
+    @pytest.mark.parametrize('revoked_row', [0, 1])
+    def test_revocation_on_any_row_gets_the_local_window(self, app, client, stored_twice,
+                                                         monkeypatch, revoked_row):
+        upstream = self._upstream(monkeypatch)
+        with app.app_context():
+            db.session.get(Certificate, stored_twice[revoked_row]).revoked = True
+            db.session.commit()
+        r = client.get(f'/acme/proxy/ari-test/renewal-info/{self._certid()}')
+        start = datetime.fromisoformat(r.get_json()['suggestedWindow']['start'].replace('Z', ''))
+        assert start < datetime.now(timezone.utc).replace(tzinfo=None)
+        assert upstream.ari_calls == []
+
+    def test_oversized_retry_after_falls_back_to_the_default_and_is_cached(self, client, issued,
+                                                                          monkeypatch):
+        upstream = self._upstream(monkeypatch, answer=_Answer(
+            {'suggestedWindow': UPSTREAM_WINDOW}, headers={'Retry-After': '9' * 30}))
+        for _ in range(2):
+            r = client.get(f'/acme/proxy/ari-test/renewal-info/{self._certid()}')
+            assert r.get_json() == {'suggestedWindow': UPSTREAM_WINDOW}
+        assert 6 * 3600 - 10 <= int(r.headers['Retry-After']) <= 6 * 3600
+        assert len(upstream.ari_calls) == 1
+
+    @pytest.mark.parametrize('retry_after, still_cached, asked_again', [
+        ('1800', 1790, 1801),  # the upstream Retry-After, within the bounds
+        ('10', 30, 61),        # raised to one minute
+    ])
+    def test_cache_follows_retry_after_within_bounds(self, client, issued, monkeypatch,
+                                                     retry_after, still_cached, asked_again):
+        import services.acme.acme_proxy_service as proxy_mod
+        upstream = self._upstream(monkeypatch, answer=_Answer(
+            {'suggestedWindow': UPSTREAM_WINDOW}, headers={'Retry-After': retry_after}))
+        clock = [1000.0]
+        monkeypatch.setattr(proxy_mod.time, 'monotonic', lambda: clock[0])
+        url = f'/acme/proxy/ari-test/renewal-info/{self._certid()}'
+        assert client.get(url).status_code == 200
+        clock[0] = 1000.0 + still_cached
+        assert client.get(url).status_code == 200
+        assert len(upstream.ari_calls) == 1
+        clock[0] = 1000.0 + asked_again
+        assert client.get(url).status_code == 200
+        assert len(upstream.ari_calls) == 2
