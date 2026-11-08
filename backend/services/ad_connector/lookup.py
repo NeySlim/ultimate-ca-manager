@@ -165,7 +165,8 @@ def realm_matches_connector(realm):
     if not config or not config.enabled or not config.base_dn:
         return False
     connector_realm = realm_of_base_dn(config.base_dn)
-    return bool(connector_realm) and connector_realm == realm.upper()
+    # RFC 4120 §6.1: realm names compare exactly; AD's is its domain in capitals
+    return bool(connector_realm) and connector_realm == realm
 
 
 def _config_fault(config):
@@ -426,6 +427,19 @@ def _search(conn, base_dn, search_filter, attributes):
     return UNREACHABLE
 
 
+def _single_entry(entries, sam_account_name):
+    """The one entry of an account search, None when there is none, else ``UNREACHABLE``:
+    a Global Catalog also answers for child domains, whose accounts may share the name."""
+    if entries is UNREACHABLE or not entries:
+        return entries if entries is UNREACHABLE else None
+    if len(entries) > 1:
+        logger.warning("AD Connector: %d accounts named %r (%s); point the connector at a "
+                       "domain controller of the realm, not a global catalog", len(entries),
+                       sam_account_name, ', '.join(e.entry_dn for e in entries))
+        return UNREACHABLE
+    return entries[0]
+
+
 def lookup_computer_dns_hostname(sam_account_name):
     """The AD computer object's ``dNSHostName`` for ``sam_account_name``
     (e.g. ``'WIN11$'``, trailing ``$`` included -- it's a real part of the
@@ -451,9 +465,10 @@ def lookup_computer_dns_hostname(sam_account_name):
         safe_sam = escape_filter_chars(sam_account_name)
         entries = _search(conn, config.base_dn, f'(&(objectClass=computer)(sAMAccountName={safe_sam}))',
                           ['dNSHostName'])
-        if not entries:
-            return entries if entries is UNREACHABLE else None
-        entry = entries[0]
+        entry = _single_entry(entries, sam_account_name)
+        # An ldap3 Entry without the requested attributes is falsy: compare by identity
+        if entry is None or entry is UNREACHABLE:
+            return entry
         if 'dNSHostName' not in entry or not entry.dNSHostName.value:
             return None
         return str(entry.dNSHostName.value)
@@ -530,9 +545,10 @@ def lookup_object_sid(sam_account_name):
     try:
         safe_sam = escape_filter_chars(sam_account_name)
         entries = _search(conn, config.base_dn, f'(sAMAccountName={safe_sam})', ['objectSid'])
-        if not entries:
-            return entries if entries is UNREACHABLE else None
-        entry = entries[0]
+        entry = _single_entry(entries, sam_account_name)
+        # An ldap3 Entry without the requested attributes is falsy: compare by identity
+        if entry is None or entry is UNREACHABLE:
+            return entry
         if 'objectSid' not in entry or not entry.objectSid.raw_values:
             return UNUSABLE_SID
         return _sid_bytes_to_string(entry.objectSid.raw_values[0]) or UNUSABLE_SID
@@ -587,9 +603,10 @@ def lookup_user_ad_identity(sam_account_name):
         entries = _search(conn, config.base_dn,
                           f'(&(objectCategory=person)(objectClass=user)(sAMAccountName={safe_sam}))',
                           ['userPrincipalName', 'mail'])
-        if not entries:
-            return entries if entries is UNREACHABLE else None
-        entry = entries[0]
+        entry = _single_entry(entries, sam_account_name)
+        # An ldap3 Entry without the requested attributes is falsy: compare by identity
+        if entry is None or entry is UNREACHABLE:
+            return entry
         if 'userPrincipalName' not in entry or not entry.userPrincipalName.value:
             return None
         upn = str(entry.userPrincipalName.value)

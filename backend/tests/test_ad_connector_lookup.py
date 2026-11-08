@@ -67,10 +67,18 @@ class TestRealmMatchesConnector:
         with app.app_context():
             assert lookup.realm_matches_connector('HAGLAND.DOMAIN') is True
 
-    def test_case_insensitive(self, app, monkeypatch):
+    def test_realm_names_are_case_sensitive(self, app, monkeypatch):
+        """RFC 4120 §6.1: realm names are case sensitive; AD's is its domain in capitals."""
         _configure(monkeypatch, app)
         with app.app_context():
-            assert lookup.realm_matches_connector('hagland.domain') is True
+            assert lookup.realm_matches_connector('hagland.domain') is False
+            assert lookup.realm_matches_connector('Hagland.Domain') is False
+
+    def test_a_child_domain_realm_is_another_realm(self, app, monkeypatch):
+        _configure(monkeypatch, app)
+        with app.app_context():
+            assert lookup.realm_matches_connector('CHILD.HAGLAND.DOMAIN') is False
+            assert lookup.connector_account('host$@CHILD.HAGLAND.DOMAIN') is lookup.FOREIGN_REALM
 
     def test_different_realm_rejected(self, app, monkeypatch):
         """A ticket from a trusted-but-different realm must not be treated
@@ -1256,5 +1264,30 @@ class TestBaseDnSpellings:
 
     def test_escaped_characters_are_kept(self):
         assert lookup.realm_of_base_dn('OU=a\\, b ,DC=corp, DC=example') == 'CORP.EXAMPLE'
+        assert lookup.realm_of_base_dn('OU=a\\ ,DC=corp,DC=example') == 'CORP.EXAMPLE'
         assert lookup.realm_of_base_dn('OU=Users,O=Corp') is None
         assert lookup.realm_of_base_dn('not a dn') is None
+
+
+class TestDuplicateAccounts:
+    """Over a Global Catalog the base DN also covers child domains, whose accounts can share a
+    sAMAccountName with one of this domain: two answers must never resolve to the first."""
+
+    @staticmethod
+    def _two(attrs):
+        first, second = _FakeEntry(attrs), _FakeEntry(attrs)
+        first.entry_dn = 'CN=CHILDDC,OU=Computers,DC=hagland,DC=domain'
+        second.entry_dn = 'CN=CHILDDC,OU=Domain Controllers,DC=child,DC=hagland,DC=domain'
+        return [first, second]
+
+    @pytest.mark.parametrize('name, attrs', [
+        ('computer', {'dNSHostName': 'childdc.child.hagland.domain'}),
+        ('sid', {'objectSid': TestSidBytesToString._WIN11_RAW_SID}),
+        ('user', {'userPrincipalName': 'alice@hagland.domain', 'mail': None}),
+    ])
+    def test_two_accounts_of_the_name_are_unreachable(self, app, monkeypatch, name, attrs):
+        _configure(None, app, enabled=True)
+        entries = self._two(attrs)
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=entries))
+        with app.app_context():
+            assert _LOOKUPS[name]() is lookup.UNREACHABLE

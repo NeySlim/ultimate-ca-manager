@@ -27,6 +27,7 @@ bp = Blueprint('ad_connector_v2', __name__)
 
 MAX_SERVER_LEN = 500
 MAX_DN_LEN = 500
+GLOBAL_CATALOG_PORTS = (3268, 3269)
 # Every configured DC is bound to in turn by the health probe, which runs on
 # the scheduler's single thread and waits out _LDAP_CONNECT_TIMEOUT_SECONDS
 # on each black-holed one. A long list would delay CRL generation, backups
@@ -131,6 +132,9 @@ def update_config():
             config.port = int(data['port']) if data['port'] not in (None, '') else 389
         except (TypeError, ValueError):
             return error_response('port must be an integer', 400)
+        # A global catalog searches child domains too, so an account name stops being unique
+        if config.port in GLOBAL_CATALOG_PORTS:
+            return error_response('the connector must reach a domain controller, not a global catalog', 400)
     if 'health_probe_interval' in data:
         try:
             interval = int(data['health_probe_interval'])

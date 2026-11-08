@@ -378,3 +378,32 @@ class TestBaseDnValidation:
 
     def test_a_spaced_domain_dn_is_accepted(self, app, auth_client):
         assert self._put(auth_client, {'base_dn': 'DC=corp, DC=example'}).status_code == 200
+
+
+class TestGlobalCatalogPortRefused:
+    @pytest.fixture(autouse=True)
+    def _disabled_connector(self, app):
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            db.session.add(ADConnectorConfig(server='dc1.corp.local', base_dn='DC=corp,DC=local', enabled=False))
+            db.session.commit()
+        yield
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            db.session.commit()
+
+    @staticmethod
+    def _put(auth_client, payload):
+        return auth_client.put('/api/v2/ad-connector', data=json.dumps(payload),
+                               content_type='application/json')
+
+    @pytest.mark.parametrize('port', [3268, 3269, '3268'])
+    def test_a_global_catalog_port_is_refused(self, app, auth_client, port):
+        response = self._put(auth_client, {'port': port})
+        assert response.status_code == 400
+        assert response.get_json()['message'] == (
+            'the connector must reach a domain controller, not a global catalog')
+
+    @pytest.mark.parametrize('port', [389, 636])
+    def test_a_domain_controller_port_is_accepted(self, app, auth_client, port):
+        assert self._put(auth_client, {'port': port}).status_code == 200
