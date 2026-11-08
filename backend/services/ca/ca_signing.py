@@ -88,6 +88,7 @@ class CASigningMixin:
         policy_template_id: int = None,
         template_ekus: list = None,
         template_id: int = None,
+        template_key_usage: list = None,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -127,6 +128,8 @@ class CASigningMixin:
                 do (WSTEP renewal); protocol-forbidden ones still dropped.
             template_id: template the certificate is issued under, recorded on
                 its row (WSTEP: the one whose OID it carries).
+            template_key_usage: Key Usage names that replace the CSR's, as a
+                bound template's do (WSTEP, for a request that carries none).
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -180,7 +183,8 @@ class CASigningMixin:
             override_san=override_san,
             requester_sid=requester_sid,
             extra_ekus=extra_ekus,
-            template_ext={'extended_key_usage': list(template_ekus)} if template_ekus else None,
+            template_ext={k: list(v) for k, v in (('extended_key_usage', template_ekus),
+                                                  ('key_usage', template_key_usage)) if v} or None,
             policy_scope={'ca_id': ca.id, 'template_id': policy_template_id,
                           'digest_explicit': False},
             san_template=policy_template,
