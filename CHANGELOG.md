@@ -134,6 +134,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME server and proxy: a URL or method no ACME route serves, a GET on a POST-only resource included, got a generic 404 without the directory link. It now gets a `malformed` problem document linking the directory, as 405 with `Allow` when another method is served (RFC 8555 §6.3, §7.1).
 - ACME proxy: a TXT record whose deferred deletion a restart interrupted stayed published for good when no client read its failed order again. The 15-minute order housekeeping task now deletes it, unless another pending order still needs the value.
 - ACME proxy: renewalInfo was computed locally, so a revocation or an incident at the upstream CA never brought renewals forward. The window of the upstream CA is now relayed with its Retry-After when its directory announces renewalInfo, the local one served otherwise (RFC 9773).
+- ACME server: renewalInfo read the revocation of one stored row of a certificate, so a revoked imported copy still got the normal window. A revocation recorded on any of its rows now gives a window in the past (RFC 9773).
 
 ### Security
 

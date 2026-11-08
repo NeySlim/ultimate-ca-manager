@@ -2102,9 +2102,10 @@ def renewal_info(certid: str):
         return acme_error('malformed', 'Malformed certificate identifier', 400)
 
     aki_hex, serial_int = parsed
-    cert = ari.find_certificate(aki_hex, serial_int)
-    if cert is None:
+    rows = ari.find_certificates(aki_hex, serial_int)
+    if not rows:
         return acme_error('malformed', 'Unknown certificate', 404)
+    cert = ari.renewal_row(rows)
 
     from models import SystemConfig
     days_cfg = SystemConfig.query.filter_by(key='auto_renewal_days').first()

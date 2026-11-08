@@ -958,7 +958,7 @@ def renewal_info(certid, slug=None):
     if not rows:
         return proxy_error('malformed', 'Unknown certificate', 404)
     # Each proxy download stores the certificate again: a revocation may be on any row
-    cert = next((row for row in rows if row.revoked), rows[0])
+    cert = ari.renewal_row(rows)
 
     relayed = None if cert.revoked else _upstream_renewal_info(rows, slug)
     if relayed:

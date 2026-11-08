@@ -93,6 +93,11 @@ def find_certificates(aki_hex: str, serial_int: int) -> list:
             if resolve_record_serial(cert) == serial_int and _aki_matches(cert.aki, aki_hex)]
 
 
+def renewal_row(rows: list) -> Certificate:
+    """The row whose window is served: a revocation recorded on any row of the certificate wins."""
+    return next((row for row in rows if row.revoked), rows[0])
+
+
 def find_certificate(aki_hex: str, serial_int: int) -> Optional[Certificate]:
     """Locate an issued certificate by AKI + serial (its oldest row)."""
     rows = find_certificates(aki_hex, serial_int)
