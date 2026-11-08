@@ -269,10 +269,8 @@ def _match_template(ca, csr, principal=None):
     else the best match of its requested EKUs against the CA's advertised
     templates (the same set XCEP's GetPolicies exposed).
 
-    Windows CertEnroll requests captured on Server 2025 name no template (their
-    CMC control sequence is empty, the CSR carries EKU, key usage and SKI only),
-    so the EKU match stays the fallback: it infers the template from what the
-    CSR itself asks for (its EKU set).
+    The EKU match is the fallback for requests naming no template; XCEP announces
+    each template's extension (1.3.6.1.4.1.311.21.7) so that CertEnroll names it.
 
     This is a real limitation, not a corner case: two templates can
     legitimately want the same EKU (e.g. "Web Server" and "VPN Server"
@@ -408,6 +406,23 @@ def _policy_oid_cas(ca):
     return [ca, xcep_ca] if xcep_ca is not None else [ca]
 
 
+def _template_oid_for(ca, template, wanted):
+    """The template OID a certificate carries: ``wanted`` when it is one of the template's
+    (XCEP may announce another CA's, which autoenrollment then looks for), else *ca*'s."""
+    from services.xcep.policy_builder import _policy_oid_for_template
+    if wanted is not None and wanted in {_policy_oid_for_template(c, template) for c in _policy_oid_cas(ca)}:
+        return wanted
+    return _policy_oid_for_template(ca, template)
+
+
+def _template_ext_oid(cert_or_csr):
+    try:
+        return extensions_of(cert_or_csr).get_extension_for_class(
+            x509.MSCertificateTemplate).value.template_id.dotted_string
+    except (x509.ExtensionNotFound, ValueError):
+        return None
+
+
 def _eku_oids(cert_or_csr):
     """Dotted EKU OIDs, or None without an ExtendedKeyUsage extension."""
     try:
@@ -451,8 +466,9 @@ def _renewal_template(ca, renewed_cert, csr):
         return matched, extra, extra, None
 
     from services.xcep.policy_builder import _policy_oid_for_template
+    cas = _policy_oid_cas(ca)
     template = next((t for t in _ca_templates(ca)
-                     if _policy_oid_for_template(ca, t) == template_oid), None)
+                     if template_oid in {_policy_oid_for_template(c, t) for c in cas}), None)
     if template is None:
         return None, [], None, ('The certificate template of the certificate being renewed '
                                 'is not offered by this CA')
@@ -958,8 +974,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         return None, 'This CA offers no certificate template'
     template_oid = None
     if matched_template is not None:
-        from services.xcep.policy_builder import _policy_oid_for_template
-        template_oid = _policy_oid_for_template(ca, matched_template)
+        template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(csr))
 
     if kerberos_principal:
         override_subject, override_san, refusal = _directory_subject(
@@ -1233,8 +1248,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
         return None, refusal
     template_oid = None
     if matched_template is not None:
-        from services.xcep.policy_builder import _policy_oid_for_template
-        template_oid = _policy_oid_for_template(ca, matched_template)
+        template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(signing_cert))
 
     try:
         cert_pem, _serial = CAService.sign_csr_from_crypto(

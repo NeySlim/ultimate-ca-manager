@@ -3,6 +3,7 @@
 szOID_CERTIFICATE_TEMPLATE (1.3.6.1.4.1.311.21.7) names it by OID, szOID_ENROLL_CERTTYPE
 (1.3.6.1.4.1.311.20.2) by name, as the MS-WSTEP 4.1.1.1 example does. A request naming
 neither is matched by its EKUs: the Windows CertEnroll captures carry none."""
+import pytest
 from asn1crypto import core as asn1_core
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
@@ -13,7 +14,7 @@ from models import CA, db
 from models.certificate_template import CertificateTemplate
 from services.xcep.policy_builder import _policy_oid_for_template
 from tests.test_wstep_subject_source import CLIENT_AUTH, SERVER_AUTH, _issue, subject_ca  # noqa: F401
-from tests.test_wstep_renew_tls import _template_oid
+from tests.test_wstep_renew_tls import _eku_csr, _renew, _template_oid
 
 TWINS = {
     'User': ('usr_cert', ['clientAuth'], False, 'RSA-2048'),
@@ -118,8 +119,9 @@ def test_an_unreadable_template_name_is_refused(app, subject_ca):
     assert err == 'Invalid certificate template extension in the request'
 
 
-def test_an_oid_announced_by_a_separate_xcep_ca_is_issued(app, subject_ca, create_ca):
-    """XCEP and WSTEP may be set to two CAs: the client names the OID the XCEP policy gave."""
+@pytest.fixture
+def split_xcep(app, subject_ca, create_ca):
+    """A WSTEP CA offering TWINS while XCEP is set to another CA: (WSTEP CA id, XCEP OID of VPNUser)."""
     from models import SystemConfig
     ca_id = subject_ca('Named split WSTEP CA', TWINS)
     xcep_ca = create_ca(cn='Named split XCEP CA')
@@ -128,11 +130,43 @@ def test_an_oid_announced_by_a_separate_xcep_ca_is_issued(app, subject_ca, creat
         oid = _policy_oid_for_template(db.session.get(CA, xcep_ca['id']), template)
         db.session.add(SystemConfig(key='xcep_ca_refid', value=xcep_ca['refid']))
         db.session.commit()
-    try:
-        cert, err = _issue(app, ca_id, _named_csr(oid=oid))
-    finally:
-        with app.app_context():
-            SystemConfig.query.filter_by(key='xcep_ca_refid').delete()
-            db.session.commit()
+    yield ca_id, oid
+    with app.app_context():
+        SystemConfig.query.filter_by(key='xcep_ca_refid').delete()
+        db.session.commit()
+
+
+def test_an_oid_announced_by_a_separate_xcep_ca_is_issued(app, split_xcep):
+    """XCEP and WSTEP may be set to two CAs: the client names the OID the XCEP policy gave,
+    and autoenrollment finds its template again only if the certificate carries that OID."""
+    ca_id, oid = split_xcep
+    cert, err = _issue(app, ca_id, _named_csr(oid=oid))
     assert err is None, err
-    assert _template_oid(cert).dotted_string == _oid_of(app, ca_id, 'Named split WSTEP CA VPNUser')
+    assert _template_oid(cert).dotted_string == oid != _oid_of(app, ca_id, 'Named split WSTEP CA VPNUser')
+
+
+@pytest.mark.parametrize('path', ['tls', 'xml'])
+def test_a_certificate_naming_the_xcep_oid_renews_under_it(app, split_xcep, path):
+    ca_id, oid = split_xcep
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'split-renew-{path}.example.test')]))
+           .add_extension(x509.ExtendedKeyUsage([CLIENT_AUTH]), critical=False)
+           .add_extension(x509.MSCertificateTemplate(x509.ObjectIdentifier(oid), 100, 0), critical=False)
+           .sign(key, hashes.SHA256()))
+    old_cert, err = _issue(app, ca_id, csr)
+    assert err is None, err
+    cert, err = _renew(app, ca_id, path, old_cert, key, _eku_csr(old_cert, key, CLIENT_AUTH))
+    assert err is None, err
+    assert _template_oid(cert).dotted_string == oid
+
+
+def test_only_an_oid_of_the_template_is_stamped(app, split_xcep):
+    from services.wstep.wstep_service import _template_oid_for
+    ca_id, oid = split_xcep
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        vpn = CertificateTemplate.query.filter_by(name='Named split WSTEP CA VPNUser').one()
+        user = CertificateTemplate.query.filter_by(name='Named split WSTEP CA User').one()
+        assert _template_oid_for(ca, vpn, oid) == oid
+        assert _template_oid_for(ca, user, oid) == _policy_oid_for_template(ca, user)

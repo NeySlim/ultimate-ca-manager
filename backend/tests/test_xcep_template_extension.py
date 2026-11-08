@@ -73,7 +73,8 @@ def test_each_policy_announces_its_template_extension(app, subject_ca):
         value = _CertificateTemplateOID.load(der)
         assert value['template_id'].dotted == policy['oid'] == _oid_of(app, ca_id, name)
         # MS-WCCE 3.1.2.4.2.2.1.9 / 3.1.2.4.2.2.2.4: the versions are the policy's revision
-        assert (value['major'].native, value['minor'].native) == policy['revision']
+        # Pinned: a higher revision than the issued certificates' makes every client re-enroll
+        assert (value['major'].native, value['minor'].native) == policy['revision'] == (100, 0)
 
 
 def test_a_request_copying_the_announced_extensions_is_issued_under_its_template(app, subject_ca):
