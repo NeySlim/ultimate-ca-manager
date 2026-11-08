@@ -490,6 +490,7 @@ class TestNakedCsrSubjectDerivation:
             headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
         )
         assert r.status_code == 400
+        assert b'CSR subject must include a non-empty CN or a SubjectAltName' in r.data, r.data
 
 
 def _clear_acl_template(app):
