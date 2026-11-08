@@ -426,10 +426,20 @@ class TestAcmeClientSettings:
     def _clear_proxy_account_link(self, app):
         from models import db, SystemConfig
         from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+        settings = SystemConfig.key.like('acme.client.%') | SystemConfig.key.like('acme.proxy.%')
         with app.app_context():
             SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
             db.session.commit()
+            saved = {row.key: (row.value, row.encrypted, row.description)
+                     for row in SystemConfig.query.filter(settings)}
         yield
+        # The PATCHed settings outlive the test otherwise (proxy_verify_ssl=False above all)
+        with app.app_context():
+            SystemConfig.query.filter(settings).delete(synchronize_session=False)
+            for key, (value, encrypted, description) in saved.items():
+                db.session.add(SystemConfig(key=key, value=value, encrypted=encrypted,
+                                            description=description))
+            db.session.commit()
 
     def test_get_client_settings(self, auth_client):
         r = auth_client.get('/api/v2/acme/client/settings')
