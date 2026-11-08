@@ -55,7 +55,7 @@ _CHALLENGE_PARENT_LEVELS = 2
 _CERT_FALLBACK_SCAN_LIMIT = 25
 # Seconds the TXT of a challenge already submitted outlives a local failure of its order:
 # the upstream CA may still be reading it. The order lists it, flagged, until deleted; a
-# deletion a restart lost runs at the order's next read one delay later, never if it is not read.
+# deletion a restart lost runs at the order's next read or housekeeping pass one delay later.
 _SUBMITTED_RECORD_LINGER = 120
 # The dns-01 threads of one order run in the worker that started them: one lock per
 # order id (striped) orders their writes to the row, a row lock covers PostgreSQL too.
@@ -183,7 +183,7 @@ class _TtlCache:
                 return None
             return copy.deepcopy(value)
 
-    def put(self, key, value) -> None:
+    def put(self, key, value, ttl: Optional[float] = None) -> None:
         if key is None or value is None:
             return
         with self._lock:
@@ -195,7 +195,7 @@ class _TtlCache:
             while len(self._entries) >= self._max:
                 # Dicts keep insertion order: the first key is the oldest entry.
                 del self._entries[next(iter(self._entries))]
-            self._entries[key] = (now + self._ttl, copy.deepcopy(value))
+            self._entries[key] = (now + (self._ttl if ttl is None else ttl), copy.deepcopy(value))
 
     def pop(self, key) -> None:
         with self._lock:
@@ -212,11 +212,16 @@ _directory_cache = _TtlCache(ttl_seconds=3600, max_entries=64)
 _finalize_url_cache = _TtlCache(ttl_seconds=24 * 3600, max_entries=4096)
 # (order id, identifier, authz URL) keyed by _challenge_cache_key().
 _challenge_order_cache = _TtlCache(ttl_seconds=24 * 3600, max_entries=8192)
+# Upstream RenewalInfo and its retry instant, keyed by (directory URL, certID): kept for
+# the upstream Retry-After, within these bounds (RFC 9773 §4.3).
+_RENEWAL_INFO_CACHE_MIN, _RENEWAL_INFO_CACHE_MAX = 60, 3600
+_renewal_info_cache = _TtlCache(ttl_seconds=_RENEWAL_INFO_CACHE_MAX, max_entries=4096)
 
 
 def reset_proxy_caches():
     """Empty every proxy process cache and the upstream nonce pool."""
-    for cache in (_directory_cache, _finalize_url_cache, _challenge_order_cache):
+    for cache in (_directory_cache, _finalize_url_cache, _challenge_order_cache,
+                  _renewal_info_cache):
         cache.clear()
     outbound.reset_nonce_pool()
 
@@ -836,16 +841,79 @@ class AcmeProxyService:
             # No keyChange: the proxy refuses key rollover (501), so it is not advertised
             "meta": meta,
         }
-        # Advertise ARI (RFC 9773) when the upstream does. Served locally
-        # from the UCM database — proxy-issued certs are stored on import,
-        # so no upstream round-trip and no upstream host leak.
-        #
+        # Advertise ARI (RFC 9773) when the upstream does: the upstream window is relayed,
+        # the local one served when the upstream gives none.
         # RFC 9773 §3/§4.1: the directory entry is the BASE URL; clients
         # append "/<certID>" to form the full request URL. Publishing the
         # literal "<certID>" placeholder here would double the path segment.
         if 'renewalInfo' in self.directory:
             directory['renewalInfo'] = f"{self.base_url}/renewal-info"
         return directory
+
+    def upstream_renewal_info(self, certid: str) -> Optional[Tuple[dict, int]]:
+        """The upstream CA's RenewalInfo for ``certid`` and the seconds until the client should
+        check again (RFC 9773 §4.2, §4.3); None when its directory announces no renewalInfo or
+        it gives no usable answer. Unauthenticated GET; the certID is the CA's own."""
+        key = (self.upstream_directory_url, certid)
+        cached = _renewal_info_cache.get(key)
+        if cached:
+            info, retry_at = cached
+            return (info, max(1, int(retry_at - time.time()))) if info else None
+        relayed = self._fetch_renewal_info(certid)
+        if relayed is None:
+            # The unauthenticated route reaches upstream at most once a minute per certificate
+            _renewal_info_cache.put(key, (None, 0), ttl=_RENEWAL_INFO_CACHE_MIN)
+            return None
+        info, retry = relayed
+        ttl = min(max(retry, _RENEWAL_INFO_CACHE_MIN), _RENEWAL_INFO_CACHE_MAX)
+        _renewal_info_cache.put(key, (info, time.time() + retry), ttl=ttl)
+        return relayed
+
+    def _fetch_renewal_info(self, certid):
+        """One upstream renewalInfo GET: (RenewalInfo, Retry-After seconds), or None."""
+        try:
+            self._ensure_directory()
+            base = self.directory.get('renewalInfo') if isinstance(self.directory, dict) else None
+            if not isinstance(base, str) or not base:
+                return None
+            url = f"{base.rstrip('/')}/{certid}"
+            self._validate_outbound_acme_url(url)
+            resp = ssrf_protection.safe_request_get(
+                url,
+                allow_loopback=acme_allow_loopback_upstream(),
+                timeout=self._http_timeout(),
+                verify=self.verify_ssl,
+                headers={'User-Agent': outbound.USER_AGENT},
+            )
+            if resp.status_code != 200:
+                logger.warning("[ACME Proxy] Upstream renewalInfo answered HTTP %s", resp.status_code)
+                return None
+            body = resp.json()
+            window = body.get('suggestedWindow') if isinstance(body, dict) else None
+            if not isinstance(window, dict):
+                raise ValueError("no suggestedWindow")
+            parse = AcmeClientService._parse_ari_datetime
+            if parse(window.get('end')) <= parse(window.get('start')):
+                raise ValueError("suggestedWindow ends before it starts")
+        except Exception as exc:
+            logger.warning("[ACME Proxy] Upstream renewalInfo not usable: %s", exc)
+            return None
+        info = {'suggestedWindow': {'start': window['start'], 'end': window['end']}}
+        if isinstance(body.get('explanationURL'), str):
+            info['explanationURL'] = body['explanationURL']
+        return info, self._renewal_retry_seconds(resp.headers.get('Retry-After'))
+
+    @staticmethod
+    def _renewal_retry_seconds(value) -> int:
+        """Seconds of an upstream Retry-After, delta or HTTP date; the local default when absent."""
+        from services.acme import ari
+        try:
+            retry_at = AcmeClientService._parse_retry_after(value)
+        except (ValueError, OverflowError):  # a delta too large for a date is no answer either
+            retry_at = None
+        if retry_at is None:
+            return ari.RETRY_AFTER_SECONDS
+        return max(1, int((retry_at - utc_now()).total_seconds()))
 
     def new_nonce(self):
         """Proxy new-nonce"""
@@ -1017,7 +1085,8 @@ class AcmeProxyService:
         order['finalize'] = f"{self.base_url}/order/{order_id}/finalize"
         if 'certificate' in order:
             if local_order is not None:
-                self._persist_certificate_url(local_order, order['certificate'])
+                self._persist_certificate_url(local_order, order['certificate'],
+                                              issued=order.get('status') == 'valid')
             order['certificate'] = self._proxy_url('cert', order['certificate'])
         if 'authorizations' in order:
             order['authorizations'] = [
@@ -1451,6 +1520,7 @@ class AcmeProxyService:
                         "%d other order(s) share it", identifier.get('value'), order.id,
                         len(shared))
 
+        # Recorded for the authorization view; an order already valid stays valid (§7.1.6)
         order.mark_authz_deactivated(authz_url)
         if order.status == 'pending':
             order.status = 'invalid'
@@ -2070,6 +2140,37 @@ class AcmeProxyService:
             thread.daemon = True
             thread.start()
 
+    @classmethod
+    def release_lost_txt_deletions(cls) -> int:
+        """Release again the records of orders that can no longer issue whose deferred deletion
+        is overdue: a restart lost its thread and no client may read the order again."""
+        from models import AcmeClientOrder
+
+        stale = time.time() - _SUBMITTED_RECORD_LINGER
+        rows = (AcmeClientOrder.query
+                .filter(AcmeClientOrder.is_proxy_order.is_(True),
+                        AcmeClientOrder.status != 'pending',
+                        AcmeClientOrder.dns_records_created.contains('release_at',
+                                                                     autoescape=True))
+                .order_by(AcmeClientOrder.id.asc()).all())
+        due = []
+        for row in rows:
+            try:
+                records = json.loads(row.dns_records_created or '[]')
+            except (TypeError, ValueError):
+                continue
+            if any(isinstance(r, dict) and isinstance(r.get('release_at'), (int, float))
+                   and r['release_at'] < stale for r in records):
+                due.append(row)
+        if not due:
+            return 0
+        # Not __init__: it resolves, and may create, an upstream account; releasing reads none
+        service = cls.__new__(cls)
+        for row in due:
+            service._release_order_records(row)
+        logger.info("[ACME Proxy] Lost TXT deletions of %s order(s) dispatched again", len(due))
+        return len(due)
+
     @staticmethod
     def _value_still_needed(record_name, value, order_id):
         """Whether another pending order lists this (name, value) pair while the order
@@ -2167,14 +2268,21 @@ class AcmeProxyService:
             finally:
                 db.session.remove()
 
-    def _persist_certificate_url(self, row, cert_url: str):
+    def _persist_certificate_url(self, row, cert_url: str, issued: bool = False):
         """Persist the upstream certificate URL on the local order served, not on
         a dead row sharing its upstream URL, so _find_order_for_certificate finds
-        it with an indexed query (#219)."""
+        it with an indexed query (#219). A pending row the CA ``issued`` turns valid:
+        valid is final (RFC 8555 §7.1.6), so a later deactivation leaves it valid."""
+        def _record(fresh):
+            fresh.certificate_url = cert_url
+            # Read under the row lock: a local failure or deactivation may have landed meanwhile
+            if (issued and fresh.status == 'pending' and not fresh.deactivated_authz_list
+                    and not self._local_failure(fresh)):
+                fresh.status = 'valid'
+
         try:
-            if row.certificate_url != cert_url:
-                row.certificate_url = cert_url
-                db.session.commit()
+            if row.certificate_url != cert_url or (issued and row.status == 'pending'):
+                _update_order_row(row, _record)
         except Exception as exc:
             db.session.rollback()
             logger.warning(f"ACME proxy: failed to persist certificate URL: {exc}")
@@ -2189,11 +2297,11 @@ class AcmeProxyService:
         """
         from models import AcmeClientOrder
 
-        order = AcmeClientOrder.query.filter_by(
-            is_proxy_order=True, certificate_url=cert_url
-        ).first()
-        if order:
-            return order
+        rows = (AcmeClientOrder.query
+                .filter_by(is_proxy_order=True, certificate_url=cert_url)
+                .order_by(AcmeClientOrder.id.asc()).all())
+        if rows:
+            return self._select_owning_order(rows, requester_account_id, requester_thumbprint)
 
         unbound = and_(
             or_(AcmeClientOrder.account_id.is_(None), AcmeClientOrder.account_id == ''),
@@ -2223,7 +2331,8 @@ class AcmeProxyService:
                 logger.debug(f"Certificate lookup: upstream order fetch failed: {exc}")
                 continue
             if isinstance(upstream_order, dict) and upstream_order.get('certificate') == cert_url:
-                self._persist_certificate_url(candidate, cert_url)
+                self._persist_certificate_url(candidate, cert_url,
+                                              issued=upstream_order.get('status') == 'valid')
                 return candidate
         return None
 
@@ -2298,9 +2407,11 @@ class AcmeProxyService:
 
         order = resp.json()
         _finalize_url_cache.put(order_url, order.get('finalize'))
-        if (local_order.deactivated_authz_list
-                and order.get('status') in ('pending', 'ready')):
+        # RFC 8555 §7.5.2: a deactivated authorization never issues, even once the shared
+        # upstream order is valid through another client's order; valid is final (§7.1.6).
+        if local_order.deactivated_authz_list and local_order.status != 'valid':
             order['status'] = 'invalid'
+            order.pop('certificate', None)
         # RFC 8555 §7.1.6: invalid is final, even when the upstream CA validates the order later
         failure = self._local_failure(local_order)
         if failure:
@@ -2390,6 +2501,10 @@ class AcmeProxyService:
         self._require_owner(
             order, requester_account_id, requester_thumbprint,
             resource='Certificate')
+        # The certificate of a shared upstream order belongs to the orders that may issue
+        if order.status != 'valid' and (order.deactivated_authz_list
+                                        or self._local_failure(order)):
+            raise ProxyResourceNotFoundError("Certificate not found")
         resp = self._post_with_account(cert_url, "")
         if resp.status_code != 200:
             raise UpstreamProblem.from_response(resp)

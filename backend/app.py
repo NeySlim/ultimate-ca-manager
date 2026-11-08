@@ -618,7 +618,8 @@ def create_app(config_name=None):
                 name="acme_order_recovery",
                 func=scheduled_order_recovery,
                 interval=900,
-                description="Set ACME orders interrupted by a restart back to pending"
+                description="Set ACME orders interrupted by a restart back to pending, "
+                            "release proxy TXT records whose deletion a restart lost"
             )
         except ImportError:
             pass
@@ -1128,6 +1129,8 @@ def create_app(config_name=None):
         response.mimetype = PROBLEM_CONTENT_TYPE
         return response, code
     
+    from api.acme.routing_problems import is_acme_path, routing_problem
+
     @app.errorhandler(400)
     def handle_400(e):
         if request.path.startswith('/api/'):
@@ -1138,12 +1141,16 @@ def create_app(config_name=None):
     def handle_404(e):
         if request.path.startswith('/api/'):
             return _json_error(404, 'Not found')
+        if is_acme_path(request.path):
+            return routing_problem(e)
         return e
     
     @app.errorhandler(405)
     def handle_405(e):
         if request.path.startswith('/api/'):
             return _json_error(405, 'Method not allowed')
+        if is_acme_path(request.path):
+            return routing_problem(e)
         return e
     
     @app.errorhandler(413)
