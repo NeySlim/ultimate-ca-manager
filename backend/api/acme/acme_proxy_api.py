@@ -942,10 +942,10 @@ def cert(cert_id, slug=None):
 def renewal_info(certid, slug=None):
     """ACME Renewal Information (ARI) — RFC 9773 §4.2.
 
-    Unauthenticated GET. Serves the suggested renewal window for a
-    certificate issued through this proxy. The certificate is looked up
-    locally in the UCM database (proxy-issued certs are stored on import),
-    so there is no upstream round-trip and no upstream host leak.
+    Unauthenticated GET. A certificate issued through the proxy gets the
+    window of the upstream CA that issued it, with its Retry-After; the
+    local window is served when that CA announces no renewalInfo, gives no
+    usable answer, or the certificate is revoked here.
     """
     from models import SystemConfig
 
@@ -958,18 +958,36 @@ def renewal_info(certid, slug=None):
     if cert is None:
         return proxy_error('malformed', 'Unknown certificate', 404)
 
-    days_cfg = SystemConfig.query.filter_by(key='auto_renewal_days').first()
-    try:
-        renew_before_days = int(days_cfg.value) if days_cfg and days_cfg.value else None
-    except (TypeError, ValueError):
-        renew_before_days = None
-
-    data = ari.build_renewal_info(cert, renew_before_days)
+    relayed = None if cert.revoked else _upstream_renewal_info(cert, certid, slug)
+    if relayed:
+        data, retry_after = relayed
+    else:
+        days_cfg = SystemConfig.query.filter_by(key='auto_renewal_days').first()
+        try:
+            renew_before_days = int(days_cfg.value) if days_cfg and days_cfg.value else None
+        except (TypeError, ValueError):
+            renew_before_days = None
+        data, retry_after = ari.build_renewal_info(cert, renew_before_days), ari.RETRY_AFTER_SECONDS
     resp = make_response(jsonify(data), 200)
     resp.headers['Content-Type'] = 'application/json'
-    resp.headers['Retry-After'] = str(ari.RETRY_AFTER_SECONDS)
-    resp.headers['Cache-Control'] = f'public, max-age={ari.RETRY_AFTER_SECONDS}'
+    resp.headers['Retry-After'] = str(retry_after)
+    resp.headers['Cache-Control'] = f'public, max-age={retry_after}'
     return resp
+
+
+def _upstream_renewal_info(cert, certid, slug):
+    """RenewalInfo of the upstream CA account that issued ``cert`` through the proxy, else None."""
+    order = (AcmeClientOrder.query
+             .filter_by(is_proxy_order=True, certificate_id=cert.id)
+             .order_by(AcmeClientOrder.id.desc()).first())
+    if order is None or not order.acme_client_account_id:
+        return None
+    try:
+        svc = AcmeProxyService(_proxy_base_url(slug), account_id=order.acme_client_account_id)
+        return svc.upstream_renewal_info(certid)
+    except Exception as exc:  # the local window still answers
+        logger.warning("ACME proxy renewalInfo relay skipped for certificate %s: %s", cert.id, exc)
+        return None
 
 
 @_dual_route('/revoke-cert', methods=['POST'], endpoint='proxy_revoke_cert')

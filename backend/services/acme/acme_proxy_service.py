@@ -183,7 +183,7 @@ class _TtlCache:
                 return None
             return copy.deepcopy(value)
 
-    def put(self, key, value) -> None:
+    def put(self, key, value, ttl: Optional[float] = None) -> None:
         if key is None or value is None:
             return
         with self._lock:
@@ -195,7 +195,7 @@ class _TtlCache:
             while len(self._entries) >= self._max:
                 # Dicts keep insertion order: the first key is the oldest entry.
                 del self._entries[next(iter(self._entries))]
-            self._entries[key] = (now + self._ttl, copy.deepcopy(value))
+            self._entries[key] = (now + (self._ttl if ttl is None else ttl), copy.deepcopy(value))
 
     def pop(self, key) -> None:
         with self._lock:
@@ -212,11 +212,16 @@ _directory_cache = _TtlCache(ttl_seconds=3600, max_entries=64)
 _finalize_url_cache = _TtlCache(ttl_seconds=24 * 3600, max_entries=4096)
 # (order id, identifier, authz URL) keyed by _challenge_cache_key().
 _challenge_order_cache = _TtlCache(ttl_seconds=24 * 3600, max_entries=8192)
+# Upstream RenewalInfo and its retry instant, keyed by (directory URL, certID): kept for
+# the upstream Retry-After, within these bounds (RFC 9773 §4.3).
+_RENEWAL_INFO_CACHE_MIN, _RENEWAL_INFO_CACHE_MAX = 60, 3600
+_renewal_info_cache = _TtlCache(ttl_seconds=_RENEWAL_INFO_CACHE_MAX, max_entries=4096)
 
 
 def reset_proxy_caches():
     """Empty every proxy process cache and the upstream nonce pool."""
-    for cache in (_directory_cache, _finalize_url_cache, _challenge_order_cache):
+    for cache in (_directory_cache, _finalize_url_cache, _challenge_order_cache,
+                  _renewal_info_cache):
         cache.clear()
     outbound.reset_nonce_pool()
 
@@ -836,16 +841,70 @@ class AcmeProxyService:
             # No keyChange: the proxy refuses key rollover (501), so it is not advertised
             "meta": meta,
         }
-        # Advertise ARI (RFC 9773) when the upstream does. Served locally
-        # from the UCM database — proxy-issued certs are stored on import,
-        # so no upstream round-trip and no upstream host leak.
-        #
+        # Advertise ARI (RFC 9773) when the upstream does: the upstream window is relayed,
+        # the local one served when the upstream gives none.
         # RFC 9773 §3/§4.1: the directory entry is the BASE URL; clients
         # append "/<certID>" to form the full request URL. Publishing the
         # literal "<certID>" placeholder here would double the path segment.
         if 'renewalInfo' in self.directory:
             directory['renewalInfo'] = f"{self.base_url}/renewal-info"
         return directory
+
+    def upstream_renewal_info(self, certid: str) -> Optional[Tuple[dict, int]]:
+        """The upstream CA's RenewalInfo for ``certid`` and the seconds until the client should
+        check again (RFC 9773 §4.2, §4.3); None when its directory announces no renewalInfo or
+        it gives no usable answer. Unauthenticated GET; the certID is the CA's own."""
+        key = (self.upstream_directory_url, certid)
+        cached = _renewal_info_cache.get(key)
+        if cached:
+            info, retry_at = cached
+            return info, max(1, int(retry_at - time.time()))
+        try:
+            self._ensure_directory()
+            base = self.directory.get('renewalInfo') if isinstance(self.directory, dict) else None
+            if not isinstance(base, str) or not base:
+                return None
+            url = f"{base.rstrip('/')}/{certid}"
+            self._validate_outbound_acme_url(url)
+            resp = ssrf_protection.safe_request_get(
+                url,
+                allow_loopback=acme_allow_loopback_upstream(),
+                timeout=self._http_timeout(),
+                verify=self.verify_ssl,
+                headers={'User-Agent': outbound.USER_AGENT},
+            )
+            if resp.status_code != 200:
+                logger.warning("[ACME Proxy] Upstream renewalInfo answered HTTP %s", resp.status_code)
+                return None
+            body = resp.json()
+            window = body.get('suggestedWindow') if isinstance(body, dict) else None
+            if not isinstance(window, dict):
+                raise ValueError("no suggestedWindow")
+            parse = AcmeClientService._parse_ari_datetime
+            if parse(window.get('end')) <= parse(window.get('start')):
+                raise ValueError("suggestedWindow ends before it starts")
+        except Exception as exc:
+            logger.warning("[ACME Proxy] Upstream renewalInfo not usable: %s", exc)
+            return None
+        info = {'suggestedWindow': {'start': window['start'], 'end': window['end']}}
+        if isinstance(body.get('explanationURL'), str):
+            info['explanationURL'] = body['explanationURL']
+        retry = self._renewal_retry_seconds(resp.headers.get('Retry-After'))
+        ttl = min(max(retry, _RENEWAL_INFO_CACHE_MIN), _RENEWAL_INFO_CACHE_MAX)
+        _renewal_info_cache.put(key, (info, time.time() + retry), ttl=ttl)
+        return info, retry
+
+    @staticmethod
+    def _renewal_retry_seconds(value) -> int:
+        """Seconds of an upstream Retry-After, delta or HTTP date; the local default when absent."""
+        from services.acme import ari
+        try:
+            retry_at = AcmeClientService._parse_retry_after(value)
+        except ValueError:
+            retry_at = None
+        if retry_at is None:
+            return ari.RETRY_AFTER_SECONDS
+        return max(1, int((retry_at - utc_now()).total_seconds()))
 
     def new_nonce(self):
         """Proxy new-nonce"""
