@@ -441,6 +441,7 @@ class TestUpstreamRenewalInfoRelay:
     @pytest.mark.parametrize('retry_after, still_cached, asked_again', [
         ('1800', 1790, 1801),  # the upstream Retry-After, within the bounds
         ('10', 30, 61),        # raised to one minute
+        ('7200', 3590, 3601),  # cut to one hour
     ])
     def test_cache_follows_retry_after_within_bounds(self, client, issued, monkeypatch,
                                                      retry_after, still_cached, asked_again):
