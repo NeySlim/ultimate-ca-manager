@@ -509,6 +509,11 @@ def _best_eku_match(candidates, csr_eku):
         # Same resolver as issuance: the template is scored on the purposes
         # it will really issue, whatever spelling it uses
         template_eku = set(_template_extra_ekus(template))
+        # A template whose EKUs are all capped (OCSP Signing) would score 0 against a bare
+        # request: it is only matched by a request asking for one of them
+        configured = set(_template_configured_ekus(template))
+        if configured and not template_eku and not csr_eku & configured:
+            continue
         score = len(csr_eku & template_eku) - len(template_eku - csr_eku)
         if score > best_score or (score == best_score and best is not None and template.id < best.id):
             best, best_score = template, score

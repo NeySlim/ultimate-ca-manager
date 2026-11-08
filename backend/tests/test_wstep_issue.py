@@ -476,3 +476,47 @@ def test_the_request_s_key_usage_wins_over_the_template_s(client, app, wstep_con
         with app.app_context():
             delete_templates(template_ids_named(name))
             db.session.commit()
+
+
+def test_a_bare_csr_is_not_issued_under_a_template_of_capped_ekus_only(client, app, wstep_config):
+    """`openssl req -new` with a CN alone: OCSP Signing, whose only EKU is never issued,
+    scores as a perfect match but is no template for it; the server pair is kept."""
+    from models import CA
+    from services.xcep.policy_builder import _policy_oid_for_template
+    with app.app_context():
+        ca = db.session.get(CA, wstep_config['id'])
+        ocsp = CertificateTemplate.query.filter_by(name='OCSP Signing').first()
+        assert ocsp is not None and ocsp.is_active
+        ocsp_oid = _policy_oid_for_template(ca, ocsp)
+    csr, _key = _make_csr(common_name='bare.example.test')
+    r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
+    assert r.status_code == 200, r.data
+    cert = _issued_cert_from_rstr(r.data)
+    usage = cert.extensions.get_extension_for_class(x509.KeyUsage).value
+    assert usage.digital_signature and usage.key_encipherment
+    ekus = {o.dotted_string for o in cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value}
+    assert ekus == {'1.3.6.1.5.5.7.3.1'}, ekus
+    try:
+        stamped = cert.extensions.get_extension_for_class(
+            x509.MSCertificateTemplate).value.template_id.dotted_string
+    except x509.ExtensionNotFound:
+        stamped = None
+    assert stamped != ocsp_oid
+
+
+def test_ocsp_signing_is_still_issued_to_a_request_carrying_its_eku(client, app, wstep_config):
+    from models import CA
+    from services.xcep.policy_builder import _policy_oid_for_template
+    with app.app_context():
+        ca = db.session.get(CA, wstep_config['id'])
+        ocsp_oid = _policy_oid_for_template(ca, CertificateTemplate.query.filter_by(name='OCSP Signing').first())
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'ocsp.example.test')]))
+           .add_extension(x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING]), critical=False)
+           .sign(key, hashes.SHA256()))
+    r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
+    assert r.status_code == 200, r.data
+    cert = _issued_cert_from_rstr(r.data)
+    assert cert.extensions.get_extension_for_class(
+        x509.MSCertificateTemplate).value.template_id.dotted_string == ocsp_oid
