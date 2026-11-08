@@ -241,9 +241,10 @@ def test_the_message_is_rebuilt_from_its_fields_whatever_the_language(text, pgco
     assert 'ZZSECRET' not in clean and 'LIGNE' not in clean and 'CONTEXTE' not in clean
 
 
-def test_an_error_without_server_fields_is_left_as_it_is():
+@pytest.mark.parametrize('pgcode', [None, '22P02'])
+def test_an_error_without_server_fields_is_left_as_it_is(pgcode):
     text = 'connection failed: connection to server at "127.0.0.1", port 5432 failed\nsecond line'
-    clean, _ = _scrubbed(_ServerError(text, None, _Diag(None)))
+    clean, _ = _scrubbed(_ServerError(text, pgcode, _Diag(None)))
     assert clean == text
 
 
