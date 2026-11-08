@@ -51,6 +51,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Sign CSR (single, bulk and approval): a request without Key Usage signed as client, code signing or S/MIME got none, so the key was unrestricted; it now gets its type's Key Usage, as on the issue form.
 - Certificates: on the issue form, Sign CSR, EST and WSTEP, a valid emailAddress in the subject is now also an rfc822Name in the SAN for every certificate type, not only email and combined (RFC 5280 §4.1.2.6); SCEP keeps the request's SAN as sent.
 - Certificates and ACME: a DNS name holding an underscore (`my_host.example`, `_sip._tcp.example.com`, also as the CN of a server or device certificate without SAN whose template allows DNS names) or in IP-address form is now refused, as RFC 5280 §4.2.1.6 requires. An EST, SCEP, WSTEP or in-place renewal keeps the names its certificate already carries; an ACME order does not.
+- EST, WSTEP and SCEP: every certificate was recorded as a server certificate, so an S/MIME or client one showed as "Server" in its details and in a renewal approval request. Each now records the type it is signed as (EST: device; SCEP: from its EKUs); certificates issued earlier keep their recorded type.
 
 ### Fixed
 
