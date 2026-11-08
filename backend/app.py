@@ -1128,6 +1128,8 @@ def create_app(config_name=None):
         response.mimetype = PROBLEM_CONTENT_TYPE
         return response, code
     
+    from api.acme.routing_problems import is_acme_path, routing_problem
+
     @app.errorhandler(400)
     def handle_400(e):
         if request.path.startswith('/api/'):
@@ -1138,12 +1140,16 @@ def create_app(config_name=None):
     def handle_404(e):
         if request.path.startswith('/api/'):
             return _json_error(404, 'Not found')
+        if is_acme_path(request.path):
+            return routing_problem(e)
         return e
     
     @app.errorhandler(405)
     def handle_405(e):
         if request.path.startswith('/api/'):
             return _json_error(405, 'Method not allowed')
+        if is_acme_path(request.path):
+            return routing_problem(e)
         return e
     
     @app.errorhandler(413)

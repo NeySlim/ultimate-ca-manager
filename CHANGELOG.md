@@ -131,6 +131,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - OCSP: an answer to a request with a nonce was sent with `Cache-Control: no-cache, no-store`, and the others with a fixed one-hour `Expires` that could outlive nextUpdate. Answers now follow RFC 5019 §6.2: no `no-cache` or `no-store`, `Expires` at nextUpdate, `max-age` never past it, `Last-Modified` and `ETag`.
 - OCSP: a POST whose Content-Type was `application/ocsp-request` in another case was answered malformedRequest. Media types are now compared without case (RFC 9110 §8.3.1).
 - ACME proxy: an order whose authorization the client deactivated was served valid, with its certificate, once another account's order completed the shared upstream order. It now stays invalid without a certificate, and that certificate is served only to an order that may issue (RFC 8555 §7.5.2).
+- ACME server and proxy: a URL or method no ACME route serves, a GET on a POST-only resource included, got a generic 404 without the directory link. It now gets a `malformed` problem document linking the directory, as 405 with `Allow` when another method is served (RFC 8555 §6.3, §7.1).
 
 ### Security
 
