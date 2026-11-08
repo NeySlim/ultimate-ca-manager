@@ -858,7 +858,19 @@ class AcmeProxyService:
         cached = _renewal_info_cache.get(key)
         if cached:
             info, retry_at = cached
-            return info, max(1, int(retry_at - time.time()))
+            return (info, max(1, int(retry_at - time.time()))) if info else None
+        relayed = self._fetch_renewal_info(certid)
+        if relayed is None:
+            # The unauthenticated route reaches upstream at most once a minute per certificate
+            _renewal_info_cache.put(key, (None, 0), ttl=_RENEWAL_INFO_CACHE_MIN)
+            return None
+        info, retry = relayed
+        ttl = min(max(retry, _RENEWAL_INFO_CACHE_MIN), _RENEWAL_INFO_CACHE_MAX)
+        _renewal_info_cache.put(key, (info, time.time() + retry), ttl=ttl)
+        return relayed
+
+    def _fetch_renewal_info(self, certid):
+        """One upstream renewalInfo GET: (RenewalInfo, Retry-After seconds), or None."""
         try:
             self._ensure_directory()
             base = self.directory.get('renewalInfo') if isinstance(self.directory, dict) else None
@@ -889,10 +901,7 @@ class AcmeProxyService:
         info = {'suggestedWindow': {'start': window['start'], 'end': window['end']}}
         if isinstance(body.get('explanationURL'), str):
             info['explanationURL'] = body['explanationURL']
-        retry = self._renewal_retry_seconds(resp.headers.get('Retry-After'))
-        ttl = min(max(retry, _RENEWAL_INFO_CACHE_MIN), _RENEWAL_INFO_CACHE_MAX)
-        _renewal_info_cache.put(key, (info, time.time() + retry), ttl=ttl)
-        return info, retry
+        return info, self._renewal_retry_seconds(resp.headers.get('Retry-After'))
 
     @staticmethod
     def _renewal_retry_seconds(value) -> int:

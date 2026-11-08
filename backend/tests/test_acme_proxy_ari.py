@@ -380,3 +380,16 @@ class TestUpstreamRenewalInfoRelay:
         r = client.get(f'/acme/proxy/renewal-info/{loose}')
         assert r.get_json()['suggestedWindow'] == UPSTREAM_WINDOW
         assert upstream.ari_calls == [self._certid()]
+
+    def test_failed_upstream_is_asked_again_only_after_a_minute(self, client, issued,
+                                                                monkeypatch):
+        import services.acme.acme_proxy_service as proxy_mod
+        upstream = self._upstream(monkeypatch, answer=ConnectionError('unreachable'))
+        clock = [1000.0]
+        monkeypatch.setattr(proxy_mod.time, 'monotonic', lambda: clock[0])
+        for _ in range(3):
+            assert _served_locally(client.get(f'/acme/proxy/ari-test/renewal-info/{self._certid()}'))
+        assert len(upstream.ari_calls) == 1
+        clock[0] += 61
+        assert _served_locally(client.get(f'/acme/proxy/ari-test/renewal-info/{self._certid()}'))
+        assert len(upstream.ari_calls) == 2
