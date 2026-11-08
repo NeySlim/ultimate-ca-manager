@@ -19,7 +19,7 @@ from lxml import etree
 from models import CA, ADConnectorConfig, AuditLog, Certificate, db
 from models.certificate_template import CertificateTemplate
 from models.system_config import SystemConfig
-from tests.fixtures.templates import delete_templates, template_ids_named
+from tests.fixtures.templates import delete_templates, template_ids_named, templates_created_here_removed
 from services.ad_connector import lookup as ad_lookup
 from services.kerberos import negotiate_auth
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WST_NS, WSSE_NS
@@ -27,6 +27,12 @@ from utils.upn_san import extract_upns_from_san_list
 
 ISSUE_URL = '/ADCertificateService_CES_Kerberos/service.svc'
 KERBEROS_PRINCIPAL = 'HOST$@HAGLAND.DOMAIN'
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
 
 
 def _set_config(key, value):
@@ -212,12 +218,12 @@ def _clear_ad_derived_templates(app):
         db.session.commit()
 
 
-def _configure_ad_derived_user_template(app):
+def _configure_ad_derived_user_template(app, ca_id):
     """An active template with ad_derived_subject=True -- the per-template
     opt-in wstep_service._user_ad_derivation_enabled gates user-branch
-    derivation on. Unpinned: _resolve_templates_for_ca falls back to every
-    active template when a CA has nothing pinned, so this alone is enough
-    to make the CA eligible."""
+    derivation on -- pinned to ``ca_id`` beside the class's anchor."""
+    from models import CATemplatePin
+
     with app.app_context():
         delete_templates(template_ids_named('Test AD User Template'))
         template = CertificateTemplate(
@@ -225,9 +231,39 @@ def _configure_ad_derived_user_template(app):
             extensions_template='{}', is_active=True, ad_derived_subject=True,
         )
         db.session.add(template)
+        db.session.flush()
+        db.session.add(CATemplatePin(ca_id=ca_id, template_id=template.id))
         db.session.commit()
 
 
+_NAKED_ANCHOR = 'Test Naked CSR Anchor'
+
+
+@pytest.fixture(scope='class')
+def _ca_offers_only_its_templates(app, wstep_kerberos_config):
+    """Pins a clientAuth template, which a naked CSR does not match, to the CA:
+    the CA then offers only what the class pins, not every active template of the database."""
+    import json
+
+    from models import CATemplatePin
+
+    with app.app_context():
+        delete_templates(template_ids_named(_NAKED_ANCHOR))
+        anchor = CertificateTemplate(
+            name=_NAKED_ANCHOR, template_type='client_auth', is_active=True,
+            extensions_template=json.dumps({'extended_key_usage': ['clientAuth']}),
+        )
+        db.session.add(anchor)
+        db.session.flush()
+        db.session.add(CATemplatePin(ca_id=wstep_kerberos_config['id'], template_id=anchor.id))
+        db.session.commit()
+    yield
+    with app.app_context():
+        delete_templates(template_ids_named(_NAKED_ANCHOR, 'Test AD User Template'))
+        db.session.commit()
+
+
+@pytest.mark.usefixtures('_ca_offers_only_its_templates')
 class TestNakedCsrSubjectDerivation:
     """Real Windows GPO machine autoenrollment submits a CSR with no CN and
     no SAN for machine templates, trusting the CA to derive the subject
@@ -335,7 +371,7 @@ class TestNakedCsrSubjectDerivation:
         gets a subject and SAN derived from AD, matching real ADCS's own
         User-template enrollment shape."""
         _configure_ad_connector(app)
-        _configure_ad_derived_user_template(app)
+        _configure_ad_derived_user_template(app, wstep_kerberos_config['id'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
         monkeypatch.setattr(
@@ -387,7 +423,7 @@ class TestNakedCsrSubjectDerivation:
         a hard requirement (unlike real ADCS's CT_FLAG_SUBJECT_REQUIRE_EMAIL,
         which would decline enrollment outright for any user without one)."""
         _configure_ad_connector(app)
-        _configure_ad_derived_user_template(app)
+        _configure_ad_derived_user_template(app, wstep_kerberos_config['id'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
         monkeypatch.setattr(
@@ -441,7 +477,7 @@ class TestNakedCsrSubjectDerivation:
         rejection, never a crash or a bypass."""
         _configure_ad_connector(app)
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
-        _configure_ad_derived_user_template(app)
+        _configure_ad_derived_user_template(app, wstep_kerberos_config['id'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
         monkeypatch.setattr(

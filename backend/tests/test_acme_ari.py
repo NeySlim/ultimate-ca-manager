@@ -102,6 +102,29 @@ class TestRenewalInfoEndpoint:
         assert body['suggestedWindow']['end'].endswith('Z')
         assert body['suggestedWindow']['start'] < body['suggestedWindow']['end']
 
+    def test_a_revocation_on_another_row_of_the_certificate_counts(self, app, client,
+                                                                  issued_cert):
+        """An imported copy of the certificate, revoked: the window is the revoked one."""
+        from uuid import uuid4
+        with app.app_context():
+            src = db.session.get(Certificate, issued_cert['id'])
+            copy = Certificate(refid=str(uuid4()), descr='ARI copy', crt=src.crt,
+                               subject=src.subject, issuer=src.issuer,
+                               serial_number=src.serial_number, aki=src.aki,
+                               valid_from=src.valid_from, valid_to=src.valid_to,
+                               revoked=True, source='import')
+            db.session.add(copy)
+            db.session.commit()
+            copy_id = copy.id
+        try:
+            r = client.get(f"/acme/renewalInfo/{issued_cert['certid']}")
+        finally:
+            with app.app_context():
+                Certificate.query.filter_by(id=copy_id).delete()
+                db.session.commit()
+        start = datetime.fromisoformat(r.get_json()['suggestedWindow']['start'][:-1])
+        assert start < datetime.now(timezone.utc).replace(tzinfo=None)
+
     def test_unauthenticated(self, client, issued_cert):
         # No JWS, no auth header — must still succeed (RFC 9773 §4.1).
         r = client.get(f"/acme/renewalInfo/{issued_cert['certid']}")

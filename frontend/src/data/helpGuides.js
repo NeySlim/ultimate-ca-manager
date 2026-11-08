@@ -1364,6 +1364,7 @@ The local ACME server advertises \`renewalInfo\` in its directory and serves a p
 - Window centered before expiry → renewals spread over time
 - Revoked certificate → window in the past (renew now)
 - Unauthenticated GET on \`/acme/renewalInfo/<certID>\`
+- ACME proxy: the upstream CA's window is relayed with its Retry-After for a certificate issued through the proxy; computed locally when the CA has none or does not answer
 `
   },
 

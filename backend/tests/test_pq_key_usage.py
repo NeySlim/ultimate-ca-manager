@@ -15,6 +15,14 @@ from services import cert_linting_service
 from services.trust_store import TrustStoreService
 from utils import key_algorithms
 from utils.leaf_key_usage import key_usage_for_key
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
+
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')

@@ -14,6 +14,14 @@ from tests.test_est_rfc7030 import _basic_auth, _post_csr, est_config  # noqa: F
 from services.trust_store.trust_store_service import TrustStoreService
 from utils.san_parse import (auto_san_buckets_from_cn, parse_cert_san_payload,
                              parse_csr_san_entries, validate_dns_san)
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
+
 
 CSRS = '/api/v2/csrs'
 CERTS = '/api/v2/certificates'

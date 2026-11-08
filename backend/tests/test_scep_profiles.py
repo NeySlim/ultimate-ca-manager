@@ -15,6 +15,14 @@ from tests.conftest import get_json
 from tests.test_scep_rfc8894_operations import (
     _set_config, _clear_config, _load_ca_material,
 )
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
+
 
 CONTENT_JSON = 'application/json'
 
