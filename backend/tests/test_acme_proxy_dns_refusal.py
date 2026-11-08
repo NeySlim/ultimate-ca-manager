@@ -1462,3 +1462,121 @@ class TestAbandonGuard:
             db.session.commit()
             AcmeProxyService._abandon_challenge(row, CHALL_URL)
             assert _fresh(row.id).challenges_dict[CHALL_URL]['status'] == state
+
+
+class TestLostDeferredDeletionIsSwept:
+    """A restart lost the deferred deletion of an order no client reads again: the
+    frequent housekeeping task dispatches it, under the same guards."""
+
+    @staticmethod
+    def _record(value, provider_id, **extra):
+        return dict({'domain': DOMAIN, 'record_name': f'_acme-challenge.{DOMAIN}',
+                     'value': value, 'provider_id': provider_id}, **extra)
+
+    @pytest.fixture
+    def dns(self, app, monkeypatch):
+        from models import DnsProvider
+        provider = _provider(monkeypatch, (True, 'ok'))
+        provider.deleted = []
+        provider.delete_txt_record.side_effect = (
+            lambda _zone, _name, value: provider.deleted.append(value) or (True, 'ok'))
+        with app.app_context():
+            model = DnsProvider(name='lost-deletion', provider_type='manual', credentials='{}')
+            db.session.add(model)
+            db.session.commit()
+            provider.model_id = model.id
+            yield provider
+            db.session.rollback()
+            AcmeClientOrder.query.filter_by(is_proxy_order=True).delete()
+            db.session.delete(db.session.get(DnsProvider, provider.model_id))
+            db.session.commit()
+
+    @staticmethod
+    def _run_cleanups():
+        for target, args in list(_ThreadRecorder.started):
+            if getattr(target, '__name__', '') == '_bg_cleanup_dns_records':
+                target(*args)
+
+    def test_overdue_record_of_an_unread_order_is_deleted(self, app, dns):
+        import time
+        from services.acme import order_housekeeping
+        overdue = self._record('lost', dns.model_id,
+                               release_at=time.time() - proxy_mod._SUBMITTED_RECORD_LINGER - 1)
+        waiting = self._record('waiting', dns.model_id,
+                               release_at=time.time() + proxy_mod._SUBMITTED_RECORD_LINGER)
+        failed = _failed_order(dns_records_created=json.dumps([overdue, waiting]))
+        outcome = order_housekeeping.scheduled_order_recovery()
+        assert outcome['status'] == 'ok' and outcome['txt_released'] == 1
+        self._run_cleanups()
+        assert dns.deleted == ['lost']
+        assert json.loads(_fresh(failed.id).dns_records_created) == [waiting]
+        # Nothing overdue is left: the next pass has nothing to do
+        _ThreadRecorder.started = []
+        assert AcmeProxyService.release_lost_txt_deletions() == 0
+
+    def test_value_a_pending_order_still_lists_is_kept(self, app, dns):
+        import time
+        overdue = self._record('shared', dns.model_id,
+                               release_at=time.time() - proxy_mod._SUBMITTED_RECORD_LINGER - 1)
+        failed = _failed_order(dns_records_created=json.dumps([overdue]))
+        _order(client_jwk_thumbprint='T', order_url=f'{ORDER_URL}b',
+               upstream_order_url=f'{ORDER_URL}b',
+               dns_records_created=json.dumps([self._record('shared', dns.model_id)]))
+        assert AcmeProxyService.release_lost_txt_deletions() == 1
+        self._run_cleanups()
+        assert dns.deleted == []
+        assert not json.loads(_fresh(failed.id).dns_records_created or '[]')
+
+    def test_pending_order_and_fresh_deferral_are_left_alone(self, app, dns):
+        import time
+        overdue = self._record('mine', dns.model_id,
+                               release_at=time.time() - proxy_mod._SUBMITTED_RECORD_LINGER - 1)
+        fresh = self._record('soon', dns.model_id,
+                             release_at=time.time() + proxy_mod._SUBMITTED_RECORD_LINGER)
+        _order(dns_records_created=json.dumps([overdue]))
+        _failed_order(order_url=f'{ORDER_URL}c', upstream_order_url=f'{ORDER_URL}c',
+                      dns_records_created=json.dumps([fresh]))
+        assert AcmeProxyService.release_lost_txt_deletions() == 0
+        assert _ThreadRecorder.started == []
+
+
+class TestIssuedOrderRecordedUnderTheRowLock:
+    """An order read valid upstream turns valid locally only if no local failure landed
+    while its upstream read was in flight (RFC 8555 §7.1.6: invalid is final too)."""
+
+    CERT_URL = f'{UPSTREAM}/acme/cert/dns/1'
+
+    def _valid_order(self):
+        return _Resp({'status': 'valid', 'authorizations': [AUTHZ_URL],
+                      'finalize': f'{ORDER_URL}/finalize', 'certificate': self.CERT_URL})
+
+    def test_failure_during_the_upstream_read_keeps_the_order_invalid(self, app, monkeypatch):
+        from services.acme.acme_proxy_service import ProxyResourceNotFoundError
+        with app.app_context():
+            row = _order(client_jwk_thumbprint='T')
+            row_id = row.id
+            svc, _calls = _svc(monkeypatch)
+
+            def _fail_meanwhile():
+                fresh = db.session.get(AcmeClientOrder, row_id)
+                svc._fail_locally(fresh, CHALL_URL, 'refused', 'DNS provider refused the TXT')
+
+            def _post(url, payload=None, *_a, **_k):
+                if url == ORDER_URL:
+                    _in_another_thread(app, _fail_meanwhile)
+                    return self._valid_order()
+                raise AssertionError(f'unexpected upstream call to {url}')
+            monkeypatch.setattr(svc, '_post_with_account', _post)
+            svc.get_order(_b64(ORDER_URL), requester_thumbprint='T')
+            assert _fresh(row_id).status == 'invalid'
+            with pytest.raises(ProxyResourceNotFoundError):
+                svc.get_certificate(_b64(self.CERT_URL), requester_thumbprint='T')
+
+    def test_fallback_lookup_records_the_issued_order_valid(self, app, monkeypatch):
+        with app.app_context():
+            row = _order(client_jwk_thumbprint='T')
+            svc, _calls = _svc(monkeypatch, {ORDER_URL: self._valid_order()})
+            found = svc._find_order_for_certificate(self.CERT_URL, None, 'T')
+            assert found.id == row.id
+            fresh = _fresh(row.id)
+            assert (fresh.status, fresh.certificate_url) == ('valid', self.CERT_URL)

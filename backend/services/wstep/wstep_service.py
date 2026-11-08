@@ -599,10 +599,8 @@ def _template_extra_ekus(template):
     return oids
 
 
-_SERVER_AUTH = '1.3.6.1.5.5.7.3.1'
 _CLIENT_AUTH = '1.3.6.1.5.5.7.3.2'
 _SMARTCARD_LOGON = '1.3.6.1.4.1.311.20.2.2'
-_PERSON_EKUS = frozenset({'1.3.6.1.5.5.7.3.4', '1.3.6.1.4.1.311.10.3.4'})  # emailProtection, EFS
 
 
 def issues_only_capped_ekus(template):
@@ -628,17 +626,15 @@ def _template_profile(template, csr):
         csr_ku = True
     except x509.ExtensionNotFound:
         csr_ku = False
+    from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS
+    from utils.request_names import cert_type_for_ekus
     configured = None if csr_ku else (_template_configured_ku(template) or None)
-    ekus = set(_template_configured_ekus(template))
-    if not ekus or _SERVER_AUTH in ekus:
-        return 'server_cert', configured
-    if ekus & _PERSON_EKUS:
-        return 'email_cert', configured
-    if _SMARTCARD_LOGON in ekus and ekus <= {_CLIENT_AUTH, _SMARTCARD_LOGON}:
-        return 'client_cert', configured or (None if csr_ku else ['digitalSignature', 'keyEncipherment'])
-    if _CLIENT_AUTH in ekus:
-        return 'client_cert', configured
-    return 'server_cert', configured
+    # The EKUs the certificate gets (_template_extra_ekus), typed as SCEP types its own
+    ekus = set(_template_configured_ekus(template)) - (PROTOCOL_UNBINDABLE_EKU_OIDS - {_SMARTCARD_LOGON})
+    cert_type = cert_type_for_ekus(ekus)
+    if cert_type == 'client_cert' and _SMARTCARD_LOGON in ekus and ekus <= {_CLIENT_AUTH, _SMARTCARD_LOGON}:
+        return cert_type, configured or (None if csr_ku else ['digitalSignature', 'keyEncipherment'])
+    return cert_type, configured
 
 
 def _template_configured_ku(template):
@@ -984,8 +980,9 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     unconditional rather than a per-template opt-in, and independent of
     whether the CSR is naked. If the AD Connector isn't configured/enabled
     at all, this simply doesn't apply (no error) -- but if it IS enabled
-    and the SID lookup for this specific request fails for any reason,
-    issuance is refused rather than silently issuing a weaker-mapped cert.
+    and the principal is of another realm, names no account, or the SID
+    lookup for this specific request fails for any reason, issuance is
+    refused rather than silently issuing a weaker-mapped cert.
     UsernamePassword-bound calls never get this either, same reason as
     Enroll ACL: no per-request principal to resolve a SID for.
     """
@@ -996,58 +993,42 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     override_subject = None
     override_san = None
     kerberos_sam_account_name = None
+    requester_sid = None
     if kerberos_principal:
         from services.ad_connector import lookup
-        parsed = lookup.parse_kerberos_principal(kerberos_principal)
-        if parsed and not lookup.realm_matches_connector(parsed[1]):
-            # Kerberos cross-realm trust means the ticket's realm isn't
-            # necessarily the domain the AD Connector is configured
-            # against; sAMAccountName alone (parsed[0]) isn't globally
-            # unique the way a realm-qualified principal is, so a mismatch
-            # here must not fall through to a same-named account lookup in
-            # the wrong domain -- see lookup.realm_matches_connector. Also
-            # denies the Enroll ACL check below a sam_account_name to check,
-            # which fails that check closed rather than skipping it.
-            logger.warning(
-                "AD Connector: Kerberos principal %r realm does not match the "
-                "configured connector's domain -- refusing to derive a subject",
-                kerberos_principal,
-            )
-            parsed = None
-        if parsed:
-            kerberos_sam_account_name = parsed[0]
 
-    # Strong certificate mapping (KB5014754): embed the authenticated
-    # requester's AD SID as the SID security extension, matching real
-    # ADCS's own automatic behavior since a 2021-era hotfix -- unlike
-    # every other WSTEP AD Connector feature here, this is unconditional,
-    # not a per-template opt-in, and independent of _is_naked_csr below:
-    # the SID identifies who authenticated, not what subject was
-    # requested, so it applies to naked AND manually-typed Kerberos-bound
-    # CSRs alike. "AD Connector not configured at all" and "configured but
-    # this lookup failed" are deliberately different outcomes -- the
-    # former means the feature doesn't apply (checked directly against
-    # ADConnectorConfig, since lookup.py's functions collapse both cases
-    # to the same None), the latter refuses issuance rather than silently
-    # issuing a weaker-mapped cert.
-    requester_sid = None
+        # An enabled connector that cannot resolve the requester refuses: issuing anyway
+        # would drop the SID extension (KB5014754) and the Enroll ACL's account.
+        account = lookup.connector_account(kerberos_principal)
+        if account is lookup.UNREACHABLE:
+            logger.warning("WSTEP: the AD Connector cannot resolve %r: %s", kerberos_principal,
+                           lookup.connector_config_fault() or 'its settings changed')
+            return None, ServerError('Could not resolve requester identity for strong certificate mapping')
+        if account is lookup.FOREIGN_REALM:
+            # sAMAccountName is unique only within its domain: never look it up in another
+            logger.warning("WSTEP: Kerberos principal %r is not of the AD Connector's realm",
+                           kerberos_principal)
+            return None, "The requester's realm is not served by the directory connector"
+        if account is lookup.NO_ACCOUNT:
+            return None, "The requester's principal names no directory account"
+        kerberos_sam_account_name = account
+
+    # Strong certificate mapping (KB5014754): the authenticated requester's AD SID goes into
+    # the SID security extension, as AD CS does, whatever the template and the CSR's subject.
+    # With the connector off there is no account (no extension); with it on, a failed lookup refuses.
     if kerberos_sam_account_name:
-        from models import ADConnectorConfig
-
-        ad_config = ADConnectorConfig.get_singleton()
-        if ad_config and ad_config.enabled:
-            requester_sid = lookup.lookup_object_sid(kerberos_sam_account_name)
-            if not requester_sid:
-                logger.warning(
-                    "WSTEP: could not resolve requester SID for %r via AD "
-                    "Connector -- refusing issuance (strong certificate mapping)",
-                    kerberos_sam_account_name,
-                )
-                if requester_sid is lookup.UNREACHABLE:
-                    return None, ServerError('Could not resolve requester identity for strong certificate mapping')
-                if requester_sid is lookup.UNUSABLE_SID:
-                    return None, 'The requester has no usable directory identity'
-                return None, 'The requester was not found in the directory'
+        requester_sid = lookup.lookup_object_sid(kerberos_sam_account_name)
+        if not requester_sid:
+            logger.warning(
+                "WSTEP: could not resolve requester SID for %r via AD "
+                "Connector -- refusing issuance (strong certificate mapping)",
+                kerberos_sam_account_name,
+            )
+            if requester_sid is lookup.UNREACHABLE:
+                return None, ServerError('Could not resolve requester identity for strong certificate mapping')
+            if requester_sid is lookup.UNUSABLE_SID:
+                return None, 'The requester has no usable directory identity'
+            return None, 'The requester was not found in the directory'
 
     err = _validate_csr(csr, require_pop=require_pop, allow_naked_subject=True)
     if err:
@@ -1104,11 +1085,9 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # per-request principal, so there's no identity here to check group
     # membership for. See _required_enroll_acl_groups for why an unmatched
     # (typically naked) CSR checks against every restricted template for
-    # the CA rather than being skipped. A missing/unresolved
-    # sam_account_name (parse failure, cross-realm mismatch) denies rather
-    # than skips the check, same as an AD lookup failure inside
-    # is_member_of_group -- this is a security gate, not a best-effort
-    # convenience lookup.
+    # the CA rather than being skipped. With the connector off there is no
+    # sam_account_name and a restricted template is denied, never skipped:
+    # this is a security gate, not a best-effort convenience lookup.
     if kerberos_principal:
         required_groups = _required_enroll_acl_groups(ca, matched_template)
         allowed, unreachable = False, False

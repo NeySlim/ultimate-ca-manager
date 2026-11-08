@@ -8,10 +8,19 @@
 import base64
 import json
 
+import pytest
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
 from tests.conftest import get_json
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
+
 
 CONTENT_JSON = 'application/json'
 

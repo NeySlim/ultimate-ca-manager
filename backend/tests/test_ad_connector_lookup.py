@@ -39,6 +39,10 @@ class TestParseKerberosPrincipal:
     def test_none(self):
         assert lookup.parse_kerberos_principal(None) is None
 
+    def test_an_uncanonicalized_enterprise_name_names_no_account(self):
+        """RFC 6806 §5: the realm follows the last unescaped '@'; '@' is not allowed in a sAMAccountName."""
+        assert lookup.parse_kerberos_principal('jdoe\\@corp.example@HAGLAND.DOMAIN') is None
+
 
 class TestIsMachinePrincipal:
     def test_machine_principal(self):
@@ -63,10 +67,20 @@ class TestRealmMatchesConnector:
         with app.app_context():
             assert lookup.realm_matches_connector('HAGLAND.DOMAIN') is True
 
-    def test_case_insensitive(self, app, monkeypatch):
+    def test_realm_names_are_case_sensitive(self, app, monkeypatch):
+        """RFC 4120 §6.1: realm names are case sensitive; AD's is its domain in capitals."""
         _configure(monkeypatch, app)
         with app.app_context():
-            assert lookup.realm_matches_connector('hagland.domain') is True
+            assert lookup.realm_matches_connector('hagland.domain') is False
+            assert lookup.realm_matches_connector('Hagland.Domain') is False
+
+    def test_characterization_a_child_domain_realm_is_another_realm(self, app, monkeypatch):
+        """Characterization, true before the exact comparison too: it guards against a
+        suffix match (``realm.endswith(connector_realm)``), which would let a child domain in."""
+        _configure(monkeypatch, app)
+        with app.app_context():
+            assert lookup.realm_matches_connector('CHILD.HAGLAND.DOMAIN') is False
+            assert lookup.connector_account('host$@CHILD.HAGLAND.DOMAIN') is lookup.FOREIGN_REALM
 
     def test_different_realm_rejected(self, app, monkeypatch):
         """A ticket from a trusted-but-different realm must not be treated
@@ -123,15 +137,22 @@ class _FakeEntry:
         return key in self._attrs
 
 
+_SUCCESS = {'result': 0, 'description': 'success'}
+
+
 class _FakeConnection:
-    def __init__(self, entries=None, search_raises=None):
+    """``result`` mirrors ldap3's ``Connection.result`` after a search (no raise_exceptions)."""
+
+    def __init__(self, entries=None, search_raises=None, result=None):
         self.entries = entries or []
         self._search_raises = search_raises
+        self.result = result or _SUCCESS
         self.unbound = False
 
     def search(self, base_dn, filter_str, attributes=None):
         if self._search_raises:
             raise self._search_raises
+        return self.result['result'] == 0
 
     def unbind(self):
         self.unbound = True
@@ -367,13 +388,17 @@ class _FakeSequentialConnection:
     which searches once to resolve a plain group name to a DN and again to
     check membership.
     """
-    def __init__(self, entries_sequence):
+    def __init__(self, entries_sequence, results=None):
         self._entries_sequence = list(entries_sequence)
+        self._results = list(results or [])
         self.entries = []
+        self.result = None
         self.unbound = False
 
     def search(self, base_dn, filter_str, attributes=None):
         self.entries = self._entries_sequence.pop(0) if self._entries_sequence else []
+        self.result = self._results.pop(0) if self._results else _SUCCESS
+        return self.result['result'] == 0
 
     def unbind(self):
         self.unbound = True
@@ -1100,3 +1125,171 @@ class TestRunHealthProbe:
             assert 'credential' in result['reason']
             # Nothing probed means nothing recorded: no verdict is invented.
             assert ADConnectorConfig.get_singleton().health == {}
+
+
+# Result codes (RFC 4511 §4.1.9) a search answers with when the directory could not
+# answer: the object may exist, so none of them may read as "not found".
+_FAILED_SEARCHES = [
+    (3, 'timeLimitExceeded'), (10, 'referral'), (11, 'adminLimitExceeded'),
+    (32, 'noSuchObject'), (50, 'insufficientAccessRights'), (51, 'busy'),
+    (52, 'unavailable'), (53, 'unwillingToPerform'), (80, 'other'),
+    (4, 'sizeLimitExceeded'),
+]
+_LOOKUPS = {
+    'computer': lambda: lookup.lookup_computer_dns_hostname('WIN11$'),
+    'sid': lambda: lookup.lookup_object_sid('WIN11$'),
+    'user': lambda: lookup.lookup_user_ad_identity('alice'),
+    'group': lambda: lookup.is_member_of_group('alice', 'VPN-Enroll'),
+    'group-dn': lambda: lookup.is_member_of_group('alice', 'CN=VPN-Enroll,OU=Groups,DC=hagland,DC=domain'),
+}
+
+
+class TestSearchResultCodes:
+    """ldap3 connections do not raise on an LDAP error result: the lookups read its code."""
+
+    @pytest.mark.parametrize('code, description', _FAILED_SEARCHES)
+    @pytest.mark.parametrize('name', sorted(_LOOKUPS))
+    def test_an_error_result_is_unreachable_not_absent(self, app, monkeypatch, name, code, description):
+        _configure(None, app, enabled=True)
+        failed = {'result': code, 'description': description, 'message': ''}
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[], result=failed))
+        with app.app_context():
+            assert _LOOKUPS[name]() is lookup.UNREACHABLE
+
+    def test_a_failed_membership_search_after_the_group_resolved_is_unreachable(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+        group_entry = _FakeEntry({})
+        group_entry.entry_dn = 'CN=VPN-Enroll,OU=Groups,DC=hagland,DC=domain'
+        busy = {'result': 51, 'description': 'busy', 'message': ''}
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeSequentialConnection(
+            [[group_entry], []], results=[_SUCCESS, busy]))
+        with app.app_context():
+            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is lookup.UNREACHABLE
+
+    @pytest.mark.parametrize('name, absent', [
+        ('computer', None), ('sid', None), ('user', None), ('group', False), ('group-dn', False)])
+    def test_a_successful_empty_search_is_still_not_found(self, app, monkeypatch, name, absent):
+        _configure(None, app, enabled=True)
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[]))
+        with app.app_context():
+            assert _LOOKUPS[name]() is absent
+
+    def test_a_size_limited_answer_that_found_the_entry_is_used(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+        entry = _FakeEntry({'dNSHostName': 'win11.hagland.domain'})
+        limited = {'result': 4, 'description': 'sizeLimitExceeded', 'message': ''}
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry], result=limited))
+        with app.app_context():
+            assert lookup.lookup_computer_dns_hostname('WIN11$') == 'win11.hagland.domain'
+
+
+class TestSearchResultCodesOnLdap3:
+    """The same reading against ldap3's own mock directory, whose results have the real shape."""
+
+    @staticmethod
+    def _mock_connection(base='DC=hagland,DC=domain'):
+        import ldap3
+        conn = ldap3.Connection(ldap3.Server('mock'), user=f'CN=svc,{base}', password='pw',
+                                client_strategy=ldap3.MOCK_SYNC, check_names=False)
+        conn.strategy.add_entry(f'CN=svc,{base}', {'userPassword': 'pw', 'objectClass': 'user'})
+        conn.strategy.add_entry(f'CN=WIN11,{base}', {'objectClass': 'computer', 'sAMAccountName': 'WIN11$',
+                                                    'dNSHostName': 'win11.hagland.domain'})
+        conn.bind()
+        return conn
+
+    def test_a_base_dn_the_directory_does_not_hold_is_unreachable(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+        monkeypatch.setattr(lookup, '_connect', lambda config: self._mock_connection(base='DC=other,DC=test'))
+        with app.app_context():
+            assert lookup.lookup_computer_dns_hostname('WIN11$') is lookup.UNREACHABLE
+
+    def test_the_same_directory_still_finds_and_misses(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+        monkeypatch.setattr(lookup, '_connect', lambda config: self._mock_connection())
+        with app.app_context():
+            # The schema-less mock hands values back as bytes: only presence is compared
+            assert 'win11.hagland.domain' in lookup.lookup_computer_dns_hostname('WIN11$')
+            assert lookup.lookup_computer_dns_hostname('GHOST$') is None
+
+
+class TestSearchWithoutResult:
+    @pytest.mark.parametrize('name', sorted(_LOOKUPS))
+    def test_a_connection_without_a_result_is_unreachable(self, app, monkeypatch, name):
+        _configure(None, app, enabled=True)
+        class _NoResult(_FakeConnection):
+            def search(self, base_dn, filter_str, attributes=None):
+                self.result = None
+                return True
+
+        monkeypatch.setattr(lookup, '_connect', lambda config: _NoResult(entries=[]))
+        with app.app_context():
+            assert _LOOKUPS[name]() is lookup.UNREACHABLE
+
+
+class TestAmbiguousAclGroup:
+    def test_a_group_name_matching_two_groups_is_unreachable(self, app, monkeypatch):
+        """A homonymous cn in another OU must never stand in for the ACL's group."""
+        _configure(None, app, enabled=True)
+        first, second = _FakeEntry({}), _FakeEntry({})
+        first.entry_dn = 'CN=VPN-Enroll,OU=Groups,DC=hagland,DC=domain'
+        second.entry_dn = 'CN=VPN-Enroll,OU=Lab,DC=hagland,DC=domain'
+        member = _FakeEntry({'sAMAccountName': 'alice'})
+        monkeypatch.setattr(lookup, '_connect',
+                            lambda config: _FakeSequentialConnection([[second, first], [member]]))
+        with app.app_context():
+            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is lookup.UNREACHABLE
+
+
+class TestBaseDnSpellings:
+    """AD accepts spaces around a DN's separators (RFC 4514 §3 lets a reader accept other forms)."""
+
+    @pytest.mark.parametrize('base_dn, realm', [
+        ('DC=hagland, DC=domain', 'HAGLAND.DOMAIN'),
+        ('OU=Users , DC=corp ,DC=example', 'CORP.EXAMPLE'),
+        ('DC = corp,DC = example', 'CORP.EXAMPLE'),
+        ('DC=corp;DC=example', 'CORP.EXAMPLE'),
+        ('  DC=corp , DC=example  ', 'CORP.EXAMPLE'),
+    ])
+    def test_a_spaced_base_dn_still_names_its_realm(self, app, base_dn, realm):
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            config = ADConnectorConfig(server='dc1', base_dn=base_dn, bind_dn='svc', enabled=True)
+            config.bind_password = 'irrelevant'
+            db.session.add(config)
+            db.session.commit()
+            try:
+                assert lookup.connector_account(f'WIN11$@{realm}') == 'WIN11$'
+                assert lookup.connector_config_fault() is None
+            finally:
+                ADConnectorConfig.query.delete()
+                db.session.commit()
+
+    def test_escaped_characters_are_kept(self):
+        assert lookup.realm_of_base_dn('OU=a\\, b ,DC=corp, DC=example') == 'CORP.EXAMPLE'
+        assert lookup.realm_of_base_dn('OU=a\\ ,DC=corp,DC=example') == 'CORP.EXAMPLE'
+        assert lookup.realm_of_base_dn('OU=Users,O=Corp') is None
+        assert lookup.realm_of_base_dn('not a dn') is None
+
+
+class TestDuplicateAccounts:
+    """Over a Global Catalog the base DN also covers child domains, whose accounts can share a
+    sAMAccountName with one of this domain: two answers must never resolve to the first."""
+
+    @staticmethod
+    def _two(attrs):
+        first, second = _FakeEntry(attrs), _FakeEntry(attrs)
+        first.entry_dn = 'CN=CHILDDC,OU=Computers,DC=hagland,DC=domain'
+        second.entry_dn = 'CN=CHILDDC,OU=Domain Controllers,DC=child,DC=hagland,DC=domain'
+        return [first, second]
+
+    @pytest.mark.parametrize('name, attrs', [
+        ('computer', {'dNSHostName': 'childdc.child.hagland.domain'}),
+        ('sid', {'objectSid': TestSidBytesToString._WIN11_RAW_SID}),
+        ('user', {'userPrincipalName': 'alice@hagland.domain', 'mail': None}),
+    ])
+    def test_two_accounts_of_the_name_are_unreachable(self, app, monkeypatch, name, attrs):
+        _configure(None, app, enabled=True)
+        entries = self._two(attrs)
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=entries))
+        with app.app_context():
+            assert _LOOKUPS[name]() is lookup.UNREACHABLE

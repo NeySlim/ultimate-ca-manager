@@ -14,6 +14,11 @@ from models.sso import SSOProvider, SSOSession
 
 
 def _cleanup(names):
+    # As the user delete route does: PostgreSQL refuses a user its SSO sessions still name
+    from api.v2.users.crud import _purge_user_dependencies
+
+    for (user_id,) in User.query.filter(User.username.in_(names)).with_entities(User.id).all():
+        _purge_user_dependencies(user_id)
     User.query.filter(User.username.in_(names)).delete(synchronize_session=False)
     db.session.commit()
 

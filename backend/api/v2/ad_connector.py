@@ -5,6 +5,7 @@ Active Directory directly, kept deliberately separate from SSO's own LDAP
 provider config (see models/ad_connector.py's module docstring for why).
 """
 import logging
+import re
 
 from flask import Blueprint, request
 
@@ -27,6 +28,10 @@ bp = Blueprint('ad_connector_v2', __name__)
 
 MAX_SERVER_LEN = 500
 MAX_DN_LEN = 500
+GLOBAL_CATALOG_PORTS = (3268, 3269)
+GLOBAL_CATALOG_REFUSAL = 'the connector must reach a domain controller, not a global catalog'
+# ldap3 takes a scheme or a port written in the host over the port field; a bare IPv6 address has several colons
+_HOST_WITH_PORT = re.compile(r'://|^[^:]*:[^:]*$|\]:')
 # Every configured DC is bound to in turn by the health probe, which runs on
 # the scheduler's single thread and waits out _LDAP_CONNECT_TIMEOUT_SECONDS
 # on each black-holed one. A long list would delay CRL generation, backups
@@ -56,6 +61,8 @@ def _parse_servers(data):
     for host in servers:
         if len(host) > MAX_SERVER_LEN:
             return None, error_response('server is too long', 400)
+        if _HOST_WITH_PORT.search(host):
+            return None, error_response('servers are host names; set the port in the port field', 400)
     if len(servers) > MAX_SERVERS:
         return None, error_response(f'at most {MAX_SERVERS} servers are supported', 400)
     joined = lookup.join_servers(servers)
@@ -131,6 +138,9 @@ def update_config():
             config.port = int(data['port']) if data['port'] not in (None, '') else 389
         except (TypeError, ValueError):
             return error_response('port must be an integer', 400)
+        # A global catalog searches child domains too, so an account name stops being unique
+        if config.port in GLOBAL_CATALOG_PORTS:
+            return error_response(GLOBAL_CATALOG_REFUSAL, 400)
     if 'health_probe_interval' in data:
         try:
             interval = int(data['health_probe_interval'])
@@ -151,6 +161,10 @@ def update_config():
         base_dn = (data['base_dn'] or '').strip()
         if len(base_dn) > MAX_DN_LEN:
             return error_response('base_dn is too long', 400)
+        # The realm of Kerberos requesters is read from the DC components
+        if base_dn and not lookup.realm_of_base_dn(base_dn):
+            return error_response('base_dn must name the domain with DC components, '
+                                  'such as DC=corp,DC=example', 400)
         config.base_dn = base_dn or None
     if 'bind_dn' in data:
         bind_dn = (data['bind_dn'] or '').strip()
@@ -214,7 +228,12 @@ def test_connection_inline():
     if not (data.get('bind_dn') or '').strip():
         return error_response('bind_dn is required', 400)
 
-    port = int(data['port']) if data.get('port') else 389
+    try:
+        port = int(data['port']) if data.get('port') else 389
+    except (TypeError, ValueError):
+        return error_response('port must be an integer', 400)
+    if port in GLOBAL_CATALOG_PORTS:
+        return error_response(GLOBAL_CATALOG_REFUSAL, 400)
     use_ssl = bool(data.get('use_ssl'))
     verify_ssl = data.get('verify_ssl', True)
     ca_bundle = data.get('ca_bundle') or None

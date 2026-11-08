@@ -1314,17 +1314,7 @@ class SCEPService:
         cert_refid = str(uuid.uuid4())
         public_key = csr.public_key()
 
-        # Enforce the CA chain's NameConstraints on the CSR's subject + SANs
-        # (RFC 5280 §4.2.1.10). SCEP is unauthenticated beyond the challenge,
-        # so a constrained CA must not be tricked into issuing out-of-scope
-        # names here just as on the web/ACME/EST paths.
         _scep_sans = _csr_san_names(csr)
-        from services.trust_store.constraints_mixin import validate_name_constraints
-        # renewal_of (the cert authenticating a RenewalReq) grants renewal at
-        # par: an enrolled fleet must stay renewable even if the CA's
-        # constraints tightened after enrollment.
-        validate_name_constraints(self.ca_cert, csr.subject, _scep_sans,
-                                  renewal_of=renewal_of)
         # The bounds and name syntax every issuance path applies
         from utils.request_names import refuse_malformed_request
         refuse_malformed_request(csr.subject, _scep_sans, renewal_of)
@@ -1554,6 +1544,17 @@ class SCEPService:
                 ]),
                 critical=False,
             )
+        # The CA chain's NameConstraints (RFC 5280 §4.2.1.10), once the EKUs are
+        # settled: they decide whether a dotted CN names a host, so a policy or
+        # template EKU refusal comes first. renewal_of grants renewal at par.
+        issued_ekus = next(e.value for e in builder._extensions
+                           if e.oid == ExtensionOID.EXTENDED_KEY_USAGE)
+        from services.trust_store.constraints_mixin import validate_name_constraints
+        from utils.request_names import cert_type_for_ekus, cn_may_name_host
+        cert_type = cert_type_for_ekus(issued_ekus)
+        validate_name_constraints(self.ca_cert, csr.subject, _scep_sans, renewal_of=renewal_of,
+                                  cn_may_name_host=cn_may_name_host(cert_type, list(issued_ekus)))
+
         # Whether the KeyUsage came from the template or the CSR, bits the
         # enrollee's key type cannot honour (keyEncipherment on an EC key)
         # are cleared here, as on every other leaf path (#327).
@@ -1662,7 +1663,7 @@ class SCEPService:
             descr=f"SCEP: {csr.subject.rfc4514_string()}",
             crt=base64.b64encode(cert_pem).decode('utf-8'),
             prv=None,
-            cert_type="server_cert",
+            cert_type=cert_type,
             subject=csr.subject.rfc4514_string(),
             subject_cn=cn_value,
             issuer=cert.issuer.rfc4514_string(),

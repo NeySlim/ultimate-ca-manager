@@ -1364,6 +1364,7 @@ The local ACME server advertises \`renewalInfo\` in its directory and serves a p
 - Window centered before expiry → renewals spread over time
 - Revoked certificate → window in the past (renew now)
 - Unauthenticated GET on \`/acme/renewalInfo/<certID>\`
+- ACME proxy: the upstream CA's window is relayed with its Retry-After for a certificate issued through the proxy; computed locally when the CA has none or does not answer
 `
   },
 
@@ -2236,9 +2237,9 @@ Settings › Backup enables automatic backups.
 UCM's own LDAP connection to Active Directory, independent of any LDAP provider configured under SSO. That one is for logging into UCM; this one is used for certificate-related AD lookups and works whether or not SSO is configured at all.
 
 - **Purpose**: Resolves a Kerberos machine or user principal to its AD object, so UCM can derive a certificate subject/SAN the same way a real Windows CA would
-- **Domain Controllers**: One per row, each by its own hostname, tried in order: lookups fail over to the next one when a DC is down. A bare domain name fails certificate verification, since a domain controller certificate names only its own host
+- **Domain Controllers**: One per row, each by its own hostname, without port or scheme, tried in order: lookups fail over to the next one when a DC is down. A bare domain name fails certificate verification, since a domain controller certificate names only its own host
 - **LDAPS**: Toggle to use LDAP over SSL/TLS; **Verify SSL Certificate** validates the DC's certificate (optionally against a custom CA bundle when it isn't publicly trusted)
-- **Base DN** and **Bind DN / Password**: Service account credentials used for lookups; Bind DN and password are both required while the connector is enabled
+- **Base DN** and **Bind DN / Password**: the domain's base DN, with its DC components (\`DC=corp,DC=example\`, which also names the Kerberos realm served) on a domain controller port (389 or 636, not a Global Catalog), and the service account used for lookups; Bind DN and password are both required while the connector is enabled
 - **Test Connection**: Verify connectivity and credentials before saving
 - **Health Check Interval**: Each domain controller is probed with a real bind at this interval; an unreachable one is skipped at enrollment time until it recovers. The verdict shows on the settings row and against each DC
 
@@ -2294,7 +2295,7 @@ Windows can also renew with \`certreq ... Renew\`, authenticated by the certific
 
 ### SID Security Extension (KB5014754)
 
-On **Kerberos-authenticated issuance**, UCM embeds the requester's AD SID in the Microsoft SID security extension (\`szOID_NTDS_CA_SECURITY_EXT\`) of the issued certificate. Domain controllers use it for **strong certificate mapping** (KB5014754): required since AD enforcement of strong mapping for certificate-based authentication (smartcard logon, PKINIT).
+On **Kerberos-authenticated issuance**, UCM embeds the requester's AD SID in the Microsoft SID security extension (\`szOID_NTDS_CA_SECURITY_EXT\`) of the issued certificate. Domain controllers use it for **strong certificate mapping** (KB5014754): required since AD enforcement of strong mapping for certificate-based authentication (smartcard logon, PKINIT). With the AD Connector enabled, a request whose SID cannot be resolved is refused rather than issued without it, including a principal of a realm other than the connector's domain.
 
 ### AD-Derived Subjects
 
