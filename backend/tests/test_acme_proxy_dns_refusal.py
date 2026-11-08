@@ -6,6 +6,7 @@ import base64
 import copy
 import hashlib
 import json
+import threading
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -55,11 +56,20 @@ class _ThreadRecorder:
         _ThreadRecorder.started.append((self.target, self.args))
 
 
+class _ProxyThreading:
+    """``threading`` as the proxy module sees it: its threads are recorded, while the
+    shared module keeps its Thread (``current_thread()`` in any other thread builds one)."""
+    Thread = _ThreadRecorder
+
+    def __getattr__(self, name):
+        return getattr(threading, name)
+
+
 @pytest.fixture(autouse=True)
 def _clean(app, monkeypatch):
     _ThreadRecorder.created = []
     _ThreadRecorder.started = []
-    monkeypatch.setattr(proxy_mod.threading, 'Thread', _ThreadRecorder)
+    monkeypatch.setattr(proxy_mod, 'threading', _ProxyThreading())
     yield
     with app.app_context():
         AcmeClientOrder.query.filter_by(is_proxy_order=True).delete()
@@ -946,9 +956,8 @@ class TestBadNonceRetries:
 
 def _in_another_thread(app, fn):
     """Run ``fn`` to completion in a real thread with its own app context and session
-    (threading.Thread is replaced by a recorder in this module)."""
+    (the proxy module's threading.Thread is a recorder in this module)."""
     import _thread
-    import threading
     done, errors = threading.Event(), []
 
     def body():
@@ -967,6 +976,13 @@ def _in_another_thread(app, fn):
     assert done.wait(30)
     if errors:
         raise errors[0]
+
+
+def test_a_thread_started_elsewhere_still_has_its_thread_object(app):
+    """Only the proxy's threads are recorded: another thread can still log (current_thread)."""
+    names = []
+    _in_another_thread(app, lambda: names.append(threading.current_thread().name))
+    assert names and names[0].startswith('Dummy-')
 
 
 def _fresh(order_id):
