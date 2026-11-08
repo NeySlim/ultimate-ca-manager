@@ -958,7 +958,7 @@ def renewal_info(certid, slug=None):
     if cert is None:
         return proxy_error('malformed', 'Unknown certificate', 404)
 
-    relayed = None if cert.revoked else _upstream_renewal_info(cert, certid, slug)
+    relayed = None if cert.revoked else _upstream_renewal_info(cert, slug)
     if relayed:
         data, retry_after = relayed
     else:
@@ -975,14 +975,16 @@ def renewal_info(certid, slug=None):
     return resp
 
 
-def _upstream_renewal_info(cert, certid, slug):
-    """RenewalInfo of the upstream CA account that issued ``cert`` through the proxy, else None."""
+def _upstream_renewal_info(cert, slug):
+    """RenewalInfo of the upstream CA account that issued ``cert`` through the proxy, else None;
+    asked with the certID of the stored certificate, DER serial bytes included (RFC 9773 §4.1)."""
     order = (AcmeClientOrder.query
              .filter_by(is_proxy_order=True, certificate_id=cert.id)
              .order_by(AcmeClientOrder.id.desc()).first())
     if order is None or not order.acme_client_account_id:
         return None
     try:
+        certid = AcmeClientService.certificate_identifier(cert)
         svc = AcmeProxyService(_proxy_base_url(slug), account_id=order.acme_client_account_id)
         return svc.upstream_renewal_info(certid)
     except Exception as exc:  # the local window still answers

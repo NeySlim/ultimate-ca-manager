@@ -85,14 +85,32 @@ class TestDirectoryRenewalInfo:
         assert 'renewalInfo' not in out
 
 
-def _import_cert_for_ari(app, aki_hex: str, serial_int: int):
+def _real_pem(aki_hex: str, serial_int: int) -> bytes:
+    """A certificate carrying this AKI and serial, as the upstream CA would issue it."""
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'ari-test')])
+    aki = x509.AuthorityKeyIdentifier(bytes.fromhex(aki_hex.replace(':', '')), None, None)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+            .public_key(key.public_key()).serial_number(serial_int)
+            .not_valid_before(datetime.now(timezone.utc) - timedelta(days=10))
+            .not_valid_after(datetime.now(timezone.utc) + timedelta(days=80))
+            .add_extension(aki, critical=False)
+            .sign(key, hashes.SHA256()))
+    return cert.public_bytes(serialization.Encoding.PEM)
+
+
+def _import_cert_for_ari(app, aki_hex: str, serial_int: int, real=False):
     """Insert a minimal Certificate row with aki + serial matching a certID."""
     with app.app_context():
         from uuid import uuid4
         cert = Certificate(
             refid=str(uuid4()),
             descr='ARI proxy test',
-            crt=base64.b64encode(b'FAKEPEM').decode(),
+            crt=base64.b64encode(_real_pem(aki_hex, serial_int) if real else b'FAKEPEM').decode(),
             subject='CN=ari-test',
             subject_cn='ari-test',
             issuer='CN=ari-test-ca',
@@ -252,15 +270,17 @@ class TestUpstreamRenewalInfoRelay:
     issued it, relayed with its Retry-After; the local window when the CA has none."""
 
     AKI = 'C0:FF:EE:01:02:03'
-    SERIAL = 0x7A11E
+    SERIAL = 0x8A11E0  # high bit set: its DER value bytes carry a leading zero
 
     def _certid(self):
-        return TestRenewalInfoRoute._certid(None, self.AKI, self.SERIAL)
+        aki = bytes.fromhex(self.AKI.replace(':', ''))
+        serial = b'\x00' + self.SERIAL.to_bytes(3, 'big')
+        return f"{_b64url(aki)}.{_b64url(serial)}"
 
     @pytest.fixture
     def issued(self, app, proxy_account):
         from models import AcmeClientOrder
-        cert_id = _import_cert_for_ari(app, self.AKI, self.SERIAL)
+        cert_id = _import_cert_for_ari(app, self.AKI, self.SERIAL, real=True)
         with app.app_context():
             order = AcmeClientOrder(domains=json.dumps(['ari.example']), environment='staging',
                                     challenge_type='dns-01', status='valid', is_proxy_order=True,
@@ -320,7 +340,7 @@ class TestUpstreamRenewalInfoRelay:
     def test_certificate_not_issued_through_the_proxy_is_not_relayed(self, app, client,
                                                                      proxy_account, monkeypatch):
         upstream = self._upstream(monkeypatch)
-        cert_id = _import_cert_for_ari(app, self.AKI, self.SERIAL)
+        cert_id = _import_cert_for_ari(app, self.AKI, self.SERIAL, real=True)
         try:
             r = client.get(f'/acme/proxy/ari-test/renewal-info/{self._certid()}')
         finally:
@@ -350,3 +370,13 @@ class TestUpstreamRenewalInfoRelay:
         start = datetime.fromisoformat(r.get_json()['suggestedWindow']['start'].replace('Z', ''))
         assert start < datetime.now(timezone.utc).replace(tzinfo=None)
         assert upstream.ari_calls == []
+
+    def test_upstream_is_asked_with_the_certid_of_the_stored_certificate(self, client, issued,
+                                                                        monkeypatch):
+        """A client that drops the serial's leading zero still names the certificate."""
+        upstream = self._upstream(monkeypatch)
+        aki = bytes.fromhex(self.AKI.replace(':', ''))
+        loose = f"{_b64url(aki)}.{_b64url(self.SERIAL.to_bytes(3, 'big'))}"
+        r = client.get(f'/acme/proxy/renewal-info/{loose}')
+        assert r.get_json()['suggestedWindow'] == UPSTREAM_WINDOW
+        assert upstream.ari_calls == [self._certid()]
