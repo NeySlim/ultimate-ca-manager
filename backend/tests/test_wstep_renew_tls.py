@@ -849,7 +849,7 @@ def test_a_twin_claimed_by_another_renewal_loses_the_claim(app, wstep_renew_conf
 
 
 @pytest.mark.parametrize('ekus', [['clientAuth', 'emailProtection', '1.3.6.1.4.1.311.10.3.4'],
-                                  ['clientAuth']])
+                                  ['clientAuth'], ['clientAuth', 'smartcardLogon']])
 def test_renewal_keeps_the_key_usage_of_its_template(app, templated_ca, ekus):
     """A renewal is signed under the profile of its template, as the issuance was."""
     ca_id = templated_ca(f'WSTEP renew user KU CA {len(ekus)}', {'User': (ekus, None)})

@@ -583,21 +583,36 @@ _PERSON_EKUS = frozenset({'1.3.6.1.5.5.7.3.4', '1.3.6.1.4.1.311.10.3.4'})  # ema
 def _template_profile(template, csr):
     """(cert_type, Key Usage names or None) the trunk signs ``csr`` under: as in AD CS,
     an S/MIME or EFS template and a Smartcard Logon one keep keyEncipherment, and a
-    user template's CN (jdoe) names no host. Templates with serverAuth stay server ones."""
+    user template's CN (jdoe) names no host. Templates with serverAuth stay server ones;
+    a request without Key Usage gets the one the template configures."""
+    try:
+        extensions_of(csr).get_extension_for_class(x509.KeyUsage)
+        csr_ku = True
+    except x509.ExtensionNotFound:
+        csr_ku = False
+    configured = None if csr_ku else (_template_configured_ku(template) or None)
     ekus = set(_template_configured_ekus(template))
     if not ekus or _SERVER_AUTH in ekus:
-        return 'server_cert', None
+        return 'server_cert', configured
     if ekus & _PERSON_EKUS:
-        return 'email_cert', None
-    if ekus <= {_CLIENT_AUTH}:
-        return 'client_cert', None
+        return 'email_cert', configured
     if _SMARTCARD_LOGON in ekus and ekus <= {_CLIENT_AUTH, _SMARTCARD_LOGON}:
-        try:
-            extensions_of(csr).get_extension_for_class(x509.KeyUsage)
-            return 'client_cert', None
-        except x509.ExtensionNotFound:
-            return 'client_cert', ['digitalSignature', 'keyEncipherment']
-    return 'server_cert', None
+        return 'client_cert', configured or (None if csr_ku else ['digitalSignature', 'keyEncipherment'])
+    if _CLIENT_AUTH in ekus:
+        return 'client_cert', configured
+    return 'server_cert', configured
+
+
+def _template_configured_ku(template):
+    """The Key Usage names ``template`` configures, [] when none."""
+    import json
+
+    try:
+        parsed = json.loads(getattr(template, 'extensions_template', None) or '{}')
+    except (TypeError, ValueError):
+        return []
+    names = parsed.get('key_usage') if isinstance(parsed, dict) else None
+    return [n for n in names if isinstance(n, str)] if isinstance(names, list) else []
 
 
 def _template_configured_ekus(template):
