@@ -20,7 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
-- AD Connector: saving or testing a base DN without DC components, which names no domain, a Global Catalog port (3268, 3269) or a server written with a port or an `ldap://` scheme is refused with 400, and a Kerberos realm must match the base DN's in capitals exactly (RFC 4120 §6.1).
+- AD Connector: saving a base DN without DC components, which names no domain, is refused with 400; saving or testing a Global Catalog port (3268, 3269) or a server written with a port or an `ldap://` scheme is refused too, and a Kerberos realm must match the base DN's in capitals exactly (RFC 4120 §6.1).
 - SSO providers: an unknown `default_role` is refused instead of being stored as viewer, and an empty one, "None" in the form, gives no implicit role; an existing provider whose default role is empty or unknown keeps viewer (migration 137).
 - LDAP: a new provider without SSL/TLS uses StartTLS by default, so passwords do not cross in clear (RFC 4513 §6.3.3); existing providers keep their setting.
 - ACME server: revokeCert refused an account other than the one that ordered the certificate even when it held valid authorizations for all its identifiers. Such an account may now revoke a certificate this ACME server issued, as RFC 8555 §7.6 requires; an authorization granted by auto-approval does not count.
