@@ -1384,6 +1384,32 @@ class TestRetryWithinTheLinger:
             svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
             provider.create_txt_record.assert_called_once_with(DOMAIN, name, _txt('tok.up'))
 
+    def test_read_of_the_failed_order_redispatches_a_long_overdue_deletion(self, app,
+                                                                         monkeypatch):
+        """A restart lost the deferred deletion: the next read of the order runs it again."""
+        import time
+
+        def record(value, **extra):
+            return dict({'domain': DOMAIN, 'record_name': f'_acme-challenge.{DOMAIN}',
+                         'value': value, 'provider_id': 5}, **extra)
+        overdue = record('lost', release_at=time.time() - proxy_mod._SUBMITTED_RECORD_LINGER - 1)
+        fresh = record('waiting', release_at=time.time() + proxy_mod._SUBMITTED_RECORD_LINGER)
+        kept = record('kept')
+        with app.app_context():
+            failed = _failed_order(dns_records_created=json.dumps([overdue, kept, fresh]))
+            # The retry on the same authorization is pending: it keeps the plain record only
+            _order(client_jwk_thumbprint='T', order_url=f'{ORDER_URL}b',
+                   upstream_order_url=f'{ORDER_URL}b')
+            svc, _calls = _svc(monkeypatch, {ORDER_URL: _Resp({
+                'status': 'pending', 'authorizations': [AUTHZ_URL],
+                'finalize': f'{ORDER_URL}/finalize'})})
+            assert svc.get_order(_b64(ORDER_URL), requester_thumbprint='T')['status'] == 'invalid'
+            cleanups = [args for target, args in _ThreadRecorder.started
+                        if getattr(target, '__name__', '') == '_bg_cleanup_dns_records']
+            assert [(args[1], args[2:]) for args in cleanups] == [([overdue], (failed.id,))]
+            left = json.loads(_fresh(failed.id).dns_records_created)
+            assert sorted(left, key=lambda r: r['value']) == [kept, fresh]
+
     def test_issued_order_still_deletes_a_value_a_sibling_lists(self, app, monkeypatch):
         """Issued, the shared authorization is valid: the sibling no longer needs the value."""
         from flask import current_app

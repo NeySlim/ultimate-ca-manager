@@ -55,7 +55,7 @@ _CHALLENGE_PARENT_LEVELS = 2
 _CERT_FALLBACK_SCAN_LIMIT = 25
 # Seconds the TXT of a challenge already submitted outlives a local failure of its order:
 # the upstream CA may still be reading it. The order lists it, flagged, until deleted; a
-# restart during the wait leaves it published, and siblings stop counting it one delay later.
+# deletion a restart lost runs at the order's next read one delay later, never if it is not read.
 _SUBMITTED_RECORD_LINGER = 120
 # The dns-01 threads of one order run in the worker that started them: one lock per
 # order id (striped) orders their writes to the row, a row lock covers PostgreSQL too.
@@ -2022,12 +2022,19 @@ class AcmeProxyService:
                 return [], []
             waiting = [r for r in records if isinstance(r, dict) and r.get('release_at')]
             records = [r for r in records if r not in waiting]
+            # A deferred deletion lost to a restart is due now: siblings no longer count it.
+            # Its deletion stays guarded by the orders listing the value under the name's lock.
+            stale = time.time() - _SUBMITTED_RECORD_LINGER
+            overdue = [r for r in waiting if r['release_at'] < stale]
+            if overdue:
+                waiting = [r for r in waiting if r not in overdue]
+                row.dns_records_created = json.dumps(waiting + records) if waiting or records else None
             if not records:
-                return [], []
+                return overdue, []
             for authz_url in self._recorded_authz_urls(row):
                 if any(o.id != row.id and o.status == 'pending'
                        for o in self._orders_by_authz_url(authz_url)):
-                    return [], []
+                    return overdue, []
             states = [state or {} for state in row.challenges_dict.values()]
             # Read under the row lock: a challenge still initiated may have its POST in flight
             if any(state.get('status') == 'initiated' for state in states):
@@ -2039,7 +2046,7 @@ class AcmeProxyService:
             waits = [deferred is None or (r.get('record_name'), r.get('value')) in deferred
                      for r in records]
             release_at = time.time() + _SUBMITTED_RECORD_LINGER
-            now = [r for r, wait in zip(records, waits) if not wait]
+            now = overdue + [r for r, wait in zip(records, waits) if not wait]
             later = [dict(r, release_at=release_at) for r, wait in zip(records, waits) if wait]
             # Deferred records stay listed until deleted: a retry within the delay sees them live
             row.dns_records_created = json.dumps(waiting + later) if waiting or later else None
