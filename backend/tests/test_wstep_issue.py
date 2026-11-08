@@ -14,13 +14,19 @@ from lxml import etree
 from models import CA, db
 from models.certificate_template import CertificateTemplate
 from models.system_config import SystemConfig
-from tests.fixtures.templates import delete_templates, template_ids_named
+from tests.fixtures.templates import delete_templates, template_ids_named, templates_created_here_removed
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS
 
 
 ISSUE_URL = '/ADCertificateService_CES_UsernamePassword/service.svc'
 WSTEP_USER = 'wstep-test'
 WSTEP_PASSWORD = 'wstep-password'
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
 
 
 def _set_config(key, value):
@@ -504,8 +510,25 @@ def test_a_bare_csr_is_not_issued_under_a_template_of_capped_ekus_only(client, a
     assert stamped != ocsp_oid
 
 
+@pytest.fixture
+def _ca_offers_only_ocsp_signing(app, wstep_config):
+    """The CA offers OCSP Signing alone, whatever templates the database holds."""
+    from models import CATemplatePin
+    with app.app_context():
+        ocsp = CertificateTemplate.query.filter_by(name='OCSP Signing').first()
+        assert ocsp is not None and ocsp.is_active
+        pin = CATemplatePin(ca_id=wstep_config['id'], template_id=ocsp.id)
+        db.session.add(pin)
+        db.session.commit()
+        pin_id = pin.id
+    yield
+    with app.app_context():
+        CATemplatePin.query.filter_by(id=pin_id).delete()
+        db.session.commit()
+
+
 @pytest.mark.parametrize('named', [False, True])
-def test_a_template_of_capped_ekus_only_is_refused(client, app, wstep_config, named):
+def test_a_template_of_capped_ekus_only_is_refused(client, app, wstep_config, _ca_offers_only_ocsp_signing, named):
     """OCSP Signing would be signed under the server profile, its only EKU dropped: the
     request asking for it, or naming it, is refused as the client's fault."""
     from models import CA

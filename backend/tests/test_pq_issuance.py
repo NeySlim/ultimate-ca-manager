@@ -13,6 +13,14 @@ from models import CA, Certificate, db
 from services.trust_store import TrustStoreService
 from tests.pqc_fixtures import fixture_bytes
 from utils import key_algorithms
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
+
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')

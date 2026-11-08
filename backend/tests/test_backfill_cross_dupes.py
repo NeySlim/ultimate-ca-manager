@@ -16,6 +16,14 @@ from cryptography.x509.oid import NameOID
 from models import db, CA
 from services.ski_aki_backfill import backfill_ski_aki
 from utils.key_codec import store_pem_bytes
+import pytest
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
 
 
 def _cert(subject_key, cn, issuer_key=None, issuer_cn=None):
