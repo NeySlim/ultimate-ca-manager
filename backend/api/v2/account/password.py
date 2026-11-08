@@ -50,10 +50,11 @@ def change_password():
         return error_response(first.get('message', 'Invalid password'), 400,
                               details={'i18n_key': first.get('key'), 'i18n_values': first.get('values', {})})
 
-    # Skip current-password verification only when the SERVER says so
+    # Skip current-password verification only when the SERVER says so.
+    # 403, not 401: the session is valid, and the UI logs out on any 401.
     if not skip_current_check:
         if not current_password or not user.check_password(current_password):
-            return error_response('Current password is incorrect', 401)
+            return error_response('Current password is incorrect', 403)
 
     # Update password: set_password() closes every session of the account,
     # then this one is kept under a new identifier.

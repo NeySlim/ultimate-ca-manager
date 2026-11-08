@@ -55,6 +55,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - EST, WSTEP and SCEP: every certificate was recorded as a server certificate, so an S/MIME or client one showed as "Server" in its details and in the API of a renewal approval request. Each now records the type it is signed as (EST: device; SCEP and WSTEP: from its EKUs, by one rule); certificates issued earlier keep their recorded type.
 
 ### Fixed
+- Account: a wrong current password on the password change form answered 401, which logged the user out; it now answers 403 and the form shows the error.
 
 - AD Connector: an LDAP search that the domain controller answered with an error (busy, unavailable, time limit, a base DN it does not hold, missing read rights) read as "account not found", so WSTEP refused the requester with 400. It now counts as a directory failure, answered 500 like an unreachable DC.
 - mTLS: a static file request sent without the session cookie, as browsers fetch the favicon, opened a new certificate session and wrote a `login_success` audit event, several per page refresh. Static files no longer open a session, so a page load logs in once.
