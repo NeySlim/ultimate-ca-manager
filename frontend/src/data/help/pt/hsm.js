@@ -83,7 +83,8 @@ A interface HSM padrão da indústria. Dispositivos suportados:
 
 Configuração:
 - **Caminho da Biblioteca**: Caminho para a biblioteca compartilhada PKCS#11 (.so/.dll)
-- **Slot**: Número do slot HSM
+- **Rótulo do Token**: Rótulo do token a usar (obrigatório)
+- **Slot**: Número do slot HSM (opcional)
 - **PIN**: PIN do usuário para autenticação
 
 ### AWS CloudHSM
@@ -126,11 +127,11 @@ Tipos de chave suportados:
 ## Gerenciando Provedores
 
 ### Adicionando um Provedor
-1. Clique em **Adicionar Provedor**
+1. Clique em **Novo Fornecedor**
 2. Selecione o **tipo de provedor**
 3. Insira os detalhes de conexão
-4. Clique em **Testar Conexão** para verificar
-5. Clique em **Salvar**
+4. Clique em **Criar**
+5. Clique em **Testar** no novo provedor para verificar a conexão
 
 ### Testando Conexão
 Sempre teste a conexão após criar ou modificar um provedor. O UCM verifica se pode se comunicar com o HSM e autenticar. Para um módulo PKCS#11, o teste registra também o que o módulo informa (biblioteca, fabricante, versões da biblioteca e do firmware), exibido na página do provedor.

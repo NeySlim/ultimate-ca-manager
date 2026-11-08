@@ -16,6 +16,7 @@ export default {
           { label: 'Grupos para el mapeo de roles', text: 'Se leen de los atributos mapeados a groups; si no, de groups y de los claims de grupos y roles de Microsoft Entra ID / AD FS. Cuando Entra ID envía groups.link en lugar de los grupos (usuarios en más de 150 grupos), se registra una advertencia y se aplica el rol predeterminado: emita solo los grupos asignados a la aplicación, o roles de aplicación.' },
           { label: 'Inicio de sesión iniciado por el IdP', text: 'Acepta inicios de sesión lanzados desde el portal del IdP, verificados como cualquier otra respuesta. Activado para los proveedores creados antes de la 2.243, desactivado para los nuevos: actívelo solo si los usuarios parten del portal del IdP.' },
           { label: 'Formato de NameID', text: 'No especificado (predeterminado del IdP), Persistente, Dirección de correo o Transitorio: se envía en cada solicitud de inicio de sesión y se publica en los metadatos del SP. Persistente da un identificador estable; un NameID transitorio nunca se usa para reconocer la cuenta.' },
+          { label: 'Cierre de sesión único', text: 'Un LogoutRequest firmado por el IdP y enviado a la URL SLO de los metadatos SP (HTTP-Redirect) cierra la sesión UCM de ese NameID en este navegador, salvo que su SessionIndex nombre otra sesión. Un LogoutResponse vuelve a la URL SLO del IdP, firmado con la clave SP (sin firmar cuando el certificado SP no es RSA, lo que un IdP estricto rechaza); sin URL SLO del IdP, el navegador vuelve a la página de inicio de sesión. Una solicitud sin firmar, falsificada, obsoleta o repetida, o sin Destination, se rechaza.' },
         ]
       },
       {
@@ -31,9 +32,11 @@ export default {
       {
         title: 'Aprovisionamiento de roles (#81)',
         items: [
-          { label: 'Rol predeterminado', text: 'Se aplica SOLO cuando un usuario se crea automáticamente en su primer inicio de sesión SSO. Los cambios de rol realizados después en UCM se conservan.' },
-          { label: 'Mapeo de roles', text: 'Mapee grupos externos (Azure AD, Okta, LDAP) → roles UCM (admin / operator / viewer). Se usa al crear el usuario y en cada inicio de sesión cuando la sincronización de roles está activada. Si varios grupos coinciden, gana el rol de mayor privilegio (admin > operator > auditor > viewer): el orden de las entradas no importa (#221). Cada grupo también puede indicar un rol personalizado (elegido entre los roles personalizados existentes): se añade al rol base o se usa solo. Si varios grupos coincidentes aportan un rol personalizado, gana el primero de la lista. Con la sincronización de roles activada, un rol personalizado asignado por SSO se retira cuando ningún grupo lo aporta; un rol personalizado asignado a mano en UCM nunca se toca. Los roles del sistema no pueden usarse como rol personalizado.' },
-          { label: 'Sincronizar rol en cada inicio de sesión', text: 'DESACTIVADO (predeterminado): SSO nunca sobrescribe los roles gestionados en UCM. ACTIVADO: el rol se resincroniza desde role_mapping en cada inicio de sesión; los usuarios sin coincidencia en el mapeo conservan su rol almacenado (default_role nunca se vuelve a aplicar).' },
+          { label: 'Coincidencia de identidad', text: 'Un inicio de sesión abre la cuenta vinculada al identificador del IdP (sub de OIDC, NameID persistente de SAML, entryUUID u objectGUID de LDAP). Un nombre de usuario o correo solo coincide con una cuenta del mismo proveedor que aún no esté vinculada; una cuenta local, o una vinculada a otra identidad, se rechaza al iniciar sesión. Para fusionar una cuenta local, use primero Vincular a SSO en Usuarios: su siguiente inicio de sesión mediante ese proveedor vincula el identificador.' },
+          { label: 'Rol predeterminado', text: 'Se asigna a las cuentas creadas en el primer inicio de sesión SSO cuando el proveedor no tiene regla de mapeo de roles, y como rol base de una cuenta nueva cuya regla solo da un rol personalizado (viewer si es Ninguno). Ninguno: nadie inicia sesión sin una regla. Los cambios de rol hechos después en UCM se conservan.' },
+          { label: 'Mapeo de roles', text: 'Mapee grupos externos (Azure AD, Okta, LDAP) → roles UCM (admin / operator / auditor / viewer) o roles personalizados. Con al menos una regla, un usuario que ninguna regla cubre se rechaza en cada inicio de sesión SSO (OIDC, SAML, LDAP), cuenta nueva o existente; un inicio de sesión con passkey o certificado no se comprueba. Se usa al crear el usuario, y en cada inicio de sesión cuando la sincronización de roles está activada. Cuando varios grupos coinciden, gana el rol de mayor privilegio (admin > operator > auditor > viewer): el orden de las entradas no importa (#221). Cada grupo también puede nombrar un rol personalizado (elegido entre los roles personalizados existentes): se suma al rol base, o se usa solo. Si varios grupos coincidentes dan un rol personalizado, gana el primero de la lista. Con la sincronización de roles activada, un rol personalizado fijado por SSO se elimina cuando ningún grupo da uno; un rol personalizado asignado a mano en UCM nunca se toca. Los roles del sistema no pueden usarse como rol personalizado.' },
+          { label: 'Sincronizar rol en cada inicio de sesión', text: 'DESACTIVADO (predeterminado): SSO nunca sobrescribe los roles gestionados en UCM. ACTIVADO: el rol se vuelve a sincronizar desde role_mapping en cada inicio de sesión; una regla coincidente que no da rol base conserva el almacenado (default_role nunca se vuelve a aplicar).' },
+          { label: 'Exigir 2FA', text: 'Los usuarios de este proveedor deben registrar un segundo factor. Los inicios de sesión LDAP piden un código TOTP registrado o una llave de seguridad, como los inicios de sesión locales, con o sin esta opción; los inicios de sesión OIDC y SAML solo exigen el registro y confían en el proveedor de identidad para la MFA.' },
           { label: 'Actualizar usuarios automáticamente', text: 'Actualiza el correo y el nombre completo en cada inicio de sesión. NO toca el rol.' },
         ]
       },
@@ -41,10 +44,12 @@ export default {
         title: 'LDAP',
         items: [
           { label: 'Servidor', text: 'Nombre de host y puerto del servidor LDAP (389 o 636 para SSL)' },
+          { label: 'StartTLS', text: 'En un puerto LDAP sin cifrar, actualiza la conexión a TLS antes de cualquier bind, con la misma verificación de certificado que LDAPS. Activado por defecto para un proveedor nuevo sin SSL/TLS. Sin SSL/TLS ni StartTLS, el bind y las contraseñas de los usuarios circulan por la red en claro.' },
           { label: 'Bind DN', text: 'Distinguished Name para la autenticación de enlace LDAP' },
           { label: 'Base DN', text: 'Base de búsqueda para consultas de usuario' },
           { label: 'Filtro de usuario', text: 'Filtro LDAP para encontrar usuarios (ej., (uid={username}))' },
           { label: 'Mapeo de atributos', text: 'Mapee atributos LDAP a nombre de usuario, correo electrónico, nombre completo' },
+          { label: 'Atributo de ID único', text: 'Id inmutable que reconoce la cuenta (entryUUID, objectGUID). Una cuenta vinculada por su DN pasa a este id en su siguiente inicio de sesión; cambiarlo de un atributo de id a otro rechaza a todos los usuarios vinculados hasta Desvincular y luego Vincular a SSO.' },
         ]
       },
     ],
@@ -100,7 +105,10 @@ Copie esta URL en la configuración "Agregar proveedor de servicios" o "Aplicaci
 Mapee los atributos SAML del IDP a los campos de usuario de UCM:
 - \`username\` → Nombre de usuario UCM (obligatorio)
 - \`email\` → Correo electrónico UCM (obligatorio)
-- \`groups\` → Membresía de grupo UCM (opcional)
+- \`groups\` → leído por las reglas de mapeo de roles (opcional); no hace al usuario miembro de grupos UCM
+
+### Cierre de sesión único
+Cuando el IdP termina una sesión, envía un **LogoutRequest** firmado a través del navegador a la URL SLO. UCM comprueba la firma del IdP, el emisor, Destination (obligatorio), IssueInstant (dentro de la ventana de reloj) y que la solicitud no se haya usado antes, cierra la sesión UCM de ese NameID en este navegador (cuando la solicitud lleva valores SessionIndex, solo una sesión que ellos nombren), y luego envía un **LogoutResponse** a la URL SLO del IdP, firmado con la clave SP; un certificado SP que no es RSA lo envía sin firmar, lo que un IdP estricto como AD FS rechaza. Sin URL SLO del IdP, el navegador vuelve a la página de inicio de sesión de UCM. Un LogoutRequest sin firmar o falsificado se rechaza y la sesión sigue abierta.
 
 ### Inicio de sesión iniciado por el IdP
 Un inicio de sesión lanzado desde el portal del IdP llega sin solicitud de UCM. **Permitir el inicio de sesión iniciado por el IdP** lo acepta, con las mismas comprobaciones de firma, audiencia, Destination, validez y reutilización. Los proveedores creados antes de la 2.243 lo mantienen activado; los nuevos lo tienen desactivado. Actívelo solo si los usuarios parten del portal del IdP.
@@ -120,7 +128,22 @@ Un inicio de sesión lanzado desde el portal del IdP llega sin solicitud de UCM.
 10. Haga clic en **Guardar** y **Activar**
 
 ### Crear usuarios automáticamente
-Cuando está activado, se crea automáticamente una nueva cuenta de usuario UCM en el primer inicio de sesión SSO, usando los atributos proporcionados por el IDP. Se asigna el rol predeterminado.
+Cuando está activado, se crea automáticamente una nueva cuenta de usuario UCM en el primer inicio de sesión SSO, usando los atributos proporcionados por el IDP, con el rol que da su regla de mapeo, o si no el rol predeterminado.
+
+## Quién puede iniciar sesión
+
+### Coincidencia de identidad
+Un inicio de sesión abre la cuenta vinculada al identificador del IdP: \`sub\` de OIDC, NameID persistente de SAML, \`entryUUID\` u \`objectGUID\` de LDAP. Un nombre de usuario o correo solo coincide con una cuenta del mismo proveedor que aún no esté vinculada (creada antes de los identificadores estables, o vinculada por un administrador); un correo que el IdP OIDC marca como no verificado (\`email_verified\` falso) no coincide con ninguna. Un inicio de sesión SSO nunca abre una cuenta local, ni una vinculada a otra identidad: el inicio de sesión se rechaza y se registra en el registro de auditoría. Para fusionar una cuenta local en una identidad SSO, use primero **Vincular a SSO** en ese usuario; su siguiente inicio de sesión mediante ese proveedor vincula el identificador del IdP.
+
+Cuando se elimina un proveedor, sus usuarios se conservan: un proveedor creado de nuevo para el mismo IdP (mismo emisor, entity ID, o servidor LDAP y base DN) los recupera en su siguiente inicio de sesión. En caso contrario, y para los usuarios que una restauración dejó sin proveedor, use **Desvincular** y luego **Vincular a SSO** en cada cuenta.
+
+### Reglas de mapeo de roles
+- **Al menos una regla**: un usuario que ninguna regla cubre se rechaza en cada inicio de sesión SSO (OIDC, SAML, LDAP), sea la cuenta nueva o ya exista; un inicio de sesión con passkey o certificado no se comprueba
+- **Ninguna regla**: todo usuario que el proveedor autentica puede iniciar sesión; las cuentas nuevas reciben el **Rol predeterminado**
+- Una regla que solo da un rol personalizado: una cuenta nueva recibe el **Rol predeterminado** como rol base (viewer si es Ninguno)
+- **Rol predeterminado: Ninguno** sin regla: nadie puede iniciar sesión mediante el proveedor
+
+La sección **Aprovisionamiento de usuarios** se abre sola y muestra una advertencia cuando el proveedor no tiene reglas.
 
 ## LDAP
 
@@ -128,11 +151,11 @@ Cuando está activado, se crea automáticamente una nueva cuenta de usuario UCM 
 1. En UCM, vaya a **Configuración → SSO**
 2. Haga clic en **Agregar proveedor** → LDAP
 3. Ingrese el **nombre de host del servidor LDAP** y el **Puerto** (389 para LDAP, 636 para LDAPS)
-4. Active **Usar SSL** para conexiones cifradas
+4. Active **Usar SSL/TLS** (LDAPS, puerto 636) o, en el puerto 389, **Usar StartTLS**: la conexión pasa a TLS antes de cualquier bind, con la misma verificación de certificado. Sin ninguno de los dos, el bind y las contraseñas de los usuarios circulan por la red en claro
 5. Ingrese el **Bind DN** y la **contraseña de enlace** (credenciales de cuenta de servicio)
 6. Ingrese el **Base DN** (base de búsqueda para consultas de usuario)
 7. Configure el **filtro de usuario** (ej., \`(uid={username})\` o \`(sAMAccountName={username})\` para AD)
-8. Mapee los atributos LDAP: **nombre de usuario**, **correo electrónico**, **nombre completo**
+8. Mapee los atributos LDAP: **nombre de usuario**, **correo electrónico**, **nombre completo** y el **atributo de ID único** (\`entryUUID\`, \`objectGUID\`). Una cuenta vinculada por su DN pasa a este id en su siguiente inicio de sesión; cambiarlo de un atributo de id a otro rechaza a todos los usuarios vinculados hasta **Desvincular** y luego **Vincular a SSO**
 9. Haga clic en **Probar conexión** para verificar, luego **Guardar** y **Activar**
 
 ### Active Directory

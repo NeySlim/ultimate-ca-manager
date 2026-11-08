@@ -83,7 +83,8 @@ Die Industriestandard-HSM-Schnittstelle. Unterstützte Geräte:
 
 Konfiguration:
 - **Bibliothekspfad**: Pfad zur PKCS#11-Shared-Library (.so/.dll)
-- **Slot**: HSM-Slotnummer
+- **Token-Label**: Label des zu verwendenden Tokens (erforderlich)
+- **Slot**: HSM-Slotnummer (optional)
 - **PIN**: Benutzer-PIN zur Authentifizierung
 
 ### AWS CloudHSM
@@ -126,11 +127,11 @@ Unterstützte Schlüsseltypen:
 ## Anbieter verwalten
 
 ### Anbieter hinzufügen
-1. Klicken Sie auf **Anbieter hinzufügen**
+1. Klicken Sie auf **Neuer Anbieter**
 2. Wählen Sie den **Anbietertyp**
 3. Geben Sie die Verbindungsdetails ein
-4. Klicken Sie auf **Verbindung testen** zur Überprüfung
-5. Klicken Sie auf **Speichern**
+4. Klicken Sie auf **Erstellen**
+5. Klicken Sie beim neuen Anbieter auf **Testen**, um die Verbindung zu prüfen
 
 ### Verbindung testen
 Testen Sie die Verbindung immer nach dem Erstellen oder Ändern eines Anbieters. UCM überprüft, ob es mit dem HSM kommunizieren und sich authentifizieren kann. Bei einem PKCS#11-Modul erfasst der Test zusätzlich die Angaben des Moduls (Bibliothek, Hersteller, Bibliotheks- und Firmware-Version), die auf der Seite des Anbieters angezeigt werden.

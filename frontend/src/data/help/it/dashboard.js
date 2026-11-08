@@ -7,23 +7,24 @@ export default {
       {
         title: 'Widget',
         items: [
-          { label: 'Statistiche', text: 'Totale CA, certificati attivi, CSR in attesa e conteggio delle scadenze imminenti' },
-          { label: 'Tendenza certificati', text: 'Grafico storico delle emissioni nel tempo' },
+          { label: 'Statistiche', text: 'Totale certificati (scaduti e revocati inclusi), CA, CSR in attesa e account ACME, più i certificati SSH quando esiste una CA SSH' },
+          { label: 'Attività certificati', text: 'Certificati emessi, revocati e scaduti per giorno nel periodo scelto' },
           { label: 'Distribuzione stati', text: 'Grafico a torta: validi / in scadenza / scaduti / revocati' },
-          { label: 'Prossima scadenza', text: 'Certificati in scadenza entro 30 giorni; il firmatario TSA dedicato configurato è contrassegnato con un chip "TSA signer" (v2.218)' },
+          { label: 'Prossima scadenza', text: 'I sei certificati validi che scadono per primi, qualunque sia la data; il firmatario TSA dedicato configurato è contrassegnato con un chip "TSA signer" (v2.218)' },
           { label: 'Stato del sistema', text: 'Stato dei servizi: ACME, SCEP, EST, OCSP, CRL/CDP, TSA (v2.218), rinnovo automatico, SMTP e webhook. I badge mostrano uno stato di avviso ambra distinto (firmatario TSA prossimo alla scadenza, SMTP configurato ma disabilitato) e il relativo messaggio di stato al passaggio del mouse' },
           { label: 'Attività recente', text: 'Ultime operazioni eseguite nel sistema' },
           { label: 'Certificati recenti', text: 'Certificati emessi o importati di recente' },
-          { label: 'Autorità di certificazione', text: 'Elenco CA con informazioni sulla catena' },
+          { label: 'Autorità di certificazione', text: 'Ultime CA, ciascuna contrassegnata Root o Sub' },
           { label: 'Account ACME', text: 'Account client ACME registrati' },
+          { label: 'Scadenza trust store', text: 'Certificati attendibili che scadono per primi' },
         ]
       },
     ],
     tips: [
-      'Trascina i widget per riorganizzare il layout della dashboard',
-      'Clicca l\'icona dell\'occhio nell\'intestazione per mostrare/nascondere widget specifici',
+      'Clicca Modifica layout nell\'intestazione, poi trascina i widget per riorganizzarli',
+      'Clicca il pulsante Personalizza (icona cursori) nell\'intestazione, poi l\'occhio accanto a un widget per mostrarlo o nasconderlo',
       'La dashboard si aggiorna in tempo reale tramite WebSocket: non è necessario aggiornare manualmente',
-      'Il layout viene salvato per utente e persiste tra le sessioni',
+      'Il layout è salvato in questo browser, per ogni account che accede da esso',
     ],
   },
   helpGuides: {
@@ -36,14 +37,15 @@ La Dashboard è il tuo hub di monitoraggio centrale. Mostra metriche in tempo re
 ## Widget
 
 ### Scheda statistiche
-Mostra quattro contatori principali:
-- **Totale CA**: Autorità di certificazione Root e Intermedie
-- **Certificati attivi**: Certificati validi e non revocati
-- **CSR in attesa**: Richieste di firma certificato in attesa di approvazione
-- **In scadenza**: Certificati in scadenza entro 30 giorni
+Mostra questi contatori:
+- **Certificati**: tutti i certificati, scaduti e revocati inclusi
+- **CA**: Autorità di certificazione Root e Intermedie
+- **CSR**: Richieste di firma certificato in attesa di firma
+- **ACME**: account ACME registrati
+- **Certificati SSH**: mostrato quando esiste una CA SSH
 
-### Tendenza certificati
-Un grafico a linee che mostra le emissioni di certificati nel tempo. Passa il mouse sui punti dati per vedere i conteggi esatti.
+### Attività certificati
+Un grafico ad area dei certificati emessi, revocati e scaduti per giorno nel periodo scelto. Passa il mouse sui punti dati per vedere i conteggi esatti.
 
 ### Distribuzione stati
 Grafico a torta che mostra la ripartizione degli stati dei certificati:
@@ -53,7 +55,7 @@ Grafico a torta che mostra la ripartizione degli stati dei certificati:
 - **Revocato**: Esplicitamente revocato
 
 ### Prossima scadenza
-Elenca i certificati con scadenza più imminente. Clicca su un certificato per visualizzarne i dettagli. Configura la soglia in **Impostazioni → Generale**.
+Elenca i sei certificati validi che scadono per primi, qualunque sia la data. Clicca su un certificato per visualizzarne i dettagli.
 
 ### Stato del sistema
 Mostra lo stato dei servizi UCM:
@@ -62,14 +64,19 @@ Mostra lo stato dei servizi UCM:
 - Protocollo EST (abilitato/disabilitato, CA assegnata)
 - Rigenerazione automatica CRL con conteggio CDP
 - Risponditore OCSP
+- TSA, SMTP e webhook
 - Stato del rinnovo automatico
-- Tempo di attività del servizio
+
+Il pannello Salute del sistema mostra anche la connessione WebSocket, il database, l'API e l'ora dell'ultimo aggiornamento.
 
 ### Attività recente
 Un feed in tempo reale delle ultime operazioni: emissione certificati, revoche, importazioni, accessi utente. Si aggiorna in tempo reale tramite WebSocket.
 
 ### Autorità di certificazione
-Visualizzazione rapida di tutte le CA con il loro tipo (Root/Intermedia) e il conteggio dei certificati.
+Visualizzazione rapida delle ultime CA, ciascuna contrassegnata Root o Sub.
+
+### Scadenza trust store
+Certificati attendibili che scadono per primi.
 
 ### Account ACME
 Elenca gli account client ACME registrati e il conteggio dei loro ordini.
@@ -77,18 +84,18 @@ Elenca gli account client ACME registrati e il conteggio dei loro ordini.
 ## Personalizzazione
 
 ### Riorganizzazione dei widget
-Trascina qualsiasi widget dalla sua intestazione per riposizionarlo. Il layout utilizza una griglia responsiva che si adatta alle dimensioni dello schermo.
+Clicca **Modifica layout** nell'intestazione della pagina, poi trascina qualsiasi widget dalla sua intestazione per riposizionarlo. Il layout utilizza una griglia responsiva che si adatta alle dimensioni dello schermo.
 
 ### Mostrare/nascondere widget
-Clicca l'**icona dell'occhio** nell'intestazione della pagina per attivare/disattivare la visibilità dei singoli widget. I widget nascosti vengono ricordati tra le sessioni.
+Clicca **Personalizza** (icona cursori) nell'intestazione della pagina, poi l'occhio accanto a un widget per attivarne/disattivarne la visibilità. I widget nascosti vengono ricordati tra le sessioni.
 
 ### Persistenza del layout
-La configurazione del layout viene salvata per utente nel browser. Persiste tra le sessioni e i dispositivi che condividono lo stesso profilo del browser.
+Il layout è salvato nel browser, non nel tuo account: ogni account che accede dallo stesso profilo del browser lo condivide, e un altro browser parte dal layout predefinito.
 
 ## Aggiornamenti in tempo reale
 La dashboard riceve aggiornamenti in tempo reale tramite WebSocket. Non è necessario aggiornare manualmente: nuovi certificati, cambi di stato e voci di attività appaiono automaticamente.
 
-> 💡 Se il WebSocket è disconnesso, appare un indicatore giallo nella barra laterale. I dati verranno aggiornati alla riconnessione.
+> 💡 Il punto verde nella barra laterale indica una connessione WebSocket attiva e scompare quando cade. I dati verranno aggiornati alla riconnessione.
 `
   }
 }

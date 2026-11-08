@@ -50,7 +50,7 @@ export default {
         content: "Copias de seguridad automáticas y cifradas de la base de datos, con cadencia configurable y retención.",
         items: [
           { label: "Cadencia", text: "Diaria / semanal / mensual" },
-          { label: "Retención", text: "Conservar las N copias más recientes; las más antiguas se eliminan" },
+          { label: "Retención", text: "Las copias más antiguas que el número de días fijado (30 por defecto) se eliminan" },
           { label: "Cifrado", text: "Las copias se cifran con la contraseña de copia de seguridad configurada" },
           { label: "Derivación de clave", text: "Automática (Argon2id si está disponible, PBKDF2 en modo FIPS), PBKDF2-HMAC-SHA256 o Argon2id. Los archivos escritos con Argon2id no se pueden restaurar en una instancia en modo FIPS" },
         ]
@@ -94,7 +94,7 @@ export default {
           { label: 'General', text: 'Nombre de host de syslog (enviado como HOSTNAME en los mensajes syslog reenviados), URL base y valores predeterminados del sistema' },
           { label: 'Apariencia', text: 'Selección de tema (claro/oscuro/sistema), color de acento, modo escritorio' },
           { label: 'Correo electrónico (SMTP)', text: 'Servidor SMTP, credenciales, editor de plantillas de correo y notificaciones de alerta de expiración' },
-          { label: 'Seguridad', text: 'Políticas de contraseña, tiempo de espera de sesión, limitación de velocidad, lista de acceso de administración' },
+          { label: 'Seguridad', text: 'Política de contraseñas, duración de sesión, lista de acceso de administración, mTLS, cifrado de claves privadas; el tiempo de inactividad y el bloqueo de cuenta están en General' },
           { label: 'SSO', text: 'Integración de inicio de sesión único con SAML 2.0, OAuth2/OIDC y LDAP' },
           { label: 'Respaldo', text: 'Copias de seguridad manuales y programadas de la base de datos' },
           { label: 'Auditoría', text: 'Retención de registros, reenvío a syslog, verificación de integridad' },
@@ -206,7 +206,6 @@ Configuración de todo el sistema organizada en pestañas. Los cambios surten ef
 - **Tema**: Claro, Oscuro o Sistema (sigue la preferencia del SO)
 - **Color de acento**: Color principal usado para botones, enlaces y resaltados
 - **Forzar modo escritorio**: Desactivar el diseño responsivo para móviles
-- **Comportamiento de la barra lateral**: Colapsada o expandida por defecto
 
 ## Correo electrónico (SMTP)
 
@@ -240,18 +239,14 @@ Cuando SMTP está configurado, active alertas automáticas de expiración de cer
 ## Seguridad
 
 ### Política de contraseñas
-- Longitud mínima (8-32 caracteres)
-- Requerir mayúsculas, minúsculas, números, caracteres especiales
-- Expiración de contraseña (días)
-- Historial de contraseñas (prevenir reutilización)
+- Longitud mínima (6-32 caracteres)
+- Requerir mayúsculas, números, caracteres especiales
 
 ### Gestión de sesiones
-- Tiempo de espera de sesión (minutos de inactividad)
-- Máximo de sesiones concurrentes por usuario
+- Duración de sesión (horas, sea cual sea la actividad); el tiempo de inactividad está en General
 
-### Limitación de velocidad
-- Límite de intentos de inicio de sesión por IP
-- Duración del bloqueo después de exceder el límite
+### Bloqueo de cuenta
+- Máximo de intentos de inicio de sesión y duración del bloqueo, en General: bloquean la cuenta, no la dirección IP
 
 ### Lista de acceso de administración
 Limita la interfaz web y la API de gestión a las direcciones IP y redes CIDR indicadas; los protocolos PKI siguen siendo accesibles desde cualquier lugar. Consulte la guía de Configuración de seguridad.
@@ -291,12 +286,12 @@ Cifre todas las claves privadas almacenadas en la base de datos con AES-256, pro
 ## Respaldo
 
 ### Respaldo manual
-Haga clic en **Crear respaldo** para generar una instantánea de la base de datos. Los respaldos incluyen todos los certificados, CAs, claves, configuración y registros de auditoría.
+Haga clic en **Crear respaldo** para generar una instantánea de la base de datos. Los respaldos incluyen los certificados, CAs, claves y configuración; el registro de auditoría y otras tablas de historial no se incluyen.
 
 ### Respaldo programado
 Configure copias de seguridad automáticas:
 - Frecuencia (diaria, semanal, mensual)
-- Cantidad de retención (número de respaldos a conservar)
+- Retención en días: los respaldos más antiguos se eliminan (30 por defecto)
 - **Derivación de clave**: Automática (Argon2id si está disponible, PBKDF2 en modo FIPS), PBKDF2-HMAC-SHA256 o Argon2id. Los archivos escritos con Argon2id no se pueden restaurar en una instancia en modo FIPS
 
 ### Restaurar
@@ -314,7 +309,7 @@ Suba un archivo de respaldo para restaurar UCM a un estado anterior.
 
 - **Retención de registros**: Limpieza automática de registros antiguos después de N días
 - **Reenvío a syslog**: Enviar eventos a un servidor syslog remoto (UDP/TCP/TLS)
-- **Verificación de integridad**: Activar encadenamiento de hash para detección de manipulación
+- **Verificación de integridad**: Comprueba la cadena de hashes que enlaza cada entrada de auditoría; la cadena siempre está activa, no hay nada que activar
 
 ## Base de datos
 
@@ -323,18 +318,17 @@ UCM admite dos backends de base de datos:
 - **SQLite** (predeterminado): basado en archivo, sin configuración, ideal para nodo único
 - **PostgreSQL 13+**: recomendado para alta disponibilidad, multi-instancia o si ya opera un clúster PG gestionado
 
-El backend activo se selecciona mediante la variable de entorno \`DATABASE_URL\`. Si no se establece, UCM usa SQLite en \`UCM_DATA_DIR/ucm.db\`.
+El backend activo se selecciona mediante la variable de entorno \`DATABASE_URL\`. Si no se establece, UCM usa SQLite en \`DATA_DIR/ucm.db\`.
 
 ### Panel de estado
-- Backend activo (sqlite / postgresql) y controlador
+- Backend activo (sqlite / postgresql) y la versión de su motor
 - Tamaño de la base de datos y número de tablas
-- Versión de migración
 
 ### Probar la conexión
 Valide una \`DATABASE_URL\` (p. ej. \`postgresql://user:pass@host:5432/ucm\`) antes de cambiar. La prueba abre una conexión real e informa cualquier error. Los servidores PostgreSQL anteriores a la versión 13 son rechazados, UCM requiere PostgreSQL 13 o más reciente.
 
 ### Cambiar de backend
-Persiste \`DATABASE_URL\` en \`/etc/ucm/ucm.env\` (DEB/RPM) y reinicia UCM. **No se copia ningún dato**: use **Migrar** primero si desea conservar sus datos existentes.
+Persiste \`DATABASE_URL\` en \`/etc/ucm/ucm.env\` (DEB/RPM) y reinicia UCM. Solo se copian al nuevo backend las tablas de cuentas, roles, SSO y MFA, para que pueda seguir iniciando sesión; use **Migrar** primero si desea conservar sus demás datos.
 
 ### Migrar datos
 Copia todas las filas del backend actual al backend destino. Funciona en ambas direcciones (SQLite ↔ PostgreSQL):
@@ -342,12 +336,12 @@ Copia todas las filas del backend actual al backend destino. Funciona en ambas d
 1. La base de datos de origen se respalda en \`/opt/ucm/data/backups/db_migration/\`
 2. El esquema se crea en el destino mediante SQLAlchemy
 3. Las restricciones FK se desactivan durante la carga masiva
-4. Las columnas origen/destino se intersectan (las columnas heredadas se omiten con una advertencia)
+4. Las columnas se emparejan por nombre; solo se descartan las columnas heredadas conocidas, y cualquier otra columna que falte en el destino rechaza la migración
 5. Las secuencias de PostgreSQL se restablecen después de la carga
 6. El servicio se reinicia automáticamente (DEB/RPM): en Docker, establezca \`DATABASE_URL\` en su archivo compose y reinicie el contenedor manualmente
 
 **Comprobaciones de seguridad (fallo rápido, origen intacto):**
-- El destino debe estar vacío. Si \`users\`, \`cas\` o \`certificates\` ya contienen filas, la migración se rechaza con HTTP 409 y una sugerencia de limpieza:
+- El destino debe estar vacío. Si alguna de sus tablas ya contiene filas, la migración se rechaza con HTTP 409 y una sugerencia de limpieza:
   - PostgreSQL: \`psql ... -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'\`
   - PostgreSQL en un esquema distinto de \`public\` (un \`search_path\` en la URL): la sugerencia nombra ese esquema, cuyas secuencias realinea la migración (v2.251)
   - SQLite: elimine el archivo \`.db\` de destino
@@ -369,18 +363,22 @@ Administre el certificado TLS usado por la interfaz web de UCM:
 - Buscar nuevas versiones de UCM desde las publicaciones de GitHub
 - Ver el registro de cambios de las actualizaciones disponibles
 - Versión actual e información de compilación
-- **Actualización automática**: en instalaciones compatibles (DEB/RPM), haga clic en **Actualizar ahora** para descargar e instalar la última versión automáticamente
-- **Incluir prelanzamientos**: active para verificar también los candidatos de lanzamiento (rc)
+- **Actualización automática**: en instalaciones compatibles (DEB/RPM), haga clic en **Instalar actualización** para descargar e instalar la última versión automáticamente
+- **Canal de actualización**: estable, prelanzamiento (candidatos de lanzamiento) o dev
 
 ## Webhooks
 
 Configure webhooks HTTP para notificar a sistemas externos sobre eventos:
 
 ### Eventos soportados
-- Certificado emitido, revocado, expirado, renovado
-- CA creada, eliminada
-- Inicio de sesión del usuario, cierre de sesión
-- Respaldo creado
+- Certificado emitido, revocado, renovado, por expirar, expirado, importado, eliminado
+- CA creada, actualizada, eliminada
+- CSR enviado, aprobado, rechazado
+- Plantilla creada, actualizada
+- Preflight ACME, fallo de renovación, fallo de revocación
+- Actualización disponible, iniciada, instalada, fallida
+
+Las importaciones de certificados y los cambios de plantilla hechos desde la interfaz web no emiten su evento.
 
 ### Autenticación
 
@@ -396,7 +394,7 @@ Los tokens se almacenan cifrados y nunca se devuelven en la UI.
 
 ### Crear un webhook
 1. Haga clic en **Agregar webhook**
-2. Ingrese la **URL** (debe ser HTTPS)
+2. Ingrese la **URL** (se recomienda HTTPS; se acepta http://)
 3. Seleccione los **eventos** a los que suscribirse
 4. Elija el **tipo de autenticación** y proporcione las credenciales (opcional)
 5. Opcionalmente establezca un **secreto** para verificación de firma HMAC
@@ -442,7 +440,7 @@ Los ajustes de autorrenovación gobiernan el planificador de renovaciones.
 Ajustes › Copia de seguridad permite copias automáticas.
 
 - Cadencia **diaria / semanal / mensual**
-- **Retención**: conservar las N más recientes, eliminar las antiguas
+- **Retención**: los respaldos más antiguos que el número de días fijado se eliminan
 - Copias **cifradas** con la contraseña de copia
 
 

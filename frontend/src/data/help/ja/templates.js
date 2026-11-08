@@ -23,12 +23,12 @@ export default {
           { label: '複製', text: '既存のテンプレートをクローンして修正' },
           { label: 'システムを表示', text: '組み込みテンプレートを非表示にして、自分のテンプレートだけを扱います。ブラウザごとに記憶されます' },
           { label: '無効化', text: '無効化したテンプレートは、組み込みのものも含め、証明書の発行フォームにも Windows 自動登録にも提供されなくなり、「非アクティブ」バッジが表示されます。「有効化」で元に戻せます。組み込みテンプレートは無効化はできますが編集はできません。変更するには「複製」してください' },
-          { label: 'インポート/エクスポート', text: 'UCMインスタンス間でテンプレートをJSONファイルとして共有。テンプレート1件、または複数件をまとめた1つのファイル' },
+          { label: 'インポート/エクスポート', text: 'UCMインスタンス間でテンプレートをJSONファイルとして共有：ページからのエクスポートは1件ずつで、インポートするファイルには1件または複数件を含められます' },
           { label: 'qcStatements', text: 'テンプレートから発行されるすべての証明書に付加される、ETSI EN 319 412-5 の任意のステートメントです。QcCompliance、QcType (署名、シール、ウェブサイト)、QcSSCD、QcPDS (HTTPS の URL と2文字の言語コード)、QcRetentionPeriod、QcLimitValue、QcCClegislation (EU 域外の法的枠組みで適格とされる証明書用)、セマンティクス識別子に対応します。EST、WSTEP、mTLS の発行には適用されず、CSR に含まれる qcStatements 拡張は無視されます。QcIdentMethod、QcQSCDlegislation、PSD2 ステートメントには対応していません' },
           { label: 'ポリシー OID', text: '追加の証明書ポリシー OID (例: ETSI の QCP-n、QCP-l、QCP-n-qscd、QCP-l-qscd、QCP-w ポリシー)。CA 自身のポリシーの後に追加されます' },
           { label: 'カスタム拡張', text: 'UCM がモデル化していない拡張で、それぞれ OID、クリティカルフラグ、DER 値の 16 進表記からなり、テンプレートから発行されるすべての証明書にそのまま追加されます (発行フォーム、CSR 署名、ACME、SCEP、WSTEP、承認。更新でも保持されます)。発行フォームでは追加したり、同じ OID のものを置き換えたりできます。UCM 自身が設定する拡張は拒否されます: それぞれの設定を使ってください。クリティカルな拡張を認識できないクライアントは証明書を拒否します' },
           { label: '鍵タイプ', text: 'RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384、EC-P521。ダイジェストは SHA-256、SHA-384、SHA-512。または ML-DSA-44、ML-DSA-65、ML-DSA-87。ダイジェストは葉の鍵ではなく発行 CA の署名ハッシュです。RSA や EC の CA の下の ML-DSA の葉にも適用され、ML-DSA の CA は無視します' },
-          { label: 'ダイジェストの優先 (v2.251)', text: 'テンプレートから発行するすべての経路（発行フォーム、CSR 署名、ACME、EST、SCEP、WSTEP、TSA 署名者）は、そのダイジェストで署名し、CA 鍵に対応するもの（P-384 は SHA-384、P-521 は SHA-512）まで引き上げます。ポリシーが禁止する場合は、許可されている最も近い強いダイジェストで署名し、結果に「Signature digest X replaced by Y by policy」と表示されます' },
+          { label: 'ダイジェストの優先 (v2.251)', text: 'テンプレートから発行するすべての経路（発行フォーム、CSR 署名、ACME、SCEP、WSTEP、TSA 署名者。EST はテンプレートを使用しません）は、そのダイジェストで署名し、CA 鍵に対応するもの（P-384 は SHA-384、P-521 は SHA-512）まで引き上げます。ポリシーが禁止する場合は、許可されている最も近い強いダイジェストで署名し、結果に「Signature digest X replaced by Y by policy」と表示されます' },
           { label: 'Brainpool', text: 'EC-BP256、EC-BP384、EC-BP512 (RFC 5639)。鍵タイプの一覧では Brainpool の下に表示され、FIPS モードでは非表示になります。OpenSSL と Windows はそのチェーンと署名を読み取れますが、Chrome、Firefox、Go、rustls、GnuTLS、Bouncy Castle を使わない Java は TLS で拒否し、Windows Schannel もデフォルトでは有効にしていません。HSM では、PKCS#11 プロバイダーのみがこれらを保持できます' },
         ]
       },
@@ -77,7 +77,7 @@ export default {
 4. **サブジェクトデフォルト**を設定（O、OU、C、ST、L、CN、Email）。メール (S/MIME) およびサーバー + クライアント (複合) 証明書では、Emailはメール用SANにもなります
 5. **Key Usage**フラグを選択
 6. サーバーが認識する用途（Smartcard Logon、Time Stamping、Microsoft RDP など）から **Extended Key Usage** 値を選択
-7. **キータイプ**（RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384、EC-P521、ML-DSA-44/65/87）、ダイジェスト、**デフォルト有効期間**を日数で設定。ダイジェストは発行 CA の署名ハッシュなので、RSA や EC の CA の下の ML-DSA 鍵にも適用され、ML-DSA の CA は無視します
+7. **キータイプ**（RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384、EC-P521、Brainpool EC-BP256/384/512、ML-DSA-44/65/87）、ダイジェスト、**デフォルト有効期間**を日数で設定。ダイジェストは発行 CA の署名ハッシュなので、RSA や EC の CA の下の ML-DSA 鍵にも適用され、ML-DSA の CA は無視します
 8. **作成**をクリック
 
 ## テンプレートの使用

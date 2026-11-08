@@ -8,7 +8,7 @@ export default {
         title: 'Rôles système',
         definitions: [
           { term: 'Admin', description: 'Accès complet à toutes les fonctionnalités et paramètres' },
-          { term: 'Opérateur', description: 'Peut gérer les certificats et CA mais pas les paramètres système' },
+          { term: 'Opérateur', description: 'Peut gérer les certificats, CA, CSR, ACME, SSH et les paramètres qu\'un admin ne réserve pas ; modèles et groupes en lecture seule, aucun accès aux utilisateurs ni au RBAC' },
           { term: 'Auditeur', description: 'Accès en lecture seule à toutes les données opérationnelles pour la conformité et l\'audit' },
           { term: 'Lecteur', description: 'Accès de base en lecture seule aux certificats, CA et modèles' },
         ]
@@ -18,7 +18,8 @@ export default {
         items: [
           { label: 'Créer un rôle', text: 'Définir un nouveau rôle avec un nom et une description' },
           { label: 'Matrice de permissions', text: 'Cocher/décocher les permissions par catégorie (CA, Certificats, Clés privées, etc.)' },
-          { label: 'Couverture', text: 'Pourcentage visuel du total des permissions accordées au rôle' },
+          { label: 'Couverture', text: 'Une barre et un décompte n/N des permissions accordées au rôle' },
+          { label: 'Permissions des rôles système', text: 'Un rôle système affiche les permissions que UCM lui applique ; Admin affiche toutes les permissions de la matrice' },
           { label: 'Nombre d\'utilisateurs', text: 'Voir combien d\'utilisateurs sont assignés à chaque rôle' },
           { label: "Permissions des CA SSH (v2.248)", text: "read:ssh_cas, write:ssh_cas et delete:ssh_cas régissent les CA SSH : write:ssh ne les crée ni ne les modifie plus. Les rôles, groupes et clés d'API qui détenaient une permission SSH ont reçu la permission correspondante à la mise à jour" },
         ]
@@ -35,14 +36,14 @@ export default {
     content: `
 ## Vue d'ensemble
 
-RBAC fournit une gestion granulaire des permissions. Définissez des rôles personnalisés avec des permissions spécifiques et attribuez-les aux utilisateurs ou groupes.
+RBAC fournit une gestion granulaire des permissions. Définissez des rôles personnalisés avec des permissions spécifiques et attribuez-les aux utilisateurs ; un groupe accorde son propre ensemble de permissions à ses membres.
 
 ## Rôles système
 
 Quatre rôles intégrés qui ne peuvent pas être modifiés ou supprimés :
 
 - **Admin** : Accès complet à tout
-- **Opérateur** : Gérer les certificats, CA, CSR, modèles. Pas d'accès aux paramètres système, utilisateurs ou RBAC
+- **Opérateur** : Gérer les certificats, CA, CSR, ACME, SSH et les paramètres système ; modèles et groupes en lecture seule. Pas d'accès aux utilisateurs ni au RBAC
 - **Auditeur** : Accès en lecture seule à toutes les données opérationnelles (certificats, CA, ACME, SCEP, HSM, journaux d'audit, politiques, groupes) mais pas aux paramètres ou à la gestion des utilisateurs
 - **Lecteur** : Accès de base en lecture seule aux certificats, CA, CSR, modèles et magasin de confiance
 
@@ -62,7 +63,7 @@ Les permissions sont organisées par catégorie :
 - **CSR** : Créer, lire, signer, supprimer
 - **Modèles** : Créer, lire, mettre à jour, supprimer
 - **Utilisateurs** : Lire (la gestion des comptes est réservée aux administrateurs)
-- **Groupes** : Créer, lire, mettre à jour, supprimer
+- **Groupes** : Lire (créer, modifier et supprimer des groupes est réservé aux administrateurs)
 - **Paramètres** : Lire, mettre à jour
 - **Audit** : Lire, exporter (le nettoyage est réservé aux administrateurs)
 - **ACME** : Configurer, gérer les comptes
@@ -80,7 +81,7 @@ Un rôle personnalisé peut accorder toute permission vérifiée par UCM, sauf c
 Cliquez sur un en-tête de catégorie pour activer/désactiver toutes les permissions de cette catégorie d'un coup.
 
 ### Indicateur de couverture
-Un badge de pourcentage montre quelle part de l'ensemble total des permissions le rôle couvre.
+Une barre et un décompte n/N montrent quelle part de l'ensemble total des permissions le rôle couvre.
 
 ## Attribuer des rôles
 

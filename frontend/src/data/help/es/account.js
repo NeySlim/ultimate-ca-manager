@@ -25,7 +25,7 @@ export default {
       {
         title: 'Claves API',
         items: [
-          { label: 'Crear clave', text: 'Genera una nueva clave API con expiración opcional' },
+          { label: 'Crear clave', text: 'Genera una nueva clave API, con expiración opcional tras un número de días' },
           { label: 'Permisos', text: 'Una clave lleva el alcance elegido al crearla, nunca más que tus propios permisos. Una clave solo puede crear o regenerar una clave cuyos permisos ella misma posee' },
           { label: 'Revocar', text: 'Invalida inmediatamente una clave API' },
           { label: 'Usuarios desactivados', text: 'Las claves API de un usuario desactivado se rechazan aunque la clave en sí siga siendo válida' },
@@ -45,10 +45,10 @@ export default {
     ],
     tips: [
       'Activa al menos un segundo factor (TOTP o clave de seguridad) para las cuentas de administrador',
-      'Las claves API pueden tener una fecha de expiración para integraciones de corta duración',
+      'Las claves API pueden expirar tras un número de días fijado para integraciones de corta duración',
       'Las claves API también pueden crearse sin expiración para automatización a largo plazo',
       'Escanea el código QR con cualquier app TOTP: Google Authenticator, Authy, 1Password, etc.',
-      'Las selecciones de filtros en cada página de lista (Certificados, CA, Auditoría, etc.) se persisten automáticamente entre recargas',
+      'Las selecciones de filtros en las páginas de lista principales (Certificados, CA, Plantillas, Auditoría, Políticas, Almacén de confianza y otras) se persisten entre recargas; CSR, Aprobaciones, Recuperación de claves, Descubrimiento y Registros del sistema empiezan sin filtrar',
     ],
   },
   helpGuides: {
@@ -61,7 +61,7 @@ Gestiona tu perfil personal, configuración de seguridad y claves API.
 ## Perfil
 
 - **Nombre completo**: Tu nombre para mostrar en UCM
-- **Email**: Utilizado para notificaciones, recuperación de contraseña y registro ACME
+- **Email**: Utilizado para notificaciones y recuperación de contraseña
 - **Info de cuenta**: Fecha de creación, marca de tiempo del último inicio de sesión, total de inicios de sesión
 
 ## Seguridad
@@ -77,9 +77,9 @@ Añade una contraseña de un solo uso basada en tiempo usando cualquier app de a
 1. Haz clic en **Activar 2FA**
 2. Escanea el código QR con tu app de autenticación (Google Authenticator, Authy, 1Password, etc.)
 3. Introduce el código de 6 dígitos para confirmar
-4. Guarda los **códigos de recuperación**: solo se muestran una vez
+4. Guarda los **códigos de respaldo**: solo se muestran una vez
 
-> ⚠ Si pierdes el acceso a tu autenticador y a los códigos de recuperación, un administrador deberá desactivar tu 2FA.
+> ⚠ Si pierdes el acceso a tu autenticador y a los códigos de respaldo, un administrador deberá desactivar tu 2FA.
 
 Para pasar la 2FA a un nuevo autenticador, desactívala primero: volver a activarla mientras está activa se rechaza.
 
@@ -90,12 +90,12 @@ Registra claves de seguridad de hardware o autenticadores biométricos:
 - Windows Hello
 - Touch ID
 
-1. Haz clic en **Registrar clave de seguridad**
+1. Haz clic en **Agregar Clave**
 2. Introduce un nombre para la clave
 3. Sigue la solicitud del navegador para autenticarte
 4. La clave aparece en tu lista de credenciales registradas
 
-Con 2FA activada o impuesta, una llave registrada también puede completar el segundo paso de un inicio de sesión con contraseña: elija **Usar una llave de seguridad**.
+Con 2FA activada o impuesta, una llave registrada también puede completar el segundo paso de un inicio de sesión con contraseña: elija **Usar llave de seguridad**.
 
 Sin aplicación de autenticación, active **Llave de seguridad como segundo factor** en la sección de autenticación de dos factores: cada inicio de sesión con contraseña pedirá entonces una de sus llaves, y la última llave no puede eliminarse mientras esté activado.
 
@@ -108,9 +108,9 @@ Gestiona certificados de cliente para autenticación TLS mutua:
 ## Claves API
 
 ### Crear una clave API
-1. Haz clic en **Crear clave API**
+1. Haz clic en **Crear Clave**
 2. Introduce un **nombre** (descriptivo, p. ej., "Pipeline CI/CD")
-3. Opcionalmente establece una **fecha de expiración**
+3. Opcionalmente establece una expiración en **días**
 4. Haz clic en **Crear**
 5. Copia la clave inmediatamente: solo se muestra una vez
 
@@ -129,9 +129,9 @@ Cada clave lleva el alcance elegido al crearla (**Acceso completo**, **Solo lect
 Las claves API, incluso las de acceso completo, no pueden cambiar tu perfil, contraseña, 2FA, claves de seguridad, certificados mTLS ni sesiones, ni alcanzar tu propia cuenta mediante las acciones de administración de usuarios: esto requiere una sesión interactiva.
 
 ### Revocar claves
-Haz clic en **Eliminar** para invalidar inmediatamente una clave API. Las sesiones activas que usen la clave serán terminadas.
+El primer **Eliminar** revoca una clave API al instante: las solicitudes con ella se rechazan desde ese momento. Un segundo Eliminar sobre la clave revocada la borra.
 
-> 💡 Usa claves API de corta duración con fechas de expiración para CI/CD y automatización.
+> 💡 Usa claves API de corta duración para CI/CD y automatización.
 `
   }
 }

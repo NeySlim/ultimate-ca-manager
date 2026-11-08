@@ -27,7 +27,7 @@ export default {
     ],
     tips: [
       'Les CSR préservent la clé privée du demandeur : elle ne quitte jamais son système',
-      'Vous pouvez ajouter une clé privée à une CSR après la signature si nécessaire pour l\'exportation PKCS#12',
+      'Téléverser la clé attache une clé privée à une CSR en attente, pour que le certificat signé puisse être exporté en PKCS#12',
       'Un certificat importé pour une CSR générée dans UCM complète cette CSR : l\'enregistrement conserve sa clé privée, le certificat s\'exporte donc avec elle',
       'Utilisez le mode Microsoft CA pour signer les CSR via AD CS lorsque vous êtes connecté à une PKI Windows',
       'Un certificat pour une clé ML-DSA ne garde que les bits de signature : keyEncipherment, dataEncipherment et keyAgreement demandés par le template sont retirés, et le résultat l\'indique',
@@ -74,7 +74,7 @@ Via l'API, \`related_to\` désigne un certificat existant **A** dont UCM détien
 ## Téléverser une CSR
 
 1. Cliquez sur **Téléverser une CSR**
-2. Collez du texte PEM ou téléversez un fichier PEM/DER
+2. Collez du texte PEM ou téléversez un fichier PEM
 3. UCM valide la signature de la CSR et affiche les détails
 4. La CSR apparaît dans l'onglet En attente
 
@@ -95,9 +95,10 @@ Cliquez sur une CSR pour voir :
 3. Choisissez la **CA de signature** (doit posséder une clé privée)
 4. Sélectionnez le **type de certificat** (serveur, client, signature de code, e-mail)
 5. Définissez la **période de validité** en jours
-6. Appliquez optionnellement un modèle pour l'utilisation de la clé et les extensions
-7. **Ajoutez des noms** (e-mail, DNS, IP, URI) à ceux de la demande si nécessaire
-8. Cliquez sur **Signer**
+6. **Ajoutez des noms** (e-mail, DNS, IP, URI) à ceux de la demande si nécessaire
+7. Cliquez sur **Signer**
+
+En mode CA Microsoft, le modèle AD CS est choisi à la place du type de certificat.
 
 Le certificat résultant apparaît sur la page des certificats.
 
@@ -113,7 +114,7 @@ Si des connexions Microsoft CA sont configurées, un onglet **Microsoft CA** app
 4. Sélectionnez le **modèle de certificat** (chargé automatiquement depuis la CA)
 5. Cliquez sur **Signer**
 
-Si le modèle nécessite l'approbation d'un gestionnaire, UCM suit la demande en attente. Vérifiez son statut depuis le panneau de détail de la CSR.
+Si le modèle nécessite l'approbation d'un gestionnaire, UCM suit la demande en attente. La page ne propose pas de vérification du statut : une fois le certificat émis sur la CA Microsoft, importez-le, ou laissez la **synchronisation de l'inventaire** via le canal d'administration WinRM importer les certificats que UCM ne connaît pas encore.
 
 ### Inscription pour le compte d'autrui (EOBO)
 
@@ -146,13 +147,13 @@ Un appareil qui garde sa clé, comme une carte à puce, ne peut souvent pas prod
 
 ## Ajouter une clé privée
 
-Après la signature, vous pouvez attacher une clé privée au certificat pour l'exportation PKCS#12. Cliquez sur **Ajouter une clé** sur le certificat signé.
+Avant la signature, **Téléverser la clé** attache la clé privée à une CSR en attente, pour que le certificat signé puisse être exporté en PKCS#12. Une demande signée ne propose plus cette action.
 
 > 💡 C'est utile lorsque le demandeur envoie à la fois la CSR et la clé de manière sécurisée.
 
 ## Supprimer des CSR
 
-La suppression retire la CSR de UCM. Si la CSR a déjà été signée, le certificat résultant n'est pas affecté.
+La suppression retire une CSR en attente de UCM. Une demande signée est son certificat : il se supprime depuis la page Certificats, pas ici.
 `
   }
 }

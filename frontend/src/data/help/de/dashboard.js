@@ -7,23 +7,24 @@ export default {
       {
         title: 'Widgets',
         items: [
-          { label: 'Statistiken', text: 'Gesamtzahl CAs, aktive Zertifikate, ausstehende CSRs und bald ablaufende Zertifikate' },
-          { label: 'Zertifikatstrend', text: 'Ausstellungsverlauf als Diagramm über die Zeit' },
+          { label: 'Statistiken', text: 'Alle Zertifikate (abgelaufene und widerrufene eingeschlossen), CAs, ausstehende CSRs und ACME-Konten, dazu SSH-Zertifikate, wenn eine SSH-CA existiert' },
+          { label: 'Zertifikatsaktivität', text: 'Ausgestellte, widerrufene und abgelaufene Zertifikate pro Tag im gewählten Zeitraum' },
           { label: 'Statusverteilung', text: 'Kreisdiagramm: gültig / ablaufend / abgelaufen / widerrufen' },
-          { label: 'Nächster Ablauf', text: 'Zertifikate, die innerhalb von 30 Tagen ablaufen; der konfigurierte dedizierte TSA-Signierer wird mit einem "TSA signer"-Chip gekennzeichnet (v2.218)' },
+          { label: 'Nächster Ablauf', text: 'Die sechs gültigen Zertifikate, die am ehesten ablaufen, unabhängig vom Datum; der konfigurierte dedizierte TSA-Signierer wird mit einem "TSA signer"-Chip gekennzeichnet (v2.218)' },
           { label: 'Systemstatus', text: 'Dienststatus: ACME, SCEP, EST, OCSP, CRL/CDP, TSA (v2.218), Auto-Erneuerung, SMTP und Webhooks. Badges zeigen einen eigenen bernsteinfarbenen Warnzustand (bald ablaufender TSA-Signierer, SMTP konfiguriert, aber deaktiviert) und beim Überfahren mit dem Mauszeiger ihre Statusmeldung' },
           { label: 'Letzte Aktivitäten', text: 'Neueste Vorgänge im gesamten System' },
           { label: 'Neueste Zertifikate', text: 'Kürzlich ausgestellte oder importierte Zertifikate' },
-          { label: 'Zertifizierungsstellen', text: 'CA-Liste mit Ketteninformationen' },
+          { label: 'Zertifizierungsstellen', text: 'Neueste CAs, jeweils als Root oder Sub gekennzeichnet' },
           { label: 'ACME-Konten', text: 'Registrierte ACME-Client-Konten' },
+          { label: 'Ablauf des Trust Store', text: 'Vertrauenswürdige Zertifikate, die am ehesten ablaufen' },
         ]
       },
     ],
     tips: [
-      'Ziehen Sie Widgets per Drag-and-Drop, um Ihr Dashboard-Layout anzupassen',
-      'Klicken Sie auf das Augen-Symbol in der Kopfzeile, um einzelne Widgets ein-/auszublenden',
+      'Klicken Sie in der Kopfzeile auf Layout bearbeiten und ziehen Sie dann die Widgets, um sie neu anzuordnen',
+      'Klicken Sie in der Kopfzeile auf die Schaltfläche Anpassen (Reglersymbol), dann auf das Auge neben einem Widget, um es ein- oder auszublenden',
       'Das Dashboard aktualisiert sich in Echtzeit über WebSocket: kein manuelles Aktualisieren nötig',
-      'Das Layout wird pro Benutzer gespeichert und bleibt über Sitzungen hinweg erhalten',
+      'Das Layout wird in diesem Browser gespeichert, für jedes Konto, das sich von hier anmeldet',
     ],
   },
   helpGuides: {
@@ -36,14 +37,15 @@ Das Dashboard ist Ihre zentrale Überwachungszentrale. Es zeigt Echtzeit-Metrike
 ## Widgets
 
 ### Statistik-Karte
-Zeigt vier wichtige Zähler an:
-- **Gesamte CAs**: Root- und Intermediate-Zertifizierungsstellen
-- **Aktive Zertifikate**: Gültige, nicht widerrufene Zertifikate
-- **Ausstehende CSRs**: Zertifikatsignierungsanfragen, die auf Genehmigung warten
-- **Bald ablaufend**: Zertifikate, die innerhalb von 30 Tagen ablaufen
+Zeigt diese Zähler an:
+- **Zertifikate**: alle Zertifikate, abgelaufene und widerrufene eingeschlossen
+- **CAs**: Root- und Intermediate-Zertifizierungsstellen
+- **CSRs**: Zertifikatsignierungsanfragen, die auf Signatur warten
+- **ACME**: registrierte ACME-Konten
+- **SSH-Zertifikate**: angezeigt, wenn eine SSH-CA existiert
 
-### Zertifikatstrend
-Ein Liniendiagramm, das die Zertifikatsausstellung über die Zeit zeigt. Bewegen Sie den Mauszeiger über Datenpunkte, um genaue Zahlen zu sehen.
+### Zertifikatsaktivität
+Ein Flächendiagramm der ausgestellten, widerrufenen und abgelaufenen Zertifikate pro Tag im gewählten Zeitraum. Bewegen Sie den Mauszeiger über Datenpunkte, um genaue Zahlen zu sehen.
 
 ### Statusverteilung
 Kreisdiagramm mit der Aufschlüsselung der Zertifikatszustände:
@@ -53,7 +55,7 @@ Kreisdiagramm mit der Aufschlüsselung der Zertifikatszustände:
 - **Widerrufen**: Explizit widerrufen
 
 ### Nächster Ablauf
-Listet die Zertifikate auf, die am ehesten ablaufen. Klicken Sie auf ein Zertifikat, um zu seinen Details zu navigieren. Konfigurieren Sie den Schwellenwert unter **Einstellungen → Allgemein**.
+Listet die sechs gültigen Zertifikate auf, die am ehesten ablaufen, unabhängig vom Datum. Klicken Sie auf ein Zertifikat, um zu seinen Details zu navigieren.
 
 ### Systemstatus
 Zeigt den Zustand der UCM-Dienste:
@@ -62,14 +64,19 @@ Zeigt den Zustand der UCM-Dienste:
 - EST-Protokoll (aktiviert/deaktiviert, zugewiesene CA)
 - CRL-Auto-Regenerierung mit CDP-Anzahl
 - OCSP-Responder
+- TSA, SMTP und Webhooks
 - Auto-Erneuerungsstatus
-- Dienst-Betriebszeit
+
+Das Systemzustand-Panel zeigt außerdem die WebSocket-Verbindung, die Datenbank, die API und den Zeitpunkt der letzten Aktualisierung.
 
 ### Letzte Aktivitäten
 Ein Live-Feed der neuesten Vorgänge: Zertifikatsausstellung, Widerrufe, Importe, Benutzeranmeldungen. Aktualisiert sich in Echtzeit über WebSocket.
 
 ### Zertifizierungsstellen
-Schnellansicht aller CAs mit ihrem Typ (Root/Intermediate) und Zertifikatsanzahl.
+Schnellansicht der neuesten CAs, jeweils als Root oder Sub gekennzeichnet.
+
+### Ablauf des Trust Store
+Vertrauenswürdige Zertifikate, die am ehesten ablaufen.
 
 ### ACME-Konten
 Listet registrierte ACME-Client-Konten und deren Bestellanzahl auf.
@@ -77,18 +84,18 @@ Listet registrierte ACME-Client-Konten und deren Bestellanzahl auf.
 ## Anpassung
 
 ### Widgets neu anordnen
-Ziehen Sie ein Widget an seiner Kopfzeile, um es zu verschieben. Das Layout verwendet ein responsives Raster, das sich an Ihre Bildschirmgröße anpasst.
+Klicken Sie in der Seitenkopfzeile auf **Layout bearbeiten** und ziehen Sie dann ein Widget an seiner Kopfzeile, um es zu verschieben. Das Layout verwendet ein responsives Raster, das sich an Ihre Bildschirmgröße anpasst.
 
 ### Widgets ein-/ausblenden
-Klicken Sie auf das **Augen-Symbol** in der Seitenkopfzeile, um die Sichtbarkeit einzelner Widgets umzuschalten. Ausgeblendete Widgets werden über Sitzungen hinweg gespeichert.
+Klicken Sie in der Seitenkopfzeile auf **Anpassen** (Reglersymbol), dann auf das Auge neben einem Widget, um dessen Sichtbarkeit umzuschalten. Ausgeblendete Widgets werden über Sitzungen hinweg gespeichert.
 
 ### Layout-Persistenz
-Ihre Layout-Konfiguration wird pro Benutzer im Browser gespeichert. Sie bleibt über Sitzungen und Geräte mit demselben Browserprofil erhalten.
+Ihr Layout wird im Browser gespeichert, nicht in Ihrem Konto: Jedes Konto, das sich im selben Browserprofil anmeldet, teilt es, und ein anderer Browser beginnt mit dem Standardlayout.
 
 ## Echtzeit-Aktualisierungen
 Das Dashboard empfängt Live-Updates über WebSocket. Kein manuelles Aktualisieren nötig: neue Zertifikate, Statusänderungen und Aktivitätseinträge erscheinen automatisch.
 
-> 💡 Wenn die WebSocket-Verbindung unterbrochen ist, erscheint ein gelber Indikator in der Seitenleiste. Die Daten werden bei Wiederverbindung aktualisiert.
+> 💡 Der grüne Punkt in der Seitenleiste zeigt eine aktive WebSocket-Verbindung an. Er verschwindet, wenn die Verbindung abbricht. Die Daten werden bei Wiederverbindung aktualisiert.
 `
   }
 }

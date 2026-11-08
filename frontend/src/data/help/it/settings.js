@@ -50,7 +50,7 @@ export default {
         content: "Backup automatici e cifrati del database, con cadenza configurabile e ritenzione.",
         items: [
           { label: "Cadenza", text: "Giornaliera / settimanale / mensile" },
-          { label: "Ritenzione", text: "Conservare i N backup più recenti; quelli più vecchi vengono eliminati" },
+          { label: "Ritenzione", text: "I backup più vecchi del numero di giorni impostato (30 per impostazione predefinita) vengono eliminati" },
           { label: "Cifratura", text: "I backup sono cifrati con la password di backup configurata" },
           { label: "Derivazione della chiave", text: "Automatica (Argon2id se disponibile, PBKDF2 in modalità FIPS), PBKDF2-HMAC-SHA256 o Argon2id. Gli archivi scritti con Argon2id non possono essere ripristinati su un'istanza in modalità FIPS" },
         ]
@@ -94,7 +94,7 @@ export default {
           { label: 'Generale', text: 'Nome host syslog (inviato come HOSTNAME nei messaggi syslog inoltrati), URL di base e impostazioni predefinite di sistema' },
           { label: 'Aspetto', text: 'Selezione tema (chiaro/scuro/sistema), colore principale, modalità desktop' },
           { label: 'Email (SMTP)', text: 'Server SMTP, credenziali, editor template email e notifiche avvisi scadenza' },
-          { label: 'Sicurezza', text: 'Politiche password, timeout sessione, limitazione frequenza, lista di accesso amministrativo' },
+          { label: 'Sicurezza', text: 'Politica password, durata della sessione, lista di accesso amministrativo, mTLS, cifratura delle chiavi private; il timeout di inattività e il blocco account sono in Generale' },
           { label: 'SSO', text: 'Integrazione single sign-on SAML 2.0, OAuth2/OIDC e LDAP' },
           { label: 'Backup', text: 'Backup del database manuali e pianificati' },
           { label: 'Audit', text: 'Conservazione log, inoltro syslog, verifica dell\'integrità' },
@@ -206,7 +206,6 @@ Configurazione a livello di sistema organizzata in schede. Le modifiche hanno ef
 - **Tema**: Chiaro, Scuro o Sistema (segue la preferenza del sistema operativo)
 - **Colore principale**: Colore primario usato per pulsanti, link ed evidenziazioni
 - **Forza modalità desktop**: Disabilita il layout mobile responsivo
-- **Comportamento barra laterale**: Compressa o espansa per impostazione predefinita
 
 ## Email (SMTP)
 
@@ -240,18 +239,14 @@ Quando SMTP è configurato, abilita gli avvisi automatici di scadenza certificat
 ## Sicurezza
 
 ### Politica password
-- Lunghezza minima (8-32 caratteri)
-- Richiedi maiuscole, minuscole, numeri, caratteri speciali
-- Scadenza password (giorni)
-- Cronologia password (impedisci riutilizzo)
+- Lunghezza minima (6-32 caratteri)
+- Richiedi maiuscole, numeri, caratteri speciali
 
 ### Gestione sessioni
-- Timeout sessione (minuti di inattività)
-- Sessioni simultanee massime per utente
+- Durata della sessione (ore, qualunque sia l'attività); il timeout di inattività è in Generale
 
-### Limitazione frequenza
-- Limite tentativi di accesso per IP
-- Durata del blocco dopo il superamento del limite
+### Blocco account
+- Tentativi di accesso massimi e durata del blocco, in Generale: bloccano l'account, non l'indirizzo IP
 
 ### Lista di accesso amministrativo
 Limita l'interfaccia web e l'API di gestione agli indirizzi IP e alle reti CIDR elencati; i protocolli PKI restano raggiungibili da ovunque. Vedi la guida Impostazioni di sicurezza.
@@ -291,12 +286,12 @@ Cifra tutte le chiavi private memorizzate nel database con AES-256, protette da 
 ## Backup
 
 ### Backup manuale
-Clicca **Crea backup** per generare uno snapshot del database. I backup includono tutti i certificati, CA, chiavi, impostazioni e log di audit.
+Clicca **Crea backup** per generare uno snapshot del database. I backup includono certificati, CA, chiavi e impostazioni; il log di audit e le altre tabelle di cronologia non sono inclusi.
 
 ### Backup pianificato
 Configura backup automatici:
 - Frequenza (giornaliero, settimanale, mensile)
-- Conteggio conservazione (numero di backup da mantenere)
+- Conservazione in giorni: i backup più vecchi vengono eliminati (30 per impostazione predefinita)
 - **Derivazione della chiave**: Automatica (Argon2id se disponibile, PBKDF2 in modalità FIPS), PBKDF2-HMAC-SHA256 o Argon2id. Gli archivi scritti con Argon2id non possono essere ripristinati su un'istanza in modalità FIPS
 
 ### Ripristino
@@ -314,7 +309,7 @@ Carica un file di backup per ripristinare UCM a uno stato precedente.
 
 - **Conservazione log**: Pulizia automatica dei vecchi log dopo N giorni
 - **Inoltro syslog**: Invia eventi a un server syslog remoto (UDP/TCP/TLS)
-- **Verifica integrità**: Abilita il concatenamento hash per il rilevamento manomissioni
+- **Verifica integrità**: Controlla la catena di hash che collega ogni voce di audit; la catena è sempre attiva, non c'è nulla da abilitare
 
 ## Database
 
@@ -323,18 +318,17 @@ UCM supporta due backend di database:
 - **SQLite** (predefinito): basato su file, senza configurazione, ideale per nodo singolo
 - **PostgreSQL 13+**: consigliato per alta disponibilità, multi-istanza o se gestisci già un cluster PG
 
-Il backend attivo è selezionato dalla variabile d'ambiente \`DATABASE_URL\`. Se non impostata, UCM usa SQLite in \`UCM_DATA_DIR/ucm.db\`.
+Il backend attivo è selezionato dalla variabile d'ambiente \`DATABASE_URL\`. Se non impostata, UCM usa SQLite in \`DATA_DIR/ucm.db\`.
 
 ### Pannello di stato
-- Backend attivo (sqlite / postgresql) e driver
+- Backend attivo (sqlite / postgresql) e versione del suo motore
 - Dimensione del database e numero di tabelle
-- Versione di migrazione
 
 ### Testare la connessione
 Convalida una \`DATABASE_URL\` (es. \`postgresql://user:pass@host:5432/ucm\`) prima di passare. Il test apre una connessione reale e riporta eventuali errori. I server PostgreSQL precedenti alla versione 13 vengono rifiutati, UCM richiede PostgreSQL 13 o più recente.
 
 ### Cambiare backend
-Salva \`DATABASE_URL\` in \`/etc/ucm/ucm.env\` (DEB/RPM) e riavvia UCM. **Nessun dato viene copiato**: usa prima **Migra** se vuoi conservare i dati esistenti.
+Salva \`DATABASE_URL\` in \`/etc/ucm/ucm.env\` (DEB/RPM) e riavvia UCM. Solo le tabelle di account, ruoli, SSO e MFA vengono copiate sul nuovo backend, così puoi ancora accedere; usa prima **Migra** se vuoi conservare gli altri dati.
 
 ### Migrare i dati
 Copia tutte le righe dal backend corrente al backend di destinazione. Funziona in entrambe le direzioni (SQLite ↔ PostgreSQL):
@@ -342,12 +336,12 @@ Copia tutte le righe dal backend corrente al backend di destinazione. Funziona i
 1. Il database di origine viene salvato in \`/opt/ucm/data/backups/db_migration/\`
 2. Lo schema viene creato sulla destinazione tramite SQLAlchemy
 3. I vincoli FK sono disabilitati durante il caricamento massivo
-4. Le colonne origine/destinazione vengono intersecate (le colonne legacy sono ignorate con un avviso)
+4. Le colonne sono abbinate per nome; solo le note colonne legacy vengono scartate, e qualsiasi altra colonna che la destinazione non ha fa rifiutare la migrazione
 5. Le sequenze PostgreSQL vengono ripristinate dopo il caricamento
 6. Il servizio si riavvia automaticamente (DEB/RPM): su Docker imposta \`DATABASE_URL\` nel file compose e riavvia manualmente il container
 
 **Controlli di sicurezza (fail-fast, sorgente intatta):**
-- La destinazione deve essere vuota. Se \`users\`, \`cas\` o \`certificates\` contengono già righe, la migrazione viene rifiutata con HTTP 409 e un suggerimento di pulizia:
+- La destinazione deve essere vuota. Se una qualsiasi delle sue tabelle contiene già righe, la migrazione viene rifiutata con HTTP 409 e un suggerimento di pulizia:
   - PostgreSQL: \`psql ... -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'\`
   - PostgreSQL in uno schema diverso da \`public\` (un \`search_path\` nell'URL): il suggerimento indica quello schema, di cui la migrazione riallinea le sequenze (v2.251)
   - SQLite: eliminare il file \`.db\` di destinazione
@@ -369,18 +363,22 @@ Gestisci il certificato TLS utilizzato dall'interfaccia web UCM:
 - Verifica la disponibilità di nuove versioni UCM dai rilasci GitHub
 - Visualizza il changelog per gli aggiornamenti disponibili
 - Versione attuale e informazioni di build
-- **Aggiornamento automatico**: su installazioni supportate (DEB/RPM), clicca **Aggiorna ora** per scaricare e installare automaticamente l'ultima versione
-- **Includi pre-release**: attiva per verificare anche i release candidate (rc)
+- **Aggiornamento automatico**: su installazioni supportate (DEB/RPM), clicca **Installa aggiornamento** per scaricare e installare automaticamente l'ultima versione
+- **Canale di aggiornamento**: stabile, pre-release (release candidate) o dev
 
 ## Webhook
 
 Configura webhook HTTP per notificare sistemi esterni sugli eventi:
 
 ### Eventi supportati
-- Certificato emesso, revocato, scaduto, rinnovato
-- CA creata, eliminata
-- Accesso utente, uscita utente
-- Backup creato
+- Certificato emesso, revocato, rinnovato, in scadenza, scaduto, importato, eliminato
+- CA creata, aggiornata, eliminata
+- CSR inviata, approvata, rifiutata
+- Template creato, aggiornato
+- Preflight ACME, rinnovo fallito, revoca fallita
+- Aggiornamento disponibile, avviato, installato, fallito
+
+Le importazioni di certificati e le modifiche ai template fatte dall'interfaccia web non emettono il loro evento.
 
 ### Autenticazione
 
@@ -396,7 +394,7 @@ I token sono archiviati crittografati e mai restituiti nell'UI.
 
 ### Creazione di un webhook
 1. Clicca **Aggiungi webhook**
-2. Inserisci l'**URL** (deve essere HTTPS)
+2. Inserisci l'**URL** (HTTPS consigliato; http:// è accettato)
 3. Seleziona gli **eventi** a cui iscriversi
 4. Scegli il **tipo di autenticazione** e fornisci le credenziali (facoltativo)
 5. Facoltativamente imposta un **segreto** per la verifica della firma HMAC
@@ -442,7 +440,7 @@ Le impostazioni di rinnovo automatico guidano lo scheduler dei rinnovi.
 Impostazioni › Backup abilita i backup automatici.
 
 - Cadenza **giornaliera / settimanale / mensile**
-- **Ritenzione**: conserva i N più recenti, elimina i vecchi
+- **Ritenzione**: i backup più vecchi del numero di giorni impostato vengono eliminati
 - Backup **cifrati** con la password di backup
 
 

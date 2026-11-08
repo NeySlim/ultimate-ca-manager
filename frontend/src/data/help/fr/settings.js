@@ -50,7 +50,7 @@ export default {
         content: "Sauvegardes chiffrées et automatiques de la base de données, à cadence configurable et avec rétention.",
         items: [
           { label: "Cadence", text: "Quotidienne / hebdomadaire / mensuelle" },
-          { label: "Rétention", text: "Conserver les N sauvegardes les plus récentes ; les plus anciennes sont purgées" },
+          { label: "Rétention", text: "Les sauvegardes plus anciennes que le nombre de jours défini (30 par défaut) sont purgées" },
           { label: "Chiffrement", text: "Les sauvegardes sont chiffrées avec le mot de passe de sauvegarde configuré" },
           { label: "Dérivation de clé", text: "Automatique (Argon2id si disponible, PBKDF2 en mode FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Les archives écrites avec Argon2id ne peuvent pas être restaurées sur une instance en mode FIPS" },
         ]
@@ -94,7 +94,7 @@ export default {
           { label: 'Général', text: 'Nom d\'hôte syslog (envoyé comme HOSTNAME dans les messages syslog transmis), URL de base et valeurs par défaut à l\'échelle du système' },
           { label: 'Apparence', text: 'Sélection du thème (clair/sombre/système), couleur d\'accentuation, mode bureau' },
           { label: 'E-mail (SMTP)', text: 'Serveur SMTP, identifiants, éditeur de modèle d\'e-mail et notifications d\'alerte d\'expiration' },
-          { label: 'Sécurité', text: 'Politiques de mot de passe, délai d\'expiration de session, limitation de débit, liste d\'accès administrateur' },
+          { label: 'Sécurité', text: 'Politique de mot de passe, durée de session, liste d\'accès administrateur, mTLS, chiffrement des clés privées ; le délai d\'inactivité et le verrouillage de compte sont sous Général' },
           { label: 'SSO', text: 'Intégration d\'authentification unique SAML 2.0, OAuth2/OIDC et LDAP' },
           { label: 'Sauvegarde', text: 'Sauvegardes de base de données manuelles et programmées' },
           { label: 'Audit', text: 'Rétention des journaux, transfert syslog, vérification d\'intégrité' },
@@ -206,7 +206,6 @@ Configuration à l'échelle du système organisée en onglets. Les modifications
 - **Thème** : Clair, Sombre ou Système (suit la préférence du système d'exploitation)
 - **Couleur d'accentuation** : Couleur principale utilisée pour les boutons, liens et mises en évidence
 - **Forcer le mode bureau** : Désactiver la disposition mobile responsive
-- **Comportement de la barre latérale** : Repliée ou étendue par défaut
 
 ## E-mail (SMTP)
 
@@ -240,18 +239,14 @@ Lorsque SMTP est configuré, activez les alertes automatiques d'expiration de ce
 ## Sécurité
 
 ### Politique de mot de passe
-- Longueur minimale (8-32 caractères)
-- Exiger majuscules, minuscules, chiffres, caractères spéciaux
-- Expiration du mot de passe (jours)
-- Historique des mots de passe (empêcher la réutilisation)
+- Longueur minimale (6-32 caractères)
+- Exiger majuscules, chiffres, caractères spéciaux
 
 ### Gestion de session
-- Délai d'expiration de session (minutes d'inactivité)
-- Sessions simultanées maximales par utilisateur
+- Durée de session (heures, quelle que soit l'activité) ; le délai d'inactivité est sous Général
 
-### Limitation de débit
-- Limite de tentatives de connexion par IP
-- Durée de verrouillage après dépassement de la limite
+### Verrouillage de compte
+- Max tentatives de connexion et durée de verrouillage, sous Général : ils verrouillent le compte, pas l'adresse IP
 
 ### Liste d'accès administrateur
 Limiter l'interface web et l'API de gestion aux adresses IP et réseaux CIDR listés ; les protocoles PKI restent accessibles de partout. Voir le guide des paramètres de sécurité.
@@ -291,12 +286,12 @@ Chiffrez toutes les clés privées stockées en base de données avec AES-256, p
 ## Sauvegarde
 
 ### Sauvegarde manuelle
-Cliquez sur **Créer une sauvegarde** pour générer un instantané de la base de données. Les sauvegardes incluent tous les certificats, CA, clés, paramètres et journaux d'audit.
+Cliquez sur **Créer une sauvegarde** pour générer un instantané de la base de données. Les sauvegardes incluent les certificats, CA, clés et paramètres ; le journal d'audit et les autres tables d'historique n'y figurent pas.
 
 ### Sauvegarde programmée
 Configurez des sauvegardes automatiques :
 - Fréquence (quotidienne, hebdomadaire, mensuelle)
-- Nombre de rétention (nombre de sauvegardes à conserver)
+- Rétention en jours : les sauvegardes plus anciennes sont purgées (30 par défaut)
 - **Dérivation de clé** : Automatique (Argon2id si disponible, PBKDF2 en mode FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Les archives écrites avec Argon2id ne peuvent pas être restaurées sur une instance en mode FIPS
 
 ### Restauration
@@ -314,7 +309,7 @@ Téléversez un fichier de sauvegarde pour restaurer UCM à un état précédent
 
 - **Rétention des journaux** : Nettoyage automatique des anciens journaux après N jours
 - **Transfert syslog** : Envoyer les événements à un serveur syslog distant (UDP/TCP/TLS)
-- **Vérification d'intégrité** : Activer le chaînage de hachages pour la détection d'altération
+- **Vérification d'intégrité** : Vérifier la chaîne de hachages qui relie chaque entrée d'audit ; la chaîne est toujours active, il n'y a rien à activer
 
 ## Base de données
 
@@ -323,18 +318,17 @@ UCM prend en charge deux backends de base de données :
 - **SQLite** (par défaut) : basé sur fichier, sans configuration, idéal pour un nœud unique
 - **PostgreSQL 13+** : recommandé pour la haute disponibilité, le multi-instance ou si vous opérez déjà un cluster PG géré
 
-Le backend actif est sélectionné par la variable d'environnement \`DATABASE_URL\`. Si elle n'est pas définie, UCM utilise SQLite dans \`UCM_DATA_DIR/ucm.db\`.
+Le backend actif est sélectionné par la variable d'environnement \`DATABASE_URL\`. Si elle n'est pas définie, UCM utilise SQLite dans \`DATA_DIR/ucm.db\`.
 
 ### Panneau d'état
-- Backend actif (sqlite / postgresql) et pilote
+- Backend actif (sqlite / postgresql) et la version de son moteur
 - Taille de la base et nombre de tables
-- Version de migration
 
 ### Tester la connexion
 Validez une \`DATABASE_URL\` (ex. \`postgresql://user:pass@host:5432/ucm\`) avant de basculer. Le test ouvre une vraie connexion et signale toute erreur. Les serveurs PostgreSQL antérieurs à la version 13 sont rejetés, UCM nécessite PostgreSQL 13 ou plus récent.
 
 ### Basculer le backend
-Persiste \`DATABASE_URL\` dans \`/etc/ucm/ucm.env\` (DEB/RPM) et redémarre UCM. **Aucune donnée n'est copiée** : utilisez **Migrer** d'abord si vous voulez conserver vos données existantes.
+Persiste \`DATABASE_URL\` dans \`/etc/ucm/ucm.env\` (DEB/RPM) et redémarre UCM. Seules les tables des comptes, rôles, SSO et MFA sont copiées vers le nouveau backend, pour que vous puissiez toujours vous connecter ; utilisez **Migrer** d'abord si vous voulez conserver vos autres données.
 
 ### Migrer les données
 Copie toutes les lignes du backend actuel vers le backend cible. Fonctionne dans les deux sens (SQLite ↔ PostgreSQL) :
@@ -342,12 +336,12 @@ Copie toutes les lignes du backend actuel vers le backend cible. Fonctionne dans
 1. La base source est sauvegardée dans \`/opt/ucm/data/backups/db_migration/\`
 2. Le schéma est créé sur la cible via SQLAlchemy
 3. Les contraintes FK sont désactivées pendant le chargement
-4. Les colonnes source/cible sont intersectées (les colonnes héritées sont ignorées avec un avertissement)
+4. Les colonnes sont appariées par nom ; seules les colonnes héritées connues sont ignorées, et toute autre colonne absente de la cible fait refuser la migration
 5. Les séquences PostgreSQL sont réinitialisées après le chargement
 6. Le service redémarre automatiquement (DEB/RPM) : sur Docker, définissez \`DATABASE_URL\` dans votre fichier compose et redémarrez le conteneur manuellement
 
 **Contrôles de sécurité (échec rapide, source intacte) :**
-- La cible doit être vide. Si \`users\`, \`cas\` ou \`certificates\` contiennent déjà des lignes, la migration est refusée avec un HTTP 409 et un indice de nettoyage :
+- La cible doit être vide. Si l'une de ses tables contient déjà des lignes, la migration est refusée avec un HTTP 409 et un indice de nettoyage :
   - PostgreSQL : \`psql ... -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'\`
   - PostgreSQL dans un schéma autre que \`public\` (un \`search_path\` dans l'URL) : l'indice nomme ce schéma, dont la migration réaligne les séquences (v2.251)
   - SQLite : supprimez le fichier cible \`.db\`
@@ -369,18 +363,22 @@ Gérez le certificat TLS utilisé par l'interface web UCM :
 - Vérifier les nouvelles versions UCM depuis les releases GitHub
 - Voir le journal des modifications pour les mises à jour disponibles
 - Version actuelle et informations de build
-- **Mise à jour automatique** : sur les installations prises en charge (DEB/RPM), cliquez sur **Mettre à jour maintenant** pour télécharger et installer automatiquement la dernière version
-- **Inclure les pré-versions** : basculez pour également vérifier les versions candidates (rc)
+- **Mise à jour automatique** : sur les installations prises en charge (DEB/RPM), cliquez sur **Installer la mise à jour** pour télécharger et installer automatiquement la dernière version
+- **Canal de mise à jour** : stable, pré-version (versions candidates) ou dev
 
 ## Webhooks
 
 Configurez des webhooks HTTP pour notifier les systèmes externes lors d'événements :
 
 ### Événements pris en charge
-- Certificat émis, révoqué, expiré, renouvelé
-- CA créée, supprimée
-- Connexion utilisateur, déconnexion
-- Sauvegarde créée
+- Certificat émis, révoqué, renouvelé, bientôt expiré, expiré, importé, supprimé
+- CA créée, modifiée, supprimée
+- CSR soumise, approuvée, rejetée
+- Modèle créé, modifié
+- ACME preflight, échec de renouvellement, échec de révocation
+- Mise à jour disponible, lancée, installée, en échec
+
+Les imports de certificats et les modifications de modèles faits depuis l'interface web n'émettent pas leur événement.
 
 ### Authentification
 
@@ -396,7 +394,7 @@ Les tokens sont stockés chiffrés et jamais renvoyés dans l'UI.
 
 ### Créer un webhook
 1. Cliquez sur **Ajouter un webhook**
-2. Entrez l'**URL** (doit être HTTPS)
+2. Entrez l'**URL** (HTTPS recommandé ; http:// est accepté)
 3. Sélectionnez les **événements** auxquels s'abonner
 4. Choisissez le **type d'authentification** et fournissez les identifiants (optionnel)
 5. Définissez optionnellement un **secret** pour la vérification de signature HMAC
@@ -444,7 +442,7 @@ Les paramètres de renouvellement automatique pilotent le planificateur de renou
 Paramètres › Sauvegarde permet des sauvegardes automatiques.
 
 - Cadence **quotidienne / hebdomadaire / mensuelle**
-- **Rétention** : conserve les N plus récentes, purge les anciennes
+- **Rétention** : les sauvegardes plus anciennes que le nombre de jours défini sont purgées
 - Sauvegardes **chiffrées** avec le mot de passe de sauvegarde
 
 

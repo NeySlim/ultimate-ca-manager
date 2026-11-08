@@ -7,27 +7,25 @@ export default {
       {
         title: 'Vues',
         items: [
-          { label: 'Vue arborescente', text: 'Affichage hiérarchique montrant les relations parent-enfant des CA' },
+          { label: 'Vue organigramme', text: 'Hiérarchie dessinée sous forme de schéma, chaque CA sous sa parente' },
+          { label: 'Vue colonnes', text: 'Hiérarchie parcourue niveau par niveau, une colonne par niveau' },
           { label: 'Vue liste', text: 'Vue tableau plate avec tri et filtrage' },
-          { label: 'Vue organisation', text: 'Regroupement par organisation pour les configurations multi-locataires' },
         ]
       },
       {
         title: 'Actions',
         items: [
-          { label: 'Créer une CA racine', text: 'Autorité de niveau supérieur auto-signée' },
-          { label: 'Créer une intermédiaire', text: 'CA signée par une CA parente dans la chaîne' },
+          { label: 'Créer CA', text: 'Un seul bouton ; la boîte de dialogue propose une racine auto-signée, une intermédiaire signée par une CA parente, ou une CA signée par une CA externe (CSR)' },
           { label: 'Importer une CA', text: 'Importer un certificat de CA existant (avec ou sans clé privée)' },
           { label: 'Exporter', text: 'PEM, DER ou PKCS#12 (P12/PFX) avec protection par mot de passe' },
-          { label: 'Renouveler la CA', text: 'Réémettre le certificat de la CA avec une nouvelle période de validité' },
           { label: 'Révoquer', text: 'Révoquer une CA intermédiaire auprès de sa CA parente : publiée dans la CRL et l\'OCSP du parent, et la CA ne peut plus signer (définitif)' },
           { label: 'Réparation de chaîne', text: 'Corriger automatiquement les relations parent-enfant rompues' },
           { label: 'Importer la clé privée', text: 'Rattacher la clé privée d\'une CA qui ne détient que son certificat, pour qu\'elle puisse signer' },
           { label: 'Clé et validité', text: 'RSA-3072 par défaut, locale ou HSM. Validité de 1, 2, 3, 5, 10, 15 ou 20 ans, ou Personnalisée (jours) jusqu\'à 50 ans. Une CA RSA-2048 qui dépasserait 2030 est signalée : l\'ANSSI accepte RSA-2048 jusqu\'à fin 2030, l\'ETSI TS 119 312 jusqu\'à fin 2026' },
-          { label: 'Post-quantique (ML-DSA)', text: "ML-DSA-44, ML-DSA-65 ou ML-DSA-87 (FIPS 204, niveaux NIST 2, 3 et 5), générées en logiciel ou sur un fournisseur HSM qui prend en charge ML-DSA, et masquées en mode FIPS. Une clé ML-DSA signe sans digest séparé : la CA, ses CRL et ses réponses OCSP n'ont donc aucun digest à choisir. Une CA ML-DSA peut signer des certificats RSA ou EC, et une CA RSA ou EC peut signer une intermédiaire ML-DSA. Le renouvellement conserve le même niveau" },
+          { label: 'Post-quantique (ML-DSA)', text: "ML-DSA-44, ML-DSA-65 ou ML-DSA-87 (FIPS 204, niveaux NIST 2, 3 et 5), générées en logiciel ou sur un fournisseur HSM qui prend en charge ML-DSA, et masquées en mode FIPS. Une clé ML-DSA signe sans digest séparé : la CA, ses CRL et ses réponses OCSP n'ont donc aucun digest à choisir. Une CA ML-DSA peut signer des certificats RSA ou EC, et une CA RSA ou EC peut signer une intermédiaire ML-DSA" },
           { label: 'EdDSA (Ed25519, Ed448)', text: "Clés Ed25519 ou Ed448 pour une CA racine, intermédiaire ou externe, en logiciel uniquement (aucun fournisseur HSM ne signe en EdDSA) et masquées en mode FIPS. Comme ML-DSA, une clé EdDSA signe sans digest, et la hiérarchie peut mélanger RSA, EC ou ML-DSA. Les navigateurs, Windows (CryptoAPI/CNG) et les clients SCEP n'acceptent pas ce qu'une CA EdDSA signe, quelle que soit la clé du certificat final : réservez-la aux consommateurs OpenSSL, Go ou Java 15+. SCEP et XCEP refusent une telle CA" },
           { label: "Import EdDSA (v2.251)", text: "Une clé de CA Ed25519 ou Ed448 peut être importée avec son certificat, ou ensuite avec Importer la clé privée" },
-          { label: "Condensat par défaut (v2.251)", text: "Sous une AC P-384 ou P-521, ce qui est signé sans condensat choisi (EST, SCEP, WSTEP, Sign CSR, formulaire d'émission, orders ACME sans condensat, CRL) utilise SHA-384 ou SHA-512, toujours borné par les politiques. Les CRL déjà émises ne changent pas : la suivante applique la règle" },
+          { label: "Condensat par défaut (v2.251)", text: "Sous une AC P-384 ou P-521, ce qui est signé sans condensat choisi (EST, SCEP, WSTEP, Sign CSR, formulaire d'émission, orders ACME sans condensat, CRL) utilise SHA-384 ou SHA-512 ; les politiques bornent les certificats, pas les CRL. Les CRL déjà émises ne changent pas : la suivante applique la règle" },
           { label: "Pas de clé privée (v2.247)", text: "Une CA détenue sans sa clé privée est marquée Pas de clé privée, avec une action Importer la clé privée. Les sélecteurs de CA indiquent combien de CA ils écartent faute de pouvoir signer" },
           { label: 'Contraintes de noms', text: 'Contraintes avancées (RFC 5280) : les sous-arbres permis et exclus (DNS, plage IP, e-mail) limitent les noms que la CA peut certifier. Pour une CA signée en externe, ils sont fixés par la CA signataire' },
           { label: 'Schéma de signature RSA', text: "PKCS#1 v1.5 par défaut, ou RSA-PSS (sel aussi long que le hachage) pour une CA RSA avec une clé locale, PKCS#11 ou OpenBao. Il s'applique aux certificats, CRL, réponses OCSP et réponses SCEP signés par la CA ; les horodatages restent en PKCS#1 v1.5, le schéma que vérifie openssl ts -verify. « Signer avec RSA-PSS » dans les détails de la CA fait basculer une CA existante dans un sens ou dans l'autre : les certificats déjà émis conservent leur signature" },
@@ -64,7 +62,7 @@ export default {
       {
         title: 'CA adossées HSM',
         items: [
-          { label: 'Stockage de la clé', text: 'Choisissez Local (chiffré en BD) ou HSM lors de la création de la CA' },
+          { label: 'Stockage de la clé', text: 'Choisissez Local (en base de données, chiffrée sous la clé maître) ou HSM lors de la création de la CA' },
           { label: 'Générer une nouvelle clé', text: 'Créer une nouvelle clé de signature sur le fournisseur HSM sélectionné' },
           { label: 'Utiliser une clé existante', text: 'Lier la CA à une clé de signature inutilisée déjà présente sur le HSM' },
           { label: 'Pas d\'export de clé privée', text: 'Les clés adossées HSM ne quittent jamais le HSM, les exports PKCS#12, JKS et clé seule sont désactivés' },
@@ -74,11 +72,11 @@ export default {
       {
         title: 'Mode hors ligne',
         items: [
-          { label: 'Objectif', text: "Protéger la clé privée d'une CA (typiquement une racine) contre l'usage runtime tout en gardant le certificat, la chaîne, la CRL et l'OCSP disponibles" },
+          { label: 'Objectif', text: "Protéger la clé privée d'une CA (typiquement une racine) contre l'usage runtime tout en gardant son certificat, sa chaîne et sa dernière CRL disponibles" },
           { label: 'Protégée par mot de passe', text: 'La clé est chiffrée avec un mot de passe utilisateur (PKCS#8) et reste en base. Restauration en saisissant le mot de passe.' },
           { label: 'Exportée en fichier', text: 'La clé est exportée en PEM chiffré téléchargeable une fois et retirée de la base. Restauration en re-téléversant le fichier avec son mot de passe.' },
           { label: 'Politique de mot de passe', text: "Le mot de passe suit la politique de complexité UCM (longueur et classes de caractères). S'il est perdu, la clé est irrécupérable." },
-          { label: 'Effet sur la signature', text: "La signature de CSR, l'émission de certificats et le renouvellement de la CA sont bloqués hors ligne. CRL et OCSP continuent depuis les signatures en cache." },
+          { label: 'Effet sur la signature', text: "La signature de CSR, l'émission de certificats et le renouvellement sont bloqués hors ligne. La dernière CRL reste servie jusqu'à ce que vous en téléversiez une nouvelle, signée auprès de la clé ; l'OCSP répond via un répondeur délégué, sinon uniquement depuis les réponses déjà en cache, jusqu'à leur nextUpdate." },
           { label: 'Sous-CA', text: 'Les CA racines et intermédiaires peuvent être mises hors ligne indépendamment' },
         ]
       },
@@ -102,7 +100,7 @@ export default {
     ],
     warnings: [
       "Une CA ML-DSA ne peut pas encore être exportée en PKCS#12 ni en JKS : exportez le certificat et la clé privée en PEM. Les clients sans prise en charge de ML-DSA (OpenSSL avant 3.5, la plupart des navigateurs aujourd'hui) ne peuvent pas vérifier ce qu'elle signe",
-      'Supprimer une CA ne révoquera PAS les certificats qu\'elle a émis : révoquez-les d\'abord',
+      'Une CA ne peut pas être supprimée tant qu\'elle a des CA intermédiaires ou des certificats émis : révoquez-les et supprimez-les d\'abord',
       'Les clés privées sont stockées chiffrées ; perdre la base de données signifie perdre les clés',
       'Les mots de passe du mode hors ligne ne sont PAS récupérables : stockez-les dans votre coffre-fort avant de confirmer',
       'Un certificat croisé ne remplace jamais le certificat propre d\'une CA : une intermédiaire qui serait re-certifiée sous un autre émetteur est refusée (409) sauf si vous la rattachez comme certificat croisé ou remplacez le certificat actuel ; un roulement de racine sous le même nom d\'émetteur le remplace',
@@ -129,19 +127,21 @@ Toute CA signée par une CA intermédiaire, créant des niveaux de hiérarchie p
 
 ## Vues
 
-### Vue arborescente
-Affiche la hiérarchie complète des CA sous forme d'arbre repliable. Les relations parent-enfant sont visualisées avec une indentation et des lignes de connexion.
+Les trois boutons à côté du champ de recherche permettent de basculer entre :
+
+### Vue organigramme
+Dessine la hiérarchie des CA sous forme de schéma, chaque CA sous sa parente.
+
+### Vue colonnes
+Parcourt la hiérarchie niveau par niveau, une colonne par niveau : sélectionnez une CA pour voir celles qui sont en dessous.
 
 ### Vue liste
-Tableau plat avec colonnes triables : Nom, Type, Statut, Certificats émis, Date d'expiration.
-
-### Vue organisation
-Regroupe les CA par leur champ Organisation (O). Utile pour les configurations multi-locataires où différents départements gèrent des arborescences de CA séparées.
+Tableau plat avec colonnes triables.
 
 ## Créer une CA
 
 ### Créer une CA racine
-1. Cliquez sur **Créer** → **CA racine**
+1. Cliquez sur **Créer CA** et choisissez le type racine dans la boîte de dialogue
 2. Remplissez les champs du sujet (CN, O, OU, C, ST, L)
 3. Sélectionnez l'algorithme de clé (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87, EdDSA Ed25519/Ed448) : RSA-3072 par défaut
 4. Choisissez l'algorithme de signature (Auto, SHA-256/384/512. Auto aligne P-384 sur SHA-384)
@@ -150,7 +150,7 @@ Regroupe les CA par leur champ Organisation (O). Utile pour les configurations m
 7. Cliquez sur **Créer**
 
 ### Créer une CA intermédiaire
-1. Cliquez sur **Créer** → **CA intermédiaire**
+1. Cliquez sur **Créer CA** et choisissez le type intermédiaire dans la boîte de dialogue
 2. Sélectionnez la **CA parente** (doit posséder une clé privée)
 3. Remplissez les champs du sujet
 4. Définissez la période de validité (typiquement 5-10 ans)
@@ -165,7 +165,6 @@ Le formulaire signale une CA RSA-2048 qui dépasserait 2030 : l'ANSSI accepte RS
 
 - Une clé ML-DSA signe sans digest séparé : le champ digest disparaît, et un digest envoyé par l'API est ignoré avec un avertissement. Les CRL et les réponses OCSP de la CA suivent la même règle.
 - Les hiérarchies peuvent se mélanger : une racine ML-DSA peut signer une intermédiaire RSA ou EC, et une CA RSA ou EC peut signer une intermédiaire ML-DSA, qui utilise alors le digest de sa parente.
-- Le renouvellement conserve la clé et son niveau.
 - Une CA ML-DSA s'exporte en PEM ou DER, pas en PKCS#12 ni en JKS. Les clients sans prise en charge de ML-DSA (OpenSSL avant 3.5, la plupart des navigateurs aujourd'hui) ne peuvent pas vérifier ce qu'elle signe.
 
 ### CA EdDSA (Ed25519, Ed448)
@@ -177,7 +176,7 @@ Des clés **Ed25519** et **Ed448** peuvent être générées pour une CA racine,
 
 ### Créer une CA signée en externe (mode CSR, v2.214)
 Pour le schéma de racine hors ligne : la clé de la CA émettrice vit dans UCM, son certificat est signé ailleurs :
-1. Cliquez sur **Créer** → type **Signée par une CA externe (CSR)**
+1. Cliquez sur **Créer CA** et choisissez le type **Signée par une CA externe (CSR)**
 2. Renseignez le sujet et les paramètres de clé (locale ou HSM) : la validité est décidée par le signataire externe
 3. Validez : UCM génère la paire de clés et un CSR de type CA (téléchargé automatiquement)
 4. Faites signer le CSR par votre CA racine externe/hors ligne
@@ -238,12 +237,7 @@ Si les relations parent-enfant sont rompues (par exemple, après une importation
 
 ## Renouveler une CA
 
-Le renouvellement réémet le certificat de la CA avec :
-- Même sujet et clé
-- Nouvelle période de validité
-- Nouveau numéro de série
-
-Les certificats existants signés par la CA restent valides.
+UCM ne réémet pas le certificat d'une CA qu'il a signée : pour remplacer une CA proche de son expiration, créez une nouvelle CA et émettez sous elle. Une CA signée par une CA externe se renouvelle avec **Renouveler via CSR**, qui réémet un CSR depuis la même clé pour que la CA externe le signe (voir CA signées en externe).
 
 ## Révoquer une CA intermédiaire
 
@@ -263,9 +257,7 @@ Ce qui se passe ensuite :
 
 ## Supprimer une CA
 
-> ⚠ Supprimer une CA la retire de UCM mais ne révoque PAS les certificats qu'elle a émis. Révoquez les certificats au préalable si nécessaire.
-
-La suppression est bloquée si la CA a des CA enfants. Supprimez ou réaffectez les enfants d'abord.
+La suppression est refusée (409) tant que la CA a des CA intermédiaires, a émis des certificats, ou est liée à un profil SCEP ou à un autre service. Révoquez et supprimez ses certificats, et supprimez ses enfants d'abord.
 
 ## CA adossées HSM
 
@@ -297,7 +289,7 @@ UCM peut stocker la clé de signature d'une CA sur un module matériel de sécur
 
 ## Mode hors ligne
 
-Sortez la clé de signature d'une CA de l'usage runtime sans supprimer la CA. Le certificat, la chaîne, la CRL et l'OCSP continuent de fonctionner : seules les opérations de signature (signer un CSR, émettre un certificat, renouveler la CA) sont bloquées.
+Sortez la clé de signature d'une CA de l'usage runtime sans supprimer la CA. Le certificat, la chaîne et la dernière CRL restent servis ; les opérations de signature (signer un CSR, émettre un certificat, renouveler, nouvelles CRL) sont bloquées. L'OCSP répond via un répondeur délégué, sinon uniquement depuis les réponses déjà en cache, jusqu'à leur nextUpdate.
 
 C'est la façon standard de protéger une CA racine entre des cérémonies rares, tout en gardant son ancre de confiance et son infrastructure de révocation en ligne.
 
@@ -330,9 +322,9 @@ Le mot de passe suit la politique de complexité standard UCM : longueur minimal
 |---|---|---|
 | Émettre un certificat | Autorisé | **Bloqué** |
 | Signer un CSR | Autorisé | **Bloqué** |
-| Renouveler la CA | Autorisé | **Bloqué** |
 | Renouveler un certificat émis | Autorisé | **Bloqué** |
-| Servir CRL / OCSP | Autorisé | Autorisé (signature en cache) |
+| Servir la dernière CRL | Autorisé | Autorisé (téléversez-en une nouvelle signée auprès de la clé) |
+| OCSP | Autorisé | Répondeur délégué, ou réponses en cache jusqu'à nextUpdate |
 | Exporter le certificat / la chaîne | Autorisé | Autorisé |
 | Supprimer la CA | Autorisé | Autorisé |
 

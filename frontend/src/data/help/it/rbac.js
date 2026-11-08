@@ -8,7 +8,7 @@ export default {
         title: 'Ruoli di sistema',
         definitions: [
           { term: 'Admin', description: 'Accesso completo a tutte le funzionalità e impostazioni' },
-          { term: 'Operator', description: 'Può gestire certificati e CA ma non le impostazioni di sistema' },
+          { term: 'Operator', description: 'Può gestire certificati, CA, CSR, ACME, SSH e le impostazioni che un amministratore non riserva; template e gruppi in sola lettura, nessun accesso a utenti o RBAC' },
           { term: 'Auditor', description: 'Accesso in sola lettura a tutti i dati operativi per conformità e audit' },
           { term: 'Viewer', description: 'Accesso di base in sola lettura a certificati, CA e template' },
         ]
@@ -18,8 +18,9 @@ export default {
         items: [
           { label: 'Crea ruolo', text: 'Definisci un nuovo ruolo con nome e descrizione' },
           { label: 'Matrice dei permessi', text: 'Seleziona/deseleziona i permessi per categoria (CA, Certificati, Chiavi private, ecc.)' },
-          { label: 'Copertura', text: 'Percentuale visuale dei permessi totali concessi al ruolo' },
+          { label: 'Copertura', text: 'Una barra e un conteggio n/N dei permessi concessi al ruolo' },
           { label: 'Conteggio utenti', text: 'Vedi quanti utenti sono assegnati a ogni ruolo' },
+          { label: 'Permessi dei ruoli di sistema', text: 'Un ruolo di sistema mostra i permessi che UCM gli applica; Admin mostra ogni permesso della matrice' },
           { label: 'Permessi CA SSH (v2.248)', text: 'read:ssh_cas, write:ssh_cas e delete:ssh_cas regolano le CA SSH, quindi write:ssh non le crea né le modifica più. Ruoli, gruppi e chiavi API con un permesso SSH hanno ricevuto quello corrispondente all\'aggiornamento' },
         ]
       },
@@ -35,14 +36,14 @@ export default {
     content: `
 ## Panoramica
 
-RBAC fornisce una gestione granulare dei permessi. Definisci ruoli personalizzati con permessi specifici e assegnali a utenti o gruppi.
+RBAC fornisce una gestione granulare dei permessi. Definisci ruoli personalizzati con permessi specifici e assegnali agli utenti; un gruppo concede il proprio insieme di permessi ai suoi membri.
 
 ## Ruoli di sistema
 
 Quattro ruoli integrati che non possono essere modificati o eliminati:
 
 - **Admin**: Accesso completo a tutto
-- **Operator**: Gestisce certificati, CA, CSR, template. Nessun accesso a impostazioni di sistema, utenti o RBAC
+- **Operator**: Gestisce certificati, CA, CSR, ACME, SSH e impostazioni di sistema; template e gruppi in sola lettura. Nessun accesso a utenti o RBAC
 - **Auditor**: Accesso in sola lettura a tutti i dati operativi (certificati, CA, ACME, SCEP, HSM, log di audit, politiche, gruppi) ma non a impostazioni o gestione utenti
 - **Viewer**: Accesso di base in sola lettura a certificati, CA, CSR, template e trust store
 
@@ -62,7 +63,7 @@ I permessi sono organizzati per categoria:
 - **CSR**: Creazione, lettura, firma, eliminazione
 - **Template**: Creazione, lettura, aggiornamento, eliminazione
 - **Utenti**: Lettura (la gestione degli account è riservata agli amministratori)
-- **Gruppi**: Creazione, lettura, aggiornamento, eliminazione
+- **Gruppi**: Lettura (creazione, modifica ed eliminazione dei gruppi sono riservate agli amministratori)
 - **Impostazioni**: Lettura, aggiornamento
 - **Audit**: Lettura, esportazione (la pulizia è riservata agli amministratori)
 - **ACME**: Configurazione, gestione account
@@ -80,7 +81,7 @@ Un ruolo personalizzato può concedere qualsiasi permesso verificato da UCM, tra
 Clicca sull'intestazione di una categoria per abilitare/disabilitare tutti i permessi in quella categoria contemporaneamente.
 
 ### Indicatore di copertura
-Un badge percentuale mostra quanta parte dell'insieme totale dei permessi copre il ruolo.
+Una barra e un conteggio n/N mostrano quanta parte dell'insieme totale dei permessi copre il ruolo.
 
 ## Assegnazione dei ruoli
 

@@ -22,7 +22,7 @@ export default {
       {
         title: 'Configuration du serveur',
         items: [
-          { label: 'Script de configuration Linux/macOS', text: 'Téléchargez un script shell POSIX (.sh) qui configure automatiquement sshd pour faire confiance à cette CA. Installation rapide : curl -fsSL <url> | bash' },
+          { label: 'Script de configuration Linux/macOS', text: 'Téléchargez un script shell POSIX (.sh) qui configure automatiquement sshd pour faire confiance à cette CA. Installation rapide : curl -sSL <url> | sudo bash' },
           { label: 'Script de configuration Windows', text: 'Téléchargez un script PowerShell (.ps1) qui configure Windows OpenSSH Server (écrit la clé publique de la CA dans %ProgramData%\\ssh, verrouille les ACL, ajoute TrustedUserCAKeys / HostCertificate dans sshd_config, valide avec sshd -T, redémarre sshd). Installation rapide : iwr <url> | iex' },
           { label: 'Bloc de diagnostic', text: 'En cas d\'échec d\'Add-WindowsCapability (WSUS / machine jointe au domaine), le script affiche un bloc étiqueté expliquant l\'état de la politique et trois pistes de remédiation, il ne modifie jamais la politique WSUS / WU lui-même' },
           { label: 'Dry-run', text: 'Les deux scripts prennent en charge un drapeau -DryRun / --dry-run pour prévisualiser les modifications sans les appliquer' },
@@ -67,7 +67,7 @@ export default {
       'Téléchargez le script de configuration pour une mise en place facile du serveur : il gère automatiquement la sauvegarde et la validation.',
     ],
     warnings: [
-      'Supprimer une CA ne révoque pas les certificats qu\'elle a signés : révoquez-les d\'abord ou mettez à jour la confiance des serveurs.',
+      'Une CA ne peut pas être supprimée tant que des certificats qu\'elle a signés subsistent : supprimez-les d\'abord, et mettez à jour la confiance des serveurs.',
       'Si la clé privée de la CA est compromise, tous les certificats signés par celle-ci doivent être considérés comme non fiables.',
     ],
   },
@@ -203,7 +203,7 @@ RevokedKeys /etc/ssh/revoked_keys
 | CA distinctes | Utilisez des CA séparées pour les certificats utilisateur et hôte |
 | Algorithme de clé | Ed25519 pour les nouveaux déploiements, RSA 4096 pour la compatibilité avec les anciens systèmes |
 | Durée de vie de la CA | Gardez les CA à longue durée de vie ; utilisez des certificats éphémères |
-| Sauvegarde | Exportez et stockez la clé privée de la CA en lieu sûr |
+| Sauvegarde | Conservez les sauvegardes UCM : la clé privée de la CA ne peut pas être exportée seule |
 | Correspondance des principals | Associez les principals à des noms d'utilisateur spécifiques, pas à des jokers |
 `
   }

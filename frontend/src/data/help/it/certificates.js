@@ -34,12 +34,12 @@ export default {
           { label: 'Rinomina', text: 'Imposta un nome visualizzato indipendente dal CN (predefinito: il CN o il primo nome DNS SAN per i certificati senza CN)' },
           { label: 'Revoca', text: 'Segna come revocato con un motivo, apparirà nella CRL' },
           { label: 'Rimuovi sospensione', text: 'Riattiva un certificato revocato con motivo "Sospensione certificato", ripristina lo stato valido' },
-          { label: 'Revoca e sostituisci', text: 'Revoca e riemetti immediatamente un sostituto' },
+          { label: 'Revoca di un certificato sospeso', text: 'Un certificato sospeso può anche essere revocato definitivamente con un altro motivo, senza passare per valido. La CRL e OCSP riportano allora il nuovo motivo, e la data di invalidità è l\'inizio della sospensione se non ne viene indicata una' },
           { label: 'Esporta', text: 'Scarica in formato PEM, DER, PKCS#12 o JKS' },
           { label: 'Modalità compatibilità PKCS#12 (v2.222)', text: 'Le finestre di esportazione offrono un profilo 3DES/SHA-1 per gli importatori che rifiutano l\'archivio AES-256 predefinito come password errata: Android 15 e precedenti, macOS 14 e precedenti, Windows Server 2016 e precedenti, Java datato. Disattivato per impostazione predefinita, protegge meno il file' },
           { label: 'Confronta', text: 'Confronto affiancato di due certificati' },
           { label: 'Altre estensioni (v2.251)', text: 'I dettagli di certificati e CA elencano sotto Altre estensioni quelle per cui UCM non ha una sezione, con OID, nome se noto, criticità e valore grezzo. Il modulo di emissione può aggiungere estensioni personalizzate a quelle del modello' },
-          { label: 'Chiavi compromesse (v2.251)', text: 'Una chiave revocata come keyCompromise resta nota dopo l\'eliminazione del suo certificato, qualunque CA l\'abbia emesso, Let\'s Encrypt compresa: una richiesta, un rinnovo o una finalizzazione con quella chiave viene rifiutata' },
+          { label: 'Chiavi compromesse (v2.251)', text: 'Una chiave revocata come keyCompromise resta nota dopo l\'eliminazione del suo certificato, qualunque CA l\'abbia emesso, Let\'s Encrypt compresa: il client ACME la rifiuta alla richiesta, al rinnovo e alla finalizzazione, ed EST rifiuta una CSR che la contiene. Gli altri percorsi di emissione non consultano questo elenco' },
           { label: 'Certificati del client ACME (v2.251)', text: 'Anche un certificato ottenuto dal client ACME viene rinnovato sul posto, mantenendo id e refid. Le copie che i rinnovi precedenti avevano importato come nuove righe restano nell\'inventario finché non vengono archiviate o eliminate' },
         ]
       },
@@ -47,7 +47,7 @@ export default {
         title: 'EKU extra personalizzati (RFC 5280 §4.2.1.12)',
         content: 'Il modulo di emissione e la modale di firma CSR espongono un selettore multiplo "EKU extra" che aggiunge OID Extended Key Usage oltre ai default del tipo di certificato:',
         items: [
-          { label: 'Catalogo', text: '18 EKU noti (Microsoft RDP 1.3.6.1.4.1.311.54.1.2, smartcard logon, document signing, IPsec, Kerberos PKINIT, ecc.)' },
+          { label: 'Catalogo', text: '26 EKU noti (Microsoft RDP 1.3.6.1.4.1.311.54.1.2, smartcard logon, document signing, IPsec, Kerberos PKINIT, ecc.)' },
           { label: 'OID libero', text: 'Qualsiasi OID puntato ben formato conforme a ^[0-2](?:\\.(?:0|[1-9]\\d*)){1,15}$' },
           { label: 'Limite', text: 'Fino a 16 OID totali per certificato' },
           { label: 'Fusione, mai sostituzione', text: 'Gli EKU di default del tipo (es. serverAuth) restano bloccati, gli extra si aggiungono sopra' },
@@ -92,7 +92,7 @@ export default {
     tips: [
       'Aggiungi la stella ⭐ ai certificati importanti per inserirli nella lista dei preferiti',
       'Usa i filtri per trovare rapidamente i certificati per stato, CA o testo di ricerca: la selezione viene conservata al ricaricamento della pagina',
-      'Il rinnovo conserva lo stesso record (id, refid, data di creazione): le chiavi detenute da UCM vengono rigenerate, i certificati registrati via protocollo (SCEP/EST/ACME) mantengono la loro chiave lato client',
+      'Il rinnovo conserva lo stesso record (id, refid, data di creazione). Il rinnovo dalla pagina genera una nuova chiave; il rinnovo automatico mantiene la chiave. Un certificato la cui chiave UCM non detiene (registrazione SCEP, EST, WSTEP o ACME, importazione senza chiave) viene rifiutato (409): rinnovalo tramite il suo protocollo o firma una nuova richiesta',
       'Serve un EKU non standard (Microsoft RDP, smartcard logon, document signing)? Aggiungilo via "EKU extra" invece di modificare i template',
       'Quando una policy o la scadenza della CA emittente accorcia la validità richiesta, il risultato lo indica: "Issued for N day(s) instead of the M requested", con il motivo',
       'Una firma RSA-PSS viene mostrata con il suo hash e la lunghezza del salt, ad es. RSASSA-PSS SHA-256 (salt 32)',
@@ -113,7 +113,7 @@ Gestione centralizzata di tutti i certificati X.509. Emetti nuovi certificati, i
 ## Stato del certificato
 
 - **Valido**: Entro il periodo di validità e non revocato
-- **In scadenza**: Scadrà entro 30 giorni (configurabile)
+- **In scadenza**: Scadrà entro 30 giorni
 - **Scaduto**: Oltre la data "Non dopo"
 - **Revocato**: Esplicitamente revocato, pubblicato nella CRL
 - **Orfano**: La CA emittente non esiste più in UCM
@@ -146,7 +146,8 @@ Formati supportati:
 Dalla v2.214, il rinnovo aggiorna il certificato **in loco**:
 - Stesso record: **id, refid e data di creazione non cambiano mai**: le integrazioni mantengono i loro riferimenti
 - Stessi Soggetto e SAN; nuovo numero di serie e nuovo periodo di validità
-- I certificati la cui chiave è detenuta da UCM vengono **rigenerati con una nuova chiave**; i certificati registrati via protocollo (SCEP/EST/ACME) vengono rifirmati con la loro chiave pubblica esistente
+- Il rinnovo dalla pagina genera una **nuova chiave**; il rinnovo automatico mantiene la chiave
+- Un certificato la cui chiave UCM non detiene (registrazione SCEP, EST, WSTEP o ACME, importazione senza chiave) viene rifiutato (409): rinnovalo tramite il suo protocollo di registrazione o firma una nuova richiesta
 - Il **numero di serie sostituito resta pubblicato nella CRL** (motivo \`superseded\`) e risponde \`revoked\` via OCSP fino alla scadenza originale del vecchio certificato
 - \`renewed_at\` / \`renewed_times\` tracciano la cronologia dei rinnovi
 - Un certificato revocato non può essere rinnovato (409): emettine invece uno nuovo
@@ -175,8 +176,9 @@ Se un certificato è stato revocato con il motivo **Sospensione certificato**, p
 
 > 💡 La Sospensione certificato è utile per sospensioni temporanee (es. dispositivo smarrito, indagine in corso).
 
-### Revoca e sostituzione
-Combina la revoca con la riemissione immediata. Il nuovo certificato eredita lo stesso Soggetto e SAN.
+### Revoca definitiva di un certificato sospeso
+
+Un certificato sospeso può essere revocato con un altro motivo (ad esempio Compromissione chiave quando l'indagine la conferma) dallo stesso pulsante **Revoca**, senza essere reso valido nel frattempo. La CRL e OCSP riportano il nuovo motivo; se non è indicata una data di invalidità, l'inizio della sospensione è registrato come data in cui il certificato è diventato non valido.
 
 ## Esportazione dei certificati
 
@@ -200,7 +202,7 @@ Una coppia ibrida collega un certificato classico (**A**, RSA o EC) e uno post-q
 
 ## Preferiti
 
-Aggiungi la stella ⭐ ai certificati importanti per aggiungerli ai segnalibri. I preferiti appaiono per primi nelle viste filtrate e sono accessibili dal filtro preferiti.
+Aggiungi la stella ⭐ ai certificati importanti per aggiungerli ai segnalibri. I preferiti sono elencati nella palette comandi (Ctrl+K).
 
 ## Confronto certificati
 
@@ -211,8 +213,8 @@ Seleziona due certificati e clicca **Confronta** per vedere un confronto affianc
 - **Filtro per stato**: Valido, In scadenza, Scaduto, Revocato, Orfano, Archiviato
 - **Filtro per CA**: Mostra i certificati di una CA specifica
 - **Filtro per origine**: Filtra in base a come il certificato è entrato in UCM (emesso, importato, ACME, SCEP, ecc.)
-- **Filtro per template**: Trova i certificati **modificati dal template**: emessi da un template ma con tipo di chiave, validità o digest esplicitamente sovrascritti al momento della richiesta. I campi divergenti sono elencati nel dettaglio del certificato; il record è congelato all'emissione
-- **Ricerca testuale**: Cerca per CN, numero di serie o SAN
+- **Filtro per template**: Trova i certificati **modificati dal template**: emessi da un template ma con tipo di chiave o validità esplicitamente sovrascritti al momento della richiesta. I campi divergenti sono elencati nel dettaglio del certificato; il record è congelato all'emissione
+- **Ricerca testuale**: Cerca per soggetto, emittente, nome visualizzato o numero di serie (i SAN non sono ricercati)
 - **Ordinamento**: Per nome, data di scadenza, data di creazione, stato
 ## Analisi di conformità
 

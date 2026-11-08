@@ -9,7 +9,7 @@ export default {
         items: [
           { label: 'Richieste', text: 'Richieste di iscrizione SCEP in attesa, approvate e rifiutate' },
           { label: 'Configurazione', text: 'Impostazioni del server SCEP: selezione CA, approvazione automatica' },
-          { label: 'Challenge Password', text: 'Gestisci le challenge password per CA per l\'iscrizione dei dispositivi' },
+          { label: 'Challenges', text: 'Visualizza e rigenera le challenge password per l\'iscrizione dei dispositivi' },
           { label: 'Informazioni', text: 'URL degli endpoint SCEP e istruzioni di integrazione' },
           { label: 'Profili', text: 'Endpoint di enrollment denominati, ciascuno con URL, CA, modello e challenge propri' },
           { label: 'Registrazioni dell\'app Intune', text: 'Registrazioni app Entra (tenant ID, client ID, client secret) condivise dai profili che validano le challenge di Intune; un secret vuoto in modifica conserva quello attuale, Verifica connessione richiede un token e individua il servizio senza consumare alcuna challenge, e un\'app ancora usata da un profilo non può essere eliminata' },
@@ -19,8 +19,9 @@ export default {
         title: 'Configurazione',
         items: [
           { label: 'CA firmataria', text: 'Seleziona quale CA firma i certificati iscritti tramite SCEP. I dispositivi cifrano la richiesta verso questa CA, che deve quindi avere una chiave RSA in software: le CA EC, basate su HSM, senza chiave, offline e revocate non sono elencate (v2.248)' },
-          { label: 'Approvazione automatica', text: 'Approva automaticamente le richieste con challenge password valide' },
-          { label: 'Challenge Password', text: 'Segreto condiviso che i dispositivi usano per autenticare l\'iscrizione' },
+          { label: 'Approvazione automatica', text: 'Approva automaticamente le richieste con challenge password valide, o i rinnovi firmati da un certificato emesso dallo stesso endpoint' },
+          { label: 'Servire su HTTP semplice', text: "Disattivato per impostazione predefinita. Risponde a SCEP anche sulla porta del protocollo HTTP (8080 per impostazione predefinita), a http://your-server:8080/scep/pkiclient.exe e agli URL dei profili, per client come sscep che non possono usare HTTPS. RFC 8894 §7.10: i messaggi SCEP sono già protetti, la busta CMS mantiene privata la challenge password" },
+          { label: 'Challenge Password', text: "Segreto condiviso che i dispositivi usano per autenticare l'iscrizione. Un rinnovo (RenewalReq) firmato da un certificato emesso dallo stesso endpoint (profilo o globale) è autenticato da quel certificato, quindi la sua challenge non viene controllata e ruotare il segreto non impedisce ai dispositivi iscritti di rinnovare (RFC 8894 §2.4). Qualsiasi altro certificato richiede ancora la challenge dell'endpoint" },
           { label: 'Chiavi del dispositivo (v2.248)', text: 'Un dispositivo firma la richiesta con una chiave RSA, ECDSA, Ed25519 o ML-DSA; una firma ML-DSA segue la RFC 9882 (digest SHA-512). Ed448 è rifiutato, e anche ML-DSA in modalità FIPS' },
         ]
       },
@@ -41,11 +42,11 @@ export default {
     tips: [
       'Usa challenge password uniche per CA per un miglior auditing di sicurezza',
       'L\'approvazione automatica è comoda ma rivedi le richieste manualmente in ambienti ad alta sicurezza',
-      'Formato URL SCEP: https://your-server:port/scep',
+      'URL SCEP: https://your-server:8443/scep/pkiclient.exe per la CA configurata, https://your-server:8443/scep/<profile>/pkiclient.exe per un profilo',
       'I profili Intune richiedono l\'approvazione automatica attiva: l\'iscrizione Intune è un round trip sincrono di convalida e poi emissione, senza coda di approvazione lato Intune',
     ],
     warnings: [
-      'Le challenge password vengono trasmesse nella richiesta SCEP: usa HTTPS per la sicurezza del trasporto',
+      "La challenge password è nella CSR, che viaggia dentro la busta CMS cifrata verso la CA (RFC 8894 §2.4), quindi l'HTTP semplice non la espone; un client che la invia come attributo firmato fuori dalla busta la espone, su HTTP e a qualsiasi cosa registri la richiesta",
     ],
   },
   helpGuides: {
@@ -67,7 +68,8 @@ Visualizza tutte le richieste di iscrizione SCEP:
 Configura il server SCEP:
 - **Abilita/Disabilita**: Attiva/disattiva il servizio SCEP
 - **CA firmataria**: Seleziona quale CA firma i certificati iscritti tramite SCEP. I dispositivi cifrano la richiesta verso questa CA, che deve quindi avere una chiave RSA in software: le CA EC, basate su HSM, senza chiave, offline e revocate non sono elencate (v2.248)
-- **Approvazione automatica**: Approva automaticamente le richieste con challenge password valide
+- **Approvazione automatica**: Approva automaticamente le richieste con challenge password valide, o i rinnovi firmati da un certificato emesso dallo stesso endpoint
+- **Servire su HTTP semplice**: disattivato per impostazione predefinita. Risponde a SCEP anche sulla porta del protocollo HTTP (8080 per impostazione predefinita) per i client che non possono usare HTTPS, come sscep. RFC 8894 §7.10: i messaggi SCEP sono già protetti, quindi TLS non è richiesto; la busta CMS mantiene privata la challenge password
 
 ### Profili
 Endpoint di enrollment denominati, ciascuno servito su un URL proprio:
@@ -86,10 +88,12 @@ Ogni profilo è associato a:
 Punta ogni flotta di dispositivi, profilo MDM o tenant al proprio URL di profilo. L'endpoint senza segmento \`/scep/pkiclient.exe\` continua a servire la configurazione globale senza modifiche.
 
 ### Challenge Password
-Gestisci le challenge password per CA. I dispositivi devono includere una challenge password valida nella loro richiesta di iscrizione per autenticarsi.
+La scheda **Challenges** mostra le challenge password. I dispositivi devono includere una challenge password valida nella loro richiesta di iscrizione per autenticarsi.
 
 - **Visualizza password**: Mostra la challenge attuale per una CA
-- **Rigenera**: Crea una nuova challenge password (invalida quella precedente)
+- **Rigenera**: Crea una nuova challenge password (invalida quella precedente per le nuove iscrizioni)
+
+Un rinnovo (RenewalReq) firmato da un certificato emesso dallo stesso endpoint (profilo o globale) è autenticato da quel certificato: la sua challenge password non viene controllata, quindi un segreto rigenerato non impedisce ai dispositivi iscritti di rinnovare (RFC 8894 §2.4). Un certificato emesso altrove, da un altro profilo, da ACME, EST o dall'interfaccia, richiede ancora la challenge dell'endpoint. Un dispositivo EC invia comunque una password, che cifra la sua risposta.
 
 ### Informazioni
 Mostra l'URL dell'endpoint SCEP e le istruzioni di integrazione.
@@ -109,16 +113,21 @@ Il dispositivo firma il proprio PKCSReq con la propria chiave: RSA, ECDSA, Ed255
 ## URL SCEP
 
 \`\`\`
-https://your-server:8443/scep                          (global endpoint)
+https://your-server:8443/scep/pkiclient.exe            (configured CA)
 https://your-server:8443/scep/<profile>/pkiclient.exe  (per-profile endpoint)
+https://your-server:8443/cgi-bin/pkiclient.exe         (configured CA, legacy path)
+http://your-server:8080/scep/pkiclient.exe             (with Serve on plain HTTP)
 \`\`\`
 
-I dispositivi necessitano dell'URL per iscriversi. Usa un URL di profilo per indirizzare la CA, il modello e la challenge password di quel profilo.
+I dispositivi necessitano dell'URL per iscriversi; \`/scep\` da solo è l'interfaccia web, non un endpoint SCEP. Usa un URL di profilo per indirizzare la CA, il modello e la challenge password di quel profilo.
+
+### Cambio di CA (GetNextCACert)
+GetNextCACert serve il successore della CA dell'endpoint, firmato dalla CA corrente: un'altra CA con lo stesso padre e lo stesso DN del soggetto, non revocata, non offline, con una chiave RSA in software, e che scade più tardi. Una CA che condivide solo il nome visualizzato non viene mai servita; senza un successore la risposta è 404.
 
 ## Approvazione/Rifiuto delle richieste
 
 Per le richieste in attesa (approvazione automatica disattivata):
-1. Rivedi i dettagli della richiesta (soggetto, tipo di chiave, challenge)
+1. Rivedi i dettagli della richiesta (soggetto, ID transazione, stato, CSR)
 2. Clicca **Approva** per firmare ed emettere il certificato
 3. Oppure clicca **Rifiuta** con una motivazione
 

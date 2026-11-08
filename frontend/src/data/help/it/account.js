@@ -25,7 +25,7 @@ export default {
       {
         title: 'Chiavi API',
         items: [
-          { label: 'Crea chiave', text: 'Genera una nuova chiave API con scadenza opzionale' },
+          { label: 'Crea chiave', text: 'Genera una nuova chiave API, con scadenza opzionale dopo un numero di giorni' },
           { label: 'Permessi', text: 'Una chiave porta l\'ambito scelto alla creazione, mai più dei tuoi permessi. Una chiave può creare o rigenerare solo una chiave i cui permessi possiede essa stessa' },
           { label: 'Revoca', text: 'Invalida immediatamente una chiave API' },
           { label: 'Utenti disattivati', text: 'Le chiavi API appartenenti a un utente disattivato vengono rifiutate anche se la chiave stessa è ancora valida' },
@@ -45,10 +45,10 @@ export default {
     ],
     tips: [
       'Abilita almeno un secondo fattore (TOTP o chiave di sicurezza) per gli account amministratore',
-      'Le chiavi API possono avere una data di scadenza per integrazioni a breve termine',
+      'Le chiavi API possono scadere dopo un numero stabilito di giorni per integrazioni a breve termine',
       'Scansiona il codice QR con qualsiasi app TOTP: Google Authenticator, Authy, 1Password, ecc.',
       'Le chiavi API possono anche essere create senza scadenza per l\'automazione a lungo termine',
-      'Le selezioni di filtro su ogni pagina elenco (Certificati, CA, Audit, ecc.) sono persistite automaticamente attraverso i ricaricamenti',
+      'Le selezioni di filtro nelle principali pagine elenco (Certificati, CA, Template, Audit, Policy, Trust Store e altre) sono persistite attraverso i ricaricamenti; CSR, Approvazioni, Recupero chiavi, Discovery e Log di sistema partono senza filtri',
     ],
   },
   helpGuides: {
@@ -61,7 +61,7 @@ Gestisci il tuo profilo personale, le impostazioni di sicurezza e le chiavi API.
 ## Profilo
 
 - **Nome completo**: Il tuo nome visualizzato in UCM
-- **Email**: Utilizzata per notifiche, recupero password e registrazione ACME
+- **Email**: Utilizzata per notifiche e recupero password
 - **Info account**: Data di creazione, timestamp dell'ultimo accesso, conteggio totale degli accessi
 
 ## Sicurezza
@@ -77,9 +77,9 @@ Aggiungi una password monouso basata sul tempo utilizzando qualsiasi app di aute
 1. Clicca **Abilita 2FA**
 2. Scansiona il codice QR con la tua app di autenticazione (Google Authenticator, Authy, 1Password, ecc.)
 3. Inserisci il codice a 6 cifre per confermare
-4. Salva i **codici di recupero**: vengono mostrati solo una volta
+4. Salva i **codici di backup**: vengono mostrati solo una volta
 
-> ⚠ Se perdi l'accesso all'autenticatore e ai codici di recupero, un amministratore dovrà disabilitare il tuo 2FA.
+> ⚠ Se perdi l'accesso all'autenticatore e ai codici di backup, un amministratore dovrà disabilitare il tuo 2FA.
 
 Per spostare il 2FA su un nuovo autenticatore, disabilitalo prima: riabilitarlo mentre è attivo viene rifiutato.
 
@@ -90,12 +90,12 @@ Registra chiavi di sicurezza hardware o autenticatori biometrici:
 - Windows Hello
 - Touch ID
 
-1. Clicca **Registra chiave di sicurezza**
+1. Clicca **Aggiungi chiave**
 2. Inserisci un nome per la chiave
 3. Segui la richiesta del browser per l'autenticazione
 4. La chiave appare nell'elenco delle credenziali registrate
 
-Con il 2FA attivo o imposto, una chiave registrata può anche completare il secondo passaggio di un accesso con password: scegli **Usa una chiave di sicurezza**.
+Con il 2FA attivo o imposto, una chiave registrata può anche completare il secondo passaggio di un accesso con password: scegli **Usa chiave di sicurezza**.
 
 Senza un'app di autenticazione, attiva **Chiave di sicurezza come secondo fattore** nella sezione Autenticazione a due fattori: ogni accesso con password richiede allora una delle tue chiavi, e l'ultima chiave non può essere rimossa finché l'opzione è attiva.
 
@@ -108,9 +108,9 @@ Gestisci i certificati client per l'autenticazione TLS reciproca:
 ## Chiavi API
 
 ### Creazione di una chiave API
-1. Clicca **Crea chiave API**
+1. Clicca **Crea chiave**
 2. Inserisci un **nome** (descrittivo, es. "Pipeline CI/CD")
-3. Facoltativamente imposta una **data di scadenza**
+3. Facoltativamente imposta una scadenza in **giorni**
 4. Clicca **Crea**
 5. Copia immediatamente la chiave: viene mostrata solo una volta
 
@@ -129,9 +129,9 @@ Ogni chiave porta l'ambito scelto alla creazione (**Accesso completo**, **Solo l
 Le chiavi API, anche quelle ad accesso completo, non possono modificare il tuo profilo, la password, il 2FA, le chiavi di sicurezza, i certificati mTLS o le sessioni, né raggiungere il tuo account tramite le azioni di amministrazione utenti: questi richiedono una sessione interattiva.
 
 ### Revoca delle chiavi
-Clicca **Elimina** per invalidare immediatamente una chiave API. Le sessioni attive che utilizzano la chiave verranno terminate.
+Il primo **Elimina** revoca subito una chiave API: le richieste con essa vengono rifiutate da quel momento. Un secondo Elimina sulla chiave revocata la rimuove.
 
-> 💡 Usa chiavi API a breve scadenza con date di scadenza per CI/CD e automazione.
+> 💡 Usa chiavi API a breve scadenza per CI/CD e automazione.
 `
   }
 }
