@@ -81,25 +81,59 @@ def _enabled_config():
 def parse_kerberos_principal(principal):
     """``'WIN11$@HAGLAND.DOMAIN'`` -> ``('WIN11$', 'HAGLAND.DOMAIN')``.
 
-    ``None`` for anything that isn't exactly one non-empty local-part and
-    one non-empty realm separated by ``@``.
+    The realm follows the last unescaped ``@`` (an uncanonicalized enterprise name,
+    RFC 6806, keeps an escaped one). ``None`` for an empty part, or a name holding ``@`` or
+    ``\\``, which no sAMAccountName does.
     """
-    if not principal or '@' not in principal:
+    if not principal:
         return None
-    local, _, realm = principal.partition('@')
-    if not local or not realm:
+    at = next((i for i in range(len(principal) - 1, -1, -1)
+               if principal[i] == '@' and (i == 0 or principal[i - 1] != '\\')), None)
+    if at is None:
+        return None
+    local, realm = principal[:at], principal[at + 1:]
+    if not local or not realm or '@' in local or '\\' in local:
         return None
     return local, realm
 
 
-def _realm_from_base_dn(base_dn):
+def _normalized_dn(dn):
+    """``dn`` with the spaces around unescaped separators dropped and ``;`` read as ``,``:
+    AD accepts that writing and RFC 4514 §3 lets a reader accept other forms."""
+    out, i = [], 0
+    dn = dn.lstrip(' ')
+    n = len(dn)
+    while i < n:
+        c = dn[i]
+        if c == '\\' and i + 1 < n:
+            out.append(dn[i:i + 2])
+            i += 2
+            continue
+        if c in ',;=+':
+            while out and out[-1] == ' ':
+                out.pop()
+            out.append(',' if c == ';' else c)
+            i += 1
+            while i < n and dn[i] == ' ':
+                i += 1
+            continue
+        out.append(c)
+        i += 1
+    while out and out[-1] == ' ':
+        out.pop()
+    return ''.join(out)
+
+
+def realm_of_base_dn(base_dn):
     """``'DC=hagland,DC=domain'`` -> ``'HAGLAND.DOMAIN'`` -- the standard AD
     convention of domain DNS name == Kerberos realm (upper-cased). ``None``
-    if the DN has no DC components at all (malformed base_dn)."""
+    if the DN does not parse or has no DC components at all."""
     from ldap3.utils.dn import parse_dn
 
+    if not base_dn:
+        return None
     try:
-        components = parse_dn(base_dn)
+        components = parse_dn(_normalized_dn(base_dn))
     except Exception:
         return None
     dc_values = [value for attr, value, _sep in components if attr.upper() == 'DC']
@@ -130,8 +164,28 @@ def realm_matches_connector(realm):
     config = ADConnectorConfig.get_singleton()
     if not config or not config.enabled or not config.base_dn:
         return False
-    connector_realm = _realm_from_base_dn(config.base_dn)
+    connector_realm = realm_of_base_dn(config.base_dn)
     return bool(connector_realm) and connector_realm == realm.upper()
+
+
+def _config_fault(config):
+    if not config.server:
+        return 'no server is configured'
+    if not config.base_dn:
+        return 'no base DN is configured'
+    if not realm_of_base_dn(config.base_dn):
+        return 'the base DN has no DC component to name its realm'
+    return None
+
+
+def connector_config_fault():
+    """Why the enabled connector cannot resolve a principal, or None."""
+    from models import ADConnectorConfig
+
+    config = ADConnectorConfig.get_singleton()
+    if not config or not config.enabled:
+        return None
+    return _config_fault(config)
 
 
 def connector_account(principal):
@@ -147,7 +201,7 @@ def connector_account(principal):
     config = ADConnectorConfig.get_singleton()
     if not config or not config.enabled:
         return None
-    if not config.server or not config.base_dn or not _realm_from_base_dn(config.base_dn):
+    if _config_fault(config):
         return UNREACHABLE
     parsed = parse_kerberos_principal(principal)
     if not parsed:
@@ -163,9 +217,8 @@ def is_machine_principal(principal):
     Never raises -- malformed input (no ``@``, empty string) is just not a
     machine principal, not an error.
     """
-    if not principal or '@' not in principal:
-        return False
-    return principal.split('@', 1)[0].endswith('$')
+    parsed = parse_kerberos_principal(principal)
+    return bool(parsed) and parsed[0].endswith('$')
 
 
 def _build_tls(config):
@@ -459,8 +512,8 @@ def lookup_object_sid(sam_account_name):
 
     ``None`` when the connector is off or the entry is not found; the falsy ``UNUSABLE_SID``
     when its SID is missing or malformed; the falsy ``UNREACHABLE`` when the directory cannot
-    answer. Never raises. A caller telling "connector off" from "not found" checks
-    ``ADConnectorConfig`` first.
+    answer. Never raises. A caller telling "connector off" from "not found" resolves the
+    account with ``connector_account`` first.
     """
     from ldap3.utils.conv import escape_filter_chars
 
@@ -580,8 +633,9 @@ def is_member_of_group(sam_account_name, group):
 
     Fails closed to ``False`` -- connector not configured/disabled, group not
     found, or account not found/not a member -- and to the falsy ``UNREACHABLE``
-    when no DC binds or a search fails. Never raises. Callers must treat either as
-    "deny", never "skip the check": this is a security gate.
+    when no DC binds, a search fails or the group name matches several groups.
+    Never raises. Callers must treat either as "deny", never "skip the check":
+    this is a security gate.
     """
     from ldap3.utils.conv import escape_filter_chars
 
@@ -611,6 +665,11 @@ def is_member_of_group(sam_account_name, group):
             if not entries:
                 logger.warning("AD Connector: group %r not found for Enroll ACL check", group)
                 return False
+            # A cn is unique only within its container: never pick one of several groups
+            if len(entries) > 1:
+                logger.warning("AD Connector: ambiguous group %r for Enroll ACL check (%s); "
+                               "name it by its DN", group, ', '.join(e.entry_dn for e in entries))
+                return UNREACHABLE
             group_dn = entries[0].entry_dn
 
         safe_sam = escape_filter_chars(sam_account_name)

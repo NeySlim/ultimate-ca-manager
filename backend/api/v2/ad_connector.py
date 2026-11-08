@@ -151,6 +151,10 @@ def update_config():
         base_dn = (data['base_dn'] or '').strip()
         if len(base_dn) > MAX_DN_LEN:
             return error_response('base_dn is too long', 400)
+        # The realm of Kerberos requesters is read from the DC components
+        if base_dn and not lookup.realm_of_base_dn(base_dn):
+            return error_response('base_dn must name the domain with DC components, '
+                                  'such as DC=corp,DC=example', 400)
         config.base_dn = base_dn or None
     if 'bind_dn' in data:
         bind_dn = (data['bind_dn'] or '').strip()

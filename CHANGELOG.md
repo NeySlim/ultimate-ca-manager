@@ -20,6 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- AD Connector: saving a base DN without DC components, which names no domain, is refused with 400.
 - SSO providers: an unknown `default_role` is refused instead of being stored as viewer, and an empty one, "None" in the form, gives no implicit role; an existing provider whose default role is empty or unknown keeps viewer (migration 137).
 - LDAP: a new provider without SSL/TLS uses StartTLS by default, so passwords do not cross in clear (RFC 4513 §6.3.3); existing providers keep their setting.
 - ACME server: revokeCert refused an account other than the one that ordered the certificate even when it held valid authorizations for all its identifiers. Such an account may now revoke a certificate this ACME server issued, as RFC 8555 §7.6 requires; an authorization granted by auto-approval does not count.
@@ -54,6 +55,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- AD Connector: a base DN written with spaces around its separators (`DC=corp, DC=example`), as Active Directory accepts, named no Kerberos realm, so every Kerberos WSTEP request was refused. It is now read as written, and an Enroll ACL group named by a cn that several groups share is refused instead of checking the first one found.
 - AD Connector: an LDAP search that the domain controller answered with an error (busy, unavailable, time limit, a base DN it does not hold, missing read rights) read as "account not found", so WSTEP refused the requester with 400. It now counts as a directory failure, answered 500 like an unreachable DC.
 - mTLS: a static file request sent without the session cookie, as browsers fetch the favicon, opened a new certificate session and wrote a `login_success` audit event, several per page refresh. Static files no longer open a session, so a page load logs in once.
 - ACME proxy: every upstream CA error reached the client as a 500 `serverInternal`, so a rate limit, a refused name or a refused CSR looked like a proxy failure. The upstream type, status, subproblems and Retry-After now reach the client, revocation included (RFC 8555 §6.6, §6.7).

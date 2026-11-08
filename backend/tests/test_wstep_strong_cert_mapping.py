@@ -250,15 +250,18 @@ class TestSidCheckIsNeverSkipped:
             assert err == "The requester's principal names no directory account"
             assert not isinstance(err, wstep_service.ServerError)
 
-    def test_connector_without_base_dn_is_a_server_fault(self, app, create_ca, monkeypatch):
+    def test_connector_without_base_dn_is_a_server_fault(self, app, create_ca, monkeypatch, caplog):
         ca_data = create_ca(cn='Strong Mapping No Base DN CA')
         monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam: _REAL_SID)
-        for base_dn in (None, '', 'not a dn', 'OU=Machines'):
+        for base_dn, cause in ((None, 'no base DN'), ('', 'no base DN'),
+                               ('not a dn', 'no DC component'), ('OU=Machines', 'no DC component')):
             _configure_connector_row(app, base_dn=base_dn)
+            caplog.clear()
             cert_pem, err = _issue_supplied_subject(app, ca_data['id'], KERBEROS_MACHINE_PRINCIPAL)
             assert cert_pem is None, base_dn
             assert isinstance(err, wstep_service.ServerError), base_dn
             assert err == 'Could not resolve requester identity for strong certificate mapping'
+            assert cause in caplog.text, base_dn
 
     def test_disabled_connector_still_issues_a_foreign_principal_without_sid(
             self, app, create_ca, monkeypatch):

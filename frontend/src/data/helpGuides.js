@@ -2238,7 +2238,7 @@ UCM's own LDAP connection to Active Directory, independent of any LDAP provider 
 - **Purpose**: Resolves a Kerberos machine or user principal to its AD object, so UCM can derive a certificate subject/SAN the same way a real Windows CA would
 - **Domain Controllers**: One per row, each by its own hostname, tried in order: lookups fail over to the next one when a DC is down. A bare domain name fails certificate verification, since a domain controller certificate names only its own host
 - **LDAPS**: Toggle to use LDAP over SSL/TLS; **Verify SSL Certificate** validates the DC's certificate (optionally against a custom CA bundle when it isn't publicly trusted)
-- **Base DN** and **Bind DN / Password**: Service account credentials used for lookups; Bind DN and password are both required while the connector is enabled
+- **Base DN** and **Bind DN / Password**: the domain's base DN, with its DC components (\`DC=corp,DC=example\`, which also names the Kerberos realm served), and the service account used for lookups; Bind DN and password are both required while the connector is enabled
 - **Test Connection**: Verify connectivity and credentials before saving
 - **Health Check Interval**: Each domain controller is probed with a real bind at this interval; an unreachable one is skipped at enrollment time until it recovers. The verdict shows on the settings row and against each DC
 

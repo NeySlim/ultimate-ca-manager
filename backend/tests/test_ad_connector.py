@@ -362,3 +362,19 @@ class TestBindCredentialIsRequired:
             data=json.dumps({'servers': ['dc1.corp.local'],
                              'bind_password': 'svc-password'}))
         assert no_dn.status_code == 400
+
+
+class TestBaseDnValidation:
+    @staticmethod
+    def _put(auth_client, payload):
+        return auth_client.put('/api/v2/ad-connector', data=json.dumps(payload),
+                               content_type='application/json')
+
+    @pytest.mark.parametrize('base_dn', ['OU=Users,O=Corp', 'not a dn', 'CN=Users'])
+    def test_a_base_dn_without_a_domain_component_is_refused(self, app, auth_client, base_dn):
+        response = self._put(auth_client, {'base_dn': base_dn})
+        assert response.status_code == 400
+        assert 'DC=' in response.get_json()['message']
+
+    def test_a_spaced_domain_dn_is_accepted(self, app, auth_client):
+        assert self._put(auth_client, {'base_dn': 'DC=corp, DC=example'}).status_code == 200

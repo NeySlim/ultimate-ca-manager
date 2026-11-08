@@ -1005,6 +1005,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         # would drop the SID extension (KB5014754) and the Enroll ACL's account.
         account = lookup.connector_account(kerberos_principal)
         if account is lookup.UNREACHABLE:
+            logger.warning("WSTEP: the AD Connector cannot resolve %r: %s", kerberos_principal,
+                           lookup.connector_config_fault() or 'its settings changed')
             return None, ServerError('Could not resolve requester identity for strong certificate mapping')
         if account is lookup.FOREIGN_REALM:
             # sAMAccountName is unique only within its domain: never look it up in another
@@ -1087,11 +1089,9 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # per-request principal, so there's no identity here to check group
     # membership for. See _required_enroll_acl_groups for why an unmatched
     # (typically naked) CSR checks against every restricted template for
-    # the CA rather than being skipped. A missing/unresolved
-    # sam_account_name (parse failure, cross-realm mismatch) denies rather
-    # than skips the check, same as an AD lookup failure inside
-    # is_member_of_group -- this is a security gate, not a best-effort
-    # convenience lookup.
+    # the CA rather than being skipped. With the connector off there is no
+    # sam_account_name and a restricted template is denied, never skipped:
+    # this is a security gate, not a best-effort convenience lookup.
     if kerberos_principal:
         required_groups = _required_enroll_acl_groups(ca, matched_template)
         allowed, unreachable = False, False

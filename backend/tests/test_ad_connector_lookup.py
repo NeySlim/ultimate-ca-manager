@@ -39,6 +39,10 @@ class TestParseKerberosPrincipal:
     def test_none(self):
         assert lookup.parse_kerberos_principal(None) is None
 
+    def test_an_uncanonicalized_enterprise_name_names_no_account(self):
+        """RFC 6806 §5: the realm follows the last unescaped '@'; '@' is not allowed in a sAMAccountName."""
+        assert lookup.parse_kerberos_principal('jdoe\\@corp.example@HAGLAND.DOMAIN') is None
+
 
 class TestIsMachinePrincipal:
     def test_machine_principal(self):
@@ -1119,6 +1123,7 @@ _FAILED_SEARCHES = [
     (3, 'timeLimitExceeded'), (10, 'referral'), (11, 'adminLimitExceeded'),
     (32, 'noSuchObject'), (50, 'insufficientAccessRights'), (51, 'busy'),
     (52, 'unavailable'), (53, 'unwillingToPerform'), (80, 'other'),
+    (4, 'sizeLimitExceeded'),
 ]
 _LOOKUPS = {
     'computer': lambda: lookup.lookup_computer_dns_hostname('WIN11$'),
@@ -1195,3 +1200,61 @@ class TestSearchResultCodesOnLdap3:
             # The schema-less mock hands values back as bytes: only presence is compared
             assert 'win11.hagland.domain' in lookup.lookup_computer_dns_hostname('WIN11$')
             assert lookup.lookup_computer_dns_hostname('GHOST$') is None
+
+
+class TestSearchWithoutResult:
+    @pytest.mark.parametrize('name', sorted(_LOOKUPS))
+    def test_a_connection_without_a_result_is_unreachable(self, app, monkeypatch, name):
+        _configure(None, app, enabled=True)
+        class _NoResult(_FakeConnection):
+            def search(self, base_dn, filter_str, attributes=None):
+                self.result = None
+                return True
+
+        monkeypatch.setattr(lookup, '_connect', lambda config: _NoResult(entries=[]))
+        with app.app_context():
+            assert _LOOKUPS[name]() is lookup.UNREACHABLE
+
+
+class TestAmbiguousAclGroup:
+    def test_a_group_name_matching_two_groups_is_unreachable(self, app, monkeypatch):
+        """A homonymous cn in another OU must never stand in for the ACL's group."""
+        _configure(None, app, enabled=True)
+        first, second = _FakeEntry({}), _FakeEntry({})
+        first.entry_dn = 'CN=VPN-Enroll,OU=Groups,DC=hagland,DC=domain'
+        second.entry_dn = 'CN=VPN-Enroll,OU=Lab,DC=hagland,DC=domain'
+        member = _FakeEntry({'sAMAccountName': 'alice'})
+        monkeypatch.setattr(lookup, '_connect',
+                            lambda config: _FakeSequentialConnection([[second, first], [member]]))
+        with app.app_context():
+            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is lookup.UNREACHABLE
+
+
+class TestBaseDnSpellings:
+    """AD accepts spaces around a DN's separators (RFC 4514 §3 lets a reader accept other forms)."""
+
+    @pytest.mark.parametrize('base_dn, realm', [
+        ('DC=hagland, DC=domain', 'HAGLAND.DOMAIN'),
+        ('OU=Users , DC=corp ,DC=example', 'CORP.EXAMPLE'),
+        ('DC = corp,DC = example', 'CORP.EXAMPLE'),
+        ('DC=corp;DC=example', 'CORP.EXAMPLE'),
+        ('  DC=corp , DC=example  ', 'CORP.EXAMPLE'),
+    ])
+    def test_a_spaced_base_dn_still_names_its_realm(self, app, base_dn, realm):
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            config = ADConnectorConfig(server='dc1', base_dn=base_dn, bind_dn='svc', enabled=True)
+            config.bind_password = 'irrelevant'
+            db.session.add(config)
+            db.session.commit()
+            try:
+                assert lookup.connector_account(f'WIN11$@{realm}') == 'WIN11$'
+                assert lookup.connector_config_fault() is None
+            finally:
+                ADConnectorConfig.query.delete()
+                db.session.commit()
+
+    def test_escaped_characters_are_kept(self):
+        assert lookup.realm_of_base_dn('OU=a\\, b ,DC=corp, DC=example') == 'CORP.EXAMPLE'
+        assert lookup.realm_of_base_dn('OU=Users,O=Corp') is None
+        assert lookup.realm_of_base_dn('not a dn') is None
