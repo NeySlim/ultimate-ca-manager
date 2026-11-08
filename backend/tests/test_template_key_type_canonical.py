@@ -19,6 +19,14 @@ from lxml import etree
 from models import CA, CATemplatePin, Certificate, CertificateTemplate, db
 from models.system_config import SystemConfig
 from tests.conftest import get_json
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
+
 
 CONTENT_JSON = 'application/json'
 XCEP_URL = '/ADPolicyProvider_CEP_UsernamePassword/service.svc'

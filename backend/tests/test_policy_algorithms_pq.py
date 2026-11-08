@@ -18,6 +18,14 @@ from models.policy import ApprovalRequest, CertificatePolicy
 from services.policy_service import PolicyEvaluationService, PolicyViolation
 from tests.conftest import get_json
 from utils import key_algorithms
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
+
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')

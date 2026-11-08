@@ -16,6 +16,7 @@ leaf path now routes its KeyUsage through ``utils.leaf_key_usage``:
 import base64
 import json
 
+import pytest
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
@@ -26,6 +27,14 @@ from models import db, CA, Certificate
 from tests.conftest import get_json
 from tests.test_scep_rfc8894_operations import _load_ca_material
 from utils.leaf_key_usage import constrain_builder_key_usage, key_usage_for_key
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
+
 
 CONTENT_JSON = 'application/json'
 

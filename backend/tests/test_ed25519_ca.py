@@ -9,6 +9,14 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
 
 from models import CA, Certificate, db
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
+
 
 EDDSA = {'Ed25519': (ed25519.Ed25519PrivateKey, ed25519.Ed25519PublicKey),
          'Ed448': (ed448.Ed448PrivateKey, ed448.Ed448PublicKey)}

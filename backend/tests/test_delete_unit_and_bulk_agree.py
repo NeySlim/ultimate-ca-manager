@@ -28,6 +28,14 @@ from models.scep import ScepProfile
 from models.certificate_template import CertificateTemplate
 from utils.datetime_utils import utc_now
 from utils.file_naming import ca_cert_path
+import pytest
+from tests.fixtures.templates import templates_created_here_removed
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _templates_stay_in_this_module(app):
+    with templates_created_here_removed(app):
+        yield
 
 
 def _mk_template(app, name):
