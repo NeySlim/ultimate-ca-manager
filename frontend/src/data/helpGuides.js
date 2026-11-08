@@ -2294,7 +2294,7 @@ Windows can also renew with \`certreq ... Renew\`, authenticated by the certific
 
 ### SID Security Extension (KB5014754)
 
-On **Kerberos-authenticated issuance**, UCM embeds the requester's AD SID in the Microsoft SID security extension (\`szOID_NTDS_CA_SECURITY_EXT\`) of the issued certificate. Domain controllers use it for **strong certificate mapping** (KB5014754): required since AD enforcement of strong mapping for certificate-based authentication (smartcard logon, PKINIT).
+On **Kerberos-authenticated issuance**, UCM embeds the requester's AD SID in the Microsoft SID security extension (\`szOID_NTDS_CA_SECURITY_EXT\`) of the issued certificate. Domain controllers use it for **strong certificate mapping** (KB5014754): required since AD enforcement of strong mapping for certificate-based authentication (smartcard logon, PKINIT). With the AD Connector enabled, a request whose SID cannot be resolved is refused rather than issued without it, including a principal of a realm other than the connector's domain.
 
 ### AD-Derived Subjects
 

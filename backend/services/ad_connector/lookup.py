@@ -61,6 +61,9 @@ class _Falsy:
 UNREACHABLE = _Falsy('UNREACHABLE')
 # The account exists but its objectSid is missing or malformed.
 UNUSABLE_SID = _Falsy('UNUSABLE_SID')
+# The Kerberos principal names no account, or one of a realm the connector does not serve.
+NO_ACCOUNT = _Falsy('NO_ACCOUNT')
+FOREIGN_REALM = _Falsy('FOREIGN_REALM')
 
 
 def _enabled_config():
@@ -130,6 +133,29 @@ def realm_matches_connector(realm):
         return False
     connector_realm = _realm_from_base_dn(config.base_dn)
     return bool(connector_realm) and connector_realm == realm.upper()
+
+
+def connector_account(principal):
+    """The sAMAccountName an enabled connector checks ``principal`` against.
+
+    None when the connector is absent or disabled; the falsy ``UNREACHABLE`` when it is
+    enabled without a server or a base DN that names a realm; the falsy ``NO_ACCOUNT``
+    or ``FOREIGN_REALM`` when the principal is malformed or of another realm, which a
+    caller refuses rather than issuing without the checks the connector enforces.
+    """
+    from models import ADConnectorConfig
+
+    config = ADConnectorConfig.get_singleton()
+    if not config or not config.enabled:
+        return None
+    if not config.server or not config.base_dn or not _realm_from_base_dn(config.base_dn):
+        return UNREACHABLE
+    parsed = parse_kerberos_principal(principal)
+    if not parsed:
+        return NO_ACCOUNT
+    if not realm_matches_connector(parsed[1]):
+        return FOREIGN_REALM
+    return parsed[0]
 
 
 def is_machine_principal(principal):
