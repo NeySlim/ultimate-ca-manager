@@ -7,9 +7,9 @@ export default {
       {
         title: 'Outils disponibles',
         items: [
-          { label: 'Vérificateur SSL', text: 'Se connecter à un hôte distant et inspecter sa chaîne de certificats SSL/TLS' },
+          { label: 'Vérificateur SSL', text: 'Se connecter à un hôte distant et inspecter le certificat qu\'il présente (le certificat final seulement, pas la chaîne)' },
           { label: 'Décodeur de CSR', text: 'Collez une CSR au format PEM pour voir son sujet, ses SAN et ses infos de clé' },
-          { label: 'Décodeur de certificat', text: 'Collez un certificat au format PEM pour inspecter tous les champs' },
+          { label: 'Décodeur de certificat', text: 'Collez un certificat au format PEM pour inspecter son sujet, son émetteur, sa validité, sa clé, ses SAN, ses usages de clé et ses empreintes ; CDP, AIA et politiques ne sont pas affichés' },
           { label: 'Vérificateur de correspondance de clé', text: 'Vérifier qu\'un certificat, une CSR et une clé privée correspondent' },
           { label: 'Convertisseur', text: 'Convertir entre les formats PEM, DER, PKCS#12 et PKCS#7' },
         ]
@@ -45,15 +45,16 @@ Inspecter le certificat SSL/TLS d'un serveur distant :
 
 1. Entrez le **nom d'hôte** (par ex. \`google.com\`)
 2. Changez optionnellement le **port** (par défaut : 443)
-3. Cliquez sur **Vérifier**
+3. Cliquez sur **Vérifier SSL**
 
 Les résultats incluent :
 - Sujet et émetteur du certificat
 - Dates de validité
 - SAN (noms alternatifs du sujet)
 - Type et taille de la clé
-- Chaîne de certificats complète
 - Version du protocole TLS
+
+Seul le certificat que présente le serveur est lu, pas le reste de sa chaîne.
 
 ## Décodeur de CSR
 
@@ -80,7 +81,7 @@ Vérifier qu'un certificat, une CSR et une clé privée correspondent :
 1. Collez le PEM du **certificat**
 2. Collez le PEM de la **clé privée** (optionnellement chiffrée : fournissez le mot de passe)
 3. Collez optionnellement le PEM de la **CSR**
-4. Cliquez sur **Vérifier**
+4. Cliquez sur **Vérifier les clés**
 
 UCM compare les clés publiques (RSA, EC, EdDSA, ML-DSA). Une correspondance confirme qu'ils forment une paire valide. Une clé privée ML-DSA doit contenir sa graine : un fichier de clé ne contenant que la forme étendue est refusé.
 

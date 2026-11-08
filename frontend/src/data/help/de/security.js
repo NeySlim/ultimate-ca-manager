@@ -9,6 +9,7 @@ export default {
         items: [
           { label: 'Status & Zähler', text: 'Zeigt, ob die Verschlüsselung aktiviert ist und wie viele gespeicherte private Schlüssel verschlüsselt bzw. unverschlüsselt sind' },
           { label: 'Aktivieren / Deaktivieren', text: 'Alle privaten Schlüssel mit AES-256 verschlüsseln. Beim Aktivieren werden Klartext-Schlüsselkopien entfernt, beim Deaktivieren neu erstellt' },
+          { label: 'Erster Start', text: 'Ohne Hauptschlüssel erzeugt UCM beim Start /etc/ucm/master.key (0600) und verschlüsselt die bereits gespeicherten Schlüssel. Ein Container tut dies nur, wenn /etc/ucm ein benanntes Volume oder ein Host-Verzeichnis ist. Übersprungen mit gesetztem KEY_ENCRYPTION_KEY, mit bereits verschlüsselten Schlüsseln oder einer verschlüsselten Audit-Kette in der Datenbank, nachdem die Verschlüsselung hier deaktiviert wurde, oder mit UCM_AUTO_MASTER_KEY=false. Bei jedem Start verschlüsselt ein geladener Schlüssel auch die noch unverschlüsselt gespeicherten Werte, und ein Schlüssel, der sie nicht entschlüsselt, versetzt UCM in den abgesicherten Modus. Sichern Sie die Schlüsseldatei' },
           { label: 'Schlüsseldateien auf dem Datenträger', text: 'Zeigt die verbleibenden Klartext-Schlüsselkopien; verwenden Sie Deploy-Hooks, wenn ein anderer Dienst eine Schlüsseldatei benötigt' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Opt-in-Umgebungsvariable: Start ohne expliziten Datenbank-Verschlüsselungsschlüssel verweigern' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: 'Opt-in-Umgebungsvariable: Start verweigern, solange die Verschlüsselung privater Schlüssel nicht aktiviert ist' },
@@ -18,17 +19,16 @@ export default {
       {
         title: 'Passwortrichtlinie',
         items: [
-          { label: 'Mindestlänge', text: 'Mindestanzahl erforderlicher Zeichen' },
-          { label: 'Komplexität', text: 'Großbuchstaben, Kleinbuchstaben, Zahlen, Sonderzeichen erfordern' },
-          { label: 'Ablauf', text: 'Passwortänderung nach einer bestimmten Anzahl von Tagen erzwingen' },
-          { label: 'Verlauf', text: 'Wiederverwendung früherer Passwörter verhindern' },
+          { label: 'Mindestlänge', text: 'Mindestanzahl erforderlicher Zeichen, 6 bis 32' },
+          { label: 'Komplexität', text: 'Großbuchstaben, Zahlen und Sonderzeichen erfordern, jeweils einzeln schaltbar' },
         ]
       },
       {
         title: 'Sitzung & Zugriff',
         items: [
-          { label: 'Sitzungszeitlimit', text: 'Automatische Abmeldung nach Inaktivitätszeitraum' },
-          { label: 'Ratenbegrenzung', text: 'Anmeldeversuche begrenzen, um Brute-Force-Angriffe zu verhindern' },
+          { label: 'Sitzungszeitlimit', text: 'Automatische Abmeldung nach Inaktivitätszeitraum (Einstellungen › Allgemein)' },
+          { label: 'Sitzungsdauer', text: 'Maximale Sitzungslänge in Stunden, unabhängig von der Aktivität' },
+          { label: 'Kontosperre', text: 'Max. Anmeldeversuche und Sperrdauer (Einstellungen › Allgemein) sperren ein Konto nach wiederholten Fehlschlägen. Anfragelimits pro IP werden über die Umgebungsvariablen RATE_LIMIT_* gesetzt, nicht auf dieser Seite' },
           { label: 'Admin-Zugriffs-Allowlist', text: 'Die Weboberfläche und die Management-API auf aufgelistete IP-Adressen und Netzwerke beschränken' },
           { label: '2FA-Durchsetzung', text: 'Zwei-Faktor-Authentifizierung für alle Benutzer erfordern' },
         ]
@@ -51,6 +51,7 @@ export default {
           { label: 'Client-Zertifikat erfordern', text: 'mTLS optional für die Web-UI verpflichtend machen, das Ändern der mTLS-Einstellungen erfordert einen Dienstneustart' },
           { label: 'Gleiche Seriennummer, andere CA (v2.251)', text: 'Eine Registrierung wird über Aussteller und Seriennummer identifiziert, sodass ein Client-Zertifikat registriert, importiert oder zugewiesen werden kann, wenn das registrierte Zertifikat einer anderen CA dieselbe Seriennummer hat' },
           { label: 'Reverse-Proxy-Header (v2.252)', text: 'Hinter einem Proxy, der das Client-Zertifikat als Header weiterleitet, senden Sie den Aussteller-DN (X-SSL-Client-I-DN) mit der Seriennummer, als Hexadezimalwert gelesen, oder das Zertifikat selbst (X-SSL-Client-Cert). Eine Seriennummer ohne ihren Aussteller öffnet keine Registrierung, die einen erfasst hat, und ein vorgelegtes Zertifikat lässt sich ohne ihn nicht registrieren' },
+          { label: 'Widerrufener Aussteller', text: 'Ein Client-Zertifikat, das unter einer widerrufenen CA ausgestellt wurde, auf jeder Ebene seiner Kette, eröffnet keine Sitzung und kann weder registriert noch importiert werden (v2.252)' },
           { label: 'Erzeugte Schlüssel (v2.251)', text: 'Ein von UCM erzeugtes mTLS-Benutzerzertifikat erhält einen Schlüssel in der Stärke der ausstellenden CA, RSA oder eine NIST-Kurve, die Browser akzeptieren, auf den nächstliegenden von den Richtlinien erlaubten Typ verschoben, statt immer RSA-2048' },
         ]
       },
@@ -93,33 +94,32 @@ Beide akzeptieren \`1\`/\`true\`/\`yes\`/\`on\`. Ein ungültiger Schlüssel wird
 ## Passwortrichtlinie
 
 ### Komplexitätsanforderungen
-- **Mindestlänge**: 8 bis 32 Zeichen
+- **Mindestlänge**: 6 bis 32 Zeichen (standardmäßig 8)
 - **Großbuchstaben erforderlich**: Mindestens ein Großbuchstabe
-- **Kleinbuchstaben erforderlich**: Mindestens ein Kleinbuchstabe
 - **Zahlen erforderlich**: Mindestens eine Ziffer
 - **Sonderzeichen erforderlich**: Mindestens ein Symbol
 
-### Passwortablauf
-Erzwingt, dass Benutzer ihr Passwort nach einer bestimmten Anzahl von Tagen ändern. Auf 0 setzen, um zu deaktivieren.
-
-### Passwortverlauf
-Verhindert die Wiederverwendung der letzten N Passwörter. Benutzer können kein Passwort festlegen, das einem ihrer vorherigen N Passwörter entspricht.
+UCM hat weder Passwortablauf noch Passwortverlauf als Einstellung.
 
 ## Sitzungsverwaltung
 
 ### Sitzungszeitlimit
-Meldet Benutzer nach N Minuten Inaktivität automatisch ab. Gilt nur für Web-UI-Sitzungen, nicht für API-Schlüssel.
+Unter **Einstellungen › Allgemein**: Meldet Benutzer nach N Minuten Inaktivität automatisch ab. Gilt nur für Web-UI-Sitzungen, nicht für API-Schlüssel.
 
-### Gleichzeitige Sitzungen
-Begrenzt die Anzahl gleichzeitiger Sitzungen pro Benutzer. Zusätzliche Anmeldungen beenden die älteste Sitzung.
+### Sitzungsdauer
+Maximale Sitzungslänge in Stunden, unabhängig von der Aktivität. Die Zahl gleichzeitiger Sitzungen pro Benutzer ist nicht begrenzt.
 
-## Ratenbegrenzung
+## Anmeldeschutz
 
-### Anmeldeversuche
-Begrenzt fehlgeschlagene Anmeldeversuche pro IP-Adresse innerhalb eines Zeitfensters. Nach Überschreitung des Limits wird die IP vorübergehend gesperrt.
+### Max. Anmeldeversuche
+Unter **Einstellungen › Allgemein**: die Zahl fehlgeschlagener Anmeldungen, nach der das **Konto** gesperrt wird.
 
 ### Sperrdauer
-Wie lange eine IP nach Überschreitung des Anmeldeversuchslimits gesperrt wird.
+Wie lange das Konto gesperrt bleibt, in Minuten.
+Ein gesperrtes Konto beantwortet eine Passwort- oder LDAP-Anmeldung bis zum Ende der Sperre mit demselben „Invalid credentials“ wie ein unbekannter Name, sodass die Antwort nicht verrät, dass das Konto existiert; die Sperre wird im Audit-Protokoll erfasst.
+
+### Anfrage-Ratenlimits
+Anfragen werden zusätzlich pro Client-IP-Adresse durch die Umgebungsvariablen \`RATE_LIMIT_*\` begrenzt (Buckets für Authentifizierung, aufwendige Anfragen, Standard und Protokolle; Clients aus privaten Netzen ausgenommen mit \`RATE_LIMIT_TRUST_LAN\`). Die Anmelderouten haben ein eigenes Limit, 5 Versuche pro Minute, das die 429-Antwort mit \`Retry-After\` nennt.
 
 ## Admin-Zugriffs-Allowlist
 

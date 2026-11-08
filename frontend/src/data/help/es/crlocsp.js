@@ -9,13 +9,15 @@ export default {
         items: [
           { label: 'Auto-regeneración', text: 'Activar la regeneración automática de CRL por CA' },
           { label: 'Regenerar manualmente', text: 'Forzar la regeneración inmediata de la CRL' },
-          { label: 'Descargar CRL', text: 'Descargar el archivo CRL en formato DER o PEM' },
+          { label: 'Descargar CRL', text: 'Descargar la CRL en PEM (archivo .crl); la forma DER se sirve en la URL del CDP' },
           { label: 'Despliegue de CRL', text: 'Asociar un destino SSH/SFTP para enviar automáticamente cada CRL regenerada. Cada vinculación define el formato PEM o DER, la ruta de destino, las CRL padre opcionales y su propio comando de recarga' },
           { label: 'CDP URL', text: 'URL del punto de distribución de CRL para incluir en los certificados' },
           { label: 'Validez', text: 'Validez de la CRL por CA desde 1 día hasta 5 años (90d/180d/1y/3y/5y para CAs sin conexión que no pueden volver a firmar según el calendario). Aparece una advertencia pasado un año, las partes que confían pueden conservar datos de revocación obsoletos durante toda la ventana' },
           { label: 'Resumen de firma', text: 'SHA-256, SHA-384 o SHA-512 para una CA RSA o EC. Una CA Ed25519, Ed448 o ML-DSA firma sin resumen: un resumen almacenado antes se muestra como ignorado, con un botón Borrar' },
           { label: 'Resumen predeterminado (v2.251)', text: 'Sin un resumen definido, una CA P-384 o P-521 firma sus CRL con SHA-384 o SHA-512. Las CRL ya emitidas conservan el suyo: la siguiente lo aplica' },
           { label: 'CRL externa', text: 'Las CAs sin clave o sin conexión no pueden autofirmar una CRL, suba una generada junto a la clave sin conexión desde el panel de detalles de la CA; se valida (firma, emisor, monotonía) y se sirve en la misma URL de CDP (v2.215)' },
+          { label: 'CRL delta', text: 'Con las CRL delta activadas, se genera una nueva delta justo después de cada CRL completa, de modo que la delta servida siempre se refiere a la última base' },
+          { label: 'Número de CRL', text: 'Las CRL base y delta de una CA comparten un número creciente, nunca dado a dos CRL, ni siquiera cuando dos generaciones se ejecutan a la vez. El número más alto alcanzado se conserva por nombre y clave de CA y viaja en las copias de seguridad, de modo que una CA restaurada en otro servidor, o eliminada e importada de nuevo, continúa desde él' },
         ]
       },
       {
@@ -24,7 +26,8 @@ export default {
           { label: 'Estado', text: 'Indica si el respondedor OCSP está activo para cada CA' },
           { label: 'AIA URL', text: 'URLs de acceso a información de autoridad, puntos de acceso del respondedor OCSP y descarga del certificado del emisor CA incluidos en los certificados emitidos' },
           { label: 'Caché', text: 'Caché de respuestas con limpieza diaria automática de las entradas expiradas' },
-          { label: 'Total de consultas', text: 'Número de solicitudes OCSP procesadas' },
+          { label: 'Total de consultas', text: 'Número de solicitudes OCSP respondidas desde que arrancó el servicio, y cuántas se sirvieron desde la caché' },
+          { label: 'Caché HTTP', text: 'Las cachés HTTP pueden conservar una respuesta sin nonce hasta su nextUpdate, una hora como máximo (RFC 5019 §6.2: Expires, Last-Modified, ETag); una respuesta con nonce no se reutiliza' },
           { label: 'Respondedor delegado', text: 'Firma las respuestas con un certificado OCSPSigning dedicado en lugar de la clave de la CA, asigne uno por CA desde el panel de detalles' },
           { label: 'Auto-renovación del respondedor', text: 'Una tarea diaria reemite el certificado del respondedor delegado antes de que expire (mismo par de claves, renovado a la par) y lo vuelve a vincular, activado por defecto. El interruptor y su ventana (días antes de la expiración, 30 por defecto) están en Ajustes › Seguridad' },
         ]
@@ -67,6 +70,11 @@ El calendario de la CRL (por CA) establece cuánto tiempo permanece válida cada
 - **Las CAs sin conexión** (típicamente una raíz que no puede volver a firmar las CRL según el calendario) son el caso de uso previsto para las opciones largas: de 90d a 5y
 - Se muestra una advertencia pasado un año: las partes que confían pueden conservar datos de revocación obsoletos durante toda la ventana de validez
 
+### Números de CRL
+Cada CRL lleva un número de CRL (RFC 5280 §5.2.3). Las CRL base y delta de una CA comparten una secuencia creciente, y ningún número se da a dos CRL, ni siquiera cuando una revocación y el programador generan una a la vez.
+
+El número más alto alcanzado se conserva para cada nombre y clave de CA, fuera de la propia CA, y viaja en las copias de seguridad. Una CA restaurada en otro servidor, o eliminada e importada de nuevo, continúa desde él en lugar de empezar de nuevo en 1.
+
 ### Punto de distribución de CRL (CDP)
 La URL del CDP se incluye en los certificados para que los clientes sepan dónde descargar la CRL. Copie la URL desde los detalles de la CRL.
 
@@ -79,7 +87,7 @@ http://su-servidor:8080/cdp/{ca_refid}.crl
 > ⚠️ **Importante**: Las URLs se generan automáticamente usando el puerto del protocolo HTTP y el FQDN del servidor. Si accede a UCM mediante \`localhost\`, la URL no puede generarse. Configure su **FQDN** o **URL base de protocolo** en Configuración → General primero.
 
 ### Descargar CRL
-Descargue las CRL en formato DER o PEM para distribuirlas a los clientes o integrarlas con otros sistemas.
+El botón de descarga guarda la CRL en PEM (un archivo .crl). La URL del CDP la sirve en DER para los clientes y otros sistemas.
 
 ## Respondedor OCSP
 
@@ -89,7 +97,7 @@ OCSP proporciona verificación del estado de certificados en tiempo real. En lug
 ### Estado de OCSP
 La sección OCSP muestra:
 - **Estado del respondedor**: Activo o inactivo por CA
-- **Total de consultas**: Número de solicitudes OCSP procesadas
+- **Total de consultas**: Número de solicitudes OCSP respondidas desde que arrancó el servicio, y cuántas procedían de la caché
 - **Caché**: Caché de respuestas con limpieza diaria automática de entradas expiradas
 
 ### Caché OCSP

@@ -10,8 +10,8 @@ export default {
           { label: 'Inventario certificati', text: 'Elenco completo di tutti i certificati con stato' },
           { label: 'Certificati in scadenza', text: 'Certificati in scadenza entro una finestra temporale specificata' },
           { label: 'Gerarchia CA', text: 'Struttura delle Autorità di certificazione e statistiche' },
-          { label: 'Riepilogo audit', text: 'Riepilogo eventi di sicurezza e attività utente' },
-          { label: 'Stato conformità', text: 'Riepilogo conformità e violazioni delle politiche' },
+          { label: 'Riepilogo audit', text: 'Le azioni più frequenti e gli utenti più attivi nel periodo' },
+          { label: 'Stato conformità', text: 'Tre controlli: certificati attivi, CA scadute e certificati in scadenza entro 30 giorni; le politiche dei certificati non vengono lette' },
           { label: 'Certificati revocati', text: 'Certificati revocati nel periodo, con data e motivo' },
         ]
       },
@@ -53,13 +53,13 @@ Elenco completo di tutti i certificati gestiti da UCM. Include soggetto, emitten
 Certificati in scadenza entro una finestra temporale specificata (predefinito: 30 giorni). Fondamentale per evitare interruzioni, rivedi questo report regolarmente o pianificalo per la consegna giornaliera.
 
 ### Gerarchia CA
-Struttura delle Autorità di certificazione che mostra le relazioni padre-figlio, il conteggio dei certificati per CA e lo stato della CA. Utile per comprendere la topologia della tua PKI.
+Struttura delle Autorità di certificazione che mostra le relazioni padre-figlio, e il conteggio dei certificati per CA. Utile per comprendere la topologia della tua PKI.
 
 ### Riepilogo audit
-Riepilogo eventi di sicurezza e attività utente. Include tentativi di accesso, operazioni sui certificati, violazioni delle politiche e modifiche alla configurazione. Essenziale per gli audit di sicurezza.
+Le dieci azioni più frequenti e i dieci utenti più attivi nel periodo.
 
 ### Stato conformità
-Riepilogo conformità e violazioni delle politiche. Mostra quali certificati sono conformi alle tue politiche e quali le violano. Necessario per la conformità normativa.
+Tre controlli con un conteggio e una gravità: certificati attivi, CA scadute e certificati in scadenza entro 30 giorni. Non legge le politiche dei certificati.
 
 ### Certificati revocati
 Certificati revocati nel periodo scelto (predefinito: 30 giorni), con data e motivo della revoca. Consultalo per seguire le revoche e le loro cause.
@@ -124,7 +124,7 @@ Prima di abilitare le pianificazioni, usa il pulsante ✈️ su qualsiasi riga d
 
 ## Permessi
 
-- **read:reports**: Genera e scarica report
+- **read:audit**: Genera e visualizza report; il download richiede anche **export:audit**
 - **read:audit + export:audit**: Scarica il report esecutivo PDF
 - **write:settings**: Configura le pianificazioni dei report
 

@@ -18,7 +18,7 @@ export default {
           { label: 'Selección de plantilla', text: 'Elegir entre las plantillas de certificado disponibles en la CA de MS' },
           { label: 'Aprobación automática', text: 'Las plantillas con autoenroll devuelven el certificado de inmediato' },
           { label: 'Aprobación del administrador', text: 'Algunas plantillas requieren aprobación del administrador, UCM rastrea la solicitud pendiente' },
-          { label: 'Consulta de estado', text: 'Verificar el estado de solicitudes pendientes desde el panel de detalle del CSR' },
+          { label: 'Solicitudes pendientes', text: 'Una solicitud que la CA retiene para su administrador sigue Pendiente en UCM, y la página no ofrece comprobar su estado: una vez emitida en la CA, importe el certificado, o deje que la Sincronización de inventario por el canal de administración WinRM importe los certificados que UCM aún no conoce' },
         ]
       },
       {
@@ -44,7 +44,7 @@ export default {
           { label: 'Propósito', text: 'Ejecuta operaciones de gestión en la CA de Windows (revocar, anular revocación, publicar CRL, inventario, aprobar/denegar) vía PowerShell remoting + certutil, cosas que la inscripción web de AD CS no puede hacer.' },
           { label: 'Transporte', text: 'NTLM o Kerberos sobre HTTP/HTTPS. Se recomienda Kerberos + HTTPS; Kerberos reutiliza el keytab de la conexión.' },
           { label: 'Credenciales', text: 'Reutiliza por defecto las de la conexión. Las conexiones mTLS deben definir una cuenta WinRM dedicada (oficial "Emitir y administrar certificados" con privilegios mínimos).' },
-          { label: 'Requisito', text: 'WinRM habilitado en la CA y el paquete opcional pywinrm instalado. Las operaciones de gestión requieren admin:system.' },
+          { label: 'Requisito', text: 'WinRM habilitado en la CA y el paquete opcional pywinrm instalado. Las operaciones de gestión requieren admin:system; propagar una revocación o un levantamiento de suspensión a la CA sigue el permiso write:certificates del certificado.' },
         ]
       },
       {
@@ -58,7 +58,7 @@ export default {
       {
         title: 'Inventario de la CA y panel de control',
         items: [
-          { label: 'Sincronización de inventario', text: 'Importa certificados emitidos directamente en la CA que UCM aún no conoce (incremental por id de solicitud, con reconciliación).' },
+          { label: 'Sincronización de inventario', text: 'Importa certificados emitidos directamente en la CA que UCM aún no conoce (incremental por id de solicitud); la reconciliación está disponible mediante la API.' },
           { label: 'Solicitudes pendientes', text: 'Listar, aprobar (reenvío + importación automática) o denegar solicitudes en espera de aprobación del administrador de la CA.' },
           { label: 'Salud de la CA', text: 'Estado del servicio de la CA, caducidad del certificado de la CA, próxima actualización de la CRL y número de solicitudes pendientes de un vistazo.' },
         ]
@@ -88,7 +88,7 @@ UCM se integra con Microsoft Active Directory Certificate Services (AD CS) para 
 1. Vaya a **Configuración → Microsoft CA**
 2. Haga clic en **Agregar conexión**
 3. Ingrese el **Nombre de conexión** y el **Nombre de host del servidor CA**
-4. Opcionalmente ingrese el **Nombre común de la CA** (se detecta automáticamente si está vacío)
+4. Opcionalmente ingrese el **Nombre común de la CA** (se usa el nombre de host del servidor si está vacío)
 5. Seleccione el **Método de autenticación**
 6. Ingrese las credenciales para el método elegido
 7. Haga clic en **Probar conexión** para verificar
@@ -124,7 +124,7 @@ UCM se integra con Microsoft Active Directory Certificate Services (AD CS) para 
 El certificado se devuelve de inmediato y se importa en UCM.
 
 ### Plantillas con aprobación del administrador
-UCM guarda la solicitud como **Pendiente** y rastrea el ID de solicitud de la CA de MS. Una vez aprobada en la CA de Windows, verifique el estado desde el panel de detalle del CSR para importar el certificado.
+UCM guarda la solicitud como **Pendiente** y rastrea el ID de solicitud de la CA de MS. La página no ofrece una comprobación de estado para ella: una vez emitida en la CA de Windows, importe el certificado, o deje que la **Sincronización de inventario** por el canal de administración WinRM importe los certificados que UCM aún no conoce.
 
 ## Enroll on Behalf Of (EOBO)
 

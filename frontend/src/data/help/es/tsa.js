@@ -8,7 +8,7 @@ export default {
         title: 'Pestañas',
         items: [
           { label: 'Configuración', text: 'Activar TSA, seleccionar la CA firmante y configurar el OID de política TSA' },
-          { label: 'Información', text: 'URL del endpoint TSA, ejemplos de uso con OpenSSL y estadísticas de solicitudes' },
+          { label: 'Punto de acceso TSA', text: 'URL del endpoint TSA, ejemplos de uso con OpenSSL y estadísticas de solicitudes' },
         ]
       },
       {
@@ -33,12 +33,15 @@ export default {
     ],
     tips: [
       'Las marcas de tiempo TSA se usan en la firma de código para asegurar que las firmas sigan siendo válidas después de la expiración del certificado',
-      'El endpoint TSA acepta HTTP POST con Content-Type: application/timestamp-query',
+      'El endpoint TSA acepta HTTP POST con Content-Type: application/timestamp-query (o application/octet-stream)',
+      'Una solicitud con cualquier extensión se rechaza con unacceptedExtension, y una mal formada con badDataFormat (RFC 3161 §2.4.1)',
+      'Los tokens llevan genTime en segundos enteros con una precisión declarada de 1 segundo, y el message imprint de la solicitud copiado tal como se envió',
       'Use SHA-256 o algoritmos de hash más fuertes al crear solicitudes de marca de tiempo',
       'No se requiere autenticación: el endpoint TSA es de acceso público como CRL/OCSP',
     ],
     warnings: [
       'Se debe configurar una CA firmante válida antes de activar TSA',
+      'openssl ts -verify y jarsigner rechazan los tokens firmados por el certificado de la CA: la RFC 3161 exige un firmante dedicado con un EKU timeStamping crítico y exclusivo. Genere uno en la pestaña Configuración',
       'El endpoint TSA es un endpoint de protocolo público, no incluya datos sensibles en las solicitudes de marca de tiempo',
     ],
   },
@@ -80,9 +83,9 @@ El OID de política identifica la política TSA bajo la cual se emiten las marca
 - Predeterminado: \`1.2.3.4.1\` (marcador de posición)
 - Para producción, registre un OID bajo el arco de su organización o use uno de su CP/CPS
 
-## Pestaña de información
+## Pestaña Punto de acceso TSA
 
-La pestaña de información muestra:
+La pestaña Punto de acceso TSA muestra:
 
 - **URL del endpoint TSA**: URL lista para copiar y pegar para la configuración del cliente
 - **Ejemplos de uso**: Comandos OpenSSL para crear solicitudes, enviarlas y verificar respuestas

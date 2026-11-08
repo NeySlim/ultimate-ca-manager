@@ -22,7 +22,7 @@ export default {
       {
         title: 'Serverkonfiguration',
         items: [
-          { label: 'Linux/macOS-Setup-Skript', text: 'Laden Sie ein POSIX-Shell-Skript (.sh) herunter, das sshd automatisch konfiguriert, dieser CA zu vertrauen. Schnellinstallation: curl -fsSL <url> | bash' },
+          { label: 'Linux/macOS-Setup-Skript', text: 'Laden Sie ein POSIX-Shell-Skript (.sh) herunter, das sshd automatisch konfiguriert, dieser CA zu vertrauen. Schnellinstallation: curl -sSL <url> | sudo bash' },
           { label: 'Windows-Setup-Skript', text: 'Laden Sie ein PowerShell-Skript (.ps1) herunter, das den Windows OpenSSH Server konfiguriert (schreibt den öffentlichen CA-Schlüssel nach %ProgramData%\\ssh, härtet die ACLs, fügt TrustedUserCAKeys / HostCertificate zur sshd_config hinzu, validiert mit sshd -T, startet sshd neu). Schnellinstallation: iwr <url> | iex' },
           { label: 'Diagnoseblock', text: 'Schlägt Add-WindowsCapability fehl (WSUS / domänenverbunden), gibt das Skript einen beschrifteten Block aus, der den Richtlinienzustand und drei Abhilfewege erklärt, es ändert die WSUS-/WU-Richtlinie nie selbst' },
           { label: 'Dry-run', text: 'Beide Skripte unterstützen ein -DryRun / --dry-run Flag, um Änderungen in der Vorschau anzuzeigen, ohne sie anzuwenden' },
@@ -67,7 +67,7 @@ export default {
       'Laden Sie das Setup-Skript für eine einfache Serverkonfiguration herunter: es übernimmt Sicherung und Validierung automatisch.',
     ],
     warnings: [
-      'Das Löschen einer CA widerruft keine von ihr signierten Zertifikate: widerrufen Sie diese zuerst oder aktualisieren Sie das Server-Vertrauen.',
+      'Eine CA kann nicht gelöscht werden, solange von ihr signierte Zertifikate bestehen: Löschen Sie diese zuerst und aktualisieren Sie das Server-Vertrauen.',
       'Wenn der private Schlüssel der CA kompromittiert wird, müssen alle von ihr signierten Zertifikate als nicht vertrauenswürdig betrachtet werden.',
     ],
   },
@@ -203,7 +203,7 @@ RevokedKeys /etc/ssh/revoked_keys
 | Getrennte CAs | Verwenden Sie separate CAs für Benutzer- und Host-Zertifikate |
 | Schlüsselalgorithmus | Ed25519 für neue Bereitstellungen, RSA 4096 für ältere Kompatibilität |
 | CA-Lebensdauer | CAs langlebig halten; stattdessen kurzlebige Zertifikate verwenden |
-| Sicherung | Exportieren und sicher aufbewahren des privaten CA-Schlüssels |
+| Sicherung | UCM-Sicherungen aufbewahren: der private CA-Schlüssel lässt sich nicht einzeln exportieren |
 | Principal-Zuordnung | Principals bestimmten Benutzernamen zuordnen, keine Platzhalter verwenden |
 `
   }

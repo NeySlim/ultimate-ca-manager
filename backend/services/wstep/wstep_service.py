@@ -554,6 +554,32 @@ def _template_extra_ekus(template):
     return oids
 
 
+_SERVER_AUTH = '1.3.6.1.5.5.7.3.1'
+_CLIENT_AUTH = '1.3.6.1.5.5.7.3.2'
+_SMARTCARD_LOGON = '1.3.6.1.4.1.311.20.2.2'
+_PERSON_EKUS = frozenset({'1.3.6.1.5.5.7.3.4', '1.3.6.1.4.1.311.10.3.4'})  # emailProtection, EFS
+
+
+def _template_profile(template, csr):
+    """(cert_type, Key Usage names or None) the trunk signs ``csr`` under: as in AD CS,
+    an S/MIME or EFS template and a Smartcard Logon one keep keyEncipherment, and a
+    user template's CN (jdoe) names no host. Templates with serverAuth stay server ones."""
+    ekus = set(_template_configured_ekus(template))
+    if not ekus or _SERVER_AUTH in ekus:
+        return 'server_cert', None
+    if ekus & _PERSON_EKUS:
+        return 'email_cert', None
+    if ekus <= {_CLIENT_AUTH}:
+        return 'client_cert', None
+    if _SMARTCARD_LOGON in ekus and ekus <= {_CLIENT_AUTH, _SMARTCARD_LOGON}:
+        try:
+            extensions_of(csr).get_extension_for_class(x509.KeyUsage)
+            return 'client_cert', None
+        except x509.ExtensionNotFound:
+            return 'client_cert', ['digitalSignature', 'keyEncipherment']
+    return 'server_cert', None
+
+
 def _template_configured_ekus(template):
     """Every EKU OID ``template`` configures, as XCEP advertises them, before the protocol cap."""
     import json
@@ -1011,6 +1037,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             )
             return None, 'Requester is not authorized to enroll against this template'
 
+    cert_type, template_ku = _template_profile(matched_template, csr)
     try:
         cert_pem, _serial = CAService.sign_csr_from_crypto(
             ca=ca, csr=csr, validity_days=_template_validity(matched_template, validity_days),
@@ -1028,6 +1055,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             template_ekus=_template_extra_ekus(matched_template) or None,
             policy_template_id=getattr(matched_template, 'id', None),
             template_id=getattr(matched_template, 'id', None),
+            cert_type=cert_type, template_key_usage=template_ku,
         )
     except PolicyViolation as e:
         logger.warning('WSTEP issue refused by policy: %s', e)
@@ -1232,6 +1260,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
         from services.xcep.policy_builder import _policy_oid_for_template
         template_oid = _policy_oid_for_template(ca, matched_template)
 
+    cert_type, template_ku = _template_profile(matched_template, csr)
     try:
         cert_pem, _serial = CAService.sign_csr_from_crypto(
             ca=ca, csr=csr, validity_days=_template_validity(matched_template, validity_days),
@@ -1243,6 +1272,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
             template_ekus=issued_ekus,
             policy_template_id=getattr(matched_template, 'id', None),
             template_id=getattr(matched_template, 'id', None),
+            cert_type=cert_type, template_key_usage=template_ku,
         )
     except AlreadySuperseded:
         return None, 'Signing certificate has been superseded by a newer one'

@@ -22,7 +22,7 @@ export default {
       {
         title: '服务器配置',
         items: [
-          { label: 'Linux/macOS配置脚本', text: '下载一个POSIX shell脚本（.sh），自动配置sshd以信任此CA。快速安装：curl -fsSL <url> | bash' },
+          { label: 'Linux/macOS配置脚本', text: '下载一个POSIX shell脚本（.sh），自动配置sshd以信任此CA。快速安装：curl -sSL <url> | sudo bash' },
           { label: 'Windows配置脚本', text: '下载一个PowerShell脚本（.ps1），配置Windows OpenSSH Server（将CA公钥写入%ProgramData%\\ssh、收紧ACL、在sshd_config中添加TrustedUserCAKeys / HostCertificate、用sshd -T验证、重启sshd）。快速安装：iwr <url> | iex' },
           { label: '诊断信息块', text: '当Add-WindowsCapability失败时（WSUS / 已加入域），脚本会打印一个带标签的信息块，说明策略状态和三种补救路径,, 脚本本身绝不修改WSUS / WU策略' },
           { label: '试运行', text: '两个脚本都支持-DryRun / --dry-run参数，可在不应用更改的情况下预览' },
@@ -67,7 +67,7 @@ export default {
       '下载配置脚本可轻松配置服务器:, 它会自动处理备份和验证。',
     ],
     warnings: [
-      '删除CA不会吊销其签发的证书:, 请先吊销证书或更新服务器信任设置。',
+      '只要仍有其签发的证书，CA 就无法删除：请先删除这些证书，并更新服务器信任设置。',
       '如果CA私钥被泄露，其签发的所有证书都必须视为不可信。',
     ],
   },
@@ -203,7 +203,7 @@ RevokedKeys /etc/ssh/revoked_keys
 | 分离CA | 用户证书和主机证书使用不同的CA |
 | 密钥算法 | 新部署使用Ed25519，旧版兼容使用RSA 4096 |
 | CA有效期 | 保持CA长期有效；改用短期证书 |
-| 备份 | 导出并安全存储CA私钥 |
+| 备份 | 保留 UCM 备份：CA 私钥无法单独导出 |
 | Principal映射 | 将principal映射到具体用户名，而非通配符 |
 `
   }

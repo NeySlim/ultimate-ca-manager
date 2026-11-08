@@ -161,7 +161,8 @@ def _cert_name_values(cert):
     return values
 
 
-def validate_name_constraints(ca_cert, subject, san_names=None, renewal_of=None):
+def validate_name_constraints(ca_cert, subject, san_names=None, renewal_of=None,
+                              cn_may_name_host=True):
     """Validate subject and SANs against the NameConstraints of the whole CA
     chain (RFC 5280 §4.2.1.10) — the direct issuer AND every CA above it, so a
     constraint set on a root is enforced even when an intermediate carries none.
@@ -172,6 +173,9 @@ def validate_name_constraints(ca_cert, subject, san_names=None, renewal_of=None)
     before the CA's constraints were tightened) must stay renewable — blocking
     them strands entire fleets at expiry. Violations on carried-over names are
     logged; only names NEW to this request are enforced.
+
+    ``cn_may_name_host``: False for an S/MIME certificate that cannot authenticate a
+    server (utils.request_names.cn_may_name_host): its dotted CN (john.doe) names a person.
     """
     names_to_check = []
     try:
@@ -181,7 +185,7 @@ def validate_name_constraints(ca_cert, subject, san_names=None, renewal_of=None)
             cn_value = attr.value
             if '@' in cn_value:
                 names_to_check.append(x509.RFC822Name(cn_value))
-            elif _DNS_LIKE_CN.match(cn_value or ''):
+            elif cn_may_name_host and _DNS_LIKE_CN.match(cn_value or ''):
                 names_to_check.append(x509.DNSName(cn_value))
             # Non-hostname CNs ("John Doe") carry no DNS/email identity —
             # RFC 5280 name constraints do not apply to them.

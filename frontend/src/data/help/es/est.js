@@ -8,15 +8,17 @@ export default {
         title: 'Pestañas',
         items: [
           { label: 'Configuración', text: 'Activar EST, seleccionar CA firmante, configurar credenciales de autenticación y validez del certificado' },
-          { label: 'Información', text: 'URLs de los endpoints EST para integración, estadísticas de inscripción y ejemplos de uso' },
+          { label: 'Endpoints EST', text: 'URLs de los endpoints EST para integración y estadísticas de inscripción' },
         ]
       },
       {
         title: 'Autenticación',
         items: [
           { label: 'mTLS (Mutual TLS)', text: 'El cliente presenta un certificado durante el handshake TLS, método de autenticación más seguro' },
-          { label: 'HTTP Basic Auth', text: 'Alternativa con usuario/contraseña cuando mTLS no está disponible' },
-          { label: 'Certificado presentado', text: 'Para /simpleenroll y /serverkeygen sobre mTLS, un certificado firmado por la CA de EST debe ser uno que esta aún conserve: los certificados revocados, sustituidos o eliminados se rechazan (RFC 7030 §3.3.2); un certificado de otra autoridad en la que confía la capa TLS sigue aceptándose' },
+          { label: 'HTTP Basic Auth', text: 'Alternativa con usuario/contraseña cuando mTLS no está disponible. Con allow_empty_username activado mediante PATCH /api/v2/est/config, un cliente también puede enviar un usuario vacío con la contraseña (RFC 7030 §3.2.3, v2.252)' },
+          { label: 'Certificado presentado', text: 'Para /simpleenroll y /serverkeygen sobre mTLS, un certificado firmado por la CA de EST debe ser uno que esta aún conserve: los certificados revocados, sustituidos o eliminados se rechazan (RFC 7030 §3.3.2). Un certificado que emitió otra CA de este servidor se rechaza si él o una CA superior está revocada, o una vez expirado (v2.252); uno de una autoridad que este servidor no conserva se deja a la capa TLS' },
+          { label: 'Vinculación tls-unique', text: 'Un CSR con challengePassword debe llevar el valor tls-unique de su conexión TLS 1.2 con UCM (RFC 7030 §3.5); se rechaza con 400 cuando el valor difiere o no puede verificarse (TLS 1.3, un proxy delante). /csrattrs no lo pide. ignore_challenge_password, activado mediante PATCH /api/v2/est/config, omite la comprobación para un cliente que pone una contraseña ahí (v2.252)' },
+          { label: 'Claves comprometidas', text: 'Un CSR cuya clave fue revocada como comprometida (keyCompromise) se rechaza con 400 (v2.252)' },
         ]
       },
       {
@@ -24,8 +26,9 @@ export default {
         items: [
           { label: '/cacerts', text: 'Obtener la cadena de certificados de la CA (no requiere autenticación)' },
           { label: '/simpleenroll', text: 'Enviar un CSR y recibir un certificado firmado' },
-          { label: '/simplereenroll', text: 'Renovar un certificado existente (requiere mTLS)' },
-          { label: '/csrattrs', text: 'Obtener los atributos de CSR recomendados por el servidor' },
+          { label: '/simplereenroll', text: 'Renovar un certificado existente (requiere mTLS; sin certificado de cliente: 403). Un CSR sin SubjectAltName renueva los nombres propios del certificado, o ninguno si no tenía, en lugar de un nombre construido a partir del CN (RFC 7030 §4.2.2, v2.252)' },
+          { label: '/csrattrs', text: 'Obtener los atributos de CSR recomendados por el servidor: keyUsage, subjectAltName y extKeyUsage como OID sueltos (RFC 9908 §5.2, v2.252). csrattrs_legacy_encoding, activado mediante PATCH /api/v2/est/config, sirve la forma anterior (los OID dentro de un extensionRequest) para un cliente que la necesite' },
+          { label: 'Errores', text: 'Los rechazos de inscripción, incluida la limitación de tasa, llegan como un mensaje de texto plano (text/plain, RFC 8951 §5) que indica el motivo, como un cuerpo que no es base64 o no es un CSR PKCS#10, o las restricciones de nombre de la CA (v2.252)' },
           { label: '/serverkeygen', text: 'El servidor genera un par de claves y devuelve el certificado + clave. La clave toma la fortaleza de la CA emisora, en la familia de la clave de la solicitud si es RSA o EC (su tamaño o curva se ignora), si no la de la CA, llevada al tipo más cercano que permitan las políticas. La clave se entrega como PKCS#8 sin cifrar bajo TLS; una CSR que nombre la clave del certificado mTLS (AsymmetricDecryptKeyIdentifier) la recibe cifrada para ese certificado, mediante transporte de clave para RSA de 2048 bits o más (keyEncipherment) o acuerdo de clave para EC (keyAgreement), con los algoritmos que enumera el SMIMECapabilities de la CSR, en un paquete de claves firmado por un certificado EST key generator que la CA emisora expide para este fin (Ed25519 bajo una CA Ed448, v2.252)' },
         ]
       },
@@ -34,7 +37,7 @@ export default {
       'EST es el reemplazo moderno de SCEP: prefiera EST para nuevas implementaciones',
       'Use autenticación mTLS para la máxima seguridad. Basic Auth es una alternativa',
       'El endpoint /simplereenroll requiere que el cliente presente su certificado actual vía mTLS',
-      'Copie las URLs de los endpoints desde la pestaña Información para configurar sus clientes EST',
+      'Copie las URLs de los endpoints desde la pestaña Endpoints EST para configurar sus clientes EST',
     ],
     warnings: [
       'EST requiere HTTPS: el cliente debe confiar en el certificado del servidor UCM o en la CA',
@@ -129,21 +132,16 @@ La clave generada toma la fortaleza de la CA emisora: la familia de la clave de 
 
 La clave privada se entrega como PKCS#8 sin cifrar (\`application/pkcs8\`), protegida por TLS. Para recibirla cifrada, autentíquese con mTLS e incluya en la CSR el identificador de clave del certificado de cliente (AsymmetricDecryptKeyIdentifier): la clave llega entonces en un paquete de claves RFC 5958 envuelto para ese certificado, mediante transporte de clave para un certificado RSA de 2048 bits o más que declare keyEncipherment, o mediante acuerdo de clave (ECDH) para un certificado EC que declare keyAgreement, con los algoritmos de transporte o acuerdo de clave y de contenido tomados del SMIMECapabilities de la CSR en el orden del cliente. El paquete está firmado por un certificado "EST key generator" que la CA emisora expide en el primer uso y renueva por sí misma; encadena con la CA que sirve \`/cacerts\` y tiene la familia de claves de la CA, Ed25519 bajo una CA Ed448 (v2.252).
 
-## Pestaña de Información
+## Pestaña Endpoints EST
 
-La pestaña de Información muestra:
+La pestaña Endpoints EST muestra:
 - **URLs de endpoints**: URLs listas para copiar y pegar para cada operación EST
-- **Estadísticas de inscripción**: Número de inscripciones, reinscripciones y errores
-- **Última actividad**: Operaciones EST más recientes de los registros de auditoría
+- **Estadísticas de inscripción**: inscripciones totales, correctas y fallidas
 
 ## Ejemplos de integración
 
 ### Usando est client (libest)
-\`\`\`bash
-estclient -s your-server -p 8443 \\
-  --srp-user est-user --srp-password est-password \\
-  -o /tmp/certs --enroll
-\`\`\`
+Use \`estclient\` con credenciales HTTP Basic (\`-u\` y \`-h\`) o un certificado de cliente. Sus opciones TLS-SRP no se aplican: UCM no ofrece TLS-SRP.
 
 ### Usando OpenSSL
 \`\`\`bash
@@ -161,15 +159,13 @@ curl -k --user est-user:est-password \\
   -H "Content-Type: application/pkcs10" \\
   --data-binary @<(openssl req -in client.csr -outform DER | base64) \\
   https://your-server:8443/.well-known/est/simpleenroll | \\
-  base64 -d | openssl x509 -inform DER -out client.pem
+  base64 -d | openssl pkcs7 -inform DER -print_certs -out client.pem
 \`\`\`
 
-### Windows (certutil)
-\`\`\`cmd
-certutil -enrollmentServerURL add \\
-  "https://your-server:8443/.well-known/est" \\
-  kerberos
-\`\`\`
+La respuesta es un PKCS#7 en base64 (solo certificados), no un certificado suelto: léala con \`openssl pkcs7\`, no con \`openssl x509\`.
+
+### Windows
+Windows no tiene un cliente EST integrado: \`certutil -enrollmentServerURL\` registra un servicio web de inscripción de certificados (WSTEP), no un servidor EST. Para equipos Windows, use la inscripción automática de Windows (XCEP/WSTEP).
 
 ## EST vs SCEP
 

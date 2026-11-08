@@ -53,12 +53,8 @@ Cada entrada de registro incluye:
 
 ## Filtrado
 
-### Por tipo de acción
-Filtra por categoría de operación:
-- Operaciones de certificados (emitir, revocar, renovar, exportar)
-- Operaciones de CA (crear, importar, eliminar)
-- Operaciones de usuarios (inicio de sesión, cierre de sesión, crear, actualizar)
-- Operaciones del sistema (cambio de configuración, respaldo, restauración)
+### Por acción
+Selecciona uno o varios nombres de acción, por ejemplo \`certificate_issued\` o \`login_success\`.
 
 ### Por usuario
 Muestra solo las acciones realizadas por un usuario específico.
@@ -71,7 +67,7 @@ Muestra solo las acciones realizadas por un usuario específico.
 Establece las fechas **Desde** y **Hasta** para acotar la ventana de tiempo.
 
 ### Búsqueda de texto
-Búsqueda de texto libre en todos los campos del registro.
+Búsqueda de texto libre en el nombre de usuario, la acción, los detalles, el tipo de recurso y la dirección IP; el nombre y el id del recurso no se buscan.
 
 ## Exportar
 
@@ -79,7 +75,7 @@ Exporta los registros filtrados en:
 - **JSON**: Legible por máquinas, incluye todos los campos
 - **CSV**: Compatible con hojas de cálculo, incluye los campos principales
 
-Las exportaciones incluyen solo los resultados filtrados actualmente.
+Las exportaciones aplican solo el rango de fechas, hasta 10 000 entradas: los demás filtros no se aplican.
 
 ## Limpieza
 
@@ -92,7 +88,7 @@ Purga registros antiguos según el período de retención:
 
 ## Verificación de integridad
 
-Haz clic en **Verificar integridad** para comprobar la cadena de registros de auditoría. UCM utiliza encadenamiento de hashes para detectar si alguna entrada ha sido manipulada o eliminada.
+Haz clic en **Verificar integridad** para comprobar la cadena de registros de auditoría. UCM utiliza encadenamiento de hashes para detectar una entrada modificada o eliminada dentro de la cadena; eliminar las últimas entradas no deja rastro en la propia cadena, por lo que el reenvío a syslog conserva una copia en otro lugar.
 
 ## Reenvío a syslog
 

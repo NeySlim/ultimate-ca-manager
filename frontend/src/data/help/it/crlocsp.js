@@ -9,13 +9,15 @@ export default {
         items: [
           { label: 'Rigenerazione automatica', text: 'Attiva/disattiva la rigenerazione automatica delle CRL per ogni CA' },
           { label: 'Rigenerazione manuale', text: 'Forza la rigenerazione immediata della CRL' },
-          { label: 'Scarica CRL', text: 'Scarica il file CRL in formato DER o PEM' },
+          { label: 'Scarica CRL', text: 'Scarica la CRL in PEM (file .crl); la forma DER è servita all\'URL CDP' },
           { label: 'Distribuzione CRL', text: 'Associa una destinazione SSH/SFTP per inviare automaticamente ogni CRL rigenerata. Ogni associazione definisce il formato PEM o DER, il percorso di destinazione, le CRL padre opzionali e il proprio comando di ricarica' },
           { label: 'URL CDP', text: 'URL del CRL Distribution Point da incorporare nei certificati' },
           { label: 'Validità', text: 'Validità della CRL per CA da 1 giorno fino a 5 anni (90d/180d/1y/3y/5y per le CA offline che non possono rifirmare secondo pianificazione). Oltre un anno appare un avviso, le relying party possono conservare dati di revoca obsoleti per l\'intera finestra' },
           { label: 'Digest della firma', text: 'SHA-256, SHA-384 o SHA-512 per una CA RSA o EC. Una CA Ed25519, Ed448 o ML-DSA firma senza digest: un digest memorizzato in precedenza viene mostrato come ignorato, con un pulsante Cancella' },
           { label: 'Digest predefinito (v2.251)', text: 'Senza un digest impostato, una CA P-384 o P-521 firma le sue CRL con SHA-384 o SHA-512. Le CRL già emesse mantengono il proprio: la successiva lo segue' },
           { label: 'CRL esterna', text: 'Le CA senza chiave/offline non possono autofirmare una CRL, carica dal pannello di dettaglio della CA una CRL generata accanto alla chiave offline; viene validata (firma, emittente, monotonicità) e servita allo stesso URL CDP (v2.215)' },
+          { label: 'CRL delta', text: 'Quando le CRL delta sono abilitate, una nuova delta viene generata subito dopo ogni CRL completa, così la delta servita si riferisce sempre all\'ultima base' },
+          { label: 'Numero CRL', text: 'Le CRL base e delta di una CA condividono un unico numero crescente, mai assegnato a due CRL, anche quando due generazioni girano contemporaneamente. Il numero più alto raggiunto è conservato per nome e chiave della CA e viaggia nei backup, così una CA ripristinata su un altro server, o eliminata e importata di nuovo, riparte da esso' },
         ]
       },
       {
@@ -25,6 +27,7 @@ export default {
           { label: 'URL AIA', text: 'URL Authority Information Access, endpoint del risponditore OCSP e download del certificato CA Issuers incorporati nei certificati emessi' },
           { label: 'Cache', text: 'Cache delle risposte con pulizia automatica giornaliera delle voci scadute' },
           { label: 'Query totali', text: 'Numero di richieste OCSP elaborate' },
+          { label: 'Cache HTTP', text: 'Una risposta senza nonce può essere conservata dalle cache HTTP fino al suo nextUpdate, al massimo un\'ora (RFC 5019 §6.2: Expires, Last-Modified, ETag); una risposta con nonce non viene riutilizzata' },
           { label: 'Risponditore delegato', text: 'Firma le risposte con un certificato OCSPSigning dedicato invece della chiave della CA, assegnane uno per CA dal pannello di dettaglio' },
           { label: 'Rinnovo automatico del risponditore', text: 'Un task giornaliero riemette il certificato del risponditore delegato prima della scadenza (stessa coppia di chiavi, rinnovato alla pari) e lo ricollega, abilitato per impostazione predefinita. L\'interruttore e la sua finestra (giorni prima della scadenza, 30 per impostazione predefinita) si trovano in Impostazioni › Sicurezza' },
         ]
@@ -67,6 +70,11 @@ La pianificazione CRL (per CA) definisce per quanto tempo ogni CRL pubblicata ri
 - Le **CA offline** (tipicamente una root che non può rifirmare le CRL secondo pianificazione) sono il caso d'uso previsto per le opzioni lunghe: da 90d fino a 5y
 - Oltre un anno viene mostrato un avviso: le relying party possono conservare dati di revoca obsoleti per l'intera finestra di validità
 
+### Numeri CRL
+Ogni CRL riporta un numero CRL (RFC 5280 §5.2.3). Le CRL base e delta di una CA condividono un'unica sequenza crescente, e nessun numero è mai assegnato a due CRL, anche quando una revoca e lo scheduler ne generano una nello stesso momento.
+
+Il numero più alto raggiunto è conservato per ogni nome e chiave della CA, fuori dalla CA stessa, e viaggia nei backup. Una CA ripristinata su un altro server, o eliminata e importata di nuovo, riparte da esso invece di ricominciare da 1.
+
 ### CRL Distribution Point (CDP)
 L'URL CDP viene incorporato nei certificati in modo che i client sappiano dove scaricare la CRL. Copia l'URL dai dettagli della CRL.
 
@@ -79,7 +87,7 @@ http://your-server:8080/cdp/{ca_refid}.crl
 > ⚠️ **Importante**: gli URL vengono generati automaticamente utilizzando la porta del protocollo HTTP e l'FQDN del server. Se accedi a UCM tramite \`localhost\`, l'URL non può essere generato. Configura prima il tuo **FQDN** o l'**URL Base protocollo** in Impostazioni → Generale.
 
 ### Download delle CRL
-Scarica le CRL in formato DER o PEM per la distribuzione ai client o l'integrazione con altri sistemi.
+Il pulsante di download salva la CRL in PEM (file .crl). L'URL CDP la serve in DER per i client e altri sistemi.
 
 ## Risponditore OCSP
 

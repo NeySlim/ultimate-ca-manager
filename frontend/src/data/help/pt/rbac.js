@@ -8,7 +8,7 @@ export default {
         title: 'Funções do Sistema',
         definitions: [
           { term: 'Admin', description: 'Acesso total a todos os recursos e configurações' },
-          { term: 'Operador', description: 'Pode gerenciar certificados e CAs, mas não configurações do sistema' },
+          { term: 'Operador', description: 'Pode gerenciar certificados, CAs, CSRs, ACME, SSH e as configurações que um admin não reserva; modelos e grupos somente leitura, sem acesso a usuários nem a RBAC' },
           { term: 'Auditor', description: 'Acesso somente leitura a todos os dados operacionais para conformidade e auditoria' },
           { term: 'Visualizador', description: 'Acesso básico somente leitura a certificados, CAs e modelos' },
         ]
@@ -18,7 +18,8 @@ export default {
         items: [
           { label: 'Criar Função', text: 'Definir uma nova função com nome e descrição' },
           { label: 'Matriz de Permissões', text: 'Marcar/desmarcar permissões por categoria (CAs, Certs, Chaves Privadas, etc.)' },
-          { label: 'Cobertura', text: 'Percentual visual do total de permissões concedidas à função' },
+          { label: 'Cobertura', text: 'Uma barra e uma contagem n/N das permissões concedidas à função' },
+          { label: 'Permissões das funções do sistema', text: 'Uma função do sistema mostra as permissões que o UCM lhe aplica; Admin mostra todas as permissões da matriz' },
           { label: 'Contagem de Usuários', text: 'Ver quantos usuários estão atribuídos a cada função' },
           { label: 'Permissões das CAs SSH (v2.248)', text: 'read:ssh_cas, write:ssh_cas e delete:ssh_cas governam as CAs SSH, de modo que write:ssh já não as cria nem edita. As funções, grupos e chaves de API com uma permissão SSH receberam a correspondente na atualização' },
         ]
@@ -35,14 +36,14 @@ export default {
     content: `
 ## Visão Geral
 
-RBAC fornece gerenciamento granular de permissões. Defina funções personalizadas com permissões específicas e atribua-as a usuários ou grupos.
+RBAC fornece gerenciamento granular de permissões. Defina funções personalizadas com permissões específicas e atribua-as a usuários; um grupo concede o seu próprio conjunto de permissões aos seus membros.
 
 ## Funções do Sistema
 
 Quatro funções integradas que não podem ser modificadas ou excluídas:
 
 - **Admin**: Acesso total a tudo
-- **Operador**: Gerenciar certificados, CAs, CSRs, modelos. Sem acesso a configurações do sistema, usuários ou RBAC
+- **Operador**: Gerenciar certificados, CAs, CSRs, ACME, SSH e configurações do sistema; modelos e grupos somente leitura. Sem acesso a usuários ou RBAC
 - **Auditor**: Acesso somente leitura a todos os dados operacionais (certificados, CAs, ACME, SCEP, HSM, logs de auditoria, políticas, grupos) mas não configurações ou gerenciamento de usuários
 - **Visualizador**: Acesso básico somente leitura a certificados, CAs, CSRs, modelos e armazenamento de confiança
 
@@ -62,7 +63,7 @@ As permissões são organizadas por categoria:
 - **CSRs**: Criar, ler, assinar, excluir
 - **Modelos**: Criar, ler, atualizar, excluir
 - **Usuários**: Ler (o gerenciamento de contas é reservado aos administradores)
-- **Grupos**: Criar, ler, atualizar, excluir
+- **Grupos**: Ler (criar, editar e excluir grupos é reservado aos administradores)
 - **Configurações**: Ler, atualizar
 - **Auditoria**: Ler, exportar (a limpeza é reservada aos administradores)
 - **ACME**: Configurar, gerenciar contas
@@ -80,7 +81,7 @@ Uma função personalizada pode conceder qualquer permissão verificada pelo UCM
 Clique no cabeçalho de uma categoria para ativar/desativar todas as permissões daquela categoria de uma vez.
 
 ### Indicador de Cobertura
-Um badge percentual mostra quanto do conjunto total de permissões a função cobre.
+Uma barra e uma contagem n/N mostram quanto do conjunto total de permissões a função cobre.
 
 ## Atribuindo Funções
 

@@ -23,12 +23,12 @@ export default {
           { label: '复制', text: '克隆现有模板并进行修改' },
           { label: '显示系统模板', text: '隐藏内置模板，只处理您自己的模板。每个浏览器单独记住此选择' },
           { label: '停用', text: '已停用的模板（包括内置模板）不会出现在签发证书表单中，也不会提供给 Windows 自动注册，并显示「非活跃」徽章。点击「激活」即可恢复。内置模板可以停用，但不能编辑：请复制一份来修改' },
-          { label: '导入/导出', text: '在 UCM 实例之间以 JSON 文件共享模板，单个模板或多个模板合并在一个文件中' },
+          { label: '导入/导出', text: '在 UCM 实例之间以 JSON 文件共享模板：页面一次导出一个模板，导入文件可包含一个或多个模板' },
           { label: '密钥类型', text: 'RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384 或 EC-P521，搭配 SHA-256、SHA-384 或 SHA-512 摘要，或 ML-DSA-44、ML-DSA-65 或 ML-DSA-87。摘要是签发 CA 的签名哈希，而非叶子密钥的哈希：它仍适用于 RSA 或 EC CA 下的 ML-DSA 叶子证书，而 ML-DSA CA 会忽略它' },
           { label: 'qcStatements', text: '可选的 ETSI EN 319 412-5 声明，添加到使用该模板签发的每个证书：QcCompliance、QcType（签名、印章或网站）、QcSSCD、QcPDS（HTTPS URL 和两位语言代码）、QcRetentionPeriod、QcLimitValue、QcCClegislation（用于依据欧盟以外法律框架认定的合格证书）以及语义标识符。不适用于 EST、WSTEP 或 mTLS 签发，CSR 中的 qcStatements 扩展会被忽略。不支持 QcIdentMethod、QcQSCDlegislation 和 PSD2 声明' },
           { label: '策略 OID', text: '额外的证书策略 OID（例如 ETSI QCP-n、QCP-l、QCP-n-qscd、QCP-l-qscd 和 QCP-w 策略），添加在 CA 自身策略之后' },
           { label: '自定义扩展', text: 'UCM 未建模的扩展, 每项包含一个 OID、关键标志和十六进制的 DER 值, 按原样添加到使用该模板签发的每个证书 (签发表单、签署 CSR、ACME、SCEP、WSTEP、审批; 续期时保留)。签发表单可以添加更多扩展, 或替换 OID 相同的扩展。UCM 自身设置的扩展会被拒绝: 请使用它们各自的设置。不识别关键扩展的客户端会拒绝该证书' },
-          { label: '摘要偏好 (v2.251)', text: '所有基于该模板签发的路径（签发表单、签署 CSR、ACME、EST、SCEP、WSTEP、TSA 签名者）都使用其摘要签名，并提升到与 CA 密钥对应的摘要：P-384 为 SHA-384，P-521 为 SHA-512。策略禁止时，改用所允许的最接近的更强摘要，结果会显示“Signature digest X replaced by Y by policy”' },
+          { label: '摘要偏好 (v2.251)', text: '所有基于该模板签发的路径（签发表单、签署 CSR、ACME、SCEP、WSTEP、TSA 签名者；EST 不使用模板）都使用其摘要签名，并提升到与 CA 密钥对应的摘要：P-384 为 SHA-384，P-521 为 SHA-512。策略禁止时，改用所允许的最接近的更强摘要，结果会显示“Signature digest X replaced by Y by policy”' },
           { label: 'Brainpool', text: 'EC-BP256、EC-BP384 和 EC-BP512（RFC 5639，在密钥类型列表中归入 Brainpool 分组，FIPS 模式下隐藏）。OpenSSL 和 Windows 可以读取其证书链和签名，但 Chrome、Firefox、Go、rustls、GnuTLS 以及未使用 Bouncy Castle 的 Java 在 TLS 中会拒绝它们，Windows Schannel 默认也未启用。在 HSM 上，只有 PKCS#11 提供者可以存放这些密钥' },
         ]
       },
@@ -77,7 +77,7 @@ export default {
 4. 配置**主题默认值**（O、OU、C、ST、L、CN、Email）。在电子邮件及服务器 + 客户端（组合）证书上，Email 也会成为 SAN
 5. 选择**密钥用途**（数字签名、密钥加密等）
 6. 从服务器已知的用途中选择**扩展密钥用途**（智能卡登录、时间戳、Microsoft RDP 等）
-7. 设置**密钥类型**（RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384、EC-P521 或 ML-DSA-44/65/87）、摘要和**默认有效期**（天数）。摘要是签发 CA 的签名哈希，因此它仍适用于 RSA 或 EC CA 下的 ML-DSA 密钥；ML-DSA CA 会忽略它
+7. 设置**密钥类型**（RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384、EC-P521、Brainpool EC-BP256/384/512 或 ML-DSA-44/65/87）、摘要和**默认有效期**（天数）。摘要是签发 CA 的签名哈希，因此它仍适用于 RSA 或 EC CA 下的 ML-DSA 密钥；ML-DSA CA 会忽略它
 8. 点击**创建**
 
 ## 使用模板

@@ -82,7 +82,8 @@ L'interfaccia HSM standard del settore. Dispositivi supportati:
 
 Configurazione:
 - **Percorso libreria**: Percorso alla libreria condivisa PKCS#11 (.so/.dll)
-- **Slot**: Numero dello slot HSM
+- **Etichetta Token**: etichetta del token da usare (obbligatoria)
+- **Slot**: Numero dello slot HSM (facoltativo)
 - **PIN**: PIN utente per l'autenticazione
 
 ### AWS CloudHSM
@@ -125,11 +126,11 @@ Tipi di chiave supportati:
 ## Gestione dei provider
 
 ### Aggiunta di un provider
-1. Clicca **Aggiungi provider**
+1. Clicca **Nuovo Provider**
 2. Seleziona il **tipo di provider**
 3. Inserisci i dettagli della connessione
-4. Clicca **Testa connessione** per verificare
-5. Clicca **Salva**
+4. Clicca **Crea**
+5. Clicca **Testa** sul nuovo provider per verificare la connessione
 
 ### Test della connessione
 Testa sempre la connessione dopo aver creato o modificato un provider. UCM verifica che possa comunicare con l'HSM e autenticarsi. Per un modulo PKCS#11, il test registra anche ciò che il modulo riporta (libreria, produttore, versioni della libreria e del firmware), mostrato nella pagina del provider.

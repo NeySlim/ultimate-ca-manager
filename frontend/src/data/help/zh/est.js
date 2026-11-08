@@ -8,15 +8,17 @@ export default {
         title: '选项卡',
         items: [
           { label: '设置', text: '启用 EST、选择签名 CA、配置认证凭据和证书有效期' },
-          { label: '信息', text: '用于集成的 EST 端点 URL、注册统计和使用示例' },
+          { label: 'EST 端点', text: '用于集成的 EST 端点 URL 和注册统计' },
         ]
       },
       {
         title: '认证方式',
         items: [
           { label: 'mTLS（双向 TLS）', text: '客户端在 TLS 握手期间提供证书,, 最强的认证方式' },
-          { label: 'HTTP Basic Auth', text: '在 mTLS 不可用时的用户名/密码回退方式' },
-          { label: '出示的证书', text: '对于通过 mTLS 访问的 /simpleenroll 和 /serverkeygen，由 EST CA 签发的证书必须是该 CA 仍持有的证书：已吊销、已被取代或已删除的证书会被拒绝（RFC 7030 §3.3.2）；由 TLS 层信任的其他颁发机构签发的证书仍会被接受' },
+          { label: 'HTTP Basic Auth', text: '在 mTLS 不可用时的用户名/密码回退方式。通过 PATCH /api/v2/est/config 设置 allow_empty_username 后，客户端也可以发送空用户名加密码（RFC 7030 §3.2.3，v2.252）' },
+          { label: '出示的证书', text: '对于通过 mTLS 访问的 /simpleenroll 和 /serverkeygen，由 EST CA 签发的证书必须是该 CA 仍持有的证书：已吊销、已被取代或已删除的证书会被拒绝（RFC 7030 §3.3.2）；由本服务器的其他 CA 签发的证书，在其自身或其上级 CA 被吊销或已过期后会被拒绝（v2.252）；来自本服务器未持有的颁发机构的证书则交由 TLS 层处理' },
+          { label: 'tls-unique 绑定', text: '带有 challengePassword 的 CSR 必须携带其到 UCM 的 TLS 1.2 连接的 tls-unique 值（RFC 7030 §3.5）；该值不同或无法验证（TLS 1.3、前置代理）时以 400 拒绝。/csrattrs 不要求该值。通过 PATCH /api/v2/est/config 设置的 ignore_challenge_password 会为在此处放入密码的客户端跳过该检查（v2.252）' },
+          { label: '已泄露的密钥', text: '密钥已因泄露（keyCompromise）而吊销的 CSR 会以 400 拒绝（v2.252）' },
         ]
       },
       {
@@ -24,8 +26,9 @@ export default {
         items: [
           { label: '/cacerts', text: '获取 CA 证书链（无需认证）' },
           { label: '/simpleenroll', text: '提交 CSR 并接收签名证书' },
-          { label: '/simplereenroll', text: '续期已有证书（需要 mTLS）' },
-          { label: '/csrattrs', text: '获取服务器推荐的 CSR 属性' },
+          { label: '/simplereenroll', text: '续期已有证书（需要 mTLS；没有客户端证书时：403）。不含 SubjectAltName 的 CSR 会续期该证书自身的名称，原本没有则不带名称，而不是由 CN 构造名称（RFC 7030 §4.2.2，v2.252）' },
+          { label: '/csrattrs', text: '获取服务器推荐的 CSR 属性：keyUsage、subjectAltName 和 extKeyUsage，均为裸 OID（RFC 9908 §5.2，v2.252）。通过 PATCH /api/v2/est/config 设置的 csrattrs_legacy_encoding 会为需要的客户端提供旧格式（OID 位于 extensionRequest 内）。' },
+          { label: '错误', text: '注册被拒绝（包括速率限制）时，会以纯文本消息（text/plain，RFC 8951 §5）说明原因，例如正文不是 base64 或不是 PKCS#10 CSR，或违反 CA 的名称约束（v2.252）' },
           { label: '/serverkeygen', text: '服务器生成密钥对并返回证书 + 密钥。密钥采用签发 CA 的强度：请求密钥为 RSA 或 EC 时沿用其类型（其大小或曲线被忽略），否则沿用 CA 的类型，并调整为策略允许的最接近类型。密钥在 TLS 下以未加密的 PKCS#8 返回；若 CSR 指明了 mTLS 证书的密钥 (AsymmetricDecryptKeyIdentifier)，则会加密给该证书：2048 位及以上的 RSA 使用密钥传输 (keyEncipherment)，EC 使用密钥协商 (keyAgreement)，算法取自 CSR 的 SMIMECapabilities 所列，并放入由签发 CA 为此签发的 EST key generator 证书签名的密钥包中（Ed448 CA 下为 Ed25519，v2.252）' },
         ]
       },
@@ -34,7 +37,7 @@ export default {
       'EST 是 SCEP 的现代替代方案:, 新部署请优先使用 EST',
       '使用 mTLS 认证获得最高安全性:, Basic Auth 是备用方案',
       '/simplereenroll 端点要求客户端通过 mTLS 提供当前证书',
-      '从信息选项卡复制端点 URL 以配置您的 EST 客户端',
+      '从 EST 端点选项卡复制端点 URL 以配置您的 EST 客户端',
     ],
     warnings: [
       'EST 需要 HTTPS:, 客户端必须信任 UCM 服务器证书或 CA',
@@ -129,21 +132,16 @@ curl -k --cert client.pem --key client.key \\
 
 私钥以未加密的 PKCS#8 (\`application/pkcs8\`) 返回，由 TLS 保护。若要加密返回，请使用 mTLS 认证，并在 CSR 中写入客户端证书的密钥标识符 (AsymmetricDecryptKeyIdentifier)：密钥将以 RFC 5958 密钥包的形式封装给该证书，断言 keyEncipherment 的 2048 位及以上 RSA 证书使用密钥传输，断言 keyAgreement 的 EC 证书使用密钥协商 (ECDH)；密钥传输或密钥协商算法以及内容算法按客户端的顺序取自 CSR 的 SMIMECapabilities。该密钥包由“EST key generator”证书签名，该证书由签发 CA 在首次使用时签发并自动续期；它链接到 \`/cacerts\` 提供的 CA，并采用该 CA 的密钥族，Ed448 CA 下为 Ed25519 (v2.252)。
 
-## 信息选项卡
+## EST 端点选项卡
 
-信息选项卡显示：
+EST 端点选项卡显示：
 - **端点 URL**: 可直接复制粘贴的各 EST 操作 URL
-- **注册统计**: 注册、重新注册和错误的数量
-- **最近活动**: 审计日志中最近的 EST 操作
+- **注册统计**: 注册总数、成功数和失败数
 
 ## 集成示例
 
 ### 使用 est client (libest)
-\`\`\`bash
-estclient -s your-server -p 8443 \\
-  --srp-user est-user --srp-password est-password \\
-  -o /tmp/certs --enroll
-\`\`\`
+使用 \`estclient\` 搭配 HTTP Basic 凭据（\`-u\` 和 \`-h\`）或客户端证书。其 TLS-SRP 选项不适用：UCM 不提供 TLS-SRP。
 
 ### 使用 OpenSSL
 \`\`\`bash
@@ -161,15 +159,13 @@ curl -k --user est-user:est-password \\
   -H "Content-Type: application/pkcs10" \\
   --data-binary @<(openssl req -in client.csr -outform DER | base64) \\
   https://your-server:8443/.well-known/est/simpleenroll | \\
-  base64 -d | openssl x509 -inform DER -out client.pem
+  base64 -d | openssl pkcs7 -inform DER -print_certs -out client.pem
 \`\`\`
 
-### Windows (certutil)
-\`\`\`cmd
-certutil -enrollmentServerURL add \\
-  "https://your-server:8443/.well-known/est" \\
-  kerberos
-\`\`\`
+应答是 base64 编码的 PKCS#7（仅含证书），而不是单独的证书：请用 \`openssl pkcs7\` 读取，而不是 \`openssl x509\`。
+
+### Windows
+Windows 没有内置的 EST 客户端：\`certutil -enrollmentServerURL\` 注册的是证书注册 Web 服务（WSTEP），而不是 EST 服务器。对于 Windows 计算机，请使用 Windows 自动注册（XCEP/WSTEP）。
 
 ## EST 与 SCEP 对比
 

@@ -27,7 +27,7 @@ export default {
     ],
     tips: [
       'I CSR preservano la chiave privata del richiedente: non lascia mai il suo sistema',
-      'Puoi aggiungere una chiave privata a un CSR dopo la firma se necessario per l\'esportazione PKCS#12',
+      'Carica chiave allega una chiave privata a un CSR in attesa, così il certificato firmato può essere esportato come PKCS#12',
       'Un certificato importato per un CSR generato in UCM completa quel CSR: il record conserva la sua chiave privata, quindi il certificato viene esportato insieme a essa',
       'Usa la modalità Microsoft CA per firmare i CSR tramite AD CS quando sei connesso a una PKI Windows',
       'Un certificato per una chiave ML-DSA conserva solo i bit di firma: keyEncipherment, dataEncipherment e keyAgreement richiesti dal modello vengono rimossi, e il risultato lo indica',
@@ -74,7 +74,7 @@ Tramite l'API, \`related_to\` indica un certificato **A** esistente di cui UCM p
 ## Caricamento di un CSR
 
 1. Clicca **Carica CSR**
-2. Incolla il testo PEM o carica un file PEM/DER
+2. Incolla il testo PEM o carica un file PEM
 3. UCM valida la firma del CSR e visualizza i dettagli
 4. Il CSR appare nella scheda In attesa
 
@@ -95,9 +95,10 @@ Clicca su un CSR per visualizzare:
 3. Scegli la **CA firmataria** (deve avere una chiave privata)
 4. Seleziona il **tipo di certificato** (server, client, firma codice, email)
 5. Imposta il **periodo di validità** in giorni
-6. Facoltativamente applica un template per Key Usage ed estensioni
-7. Facoltativamente **Aggiungi nomi** (email, DNS, IP, URI) a quelli della richiesta
-8. Clicca **Firma**
+6. Facoltativamente **Aggiungi nomi** (email, DNS, IP, URI) a quelli della richiesta
+7. Clicca **Firma**
+
+In modalità Microsoft CA, al posto del tipo di certificato si sceglie il template AD CS.
 
 Il certificato risultante appare nella pagina Certificati.
 
@@ -146,13 +147,13 @@ Un dispositivo che conserva la propria chiave, come una smartcard, spesso non pu
 
 ## Aggiunta di una chiave privata
 
-Dopo la firma, puoi allegare una chiave privata al certificato per l'esportazione PKCS#12. Clicca **Aggiungi chiave** sul certificato firmato.
+Prima della firma, **Carica chiave** allega la chiave privata a un CSR in attesa, così il certificato firmato può essere esportato come PKCS#12. Una richiesta firmata non offre più questa azione.
 
 > 💡 Questo è utile quando il richiedente invia sia il CSR che la chiave in modo sicuro.
 
 ## Eliminazione dei CSR
 
-L'eliminazione rimuove il CSR da UCM. Se il CSR è già stato firmato, il certificato risultante non viene influenzato.
+L'eliminazione rimuove un CSR in attesa da UCM. Una richiesta firmata è il suo certificato: si elimina dalla pagina Certificati, non da qui.
 `
   }
 }
