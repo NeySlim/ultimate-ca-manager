@@ -309,3 +309,84 @@ def test_issue_refusal_gives_its_reason(client, wstep_config):
     r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
     assert r.status_code == 400
     assert b'bad name.example' in r.data
+
+
+@pytest.mark.parametrize('eku,cn,dns', [
+    (x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH, 'jdoe', []),
+    (x509.oid.ExtendedKeyUsageOID.SERVER_AUTH, 'intranet', ['intranet']),
+])
+def test_issue_cert_type_follows_the_template_eku(client, app, wstep_config, eku, cn, dns):
+    """A user template's CN names a person, so CN=jdoe gives no DNS:jdoe; a machine's keeps it."""
+    name = f'Test WSTEP profile {eku.dotted_string}'
+    with app.app_context():
+        delete_templates(template_ids_named(name))
+        db.session.add(CertificateTemplate(
+            name=name, template_type='custom', key_type='RSA-2048', is_active=True,
+            extensions_template='{"extended_key_usage": ["%s"]}' % eku.dotted_string))
+        db.session.commit()
+    try:
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
+               .add_extension(x509.ExtendedKeyUsage([eku]), critical=False)
+               .sign(key, hashes.SHA256()))
+        r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
+        assert r.status_code == 200, r.data
+        cert = _issued_cert_from_rstr(r.data)
+        try:
+            names = cert.extensions.get_extension_for_class(
+                x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName)
+        except x509.ExtensionNotFound:
+            names = []
+        assert names == dns
+    finally:
+        with app.app_context():
+            delete_templates(template_ids_named(name))
+            db.session.commit()
+
+
+_EFS = '1.3.6.1.4.1.311.10.3.4'
+_SMARTCARD_LOGON = '1.3.6.1.4.1.311.20.2.2'
+
+
+@pytest.mark.parametrize('ekus,ku', [
+    # AD CS User, Smartcard Logon and Basic EFS: keyEncipherment for S/MIME, EFS and PKINIT
+    (['1.3.6.1.5.5.7.3.2', '1.3.6.1.5.5.7.3.4', _EFS], {'key_encipherment', 'content_commitment'}),
+    (['1.3.6.1.5.5.7.3.2', _SMARTCARD_LOGON], {'key_encipherment'}),
+    ([_EFS], {'key_encipherment', 'content_commitment'}),
+    (['1.3.6.1.5.5.7.3.4'], {'key_encipherment', 'content_commitment'}),
+    (['1.3.6.1.5.5.7.3.2'], set()),
+])
+def test_user_template_key_usage_and_names(client, app, wstep_config, ekus, ku):
+    """A request without Key Usage gets its template's profile; a person's CN gives no DNS name."""
+    import json
+    name = f'Test WSTEP user profile {"-".join(ekus)}'
+    with app.app_context():
+        delete_templates(template_ids_named(name))
+        db.session.add(CertificateTemplate(
+            name=name, template_type='custom', key_type='RSA-2048', is_active=True,
+            extensions_template=json.dumps({'extended_key_usage': ekus})))
+        db.session.commit()
+    try:
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'jdoe')]))
+               .add_extension(x509.ExtendedKeyUsage([x509.ObjectIdentifier(o) for o in ekus]),
+                              critical=False)
+               .sign(key, hashes.SHA256()))
+        r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
+        assert r.status_code == 200, r.data
+        cert = _issued_cert_from_rstr(r.data)
+        usage = cert.extensions.get_extension_for_class(x509.KeyUsage).value
+        granted = {bit for bit in ('key_encipherment', 'content_commitment', 'key_agreement',
+                                   'data_encipherment') if getattr(usage, bit)}
+        assert usage.digital_signature and granted == ku, granted
+        try:
+            san = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName).value
+            assert san.get_values_for_type(x509.DNSName) == []
+        except x509.ExtensionNotFound:
+            pass
+    finally:
+        with app.app_context():
+            delete_templates(template_ids_named(name))
+            db.session.commit()

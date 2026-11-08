@@ -846,3 +846,24 @@ def test_a_twin_claimed_by_another_renewal_loses_the_claim(app, wstep_renew_conf
         assert _claim_superseded(original) is False
         monkeypatch.undo()
         db.session.rollback()
+
+
+@pytest.mark.parametrize('ekus', [['clientAuth', 'emailProtection', '1.3.6.1.4.1.311.10.3.4'],
+                                  ['clientAuth']])
+def test_renewal_keeps_the_key_usage_of_its_template(app, templated_ca, ekus):
+    """A renewal is signed under the profile of its template, as the issuance was."""
+    ca_id = templated_ca(f'WSTEP renew user KU CA {len(ekus)}', {'User': (ekus, None)})
+    with app.app_context():
+        oids = [x509.ObjectIdentifier(o) for o in wstep_service._template_configured_ekus(
+            CertificateTemplate.query.filter_by(name=f'WSTEP renew user KU CA {len(ekus)} User').one())]
+    key = _key()
+    csr = _eku_csr('jdoe', key, *oids)
+    with app.app_context():
+        pem, err = wstep_service.issue(db.session.get(CA, ca_id),
+                                       csr.public_bytes(serialization.Encoding.DER), 30)
+    assert err is None, err
+    old_cert = x509.load_pem_x509_certificate(pem.encode())
+    cert, err = _renew(app, ca_id, 'tls', old_cert, key, _eku_csr(old_cert, key, *oids))
+    assert err is None, err
+    assert (cert.extensions.get_extension_for_class(x509.KeyUsage).value
+            == old_cert.extensions.get_extension_for_class(x509.KeyUsage).value)

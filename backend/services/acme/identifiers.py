@@ -27,6 +27,7 @@ from typing import Any, Dict, Optional, Tuple
 # The label rule certificates are issued under (utils.san_parse); a single
 # trailing root dot is still tolerated here, as before.
 from utils.san_parse import _HOSTNAME_LABEL_RE as _DNS_LABEL_RE
+from utils.san_parse import dns_name_syntax_error
 
 
 def is_valid_dns_identifier(value: Any) -> bool:
@@ -131,6 +132,7 @@ def normalize_client_identifier(value: Any) -> Tuple[Optional[str], bool, Option
         return None, False, (
             f'Invalid domain (>{CLIENT_MAX_DOMAIN_LENGTH} chars): {value[:60]}...'
         )
-    if not _CLIENT_FQDN_RE.fullmatch(value):  # `$` alone lets a final newline through
+    # Two labels on top of the server's RFC 5280 syntax; fullmatch, since `$` lets a newline through
+    if not _CLIENT_FQDN_RE.fullmatch(value) or dns_name_syntax_error(value):
         return None, False, f'Invalid domain syntax: {value}'
     return value, False, None
