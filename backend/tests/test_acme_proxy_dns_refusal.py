@@ -558,8 +558,10 @@ class TestChallengeSubmissionFailure:
             assert row.status == 'invalid'
             assert row.challenges_dict[CHALL_URL]['status'] == 'failed'
             assert row.error_message
-            assert row.dns_records_created is None
-            # An authorization left unread may hide a received POST: its record stays a while
+            # An authorization left unread may hide a received POST: its record stays a while,
+            # listed until deleted
+            listed = json.loads(row.dns_records_created or '[]')
+            assert bool(listed) == rechecked and all(r['release_at'] for r in listed)
             [(_app, released, order_id, *delay)] = _cleanups()
             assert order_id == row.id
             assert {r['record_name'] for r in released} == {f'_acme-challenge.{DOMAIN}'}
@@ -848,7 +850,8 @@ class TestSubmittedRecordOutlivesASiblingFailure:
             by_delay = {(args[3] if len(args) > 3 else 0): args[1] for args in _cleanups()}
             assert by_delay.pop(0) == records[:1]
             [(delay, kept)] = by_delay.items()
-            assert kept == records[1:] and delay > 0
+            assert [{k: v for k, v in r.items() if k != 'release_at'} for r in kept] == records[1:]
+            assert delay > 0 and all(r['release_at'] for r in kept)
 
     def test_lingering_record_is_deleted_only_after_the_wait(self, app, monkeypatch):
         from models import DnsProvider
@@ -1100,7 +1103,8 @@ class TestConcurrentChallengesOfOneOrder:
             svc, _calls = _svc(monkeypatch)
             svc._release_order_records(row)
             assert sorted(r['value'] for args in _cleanups() for r in args[1]) == ['vx', 'vz']
-            assert _fresh(order_id).dns_records_created is None
+            listed = json.loads(_fresh(order_id).dns_records_created)
+            assert sorted(r['value'] for r in listed if r['release_at']) == ['vx', 'vz']
 
     def test_abandon_keeps_a_failure_written_meanwhile(self, app, monkeypatch):
         with app.app_context():
@@ -1162,3 +1166,226 @@ class TestOrderRowUpdate:
             with pytest.raises(Exception):
                 proxy_mod._update_order_row(row, lambda _row: None)
             assert AcmeClientOrder.query.filter_by(id=row.id).count() == 1
+
+
+@pytest.fixture
+def _recorded_rows(monkeypatch):
+    calls = []
+    monkeypatch.setattr(proxy_mod, '_dns_rows_hook', lambda action, *args: calls.append((action, args)))
+    monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
+                        lambda *_a, **_k: {'provider': object()})
+    return calls
+
+
+@pytest.mark.usefixtures('_quiet_rows')
+class TestSiblingOrderOfOneAccount:
+    """O1 {a, b} and O2 {a} of one account share the authorization of a: O1 failing
+    on b leaves the challenge of a served pending to O2 (RFC 8555 §7.1.6)."""
+
+    def test_challenge_cached_on_the_failed_order_is_served_for_the_live_one(self, app, monkeypatch):
+        with app.app_context():
+            first = _two_names(client_jwk_thumbprint='T')
+            _order(client_jwk_thumbprint='T', order_url=f'{ORDER_URL}b',
+                   upstream_order_url=f'{ORDER_URL}b')
+            svc, _calls = _svc(monkeypatch, {AUTHZ_URL: _Resp(_authz())})
+            svc.get_authz(_b64(AUTHZ_URL), requester_thumbprint='T')
+            assert _automation_orders() == [first.id]
+
+            first = _fresh(first.id)
+            states = first.challenges_dict
+            states[CHALL_B] = {'status': 'failed', 'error': 'x'}
+            first.set_challenges_dict(states)
+            first.status = 'invalid'
+            db.session.commit()
+
+            svc, _calls = _svc(monkeypatch, {AUTHZ_URL: _Resp(_authz())})
+            chall, _link = svc.respond_challenge(_b64(CHALL_URL), requester_thumbprint='T')
+            assert chall['status'] == 'processing' and 'error' not in chall
+
+    @pytest.mark.parametrize('first_url', [ORDER_URL, f'{ORDER_URL}b'])
+    def test_valid_retry_wins_over_the_failed_order(self, app, monkeypatch, first_url):
+        with app.app_context():
+            _failed_order(order_url=first_url, upstream_order_url=first_url)
+            _order(client_jwk_thumbprint='T', status='valid')
+            cert_url = f'{UPSTREAM}/acme/cert/dns/1'
+            svc, _calls = _svc(monkeypatch, {
+                ORDER_URL: _Resp({'status': 'valid', 'authorizations': [AUTHZ_URL],
+                                  'finalize': f'{ORDER_URL}/finalize', 'certificate': cert_url}),
+                AUTHZ_URL: _Resp(_authz(status='valid', chall_status='valid'))})
+            order = svc.get_order(_b64(ORDER_URL), requester_thumbprint='T')
+            assert order['status'] == 'valid' and order.get('certificate')
+            authz, _ident = svc.get_authz(_b64(AUTHZ_URL), requester_thumbprint='T')
+            assert authz['status'] == 'valid'
+            assert authz['challenges'][0]['status'] == 'valid'
+
+
+class TestLocalFailureLeavesSharedRowsOpen:
+    """A local failure closes the DNS UPDATE rows of its own order only: the other
+    accounts sharing the upstream challenge still validate it."""
+
+    @pytest.mark.parametrize('entry', ['authz', 'challenge'])
+    def test_failed_order_read_closes_no_shared_row(self, app, monkeypatch, _recorded_rows, entry):
+        with app.app_context():
+            _failed_order()
+            _order(client_jwk_thumbprint='U', order_url=f'{ORDER_URL}b',
+                   upstream_order_url=f'{ORDER_URL}b')
+            svc, _calls = _svc(monkeypatch, {AUTHZ_URL: _Resp(_authz()),
+                                             ORDER_URL: _Resp({'status': 'pending'})})
+            if entry == 'authz':
+                served, _ident = svc.get_authz(_b64(AUTHZ_URL), requester_thumbprint='T')
+                served = served['challenges'][0]
+            else:
+                served, _link = svc.respond_challenge(_b64(CHALL_URL), requester_thumbprint='T')
+            assert served['status'] == 'invalid'
+            assert 'close_for_challenge_urls' not in [action for action, _args in _recorded_rows]
+
+    def test_upstream_failure_still_closes_the_rows(self, app, monkeypatch, _recorded_rows):
+        with app.app_context():
+            _failed_order()
+            svc, _calls = _svc(monkeypatch, {AUTHZ_URL: _Resp(_authz(chall_status='invalid'))})
+            svc.respond_challenge(_b64(CHALL_URL), requester_thumbprint='T')
+            assert ('close_for_challenge_urls', ([CHALL_URL],)) in _recorded_rows
+
+    def test_already_valid_is_not_logged_for_a_failed_order(self, app, monkeypatch, caplog,
+                                                             _recorded_rows):
+        import logging
+        with app.app_context(), caplog.at_level(logging.INFO, logger=proxy_mod.logger.name):
+            _failed_order()
+            svc, _calls = _svc(monkeypatch, {
+                AUTHZ_URL: _Resp(_authz(status='valid', chall_status='valid'))})
+            authz, _ident = svc.get_authz(_b64(AUTHZ_URL), requester_thumbprint='T')
+            assert authz['status'] == 'invalid'
+            assert not any('passed through without validation' in r.getMessage()
+                           for r in caplog.records)
+
+
+@pytest.mark.usefixtures('_quiet_rows')
+class TestRetryWithinTheLinger:
+    """A retry on the same authorization publishes the value its failed sibling still
+    holds during the delay: not written twice, not deleted under the live order."""
+
+    def _fail_with_linger(self, monkeypatch):
+        row = _order(client_jwk_thumbprint='T')
+        row.set_challenges_dict({CHALL_URL: {'status': 'initiated'}})
+        db.session.commit()
+        svc, _calls = _svc(monkeypatch)
+        monkeypatch.setattr(svc, '_post_with_account', _Upstream({
+            CHALL_URL: requests.exceptions.ReadTimeout('read timed out'),
+            AUTHZ_URL: requests.exceptions.ReadTimeout('read timed out')}))
+        svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
+        return row.id
+
+    def test_retry_neither_rewrites_nor_loses_the_lingering_value(self, app, monkeypatch):
+        from models import DnsProvider
+        provider = _provider(monkeypatch, (True, 'ok'))
+        deleted = []
+        provider.delete_txt_record.side_effect = (
+            lambda _zone, name, value: deleted.append(value) or (True, 'ok'))
+        monkeypatch.setattr(proxy_mod.time, 'sleep', lambda _seconds: None)
+        with app.app_context():
+            model = DnsProvider(name='linger-retry', provider_type='manual', credentials='{}')
+            db.session.add(model)
+            db.session.commit()
+            monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
+                                lambda *_a, **_k: {'provider': model})
+            try:
+                failed_id = self._fail_with_linger(monkeypatch)
+                [(target, args)] = [(t, a) for t, a in _ThreadRecorder.created
+                                    if getattr(t, '__name__', '') == '_bg_cleanup_dns_records']
+                assert args[3] == proxy_mod._SUBMITTED_RECORD_LINGER
+
+                # Duplicate refused, as Cloudflare does
+                provider.create_txt_record.reset_mock()
+                provider.create_txt_record.return_value = (False, 'record already exists')
+                retry = _order(client_jwk_thumbprint='T', order_url=f'{ORDER_URL}b',
+                               upstream_order_url=f'{ORDER_URL}b')
+                svc, _calls = _svc(monkeypatch, {CHALL_URL: _Resp({'status': 'processing'})})
+                svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, retry.id, AUTHZ_URL)
+                retry = _fresh(retry.id)
+                assert retry.status == 'pending'
+                assert retry.challenges_dict[CHALL_URL]['status'] == 'submitted'
+                assert _txt('tok.up') in [r['value'] for r in json.loads(retry.dns_records_created)]
+                assert provider.create_txt_record.call_count == 0
+
+                target(*args)
+                assert deleted == []
+                assert not json.loads(_fresh(failed_id).dns_records_created or '[]')
+            finally:
+                AcmeClientOrder.query.filter_by(is_proxy_order=True).delete()
+                db.session.delete(model)
+                db.session.commit()
+
+    def test_lingering_value_is_deleted_when_no_order_holds_it(self, app, monkeypatch):
+        from models import DnsProvider
+        provider = _provider(monkeypatch, (True, 'ok'))
+        deleted = []
+        provider.delete_txt_record.side_effect = (
+            lambda _zone, name, value: deleted.append(value) or (True, 'ok'))
+        monkeypatch.setattr(proxy_mod.time, 'sleep', lambda _seconds: None)
+        with app.app_context():
+            model = DnsProvider(name='linger-alone', provider_type='manual', credentials='{}')
+            db.session.add(model)
+            db.session.commit()
+            monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
+                                lambda *_a, **_k: {'provider': model})
+            try:
+                failed_id = self._fail_with_linger(monkeypatch)
+                for target, args in list(_ThreadRecorder.created):
+                    target(*args)
+                assert _txt('tok.up') in deleted
+                assert not json.loads(_fresh(failed_id).dns_records_created or '[]')
+            finally:
+                AcmeClientOrder.query.filter_by(is_proxy_order=True).delete()
+                db.session.delete(model)
+                db.session.commit()
+
+
+    def test_value_whose_deletion_is_long_overdue_is_written_again(self, app, monkeypatch):
+        """A restart lost the deferred deletion: past one more delay the value is not trusted."""
+        import time
+        provider = _provider(monkeypatch, (True, 'ok'))
+        name = f'_acme-challenge.{DOMAIN}'
+        overdue = {'domain': DOMAIN, 'record_name': name, 'value': _txt('tok.up'), 'provider_id': 5,
+                   'release_at': time.time() - proxy_mod._SUBMITTED_RECORD_LINGER - 1}
+        with app.app_context():
+            _order(status='invalid', dns_records_created=json.dumps([overdue]))
+            row = _order(order_url=f'{ORDER_URL}b', upstream_order_url=f'{ORDER_URL}b')
+            svc, _calls = _svc(monkeypatch, {CHALL_URL: _Resp({'status': 'processing'})})
+            svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
+            provider.create_txt_record.assert_called_once_with(DOMAIN, name, _txt('tok.up'))
+
+    def test_issued_order_still_deletes_a_value_a_sibling_lists(self, app, monkeypatch):
+        """Issued, the shared authorization is valid: the sibling no longer needs the value."""
+        from flask import current_app
+        from models import DnsProvider
+        provider = _provider(monkeypatch, (True, 'ok'))
+        deleted = []
+        provider.delete_txt_record.side_effect = (
+            lambda _zone, name, value: deleted.append(value) or (True, 'ok'))
+        with app.app_context():
+            model = DnsProvider(name='issued-sibling', provider_type='manual', credentials='{}')
+            db.session.add(model)
+            db.session.commit()
+            record = {'domain': DOMAIN, 'record_name': f'_acme-challenge.{DOMAIN}',
+                      'value': 'shared', 'provider_id': model.id}
+            try:
+                issued = _order(status='valid')
+                _order(order_url=f'{ORDER_URL}b', upstream_order_url=f'{ORDER_URL}b',
+                       dns_records_created=json.dumps([record]))
+                svc, _calls = _svc(monkeypatch)
+                svc._bg_cleanup_dns_records(current_app._get_current_object(), [record], issued.id)
+                assert deleted == ['shared']
+            finally:
+                AcmeClientOrder.query.filter_by(is_proxy_order=True).delete()
+                db.session.delete(model)
+                db.session.commit()
+
+class TestAbandonGuard:
+    @pytest.mark.parametrize('state', ['submitted', 'failed'])
+    def test_only_an_initiated_challenge_is_abandoned(self, app, state):
+        with app.app_context():
+            row = _order()
+            row.set_challenges_dict({CHALL_URL: {'status': state, 'error': 'x'}})
+            db.session.commit()
+            AcmeProxyService._abandon_challenge(row, CHALL_URL)
+            assert _fresh(row.id).challenges_dict[CHALL_URL]['status'] == state
