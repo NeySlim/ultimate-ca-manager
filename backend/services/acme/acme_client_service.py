@@ -751,21 +751,10 @@ class AcmeClientService:
         }
     
     def _post(self, url: str, payload: Any, use_jwk: bool = False) -> requests.Response:
-        """POST signed JWS to ACME endpoint, retrying once on badNonce.
-
-        RFC 8555 §6.5: on badNonce the server returns a fresh nonce and the
-        client retries with it. Without the retry a badNonce was terminal here,
-        while the proxy side recovered from the same answer.
-        """
+        """POST signed JWS to ACME endpoint, retrying on badNonce (RFC 8555 §6.5)."""
         self._validate_outbound_acme_url(url)
-        resp = self._sign_and_post(url, payload, use_jwk=use_jwk)
-
-        fresh_nonce = outbound.bad_nonce_retry_value(resp)
-        if fresh_nonce:
-            logger.warning(f"Upstream rejected nonce on {url}, retrying with fresh nonce")
-            resp = self._sign_and_post(url, payload, use_jwk=use_jwk,
-                                       nonce=fresh_nonce)
-        return resp
+        return outbound.post_with_bad_nonce_retries(
+            lambda nonce: self._sign_and_post(url, payload, use_jwk=use_jwk, nonce=nonce), url)
 
     def _sign_and_post(self, url: str, payload: Any, use_jwk: bool = False,
                        nonce: Optional[str] = None) -> requests.Response:

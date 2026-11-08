@@ -306,6 +306,18 @@ class TestFinalizeCsrMatchesTheOrder:
         assert response.get_json()['type'] == 'urn:ietf:params:acme:error:badCSR'
         assert FINALIZE_URL not in [url for url, _p in upstream.calls]
 
+    def test_csr_with_a_duplicate_extension_is_bad_csr(self, app, client, route, monkeypatch):
+        import asn1crypto.csr
+        der = base64.urlsafe_b64decode(_csr_b64(dns=[DOMAIN]) + '==')
+        request = asn1crypto.csr.CertificationRequest.load(der)
+        extensions = request['certification_request_info']['attributes'][0]['values'][0]
+        extensions.append(extensions[0].copy())
+        duplicated = base64.urlsafe_b64encode(request.dump(force=True)).rstrip(b'=').decode()
+        response, upstream = self._finalize(app, client, route, monkeypatch, duplicated)
+        assert response.status_code == 400
+        assert response.get_json()['type'] == 'urn:ietf:params:acme:error:badCSR'
+        assert FINALIZE_URL not in [url for url, _p in upstream.calls]
+
     def test_wildcard_is_its_own_identifier(self, app, client, route, monkeypatch):
         response, _up = self._finalize(app, client, route, monkeypatch,
                                        _csr_b64(dns=['example.com']), domains=['*.example.com'])

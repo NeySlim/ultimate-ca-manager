@@ -3,13 +3,16 @@ upstream (the shared upstream account would count a failed validation), the
 order fails locally, and the TXT records of orders that can no longer be issued
 are removed."""
 import base64
+import hashlib
 import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+import requests
 
 import services.acme.acme_proxy_service as proxy_mod
+from services.acme import outbound
 from models import db, AcmeClientOrder
 from services.acme.acme_proxy_service import AcmeProxyService, ProxyOrderNotReadyError
 
@@ -520,13 +523,15 @@ class TestChallengeSubmissionFailure:
     """The upstream POST of the challenge fails: the order fails locally, its TXT
     records are released and the next order on the authorization starts afresh."""
 
-    @pytest.mark.parametrize('answer', [
-        _Resp(BAD_NONCE, 400, {'Replay-Nonce': 'n'}),
-        _Resp({'type': 'urn:ietf:params:acme:error:serverInternal', 'detail': 'boom'}, 500),
-        ConnectionError('upstream unreachable'),
+    @pytest.mark.parametrize('answer, rechecked', [
+        (_Resp(BAD_NONCE, 400, {'Replay-Nonce': 'n'}), False),
+        (_Resp({'type': 'urn:ietf:params:acme:error:rateLimited'}, 429), False),
+        (requests.exceptions.ConnectTimeout('upstream unreachable'), False),
+        (_Resp({'type': 'urn:ietf:params:acme:error:serverInternal', 'detail': 'boom'}, 500), True),
+        (requests.exceptions.ReadTimeout('no answer'), True),
     ])
     def test_failed_post_fails_the_order_and_releases_its_records(self, app, monkeypatch,
-                                                                  answer):
+                                                                  answer, rechecked):
         _provider(monkeypatch, (True, 'ok'))
         with app.app_context():
             row = _order(client_jwk_thumbprint='T')
@@ -537,7 +542,8 @@ class TestChallengeSubmissionFailure:
             monkeypatch.setattr(svc, '_post_with_account', post)
             svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
 
-            assert post.calls == [(CHALL_URL, {})]
+            # An answer that may hide a received POST is checked on the authorization
+            assert post.calls == [(CHALL_URL, {})] + ([(AUTHZ_URL, '')] if rechecked else [])
             db.session.refresh(row)
             assert row.status == 'invalid'
             assert row.challenges_dict[CHALL_URL]['status'] == 'failed'
@@ -578,6 +584,168 @@ class TestChallengeSubmissionFailure:
             assert _automation_orders() == [retry.id]
 
 
+class _Upstream:
+    """Upstream answers by URL; an exception answer is raised."""
+
+    def __init__(self, answers):
+        self.answers = dict(answers)
+        self.calls = []
+
+    def __call__(self, url, payload=None, *_a, **_k):
+        self.calls.append((url, payload))
+        answer = self.answers[url]
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+
+def _csr_pem(domain):
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    csr = (x509.CertificateSigningRequestBuilder().subject_name(x509.Name([]))
+           .add_extension(x509.SubjectAlternativeName([x509.DNSName(domain)]), False)
+           .sign(ec.generate_private_key(ec.SECP256R1()), hashes.SHA256()))
+    return csr.public_bytes(serialization.Encoding.PEM).decode()
+
+
+def _txt(key_authz):
+    return base64.urlsafe_b64encode(hashlib.sha256(key_authz.encode()).digest()).rstrip(b'=').decode()
+
+
+@pytest.mark.usefixtures('_quiet_rows')
+class TestAmbiguousSubmission:
+    """A POST that may have reached the CA (no answer, 5xx) is checked on the
+    authorization: a challenge the CA took is submitted, its record kept."""
+
+    def _run(self, app, monkeypatch, answer, authz):
+        _provider(monkeypatch, (True, 'ok'))
+        row = _order(client_jwk_thumbprint='T')
+        row.set_challenges_dict({CHALL_URL: {'status': 'initiated'}})
+        db.session.commit()
+        svc, _calls = _svc(monkeypatch)
+        upstream = _Upstream({CHALL_URL: answer, AUTHZ_URL: _Resp(authz),
+                              ORDER_URL: _Resp({'status': 'ready', 'authorizations': [AUTHZ_URL],
+                                                'finalize': f'{ORDER_URL}/finalize'})})
+        monkeypatch.setattr(svc, '_post_with_account', upstream)
+        svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
+        db.session.refresh(row)
+        return svc, row, upstream
+
+    @pytest.mark.parametrize('answer', [
+        requests.exceptions.ReadTimeout('read timed out'),
+        _Resp({'type': 'urn:ietf:params:acme:error:serverInternal', 'detail': 'boom'}, 502),
+    ])
+    @pytest.mark.parametrize('authz', [
+        _authz(status='valid', chall_status='valid'),
+        _authz(chall_status='processing'),
+    ])
+    def test_challenge_the_ca_took_is_submitted(self, app, monkeypatch, answer, authz):
+        with app.app_context():
+            svc, row, upstream = self._run(app, monkeypatch, answer, authz)
+            assert upstream.calls == [(CHALL_URL, {}), (AUTHZ_URL, '')]
+            assert row.status == 'pending'
+            assert row.challenges_dict[CHALL_URL]['status'] == 'submitted'
+            assert json.loads(row.dns_records_created)
+            assert _cleanups() == []
+            order = svc.get_order(_b64(ORDER_URL), requester_thumbprint='T')
+            assert order['status'] == 'ready' and 'error' not in order
+
+    def test_challenge_still_pending_fails_the_order(self, app, monkeypatch):
+        with app.app_context():
+            _svc_, row, upstream = self._run(
+                app, monkeypatch, requests.exceptions.ReadTimeout('read timed out'), _authz())
+            assert upstream.calls == [(CHALL_URL, {}), (AUTHZ_URL, '')]
+            assert row.status == 'invalid'
+            assert row.challenges_dict[CHALL_URL]['status'] == 'failed'
+            [(_app, released, _order_id)] = _cleanups()
+            assert released
+
+    def test_upstream_ready_is_served_over_a_local_failure(self, app, monkeypatch):
+        """The authorization read failed too: the upstream order decides."""
+        with app.app_context():
+            row = _order(client_jwk_thumbprint='T', status='invalid')
+            row.set_challenges_dict({CHALL_URL: {'status': 'failed', 'error': 'x'}})
+            db.session.commit()
+            def _answers():
+                return {ORDER_URL: _Resp({'status': 'ready', 'authorizations': [AUTHZ_URL],
+                                          'finalize': f'{ORDER_URL}/finalize'}),
+                        f'{ORDER_URL}/finalize': _Resp({'status': 'processing',
+                                                        'finalize': f'{ORDER_URL}/finalize'})}
+            svc, _calls = _svc(monkeypatch, _answers())
+            order = svc.get_order(_b64(ORDER_URL), requester_thumbprint='T')
+            assert order['status'] == 'ready' and 'error' not in order
+            svc, _calls = _svc(monkeypatch, _answers())
+            done = svc.finalize_order(_b64(ORDER_URL), _csr_pem(DOMAIN), requester_thumbprint='T')
+            assert done['status'] == 'processing'
+
+
+@pytest.mark.usefixtures('_quiet_rows')
+class TestProblemWithoutDetail:
+    """RFC 7807 §3.1: ``detail`` is optional; its absence must not stall the order."""
+
+    def test_rate_limit_without_detail_fails_the_order(self, app, monkeypatch):
+        _provider(monkeypatch, (True, 'ok'))
+        with app.app_context():
+            row = _order(client_jwk_thumbprint='T')
+            row.set_challenges_dict({CHALL_URL: {'status': 'initiated'}})
+            db.session.commit()
+            svc, _calls = _svc(monkeypatch)
+            monkeypatch.setattr(svc, '_post_with_account', _FailingPost(_Resp(
+                {'type': 'urn:ietf:params:acme:error:rateLimited'}, 429)))
+            svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
+            db.session.refresh(row)
+            assert row.status == 'invalid'
+            assert row.challenges_dict[CHALL_URL]['status'] == 'failed'
+            assert 'rateLimited' in row.error_message
+
+            svc, _calls = _svc(monkeypatch, {ORDER_URL: _Resp(
+                {'status': 'pending', 'authorizations': [AUTHZ_URL],
+                 'finalize': f'{ORDER_URL}/finalize'})})
+            with pytest.raises(ProxyOrderNotReadyError, match='rateLimited'):
+                svc.finalize_order(_b64(ORDER_URL), 'unused', requester_thumbprint='T')
+
+
+@pytest.mark.usefixtures('_quiet_rows')
+class TestSubmittedRecordOutlivesASiblingFailure:
+    def test_record_of_a_submitted_challenge_is_released_later(self, app, monkeypatch):
+        records = [{'domain': DOMAIN, 'record_name': f'_acme-challenge.{DOMAIN}',
+                    'value': 'v1', 'provider_id': 5},
+                   {'domain': OTHER, 'record_name': f'_acme-challenge.{OTHER}',
+                    'value': 'v2', 'provider_id': 5}]
+        _provider(monkeypatch, (True, 'ok'))
+        with app.app_context():
+            row = _two_names(dns_records_created=json.dumps(records))
+            row.set_challenges_dict({
+                CHALL_B: {'status': 'submitted', 'records': [[f'_acme-challenge.{OTHER}', 'v2']]},
+                CHALL_URL: {'status': 'initiated'}})
+            db.session.commit()
+            svc, _calls = _svc(monkeypatch)
+            svc._fail_dns_automation(row, CHALL_URL, DOMAIN, 'refused')
+            by_delay = {(args[3] if len(args) > 3 else 0): args[1] for args in _cleanups()}
+            assert by_delay.pop(0) == records[:1]
+            [(delay, kept)] = by_delay.items()
+            assert kept == records[1:] and delay > 0
+
+
+@pytest.mark.usefixtures('_quiet_rows')
+class TestValueAlreadyPublishedBySibling:
+    def test_sibling_record_is_not_written_again(self, app, monkeypatch):
+        provider = _provider(monkeypatch, (False, 'record already exists'))
+        name = f'_acme-challenge.{DOMAIN}'
+        mine = {'domain': DOMAIN, 'record_name': name, 'value': _txt('tok.up'), 'provider_id': 5}
+        with app.app_context():
+            _order(status='invalid', dns_records_created=json.dumps([mine]))
+            row = _order(order_url=f'{ORDER_URL}b', upstream_order_url=f'{ORDER_URL}b')
+            svc, calls = _svc(monkeypatch, {CHALL_URL: _Resp({'status': 'processing'})})
+            svc._run_dns01_automation(CHALL_URL, 'tok.up', DOMAIN, row.id, AUTHZ_URL)
+            assert provider.create_txt_record.call_count == 0
+            assert calls == [(CHALL_URL, {})]
+            db.session.refresh(row)
+            assert row.challenges_dict[CHALL_URL]['status'] == 'submitted'
+            assert [r['value'] for r in json.loads(row.dns_records_created)] == [mine['value']]
+
+
 class TestBadNonceRetries:
     """RFC 8555 §6.5: each badNonce answer carries the nonce of the next attempt."""
 
@@ -607,7 +775,7 @@ class TestBadNonceRetries:
         svc, sent = self._svc(monkeypatch, answers)
         resp = svc._post_jws(CHALL_URL, {}, kid='k')
         assert resp.status_code == 400
-        assert len(sent) == 1 + proxy_mod._BAD_NONCE_RETRIES
+        assert len(sent) == 1 + outbound.BAD_NONCE_RETRIES
 
     def test_other_400_is_not_retried(self, monkeypatch):
         answers = [_Resp({'type': 'urn:ietf:params:acme:error:malformed'}, 400,
