@@ -115,7 +115,8 @@ class CASigningMixin:
             cert_type: Signing profile for TrustStoreService.sign_csr —
                 decides the EKU ceiling. EST passes 'device_cert'; WSTEP
                 overrides this too for its own matched-template flow; the
-                default keeps every other caller on the TLS profile.
+                default keeps every other caller on the TLS profile. Recorded on
+                the certificate's row.
             extra_ekus: forwarded to TrustStoreService.sign_csr — see its
                 docstring. Only WSTEP passes this, for a matched template's
                 own configured EKUs (e.g. Smartcard Logon) that a CSR-EKU
@@ -240,7 +241,7 @@ class CASigningMixin:
             caref=ca.refid,
             crt=base64.b64encode(cert_pem_raw).decode(),
             csr=base64.b64encode(csr_pem).decode(),
-            cert_type='server',
+            cert_type=cert_type,
             subject=cert_obj.subject.rfc4514_string(),
             subject_cn=cn,
             issuer=cert_obj.issuer.rfc4514_string(),
