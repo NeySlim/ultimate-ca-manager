@@ -128,11 +128,8 @@ def process_client_certificate():
     # session there would keep a cookie's inactivity clock running from anywhere.
     if is_exempt_path(request.path) or _is_file_request(request.path):
         return
-    # Already authenticated via certificate — skip
-    if session.get('user_id') and session.get('auth_method') == 'certificate':
-        return
-
-    # Valid non-certificate session — respect it (don't overwrite password/LDAP/WebAuthn)
+    # A valid session of any method is kept (password/LDAP/WebAuthn never overwritten);
+    # an expired one, certificate included, takes the expired-cookie path below
     if session.get('user_id'):
         from auth.unified import verify_request_auth
         if verify_request_auth():
