@@ -91,6 +91,25 @@ def cn_may_name_host(cert_type: str, eku_oids) -> bool:
     return any(getattr(oid, 'dotted_string', oid) in _HOST_EKU_OIDS for oid in eku_oids)
 
 
+_CLIENT_AUTH, _CODE_SIGNING = '1.3.6.1.5.5.7.3.2', '1.3.6.1.5.5.7.3.3'
+_SMARTCARD_LOGON = '1.3.6.1.4.1.311.20.2.2'
+_PERSON_EKU_OIDS = frozenset({'1.3.6.1.5.5.7.3.4', '1.3.6.1.4.1.311.10.3.4'})  # emailProtection, EFS
+
+
+def cert_type_for_ekus(eku_oids) -> str:
+    """The trunk type of a leaf whose EKUs come from a template or the request
+    (SCEP, WSTEP): one able to authenticate a server, or with no EKU, is a server one."""
+    dotted = {getattr(oid, 'dotted_string', oid) for oid in eku_oids or ()}
+    if not dotted or dotted & _HOST_EKU_OIDS:
+        return 'server_cert'
+    if dotted & _PERSON_EKU_OIDS:
+        return 'email_cert'
+    if _CLIENT_AUTH in dotted or (_SMARTCARD_LOGON in dotted
+                                  and dotted <= {_CLIENT_AUTH, _SMARTCARD_LOGON}):
+        return 'client_cert'
+    return 'code_signing' if dotted == {_CODE_SIGNING} else 'server_cert'
+
+
 def _non_host_cn_dns_name(cn: str, cert_type: str) -> str | None:
     """A client or code-signing CN names a host only when dotted and valid, as a
     machine's client certificate does (#389); an S/MIME CN never does."""
