@@ -174,8 +174,8 @@ def validate_name_constraints(ca_cert, subject, san_names=None, renewal_of=None,
     them strands entire fleets at expiry. Violations on carried-over names are
     logged; only names NEW to this request are enforced.
 
-    ``cn_may_name_host``: False for an S/MIME certificate, whose CN names a person,
-    so a dotted CN (john.doe) is not checked as a DNS name.
+    ``cn_may_name_host``: False for an S/MIME certificate that cannot authenticate a
+    server (utils.request_names.cn_may_name_host): its dotted CN (john.doe) names a person.
     """
     names_to_check = []
     try:

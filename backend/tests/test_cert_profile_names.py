@@ -275,6 +275,47 @@ class TestNameImpliedByTheCn:
         finally:
             _drop_policy(app, pid)
 
+    @pytest.mark.parametrize('path', ['form', 'approval', 'sign_extra', 'sign_csr_eku'])
+    def test_an_smime_cn_that_may_name_a_server_is_checked_as_a_host(
+            self, app, auth_client, create_ca, create_user, path):
+        """With serverAuth the certificate can authenticate the host its CN names."""
+        from cryptography.x509.oid import ExtendedKeyUsageOID
+        from tests.test_approval_on_sign_and_renew import _drop_policy, _json, _operator, _policy
+        ca = create_ca(cn=f'Profile CN smime serverAuth NC CA {path}', nameConstraintsPermitted=[
+            {'type': 'dns', 'value': 'example.com'}, {'type': 'email', 'value': 'example.com'}])
+        if path in ('form', 'approval'):
+            body = {'ca_id': ca['id'], 'cn': 'www.outside.test', 'cert_type': 'email',
+                    'extra_ekus': ['serverAuth']}
+            if path == 'form':
+                r = auth_client.post(CERTS, json=body)
+                assert r.status_code == 400, r.get_json()
+                assert 'www.outside.test' in r.get_json()['message']
+                return
+            pid = _policy(app, ca['id'], 'profile-smime-server-auth')
+            try:
+                r = _operator(app, create_user).post(CERTS, json=body)
+                approval_id = r.get_json()['data']['approval_id']
+                r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve',
+                          {'comment': 'ok'})
+                assert r.get_json()['data']['certificate_issued'] is False, r.get_json()
+            finally:
+                _drop_policy(app, pid)
+            return
+        if path == 'sign_extra':
+            csr, extra = _csr(_cn('www.outside.test')), {'extra_ekus': ['serverAuth']}
+        else:
+            key = ec.generate_private_key(ec.SECP256R1())
+            csr = (x509.CertificateSigningRequestBuilder()
+                   .subject_name(x509.Name(_cn('www.outside.test')))
+                   .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.EMAIL_PROTECTION,
+                                                         ExtendedKeyUsageOID.SERVER_AUTH]),
+                                  critical=False)
+                   .sign(key, hashes.SHA256()))
+            extra = {}
+        r = _sign(auth_client, _upload(auth_client, csr), ca['id'], cert_type='email', **extra)
+        assert r.status_code == 400, r.get_json()
+        assert 'www.outside.test' in r.get_json()['message']
+
     @pytest.mark.parametrize('cert_type,cn', [
         ('client', 'jdoe'), ('email', 'jdoe'), ('code_signing', 'jdoe'),
         ('client', 'svc_backup.corp.example'), ('code_signing', 'svc_backup.corp.example'),
@@ -681,8 +722,8 @@ class TestEstPath:
         assert r.status_code == 400
         assert b'bad name.example' in r.data
 
-    def test_simplereenroll_refusal_names_its_reason(self, client, est_config):
-        """A key under the floor is refused with its reason, by the EST check or else the trunk."""
+    def test_simplereenroll_weak_key_refusal_names_its_reason(self, client, est_config):
+        """EST's own key check answers a re-enrolment; the trunk's RequestRejected is not reached."""
         from cryptography.hazmat.primitives.asymmetric import rsa
         from cryptography.hazmat.primitives.serialization import pkcs7
         from tests.test_est_rfc7030 import _make_csr

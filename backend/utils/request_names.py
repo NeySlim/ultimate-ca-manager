@@ -79,6 +79,16 @@ def _cn_dns_name(cn: str) -> str | None:
 
 # An S/MIME CN names a person (john.doe), never a host
 PERSON_CERT_TYPES = frozenset({'email_cert', 'email'})
+# serverAuth, anyExtendedKeyUsage: the certificate can authenticate the host its CN names
+_HOST_EKU_OIDS = frozenset({'1.3.6.1.5.5.7.3.1', '2.5.29.37.0'})
+
+
+def cn_may_name_host(cert_type: str, eku_oids) -> bool:
+    """Whether name constraints check a dotted CN as a DNS name: always, except on an
+    S/MIME certificate whose EKUs (none means any) cannot authenticate a server."""
+    if cert_type not in PERSON_CERT_TYPES or not eku_oids:
+        return True
+    return any(getattr(oid, 'dotted_string', oid) in _HOST_EKU_OIDS for oid in eku_oids)
 
 
 def _non_host_cn_dns_name(cn: str, cert_type: str) -> str | None:

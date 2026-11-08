@@ -9,7 +9,7 @@ from typing import List, Optional, Tuple
 
 from cryptography import x509
 from utils.csr_extensions import csr_extensions
-from utils.request_names import (PERSON_CERT_TYPES, RequestRejected, cn_implied_names,
+from utils.request_names import (RequestRejected, cn_implied_names, cn_may_name_host,
                                  cn_without_name_notice, refuse_malformed_request,
                                  subject_email_names)
 from utils.eku_validation import add_ocsp_nocheck_if_responder
@@ -763,11 +763,6 @@ class CSROperationsMixin:
         refuse_malformed_request(subject if override_subject is None else None,
                                  effective_sans, renewal_of)
 
-        ConstraintsMixin._validate_name_constraints(
-            ca_cert, subject, effective_sans if effective_sans else None, renewal_of=renewal_of,
-            cn_may_name_host=cert_type not in PERSON_CERT_TYPES,
-        )
-
         # The CA can only vouch inside its own validity window, and the leaf
         # never outlives it (RFC 5280 §6.1) -- checked here for every caller
         # of this trunk rather than by each of them
@@ -1108,6 +1103,14 @@ class CSROperationsMixin:
             )
             new_builder = add_ocsp_nocheck_if_responder(new_builder, merged)
             builder = new_builder
+
+        # Checked once the EKUs are settled: they decide whether the CN may name a host
+        issued_ekus = next((e.value for e in builder._extensions
+                            if e.oid == ExtensionOID.EXTENDED_KEY_USAGE), None)
+        ConstraintsMixin._validate_name_constraints(
+            ca_cert, subject, effective_sans if effective_sans else None, renewal_of=renewal_of,
+            cn_may_name_host=cn_may_name_host(cert_type, list(issued_ekus or ())),
+        )
 
         # RFC 5480 §3, RFC 9881 §5: a non-RSA key cannot honour keyEncipherment /
         # dataEncipherment, on a leaf or a sub-CA (#327). Applied once the EKU is
