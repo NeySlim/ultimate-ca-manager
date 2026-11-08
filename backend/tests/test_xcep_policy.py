@@ -498,11 +498,11 @@ def test_client_faults_are_sender_faults(client, xcep_config):
 
 
 def test_a_server_failure_is_a_receiver_fault(client, xcep_config, monkeypatch):
-    import api.xcep_protocol as xcep_protocol
+    from services.xcep import policy_builder
 
     def _fail(*_args, **_kwargs):
         raise RuntimeError('database unreachable')
-    monkeypatch.setattr(xcep_protocol, 'build_get_policies_response', _fail)
+    monkeypatch.setattr(policy_builder, 'build_get_policies_response', _fail)
     r = client.post(XCEP_URL, data=b'<GetPolicies/>', headers=_basic_auth())
     assert r.status_code == 500
     assert _fault_code(r.data) == 's:Receiver'
