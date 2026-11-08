@@ -21,6 +21,8 @@ TOO_LONG = ('a' * 60 + '.') * 4 + 'example.com'          # 255 chars, labels <= 
     ('a_b.example.com', (None, False, 'Invalid domain syntax: a_b.example.com')),
     ('example.com.', (None, False, 'Invalid domain syntax: example.com.')),
     ('host.example.com\n', (None, False, 'Invalid domain syntax: host.example.com\n')),
+    ('host.123', (None, False, 'Invalid domain syntax: host.123')),
+    ('xn--zz.example', (None, False, 'Invalid domain syntax: xn--zz.example')),
     ('', (None, False, 'Invalid domain (empty or not a string)')),
     (5, (None, False, 'Invalid domain (empty or not a string)')),
 ])
