@@ -316,6 +316,41 @@ class TestNameImpliedByTheCn:
         assert r.status_code == 400, r.get_json()
         assert 'www.outside.test' in r.get_json()['message']
 
+    def test_an_smime_cn_with_any_purpose_is_checked_as_a_host(self, auth_client, create_ca):
+        """anyExtendedKeyUsage lets the certificate authenticate the host its CN names."""
+        from cryptography.x509.oid import ExtendedKeyUsageOID
+        ca = create_ca(cn='Profile CN smime anyEKU NC CA', nameConstraintsPermitted=[
+            {'type': 'dns', 'value': 'example.com'}, {'type': 'email', 'value': 'example.com'}])
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name(_cn('www.outside.test')))
+               .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.EMAIL_PROTECTION,
+                                                     ExtendedKeyUsageOID.ANY_EXTENDED_KEY_USAGE]),
+                              critical=False)
+               .sign(ec.generate_private_key(ec.SECP256R1()), hashes.SHA256()))
+        r = _sign(auth_client, _upload(auth_client, csr), ca['id'], cert_type='email')
+        assert r.status_code == 400, r.get_json()
+        assert 'www.outside.test' in r.get_json()['message']
+
+    def test_an_smime_cn_without_eku_is_checked_as_a_host(self, app):
+        """No ExtendedKeyUsage means any purpose (RFC 5280 4.2.1.12), a server's included."""
+        key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name(_cn('Profile CN smime no EKU NC CA'))
+        now = datetime.now(timezone.utc)
+        ca_cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+                   .public_key(key.public_key()).serial_number(x509.random_serial_number())
+                   .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=365))
+                   .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                   .add_extension(x509.NameConstraints(permitted_subtrees=[
+                       x509.DNSName('example.com'), x509.RFC822Name('example.com')],
+                       excluded_subtrees=None), critical=True)
+                   .sign(key, hashes.SHA256()))
+        pem = _csr(_cn('www.outside.test')).public_bytes(serialization.Encoding.PEM)
+        with app.app_context():
+            with pytest.raises(ValueError, match='www.outside.test'):
+                # The trunk's 'email' type has no default EKU: the leaf would carry none
+                TrustStoreService.sign_csr(csr_pem=pem, ca_cert=ca_cert, ca_private_key=key,
+                                           validity_days=30, cert_type='email')
+
     @pytest.mark.parametrize('cert_type,cn', [
         ('client', 'jdoe'), ('email', 'jdoe'), ('code_signing', 'jdoe'),
         ('client', 'svc_backup.corp.example'), ('code_signing', 'svc_backup.corp.example'),
