@@ -1528,9 +1528,8 @@ class AcmeProxyService:
         except Exception:
             db.session.rollback()
             raise
-        if order.status != 'valid':
-            _dns_rows_hook('close_for_order', order.id)
-            self._release_order_records(order)
+        _dns_rows_hook('close_for_order', order.id)
+        self._release_order_records(order)
         return self._deactivated_view(authz), identifier
 
     def _deactivated_view(self, authz):
