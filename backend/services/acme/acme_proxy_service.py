@@ -2189,11 +2189,11 @@ class AcmeProxyService:
         """
         from models import AcmeClientOrder
 
-        order = AcmeClientOrder.query.filter_by(
-            is_proxy_order=True, certificate_url=cert_url
-        ).first()
-        if order:
-            return order
+        rows = (AcmeClientOrder.query
+                .filter_by(is_proxy_order=True, certificate_url=cert_url)
+                .order_by(AcmeClientOrder.id.asc()).all())
+        if rows:
+            return self._select_owning_order(rows, requester_account_id, requester_thumbprint)
 
         unbound = and_(
             or_(AcmeClientOrder.account_id.is_(None), AcmeClientOrder.account_id == ''),
@@ -2298,9 +2298,11 @@ class AcmeProxyService:
 
         order = resp.json()
         _finalize_url_cache.put(order_url, order.get('finalize'))
-        if (local_order.deactivated_authz_list
-                and order.get('status') in ('pending', 'ready')):
+        # RFC 8555 §7.5.2: a deactivated authorization never issues, even once the shared
+        # upstream order is valid through another client's order: no certificate served.
+        if local_order.deactivated_authz_list:
             order['status'] = 'invalid'
+            order.pop('certificate', None)
         # RFC 8555 §7.1.6: invalid is final, even when the upstream CA validates the order later
         failure = self._local_failure(local_order)
         if failure:
@@ -2390,6 +2392,9 @@ class AcmeProxyService:
         self._require_owner(
             order, requester_account_id, requester_thumbprint,
             resource='Certificate')
+        # The certificate of a shared upstream order belongs to the orders that may issue
+        if order.deactivated_authz_list or self._local_failure(order):
+            raise ProxyResourceNotFoundError("Certificate not found")
         resp = self._post_with_account(cert_url, "")
         if resp.status_code != 200:
             raise UpstreamProblem.from_response(resp)

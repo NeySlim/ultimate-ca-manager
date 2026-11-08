@@ -422,3 +422,72 @@ class TestEndpoint:
         assert upstream.deactivations == []
         with app.app_context():
             assert db.session.get(AcmeClientOrder, order_id).status == 'pending'
+
+
+CERT_URL = f'{UPSTREAM}/acme/cert/422'
+
+
+class TestDeactivatedOrderOnceUpstreamIsValid:
+    """RFC 8555 §7.5.2: the shared upstream order turns valid through another
+    account's order; the order whose authorization was deactivated stays invalid
+    and is never handed the other account's certificate."""
+
+    def _valid_upstream(self, svc):
+        def _answer(url, payload, *_a, **_k):
+            svc.upstream.calls.append((url, payload))
+            if url == AUTHZ_URL:
+                return _FakeResp(_authz('valid', 'valid'))
+            if url == ORDER_URL:
+                return _FakeResp({'status': 'valid', 'finalize': f'{url}/finalize',
+                                  'authorizations': [AUTHZ_URL], 'certificate': CERT_URL})
+            raise AssertionError(f'unexpected upstream call {url}')
+        svc._post_with_account = _answer
+
+    def test_order_reads_invalid_without_certificate(self, app, svc):
+        with app.app_context():
+            mine = _seed()
+            theirs = _seed(account='acct-b', thumb='thumb-b')
+            _deactivate(svc)
+            assert svc.upstream.deactivations == []  # shared: kept upstream for acct-b
+            self._valid_upstream(svc)
+            order = svc.get_order(_b64(ORDER_URL), requester_account_id='acct-a',
+                                  requester_thumbprint='thumb-a')
+            other = svc.get_order(_b64(ORDER_URL), requester_account_id='acct-b',
+                                  requester_thumbprint='thumb-b')
+            mine_row = db.session.get(AcmeClientOrder, mine)
+            theirs_row = db.session.get(AcmeClientOrder, theirs)
+            assert mine_row.status == 'invalid'
+            assert mine_row.certificate_url is None
+            assert theirs_row.certificate_url == CERT_URL
+        assert order['status'] == 'invalid'
+        assert 'certificate' not in order
+        assert other['status'] == 'valid'
+        assert other['certificate'].startswith('https://ucm.example/acme/proxy/cert/')
+
+    def test_authz_reads_deactivated(self, app, svc):
+        with app.app_context():
+            _seed()
+            _seed(account='acct-b', thumb='thumb-b')
+            _deactivate(svc)
+            self._valid_upstream(svc)
+            view, _ = svc.get_authz(_b64(AUTHZ_URL), requester_account_id='acct-a',
+                                    requester_thumbprint='thumb-a')
+        assert view['status'] == 'deactivated'
+
+    def test_certificate_of_the_other_account_is_refused(self, app, svc):
+        from services.acme.acme_proxy_service import ProxyResourceNotFoundError
+        with app.app_context():
+            mine = _seed(deactivated=[AUTHZ_URL], status='invalid')
+            theirs = _seed(account='acct-b', thumb='thumb-b')
+            # A URL recorded on the deactivated row before it could no longer issue
+            for order_id in (mine, theirs):
+                db.session.get(AcmeClientOrder, order_id).certificate_url = CERT_URL
+            db.session.commit()
+            self._valid_upstream(svc)
+            with pytest.raises(ProxyResourceNotFoundError):
+                svc.get_certificate(_b64(CERT_URL), requester_account_id='acct-a',
+                                    requester_thumbprint='thumb-a')
+            assert svc.upstream.calls == []
+            found = svc._find_order_for_certificate(CERT_URL, 'acct-b', 'thumb-b')
+            assert found.id == theirs
+            assert db.session.get(AcmeClientOrder, mine).certificate_id is None
