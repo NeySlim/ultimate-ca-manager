@@ -12,6 +12,7 @@ tech debt.
 """
 import base64
 import logging
+import re
 
 from cryptography import x509
 from cryptography.hazmat.primitives.serialization import Encoding
@@ -287,7 +288,7 @@ def _match_template(ca, csr, principal=None):
     a user, generalFlags) are matched first, as a Windows client only offers those.
 
     Callers use the matched row three ways: its policy OID (via
-    ``policy_builder._policy_oid_for_template``) for the issued cert's
+    ``_template_oid_for``) for the issued cert's
     ``ms_certificate_template_oid`` — a real Windows client fails
     CX509Enrollment::Enroll with CERTSRV_E_PROPERTY_EMPTY when the cert
     carries no Certificate Template extension — and its own configured
@@ -407,12 +408,22 @@ def _policy_oid_cas(ca):
 
 
 def _template_oid_for(ca, template, wanted):
-    """The template OID a certificate carries: ``wanted`` when it is one of the template's
-    (XCEP may announce another CA's, which autoenrollment then looks for), else *ca*'s."""
+    """The template OID a certificate carries: ``wanted`` when it is one of the template's,
+    else the one XCEP announces (another CA's on a split setup), which autoenrollment looks for."""
     from services.xcep.policy_builder import _policy_oid_for_template
-    if wanted is not None and wanted in {_policy_oid_for_template(c, template) for c in _policy_oid_cas(ca)}:
+    cas = _policy_oid_cas(ca)
+    if wanted is not None and wanted in {_policy_oid_for_template(c, template) for c in cas}:
         return wanted
-    return _policy_oid_for_template(ca, template)
+    return _policy_oid_for_template(cas[-1], template)
+
+
+_POLICY_OID_SHAPE = re.compile(r'1\.3\.6\.1\.4\.1\.311\.21\.8\.\d+\.\d+\.\d+\.\d+\.1\.(\d+)')
+
+
+def _template_id_of_policy_oid(oid):
+    """The template id a UCM policy OID ends with, whatever CA it was derived from; None otherwise."""
+    m = _POLICY_OID_SHAPE.fullmatch(oid or '')
+    return int(m.group(1)) if m else None
 
 
 def _template_ext_oid(cert_or_csr):
@@ -465,10 +476,10 @@ def _renewal_template(ca, renewed_cert, csr):
             return None, [oid for oid in extra if oid in prior], _issuable_ekus(prior), None
         return matched, extra, extra, None
 
-    from services.xcep.policy_builder import _policy_oid_for_template
-    cas = _policy_oid_cas(ca)
-    template = next((t for t in _ca_templates(ca)
-                     if template_oid in {_policy_oid_for_template(c, t) for c in cas}), None)
+    # The renewed certificate is this CA's: its OID names the template under whichever
+    # CA XCEP announced at issuance, even once xcep_ca_refid has changed
+    template_id = _template_id_of_policy_oid(template_oid)
+    template = next((t for t in _ca_templates(ca) if t.id == template_id), None)
     if template is None:
         return None, [], None, ('The certificate template of the certificate being renewed '
                                 'is not offered by this CA')

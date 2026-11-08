@@ -169,4 +169,57 @@ def test_only_an_oid_of_the_template_is_stamped(app, split_xcep):
         vpn = CertificateTemplate.query.filter_by(name='Named split WSTEP CA VPNUser').one()
         user = CertificateTemplate.query.filter_by(name='Named split WSTEP CA User').one()
         assert _template_oid_for(ca, vpn, oid) == oid
-        assert _template_oid_for(ca, user, oid) == _policy_oid_for_template(ca, user)
+        xcep_ca = db.session.get(CA, ca_id_of_xcep(oid))
+        # A request naming another template's OID, or none, gets the OID XCEP announced
+        assert _template_oid_for(ca, user, oid) == _policy_oid_for_template(xcep_ca, user)
+        assert _template_oid_for(ca, user, None) == _policy_oid_for_template(xcep_ca, user)
+
+
+def ca_id_of_xcep(oid):
+    from models import SystemConfig
+    return CA.query.filter_by(refid=SystemConfig.query.filter_by(key='xcep_ca_refid').one().value).one().id
+
+
+@pytest.mark.parametrize('how', ['name', 'eku'])
+def test_a_request_not_naming_the_oid_carries_the_one_xcep_announced(app, split_xcep, how):
+    """Named by szOID_ENROLL_CERTTYPE only, or matched by its EKUs: autoenrollment still
+    looks the certificate's template up by the OID XCEP announced."""
+    ca_id, _oid = split_xcep
+    csr = (_named_csr(name='Named split WSTEP CA VPNUser') if how == 'name'
+           else _named_csr(ekus=(SERVER_AUTH,)))
+    cert, err = _issue(app, ca_id, csr)
+    assert err is None, err
+    template = 'VPNUser' if how == 'name' else 'Web'
+    with app.app_context():
+        xcep_ca = db.session.get(CA, ca_id_of_xcep(_oid))
+        wanted = _policy_oid_for_template(
+            xcep_ca, CertificateTemplate.query.filter_by(name=f'Named split WSTEP CA {template}').one())
+    assert _template_oid(cert).dotted_string == wanted != _oid_of(app, ca_id, f'Named split WSTEP CA {template}')
+
+
+@pytest.mark.parametrize('path', ['tls', 'xml'])
+@pytest.mark.parametrize('change', ['cleared', 'moved'])
+def test_a_certificate_renews_after_the_xcep_ca_changes(app, split_xcep, create_ca, change, path):
+    """The renewed certificate was issued by this CA: its template OID, stamped under the XCEP
+    CA of the time, still names its template once that setting is cleared or moved."""
+    from models import SystemConfig
+    ca_id, oid = split_xcep
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'split-move-{change}-{path}.example.test')]))
+           .add_extension(x509.ExtendedKeyUsage([CLIENT_AUTH]), critical=False)
+           .add_extension(x509.MSCertificateTemplate(x509.ObjectIdentifier(oid), 100, 0), critical=False)
+           .sign(key, hashes.SHA256()))
+    old_cert, err = _issue(app, ca_id, csr)
+    assert err is None, err
+    other = create_ca(cn=f'Named split other XCEP CA {change} {path}') if change == 'moved' else None
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key='xcep_ca_refid').one()
+        row.value = other['refid'] if other else ''
+        db.session.commit()
+    cert, err = _renew(app, ca_id, path, old_cert, key, _eku_csr(old_cert, key, CLIENT_AUTH))
+    assert err is None, err
+    with app.app_context():
+        vpn = CertificateTemplate.query.filter_by(name='Named split WSTEP CA VPNUser').one()
+        now = _policy_oid_for_template(db.session.get(CA, other['id'] if other else ca_id), vpn)
+    assert _template_oid(cert).dotted_string == now != oid
