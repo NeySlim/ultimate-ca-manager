@@ -52,6 +52,10 @@ _DN_ATTR_OIDS = {
 }
 
 
+class ServerError(str):
+    """An error message for a failure on the CA's side, faulted as SOAP env:Receiver (HTTP 500)."""
+
+
 def _x509_name_from_dn_components(dn_components, email=None):
     """Build an x509.Name from AD DN RDN components (attr, value) pairs.
 
@@ -935,7 +939,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
                     "Connector -- refusing issuance (strong certificate mapping)",
                     kerberos_sam_account_name,
                 )
-                return None, 'Could not resolve requester identity for strong certificate mapping'
+                return None, ServerError('Could not resolve requester identity for strong certificate mapping')
 
     err = _validate_csr(csr, require_pop=require_pop, allow_naked_subject=True)
     if err:
@@ -1037,7 +1041,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         return None, str(e)
     except Exception as e:
         logger.error('WSTEP issue failed: %s', e)
-        return None, 'Certificate issuance failed'
+        return None, ServerError('Certificate issuance failed')
 
     return cert_pem, None
 
@@ -1254,6 +1258,6 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
         return None, str(e)
     except Exception as e:
         logger.error('WSTEP renew failed: %s', e)
-        return None, 'Certificate renewal failed'
+        return None, ServerError('Certificate renewal failed')
 
     return cert_pem, None

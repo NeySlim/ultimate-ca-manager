@@ -270,6 +270,7 @@ class TestNakedCsrSubjectDerivation:
         self, client, app, wstep_kerberos_config, monkeypatch
     ):
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
         monkeypatch.setattr(
@@ -439,6 +440,7 @@ class TestNakedCsrSubjectDerivation:
         ...) means the naked CSR falls through to the pre-existing
         rejection, never a crash or a bypass."""
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         _configure_ad_derived_user_template(app)
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -464,6 +466,7 @@ class TestNakedCsrSubjectDerivation:
         + a successful lookup -- without any ad_derived_subject template,
         derivation must not fire even if AD would have resolved the user."""
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         _clear_ad_derived_templates(app)
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -628,6 +631,7 @@ class TestEnrollAcl:
         propagates that as a denial, not a silent bypass, when the
         connector/DC is unreachable."""
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         _configure_acl_template(app, 'VPN-Enroll', wstep_kerberos_config['id'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -691,6 +695,7 @@ class TestEnrollAcl:
         never be checked at all -- silently defeating the ACL for exactly
         the unattended-autoenrollment case it exists to restrict."""
         _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
         _configure_acl_template(app, 'VPN-Enroll', wstep_kerberos_config['id'], extended_key_usage=['clientAuth'])
         monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
         monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
@@ -749,3 +754,21 @@ class TestEnrollAcl:
             assert cert.public_key().public_numbers() == key.public_key().public_numbers()
         finally:
             _clear_acl_template(app)
+
+
+def test_an_unreachable_directory_is_a_receiver_fault(client, app, wstep_kerberos_config, monkeypatch):
+    """The SID lookup failing is the server's fault (SOAP env:Receiver, HTTP 500), not the client's."""
+    _configure_ad_connector(app)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: None)
+    csr, _key = _make_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 500
+    fault = etree.fromstring(r.data).find(f'.//{{{SOAP_NS}}}Fault')
+    assert fault.find(f'.//{{{SOAP_NS}}}Text').text == (
+        'Could not resolve requester identity for strong certificate mapping')
+    assert fault.find(f'{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text == 's:Receiver'

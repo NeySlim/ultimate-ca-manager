@@ -147,6 +147,10 @@ def _fault_response(reason, status=500, relates_to=None, subcode=None):
     return Response(body, status=status, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
 
 
+def _error_status(error):
+    return 500 if isinstance(error, wstep_service.ServerError) else 400
+
+
 def _parse_request(body):
     """``(parsed, fault)``: the RST, or the fault answering it. MS-WSTEP 3.1.4.2.1
     serves Issue only (renewal included); an expired wsu:Timestamp is refused."""
@@ -227,7 +231,7 @@ def _issue_and_respond(ca, parsed, username, action='certificate.issued', kerber
     )
     if error:
         logger.warning("WSTEP issuance rejected for %r: %s", username, error)
-        return _fault_response(error, status=400, relates_to=parsed.message_id)
+        return _fault_response(error, status=_error_status(error), relates_to=parsed.message_id)
 
     try:
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -402,7 +406,7 @@ def renew_certificate_bound():
         if old_serial is not None:
             _audit_issuance('certificate.renewed', None, username, success=False, details=(
                 f'WSTEP renewal refused from {client_ip()}: {error} (old serial {old_serial})'))
-        return _fault_response(error, status=400, relates_to=parsed.message_id)
+        return _fault_response(error, status=_error_status(error), relates_to=parsed.message_id)
 
     try:
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
