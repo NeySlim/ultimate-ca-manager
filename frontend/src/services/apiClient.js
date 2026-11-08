@@ -68,6 +68,13 @@ export function resetLoginRedirect() {
   loginRedirectPending = false
 }
 
+// A page restored from the back-forward cache keeps its module state: it sends again
+if (typeof window !== 'undefined') {
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) resetLoginRedirect()
+  })
+}
+
 class APIClient {
   constructor() {
     this.baseURL = API_BASE_URL

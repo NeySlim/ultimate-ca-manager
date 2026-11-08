@@ -353,6 +353,31 @@ describe('API Client', () => {
       expect(assigned).toEqual(['/login'])
     })
 
+    it('a page restored from the back-forward cache sends its calls again', async () => {
+      global.fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 401,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({ error: 'Unauthorized' })
+      })
+      const { apiClient } = await import('../apiClient')
+      await expect(apiClient.get('/certificates')).rejects.toThrow()
+      expect(window.location.href).toBe('/login')
+
+      window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: false }))
+      await expect(apiClient.get('/certificates')).rejects.toMatchObject({ status: 401 })
+      expect(global.fetch).toHaveBeenCalledTimes(1)
+
+      window.dispatchEvent(Object.assign(new Event('pageshow'), { persisted: true }))
+      global.fetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({ data: [] })
+      })
+      await expect(apiClient.get('/certificates')).resolves.toEqual({ data: [] })
+      expect(global.fetch).toHaveBeenCalledTimes(2)
+    })
+
     it('does not redirect on 401 when already on login page', async () => {
       window.location = { pathname: '/login', href: '' }
       
