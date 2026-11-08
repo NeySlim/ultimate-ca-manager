@@ -1219,6 +1219,23 @@ class TestSiblingOrderOfOneAccount:
             assert authz['challenges'][0]['status'] == 'valid'
 
 
+    @pytest.mark.parametrize('failed_first', [True, False])
+    def test_failed_order_wins_over_a_deactivated_one_on_one_order_url(self, app, monkeypatch,
+                                                                       failed_first):
+        """Both dead: the deactivated row must not serve the valid upstream order."""
+        with app.app_context():
+            make = [_failed_order, lambda: _order(
+                client_jwk_thumbprint='T', status='invalid',
+                deactivated_authz_urls=json.dumps([AUTHZ_URL]))]
+            for build in (make if failed_first else make[::-1]):
+                build()
+            svc, _calls = _svc(monkeypatch, {ORDER_URL: _Resp({
+                'status': 'valid', 'authorizations': [AUTHZ_URL],
+                'finalize': f'{ORDER_URL}/finalize',
+                'certificate': f'{UPSTREAM}/acme/cert/dns/1'})})
+            order = svc.get_order(_b64(ORDER_URL), requester_thumbprint='T')
+            assert order['status'] == 'invalid' and 'certificate' not in order
+
 class TestLocalFailureLeavesSharedRowsOpen:
     """A local failure closes the DNS UPDATE rows of its own order only: the other
     accounts sharing the upstream challenge still validate it."""

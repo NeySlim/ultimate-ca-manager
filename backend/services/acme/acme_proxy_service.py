@@ -1189,8 +1189,9 @@ class AcmeProxyService:
         # The CA hands a still-pending authz or order to the client's next order
         # after a deactivation (#422) or a refused TXT record: the live order wins.
         # A locally failed order loses to one that did not fail: invalid is final for it only.
+        # Without an authz URL (order lookup), any deactivated authz ranks the order last.
         candidates = sorted(candidates, key=lambda c: (
-            bool(authz_url) and authz_url in c.deactivated_authz_list,
+            authz_url in c.deactivated_authz_list if authz_url else bool(c.deactivated_authz_list),
             bool(AcmeProxyService._local_failure(c)),
             c.status != 'pending'))
         for candidate in candidates:
@@ -2269,7 +2270,6 @@ class AcmeProxyService:
         rows = (AcmeClientOrder.query
                 .filter_by(upstream_order_url=order_url, is_proxy_order=True)
                 .order_by(AcmeClientOrder.id.asc()).all())
-        rows.sort(key=lambda row: bool(row.deactivated_authz_list))
         return self._select_owning_order(rows, requester_account_id, requester_thumbprint)
 
     def get_order(self, order_id_b64, requester_account_id=None, requester_thumbprint=None):
