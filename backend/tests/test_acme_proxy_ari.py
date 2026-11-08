@@ -240,6 +240,13 @@ class _FakeUpstream:
         raise AssertionError(f'unexpected upstream GET {url}')
 
 
+def _served_locally(resp):
+    """The local window of a certificate valid for 80 more days starts weeks from now."""
+    start = resp.get_json()['suggestedWindow']['start']
+    start = datetime.fromisoformat(start.replace('Z', '+00:00'))
+    return resp.status_code == 200 and start > datetime.now(timezone.utc) + timedelta(days=7)
+
+
 class TestUpstreamRenewalInfoRelay:
     """RFC 9773: a certificate issued through the proxy gets the window of the CA that
     issued it, relayed with its Retry-After; the local window when the CA has none."""
@@ -291,14 +298,13 @@ class TestUpstreamRenewalInfoRelay:
 
     def test_local_window_when_upstream_announces_none(self, client, issued, monkeypatch):
         upstream = self._upstream(monkeypatch, announces=False)
-        r = client.get(f'/acme/proxy/renewal-info/{self._certid()}')
-        assert r.status_code == 200
-        assert r.get_json()['suggestedWindow'] != UPSTREAM_WINDOW
+        r = client.get(f'/acme/proxy/ari-test/renewal-info/{self._certid()}')
+        assert _served_locally(r)
         assert r.headers['Retry-After'] == str(6 * 3600)
         assert upstream.ari_calls == []
 
     @pytest.mark.parametrize('answer', [
-        _Answer({'detail': 'down'}, status_code=503),
+        _Answer({'suggestedWindow': UPSTREAM_WINDOW}, status_code=503),
         _Answer({'suggestedWindow': {'start': UPSTREAM_WINDOW['end'],
                                      'end': UPSTREAM_WINDOW['start']}}),
         _Answer(['not', 'an', 'object']),
@@ -307,9 +313,8 @@ class TestUpstreamRenewalInfoRelay:
     def test_local_window_when_upstream_gives_no_usable_answer(self, client, issued, monkeypatch,
                                                                answer):
         upstream = self._upstream(monkeypatch, answer=answer)
-        r = client.get(f'/acme/proxy/renewal-info/{self._certid()}')
-        assert r.status_code == 200
-        assert r.get_json()['suggestedWindow'] != UPSTREAM_WINDOW
+        r = client.get(f'/acme/proxy/ari-test/renewal-info/{self._certid()}')
+        assert _served_locally(r)
         assert upstream.ari_calls == [self._certid()]
 
     def test_certificate_not_issued_through_the_proxy_is_not_relayed(self, app, client,
@@ -317,13 +322,12 @@ class TestUpstreamRenewalInfoRelay:
         upstream = self._upstream(monkeypatch)
         cert_id = _import_cert_for_ari(app, self.AKI, self.SERIAL)
         try:
-            r = client.get(f'/acme/proxy/renewal-info/{self._certid()}')
+            r = client.get(f'/acme/proxy/ari-test/renewal-info/{self._certid()}')
         finally:
             with app.app_context():
                 Certificate.query.filter_by(id=cert_id).delete()
                 db.session.commit()
-        assert r.status_code == 200
-        assert r.get_json()['suggestedWindow'] != UPSTREAM_WINDOW
+        assert _served_locally(r)
         assert upstream.ari_calls == []
 
     def test_http_date_retry_after(self, client, issued, monkeypatch):
