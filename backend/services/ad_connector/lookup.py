@@ -29,9 +29,9 @@ Bind/search mechanics mirror ``api/v2/sso/connection_tests.py``'s
 temp CA-bundle file that exists in that code (no matching cleanup there).
 
 The public lookups never raise: they answer None (or False) when the connector is
-off or the object is not found, and the falsy ``UNREACHABLE`` when no DC binds, the
-search raises or the enabled connector lacks a server or base DN, so a caller can refuse
-the request or fault on its own side.
+off or the object is not found, and the falsy ``UNREACHABLE`` when no DC binds, a
+search raises or returns an LDAP error result, or the enabled connector lacks a server
+or base DN, so a caller can refuse the request or fault on its own side.
 """
 import logging
 import os
@@ -56,8 +56,7 @@ class _Falsy:
         return self._name
 
 
-# No DC bound, the search raised, or the enabled connector has no server or base DN. An LDAP
-# error result without an exception reads as no entry (connections skip raise_exceptions).
+# No DC bound, a search failed, or the enabled connector has no server or base DN.
 UNREACHABLE = _Falsy('UNREACHABLE')
 # The account exists but its objectSid is missing or malformed.
 UNUSABLE_SID = _Falsy('UNUSABLE_SID')
@@ -353,6 +352,27 @@ def _connect(config):
         cleanup()
 
 
+_RESULT_SUCCESS = 0
+_RESULT_SIZE_LIMIT_EXCEEDED = 4
+
+
+def _search(conn, base_dn, search_filter, attributes):
+    """The entries of a search the directory answered, else ``UNREACHABLE``.
+
+    Connections skip raise_exceptions, so an error result (busy, unavailable, referral,
+    noSuchObject on the base DN, insufficientAccessRights...) comes back with no entries
+    and must not read as "not found"; a size-limited answer counts only for what it found.
+    """
+    conn.search(base_dn, search_filter, attributes=attributes)
+    result = conn.result if isinstance(getattr(conn, 'result', None), dict) else {}
+    code = result.get('result')
+    if code == _RESULT_SUCCESS or (code == _RESULT_SIZE_LIMIT_EXCEEDED and conn.entries):
+        return conn.entries
+    logger.warning('AD Connector: search under %r failed: %s (%s) %s', base_dn,
+                   result.get('description'), code, result.get('message') or '')
+    return UNREACHABLE
+
+
 def lookup_computer_dns_hostname(sam_account_name):
     """The AD computer object's ``dNSHostName`` for ``sam_account_name``
     (e.g. ``'WIN11$'``, trailing ``$`` included -- it's a real part of the
@@ -360,7 +380,7 @@ def lookup_computer_dns_hostname(sam_account_name):
 
     Returns ``None`` when the connector is not configured or disabled, the entry
     is not found or the attribute is empty/missing, and the falsy ``UNREACHABLE``
-    when no DC binds or the search raises. Never raises.
+    when no DC binds or the search fails. Never raises.
     """
     from ldap3.utils.conv import escape_filter_chars
 
@@ -376,14 +396,11 @@ def lookup_computer_dns_hostname(sam_account_name):
 
     try:
         safe_sam = escape_filter_chars(sam_account_name)
-        conn.search(
-            config.base_dn,
-            f'(&(objectClass=computer)(sAMAccountName={safe_sam}))',
-            attributes=['dNSHostName'],
-        )
-        if not conn.entries:
-            return None
-        entry = conn.entries[0]
+        entries = _search(conn, config.base_dn, f'(&(objectClass=computer)(sAMAccountName={safe_sam}))',
+                          ['dNSHostName'])
+        if not entries:
+            return entries if entries is UNREACHABLE else None
+        entry = entries[0]
         if 'dNSHostName' not in entry or not entry.dNSHostName.value:
             return None
         return str(entry.dNSHostName.value)
@@ -459,14 +476,10 @@ def lookup_object_sid(sam_account_name):
 
     try:
         safe_sam = escape_filter_chars(sam_account_name)
-        conn.search(
-            config.base_dn,
-            f'(sAMAccountName={safe_sam})',
-            attributes=['objectSid'],
-        )
-        if not conn.entries:
-            return None
-        entry = conn.entries[0]
+        entries = _search(conn, config.base_dn, f'(sAMAccountName={safe_sam})', ['objectSid'])
+        if not entries:
+            return entries if entries is UNREACHABLE else None
+        entry = entries[0]
         if 'objectSid' not in entry or not entry.objectSid.raw_values:
             return UNUSABLE_SID
         return _sid_bytes_to_string(entry.objectSid.raw_values[0]) or UNUSABLE_SID
@@ -493,7 +506,7 @@ def lookup_user_ad_identity(sam_account_name):
     'hagland'), ('DC', 'domain')]``), confirmed against a real ADCS-issued
     User certificate's subject in the lab. ``None`` when the connector is not
     configured/disabled, the entry is not found or has no ``userPrincipalName``;
-    the falsy ``UNREACHABLE`` when no DC binds or the search raises. Never raises.
+    the falsy ``UNREACHABLE`` when no DC binds or the search fails. Never raises.
 
     ``mail`` is deliberately optional (``None`` when unset), not a failure
     mode: real ADCS's own CT_FLAG_SUBJECT_REQUIRE_EMAIL hard-declines
@@ -518,14 +531,12 @@ def lookup_user_ad_identity(sam_account_name):
 
     try:
         safe_sam = escape_filter_chars(sam_account_name)
-        conn.search(
-            config.base_dn,
-            f'(&(objectCategory=person)(objectClass=user)(sAMAccountName={safe_sam}))',
-            attributes=['userPrincipalName', 'mail'],
-        )
-        if not conn.entries:
-            return None
-        entry = conn.entries[0]
+        entries = _search(conn, config.base_dn,
+                          f'(&(objectCategory=person)(objectClass=user)(sAMAccountName={safe_sam}))',
+                          ['userPrincipalName', 'mail'])
+        if not entries:
+            return entries if entries is UNREACHABLE else None
+        entry = entries[0]
         if 'userPrincipalName' not in entry or not entry.userPrincipalName.value:
             return None
         upn = str(entry.userPrincipalName.value)
@@ -569,7 +580,7 @@ def is_member_of_group(sam_account_name, group):
 
     Fails closed to ``False`` -- connector not configured/disabled, group not
     found, or account not found/not a member -- and to the falsy ``UNREACHABLE``
-    when no DC binds or a search raises. Never raises. Callers must treat either as
+    when no DC binds or a search fails. Never raises. Callers must treat either as
     "deny", never "skip the check": this is a security gate.
     """
     from ldap3.utils.conv import escape_filter_chars
@@ -592,25 +603,23 @@ def is_member_of_group(sam_account_name, group):
             group_dn = group
         else:
             safe_group = escape_filter_chars(group)
-            conn.search(
-                config.base_dn,
-                f'(&(objectClass=group)(|(sAMAccountName={safe_group})(cn={safe_group})))',
-                attributes=['distinguishedName'],
-            )
-            if not conn.entries:
+            entries = _search(conn, config.base_dn,
+                              f'(&(objectClass=group)(|(sAMAccountName={safe_group})(cn={safe_group})))',
+                              ['distinguishedName'])
+            if entries is UNREACHABLE:
+                return UNREACHABLE
+            if not entries:
                 logger.warning("AD Connector: group %r not found for Enroll ACL check", group)
                 return False
-            group_dn = conn.entries[0].entry_dn
+            group_dn = entries[0].entry_dn
 
         safe_sam = escape_filter_chars(sam_account_name)
         safe_group_dn = escape_filter_chars(group_dn)
-        conn.search(
-            config.base_dn,
-            f'(&(sAMAccountName={safe_sam})'
-            f'(memberOf:1.2.840.113556.1.4.1941:={safe_group_dn}))',
-            attributes=['sAMAccountName'],
-        )
-        return bool(conn.entries)
+        entries = _search(conn, config.base_dn,
+                          f'(&(sAMAccountName={safe_sam})'
+                          f'(memberOf:1.2.840.113556.1.4.1941:={safe_group_dn}))',
+                          ['sAMAccountName'])
+        return entries if entries is UNREACHABLE else bool(entries)
     except Exception as e:
         logger.warning("AD Connector: group membership check failed: %s", e)
         return UNREACHABLE
