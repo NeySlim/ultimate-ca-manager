@@ -554,6 +554,17 @@ def _template_extra_ekus(template):
     return oids
 
 
+_SERVER_AUTH = '1.3.6.1.5.5.7.3.1'
+_USER_EKUS = frozenset({'1.3.6.1.5.5.7.3.2', '1.3.6.1.4.1.311.20.2.2'})  # clientAuth, Smartcard Logon
+
+
+def _template_cert_type(template):
+    """Trunk profile of the matched template: without serverAuth, a clientAuth or
+    Smartcard Logon template is a client one, whose one-label CN (jdoe) names no host."""
+    ekus = set(_template_configured_ekus(template))
+    return 'client_cert' if _SERVER_AUTH not in ekus and ekus & _USER_EKUS else 'server_cert'
+
+
 def _template_configured_ekus(template):
     """Every EKU OID ``template`` configures, as XCEP advertises them, before the protocol cap."""
     import json
@@ -1028,6 +1039,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             template_ekus=_template_extra_ekus(matched_template) or None,
             policy_template_id=getattr(matched_template, 'id', None),
             template_id=getattr(matched_template, 'id', None),
+            cert_type=_template_cert_type(matched_template),
         )
     except PolicyViolation as e:
         logger.warning('WSTEP issue refused by policy: %s', e)

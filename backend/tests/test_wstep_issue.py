@@ -309,3 +309,37 @@ def test_issue_refusal_gives_its_reason(client, wstep_config):
     r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
     assert r.status_code == 400
     assert b'bad name.example' in r.data
+
+
+@pytest.mark.parametrize('eku,cn,dns', [
+    (x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH, 'jdoe', []),
+    (x509.oid.ExtendedKeyUsageOID.SERVER_AUTH, 'intranet', ['intranet']),
+])
+def test_issue_cert_type_follows_the_template_eku(client, app, wstep_config, eku, cn, dns):
+    """A user template's CN names a person, so CN=jdoe gives no DNS:jdoe; a machine's keeps it."""
+    name = f'Test WSTEP profile {eku.dotted_string}'
+    with app.app_context():
+        delete_templates(template_ids_named(name))
+        db.session.add(CertificateTemplate(
+            name=name, template_type='custom', key_type='RSA-2048', is_active=True,
+            extensions_template='{"extended_key_usage": ["%s"]}' % eku.dotted_string))
+        db.session.commit()
+    try:
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
+               .add_extension(x509.ExtendedKeyUsage([eku]), critical=False)
+               .sign(key, hashes.SHA256()))
+        r = client.post(ISSUE_URL, data=_build_rst(csr), headers=_basic_auth())
+        assert r.status_code == 200, r.data
+        cert = _issued_cert_from_rstr(r.data)
+        try:
+            names = cert.extensions.get_extension_for_class(
+                x509.SubjectAlternativeName).value.get_values_for_type(x509.DNSName)
+        except x509.ExtensionNotFound:
+            names = []
+        assert names == dns
+    finally:
+        with app.app_context():
+            delete_templates(template_ids_named(name))
+            db.session.commit()
