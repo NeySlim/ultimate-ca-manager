@@ -613,27 +613,25 @@ class TestEstPath:
         assert r.status_code == 400
         assert b'bad name.example' in r.data
 
-    def test_simplereenroll_refusal_names_its_reason(self, client, est_config, monkeypatch):
-        """A re-enrolment keeps names already issued, so the refusal is injected."""
-        from tests.test_est_rfc7030 import _make_csr
+    def test_simplereenroll_refusal_names_its_reason(self, client, est_config):
+        """A key under the floor is refused with its reason, by the EST check or else the trunk."""
+        from cryptography.hazmat.primitives.asymmetric import rsa
         from cryptography.hazmat.primitives.serialization import pkcs7
-        from services.ca_service import CAService
-        from utils.request_names import RequestRejected
-        first, key = _make_csr(san_names=('reenroll.example.test',))
+        from tests.test_est_rfc7030 import _make_csr
+        first, _key = _make_csr(san_names=('reenroll.example.test',))
         enrolled = _post_csr(client, 'simpleenroll', first, headers=_basic_auth())
         assert enrolled.status_code == 200, enrolled.data
         leaf = [c for c in pkcs7.load_der_pkcs7_certificates(base64.b64decode(enrolled.data))
                 if not c.extensions.get_extension_for_class(x509.BasicConstraints).value.ca][0]
-
-        def refuse(*args, **kwargs):
-            raise RequestRejected("Invalid DNS name(s) in the request: 'bad name.example'")
-        monkeypatch.setattr(CAService, 'sign_csr_from_crypto', staticmethod(refuse))
-        csr = x509.CertificateSigningRequestBuilder().subject_name(leaf.subject).sign(
-            key, hashes.SHA256())
+        weak = rsa.generate_private_key(public_exponent=65537, key_size=1024)
+        csr = (x509.CertificateSigningRequestBuilder().subject_name(leaf.subject)
+               .add_extension(leaf.extensions.get_extension_for_class(
+                   x509.SubjectAlternativeName).value, critical=False)
+               .sign(weak, hashes.SHA256()))
         r = _post_csr(client, 'simplereenroll', csr,
                       client_cert_pem=leaf.public_bytes(serialization.Encoding.PEM).decode())
         assert r.status_code == 400, r.data
-        assert b'bad name.example' in r.data
+        assert b'RSA key too small (1024 bits)' in r.data, r.data
 
 
 class TestApprovalAfterTheChecks:
