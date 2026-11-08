@@ -60,6 +60,14 @@ function buildErrorMessage(status, data, fallback = 'Request failed') {
   return backendMsg || HTTP_ERROR_MESSAGES[status] || fallback
 }
 
+// One redirect for a burst of 401s: each navigation to /login can log in again with
+// a client certificate, and calls sent while it loads would carry no cookie.
+let loginRedirectPending = false
+
+export function resetLoginRedirect() {
+  loginRedirectPending = false
+}
+
 class APIClient {
   constructor() {
     this.baseURL = API_BASE_URL
@@ -91,6 +99,11 @@ class APIClient {
   async request(endpoint, options = {}) {
     if (import.meta.env.DEV && options.params) {
       console.warn(`⚠️ apiClient does not support 'params'. Use buildQueryString() to append query params to the URL. Called on: ${endpoint}`)
+    }
+    if (loginRedirectPending) {
+      const error = new Error(HTTP_ERROR_MESSAGES[401])
+      error.status = 401
+      throw error
     }
     const url = `${this.baseURL}${endpoint}`
     
@@ -153,8 +166,9 @@ class APIClient {
         const isLoginPage = window.location.pathname.includes('/login')
         const isAuthEndpoint = endpoint.includes('/auth/login') || endpoint.includes('/auth/verify')
         
-        if (response.status === 401 && !isLoginPage && !isAuthEndpoint) {
+        if (response.status === 401 && !isLoginPage && !isAuthEndpoint && !loginRedirectPending) {
           console.warn('🚪 401 Unauthorized - redirecting to login')
+          loginRedirectPending = true
           window.location.href = '/login'
         }
         

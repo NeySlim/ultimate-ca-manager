@@ -16,7 +16,9 @@ describe('API Client', () => {
     window.location = { pathname: '/dashboard', href: '' }
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    const { resetLoginRedirect } = await import('../apiClient')
+    resetLoginRedirect()
     global.fetch = originalFetch
     window.location = originalLocation
     vi.clearAllMocks()
@@ -327,6 +329,28 @@ describe('API Client', () => {
       
       await expect(apiClient.get('/certificates')).rejects.toThrow()
       expect(window.location.href).toBe('/login')
+    })
+
+    it('redirects once when parallel calls all get 401, and sends no call after', async () => {
+      const assigned = []
+      window.location = { pathname: '/dashboard', set href(v) { assigned.push(v) }, get href() { return assigned.at(-1) ?? '' } }
+      global.fetch.mockResolvedValue({
+        ok: false,
+        status: 401,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({ error: 'Unauthorized' })
+      })
+
+      const { apiClient } = await import('../apiClient')
+
+      const calls = ['/certificates', '/cas', '/dashboard/stats'].map(e => apiClient.get(e))
+      await Promise.allSettled(calls)
+      expect(assigned).toEqual(['/login'])
+      const sent = global.fetch.mock.calls.length
+
+      await expect(apiClient.get('/certificates')).rejects.toMatchObject({ status: 401 })
+      expect(global.fetch.mock.calls.length).toBe(sent)
+      expect(assigned).toEqual(['/login'])
     })
 
     it('does not redirect on 401 when already on login page', async () => {
