@@ -56,7 +56,7 @@ Verwalten Sie Benutzerkonten, Gruppen und Rollenzuweisungen. Benutzer authentifi
 Schalten Sie den Status eines Benutzers um, ohne sein Konto zu löschen.
 
 ### Passwort zurücksetzen
-Administratoren können das Passwort jedes Benutzers zurücksetzen. Der Benutzer wird bei der nächsten Anmeldung zur Änderung aufgefordert.
+Administratoren können das Passwort jedes Benutzers zurücksetzen. Der Benutzer wird bei der nächsten Anmeldung nicht zur Änderung aufgefordert: Geben Sie ihm das neue Passwort und bitten Sie ihn, es unter Mein Konto zu ändern.
 
 ### Sicherheitsschlüssel
 In den Details eines Benutzers sehen Administratoren dessen Sicherheitsschlüssel und können einen deaktivieren oder entfernen, typischerweise einen verlorenen Schlüssel, der sonst weiterhin die Anmeldung ohne Passwort erlaubt. Das Entfernen des letzten zweiten Faktors eines Kontos, das einen verlangt, erfordert eine zweite Bestätigung; der Benutzer richtet dann bei der nächsten Anmeldung erneut einen Faktor ein.
@@ -80,13 +80,14 @@ Jeder Benutzer kann mehrere API-Schlüssel für programmatischen Zugriff haben. 
 ### Gruppenberechtigungen
 Die effektiven Berechtigungen eines Benutzers sind die **Vereinigung** von:
 - Den Berechtigungen seiner direkt zugewiesenen Rolle
+- Den Berechtigungen seiner benutzerdefinierten Rolle, falls vorhanden
 - Den Berechtigungen, die von jeder Gruppe gewährt werden, der er angehört
 
 ## Rollen
 
 ### Systemrollen
 - **Admin**: Vollständiger Zugriff auf alle Funktionen
-- **Operator**: Kann Zertifikate, CAs, CSRs verwalten, aber keine Systemeinstellungen
+- **Operator**: Kann Zertifikate, CAs, CSRs, ACME, SSH und Systemeinstellungen verwalten; Templates und Gruppen nur lesend, kein Zugriff auf Benutzer oder RBAC
 - **Auditor**: Nur-Lese-Zugriff auf alle Betriebsdaten für Compliance und Audit
 - **Viewer**: Nur-Lese-Zugriff auf Zertifikate, CAs und Templates
 

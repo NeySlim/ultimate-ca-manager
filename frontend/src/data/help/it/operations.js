@@ -27,7 +27,7 @@ export default {
       'Usa i chip delle risorse per passare rapidamente tra i tipi di risorsa',
       'La ricerca e i filtri inline (Stato, CA) ti permettono di restringere gli elementi senza lasciare la barra degli strumenti',
       'Alterna tra le modalità vista Tabella e Cestino (pannello di trasferimento) sul desktop',
-      'Visualizza l\'anteprima delle modifiche prima di confermare le operazioni massive',
+      'Revoca, rinnovo, firma ed eliminazione chiedono conferma prima di essere eseguiti; un\'esportazione parte subito',
     ],
     warnings: [
       'L\'eliminazione massiva è irreversibile: crea sempre un backup prima',
@@ -41,13 +41,13 @@ export default {
 
 Operazioni massive e gestione dei dati. Esegui azioni batch su più risorse contemporaneamente.
 
-## Scheda Importazione/Esportazione
+## Scheda Importazione
 
-Come la pagina Importa ed esporta: procedura guidata di importazione intelligente e funzionalità di esportazione massiva.
+Come la pagina Importa ed esporta: procedura guidata di importazione intelligente e integrazione OPNsense (connetti, sfoglia e importa da OPNsense).
 
-## Scheda OPNsense
+## Scheda Esportazione
 
-Come l'integrazione OPNsense di Importa ed esporta: connetti, sfoglia e importa da OPNsense.
+Esportazione massiva di certificati e CA.
 
 ## Azioni massive
 
@@ -55,10 +55,9 @@ Esegui operazioni batch su più risorse contemporaneamente.
 
 ### Come funziona
 1. Seleziona il **tipo di risorsa** (Certificati, CA, CSR, Template, Utenti)
-2. Sfoglia gli elementi disponibili nel **pannello sinistro**
-3. Sposta gli elementi nel **pannello destro** (selezionati) usando le frecce di trasferimento
-4. Scegli l'**azione** da eseguire
-5. Conferma ed esegui
+2. Spunta gli elementi nella tabella (la vista Cestino facoltativa li sposta invece tra due pannelli)
+3. Scegli l'**azione** da eseguire
+4. Conferma ed esegui
 
 ### Azioni disponibili per risorsa
 
@@ -77,16 +76,14 @@ Esegui operazioni batch su più risorse contemporaneamente.
 - **Eliminazione massiva**: Rimuovi i CSR selezionati
 
 #### Template
-- **Esportazione massiva**: Esporta come JSON
 - **Eliminazione massiva**: Rimuovi i template selezionati
 
 #### Utenti
-- **Disabilitazione massiva**: Disattiva gli account utente selezionati
 - **Eliminazione massiva**: Rimuovi permanentemente gli utenti selezionati
 
 > ⚠ Le operazioni massive sono irreversibili. Crea sempre un backup prima di eseguire eliminazioni o revoche massive.
 
-> 💡 Usa la ricerca e il filtro nel pannello sinistro per trovare rapidamente elementi specifici.
+> 💡 Usa la ricerca e i filtri sopra la tabella per trovare rapidamente elementi specifici.
 `
   }
 }

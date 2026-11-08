@@ -19,7 +19,7 @@ export default {
           { label: 'Maximale Gültigkeit', text: 'Maximale Zertifikatslaufzeit in Tagen' },
           { label: 'Erlaubte Schlüsseltypen', text: 'Einschränken, welche Schlüsselalgorithmen und -größen verwendet werden können, einschließlich ML-DSA-44, ML-DSA-65 und ML-DSA-87; der FIPS-Modus entfernt ML-DSA' },
           { label: 'Erlaubte Signaturverfahren', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA oder SLH-DSA, abgeglichen mit dem Schlüssel der signierenden CA. Erlaubte Signatur-Hashes binden eine ML-DSA-CA nicht, da sie ohne separaten Digest signiert' },
-          { label: 'SAN-Einschränkungen', text: 'Anzahl der SANs begrenzen und DNS-Namensmuster durchsetzen' },
+          { label: 'SAN-Einschränkungen', text: 'Anzahl der DNS-Namen begrenzen (andere SAN-Typen werden nicht gezählt); ein DNS-Muster pro Richtlinie (*.company.com, oder company.com, um die Domain selbst einzuschließen) beschränkt die Richtlinie auf die passenden Namen' },
           { label: 'Erlaubte Signatur-Hashes', text: 'SHA-256, SHA-384 oder SHA-512; keine Auswahl erlaubt jeden. Hat niemand den Hash gewählt, gilt der Standard, falls erlaubt, sonst der schwächste erlaubte. Das Ausstellungsformular bietet nur die erlaubten Schlüsseltypen an, die CA-Erstellung nur die erlaubten Schlüsseltypen und Hashes' },
         ]
       },
@@ -33,7 +33,7 @@ export default {
       },
     ],
     tips: [
-      'Niedrigere Prioritätsnummer = höhere Priorität. Verwenden Sie 1–10 für kritische Richtlinien.',
+      'Niedrigere Prioritätsnummer = höhere Priorität für die Genehmigung. Die Regeln aller Richtlinien im Geltungsbereich gelten zusammen, die strengste gewinnt.',
       'Richten Sie Richtlinien auf bestimmte CAs aus für granulare Kontrolle.',
       'Aktivieren Sie Benachrichtigungen, um Richtlinienverstöße frühzeitig zu erkennen.',
     ],
@@ -84,7 +84,7 @@ Einschränken, welche Schlüsselalgorithmen und -größen verwendet werden könn
 **Erlaubte Signatur-Hashes** schränkt den Signatur-Hash auf dieselbe Weise ein (SHA-256, SHA-384, SHA-512); keine Auswahl erlaubt jeden. Hat niemand den Hash gewählt, gilt der Standard, falls erlaubt, sonst der schwächste erlaubte. Das Ausstellungsformular bietet nur die erlaubten Schlüsseltypen an, die CA-Erstellung nur die erlaubten Schlüsseltypen und Hashes.
 
 ### SAN-Einschränkungen
-- **Max. DNS-Namen**: Anzahl der Subject Alternative Names begrenzen
+- **Max. DNS-Namen**: Anzahl der DNS-Namen im SAN begrenzen; IP-, E-Mail- und URI-Einträge werden nicht gezählt
 - **DNS-Muster**: Auf bestimmte Domänenmuster einschränken (z.B. \`*.firma.com\`)
 
 ## Genehmigungsworkflows
@@ -105,7 +105,7 @@ Richtlinien werden in Prioritätsreihenfolge ausgewertet. Niedrigere Nummern hab
 - **10–20**: Standard-Compliance (öffentliches TLS, interne PKI)
 - **20+**: Permissive Standardwerte
 
-Wenn mehrere Richtlinien auf eine Zertifikatsanfrage zutreffen, gewinnt die Richtlinie mit der höchsten Priorität (niedrigste Nummer).
+Wenn mehrere Richtlinien auf eine Zertifikatsanfrage zutreffen, entscheidet die Richtlinie mit der höchsten Priorität (niedrigste Nummer) über die Genehmigung; die Regeln aller passenden Richtlinien gelten zusammen (die kleinste maximale Gültigkeit, die Schnittmenge der erlaubten Schlüsseltypen usw.).
 
 ## Geltungsbereich
 
@@ -117,14 +117,7 @@ Richtlinie gilt nur für Zertifikate, die von der ausgewählten CA ausgestellt w
 
 ## Standardrichtlinien
 
-UCM wird mit 5 integrierten Richtlinien ausgeliefert, die reale PKI-Best-Practices widerspiegeln:
-- **Code-Signierung** (Priorität 5): Starke Schlüssel, Genehmigung erforderlich
-- **Wildcard-Zertifikate** (Priorität 8): Genehmigung erforderlich, max. 10 SANs
-- **Webserver-TLS** (Priorität 10): CA/B-Forum-konform, 397 Tage max.
-- **Kurzlebige Automatisierung** (Priorität 15): 90 Tage ACME-Stil
-- **Interne PKI** (Priorität 20): 730 Tage, lockere Regeln
-
-> 💡 Passen Sie die Standardrichtlinien an die Anforderungen Ihrer Organisation an oder deaktivieren Sie sie.
+Eine Neuinstallation hat keine Richtlinie: Legen Sie die an, die Ihre Organisation braucht. Eine von einer älteren Version aktualisierte Installation kann fünf Beispielrichtlinien auflisten (Code-Signierung, Wildcard-Zertifikate, Webserver-TLS, Kurzlebige Automatisierung, Interne PKI), alle deaktiviert.
 `
   }
 }

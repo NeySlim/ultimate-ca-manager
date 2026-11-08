@@ -11,7 +11,7 @@ export default {
           { label: 'Konfiguration', text: 'SCEP-Servereinstellungen: CA-Auswahl, Auto-Genehmigung' },
           { label: 'Profile', text: 'Benannte Enrollment-Endpunkte, jeder mit eigener URL, CA, Vorlage und Challenge' },
           { label: 'Intune-App-Registrierungen', text: 'Entra-App-Registrierungen (Mandanten-ID, Client-ID, Client-Secret), die sich die Profile teilen, die Intune-Challenges validieren; ein leeres Secret beim Bearbeiten behält das bisherige, Verbindung testen fordert ein Token an und ermittelt den Dienst, ohne eine Challenge zu verbrauchen, und eine noch von einem Profil verwendete App kann nicht gelöscht werden' },
-          { label: 'Challenge-Passwörter', text: 'Pro-CA-Challenge-Passwörter für die Geräteregistrierung verwalten' },
+          { label: 'Herausforderungen', text: 'Die Challenge-Passwörter für die Geräteregistrierung anzeigen und neu erzeugen' },
           { label: 'Information', text: 'SCEP-Endpunkt-URLs und Integrationsanweisungen' },
         ]
       },
@@ -19,8 +19,9 @@ export default {
         title: 'Konfiguration',
         items: [
           { label: 'Signierende CA', text: 'Auswählen, welche CA SCEP-registrierte Zertifikate signiert. Geräte verschlüsseln ihre Anfrage an diese CA, daher muss sie einen RSA-Schlüssel in Software besitzen: EC-, HSM-gestützte, schlüssellose, Offline- und widerrufene CAs werden nicht aufgelistet (v2.248)' },
-          { label: 'Auto-Genehmigung', text: 'Anfragen mit gültigem Challenge-Passwort automatisch genehmigen' },
-          { label: 'Challenge-Passwort', text: 'Gemeinsames Geheimnis, das Geräte zur Authentifizierung der Registrierung verwenden' },
+          { label: 'Auto-Genehmigung', text: 'Anfragen mit gültigem Challenge-Passwort automatisch genehmigen, oder Erneuerungen, die von einem durch denselben Endpunkt ausgestellten Zertifikat signiert sind' },
+          { label: 'Über Klartext-HTTP bereitstellen', text: 'Standardmäßig aus. Beantwortet SCEP zusätzlich auf dem HTTP-Protokollport (standardmäßig 8080) unter http://ihr-server:8080/scep/pkiclient.exe und den Profil-URLs, für Clients wie sscep, die HTTPS nicht verwenden können. RFC 8894 §7.10: SCEP-Nachrichten sind bereits geschützt, der CMS-Umschlag hält das Challenge-Passwort geheim' },
+          { label: 'Challenge-Passwort', text: 'Gemeinsames Geheimnis, das Geräte zur Authentifizierung der Registrierung verwenden. Eine Erneuerung (RenewalReq), die von einem durch denselben Endpunkt (Profil oder global) ausgestellten Zertifikat signiert ist, wird durch dieses Zertifikat authentifiziert, daher wird ihre Challenge nicht geprüft und ein Wechsel des Geheimnisses hindert bereits registrierte Geräte nicht an der Erneuerung (RFC 8894 §2.4). Jedes andere Zertifikat benötigt weiterhin die Challenge des Endpunkts' },
           { label: 'Geräteschlüssel (v2.248)', text: 'Ein Gerät signiert seine Anfrage mit einem RSA-, ECDSA-, Ed25519- oder ML-DSA-Schlüssel; eine ML-DSA-Signatur folgt RFC 9882 (SHA-512-Digest). Ed448 wird abgelehnt, ML-DSA im FIPS-Modus ebenfalls' },
         ]
       },
@@ -41,11 +42,11 @@ export default {
     tips: [
       'Verwenden Sie eindeutige Challenge-Passwörter pro CA für bessere Sicherheitsüberwachung',
       'Auto-Genehmigung ist praktisch, aber überprüfen Sie Anfragen in Hochsicherheitsumgebungen manuell',
-      'SCEP-URL-Format: https://ihr-server:port/scep',
+      'SCEP-URL: https://ihr-server:8443/scep/pkiclient.exe für die konfigurierte CA, https://ihr-server:8443/scep/<profil>/pkiclient.exe für ein Profil',
       'Intune-Profile benötigen aktivierte Auto-Genehmigung: die Registrierung bei Intune ist ein synchroner Validierungs- und Ausstellungsvorgang ohne Genehmigungswarteschlange auf Intune-Seite',
     ],
     warnings: [
-      'Challenge-Passwörter werden in der SCEP-Anfrage übertragen: verwenden Sie HTTPS für Transportsicherheit',
+      'Das Challenge-Passwort gehört in den CSR, der im CMS-Umschlag, verschlüsselt an die CA, übertragen wird (RFC 8894 §2.4), daher legt Klartext-HTTP es nicht offen; ein Client, der es als signiertes Attribut außerhalb des Umschlags sendet, legt es offen, über HTTP und gegenüber allem, was die Anfrage protokolliert',
     ],
   },
   helpGuides: {
@@ -67,7 +68,8 @@ Alle SCEP-Registrierungsanfragen anzeigen:
 Den SCEP-Server konfigurieren:
 - **Aktivieren/Deaktivieren**: Den SCEP-Dienst umschalten
 - **Signierende CA**: Auswählen, welche CA SCEP-registrierte Zertifikate signiert. Geräte verschlüsseln ihre Anfrage an diese CA, daher muss sie einen RSA-Schlüssel in Software besitzen: EC-, HSM-gestützte, schlüssellose, Offline- und widerrufene CAs werden nicht aufgelistet (v2.248)
-- **Auto-Genehmigung**: Anfragen mit gültigem Challenge-Passwort automatisch genehmigen
+- **Auto-Genehmigung**: Anfragen mit gültigem Challenge-Passwort automatisch genehmigen, oder Erneuerungen, die von einem durch denselben Endpunkt ausgestellten Zertifikat signiert sind
+- **Über Klartext-HTTP bereitstellen**: standardmäßig aus. Beantwortet SCEP zusätzlich auf dem HTTP-Protokollport (standardmäßig 8080) für Clients, die HTTPS nicht verwenden können, etwa sscep. RFC 8894 §7.10: SCEP-Nachrichten sind bereits geschützt, TLS ist daher nicht erforderlich; der CMS-Umschlag hält das Challenge-Passwort geheim
 
 ### Profile
 Benannte Enrollment-Endpunkte, jeder unter seiner eigenen URL bereitgestellt:
@@ -86,10 +88,12 @@ Jedes Profil ist gebunden an:
 Lassen Sie jede Geräteflotte, jedes MDM-Profil oder jeden Mandanten auf die eigene Profil-URL zeigen. Der Endpunkt \`/scep/pkiclient.exe\` ohne Segment bedient weiterhin unverändert die globale Konfiguration.
 
 ### Challenge-Passwörter
-Pro-CA-Challenge-Passwörter verwalten. Geräte müssen ein gültiges Challenge-Passwort in ihrer Registrierungsanfrage zur Authentifizierung angeben.
+Der Tab **Herausforderungen** zeigt die Challenge-Passwörter. Geräte müssen ein gültiges Challenge-Passwort in ihrer Registrierungsanfrage zur Authentifizierung angeben.
 
 - **Passwort anzeigen**: Das aktuelle Challenge für eine CA anzeigen
-- **Regenerieren**: Ein neues Challenge-Passwort erstellen (macht das alte ungültig)
+- **Regenerieren**: Ein neues Challenge-Passwort erstellen (macht das alte für neue Registrierungen ungültig)
+
+Eine Erneuerung (RenewalReq), die von einem durch denselben Endpunkt (Profil oder global) ausgestellten Zertifikat signiert ist, wird durch dieses Zertifikat authentifiziert: Ihr Challenge-Passwort wird nicht geprüft, sodass ein neu erzeugtes Geheimnis bereits registrierte Geräte nicht an der Erneuerung hindert (RFC 8894 §2.4). Ein anderswo ausgestelltes Zertifikat, durch ein anderes Profil, ACME, EST oder die Oberfläche, benötigt weiterhin die Challenge des Endpunkts. Ein EC-Gerät sendet weiterhin ein Passwort, das die Verschlüsselung seiner Antwort schlüsselt.
 
 ### Information
 Zeigt die SCEP-Endpunkt-URL und Integrationsanweisungen an.
@@ -109,35 +113,40 @@ Das Gerät signiert seine PKCSReq mit seinem eigenen Schlüssel: RSA, ECDSA, Ed2
 ## SCEP-URLs
 
 \`\`\`
-https://ihr-server:8443/scep                          (globaler Endpunkt)
-https://ihr-server:8443/scep/<profil>/pkiclient.exe   (Endpunkt pro Profil)
+https://ihr-server:8443/scep/pkiclient.exe            (konfigurierte CA)
+https://ihr-server:8443/scep/<profil>/pkiclient.exe  (Endpunkt pro Profil)
+https://ihr-server:8443/cgi-bin/pkiclient.exe         (konfigurierte CA, Legacy-Pfad)
+http://ihr-server:8080/scep/pkiclient.exe             (mit Über Klartext-HTTP bereitstellen)
 \`\`\`
 
-Geräte benötigen die URL für die Registrierung. Verwenden Sie eine Profil-URL, um die CA, Vorlage und das Challenge-Passwort dieses Profils anzusprechen.
+Geräte benötigen die URL für die Registrierung; \`/scep\` allein ist die Weboberfläche, kein SCEP-Endpunkt. Verwenden Sie eine Profil-URL, um die CA, Vorlage und das Challenge-Passwort dieses Profils anzusprechen.
+
+### CA-Wechsel (GetNextCACert)
+GetNextCACert liefert den Nachfolger der CA des Endpunkts, signiert von der aktuellen CA: eine andere CA mit derselben übergeordneten CA und demselben Subject-DN, nicht widerrufen, nicht offline, mit einem RSA-Schlüssel in Software und mit späterem Ablauf. Eine CA, die nur den Anzeigenamen teilt, wird nie ausgeliefert; ohne Nachfolger lautet die Antwort 404.
 
 ## Anfragen genehmigen/ablehnen
 
 Für ausstehende Anfragen (Auto-Genehmigung deaktiviert):
-1. Prüfen Sie die Anfragedetails (Betreff, Schlüsseltyp, Challenge)
+1. Prüfen Sie die Anfragedetails (Betreff, Transaktions-ID, Status, CSR)
 2. Klicken Sie auf **Genehmigen**, um das Zertifikat zu signieren und auszustellen
 3. Oder klicken Sie auf **Ablehnen** mit einem Grund
 
 Eine über ein Profil eingegangene Anfrage wird mit der Vorlage dieses Profils (Gültigkeit, Key Usages) ausgestellt, genau wie bei der Auto-Genehmigung.
 
-> ⚠ Challenge-Passwörter werden in der SCEP-Anfrage übertragen. Verwenden Sie immer HTTPS für den SCEP-Endpunkt.
+> Das Challenge-Passwort gehört in den CSR, der im CMS-Umschlag, verschlüsselt an die CA, übertragen wird (RFC 8894 §2.4), daher legt Klartext-HTTP es nicht offen. Ein Client, der es als signiertes Attribut außerhalb des Umschlags sendet, legt es offen: Lassen Sie solche Clients bei HTTPS.
 
 ## Geräteintegration
 
 ### Cisco IOS
 \`\`\`
 crypto pki trustpoint UCM
-  enrollment url https://ihr-server:8443/scep
+  enrollment url https://ihr-server:8443/scep/pkiclient.exe
   password <challenge-passwort>
 \`\`\`
 
 ### JAMF
 Konfigurieren Sie das SCEP-Profil mit:
-- Server-URL: \`https://ihr-server:8443/scep\`
+- Server-URL: \`https://ihr-server:8443/scep/pkiclient.exe\`, oder der \`/scep/<profil>/pkiclient.exe\` eines Profils
 - Challenge: das Passwort von UCM
 
 ### Microsoft Intune

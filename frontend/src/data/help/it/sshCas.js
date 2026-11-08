@@ -22,7 +22,7 @@ export default {
       {
         title: 'Configurazione del server',
         items: [
-          { label: 'Script di configurazione Linux/macOS', text: 'Scarica uno script shell POSIX (.sh) che configura automaticamente sshd per fidarsi di questa CA. Installazione rapida: curl -fsSL <url> | bash' },
+          { label: 'Script di configurazione Linux/macOS', text: 'Scarica uno script shell POSIX (.sh) che configura automaticamente sshd per fidarsi di questa CA. Installazione rapida: curl -sSL <url> | sudo bash' },
           { label: 'Script di configurazione Windows', text: 'Scarica uno script PowerShell (.ps1) che configura Windows OpenSSH Server (scrive la chiave pubblica della CA in %ProgramData%\\ssh, blinda le ACL, aggiunge TrustedUserCAKeys / HostCertificate a sshd_config, valida con sshd -T, riavvia sshd). Installazione rapida: iwr <url> | iex' },
           { label: 'Blocco diagnostico', text: 'In caso di errore di Add-WindowsCapability (WSUS / dominio), lo script stampa un blocco etichettato che spiega lo stato della policy e tre percorsi di risoluzione, non modifica mai da sé la policy WSUS / WU' },
           { label: 'Dry-run', text: 'Entrambi gli script supportano un flag -DryRun / --dry-run per visualizzare in anteprima le modifiche senza applicarle' },
@@ -67,7 +67,7 @@ export default {
       'Scarica lo script di configurazione per una facile impostazione del server: gestisce automaticamente backup e validazione.',
     ],
     warnings: [
-      'Eliminare una CA non revoca i certificati che ha firmato: revocali prima o aggiorna la fiducia dei server.',
+      'Una CA non può essere eliminata finché restano certificati che ha firmato: eliminali prima, e aggiorna la fiducia dei server.',
       'Se la chiave privata della CA viene compromessa, tutti i certificati da essa firmati devono essere considerati non affidabili.',
     ],
   },
@@ -203,7 +203,7 @@ RevokedKeys /etc/ssh/revoked_keys
 | CA separate | Usa CA distinte per i certificati utente e host |
 | Algoritmo di chiave | Ed25519 per le nuove installazioni, RSA 4096 per compatibilità con sistemi datati |
 | Durata della CA | Mantieni le CA a lunga durata; usa certificati a breve scadenza |
-| Backup | Esporta e conserva la chiave privata della CA in modo sicuro |
+| Backup | Conserva i backup di UCM: la chiave privata della CA non può essere esportata da sola |
 | Mappatura dei principals | Associa i principals a nomi utente specifici, non a caratteri jolly |
 `
   }

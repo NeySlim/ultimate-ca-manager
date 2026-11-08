@@ -25,9 +25,9 @@ export default {
         title: 'Permisos',
         items: [
           { label: 'Viewers', text: 'Solo pueden ver sus propios certificados' },
-          { label: 'Operators', text: 'Pueden ver, exportar y revocar todos los certificados de usuario' },
-          { label: 'Admins', text: 'Acceso completo, incluida la eliminación' },
-          { label: 'Auditors', text: 'Pueden ver los certificados pero no exportarlos' },
+          { label: 'Operators', text: 'Pueden ver, exportar, revocar y eliminar todos los certificados de usuario; exportar la clave privada del certificado de otro usuario requiere read:private_keys, que el rol no tiene' },
+          { label: 'Admins', text: 'Acceso completo, claves privadas incluidas' },
+          { label: 'Auditors', text: 'Pueden ver y exportar certificados, sin su clave privada' },
         ]
       },
     ],
@@ -101,8 +101,8 @@ Eliminar borra tanto el certificado como la asociación usuario-certificado. Sol
 | Rol | Ver | Exportar | Revocar | Eliminar |
 |------|------|--------|--------|--------|
 | Admin | Todos | Todos | Todos | Todos |
-| Operator | Todos | Todos | Todos | Todos |
-| Auditor | Todos | ✗ | ✗ | ✗ |
+| Operator | Todos | Todos (la clave privada de otro usuario requiere read:private_keys) | Todos | Todos |
+| Auditor | Todos | Solo el certificado, sin clave privada | ✗ | ✗ |
 | Viewer | Solo propios | Solo propios | ✗ | ✗ |
 
 ### Permisos requeridos

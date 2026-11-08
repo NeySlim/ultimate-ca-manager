@@ -82,7 +82,8 @@ L'interface HSM standard de l'industrie. Appareils pris en charge :
 
 Configuration :
 - **Chemin de la bibliothèque** : Chemin vers la bibliothèque partagée PKCS#11 (.so/.dll)
-- **Slot** : Numéro de slot HSM
+- **Libellé du jeton** : Libellé du jeton à utiliser (obligatoire)
+- **Slot** : Numéro de slot HSM (facultatif)
 - **PIN** : PIN utilisateur pour l'authentification
 
 ### AWS CloudHSM
@@ -127,11 +128,11 @@ Types de clés pris en charge :
 ## Gérer les fournisseurs
 
 ### Ajouter un fournisseur
-1. Cliquez sur **Ajouter un fournisseur**
+1. Cliquez sur **Nouveau fournisseur**
 2. Sélectionnez le **type de fournisseur**
 3. Entrez les détails de connexion
-4. Cliquez sur **Tester la connexion** pour vérifier
-5. Cliquez sur **Enregistrer**
+4. Cliquez sur **Créer**
+5. Cliquez sur **Tester** sur le nouveau fournisseur pour vérifier la connexion
 
 ### Tester la connexion
 Testez toujours la connexion après avoir créé ou modifié un fournisseur. UCM vérifie qu'il peut communiquer avec le HSM et s'authentifier. Pour un module PKCS#11, le test enregistre aussi ce que le module déclare (bibliothèque, fabricant, versions de la bibliothèque et du firmware), affiché sur la page du fournisseur.

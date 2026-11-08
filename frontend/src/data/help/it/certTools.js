@@ -7,9 +7,9 @@ export default {
       {
         title: 'Strumenti disponibili',
         items: [
-          { label: 'Verifica SSL', text: 'Connettiti a un host remoto e ispeziona la sua catena di certificati SSL/TLS' },
+          { label: 'Verifica SSL', text: 'Connettiti a un host remoto e ispeziona il certificato che presenta (solo il certificato foglia, non la catena)' },
           { label: 'Decodificatore CSR', text: 'Incolla un CSR in formato PEM per visualizzare soggetto, SAN e informazioni sulla chiave' },
-          { label: 'Decodificatore certificati', text: 'Incolla un certificato in formato PEM per ispezionare tutti i campi' },
+          { label: 'Decodificatore certificati', text: 'Incolla un certificato in formato PEM per ispezionare soggetto, emittente, validità, chiave, SAN, key usage e impronte; CDP, AIA e policy non sono mostrati' },
           { label: 'Corrispondenza chiavi', text: 'Verifica che un certificato, un CSR e una chiave privata appartengano allo stesso insieme' },
           { label: 'Convertitore', text: 'Converti tra formati PEM, DER, PKCS#12 e PKCS#7' },
         ]
@@ -45,15 +45,16 @@ Ispeziona il certificato SSL/TLS di un server remoto:
 
 1. Inserisci l'**hostname** (es. \`google.com\`)
 2. Facoltativamente cambia la **porta** (predefinita: 443)
-3. Clicca **Verifica**
+3. Clicca **Verifica SSL**
 
 I risultati includono:
 - Soggetto e emittente del certificato
 - Date di validità
 - SAN (Subject Alternative Names)
 - Tipo e dimensione della chiave
-- Catena completa dei certificati
 - Versione del protocollo TLS
+
+Viene letto solo il certificato presentato dal server, non il resto della sua catena.
 
 ## Decodificatore CSR
 
@@ -80,7 +81,7 @@ Verifica che un certificato, un CSR e una chiave privata appartengano allo stess
 1. Incolla il **certificato** PEM
 2. Incolla la **chiave privata** PEM (opzionalmente crittografata: fornisci la password)
 3. Facoltativamente incolla un **CSR** PEM
-4. Clicca **Verifica corrispondenza**
+4. Clicca **Verifica chiavi**
 
 UCM confronta le chiavi pubbliche (RSA, EC, EdDSA, ML-DSA). Una corrispondenza conferma che formano una coppia valida. Una chiave privata ML-DSA deve contenere il proprio seed: un file chiave con la sola forma espansa viene rifiutato.
 

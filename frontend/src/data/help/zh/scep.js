@@ -11,7 +11,7 @@ export default {
           { label: '配置', text: 'SCEP 服务器设置：CA 选择、自动批准' },
           { label: '配置文件', text: '命名注册端点，每个都有自己的 URL、CA、模板和质询' },
           { label: 'Intune 应用注册', text: '由验证 Intune 质询的配置文件共享的 Entra 应用注册（租户 ID、客户端 ID、客户端密钥）；编辑时密钥留空则保留当前密钥，测试连接仅获取令牌并发现服务，不消耗任何质询，仍被配置文件使用的应用无法删除' },
-          { label: '质询密码', text: '管理每个 CA 的设备注册质询密码' },
+          { label: '质询', text: '查看并重新生成设备注册的质询密码' },
           { label: '信息', text: 'SCEP 端点 URL 和集成说明' },
         ]
       },
@@ -19,8 +19,9 @@ export default {
         title: '配置',
         items: [
           { label: '签名 CA', text: '选择签署 SCEP 注册证书的 CA。设备会用此 CA 加密其请求，因此它必须在软件中持有 RSA 密钥：EC、HSM 支持、无密钥、离线和已吊销的 CA 不会列出 (v2.248)' },
-          { label: '自动批准', text: '自动批准带有有效质询密码的请求' },
-          { label: '质询密码', text: '设备用于认证注册的共享密钥' },
+          { label: '自动批准', text: '自动批准带有有效质询密码的请求，或由同一端点签发的证书所签署的续期请求' },
+          { label: '通过纯 HTTP 提供', text: '默认关闭。同时在 HTTP 协议端口（默认 8080）上应答 SCEP，地址为 http://your-server:8080/scep/pkiclient.exe 和各配置文件 URL，供 sscep 等无法使用 HTTPS 的客户端使用。RFC 8894 §7.10：SCEP 消息本身已受保护，CMS 信封使质询密码保持私密' },
+          { label: '质询密码', text: '设备用于认证注册的共享密钥。由同一端点（配置文件或全局）签发的证书所签署的续期请求（RenewalReq）由该证书认证，因此不检查其质询，更换密钥也不会阻止已注册的设备续期（RFC 8894 §2.4）。任何其他证书仍需要该端点的质询' },
           { label: '设备密钥 (v2.248)', text: '设备使用 RSA、ECDSA、Ed25519 或 ML-DSA 密钥签署其请求；ML-DSA 签名遵循 RFC 9882（SHA-512 摘要）。Ed448 会被拒绝，FIPS 模式下 ML-DSA 也会被拒绝' },
         ]
       },
@@ -41,11 +42,11 @@ export default {
     tips: [
       '为每个 CA 使用唯一的质询密码以提高安全审计能力',
       '自动批准很方便，但在高安全环境中建议手动审核请求',
-      'SCEP URL 格式：https://your-server:port/scep',
+      'SCEP URL：https://your-server:8443/scep/pkiclient.exe 用于已配置的 CA，https://your-server:8443/scep/<profile>/pkiclient.exe 用于配置文件',
       'Intune 配置文件需要启用自动批准:, Intune 的注册是同步的验证并签发往返过程，Intune 一侧没有批准队列',
     ],
     warnings: [
-      '质询密码在 SCEP 请求中传输:, 请使用 HTTPS 保证传输安全',
+      '质询密码位于 CSR 中，CSR 在加密到 CA 的 CMS 信封内传输（RFC 8894 §2.4），因此纯 HTTP 不会暴露它；如果客户端把它作为信封外的签名属性发送，则会在 HTTP 上以及任何记录该请求的环节暴露',
     ],
   },
   helpGuides: {
@@ -67,7 +68,8 @@ export default {
 配置 SCEP 服务器设置：
 - **启用/禁用**: 开启或关闭 SCEP 服务
 - **签名 CA**: 选择签署 SCEP 注册证书的 CA。设备会用此 CA 加密其请求，因此它必须在软件中持有 RSA 密钥：EC、HSM 支持、无密钥、离线和已吊销的 CA 不会列出 (v2.248)
-- **自动批准**: 启用/禁用带有有效质询密码的请求的自动批准
+- **自动批准**: 自动批准带有有效质询密码的请求，或由同一端点签发的证书所签署的续期请求
+- **通过纯 HTTP 提供**: 默认关闭。同时在 HTTP 协议端口（默认 8080）上应答 SCEP，供 sscep 等无法使用 HTTPS 的客户端使用。RFC 8894 §7.10：SCEP 消息本身已受保护，因此不要求 TLS；CMS 信封使质询密码保持私密
 
 ### 配置文件
 命名注册端点，每个都通过自己的 URL 提供服务：
@@ -86,9 +88,12 @@ https://your-server:8443/scep/<profile>/pkiclient.exe
 将每个设备群、MDM 配置文件或租户指向其专属配置文件 URL。不带片段的 \`/scep/pkiclient.exe\` 端点继续使用全局配置，保持不变。
 
 ### 质询密码
-管理用于设备注册认证的质询密码：
-- 每个 CA 可以有自己的质询密码
-- 密码在设备注册配置文件中配置
+**质询**选项卡显示质询密码。设备必须在其注册请求中包含有效的质询密码才能通过认证。
+
+- **查看密码**: 显示 CA 的当前质询
+- **重新生成**: 创建新的质询密码（对新的注册使旧密码失效）
+
+由同一端点（配置文件或全局）签发的证书所签署的续期请求（RenewalReq）由该证书认证：不检查其质询密码，因此重新生成的密钥不会阻止已注册的设备续期（RFC 8894 §2.4）。在其他地方签发的证书（由其他配置文件、ACME、EST 或界面签发）仍需要该端点的质询。EC 设备仍会发送密码，用于对其应答加密。
 
 ### 信息
 查看 SCEP 端点 URL 和集成说明。
@@ -108,18 +113,23 @@ https://your-server:8443/scep/<profile>/pkiclient.exe
 ## SCEP URL
 
 \`\`\`
-https://your-server:8443/scep                          (全局端点)
+https://your-server:8443/scep/pkiclient.exe            (已配置的 CA)
 https://your-server:8443/scep/<profile>/pkiclient.exe  (按配置文件端点)
+https://your-server:8443/cgi-bin/pkiclient.exe         (已配置的 CA，旧路径)
+http://your-server:8080/scep/pkiclient.exe             (启用通过纯 HTTP 提供时)
 \`\`\`
 
-设备需要此 URL 才能注册。使用配置文件 URL 可指向该配置文件的 CA、模板和质询密码。
+设备需要完整 URL 才能注册；单独的 \`/scep\` 是 Web 界面，而不是 SCEP 端点。使用配置文件 URL 可指向该配置文件的 CA、模板和质询密码。
+
+### CA 轮换（GetNextCACert）
+GetNextCACert 提供该端点 CA 的后继者，由当前 CA 签署：与其具有相同父 CA 和相同主题 DN、未被吊销、未脱机、持有软件 RSA 密钥且到期更晚的另一个 CA。仅显示名称相同的 CA 绝不会被提供；没有后继者时应答 404。
 
 ## 批准/拒绝请求
 
 如果未启用自动批准：
 1. 前往**请求**选项卡
 2. 查看待处理的请求
-3. 检查主题、密钥类型和质询
+3. 检查请求详情（主题、事务 ID、状态、CSR）
 4. 点击**批准**或**拒绝**
 
 通过配置文件提交的请求会以该配置文件的模板（有效期、密钥用法）签发，与自动批准的结果完全一致。

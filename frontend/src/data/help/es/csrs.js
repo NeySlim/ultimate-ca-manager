@@ -27,7 +27,7 @@ export default {
     ],
     tips: [
       'Los CSR preservan la clave privada del solicitante: nunca sale de su sistema',
-      'Puede añadir una clave privada a un CSR después de firmarlo si es necesario para la exportación PKCS#12',
+      'Subir Clave adjunta una clave privada a un CSR pendiente, de modo que el certificado firmado pueda exportarse como PKCS#12',
       'Un certificado importado para un CSR generado en UCM completa ese CSR: el registro conserva su clave privada, por lo que el certificado se exporta con ella',
       'Utilice el modo Microsoft CA para firmar CSR a través de AD CS cuando esté conectado a una PKI Windows',
       'Un certificado para una clave ML-DSA conserva solo los bits de firma: keyEncipherment, dataEncipherment y keyAgreement pedidos por la plantilla se eliminan, y el resultado lo indica',
@@ -74,7 +74,7 @@ Mediante la API, \`related_to\` nombra un certificado existente **A** cuya clave
 ## Cargar un CSR
 
 1. Haga clic en **Cargar CSR**
-2. Pegue texto PEM o suba un archivo PEM/DER
+2. Pegue texto PEM o suba un archivo PEM
 3. UCM valida la firma del CSR y muestra los detalles
 4. El CSR aparece en la pestaña Pendientes
 
@@ -95,9 +95,10 @@ Haga clic en un CSR para ver:
 3. Elija la **CA de firma** (debe poseer una clave privada)
 4. Seleccione el **tipo de certificado** (servidor, cliente, firma de código, correo electrónico)
 5. Establezca el **período de validez** en días
-6. Opcionalmente aplique una plantilla para el uso de clave y extensiones
-7. Opcionalmente **Añadir nombres** (correo, DNS, IP, URI) a los de la solicitud
-8. Haga clic en **Firmar**
+6. Opcionalmente **Añadir nombres** (correo, DNS, IP, URI) a los de la solicitud
+7. Haga clic en **Firmar**
+
+En modo Microsoft CA, se elige la plantilla AD CS en lugar del tipo de certificado.
 
 El certificado resultante aparece en la página de Certificados.
 
@@ -146,13 +147,13 @@ Un dispositivo que conserva su clave, como una tarjeta inteligente, a menudo no 
 
 ## Añadir una clave privada
 
-Después de firmar, puede adjuntar una clave privada al certificado para la exportación PKCS#12. Haga clic en **Añadir clave** en el certificado firmado.
+Antes de firmar, **Subir Clave** adjunta la clave privada a un CSR pendiente, de modo que el certificado firmado pueda exportarse como PKCS#12. Una solicitud firmada ya no ofrece esta acción.
 
 > 💡 Esto es útil cuando el solicitante envía tanto el CSR como la clave de forma segura.
 
 ## Eliminar CSR
 
-Eliminar quita el CSR de UCM. Si el CSR ya fue firmado, el certificado resultante no se ve afectado.
+Eliminar quita un CSR pendiente de UCM. Una solicitud firmada es su certificado: se elimina desde la página Certificados, no desde aquí.
 `
   }
 }

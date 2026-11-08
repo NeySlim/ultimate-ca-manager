@@ -44,6 +44,9 @@ export default {
           { label: 'Pulizia dei TXT (v2.252)', text: 'La pulizia rimuove solo il valore TXT del proprio ordine, così un altro ordine, o il wildcard e l\'apex che condividono il nome, mantengono i loro. DuckDNS, Hurricane Electric e FreeDNS tengono un solo valore per nome: lo cancellano solo se nessun altro ordine in corso usa quel nome' },
           { label: 'Nomi univoci (v2.251)', text: 'Il nome di un provider DNS o di un account CA esterno già in uso viene rifiutato (409), alla creazione e alla rinomina. L\'aggiornamento ha rinominato i duplicati esistenti «nome (2)», «nome (3)», dal più vecchio' },
           { label: 'Team Vercel (v2.251)', text: 'Il provider Vercel accetta un Team ID facoltativo per i domini di proprietà di un team' },
+          { label: 'Provider RFC 2136 (v2.252)', text: 'Il server DNS può essere un nome host. Una Zona compilata è usata per i nomi al suo interno; per gli altri nomi, o quando è vuota, la zona è letta dal SOA restituito dal server configurato, poi dal resolver di sistema' },
+          { label: 'Momento di rinnovo ARI (v2.252)', text: 'Quando la CA suggerisce una finestra di rinnovo, ogni certificato si rinnova all\'ultimo passaggio di 6 ore prima di un momento casuale estratto una volta al suo interno. La finestra viene ricontrollata dopo il Retry-After della CA, mantenuto tra un minuto e un giorno, e mai dopo la scadenza del certificato (RFC 9773)' },
+          { label: 'Errori della CA (v2.252)', text: 'Una pagina di errore della CA che non è un problema ACME (un 503 HTML) viene riportata con il suo stato HTTP e il Retry-After' },
           { label: 'Token RcodeZero (v2.251)', text: 'RcodeZero richiede un token API con accesso in lettura e scrittura alla zona, non uno limitato al permesso ACME' },
           { label: 'Checkdomain (v2.251)', text: 'Checkdomain rimuove un valore riscrivendo i record della zona senza di esso, come documenta la sua API, dopo aver letto ogni pagina. Il SOA, gli NS dell\'apex e le copie www generate restano fuori da questa riscrittura' },
         ]
@@ -60,6 +63,11 @@ export default {
                   { label: 'Profili e modelli (v2.221)', text: 'I profili di certificato (draft-ietf-acme-profiles) sono pubblicati nella directory e scelti dal client per ogni ordine. Ogni profilo fissa validità e digest e può associare un modello di certificato, i cui KU/EKU governano quindi il certificato emesso' },
                   { label: 'Profilo predefinito', text: 'La maggior parte dei client non richiede alcun profilo. Il profilo predefinito, scelto sotto i profili, si applica ai loro ordini; senza di esso ricevono 90 giorni e il digest predefinito' },
                   { label: 'Revoca (v2.248)', text: 'Il certificato inviato da un client per la revoca deve corrispondere byte per byte a quello memorizzato. Solo una chiave di certificato RSA o EC P-256, P-384 o P-521 può firmare la richiesta stessa: un certificato ML-DSA, EdDSA o Brainpool si revoca con l\'account che lo ha ordinato' },
+                  { label: 'Revoca tramite autorizzazioni (v2.252)', text: 'Un account con autorizzazioni valide e non scadute per ogni nome e indirizzo IP di un certificato emesso da questo server ACME può revocarlo, anche se lo ha ordinato un altro account (RFC 8555 §7.6). Le autorizzazioni concesse dall\'approvazione automatica non contano' },
+                  { label: 'Date richieste (v2.252)', text: 'Un ordine può chiedere notBefore e notAfter (duration di cert-manager, lego --not-after): il certificato riporta esattamente quelle date. Una finestra più lunga della validità del profilo, fuori da quella della CA emittente, vietata da una policy o già passata viene rifiutata invece di essere emessa con altre date' },
+                  { label: 'Scadenza (v2.252)', text: 'Un ordine oltre la sua scadenza, o la cui autorizzazione valida è scaduta, non può più essere finalizzato: diventa non valido e il client effettua un nuovo ordine. Un\'autorizzazione valida scaduta risulta expired' },
+                  { label: 'Sfide (v2.252)', text: 'Leggere una sfida con un payload vuoto non avvia mai la sua validazione: il client invia {} a questo scopo. Un certificato tls-alpn-01 deve riportare esattamente il nome o l\'indirizzo IP validato come subject alternative name' },
+                  { label: 'Identità CAA (v2.252)', text: 'La directory pubblica gli identificatori CAA configurati come caaIdentities, altrimenti l\'host ACME pubblico, la stessa lista con cui la finalizzazione controlla i record CAA' },
         ]
       },
       {
@@ -74,6 +82,10 @@ export default {
           { label: 'Elimina certificati sostituiti', text: 'Interruttore opt-in: quando un ordine proxy viene finalizzato, i certificati importati in precedenza da ordini proxy per lo stesso identico insieme di domini vengono eliminati. I certificati revocati sono sempre conservati; i certificati non-proxy non vengono mai toccati. Disattivato per impostazione predefinita' },
                   { label: 'Pre-check dei client (v2.217)', text: 'Il proxy pubblica anche i valori TXT dns-01 calcolati con la chiave account di ogni client: i pre-check di propagazione di lego/Traefik/Caddy passano senza essere disattivati, tranne su DuckDNS, Hurricane Electric e FreeDNS, che tengono un solo valore: lì disattivate il pre-check del client; un new-order ripetuto restituisce l\'ordine ancora pending dell\'account' },
                   { label: 'Compatibilità dei client (v2.246)', text: 'Con EAB richiesto, una ricerca onlyReturnExisting e un new-account con una chiave registrata restituiscono l\'account esistente (cert-manager). L\'URL dell\'account risponde a letture, aggiornamenti dei contatti e disattivazione, la disattivazione delle autorizzazioni è accettata (lego) e le risposte alle sfide riportano Link rel="up"' },
+                  { label: 'Errori a monte (v2.252)', text: 'Un errore della CA a monte raggiunge il client con il suo tipo (rateLimited, badCSR, rejectedIdentifier, alreadyRevoked...), stato, sottoproblemi e Retry-After. Gli errori sull\'account a monte del proxy stessi restano serverInternal' },
+                  { label: 'Profili e validità (v2.252)', text: 'La directory elenca i profili della CA a monte. Un profilo, notBefore e notAfter richiesti dal client sono passati a monte, un new-order ripetuto riutilizza un ordine in attesa solo se li riporta, e un profilo che la CA a monte non offre viene rifiutato con invalidProfile' },
+                  { label: 'Record TXT rifiutato (v2.252)', text: 'Quando il provider DNS rifiuta il record TXT, la sfida non viene inviata a monte: l\'ordine, le sue autorizzazioni e sfide diventano non validi, nessuna delle sue altre sfide viene inviata, e il messaggio del provider viene registrato e conservato nell\'ordine. I record TXT di un ordine non valido o disattivato vengono rimossi' },
+                  { label: 'Letture delle sfide (v2.252)', text: 'Il proxy legge una sfida tramite la sua autorizzazione, mai con un POST-as-GET sulla sfida, che su alcune CA avvia la validazione prima che il record TXT esista. Il key rollover non è offerto dalla directory del proxy' },
         ]
       },
       {
@@ -95,7 +107,7 @@ export default {
           { label: 'Emettere', text: 'Generare una nuova coppia kid + chiave HMAC da ACME → EAB Credentials' },
           { label: 'Distribuire', text: 'Consegnare kid + HMAC al client (cert-manager, certbot, acme.sh)' },
           { label: 'Vincolare', text: 'Il client firma un JWS sulla chiave MAC su newAccount per vincolare il suo account ACME' },
-          { label: 'Ruotare / Revocare', text: 'Revocare un kid in qualsiasi momento, gli account esistenti continuano, i nuovi vincoli vengono rifiutati' },
+          { label: 'Revocare', text: 'Revocare un kid in qualsiasi momento, gli account esistenti continuano, i nuovi vincoli vengono rifiutati. Per ruotare, crea un nuovo kid e revoca il vecchio' },
           { label: 'Audit', text: 'Emissione, rotazione e revoca sono auditate sotto l\'operatore che le ha effettuate' },
           { label: 'Restrizioni di dominio', text: 'Limita una credenziale ai domini che può richiedere: * (qualsiasi), *.example.com (tutti i sottodomini) o un elenco esplicito, un elenco vuoto blocca completamente l\'emissione. Applicate su new-order/new-authz, server e proxy; significative solo quando l\'EAB è obbligatorio' },
         ]
@@ -144,7 +156,7 @@ export default {
         content: 'Il server ACME locale può validare i domini tramite un record TXT persistente legato all\'account ACME (draft-ietf-acme-dns-persist): rinnovo senza scritture DNS. Opt-in, disattivato per impostazione predefinita.',
         items: [
           { label: 'Record', text: 'Create _validation-persist.<dominio> TXT "<dominio-emittente>; accounturi=<URL dell\'account>", l\'oggetto challenge annuncia i due valori attesi' },
-          { label: 'Attivazione', text: 'ACME → Configurazione → Validazione DNS persistente (dns-persist-01)' },
+          { label: 'Attivazione', text: 'ACME → ACME locale → Validazione DNS persistente (dns-persist-01)' },
           { label: 'Wildcard / sottodomini', text: 'Aggiungete policy=wildcard per autorizzare anche certificati wildcard e sottodomini del nome validato' },
           { label: 'persistUntil', text: 'persistUntil=<timestamp unix> opzionale: blocca le nuove validazioni dopo tale data' },
           { label: 'Sicurezza', text: 'Il record conferisce alla chiave dell\'account la capacità di emissione finché esiste, eliminate il TXT per revocarla' },
@@ -422,7 +434,7 @@ acme.sh --issue --dns dns_nsupdate --server https://ucm.example.com/acme/proxy/<
 ### Configurazione
 - **Abilita/Disabilita**: Attiva/disattiva il server ACME integrato
 - **CA predefinita**: Seleziona quale CA firma i certificati per impostazione predefinita
-- **Termini di servizio**: URL opzionale dei ToS per i client
+- **Termini di servizio**: titolo e testo Markdown opzionali, serviti da UCM e collegati dalla directory
 
 ### URL directory ACME
 \`\`\`
@@ -465,14 +477,18 @@ Visualizza gli account client ACME registrati:
 - Numero di ordini
 
 ### Cronologia
-Sfoglia tutti gli ordini di emissione certificati:
-- Stato dell'ordine (in attesa, valido, non valido, pronto)
-- Nomi di dominio richiesti
-- CA firmataria utilizzata
-- Timestamp di emissione
+Sfoglia i certificati emessi tramite ACME:
+- Nome comune
+- Stato
+- Emittente
+- Data di scadenza
+- Origine
+
+### Date richieste
+Un ordine può riportare \`notBefore\` e \`notAfter\` (cert-manager con una \`duration\`, lego \`--not-after\`). Il certificato è emesso esattamente con quelle date, oppure la richiesta è rifiutata come \`malformed\`: una finestra più lunga della validità del profilo (15 minuti di sfasamento dell'orologio a parte), fuori dalla validità della CA emittente, o già passata. Una finestra che una policy vieta, più lunga della sua validità massima o oltre l'orizzonte di un tipo di chiave, è rifiutata alla finalizzazione come \`badCSR\`. Senza di esse si applica la validità del profilo.
 
 ### Revoca
-Un client revoca con la chiave del proprio account o con la chiave del certificato stesso, e il certificato inviato deve corrispondere byte per byte a quello memorizzato: un numero di serie da solo non basta mai. Solo una chiave RSA o EC P-256, P-384 o P-521 può firmare una richiesta ACME, quindi un certificato ML-DSA, EdDSA o Brainpool si revoca con l'account che lo ha ordinato; UCM lo indica nel rifiuto.
+Un client revoca con la chiave del proprio account o con la chiave del certificato stesso, e il certificato inviato deve corrispondere byte per byte a quello memorizzato: un numero di serie da solo non basta mai. Un account con autorizzazioni valide e non scadute per ogni nome e indirizzo IP di un certificato emesso da questo server ACME può revocarlo a sua volta, chiunque lo abbia ordinato; le autorizzazioni concesse dall'approvazione automatica non contano. Solo una chiave RSA o EC P-256, P-384 o P-521 può firmare una richiesta ACME, quindi un certificato ML-DSA, EdDSA o Brainpool si revoca con l'account che lo ha ordinato; UCM lo indica nel rifiuto.
 
 ## Certificati per indirizzi IP (RFC 8738)
 
@@ -505,7 +521,7 @@ Il certificato firmato contiene una voce SubjectAltName **iPAddress** per ogni I
 Il server ACME locale supporta **dns-persist-01** (draft-ietf-acme-dns-persist): validazione tramite un record TXT **persistente** legato all'account ACME, i rinnovi non richiedono scritture DNS.
 
 ### Configurazione
-1. Attivatelo in **ACME → Configurazione → Validazione DNS persistente** (disattivato per impostazione predefinita).
+1. Attivatelo in **ACME → ACME locale → Validazione DNS persistente** (disattivato per impostazione predefinita).
 2. Create il record una sola volta:
 \`\`\`
 _validation-persist.app.example.com. IN TXT "ca.example.com; accounturi=https://ca.example.com/acme/acct/<id>"

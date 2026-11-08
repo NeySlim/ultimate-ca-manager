@@ -9,13 +9,15 @@ export default {
         items: [
           { label: '自动重新生成', text: '按 CA 切换 CRL 自动重新生成' },
           { label: '手动重新生成', text: '立即强制重新生成 CRL' },
-          { label: '下载 CRL', text: '以 DER 或 PEM 格式下载 CRL 文件' },
+          { label: '下载 CRL', text: '以 PEM 格式下载 CRL（.crl 文件）；DER 格式由 CDP URL 提供' },
           { label: 'CRL 部署', text: '关联一个 SSH/SFTP 目标，即可在每次重新生成 CRL 后自动推送。每个绑定各自选择 PEM 或 DER 格式、目标路径、可选的上级 CRL 以及自己的重载命令' },
           { label: 'CDP URL', text: '嵌入证书中的 CRL 分发点 URL' },
           { label: '有效期', text: '每个 CA 的 CRL 有效期从 1 天到 5 年（90d/180d/1y/3y/5y 适用于无法按计划重新签名的离线 CA）。超过一年会显示警告,, 依赖方可能在整个有效期窗口内保留过期的吊销数据' },
           { label: '签名摘要', text: 'RSA 或 EC CA 可选 SHA-256、SHA-384 或 SHA-512。Ed25519、Ed448 或 ML-DSA CA 签名时不使用摘要：此前为其存储的摘要会显示为已忽略，并带有“清除”按钮' },
           { label: '默认摘要 (v2.251)', text: '未设置摘要时，P-384 或 P-521 CA 使用 SHA-384 或 SHA-512 签署其 CRL。已签发的 CRL 保留原摘要：下一个 CRL 将遵循此规则' },
           { label: '外部 CRL', text: '无密钥/离线 CA 无法自签 CRL,, 请从 CA 详情视图上传在离线密钥旁生成的 CRL；上传会经过验证（签名、签发者、单调性）并在相同的 CDP URL 上提供（v2.215）' },
+          { label: '增量 CRL', text: '启用增量 CRL 后，每次完整 CRL 之后都会立即生成新的增量，因此提供的增量始终对应最新的基础 CRL' },
+          { label: 'CRL 编号', text: '同一 CA 的基础 CRL 和增量 CRL 共用一个递增编号，即使两次生成同时进行，也不会把同一编号给两个 CRL。已达到的最高编号按 CA 名称和密钥保存并随备份一同保存，因此在另一台服务器上恢复的 CA，或删除后重新导入的 CA，会从该编号继续' },
         ]
       },
       {
@@ -24,7 +26,8 @@ export default {
           { label: '状态', text: '指示每个 CA 的 OCSP 响应器是否处于活动状态' },
           { label: 'AIA URL', text: '颁发机构信息访问 URL,, OCSP 响应器和 CA 签发者证书下载端点，嵌入在签发的证书中' },
           { label: '缓存', text: '响应缓存，自动每日清理过期条目' },
-          { label: '总查询数', text: '已处理的 OCSP 请求数量' },
+          { label: '总查询数', text: '服务启动以来已应答的 OCSP 请求数量，以及其中由缓存提供的数量' },
+          { label: 'HTTP 缓存', text: '不带 nonce 的应答可被 HTTP 缓存保留到其 nextUpdate，最长一小时（RFC 5019 §6.2：Expires、Last-Modified、ETag）；带 nonce 的应答不会被重用' },
           { label: '委托响应器', text: '使用专用的 OCSPSigning 证书而非 CA 密钥签署响应,, 在详情面板中按 CA 分配' },
           { label: '响应器自动续期', text: '每日任务在委托响应器证书到期前重新签发（相同密钥对，按原样续期）并重新绑定,, 默认启用。开关及其窗口（到期前天数，默认 30）位于 设置 › 安全' },
         ]
@@ -67,6 +70,11 @@ CRL 计划（按 CA）设置每个已发布 CRL 的有效时长。选项范围�
 - **离线 CA**（通常是无法按计划重新签署 CRL 的根 CA）是长选项的预期使用场景:: 90d 至 5y
 - 超过一年会显示警告：依赖方可能在整个有效期窗口内保留过期的吊销数据
 
+### CRL 编号
+每个 CRL 都带有 CRL 编号（RFC 5280 §5.2.3）。同一 CA 的基础 CRL 和增量 CRL 共用一个递增序列，即使吊销操作和调度器同时生成 CRL，也不会把同一编号给两个 CRL。
+
+已达到的最高编号按 CA 名称和密钥保存在 CA 之外，并随备份一同保存。在另一台服务器上恢复的 CA，或删除后重新导入的 CA，会从该编号继续，而不是从 1 重新开始。
+
 ### CRL 分发点（CDP）
 CDP URL 嵌入在证书中，以便客户端知道从何处下载 CRL。可从 CRL 详情中复制 URL。
 
@@ -79,7 +87,7 @@ http://your-server:8080/cdp/{ca_refid}.crl
 > ⚠️ **重要**：URL 使用 HTTP 协议端口和服务器 FQDN 自动生成。如果您通过 \`localhost\` 访问 UCM，将无法生成 URL。请先在设置 → 通用中配置您的 **FQDN** 或**协议基础 URL**。
 
 ### 下载 CRL
-以 DER 或 PEM 格式下载 CRL，用于分发给客户端或与其他系统集成。
+下载按钮将 CRL 保存为 PEM（.crl 文件）。CDP URL 以 DER 格式提供，供客户端和其他系统使用。
 
 ## OCSP 响应器
 

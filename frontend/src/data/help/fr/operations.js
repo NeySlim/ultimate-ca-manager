@@ -27,7 +27,7 @@ export default {
       'Utilisez les puces de ressources pour basculer rapidement entre les types de ressources',
       'La recherche et les filtres intégrés (Statut, CA) permettent d\'affiner les éléments sans quitter la barre d\'outils',
       'Basculez entre les modes d\'affichage Tableau et Panier (panneau de transfert) sur ordinateur',
-      'Prévisualisez les changements avant de confirmer les opérations en masse',
+      'La révocation, le renouvellement, la signature et la suppression demandent une confirmation avant de s\'exécuter ; un export démarre aussitôt',
     ],
     warnings: [
       'La suppression en masse est irréversible : créez toujours une sauvegarde d\'abord',
@@ -41,13 +41,13 @@ export default {
 
 Opérations en masse et gestion des données. Effectuez des actions par lots sur plusieurs ressources simultanément.
 
-## Onglet Importation/Exportation
+## Onglet Importation
 
-Identique à la page Importation & Exportation : assistant d'importation intelligente et fonctionnalité d'export en masse.
+Identique à la page Importation & Exportation : l'assistant d'importation intelligente, et l'intégration OPNsense (connexion, navigation et import depuis OPNsense).
 
-## Onglet OPNsense
+## Onglet Exportation
 
-Identique à l'intégration OPNsense de la page Importation & Exportation : connectez-vous, parcourez et importez depuis OPNsense.
+Exportation en masse des certificats et des CA.
 
 ## Actions en masse
 
@@ -55,10 +55,9 @@ Effectuez des opérations par lots sur plusieurs ressources à la fois.
 
 ### Comment ça fonctionne
 1. Sélectionnez le **type de ressource** (Certificats, CA, CSR, Modèles, Utilisateurs)
-2. Parcourez les éléments disponibles dans le **panneau de gauche**
-3. Déplacez les éléments vers le **panneau de droite** (sélectionné) à l'aide des flèches de transfert
-4. Choisissez l'**action** à effectuer
-5. Confirmez et exécutez
+2. Cochez les éléments dans le tableau (la vue Panier, facultative, les déplace entre deux panneaux à la place)
+3. Choisissez l'**action** à effectuer
+4. Confirmez et exécutez
 
 ### Actions disponibles par ressource
 
@@ -77,16 +76,14 @@ Effectuez des opérations par lots sur plusieurs ressources à la fois.
 - **Suppression en masse** : Supprimer les CSR sélectionnées
 
 #### Modèles
-- **Exportation en masse** : Exporter au format JSON
 - **Suppression en masse** : Supprimer les modèles sélectionnés
 
 #### Utilisateurs
-- **Désactivation en masse** : Désactiver les comptes utilisateurs sélectionnés
 - **Suppression en masse** : Supprimer définitivement les utilisateurs sélectionnés
 
 > ⚠ Les opérations en masse sont irréversibles. Créez toujours une sauvegarde avant d'effectuer des suppressions ou révocations en masse.
 
-> 💡 Utilisez la recherche et le filtre dans le panneau de gauche pour trouver rapidement des éléments spécifiques.
+> 💡 Utilisez la recherche et les filtres au-dessus du tableau pour trouver rapidement des éléments spécifiques.
 `
   }
 }

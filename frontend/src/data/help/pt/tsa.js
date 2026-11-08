@@ -8,7 +8,7 @@ export default {
         title: 'Abas',
         items: [
           { label: 'Configurações', text: 'Ativar TSA, selecionar a CA assinante e configurar o OID da política TSA' },
-          { label: 'Informações', text: 'URL do endpoint TSA, exemplos de uso com OpenSSL e estatísticas de requisições' },
+          { label: 'Endpoint TSA', text: 'URL do endpoint TSA, exemplos de uso com OpenSSL e estatísticas de requisições' },
         ]
       },
       {
@@ -33,12 +33,15 @@ export default {
     ],
     tips: [
       'Carimbos de tempo TSA são usados em assinatura de código para garantir que assinaturas permaneçam válidas após a expiração do certificado',
-      'O endpoint TSA aceita HTTP POST com Content-Type: application/timestamp-query',
+      'O endpoint TSA aceita HTTP POST com Content-Type: application/timestamp-query (ou application/octet-stream)',
+      'Uma requisição com qualquer extensão é recusada com unacceptedExtension, e uma malformada com badDataFormat (RFC 3161 §2.4.1)',
+      'Os tokens trazem genTime em segundos inteiros com uma precisão declarada de 1 segundo, e o message imprint da requisição copiado como enviado',
       'Use algoritmos de hash SHA-256 ou mais fortes ao criar requisições de carimbo de tempo',
       'Nenhuma autenticação é necessária: o endpoint TSA é acessível publicamente como CRL/OCSP',
     ],
     warnings: [
       'Uma CA assinante válida deve ser configurada antes de ativar o TSA',
+      'openssl ts -verify e jarsigner recusam tokens assinados pelo certificado da CA: a RFC 3161 exige um assinante dedicado com um EKU timeStamping crítico e exclusivo. Gere um na aba Configurações',
       'O endpoint TSA é um endpoint de protocolo público: não coloque dados sensíveis nas requisições de carimbo de tempo',
     ],
   },
@@ -80,9 +83,9 @@ O OID da Política identifica a política TSA sob a qual os carimbos de tempo s�
 - Padrão: \`1.2.3.4.1\` (placeholder)
 - Para produção, registre um OID sob o arco da sua organização ou use um do seu CP/CPS
 
-## Aba Informações
+## Aba Endpoint TSA
 
-A aba Informações exibe:
+A aba Endpoint TSA exibe:
 
 - **URL do Endpoint TSA**: URL pronta para copiar e colar para configuração do cliente
 - **Exemplos de Uso**: Comandos OpenSSL para criar requisições, enviá-las e verificar respostas

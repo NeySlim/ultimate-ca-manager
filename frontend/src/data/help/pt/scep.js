@@ -11,7 +11,7 @@ export default {
           { label: 'Configuração', text: 'Configurações do servidor SCEP: seleção de CA, auto-aprovação' },
           { label: 'Perfis', text: 'Endpoints de inscrição nomeados, cada um com URL, CA, modelo e desafio próprios' },
           { label: 'Registros de aplicativo do Intune', text: 'Registros de aplicativo no Entra (ID do locatário, ID do cliente, segredo do cliente) compartilhados pelos perfis que validam desafios do Intune; um segredo vazio na edição mantém o atual, Testar conexão solicita um token e descobre o serviço sem consumir nenhum desafio, e um app ainda usado por um perfil não pode ser excluído' },
-          { label: 'Senhas de Desafio', text: 'Gerenciar senhas de desafio por CA para inscrição de dispositivos' },
+          { label: 'Desafios', text: 'Ver e regenerar as senhas de desafio para inscrição de dispositivos' },
           { label: 'Informações', text: 'URLs de endpoints SCEP e instruções de integração' },
         ]
       },
@@ -20,6 +20,7 @@ export default {
         items: [
           { label: 'CA Assinante', text: 'Selecione qual CA assina os certificados inscritos via SCEP. Os dispositivos cifram a solicitação para esta CA, que deve portanto ter uma chave RSA em software: CAs EC, com HSM, sem chave, offline e revogadas não são listadas (v2.248)' },
           { label: 'Auto-Aprovação', text: 'Aprovar automaticamente solicitações com senhas de desafio válidas' },
+          { label: 'Servir em HTTP simples', text: 'Desativado por padrão. Responde também ao SCEP na porta do protocolo HTTP (8080 por padrão), em http://seu-servidor:8080/scep/pkiclient.exe e nas URLs de perfil, para clientes como o sscep que não podem usar HTTPS. RFC 8894 §7.10: as mensagens SCEP já são protegidas, o envelope CMS mantém a senha de desafio privada' },
           { label: 'Senha de Desafio', text: 'Segredo compartilhado que dispositivos usam para autenticar a inscrição' },
           { label: 'Chaves do dispositivo (v2.248)', text: 'Um dispositivo assina o seu pedido com uma chave RSA, ECDSA, Ed25519 ou ML-DSA; uma assinatura ML-DSA segue a RFC 9882 (resumo SHA-512). Ed448 é recusado, e ML-DSA também em modo FIPS' },
         ]
@@ -86,7 +87,7 @@ Cada perfil está vinculado a:
 Aponte cada frota de dispositivos, perfil MDM ou tenant para sua própria URL de perfil. O endpoint \`/scep/pkiclient.exe\` sem segmento continua servindo a configuração global inalterada.
 
 ### Senhas de Desafio
-Gerencie senhas de desafio por CA. Os dispositivos devem incluir uma senha de desafio válida em sua solicitação de inscrição para autenticação.
+A aba **Desafios** mostra as senhas de desafio. Os dispositivos devem incluir uma senha de desafio válida em sua solicitação de inscrição para autenticação.
 
 - **Ver senha**: Mostrar o desafio atual para uma CA
 - **Regenerar**: Criar uma nova senha de desafio (invalida a anterior)
@@ -115,16 +116,19 @@ https://seu-servidor:8443/scep/<perfil>/pkiclient.exe   (endpoint por perfil)
 
 Os dispositivos precisam da URL para se inscrever. Use uma URL de perfil para direcionar a CA, o modelo e a senha de desafio daquele perfil.
 
+### Troca de CA (GetNextCACert)
+O GetNextCACert serve a sucessora da CA do endpoint, assinada pela CA atual: outra CA com o mesmo pai e o mesmo DN de sujeito, não revogada, não offline, com chave RSA em software e que expira mais tarde. Uma CA que apenas compartilha o nome de exibição nunca é servida; sem sucessora, a resposta é 404.
+
 ## Aprovando/Rejeitando Solicitações
 
 Para solicitações pendentes (auto-aprovação desativada):
-1. Revise os detalhes da solicitação (sujeito, tipo de chave, desafio)
+1. Revise os detalhes da solicitação (sujeito, ID da transação, status, CSR)
 2. Clique em **Aprovar** para assinar e emitir o certificado
 3. Ou clique em **Rejeitar** com um motivo
 
 Uma solicitação que chegou por um perfil é emitida com o modelo desse perfil (validade, key usages), exatamente como a auto-aprovação faria.
 
-> ⚠ Senhas de desafio são transmitidas na solicitação SCEP. Sempre use HTTPS para o endpoint SCEP.
+> A senha de desafio fica no CSR, que viaja dentro do envelope CMS cifrado para a CA (RFC 8894 §2.4), portanto o HTTP simples não a expõe. Um cliente que a envia como atributo assinado fora do envelope a expõe: mantenha esses clientes em HTTPS.
 
 ## Integração com Dispositivos
 

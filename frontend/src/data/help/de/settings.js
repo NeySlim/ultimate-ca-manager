@@ -50,7 +50,7 @@ export default {
         content: "Automatische, verschlüsselte Datenbank-Backups in konfigurierbarer Frequenz mit Aufbewahrung.",
         items: [
           { label: "Frequenz", text: "Täglich / wöchentlich / monatlich" },
-          { label: "Aufbewahrung", text: "Die N neuesten Backups behalten; ältere werden bereinigt" },
+          { label: "Aufbewahrung", text: "Backups, die älter sind als die eingestellte Anzahl Tage (standardmäßig 30), werden bereinigt" },
           { label: "Verschlüsselung", text: "Backups werden mit dem konfigurierten Backup-Passwort verschlüsselt" },
           { label: "Schlüsselableitung", text: "Automatisch (Argon2id, sofern verfügbar, PBKDF2 im FIPS-Modus), PBKDF2-HMAC-SHA256 oder Argon2id. Mit Argon2id geschriebene Archive lassen sich auf einer Instanz im FIPS-Modus nicht wiederherstellen" },
         ]
@@ -94,7 +94,7 @@ export default {
           { label: 'Allgemein', text: 'Syslog-Hostname (als HOSTNAME in weitergeleiteten Syslog-Nachrichten gesendet), Basis-URLs und systemweite Standardwerte' },
           { label: 'Darstellung', text: 'Theme-Auswahl (hell/dunkel/System), Akzentfarbe, Desktop-Modus' },
           { label: 'E-Mail (SMTP)', text: 'SMTP-Server, Anmeldedaten, E-Mail-Template-Editor und Ablauf-Warnbenachrichtigungen' },
-          { label: 'Sicherheit', text: 'Passwortrichtlinien, Sitzungszeitlimit, Ratenbegrenzung, Admin-Zugriffs-Allowlist' },
+          { label: 'Sicherheit', text: 'Passwortrichtlinie, Sitzungsdauer, Admin-Zugriffs-Allowlist, mTLS, Verschlüsselung privater Schlüssel; Inaktivitäts-Timeout und Kontosperre befinden sich unter Allgemein' },
           { label: 'SSO', text: 'SAML 2.0, OAuth2/OIDC und LDAP Single-Sign-On-Integration' },
           { label: 'Sicherung', text: 'Manuelle und geplante Datenbanksicherungen' },
           { label: 'Audit', text: 'Protokollaufbewahrung, Syslog-Weiterleitung, Integritätsüberprüfung' },
@@ -206,7 +206,6 @@ Systemweite Konfiguration in Tabs organisiert. Änderungen werden sofort wirksam
 - **Theme**: Hell, Dunkel oder System (folgt OS-Präferenz)
 - **Akzentfarbe**: Primärfarbe für Schaltflächen, Links und Hervorhebungen
 - **Desktop-Modus erzwingen**: Responsives mobiles Layout deaktivieren
-- **Seitenleisten-Verhalten**: Standardmäßig eingeklappt oder ausgeklappt
 
 ## E-Mail (SMTP)
 
@@ -240,18 +239,14 @@ Wenn SMTP konfiguriert ist, aktivieren Sie automatische Zertifikatsablaufwarnung
 ## Sicherheit
 
 ### Passwortrichtlinie
-- Mindestlänge (8-32 Zeichen)
-- Großbuchstaben, Kleinbuchstaben, Zahlen, Sonderzeichen erfordern
-- Passwortablauf (Tage)
-- Passwortverlauf (Wiederverwendung verhindern)
+- Mindestlänge (6-32 Zeichen)
+- Großbuchstaben, Zahlen, Sonderzeichen erfordern
 
 ### Sitzungsverwaltung
-- Sitzungszeitlimit (Minuten der Inaktivität)
-- Maximale gleichzeitige Sitzungen pro Benutzer
+- Sitzungsdauer (Stunden, unabhängig von der Aktivität); das Inaktivitäts-Timeout befindet sich unter Allgemein
 
-### Ratenbegrenzung
-- Anmeldeversuchslimit pro IP
-- Sperrdauer nach Überschreitung des Limits
+### Kontosperre
+- Maximale Anmeldeversuche und Sperrdauer, unter Allgemein: Sie sperren das Konto, nicht die IP-Adresse
 
 ### Admin-Zugriffs-Allowlist
 Beschränkt die Weboberfläche und die Management-API auf aufgelistete IP-Adressen und CIDR-Netzwerke; PKI-Protokolle bleiben von überall erreichbar. Siehe die Anleitung zu den Sicherheitseinstellungen.
@@ -291,12 +286,12 @@ Alle in der Datenbank gespeicherten privaten Schlüssel mit AES-256 verschlüsse
 ## Sicherung
 
 ### Manuelle Sicherung
-Klicken Sie auf **Sicherung erstellen**, um einen Datenbank-Snapshot zu erstellen. Sicherungen enthalten alle Zertifikate, CAs, Schlüssel, Einstellungen und Audit-Protokolle.
+Klicken Sie auf **Sicherung erstellen**, um einen Datenbank-Snapshot zu erstellen. Sicherungen enthalten die Zertifikate, CAs, Schlüssel und Einstellungen; das Audit-Protokoll und andere Verlaufstabellen sind nicht enthalten.
 
 ### Geplante Sicherung
 Automatische Sicherungen konfigurieren:
 - Häufigkeit (täglich, wöchentlich, monatlich)
-- Aufbewahrungsanzahl (Anzahl der zu behaltenden Sicherungen)
+- Aufbewahrung in Tagen: ältere Sicherungen werden bereinigt (standardmäßig 30)
 - **Schlüsselableitung**: Automatisch (Argon2id, sofern verfügbar, PBKDF2 im FIPS-Modus), PBKDF2-HMAC-SHA256 oder Argon2id. Mit Argon2id geschriebene Archive lassen sich auf einer Instanz im FIPS-Modus nicht wiederherstellen
 
 ### Wiederherstellen
@@ -314,7 +309,7 @@ Laden Sie eine Sicherungsdatei hoch, um UCM auf einen früheren Zustand zurückz
 
 - **Protokollaufbewahrung**: Alte Protokolle nach N Tagen automatisch bereinigen
 - **Syslog-Weiterleitung**: Ereignisse an einen Remote-Syslog-Server senden (UDP/TCP/TLS)
-- **Integritätsüberprüfung**: Hash-Verkettung zur Manipulationserkennung aktivieren
+- **Integritätsüberprüfung**: Die Hash-Kette prüfen, die jeden Audit-Eintrag verbindet; die Kette ist immer aktiv, es gibt nichts zu aktivieren
 
 ## Datenbank
 
@@ -323,18 +318,17 @@ UCM unterstützt zwei Datenbank-Backends:
 - **SQLite** (Standard): dateibasiert, ohne Konfiguration, ideal für Einzelknoten
 - **PostgreSQL 13+**: empfohlen für Hochverfügbarkeit, Multi-Instanz oder wenn Sie bereits einen verwalteten PG-Cluster betreiben
 
-Das aktive Backend wird über die Umgebungsvariable \`DATABASE_URL\` ausgewählt. Wenn nicht gesetzt, verwendet UCM SQLite unter \`UCM_DATA_DIR/ucm.db\`.
+Das aktive Backend wird über die Umgebungsvariable \`DATABASE_URL\` ausgewählt. Wenn nicht gesetzt, verwendet UCM SQLite unter \`DATA_DIR/ucm.db\`.
 
 ### Statusbereich
-- Aktives Backend (sqlite / postgresql) und Treiber
+- Aktives Backend (sqlite / postgresql) und seine Engine-Version
 - Datenbankgröße und Tabellenanzahl
-- Migrationsversion
 
 ### Verbindung testen
 Validieren Sie eine \`DATABASE_URL\` (z. B. \`postgresql://user:pass@host:5432/ucm\`) vor dem Wechsel. Der Test öffnet eine echte Verbindung und meldet jeden Fehler. PostgreSQL-Server älter als Version 13 werden abgelehnt, UCM erfordert PostgreSQL 13 oder neuer.
 
 ### Backend wechseln
-Speichert \`DATABASE_URL\` in \`/etc/ucm/ucm.env\` (DEB/RPM) und startet UCM neu. **Keine Daten werden kopiert**: verwenden Sie zuerst **Migrieren**, wenn Sie Ihre bestehenden Daten behalten möchten.
+Speichert \`DATABASE_URL\` in \`/etc/ucm/ucm.env\` (DEB/RPM) und startet UCM neu. Nur die Tabellen für Konten, Rollen, SSO und MFA werden ins neue Backend kopiert, sodass Sie sich weiterhin anmelden können; verwenden Sie zuerst **Migrieren**, wenn Sie Ihre übrigen Daten behalten möchten.
 
 ### Daten migrieren
 Kopiert alle Zeilen vom aktuellen zum Ziel-Backend. Funktioniert in beide Richtungen (SQLite ↔ PostgreSQL):
@@ -342,12 +336,12 @@ Kopiert alle Zeilen vom aktuellen zum Ziel-Backend. Funktioniert in beide Richtu
 1. Die Quelldatenbank wird unter \`/opt/ucm/data/backups/db_migration/\` gesichert
 2. Das Schema wird auf dem Ziel über SQLAlchemy erstellt
 3. FK-Prüfungen werden während des Bulk-Loads deaktiviert
-4. Quell-/Ziel-Spalten werden geschnitten (Legacy-Spalten werden mit einer Warnung übersprungen)
+4. Spalten werden nach Namen zugeordnet; nur die bekannten Legacy-Spalten entfallen, und jede andere Spalte, die dem Ziel fehlt, lässt die Migration ablehnen
 5. PostgreSQL-Sequenzen werden nach dem Laden zurückgesetzt
 6. Der Dienst startet automatisch neu (DEB/RPM): auf Docker setzen Sie \`DATABASE_URL\` in Ihrer Compose-Datei und starten den Container manuell neu
 
 **Sicherheitsprüfungen (schneller Abbruch, Quelle unangetastet):**
-- Das Ziel muss leer sein. Wenn \`users\`, \`cas\` oder \`certificates\` bereits Zeilen enthalten, wird die Migration mit HTTP 409 abgelehnt und ein Bereinigungshinweis ausgegeben:
+- Das Ziel muss leer sein. Wenn eine seiner Tabellen bereits Zeilen enthält, wird die Migration mit HTTP 409 abgelehnt und ein Bereinigungshinweis ausgegeben:
   - PostgreSQL: \`psql ... -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;'\`
   - PostgreSQL in einem anderen Schema als \`public\` (ein \`search_path\` in der URL): Der Hinweis nennt dieses Schema, dessen Sequenzen die Migration angleicht (v2.251)
   - SQLite: löschen Sie die Ziel-\`.db\`-Datei
@@ -369,18 +363,22 @@ TLS-Zertifikat für die UCM-Weboberfläche verwalten:
 - Nach neuen UCM-Versionen von GitHub-Releases suchen
 - Änderungsprotokoll für verfügbare Updates anzeigen
 - Aktuelle Version und Build-Informationen
-- **Auto-Update**: Auf unterstützten Installationen (DEB/RPM) klicken Sie auf **Jetzt aktualisieren**, um die neueste Version automatisch herunterzuladen und zu installieren
-- **Vorabversionen einbeziehen**: Umschalten, um auch nach Release-Kandidaten (RC) zu suchen
+- **Auto-Update**: Auf unterstützten Installationen (DEB/RPM) klicken Sie auf **Update installieren**, um die neueste Version automatisch herunterzuladen und zu installieren
+- **Update-Kanal**: stabil, Vorabversion (Release-Kandidaten) oder dev
 
 ## Webhooks
 
 HTTP-Webhooks konfigurieren, um externe Systeme bei Ereignissen zu benachrichtigen:
 
 ### Unterstützte Ereignisse
-- Zertifikat ausgestellt, widerrufen, abgelaufen, erneuert
-- CA erstellt, gelöscht
-- Benutzer angemeldet, abgemeldet
-- Sicherung erstellt
+- Zertifikat ausgestellt, widerrufen, erneuert, bald ablaufend, abgelaufen, importiert, gelöscht
+- CA erstellt, aktualisiert, gelöscht
+- CSR eingereicht, genehmigt, abgelehnt
+- Template erstellt, aktualisiert
+- ACME-Preflight, Erneuerung fehlgeschlagen, Widerruf fehlgeschlagen
+- Update verfügbar, gestartet, installiert, fehlgeschlagen
+
+Zertifikatsimporte und Template-Änderungen über die Weboberfläche lösen ihr Ereignis nicht aus.
 
 ### Authentifizierung
 
@@ -396,7 +394,7 @@ Tokens werden verschlüsselt gespeichert und nie in der UI zurückgegeben.
 
 ### Webhook erstellen
 1. Klicken Sie auf **Webhook hinzufügen**
-2. Geben Sie die **URL** ein (muss HTTPS sein)
+2. Geben Sie die **URL** ein (HTTPS empfohlen; http:// wird akzeptiert)
 3. Wählen Sie die zu abonnierenden **Ereignisse**
 4. Setzen Sie optional ein **Geheimnis** für HMAC-Signaturverifizierung
 5. Klicken Sie auf **Erstellen**
@@ -443,7 +441,7 @@ Die Einstellungen zur Auto-Erneuerung steuern den Erneuerungsplaner.
 Einstellungen › Sicherung ermöglicht automatische Backups.
 
 - Frequenz **täglich / wöchentlich / monatlich**
-- **Aufbewahrung**: die N neuesten behalten, ältere bereinigen
+- **Aufbewahrung**: Backups, die älter sind als die eingestellte Anzahl Tage, werden bereinigt
 - Backups mit dem Backup-Passwort **verschlüsselt**
 
 

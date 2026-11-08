@@ -18,7 +18,7 @@ export default {
           { label: 'Sélection du modèle', text: 'Choisir parmi les modèles de certificats disponibles sur la MS CA' },
           { label: 'Auto-approuvé', text: 'Les modèles avec autoenroll retournent le certificat immédiatement' },
           { label: 'Approbation du gestionnaire', text: 'Certains modèles exigent l\'approbation du gestionnaire, UCM suit la requête en attente' },
-          { label: 'Interrogation du statut', text: 'Vérifier le statut des requêtes en attente depuis le panneau de détail de la CSR' },
+          { label: 'Requêtes en attente', text: 'Une requête que la CA retient pour son gestionnaire reste En attente dans UCM, et la page ne propose pas de vérification du statut : une fois émise sur la CA, importez le certificat, ou laissez la synchronisation de l\'inventaire via le canal d\'administration WinRM importer les certificats que UCM ne connaît pas encore' },
         ]
       },
       {
@@ -44,7 +44,7 @@ export default {
           { label: 'Rôle', text: 'Exécute les opérations de gestion sur la CA Windows (révoquer, dé-révoquer, publier la CRL, inventaire, approuver/refuser) via PowerShell remoting + certutil, ce que l\'inscription Web AD CS ne sait pas faire.' },
           { label: 'Transport', text: 'NTLM ou Kerberos sur HTTP/HTTPS. Kerberos + HTTPS recommandé ; Kerberos réutilise le keytab de la connexion.' },
           { label: 'Identifiants', text: 'Réutilise par défaut ceux de la connexion. Les connexions en mTLS doivent définir un compte WinRM dédié (officier « Émettre et gérer les certificats » à moindre privilège).' },
-          { label: 'Prérequis', text: 'WinRM activé sur la CA et le paquet optionnel pywinrm installé. Les opérations de gestion exigent admin:system.' },
+          { label: 'Prérequis', text: 'WinRM activé sur la CA et le paquet optionnel pywinrm installé. Les opérations de gestion exigent admin:system ; propager une révocation ou une levée de suspension à la CA suit le write:certificates du certificat.' },
         ]
       },
       {
@@ -58,7 +58,7 @@ export default {
       {
         title: 'Inventaire CA & panneau de contrôle',
         items: [
-          { label: 'Sync d\'inventaire', text: 'Importe les certificats émis directement sur la CA et encore inconnus d\'UCM (incrémental par id de requête, avec réconciliation).' },
+          { label: 'Sync d\'inventaire', text: 'Importe les certificats émis directement sur la CA et encore inconnus d\'UCM (incrémental par id de requête) ; la réconciliation est disponible via l\'API.' },
           { label: 'Requêtes en attente', text: 'Lister, approuver (resoumission + import auto) ou refuser les requêtes en attente d\'approbation du gestionnaire de la CA.' },
           { label: 'Santé de la CA', text: 'État du service CA, expiration du certificat CA, prochaine mise à jour de la CRL et nombre de requêtes en attente, d\'un coup d\'œil.' },
         ]
@@ -88,7 +88,7 @@ UCM s'intègre avec Microsoft Active Directory Certificate Services (AD CS) pour
 1. Allez dans **Paramètres → Microsoft CA**
 2. Cliquez sur **Ajouter une connexion**
 3. Entrez le **nom de la connexion** et le **nom d'hôte du serveur CA**
-4. Entrez optionnellement le **nom commun de la CA** (auto-détecté si vide)
+4. Entrez optionnellement le **nom commun de la CA** (le nom d'hôte du serveur est utilisé si vide)
 5. Sélectionnez la **méthode d'authentification**
 6. Entrez les identifiants pour la méthode choisie
 7. Cliquez sur **Tester la connexion** pour vérifier
@@ -124,7 +124,7 @@ UCM s'intègre avec Microsoft Active Directory Certificate Services (AD CS) pour
 Le certificat est retourné immédiatement et importé dans UCM.
 
 ### Modèles avec approbation du gestionnaire
-UCM enregistre la requête comme **En attente** et suit l'ID de requête MS CA. Une fois approuvée sur la CA Windows, vérifiez le statut depuis le panneau de détail de la CSR pour importer le certificat.
+UCM enregistre la requête comme **En attente** et suit l'ID de requête MS CA. La page ne propose pas de vérification du statut : une fois le certificat émis sur la CA Windows, importez-le, ou laissez la **synchronisation de l'inventaire** via le canal d'administration WinRM importer les certificats que UCM ne connaît pas encore.
 
 ## Inscription pour le compte d'autrui (EOBO)
 
