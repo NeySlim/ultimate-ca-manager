@@ -10,6 +10,8 @@ issue() and its helpers.
 """
 import contextlib
 
+import pytest
+
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa
@@ -194,3 +196,124 @@ class TestStrongCertMapping:
         assert err is None, err
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
         assert _sid_extension_value(cert) is None
+
+
+def _configure_connector_row(app, **fields):
+    with app.app_context():
+        ADConnectorConfig.query.delete()
+        values = dict(server='dc1.hagland.domain', base_dn='DC=hagland,DC=domain',
+                      bind_dn='svc-ucm', enabled=True)
+        values.update(fields)
+        config = ADConnectorConfig(**values)
+        config.bind_password = 'irrelevant'
+        db.session.add(config)
+        db.session.commit()
+
+
+def _issue_supplied_subject(app, ca_id, principal):
+    csr, _key = _make_csr(common_name='win11-manual.hagland.domain')
+    with _supplied_subject_template(app, ca_id), app.app_context():
+        ca = db.session.get(CA, ca_id)
+        return wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30,
+                                   kerberos_principal=principal)
+
+
+class TestSidCheckIsNeverSkipped:
+    """An enabled connector that cannot resolve the requester refuses: issuing under a
+    template that keeps the request's subject would drop the SID extension (KB5014754)."""
+
+    @pytest.fixture(autouse=True)
+    def _no_connector_left_behind(self, app):
+        yield
+        _clear_ad_connector(app)
+
+    def test_foreign_realm_is_refused_before_any_lookup(self, app, create_ca, monkeypatch):
+        ca_data = create_ca(cn='Strong Mapping Foreign Realm CA')
+        _configure_connector_row(app)
+
+        def _fail_if_called(sam):
+            raise AssertionError('a foreign principal must not be looked up in this domain')
+
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', _fail_if_called)
+        cert_pem, err = _issue_supplied_subject(app, ca_data['id'], 'WIN11$@OTHER.DOMAIN')
+        assert cert_pem is None
+        assert err == "The requester's realm is not served by the directory connector"
+        assert not isinstance(err, wstep_service.ServerError)
+
+    def test_principal_without_an_account_is_refused(self, app, create_ca, monkeypatch):
+        ca_data = create_ca(cn='Strong Mapping No Account CA')
+        _configure_connector_row(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam: _REAL_SID)
+        for principal in ('@HAGLAND.DOMAIN', 'WIN11$'):
+            cert_pem, err = _issue_supplied_subject(app, ca_data['id'], principal)
+            assert cert_pem is None, principal
+            assert err == "The requester's principal names no directory account"
+            assert not isinstance(err, wstep_service.ServerError)
+
+    def test_connector_without_base_dn_is_a_server_fault(self, app, create_ca, monkeypatch, caplog):
+        ca_data = create_ca(cn='Strong Mapping No Base DN CA')
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam: _REAL_SID)
+        for base_dn, cause in ((None, 'no base DN'), ('', 'no base DN'),
+                               ('not a dn', 'no DC component'), ('OU=Machines', 'no DC component')):
+            _configure_connector_row(app, base_dn=base_dn)
+            caplog.clear()
+            cert_pem, err = _issue_supplied_subject(app, ca_data['id'], KERBEROS_MACHINE_PRINCIPAL)
+            assert cert_pem is None, base_dn
+            assert isinstance(err, wstep_service.ServerError), base_dn
+            assert err == 'Could not resolve requester identity for strong certificate mapping'
+            assert cause in caplog.text, base_dn
+
+    def test_disabled_connector_still_issues_a_foreign_principal_without_sid(
+            self, app, create_ca, monkeypatch):
+        ca_data = create_ca(cn='Strong Mapping Disabled Foreign CA')
+        _configure_connector_row(app, enabled=False)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid',
+                            lambda sam: (_ for _ in ()).throw(AssertionError('connector is off')))
+        cert_pem, err = _issue_supplied_subject(app, ca_data['id'], 'WIN11$@OTHER.DOMAIN')
+        assert err is None, err
+        assert _sid_extension_value(x509.load_pem_x509_certificate(cert_pem.encode())) is None
+
+    def test_same_realm_keeps_the_sid_and_its_lowercase_spelling_is_another_realm(
+            self, app, create_ca, monkeypatch):
+        ca_data = create_ca(cn='Strong Mapping Same Realm CA')
+        _configure_connector_row(app)
+        looked_up = []
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam: looked_up.append(sam) or _REAL_SID)
+        cert_pem, err = _issue_supplied_subject(app, ca_data['id'], KERBEROS_MACHINE_PRINCIPAL)
+        assert err is None, err
+        assert looked_up == ['WIN11$']
+        assert _sid_extension_value(x509.load_pem_x509_certificate(cert_pem.encode())) is not None
+        # RFC 4120 §6.1: realm names are case sensitive
+        cert_pem, err = _issue_supplied_subject(app, ca_data['id'], 'WIN11$@hagland.domain')
+        assert cert_pem is None
+        assert err == "The requester's realm is not served by the directory connector"
+
+    def test_two_accounts_of_the_requester_s_name_are_a_server_fault(self, app, create_ca, monkeypatch):
+        """A Global Catalog answers for child domains too: an ambiguous account is never mapped."""
+        ca_data = create_ca(cn='Strong Mapping Duplicate Account CA')
+        _configure_connector_row(app)
+
+        class _Entry:
+            def __init__(self, dn):
+                self.entry_dn = dn
+                self.objectSid = type('A', (), {'raw_values': [b'\x01\x01\x00\x00\x00\x00\x00\x05\x12\x00\x00\x00']})()
+
+            def __contains__(self, key):
+                return key == 'objectSid'
+
+        class _Conn:
+            result = {'result': 0, 'description': 'success'}
+            entries = [_Entry('CN=CHILDDC,CN=Computers,DC=hagland,DC=domain'),
+                       _Entry('CN=CHILDDC,OU=Domain Controllers,DC=child,DC=hagland,DC=domain')]
+
+            def search(self, *args, **kwargs):
+                return True
+
+            def unbind(self):
+                pass
+
+        monkeypatch.setattr(ad_lookup, '_connect', lambda config: _Conn())
+        cert_pem, err = _issue_supplied_subject(app, ca_data['id'], 'CHILDDC$@HAGLAND.DOMAIN')
+        assert cert_pem is None
+        assert isinstance(err, wstep_service.ServerError)
+        assert err == 'Could not resolve requester identity for strong certificate mapping'

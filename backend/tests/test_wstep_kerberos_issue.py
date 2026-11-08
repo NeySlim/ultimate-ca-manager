@@ -890,3 +890,37 @@ def test_a_naked_request_the_directory_cannot_answer_is_a_receiver_fault(
     assert _fault_text_and_code(r.data) == (
         'The directory that builds the certificate subject could not be reached', 's:Receiver')
     assert b'DC unreachable' not in r.data
+
+
+@pytest.mark.parametrize('principal, base_dn, status, text, code', [
+    ('HOST$@OTHER.DOMAIN', 'DC=hagland,DC=domain', 400,
+     "The requester's realm is not served by the directory connector", 's:Sender'),
+    (KERBEROS_PRINCIPAL, None, 500,
+     'Could not resolve requester identity for strong certificate mapping', 's:Receiver'),
+])
+def test_an_enabled_connector_that_cannot_resolve_the_requester_faults(
+        client, app, wstep_kerberos_config, monkeypatch, principal, base_dn, status, text, code):
+    """Never issued without the SID extension: a foreign realm is the requester's fault, no base DN the CA's."""
+    with app.app_context():
+        ADConnectorConfig.query.delete()
+        config = ADConnectorConfig(server='dc1.hagland.domain', base_dn=base_dn,
+                                   bind_dn='svc-ucm', enabled=True)
+        config.bind_password = 'irrelevant'
+        db.session.add(config)
+        db.session.commit()
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: negotiate_auth.NegotiateResult(
+                            status='authenticated', client_principal=principal))
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+    csr, _key = _make_csr()
+    try:
+        r = client.post(ISSUE_URL, data=_build_rst(csr),
+                        headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    finally:
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            db.session.commit()
+    assert r.status_code == status
+    assert _fault_text_and_code(r.data) == (text, code)
