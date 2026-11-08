@@ -226,15 +226,15 @@ def _update_order_row(order, change):
 
     Each writer merges its own keys onto a fresh read: a copy read before another
     thread's commit would overwrite it."""
-    db.session.commit()  # no transaction held while waiting for the lock
-    with _ORDER_ROW_LOCKS[order.id % len(_ORDER_ROW_LOCKS)]:
-        try:
+    try:
+        db.session.commit()  # no transaction held while waiting for the lock
+        with _ORDER_ROW_LOCKS[order.id % len(_ORDER_ROW_LOCKS)]:
             db.session.refresh(order, with_for_update=True)
             result = change(order)
             db.session.commit()
-        except Exception:
-            db.session.rollback()
-            raise
+    except Exception:
+        db.session.rollback()
+        raise
     return result
 
 
@@ -1300,6 +1300,10 @@ class AcmeProxyService:
             # RFC 8555 §7.1.6: every order using a failed authorization is invalid
             self._mark_invalid(o for o in candidates if o.status == 'pending')
             self._release_order_records(order)
+        # RFC 8555 §7.1.6: invalid is final, even when the upstream CA validates it later
+        failure = self._local_failure(order)
+        if failure:
+            authz['status'] = 'invalid'
         proxy_challenges = []
         closed_chall_urls = []
         for chall in authz.get('challenges', []):
@@ -1308,10 +1312,8 @@ class AcmeProxyService:
             chall_url = chall.get('url')
             if not chall_url:
                 continue
-            failure = self._local_failure(order) if chall.get('status') == 'pending' else None
             if failure:
                 chall.update(status='invalid', error=failure)
-                authz['status'] = 'invalid'
             if (_dns_failed_state(authz.get('status'))
                     or _dns_failed_state(chall.get('status'))):
                 closed_chall_urls.append(chall_url)
@@ -1513,7 +1515,7 @@ class AcmeProxyService:
         status = challenge_data.get('status')
         up_link = self._get_authz_link(None, authz_url)
 
-        failure = self._local_failure(order) if status == 'pending' else None
+        failure = self._local_failure(order)  # final, whatever the upstream state (RFC 8555 §7.1.6)
         if failure:
             challenge_data.update(status='invalid', error=failure)
             status = 'invalid'
@@ -1965,13 +1967,10 @@ class AcmeProxyService:
             row.status = 'invalid'
             row.error_message = message
             row.last_error_at = utc_now()
-            return {tuple(record) for entry in challenges_data.values()
-                    if (entry or {}).get('status') == 'submitted'
-                    for record in entry.get('records') or []}
 
-        submitted = _update_order_row(order, _fail)
+        _update_order_row(order, _fail)
         _dns_rows_hook('close_for_order', order.id)
-        self._release_order_records(order, linger=submitted | {tuple(r) for r in linger})
+        self._release_order_records(order, linger={tuple(r) for r in linger})
 
     @staticmethod
     def _local_failure(order):
@@ -2000,32 +1999,40 @@ class AcmeProxyService:
         """Remove in the background the TXT records of an order that can no longer issue.
 
         Kept while another pending order shares one of its authorizations: the
-        record may be the value that order's validation reads. The ``linger``
-        (record name, value) pairs belong to submitted challenges and go later."""
+        record may be the value that order's validation reads. The records of
+        submitted challenges and the ``linger`` (record name, value) pairs go later."""
         def _take(row):
             try:
                 records = json.loads(row.dns_records_created or '[]')
             except (TypeError, ValueError):
-                return []
+                return [], None
             if not records:
-                return []
+                return [], None
             for authz_url in self._recorded_authz_urls(row):
                 if any(o.id != row.id and o.status == 'pending'
                        for o in self._orders_by_authz_url(authz_url)):
-                    return []
+                    return [], None
             row.dns_records_created = None
-            return records
+            states = [state or {} for state in row.challenges_dict.values()]
+            # Read under the row lock: a challenge still initiated may have its POST in flight
+            if any(state.get('status') == 'initiated' for state in states):
+                return records, None
+            return records, {tuple(record) for state in states
+                             if state.get('status') == 'submitted'
+                             for record in state.get('records') or []}
 
         order_id = order.id
         try:
-            records = _update_order_row(order, _take)
+            records, submitted = _update_order_row(order, _take)
         except Exception as exc:
             logger.warning("[ACME Proxy] TXT cleanup of order %s not recorded: %s", order_id, exc)
             return
         if not records:
             return
         app = current_app._get_current_object()
-        later = [r for r in records if (r.get('record_name'), r.get('value')) in linger]
+        deferred = None if submitted is None else set(linger) | submitted
+        later = [r for r in records
+                 if deferred is None or (r.get('record_name'), r.get('value')) in deferred]
         now = [r for r in records if r not in later]
         for batch, args in ((now, (app, now, order_id)),
                             (later, (app, later, order_id, _SUBMITTED_RECORD_LINGER))):
@@ -2211,11 +2218,12 @@ class AcmeProxyService:
         if (local_order.deactivated_authz_list
                 and order.get('status') in ('pending', 'ready')):
             order['status'] = 'invalid'
-        # Only a pending upstream order is overridden: ready or valid, the CA validated it all
+        # RFC 8555 §7.1.6: invalid is final, even when the upstream CA validates the order later
         failure = self._local_failure(local_order)
-        if failure and order.get('status') == 'pending':
+        if failure:
             order['status'] = 'invalid'
             order.setdefault('error', failure)
+            order.pop('certificate', None)
         if order.get('status') == 'invalid':
             self._mark_invalid([local_order] if local_order.status == 'pending' else [])
             self._release_order_records(local_order)
@@ -2246,18 +2254,8 @@ class AcmeProxyService:
             raise ProxyOrderNotReadyError(
                 "Order is invalid: one of its authorizations was deactivated")
         failure = self._local_failure(local_order)
-        finalize_url = None
         if failure:
-            upstream_order = self._post_with_account(order_url, "")
-            if upstream_order.status_code != 200:
-                raise UpstreamProblem.from_response(upstream_order)
-            upstream_status = upstream_order.json().get('status')
-            if upstream_status in ('processing', 'valid'):
-                raise ProxyOrderNotReadyError(
-                    f"Order is not ready: the upstream order is {upstream_status}")
-            if upstream_status != 'ready':
-                raise ProxyOrderNotReadyError(f"Order is invalid: {_problem_text(failure)}")
-            finalize_url = upstream_order.json().get('finalize')
+            raise ProxyOrderNotReadyError(f"Order is invalid: {_problem_text(failure)}")
 
         from cryptography import x509
         csr = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())
@@ -2268,7 +2266,7 @@ class AcmeProxyService:
 
         payload = {"csr": csr_b64}
 
-        finalize_url = finalize_url or _finalize_url_cache.get(order_url)
+        finalize_url = _finalize_url_cache.get(order_url)
         if not finalize_url:
             order_resp = self._post_with_account(order_url, "")
             if order_resp.status_code != 200:
