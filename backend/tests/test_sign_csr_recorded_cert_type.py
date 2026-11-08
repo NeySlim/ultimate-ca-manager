@@ -92,3 +92,25 @@ def test_a_renewal_approval_names_the_recorded_type(app, templated_ca):
         assert data['cert_type'] == 'email_cert'
     finally:
         _drop_policy(app, pid)
+
+
+SA, CA_, EP, EFS, SC, CS = ('1.3.6.1.5.5.7.3.1', '1.3.6.1.5.5.7.3.2', '1.3.6.1.5.5.7.3.4',
+                            '1.3.6.1.4.1.311.10.3.4', '1.3.6.1.4.1.311.20.2.2', '1.3.6.1.5.5.7.3.3')
+
+
+@pytest.mark.parametrize('ekus,expected', [
+    ([], 'server_cert'), ([SA], 'server_cert'), ([SA, CA_], 'server_cert'),
+    ([EP, SA], 'server_cert'), ([EP], 'email_cert'), ([EFS], 'email_cert'),
+    ([EFS, CA_], 'email_cert'), ([EP, CA_], 'email_cert'), ([CA_], 'client_cert'),
+    ([SC], 'client_cert'), ([SC, CA_], 'client_cert'), ([CS], 'code_signing'),
+    ([CS, CA_], 'client_cert'),
+])
+def test_scep_and_wstep_type_an_eku_set_alike(ekus, expected):
+    """SCEP types its issued EKUs, WSTEP its template's: one rule for both."""
+    from models.certificate_template import CertificateTemplate
+    from utils.request_names import cert_type_for_ekus
+    template = CertificateTemplate(extensions_template=json.dumps({'extended_key_usage': ekus}))
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'jdoe')]))
+           .sign(ec.generate_private_key(ec.SECP256R1()), hashes.SHA256()))
+    assert wstep_service._template_profile(template, csr)[0] == cert_type_for_ekus(ekus) == expected

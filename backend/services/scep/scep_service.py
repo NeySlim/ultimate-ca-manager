@@ -1545,8 +1545,8 @@ class SCEPService:
                 critical=False,
             )
         # The CA chain's NameConstraints (RFC 5280 §4.2.1.10), once the EKUs are
-        # settled: they decide whether a dotted CN names a host. renewal_of grants
-        # renewal at par, so a fleet stays renewable after the constraints tightened.
+        # settled: they decide whether a dotted CN names a host, so a policy or
+        # template EKU refusal comes first. renewal_of grants renewal at par.
         issued_ekus = next(e.value for e in builder._extensions
                            if e.oid == ExtensionOID.EXTENDED_KEY_USAGE)
         from services.trust_store.constraints_mixin import validate_name_constraints
