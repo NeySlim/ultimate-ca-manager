@@ -270,3 +270,22 @@ def test_a_template_of_capped_ekus_only_does_not_renew(app, subject_ca, path):
     assert cert is None
     assert err == (f"Template 'Named capped {path} CA OCSP' configures only Extended Key Usages "
                    'this service does not issue')
+
+
+@pytest.mark.parametrize('path', ['tls', 'xml'])
+def test_a_certificate_without_template_does_not_renew_into_capped_ekus_only(app, subject_ca, path):
+    """Matched by its EKUs on renewal, as on issuance, the capped template is refused too."""
+    from services.ca_service import CAService
+    ca_id = subject_ca(f'Named capped bare {path} CA', {**TWINS, 'OCSP': ('ocsp', ['ocspSigning'], False, 'RSA-2048')})
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    with app.app_context():
+        pem, _serial = CAService.sign_csr_from_crypto(
+            ca=db.session.get(CA, ca_id), csr=_eku_csr('bare-renew.example.test', key, CLIENT_AUTH),
+            validity_days=30, source='wstep', cert_type='client_cert')
+    old_cert = x509.load_pem_x509_certificate(pem.encode())
+    assert _template_oid(old_cert) is None
+    cert, err = _renew(app, ca_id, path, old_cert, key,
+                       _eku_csr(old_cert, key, x509.oid.ExtendedKeyUsageOID.OCSP_SIGNING))
+    assert cert is None
+    assert err == (f"Template 'Named capped bare {path} CA OCSP' configures only Extended Key Usages "
+                   'this service does not issue')
