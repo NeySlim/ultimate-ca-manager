@@ -480,27 +480,6 @@ class SCEPService:
 
             logger.debug(f"SCEP: CSR parsed, subject={csr.subject.rfc4514_string()}")
 
-            # Issuance policies (key type, signature hash), before anything is stored
-            _, policy_violations = self._policy_signing_hash(csr)
-            if policy_violations:
-                logger.warning("SCEP: request refused by policy: %s", '; '.join(policy_violations))
-                return self._create_error_response(
-                    self.FAIL_BAD_REQUEST, 'Policy violation: ' + '; '.join(policy_violations),
-                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
-                ), 200
-            # Subject bounds and name syntax too: a manual approval must not queue what issuing refuses
-            from utils.request_names import RequestRejected, refuse_malformed_request
-            try:
-                refuse_malformed_request(
-                    csr.subject, _csr_san_names(csr),
-                    signer_cert if message_type == self.MSG_TYPE_RENEWAL_REQ else None)
-            except RequestRejected as e:
-                logger.warning("SCEP: request refused: %s", e)
-                return self._create_error_response(
-                    self.FAIL_BAD_REQUEST, str(e),
-                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
-                ), 200
-
             # ---- 6. Also check challengePassword in CSR attributes (scepclient) ----
             if not self._has_usable_challenge_password(challenge_pwd):
                 challenge_pwd = _csr_challenge_password(csr_data)
@@ -605,6 +584,18 @@ class SCEPService:
                         transaction_id=transaction_id, recipient_nonce=sender_nonce,
                     ), 200
 
+            # ---- 8b. Policies, subject bounds and names, once the requester is authenticated ----
+            # Before anything is stored: a manual approval must not queue what issuing refuses
+            refusal = self._content_refusal(
+                csr, signer_cert if message_type == self.MSG_TYPE_RENEWAL_REQ else None)
+            if refusal:
+                logger.warning("SCEP: request refused: %s", refusal)
+                self._notify_intune_failure(transaction_id, csr_data, refusal)
+                return self._create_error_response(
+                    self.FAIL_BAD_REQUEST, refusal,
+                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                ), 200
+
             # ---- 9. Idempotency (scoped to this CA) ----
             existing = SCEPRequest.query.filter_by(
                 transaction_id=transaction_id, ca_refid=self.ca_refid
@@ -662,18 +653,8 @@ class SCEPService:
                     # Intune expects to hear about a subsequent failure too,
                     # not just silence. Best-effort: a failed notify here
                     # must not mask the real error back to the device.
-                    if self.intune_client is not None:
-                        try:
-                            self.intune_client.send_failure_notification(
-                                transaction_id, csr_data,
-                                hresult=0x80004005,  # E_FAIL — no finer-grained mapping available
-                                description=getattr(e, 'public_message', str(e))[:255],
-                            )
-                        except Exception as notify_err:
-                            logger.error(
-                                "SCEP: Intune failure notification also failed: %s",
-                                notify_err,
-                            )
+                    self._notify_intune_failure(
+                        transaction_id, csr_data, getattr(e, 'public_message', str(e)))
                     # A refusal for the request's content is the device's to read (RFC 8894 §3.2.1.4)
                     from utils.request_names import RequestRejected
                     return self._create_error_response(
@@ -1044,6 +1025,31 @@ class SCEPService:
         query = query.filter(SCEPRequest.profile_id.is_(None) if self.profile_id is None
                              else SCEPRequest.profile_id == self.profile_id)
         return query.first() is not None
+
+    def _content_refusal(self, csr, renewal_of):
+        """Why issuance would refuse the request's key, hash, subject or names, else None."""
+        _, policy_violations = self._policy_signing_hash(csr)
+        if policy_violations:
+            return 'Policy violation: ' + '; '.join(policy_violations)
+        from utils.request_names import RequestRejected, refuse_malformed_request
+        try:
+            refuse_malformed_request(csr.subject, _csr_san_names(csr), renewal_of)
+        except RequestRejected as e:
+            return str(e)
+        return None
+
+    def _notify_intune_failure(self, transaction_id, csr_data, description):
+        """Tell Intune a request it validated was refused; best effort, the device still gets the reason."""
+        if self.intune_client is None:
+            return
+        try:
+            self.intune_client.send_failure_notification(
+                transaction_id, csr_data,
+                hresult=0x80004005,  # E_FAIL: no finer-grained mapping available
+                description=description[:255],
+            )
+        except Exception as notify_err:
+            logger.error("SCEP: Intune failure notification also failed: %s", notify_err)
 
     def _validate_renewal(self, signer_cert: x509.Certificate, csr) \
             -> Optional[Tuple[int, str]]:

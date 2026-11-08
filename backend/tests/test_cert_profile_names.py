@@ -594,7 +594,8 @@ class TestScepPath:
 class TestScepReplies:
     """The device is told why, and a malformed request is not queued."""
 
-    def _reply(self, app, create_ca, sans, auto_approve=True, **ca_kwargs):
+    def _reply(self, app, create_ca, sans, auto_approve=True, password=b'sekret', intune=None,
+               **ca_kwargs):
         import uuid
         from cryptography.hazmat.primitives.asymmetric import rsa
         from cryptography.x509.oid import AttributeOID
@@ -603,7 +604,7 @@ class TestScepReplies:
         from services.scep.scep_service import SCEPService
         from tests.test_scep_fail_info import FAIL_INFO_TEXT_OID
         from tests.test_scep_rfc8894_operations import (
-            MESSAGE_TYPE_OID, PKI_STATUS_OID, SENDER_NONCE_OID, TRANSACTION_ID_OID,
+            FAIL_INFO_OID, MESSAGE_TYPE_OID, PKI_STATUS_OID, SENDER_NONCE_OID, TRANSACTION_ID_OID,
             _client_identity, _load_ca_material, _response_attributes)
         import asn1crypto.core
         ca_data = create_ca(cn=f'Profile SCEP reply CA {uuid.uuid4().hex[:8]}', **ca_kwargs)
@@ -615,7 +616,7 @@ class TestScepReplies:
             csr = (x509.CertificateSigningRequestBuilder()
                    .subject_name(x509.Name(_cn('scep-reply.example.test')))
                    .add_extension(x509.SubjectAlternativeName(sans), critical=False)
-                   .add_attribute(AttributeOID.CHALLENGE_PASSWORD, b'sekret')
+                   .add_attribute(AttributeOID.CHALLENGE_PASSWORD, password)
                    .sign(key, hashes.SHA256()))
             envelope = encrypt_for_client(csr.public_bytes(serialization.Encoding.DER), ca_cert)
             message = create_signed_pkcs7(envelope, key, signer, signed_attributes=[
@@ -623,10 +624,12 @@ class TestScepReplies:
                 {'type': MESSAGE_TYPE_OID, 'values': [asn1crypto.core.PrintableString('19')]},
                 {'type': SENDER_NONCE_OID, 'values': [asn1crypto.core.OctetString(b'profile-nonce-16')]},
             ])
-            response, _ = SCEPService(ca.refid, challenge_password='sekret',
-                                      auto_approve=auto_approve).process_pkcs_req(message, '127.0.0.1')
+            response, _ = SCEPService(
+                ca.refid, challenge_password=None if intune else 'sekret',
+                auto_approve=auto_approve, intune_client=intune).process_pkcs_req(message, '127.0.0.1')
             attrs = _response_attributes(response)
             queued = SCEPRequest.query.filter_by(transaction_id=txn).count()
+        self.fail_info = attrs.get(FAIL_INFO_OID)
         return attrs[PKI_STATUS_OID], attrs.get(FAIL_INFO_TEXT_OID), queued
 
     def test_a_malformed_name_is_refused_with_its_reason(self, app, create_ca):
@@ -638,6 +641,23 @@ class TestScepReplies:
             app, create_ca, [x509.DNSName('bad name.example')], auto_approve=False)
         assert status == '2' and 'bad name.example' in (text or ''), text
         assert queued == 0
+
+    def test_a_wrong_password_is_refused_before_the_names(self, app, create_ca):
+        """The challenge comes first: badMessageCheck, not the request's names."""
+        status, text, queued = self._reply(
+            app, create_ca, [x509.DNSName('bad name.example')], password=b'wrong')
+        assert (status, self.fail_info) == ('2', '1'), text
+        assert 'challenge' in (text or '').lower() and 'bad name' not in (text or ''), text
+        assert queued == 0
+
+    def test_intune_validates_then_hears_of_the_refusal(self, app, create_ca):
+        from tests.test_scep_intune_validation import _FakeIntuneClient
+        intune = _FakeIntuneClient()
+        status, text, queued = self._reply(
+            app, create_ca, [x509.DNSName('bad name.example')], intune=intune)
+        assert status == '2' and 'bad name.example' in (text or ''), text
+        assert len(intune.validate_calls) == 1 and queued == 0
+        assert [c[3] for c in intune.failure_notify_calls] == [text], intune.failure_notify_calls
 
     def test_a_refusal_at_issuance_gives_its_reason(self, app, create_ca):
         """A name outside the CA's constraints is refused while issuing, not before."""
