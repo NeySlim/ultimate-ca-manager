@@ -466,7 +466,7 @@ def lookup_computer_dns_hostname(sam_account_name):
         entries = _search(conn, config.base_dn, f'(&(objectClass=computer)(sAMAccountName={safe_sam}))',
                           ['dNSHostName'])
         entry = _single_entry(entries, sam_account_name)
-        # An ldap3 Entry without the requested attributes is falsy: compare by identity
+        # Compared by identity: None and UNREACHABLE are the only non-entry answers
         if entry is None or entry is UNREACHABLE:
             return entry
         if 'dNSHostName' not in entry or not entry.dNSHostName.value:
@@ -546,7 +546,7 @@ def lookup_object_sid(sam_account_name):
         safe_sam = escape_filter_chars(sam_account_name)
         entries = _search(conn, config.base_dn, f'(sAMAccountName={safe_sam})', ['objectSid'])
         entry = _single_entry(entries, sam_account_name)
-        # An ldap3 Entry without the requested attributes is falsy: compare by identity
+        # Compared by identity: None and UNREACHABLE are the only non-entry answers
         if entry is None or entry is UNREACHABLE:
             return entry
         if 'objectSid' not in entry or not entry.objectSid.raw_values:
@@ -604,7 +604,7 @@ def lookup_user_ad_identity(sam_account_name):
                           f'(&(objectCategory=person)(objectClass=user)(sAMAccountName={safe_sam}))',
                           ['userPrincipalName', 'mail'])
         entry = _single_entry(entries, sam_account_name)
-        # An ldap3 Entry without the requested attributes is falsy: compare by identity
+        # Compared by identity: None and UNREACHABLE are the only non-entry answers
         if entry is None or entry is UNREACHABLE:
             return entry
         if 'userPrincipalName' not in entry or not entry.userPrincipalName.value:

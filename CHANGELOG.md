@@ -20,7 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
-- AD Connector: saving a base DN without DC components, which names no domain, or a Global Catalog port (3268, 3269) is refused with 400, and a Kerberos realm must match the base DN's in capitals exactly (RFC 4120 §6.1).
+- AD Connector: saving or testing a base DN without DC components, which names no domain, a Global Catalog port (3268, 3269) or a server written with a port or an `ldap://` scheme is refused with 400, and a Kerberos realm must match the base DN's in capitals exactly (RFC 4120 §6.1).
 - SSO providers: an unknown `default_role` is refused instead of being stored as viewer, and an empty one, "None" in the form, gives no implicit role; an existing provider whose default role is empty or unknown keeps viewer (migration 137).
 - LDAP: a new provider without SSL/TLS uses StartTLS by default, so passwords do not cross in clear (RFC 4513 §6.3.3); existing providers keep their setting.
 - ACME server: revokeCert refused an account other than the one that ordered the certificate even when it held valid authorizations for all its identifiers. Such an account may now revoke a certificate this ACME server issued, as RFC 8555 §7.6 requires; an authorization granted by auto-approval does not count.
@@ -193,7 +193,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Certificates and ACME: rename the hosts whose DNS name holds an underscore and shorten any CN over 64 characters before their next renewal, since ACME orders (cert-manager, certbot, lego), initial EST and WSTEP enrollments, Sign CSR requests and server certificates from the issue form carrying them are now refused.
 - SCEP and Intune: a profile whose SAN DNS is built from a device name holding spaces, apostrophes or underscores (such as `{{DeviceName}}` on iOS) must use a DNS-safe value before the upgrade, since each enrollment carrying it, Intune renewals included, is now refused with the reason.
 - WSTEP: with the AD Connector enabled, users and computers of a trusted realm other than the connector's domain are now refused on the Kerberos binding instead of getting a certificate without SID; they can use the Username/Password binding, or a UCM whose connector points at their own domain.
-- AD Connector: name an Enroll ACL group whose cn other groups share by its DN, and move a connector saved on a Global Catalog port (3268, 3269) to 389 or 636 of a domain controller.
+- AD Connector: name an Enroll ACL group whose cn other groups share by its DN, and move a connector saved on a Global Catalog port (3268, 3269), or with a port in a server name, to 389 or 636 of a domain controller.
 
 ## [2.251] - 2026-11-06
 

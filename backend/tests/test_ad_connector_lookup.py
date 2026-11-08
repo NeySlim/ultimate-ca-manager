@@ -74,7 +74,9 @@ class TestRealmMatchesConnector:
             assert lookup.realm_matches_connector('hagland.domain') is False
             assert lookup.realm_matches_connector('Hagland.Domain') is False
 
-    def test_a_child_domain_realm_is_another_realm(self, app, monkeypatch):
+    def test_characterization_a_child_domain_realm_is_another_realm(self, app, monkeypatch):
+        """Characterization, true before the exact comparison too: it guards against a
+        suffix match (``realm.endswith(connector_realm)``), which would let a child domain in."""
         _configure(monkeypatch, app)
         with app.app_context():
             assert lookup.realm_matches_connector('CHILD.HAGLAND.DOMAIN') is False
