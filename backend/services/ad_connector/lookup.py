@@ -41,6 +41,21 @@ import tempfile
 logger = logging.getLogger(__name__)
 
 
+class _Unreachable:
+    """The falsy answer of a lookup the directory could not give (no DC bound, or the
+    search failed), told apart from "not found" so a caller can fault on its own side."""
+    __slots__ = ()
+
+    def __bool__(self):
+        return False
+
+    def __repr__(self):
+        return 'UNREACHABLE'
+
+
+UNREACHABLE = _Unreachable()
+
+
 def parse_kerberos_principal(principal):
     """``'WIN11$@HAGLAND.DOMAIN'`` -> ``('WIN11$', 'HAGLAND.DOMAIN')``.
 
@@ -297,9 +312,9 @@ def lookup_computer_dns_hostname(sam_account_name):
     (e.g. ``'WIN11$'``, trailing ``$`` included -- it's a real part of the
     attribute value, not an LDAP filter metacharacter to strip).
 
-    Returns ``None`` on every failure mode: connector not configured or
-    disabled, unreachable, bind failure, entry not found, or the attribute
-    is empty/missing. Never raises.
+    Returns ``None`` when the connector is not configured or disabled, the entry
+    is not found or the attribute is empty/missing, and the falsy ``UNREACHABLE``
+    when no DC binds or the search fails. Never raises.
     """
     from ldap3.utils.conv import escape_filter_chars
 
@@ -313,7 +328,7 @@ def lookup_computer_dns_hostname(sam_account_name):
         conn = _connect(config)
     except Exception as e:
         logger.warning("AD Connector: bind failed during computer lookup: %s", e)
-        return None
+        return UNREACHABLE
 
     try:
         safe_sam = escape_filter_chars(sam_account_name)
@@ -330,7 +345,7 @@ def lookup_computer_dns_hostname(sam_account_name):
         return str(entry.dNSHostName.value)
     except Exception as e:
         logger.warning("AD Connector: computer lookup failed: %s", e)
-        return None
+        return UNREACHABLE
     finally:
         try:
             conn.unbind()
@@ -438,9 +453,9 @@ def lookup_user_ad_identity(sam_account_name):
     str | None}`` -- the DN components ordered exactly as AD returns them
     (leaf to root, e.g. ``[('CN', 'Roy Hagland'), ('CN', 'Users'), ('DC',
     'hagland'), ('DC', 'domain')]``), confirmed against a real ADCS-issued
-    User certificate's subject in the lab. ``None`` on every failure mode
-    -- connector not configured/disabled, unreachable, bind failure, entry
-    not found, or no ``userPrincipalName`` set. Never raises.
+    User certificate's subject in the lab. ``None`` when the connector is not
+    configured/disabled, the entry is not found or has no ``userPrincipalName``;
+    the falsy ``UNREACHABLE`` when no DC binds or the search fails. Never raises.
 
     ``mail`` is deliberately optional (``None`` when unset), not a failure
     mode: real ADCS's own CT_FLAG_SUBJECT_REQUIRE_EMAIL hard-declines
@@ -463,7 +478,7 @@ def lookup_user_ad_identity(sam_account_name):
         conn = _connect(config)
     except Exception as e:
         logger.warning("AD Connector: bind failed during user lookup: %s", e)
-        return None
+        return UNREACHABLE
 
     try:
         safe_sam = escape_filter_chars(sam_account_name)
@@ -485,7 +500,7 @@ def lookup_user_ad_identity(sam_account_name):
         return {'dn_components': dn_components, 'upn': upn, 'mail': mail}
     except Exception as e:
         logger.warning("AD Connector: user identity lookup failed: %s", e)
-        return None
+        return UNREACHABLE
     finally:
         try:
             conn.unbind()
@@ -516,10 +531,10 @@ def is_member_of_group(sam_account_name, group):
     ADCS Enroll ACL evaluates a principal's full token group list rather
     than only direct membership.
 
-    Fails closed to ``False`` on every failure mode -- connector not
-    configured/disabled, unreachable, bind failure, group not found, or
-    account not found/not a member. Never raises. Callers must treat
-    ``False`` as "deny", not "skip the check" -- this is a security gate,
+    Fails closed to ``False`` -- connector not configured/disabled, group not
+    found, or account not found/not a member -- and to the falsy ``UNREACHABLE``
+    when no DC binds or the search fails. Never raises. Callers must treat
+    either as "deny", not "skip the check" -- this is a security gate,
     unlike the subject-derivation lookups above which fail closed to a
     softer "can't derive a subject, fall through to normal rejection".
     """
@@ -538,7 +553,7 @@ def is_member_of_group(sam_account_name, group):
         conn = _connect(config)
     except Exception as e:
         logger.warning("AD Connector: bind failed during group membership check: %s", e)
-        return False
+        return UNREACHABLE
 
     try:
         if _looks_like_dn(group):
@@ -566,7 +581,7 @@ def is_member_of_group(sam_account_name, group):
         return bool(conn.entries)
     except Exception as e:
         logger.warning("AD Connector: group membership check failed: %s", e)
-        return False
+        return UNREACHABLE
     finally:
         try:
             conn.unbind()

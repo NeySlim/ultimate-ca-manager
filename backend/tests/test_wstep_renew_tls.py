@@ -771,6 +771,7 @@ def test_legacy_certificate_is_refused_when_the_ca_offers_no_template(app, templ
         db.session.commit()
         _template, _extra, _issued, err = wstep_service._renewal_template(db.session.get(CA, ca_id), renewed, csr)
     assert err == 'This CA offers no certificate template'
+    assert isinstance(err, wstep_service.ServerError)
 
 
 def test_renewal_may_ask_for_what_xcep_advertised(app, templated_ca):

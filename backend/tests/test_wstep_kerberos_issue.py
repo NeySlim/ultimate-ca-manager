@@ -621,8 +621,8 @@ class TestEnrollAcl:
                 ISSUE_URL, data=_build_rst(csr),
                 headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
             )
-            assert r.status_code == 400
-            assert b'This CA offers no certificate template' in r.data, r.data
+            assert r.status_code == 500
+            assert _fault_text_and_code(r.data) == ('This CA offers no certificate template', 's:Receiver')
         finally:
             _clear_acl_template(app)
 
@@ -648,7 +648,11 @@ class TestEnrollAcl:
                 ISSUE_URL, data=_build_rst(csr),
                 headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
             )
-            assert r.status_code == 400
+            # Denied all the same, but as the server's failure (SOAP env:Receiver), not the requester's
+            assert r.status_code == 500
+            assert _fault_text_and_code(r.data) == (
+                'The directory could not be reached to check enrollment rights', 's:Receiver')
+            assert b'DC unreachable' not in r.data
         finally:
             _clear_acl_template(app)
 
@@ -773,3 +777,28 @@ def test_an_unreachable_directory_is_a_receiver_fault(client, app, wstep_kerbero
     assert fault.find(f'.//{{{SOAP_NS}}}Text').text == (
         'Could not resolve requester identity for strong certificate mapping')
     assert fault.find(f'{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text == 's:Receiver'
+
+
+def _fault_text_and_code(data):
+    fault = etree.fromstring(data).find(f'.//{{{SOAP_NS}}}Fault')
+    return (fault.find(f'.//{{{SOAP_NS}}}Text').text,
+            fault.find(f'{{{SOAP_NS}}}Code/{{{SOAP_NS}}}Value').text)
+
+
+def test_a_naked_request_the_directory_cannot_answer_is_a_receiver_fault(
+        client, app, wstep_kerberos_config, monkeypatch):
+    """GPO autoenrollment with no DC bound: the CA, not the computer, failed to build the subject."""
+    _configure_ad_connector(app)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result())
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+    monkeypatch.setattr(ad_lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('DC unreachable')))
+    csr, _key = _make_naked_csr()
+    r = client.post(ISSUE_URL, data=_build_rst(csr),
+                    headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    assert r.status_code == 500
+    assert _fault_text_and_code(r.data) == (
+        'The directory that builds the certificate subject could not be reached', 's:Receiver')
+    assert b'DC unreachable' not in r.data

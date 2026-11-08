@@ -141,6 +141,20 @@ def test_a_subject_the_directory_cannot_build_is_refused(app, subject_ca, direct
     cert, err = _issue(app, ca_id, _csr('dc01.example.test', FORGED_SANS, [SERVER_AUTH]), MACHINE)
     assert cert is None
     assert err == 'The certificate subject is built from Active Directory, which could not resolve the requester'
+    assert not isinstance(err, wstep_service.ServerError)
+
+
+@pytest.mark.parametrize('principal,naked', [(MACHINE, False), (MACHINE, True), (USER, False), (USER, True)])
+def test_a_directory_that_cannot_answer_is_the_server_s_failure(app, subject_ca, directory, principal, naked):
+    """Not found stays the request's refusal; no DC bound is a ServerError (env:Receiver)."""
+    directory['dns'] = directory['user'] = ad_lookup.UNREACHABLE
+    ca_id = subject_ca(f'Subject source unreachable CA {principal.split("@")[0].rstrip("$")} {naked}', MIXED)
+    csr = _csr() if naked else _csr('dc01.example.test', FORGED_SANS, [SERVER_AUTH if principal == MACHINE
+                                                                        else EMAIL])
+    cert, err = _issue(app, ca_id, csr, principal)
+    assert cert is None
+    assert isinstance(err, wstep_service.ServerError)
+    assert err == 'The directory that builds the certificate subject could not be reached'
 
 
 def test_an_unresolved_principal_gets_no_requested_subject(app, subject_ca, directory, monkeypatch):
@@ -248,6 +262,7 @@ def test_a_template_with_a_supplied_subject_and_no_eku_is_refused(app, subject_c
     assert cert is None
     assert err == ("Template 'Subject source no eku CA Any' lets the request name its subject "
                    'but configures no Extended Key Usage')
+    assert isinstance(err, wstep_service.ServerError)  # the template's configuration, not the request
 
 
 def test_a_naked_request_under_a_template_without_eku_is_still_derived(app, subject_ca, directory):

@@ -161,11 +161,12 @@ class TestLookupComputerDnsHostname:
         with app.app_context():
             assert lookup.lookup_computer_dns_hostname('WIN11$') is None
 
-    def test_bind_failure_returns_none(self, app, monkeypatch):
+    def test_bind_failure_returns_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('bind failed')))
         with app.app_context():
-            assert lookup.lookup_computer_dns_hostname('WIN11$') is None
+            result = lookup.lookup_computer_dns_hostname('WIN11$')
+            assert result is lookup.UNREACHABLE and not result
 
     def test_computer_not_found_returns_none(self, app, monkeypatch):
         _configure(None, app, enabled=True)
@@ -187,14 +188,14 @@ class TestLookupComputerDnsHostname:
         with app.app_context():
             assert lookup.lookup_computer_dns_hostname('WIN11$') is None
 
-    def test_search_exception_returns_none(self, app, monkeypatch):
+    def test_search_exception_returns_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(
             lookup, '_connect',
             lambda config: _FakeConnection(search_raises=RuntimeError('search failed')),
         )
         with app.app_context():
-            assert lookup.lookup_computer_dns_hostname('WIN11$') is None
+            assert lookup.lookup_computer_dns_hostname('WIN11$') is lookup.UNREACHABLE
 
     def test_success_returns_dns_hostname(self, app, monkeypatch):
         _configure(None, app, enabled=True)
@@ -202,6 +203,23 @@ class TestLookupComputerDnsHostname:
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[entry]))
         with app.app_context():
             assert lookup.lookup_computer_dns_hostname('WIN11$') == 'win11.hagland.domain'
+
+
+class TestLookupUserAdIdentityUnreachable:
+    def test_not_found_is_none_and_unreachable_is_told_apart(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[]))
+        with app.app_context():
+            assert lookup.lookup_user_ad_identity('alice') is None
+        monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('bind failed')))
+        with app.app_context():
+            assert lookup.lookup_user_ad_identity('alice') is lookup.UNREACHABLE
+        monkeypatch.setattr(
+            lookup, '_connect',
+            lambda config: _FakeConnection(search_raises=RuntimeError('search failed')),
+        )
+        with app.app_context():
+            assert lookup.lookup_user_ad_identity('alice') is lookup.UNREACHABLE
 
 
 class TestSidBytesToString:
@@ -354,11 +372,12 @@ class TestIsMemberOfGroup:
             assert lookup.is_member_of_group('alice', '') is False
             assert lookup.is_member_of_group('alice', None) is False
 
-    def test_bind_failure_returns_false(self, app, monkeypatch):
+    def test_bind_failure_returns_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(RuntimeError('bind failed')))
         with app.app_context():
-            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is False
+            result = lookup.is_member_of_group('alice', 'VPN-Enroll')
+            assert result is lookup.UNREACHABLE and not result
 
     def test_group_name_not_found_returns_false(self, app, monkeypatch):
         _configure(None, app, enabled=True)
@@ -401,14 +420,14 @@ class TestIsMemberOfGroup:
                 'alice', 'CN=VPN-Enroll,OU=Groups,DC=hagland,DC=domain'
             ) is True
 
-    def test_search_exception_returns_false(self, app, monkeypatch):
+    def test_search_exception_returns_unreachable(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         monkeypatch.setattr(
             lookup, '_connect',
             lambda config: _FakeConnection(search_raises=RuntimeError('search failed')),
         )
         with app.app_context():
-            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is False
+            assert lookup.is_member_of_group('alice', 'VPN-Enroll') is lookup.UNREACHABLE
 
     def test_machine_principal_sam_account_name(self, app, monkeypatch):
         """A trailing '$' on a machine account's sAMAccountName is passed

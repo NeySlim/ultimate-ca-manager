@@ -462,7 +462,7 @@ def _renewal_template(ca, renewed_cert, csr):
         if refusal:
             return None, [], None, refusal
         if matched is None and not _ca_templates(ca):
-            return None, [], None, 'This CA offers no certificate template'
+            return None, [], None, ServerError('This CA offers no certificate template')
         extra = _template_extra_ekus(matched)
         prior = _eku_oids(renewed_cert)
         if prior is None:
@@ -862,16 +862,21 @@ def _directory_subject(ca, template, csr, principal, sam_account_name):
     if not (naked or built_by_ca):
         return None, None, None
 
-    subject, san = None, None
+    subject, san, reached = None, None, True
     if sam_account_name and is_machine:
         dns_hostname = lookup.lookup_computer_dns_hostname(sam_account_name)
+        reached = dns_hostname is not lookup.UNREACHABLE
         if dns_hostname:
             subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, dns_hostname)])
             # MS-WCCE: the dNSHostName is the DNS SAN; a CSR without SAN gets it from the CN
             san = [x509.DNSName(dns_hostname)] if _san_values(csr) is not None else None
     elif sam_account_name and (source == 'directory' or _user_ad_derivation_enabled(ca)):
         subject, san = _user_directory_subject(sam_account_name)
+        reached, subject = subject is not lookup.UNREACHABLE, subject or None
 
+    # The requester is not at fault when the directory cannot answer: env:Receiver
+    if subject is None and not reached:
+        return None, None, ServerError('The directory that builds the certificate subject could not be reached')
     if subject is None and built_by_ca and not naked:
         if template is None and sam_account_name and not is_machine:
             return None, None, 'The request matches no certificate template whose subject it may supply'
@@ -881,10 +886,13 @@ def _directory_subject(ca, template, csr, principal, sam_account_name):
 
 
 def _user_directory_subject(sam_account_name):
-    """(subject, SAN) from the AD user object: its DN, its UPN, its mail when valid."""
+    """(subject, SAN) from the AD user object: its DN, its UPN, its mail when valid;
+    (``lookup.UNREACHABLE``, None) when the directory could not answer."""
     from services.ad_connector import lookup
 
     identity = lookup.lookup_user_ad_identity(sam_account_name)
+    if identity is lookup.UNREACHABLE:
+        return identity, None
     if not identity:
         return None, None
     # AD's mail attribute is optional -- validated (not just truthy) before use,
@@ -1028,7 +1036,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         return None, refusal
     # No active template offered (pins all off, or none active at all): nothing would carry an Enroll ACL
     if matched_template is None and not _ca_templates(ca):
-        return None, 'This CA offers no certificate template'
+        return None, ServerError('This CA offers no certificate template')
     template_oid = None
     if matched_template is not None:
         template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(csr))
@@ -1042,8 +1050,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         if (override_subject is None and matched_template is not None
                 and _subject_source(matched_template) == 'request'
                 and not _template_extra_ekus(matched_template)):
-            return None, (f"Template '{matched_template.name}' lets the request name its subject "
-                          'but configures no Extended Key Usage')
+            return None, ServerError(f"Template '{matched_template.name}' lets the request name "
+                                     'its subject but configures no Extended Key Usage')
     if override_subject is None and _is_naked_csr(csr):
         return None, 'CSR subject must include a non-empty CN or a SubjectAltName'
 
@@ -1074,17 +1082,20 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     # convenience lookup.
     if kerberos_principal:
         required_groups = _required_enroll_acl_groups(ca, matched_template)
-        if required_groups and (
-            not kerberos_sam_account_name
-            or not any(
-                lookup.is_member_of_group(kerberos_sam_account_name, group)
-                for group in required_groups
-            )
-        ):
+        allowed, unreachable = False, False
+        for group in (required_groups if kerberos_sam_account_name else []):
+            answer = lookup.is_member_of_group(kerberos_sam_account_name, group)
+            if answer:
+                allowed = True
+                break
+            unreachable = unreachable or answer is lookup.UNREACHABLE
+        if required_groups and not allowed:
             logger.warning(
                 "WSTEP Enroll ACL: principal %r denied (requires membership in one of %r)",
                 kerberos_principal, required_groups,
             )
+            if unreachable:
+                return None, ServerError('The directory could not be reached to check enrollment rights')
             return None, 'Requester is not authorized to enroll against this template'
 
     cert_type, template_ku = _template_profile(matched_template, csr)
