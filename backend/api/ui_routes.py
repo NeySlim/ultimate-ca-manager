@@ -55,7 +55,7 @@ def spa(path):
     # what keeps 'scep/' (the protocol endpoint) apart from 'scep-config' and
     # 'tsa' apart from 'tsa-config' — both React routes that must be served.
     from utils.public_endpoints import is_public_protocol_path
-    if path == 'acme' or path.startswith('acme/'):
+    if path.startswith('acme/'):
         abort(404)  # answered as an ACME problem, 405 where another method is served
     if path.startswith('api/') or is_public_protocol_path('/' + path):
         from utils.response import error_response

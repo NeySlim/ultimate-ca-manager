@@ -12,13 +12,14 @@ _DETAILS = {404: 'No ACME resource at this URL', 405: 'Method not allowed on thi
 
 
 def is_acme_path(path: str) -> bool:
-    return path == '/acme' or path.startswith('/acme/')
+    """Under the ACME server or proxy; /acme itself is the ACME page of the web UI."""
+    return path.startswith('/acme/')
 
 
 def _directory_url() -> str:
     """The directory of the server or proxy endpoint the path falls under."""
     path = request.path
-    if path != '/acme/proxy' and not path.startswith(_PROXY_PREFIX):
+    if not path.startswith(_PROXY_PREFIX):
         return f'{get_acme_public_origin(request)}/acme/directory'
     base = get_acme_proxy_public_base(request)
     segment = path[len(_PROXY_PREFIX):].split('/', 1)[0]

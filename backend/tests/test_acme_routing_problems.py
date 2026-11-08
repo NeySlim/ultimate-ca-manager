@@ -71,8 +71,10 @@ class TestProxy:
                         f'/acme/proxy/{slug_endpoint}/directory')
 
 
-def test_paths_outside_acme_are_left_alone(client):
-    resp = client.get('/acmefoo/bar')
+@pytest.mark.parametrize('path', ['/acmefoo/bar', '/acme'])
+def test_paths_outside_acme_are_left_alone(client, path):
+    """/acme is the ACME page of the web UI, served by the SPA."""
+    resp = client.get(path)
     assert resp.headers.get('Content-Type') != 'application/problem+json'
     assert not _index_links(resp)
 
