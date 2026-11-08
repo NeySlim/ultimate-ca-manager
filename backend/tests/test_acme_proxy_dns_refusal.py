@@ -1239,6 +1239,20 @@ class TestLocalFailureLeavesSharedRowsOpen:
             assert served['status'] == 'invalid'
             assert 'close_for_challenge_urls' not in [action for action, _args in _recorded_rows]
 
+    def test_failed_order_read_still_writes_the_live_sibling_row(self, app, monkeypatch,
+                                                                 _recorded_rows):
+        """Upstream pending: the row of the live order is written although T's view is invalid."""
+        with app.app_context():
+            _failed_order()
+            live = _order(client_jwk_thumbprint='U', order_url=f'{ORDER_URL}b',
+                          upstream_order_url=f'{ORDER_URL}b')
+            svc, _calls = _svc(monkeypatch, {AUTHZ_URL: _Resp(_authz())})
+            served, _ident = svc.get_authz(_b64(AUTHZ_URL), requester_thumbprint='T')
+            assert served['status'] == 'invalid'
+            [args] = [args for action, args in _recorded_rows
+                      if action == 'persist_expected_values']
+            assert [o.id for o in args[0]] == [live.id]
+
     def test_upstream_failure_still_closes_the_rows(self, app, monkeypatch, _recorded_rows):
         with app.app_context():
             _failed_order()
@@ -1339,7 +1353,6 @@ class TestRetryWithinTheLinger:
                 db.session.delete(model)
                 db.session.commit()
 
-
     def test_value_whose_deletion_is_long_overdue_is_written_again(self, app, monkeypatch):
         """A restart lost the deferred deletion: past one more delay the value is not trusted."""
         import time
@@ -1379,6 +1392,7 @@ class TestRetryWithinTheLinger:
                 AcmeClientOrder.query.filter_by(is_proxy_order=True).delete()
                 db.session.delete(model)
                 db.session.commit()
+
 
 class TestAbandonGuard:
     @pytest.mark.parametrize('state', ['submitted', 'failed'])
