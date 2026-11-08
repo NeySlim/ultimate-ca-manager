@@ -75,7 +75,8 @@ class TestProxy:
 def test_paths_outside_acme_are_left_alone(client, path):
     """/acme is the ACME page of the web UI, served by the SPA."""
     resp = client.get(path)
-    assert resp.headers.get('Content-Type') != 'application/problem+json'
+    assert resp.status_code == 200
+    assert resp.mimetype == 'text/html'
     assert not _index_links(resp)
 
 
