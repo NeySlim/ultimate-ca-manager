@@ -508,7 +508,9 @@ def create_certificate():
         final_san_upn = extract_upns_from_san_list(san_list)
 
         try:
-            validate_name_constraints(ca_cert, subject, san_list or None)
+            from utils.request_names import PERSON_CERT_TYPES
+            validate_name_constraints(ca_cert, subject, san_list or None,
+                                      cn_may_name_host=cert_type not in PERSON_CERT_TYPES)
         except ValueError as exc:
             logger.info(f"Certificate rejected by CA NameConstraints: {exc}")
             return error_response(str(exc), 400)

@@ -705,7 +705,9 @@ def _issue_approved_certificate(approval):
     # Enforce the CA chain's NameConstraints (RFC 5280 §4.2.1.10) on the
     # approved subject + SANs before signing.
     from services.trust_store.constraints_mixin import validate_name_constraints
-    validate_name_constraints(ca_cert, subject, san_list or None)
+    from utils.request_names import PERSON_CERT_TYPES
+    validate_name_constraints(ca_cert, subject, san_list or None,
+                              cn_may_name_host=cert_type not in PERSON_CERT_TYPES)
 
     # SKI/AKI
     builder = builder.add_extension(x509.SubjectKeyIdentifier.from_public_key(new_key.public_key()), critical=False)

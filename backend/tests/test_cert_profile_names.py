@@ -227,6 +227,38 @@ class TestNameImpliedByTheCn:
         assert r.status_code == 200, r.get_json()
         assert _san(_cert(app, csr_id)) == [x509.RFC822Name('jdoe@example.com')]
 
+    def test_a_dotted_person_cn_adds_no_dns_name_to_an_smime_certificate(
+            self, app, auth_client, create_ca):
+        """An S/MIME CN names a person: john.doe is no host, even under constraints."""
+        ca = create_ca(cn='Profile CN smime dotted NC CA', nameConstraintsPermitted=[
+            {'type': 'dns', 'value': 'example.com'}, {'type': 'email', 'value': 'example.com'}])
+        csr_id = _upload(auth_client, _csr(_cn('john.doe')))
+        r = _sign(auth_client, csr_id, ca['id'], cert_type='email',
+                  san_email=['john.doe@example.com'])
+        assert r.status_code == 200, r.get_json()
+        assert _san(_cert(app, csr_id)) == [x509.RFC822Name('john.doe@example.com')]
+
+    def test_the_form_and_its_approval_issue_a_dotted_person_cn(
+            self, app, auth_client, create_ca, create_user):
+        from tests.test_approval_on_sign_and_renew import _drop_policy, _json, _operator, _policy
+        ca = create_ca(cn='Profile CN smime form NC CA', nameConstraintsPermitted=[
+            {'type': 'dns', 'value': 'example.com'}, {'type': 'email', 'value': 'example.com'}])
+        body = {'ca_id': ca['id'], 'cn': 'john.doe', 'cert_type': 'email',
+                'san_email': ['john.doe@example.com']}
+        r = auth_client.post(CERTS, json=body)
+        assert r.status_code == 201, r.get_json()
+        assert _san(_cert(app, r.get_json()['data']['id'])) == [
+            x509.RFC822Name('john.doe@example.com')]
+        pid = _policy(app, ca['id'], 'profile-smime-dotted')
+        try:
+            r = _operator(app, create_user).post(CERTS, json=body)
+            approval_id = r.get_json()['data']['approval_id']
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve',
+                      {'comment': 'ok'})
+            assert r.get_json()['data']['certificate_issued'] is True, r.get_json()
+        finally:
+            _drop_policy(app, pid)
+
     @pytest.mark.parametrize('cert_type,cn', [
         ('client', 'jdoe'), ('email', 'jdoe'), ('code_signing', 'jdoe'),
         ('client', 'svc_backup.corp.example'), ('code_signing', 'svc_backup.corp.example'),

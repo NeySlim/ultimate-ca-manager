@@ -9,8 +9,9 @@ from typing import List, Optional, Tuple
 
 from cryptography import x509
 from utils.csr_extensions import csr_extensions
-from utils.request_names import (RequestRejected, cn_implied_names, cn_without_name_notice,
-                                 refuse_malformed_request, subject_email_names)
+from utils.request_names import (PERSON_CERT_TYPES, RequestRejected, cn_implied_names,
+                                 cn_without_name_notice, refuse_malformed_request,
+                                 subject_email_names)
 from utils.eku_validation import add_ocsp_nocheck_if_responder
 from cryptography.x509.oid import NameOID, ExtensionOID
 from cryptography.hazmat.primitives import serialization
@@ -763,7 +764,8 @@ class CSROperationsMixin:
                                  effective_sans, renewal_of)
 
         ConstraintsMixin._validate_name_constraints(
-            ca_cert, subject, effective_sans if effective_sans else None, renewal_of=renewal_of
+            ca_cert, subject, effective_sans if effective_sans else None, renewal_of=renewal_of,
+            cn_may_name_host=cert_type not in PERSON_CERT_TYPES,
         )
 
         # The CA can only vouch inside its own validity window, and the leaf
