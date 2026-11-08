@@ -87,7 +87,6 @@ def create_certificate():
     from utils.san_parse import cn_dns_name_error, parse_cert_san_payload
 
     san_buckets, san_err = parse_cert_san_payload(data)
-    san_err = san_err or cn_dns_name_error(data.get('cn'), data.get('cert_type', 'server'))
     if san_err:
         return error_response(san_err, 400)
     for key, values in san_buckets.items():
@@ -123,6 +122,9 @@ def create_certificate():
         san_refusal = bucket_san_refusal(template, data)
         if san_refusal:
             return error_response(san_refusal, 400)
+    cn_err = cn_dns_name_error(data.get('cn'), data.get('cert_type', 'server'), san_buckets, template)
+    if cn_err:
+        return error_response(cn_err, 400)
 
     # The request's own extensions win over the template's for the same OID;
     # the approval workflow stores the request's alone

@@ -108,6 +108,22 @@ class TestDnsNameSyntax:
         assert r.status_code == 400, r.get_json()
         assert 'my_host.example.com' in r.get_json()['message']
 
+    @pytest.mark.parametrize('extra', [{'san_dns': ['host.example.com']},
+                                       {'san_ip': ['192.0.2.10']}, 'ip_template'])
+    def test_form_issues_an_underscore_cn_that_names_nothing(
+            self, app, auth_client, create_ca, extra):
+        """As Sign CSR: a request with its own SAN, or a template without DNS, takes no name from the CN."""
+        if extra == 'ip_template':
+            from tests.test_template_san_types import _template
+            extra = {'template_id': _template(app, ['ip'])}
+        ca = create_ca(cn=f'Profile DNS form CN named CA {sorted(extra)[0]}')
+        r = auth_client.post(CERTS, json={'ca_id': ca['id'], 'cn': 'my_host.example.com',
+                                          'cert_type': 'server', **extra})
+        assert r.status_code == 201, r.get_json()
+        assert 'my_host.example.com' not in [
+            n.value for n in _san(_cert(app, r.get_json()['data']['id']))
+            if isinstance(n, x509.DNSName)]
+
     def test_form_client_with_an_underscore_cn_is_issued(self, auth_client, create_ca):
         ca = create_ca(cn='Profile DNS form CN client CA')
         r = auth_client.post(CERTS, json={'ca_id': ca['id'], 'cn': 'svc_backup.corp.example',
