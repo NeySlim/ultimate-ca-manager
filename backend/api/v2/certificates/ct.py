@@ -4,17 +4,21 @@ Certificates CT Routes
 """
 
 import json
+import re
 import base64
 import logging
 from flask import request
 from auth.unified import require_auth
-from models import Certificate, CA, SystemConfig, db
+from models import Certificate, SystemConfig, db
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
-from utils.ct_client import collect_scts
+from utils.ca_chain import issuer_chain, PRIMARY
+from utils.ct_client import collect_scts, _configured_log_urls
 from . import bp
 
 logger = logging.getLogger(__name__)
+
+_PEM_CERT = re.compile(r'-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----', re.S)
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>/submit-ct', methods=['POST'])
@@ -32,19 +36,18 @@ def submit_to_ct(cert_id):
         return error_response('Certificate Transparency is not enabled', 400)
 
     try:
-        ct_log_urls_config = SystemConfig.query.filter_by(key='ct_log_urls').first()
-        ct_log_urls = json.loads(ct_log_urls_config.value) if ct_log_urls_config and ct_log_urls_config.value else None
+        ct_log_urls = _configured_log_urls()
+        if ct_log_urls == []:
+            return error_response('No valid CT log configured', 400)
 
-        # Build cert chain
-        cert_pem = base64.b64decode(cert.crt).decode('utf-8')
-        chain = [cert_pem]
-
-        # Add issuer cert if available
-        if cert.ca_id:
-            ca = db.session.get(CA, cert.ca_id)
-            if ca and ca.crt:
-                ca_pem = base64.b64decode(ca.crt).decode('utf-8')
-                chain.append(ca_pem)
+        # add-chain takes one certificate per element (RFC 6962 §4.1): split an
+        # inline chain, else complete the leaf with its issuers up to the root.
+        chain = _PEM_CERT.findall(base64.b64decode(cert.crt).decode('utf-8'))
+        if not chain:
+            return error_response('Certificate has no PEM data', 400)
+        if len(chain) == 1:
+            # cert.ca is None for an orphan: issuer_chain gives [], the leaf goes alone.
+            chain += [link.pem.decode('ascii') for link in issuer_chain(cert.ca, PRIMARY)]
 
         scts = collect_scts(chain, ct_log_urls)
 
