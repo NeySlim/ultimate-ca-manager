@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 ROLE_PERMISSIONS = {
     'admin': ['*'],  # Full access
     'operator': [
+        'read:dashboard',
         'read:certificates', 'write:certificates',
         'read:user_certificates', 'write:user_certificates', 'delete:user_certificates',
         'read:cas', 'write:cas',
@@ -33,6 +34,7 @@ ROLE_PERMISSIONS = {
         'read:groups', 'write:groups',
     ],
     'auditor': [
+        'read:dashboard',
         'read:certificates',
         'read:user_certificates',
         'read:cas',
@@ -54,6 +56,7 @@ ROLE_PERMISSIONS = {
         'read:groups',
     ],
     'viewer': [
+        'read:dashboard',
         'read:certificates',
         'read:user_certificates',
         'read:cas',
@@ -159,6 +162,7 @@ CUSTOM_ROLE_GRANTABLE_PERMISSIONS = sorted({
     'read:certificates', 'write:certificates', 'delete:certificates',
     'read:crl', 'write:crl',
     'read:csrs', 'write:csrs', 'delete:csrs',
+    'read:dashboard',
     'read:est', 'write:est',
     'read:groups', 'write:groups', 'delete:groups',
     'read:hsm', 'delete:hsm',

@@ -15,6 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Sessions: on PostgreSQL without Redis, server-side sessions are stored in the database (migration 138) so a session opened on one node is valid on the others; expired rows are purged by the scheduler and every row is deleted after a restore.
 - HA preview: `UCM_HA=1` enables an HA preview: the node requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, refuses operations that only change the local host, and reports `ha`, `node_id` and `leader` in `/health`. Full high availability arrives in later releases. The Helm chart now probes readiness on `/health/ready` (503 in safe mode only with `UCM_HA=1`) and liveness on `/health/live`.
 - HA preview: one node runs the scheduled tasks, elected by a PostgreSQL advisory lock and replaced within seconds when its connection drops, or about a minute after its host vanishes; nodes heartbeat in `cluster_nodes` (reported under `cluster` in `/health`), "run now" works from any node, and startup migrations run on one node at a time (migration 141).
+- Dashboard: `GET /api/v2/dashboard/queue`, `/health`, `/compliance` and `/issuance` (scope `read:dashboard`, now held by every built-in role and grantable to groups) return the work queue, per-protocol health, compliance counters and issuances and in-place renewals per CA, computed in SQL without parsing certificates. Certificates gain `key_bits` and `sig_hash` columns, backfilled by migration 139.
 
 ### Fixed
 

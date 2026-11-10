@@ -108,7 +108,9 @@ SECTIONS: Dict[str, Section] = {
     'certificates': Section(
         model='models:Certificate',
         identity=('refid',),
-        exclude={**_SURROGATE},
+        exclude={**_SURROGATE,
+                 'key_bits': 'derived from crt on restore, by the listener on Certificate.crt',
+                 'sig_hash': 'derived from crt on restore, by the listener on Certificate.crt'},
         references={'template_id': 'certificate_templates', 'owner_group_id': 'groups',
                     'related_certificate_id': 'certificates'},
         custom=True,

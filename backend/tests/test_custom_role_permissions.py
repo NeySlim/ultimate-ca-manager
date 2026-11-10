@@ -214,16 +214,16 @@ class TestChainIsBounded:
 class TestStoredPermissionsAreKept:
     def test_a_save_keeps_an_ignored_permission(self, app, auth_client):
         with app.app_context():
-            role = CustomRole(name='Kept Ignored Probe', permissions=['*', 'read:dashboard'])
+            role = CustomRole(name='Kept Ignored Probe', permissions=['*', 'read:retired_widget'])
             db.session.add(role)
             db.session.commit()
             role_id = role.id
         r = auth_client.put(f'{ROLES}/{role_id}',
-                            data=json.dumps({'permissions': ['*', 'read:dashboard', 'read:certs']}),
+                            data=json.dumps({'permissions': ['*', 'read:retired_widget', 'read:certs']}),
                             content_type='application/json')
         assert r.status_code == 200, r.data
         data = json.loads(r.data)['data']
-        assert data['permissions'] == ['*', 'read:dashboard', 'read:certificates']
+        assert data['permissions'] == ['*', 'read:retired_widget', 'read:certificates']
         assert data['all_permissions'] == ['read:certificates']
 
     def test_a_save_cannot_add_a_reserved_permission(self, auth_client):

@@ -43,6 +43,18 @@ def _get_config(key, default=None):
     return row.value if row else default
 
 
+def renewed_by_responder_task(model=Certificate):
+    """SQL condition: *model* is bound as a CA's delegated responder and this task
+    renews it (it holds the key and ``ocsp_responder_auto_renew`` is unset or 'true')."""
+    from sqlalchemy import String, and_, cast, or_, select
+    bound = select(SystemConfig.id).where(
+        SystemConfig.key.like(f'{RESPONDER_KEY_PREFIX}%'), SystemConfig.value == cast(model.id, String)).exists()
+    switched_off = select(SystemConfig.id).where(
+        SystemConfig.key == 'ocsp_responder_auto_renew',
+        or_(SystemConfig.value.is_(None), SystemConfig.value != 'true')).exists()
+    return and_(bound, model.prv.isnot(None), model.prv != '', ~switched_off)
+
+
 def _renew_threshold_days(lifetime_days: int) -> int:
     """Days-before-expiry threshold, bounded so short-lived responders don't
     renew immediately after issuance (never earlier than 1/3 of lifetime left).

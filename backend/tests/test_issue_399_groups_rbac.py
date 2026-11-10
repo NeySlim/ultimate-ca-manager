@@ -30,8 +30,8 @@ def _check(rows):
     assert rows[1] == ([], _migration().ADMIN_GROUP_NOW)
     assert rows[2] == (['read:certificates', 'write:certificates'], 'ops')
     assert rows[3] == (['read:cas'], 'already a list')
-    # read:dashboard is not grantable: kept, it would make every save of the group fail.
-    assert rows[5] == (['read:audit', 'read:certificates', 'read:cas'], 'auditors')
+    # read:dashboard is held by built-in roles, hence grantable to groups: kept.
+    assert rows[5] == (['read:audit', 'read:dashboard', 'read:certificates', 'read:cas'], 'auditors')
 
 
 def test_sqlite_decodes_string_permissions():
