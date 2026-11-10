@@ -955,7 +955,7 @@ def _user_directory_subject(sam_account_name):
 
 
 def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos_principal=None,
-          outer_signed_data=None, gate=None):
+          outer_signed_data=None, gate=None, on_stored=None):
     """UsernamePassword- or Kerberos-bound initial enrollment. Returns
     (cert_pem, error).
 
@@ -1154,7 +1154,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             template_ekus=_template_extra_ekus(matched_template) or None,
             policy_template_id=getattr(matched_template, 'id', None),
             template_id=getattr(matched_template, 'id', None),
-            cert_type=cert_type, template_key_usage=template_ku,
+            cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
         )
     except PolicyViolation as e:
         logger.warning('WSTEP issue refused by policy: %s', e)
@@ -1340,7 +1340,8 @@ def _renewable_certificate(ca, cert):
     return db_cert, None
 
 
-def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop, gate=None):
+def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop, gate=None,
+                  on_stored=None):
     """Issue the renewal once the caller has authenticated ``signing_cert``."""
     err = _validate_csr(csr, require_pop=require_pop)
     if err:
@@ -1374,7 +1375,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
             template_ekus=issued_ekus,
             policy_template_id=getattr(matched_template, 'id', None),
             template_id=getattr(matched_template, 'id', None),
-            cert_type=cert_type, template_key_usage=template_ku,
+            cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
         )
     except AlreadySuperseded:
         return None, 'Signing certificate has been superseded by a newer one'

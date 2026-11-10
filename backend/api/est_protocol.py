@@ -653,14 +653,14 @@ def _est_identity(username):
     return f'basic:{username or ""}'
 
 
-def sign_est_csr(ca, csr, *, renewal_of=None, supersedes=None):
+def sign_est_csr(ca, csr, *, renewal_of=None, supersedes=None, on_stored=None):
     """Sign an EST request (direct or approved): ``(cert_pem, serial)``."""
     from models import SystemConfig
     validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
     days = int(validity_days.value) if validity_days else 365
     return CAService.sign_csr_from_crypto(
         ca=ca, csr=csr, validity_days=days, source='est', cert_type='device_cert',
-        renewal_of=renewal_of, supersedes=supersedes,
+        renewal_of=renewal_of, supersedes=supersedes, on_stored=on_stored,
     )
 
 

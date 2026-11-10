@@ -346,3 +346,33 @@ def test_a_key_generation_refused_at_issuance_closes_the_request(app, client, au
         assert status == 'rejected' and data['closed_reason'] == 'Refused at issuance'
         _held(_post_csr(client, 'serverkeygen', csr, headers=_basic_auth()))
         assert [r[1] for r in requests_of(app, pid, 'est_enroll')] == ['rejected', 'pending']
+
+
+def _retry_while_linking(app, monkeypatch, retry):
+    """Run *retry* (a fresh client's request) right after the approved
+    request is issued and before the approval route goes on: what the
+    client would hear at that instant."""
+    from services import protocol_approval
+    real = protocol_approval.issue_approved
+    heard = []
+
+    def issue_then_retry(approval, data):
+        outcome = real(approval, data)
+        heard.append(retry(app.test_client()))
+        return outcome
+    monkeypatch.setattr(protocol_approval, 'issue_approved', issue_then_retry)
+    return heard
+
+
+def test_an_approval_is_never_seen_without_its_certificate(app, client, auth_client, est_config,
+                                                           monkeypatch):
+    with approval_policy(app, est_config['id'], 'est-held-linking') as pid:
+        csr, _ = _make_csr(common_name='linking.est-approval.test')
+        _held(_enroll(client, csr))
+        (approval_id, *_), = requests_of(app, pid, 'est_enroll')
+        heard = _retry_while_linking(app, monkeypatch, lambda c: _enroll(c, csr))
+        approve(auth_client, approval_id)
+        assert heard[0].data != b'Certificate withdrawn'
+        assert _cert_of(heard[0]).public_key() == csr.public_key()
+        (_id, status, data, cert_id), = requests_of(app, pid, 'est_enroll')
+        assert status == 'approved' and cert_id is not None and data['delivered_at']

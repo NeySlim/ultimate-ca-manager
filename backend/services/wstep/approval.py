@@ -60,11 +60,13 @@ def _issue(approval, data):
         if not err:
             # The proof of possession was checked when the request came in
             cert_pem, err = wstep_service._sign_renewal(
-                ca, signing_cert, db_cert, csr, _validity_days(), 'wstep', require_pop)
+                ca, signing_cert, db_cert, csr, _validity_days(), 'wstep', require_pop,
+                on_stored=protocol_approval.linker(approval))
     else:
         cert_pem, err = wstep_service.issue(
             ca, csr.public_bytes(Encoding.DER), _validity_days(), require_pop=require_pop,
-            kerberos_principal=data.get('kerberos_principal'))
+            kerberos_principal=data.get('kerberos_principal'),
+            on_stored=protocol_approval.linker(approval))
     if err:
         if isinstance(err, wstep_service.ServerError):
             raise ValueError(str(err))

@@ -27,7 +27,8 @@ def _issue(approval, data):
         supersedes, status = issued_certificate_status(ca, renewal_of)
         if status != OK:
             raise ProtocolRequestGone(f'The certificate being renewed can no longer be renewed ({status})')
-    pem, _serial = sign_est_csr(ca, csr, renewal_of=renewal_of, supersedes=supersedes)
+    pem, _serial = sign_est_csr(ca, csr, renewal_of=renewal_of, supersedes=supersedes,
+                                on_stored=protocol_approval.linker(approval))
     serial = x509.load_pem_x509_certificate(pem.encode()).serial_number
     row = Certificate.query.filter_by(serial_number=str(serial), caref=ca.refid).first()
     return {'id': row.id if row is not None else None, 'cn': data.get('cn'), 'protocol': 'est',

@@ -221,3 +221,33 @@ def test_renewal_approved_then_revoked_is_refused(app, client, auth_client, wste
         assert invalid == 'true' and echoed == request_id
         (_id, status, data, _cert), = requests_of(app, pid, 'wstep_request')
         assert status == 'rejected' and data['closed_reason'] == 'Renewed certificate revoked'
+
+
+def test_an_approval_is_never_seen_without_its_certificate(app, client, auth_client, wstep_config,
+                                                           monkeypatch):
+    from tests.test_protocol_approval_est import _retry_while_linking
+    with approval_policy(app, wstep_config['id'], 'wstep-held-linking') as pid:
+        csr, _ = _make_csr(common_name='linking.wstep-approval.test')
+        request_id = _pending(_issue_rst(client, csr))
+        (approval_id, *_), = requests_of(app, pid, 'wstep_request')
+        heard = _retry_while_linking(app, monkeypatch, lambda c: _query(c, request_id))
+        approve(auth_client, approval_id)
+        assert heard[0].status_code == 200, heard[0].data
+        assert _issued_cert_from_rstr(heard[0].data).public_key() == csr.public_key()
+        (_id, status, _data, cert_id), = requests_of(app, pid, 'wstep_request')
+        assert status == 'approved' and cert_id is not None
+
+
+def test_a_renewal_approval_is_never_seen_without_its_certificate(app, client, auth_client, wstep_config,
+                                                                  monkeypatch):
+    from tests.test_protocol_approval_est import _retry_while_linking
+    old_cert, old_key = _issue(app, wstep_config['id'], 'linking-renew.wstep-approval.test')
+    body = _rst(_cmc_renewal(_renewal_csr(old_cert, old_key), [(old_key, old_cert)]))
+    with approval_policy(app, wstep_config['id'], 'wstep-held-linking-renew') as pid:
+        request_id = _pending(_post(client, body, tls_cert=old_cert))
+        (approval_id, *_), = requests_of(app, pid, 'wstep_request')
+        heard = _retry_while_linking(
+            app, monkeypatch, lambda c: _post(c, _query_rst(request_id), tls_cert=old_cert))
+        approve(auth_client, approval_id)
+        assert heard[0].status_code == 200, heard[0].data
+        assert _issued_cert_from_rstr(heard[0].data).subject == old_cert.subject

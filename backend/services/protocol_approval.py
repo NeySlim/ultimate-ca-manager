@@ -202,6 +202,14 @@ def gate_protocol_issuance(protocol: str, *, ca, template_id=None, cn=None, san_
         raise ApprovalGateUnavailable('The request could not be queued for approval') from e
 
 
+def linker(approval):
+    """The ``on_stored`` hook of an approved issuance: the certificate is
+    linked in the commit that stores it, never seen approved without it."""
+    def link(row):
+        approval.certificate_id = row.id
+    return link
+
+
 def mark_delivered(approval) -> None:
     """Record that the client heard the decision: its next request is a new one."""
     data = request_data(approval)

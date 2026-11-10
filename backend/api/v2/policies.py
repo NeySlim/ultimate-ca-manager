@@ -320,7 +320,8 @@ def _issue_approved_protocol_request(approval, data):
     deferred one (server-generated key) is issued at the client's next request."""
     from services import protocol_approval
     outcome = protocol_approval.issue_approved(approval, data)
-    if outcome.get('id') is not None:
+    # EST and WSTEP link in the commit that stores the certificate
+    if outcome.get('id') is not None and approval.certificate_id != outcome['id']:
         _link_approval(approval, outcome['id'])
     logger.info(f"{approval.request_type} request issued via approval #{approval.id}")
     return outcome
