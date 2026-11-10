@@ -90,6 +90,8 @@ def _of_strength(family, bits):
 
 # What a leaf key is when nothing (request, template, issuer) names one; the policies bound it
 BASELINE_ISSUE_KEY = 'RSA-2048'
+# Key type of a new ACME account when the request names none (not an issuance key)
+DEFAULT_ACME_ACCOUNT_KEY_TYPE = 'RSA-2048'
 _ISSUE_KEY_FALLBACKS = ('RSA-3072', 'EC-P256', 'EC-P384')
 
 
