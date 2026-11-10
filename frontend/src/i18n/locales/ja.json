@@ -603,7 +603,10 @@
     "samlLoginExpired": "このサインインは期限切れか、別のタブまたはブラウザーで開始されました。このページからやり直してください。",
     "ssoUsernameConflict": "このサインインは、ローカルまたは別の ID にリンクされた既存のアカウントと一致します。管理者にアカウントのリンクを依頼してください。",
     "ssoUnmapped": "アクセスが拒否されました。このサインインプロバイダーのロールマッピングルールのいずれもあなたのアカウントに一致しません。管理者に連絡してください。",
-    "samlLogoutRejected": "ID プロバイダーからのサインアウト要求を検証できませんでした。サインインしたままです。"
+    "samlLogoutRejected": "ID プロバイダーからのサインアウト要求を検証できませんでした。サインインしたままです。",
+    "tooManyAttempts": "Too many failed attempts",
+    "retryAfterSeconds": "Try again in {{seconds}} seconds.",
+    "retryLater": "Try again later."
   },
   "dashboard": {
     "goodMorning": "おはようございます",
@@ -5992,6 +5995,37 @@
     "haLeader": "leader",
     "haFollower": "follower",
     "haNodes": "Nodes: {{count}}",
-    "haLate": "Late: {{count}}"
+    "haLate": "Late: {{count}}",
+    "theme": {
+      "menu": "Theme"
+    },
+    "bell": {
+      "title": "Notifications",
+      "unread": "{{count}} unread",
+      "allRead": "All read",
+      "markAllRead": "Mark all read",
+      "markRead": "Mark read",
+      "open": "Open",
+      "new": "New",
+      "empty": "Nothing needs your attention.",
+      "kinds": {
+        "acme_order_failed": "ACME order failed",
+        "acme_client_renewal_failed": "ACME renewal failed",
+        "approval_pending": "Approval pending",
+        "scep_request_pending": "SCEP request pending",
+        "key_recovery_pending": "Key recovery pending",
+        "crl_due": "CRL due",
+        "crl_missing": "CRL missing",
+        "manual_renewal_due": "Manual renewal due",
+        "client_renewal_overdue": "Client renewal overdue",
+        "auto_renewal_blocked": "Automatic renewal blocked",
+        "renewal_declined": "Renewal declined",
+        "ca_expiring": "CA expiring",
+        "backup_create": "Backup failed",
+        "backup_restore": "Restore failed",
+        "session_revoke": "Session revoked",
+        "session_revoke_all": "Sessions revoked"
+      }
+    }
   }
 }

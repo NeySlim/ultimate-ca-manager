@@ -1,23 +1,17 @@
 /**
- * Account menu: identity, sign-in method, account and settings, the theme and
- * language choices the old sidebar menu carried, and sign out.
+ * Account menu: identity, sign-in method, account and settings, the language
+ * choice the old sidebar menu carried, and sign out. The theme lives in ThemeMenu.
  */
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link, useNavigate } from 'react-router-dom'
 import { UserCircle, Gear, SignOut, Check } from '@phosphor-icons/react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useTheme } from '../../contexts/ThemeContext'
 import { persistPreference } from '../../stores/userPreferencesStore'
 import { isVisible, moduleById } from '../../navigation/registry'
 import { languages } from '../../i18n'
 import { useDisclosure, moveFocus } from './useDisclosure'
 
-const MODES = [
-  { id: 'system', labelKey: 'settings.followSystem' },
-  { id: 'dark', labelKey: 'settings.dark' },
-  { id: 'light', labelKey: 'settings.light' },
-]
 const METHOD_KEYS = {
   password: 'shell.method.password',
   mtls: 'shell.method.mtls',
@@ -31,7 +25,6 @@ export function UserMenu({ can }) {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const { user, logout, authMethod } = useAuth()
-  const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
   const { open, setOpen, close, buttonRef, rootProps } = useDisclosure()
   const panelRef = useRef(null)
   const username = user?.username || 'User'
@@ -93,27 +86,6 @@ export function UserMenu({ can }) {
           </Link>
         )}
 
-        <div role="group" aria-label={t('settings.colorTheme')} className="shell-pop-group">
-          <span className="shell-pop-label">{t('settings.colorTheme')}</span>
-          {themes.map(theme => (
-            <button key={theme.id} type="button" className="shell-pop-item" aria-pressed={themeFamily === theme.id}
-              onClick={() => setThemeFamily(theme.id)}>
-              <span className="shell-swatch" style={{ background: theme.accent }} aria-hidden="true" />
-              <span className="shell-grow">{t(theme.nameKey)}</span>
-              {themeFamily === theme.id && <Check size={14} weight="bold" aria-hidden="true" />}
-            </button>
-          ))}
-        </div>
-        <div role="group" aria-label={t('settings.appearanceMode')} className="shell-pop-group">
-          <span className="shell-pop-label">{t('settings.appearanceMode')}</span>
-          {MODES.map(opt => (
-            <button key={opt.id} type="button" className="shell-pop-item" aria-pressed={mode === opt.id}
-              onClick={() => setMode(opt.id)}>
-              <span className="shell-grow">{t(opt.labelKey)}</span>
-              {mode === opt.id && <Check size={14} weight="bold" aria-hidden="true" />}
-            </button>
-          ))}
-        </div>
         <div role="group" aria-label={t('settings.language')} className="shell-pop-group">
           <span className="shell-pop-label">{t('settings.language')}</span>
           {languages.map(l => (

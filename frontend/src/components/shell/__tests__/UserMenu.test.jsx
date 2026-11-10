@@ -6,8 +6,6 @@ import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
 import { ROLES, canFor, tStub } from './shellTestUtils'
 
 const logout = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
-const setThemeFamily = vi.hoisted(() => vi.fn())
-const setMode = vi.hoisted(() => vi.fn())
 const changeLanguage = vi.hoisted(() => vi.fn())
 const persistPreference = vi.hoisted(() => vi.fn())
 const auth = vi.hoisted(() => ({ method: 'password' }))
@@ -18,12 +16,6 @@ vi.mock('react-i18next', () => ({
 }))
 vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { username: 'probe', role: 'operator' }, logout, authMethod: auth.method }),
-}))
-vi.mock('../../../contexts/ThemeContext', () => ({
-  useTheme: () => ({
-    themeFamily: 'atelier', setThemeFamily, mode: 'dark', setMode,
-    themes: [{ id: 'atelier', nameKey: 'themes.atelier', accent: 'x' }, { id: 'aurore', nameKey: 'themes.aurore', accent: 'y' }],
-  }),
 }))
 vi.mock('../../../stores/userPreferencesStore', () => ({ persistPreference }))
 
@@ -74,16 +66,6 @@ describe('UserMenu', () => {
     await user.click(trigger())
     expect(screen.queryByRole('link', { name: 'common.settings' })).toBeNull()
     expect(screen.getByRole('link', { name: 'common.account' })).toBeVisible()
-  })
-
-  it('sets the theme family and the mode', async () => {
-    const user = setup()
-    await user.click(trigger())
-    await user.click(screen.getByRole('button', { name: /themes\.aurore/ }))
-    expect(setThemeFamily).toHaveBeenCalledWith('aurore')
-    await user.click(screen.getByRole('button', { name: /settings\.light/ }))
-    expect(setMode).toHaveBeenCalledWith('light')
-    expect(screen.getByRole('button', { name: /themes\.atelier/ })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('changes the language and saves it with the preferences', async () => {

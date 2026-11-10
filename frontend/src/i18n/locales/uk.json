@@ -605,7 +605,10 @@
     "samlLoginExpired": "Цей вхід застарів або був розпочатий в іншій вкладці чи браузері. Почніть знову з цієї сторінки.",
     "ssoUsernameConflict": "Цей вхід відповідає наявному обліковому запису, локальному або пов'язаному з іншою ідентичністю. Попросіть адміністратора пов'язати облікові записи.",
     "ssoUnmapped": "Доступ заборонено: жодне правило зіставлення ролей цього постачальника не розпізнає ваш обліковий запис. Зверніться до адміністратора.",
-    "samlLogoutRejected": "Не вдалося перевірити запит на вихід від постачальника ідентичності; ви досі в системі."
+    "samlLogoutRejected": "Не вдалося перевірити запит на вихід від постачальника ідентичності; ви досі в системі.",
+    "tooManyAttempts": "Too many failed attempts",
+    "retryAfterSeconds": "Try again in {{seconds}} seconds.",
+    "retryLater": "Try again later."
   },
   "dashboard": {
     "goodMorning": "Доброго ранку",
@@ -6057,6 +6060,37 @@
     "haLeader": "leader",
     "haFollower": "follower",
     "haNodes": "Nodes: {{count}}",
-    "haLate": "Late: {{count}}"
+    "haLate": "Late: {{count}}",
+    "theme": {
+      "menu": "Theme"
+    },
+    "bell": {
+      "title": "Notifications",
+      "unread": "{{count}} unread",
+      "allRead": "All read",
+      "markAllRead": "Mark all read",
+      "markRead": "Mark read",
+      "open": "Open",
+      "new": "New",
+      "empty": "Nothing needs your attention.",
+      "kinds": {
+        "acme_order_failed": "ACME order failed",
+        "acme_client_renewal_failed": "ACME renewal failed",
+        "approval_pending": "Approval pending",
+        "scep_request_pending": "SCEP request pending",
+        "key_recovery_pending": "Key recovery pending",
+        "crl_due": "CRL due",
+        "crl_missing": "CRL missing",
+        "manual_renewal_due": "Manual renewal due",
+        "client_renewal_overdue": "Client renewal overdue",
+        "auto_renewal_blocked": "Automatic renewal blocked",
+        "renewal_declined": "Renewal declined",
+        "ca_expiring": "CA expiring",
+        "backup_create": "Backup failed",
+        "backup_restore": "Restore failed",
+        "session_revoke": "Session revoked",
+        "session_revoke_all": "Sessions revoked"
+      }
+    }
   }
 }

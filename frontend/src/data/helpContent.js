@@ -75,7 +75,26 @@ export const helpContent = {
         title: 'Account menu',
         icon: Users,
         items: [
-          { label: 'Account', text: 'Your profile and settings, theme, appearance mode, language and sign out' },
+          { label: 'Account', text: 'Your profile and settings, language and sign out' },
+        ]
+      },
+      {
+        title: 'Theme menu',
+        icon: Stack,
+        items: [
+          { label: 'Choose', text: 'The sun or moon button sets the color theme and the mode; System follows your device, and the icon shows the mode applied' },
+          { label: 'Keyboard', text: 'Up Arrow and Down Arrow loop over the options; Escape or Tab closes the menu and returns to the button' },
+          { label: 'Saved', text: 'The choice is the one under Settings, Appearance, and follows you to every browser' },
+        ]
+      },
+      {
+        title: 'Notifications',
+        icon: Stack,
+        items: [
+          { label: 'Bell', text: 'The count is the number of unread items in the panel: critical items and approvals from the dashboard queue, and failed backups or revoked sessions from the audit log' },
+          { label: 'Rights', text: 'You only see items from sources you may read; a source you have no right on shows nothing' },
+          { label: 'Read', text: 'Mark an item or all of them read; the marks are saved with your preferences, and an item that resolves leaves the panel' },
+          { label: 'Open', text: 'Open goes to the page of the item; nothing is approved or retried from the panel' },
         ]
       },
     ],

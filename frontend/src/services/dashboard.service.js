@@ -30,6 +30,11 @@ export const dashboardService = {
     return apiClient.get(`/dashboard/certificate-trend${buildQueryString({ days })}`)
   },
 
+  /** Work queue: `kinds` restricts the items (repeated `kind`), `counts` keeps the full totals. */
+  async getQueue(kinds = []) {
+    return apiClient.get(`/dashboard/queue${buildQueryString({ kind: kinds })}`)
+  },
+
   async getSystemStatus() {
     return apiClient.get('/dashboard/system-status')
   }

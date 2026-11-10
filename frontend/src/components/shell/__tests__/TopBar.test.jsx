@@ -16,8 +16,10 @@ vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { username: 'probe', role: 'viewer' }, logout, authMethod: 'password' }),
 }))
 vi.mock('../../../contexts/ThemeContext', () => ({
-  useTheme: () => ({ themeFamily: 'atelier', setThemeFamily: vi.fn(), mode: 'dark', setMode: vi.fn(), themes: [] }),
+  useTheme: () => ({ themeFamily: 'atelier', setThemeFamily: vi.fn(), mode: 'dark', setMode: vi.fn(), resolvedMode: 'dark', themes: [] }),
 }))
+vi.mock('../../../services/dashboard.service', () => ({ dashboardService: { getQueue: vi.fn().mockResolvedValue({ data: { items: [] } }) } }))
+vi.mock('../../../services/audit.service', () => ({ default: { getLogs: vi.fn().mockResolvedValue({ data: [] }) } }))
 vi.mock('../../WebSocketIndicator', () => ({ WebSocketIndicator: () => <span data-testid="ws" /> }))
 vi.mock('../../../services', () => ({ certificatesService: { getStats } }))
 
@@ -67,10 +69,10 @@ describe('TopBar', () => {
     expect(audit).toHaveAttribute('aria-current', 'page')
   })
 
-  it('tabs through the bar in reading order: brand, pages, pins, Modules, search, help, account', async () => {
+  it('tabs through the bar in reading order: brand, pages, pins, Modules, search, help, theme, bell, account', async () => {
     const { user } = setup({ pins: ['users'] })
     const seen = []
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 12; i++) {
       await user.tab()
       const el = document.activeElement
       seen.push(el.getAttribute('data-module') || el.getAttribute('aria-label') || el.textContent)
@@ -78,7 +80,8 @@ describe('TopBar', () => {
     // The phone picker is display:none on desktop (CSS, not applied in jsdom)
     expect(seen.filter(l => l !== 'shell.navigate')).toEqual([
       'UCM', 'dashboard', 'certificates', 'cas', 'users',
-      'shell.modules', 'shell.search', 'common.help', 'common.account: probe',
+      'shell.modules', 'shell.search', 'common.help', 'shell.theme.menu', 'shell.bell.title: shell.bell.allRead',
+      'common.account: probe',
     ])
   })
 
