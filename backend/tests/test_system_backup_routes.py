@@ -914,3 +914,88 @@ class TestRestoreUploadCeiling:
         assert response.status_code == 200, response.data
         assert 'restore_limit_warning' not in response.get_json()['data']
 
+
+class TestAV4ArchiveIsNotBoundByTheUploadCeiling:
+    RESTORE_URLS = ('/api/v2/system/restore', '/api/v2/settings/backup/restore')
+
+    @pytest.fixture
+    def empty_v4(self, app):
+        """A real v4 archive carrying no section: restoring it changes nothing."""
+        from services.backup.manifest import SECTIONS
+        from services.backup_service import BackupService
+        with app.app_context():
+            return BackupService().create_backup(
+                PASSWORD, include={name: False for name in SECTIONS})
+
+    def test_a_v4_above_both_ceilings_is_restored(
+            self, app, auth_client, empty_v4, invalidations, monkeypatch):
+        from services.backup import storage
+        assert empty_v4[4] == 4
+        monkeypatch.setitem(app.config, 'MAX_CONTENT_LENGTH', len(empty_v4) // 2)
+        monkeypatch.setattr(storage, 'restore_upload_limit', lambda: len(empty_v4) // 4)
+        for url in self.RESTORE_URLS:
+            response = _restore(auth_client, empty_v4, url=url)
+            assert response.status_code == 200, (url, response.data)
+            assert 'carried no data' in _message(response)
+
+    def test_the_same_size_as_v3_is_still_refused_naming_the_setting(
+            self, app, auth_client, empty_v4, fake_restore, monkeypatch):
+        from services.backup import storage
+        legacy = b'UCMB\x03' + empty_v4[5:]
+        monkeypatch.setattr(storage, 'restore_upload_limit', lambda: 64)
+        monkeypatch.setattr(storage, 'RESTORE_FORM_MARGIN', 64)
+        calls, _ = fake_restore
+        for url in self.RESTORE_URLS:
+            response = _restore(auth_client, legacy, url=url)
+            assert response.status_code == 413, (url, response.data)
+            assert 'BACKUP_MAX_UPLOAD_MB' in _message(response)
+        assert calls == []
+
+    def test_backup_max_archive_mb_bounds_a_v4(
+            self, auth_client, empty_v4, monkeypatch):
+        from services.backup import storage
+        monkeypatch.setattr(storage, 'restore_archive_limit', lambda: len(empty_v4) - 1)
+        for url in self.RESTORE_URLS:
+            response = _restore(auth_client, empty_v4, url=url)
+            assert response.status_code == 413, (url, response.data)
+            assert 'BACKUP_MAX_ARCHIVE_MB' in _message(response)
+
+    def test_a_body_past_backup_max_archive_mb_is_refused_naming_it(
+            self, auth_client, fake_restore, monkeypatch):
+        from config.settings import Config
+        from services.backup import storage
+        monkeypatch.setattr(Config, 'BACKUP_MAX_ARCHIVE_MB', 1)
+        monkeypatch.setattr(storage, 'restore_upload_limit', lambda: 1024)
+        calls, _ = fake_restore
+        for url in self.RESTORE_URLS:
+            response = _restore(auth_client, b'x' * (storage.restore_body_limit() + 1), url=url)
+            assert response.status_code == 413, (url, response.data)
+            assert 'BACKUP_MAX_ARCHIVE_MB' in _message(response)
+        assert calls == []
+
+    @pytest.mark.parametrize('raw, expected', [('0', 0), ('2048', 2048), ('-5', 0), ('lots', 0)])
+    def test_the_setting_never_stops_the_server_from_starting(self, monkeypatch, raw, expected):
+        from config.settings import backup_max_archive_mb
+        monkeypatch.setenv('BACKUP_MAX_ARCHIVE_MB', raw)
+        assert backup_max_archive_mb() == expected
+
+    def test_without_the_setting_a_restore_reads_any_body(self, monkeypatch):
+        import sys
+        from config.settings import Config
+        from services.backup import storage
+        monkeypatch.setattr(Config, 'BACKUP_MAX_ARCHIVE_MB', 0)
+        assert storage.restore_body_limit() == sys.maxsize
+
+    def test_a_body_past_both_ceilings_names_both_settings(
+            self, auth_client, fake_restore, monkeypatch):
+        from config.settings import Config
+        from services.backup import storage
+        monkeypatch.setattr(Config, 'BACKUP_MAX_ARCHIVE_MB', 1)
+        monkeypatch.setattr(storage, 'restore_upload_limit', lambda: 2 * 1024 * 1024)
+        calls, _ = fake_restore
+        for url in self.RESTORE_URLS:
+            response = _restore(auth_client, b'x' * (storage.restore_body_limit() + 1), url=url)
+            assert response.status_code == 413, (url, response.data)
+            assert 'BACKUP_MAX_ARCHIVE_MB' in _message(response)
+            assert 'BACKUP_MAX_UPLOAD_MB' in _message(response)
+        assert calls == []

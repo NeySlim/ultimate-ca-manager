@@ -34,7 +34,7 @@ from services.backup_service import (
 )
 from datetime import datetime, timezone
 import logging
-from utils.file_validation import validate_upload, BACKUP_EXTENSIONS
+from utils.file_validation import validate_upload_name, BACKUP_EXTENSIONS
 
 logger = logging.getLogger(__name__)
 
@@ -395,9 +395,9 @@ def restore_backup():
     Only restore archives you produced yourself: a replacing restore puts back
     users, private keys and secrets exactly as the archive holds them.
     """
-    limit = storage.restore_upload_limit()
-    # Before anything reads the body: this route's ceiling, not the global one
-    request.max_content_length = limit + storage.RESTORE_FORM_MARGIN
+    # Before anything reads the body: this route's ceiling, not the global one.
+    # The archive's version decides the rest, once the upload is spooled.
+    request.max_content_length = storage.restore_body_limit()
     if 'file' not in request.files:
         return error_response('No backup file provided', 400)
     file = request.files['file']
@@ -414,11 +414,15 @@ def restore_backup():
 
     try:
         try:
-            backup_bytes, _ = validate_upload(
-                file, BACKUP_EXTENSIONS, max_size=limit)
+            validate_upload_name(file, BACKUP_EXTENSIONS)
         except ValueError as exc:
             logger.warning('Backup upload refused: %s', exc)
             return error_response('Invalid backup file', 400)
+        too_large = storage.restore_size_refusal(file.stream)
+        if too_large:
+            status, message = too_large
+            logger.warning('Backup upload refused: %s', message)
+            return error_response(message, status)
 
         # A restore landing before a pending backend switch is lost at restart.
         pending = pending_switch_refusal()
@@ -429,8 +433,8 @@ def restore_backup():
             # The backup lock too: an archive written meanwhile would read half of the restore
             with database_migration_lock(purpose='the restore'), \
                     backup_operation_lock(purpose='the restore'):
-                results = BackupService().restore_backup(
-                    backup_bytes, password, mode=mode)
+                results = BackupService().restore_backup_from_stream(
+                    file.stream, password, mode=mode)
         except MigrationBusyError as busy:
             return error_response(
                 f'{busy} A backend migration or another restore is still '

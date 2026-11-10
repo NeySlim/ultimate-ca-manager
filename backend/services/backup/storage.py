@@ -13,6 +13,7 @@ import hashlib
 import json
 import logging
 import os
+import sys
 import tempfile
 from pathlib import Path
 from uuid import uuid4
@@ -376,6 +377,66 @@ RESTORE_FORM_MARGIN = 1024 * 1024
 def restore_upload_limit() -> int:
     """Bytes of a v1 to v3 archive a restore route accepts (`BACKUP_MAX_UPLOAD_MB`)."""
     return int(Config.BACKUP_MAX_UPLOAD_MB) * 1024 * 1024
+
+
+def restore_archive_limit() -> int:
+    """Bytes of a v4 archive a restore route accepts (`BACKUP_MAX_ARCHIVE_MB`), 0 for any."""
+    return max(0, int(getattr(Config, 'BACKUP_MAX_ARCHIVE_MB', 0) or 0)) * 1024 * 1024
+
+
+def restore_body_limit() -> int:
+    """The request body a restore route reads before it knows the archive's version.
+
+    Unbounded unless BACKUP_MAX_ARCHIVE_MB is set: the version is in the
+    archive's first bytes, and the spooled upload is checked once it is known.
+    """
+    archive = restore_archive_limit()
+    if not archive:
+        return sys.maxsize
+    return max(archive, restore_upload_limit()) + RESTORE_FORM_MARGIN
+
+
+def restore_too_large_message(setting: str = 'BACKUP_MAX_UPLOAD_MB') -> str:
+    limit = restore_archive_limit() if setting == 'BACKUP_MAX_ARCHIVE_MB' else restore_upload_limit()
+    return (f'Backup archive too large: a restore accepts up to '
+            f'{limit // (1024 * 1024)} MB ({setting})')
+
+
+def restore_body_too_large_message() -> str:
+    """The 413 past a restore route's body ceiling, read before the version is known."""
+    archive, legacy = restore_archive_limit(), restore_upload_limit()
+    if archive >= legacy:
+        return restore_too_large_message('BACKUP_MAX_ARCHIVE_MB')
+    return (f'Backup archive too large: a restore accepts up to {archive // (1024 * 1024)} MB '
+            f'for a v4 archive (BACKUP_MAX_ARCHIVE_MB) and {legacy // (1024 * 1024)} MB '
+            'for an older one (BACKUP_MAX_UPLOAD_MB)')
+
+
+def restore_size_refusal(stream):
+    """(status, message) refusing an uploaded archive as too large, or None.
+
+    v1 to v3 are read whole and stay bound by BACKUP_MAX_UPLOAD_MB, with the
+    answers they always had: 413 naming the setting past the request ceiling
+    it used to set, 400 below it. A v4 is read chunk by chunk and only
+    BACKUP_MAX_ARCHIVE_MB, when set, bounds it. The stream is left in place.
+    """
+    from . import container
+
+    start = stream.tell()
+    head = stream.read(container.HEADER_PREFIX_SIZE)
+    size = stream.seek(0, os.SEEK_END) - start
+    stream.seek(start)
+    if container.format_version_of(head) == container.FORMAT_VERSION_V4:
+        limit = restore_archive_limit()
+        if limit and size > limit:
+            return 413, restore_too_large_message('BACKUP_MAX_ARCHIVE_MB')
+        return None
+    limit = restore_upload_limit()
+    if size > limit + RESTORE_FORM_MARGIN:
+        return 413, restore_too_large_message()
+    if size > limit:
+        return 400, 'Invalid backup file'
+    return None
 
 
 # Seconds a manual backup waits for the backup lock before it is refused.

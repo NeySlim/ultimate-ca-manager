@@ -151,9 +151,9 @@ def restore_backup():
     takes a `mode` for the rare case of merging an archive into a live
     instance; this one always replaces.
     """
-    limit = storage.restore_upload_limit()
-    # Before anything reads the body: this route's ceiling, not the global one
-    request.max_content_length = limit + storage.RESTORE_FORM_MARGIN
+    # Before anything reads the body: this route's ceiling, not the global one.
+    # The archive's version decides the rest, once the upload is spooled.
+    request.max_content_length = storage.restore_body_limit()
     if 'file' not in request.files:
         return error_response('No backup file provided', 400)
 
@@ -177,19 +177,20 @@ def restore_backup():
             "rows to a live instance.", 400)
 
     try:
-        from utils.file_validation import validate_upload, BACKUP_EXTENSIONS
+        from utils.file_validation import validate_upload_name, BACKUP_EXTENSIONS
 
-        # Read + size-cap the upload as bytes (restore_backup expects bytes, not
-        # a path). Reading in memory also avoids leaving the encrypted backup on
-        # disk in /tmp, which the previous NamedTemporaryFile(delete=False) path
-        # did on every failed attempt.
+        # The upload is read from its spool, never whole into memory: a v4
+        # archive is restored chunk by chunk, an older one is bounded first.
         try:
-            backup_bytes, _ = validate_upload(
-                file, BACKUP_EXTENSIONS, max_size=limit
-            )
+            validate_upload_name(file, BACKUP_EXTENSIONS)
         except ValueError as exc:
             logger.warning(f"Backup upload validation error: {exc}")
             return error_response('Invalid backup file', 400)
+        too_large = storage.restore_size_refusal(file.stream)
+        if too_large:
+            status, message = too_large
+            logger.warning('Backup upload refused: %s', message)
+            return error_response(message, status)
 
         # Between a backend switch being written and the service restarting
         # onto it, this instance still runs on the backend being left behind:
@@ -207,7 +208,7 @@ def restore_backup():
         try:
             with database_migration_lock(purpose='the restore'), \
                     backup_operation_lock(purpose='the restore'):
-                results = service.restore_backup(backup_bytes, password)
+                results = service.restore_backup_from_stream(file.stream, password)
         except MigrationBusyError as busy:
             return error_response(
                 f"{busy} A backend migration or another restore is still "

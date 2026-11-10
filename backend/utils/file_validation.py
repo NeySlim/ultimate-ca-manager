@@ -12,6 +12,16 @@ BACKUP_EXTENSIONS = {'.zip', '.enc', '.ucmbkp'}
 
 def validate_upload(file, allowed_extensions=None, max_size=MAX_UPLOAD_SIZE):
     """Validate an uploaded file. Returns (data, safe_filename) or raises ValueError."""
+    filename = validate_upload_name(file, allowed_extensions)
+    data = file.read(max_size + 1)
+    if len(data) > max_size:
+        raise ValueError(f"File too large (max {max_size // (1024*1024)}MB)")
+
+    return data, filename
+
+
+def validate_upload_name(file, allowed_extensions=None):
+    """Validate an upload's name and extension without reading it. Returns the safe filename."""
     if not file or not file.filename:
         raise ValueError("No file provided")
 
@@ -23,9 +33,4 @@ def validate_upload(file, allowed_extensions=None, max_size=MAX_UPLOAD_SIZE):
         ext = Path(filename).suffix.lower()
         if ext not in allowed_extensions:
             raise ValueError(f"Invalid file type: {ext}")
-
-    data = file.read(max_size + 1)
-    if len(data) > max_size:
-        raise ValueError(f"File too large (max {max_size // (1024*1024)}MB)")
-
-    return data, filename
+    return filename
