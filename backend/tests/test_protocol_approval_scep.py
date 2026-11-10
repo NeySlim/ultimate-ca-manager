@@ -507,7 +507,7 @@ def test_a_delivered_request_is_never_judged_again(app, auth_client, scep_ca, mo
 
 def test_an_auto_approved_request_is_never_judged_again(app, scep_ca):
     """Answered SUCCESS at once, with no approval to mark it delivered: a
-    poll after its certificate went away is told PENDING, never closed."""
+    poll after its certificate went away is refused, the request never closed."""
     from models import Certificate
     identity = _client_identity('scep auto delivered')
     assert _enroll(app, scep_ca, identity) == SUCCESS
@@ -517,7 +517,7 @@ def test_an_auto_approved_request_is_never_judged_again(app, scep_ca):
     with app.app_context():
         Certificate.query.filter_by(refid=cert_refid).delete()
         db.session.commit()
-    assert _poll(app, scep_ca, identity) == PENDING
+    assert _poll(app, scep_ca, identity) == FAILURE
     assert _scep_row(app, scep_ca)[1] == 'approved'
 
 

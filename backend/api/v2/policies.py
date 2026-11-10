@@ -1189,12 +1189,14 @@ def delete_policy(policy_id):
     
     if pending > 0:
         return error_response(f"Cannot delete policy with {pending} pending approval requests", 400)
-    # An approved protocol request still owed to its client is found by its row only
-    from services.protocol_approval import REQUEST_TYPE_PROTOCOLS, request_data
+    # An approved EST, SCEP or WSTEP request still owed to its client is found by its row
+    # only; an ACME order carries its own state once approved, so it never holds a policy
+    from services.protocol_approval import PROTOCOL_REQUEST_TYPES, request_data
+    owed_types = tuple(v for k, v in PROTOCOL_REQUEST_TYPES.items() if k != 'acme')
     undelivered = sum(1 for r in ApprovalRequest.query.filter(
         ApprovalRequest.policy_id == policy_id,
         ApprovalRequest.status == 'approved',
-        ApprovalRequest.request_type.in_(tuple(REQUEST_TYPE_PROTOCOLS))).all()
+        ApprovalRequest.request_type.in_(owed_types)).all()
         if not request_data(r).get('delivered_at'))
     if undelivered > 0:
         return error_response(

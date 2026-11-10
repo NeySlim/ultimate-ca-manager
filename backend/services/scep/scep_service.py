@@ -1223,11 +1223,15 @@ class SCEPService:
             from services.scep.approval import approved_request
             approval = approved_request(existing)
             if approval is None:
-                # Answered SUCCESS when issued (no approval held it): never judged again
+                # Answered SUCCESS when issued (no approval held it): never judged again;
+                # a certificate gone since is refused, not left PENDING for ever
                 cert = (Certificate.query.filter_by(refid=existing.cert_refid).first()
                         if existing.cert_refid else None)
                 if cert is None or not cert.crt:
-                    return self._create_cert_rep_pending(existing.transaction_id, sender_nonce)
+                    from services import protocol_approval
+                    return self._create_error_response(
+                        self.FAIL_BAD_REQUEST, protocol_approval.CERTIFICATE_WITHDRAWN,
+                        transaction_id=existing.transaction_id, recipient_nonce=sender_nonce)
                 return self._create_cert_rep_success(
                     x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend()),
                     existing.transaction_id, sender_nonce, signer_cert, challenge_password,

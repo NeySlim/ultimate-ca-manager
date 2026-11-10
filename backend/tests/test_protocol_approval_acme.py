@@ -307,3 +307,15 @@ def test_finalize_and_approval_agree_on_a_transient_caa_failure(app, client, aut
     direct_account, direct_id, direct = _held(app, client, acme_ca)
     assert direct.get_json()['type'] != 'urn:ietf:params:acme:error:caa'
     assert _read(client, direct_account, direct_id).get_json()['status'] == 'ready'
+
+
+def test_an_approved_order_does_not_hold_its_policy(app, client, auth_client, acme_ca):
+    """ACME issues when the request is approved and the order keeps its own
+    state: nothing is owed through the approval row, so the policy can go."""
+    with approval_policy(app, acme_ca[0], 'acme-held-delete') as pid:
+        account, order_id, _r = _held(app, client, acme_ca)
+        (approval_id, *_), = requests_of(app, pid, 'acme_order')
+        approve(auth_client, approval_id)
+        assert _read(client, account, order_id).get_json()['status'] == 'valid'
+        r = auth_client.delete(f'/api/v2/policies/{pid}')
+        assert r.status_code == 200, r.get_json()
