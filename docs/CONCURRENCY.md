@@ -31,4 +31,5 @@ conditional `UPDATE`.
 
 When the migration 142 finds certificates sharing a serial under one CA, it lists them,
 keeps them, and records them under the `SystemConfig` key `serial_unique_index_pending`;
-the index is created once they are resolved and the migration runs again.
+once they are resolved, deleting the `142_serial_per_ca_and_proxy_links` row from
+`_migrations` makes the next start run the migration again and create the index.
