@@ -6078,7 +6078,10 @@
       "webauthn": "security key",
       "session": "browser session"
     },
-    "expiringBadge": "{{count}} certificates expiring or expired. Dismiss.",
+    "expiringBadge_one": "{{count}} certificate expiring or expired. Dismiss.",
+    "expiringBadge_few": "{{count}} certificates expiring or expired. Dismiss.",
+    "expiringBadge_many": "{{count}} certificates expiring or expired. Dismiss.",
+    "expiringBadge_other": "{{count}} certificates expiring or expired. Dismiss.",
     "statusRunning": "Service running",
     "statusUnreachable": "Service unreachable",
     "statusSafeMode": "Safe mode",
@@ -6086,8 +6089,14 @@
     "haNode": "HA node {{node}}",
     "haLeader": "leader",
     "haFollower": "follower",
-    "haNodes": "Nodes: {{count}}",
-    "haLate": "Late: {{count}}",
+    "haNodes_one": "{{count}} node",
+    "haNodes_few": "{{count}} nodes",
+    "haNodes_many": "{{count}} nodes",
+    "haNodes_other": "{{count}} nodes",
+    "haLate_one": "{{count}} late",
+    "haLate_few": "{{count}} late",
+    "haLate_many": "{{count}} late",
+    "haLate_other": "{{count}} late",
     "theme": {
       "menu": "Theme"
     },
