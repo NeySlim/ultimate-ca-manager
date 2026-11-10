@@ -97,6 +97,12 @@ def canonical_stored_serial(stored: str | int | None, crt=None) -> str | None:
     return canonical_serial(stored)
 
 
+def names_certificate(recorded: str | int | None, cert) -> bool:
+    """True when a serial recorded before migration 144 (hex or decimal) is the
+    serial of *cert*, whose column is canonical; the certificate settles ambiguous text."""
+    return canonical_stored_serial(recorded, getattr(cert, 'crt', None)) == cert.serial_number
+
+
 def serial_to_int(serial: str | int | None) -> int | None:
     """Return the integer form of a certificate serial.
 
