@@ -11,11 +11,12 @@ from typing import Optional
 from datetime import timedelta
 from dotenv import load_dotenv
 
+from config.paths import env_file as _config_env_file
 from utils.db_url import is_postgres_url, postgres_connect_args, sqlalchemy_url
 
 # Load environment variables FIRST (before using them)
 # Try multiple locations for .env files
-load_dotenv("/etc/ucm/ucm.env")  # System config (DEB/RPM)
+load_dotenv(_config_env_file())  # System config (DEB/RPM), moved by UCM_CONFIG_DIR
 load_dotenv(Path(__file__).resolve().parent.parent.parent / ".env")  # Local dev
 
 # Base directory
@@ -242,7 +243,7 @@ class Config:
         if cls.SECRET_KEY == "INSTALL_TIME_PLACEHOLDER" or not cls.SECRET_KEY:
             raise ValueError(
                 "SECRET_KEY must be set in environment. "
-                "Check /etc/ucm/ucm.env or load environment variables."
+                f"Check {_config_env_file()} or load environment variables."
             )
     
     # Session settings

@@ -14,6 +14,11 @@ on:
   pull_request:
     branches: [main, master, develop, dev]
   workflow_dispatch:
+    inputs:
+      ha:
+        description: 'Also run the two-node HA bench (backend/tests/ha)'
+        type: boolean
+        default: false
   schedule:
     # Nightly sequential run of dev (the default branch is main, see the job)
     - cron: '0 3 * * *'
@@ -299,7 +304,8 @@ jobs:
             tests/test_database_migration_scale.py \
             tests/test_database_admin.py \
             tests/test_migration_036.py \
-            tests/test_migration_runner_pg.py
+            tests/test_migration_runner_pg.py \
+            tests/test_scep_intune_ca_lock_pg.py
 
       # The application itself on PostgreSQL: the session `app` fixture builds
       # it in a schema of its own (docs/testing/postgres-harness.md), so the
@@ -348,6 +354,72 @@ jobs:
             tests/test_audit_oversized_fields.py \
             tests/test_sso_login_identity.py
   
+  # Two real UCM nodes in HA mode on one PostgreSQL (docs/testing/ha-bench.md).
+  # Manual only: run the workflow by hand with the `ha` input ticked.
+  test-ha-bench:
+    name: HA bench (two nodes)
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && inputs.ha
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ucm
+          POSTGRES_PASSWORD: ucm_ci_password
+          POSTGRES_DB: ucm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev libpq-dev postgresql-client
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+          pip install --no-deps pyjks==20.0.0
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            pg_isready -h localhost -p 5432 -U ucm && break
+            sleep 1
+          done
+
+      - name: Create the unprivileged role the bench runs as
+        env:
+          PGPASSWORD: ucm_ci_password
+        run: |
+          psql -h localhost -U ucm -d ucm_test -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE ucm_migtest LOGIN PASSWORD 'ucm_migtest_ci' NOSUPERUSER;
+          CREATE DATABASE ucm_migtest OWNER ucm_migtest;
+          SQL
+
+      - name: Run the HA bench
+        env:
+          UCM_TEST_HA: '1'
+          UCM_TEST_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
+        run: |
+          cd backend
+          pytest --tb=short -m ha tests/ha
+
   test-frontend:
     name: Frontend Tests
     runs-on: ubuntu-latest

@@ -29,6 +29,7 @@ from services.notification_service import NotificationService
 from websocket.emitters import on_certificate_issued
 from utils.datetime_utils import utc_now, utc_isoformat, cert_not_before
 from security.encryption import encrypt_private_key
+from utils.ca_serial_counter import next_ca_serial
 from utils.db_transaction import safe_commit
 from . import bp
 from utils.qc_statements import add_certificate_policies, add_qc_statements, template_policy_oids
@@ -679,6 +680,9 @@ def create_certificate():
             db.session.add(db_pq)
             db.session.flush()
             db_cert.related_certificate_id, db_cert.hybrid_role = db_pq.id, 'classical'
+        # One count per certificate issued, committed with the certificates
+        for _issued in filter(None, (db_cert, db_pq)):
+            next_ca_serial(ca)
         ok, err = safe_commit(logger, "Failed to create certificate")
         if not ok:
             return err

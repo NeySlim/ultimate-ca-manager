@@ -817,7 +817,10 @@ def _issue_approved_certificate(approval):
         created_by=approval.requester.username if approval.requester else 'system'
     )
     db.session.add(db_cert)
-    
+    # Counted in the same transaction: a lost claim below rolls the count back too
+    from utils.ca_serial_counter import next_ca_serial
+    next_ca_serial(ca)
+
     # Link approval to issued cert: the id exists only once flushed. Only the
     # request that finds the sentinel still empty may link (and keep) its
     # certificate: two approvers racing on SQLite, which serialises writes
