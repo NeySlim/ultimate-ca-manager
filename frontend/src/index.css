@@ -1,3 +1,5 @@
+@import './styles/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -70,26 +72,6 @@
   --kofi-coral: #FF5E5B;
   --kofi-coral-strong: #D63B36;
   --kofi-coral-hover: #B8312C;
-  --bg-primary: #12161C;
-  --bg-secondary: #1C222A;
-  --bg-tertiary: #252D38;
-  --text-primary: #F0F4F8;
-  --text-secondary: #9CA8B8;
-  --text-tertiary: #6E7A8A;
-  --accent-primary: #4F8EF7;
-  --accent-success: #34D399;
-  --accent-warning: #FBBF24;
-  --accent-danger: #F87171;
-  --accent-purple: #A78BFA;
-  --border: #3A4555;
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-strong: rgba(255, 255, 255, 0.12);
-  
-  /* Logo gradient colors */
-  --logo-gradient-start: #fb923c;
-  --logo-gradient-mid: #f97316;
-  --logo-gradient-end: #ea580c;
-  --logo-gradient-accent: #fbbf24;
   
   /* ===== ENHANCED SHADOW SYSTEM ===== */
   --shadow-color: 220deg 40% 2%;
@@ -148,66 +130,19 @@
   --duration-normal: 250ms;
   --duration-slow: 400ms;
   
-  /* DetailCard soft colors - dark theme */
-  --detail-header-bg: linear-gradient(135deg, 
-    color-mix(in srgb, var(--accent-primary) 8%, transparent),
-    color-mix(in srgb, var(--logo-gradient-end) 4%, transparent),
-    transparent
-  );
-  --detail-header-border: rgba(255, 255, 255, 0.06);
-  --detail-header-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.04);
-  --detail-icon-bg: linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 70%, transparent));
-  --detail-icon-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 25%, transparent);
-  --detail-stats-border: rgba(255, 255, 255, 0.06);
-  --detail-section-bg: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
-  --detail-section-border: var(--border);
-  --detail-field-bg: rgba(255, 255, 255, 0.02);
-  --detail-field-border: rgba(255, 255, 255, 0.05);
   
   /* Floating window shadow */
   --floating-window-shadow: 
     0 10px 40px rgba(0,0,0,0.30),
     0 2px 10px rgba(0,0,0,0.20);
   
-  /* Icon colors - defaults for dark theme, overridden by ThemeContext for colored themes */
-  --icon-orange-bg: rgba(249, 115, 22, 0.15);
-  --icon-orange-text: #FB923C;
-  --icon-amber-bg: rgba(245, 158, 11, 0.15);
-  --icon-amber-text: #FBBF24;
-  --icon-emerald-bg: rgba(52, 211, 153, 0.15);
-  --icon-emerald-text: #34D399;
-  --icon-blue-bg: rgba(79, 142, 247, 0.15);
-  --icon-blue-text: #60A5FA;
-  --icon-violet-bg: rgba(139, 92, 246, 0.15);
-  --icon-violet-text: #A78BFA;
-  --icon-teal-bg: rgba(20, 184, 166, 0.15);
-  --icon-teal-text: #2DD4BF;
 }
 
 /* ============================================
    THEME: Light (legacy - most values now in ThemeContext)
    ============================================ */
 .theme-light {
-  --bg-primary: #EFF2F7;
-  --bg-secondary: #FFFFFF;
-  --bg-tertiary: #E4E8EF;
-  --text-primary: #111827;
-  --text-secondary: #4B5563;
-  --text-tertiary: #6B7280;
-  --accent-primary: #2563EB;
-  --accent-success: #059669;
-  --accent-warning: #D97706;
-  --accent-danger: #DC2626;
-  --accent-purple: #7C3AED;
-  --border: #CBD5E1;
-  --border-subtle: rgba(0, 0, 0, 0.06);
-  --border-strong: rgba(0, 0, 0, 0.12);
   
-  /* Logo gradient colors - light */
-  --logo-gradient-start: #ea580c;
-  --logo-gradient-mid: #c2410c;
-  --logo-gradient-end: #9a3412;
-  --logo-gradient-accent: #d97706;
   
   /* Light theme shadow adjustments — stronger, colored */
   --shadow-color: 220deg 30% 50%;
@@ -250,21 +185,6 @@
   --gradient-shine: linear-gradient(135deg, rgba(255,255,255,0.7), transparent 50%);
   --gradient-surface: linear-gradient(180deg, #FFFFFF, #F8FAFC);
   
-  /* DetailCard soft colors - light theme */
-  --detail-header-bg: linear-gradient(135deg, 
-    color-mix(in srgb, var(--accent-primary) 8%, white),
-    color-mix(in srgb, var(--logo-gradient-end) 4%, white),
-    white
-  );
-  --detail-header-border: rgba(0, 0, 0, 0.08);
-  --detail-header-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
-  --detail-icon-bg: linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 80%, #4F46E5));
-  --detail-icon-shadow: 0 4px 14px color-mix(in srgb, var(--accent-primary) 30%, transparent);
-  --detail-stats-border: rgba(0, 0, 0, 0.08);
-  --detail-section-bg: #F1F5F9;
-  --detail-section-border: var(--border);
-  --detail-field-bg: rgba(0, 0, 0, 0.035);
-  --detail-field-border: rgba(0, 0, 0, 0.08);
   
   /* Floating window shadow — stronger for light mode */
   --floating-window-shadow: 
@@ -1662,7 +1582,7 @@ input:focus, select:focus, textarea:focus {
 /* Size variants */
 .select-native-sm {
   padding: 0.25rem 1.75rem 0.25rem 0.5rem;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   border-radius: 5px;
 }
 
@@ -2700,7 +2620,7 @@ input:focus, select:focus, textarea:focus {
   gap: 4px;
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 500;
   background: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);
   transition: all 0.15s var(--ease-smooth);
@@ -2915,7 +2835,7 @@ input:focus, select:focus, textarea:focus {
   min-width: 1.25rem;
   padding: 0 0.25rem;
   height: 1.125rem;
-  font-size: 0.625rem;
+  font-size: 0.75rem;
   font-family: inherit;
   line-height: 1;
   border-radius: 0.25rem;

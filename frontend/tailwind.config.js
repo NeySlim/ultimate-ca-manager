@@ -46,9 +46,9 @@ export default {
         'border-hover': 'var(--text-tertiary)',
       },
       fontSize: {
-        // Custom sizes for compact UI
-        '2xs': ['0.625rem', { lineHeight: '0.875rem' }],  // 10px
-        '3xs': ['0.5625rem', { lineHeight: '0.75rem' }],  // 9px
+        // Compact UI sizes; 12px is the floor, so they equal text-xs in size
+        '2xs': ['0.75rem', { lineHeight: '1rem' }],  // 12px
+        '3xs': ['0.75rem', { lineHeight: '1rem' }],  // 12px
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
