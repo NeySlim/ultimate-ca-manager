@@ -32,15 +32,16 @@ class AlreadySuperseded(Exception):
     """The certificate being renewed was superseded by a concurrent renewal."""
 
 
-def _claim_superseded(row):
-    """Archive every live row holding *row*'s certificate (same DER, under any CA: it is
-    replaced everywhere); False when another renewal got there first. One row at a time
-    in id order, so two concurrent claims never lock in opposite orders."""
+def _claim_superseded(row, presented=None):
+    """Archive every live row holding *presented*, the certificate the client renews (by
+    default *row*'s), same DER under any CA: it is replaced everywhere. False when another
+    renewal got there first. One row at a time in id order, so two claims never cross."""
     from sqlalchemy import update
     from sqlalchemy.orm.attributes import set_committed_value
     from services.cert.issued_lookup import _rows_holding
     from utils.serial_format import serial_variants
-    held = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+    held = presented if presented is not None else \
+        x509.load_pem_x509_certificate(base64.b64decode(row.crt))
     live = sorted(r.id for r in _rows_holding(held, Certificate.archived.isnot(True)))
     if row.id not in live:
         return False
@@ -272,7 +273,7 @@ class CASigningMixin:
             db.session.flush()
             # The renewed row is archived in the commit that stores its successor,
             # compare-and-set: of two concurrent renewals, only one stores a certificate
-            if supersedes is not None and not _claim_superseded(supersedes):
+            if supersedes is not None and not _claim_superseded(supersedes, renewal_of):
                 db.session.rollback()
                 raise AlreadySuperseded('the renewed certificate is already superseded')
             link_issued(new_cert, cert_obj, related_a)
