@@ -13,6 +13,9 @@ ROUTES = [
     '/api/v2/system/security/encrypt-all-keys',
     '/api/v2/system/security/rotate-secrets',
     '/api/v2/system/updates/install',
+    '/api/v2/system/https/unbind',
+    '/api/v2/system/https/regenerate',
+    '/api/v2/system/https/apply',
     '/api/v2/system/restore',
     '/api/v2/system/backup/restore',
     '/api/v2/settings/backup/restore',
@@ -102,6 +105,10 @@ USUAL = {
     '/api/v2/system/security/encrypt-all-keys': (200, {}),
     '/api/v2/system/security/rotate-secrets': (400, {'new_secret': 'short'}),
     '/api/v2/system/updates/install': (400, {}),
+    '/api/v2/system/https/unbind': (400, {}),
+    # a string validity fails before any file is written
+    '/api/v2/system/https/regenerate': (500, {'validity_days': 'x'}),
+    '/api/v2/system/https/apply': (400, {}),
 }
 
 

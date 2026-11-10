@@ -5,6 +5,7 @@ System HTTPS Operations
 from . import bp
 from flask import request, current_app, Response
 from auth.unified import require_auth
+from utils.ha import reject_in_ha
 from utils.response import success_response, error_response
 from models import Certificate, db, SystemConfig
 from services.audit_service import AuditService
@@ -110,6 +111,7 @@ def get_https_cert_info():
 
 @bp.route('/api/v2/system/https/unbind', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def unbind_https_cert():
     """Stop following renewals of the bound HTTPS certificate (#303 M1).
 
@@ -132,6 +134,7 @@ def unbind_https_cert():
 
 @bp.route('/api/v2/system/https/regenerate', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def regenerate_https_cert():
     """Regenerate self-signed HTTPS certificate"""
     data = request.json or {}
@@ -236,6 +239,7 @@ def regenerate_https_cert():
 
 @bp.route('/api/v2/system/https/apply', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def apply_https_cert():
     """Apply a managed certificate to HTTPS"""
     data = request.json
