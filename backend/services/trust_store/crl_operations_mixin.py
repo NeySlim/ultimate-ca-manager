@@ -2,7 +2,7 @@
 CRL operations mixin for TrustStoreService
 """
 from datetime import datetime, timedelta
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
@@ -24,7 +24,7 @@ class CRLOperationsMixin:
         ca_private_key,
         revoked_certs: List[Tuple[int, datetime]],
         validity_days: int = 30,
-        digest: str = 'sha256'
+        digest: Optional[str] = None
     ) -> bytes:
         """Generate a Certificate Revocation List."""
         builder = x509.CertificateRevocationListBuilder()

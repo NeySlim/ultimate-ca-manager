@@ -488,8 +488,8 @@ class CSROperationsMixin:
     @staticmethod
     def generate_csr(
         subject: x509.Name,
-        key_type: str = '2048',
-        digest: str = 'sha256',
+        key_type: Optional[str] = None,
+        digest: Optional[str] = None,
         san_dns: Optional[List[str]] = None,
         san_ip: Optional[List[str]] = None,
         san_email: Optional[List[str]] = None,
@@ -501,7 +501,8 @@ class CSROperationsMixin:
         """Generate a Certificate Signing Request. With *related_certificate* (A) and
         its *related_private_key*, the request carries an RFC 9763 relatedCertRequest."""
         # Generate private key
-        private_key = KeyOperationsMixin.generate_private_key(key_type)
+        from utils.issuance_defaults import default_issue_key_id
+        private_key = KeyOperationsMixin.generate_private_key(key_type or default_issue_key_id())
 
         # Build CSR
         builder = x509.CertificateSigningRequestBuilder()
@@ -551,7 +552,7 @@ class CSROperationsMixin:
     def generate_ca_csr(
         subject: x509.Name,
         private_key,
-        digest: Optional[str] = 'sha256',
+        digest: Optional[str] = None,
         path_length: Optional[int] = None,
         key_usage: Optional[List[str]] = None,
     ) -> bytes:

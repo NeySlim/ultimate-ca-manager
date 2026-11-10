@@ -114,3 +114,38 @@ def test_template_created_without_key_type(app, auth_client, rsa3072):
     with app.app_context():
         for name in ('defaults-created', 'defaults-imported'):
             assert CertificateTemplate.query.filter_by(name=name).one().key_type == 'RSA-3072', name
+
+
+KEY_LITERAL_FILES = [
+    'api/v2/certificates/cert_create.py', 'api/v2/csrs.py', 'api/v2/policies.py', 'api/v2/cas/crud.py',
+    'api/v2/templates.py', 'services/tsa_signer_cert.py', 'services/xcep/policy_builder.py',
+    'services/wstep/wstep_service.py', 'services/cert/mixins/lifecycle.py', 'services/ca/ca_creation.py',
+    'services/trust_store/csr_operations_mixin.py', 'services/cert/mixins/csr.py',
+    'services/trust_store/certificate_creation_mixin.py',
+]
+DIGEST_LITERAL_FILES = [
+    'services/cert/mixins/lifecycle.py', 'services/ca/ca_creation.py',
+    'services/trust_store/ca_certificate_creation_mixin.py', 'services/trust_store/csr_operations_mixin.py',
+    'services/trust_store/certificate_creation_mixin.py', 'services/trust_store/crl_operations_mixin.py',
+    'services/cert/mixins/csr.py', 'services/ca/cross_signing.py', 'services/xcep/policy_builder.py',
+]
+
+
+def _literals(path, wanted):
+    """Lines of the string constants of *path* equal to one of *wanted*, lookup tables apart."""
+    import ast
+    from pathlib import Path
+    tree = ast.parse((Path(__file__).resolve().parent.parent / path).read_text())
+    keys = {id(c) for n in ast.walk(tree) if isinstance(n, ast.Dict) for c in ast.walk(n)}
+    return [n.lineno for n in ast.walk(tree) if isinstance(n, ast.Constant)
+            and isinstance(n.value, str) and n.value in wanted and id(n) not in keys]
+
+
+@pytest.mark.parametrize('path', KEY_LITERAL_FILES)
+def test_no_key_literal_on_an_issuance_path(path):
+    assert _literals(path, {'2048', 'RSA-2048', 'RSA 2048'}) == []
+
+
+@pytest.mark.parametrize('path', DIGEST_LITERAL_FILES)
+def test_no_digest_literal_on_an_issuance_path(path):
+    assert _literals(path, {'sha256'}) == []

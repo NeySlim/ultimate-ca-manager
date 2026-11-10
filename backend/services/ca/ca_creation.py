@@ -119,6 +119,17 @@ def _refuse_on_violations(violations):
         raise PolicyViolation('Policy violation: ' + '; '.join(violations))
 
 
+def _default_ca_digest(caref, key_type):
+    """Hash of a CA certificate nobody chose: the parent key's for an intermediate, else the new key's."""
+    from utils.ca_profile import resolve_digest
+    from utils.issuance_defaults import digest_for_key
+    parent = CA.query.filter_by(refid=caref).first() if caref else None
+    if parent is not None and parent.crt:
+        from services.ca.helpers import get_ca_cert_pem
+        return digest_for_key(x509.load_pem_x509_certificate(get_ca_cert_pem(parent)).public_key())
+    return resolve_digest(None, key_type)[0]
+
+
 class CACreationMixin:
     """CA creation and import operations"""
 
@@ -228,9 +239,9 @@ class CACreationMixin:
     def create_internal_ca(
         descr: str,
         dn: Dict[str, str],
-        key_type: str = '2048',
+        key_type: Optional[str] = None,
         validity_days: int = 825,
-        digest: str = 'sha256',
+        digest: Optional[str] = None,
         caref: Optional[str] = None,
         ocsp_uri: Optional[str] = None,
         username: str = 'system',
@@ -279,6 +290,11 @@ class CACreationMixin:
         from services.hsm.ca_key_loader import bind_signature_scheme, get_ca_signing_key
         from services.policy_service import (
             PolicyEvaluationService, key_label_for_public_key)
+        from utils.issuance_defaults import default_issue_key_id
+
+        key_type = key_type or default_issue_key_id()
+        if digest is None:  # nobody chose: the signer key's own, yielding to the policies
+            digest, digest_explicit = _default_ca_digest(caref, key_type), False
 
         # Issuance policies, checked before a key is generated (an HSM key is
         # created on the device), then again on the real key and signer below
@@ -597,7 +613,7 @@ class CACreationMixin:
     def create_external_ca(
         descr: str,
         dn: Dict[str, str],
-        key_type: str = '2048',
+        key_type: Optional[str] = None,
         digest: Optional[str] = None,
         username: str = 'system',
         path_length: Optional[int] = None,
@@ -619,6 +635,8 @@ class CACreationMixin:
         *digest* signs the CSR; None picks the key's own (none for ML-DSA).
         """
         from services.policy_service import PolicyEvaluationService, key_label_for_public_key
+        from utils.issuance_defaults import default_issue_key_id
+        key_type = key_type or default_issue_key_id()
         policies, key_label = _ca_policies(None, dn, key_type, hsm_key_id, hsm_key_algorithm,
                                            compliance_profile)
         rule_context = {'operation': 'ca_creation', 'subject': (dn or {}).get('CN')}

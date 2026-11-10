@@ -187,3 +187,83 @@ class TestPaths:
         ca = _ec384_ca(create_ca, 'Fixed CRL P-384 CA')
         with app.app_context():
             assert db.session.get(CA, ca['id']).effective_crl_digest() == 'sha384'
+
+
+def _hash_of(obj):
+    return obj.signature_hash_algorithm.name
+
+
+class TestFallbacks:
+    """Where no digest is named, a P-384 key signs with SHA-384, never a literal SHA-256 (#397)."""
+
+    def test_issue_without_digest_or_template(self, app, create_ca):
+        from services.cert_service import CertificateService
+        ca = _ec384_ca(create_ca, 'Fallback lifecycle P-384 CA')
+        with app.app_context():
+            row = CertificateService.create_certificate(
+                descr='fallback', caref=db.session.get(CA, ca['id']).refid,
+                dn={'CN': 'fallback-lifecycle.test'}, validity_days=30)
+            import base64
+            cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+            assert _hash_of(cert) == 'sha384'
+            db.session.delete(row)
+            db.session.commit()
+
+    def test_internal_ca_without_digest(self, app, create_ca):
+        import base64
+        from services.ca_service import CAService
+        parent = _ec384_ca(create_ca, 'Fallback CA creation parent')
+        with app.app_context():
+            parent_ref = db.session.get(CA, parent['id']).refid
+            root = CAService.create_internal_ca(
+                descr='fallback root', dn={'CN': 'Fallback P-384 root'}, key_type='secp384r1')
+            child = CAService.create_internal_ca(
+                descr='fallback child', dn={'CN': 'Fallback RSA child'}, caref=parent_ref)
+            hashes_ = [_hash_of(x509.load_pem_x509_certificate(base64.b64decode(c.crt)))
+                       for c in (root, child)]
+            for c in (root, child):
+                db.session.delete(c)
+            db.session.commit()
+        assert hashes_ == ['sha384', 'sha384']
+
+    def test_trust_store_signers_without_digest(self):
+        import datetime as dt
+        from services.trust_store import TrustStoreService
+        key = ec.generate_private_key(ec.SECP384R1())
+        subject = x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, 'Fallback TS CA')])
+        pem, _ = TrustStoreService.create_ca_certificate(subject=subject, private_key=key)
+        ca_cert = x509.load_pem_x509_certificate(pem)
+        assert _hash_of(ca_cert) == 'sha384'
+        crl = x509.load_pem_x509_crl(TrustStoreService.generate_crl(ca_cert, key, []))
+        assert crl.signature_hash_algorithm.name == 'sha384'
+        csr = x509.load_pem_x509_csr(TrustStoreService.generate_ca_csr(subject, key))
+        assert csr.signature_hash_algorithm.name == 'sha384'
+        csr_pem, _ = TrustStoreService.generate_csr(subject, key_type='secp384r1')
+        assert x509.load_pem_x509_csr(csr_pem).signature_hash_algorithm.name == 'sha384'
+
+    def test_stored_csr_without_digest(self, app):
+        import base64
+        from services.cert_service import CertificateService
+        with app.app_context():
+            row = CertificateService.generate_csr(
+                descr='fallback csr', dn={'CN': 'fallback-csr.test'}, key_type='secp384r1')
+            csr = x509.load_pem_x509_csr(base64.b64decode(row.csr))
+            db.session.delete(row)
+            db.session.commit()
+        assert csr.signature_hash_algorithm.name == 'sha384'
+
+    @pytest.mark.parametrize('key_label,expected', [
+        ('EC-P384', '2.16.840.1.101.3.4.2.2'), ('EC-P521', '2.16.840.1.101.3.4.2.3'),
+        ('RSA-3072', '2.16.840.1.101.3.4.2.1')])
+    def test_xcep_template_without_digest_announces_the_key_hash(self, app, key_label, expected):
+        from types import SimpleNamespace
+        from services.xcep.policy_builder import _request_hash
+        with app.app_context():
+            assert _request_hash(SimpleNamespace(digest=None, name='t'), key_label)[0] == expected
+
+    def test_xcep_template_without_key_or_digest_follows_the_default_key(self, app, monkeypatch):
+        from types import SimpleNamespace
+        from services.xcep.policy_builder import _request_hash
+        monkeypatch.setattr(issuance_defaults, 'BASELINE_ISSUE_KEY', 'EC-P384')
+        with app.app_context():
+            assert _request_hash(SimpleNamespace(digest=None, name='t'))[0] == '2.16.840.1.101.3.4.2.2'

@@ -78,8 +78,8 @@ class CSRMixin:
     def generate_csr(
         descr: str,
         dn: Dict[str, str],
-        key_type: str = '2048',
-        digest: str = 'sha256',
+        key_type: Optional[str] = None,
+        digest: Optional[str] = None,
         san_dns: Optional[List[str]] = None,
         san_ip: Optional[List[str]] = None,
         san_email: Optional[List[str]] = None,

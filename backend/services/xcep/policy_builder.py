@@ -77,7 +77,6 @@ _HASH_ALGORITHM_OIDS = {
     'sha384': ('2.16.840.1.101.3.4.2.2', 'sha384'),
     'sha512': ('2.16.840.1.101.3.4.2.3', 'sha512'),
 }
-_DEFAULT_HASH = 'sha256'
 
 # id-ce-extKeyUsage / id-ce-keyUsage (RFC 5280) -- the extension OIDs
 # referenced by attributes/extensions/extension/oIDReference. Distinct from
@@ -277,16 +276,19 @@ def _request_hash(template, key_label=None):
     """The digest a client must sign its request with: the template's own, raised to
     the one matching its key (SHA-384 for P-384), SHA-512 for ML-DSA. Never SHA-1."""
     from services.policy_service import POLICY_DIGESTS
-    from utils.issuance_defaults import digest_for_label
+    from utils.issuance_defaults import default_issue_key_type, digest_for_label
     if key_label in _MLDSA_OIDS:
         # RFC 9882 §3.3: an ML-DSA CMS signer digests with SHA-512, the one hash it must support
         return _HASH_ALGORITHM_OIDS['sha512']
-    digest = (getattr(template, 'digest', None) or _DEFAULT_HASH).strip().lower().replace('-', '')
+    # A template without a usable digest takes its key's own
+    fallback = (digest_for_label(key_label or default_issue_key_type())
+                or digest_for_label(default_issue_key_type()))
+    digest = (getattr(template, 'digest', None) or fallback).strip().lower().replace('-', '')
     if digest not in _HASH_ALGORITHM_OIDS:
         if digest == 'sha1':
             logger.warning("XCEP: template %r digest SHA-1 not announced, using %s",
-                           getattr(template, 'name', '?'), _DEFAULT_HASH)
-        digest = _DEFAULT_HASH
+                           getattr(template, 'name', '?'), fallback)
+        digest = fallback
     floor = digest_for_label(key_label) if key_label else None
     if floor in POLICY_DIGESTS and POLICY_DIGESTS.index(floor) > POLICY_DIGESTS.index(digest):
         digest = floor

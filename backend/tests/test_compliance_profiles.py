@@ -166,9 +166,11 @@ def test_a_rsa_2048_leaf_is_refused_under_bsi_and_passes_without(app, auth_clien
     ca = create_ca(cn='Profile leaf CA', signatureScheme='pss')
     assert _leaf(auth_client, ca['id'], 'before.profile.example.test').status_code == 201
     assert _patch(auth_client, ca['id'], complianceProfile='bsi').status_code == 200
-    r = _leaf(auth_client, ca['id'], 'under.bsi.example.test')
+    r = _leaf(auth_client, ca['id'], 'under.bsi.example.test', key_type='rsa', key_size=2048)
     assert r.status_code == 400, r.get_json()
     assert 'RSA-2048' in r.get_json()['message'] and 'bsi' in r.get_json()['message']
+    # A request that names no key gets the default the profile allows (#397)
+    assert _leaf(auth_client, ca['id'], 'default.bsi.example.test').status_code == 201
     # The same request with a key the profile allows is issued
     ec = _leaf(auth_client, ca['id'], 'rsa3072.bsi.example.test', key_type='rsa', key_size=3072)
     assert ec.status_code == 201, ec.get_json()

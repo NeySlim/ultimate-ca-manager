@@ -21,7 +21,7 @@ from services.trust_store import TrustStoreService
 from utils.ct_client import embed_scts_in_certificate
 from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, cleanup_old_files
 from utils.datetime_utils import utc_now, to_naive_utc
-from utils.issuance_defaults import template_digest
+from utils.issuance_defaults import default_issue_key_id, template_digest
 from utils.spki_digest import certificate_key_sha256
 from utils.revocation_reasons import revocable
 
@@ -139,13 +139,15 @@ class LifecycleMixin:
                     raise PolicyViolation(san_refusal)
 
         if key_type is None:
-            key_type = '2048'
+            ca_row = CA.query.filter_by(refid=caref).first()
+            key_type = default_issue_key_id(ca_row.id if ca_row else None)
         if validity_days is None:
             validity_days = DEFAULT_CERTIFICATE_VALIDITY_DAYS
         # A digest asked for is checked; the template's (floored at the CA key's) and the default yield
         digest_explicit = digest is not None
         if digest is None:
-            digest = (template.digest if template is not None else None) or 'sha256'
+            # Only the divergence check reads it: signing takes the template's, floored at the CA key's
+            digest = template.digest if template is not None else None
 
         # Record divergences from the template on the final effective values
         # (#258) — inherited-as-default values compare equal and are not

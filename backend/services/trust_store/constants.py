@@ -34,10 +34,10 @@ HASH_ALGORITHMS = {
 
 
 def hash_algorithm(digest):
-    """The signature hash named *digest*, SHA-256 when none is named; an unknown
-    name is refused rather than signed in SHA-256."""
+    """The signature hash named *digest*, None when none is named (``signing_hash_for`` then
+    takes the key's own); an unknown name is refused rather than signed in SHA-256."""
     if not digest:
-        return hashes.SHA256()
+        return None
     algo = HASH_ALGORITHMS.get(str(digest).strip().lower())
     if algo is None:
         raise ValueError(f'Unsupported signature hash: {digest}')
