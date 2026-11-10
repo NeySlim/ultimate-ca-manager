@@ -3,8 +3,6 @@
 Signed serials are random (RFC 5280 §4.1.2.2); this counter only counts. It is
 incremented by one UPDATE in the database, so concurrent workers never lose a count.
 """
-import sqlite3
-
 from sqlalchemy import func, select, update
 from sqlalchemy.orm.attributes import set_committed_value
 
@@ -16,8 +14,8 @@ def next_ca_serial(ca) -> int:
     # A Core statement: no autoflush, the row lock (PostgreSQL) is held until the commit
     bump = (update(table).where(table.c.id == ca.id)
             .values(serial=func.coalesce(table.c.serial, 0) + 1))
-    if db.session.get_bind().dialect.name == 'sqlite' and sqlite3.sqlite_version_info < (3, 35):
-        # No RETURNING before SQLite 3.35; the UPDATE holds the write lock until the commit
+    if not db.session.get_bind().dialect.update_returning:
+        # SQLite before 3.35: no RETURNING; the UPDATE holds the write lock until the commit
         db.session.execute(bump)
         count = db.session.execute(
             select(table.c.serial).where(table.c.id == ca.id)).scalar_one()

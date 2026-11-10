@@ -230,22 +230,20 @@ def test_concurrent_issuance_on_postgresql_keeps_serials_and_count(app):
     assert count == WORKERS * EACH
 
 
-def test_next_ca_serial_counts_on_sqlite_without_returning(app, monkeypatch):
-    """SQLite before 3.35 (el9 system library) has no RETURNING: the counter still counts."""
-    import sqlite3
+def test_next_ca_serial_counts_on_a_dialect_without_update_returning(app, monkeypatch):
+    """SQLite before 3.35 (el9 system library) has no UPDATE ... RETURNING: SQLAlchemy says so
+    through the dialect, and the counter still counts."""
     from sqlalchemy import event
     from utils.ca_serial_counter import next_ca_serial
-    monkeypatch.setattr(sqlite3, 'sqlite_version_info', (3, 34, 1))
 
     def refuse_returning(conn, cursor, statement, *args):
         if 'RETURNING' in statement.upper():
-            raise sqlite3.OperationalError('near "RETURNING": syntax error')
+            raise RuntimeError('RETURNING is not available on this database')
 
     with app.app_context():
         engine = db.session.get_bind()
-        if engine.dialect.name != 'sqlite':
-            pytest.skip('SQLite-only fallback')
         ca = _ca_row(*_authority())
+        monkeypatch.setattr(engine.dialect, 'update_returning', False)
         event.listen(engine, 'before_cursor_execute', refuse_returning)
         try:
             assert [next_ca_serial(ca), next_ca_serial(ca)] == [1, 2]
