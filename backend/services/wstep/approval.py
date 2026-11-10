@@ -51,7 +51,7 @@ def _issue(approval, data):
     from services.wstep import wstep_service
     ca = db.session.get(CA, int(data['ca_id'])) if data.get('ca_id') is not None else None
     if ca is None:
-        raise ProtocolRequestGone('The WSTEP CA no longer exists')
+        raise ProtocolRequestGone('The WSTEP CA no longer exists', refusal=protocol_approval.ISSUANCE_REFUSAL)
     csr = x509.load_pem_x509_csr(data['csr'].encode())
     require_pop = bool(data.get('require_pop', True))
     if data.get('operation') == 'renew':
@@ -70,7 +70,8 @@ def _issue(approval, data):
     if err:
         if isinstance(err, wstep_service.ServerError):
             raise ValueError(str(err))
-        raise ProtocolRequestGone(f'The WSTEP request can no longer be issued: {err}')
+        raise ProtocolRequestGone(f'The WSTEP request can no longer be issued: {err}',
+                                  refusal=protocol_approval.ISSUANCE_REFUSAL)
     serial = x509.load_pem_x509_certificate(cert_pem.encode()).serial_number
     row = Certificate.query.filter_by(serial_number=str(serial), caref=ca.refid).first()
     return {'id': row.id if row is not None else None, 'cn': data.get('cn'), 'protocol': 'wstep',

@@ -402,3 +402,24 @@ def test_a_withdrawn_certificate_closes_the_request_as_any_closure(app, client, 
             assert entry is not None and 'Certificate withdrawn' in entry.details
             votes = db.session.get(ApprovalRequest, approval_id).get_approvals()
             assert votes[-1]['action'] == 'reject' and votes[-1]['comment'] == 'Certificate withdrawn'
+
+
+def test_a_reenrolment_refused_at_issuance_is_announced_as_such(app, client, auth_client, est_config,
+                                                                monkeypatch):
+    """Closed by the issuance, not by an approver: the client is told so."""
+    from services.cert import issued_lookup
+    csr, key = _make_csr(common_name='renew-refused.est-approval.test')
+    leaf = _cert_of(_enroll(client, csr))
+    client_pem = leaf.public_bytes(serialization.Encoding.PEM).decode()
+    renewal = x509.CertificateSigningRequestBuilder().subject_name(leaf.subject).sign(key, hashes.SHA256())
+    with approval_policy(app, est_config['id'], 'est-held-reenroll-refused') as pid:
+        _held(_post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem))
+        (approval_id, *_), = requests_of(app, pid, 'est_enroll')
+        real = issued_lookup.issued_certificate_status
+        monkeypatch.setattr(issued_lookup, 'issued_certificate_status',
+                            lambda ca, cert: (real(ca, cert)[0], issued_lookup.REVOKED))
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        monkeypatch.setattr(issued_lookup, 'issued_certificate_status', real)
+        assert r.get_json()['message'] == 'Request closed'
+        refused = _post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem)
+        assert refused.status_code == 403 and refused.data == b'Refused at issuance'

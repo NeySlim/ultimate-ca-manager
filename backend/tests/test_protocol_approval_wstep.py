@@ -251,3 +251,21 @@ def test_a_renewal_approval_is_never_seen_without_its_certificate(app, client, a
         approve(auth_client, approval_id)
         assert heard[0].status_code == 200, heard[0].data
         assert _issued_cert_from_rstr(heard[0].data).subject == old_cert.subject
+
+
+def test_a_renewal_refused_at_issuance_is_announced_as_such(app, client, auth_client, wstep_config):
+    """Closed by the issuance (renewed certificate revoked while held), not by an approver."""
+    from models import db
+    old_cert, old_key = _issue(app, wstep_config['id'], 'renew-refused.wstep-approval.test')
+    body = _rst(_cmc_renewal(_renewal_csr(old_cert, old_key), [(old_key, old_cert)]))
+    with approval_policy(app, wstep_config['id'], 'wstep-held-renew-refused') as pid:
+        request_id = _pending(_post(client, body, tls_cert=old_cert))
+        (approval_id, *_), = requests_of(app, pid, 'wstep_request')
+        with app.app_context():
+            row = Certificate.query.filter_by(serial_number=str(old_cert.serial_number)).first()
+            row.revoked = True
+            db.session.commit()
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.get_json()['message'] == 'Request closed'
+        reason, invalid, _echo = _fault(_post(client, _query_rst(request_id), tls_cert=old_cert))
+        assert reason == 'Refused at issuance' and invalid == 'true'

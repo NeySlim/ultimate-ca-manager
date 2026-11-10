@@ -53,6 +53,10 @@ class ApprovalGateUnavailable(Exception):
     """The policies could not be evaluated: the caller must not issue."""
 
 
+# What EST and WSTEP record when their issuance refuses an approved request
+ISSUANCE_REFUSAL = {'reason': REFUSED_AT_ISSUANCE}
+
+
 class ProtocolRequestGone(ValueError):
     """The protocol request an approval names can no longer be issued
     (order finalized or invalidated, SCEP request closed elsewhere).
@@ -290,9 +294,13 @@ def close_withdrawn(approval, reason: str = CERTIFICATE_WITHDRAWN) -> None:
 def decision_reason(approval) -> str:
     """What the client is told about a request that will not be issued: a
     fixed text, the approver's comment stays server side (vote, audit, webhook)."""
-    closed_reason = request_data(approval).get('closed_reason')
+    data = request_data(approval)
+    closed_reason = data.get('closed_reason')
     if closed_reason in (CERTIFICATE_WITHDRAWN, RENEWED_REVOKED, REFUSED_AT_ISSUANCE):
         return closed_reason
+    if data.get('refusal'):
+        # Closed by the issuance itself, whose own text stays server side
+        return REFUSED_AT_ISSUANCE
     if approval.status == 'expired':
         return 'Approval request expired'
     return 'Rejected by an approver'

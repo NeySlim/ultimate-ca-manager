@@ -18,7 +18,7 @@ def _issue(approval, data):
     from api.est_protocol import sign_est_csr
     ca = db.session.get(CA, int(data['ca_id'])) if data.get('ca_id') is not None else None
     if ca is None:
-        raise ProtocolRequestGone('The EST CA no longer exists')
+        raise ProtocolRequestGone('The EST CA no longer exists', refusal=protocol_approval.ISSUANCE_REFUSAL)
     csr = x509.load_pem_x509_csr(data['csr'].encode())
     renewal_of = supersedes = None
     if data.get('operation') == 'reenroll':
@@ -26,7 +26,8 @@ def _issue(approval, data):
         renewal_of = x509.load_pem_x509_certificate(data['renewal_of'].encode())
         supersedes, status = issued_certificate_status(ca, renewal_of)
         if status != OK:
-            raise ProtocolRequestGone(f'The certificate being renewed can no longer be renewed ({status})')
+            raise ProtocolRequestGone(f'The certificate being renewed can no longer be renewed ({status})',
+                                      refusal=protocol_approval.ISSUANCE_REFUSAL)
     pem, _serial = sign_est_csr(ca, csr, renewal_of=renewal_of, supersedes=supersedes,
                                 on_stored=protocol_approval.linker(approval))
     serial = x509.load_pem_x509_certificate(pem.encode()).serial_number
