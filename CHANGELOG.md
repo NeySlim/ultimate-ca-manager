@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- Dashboard: `GET /api/v2/dashboard/queue`, `/health`, `/compliance` and `/issuance` (scope `read:dashboard`, now held by every built-in role) return the work queue, per-protocol health, compliance counters and issuance per CA, computed in SQL without parsing certificates; certificates gain `key_bits` and `sig_hash` columns, backfilled by migration 139.
+
 ### Fixed
 
 - Certificate Transparency: `POST /api/v2/certificates/<id>/submit-ct` always failed with a server error, as it read an attribute the certificate model does not have, and the chain it built stopped at the direct issuer; the submission now sends the leaf with its full issuer chain up to the root, or the chain stored inline with the certificate, one element per certificate (RFC 6962 §4.1). Reported by Chris by e-mail.

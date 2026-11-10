@@ -1944,6 +1944,15 @@ GET /api/v2/dashboard/certificate-trend?days=30
 }
 ```
 
+### Overview Aggregates
+```http
+GET /api/v2/dashboard/queue?limit=100
+GET /api/v2/dashboard/health?days=7
+GET /api/v2/dashboard/compliance
+GET /api/v2/dashboard/issuance?days=7
+```
+Scope `read:dashboard`. `queue` lists `{kind, tier, id, label, due_at, href_hint}` items (critical first, at most 100) with the total per kind in `counts`; `health` gives per protocol (`acme`, `scep`, `est`, `scheduler`) one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) and the `basis` it is measured on; `compliance` counts the live certificates by key algorithm and weakness, each with a `filter_hint`; `issuance` counts issued certificates per CA and per day (`days` 1 to 90) and per source. A `days` outside its range is refused with 400.
+
 ### Get Stats Overview
 ```http
 GET /api/v2/stats/overview
