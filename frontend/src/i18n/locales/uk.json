@@ -6087,7 +6087,6 @@
         "renewal_declined": "Renewal declined",
         "ca_expiring": "CA expiring",
         "system_backup": "Backup failed",
-        "system_restore": "Restore failed",
         "session_revoke": "Session revoked",
         "session_revoke_all": "Sessions revoked"
       }

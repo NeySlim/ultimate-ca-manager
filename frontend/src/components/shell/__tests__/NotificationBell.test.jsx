@@ -161,9 +161,9 @@ describe('NotificationBell', () => {
     expect(bell()).toHaveFocus()
   })
 
-  it('asks for backup and restore failures in their own request', async () => {
+  it('asks for failed scheduled backups in their own request, and for nothing else', async () => {
     setup()
     await waitFor(() => expect(m.getLogs).toHaveBeenCalledWith(
-      expect.objectContaining({ action: ['system_backup', 'system_restore'], success: false })))
+      expect.objectContaining({ action: ['system_backup'], success: false })))
   })
 })

@@ -91,7 +91,7 @@ export const helpContent = {
         title: 'Notifications',
         icon: Stack,
         items: [
-          { label: 'Bell', text: 'The count is the number of unread items in the panel: critical items and approvals from the dashboard queue, and failed backups or revoked sessions from the audit log' },
+          { label: 'Bell', text: 'The count is the number of unread items in the panel: critical items and approvals from the dashboard queue, and failed scheduled backups or revoked sessions from the audit log' },
           { label: 'Rights', text: 'You only see items from sources you may read; a source you have no right on shows nothing' },
           { label: 'Read', text: 'Mark an item or all of them read; the marks are saved with your preferences, and an item that resolves leaves the panel' },
           { label: 'Open', text: 'Open goes to the page of the item; nothing is approved or retried from the panel' },
