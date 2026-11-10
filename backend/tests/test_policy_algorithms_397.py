@@ -27,12 +27,12 @@ CONTENT_JSON = 'application/json'
 
 
 def _forget_newer_than(floor):
-    """Rows pointing at a CA without ON DELETE CASCADE go first, or PostgreSQL refuses the delete."""
+    """Delete the certificates, CA dependents (purge_ca_dependents) and policies of the CAs made after `floor`, then those CAs."""
     from services.deletion_blockers import purge_ca_dependents
     cas = CA.query.filter(CA.id > floor[CA]).all()
     ca_ids = [row.id for row in cas]
     Certificate.query.filter(Certificate.id > floor[Certificate]).delete(synchronize_session=False)
-    # The product's own list of CA dependents (revoked serials, CRL, OCSP, SCEP...)
+    # Dependents first, or PostgreSQL refuses the CA delete
     for ca in cas:
         purge_ca_dependents(ca)
     CertificatePolicy.query.filter(CertificatePolicy.ca_id.in_(ca_ids)).delete(synchronize_session=False)
@@ -604,7 +604,7 @@ class TestReviewFollowups:
 
 
 def test_cleanup_removes_a_ca_that_has_crl_and_ocsp_rows(app, create_ca):
-    """With foreign keys enforced (PostgreSQL always), the dependents must go before the CA."""
+    """With foreign keys enforced (PostgreSQL always), the CRL, OCSP and revoked-serial rows go before the CA."""
     from models import CRLMetadata, OCSPResponse
     from models.revoked_serial import RevokedSerial
     from utils.datetime_utils import utc_now
