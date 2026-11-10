@@ -257,7 +257,7 @@ def _is_stale(node, wake_interval, now) -> bool:
 
 def cluster_summary(wake_interval) -> dict:
     """{leader_node_id, nodes, stale, command_seen} as the public /health reports it; a stale
-    leader is no leader. command_seen is the answering node's own: no other node is named."""
+    leader is no leader. The leader is the only node it names; command_seen is the answering node's."""
     from config.settings import Config
     from models import ClusterNode
     now = cluster_utc_now()
