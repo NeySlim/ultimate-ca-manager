@@ -220,3 +220,31 @@ def test_pg_migration_runs_against_real_postgres(tmp_path, monkeypatch):
     with engine.begin() as conn:
         conn.execute(text("DROP TABLE IF EXISTS regression_103_marker"))
         conn.execute(text("DELETE FROM _migrations WHERE name = '999_regression_103'"))
+
+
+@pytest.mark.skipif(not PG_URL, reason="needs UCM_TEST_POSTGRES_URL")
+def test_the_ledger_records_utc_whatever_the_session_zone():
+    """`_mark_applied` writes naive UTC, so a copy from SQLite and a native write agree."""
+    import uuid
+    from datetime import datetime, timezone
+
+    from sqlalchemy import create_engine, text
+
+    import migration_runner
+
+    schema = f"ledger_{uuid.uuid4().hex[:8]}"
+    admin = create_engine(PG_URL)
+    with admin.begin() as conn:
+        conn.execute(text(f"CREATE SCHEMA {schema}"))
+    engine = create_engine(PG_URL, connect_args={"options": f"-c search_path={schema} -c TimeZone=Pacific/Kiritimati"})
+    try:
+        migration_runner._ensure_tracking_table(engine, True)
+        migration_runner._mark_applied(engine, ["999_zone"], True)
+        with engine.begin() as conn:
+            stored = conn.execute(text("SELECT applied_at FROM _migrations WHERE name = '999_zone'")).scalar()
+        assert abs((datetime.now(timezone.utc).replace(tzinfo=None) - stored).total_seconds()) < 120
+    finally:
+        engine.dispose()
+        with admin.begin() as conn:
+            conn.execute(text(f"DROP SCHEMA {schema} CASCADE"))
+        admin.dispose()

@@ -126,11 +126,13 @@ def _migrations_ddl(target_is_pg: bool) -> str:
         "id SERIAL PRIMARY KEY" if target_is_pg
         else "id INTEGER PRIMARY KEY AUTOINCREMENT"
     )
+    # Naive UTC on both backends: the rows are copied as they are
+    now = "(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')" if target_is_pg else "CURRENT_TIMESTAMP"
     return f"""
         CREATE TABLE IF NOT EXISTS _migrations (
             {identity},
             name VARCHAR(255) NOT NULL UNIQUE,
-            applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+            applied_at TIMESTAMP NOT NULL DEFAULT {now}
         )
     """
 
