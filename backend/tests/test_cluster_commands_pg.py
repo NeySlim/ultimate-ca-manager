@@ -309,6 +309,26 @@ def test_a_node_started_after_the_restart_command_is_spared(app, ha):
     assert cluster.events == []
 
 
+def test_a_node_waiting_its_turn_keeps_applying_reloads_in_order(app, ha):
+    cluster, log = _Cluster(app), []
+    for name in ('a', 'b'):
+        _node_row(app, name)
+    b = ha('b', restart_action=cluster.action('b'), guard=30,
+           handlers={cc.RELOAD_SYSLOG: _recorder(log, 'b')})
+    _emit(app, cc.RESTART)
+    b.start()
+    assert wait_for(lambda: b._restart_wait is not None)  # a is ahead and still on its old process
+    started = time.monotonic()
+    _emit(app, cc.RELOAD_SYSLOG, {'mark': 1})
+    _emit(app, cc.RELOAD_SYSLOG, {'mark': 2})
+    assert wait_for(lambda: len(log) == 2, timeout=10)
+    assert time.monotonic() - started < 10
+    assert log == [('b', 1), ('b', 2)] and cluster.events == []
+    _back(app, 'a')
+    assert wait_for(lambda: ('up', 'b') in cluster.events)  # the restart still runs, once
+    assert cluster.events == [('down', 'b'), ('up', 'b')]
+
+
 LAG = timedelta(hours=1)
 
 

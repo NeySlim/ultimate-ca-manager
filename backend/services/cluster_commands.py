@@ -192,6 +192,7 @@ class CommandApplier:
         self._holes = []  # [lo, hi, monotonic deadline]: ids passed over that may still commit
         self._gap = None  # (first missing id, monotonic time it was noticed)
         self._restart_wait = None  # (command id, monotonic first sight, nodes ahead then)
+        self._held = None  # the restart waiting for this node's turn; later reloads still apply
         self._engine = None
         self._conn = None
         self._error_logged = False
@@ -261,6 +262,12 @@ class CommandApplier:
     def _drain(self, conn):
         now = time.monotonic()
         self._holes = [h for h in self._holes if h[2] > now][-MAX_HOLES:]
+        if self._held is not None:
+            held, self._held = self._held, None
+            if not self._restart(conn, held):
+                return
+            if self._held is None:
+                self._fill_hole(held.id)
         where, params = ['id > :seen'], {'seen': self.seen, 'n': BATCH}
         for i, (lo, hi, _) in enumerate(self._holes):
             where.append(f'id BETWEEN :lo{i} AND :hi{i}')
@@ -271,16 +278,16 @@ class CommandApplier:
         for row in rows:
             if self._stop.is_set():
                 return
-            if row.id <= self.seen:
-                # Committed after this node moved past it; stays a hole until applied
-                if not self._apply(conn, row):
-                    return
-                self._fill_hole(row.id)
+            if self._held is not None and row.id == self._held.id:
                 continue
-            if row.id > self.seen + 1 and not self._gap_passed(row.id, now):
+            # Committed after this node moved past it: stays a hole until applied
+            late = row.id <= self.seen
+            if not late and row.id > self.seen + 1 and not self._gap_passed(row.id, now):
                 return
             if not self._apply(conn, row):
                 return
+            if late and self._held is not row:
+                self._fill_hole(row.id)
 
     def _gap_passed(self, next_id, now):
         first_missing = self.seen + 1
@@ -308,6 +315,8 @@ class CommandApplier:
             self._advance(conn, row.id)
             return True
         if row.kind == RESTART:
+            if self._held is not None:
+                return False  # one restart at a time, in id order
             return self._restart(conn, row)
         handler = self.handlers.get(row.kind)
         if handler is None:
@@ -348,6 +357,8 @@ class CommandApplier:
         return conn.execute(_ROW_SQL, {'n': self.node_id}).first() is None
 
     def _restart(self, conn, row):
+        """False when this process leaves; while it waits for its turn, ``row`` is held
+        (restart_seen, not command_seen, records the claim) and later reloads go on."""
         if not self.record or row.created_at <= self.started_at:
             # Started after the command (or the scheduler process): nothing to restart here
             self._advance(conn, row.id)
@@ -361,7 +372,9 @@ class CommandApplier:
             self._restart_wait = (row.id, now, len(pending))
         _, since, ahead = self._restart_wait
         if pending and now - since < self.guard * ahead:
-            return False
+            self._held = row
+            self._advance(conn, row.id)
+            return True
         self._restart_wait = None
         if pending:
             logger.warning(f"Rolling restart: {', '.join(pending)} not back after "
