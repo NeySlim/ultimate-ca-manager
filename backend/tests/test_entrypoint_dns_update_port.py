@@ -39,8 +39,8 @@ def test_scripts_with_a_syntax_error_are_caught_neg(tmp_path):
 
 
 def test_entrypoint_checks_the_port_before_setting_up_the_data_dir_neg():
-    # test d'ordre textuel : le comportement est prouvé par les tests de dns-update-port.sh,
-    # l'entrypoint n'est jamais exécuté ici
+    # Textual order test: dns-update-port.sh carries the behaviour tests,
+    # the entrypoint is never run here.
     text = ENTRYPOINT.read_text()
     check = text.index('check_dns_update_port || exit 1')
     assert text.index('dns-update-port.sh') < check
