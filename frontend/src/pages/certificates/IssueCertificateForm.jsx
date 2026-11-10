@@ -31,7 +31,8 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   const [issuing, setIssuing] = useState(false)
   const issuingRef = useRef(false)
   // True once the user, a template or a re-key picked the key: the server default then leaves it alone
-  const keyChosen = useRef(false)
+  // Who set the current key: 'user', 'template' or null (server default applies)
+  const keySource = useRef(null)
   const [showAllTemplates, setShowAllTemplates] = useState(false)
   const [showHiddenCas, setShowHiddenCas] = useState(false)
   const [customExtRows, setCustomExtRows] = useState([])
@@ -139,7 +140,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
         key_type: initialData.key_type || '',
         key_size: initialData.key_size || '',
       }))
-      keyChosen.current = !!initialData.key_type
+      keySource.current = initialData.key_type ? 'user' : null
       if (initialData.sans?.length > 0) {
         setSans(initialData.sans.filter(s => s && typeof s.type === 'string' && typeof s.value === 'string'))
       }
@@ -183,7 +184,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
 
   // The server's default key for this CA and template, until the user picks another
   useEffect(() => {
-    if (keyChosen.current || !defaultKeyType) return
+    if (keySource.current || !defaultKeyType) return
     const pair = findAlgorithm(defaultKeyType)?.issue
     if (pair) setFormData(prev => ({ ...prev, key_type: pair[0], key_size: pair[1] }))
   }, [defaultKeyType])
@@ -193,7 +194,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   useEffect(() => {
     if (noKeyAllowed || (!formData.key_type && !allowedKeyTypes)) return
     if (allowedKeys.some(([k, sz]) => k === formData.key_type && sz === formData.key_size)) return
-    const def = !keyChosen.current && findAlgorithm(defaultKeyType)?.issue
+    const def = !keySource.current && findAlgorithm(defaultKeyType)?.issue
     const [type, size] = (def && allowedKeys.some(([k, sz]) => k === def[0] && sz === def[1]) ? def : null)
       || allowedKeys.find(([k]) => k === formData.key_type) || allowedKeys[0]
     setFormData(prev => ({ ...prev, key_type: type, key_size: size }))
@@ -225,11 +226,12 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     const updates = {}
 
     // Map template key_type to form fields
-    keyChosen.current = false
+    // A keyless template releases only a template's key, never the user's own choice
+    if (keySource.current === 'template') keySource.current = null
     if (tpl.key_type) {
       const pair = findAlgorithm(tpl.key_type)?.issue
       if (pair) {
-        keyChosen.current = true
+        keySource.current = 'template'
         updates.key_type = pair[0]
         updates.key_size = pair[1]
       }
@@ -684,7 +686,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
           label={t('common.keyType')}
           value={formData.key_type}
           onChange={(val) => {
-            keyChosen.current = true
+            keySource.current = 'user'
             update('key_type', val)
             update('key_size', sizeForType(val))
           }}
@@ -693,7 +695,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
         <Select
           label={t('common.keySize')}
           value={formData.key_size}
-          onChange={(val) => { keyChosen.current = true; update('key_size', val) }}
+          onChange={(val) => { keySource.current = 'user'; update('key_size', val) }}
           options={groupedOptions(
             KEY_ALGORITHMS.filter(k => k.generate && k.issue && k.issue[0] === formData.key_type), t,
             k => algorithmName(k, t, 'sizeKey'), k => k.issue[1],
