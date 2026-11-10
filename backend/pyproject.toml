@@ -3,11 +3,12 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "--ignore=tests/e2e_test_suite.py"
+addopts = "--ignore=tests/e2e_test_suite.py -m 'not ha'"
 markers = [
     "postgres: marks tests requiring a real PostgreSQL instance (set UCM_TEST_POSTGRES_URL)",
     "sqlite_only(reason): skipped when the session app runs on PostgreSQL (UCM_TEST_APP_PG_URL)",
     "slow: a test that takes more than a minute; still part of the suite",
+    "ha: two-node HA bench (tests/ha), deselected unless run with -m ha; needs UCM_TEST_HA=1 and UCM_TEST_PG_URL",
 ]
 
 [tool.coverage.run]

@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 SUPERVISED_ENV = 'UCM_SCHEDULER_SUPERVISED'
 # How often a process waiting for the scheduler lock tries again
 LOCK_RETRY_SECONDS = 5
+# How often the loop wakes; a heartbeat is written at most once per wake
+WAKE_INTERVAL_SECONDS = 60
 # How soon the loop sees a "run now" asked by a web worker, and how long that worker waits
 REQUEST_POLL_SECONDS = 1
 RUN_NOW_WAIT_SECONDS = 30
@@ -879,11 +881,11 @@ def get_scheduler() -> SchedulerService:
     """Get or create global scheduler instance"""
     global _scheduler
     if _scheduler is None:
-        _scheduler = SchedulerService(wake_interval=60)
+        _scheduler = SchedulerService(wake_interval=WAKE_INTERVAL_SECONDS)
     return _scheduler
 
 
-def init_scheduler(app=None, wake_interval: int = 60, autostart: bool = True) -> SchedulerService:
+def init_scheduler(app=None, wake_interval: int = WAKE_INTERVAL_SECONDS, autostart: bool = True) -> SchedulerService:
     """
     Initialize and start the scheduler
     
