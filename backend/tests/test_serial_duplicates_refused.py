@@ -35,12 +35,20 @@ def test_the_database_listing_names_each_pair_and_its_rows():
     conn.commit()
     engine = create_engine('sqlite://', creator=lambda: conn)
     with engine.connect() as c:
-        assert duplicates_in_database(c) == [{'caref': 'ca-a', 'serial_number': '11', 'ids': [1, 2]}]
+        assert duplicates_in_database(c) == [
+            {'caref': 'ca-a', 'serial_number': '11', 'ids': [1, 2], 'stored': ['11', '11']}]
     assert duplicates_in_rows([{'refid': 'r1', 'caref': 'ca-a', 'serial_number': '11'},
                                {'refid': 'r2', 'caref': 'ca-a', 'serial_number': '11'},
                                {'refid': 'r3', 'caref': None, 'serial_number': '11'},
                                {'refid': 'r4', 'caref': 'ca-a', 'serial_number': None}]) == [
-        {'caref': 'ca-a', 'serial_number': '11', 'ids': ['r1', 'r2']}]
+        {'caref': 'ca-a', 'serial_number': '11', 'ids': ['r1', 'r2'], 'stored': ['11', '11']}]
+
+
+def test_describe_gives_each_id_with_the_spelling_stored():
+    from utils.serial_duplicates import describe
+    pair = {'caref': 'ca-a', 'serial_number': '11', 'ids': [4, 9], 'stored': ['11', 'b']}
+    assert describe([pair]) == "CA ca-a serial 11: 4 (stored as '11'), 9 (stored as 'b')"
+    assert describe([{'caref': 'c', 'serial_number': '1', 'ids': [1, 2]}]) == 'CA c serial 1: 1, 2'
 
 
 @pytest.fixture
@@ -74,7 +82,8 @@ def test_a_backend_migration_refuses_a_source_with_duplicate_serials(app, duplic
     with app.app_context():
         ok, message, stats = migrate_data(f'sqlite:///{target}')
     assert not ok and stats['refusal'] == 'preflight' and stats['target_written'] is False
-    assert caref in message and SERIAL in message and all(str(i) in message for i in ids)
+    assert caref in message and SERIAL in message
+    assert all(f"{i} (stored as '{SERIAL}')" in message for i in ids)
     assert 'migration 142' in message
     _states_the_procedure(message)
 
@@ -91,7 +100,7 @@ def test_a_restore_refuses_an_archive_with_duplicate_serials(app, create_ca):
             with pytest.raises(BackupSchemaError) as refusal:
                 _service().restore_backup(blob, PASSWORD, mode='merge')
             assert caref in str(refusal.value) and SERIAL in str(refusal.value)
-            assert all(r in str(refusal.value) for r in refids)
+            assert all(f"{r} (stored as '{SERIAL}')" in str(refusal.value) for r in refids)
             assert 'migration 142' in str(refusal.value)
             _states_the_procedure(str(refusal.value))
             assert Certificate.query.filter(Certificate.refid.in_(refids)).count() == 0
@@ -165,7 +174,7 @@ def test_the_start_warning_names_the_rows_and_still_reads_an_entry_stored_withou
         warning = next(r.getMessage() for r in caplog.records if PENDING_KEY in r.getMessage())
         assert "41 stored as '11'" in warning and "57 stored as 'b'" in warning
         assert 'CA ca-z serial 7 x2' in warning
-        assert 'certificate ids and stored spellings' in warning
+        assert 'certificate ids and stored spellings shown with it' in warning
     finally:
         with app.app_context():
             SystemConfig.query.filter_by(key=PENDING_KEY).delete()

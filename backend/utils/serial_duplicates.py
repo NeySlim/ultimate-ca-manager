@@ -22,7 +22,7 @@ ROWS_OF_COVERED = f"SELECT id, caref, serial_number FROM certificates WHERE {_CO
 _ROWS = f"SELECT id, caref, serial_number, crt FROM certificates WHERE {_COVERED} ORDER BY id"
 # Self-contained: packages ship no docs/, so the message is the procedure
 CLEANUP = ("Delete all but one certificate of each listed serial on the installation that holds "
-           "them, found by the certificate ids and stored spellings given with it (revoke it first if it is in use; a revoked row still counts), until each serial "
+           "them, found by the certificate ids and stored spellings shown with it where there are any (revoke it first if it is in use; a revoked row still counts), until each serial "
            "appears once under its CA. Then delete the rows '142_serial_per_ca_and_proxy_links' "
            "and '144_canonical_certificate_serials' from the _migrations table, so the next start "
            "runs migration 142 and migration 144 again, which create the index and store every "
@@ -35,7 +35,7 @@ def duplicates_in_database(conn) -> List[Dict]:
     groups: Dict = {}
     # Streamed: one batch of PEMs in memory at a time, as in migration 144
     for row_id, caref, serial, crt in conn.execute(text(_ROWS), execution_options={'yield_per': 500}):
-        groups.setdefault((caref, canonical_stored_serial(serial, crt)), []).append(row_id)
+        groups.setdefault((caref, canonical_stored_serial(serial, crt)), []).append((row_id, serial))
     return _shared(groups)
 
 
@@ -46,15 +46,15 @@ def duplicates_in_rows(rows: Iterable[Dict], id_key: str = 'refid') -> List[Dict
         caref, serial = row.get('caref'), row.get('serial_number')
         if caref is None or serial is None or serial == '':
             continue
-        serial = canonical_stored_serial(serial, row.get('certificate_pem'))
-        groups.setdefault((caref, serial), []).append(row.get(id_key))
+        canonical = canonical_stored_serial(serial, row.get('certificate_pem'))
+        groups.setdefault((caref, canonical), []).append((row.get(id_key), serial))
     return _shared(groups)
 
 
 def _shared(groups: Dict) -> List[Dict]:
-    return [{'caref': caref, 'serial_number': serial, 'ids': ids}
-            for (caref, serial), ids in sorted(groups.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1])))
-            if len(ids) > 1]
+    return [{'caref': caref, 'serial_number': serial, 'ids': [i for i, _ in held], 'stored': [s for _, s in held]}
+            for (caref, serial), held in sorted(groups.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1])))
+            if len(held) > 1]
 
 
 def stored_rows(ids, raw) -> List[Dict]:
@@ -74,9 +74,12 @@ def describe_pending(entry: Dict) -> str:
 
 
 def describe(duplicates: List[Dict], limit: int = 10) -> str:
-    """One line per pair, for a refusal message."""
-    shown = '; '.join(f"CA {d['caref']} serial {d['serial_number']}: {', '.join(map(str, d['ids']))}"
-                      for d in duplicates[:limit])
+    """One line per pair, each id with the spelling it stores, for a refusal message."""
+    def rows(d):
+        stored = d.get('stored')
+        return ', '.join(f"{i} (stored as '{s}')" for i, s in zip(d['ids'], stored)) if stored \
+            else ', '.join(map(str, d['ids']))
+    shown = '; '.join(f"CA {d['caref']} serial {d['serial_number']}: {rows(d)}" for d in duplicates[:limit])
     more = f" (and {len(duplicates) - limit} more)" if len(duplicates) > limit else ''
     return shown + more
 
