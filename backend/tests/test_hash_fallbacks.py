@@ -18,10 +18,21 @@ SUBJECT = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'hash fallback')])
 
 
 @pytest.mark.parametrize('name, expected', [
-    (None, hashes.SHA256), ('', hashes.SHA256), ('sha384', hashes.SHA384), (' SHA512 ', hashes.SHA512),
+    ('sha384', hashes.SHA384), (' SHA512 ', hashes.SHA512),
 ])
 def test_known_hashes_resolve(name, expected):
     assert isinstance(hash_algorithm(name), expected)
+
+
+@pytest.mark.parametrize('name', [None, ''])
+def test_no_hash_named_leaves_the_choice_to_the_key(name):
+    assert hash_algorithm(name) is None
+
+
+def test_signing_hash_takes_the_keys_own_when_none_is_named():
+    from utils.signing_hash import signing_hash_for
+    assert isinstance(signing_hash_for(ec.generate_private_key(ec.SECP384R1()), hash_algorithm(None)),
+                      hashes.SHA384)
 
 
 @pytest.mark.parametrize('name', ['sha1', 'md5', 'sha224', 'sha3_256', 'sha265'])
