@@ -122,6 +122,30 @@ def test_still_held_asks_the_server(app, ha, monkeypatch):
         other.dispose()
 
 
+def test_a_follower_keeps_one_session_across_its_attempts(app, ha):
+    """A non-leader retries every few seconds on the same connection, not a new one each time."""
+    from models import db
+    with app.app_context():
+        url = db.engine.url
+    lock = scheduler_leader.PgAdvisoryLock(url)
+    other = scheduler_leader.PgAdvisoryLock(url)
+    try:
+        assert lock.acquire()
+        pids = set()
+        for _ in range(4):
+            assert not other.acquire()
+            pids.add(other._conn.execute(text('SELECT pg_backend_pid()')).scalar())
+        assert len(pids) == 1
+        pid = pids.pop()
+        kill_backend(app, pid)  # a dropped session is opened again
+        assert wait_for(lambda: not backend_alive(app, pid))
+        lock.release()
+        assert other.acquire() and other.still_held()
+    finally:
+        lock.dispose()
+        other.dispose()
+
+
 def test_the_lock_session_has_server_side_dead_peer_timeouts(app, ha):
     """The server, not only the client, must drop the session of a leader whose host vanished."""
     from models import db

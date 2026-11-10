@@ -64,7 +64,35 @@ class PgAdvisoryLock:
         self._connect_error_logged = False
 
     def acquire(self) -> bool:
-        self.release()
+        if self.backend_pid is not None:
+            self.release()
+        reused = self._conn is not None
+        got = self._try_lock()
+        if got is None and reused:
+            got = self._try_lock()  # the kept session had dropped: one new one, at once
+        return bool(got)
+
+    def _try_lock(self):
+        """True/False from the server, None when the session failed (it is then closed)."""
+        conn = self._session()
+        if conn is None:
+            return None
+        try:
+            got = conn.execute(text('SELECT pg_try_advisory_lock(:k)'), {'k': self.key}).scalar()
+            pid = conn.execute(text('SELECT pg_backend_pid()')).scalar()
+        except Exception as e:
+            logger.error(f"Scheduler leader lock not taken: {type(e).__name__}")
+            self._conn = None
+            self._close(conn)
+            return None
+        if got:
+            self.backend_pid = pid
+        return bool(got)
+
+    def _session(self):
+        """The dedicated connection, kept open between attempts and reopened only once dropped."""
+        if self._conn is not None:
+            return self._conn
         if self._engine is None:
             self._engine = _dedicated_engine(self._url)
         try:
@@ -73,29 +101,19 @@ class PgAdvisoryLock:
             if not self._connect_error_logged:
                 logger.error(f"Scheduler leader lock: no connection to the database ({type(e).__name__})")
                 self._connect_error_logged = True
-            return False
+            return None
         self._connect_error_logged = False
         try:
             conn.execute(_SERVER_TIMEOUTS_SQL)
         except Exception as e:
             logger.warning(f"Scheduler leader lock: server-side keepalives not set ({type(e).__name__})")
-        try:
-            got = conn.execute(text('SELECT pg_try_advisory_lock(:k)'), {'k': self.key}).scalar()
-            pid = conn.execute(text('SELECT pg_backend_pid()')).scalar()
-        except Exception as e:
-            logger.error(f"Scheduler leader lock not taken: {type(e).__name__}")
-            self._close(conn)
-            return False
-        if not got:
-            self._close(conn)
-            return False
-        self._conn, self.backend_pid = conn, pid
-        return True
+        self._conn = conn
+        return conn
 
     def still_held(self) -> bool:
         """Asks the server: a reconnected session or a dropped one no longer holds the lock."""
         conn = self._conn
-        if conn is None:
+        if conn is None or self.backend_pid is None:
             return False
         try:
             held = conn.execute(_HELD_SQL, {
@@ -111,13 +129,15 @@ class PgAdvisoryLock:
         return bool(held)
 
     def release(self) -> None:
-        conn, self._conn, self.backend_pid = self._conn, None, None
+        conn, held = self._conn, self.backend_pid is not None
+        self._conn, self.backend_pid = None, None
         if conn is None:
             return
-        try:
-            conn.execute(text('SELECT pg_advisory_unlock(:k)'), {'k': self.key})
-        except Exception:
-            pass  # a dead session already freed it
+        if held:
+            try:
+                conn.execute(text('SELECT pg_advisory_unlock(:k)'), {'k': self.key})
+            except Exception:
+                pass  # a dead session already freed it
         self._close(conn)
 
     def dispose(self) -> None:
