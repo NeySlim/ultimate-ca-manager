@@ -24,7 +24,7 @@ export function rgbToHex(rgb) {
   return '#' + rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')
 }
 
-function splitArgs(s) {
+export function splitArgs(s) {
   const out = []
   let depth = 0
   let cur = ''
@@ -37,7 +37,7 @@ function splitArgs(s) {
   return out
 }
 
-function resolve(value, decls) {
+export function resolve(value, decls) {
   const v = value.trim()
   const ref = v.match(/^var\(--([a-z-]+)\)$/)
   if (ref) return resolve(decls[ref[1]], decls)
@@ -51,6 +51,27 @@ function resolve(value, decls) {
     return rgbToHex(ca.map((x, i) => x * p + cb[i] * (1 - p)))
   }
   return v.toLowerCase()
+}
+
+// Every custom property in effect per palette: shared :root aliases, then `rootCss` :root
+// declarations (index.css, imported after tokens.css), then the palette block itself.
+export function paletteDecls(rootCss = '', css = fs.readFileSync(TOKENS_CSS, 'utf8')) {
+  const shared = {}
+  for (const src of [css, rootCss]) {
+    for (const block of src.matchAll(/(:root)\s*\{([^}]*)\}/g)) {
+      for (const d of block[2].matchAll(/--([a-z-]+):\s*([^;]+);/g)) shared[d[1]] = d[2].trim()
+    }
+  }
+  const out = {}
+  for (const block of css.matchAll(/(:root[^{]*)\{([^}]*)\}/g)) {
+    const decls = {}
+    for (const d of block[2].matchAll(/--([a-z-]+):\s*([^;]+);/g)) decls[d[1]] = d[2].trim()
+    for (const sel of block[1].split(',')) {
+      const m = sel.match(/data-theme="([a-z]+)"\]\[data-mode="([a-z]+)"/)
+      if (m) out[`${m[1]}-${m[2]}`] = { ...shared, ...decls }
+    }
+  }
+  return out
 }
 
 export function parseTokens(css = fs.readFileSync(TOKENS_CSS, 'utf8')) {

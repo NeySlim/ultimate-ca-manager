@@ -4,12 +4,37 @@
  * `line` is a decorative divider (exempt from 1.4.11); `control` is the border that carries 3:1.
  */
 import { describe, it, expect } from 'vitest'
-import { parseTokens, contrast, hexToRgb, rgbToHex, FAMILIES, MODES } from './themeTokensParser'
+import fs from 'fs'
+import path from 'path'
+import { parseTokens, paletteDecls, resolve, splitArgs, contrast, FAMILIES, MODES } from './themeTokensParser'
 
 const tokens = parseTokens()
+const INDEX_CSS = fs.readFileSync(path.resolve(__dirname, '../../index.css'), 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+const decls = paletteDecls(INDEX_CSS)
 
-// Gradient end stops as composed in index.css (--gradient-*: 70% of the token mixed with a constant).
-const mix = (c, k) => rgbToHex(hexToRgb(c).map((v, i) => v * 0.7 + hexToRgb(k)[i] * 0.3))
+// Declarations of every rule whose selector list is exactly `selector`, in source order.
+function ruleDecls(css, selector) {
+  const out = []
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!m[1].split(',').map((x) => x.trim()).includes(selector)) continue
+    for (const d of m[2].matchAll(/(?:^|;)\s*([a-z-]+)\s*:\s*([^;]+)/g)) out.push([d[1], d[2].trim()])
+  }
+  return out
+}
+const lastValue = (pairs, prop) => pairs.filter(([p]) => p === prop).map(([, v]) => v).pop()
+
+// Text colour and gradient stops of a .btn-gradient variant, resolved against one palette.
+function gradientButton(key, variant) {
+  const rules = [...ruleDecls(INDEX_CSS, '.btn-gradient'), ...(variant ? ruleDecls(INDEX_CSS, `.btn-gradient.${variant}`) : [])]
+  const bg = lastValue(rules, 'background').match(/^var\(--([a-z-]+)\)$/)[1]
+  const grad = decls[key][bg].match(/^linear-gradient\((.*)\)$/)[1]
+  const stops = splitArgs(grad).filter((x) => !/deg$/.test(x))
+  return {
+    color: resolve(lastValue(rules, 'color'), decls[key]),
+    stops: stops.map((x) => resolve(x.replace(/\s+[0-9.]+%$/, ''), decls[key])),
+  }
+}
 
 const TEXT_PAIRS = [
   ['text', 'bg'], ['text', 'panel'], ['text', 'raised'], ['muted', 'bg'], ['muted', 'panel'],
@@ -40,15 +65,14 @@ describe('theme contrast matrix', () => {
             expect(contrast(t[fg], t[bg])).toBeGreaterThanOrEqual(3)
           })
         }
-        // --on-accent is the text colour of .btn-gradient (primary, success, danger).
-        const fills = {
-          accent: [t.accent, t['grad-b'] && mix(t.accent, '#8B5CF6')],
-          good: [t.good, mix(t.good, '#059669')],
-          bad: [t.bad, mix(t.bad, '#DC2626')],
-        }
-        for (const [name, stops] of Object.entries(fills)) {
-          it(`on-accent on ${name} gradient >= 4.5`, () => {
-            for (const c of stops) expect(contrast(t['on-accent'], c)).toBeGreaterThanOrEqual(4.5)
+        // .btn-gradient (primary, success, danger) as index.css draws it: text is --on-accent,
+        // every stop of its --gradient-* background is readable under it.
+        for (const variant of ['', 'success', 'danger']) {
+          it(`.btn-gradient${variant && '.' + variant} text is on-accent, >= 4.5 on each stop`, () => {
+            const { color, stops } = gradientButton(key, variant)
+            expect(color).toBe(t['on-accent'])
+            expect(stops.length).toBeGreaterThanOrEqual(2)
+            for (const c of stops) expect(contrast(color, c)).toBeGreaterThanOrEqual(4.5)
           })
         }
         if (family === 'aurore') {
