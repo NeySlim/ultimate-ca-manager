@@ -81,14 +81,15 @@ def _approval_is_expired(approval):
     return approval_is_expired(approval)
 
 
-def _expire_request(approval):
-    """Close a request found past its deadline; its protocol (if any) follows."""
+def _expire_request(approval, notify=True):
+    """Close a request found past its deadline; its protocol (if any) follows
+    (a read route passes *notify* False: no Intune call from a GET)."""
     approval.status = 'expired'
     approval.resolved_at = utc_now()
     ok, _err = safe_commit(logger, "Failed to expire request")
     if ok:
         from services.protocol_approval import propagate_closed
-        propagate_closed([approval])
+        propagate_closed([approval], notify=notify)
 
 
 def _link_approval(approval, certificate_id):
@@ -1252,7 +1253,7 @@ def get_approval(request_id):
     """Get approval request details"""
     approval = db.get_or_404(ApprovalRequest, request_id)
     if approval.status == 'pending' and _approval_is_expired(approval):
-        _expire_request(approval)
+        _expire_request(approval, notify=False)
     return success_response(data=approval.to_dict())
 
 

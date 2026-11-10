@@ -70,16 +70,18 @@ class ProtocolRequestGone(ValueError):
 @dataclass
 class _Handler:
     issue: Callable  # (approval, data) -> dict with 'id' (certificate id, None when deferred)
-    closed: Optional[Callable] = None  # (approval, data) after a rejection or an expiry
+    closed: Optional[Callable] = None  # (approval, data) after a rejection or an expiry -> notice owed
     gone: Optional[Callable] = None  # (approval, data) -> reason or None
+    notice: Optional[Callable] = None  # (approval, data): the closure told outside (Intune)
 
 
 _HANDLERS = {}
 
 
-def register(request_type: str, issue: Callable, closed: Callable = None, gone: Callable = None):
+def register(request_type: str, issue: Callable, closed: Callable = None, gone: Callable = None,
+             notice: Callable = None):
     """Declare how a protocol issues its approved requests and follows closed ones."""
-    _HANDLERS[request_type] = _Handler(issue=issue, closed=closed, gone=gone)
+    _HANDLERS[request_type] = _Handler(issue=issue, closed=closed, gone=gone, notice=notice)
 
 
 def _handler(request_type):
@@ -322,16 +324,50 @@ def target_gone(approval) -> Optional[str]:
     return handler.gone(approval, request_data(approval))
 
 
-def propagate_closed(approvals) -> None:
+_NOTICE_PENDING = 'notice_pending'
+
+
+def propagate_closed(approvals, *, notify: bool = True) -> None:
     """Carry rejections and expiries to the protocols' own state. Never
     raises: the decision is recorded whatever happens to its echo, and the
-    protocol reads it again at the client's next request."""
+    protocol reads it again at the client's next request. A read route
+    passes ``notify=False``: the outside notice (Intune) is then owed to
+    :func:`send_pending_notices`, run by the scheduled expiry."""
     for approval in approvals:
         handler = _handler(approval.request_type)
         if handler is None or handler.closed is None:
             continue
         try:
-            handler.closed(approval, request_data(approval))
+            owed = handler.closed(approval, request_data(approval))
+            if owed and handler.notice is not None:
+                if notify:
+                    handler.notice(approval, request_data(approval))
+                else:
+                    data = request_data(approval)
+                    data[_NOTICE_PENDING] = True
+                    approval.request_data = json.dumps(data)
+                    db.session.commit()
         except Exception as e:
             db.session.rollback()
             logger.warning("Approval #%s: protocol state not updated: %s", approval.id, e)
+
+
+def send_pending_notices() -> int:
+    """Send the outside notices read routes left owed; each is sent once."""
+    sent = 0
+    for approval in ApprovalRequest.query.filter(
+            ApprovalRequest.request_type.in_(tuple(REQUEST_TYPE_PROTOCOLS)),
+            ApprovalRequest.request_data.like(f'%"{_NOTICE_PENDING}": true%')).all():
+        data = request_data(approval)
+        if not data.pop(_NOTICE_PENDING, False):
+            continue
+        approval.request_data = json.dumps(data)
+        db.session.commit()
+        handler = _handler(approval.request_type)
+        if handler is not None and handler.notice is not None:
+            try:
+                handler.notice(approval, data)
+                sent += 1
+            except Exception as e:
+                logger.warning("Approval #%s: outside notice not sent: %s", approval.id, e)
+    return sent

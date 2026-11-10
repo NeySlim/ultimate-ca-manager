@@ -73,20 +73,30 @@ def _issue(approval, data):
 
 
 def _closed(approval, data):
+    """Reject the SCEP request; True when it was rejected now (Intune is owed a notice)."""
     scep_req = _scep_request(data)
     if scep_req is None or scep_req.status != 'pending':
-        return
+        return False
     scep_req.status = 'rejected'
     reason = (data.get('refusal') or {}).get('reason') or protocol_approval.decision_reason(approval)
     scep_req.rejection_reason = reason[:255]
     db.session.commit()
+    return True
+
+
+def _notice(approval, data):
+    """Tell Intune, for an Intune profile's request, that it will not be issued."""
+    scep_req = _scep_request(data)
+    if scep_req is None or scep_req.status != 'rejected':
+        return
     try:
         client = _intune_client(scep_req)
     except ValueError as e:
         logger.error("SCEP request %s: Intune not notified of its refusal: %s", scep_req.id, e)
         return
     from services.scep.scep_service import notify_intune_failure
-    notify_intune_failure(client, scep_req.transaction_id, base64.b64decode(scep_req.csr), reason)
+    notify_intune_failure(client, scep_req.transaction_id, base64.b64decode(scep_req.csr),
+                          scep_req.rejection_reason or protocol_approval.decision_reason(approval))
 
 
 def _gone(approval, data):
@@ -94,7 +104,7 @@ def _gone(approval, data):
     return None if scep_req is not None and scep_req.status == 'pending' else _GONE
 
 
-protocol_approval.register('scep_request', _issue, closed=_closed, gone=_gone)
+protocol_approval.register('scep_request', _issue, closed=_closed, gone=_gone, notice=_notice)
 
 
 def linked_approval(scep_req):
@@ -114,7 +124,7 @@ def follow_approval(scep_req):
     ref = protocol_approval.make_ref('scep', scep_req.transaction_id, scep_req.ca_refid)
     approval = protocol_approval.find_protocol_request('scep', ref)
     if approval is not None and approval.status == 'rejected':
-        _closed(approval, protocol_approval.request_data(approval))
+        protocol_approval.propagate_closed([approval])
         return
     if approval is None:
         from models.policy import ApprovalRequest
@@ -124,4 +134,4 @@ def follow_approval(scep_req):
             ApprovalRequest.request_data.like(f'%"{ref}"%'),
         ).order_by(ApprovalRequest.id.desc()).first()
         if closed is not None and protocol_approval.request_data(closed).get('protocol_ref') == ref:
-            _closed(closed, protocol_approval.request_data(closed))
+            protocol_approval.propagate_closed([closed])

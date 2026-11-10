@@ -87,6 +87,7 @@ def _closed(approval, data):
     else:
         error_type, detail = 'unauthorized', protocol_approval.decision_reason(approval)
     _service(data).invalidate_processing_order(order.order_id, error_type, detail)
+    return False
 
 
 def _gone(approval, data):

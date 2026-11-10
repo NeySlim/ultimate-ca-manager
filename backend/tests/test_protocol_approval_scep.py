@@ -403,3 +403,32 @@ def test_an_approved_request_whose_certificate_went_away_fails_the_poll(app, aut
         assert _scep_row(app, scep_ca)[1] == 'rejected'
         (_id, status, data, _cert), = requests_of(app, pid, 'scep_request')
         assert status == 'rejected' and data['closed_reason'] == 'Certificate withdrawn'
+
+
+@pytest.mark.parametrize('route', ['/api/v2/approvals?status=all', '/api/v2/approvals/stats', 'detail'])
+def test_an_expiry_seen_by_a_read_route_is_told_to_intune_by_the_scheduled_task(
+        app, auth_client, scep_ca, intune_held, route):
+    """A GET never calls Intune: the hourly expiry task tells it."""
+    from datetime import timedelta
+    from models.policy import ApprovalRequest
+    from services.approval_gate import scheduled_expiry
+    from utils.datetime_utils import utc_now
+    identity = _client_identity('scep intune expired')
+    with approval_policy(app, scep_ca, f'scep-held-intune-late-{route[-5:]}') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        _on_profile(app, scep_ca, intune_held)
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        with app.app_context():
+            db.session.get(ApprovalRequest, approval_id).expires_at = utc_now() - timedelta(minutes=1)
+            db.session.commit()
+        url = f'/api/v2/approvals/{approval_id}' if route == 'detail' else route
+        assert auth_client.get(url).status_code == 200
+        assert requests_of(app, pid, 'scep_request')[0][1] == 'expired'
+        assert _scep_row(app, scep_ca)[1] == 'rejected'
+        assert _FakeIntune.calls == []
+        with app.app_context():
+            scheduled_expiry()
+        assert _FakeIntune.calls == [('failure', 'txn-19', 'Approval request expired')]
+        with app.app_context():
+            scheduled_expiry()
+        assert len(_FakeIntune.calls) == 1
