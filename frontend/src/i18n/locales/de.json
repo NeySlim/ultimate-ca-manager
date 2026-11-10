@@ -1229,6 +1229,7 @@
     "pinnedSubjectBadge": "Angeheftet",
     "pinnedSubjectBadgeTooltip": "Einige Subject-Felder sind angeheftet und werden bei der WSTEP-Ausstellung erzwungen",
     "keySettings": "Schlüsseleinstellungen",
+    "keyServerDefault": "Server default",
     "extensions": "Erweiterungen",
     "noTemplates": "Keine Vorlagen",
     "noTemplatesDescription": "Erstellen Sie Ihre erste Vorlage",

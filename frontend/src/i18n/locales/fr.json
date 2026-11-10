@@ -3766,6 +3766,7 @@
     "pinnedSubjectBadge": "Épinglé",
     "pinnedSubjectBadgeTooltip": "Certains champs du sujet sont épinglés et appliqués lors de l'émission WSTEP",
     "keySettings": "Paramètres de clé",
+    "keyServerDefault": "Défaut du serveur",
     "extensions": "Extensions",
     "noTemplates": "Aucun modèle",
     "serverAuth": "Authentification serveur",

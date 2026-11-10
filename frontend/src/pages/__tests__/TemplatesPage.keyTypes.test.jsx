@@ -32,7 +32,9 @@ const template = (key_type) => ({
   dn_template: {}, extensions_template: { key_usage: ['digitalSignature'], extended_key_usage: ['serverAuth'], san_types: ['dns'] },
 })
 
-const keyOptions = () => [...screen.getByLabelText('common.keyType').querySelectorAll('option')].map(o => o.value)
+const allKeyOptions = () => [...screen.getByLabelText('common.keyType').querySelectorAll('option')].map(o => o.value)
+// The algorithms offered, without the empty "server default" entry
+const keyOptions = () => allKeyOptions().filter(Boolean)
 const submit = async (onSubmit, name) => {
   fireEvent.click(screen.getByRole('button', { name }))
   await waitFor(() => expect(onSubmit).toHaveBeenCalled())
@@ -63,15 +65,25 @@ describe('TemplateForm key types', () => {
     expect(PQ_ROWS.map(a => a.label)).toContain(PQ_LABEL)
   })
 
-  it('defaults a new template to the first generated key and SHA-256', async () => {
+  it('starts a new template on the server default key, with SHA-256', async () => {
     const onSubmit = vi.fn()
     render(<TemplateForm template={null} onSubmit={onSubmit} onCancel={() => {}} />)
-    const first = listAlgorithms({ generate: true })[0]
+    expect(allKeyOptions()[0]).toBe('')
     expect(keyOptions()).toEqual(listAlgorithms({ generate: true }).map(a => a.label))
+    expect(screen.getByLabelText('common.keyType')).toHaveValue('')
     fireEvent.change(screen.getByPlaceholderText('templates.namePlaceholder'), { target: { value: 'New' } })
     const body = await submit(onSubmit, 'common.create')
-    expect(body.key_type).toBe(first.label)
+    expect(body).not.toHaveProperty('key_type')
     expect(body.digest).toBe('sha256')
+  })
+
+  it('submits the key the operator picks on a new template', async () => {
+    const onSubmit = vi.fn()
+    render(<TemplateForm template={null} onSubmit={onSubmit} onCancel={() => {}} />)
+    const pick = listAlgorithms({ generate: true })[1].label
+    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: pick } })
+    fireEvent.change(screen.getByPlaceholderText('templates.namePlaceholder'), { target: { value: 'New' } })
+    expect((await submit(onSubmit, 'common.create')).key_type).toBe(pick)
   })
 
   it('keeps an ML-DSA template on its key and lets its CA digest be changed', async () => {

@@ -1229,6 +1229,7 @@
     "pinnedSubjectBadge": "Fissato",
     "pinnedSubjectBadgeTooltip": "Alcuni campi del soggetto sono fissati e applicati durante l'emissione WSTEP",
     "keySettings": "Impostazioni chiave",
+    "keyServerDefault": "Server default",
     "extensions": "Estensioni",
     "noTemplates": "Nessun modello",
     "noTemplatesDescription": "Crea il tuo primo modello",

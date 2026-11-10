@@ -1229,6 +1229,7 @@
     "pinnedSubjectBadge": "Pinned",
     "pinnedSubjectBadgeTooltip": "Some subject fields are pinned and enforced on WSTEP issuance",
     "keySettings": "Key Settings",
+    "keyServerDefault": "Server default",
     "extensions": "Extensions",
     "noTemplates": "No templates",
     "noTemplatesDescription": "Create your first template to get started",

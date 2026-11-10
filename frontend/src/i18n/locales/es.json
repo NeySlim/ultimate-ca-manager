@@ -1229,6 +1229,7 @@
     "pinnedSubjectBadge": "Fijado",
     "pinnedSubjectBadgeTooltip": "Algunos campos del asunto están fijados y se aplican en la emisión WSTEP",
     "keySettings": "Configuración de clave",
+    "keyServerDefault": "Server default",
     "extensions": "Extensiones",
     "noTemplates": "Sin plantillas",
     "noTemplatesDescription": "Cree su primera plantilla",

@@ -1247,6 +1247,7 @@
     "pinnedSubjectBadge": "Закріплено",
     "pinnedSubjectBadgeTooltip": "Деякі поля суб'єкта закріплені та примусово застосовуються під час видачі WSTEP",
     "keySettings": "Налаштування ключа",
+    "keyServerDefault": "Server default",
     "extensions": "Розширення",
     "noTemplates": "Немає шаблонів",
     "noTemplatesDescription": "Створіть свій перший шаблон",
