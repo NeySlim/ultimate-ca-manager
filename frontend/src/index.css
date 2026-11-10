@@ -2697,8 +2697,8 @@ input:focus, select:focus, textarea:focus {
 
 /* Search highlight for Help reader */
 ::highlight(search-results) {
-  background-color: var(--warnbg);
-  color: var(--warn);
+  background-color: var(--warn);
+  color: var(--on-accent);
 }
 
 /* Keyboard shortcut indicator */
