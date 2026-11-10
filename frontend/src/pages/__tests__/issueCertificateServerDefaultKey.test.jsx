@@ -74,6 +74,20 @@ describe('IssueCertificateForm server default key', () => {
     expect(state('common.keyType')).toBe('ml-dsa')
   })
 
+  it('preselects the server default when a policy restricts the key types', async () => {
+    mocks.getEffective.mockImplementation(async ({ ca_id }) => ({
+      data: ca_id === '4'
+        ? { allowed_key_types: ['RSA-4096', 'EC-P384'], default_key_type: 'EC-P384' }
+        : { allowed_key_types: null, default_key_type: 'RSA-3072' },
+    }))
+    renderForm()
+    pickCa('3')
+    await waitFor(() => expect(state('common.keySize')).toBe('3072'))
+    pickCa('4')
+    await waitFor(() => expect(state('common.keyType')).toBe('ecdsa'))
+    await waitFor(() => expect(state('common.keySize')).toBe('384'))
+  })
+
   it('preselects nothing and submits no key when the server does not answer', async () => {
     mocks.getEffective.mockRejectedValue(new Error('down'))
     const onSubmit = renderForm()

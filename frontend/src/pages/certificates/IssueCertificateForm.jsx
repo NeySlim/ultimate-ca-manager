@@ -193,9 +193,11 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   useEffect(() => {
     if (noKeyAllowed || (!formData.key_type && !allowedKeyTypes)) return
     if (allowedKeys.some(([k, sz]) => k === formData.key_type && sz === formData.key_size)) return
-    const [type, size] = allowedKeys.find(([k]) => k === formData.key_type) || allowedKeys[0]
+    const def = !keyChosen.current && findAlgorithm(defaultKeyType)?.issue
+    const [type, size] = (def && allowedKeys.some(([k, sz]) => k === def[0] && sz === def[1]) ? def : null)
+      || allowedKeys.find(([k]) => k === formData.key_type) || allowedKeys[0]
     setFormData(prev => ({ ...prev, key_type: type, key_size: size }))
-  }, [allowedKeys, allowedKeyTypes, noKeyAllowed, formData.key_type, formData.key_size])
+  }, [allowedKeys, allowedKeyTypes, noKeyAllowed, defaultKeyType, formData.key_type, formData.key_size])
 
   // Get selected CA's expiry for max date
   const selectedCa = useMemo(() => 
