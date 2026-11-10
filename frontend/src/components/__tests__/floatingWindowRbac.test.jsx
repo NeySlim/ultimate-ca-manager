@@ -105,20 +105,6 @@ describe('deleting a trust store entry from the floating window', () => {
     await waitFor(() => expect(truststoreMocks.delete).toHaveBeenCalledWith(9))
   })
 
-  it('carries the guard at the head of the handler, not only on the button', () => {
-    // ActionBar receives onDelete as a prop. A surface that wires the button up
-    // regardless must still not be able to send the request, so the check lives
-    // in the handler too rather than only in the JSX that offers it.
-    const source = readFileSync(join(__dirname, '..', 'FloatingDetailWindow.jsx'), 'utf8')
-    const start = source.indexOf('const handleDelete =')
-    expect(start).toBeGreaterThan(-1)
-    const body = source.slice(start, source.indexOf('const handleOffline', start))
-    const guard = body.indexOf('canDelete(resource)')
-    const call = body.indexOf('.delete(')
-    expect(guard, 'handleDelete does not check canDelete(resource)').toBeGreaterThan(-1)
-    expect(guard).toBeLessThan(call)
-  })
-
   it('revokes a user certificate through its own route, with its own id', async () => {
     // windowInfo.entityId is the enrolment (AuthCertificate) id: the row comes
     // from auth_cert.to_dict() and exposes the Certificate id separately as

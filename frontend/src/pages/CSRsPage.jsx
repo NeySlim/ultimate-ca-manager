@@ -13,7 +13,6 @@ import {
 } from '@phosphor-icons/react'
 import {
   Badge, Button, Modal, Input, Select, HelpCard, FileUpload, Textarea,
-  CompactSection, CompactGrid, CompactField, CompactHeader, CompactStats,
   KeyIndicator, EkuMultiSelect
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
@@ -29,7 +28,7 @@ import { VALIDITY } from '../constants/config'
 import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../lib/caSelection'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { soleImported } from '../lib/importResult'
-import { PostQuantumBadge } from '../components/PostQuantumBadge'
+import { CSRPanel } from '../components/detail/CSRPanel'
 import {
   CSR_LABELS, ISSUE_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, findAlgorithm,
   groupedOptions, isUsable, keyAlgorithmLabel, listAlgorithms,
@@ -1487,28 +1486,7 @@ function SanRows({ rows, onChange, types, allowEmpty = false, t }) {
 
 function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDownloadKey, onDelete, onUploadKey, onRekey, t }) {
   return (
-    <div className="p-3 space-y-3">
-      {/* Header */}
-      <CompactHeader
-        icon={FileText}
-        iconClass="bg-accent-warning-op20"
-        title={csr.common_name || csr.cn || t('csrs.unnamedCSR')}
-        subtitle={csr.organization}
-        badge={
-          <div className="flex gap-1">
-            <Badge variant="warning" size="sm" icon={Clock}>{t('common.pending')}</Badge>
-            {csr.has_private_key && <Badge variant="success" size="sm" icon={Key}>{t('common.hasKey')}</Badge>}
-            <PostQuantumBadge postQuantum={csr.post_quantum} algorithm={csr.key_algorithm} />
-          </div>
-        }
-      />
-
-      {/* Stats */}
-      <CompactStats stats={[
-        { icon: Clock, value: csr.created_at ? formatDate(csr.created_at, 'short') : '—' },
-        { icon: Key, value: [keyAlgorithmLabel(csr.key_algorithm, t, csr.security_level) || '—', csr.key_size].filter(Boolean).join(' ') },
-      ]} />
-
+    <CSRPanel csr={csr}>
       {/* Actions */}
       <div className="flex gap-2 flex-wrap">
         <Button type="button" size="sm" variant="secondary" onClick={onDownload}>
@@ -1540,50 +1518,7 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDownl
           </Button>
         )}
       </div>
-
-      {/* Subject Information */}
-      <CompactSection title={t('common.subject')}>
-        <CompactGrid>
-          <CompactField autoIcon="commonName" label={t('common.commonName')} value={csr.common_name || csr.cn} className="col-span-2" />
-          <CompactField autoIcon="organization" label={t('common.organization')} value={csr.organization} />
-          <CompactField autoIcon="orgUnit" label={t('common.orgUnit')} value={csr.organizational_unit} />
-          <CompactField autoIcon="country" label={t('common.country')} value={csr.country} />
-          <CompactField autoIcon="state" label={t('common.state')} value={csr.state} />
-          <CompactField autoIcon="locality" label={t('common.locality')} value={csr.locality} />
-          <CompactField autoIcon="email" label={t('common.email')} value={csr.email} />
-        </CompactGrid>
-      </CompactSection>
-
-      {/* Key Information */}
-      <CompactSection title={t('common.keyInformation')}>
-        <CompactGrid>
-          <CompactField autoIcon="algorithm" label={t('common.algorithm')} value={keyAlgorithmLabel(csr.key_algorithm, t, csr.security_level) || '—'} />
-          <CompactField autoIcon="keySize" label={t('common.keySize')} value={csr.key_size} />
-          <CompactField autoIcon="signature" label={t('common.signature')} value={csr.signature_algorithm} />
-        </CompactGrid>
-      </CompactSection>
-
-      {/* SANs */}
-      {(csr.sans?.length > 0 || csr.san_dns?.length > 0) && (
-        <CompactSection title={t('common.subjectAltNames')}>
-          <div className="text-xs text-text-secondary space-y-1">
-            {(csr.sans || csr.san_dns || []).map((san, i) => (
-              <div key={i} className="font-mono bg-bg-tertiary px-2 py-1 rounded">
-                {san}
-              </div>
-            ))}
-          </div>
-        </CompactSection>
-      )}
-
-      {/* Timeline */}
-      <CompactSection title={t('common.timeline')}>
-        <CompactGrid>
-          <CompactField autoIcon="created" label={t('common.created')} value={csr.created_at ? formatDate(csr.created_at) : '—'} />
-          <CompactField autoIcon="requester" label={t('csrs.requester')} value={csr.requester || csr.created_by} />
-        </CompactGrid>
-      </CompactSection>
-    </div>
+    </CSRPanel>
   )
 }
 
@@ -1593,38 +1528,8 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDownl
 
 function SignedCSRDetailsPanel({ cert, onDownload, onDownloadCSR, onSignAgain, onRekey, t }) {
   const navigate = useNavigate()
-  // `|| 0` turned a null expiry date into a confident "0 days left", and
-  // turned the old -1 "no expiry" sentinel into "Expired".
-  const daysRemaining = cert.days_remaining
-  const expiryBadge = expiryVariant(daysRemaining)
-  const isAcme = cert.source === 'acme'
-  const isScep = cert.source === 'scep'
-  
   return (
-    <div className="p-3 space-y-3">
-      {/* Header */}
-      <CompactHeader
-        icon={Certificate}
-        iconClass="bg-accent-success-op20"
-        title={cert.common_name || cert.cn || t('csrs.unnamedCertificate')}
-        subtitle={cert.organization}
-        badge={
-          <div className="flex gap-1">
-            <Badge variant="success" size="sm" icon={CheckCircle}>{t('csrs.signed')}</Badge>
-            {isAcme && <Badge variant="info" size="sm">ACME</Badge>}
-            {isScep && <Badge variant="purple" size="sm">SCEP</Badge>}
-          </div>
-        }
-      />
-
-      {/* Stats */}
-      <CompactStats stats={[
-        { icon: Stamp, value: cert.signed_by || cert.issuer_name || '—' },
-        { icon: Clock, value: hasExpiry(daysRemaining)
-            ? t('csrs.remaining', { days: daysRemaining })
-            : t('common.never') },
-      ]} />
-
+    <CSRPanel csr={cert} variant="signed">
       {/* Actions */}
       <div className="flex gap-2 flex-wrap">
         {onDownload && (
@@ -1654,55 +1559,6 @@ function SignedCSRDetailsPanel({ cert, onDownload, onDownloadCSR, onSignAgain, o
           </Button>
         )}
       </div>
-
-      {/* Signing Information */}
-      <CompactSection title={t('common.signingDetails')}>
-        <CompactGrid>
-          <CompactField autoIcon="signedBy" label={t('common.signedBy')} value={cert.signed_by || cert.issuer_name} className="col-span-2" />
-          <CompactField autoIcon="signedAt" label={t('csrs.signed')} value={cert.signed_at ? formatDate(cert.signed_at) : formatDate(cert.valid_from)} />
-          <CompactField autoIcon="expires" label={t('common.expires')} value={cert.valid_to ? formatDate(cert.valid_to) : '—'} />
-          <CompactField 
-            autoIcon="status" label={t('common.status')} 
-            value={
-              <Badge variant={expiryBadge} size="sm">
-                {!hasExpiry(daysRemaining)
-                  ? t('common.never')
-                  : daysRemaining <= 0
-                    ? t('details.expiredDaysAgo', { count: daysSinceExpiry(daysRemaining) })
-                    : t('csrs.daysLeft', { days: daysRemaining })}
-              </Badge>
-            } 
-          />
-        </CompactGrid>
-      </CompactSection>
-
-      {/* Subject Information */}
-      <CompactSection title={t('common.subject')}>
-        <CompactGrid>
-          <CompactField autoIcon="commonName" label={t('common.commonName')} value={cert.common_name || cert.cn} className="col-span-2" />
-          <CompactField autoIcon="organization" label={t('common.organization')} value={cert.organization} />
-          <CompactField autoIcon="orgUnit" label={t('common.orgUnit')} value={cert.organizational_unit} />
-          <CompactField autoIcon="country" label={t('common.country')} value={cert.country} />
-          <CompactField autoIcon="state" label={t('common.state')} value={cert.state} />
-        </CompactGrid>
-      </CompactSection>
-
-      {/* Key Information */}
-      <CompactSection title={t('common.keyInformation')}>
-        <CompactGrid>
-          <CompactField autoIcon="algorithm" label={t('common.algorithm')} value={keyAlgorithmLabel(cert.key_algorithm, t, cert.security_level) || '—'} />
-          <CompactField autoIcon="keySize" label={t('common.keySize')} value={cert.key_size} />
-          <CompactField autoIcon="serial" label={t('common.serial')} value={cert.serial_number} copyable mono className="col-span-2" />
-        </CompactGrid>
-      </CompactSection>
-
-      {/* Timeline */}
-      <CompactSection title={t('common.timeline')}>
-        <CompactGrid>
-          <CompactField autoIcon="created" label={t('csrs.csrCreated')} value={cert.created_at ? formatDate(cert.created_at) : '—'} />
-          <CompactField autoIcon="issued" label={t('csrs.certificateIssued')} value={cert.valid_from ? formatDate(cert.valid_from) : '—'} />
-        </CompactGrid>
-      </CompactSection>
-    </div>
+    </CSRPanel>
   )
 }

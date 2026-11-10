@@ -1,5 +1,5 @@
 /**
- * DUP-FE-012. CADetails read `ca.days_remaining`, which the CA serializer never
+ * DUP-FE-012. CAPanel read `ca.days_remaining`, which the CA serializer never
  * emits: backend/models/ca.py to_dict() carries valid_from/valid_to and
  * crl_validity_days, but no days_remaining — only Certificate.to_dict() has one.
  *
@@ -25,16 +25,16 @@ vi.mock('react-i18next', () => {
     initReactI18next: { type: '3rdParty', init: vi.fn() },
   }
 })
-vi.mock('../../contexts', () => ({
+vi.mock('../../../contexts', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showConfirm: vi.fn() }),
   useAuth: () => ({ user: { role: 'admin' }, isAuthenticated: true, permissions: ['*'] }),
 }))
-vi.mock('../../contexts/AuthContext', () => ({
+vi.mock('../../../contexts/AuthContext', () => ({
   useAuth: () => ({ user: { role: 'admin' }, isAuthenticated: true, permissions: ['*'] }),
 }))
-vi.mock('../cas/CACrlSection', () => ({ CACrlSection: () => null }))
+vi.mock('../../cas/CACrlSection', () => ({ CACrlSection: () => null }))
 
-const { CADetails } = await import('../CADetails')
+const { CAPanel } = await import('../CAPanel')
 
 const NOW = new Date('2026-06-01T12:00:00Z')
 
@@ -53,11 +53,11 @@ function renderCA(extra) {
     valid_from: '2020-01-01T00:00:00Z',
     ...extra,
   }
-  const utils = render(<CADetails ca={ca} showActions={false} />)
+  const utils = render(<CAPanel ca={ca} />)
   return utils
 }
 
-describe('CADetails — days remaining', () => {
+describe('CAPanel — days remaining', () => {
   it('shows a real count for a CA that expires in 45 days', () => {
     renderCA({ valid_to: '2026-07-16T12:00:00Z' })
     expect(screen.getByText('details.daysRemaining:45')).toBeInTheDocument()

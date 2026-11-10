@@ -4,8 +4,8 @@
  */
 import { render, renderHook, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import en from '../../i18n/locales/en.json'
-import { GROUP_PQ, KEY_ALGORITHMS } from '../../lib/keyAlgorithms'
+import en from '../../../i18n/locales/en.json'
+import { GROUP_PQ, KEY_ALGORITHMS } from '../../../lib/keyAlgorithms'
 
 const lookup = (key) => key.split('.').reduce((node, part) => (node == null ? node : node[part]), en)
 const t = (key, opts) => {
@@ -18,17 +18,17 @@ vi.mock('react-i18next', () => ({
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: () => {} },
 }))
-vi.mock('../../contexts/NotificationContext', () => ({
+vi.mock('../../../contexts/NotificationContext', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showConfirm: vi.fn() }),
 }))
-vi.mock('../../services', () => ({ casService: {} }))
-vi.mock('../cas/CACrlSection', () => ({ CACrlSection: () => null }))
-vi.mock('../cas/ChainUsageSection', () => ({ ChainUsageSection: () => null }))
+vi.mock('../../../services', () => ({ casService: {} }))
+vi.mock('../../cas/CACrlSection', () => ({ CACrlSection: () => null }))
+vi.mock('../../cas/ChainUsageSection', () => ({ ChainUsageSection: () => null }))
 
-const { CADetails } = await import('../CADetails')
-const { TemplatePreviewModal } = await import('../TemplatePreviewModal')
-const { TrustCertDetails } = await import('../TrustCertDetails')
-const { useCertificateColumns } = await import('../../pages/certificates/useCertificateColumns')
+const { CAPanel } = await import('../CAPanel')
+const { TemplatePreviewModal } = await import('../../TemplatePreviewModal')
+const { TrustCertPanel } = await import('../TrustCertPanel')
+const { useCertificateColumns } = await import('../../../pages/certificates/useCertificateColumns')
 
 const ML_DSA_65 = KEY_ALGORITHMS.find(a => a.group === GROUP_PQ && a.label === 'ML-DSA-65')
 const LEVEL_LABEL = `${ML_DSA_65.label} (level ${ML_DSA_65.securityLevel})`
@@ -43,7 +43,7 @@ describe('key display outside the certificate panel', () => {
   it('names an ML-DSA CA with its level, a badge, and no RSA signature scheme', () => {
     const ca = { id: 9, descr: 'PQ root', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true,
       valid_to: '2030-01-01T00:00:00Z' }
-    render(<CADetails ca={ca} />)
+    render(<CAPanel ca={ca} />)
     expect(screen.getAllByText(LEVEL_LABEL).length).toBeGreaterThan(0)
     expect(screen.queryByText(ML_DSA_65.label)).toBeNull()
     expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
@@ -51,19 +51,19 @@ describe('key display outside the certificate panel', () => {
   })
 
   it('shows the badge in the compact bar of the CA detail window', () => {
-    render(<CADetails ca={{ id: 9, descr: 'PQ root', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true }} embedded />)
+    render(<CAPanel ca={{ id: 9, descr: 'PQ root', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true }} embedded />)
     expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
     expect(screen.getAllByText(LEVEL_LABEL).length).toBeGreaterThan(0)
   })
 
   it('shows the badge in the compact bar of a trusted certificate window', () => {
-    render(<TrustCertDetails cert={{ id: 3, name: 'PQ root', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true }} embedded />)
+    render(<TrustCertPanel cert={{ id: 3, name: 'PQ root', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true }} embedded />)
     expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
   })
 
   it('explains the badge by the key, never by the signature', () => {
     // An RSA CA may sign an ML-DSA leaf: the badge follows the leaf's own key
-    render(<CADetails ca={{ id: 9, descr: 'PQ root', key_type: 'ML-DSA-65', post_quantum: true }} />)
+    render(<CAPanel ca={{ id: 9, descr: 'PQ root', key_type: 'ML-DSA-65', post_quantum: true }} />)
     const hint = screen.getByTestId('post-quantum-badge').getAttribute('title')
     expect(hint).toMatch(/post-quantum key/i)
     expect(hint).not.toMatch(/signed/i)

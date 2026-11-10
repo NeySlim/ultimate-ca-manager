@@ -72,21 +72,15 @@ vi.mock('../IssueCertificateForm', () => ({
   ),
 }))
 
-// Details and dialog stubs expose the callbacks the page hands them
-vi.mock('../../../components', async () => {
-  const actual = await vi.importActual('../../../components')
-  return {
-    ...actual,
-    CertificateDetails: ({ certificate, onRevoke, onRenew, onOpenRelated }) => (
-      <div>
-        <span>details-{certificate.id}</span>
-        <button type="button" onClick={onRevoke}>details-revoke</button>
-        <button type="button" onClick={() => onRenew?.()}>details-renew</button>
-        <button type="button" onClick={() => onOpenRelated?.(certificate.related_certificate_id)}>details-open-related</button>
-      </div>
-    ),
-  }
-})
+// The panel stub exposes the callbacks the page hands it; actions come from the real action bar
+vi.mock('../../../components/detail/CertificatePanel', () => ({
+  CertificatePanel: ({ certificate, onOpenRelated }) => (
+    <div>
+      <span>details-{certificate.id}</span>
+      <button type="button" onClick={() => onOpenRelated?.(certificate.related_certificate_id)}>details-open-related</button>
+    </div>
+  ),
+}))
 vi.mock('../../../components/RevokeCertificateModal', () => ({
   RevokeCertificateModal: ({ open, onConfirm }) => (open
     ? <button type="button" onClick={() => onConfirm('keyCompromise', mocks.revokeOptions)}>confirm-revoke</button>
@@ -139,7 +133,7 @@ describe('CertificatesPage and a hybrid pair', () => {
 
   it('forwards the revocation answer about the linked certificate', async () => {
     await openMemberOnMobile()
-    fireEvent.click(screen.getByText('details-revoke'))
+    fireEvent.click(screen.getByText('common.revoke'))
     fireEvent.click(await screen.findByText('confirm-revoke'))
     await waitFor(() => expect(mocks.revoke).toHaveBeenCalledWith(11, 'keyCompromise', { revokeRelated: false }))
   })
@@ -148,7 +142,7 @@ describe('CertificatesPage and a hybrid pair', () => {
     mocks.revokeOptions = { revokeRelated: true }
     mocks.revoke.mockResolvedValue({ data: { id: 11, revoked: true, related_revoked: 12 } })
     await openMemberOnMobile()
-    fireEvent.click(screen.getByText('details-revoke'))
+    fireEvent.click(screen.getByText('common.revoke'))
     fireEvent.click(await screen.findByText('confirm-revoke'))
     await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalledWith('revocation.revokedWithRelated'))
     expect(mocks.showWarning).not.toHaveBeenCalledWith('revocation.relatedNotRevoked')
@@ -158,7 +152,7 @@ describe('CertificatesPage and a hybrid pair', () => {
     mocks.revokeOptions = { revokeRelated: true }
     mocks.revoke.mockResolvedValue({ data: { id: 11, revoked: true, related_not_revoked: 12 } })
     await openMemberOnMobile()
-    fireEvent.click(screen.getByText('details-revoke'))
+    fireEvent.click(screen.getByText('common.revoke'))
     fireEvent.click(await screen.findByText('confirm-revoke'))
     await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('revocation.relatedRevokeFailed'))
     expect(mocks.showWarning).not.toHaveBeenCalledWith('revocation.relatedNotRevoked')
@@ -168,20 +162,20 @@ describe('CertificatesPage and a hybrid pair', () => {
     mocks.revokeOptions = { revokeRelated: true }
     mocks.revoke.mockResolvedValue({ data: { id: 11, revoked: true } })
     await openMemberOnMobile()
-    fireEvent.click(screen.getByText('details-revoke'))
+    fireEvent.click(screen.getByText('common.revoke'))
     fireEvent.click(await screen.findByText('confirm-revoke'))
     await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('revocation.relatedNotRevoked'))
-    expect(mocks.showSuccess).toHaveBeenCalledWith('messages.success.other.revoked')
+    expect(mocks.showSuccess).toHaveBeenCalledWith('certificates.revoked')
   })
 
   it.each([
     [{ id: 11, related_renewed: [12] }, 'certificates.hybrid.renewedWithRelated'],
-    [{ id: 11 }, 'notifications.certificateIssued'],
+    [{ id: 11 }, 'certificates.renewed'],
   ])('names the linked certificate renewed with it (%o)', async (answer, toast) => {
     mocks.getById.mockImplementation((id) => Promise.resolve({ data: id === 12 ? B : { ...A, has_private_key: true } }))
     mocks.renew.mockResolvedValue({ data: answer })
     await openMemberOnMobile()
-    fireEvent.click(screen.getByText('details-renew'))
+    fireEvent.click(screen.getByText('common.renew'))
     await waitFor(() => expect(mocks.renew).toHaveBeenCalledWith(11, {}))
     await waitFor(() => expect(mocks.showSuccess).toHaveBeenCalledWith(toast))
   })

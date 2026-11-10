@@ -7,13 +7,12 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useParams, useNavigate } from 'react-router-dom'
 import { 
-  ShieldCheck, Plus, Trash, Download, Certificate, Clock,
-  CheckCircle, Warning, UploadSimple, ArrowsClockwise, Calendar,
-  Globe, Buildings, Fingerprint, Key, Hash, Info
+  ShieldCheck, Plus, Trash, Download, Certificate, 
+  CheckCircle, Warning, UploadSimple, ArrowsClockwise
 } from '@phosphor-icons/react'
 import {
   Button, Input, Badge, Modal, Textarea, HelpCard,
-  CompactSection, CompactGrid, CompactField, FormSelect
+  FormSelect
 } from '../components'
 import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
@@ -22,11 +21,12 @@ import { useNotification } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useModals, usePersistedState } from '../hooks'
-import { formatDate, cn, daysRemaining, downloadBlob } from '../lib/utils'
+import { formatDate, cn, downloadBlob } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
 import { runInBatches } from '../lib/bulkChunks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
-import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
+import { TrustCertPanel } from '../components/detail/TrustCertPanel'
+
 export default function TrustStorePage() {
   const { t } = useTranslation()
   const { id: urlCertId } = useParams()
@@ -423,149 +423,21 @@ export default function TrustStorePage() {
     ] : [])
   ]
 
-  // Calculate days remaining for expiry indicator
-  const getDaysRemaining = (cert) => {
-    if (!cert?.not_after) return null
-    const expiryDate = new Date(cert.not_after)
-    return daysRemaining(expiryDate)
-  }
-
-  // Detail panel content - same design as CertificateDetails
-  const detailContent = selectedCert && (() => {
-    const daysRemaining = getDaysRemaining(selectedCert)
-    const isExpired = daysRemaining !== null && daysRemaining <= 0
-    const isExpiring = daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 30
-    
-    return (
-      <div className="space-y-4 p-4">
-        {/* Header */}
-        <div className="flex items-start gap-3">
-          <div className={cn(
-            "p-2.5 rounded-lg shrink-0",
-            isExpired ? "bg-status-danger-op10" : "bg-accent-primary-op10"
-          )}>
-            <Certificate size={24} className={isExpired ? "text-status-danger" : "text-accent-primary"} />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-lg font-semibold text-text-primary truncate">
-                {selectedCert.name || t('common.certificate')}
-              </h3>
-              <Badge variant={isExpired ? 'danger' : isExpiring ? 'warning' : 'success'} size="sm">
-                {isExpired ? t('common.expired') : isExpiring ? t('common.detailsExpiring') : t('common.valid')}
-              </Badge>
-              <Badge variant={selectedCert.purpose === 'root_ca' ? 'info' : 'default'} size="sm">
-                {selectedCert.purpose?.replace('_', ' ') || 'trusted'}
-              </Badge>
-            </div>
-            <p className="text-xs text-text-tertiary truncate mt-0.5">{selectedCert.subject || selectedCert.issuer}</p>
-          </div>
-        </div>
-
-        {/* Expiry Indicator */}
-        {daysRemaining !== null && (
-          <div className={cn(
-            "flex items-center gap-2 px-3 py-2 rounded-lg",
-            isExpired && "bg-status-danger-op10",
-            isExpiring && "bg-status-warning-op10",
-            !isExpired && !isExpiring && "bg-status-success-op10"
-          )}>
-            <Clock size={16} className={cn(
-              isExpired && "text-status-danger",
-              isExpiring && "text-status-warning",
-              !isExpired && !isExpiring && "text-status-success"
-            )} />
-            <div>
-              <div className={cn(
-                "text-sm font-medium",
-                isExpired && "text-status-danger",
-                isExpiring && "text-status-warning",
-                !isExpired && !isExpiring && "text-status-success"
-              )}>
-                {isExpired ? t('common.expired') : t('trustStore.daysRemaining', { count: daysRemaining })}
-              </div>
-              <div className="text-xs text-text-tertiary">
-                {t('common.expires')} {formatDate(selectedCert.not_after)}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Quick Stats Grid */}
-        <div className="grid grid-cols-3 gap-2">
-          <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
-            <Key size={16} className="mx-auto text-text-tertiary mb-1" />
-            <div className="text-xs font-medium text-text-primary">{keyAlgorithmLabel(selectedCert.key_type, t, selectedCert.security_level) || '—'}</div>
-            <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
-          </div>
-          <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
-            <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
-            <div className="text-xs font-medium text-text-primary truncate">{selectedCert.signature_algorithm || '—'}</div>
-            <div className="text-2xs text-text-tertiary" title={t('common.issuerSignatureAlgorithmHint')}>{t('common.issuerSignatureShort')}</div>
-          </div>
-          <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
-            <Certificate size={16} className="mx-auto text-text-tertiary mb-1" />
-            <div className="text-xs font-medium text-text-primary">{selectedCert.is_ca ? t('common.ca') : t('common.endEntity')}</div>
-            <div className="text-2xs text-text-tertiary">{t('common.type')}</div>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-2 flex-wrap">
-          <Button type="button" size="sm" variant="secondary" onClick={() => handleExport(selectedCert)}>
-            <Download size={14} /> {t('common.export')}
+  // Detail panel content: the shared panel, with this page's own actions
+  const detailContent = selectedCert && (
+    <TrustCertPanel cert={selectedCert}>
+      <div className="flex gap-2 flex-wrap">
+        <Button type="button" size="sm" variant="secondary" onClick={() => handleExport(selectedCert)}>
+          <Download size={14} /> {t('common.export')}
+        </Button>
+        {canDelete('truststore') && (
+          <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(selectedCert)}>
+            <Trash size={14} /> {t('common.delete')}
           </Button>
-          {canDelete('truststore') && (
-            <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(selectedCert)}>
-              <Trash size={14} /> {t('common.delete')}
-            </Button>
-          )}
-        </div>
-
-        {/* Subject Section */}
-        <CompactSection title={t('common.subject')} icon={Globe}>
-          <CompactGrid>
-            <CompactField icon={Globe} label={t('common.subject')} value={selectedCert.subject || selectedCert.name} mono />
-          </CompactGrid>
-        </CompactSection>
-
-        {/* Issuer Section */}
-        <CompactSection title={t('common.issuer')} icon={ShieldCheck}>
-          <CompactField autoIcon="issuer" label={t('common.issuer')} value={selectedCert.issuer} mono />
-        </CompactSection>
-
-        {/* Validity Section */}
-        <CompactSection title={t('common.validity')} icon={Calendar}>
-          <CompactGrid>
-            <CompactField icon={Calendar} label={t('common.validFrom')} value={selectedCert.not_before ? formatDate(selectedCert.not_before) : '—'} />
-            <CompactField icon={Calendar} label={t('common.validUntil')} value={selectedCert.not_after ? formatDate(selectedCert.not_after) : '—'} />
-          </CompactGrid>
-        </CompactSection>
-
-        {/* Technical Details */}
-        <CompactSection title={t('common.technicalDetails')} icon={Info}>
-          <CompactGrid>
-            <CompactField icon={Hash} label={t('common.serial')} value={selectedCert.serial_number} mono copyable />
-            <CompactField icon={Key} label={t('common.keyType')} value={keyAlgorithmLabel(selectedCert.key_type, t, selectedCert.security_level)} />
-          </CompactGrid>
-        </CompactSection>
-
-        {/* Fingerprints */}
-        {selectedCert.fingerprint_sha256 && (
-          <CompactSection title={t('common.fingerprints')} icon={Fingerprint} collapsible defaultOpen={false}>
-            <CompactField icon={Fingerprint} label={t('common.sha256')} value={selectedCert.fingerprint_sha256} mono copyable />
-          </CompactSection>
-        )}
-
-        {/* Notes */}
-        {selectedCert.notes && (
-          <CompactSection title={t('common.notes')} icon={Warning}>
-            <p className="text-sm text-text-secondary">{selectedCert.notes}</p>
-          </CompactSection>
         )}
       </div>
-    )
-  })()
+    </TrustCertPanel>
+  )
 
   // Help content
   const helpContent = (

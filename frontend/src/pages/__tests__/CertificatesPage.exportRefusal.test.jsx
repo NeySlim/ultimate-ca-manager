@@ -84,12 +84,12 @@ describe('CertificatesPage export refused by the server', () => {
     ['the server reason', Object.assign(new Error('Certificate 5 has no private key'), { status: 400 }),
       'Certificate 5 has no private key'],
     ['the generic message without an answer', Object.assign(new Error('Network error'), { status: 0 }),
-      'messages.errors.exportFailed.certificate'],
+      'common.exportFailed'],
   ])('shows %s', async (_name, error, toast) => {
     mocks.export.mockRejectedValue(error)
     render(<MemoryRouter><CertificatesPage /></MemoryRouter>)
     fireEvent.click(await screen.findByText('row-4'))
-    fireEvent.click(await screen.findByTitle('export.title'))
+    fireEvent.click(await screen.findByText('export.title'))
     fireEvent.click(screen.getByText('export.formats.hybridBundle').closest('button'))
     fireEvent.submit(screen.getByText('PEM').closest('form'))
     await waitFor(() => expect(mocks.showError).toHaveBeenCalledWith(toast))

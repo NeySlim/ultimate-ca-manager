@@ -1,104 +1,54 @@
 /**
- * FloatingDetailWindow — Renders entity detail in a floating window
- * 
- * Wraps FloatingWindow + entity-specific content (CertificateDetails, CA details, etc.)
- * Fetches full entity data on mount, shows loading state.
+ * FloatingDetailWindow: container of an entity detail window. Loads the
+ * entity, then renders the shared action bar and the pure detail panel; the
+ * actions themselves live in hooks/useEntityActions.
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Certificate, ShieldCheck, Fingerprint, Trash, X, ArrowsClockwise, ShieldWarning, PushPin, SealCheck, Vault, PencilSimple } from '@phosphor-icons/react'
+import { Certificate, ShieldCheck, Fingerprint } from '@phosphor-icons/react'
 import { FloatingWindow } from './ui/FloatingWindow'
-import { CertificateDetails } from './CertificateDetails'
-import { CertificateLintModal } from './CertificateLintModal'
-import { KeyRecoveryRequestModal } from './KeyRecoveryRequestModal'
-import { CADetails } from './CADetails'
-import { TrustCertDetails } from './TrustCertDetails'
+import { CertificatePanel } from './detail/CertificatePanel'
+import { CAPanel } from './detail/CAPanel'
+import { TrustCertPanel } from './detail/TrustCertPanel'
+import { ActionBar } from './detail/ActionBar'
 import { certificatesService, casService, truststoreService, userCertificatesService } from '../services'
-import { extractCN, isOnHold } from '../lib/utils'
 import { useWindowManager } from '../contexts/WindowManagerContext'
-import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
+import { useEntityActions } from '../hooks/useEntityActions'
+import { entityTitle, entitySubtitle } from '../lib/entityDetail'
 import { extractData } from '../lib/utils'
 import { LoadingSpinner } from './LoadingSpinner'
-import { ExportModal } from './ExportModal'
-import { RevokeCertificateModal } from './RevokeCertificateModal'
-import { TakeOfflineModal } from './cas/TakeOfflineModal'
-import { ImportCaKeyModal } from './cas/ImportCaKeyModal'
-import { holdsNoKey } from '../lib/caSelection'
-import { RestoreModal } from './cas/RestoreModal'
-import { UploadCACertModal } from '../pages/cas/UploadCACertModal'
-import { cn, downloadBlob } from '../lib/utils'
-import { canExportPrivateKey } from '../lib/exportPermissions'
-import { downloadExport } from '../lib/exportDownload'
-import { askRenewal } from '../lib/renewalPrompt'
-import { renameCertificate } from '../lib/certificateRename'
-import { showNotices } from '../lib/notices'
 
 const ENTITY_CONFIG = {
   certificate: {
     icon: Certificate,
     iconClass: 'bg-accent-primary-op15 text-accent-primary',
-    service: () => certificatesService,
     fetchById: (id) => certificatesService.getById(id),
-    getTitle: (data) => data?.common_name || data?.subject || `Certificate #${data?.id}`,
-    getSubtitle: (data) => data?.issuer ? extractCN(data.issuer) : '',
   },
   ca: {
     icon: ShieldCheck,
     iconClass: 'bg-accent-success-op15 text-accent-success',
-    service: () => casService,
     fetchById: (id) => casService.getById(id),
-    getTitle: (data) => data?.common_name || data?.descr || `CA #${data?.id}`,
-    getSubtitle: (data) => data?.is_root ? 'common.rootCA' : 'common.intermediate',
   },
   truststore: {
     icon: Fingerprint,
     iconClass: 'bg-accent-warning-op15 text-accent-warning',
-    service: () => truststoreService,
     fetchById: (id) => truststoreService.getById(id),
-    getTitle: (data) => data?.name || data?.subject || `Trust Store #${data?.id}`,
-    getSubtitle: (data) => data?.purpose || '',
   },
   user_certificate: {
     icon: Certificate,
     iconClass: 'bg-accent-primary-op15 text-accent-primary',
-    service: () => userCertificatesService,
     fetchById: (id) => userCertificatesService.getById(id),
-    getTitle: (data) => data?.name || data?.cert_subject || `User Certificate #${data?.id}`,
-    getSubtitle: (data) => data?.owner ? `Owner: ${data.owner}` : '',
   },
-}
-
-// The RBAC resource each window type is judged by, matching the scope its route
-// enforces. A type missing here would be guarded as a certificate, which is how
-// trust store entries came to be gated on delete:certificates while
-// DELETE /api/v2/truststore/<id> asks for delete:truststore.
-const ENTITY_RESOURCE = {
-  certificate: 'certificates',
-  ca: 'cas',
-  truststore: 'truststore',
-  user_certificate: 'user_certificates',
 }
 
 export function FloatingDetailWindow({ windowInfo }) {
   const { t } = useTranslation()
   const { closeWindow, focusWindow, sameWindow, openWindow } = useWindowManager()
-  const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
-  const { canWrite, canDelete, hasPermission } = usePermission()
-  const resource = ENTITY_RESOURCE[windowInfo.type] || 'certificates'
+  const { canWrite, hasPermission } = usePermission()
   const [data, setData] = useState(windowInfo.data?.fullData || null)
   const [loading, setLoading] = useState(!windowInfo.data?.fullData)
   const [minimized, setMinimized] = useState(false)
-  const [offlineModalOpen, setOfflineModalOpen] = useState(false)
-  const [importKeyOpen, setImportKeyOpen] = useState(false)
-  const [restoreModalOpen, setRestoreModalOpen] = useState(false)
-  const [uploadCertOpen, setUploadCertOpen] = useState(false)
-  const [lintOpen, setLintOpen] = useState(false)
-  const [keyRecoveryOpen, setKeyRecoveryOpen] = useState(false)
-  const [revokeOpen, setRevokeOpen] = useState(false)  // reason dialog (#334)
-  // The operator asked to delete a still-valid certificate and accepted to
-  // revoke it first; the deletion resumes once the revocation is through.
-  const [deleteAfterRevoke, setDeleteAfterRevoke] = useState(false)
 
   const config = ENTITY_CONFIG[windowInfo.type]
 
@@ -123,264 +73,19 @@ export function FloatingDetailWindow({ windowInfo }) {
     return () => { cancelled = true }
   }, [windowInfo.entityId, windowInfo.type])
 
+  const { actions, modals, handler } = useEntityActions({
+    type: windowInfo.type,
+    entity: data,
+    entityId: windowInfo.entityId,
+    onChanged: setData,
+    onClose: () => closeWindow(windowInfo.id),
+  })
+
   if (!config) return null
 
-  // Header action handlers
-  const handleExport = async (format = 'pem', options = {}) => {
-    try {
-      const service = config.service()
-      const id = windowInfo.entityId
-      const name = data?.cn || data?.common_name || data?.name || windowInfo.type
-      
-      await downloadExport(service.export(id, format, options), { format, name })
-      showSuccess(t('common.exported'))
-    } catch (err) {
-      // The server's refusal says why (a bundle member without a key); a network failure does not
-      showError(err?.status ? err.message : t('common.exportFailed'))
-    }
-  }
-
-  const handleRevoke = () => setRevokeOpen(true)
-  const handleRevokeConfirm = async (reason, options) => {
-    setRevokeOpen(false)
-    try {
-      let queued = null
-      if (windowInfo.type === 'ca') {
-        // Intermediate CA revoked from its parent (#343)
-        const res = await casService.revoke(windowInfo.entityId, { reason })
-        if (res?.data?.approval_required) queued = t('cas.revocationApprovalRequired', { policy: res.data.policy_name })
-        else showSuccess(t('cas.revokeSuccess', 'CA revoked'))
-        // The parent could not publish the revocation (offline parent, CDP off)
-        const revoked = res?.data || res
-        const codes = revoked?.warning_codes || []
-        if (codes.length) codes.forEach(code => showWarning(t(`cas.revokeWarnings.${code}`)))
-        else for (const w of revoked?.warnings || []) showWarning(w)
-      } else if (windowInfo.type === 'user_certificate') {
-        // entityId is the enrolment id, which only this route resolves; the
-        // certificates route would look it up in a different table.
-        const res = await userCertificatesService.revoke(windowInfo.entityId, reason)
-        if (res?.data?.approval_required) queued = t('certificates.revocationApprovalRequired', { policy: res.data.policy_name })
-        else showSuccess(t('certificates.revoked', 'Certificate revoked'))
-      } else {
-        const res = await certificatesService.revoke(windowInfo.entityId, reason, options)
-        const relatedRevoked = res?.data?.related_revoked
-        if (res?.data?.approval_required) queued = t('certificates.revocationApprovalRequired', { policy: res.data.policy_name })
-        else {
-          showSuccess(relatedRevoked != null
-            ? t('revocation.revokedWithRelated', { id: relatedRevoked })
-            : t('certificates.revoked', 'Certificate revoked'))
-          if (res?.data?.related_not_revoked != null) {
-            showWarning(t('revocation.relatedRevokeFailed', { id: res.data.related_not_revoked }))
-          } else if (options?.revokeRelated && relatedRevoked == null) showWarning(t('revocation.relatedNotRevoked'))
-        }
-      }
-      if (queued) {
-        // Held by a revocation policy: nothing was revoked, so nothing is deleted
-        showWarning(queued)
-        setDeleteAfterRevoke(false)
-      } else if (deleteAfterRevoke) {
-        setDeleteAfterRevoke(false)
-        try {
-          await config.service().delete(windowInfo.entityId)
-          showSuccess(t('common.deleted'))
-        } catch (err) {
-          showError(err.message || t('common.deleteFailed'))
-        }
-      }
-      window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
-      closeWindow(windowInfo.id)
-    } catch (err) {
-      showError(err.message || (windowInfo.type === 'ca' ? t('cas.revokeFailed', 'Failed to revoke CA') : t('certificates.revokeFailed', 'Revoke failed')))
-    }
-  }
-
-  const handleUnhold = async () => {
-    const confirmed = await showConfirm(
-      t('certificates.unholdWarning', 'This will remove the certificate hold and restore it to valid status. The certificate will be removed from the CRL.'),
-      {
-        title: t('certificates.unholdCertificate', 'Remove Certificate Hold'),
-        confirmText: t('certificates.unholdCertificate', 'Remove Hold'),
-        variant: 'warning'
-      }
-    )
-    if (!confirmed) return
-    try {
-      await certificatesService.unhold(windowInfo.entityId)
-      showSuccess(t('certificates.unheld', 'Certificate hold removed'))
-      window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
-      closeWindow(windowInfo.id)
-    } catch (err) {
-      showError(err.message || t('certificates.unholdFailed', 'Failed to remove hold'))
-    }
-  }
-
-  const handleRenew = async () => {
-    const body = await askRenewal(data, { showPrompt, showConfirm, showError, t })
-    if (!body) return
-    try {
-      const res = await certificatesService.renew(windowInfo.entityId, body)
-      if (res?.data?.approval_required) {
-        showWarning(t('certificates.approvalRequired', { policy: res.data.policy_name }))
-      } else {
-        const relatedRenewed = res?.data?.related_renewed
-        showSuccess(relatedRenewed?.length
-          ? t('certificates.hybrid.renewedWithRelated', { id: relatedRenewed.join(', #') })
-          : t('certificates.renewed', 'Certificate renewed'))
-        showNotices(res, showWarning)
-      }
-      window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
-      closeWindow(windowInfo.id)
-    } catch (err) {
-      showError(err?.message || t('certificates.renewFailed', 'Renew failed'))
-    }
-  }
-
-  const handleRename = async () => {
-    const updated = await renameCertificate(data, { showPrompt, showSuccess, showError, t })
-    if (!updated) return
-    setData((prev) => ({ ...prev, ...updated }))
-    window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
-  }
-
-  const handleDelete = async () => {
-    // The guard sits here as well as on the button: a surface that offers the
-    // action anyway still cannot reach a route that would refuse it.
-    if (!canDelete(resource)) return
-    // A certificate still trusted by relying parties has to be revoked first,
-    // or it leaves UCM while staying valid everywhere else. Say so here rather
-    // than let the route refuse afterwards, and offer to do both.
-    const certKinds = ['certificate', 'user_certificate']
-    const status = data?.revoked ? 'revoked' : data?.status
-    if (certKinds.includes(windowInfo.type) && data
-        && status !== 'revoked' && status !== 'expired') {
-      const revokeFirst = await showConfirm(t('certificates.deleteNeedsRevoke'), {
-        title: t('common.deleteCertificate'),
-        confirmText: t('certificates.revokeThenDelete'),
-        variant: 'danger'
-      })
-      if (!revokeFirst) return
-      setDeleteAfterRevoke(true)
-      setRevokeOpen(true)
-      return
-    }
-    const confirmed = await showConfirm(
-      t('common.confirmDeleteMessage', 'Are you sure you want to delete this item? This action cannot be undone.'),
-      {
-        title: t('common.confirmDelete', 'Confirm Delete'),
-        confirmText: t('common.delete', 'Delete'),
-        variant: 'danger'
-      }
-    )
-    if (!confirmed) return
-    try {
-      const service = config.service()
-      await service.delete(windowInfo.entityId)
-      showSuccess(t('common.deleted'))
-      window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
-      closeWindow(windowInfo.id)
-    } catch (err) {
-      showError(err.message || t('common.deleteFailed'))
-    }
-  }
-
-  const handleOffline = () => {
-    setOfflineModalOpen(true)
-  }
-
-  const handleRestore = () => {
-    setRestoreModalOpen(true)
-  }
-
-  const handleOfflineSuccess = () => {
-    closeWindow(windowInfo.id)
-  }
-
-  const handleKeyImported = (updated) => {
-    if (updated?.id) setData(updated)
-    window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'ca' } }))
-  }
-
-  const handleRestoreSuccess = () => {
-    closeWindow(windowInfo.id)
-  }
-
-  const handleManagePins = () => {
-    window.dispatchEvent(new CustomEvent('ucm:open-pins-modal', { detail: { caId: windowInfo.entityId } }))
-  }
-
-  // External-CSR CA lifecycle (#298)
-  const handleDownloadCsr = async () => {
-    try {
-      const blob = await casService.downloadCsr(windowInfo.entityId)
-      const name = (data?.common_name || data?.descr || 'ca').replace(/[^a-zA-Z0-9._-]+/g, '_')
-      downloadBlob(blob, `${name}.csr`)
-    } catch (err) {
-      showError(err?.message || t('cas.csrDownloadFailed', 'Failed to download CSR'))
-    }
-  }
-
-  const handleRenewCsr = async () => {
-    try {
-      await casService.renewCsr(windowInfo.entityId)
-      showSuccess(t('cas.csrDownloadStarted', 'CSR generated: download started'))
-      window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: 'ca' } }))
-      await handleDownloadCsr()
-      closeWindow(windowInfo.id)
-    } catch (err) {
-      showError(err?.message || t('cas.csrDownloadFailed', 'Failed to download CSR'))
-    }
-  }
-
-  const handleUploadCertSuccess = () => {
-    closeWindow(windowInfo.id)
-  }
-
-  const title = data ? config.getTitle(data) : t('common.loading')
-  const subtitle = data ? (windowInfo.type === 'ca' ? t(config.getSubtitle(data)) : config.getSubtitle(data)) : ''
-
-  // Build action bar props
+  const title = data ? entityTitle(windowInfo.type, data, t) : t('common.loading')
+  const subtitle = data ? entitySubtitle(windowInfo.type, data, t) : ''
   const isCert = windowInfo.type === 'certificate'
-  const isUserCert = windowInfo.type === 'user_certificate'
-  const isCA = windowInfo.type === 'ca'
-  const hasPrivateKey = !!data?.has_private_key
-  const onHold = isOnHold(data)
-  const actionBarProps = data ? {
-    onExport: handleExport,
-    hasPrivateKey,
-    keyAlgorithm: data?.key_algorithm || data?.key_type,
-    // Each entity type has its own server-side key gate (lib/exportPermissions);
-    // write access to the resource was never one of them for a certificate.
-    canExportKey: canExportPrivateKey(windowInfo.type, {
-      hasPermission, canWrite, usesHsm: !!data?.uses_hsm,
-    }),
-    entityType: isCA ? 'ca' : 'certificate',
-    chainVariantsFor: isCA || isCert ? { type: isCA ? 'ca' : 'certificate', id: windowInfo.entityId } : undefined,
-    relatedCertificateId: isCert ? (data?.related_certificate_id ?? null) : null,
-    entityName: title,
-    onLint: (isCert || isUserCert) ? () => setLintOpen(true) : null,
-    onRequestKeyRecovery: (isCert || isUserCert) && hasPrivateKey && hasPermission('write:key_recovery') ? () => setKeyRecoveryOpen(true) : null,
-    onRenew: isCert && canWrite('certificates') && !data.revoked && (data.has_private_key || data.source === 'msca') ? handleRenew : null,
-    onRename: isCert && canWrite('certificates') ? handleRename : null,
-    // A certificate on hold can still be revoked for good (RFC 5280 §5.2.4)
-    onRevoke: ((isCert || isUserCert) && canWrite(resource) && (!data.revoked || onHold))
-      // A CA is revoked by its parent, so it needs one held in UCM (#343)
-      || (isCA && canWrite('cas') && !data.revoked && !data.revoked_in_chain && !data.pending && !data.is_root && data.type !== 'root' && !!data.parent_id)
-      ? handleRevoke : null,
-    onUnhold: isCert && canWrite('certificates') && onHold ? handleUnhold : null,
-    // Offline needs the key in UCM's own store, and a revoked CA stays visibly revoked (#348, review)
-    onOffline: isCA && canWrite('cas') && !data.offline && !data.pending && !data.revoked && data.has_private_key && !data.uses_hsm ? handleOffline : null,
-    onRestore: isCA && canWrite('cas') && data.offline ? handleRestore : null,
-    onManagePins: isCA && canWrite('cas') && canWrite('templates') && !data.pending ? handleManagePins : null,
-    // External-CSR CA lifecycle (#298)
-    canExport: !(isCA && data.pending),
-    onDownloadCsr: isCA && data.has_csr ? handleDownloadCsr : null,
-    onUploadCertificate: isCA && canWrite('cas') && data.imported_from === 'external_csr'
-      && (data.pending || data.has_csr) && !data.offline ? () => setUploadCertOpen(true) : null,
-    onRenewCsr: isCA && canWrite('cas') && data.imported_from === 'external_csr'
-      && !data.pending && !data.offline && !data.revoked ? handleRenewCsr : null,
-    onDelete: canDelete(resource) ? handleDelete : null,
-    t,
-  } : null
 
   return (
     <>
@@ -405,20 +110,26 @@ export function FloatingDetailWindow({ windowInfo }) {
         </div>
       ) : data ? (
         <>
-          <ActionBar {...actionBarProps} />
+          <ActionBar actions={actions} />
           <div className="flex-1 overflow-y-auto p-0">
-            <DetailContent 
-              type={windowInfo.type} 
-              data={data}
-              canWrite={canWrite}
-              canDelete={canDelete}
-              hasPermission={hasPermission}
-              onExport={handleExport}
-              onDelete={handleDelete}
-              onImportKey={isCA && canWrite('cas') && holdsNoKey(data) ? () => setImportKeyOpen(true) : null}
-              onCaChanged={(updated) => setData(updated)}
-              onOpenRelated={isCert ? (id) => openWindow('certificate', id) : undefined}
-            />
+            {windowInfo.type === 'ca' ? (
+              <CAPanel
+                ca={data}
+                embedded
+                onImportKey={handler('importKey')}
+                onCaChanged={setData}
+                canWriteCas={canWrite('cas')}
+                canAttachProfile={canWrite('cas') && hasPermission('admin:system')}
+              />
+            ) : windowInfo.type === 'truststore' ? (
+              <TrustCertPanel cert={data} embedded />
+            ) : (
+              <CertificatePanel
+                certificate={data}
+                embedded
+                onOpenRelated={isCert ? (id) => openWindow('certificate', id) : undefined}
+              />
+            )}
           </div>
         </>
       ) : (
@@ -427,256 +138,7 @@ export function FloatingDetailWindow({ windowInfo }) {
         </div>
       )}
     </FloatingWindow>
-
-    {(isCert || isUserCert) && data && (
-      <CertificateLintModal
-        certId={windowInfo.entityId}
-        certName={title}
-        open={lintOpen}
-        onClose={() => setLintOpen(false)}
-      />
-    )}
-
-    {(isCert || isUserCert || isCA) && (
-      <RevokeCertificateModal
-        allowHold={!isCA && !onHold}
-        open={revokeOpen}
-        onClose={() => { setRevokeOpen(false); setDeleteAfterRevoke(false) }}
-        onConfirm={handleRevokeConfirm}
-        certificate={data}
-        title={isCA ? t('cas.revoke', 'Revoke CA') : undefined}
-        warning={isCA ? t('cas.revokeWarning') : undefined}
-      />
-    )}
-    {(isCert || isUserCert) && data && (
-      <KeyRecoveryRequestModal
-        certId={windowInfo.entityId}
-        certName={title}
-        open={keyRecoveryOpen}
-        onClose={() => setKeyRecoveryOpen(false)}
-      />
-    )}
-
-    {isCA && data && (
-      <>
-        <ImportCaKeyModal
-          open={importKeyOpen}
-          onClose={() => setImportKeyOpen(false)}
-          ca={data}
-          onSuccess={handleKeyImported}
-          t={t}
-        />
-        <TakeOfflineModal
-          open={offlineModalOpen}
-          onClose={() => setOfflineModalOpen(false)}
-          ca={data}
-          onSuccess={handleOfflineSuccess}
-        />
-        <RestoreModal
-          open={restoreModalOpen}
-          onClose={() => setRestoreModalOpen(false)}
-          ca={data}
-          onSuccess={handleRestoreSuccess}
-        />
-        <UploadCACertModal
-          open={uploadCertOpen}
-          onClose={() => setUploadCertOpen(false)}
-          ca={data}
-          onSuccess={handleUploadCertSuccess}
-        />
-      </>
-    )}
-    </>
-  )
-}
-
-/**
- * DetailContent — Renders the appropriate detail view based on entity type
- */
-function DetailContent({ type, data, canWrite, canDelete, hasPermission, onExport, onDelete, onImportKey, onCaChanged, onOpenRelated }) {
-  if (type === 'certificate' || type === 'user_certificate') {
-    return (
-      <CertificateDetails
-        certificate={data}
-        onOpenRelated={onOpenRelated}
-        compact={false}
-        showActions={false}
-        showPem={true}
-        embedded={true}
-      />
-    )
-  }
-
-  if (type === 'ca') {
-    return (
-      <CADetails
-        ca={data}
-        showActions={true}
-        showPem={true}
-        embedded={true}
-        canWrite={canWrite('cas') && canWrite('templates')}
-        canWriteCas={canWrite('cas')}
-        canAttachProfile={canWrite('cas') && hasPermission('admin:system')}
-        canDelete={canDelete('cas')}
-        onExport={onExport}
-        onDelete={onDelete}
-        onImportKey={onImportKey}
-        onCaChanged={onCaChanged}
-      />
-    )
-  }
-
-  if (type === 'truststore') {
-    return (
-      <TrustCertDetails
-        cert={data}
-        showActions={false}
-        showPem={true}
-        embedded={true}
-      />
-    )
-  }
-
-  return null
-}
-
-/**
- * ActionBar — Toolbar under the window header with labeled action buttons
- */
-function ActionBar({ onExport, hasPrivateKey, keyAlgorithm, canExportKey, entityType, entityName, onLint, onRequestKeyRecovery, onRename, onRenew, onRevoke, onUnhold, onOffline, onRestore, onManagePins, onDelete, canExport = true, onDownloadCsr, onUploadCertificate, onRenewCsr, chainVariantsFor, relatedCertificateId, t }) {
-  const [showExportModal, setShowExportModal] = useState(false)
-  const btnBase = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150'
-
-  return (
-    <>
-    <div className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 border-b border-border-op40 bg-tertiary-op30">
-      {/* Export button → modal (hidden for pending external-CSR CAs) */}
-      {canExport && (
-        <button onClick={() => setShowExportModal(true)} className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary-op10')}>
-          <Certificate size={14} weight="duotone" />
-          {t('export.title', 'Export')}
-        </button>
-      )}
-
-      {/* Download CSR — external-CSR CA with an outstanding CSR */}
-      {onDownloadCsr && (
-        <button onClick={onDownloadCsr} className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary-op10')}>
-          <Certificate size={14} weight="duotone" />
-          {t('cas.downloadCsr', 'Download CSR')}
-        </button>
-      )}
-
-      {/* Upload signed certificate — external-CSR CA */}
-      {onUploadCertificate && (
-        <button onClick={onUploadCertificate} className={cn(btnBase, 'text-text-secondary hover:text-accent-success hover:bg-accent-success-op10')}>
-          <ShieldCheck size={14} weight="duotone" />
-          {t('cas.uploadCertificate', 'Upload certificate')}
-        </button>
-      )}
-
-      {/* Renew via CSR — active external-CSR CA */}
-      {onRenewCsr && (
-        <button onClick={onRenewCsr} className={cn(btnBase, 'text-text-secondary hover:text-accent-success hover:bg-accent-success-op10')}>
-          <ArrowsClockwise size={14} weight="duotone" />
-          {t('cas.renewViaCsr', 'Renew via CSR')}
-        </button>
-      )}
-
-      {/* Conformance lint — certificates only */}
-      {onLint && (
-        <button onClick={onLint} className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary-op10')}>
-          <SealCheck size={14} weight="duotone" />
-          {t('lint.action', 'Lint')}
-        </button>
-      )}
-
-      {/* Request key recovery (escrow) — certs with an archived private key */}
-      {onRequestKeyRecovery && (
-        <button onClick={onRequestKeyRecovery} className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary-op10')}>
-          <Vault size={14} weight="duotone" />
-          {t('keyRecovery.requestShort', 'Recover key')}
-        </button>
-      )}
-
-      {/* Manage Pins — CA only */}
-      {onManagePins && (
-        <button onClick={onManagePins} className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary-op10')}>
-          <PushPin size={14} weight="duotone" />
-          {t('templates.managePins', 'Manage Pins')}
-        </button>
-      )}
-
-      {/* Rename: display name only (#286) */}
-      {onRename && (
-        <button onClick={onRename} className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary-op10')}>
-          <PencilSimple size={14} weight="duotone" />
-          {t('certificates.rename', 'Rename')}
-        </button>
-      )}
-
-      {/* Renew */}
-      {onRenew && (
-        <button onClick={onRenew} className={cn(btnBase, 'text-text-secondary hover:text-accent-success hover:bg-accent-success-op10')}>
-          <ArrowsClockwise size={14} weight="duotone" />
-          {t('common.renew', 'Renew')}
-        </button>
-      )}
-
-      {/* Revoke */}
-      {onRevoke && (
-        <button onClick={onRevoke} className={cn(btnBase, 'text-text-secondary hover:text-status-warning hover:bg-status-warning-op10')}>
-          <X size={14} weight="bold" />
-          {entityType === 'ca' ? t('cas.revoke', 'Revoke CA') : t('common.revoke', 'Revoke')}
-        </button>
-      )}
-
-      {/* Unhold — only shown for certificateHold revoked certs */}
-      {onUnhold && (
-        <button onClick={onUnhold} className={cn(btnBase, 'text-text-secondary hover:text-accent-success hover:bg-accent-success-op10')}>
-          <ArrowsClockwise size={14} weight="duotone" />
-          {t('certificates.removeHold', 'Remove Hold')}
-        </button>
-      )}
-
-      {/* Take Offline — CA only */}
-      {onOffline && (
-        <button onClick={onOffline} className={cn(btnBase, 'text-text-secondary hover:text-status-warning hover:bg-status-warning-op10')}>
-          <ShieldWarning size={14} weight="duotone" />
-          {t('cas.takeOffline', 'Take Offline')}
-        </button>
-      )}
-
-      {/* Restore — CA only, when offline */}
-      {onRestore && (
-        <button onClick={onRestore} className={cn(btnBase, 'text-text-secondary hover:text-accent-success hover:bg-accent-success-op10')}>
-          <ArrowsClockwise size={14} weight="duotone" />
-          {t('cas.restore', 'Restore')}
-        </button>
-      )}
-
-      {/* Spacer */}
-      <div className="flex-1" />
-
-      {/* Delete — right-aligned */}
-      {onDelete && (
-        <button onClick={onDelete} className={cn(btnBase, 'text-text-tertiary hover:text-status-danger hover:bg-status-danger-op10')} aria-label={t('common.delete')}>
-          <Trash size={14} weight="duotone" />
-        </button>
-      )}
-    </div>
-
-    <ExportModal
-      open={showExportModal}
-      onClose={() => setShowExportModal(false)}
-      entityType={entityType}
-      entityName={entityName}
-      hasPrivateKey={hasPrivateKey}
-      keyAlgorithm={keyAlgorithm}
-      canExportKey={canExportKey}
-      onExport={onExport}
-      chainVariantsFor={chainVariantsFor}
-      relatedCertificateId={relatedCertificateId}
-    />
+    {modals}
     </>
   )
 }

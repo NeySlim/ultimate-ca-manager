@@ -38,17 +38,15 @@ vi.mock('react-i18next', () => ({
   Trans: ({ children }) => children,
 }))
 
-vi.mock('../deploy/CertDeploySection', () => ({
-  CertDeploySection: () => null,
+vi.mock('../../../contexts', () => ({
+  useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showWarning: vi.fn(), showConfirm: vi.fn(), showPrompt: vi.fn() }),
+  useMobile: () => ({ isMobile: false, isTablet: false }),
 }))
+vi.mock('../../../contexts/AuthContext', () => ({ useAuth: () => ({ permissions: ['*'] }) }))
 
-vi.mock('../CertificateLintModal', () => ({
-  CertificateLintModal: () => null,
-}))
-
-import { CertificateDetails } from '../CertificateDetails'
-import { ExportModal } from '../ExportModal'
-import { canExportPrivateKey } from '../../lib/exportPermissions'
+import { ActionsHarness } from './ActionsHarness'
+import { ExportModal } from '../../ExportModal'
+import { canExportPrivateKey } from '../../../lib/exportPermissions'
 
 // Verbatim from backend/auth/permissions.py.
 const OPERATOR_PERMISSIONS = [
@@ -152,15 +150,12 @@ describe('certificate surfaces agree on the same state', () => {
 
   it('hides them in the detail panel too, for that same Operator', () => {
     render(
-      <CertificateDetails
-        certificate={CERT}
-        onExport={vi.fn()}
-        canWrite={operator.canWrite('certificates')}
-        canExportKey={canExportPrivateKey('certificate', operator)}
-        canDelete={false}
+      <ActionsHarness
+        entity={CERT}
+        permissions={{ ...operator, canDelete: () => false }}
       />
     )
-    fireEvent.click(screen.getByTitle('export.title'))
+    fireEvent.click(screen.getAllByRole('button', { name: /export/i })[0])
     KEY_FORMATS.forEach(label => expect(screen.queryByText(label)).toBeNull())
     // The panel still exports the certificate itself.
     expect(screen.getByText('PEM')).toBeInTheDocument()
@@ -183,15 +178,12 @@ describe('certificate surfaces agree on the same state', () => {
     unmount()
 
     render(
-      <CertificateDetails
-        certificate={CERT}
-        onExport={vi.fn()}
-        canWrite
-        canExportKey={canExportPrivateKey('certificate', admin)}
-        canDelete={false}
+      <ActionsHarness
+        entity={CERT}
+        permissions={{ ...admin, canDelete: () => false }}
       />
     )
-    fireEvent.click(screen.getByTitle('export.title'))
+    fireEvent.click(screen.getAllByRole('button', { name: /export/i })[0])
     KEY_FORMATS.forEach(label => expect(screen.getByText(label)).toBeInTheDocument())
   })
 })

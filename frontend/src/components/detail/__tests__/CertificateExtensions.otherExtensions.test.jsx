@@ -1,7 +1,7 @@
 /** #437: extensions without a section of their own (backend key `other_extensions`). */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import '../../pages/__tests__/pageRenderingSetup.jsx'
+import '../../../pages/__tests__/pageRenderingSetup.jsx'
 
 import { CertificateExtensions } from '../CertificateExtensions'
 

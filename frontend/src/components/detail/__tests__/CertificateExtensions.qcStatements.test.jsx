@@ -1,7 +1,7 @@
 /** Decoded qcStatements (backend key `qc_statements`) shown with the other extensions. */
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import '../../pages/__tests__/pageRenderingSetup.jsx'
+import '../../../pages/__tests__/pageRenderingSetup.jsx'
 
 import { CertificateExtensions } from '../CertificateExtensions'
 
