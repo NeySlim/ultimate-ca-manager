@@ -210,3 +210,19 @@ def test_a_bad_csr_at_approval_closes_the_request(app, client, auth_client, acme
         read = _read(client, account, order_id).get_json()
         assert read['status'] == 'invalid'
         assert read['error']['type'] == 'urn:ietf:params:acme:error:badCSR'
+
+
+def test_a_caa_dns_error_at_approval_keeps_the_request_pending(app, client, auth_client, acme_ca,
+                                                               monkeypatch):
+    import utils.caa_checker as caa
+    with approval_policy(app, acme_ca[0], 'acme-held-caa-dns') as pid:
+        account, order_id, _r = _held(app, client, acme_ca)
+        (approval_id, *_), = requests_of(app, pid, 'acme_order')
+        # What check_caa_for_domains returns on a lookup failure under acme_caa_enforce
+        monkeypatch.setattr(caa, 'check_caa_for_domains', lambda *a, **k: (
+            False, 'CAA check failed for x: CAA DNS lookup failed (DNS error) for x'))
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.get_json()['message'] != 'Request closed', r.get_json()
+        assert requests_of(app, pid, 'acme_order')[0][1] == 'pending'
+        assert _read(client, account, order_id).get_json()['status'] == 'processing'
+

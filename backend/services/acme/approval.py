@@ -50,8 +50,9 @@ def _issue(approval, data):
     if not success:
         error_type = 'caa' if _is_caa_failure(error) else (
             getattr(service, '_last_finalize_error_type', None) or 'badCSR')
-        if error_type == 'serverInternal':
-            # The order stays processing: the approver may try again once the CA is back
+        if error_type == 'serverInternal' or 'dns error' in (error or '').lower():
+            # Transient (CA down, CAA lookup failed): the order stays processing
+            # and the approver may try again once the cause is gone
             raise ValueError(error)
         # Nothing is committed here: the approval route rolls the vote back
         # and closes the request, whose closed handler invalidates the order
