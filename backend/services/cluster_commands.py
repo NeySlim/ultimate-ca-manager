@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import signal
+import sys
 import threading
 import time
 from collections import namedtuple
@@ -40,7 +41,7 @@ RESTART_RETRY_FIRST = 2.0
 RESTART_RETRY_MAX = 60.0
 RETENTION = timedelta(hours=24)
 # A starting process replays the reloads of this window (idempotent): one committed while it
-# read its settings is not lost. A restart in it, committed before the first pass, never runs.
+# read its settings is not lost. A restart in it runs unless committed before that read.
 START_REPLAY = timedelta(seconds=60)
 BATCH = 200
 
@@ -50,6 +51,9 @@ _Held = namedtuple('_Held', 'id created_at')
 # Imported by gunicorn_config before the master reads a setting: a restart created later runs.
 # On this host's clock: the applier moves it onto the cluster clock before comparing.
 PROCESS_STARTED = utc_now()
+# Restart ids committed before the gunicorn master read its settings (their changes are in
+# this process); None without that snapshot: the applier reads them at its first pass
+KNOWN_AT_START = None
 
 _RESTARTS_SQL = text("SELECT id FROM cluster_commands WHERE kind = :k AND created_at > :t")
 _INITIAL_SQL = text("SELECT COALESCE(MAX(id), 0) FROM cluster_commands WHERE created_at <= :t")
@@ -63,6 +67,32 @@ _CLAIM_SQL = text("UPDATE cluster_nodes SET restart_seen = :id WHERE node_id = :
 _CLAIMED_SQL = text("SELECT restart_seen FROM cluster_nodes WHERE node_id = :n")
 _RELEASE_SQL = text("UPDATE cluster_nodes SET restart_seen = :prev WHERE node_id = :n "
                     "AND restart_seen = :id")
+
+
+def _ha_from_environment():
+    # The master reads this before config.settings: the same test as env_bool('UCM_HA')
+    return os.getenv('UCM_HA', '').strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def snapshot_committed_restarts(data_path):
+    """gunicorn master, HA only, before the mTLS and WSTEP settings are read: a restart
+    committed later is not spared by this process. Unreadable: none is spared."""
+    global KNOWN_AT_START
+    if not _ha_from_environment():
+        return None
+    from boot_config import open_boot_database
+    try:
+        database = open_boot_database(data_path)
+        if database is None:
+            raise RuntimeError('no database')
+        with database:
+            KNOWN_AT_START = frozenset(row[0] for row in database.rows(
+                "SELECT id FROM cluster_commands WHERE kind = ?", (RESTART,)))
+    except Exception as e:
+        print(f"Cluster commands: restarts not read before the settings, none is spared: "
+              f"{type(e).__name__}: {e}", file=sys.stderr)
+        KNOWN_AT_START = frozenset()
+    return KNOWN_AT_START
 
 
 def emit(kind, payload=None, target=None):
@@ -191,7 +221,7 @@ class CommandApplier:
         self.guard = RESTART_GUARD_SECONDS if guard is None else guard
         self.stale_seconds = STALE_PASSES * 60 if stale_seconds is None else stale_seconds
         self.seen = None
-        self._known_at_start = None  # restart ids already committed at the first pass
+        self._known_at_start = KNOWN_AT_START  # restart ids whose change this process has
         self.restarting = False
         self._holes = []  # [lo, hi, monotonic deadline]: ids passed over that may still commit
         self._gap = None  # (first missing id, monotonic time it was noticed)
@@ -258,8 +288,8 @@ class CommandApplier:
                 self.started_at = self._cluster_clock(conn, self.started_at)
                 self._on_cluster_clock = True
             if self._known_at_start is None:
-                # Before the cursor, once: a restart committed later is not taken for one this
-                # process already started after
+                # No master snapshot: before the cursor, once, a restart committed later is not
+                # taken for one this process already started after
                 self._known_at_start = frozenset(conn.execute(_RESTARTS_SQL, {
                     'k': RESTART, 't': self.started_at - START_REPLAY}).scalars())
             if self.seen is None:

@@ -898,3 +898,59 @@ def test_a_hole_whose_command_never_commits_expires(app, ha):
     clock.t += 20
     b.run_once()
     assert not _in_hole(b, lost_id) and log == [('b', 'kept')]
+
+
+@pytest.fixture
+def master_boot(app, monkeypatch):
+    """The gunicorn master's environment: HA on, the database reached through DATABASE_URL."""
+    monkeypatch.setenv('UCM_HA', '1')
+    monkeypatch.setenv('DATABASE_URL', pg_app_harness.app_url())
+    monkeypatch.setattr(cc, 'KNOWN_AT_START', None)
+
+
+@pytest.mark.parametrize('committed', ['before-settings', 'after-settings'])
+def test_only_a_restart_committed_before_the_master_read_its_settings_is_spared(
+        app, ha, master_boot, tmp_path, committed):
+    """Created before the process started either way: the snapshot taken before the settings
+    are read, not the applier's first pass, decides whether its change was seen."""
+    from sqlalchemy.orm import Session
+    from models import ClusterCommand
+    from services.scheduler_leader import _dedicated_engine, application_url
+    cluster, log = _Cluster(app), []
+    _node_row(app, 'n')
+    started = utc_now()
+    with app.app_context():
+        engine = _dedicated_engine(application_url())
+    try:
+        with Session(bind=engine) as writer:
+            writer.add(ClusterCommand(kind=cc.RESTART, created_at=started - timedelta(seconds=5)))
+            if committed == 'before-settings':
+                writer.commit()
+                cc.snapshot_committed_restarts(str(tmp_path))
+            else:
+                writer.flush()
+                cc.snapshot_committed_restarts(str(tmp_path))
+                writer.commit()  # before the applier's first pass
+    finally:
+        engine.dispose()
+    n = ha('n', started_at=started, restart_action=cluster.action('n'),
+           handlers={cc.RELOAD_SYSLOG: _recorder(log, 'n')})
+    n.start()
+    if committed == 'after-settings':
+        assert wait_for(lambda: ('down', 'n') in cluster.events)
+        return
+    assert wait_for(lambda: n.seen is not None)
+    after = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'})
+    assert wait_for(lambda: n.seen == after)
+    assert log == [('n', 'after')] and cluster.events == []
+
+
+def test_an_unreadable_snapshot_spares_no_restart(master_boot, monkeypatch, tmp_path):
+    monkeypatch.setenv('DATABASE_URL', 'postgresql://ucm@127.0.0.1:1/ucm')
+    assert cc.snapshot_committed_restarts(str(tmp_path)) == frozenset()
+
+
+def test_no_snapshot_outside_ha(master_boot, monkeypatch, tmp_path):
+    monkeypatch.delenv('UCM_HA')
+    monkeypatch.setenv('DATABASE_URL', 'postgresql://ucm@127.0.0.1:1/ucm')
+    assert cc.snapshot_committed_restarts(str(tmp_path)) is None and cc.KNOWN_AT_START is None

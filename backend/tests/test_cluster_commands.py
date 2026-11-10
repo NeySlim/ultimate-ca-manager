@@ -196,6 +196,52 @@ print(json.dumps(reads))
 '''
 
 
+_BOOT_SNAPSHOT = r'''
+import json, sys
+import boot_config
+
+
+class Committed:
+    def rows(self, sql, params=()):
+        return [(7,)]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+boot_config.open_boot_database = lambda data_path: Committed()
+reads = []
+
+def recorder(name, value):
+    def read(data_path):
+        known = getattr(sys.modules.get('services.cluster_commands'), 'KNOWN_AT_START', None)
+        reads.append([name, sorted(known or [])])
+        return value
+    return read
+boot_config.wstep_enabled = recorder('wstep', False)
+boot_config.mtls_client_ca = recorder('mtls', None)
+import gunicorn_config
+print(json.dumps(reads))
+'''
+
+
+def test_the_master_reads_the_committed_restarts_before_its_settings(tmp_path):
+    """HA: a restart committed after this snapshot restarts the node, whatever the first pass sees."""
+    import json
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    backend = str(Path(__file__).resolve().parent.parent)
+    env = {k: v for k, v in os.environ.items() if k not in ('DATABASE_URL', 'DATABASE_PATH')}
+    env.update(DATA_DIR=str(tmp_path), UCM_BASE_PATH=str(tmp_path), PYTHONPATH=backend, UCM_HA='1')
+    run = subprocess.run([sys.executable, '-c', _BOOT_SNAPSHOT], cwd=backend, env=env,
+                         capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0, run.stderr
+    assert json.loads(run.stdout.strip().splitlines()[-1]) == [['wstep', [7]], ['mtls', [7]]]
+
+
 def test_the_process_start_is_stamped_before_the_master_reads_a_setting(tmp_path):
     """A restart committed after a setting was read is never judged older than the process."""
     import json

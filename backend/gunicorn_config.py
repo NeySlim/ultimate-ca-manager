@@ -15,11 +15,13 @@ import sys
 os.environ['UCM_SCHEDULER_SUPERVISED'] = '1'
 
 # Stamps the process start (HA cluster commands) before the mTLS and WSTEP settings are read
-import services.cluster_commands  # noqa: E402,F401
+import services.cluster_commands  # noqa: E402
 
 # Detect environment
 base_path = os.getenv('UCM_BASE_PATH', '/opt/ucm')
 data_path = os.getenv('DATA_DIR', f'{base_path}/data')
+# HA: the restarts committed before the settings below are read; a later one restarts this node
+services.cluster_commands.snapshot_committed_restarts(data_path)
 is_docker = os.path.exists('/.dockerenv') or os.getenv('UCM_DOCKER') == '1'
 
 # Server socket — HOST selects the listen address (0.0.0.0 by default,
