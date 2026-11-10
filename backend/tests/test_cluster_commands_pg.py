@@ -323,7 +323,7 @@ def test_a_node_started_after_the_restart_command_is_spared(app, ha):
     late = ha('late', started_at=utc_now(), restart_action=cluster.action('late'),
               handlers={cc.RELOAD_SYSLOG: _recorder(log, 'late')})
     after = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'})
-    late.seen = restart_id - 1  # as if the restart committed after this process read its cursor
+    late.seen = restart_id - 1  # read, then spared: committed before the first pass (no master snapshot)
     late.start()
     assert wait_for(lambda: late.seen == after)
     assert restart_id < after and log == [('late', 'after')]
