@@ -4,6 +4,7 @@ PostgreSQL frees a session lock when its connection ends, so the leader is the
 node whose dedicated connection still holds it; nothing on disk is shared.
 """
 import logging
+import os
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
@@ -114,3 +115,62 @@ class PgAdvisoryLock:
         except Exception:
             pass
 
+
+
+# A node whose scheduler process missed this many passes counts as gone
+STALE_PASSES = 3
+
+
+def write_heartbeat(node_id, leader, started_at) -> None:
+    """Refresh this node's row; the leader also takes the flag off every other row."""
+    from config.settings import Config
+    from models import ClusterNode, db
+    from utils.datetime_utils import utc_now
+    now = utc_now()
+    node = db.session.get(ClusterNode, node_id)
+    if node is None:
+        node = ClusterNode(node_id=node_id, started_at=started_at)
+        db.session.add(node)
+    elif node.pid != os.getpid():
+        node.started_at = started_at  # a new process on the same node
+    node.heartbeat_at, node.is_leader = now, bool(leader)
+    node.version, node.pid = Config.APP_VERSION, os.getpid()
+    if leader:
+        ClusterNode.query.filter(ClusterNode.node_id != node_id, ClusterNode.is_leader.is_(True)) \
+            .update({'is_leader': False}, synchronize_session=False)
+    db.session.commit()
+
+
+def _is_stale(node, wake_interval, now) -> bool:
+    return (now - node.heartbeat_at).total_seconds() > STALE_PASSES * wake_interval
+
+
+def cluster_summary(wake_interval) -> dict:
+    """{leader_node_id, nodes, stale} as /health reports it; a stale leader is no leader."""
+    from models import ClusterNode
+    from utils.datetime_utils import utc_now
+    now = utc_now()
+    nodes = ClusterNode.query.all()
+    stale = {n.node_id for n in nodes if _is_stale(n, wake_interval, now)}
+    leader = next((n.node_id for n in nodes if n.is_leader and n.node_id not in stale), None)
+    return {'leader_node_id': leader, 'nodes': len(nodes), 'stale': len(stale)}
+
+
+def node_registered(node_id) -> bool:
+    from models import ClusterNode, db
+    return db.session.get(ClusterNode, node_id) is not None
+
+
+def node_is_leader(node_id, wake_interval) -> bool:
+    """Whether this node's scheduler process holds the lock, as its last fresh heartbeat says."""
+    from models import ClusterNode, db
+    from utils.datetime_utils import utc_now
+    node = db.session.get(ClusterNode, node_id)
+    return bool(node and node.is_leader and not _is_stale(node, wake_interval, utc_now()))
+
+
+def fresh_node_ids(wake_interval) -> set:
+    from models import ClusterNode
+    from utils.datetime_utils import utc_now
+    now = utc_now()
+    return {n.node_id for n in ClusterNode.query.all() if not _is_stale(n, wake_interval, now)}

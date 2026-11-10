@@ -98,6 +98,8 @@ class ScanRun(db.Model):
     timeout = db.Column(db.Integer, nullable=False, default=5)
     max_workers = db.Column(db.Integer, nullable=False, default=20)
     resolve_dns = db.Column(db.Boolean, nullable=False, default=False)
+    # The node whose process runs the scan: HA recovery only fails runs of nodes gone
+    node_id = db.Column(db.String(255))
 
     @property
     def duration_seconds(self):

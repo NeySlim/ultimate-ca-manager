@@ -32,7 +32,7 @@ def wait_for(predicate, timeout=5.0):
 def ha(app, monkeypatch, tmp_path):
     """HA mode, a lock key of this test's own, and schedulers stopped afterwards."""
     monkeypatch.setattr(Config, 'HA_MODE', True)
-    monkeypatch.setattr('config.settings.DATA_DIR', str(tmp_path), raising=False)
+    monkeypatch.setattr('config.settings.DATA_DIR', tmp_path, raising=False)
     monkeypatch.setattr(scheduler_leader, 'LEADER_LOCK_KEY', secrets.randbits(62))
     monkeypatch.setattr(scheduler_service, 'LOCK_RETRY_SECONDS', RETRY)
     made = []
@@ -46,6 +46,10 @@ def ha(app, monkeypatch, tmp_path):
     yield make
     for s in made:
         s.stop(timeout=10)
+    from models import ClusterNode, db
+    with app.app_context():
+        ClusterNode.query.delete()  # their heartbeats, out of the shared test schema
+        db.session.commit()
 
 
 def kill_backend(app, pid):
@@ -112,7 +116,7 @@ def test_still_held_asks_the_server(app, ha, monkeypatch):
 
 def test_without_ha_the_host_lock_is_used(app, monkeypatch, tmp_path):
     monkeypatch.setattr(Config, 'HA_MODE', False)
-    monkeypatch.setattr('config.settings.DATA_DIR', str(tmp_path), raising=False)
+    monkeypatch.setattr('config.settings.DATA_DIR', tmp_path, raising=False)
     s = SchedulerService(wake_interval=3600)
     try:
         assert s._singleton_lock().acquire()

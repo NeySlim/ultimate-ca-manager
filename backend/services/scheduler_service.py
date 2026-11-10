@@ -142,6 +142,9 @@ class SchedulerService:
         self._node_id = node_id
         # HA: the PostgreSQL leader lock; None means the host lock (flock / pid file)
         self._leader_lock = None
+        self._started_at = utc_now()
+        self._last_heartbeat = None
+        self._heartbeat_error_logged = False
         self.tasks: Dict[str, ScheduledTask] = {}
         self.tasks_lock = Lock()
         self._thread: Optional[threading.Thread] = None
@@ -463,17 +466,18 @@ class SchedulerService:
                     self._running = False
                     break
                 lock = self._singleton_lock()
-                if self._owns_lock and not self._still_leader(lock):
-                    self._wake.wait(LOCK_RETRY_SECONDS)
-                    continue
-                if not self._owns_lock:
-                    if not lock.acquire():
-                        self._wake.wait(LOCK_RETRY_SECONDS)
-                        continue
+                # A node that just lost the lock waits a retry period: another one takes over first
+                lost = self._owns_lock and not self._still_leader(lock)
+                if not lost and not self._owns_lock and lock.acquire():
                     self._owns_lock, self._owner_pid = True, os.getpid()
                     logger.info(f"Scheduler lock acquired: pid {os.getpid()} on node {self.node_id} "
                                 "runs the scheduled tasks")
+                    self._heartbeat(force=True)
                     self._publish_state()
+                self._heartbeat(force=lost)
+                if not self._owns_lock:
+                    self._wake.wait(LOCK_RETRY_SECONDS)
+                    continue
                 try:
                     requested = self._take_requests() if supervised() else []
                     with self.tasks_lock:
@@ -501,6 +505,33 @@ class SchedulerService:
         finally:
             # The next process waiting for the lock takes over from here
             self._release_lock()
+            self._heartbeat(force=True)
+
+    def _heartbeat(self, force: bool = False) -> None:
+        """HA: this node's row in cluster_nodes, at most once a pass unless leadership changed."""
+        from utils.ha import ha_enabled
+        if not ha_enabled():
+            return
+        now = time.monotonic()
+        if not force and self._last_heartbeat is not None \
+                and now - self._last_heartbeat < self.wake_interval:
+            return
+        from services.scheduler_leader import write_heartbeat
+        try:
+            self._in_app(write_heartbeat, self.node_id, self._owns_lock, self._started_at)
+            self._last_heartbeat = now
+            self._heartbeat_error_logged = False
+        except Exception as e:
+            self._in_app(_rollback)
+            if not self._heartbeat_error_logged:
+                logger.error(f"Node heartbeat not written: {type(e).__name__}: {e}")
+                self._heartbeat_error_logged = True
+
+    def _in_app(self, fn, *args):
+        if self._app is not None:
+            with self._app.app_context():
+                return fn(*args)
+        return fn(*args)
 
     def _acquire_singleton_lock(self) -> bool:
         """Take the host-wide scheduler lock, so only ONE process runs the loop.
@@ -663,6 +694,14 @@ class SchedulerService:
         return True
 
 
+def _rollback() -> None:
+    try:
+        from models import db
+        db.session.rollback()
+    except Exception:
+        pass
+
+
 class _HostLock:
     """SingletonLock on this host: the scheduler's flock, or its pid file without flock."""
 
@@ -734,6 +773,11 @@ def is_leader():
     """
     if _scheduler is None:
         return None
+    from utils.ha import ha_enabled
+    if ha_enabled() and not getattr(_scheduler, '_running', False):
+        # HA: the scheduler process of this node says in cluster_nodes whether it holds the lock
+        from services.scheduler_leader import node_is_leader
+        return node_is_leader(_scheduler.node_id, _scheduler.wake_interval)
     if _scheduler._delegated():
         return not _scheduler.state_is_stale()
     return bool(_scheduler._owns_lock)

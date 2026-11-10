@@ -26,6 +26,32 @@ def _ha_fields():
     return {'ha': bool(Config.HA_MODE), 'node_id': Config.NODE_ID, 'leader': leader}
 
 
+def _cluster():
+    """HA only: who leads, how many nodes registered, how many stopped heartbeating."""
+    try:
+        from services.scheduler_leader import cluster_summary
+        from services.scheduler_service import get_scheduler
+        return cluster_summary(get_scheduler().wake_interval)
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Cluster registry not readable: {e}")
+        return None
+
+
+def _check_cluster():
+    """HA only: this node serves once its scheduler process registered it."""
+    from config.settings import Config
+    try:
+        from services.scheduler_leader import node_registered
+        if node_registered(Config.NODE_ID):
+            return {'status': 'ok'}
+        return {'status': 'error', 'message': 'Node not registered yet (no scheduler heartbeat)'}
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Cluster registry check failed: {e}")
+        return {'status': 'error', 'message': 'Cluster registry not readable'}
+
+
 @health_bp.route('/api/v2/health')
 @health_bp.route('/api/health')
 @health_bp.route('/health')
@@ -55,6 +81,9 @@ def health():
         'fips_active': fips_mode.enabled(),
         **_ha_fields(),
     }
+    from config.settings import Config
+    if Config.HA_MODE:
+        result['cluster'] = _cluster()
     if current_app.config.get('SAFE_MODE'):
         result['safe_mode'] = True
         result['safe_mode_reason'] = current_app.config.get('SAFE_MODE_REASON',
@@ -82,6 +111,8 @@ def readiness():
     redis_url = config_redis_url()
     if redis_url:
         checks['redis'] = _check_redis(redis_url)
+    if Config.HA_MODE:
+        checks['cluster'] = _check_cluster()
 
     all_ok = all(c.get('status') in ('ok', 'skipped') for c in checks.values())
 
