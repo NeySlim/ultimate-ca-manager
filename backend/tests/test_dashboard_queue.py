@@ -39,7 +39,8 @@ def _crl(ca, next_update, **kw):
 
 def _cert(name, valid_to, **kw):
     kw.setdefault('source', 'manual')
-    row = Certificate(refid=str(uuid.uuid4()), descr=name, subject_cn=name, crt=_PEM[0],
+    kw.setdefault('subject_cn', name)
+    row = Certificate(refid=str(uuid.uuid4()), descr=name, crt=_PEM[0],
                       valid_from=utc_now() - timedelta(days=300), valid_to=valid_to, **kw)
     db.session.add(row)
     db.session.flush()
@@ -90,6 +91,12 @@ def seeded(app):
         _crl(crl_renewed, now + timedelta(hours=12), crl_number=1)  # superseded by number 2
         _crl(crl_renewed, now + timedelta(days=7), crl_number=2)
         crl_none = _ca('queue-crl-none', cdp_enabled=True, valid_to=now + timedelta(days=3650))
+        # Offline CAs publish uploaded CRLs; the CDP serves the newest full one by number, uploads included
+        crl_offline = _ca('queue-crl-offline', cdp_enabled=True, valid_to=now + timedelta(days=3650))
+        _crl(crl_offline, now + timedelta(hours=12), crl_number=1)
+        _crl(crl_offline, now + timedelta(days=30), crl_number=5, is_external=True)
+        crl_upload = _ca('queue-crl-upload', cdp_enabled=True, valid_to=now + timedelta(days=3650))
+        _crl(crl_upload, now + timedelta(days=30), crl_number=5, is_external=True)
         no_cdp = _ca('queue-no-cdp', cdp_enabled=False, valid_to=now + timedelta(days=3650))
         ca_soon = _ca('queue-ca-60d', valid_to=now + timedelta(days=60))
         ca_later = _ca('queue-ca-200d', valid_to=now + timedelta(days=200))
@@ -107,7 +114,8 @@ def seeded(app):
         db.session.commit()
         ids.update(failed=failed.id, old=old.id, client=client.id, healthy=healthy.id, urgent=urgent.id,
                    calm=calm.id, done=done.id, scep=scep.id, recovery=recovery.id,
-                   crl_soon=crl_soon.id, crl_fresh=crl_fresh.id, crl_renewed=crl_renewed.id, crl_none=crl_none.id, no_cdp=no_cdp.id,
+                   crl_soon=crl_soon.id, crl_fresh=crl_fresh.id, crl_renewed=crl_renewed.id, crl_none=crl_none.id,
+                   crl_offline=crl_offline.id, crl_upload=crl_upload.id, no_cdp=no_cdp.id,
                    ca_soon=ca_soon.id, ca_later=ca_later.id, ca_revoked=ca_revoked.id,
                    **{k: v.id for k, v in certs.items()}, account=account.id)
     yield ids
@@ -119,7 +127,7 @@ def seeded(app):
                 row = db.session.get(model, ids[key])
                 if row is not None:
                     db.session.delete(row)
-        cas = [ids[k] for k in ('crl_soon', 'crl_fresh', 'crl_renewed', 'crl_none', 'no_cdp', 'ca_soon', 'ca_later', 'ca_revoked')]
+        cas = [ids[k] for k in ('crl_soon', 'crl_fresh', 'crl_renewed', 'crl_none', 'crl_offline', 'crl_upload', 'no_cdp', 'ca_soon', 'ca_later', 'ca_revoked')]
         CRLMetadata.query.filter(CRLMetadata.ca_id.in_(cas)).delete(synchronize_session=False)
         CA.query.filter(CA.id.in_(cas)).delete(synchronize_session=False)
         db.session.delete(db.session.get(AcmeAccount, ids['account']))
@@ -170,6 +178,8 @@ def test_crl_due_date_is_the_latest_full_crl(auth_client, seeded):
     ('acme_order_failed', 'old'), ('acme_client_renewal_failed', 'healthy'),
     ('approval_pending', 'done'), ('crl_due', 'crl_fresh'), ('crl_missing', 'crl_fresh'),
     ('crl_due', 'crl_renewed'),
+    ('crl_due', 'crl_offline'), ('crl_missing', 'crl_offline'),
+    ('crl_due', 'crl_upload'), ('crl_missing', 'crl_upload'),
     ('crl_missing', 'no_cdp'), ('ca_expiring', 'ca_revoked'),
     ('manual_renewal_due', 'auto'), ('manual_renewal_due', 'revoked'),
     ('manual_renewal_due', 'archived'), ('manual_renewal_due', 'far'), ('manual_renewal_due', 'expired'),

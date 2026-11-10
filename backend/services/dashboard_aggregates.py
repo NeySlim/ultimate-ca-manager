@@ -125,11 +125,10 @@ def _queue_union(now):
         due(KeyRecoveryRequest.requested_at).label('due_at'),
     ).where(KeyRecoveryRequest.status == STATUS_PENDING))
 
-    # nextUpdate of the newest full CRL signed here, per CA; deltas and uploads do not refresh it
-    own_full = and_(or_(CRLMetadata.is_delta.is_(False), CRLMetadata.is_delta.is_(None)),
-                    or_(CRLMetadata.is_external.is_(False), CRLMetadata.is_external.is_(None)))
+    # nextUpdate of the newest full CRL by number, uploads included, as the CDP serves it
+    full_crl = or_(CRLMetadata.is_delta.is_(False), CRLMetadata.is_delta.is_(None))
     newest = (select(CRLMetadata.ca_id.label('ca_id'), func.max(CRLMetadata.crl_number).label('number'))
-              .where(own_full).group_by(CRLMetadata.ca_id).subquery())
+              .where(full_crl).group_by(CRLMetadata.ca_id).subquery())
     latest = (select(CRLMetadata.ca_id.label('ca_id'), CRLMetadata.next_update.label('next_update'))
               .join(newest, and_(newest.c.ca_id == CRLMetadata.ca_id, newest.c.number == CRLMetadata.crl_number))
               .subquery())
