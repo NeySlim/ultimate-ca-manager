@@ -768,3 +768,62 @@ def test_a_restart_committed_after_the_node_started_runs_though_created_before(a
         assert wait_for(lambda: ('down', 'n') in cluster.events)
     finally:
         engine.dispose()
+
+
+def test_a_late_reload_whose_handler_always_raises_closes_its_hole_and_holds_nothing(app, ha):
+    from sqlalchemy.orm import Session
+    from models import ClusterCommand
+    from services.scheduler_leader import _dedicated_engine, application_url
+    clock, log, calls = _FakeMonotonic(), [], []
+
+    def boom(payload):
+        calls.append(payload)
+        raise TypeError('invalid payload')
+    b = ha('b', monotonic=clock, handlers={cc.RELOAD_RATE_LIMITS: boom, cc.RELOAD_SYSLOG: _recorder(log, 'b')})
+    b.run_once()
+    with app.app_context():
+        engine = _dedicated_engine(application_url())
+    try:
+        with Session(bind=engine) as slow, Session(bind=engine) as fast:
+            slow.add(ClusterCommand(kind=cc.RELOAD_RATE_LIMITS, payload='"not an object"', created_at=utc_now()))
+            slow.flush()
+            late = slow.query(ClusterCommand).one().id
+            fast.add(ClusterCommand(kind=cc.RELOAD_SYSLOG, payload='{"mark": "fast"}', created_at=utc_now()))
+            fast.commit()
+            for _ in range(3):
+                clock.t += 1  # past the gap grace: the late id becomes a hole
+                b.run_once()
+            assert log == [('b', 'fast')] and _in_hole(b, late)
+            slow.commit()
+        b.run_once()
+        assert calls == ['not an object'] and not _in_hole(b, late)
+        after = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'})
+        clock.t += 1
+        b.run_once()
+        b.run_once()
+        assert b.seen == after and log == [('b', 'fast'), ('b', 'after')] and len(calls) == 1
+    finally:
+        engine.dispose()
+
+
+def test_a_hole_whose_command_never_commits_expires(app, ha):
+    from models import db
+    clock, log = _FakeMonotonic(), []
+    b = ha('b', monotonic=clock, handlers={cc.RELOAD_SYSLOG: _recorder(log, 'b')})
+    b.run_once()
+    with app.app_context():
+        lost = cc.emit(cc.RELOAD_SYSLOG, {'mark': 'rolled-back'})
+        db.session.flush()
+        lost_id = lost.id
+        db.session.rollback()
+    kept = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'kept'})
+    for _ in range(3):
+        clock.t += 1
+        b.run_once()
+    assert b.seen == kept and _in_hole(b, lost_id)
+    clock.t += cc.HOLE_TTL_SECONDS - 10
+    b.run_once()
+    assert _in_hole(b, lost_id)
+    clock.t += 20
+    b.run_once()
+    assert not _in_hole(b, lost_id) and log == [('b', 'kept')]
