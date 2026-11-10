@@ -715,10 +715,13 @@ def _approval_gate(ca, csr, operation, identity, extra=None):
             return _approval_gate(ca, csr, operation, identity, extra)
         from models import Certificate
         row = db.session.get(Certificate, approval.certificate_id) if approval.certificate_id else None
-        if row is not None and row.crt:
-            cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt), default_backend())
+        if row is None or not row.crt:
+            protocol_approval.close_withdrawn(approval)
             protocol_approval.mark_delivered(approval)
-            return _certs_only_response(cert, ca=ca), None
+            return Response(protocol_approval.decision_reason(approval), status=403), None
+        cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt), default_backend())
+        protocol_approval.mark_delivered(approval)
+        return _certs_only_response(cert, ca=ca), None
     logger.info('EST %s held for approval #%s', operation, approval.id)
     return Response(f'Request held for approval (#{approval.id}); retry later', status=202,
                     headers={'Retry-After': str(_retry_after_seconds())}), None

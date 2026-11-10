@@ -40,6 +40,7 @@ _ANSWERING = ('pending', 'approved', 'rejected')
 # Failures of the server's own key material: their text stays in the logs
 _KEY_MATERIAL_MARKERS = ('signing key', 'KEY_ENCRYPTION_KEY', 'HSM')
 GENERIC_ISSUE_ERROR = 'Certificate issuance failed. Check server logs.'
+CERTIFICATE_WITHDRAWN = 'Certificate withdrawn'
 
 
 def is_key_material_error(text) -> bool:
@@ -238,9 +239,23 @@ def record_refusal(approval, error) -> None:
         approval.request_data = json.dumps(data)
 
 
+def close_withdrawn(approval) -> None:
+    """Close an approved request whose certificate went away before its
+    client collected it: rejected, so the client hears a refusal."""
+    data = request_data(approval)
+    data['closed_reason'] = CERTIFICATE_WITHDRAWN
+    approval.request_data = json.dumps(data)
+    approval.status = 'rejected'
+    approval.resolved_at = utc_now()
+    db.session.commit()
+    logger.warning("Approval #%s closed: its certificate was withdrawn before delivery", approval.id)
+
+
 def decision_reason(approval) -> str:
     """What the client is told about a request that will not be issued: a
     fixed text, the approver's comment stays server side (vote, audit, webhook)."""
+    if request_data(approval).get('closed_reason') == CERTIFICATE_WITHDRAWN:
+        return CERTIFICATE_WITHDRAWN
     if approval.status == 'expired':
         return 'Approval request expired'
     return 'Rejected by an approver'

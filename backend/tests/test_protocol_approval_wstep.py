@@ -108,6 +108,20 @@ def test_query_is_denied_after_rejection(app, client, auth_client, wstep_config)
         assert invalid == 'true' and echoed == request_id
 
 
+def test_query_is_denied_when_the_approved_certificate_went_away(app, client, auth_client, wstep_config):
+    from tests.test_protocol_approval_est import _withdraw
+    with approval_policy(app, wstep_config['id'], 'wstep-held-withdrawn') as pid:
+        csr, _ = _make_csr(common_name='withdrawn.wstep-approval.test')
+        request_id = _pending(_issue_rst(client, csr))
+        (approval_id, *_), = requests_of(app, pid, 'wstep_request')
+        approve(auth_client, approval_id)
+        _withdraw(app, approval_id)
+        reason, invalid, echoed = _fault(_query(client, request_id))
+        assert reason == 'Certificate withdrawn'
+        assert invalid == 'true' and echoed == request_id
+        assert requests_of(app, pid, 'wstep_request')[0][1] == 'rejected'
+
+
 def test_query_is_denied_after_expiry(app, client, wstep_config):
     with approval_policy(app, wstep_config['id'], 'wstep-held-expire') as pid:
         csr, _ = _make_csr(common_name='late.wstep-approval.test')

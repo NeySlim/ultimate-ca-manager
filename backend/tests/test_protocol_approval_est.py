@@ -256,3 +256,27 @@ def test_reenrolment_approved_then_revoked_is_refused(app, client, auth_client, 
         refused = _post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem)
         assert refused.status_code == 403, refused.data
         assert b'revoked' in refused.data
+
+
+def _withdraw(app, approval_id):
+    """The approved request loses its certificate before delivery."""
+    from models import db
+    from models.policy import ApprovalRequest
+    with app.app_context(), db.engine.begin() as conn:
+        conn.execute(ApprovalRequest.__table__.update()
+                     .where(ApprovalRequest.__table__.c.id == approval_id).values(certificate_id=None))
+
+
+def test_an_approved_enrolment_whose_certificate_went_away_is_refused(app, client, auth_client, est_config):
+    with approval_policy(app, est_config['id'], 'est-held-withdrawn') as pid:
+        csr, _ = _make_csr(common_name='withdrawn.est-approval.test')
+        _held(_enroll(client, csr))
+        (approval_id, *_), = requests_of(app, pid, 'est_enroll')
+        approve(auth_client, approval_id)
+        _withdraw(app, approval_id)
+        refused = _enroll(client, csr)
+        assert refused.status_code == 403, refused.data
+        assert refused.data == b'Certificate withdrawn'
+        (_id, status, data, _cert), = requests_of(app, pid, 'est_enroll')
+        assert status == 'rejected' and data['delivered_at']
+        _held(_enroll(client, csr))

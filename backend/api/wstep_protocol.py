@@ -241,6 +241,7 @@ def _answer_held(ca, parsed, approval):
                                         cmc_response_der=_cmc_response_der_for(ca, cert, parsed))
             protocol_approval.mark_delivered(approval)
             return _rstr(body)
+        protocol_approval.close_withdrawn(approval)
     if approval.status in ('rejected', 'expired', 'cancelled'):
         protocol_approval.mark_delivered(approval)
         return _fault_response(protocol_approval.decision_reason(approval), status=400,
