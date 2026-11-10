@@ -49,8 +49,13 @@ describe('legacy detail windows', () => {
     expect(users).toEqual([])
   })
 
-  it('keeps the still-used floating modules out of the legacy set', () => {
-    const live = files.filter(([, text]) => importStatements(text).some((st) => /\/FloatingWindow['"]|useFloatingWindow/.test(st)))
-    expect(live.length).toBeGreaterThan(0)
-  })
+  it.each(['ui/FloatingWindow.jsx', 'hooks/useFloatingWindow.js'])(
+    'keeps %s out of the legacy set while a live module imports it', (shared) => {
+      const name = shared.split('/').pop().replace(/\.jsx?$/, '')
+      const users = files
+        .filter(([rel]) => !Object.keys(LEGACY).includes(rel) && rel !== shared)
+        .filter(([, text]) => importStatements(text).some((st) => new RegExp(`/${name}['"]`).test(st)))
+      expect(users.length).toBeGreaterThan(0)
+      expect(Object.keys(LEGACY)).not.toContain(shared)
+    })
 })
