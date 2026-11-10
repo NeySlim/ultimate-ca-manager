@@ -197,3 +197,28 @@ def test_a_lock_lost_mid_pass_stops_the_tasks_left_in_that_pass(app, ha, monkeyp
     assert wait_for(lambda: runs and not s._owns_lock)
     time.sleep(0.3)
     assert runs == ['first'], 'a task started after the lock was lost'
+
+
+def test_stopping_a_follower_closes_its_lock_session(app, ha, monkeypatch):
+    """A follower keeps its lock session between attempts: stop() must close it, not leak it."""
+    pids = {}
+    try_lock = scheduler_leader.PgAdvisoryLock._try_lock
+
+    def spy(self):
+        got = try_lock(self)
+        if self._conn is not None:  # in the loop's own thread, which owns this connection
+            pids[id(self)] = self._conn.execute(text('SELECT pg_backend_pid()')).scalar()
+        return got
+    monkeypatch.setattr(scheduler_leader.PgAdvisoryLock, '_try_lock', spy)
+    leader = ha('node-a', lambda: None)
+    leader.start(app=app)
+    assert wait_for(lambda: leader._owns_lock)
+    follower = ha('node-b', lambda: None)
+    follower.start(app=app)
+    assert wait_for(lambda: follower._leader_lock is not None and id(follower._leader_lock) in pids)
+    assert not follower._owns_lock
+    pid = pids[id(follower._leader_lock)]
+    assert backend_alive(app, pid)
+    assert follower.stop(timeout=10)
+    assert wait_for(lambda: not backend_alive(app, pid)), 'the follower left its lock session open'
+    assert leader._owns_lock

@@ -149,6 +149,7 @@ class SchedulerService:
         self._node_id = node_id
         # HA: the PostgreSQL leader lock; None means the host lock (flock / pid file)
         self._leader_lock = None
+        self._leader_lock_pid = None
         # Set when the lock goes away, mid-pass or not: the next pass waits instead of retaking it
         self._lost_lock = False
         self._started_at = utc_now()
@@ -533,6 +534,7 @@ class SchedulerService:
             else:
                 url = application_url()
             self._leader_lock = PgAdvisoryLock(url)
+            self._leader_lock_pid = os.getpid()
         return self._leader_lock
 
     def _still_leader(self, lock) -> bool:
@@ -733,13 +735,15 @@ class SchedulerService:
         return False
 
     def _release_lock(self) -> None:
-        # A forked copy shares the holder's open file: closing it there would not free
-        # the lock, and must not touch the holder's state either
-        if not self._owns_lock or self._owner_pid != os.getpid():
+        # A forked copy shares the holder's open file and lock session: closing them there
+        # would not free the lock, and must not touch the holder's state either
+        if self._owns_lock and self._owner_pid != os.getpid():
             return
-        self._owns_lock = False
-        if self._leader_lock is not None:
-            self._leader_lock.release()
+        owned, self._owns_lock = self._owns_lock, False
+        if self._leader_lock is not None and self._leader_lock_pid == os.getpid():
+            self._leader_lock.release()  # a follower's kept session as well
+        if not owned:
+            return
         if self._lock_fd is not None:
             fd, self._lock_fd = self._lock_fd, None
             try:
