@@ -479,3 +479,23 @@ def test_an_approved_reenrolment_whose_certificate_went_away_is_closed(app, clie
         (_id, status, data, _cert), = requests_of(app, pid, 'est_enroll')
         assert status == 'rejected' and data['delivered_at']
         assert data['closed_reason'] == 'Certificate withdrawn'
+
+
+def test_a_policy_with_an_undelivered_approval_is_not_deleted(app, client, auth_client, est_config):
+    """Deleting the policy would orphan the approved re-enrolment: issued,
+    the old certificate superseded, and the retry never finds it again."""
+    csr, key = _make_csr(common_name='renew-kept.est-approval.test')
+    leaf = _cert_of(_enroll(client, csr))
+    client_pem = leaf.public_bytes(serialization.Encoding.PEM).decode()
+    renewal = x509.CertificateSigningRequestBuilder().subject_name(leaf.subject).sign(key, hashes.SHA256())
+    with approval_policy(app, est_config['id'], 'est-held-reenroll-kept') as pid:
+        _held(_post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem))
+        (approval_id, *_), = requests_of(app, pid, 'est_enroll')
+        approve(auth_client, approval_id)
+        assert auth_client.delete(f'/api/v2/policies/{pid}').status_code == 400
+        renewed = _cert_of(_post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem))
+        assert renewed.serial_number != leaf.serial_number
+        (_id, status, data, _cert), = requests_of(app, pid, 'est_enroll')
+        assert status == 'approved' and data['delivered_at']
+        # Delivered: nothing holds the policy any more
+        assert auth_client.delete(f'/api/v2/policies/{pid}').status_code == 200
