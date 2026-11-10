@@ -55,6 +55,26 @@ def test_issuance_counts_one_per_certificate_on_sqlite(app):
         assert db.session.get(CA, ca_id).serial == 3
 
 
+
+def test_a_taken_random_serial_is_signed_again_once(app):
+    """RFC 5280 §4.1.2.2: the second certificate cannot reuse a serial; one retry, then a clean failure."""
+    from unittest.mock import patch
+    from sqlalchemy.exc import IntegrityError
+    taken = x509.random_serial_number()
+    with app.app_context():
+        ca_id = _ca_row(*_authority()).id
+        with patch('cryptography.x509.random_serial_number', return_value=taken):
+            _issue(ca_id, 'first.example.test')
+        fresh = x509.random_serial_number()
+        with patch('cryptography.x509.random_serial_number', side_effect=[taken, fresh]):
+            _, second = _issue(ca_id, 'second.example.test')
+        assert int(second, 16) == fresh
+        with patch('cryptography.x509.random_serial_number', return_value=taken), \
+                pytest.raises(IntegrityError):
+            _issue(ca_id, 'third.example.test')
+        db.session.expire_all()
+        assert db.session.get(CA, ca_id).serial == 2
+
 def _race(app, ca_id):
     errors, start = [], threading.Barrier(WORKERS)
 

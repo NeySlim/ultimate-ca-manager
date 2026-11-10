@@ -12,7 +12,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, CertificateTemplate, Certificate, SystemConfig
-from utils.ca_serial_counter import next_ca_serial
+from utils.ca_serial_counter import next_ca_serial, retry_on_serial_collision
 from models.compromised_key import remember_if_compromised
 from utils.validity import DEFAULT_CERTIFICATE_VALIDITY_DAYS
 from utils.key_type import issue_key_type_from_template
@@ -72,6 +72,7 @@ REVOKED_THEN_DELETED = ('Certificate {id} was revoked, then deleted: automatic r
 class LifecycleMixin:
 
     @staticmethod
+    @retry_on_serial_collision
     def create_certificate(
         descr: str,
         caref: str,

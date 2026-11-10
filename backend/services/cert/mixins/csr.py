@@ -10,7 +10,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, Certificate
-from utils.ca_serial_counter import next_ca_serial
+from utils.ca_serial_counter import next_ca_serial, retry_on_serial_collision
 from services.file_regen_service import mirror_private_key
 from services.trust_store import TrustStoreService
 from utils.dn_parse import subject_common_name
@@ -188,6 +188,7 @@ class CSRMixin:
         return certificate
 
     @staticmethod
+    @retry_on_serial_collision
     def sign_csr(
         cert_id: int,
         caref: str,

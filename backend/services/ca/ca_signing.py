@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from models import CA, Certificate, db
-from utils.ca_serial_counter import next_ca_serial
+from utils.ca_serial_counter import next_ca_serial, retry_on_serial_collision
 from models.certificate_template import CertificateTemplate
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
@@ -72,6 +72,7 @@ class CASigningMixin:
             )
 
     @staticmethod
+    @retry_on_serial_collision
     def sign_csr_from_crypto(
         ca: CA,
         csr: x509.CertificateSigningRequest,
