@@ -11,6 +11,7 @@ vi.mock('../../stores/userPreferencesStore', () => ({
 }))
 
 import { ThemeProvider, useTheme } from '../ThemeContext'
+import { parseTokens } from '../../lib/__tests__/themeTokensParser'
 
 let api
 function Probe() {
@@ -59,6 +60,17 @@ describe('ThemeContext', () => {
       })
     }
   }
+
+  it('picker accent is the --accent applied for the resolved mode', () => {
+    const tokens = parseTokens()
+    mount()
+    for (const mode of ['dark', 'light']) {
+      act(() => { api.setMode(mode) })
+      for (const t of api.themes) {
+        expect(t.accent.toLowerCase()).toBe(tokens[`${t.id}-${mode}`].accent)
+      }
+    }
+  })
 
   it('writes no inline colour variable on <html>', () => {
     mount()

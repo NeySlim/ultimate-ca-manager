@@ -2,13 +2,12 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { subscribePreferences, persistPreference, getPreferences } from '../stores/userPreferencesStore'
 
 // Colours live in styles/tokens.css, selected by data-theme / data-mode on <html>.
-// Here only what the pickers need: id, label key, accent and a per-mode preview.
+// Here only what the pickers need: id, label key and a per-mode preview (surface, accent).
 const themeFamilies = {
   atelier: {
     id: 'atelier',
     name: 'Atelier',
     nameKey: 'settings.themeFamilies.atelier',
-    accent: '#4F8EF7',
     swatch: {
       dark: { surface: '#233143', accent: '#94bfff' },
       light: { surface: '#eaf0f6', accent: '#245bb1' },
@@ -18,7 +17,6 @@ const themeFamilies = {
     id: 'aurore',
     name: 'Aurore',
     nameKey: 'settings.themeFamilies.aurore',
-    accent: '#6b78e0',
     swatch: {
       dark: { surface: '#1a2036', accent: '#a5b4ff' },
       light: { surface: '#eef0f8', accent: '#3742bd' },
@@ -28,7 +26,6 @@ const themeFamilies = {
     id: 'purple',
     name: 'Purple Night',
     nameKey: 'settings.themeFamilies.purple',
-    accent: '#A855F7',
     swatch: {
       dark: { surface: '#301E47', accent: '#A855F7' },
       light: { surface: '#E8DFF5', accent: '#9a3ff0' },
@@ -38,7 +35,6 @@ const themeFamilies = {
     id: 'sunset',
     name: 'Orange Sunset',
     nameKey: 'settings.themeFamilies.sunset',
-    accent: '#F97316',
     swatch: {
       dark: { surface: '#3A1F16', accent: '#F97316' },
       light: { surface: '#FDDCB5', accent: '#cd4d0b' },
@@ -146,7 +142,8 @@ export function ThemeProvider({ children }) {
     }
   }, [setThemeFamilyAndPersist, setModeAndPersist])
 
-  const themes = Object.values(themeFamilies)
+  // Pickers show the accent actually applied in the resolved mode.
+  const themes = Object.values(themeFamilies).map((f) => ({ ...f, accent: f.swatch[resolvedMode].accent }))
   const isLight = resolvedMode === 'light'
 
   return (
