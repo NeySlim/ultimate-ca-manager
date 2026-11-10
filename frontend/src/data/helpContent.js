@@ -81,7 +81,7 @@ export const helpContent = {
     ],
     tips: [
       'Your pins follow you to every browser and device you sign in from',
-      'A pinned page you lose the right to open is hidden, and returns if the right is restored',
+      'A pinned page you lose the right to open is hidden, and returns if the right is restored before you change your pins',
     ],
     related: ['Dashboard', 'Certificates', 'Settings']
   },
