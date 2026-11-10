@@ -299,6 +299,7 @@ export default function LoginPage() {
       setAuthMethod('password')
       setStatusMessage('')
       setLoading(false)
+      if (noteRateLimit(error)) return
       if (error.message?.includes('cancelled') || error.message?.includes('abort')) {
         showInfo(t('auth.securityKeyCancelled'))
       }
@@ -362,6 +363,7 @@ export default function LoginPage() {
       const userData = await authMethodsService.loginPassword(username, password)
       if (userData.requires_2fa) {
         twoFactorFrom.current = 'password'
+        setRateLimit(null)
         setStep('2fa')
         setTwoFactorMethods(userData.methods || ['totp'])
         setTotpCode('')
@@ -459,6 +461,7 @@ export default function LoginPage() {
       // The provider enforces 2FA: the enrolled code is asked next.
       if (responseData.requires_2fa) {
         twoFactorFrom.current = 'ldap'
+        setRateLimit(null)
         setStep('2fa')
         setTwoFactorMethods(responseData.methods || ['totp'])
         setTotpCode('')

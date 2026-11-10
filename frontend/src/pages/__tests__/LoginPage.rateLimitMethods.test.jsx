@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 const s = vi.hoisted(() => ({
-  detectMethods: vi.fn(), loginPassword: vi.fn(), login2FAWebAuthn: vi.fn(), ldapLogin: vi.fn(),
+  detectMethods: vi.fn(), loginPassword: vi.fn(), authenticateWebAuthn: vi.fn(), login2FAWebAuthn: vi.fn(), ldapLogin: vi.fn(),
   getSsoProviders: vi.fn(), login: vi.fn(), showError: vi.fn(), showInfo: vi.fn(),
 }))
 
@@ -33,7 +33,7 @@ vi.mock('../../services/auth.service', () => ({
 vi.mock('../../services/auth-methods.service', () => ({
   authMethodsService: {
     detectMethods: s.detectMethods, loginPassword: s.loginPassword,
-    login2FAWebAuthn: s.login2FAWebAuthn, isWebAuthnSupported: () => true,
+    login2FAWebAuthn: s.login2FAWebAuthn, authenticateWebAuthn: s.authenticateWebAuthn, isWebAuthnSupported: () => true,
   },
 }))
 
@@ -113,6 +113,31 @@ describe('LoginPage 429 banner across methods', () => {
     await screen.findByRole('alert')
     fireEvent.click(screen.getByText('auth.twoFactorUseSecurityKey'))
     await waitFor(() => expect(s.showInfo).toHaveBeenCalledWith('auth.twoFactorKeyCancelled'))
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
+  it('shows the server 429 of a passkey sign-in, and a later ordinary failure removes it', async () => {
+    s.detectMethods.mockResolvedValue({ password: true, webauthn: true, webauthn_credentials: 1 })
+    s.authenticateWebAuthn.mockRejectedValueOnce(tooMany()).mockRejectedValue(new Error('no'))
+    renderLogin()
+    await typeUsername()
+    fireEvent.click(screen.getByText('auth.continue'))
+    fireEvent.click(await screen.findByText('auth.useSecurityKey'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('auth.tooManyAttempts')
+    fireEvent.click(await screen.findByText('auth.useSecurityKey'))
+    await waitFor(() => expect(s.authenticateWebAuthn).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+  })
+
+  it('drops a password 429 banner when the next attempt reaches the second factor', async () => {
+    s.loginPassword.mockRejectedValueOnce(tooMany()).mockResolvedValue({ requires_2fa: true, methods: ['totp'] })
+    renderLogin()
+    await typeUsername()
+    await submitPassword()
+    await screen.findByRole('alert')
+    fireEvent.change(screen.getByPlaceholderText('auth.enterPassword'), { target: { value: 'pw' } })
+    fireEvent.click(screen.getByText('auth.login'))
+    await screen.findByText('auth.twoFactorTitle')
     expect(screen.queryByRole('alert')).toBeNull()
   })
 })
