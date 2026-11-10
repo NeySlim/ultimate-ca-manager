@@ -1329,7 +1329,7 @@ def approve_request(request_id):
             from services.cert.renewal import RenewalError
             from utils.custom_extensions import TemplateConfigError
             if isinstance(e, PolicyViolation):
-                issue_error = f'Policy violation: {e}'
+                issue_error = str(e) if str(e).startswith('Policy violation:') else f'Policy violation: {e}'
             elif isinstance(e, RenewalError):
                 issue_error = e.message
             elif isinstance(e, TemplateConfigError):

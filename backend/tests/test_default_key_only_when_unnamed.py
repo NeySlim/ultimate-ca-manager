@@ -98,3 +98,15 @@ def test_tsa_signer_of_the_only_allowed_key(auth_client, create_ca, only, tsa_se
     r = _post(auth_client, '/api/v2/tsa/signer-certificate',
               {'ca_id': ca['id'], 'select': False, 'key_type': 'rsa', 'key_size': '4096'})
     assert r.status_code == 200, r.get_json()
+
+
+def test_approval_issue_error_is_prefixed_once(app, auth_client, create_ca, create_user, only):
+    ca = create_ca(cn=f'Named key prefix CA {uuid.uuid4().hex[:6]}')
+    only(['RSA-4096'], ca_id=ca['id'])
+    requester = create_user(role='operator')
+    approval_id = _mk_approval_id(app, requester['id'], {
+        'cn': 'prefix-once.example.test', 'ca_id': ca['id'], 'validity_days': 30})
+    r = _post(auth_client, f'/api/v2/approvals/{approval_id}/approve', {'comment': 'ok'})
+    error = r.get_json()['data']['issue_error']
+    assert error.startswith('Policy violation: no default key type'), error
+    assert error.count('Policy violation:') == 1, error
