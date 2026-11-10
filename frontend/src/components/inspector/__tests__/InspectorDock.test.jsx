@@ -122,6 +122,51 @@ describe('InspectorDock', () => {
     expect(screen.queryByRole('tab', { name: 'two.example.com' })).toBeNull()
   })
 
+  it('keeps the focus in the dock when one of two objects closes, then returns it to the opener', async () => {
+    renderDock()
+    const opener = screen.getByText('open-1')
+    opener.focus()
+    fireEvent.click(opener)
+    await screen.findByText('one.example.com:overview')
+    const second = screen.getByText('open-2')
+    second.focus()
+    fireEvent.click(second)
+    await screen.findByText('two.example.com:overview')
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'two.example.com' })).toHaveFocus())
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'two.example.com' }), { key: 'Escape' })
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'one.example.com' })).toHaveFocus())
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'one.example.com' }), { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByTestId('inspector-dock')).toBeNull())
+    await waitFor(() => expect(opener).toHaveFocus())
+  })
+
+  it('header close button returns focus to the opener', async () => {
+    renderDock()
+    const opener = screen.getByText('open-1')
+    opener.focus()
+    fireEvent.click(opener)
+    await screen.findByText('one.example.com:overview')
+    const close = screen.getByRole('button', { name: 'inspector.close' })
+    close.focus()
+    fireEvent.click(close)
+    await waitFor(() => expect(screen.queryByTestId('inspector-dock')).toBeNull())
+    await waitFor(() => expect(opener).toHaveFocus())
+  })
+
+  it('reserves its room on the root while open, bottom then right, and releases it', async () => {
+    const root = document.documentElement.style
+    renderDock()
+    fireEvent.click(screen.getByText('open-1'))
+    await screen.findByTestId('inspector-dock')
+    expect(root.getPropertyValue('--inspector-reserve-bottom')).toBe('380px')
+    expect(root.getPropertyValue('--inspector-reserve-right')).toBe('0px')
+    fireEvent.click(screen.getByRole('button', { name: 'inspector.dockRight' }))
+    await waitFor(() => expect(root.getPropertyValue('--inspector-reserve-right')).toBe('520px'))
+    expect(root.getPropertyValue('--inspector-reserve-bottom')).toBe('0px')
+    fireEvent.click(screen.getByRole('button', { name: 'inspector.close' }))
+    await waitFor(() => expect(root.getPropertyValue('--inspector-reserve-right')).toBe(''))
+  })
+
   it('closes an object from its own close button', async () => {
     renderDock()
     fireEvent.click(screen.getByText('open-1'))

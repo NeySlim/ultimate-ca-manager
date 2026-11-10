@@ -52,6 +52,8 @@ export function InspectorProvider({ children }) {
   const origins = useRef(new Map())
   const openedRef = useRef([])
   const geometryRef = useRef(geometry)
+  const activeRef = useRef(null)
+  activeRef.current = activeKey
 
   // The server copy arrives after sign-in and wins over the local one
   useEffect(() => subscribePreferences((prefs) => {
@@ -88,10 +90,16 @@ export function InspectorProvider({ children }) {
     setActiveKey((cur) => (cur === key ? (next[Math.min(idx, next.length - 1)]?.key ?? null) : cur))
     // Last object closed: the focus goes back to the control that opened it
     if (!next.length && origin?.isConnected) queueMicrotask(() => origin.focus())
+    // Another object stays open: its tab takes the focus the closed one held
+    else if (next.length && key === activeRef.current) setFocusToken((n) => n + 1)
   }, [])
 
   const closeAll = useCallback(() => {
+    // The opener of the active object, else the latest one still in the page, gets the focus back
+    const cands = [origins.current.get(activeRef.current), ...[...origins.current.values()].reverse()]
+    const origin = cands.find((o) => o?.isConnected)
     origins.current.clear()
+    if (origin) queueMicrotask(() => origin.focus())
     openedRef.current = []
     setOpened([])
     setActiveKey(null)
