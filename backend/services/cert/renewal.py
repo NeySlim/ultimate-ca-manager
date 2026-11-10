@@ -238,6 +238,10 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
             if pair and index == 0:
                 renewed_a = x509.load_pem_x509_certificate(staged_member['cert_pem'])
             staged_all.append(staged_member)
+        # A renewal is an issuance, counted in its commit; the CA row is locked only
+        # after every member's row, the order a protocol renewal of one member takes
+        for s in staged_all:
+            next_ca_serial(s['ca'])
         if not pair and related_to is None:
             # Renewed alone and naming none: the row leaves its pair, as its certificate has
             from services.cert.related_pair import leave_pair
@@ -362,8 +366,6 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     _write_row(cert, ca, ca_cert, renewed, cert_pem, key_pem, new_serial, now)
     _record_superseded(cert.id, ca, old_serial, old_valid_to, now, old_digest)
     _record_scts(cert.id, scts)
-    # A renewal is an issuance; counted in the renewal's commit, undone with it
-    next_ca_serial(ca)
     return {
         'cert': cert, 'cert_id': cert.id, 'ca': ca, 'old_serial': old_serial,
         'new_serial': new_serial, 'valid_from': cert.valid_from, 'valid_to': cert.valid_to,

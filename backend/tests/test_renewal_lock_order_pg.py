@@ -134,3 +134,95 @@ def _pid_of(pids, name, timeout=10):
     while name not in pids and time.monotonic() < deadline:
         time.sleep(0.02)
     return pids[name]
+
+
+def _done_or_waiting(url, pids, name, thread, timeout=15):
+    """True once *thread* has finished or waits on a row lock."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if not thread.is_alive():
+            return True
+        if name in pids and _waits_on_a_lock(url, pids[name], timeout=0.2):
+            return True
+    return False
+
+
+def test_in_place_renewal_of_a_pair_and_a_protocol_renewal_of_b_do_not_deadlock(app, monkeypatch):
+    """The pair locks A then B; the protocol renewal of B locks B then the CA row.
+    The CA row must come after both members, or the two wait on each other."""
+    from services.ca import CAService
+    from services.cert import renewal
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    schema = f'renewal_pair_{uuid.uuid4().hex[:6]}'
+    with _a_schema_of_our_own(schema) as url, _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            ca = _ca_row(*_authority())
+            ca_id = ca.id
+            a, b = (CertificateService.create_certificate(
+                descr=n, caref=ca.refid, dn={'CN': f'{n}.example.test'},
+                key_type='prime256v1', validity_days=30) for n in ('pair-a', 'pair-b'))
+            a.related_certificate_id, b.related_certificate_id = b.id, a.id
+            a_id, b_id = a.id, b.id
+            db.session.commit()
+            db.session.remove()
+
+        holds, release = threading.Event(), threading.Event()
+        errors, pids, rereads = [], {}, []
+        reread = renewal._reread
+
+        def pause_before_the_second_member(*args):
+            if threading.current_thread().name == 'in-place':
+                rereads.append(args[0].id)
+                if len(rereads) == 2:
+                    holds.set()
+                    release.wait(30)
+            return reread(*args)
+        monkeypatch.setattr(renewal, '_reread', pause_before_the_second_member)
+
+        def in_place():
+            with app.app_context():
+                engine, pids['in-place'] = _own_session(url)
+                try:
+                    renewal.renew_certificate_in_place(db.session.get(Certificate, a_id),
+                                                       db.session.get(CA, ca_id))
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(('in-place', repr(exc)))
+                finally:
+                    holds.set()
+                    db.session.remove()
+                    engine.dispose()
+
+        def protocol():
+            with app.app_context():
+                engine, pids['protocol'] = _own_session(url)
+                try:
+                    row = db.session.get(Certificate, b_id)
+                    CAService.sign_csr_from_crypto(db.session.get(CA, ca_id),
+                                                   _csr('pair-b.example.test'), validity_days=30,
+                                                   source='test-renewal', supersedes=row)
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(('protocol', repr(exc)))
+                finally:
+                    db.session.remove()
+                    engine.dispose()
+
+        t_a = threading.Thread(target=in_place, name='in-place')
+        t_a.start()
+        assert holds.wait(30)
+        t_b = threading.Thread(target=protocol, name='protocol')
+        t_b.start()
+        settled = _done_or_waiting(url, pids, 'protocol', t_b)
+        release.set()
+        t_a.join(60)
+        t_b.join(60)
+
+        with app.app_context():
+            count = db.session.get(CA, ca_id).serial
+            db.session.remove()
+    assert settled
+    assert rereads == [a_id, b_id]
+    assert errors == []
+    assert count == 5
