@@ -355,9 +355,10 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
 
     logger.info(
         "Restore: revoked %s sessions and %s SSO sessions, removed %s session "
-        "files, cleared %s caches (%s failed), restart requested: %s",
+        "files and %s database session rows, cleared %s caches (%s failed), restart requested: %s",
         summary['sessions_revoked'], summary['sso_sessions_revoked'],
-        summary['session_files_removed'], len(summary['caches_cleared']),
+        summary['session_files_removed'], summary['flask_sessions_revoked'],
+        len(summary['caches_cleared']),
         len(summary['caches_failed']), summary['restart_requested'],
     )
     return summary
