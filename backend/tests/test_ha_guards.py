@@ -13,7 +13,6 @@ ROUTES = [
     '/api/v2/system/security/encrypt-all-keys',
     '/api/v2/system/security/rotate-secrets',
     '/api/v2/system/updates/install',
-    '/api/v2/system/https/unbind',
     '/api/v2/system/https/regenerate',
     '/api/v2/system/https/apply',
     '/api/v2/system/restore',
@@ -93,6 +92,8 @@ def _no_side_effects(monkeypatch, path):
                             property(lambda self: False), raising=False)
         monkeypatch.setattr('security.master_key_bootstrap.ephemeral_key_dir_refusal',
                             lambda: 'test')
+    elif path.endswith('/https/unbind'):
+        monkeypatch.setattr('services.https_binding.get_bound_refid', lambda: '')
     elif path.endswith('/disable-encryption'):
         monkeypatch.setattr('security.encryption.key_encryption_required', lambda: True)
 
@@ -151,3 +152,11 @@ def test_bound_cert_renewal_materialized_without_ha(monkeypatch):
     monkeypatch.setattr(Config, 'HA_MODE', False)
     hb.on_certificate_renewed('certificate.renewed', {'certificate': {'refid': 'r1'}}, None, {})
     assert 'materialize' in calls
+
+
+def test_https_unbind_allowed_in_ha(auth_client, monkeypatch):
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr('services.https_binding.get_bound_refid', lambda: '')
+    r = auth_client.post('/api/v2/system/https/unbind', json={})
+    assert r.status_code == 400, r.data
+    assert (r.get_json() or {}).get('code') != 'ha_mode'

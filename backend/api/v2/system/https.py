@@ -111,7 +111,6 @@ def get_https_cert_info():
 
 @bp.route('/api/v2/system/https/unbind', methods=['POST'])
 @require_auth(['admin:system'])
-@reject_in_ha()
 def unbind_https_cert():
     """Stop following renewals of the bound HTTPS certificate (#303 M1).
 
