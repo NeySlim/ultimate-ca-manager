@@ -4,11 +4,31 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import AttributeOID, NameOID
 
+import pytest
+
 from models import CA, Certificate, db
+from models.policy import ApprovalRequest, CertificatePolicy
+from tests.seeded_rows import delete_cas
 from services.scep.scep_service import SCEPService
 from tests.test_scep_rfc8894_operations import (
     PKI_STATUS_OID, _build_request, _client_identity, _load_ca_material, _response_attributes,
 )
+
+
+@pytest.fixture(autouse=True)
+def _remove_what_the_test_created(app):
+    def ids(model):
+        with app.app_context():
+            return {r.id for r in model.query.with_entities(model.id)}
+    before = {m: ids(m) for m in (CA, ApprovalRequest, CertificatePolicy)}
+    yield
+    with app.app_context():
+        for m in (ApprovalRequest, CertificatePolicy):
+            new = {r.id for r in m.query.with_entities(m.id)} - before[m]
+            if new:
+                m.query.filter(m.id.in_(new)).delete(synchronize_session=False)
+        delete_cas(CA.query.filter(CA.id.notin_(before[CA])))
+        db.session.commit()
 
 
 def _count(app, ca_id):
