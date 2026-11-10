@@ -187,10 +187,11 @@ def on_certificate_renewed(event_type, payload, ca_refid, meta):
                 "(missing cert or key). HTTPS files left untouched", refid)
             return
         from utils.ha import ha_enabled
+        # HA: no rolling restart until every node writes the files itself
         if ha_enabled():
             logger.warning(
-                "bound HTTPS certificate %s renewed, files not "
-                "re-materialized on this node (HA)", refid)
+                "bound HTTPS certificate %s renewed, files not re-materialized and "
+                "no restart (HA: the other nodes would restart on their old files)", refid)
             return
         materialize_https_cert(cert)
         logger.info(
