@@ -226,3 +226,20 @@ def test_a_caa_dns_error_at_approval_keeps_the_request_pending(app, client, auth
         assert requests_of(app, pid, 'acme_order')[0][1] == 'pending'
         assert _read(client, account, order_id).get_json()['status'] == 'processing'
 
+
+def test_a_profile_withdrawn_while_held_closes_the_request(app, client, auth_client, acme_ca):
+    with approval_policy(app, acme_ca[0], 'acme-held-profile-gone') as pid:
+        account, order_id, _r = _held(app, client, acme_ca)
+        (approval_id, *_), = requests_of(app, pid, 'acme_order')
+        with app.app_context():
+            AcmeOrder.query.filter_by(order_id=order_id).first().profile = 'withdrawn-profile'
+            db.session.commit()
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.status_code == 200, r.get_json()
+        assert r.get_json()['message'] == 'Request closed'
+        assert r.get_json()['data']['certificate_issued'] is False
+        (_id, status, _data, cert_id), = requests_of(app, pid, 'acme_order')
+        assert status == 'rejected' and cert_id is None
+        read = _read(client, account, order_id).get_json()
+        assert read['status'] == 'invalid'
+        assert read['error']['type'] == 'urn:ietf:params:acme:error:invalidProfile'

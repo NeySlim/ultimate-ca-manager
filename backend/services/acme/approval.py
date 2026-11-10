@@ -39,6 +39,14 @@ def _issue(approval, data):
     order = _held_order(data)
     if order is None:
         raise ProtocolRequestGone(_GONE)
+    # draft-ietf-acme-profiles: as on finalize, a profile withdrawn while the
+    # order was held is refused, never replaced by the historical defaults
+    from services.acme import profiles as acme_profiles
+    if order.profile and not acme_profiles.is_known(order.profile):
+        raise ProtocolRequestGone(
+            'The ACME order was refused: its profile is no longer offered',
+            refusal={'type': 'invalidProfile',
+                     'detail': 'The certificate profile of this order is no longer offered by this server'})
     order_id = order.order_id
     service = _service(data)
     service._finalizing_order_id = order_id
