@@ -39,14 +39,17 @@ def _claim_superseded(row):
     from sqlalchemy import update
     from sqlalchemy.orm.attributes import set_committed_value
     from services.cert.issued_lookup import _rows_holding
+    from utils.serial_format import serial_variants
     held = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
     live = sorted(r.id for r in _rows_holding(held, Certificate.archived.isnot(True)))
     if row.id not in live:
         return False
     for row_id in live:
+        # Re-checked after any lock wait: a row renewed in place meanwhile holds another serial
         result = db.session.execute(
             update(Certificate)
-            .where(Certificate.id == row_id, Certificate.archived.isnot(True))
+            .where(Certificate.id == row_id, Certificate.archived.isnot(True),
+                   Certificate.serial_number.in_(serial_variants(held.serial_number)))
             .values(archived=True)
             .execution_options(synchronize_session=False)
         )

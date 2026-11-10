@@ -1,7 +1,8 @@
 """A protocol renewal and an in-place renewal of one certificate never deadlock.
 
 Both lock the certificate row before the CA row (its issuance counter), so the
-second one waits for the first instead of each holding what the other needs.
+second one waits for the first instead of each holding what the other needs; the
+one that waited finds the certificate renewed meanwhile and stores nothing.
 """
 import os
 import threading
@@ -55,7 +56,8 @@ def _waits_on_a_lock(url, pid, timeout=15):
         probe.dispose()
 
 
-def test_protocol_and_in_place_renewals_of_one_certificate_do_not_deadlock(app, monkeypatch):
+def test_a_protocol_renewal_waiting_on_an_in_place_one_is_refused(app, monkeypatch):
+    """The protocol side waits on the row, then finds it renewed: nothing archived, nothing counted."""
     from services.ca import CAService
     from services.cert import renewal
     from tests.test_backup_cross_installation import _bound_to
@@ -123,10 +125,13 @@ def test_protocol_and_in_place_renewals_of_one_certificate_do_not_deadlock(app, 
 
         with app.app_context():
             count = db.session.get(CA, ca_id).serial
+            row = db.session.get(Certificate, cert_id)
+            archived, live = row.archived, Certificate.query.filter_by(caref=row.caref).count()
             db.session.remove()
     assert blocked, errors
-    assert errors == []
-    assert count == 3
+    assert [(name, 'AlreadySuperseded' in error) for name, error in errors] == [('protocol', True)]
+    # Created, then renewed in place once; the protocol certificate was never stored
+    assert (count, archived, live) == (2, False, 1)
 
 
 def _pid_of(pids, name, timeout=10):
@@ -228,9 +233,9 @@ def test_in_place_renewal_of_a_pair_and_a_protocol_renewal_of_b_do_not_deadlock(
     assert count == 5
 
 
-def test_in_place_renewal_and_the_responder_task_on_one_responder_do_not_deadlock(app, monkeypatch):
+def test_the_responder_task_waiting_on_an_in_place_renewal_leaves_the_renewed_row(app, monkeypatch):
     """The in-place renewal locks the responder row then the CA row; the responder
-    task archives that row and must count only afterwards, in the same order."""
+    task waits on that row, then finds it renewed and leaves it as it is."""
     from datetime import timedelta
 
     from models import SystemConfig
@@ -301,11 +306,14 @@ def test_in_place_renewal_and_the_responder_task_on_one_responder_do_not_deadloc
 
         with app.app_context():
             count = db.session.get(CA, ca_id).serial
+            row = db.session.get(Certificate, cert_id)
+            archived, live = row.archived, Certificate.query.filter_by(caref=row.caref).count()
+            binding = SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{ca_id}').one().value
             db.session.remove()
     assert blocked
     assert errors == []
-    assert (stats.get('renewed'), stats.get('failed')) == (1, 0)
-    assert count == 3
+    assert (stats.get('renewed'), stats.get('failed'), stats.get('skipped')) == (0, 0, 1)
+    assert (count, archived, live, binding) == (2, False, 1, str(cert_id))
 
 
 def _race_with_an_in_place_renewal(app, url, monkeypatch, held_id, ca_id, other):
