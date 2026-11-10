@@ -52,7 +52,7 @@ function PermissionRoute({ children, permission }) {
   return children
 }
 
-function guarded(guard, element) {
+export function guarded(guard, element) {
   if (guard === 'admin') return <AdminRoute>{element}</AdminRoute>
   if (guard && guard.permission) return <PermissionRoute permission={guard.permission}>{element}</PermissionRoute>
   return <ProtectedRoute>{element}</ProtectedRoute>

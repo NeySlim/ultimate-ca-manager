@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, cleanup } from '@testing-library/react'
 import { MemoryRouter, createRoutesFromChildren, useLocation } from 'react-router-dom'
 
 const auth = vi.hoisted(() => ({ value: {} }))
@@ -31,7 +31,8 @@ vi.mock('../../components', async () => {
 
 vi.mock('../../pages/DashboardPage', () => ({ default: () => <div>dashboard-page</div> }))
 
-import { AppRoutes, moduleRoutes } from '../../App'
+import { AppRoutes, moduleRoutes, guarded } from '../../App'
+import { Routes, Route } from 'react-router-dom'
 import { pages } from '../pages'
 import {
   MODULES, GROUPS, SIDEBAR_GROUPS, REDIRECTS, visibleModules, groupsFor, sidebarGroups,
@@ -72,6 +73,77 @@ describe('registry and router agree (a)', () => {
       await waitFor(() => expect(screen.getByTestId('where').textContent, m.id).toBe('/'))
       unmount()
     }
+  })
+})
+
+// Guards of every route as the router declared them before the registry: 'auth', 'admin' or a permission
+const BASE_GUARDS = {
+  '/': 'auth', '/dashboard': 'auth', '/certificates': 'auth', '/certificates/:id': 'auth',
+  '/user-certificates': 'read:user_certificates', '/cas': 'auth', '/cas/:id': 'auth', '/csrs': 'auth',
+  '/templates': 'auth', '/users': 'admin', '/acme': 'read:acme', '/scep-config': 'read:scep',
+  '/est-config': 'read:est', '/tsa-config': 'read:settings', '/settings': 'admin', '/audit': 'read:audit',
+  '/logs': 'admin', '/operations': 'admin', '/tools': 'auth', '/account': 'auth', '/crl-ocsp': 'read:crl',
+  '/truststore': 'read:truststore', '/truststore/:id': 'read:truststore', '/rbac': 'admin',
+  '/hsm': 'read:hsm', '/policies': 'read:policies', '/approvals': 'read:approvals',
+  '/key-recovery': 'read:key_recovery', '/reports': 'read:audit', '/discovery': 'read:certificates',
+  '/ssh/cas': 'read:ssh_cas', '/ssh/certificates': 'read:ssh',
+}
+const BASE_REDIRECTS = {
+  '/import': '/operations', '/groups': '/users?tab=groups', '/sso': '/settings?tab=sso',
+  '/security': '/settings?tab=security',
+}
+const guardOf = (g) => (typeof g === 'string' ? g : g.permission)
+
+describe('guards are those of the router before the registry', () => {
+  it('every path carries the same guard', () => {
+    const now = {}
+    for (const m of MODULES) for (const p of [m.path, ...m.paths]) now[p] = guardOf(m.guard)
+    expect(now).toEqual(BASE_GUARDS)
+  })
+
+  it('the legacy redirects lead to the same targets', () => {
+    expect(Object.fromEntries(REDIRECTS.map(r => [r.from, r.to]))).toEqual(BASE_REDIRECTS)
+  })
+
+  const Where = () => <div data-testid="where">{useLocation().pathname}</div>
+  const at = (guard, perms, signedIn = true) => {
+    auth.value = { isAuthenticated: signedIn, loading: false, sessionChecked: true, permissions: perms }
+    return render(
+      <MemoryRouter initialEntries={['/p']}>
+        <Routes>
+          <Route path="/p" element={guarded(guard, <div data-testid="page">page</div>)} />
+          <Route path="*" element={<Where />} />
+        </Routes>
+      </MemoryRouter>)
+  }
+
+  it.each([['auth'], ['admin'], [{ permission: 'read:cas' }]])('guarded(%j) sends a signed-out user to /login', (g) => {
+    at(g, [], false)
+    expect(screen.getByTestId('where').textContent).toBe('/login')
+  })
+
+  it('auth admits any signed-in user', () => {
+    at('auth', [])
+    expect(screen.getByTestId('page')).toBeTruthy()
+  })
+
+  it('admin admits the wildcard only', () => {
+    at('admin', ['read:settings'])
+    expect(screen.getByTestId('where').textContent).toBe('/')
+    cleanup()
+    at('admin', ['*'])
+    expect(screen.getByTestId('page')).toBeTruthy()
+  })
+
+  it('a permission module admits that permission, the wildcard, and no other', () => {
+    at({ permission: 'read:hsm' }, ['read:audit'])
+    expect(screen.getByTestId('where').textContent).toBe('/')
+    cleanup()
+    at({ permission: 'read:hsm' }, ['read:hsm'])
+    expect(screen.getByTestId('page')).toBeTruthy()
+    cleanup()
+    at({ permission: 'read:hsm' }, ['*'])
+    expect(screen.getByTestId('page')).toBeTruthy()
   })
 })
 
