@@ -90,6 +90,19 @@ describe('LoginPage 429 banner across methods', () => {
     expect(screen.queryByRole('alert')).toBeNull()
   })
 
+  it('drops a password 429 banner when an LDAP login reaches the second factor', async () => {
+    s.loginPassword.mockRejectedValueOnce(tooMany())
+    s.ldapLogin.mockResolvedValue({ data: { requires_2fa: true, methods: ['totp'] } })
+    renderLogin()
+    await typeUsername()
+    await submitPassword()
+    await screen.findByRole('alert')
+    fireEvent.click(screen.getByText('common.back'))
+    await submitLdap()
+    await screen.findByText('auth.twoFactorTitle')
+    expect(screen.queryByRole('alert')).toBeNull()
+  })
+
   async function reachKeyStep() {
     s.loginPassword.mockResolvedValue({ requires_2fa: true, methods: ['webauthn'] })
     renderLogin()
