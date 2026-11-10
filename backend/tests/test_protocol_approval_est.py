@@ -499,3 +499,28 @@ def test_a_policy_with_an_undelivered_approval_is_not_deleted(app, client, auth_
         assert status == 'approved' and data['delivered_at']
         # Delivered: nothing holds the policy any more
         assert auth_client.delete(f'/api/v2/policies/{pid}').status_code == 200
+
+
+def test_an_approved_reenrolment_whose_renewed_row_went_away_is_delivered(app, client, auth_client,
+                                                                          est_config):
+    """Only a revocation refuses an approved re-enrolment: a renewed
+    certificate no longer on record (UNKNOWN) lets the approved one through."""
+    from models import db
+    from tests.protocol_approval_support import _delete_with_dependents
+    csr, key = _make_csr(common_name='renew-unknown.est-approval.test')
+    leaf = _cert_of(_enroll(client, csr))
+    client_pem = leaf.public_bytes(serialization.Encoding.PEM).decode()
+    renewal = x509.CertificateSigningRequestBuilder().subject_name(leaf.subject).sign(key, hashes.SHA256())
+    with approval_policy(app, est_config['id'], 'est-held-reenroll-unknown') as pid:
+        _held(_post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem))
+        (approval_id, *_), = requests_of(app, pid, 'est_enroll')
+        cert_id = approve(auth_client, approval_id)['certificate']['id']
+        with app.app_context():
+            old_id = Certificate.query.filter_by(serial_number=str(leaf.serial_number)).first().id
+            _delete_with_dependents(Certificate, {'id': [old_id]})
+            db.session.commit()
+            issued_serial = db.session.get(Certificate, cert_id).serial_number
+        renewed = _cert_of(_post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem))
+        assert str(renewed.serial_number) == issued_serial
+        (_id, status, data, _cert), = requests_of(app, pid, 'est_enroll')
+        assert status == 'approved' and data['delivered_at']

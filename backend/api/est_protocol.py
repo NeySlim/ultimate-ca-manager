@@ -945,13 +945,12 @@ def simple_reenroll(label=None):
                 OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
             )
             renewed_row, status = issued_certificate_status(ca, client_cert_obj)
-            # An approved re-enrolment superseded the certificate the client still
-            # presents: only that state lets its answer through; a revocation closes it
-            if status in (OK, SUPERSEDED, REVOKED):
-                delivered = _approved_delivery(ca, csr, 'reenroll', _est_identity(None),
-                                               renewed_revoked=status == REVOKED)
-                if delivered is not None:
-                    return delivered
+            # An approved re-enrolment is delivered whatever the presented certificate
+            # became (superseded, expired, no longer on record); only a revocation closes it
+            delivered = _approved_delivery(ca, csr, 'reenroll', _est_identity(None),
+                                           renewed_revoked=status == REVOKED)
+            if delivered is not None:
+                return delivered
             if status != OK:
                 logger.warning(
                     'EST reenroll: client certificate refused (%s), serial=%s',
