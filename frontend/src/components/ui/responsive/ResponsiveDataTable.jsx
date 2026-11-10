@@ -282,6 +282,8 @@ export function ResponsiveDataTable({
       return f.value
     })
   }, [toolbarFilters, searchValue])
+  // State carried only by presetExtras (a link view) is savable too
+  const canSavePreset = hasActiveFilters || Object.keys(presetExtras || {}).length > 0
 
   // Build filter chips from active toolbar filters
   const filterChipsArray = useMemo(() => {
@@ -604,7 +606,7 @@ export function ResponsiveDataTable({
             presetName={presetName}
             setPresetName={setPresetName}
             presetsMenuRef={presetsMenuRef}
-            hasActiveFilters={hasActiveFilters}
+            hasActiveFilters={canSavePreset}
             savePreset={savePreset}
             deletePreset={deletePreset}
             applyPreset={applyPreset}
@@ -670,7 +672,7 @@ export function ResponsiveDataTable({
           presetName={presetName}
           setPresetName={setPresetName}
           presetsMenuRef={presetsMenuRef}
-          hasActiveFilters={hasActiveFilters}
+          hasActiveFilters={canSavePreset}
           savePreset={savePreset}
           deletePreset={deletePreset}
           applyPreset={applyPreset}

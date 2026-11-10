@@ -131,7 +131,7 @@ describe('CertificatesPage: status cards in a link view', () => {
     expect(screen.getByTestId('where').textContent).toContain('key_algo_prefix=RSA')
   })
 
-  it('keeps the search when a card or the status filter rewrites the link', async () => {
+  it('keeps the search when a status card rewrites the link', async () => {
     renderAt('/certificates?status=expiring&live=true')
     await waitFor(() => expect(lastParams().status).toEqual(['expiring']))
     fireEvent.change(screen.getByPlaceholderText(/common.search/), { target: { value: 'web' } })
@@ -187,6 +187,18 @@ describe('CertificatesPage: status cards in a link view', () => {
     await applyPreset('rsa')
     await waitFor(() => expect(lastParams()).toMatchObject({ status: ['expiring'], live: 'true', key_algo_prefix: 'RSA' }))
     expect(screen.getByTestId('where').textContent).toBe('?status=expiring&live=true&key_algo_prefix=RSA')
+  })
+
+  it('saves and reopens a link without status, as the compliance counters emit', async () => {
+    const link = '?live=true&key_algo_prefix=RSA&key_bits_below=3072'
+    const presets = await savePreset(`/certificates${link}`, 'weak-rsa')
+    cleanup()
+    window.localStorage.setItem('ucm-certs-presets', JSON.stringify(presets))
+    renderAt('/certificates')
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    await applyPreset('weak-rsa')
+    await waitFor(() => expect(lastParams()).toMatchObject({ live: 'true', key_algo_prefix: 'RSA', key_bits_below: '3072' }))
+    expect(screen.getByTestId('where').textContent).toBe(link)
   })
 
   it('a preset saved before links existed still applies its saved filters', async () => {

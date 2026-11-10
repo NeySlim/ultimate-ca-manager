@@ -89,7 +89,6 @@ describe('legacy detail windows', () => {
   // Live = reached from the entry point through relative imports (barrels included),
   // never through a legacy module
   const live = liveModules(files, Object.keys(LEGACY))
-  const isLive = (rel) => live.has(rel)
   const importersOf = (target) => {
     const name = target.split('/').pop().replace(/\.jsx?$/, '')
     return files
@@ -99,14 +98,14 @@ describe('legacy detail windows', () => {
   }
 
   it('tells a live module from one only a dead module imports', () => {
-    expect(isLive('main.jsx')).toBe(true)
-    expect(isLive('components/DetailWindowLayer.jsx')).toBe(false)
+    expect(live.has('main.jsx')).toBe(true)
+    expect(live.has('components/DetailWindowLayer.jsx')).toBe(false)
   })
 
   it.each(['ui/FloatingWindow.jsx', 'hooks/useFloatingWindow.js'])(
     'keeps %s out of the legacy set while a live module imports it', (shared) => {
       const users = importersOf(`${shared.startsWith('ui/') ? 'components/' : ''}${shared}`)
-      expect(users.some((u) => isLive(u))).toBe(true)
+      expect(users.some((u) => live.has(u))).toBe(true)
       expect(Object.keys(LEGACY)).not.toContain(shared)
     })
 })
