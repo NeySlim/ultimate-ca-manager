@@ -918,7 +918,8 @@ def _read_state() -> dict:
 def is_leader():
     """Whether this node's scheduler loop is live: True/False, None when unknown.
 
-    Under gunicorn the loop lives in another process, so its fresh state file is the evidence.
+    HA: ``_owns_lock`` where the loop runs, else this node's row in cluster_nodes.
+    Single node: under gunicorn the loop lives in another process, so its fresh state file is the evidence.
     """
     if _scheduler is None:
         return None
