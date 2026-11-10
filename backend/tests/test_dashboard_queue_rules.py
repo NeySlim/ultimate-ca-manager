@@ -54,9 +54,12 @@ def rules(app):
         db.session.commit()
 
 
+# Queue ids are not unique across kinds (a CA or a request may share the number)
+CERT_KINDS = ('manual_renewal_due', 'client_renewal_overdue', 'auto_renewal_blocked', 'renewal_declined')
+
+
 def _kinds(client, cert_id):
-    return [i['kind'] for i in _queue(client)['items'] if i['id'] == cert_id and i['kind'] != 'ca_expiring'
-            and i['kind'] not in ('approval_pending', 'acme_order_failed')]
+    return [i['kind'] for i in _queue(client)['items'] if i['id'] == cert_id and i['kind'] in CERT_KINDS]
 
 
 def test_manual_refusal_does_not_hide_a_blocked_renewal(app, auth_client, rules):
@@ -124,3 +127,18 @@ def test_a_keyless_msca_certificate_is_a_manual_renewal(app, auth_client, rules)
         cert = rules.cert('rules-msca', 10, source='msca')
         db.session.commit()
         assert _kinds(auth_client, cert.id) == ['manual_renewal_due']
+
+
+def test_blocked_waits_for_the_last_third_of_the_lifetime(app, auth_client, rules):
+    # A 30-day certificate issued yesterday is inside auto_renewal_days=30, but the
+    # scheduler only acts in the last third of the lifetime: no pass has failed yet.
+    with app.app_context():
+        ca = rules.ca('rules-offline-third', offline=True, prv='k')
+        fresh = rules.cert('rules-30d-fresh', 29, prv='k', caref=ca.refid)
+        fresh.valid_from = utc_now() - timedelta(days=1)
+        late = rules.cert('rules-30d-late', 9, prv='k', caref=ca.refid)
+        late.valid_from = utc_now() - timedelta(days=21)
+        rules.days(30)
+        db.session.commit()
+        assert _kinds(auth_client, fresh.id) == []
+        assert _kinds(auth_client, late.id) == ['auto_renewal_blocked']

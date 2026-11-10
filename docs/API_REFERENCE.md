@@ -1965,11 +1965,11 @@ Scope `read:dashboard`. A `days` outside its range is refused with 400.
 | `crl_missing` | active CA with CDP and no CRL | |
 | `manual_renewal_due` | expires within 24 h | expires within 30 days |
 | `client_renewal_overdue` | | protocol certificate without a stored key, expires within 7 days |
-| `auto_renewal_blocked` | within `auto_renewal_days` of expiry (due for auto-renewal), its CA offline, revoked, expired or keyless | |
-| `renewal_declined` | | renewal rejected by an approver during the current lifetime, expires within 30 days |
+| `auto_renewal_blocked` | due for auto-renewal (within `auto_renewal_days` of expiry and in the last third of its lifetime), its CA offline, revoked, expired or keyless | |
+| `renewal_declined` | | renewal rejected by an approver during the current lifetime, expires within 30 days, not superseded by a live certificate |
 | `ca_expiring` | expires within 90 days | expires within a year |
 
-Certificates counted are issued, not revoked, not archived and not expired. `manual_renewal_due` leaves out what auto-renewal, the enrolling client (ACME, SCEP, EST, WSTEP without a stored key), UCM's ACME client or the delegated OCSP responder task renews, a declined renewal, and a certificate superseded by a live one beyond the 30 days with the same subject, DNS and IP SANs from the same CA.
+Certificates counted are issued, not revoked, not archived and not expired. A certificate appears under one kind only, by precedence `auto_renewal_blocked` > `renewal_declined` > `manual_renewal_due` > `client_renewal_overdue`. `manual_renewal_due` leaves out what auto-renewal, the enrolling client (ACME, SCEP, EST, WSTEP without a stored key), UCM's ACME client or the delegated OCSP responder task renews, a declined renewal, and a certificate superseded by a live one beyond the 30 days with the same subject, DNS and IP SANs from the same CA.
 
 `health` gives per protocol (`acme`, `scep`, `est`, `scheduler`) one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) and the `basis` it is measured on. `compliance` counts the live certificates by key algorithm and weakness; each counter carries `filter_available` and, when true, a `filter_hint` that the certificate list reproduces exactly (none yet). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
 

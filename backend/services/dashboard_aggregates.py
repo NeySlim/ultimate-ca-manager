@@ -105,6 +105,7 @@ def _within_half_validity(next_update, now, dialect):
 def _queue_union(now, dialect):
     """One SELECT per kind, all shaped (kind, rank, id, label, due_at); rank 0 is critical."""
     soon = now + CRITICAL_WITHIN
+    config = _renewal_config()  # read once: four kinds depend on it
     # type_coerce, not CAST: SQLite would turn CAST(... AS DATETIME) into a number
     text_label = lambda col: type_coerce(col, String)  # noqa: E731
     due = lambda col: type_coerce(col, DateTime)  # noqa: E731
@@ -169,12 +170,12 @@ def _queue_union(now, dialect):
         case((Certificate.valid_to < soon, _CRITICAL), else_=_WARNING).label('rank'),
         Certificate.id.label('id'), text_label(func.coalesce(func.nullif(Certificate.subject_cn, ''), Certificate.descr)).label('label'),
         due(Certificate.valid_to).label('due_at'),
-    ).where(*_manual_renewal_conditions(now)))
+    ).where(*_manual_renewal_conditions(now, config)))
 
     cert_label = text_label(func.coalesce(func.nullif(Certificate.subject_cn, ''), Certificate.descr))
     for kind, rank, conditions in (('client_renewal_overdue', _WARNING, _client_overdue_conditions(now)),
-                                   ('auto_renewal_blocked', _CRITICAL, _blocked_conditions(now)),
-                                   ('renewal_declined', _WARNING, _declined_conditions(now))):
+                                   ('auto_renewal_blocked', _CRITICAL, _blocked_conditions(now, config, dialect)),
+                                   ('renewal_declined', _WARNING, _declined_conditions(now, config, dialect))):
         parts.append(select(
             _const(kind).label('kind'), rank.label('rank'), Certificate.id.label('id'),
             cert_label.label('label'), due(Certificate.valid_to).label('due_at'),
@@ -231,11 +232,10 @@ def _live_until(now, days):
             Certificate.valid_to <= now + timedelta(days=days)]
 
 
-def _manual_renewal_conditions(now):
+def _manual_renewal_conditions(now, config):
     """Issued, live, inside the expiry window, left alone by auto-renewal (no stored key, a
     source it skips, or auto-renewal off). Excludes: a declined renewal, a delegated OCSP
     responder (its own task), client-renewed sources and UCM's ACME client, a superseded one."""
-    config = _renewal_config()
     skipped = [_no_key(), Certificate.source.is_(None), Certificate.source.notin_(config['renewal_sources'] or [''])]
     return [
         *_live_until(now, EXPIRY_WINDOW_DAYS),
@@ -279,22 +279,33 @@ def _renewal_declined(auto_only=False):
     return select(ApprovalRequest.id).where(*conditions).exists()
 
 
-def _and_blocked(now):
-    return and_(*_blocked_conditions(now))
+def _and_blocked(now, config, dialect):
+    return and_(*_blocked_conditions(now, config, dialect))
 
 
-def _blocked_conditions(now):
-    """Due for auto-renewal (inside its days_before_expiry), which then fails on every pass
-    because the CA cannot sign; only an automatic refusal parks it, not a refused manual request."""
-    config = _renewal_config()
-    return [*_live_until(now, config['days_before_expiry']), _auto_renewed(config),
-            _issuer_cannot_sign(now), ~_renewal_declined(auto_only=True)]
+def _past_last_third(now, dialect):
+    """The scheduler never renews before the last third of the lifetime
+    (AutoRenewalService._in_renewal_window); a certificate without valid_from is taken as due."""
+    if dialect == 'sqlite':
+        remaining = func.julianday(Certificate.valid_to) - func.julianday(literal(now, DateTime))
+        lifetime = func.julianday(Certificate.valid_to) - func.julianday(Certificate.valid_from)
+    else:
+        remaining = Certificate.valid_to - literal(now, DateTime)
+        lifetime = Certificate.valid_to - Certificate.valid_from
+    return or_(Certificate.valid_from.is_(None), remaining * 3 <= lifetime)
 
 
-def _declined_conditions(now):
+def _blocked_conditions(now, config, dialect):
+    """Due for auto-renewal (inside days_before_expiry and the last third of its lifetime), which
+    then fails on every pass because the CA cannot sign; only an automatic refusal parks it."""
+    return [*_live_until(now, config['days_before_expiry']), _past_last_third(now, dialect),
+            _auto_renewed(config), _issuer_cannot_sign(now), ~_renewal_declined(auto_only=True)]
+
+
+def _declined_conditions(now, config, dialect):
     """Precedence auto_renewal_blocked > renewal_declined: a certificate is queued once."""
     return [*_live_until(now, EXPIRY_WINDOW_DAYS), _renewal_declined(), ~_superseded(now),
-            ~_and_blocked(now)]
+            ~_and_blocked(now, config, dialect)]
 
 
 def _client_overdue_conditions(now):
