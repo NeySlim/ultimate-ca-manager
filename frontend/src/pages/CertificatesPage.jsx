@@ -14,7 +14,7 @@ import {
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, HelpCard,
-  CertificateDetails, CertificateCompareModal
+  CertificateCompareModal
 } from '../components'
 import { ExportModal } from '../components/ExportModal'
 import { RevokeCertificateModal } from '../components/RevokeCertificateModal'
@@ -27,6 +27,7 @@ import { extractCN, cn, certificateNames, isOnHold } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { IssueCertificateForm } from './certificates/IssueCertificateForm'
+import { CertificateSlideOver } from './certificates/CertificateSlideOver'
 import { useCertificateColumns } from './certificates/useCertificateColumns'
 import { UploadKeyModal } from './certificates/UploadKeyModal'
 import { soleImported } from '../lib/importResult'
@@ -255,22 +256,6 @@ export default function CertificatesPage() {
       }
     }
   }, [urlCertId, loading])
-
-  // Export certificate
-  const handleExport = async (format, options = {}) => {
-    if (!selectedCert) return
-
-    try {
-      await downloadExport(
-        certificatesService.export(selectedCert.id, format, options),
-        { format, name: selectedCert.common_name || 'certificate' },
-      )
-      showSuccess(t('messages.success.export.certificate'))
-    } catch (err) {
-      // The server's refusal says why (a bundle member without a key); a network failure does not
-      showError(err?.status ? err.message : t('messages.errors.exportFailed.certificate'))
-    }
-  }
 
   // Revoke certificate
   // Revocation asks for the RFC 5280 reason (#334); the dialog is rendered below
@@ -643,19 +628,13 @@ export default function CertificatesPage() {
 
   // Slide-over content
   const slideOverContent = selectedCert ? (
-    <CertificateDetails
-      certificate={selectedCert}
-      onExport={handleExport}
-      onRevoke={() => handleRevoke(selectedCert.id)}
-      onRenew={(selectedCert.has_private_key || selectedCert.source === 'msca') && !selectedCert.revoked ? () => handleRenew(selectedCert) : null}
-      onDelete={() => handleDelete(selectedCert.id)}
-      onRename={() => handleRename(selectedCert)}
+    <CertificateSlideOver
+      cert={selectedCert}
+      onChanged={setSelectedCert}
+      onClose={() => setSelectedCert(null)}
+      onMutate={muteToasts}
       onOpenRelated={(id) => handleSelectCert({ id })}
-      onUploadKey={() => setShowKeyModal(true)}
       onAddToTrustStore={handleAddToTrustStore}
-      canWrite={canWrite('certificates')}
-      canDelete={canDelete('certificates')}
-      canExportKey={canExportKey}
     />
   ) : null
 

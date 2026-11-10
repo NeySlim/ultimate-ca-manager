@@ -4,10 +4,10 @@
  */
 import { useTranslation } from 'react-i18next'
 import { ShieldCheck, Copy, Check } from '@phosphor-icons/react'
-import { Badge } from './Badge'
-import { CompactSection } from './DetailCard'
-import { useClipboard } from '../hooks/useClipboard'
-import { truncateHex } from '../lib/customExtensions'
+import { Badge } from '../Badge'
+import { CompactSection } from '../DetailCard'
+import { useClipboard } from '../../hooks/useClipboard'
+import { truncateHex } from '../../lib/customExtensions'
 
 const SAN_COLORS = {
   DNS: 'primary', IP: 'warning', Email: 'teal', URI: 'cyan',

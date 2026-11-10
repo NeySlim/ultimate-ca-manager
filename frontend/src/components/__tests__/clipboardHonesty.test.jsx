@@ -54,8 +54,8 @@ vi.mock('../../services', () => ({
 }))
 
 import { CompactField, DetailField } from '../DetailCard'
-import { CSRDetails } from '../CSRDetails'
-import { TrustCertDetails } from '../TrustCertDetails'
+import { CSRPanel } from '../detail/CSRPanel'
+import { TrustCertPanel } from '../detail/TrustCertPanel'
 import CopyableUrl from '../../pages/settings/CopyableUrl'
 import EmailSection from '../../pages/settings/EmailSection'
 import ScepProfilesTab from '../../pages/scep/ScepProfilesTab'
@@ -303,34 +303,34 @@ describe('CopyableUrl', () => {
 const PEM = '-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----'
 
 describe('PEM copy buttons', () => {
-  it('CSRDetails does not claim the PEM was copied on plain HTTP', async () => {
-    render(<CSRDetails csr={{ id: 1, subject: 'CN=web', pem: PEM }} />)
+  it('CSRPanel does not claim the PEM was copied on plain HTTP', async () => {
+    render(<CSRPanel csr={{ id: 1, subject: 'CN=web', pem: PEM }} />)
     fireEvent.click(screen.getByText('details.copyPem'))
 
     await waitFor(() => expect(document.execCommand).toHaveBeenCalled())
     expect(screen.queryByText('common.copied')).toBeNull()
   })
 
-  it('CSRDetails confirms a copy that worked', async () => {
+  it('CSRPanel confirms a copy that worked', async () => {
     const writeText = workingClipboard()
-    render(<CSRDetails csr={{ id: 1, subject: 'CN=web', pem: PEM }} />)
+    render(<CSRPanel csr={{ id: 1, subject: 'CN=web', pem: PEM }} />)
     fireEvent.click(screen.getByText('details.copyPem'))
 
     await waitFor(() => expect(screen.getByText('common.copied')).toBeTruthy())
     expect(writeText).toHaveBeenCalledWith(PEM)
   })
 
-  it('TrustCertDetails does not claim it either', async () => {
-    render(<TrustCertDetails cert={{ id: 1, subject: 'CN=root', pem: PEM }} />)
+  it('TrustCertPanel does not claim it either', async () => {
+    render(<TrustCertPanel cert={{ id: 1, subject: 'CN=root', pem: PEM }} />)
     fireEvent.click(screen.getByText('details.copyPem'))
 
     await waitFor(() => expect(document.execCommand).toHaveBeenCalled())
     expect(screen.queryByText('common.copied')).toBeNull()
   })
 
-  it('TrustCertDetails confirms a copy that worked', async () => {
+  it('TrustCertPanel confirms a copy that worked', async () => {
     workingClipboard()
-    render(<TrustCertDetails cert={{ id: 1, subject: 'CN=root', pem: PEM }} />)
+    render(<TrustCertPanel cert={{ id: 1, subject: 'CN=root', pem: PEM }} />)
     fireEvent.click(screen.getByText('details.copyPem'))
 
     await waitFor(() => expect(screen.getByText('common.copied')).toBeTruthy())
@@ -355,10 +355,10 @@ const MIGRATED = [
   'pages/TSAPage.jsx',
   'pages/SCEPPage.jsx',
   'components/DetailCard.jsx',
-  'components/CSRDetails.jsx',
-  'components/CADetails.jsx',
-  'components/CertificateDetails.jsx',
-  'components/TrustCertDetails.jsx',
+  'components/detail/CSRPanel.jsx',
+  'components/detail/CAPanel.jsx',
+  'components/detail/CertificatePanel.jsx',
+  'components/detail/TrustCertPanel.jsx',
 ]
 
 describe('the copy path is not re-implemented', () => {
@@ -371,8 +371,8 @@ describe('the copy path is not re-implemented', () => {
     },
   )
 
-  it.each(['components/CSRDetails.jsx', 'components/CADetails.jsx',
-    'components/CertificateDetails.jsx', 'components/TrustCertDetails.jsx',
+  it.each(['components/detail/CSRPanel.jsx', 'components/detail/CAPanel.jsx',
+    'components/detail/CertificatePanel.jsx', 'components/detail/TrustCertPanel.jsx',
     'components/DetailCard.jsx', 'pages/settings/DeploySection.jsx'])(
     '%s no longer owns an uncleaned copy-reset timer',
     (file) => {

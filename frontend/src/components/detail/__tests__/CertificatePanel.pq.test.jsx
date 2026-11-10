@@ -3,10 +3,10 @@
  * level and a badge, and a key the API does not name is never shown as RSA.
  * Records follow the API contract for ML-DSA and SLH-DSA keys.
  */
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import en from '../../i18n/locales/en.json'
-import { GROUP_PQ, KEY_ALGORITHMS } from '../../lib/keyAlgorithms'
+import en from '../../../i18n/locales/en.json'
+import { GROUP_PQ, KEY_ALGORITHMS } from '../../../lib/keyAlgorithms'
 
 // Resolves keys against the English catalogue, so the test reads what a user reads
 const lookup = (key) => key.split('.').reduce((node, part) => (node == null ? node : node[part]), en)
@@ -21,10 +21,10 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: () => {} },
   Trans: ({ children }) => children,
 }))
-vi.mock('../deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
-vi.mock('../CertificateLintModal', () => ({ CertificateLintModal: () => null }))
+vi.mock('../../deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
+vi.mock('../../CertificateLintModal', () => ({ CertificateLintModal: () => null }))
 
-import { CertificateDetails } from '../CertificateDetails'
+import { CertificatePanel } from '../CertificatePanel'
 
 const PQ_ROWS = KEY_ALGORITHMS.filter(a => a.group === GROUP_PQ)
 
@@ -47,9 +47,9 @@ const rsa = {
 
 const levelLabel = (a) => `${a.label} (level ${a.securityLevel})`
 
-describe('CertificateDetails with a post-quantum key', () => {
+describe('CertificatePanel with a post-quantum key', () => {
   it.each(PQ_ROWS.map(a => [a.label, a]))('names %s with its security level and a badge', (_label, a) => {
-    render(<CertificateDetails certificate={mldsa(a)} />)
+    render(<CertificatePanel certificate={mldsa(a)} />)
     expect(screen.getAllByText(levelLabel(a)).length).toBeGreaterThan(0)
     expect(screen.getByTestId('post-quantum-badge')).toHaveTextContent('Post-quantum')
     // No size in bits for a key that has none
@@ -57,39 +57,39 @@ describe('CertificateDetails with a post-quantum key', () => {
   })
 
   it.each(PQ_ROWS.map(a => [a.label, a]))('names %s with its level in Technical details too', (_label, a) => {
-    render(<CertificateDetails certificate={mldsa(a)} />)
+    render(<CertificatePanel certificate={mldsa(a)} />)
     expect(screen.getByText('Key Type').nextSibling).toHaveTextContent(levelLabel(a))
   })
 
   it('names in Technical details a key the API sends without key_type', () => {
-    render(<CertificateDetails certificate={{ ...base, key_algorithm: 'ML-DSA-65', key_size: null, post_quantum: true }} />)
+    render(<CertificatePanel certificate={{ ...base, key_algorithm: 'ML-DSA-65', key_size: null, post_quantum: true }} />)
     expect(screen.getByText('Key Type').nextSibling).toHaveTextContent('ML-DSA-65 (level 3)')
   })
 
   it('keeps the RSA key type in Technical details as the API sends it', () => {
-    render(<CertificateDetails certificate={rsa} />)
+    render(<CertificatePanel certificate={rsa} />)
     expect(screen.getByText('Key Type').nextSibling).toHaveTextContent(/^RSA 2048$/)
   })
 
   it('shows the whole ML-DSA signature name in the summary chip', () => {
     const a = PQ_ROWS.find(r => r.label === 'ML-DSA-65')
-    render(<CertificateDetails certificate={mldsa(a)} />)
+    render(<CertificatePanel certificate={mldsa(a)} />)
     expect(screen.queryByText('ML')).toBeNull()
   })
 
   it('names an SLH-DSA key as the API does, with the badge', () => {
-    render(<CertificateDetails certificate={slhdsa} />)
+    render(<CertificatePanel certificate={slhdsa} />)
     expect(screen.getAllByText('SLH-DSA-SHA2-128s').length).toBeGreaterThan(0)
     expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
   })
 
   it('shows the badge in the compact bar of the detail window too', () => {
-    render(<CertificateDetails certificate={slhdsa} embedded />)
+    render(<CertificatePanel certificate={slhdsa} embedded />)
     expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
   })
 
   it('keeps an RSA certificate as it was, without the badge', () => {
-    render(<CertificateDetails certificate={rsa} />)
+    render(<CertificatePanel certificate={rsa} />)
     expect(screen.getByText('RSA')).toBeInTheDocument()
     expect(screen.getByText('2048 bits')).toBeInTheDocument()
     expect(screen.queryByTestId('post-quantum-badge')).toBeNull()
@@ -97,17 +97,7 @@ describe('CertificateDetails with a post-quantum key', () => {
 
   it.each([[false], [true]])('never calls a key the API did not name RSA (embedded: %s)', (embedded) => {
     const unnamed = { ...base, key_algorithm: null, key_type: null, key_size: null, signature_algorithm: null }
-    render(<CertificateDetails certificate={unnamed} embedded={embedded} />)
+    render(<CertificatePanel certificate={unnamed} embedded={embedded} />)
     expect(screen.queryByText(/\bRSA\b/)).toBeNull()
-  })
-
-  it('offers no PKCS#12 or JKS export for an ML-DSA key', () => {
-    const a = PQ_ROWS.find(r => r.label === 'ML-DSA-65')
-    render(<CertificateDetails certificate={mldsa(a)} onExport={vi.fn()} canExportKey />)
-    fireEvent.click(screen.getAllByRole('button', { name: /export/i })[0])
-    const dialog = screen.getByRole('dialog')
-    expect(within(dialog).getByText('P12 / PKCS#12').closest('button')).toBeDisabled()
-    expect(within(dialog).getByText('JKS').closest('button')).toBeDisabled()
-    expect(within(dialog).getByText('PEM').closest('button')).toBeEnabled()
   })
 })

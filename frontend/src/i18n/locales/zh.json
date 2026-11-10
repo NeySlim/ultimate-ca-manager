@@ -861,7 +861,8 @@
       "pairIssued": "已签发混合证书对：证书 #{{classical}} 和 #{{pq}}",
       "renewedWithRelated": "证书已续期，其关联证书 #{{id}} 一并续期",
       "bulkRelatedRenewed": "已随所选项一并续期 {{count}} 张关联证书"
-    }
+    },
+    "renewed": "Certificate renewed"
   },
   "cas": {
     "chainRevoked": "上游已吊销",
@@ -4068,7 +4069,14 @@
         "semantics": "语义标识符"
       }
     },
-    "subjectAltNames": "主题备用名称"
+    "subjectAltNames": "主题备用名称",
+    "entityTitle": {
+      "certificate": "Certificate #{{id}}",
+      "ca": "CA #{{id}}",
+      "truststore": "Trust Store #{{id}}",
+      "userCertificate": "User Certificate #{{id}}"
+    },
+    "ownerLabel": "Owner: {{owner}}"
   },
   "compare": {
     "title": "比较证书",

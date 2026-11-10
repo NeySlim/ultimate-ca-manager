@@ -69,15 +69,15 @@ export {
 } from './DetailCard'
 
 // Certificate Details (reusable)
-export { CertificateDetails } from './CertificateDetails'
-export { CertificateExtensions, SubjectAltNames } from './CertificateExtensions'
+export { CertificatePanel } from './detail/CertificatePanel'
+export { CertificateExtensions, SubjectAltNames } from './detail/CertificateExtensions'
 export { CertificateCompareModal } from './CertificateCompareModal'
 export { CertificateLintModal } from './CertificateLintModal'
 export { KeyRecoveryRequestModal } from './KeyRecoveryRequestModal'
 export { TemplatePreviewModal } from './TemplatePreviewModal'
-export { CADetails } from './CADetails'
-export { CSRDetails } from './CSRDetails'
-export { TrustCertDetails } from './TrustCertDetails'
+export { CAPanel } from './detail/CAPanel'
+export { CSRPanel } from './detail/CSRPanel'
+export { TrustCertPanel } from './detail/TrustCertPanel'
 export { EkuMultiSelect } from './EkuMultiSelect'
 
 // Filter components

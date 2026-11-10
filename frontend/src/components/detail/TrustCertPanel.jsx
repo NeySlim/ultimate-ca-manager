@@ -1,8 +1,7 @@
 /**
- * TrustCertDetails Component
- * 
- * Reusable component for displaying Trust Store certificate details.
- * Uses global CompactSection/CompactGrid/CompactField for consistent styling.
+ * TrustCertPanel: pure presentation of one trust store certificate. Reads the
+ * trust store payload (not_before/not_after, certificate_pem, added_*) and
+ * falls back to the certificate field names.
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -10,9 +9,7 @@ import {
   Certificate, 
   Key, 
   Clock, 
-  Calendar,
-  Download, 
-  Trash,
+  Calendar, 
   Copy,
   CheckCircle,
   ShieldCheck,
@@ -25,15 +22,15 @@ import {
   User,
   Info
 } from '@phosphor-icons/react'
-import { Badge } from './Badge'
-import { Button } from './Button'
-import { CompactSection, CompactGrid, CompactField } from './DetailCard'
-import { cn, daysRemaining as computeDaysRemaining } from '../lib/utils'
-import { useClipboard } from '../hooks/useClipboard'
-import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
-import { PostQuantumBadge } from './PostQuantumBadge'
-import { getAppTimezone } from '../stores/timezoneStore'
-import { formatDate as formatDateUtil } from '../lib/utils'
+import { Badge } from '../Badge'
+import { Button } from '../Button'
+import { CompactSection, CompactGrid, CompactField } from '../DetailCard'
+import { cn, daysRemaining as computeDaysRemaining } from '../../lib/utils'
+import { useClipboard } from '../../hooks/useClipboard'
+import { keyAlgorithmLabel } from '../../lib/keyAlgorithms'
+import { PostQuantumBadge } from '../PostQuantumBadge'
+import { showSection } from './sections'
+import { formatDate as formatDateUtil } from '../../lib/utils'
 
 // Format date helper — delegates to shared util
 function formatDate(dateStr) {
@@ -50,27 +47,31 @@ const getPurposeConfig = (t) => ({
   client: { variant: 'info', label: t('trustStore.clientAuth'), description: t('trustStore.clientAuthDesc') }
 })
 
-export function TrustCertDetails({ 
+export function TrustCertPanel({
   cert,
-  onExport,
-  onDelete,
-  canWrite = false,
-  canDelete = false,
-  showActions = true,
+  section = 'all',
   showPem = true,
   embedded = false,
+  // Caller content (its action row), rendered under the summary
+  children,
 }) {
+
   const { t } = useTranslation()
   const [showFullPem, setShowFullPem] = useState(false)
   const { copy: copyPem, isCopied } = useClipboard()
   const pemCopied = isCopied('pem')
   
   if (!cert) return null
+
+  const on = (...names) => showSection(section, ...names)
+  const validTo = cert.valid_to ?? cert.not_after
+  const validFrom = cert.valid_from ?? cert.not_before
+  const pem = cert.pem ?? cert.certificate_pem
   
   // Determine status based on validity
   const getStatus = () => {
-    if (cert.valid_to) {
-      const remaining = computeDaysRemaining(cert.valid_to)
+    if (validTo) {
+      const remaining = computeDaysRemaining(validTo)
       // null means the date could not be read, not that it has passed.
       if (remaining !== null && remaining <= 0) return 'expired'
       if (remaining !== null && remaining <= 30) return 'expiring'
@@ -88,8 +89,7 @@ export function TrustCertDetails({
   const purposeConfig = getPurposeConfig(t)
   
   // Calculate days remaining
-  const daysRemaining = cert.valid_to ? 
-    computeDaysRemaining(cert.valid_to) : null
+  const daysRemaining = validTo ? computeDaysRemaining(validTo) : null
   
   // Get purposes as array
   const purposes = cert.purpose ? 
@@ -98,6 +98,7 @@ export function TrustCertDetails({
   
   return (
     <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", embedded && "space-y-3 p-3")}>
+      {on('overview') && (<>
       {!embedded && <>
       {/* Header with badges */}
       <div className="flex items-start justify-between gap-4">
@@ -168,24 +169,10 @@ export function TrustCertDetails({
           )}
         </div>
       )}
-      
-      {/* Actions */}
-      {showActions && (
-        <div className="flex gap-2 flex-wrap">
-          {onExport && (
-            <Button type="button" size="sm" variant="secondary" onClick={onExport}>
-              <Download size={14} /> {t('common.export')}
-            </Button>
-          )}
-          {onDelete && canDelete && (
-            <Button type="button" size="sm" variant="danger" onClick={onDelete}>
-              <Trash size={14} /> {t('common.delete')}
-            </Button>
-          )}
-        </div>
-      )}
       </>}
-
+      {children}
+      </>)}
+      {on('overview') && (<>
       {/* Embedded: compact status bar */}
       {embedded && (
         <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-lg border border-border bg-tertiary-op30">
@@ -202,6 +189,8 @@ export function TrustCertDetails({
         </div>
       )}
       
+      </>)}
+      {on('overview') && (<>
       {/* Subject Information */}
       <CompactSection title={t('common.subject')} icon={Globe}>
         <CompactGrid>
@@ -214,6 +203,8 @@ export function TrustCertDetails({
         </CompactGrid>
       </CompactSection>
       
+      </>)}
+      {on('overview', 'chain') && (<>
       {/* Issuer */}
       {cert.issuer && (
         <CompactSection title={t('common.issuer')} icon={ShieldCheck}>
@@ -221,14 +212,18 @@ export function TrustCertDetails({
         </CompactSection>
       )}
       
+      </>)}
+      {on('overview') && (<>
       {/* Validity Period */}
       <CompactSection title={t('common.validity')} icon={Calendar}>
         <CompactGrid>
-          <CompactField label={t('common.validFrom')} value={formatDate(cert.valid_from)} icon={Calendar} />
-          <CompactField label={t('common.validUntil')} value={formatDate(cert.valid_to)} icon={Calendar} />
+          <CompactField label={t('common.validFrom')} value={formatDate(validFrom)} icon={Calendar} />
+          <CompactField label={t('common.validUntil')} value={formatDate(validTo)} icon={Calendar} />
         </CompactGrid>
       </CompactSection>
       
+      </>)}
+      {on('overview') && (<>
       {/* Technical Details */}
       <CompactSection title={t('common.technicalDetails')} icon={Info}>
         <CompactGrid>
@@ -246,23 +241,27 @@ export function TrustCertDetails({
         </CompactGrid>
       </CompactSection>
       
+      </>)}
+      {on('overview') && (<>
       {/* Fingerprints */}
       <CompactSection title={t('common.fingerprints')} icon={Fingerprint} collapsible defaultOpen={false}>
         <CompactField label="SHA-256" value={cert.thumbprint_sha256 || cert.fingerprint_sha256} icon={Fingerprint} mono />
         <CompactField label="SHA-1" value={cert.thumbprint_sha1 || cert.fingerprint_sha1} icon={Fingerprint} mono />
       </CompactSection>
       
+      </>)}
+      {on('pem') && (<>
       {/* PEM */}
-      {showPem && cert.pem && (
+      {showPem && pem && (
         <CompactSection title={t('details.pemCertificate')} icon={Certificate} collapsible defaultOpen={false}>
           <div className="relative">
             <pre className={cn(
               "text-2xs font-mono text-text-secondary bg-tertiary-op50 p-2 rounded overflow-x-auto",
               !showFullPem && "max-h-24 overflow-hidden"
             )}>
-              {cert.pem}
+              {pem}
             </pre>
-            {!showFullPem && cert.pem.length > 500 && (
+            {!showFullPem && pem.length > 500 && (
               <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-bg-primary to-transparent pointer-events-none" />
             )}
           </div>
@@ -284,7 +283,7 @@ export function TrustCertDetails({
               variant="ghost"
               onClick={(e) => {
                 e.stopPropagation()
-                copyPem(cert.pem, 'pem')
+                copyPem(pem, 'pem')
               }}
             >
               {pemCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
@@ -294,16 +293,19 @@ export function TrustCertDetails({
         </CompactSection>
       )}
       
+      </>)}
+      {on('overview') && (<>
       {/* Metadata */}
       <CompactSection title={t('details.metadata')} icon={Info} collapsible defaultOpen={false}>
         <CompactGrid>
-          <CompactField label={t('details.addedAt')} value={formatDate(cert.created_at)} icon={Calendar} />
-          <CompactField label={t('details.addedBy')} value={cert.created_by} icon={User} />
+          <CompactField label={t('details.addedAt')} value={formatDate(cert.created_at ?? cert.added_at)} icon={Calendar} />
+          <CompactField label={t('details.addedBy')} value={cert.created_by ?? cert.added_by} icon={User} />
           {cert.notes && (
             <CompactField autoIcon="notes" label={t('common.notes')} value={cert.notes} className="col-span-2" />
           )}
         </CompactGrid>
       </CompactSection>
+      </>)}
     </div>
   )
 }

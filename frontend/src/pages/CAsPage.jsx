@@ -16,7 +16,7 @@ import { useNotification } from '../contexts'
 import { useWindowManager } from '../contexts/WindowManagerContext'
 import { usePermission, useModals, useRecentHistory, useWebSocket, usePersistedState } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
-import { extractData, cn, downloadBlob } from '../lib/utils'
+import { extractData, cn } from '../lib/utils'
 import { OrgView } from './cas/OrgView'
 import { ColumnsView } from './cas/ColumnsView'
 import { ListView } from './cas/ListView'
@@ -242,39 +242,9 @@ export default function CAsPage() {
     }
   }
 
-  const handleDelete = async (id) => {
-    const confirmed = await showConfirm(t('messages.confirm.delete.ca'), {
-      title: t('cas.deleteCA'),
-      confirmText: t('cas.deleteCAButton'),
-      variant: 'danger'
-    })
-    if (!confirmed) return
-    
-    try {
-      muteToasts()
-      await casService.delete(id)
-      showSuccess(t('messages.success.delete.ca'))
-      loadCAs()
-      setSelectedCA(null)
-    } catch (error) {
-      showError(error.message || t('cas.deleteFailed'))
-    }
-  }
-
-  const handleExport = async (ca, format = 'pem', options = {}) => {
-    try {
-      const blob = await casService.export(ca.id, format, options)
-      const ext = { pem: 'pem', der: 'der', pkcs7: 'p7b', pkcs12: 'p12', jks: 'jks' }[format] || format
-      downloadBlob(blob, `${ca.name || ca.common_name || 'ca'}.${ext}`)
-      showSuccess(t('messages.success.export.ca'))
-    } catch (error) {
-      showError(error.message || t('cas.exportFailed'))
-    }
-  }
-
-  // CA offline / restore are driven by TakeOfflineModal / RestoreModal in
-  // CADetailsPanel — they call casService directly and dispatch
-  // 'ucm:data-changed' which this page already listens to.
+  // CA actions of the slide-over (offline, restore, delete...) come from
+  // useEntityActions and announce themselves with 'ucm:data-changed', which
+  // this page already listens to.
 
   // Check if intermediate CA is orphan
   const isOrphanIntermediate = useCallback((ca) => {
@@ -454,9 +424,9 @@ export default function CAsPage() {
             canWrite={canWrite}
             canDelete={canDelete}
             hasPermission={hasPermission}
-            onExport={(format, options) => handleExport(selectedCA, format, options)}
-            onDelete={() => handleDelete(selectedCA.id)}
             onChanged={(updated) => setSelectedCA(prev => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev))}
+            onClose={() => setSelectedCA(null)}
+            onMutate={muteToasts}
             t={t}
           />
         ) : null}

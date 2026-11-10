@@ -1,37 +1,23 @@
 /**
- * CertificateDetails Component
- * 
- * Reusable component for displaying certificate details.
- * Can be used in modals, slide-overs, or standalone pages.
- * Uses global Compact components for consistent styling.
- * 
- * Usage:
- *   <CertificateDetails 
- *     certificate={cert} 
- *     onExport={handleExport}
- *     onRevoke={handleRevoke}
- *     onDelete={handleDelete}
- *     canWrite={true}
- *     canDelete={true}
- *   />
+ * CertificatePanel: pure presentation of one certificate. No service call, no
+ * modal, no action button; actions live in hooks/useEntityActions. The rule
+ * covers direct imports: self-loading field components (see README.md) are
+ * known exceptions until the inspector lot.
+ * `section` limits the output to one named part (see ./sections.js).
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getAppTimezone } from '../stores/timezoneStore'
-import { formatDate as formatDateUtil, formatSerialNumberHex } from '../lib/utils'
-import { daysSinceExpiry, hasExpiry } from '../lib/expiry'
+import { formatDate as formatDateUtil, formatSerialNumberHex } from '../../lib/utils'
+import { daysSinceExpiry, hasExpiry } from '../../lib/expiry'
 import { 
   Certificate, 
   Key, 
   Lock, 
   Clock, 
-  Calendar,
-  Download, 
+  Calendar, 
   X, 
-  Trash,
   Copy,
   CheckCircle,
-  Warning,
   ShieldCheck,
   Globe,
   Envelope,
@@ -39,25 +25,20 @@ import {
   MapPin,
   Hash,
   Fingerprint,
-  ArrowsClockwise,
-  UploadSimple,
   LinkSimple,
-  SealCheck,
   Stack,
-  PencilSimple
 } from '@phosphor-icons/react'
-import { Badge } from './Badge'
-import { Button } from './Button'
-import { ExportModal } from './ExportModal'
-import { CertificateLintModal } from './CertificateLintModal'
-import { CompactSection, CompactGrid, CompactField } from './DetailCard'
+import { Badge } from '../Badge'
+import { Button } from '../Button'
+import { CompactSection, CompactGrid, CompactField } from '../DetailCard'
 import { CertificateExtensions, SubjectAltNames } from './CertificateExtensions'
-import { CertDeploySection } from './deploy/CertDeploySection'
-import { cn, isOnHold } from '../lib/utils'
-import { useClipboard } from '../hooks/useClipboard'
-import { signatureShortName } from '../lib/signatureName'
-import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
-import { PostQuantumBadge } from './PostQuantumBadge'
+import { CertDeploySection } from '../deploy/CertDeploySection'
+import { cn } from '../../lib/utils'
+import { useClipboard } from '../../hooks/useClipboard'
+import { signatureShortName } from '../../lib/signatureName'
+import { keyAlgorithmLabel } from '../../lib/keyAlgorithms'
+import { PostQuantumBadge } from '../PostQuantumBadge'
+import { showSection } from './sections'
 
 // Maps a template_override field name to the i18n key of its label (#258).
 const OVERRIDE_FIELD_LABEL_KEYS = {
@@ -131,33 +112,21 @@ function ExpiryIndicator({ daysRemaining, validTo, t }) {
   )
 }
 
-export function CertificateDetails({ 
+export function CertificatePanel({
   certificate,
-  onExport,
-  onRevoke,
-  onDelete,
-  onRenew,
-  onRename,
-  onUploadKey,
-  onAddToTrustStore,
   // Opens the other member of a hybrid pair; without it the link navigates
   onOpenRelated,
-  canWrite = false,
-  canDelete = false,
-  // Private-key export is its own scope (read:private_keys), not write access —
-  // see lib/exportPermissions. Callers pass canExportPrivateKey('certificate').
-  canExportKey = false,
+  onAddToTrustStore,
+  section = 'all',
   compact = false,
-  showActions = true,
   showPem = true,
   embedded = false,
 }) {
+
   const { t } = useTranslation()
   const { copy: copyPem, isCopied } = useClipboard()
   const pemCopied = isCopied('pem')
   const [showFullPem, setShowFullPem] = useState(false)
-  const [showExportModal, setShowExportModal] = useState(false)
-  const [showLintModal, setShowLintModal] = useState(false)
 
   if (!certificate) return null
   
@@ -196,11 +165,12 @@ export function CertificateDetails({
   }
   
   const statusBadge = statusConfig[status] || statusConfig.valid
+  const on = (...names) => showSection(section, ...names)
   const sourceBadge = sourceConfig[cert.source] || null
   
   return (
-    <>
     <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", compact && "space-y-2 p-2", embedded && "space-y-3 p-3")}>
+      {on('overview') && (<>
       {!embedded && <>
       {/* Header */}
       <div className="flex items-start gap-2 sm:gap-3">
@@ -266,45 +236,9 @@ export function CertificateDetails({
           <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block" title={t('common.issuerSignatureAlgorithmHint')}>{t('common.issuerSignatureShort')}</div>
         </div>
       </div>
-      
-      {/* Actions - compact on mobile */}
-      {showActions && (
-        <div className="flex flex-wrap gap-1.5 sm:gap-2">
-          {/* Export button → modal */}
-          {onExport && (
-            <Button type="button" size="xs" variant="secondary" onClick={() => setShowExportModal(true)} title={t('export.title')}>
-              <Download size={14} /> {t('export.title')}
-            </Button>
-          )}
-          {/* Conformance lint (read-only, always available) */}
-          <Button type="button" size="xs" variant="secondary" onClick={() => setShowLintModal(true)} title={t('lint.action')}>
-            <SealCheck size={14} /> {t('lint.action')}
-          </Button>
-          {/* Action buttons */}
-          {onRename && canWrite && (
-            <Button type="button" size="xs" variant="secondary" onClick={onRename} title={t('certificates.renameCertificate')} aria-label={t('certificates.renameCertificate')}>
-              <PencilSimple size={14} />
-            </Button>
-          )}
-          {onRenew && canWrite && !cert.revoked && (
-            <Button type="button" size="xs" variant="secondary" onClick={onRenew} title={t('certificates.renewCertificate')} aria-label={t('certificates.renewCertificate')}>
-              <ArrowsClockwise size={14} />
-            </Button>
-          )}
-          {onRevoke && canWrite && (!cert.revoked || isOnHold(cert)) && (
-            <Button type="button" size="xs" variant="warning-soft" onClick={onRevoke} title={t('certificates.revokeCertificate')} aria-label={t('certificates.revokeCertificate')}>
-              <X size={14} />
-            </Button>
-          )}
-          {onDelete && canDelete && (
-            <Button type="button" size="xs" variant="danger-soft" onClick={onDelete} title={t('common.delete')} aria-label={t('common.delete')}>
-              <Trash size={14} />
-            </Button>
-          )}
-        </div>
-      )}
       </>}
-
+      </>)}
+      {on('overview') && (<>
       {/* Embedded: compact status bar */}
       {embedded && (
         <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-lg border border-border bg-tertiary-op30">
@@ -330,6 +264,8 @@ export function CertificateDetails({
         </div>
       )}
       
+      </>)}
+      {on('overview') && (<>
       {/* Subject Information */}
       <CompactSection title={t('common.subject')} icon={Globe} iconClass="icon-bg-blue">
         <CompactGrid>
@@ -343,6 +279,8 @@ export function CertificateDetails({
         </CompactGrid>
       </CompactSection>
       
+      </>)}
+      {on('overview') && (<>
       {/* Validity Period */}
       <CompactSection title={t('common.validity')} icon={Calendar} iconClass="icon-bg-green">
         <CompactGrid>
@@ -351,6 +289,8 @@ export function CertificateDetails({
         </CompactGrid>
       </CompactSection>
       
+      </>)}
+      {on('overview') && (<>
       {/* Technical Details */}
       <CompactSection title={t('common.technicalDetails')} icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
@@ -390,12 +330,17 @@ export function CertificateDetails({
         </CompactGrid>
       </CompactSection>
       
+      </>)}
+      {on('overview') && (<>
       {/* SANs — shared component */}
       <SubjectAltNames extensions={cert.extensions} sanCombined={cert.san_combined} />
       
+      </>)}
+      {on('extensions') && (<>
       {/* X.509 Extensions — shared component */}
       <CertificateExtensions extensions={cert.extensions} />
-
+      </>)}
+      {on('overview') && (<>
       {/* CT SCTs */}
       <CompactSection title={t('certificates.ctScts')} icon={ShieldCheck} iconClass="icon-bg-cyan" collapsible defaultOpen={false}>
         {cert.ct_scts && cert.ct_scts.length > 0 ? (
@@ -412,6 +357,8 @@ export function CertificateDetails({
         )}
       </CompactSection>
       
+      </>)}
+      {on('overview', 'chain') && (<>
       {/* Issuer */}
       <CompactSection title={t('common.issuer')} icon={ShieldCheck} iconClass="icon-bg-orange">
         <CompactGrid cols={1}>
@@ -420,7 +367,8 @@ export function CertificateDetails({
           <CompactField autoIcon="caReference" label={t('details.caReference')} value={cert.caref} mono copyable />
         </CompactGrid>
       </CompactSection>
-
+      </>)}
+      {on('chain') && (<>
       {/* Chain Validation */}
       {cert.chain_status && (
         <CompactSection 
@@ -483,6 +431,8 @@ export function CertificateDetails({
         </CompactSection>
       )}
       
+      </>)}
+      {on('overview') && (<>
       {/* Compliance Score */}
       {cert.compliance && (
         <CompactSection title={t('compliance.title')} icon={ShieldCheck} iconClass={
@@ -539,9 +489,12 @@ export function CertificateDetails({
         </CompactSection>
       )}
       
+      </>)}
+      {on('overview') && (<>
       {/* Deployment — push to remote hosts over SSH (#299, admin-only) */}
       <CertDeploySection certificate={cert} />
-
+      </>)}
+      {on('overview') && (<>
       {/* Thumbprints */}
       <CompactSection title={t('common.fingerprints')} icon={Fingerprint} iconClass="icon-bg-gray" collapsible defaultOpen={false}>
         <CompactGrid cols={1}>
@@ -550,6 +503,8 @@ export function CertificateDetails({
         </CompactGrid>
       </CompactSection>
       
+      </>)}
+      {on('pem') && (<>
       {/* PEM */}
       {showPem && cert.pem && (
         <CompactSection title={t('details.pemCertificate')} icon={Certificate} iconClass="icon-bg-green" collapsible defaultOpen={false}>
@@ -592,6 +547,8 @@ export function CertificateDetails({
         </CompactSection>
       )}
       
+      </>)}
+      {on('overview') && (<>
       {/* Revocation info */}
       {cert.revoked && (
         <CompactSection title={t('details.revocationDetails')}>
@@ -608,6 +565,8 @@ export function CertificateDetails({
         </CompactSection>
       )}
       
+      </>)}
+      {on('overview') && (<>
       {/* Metadata */}
       <CompactSection title={t('details.metadata')} collapsible defaultOpen={false}>
         <CompactGrid>
@@ -618,31 +577,9 @@ export function CertificateDetails({
           <CompactField autoIcon="referenceId" label={t('details.referenceId')} value={cert.refid} mono copyable colSpan={2} />
         </CompactGrid>
       </CompactSection>
+      </>)}
     </div>
-
-    {/* Export Modal */}
-    <ExportModal
-      open={showExportModal}
-      onClose={() => setShowExportModal(false)}
-      entityType="certificate"
-      entityName={cert.common_name || cert.subject}
-      hasPrivateKey={!!cert.has_private_key}
-      canExportKey={canExportKey}
-      keyAlgorithm={cert.key_algorithm || cert.key_type}
-      relatedCertificateId={relatedId}
-      onExport={onExport}
-      chainVariantsFor={{ type: 'certificate', id: cert.id }}
-    />
-
-    {/* Conformance Lint Modal */}
-    <CertificateLintModal
-      certId={cert.id}
-      certName={cert.cn || cert.common_name || cert.descr}
-      open={showLintModal}
-      onClose={() => setShowLintModal(false)}
-    />
-    </>
   )
 }
 
-export default CertificateDetails
+export default CertificatePanel
