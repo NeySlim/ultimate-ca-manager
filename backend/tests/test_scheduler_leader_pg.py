@@ -60,6 +60,14 @@ def kill_backend(app, pid):
             conn.commit()
 
 
+def backend_alive(app, pid):
+    from models import db
+    with app.app_context():
+        with db.engine.connect() as conn:
+            return bool(conn.execute(text('SELECT count(*) FROM pg_stat_activity WHERE pid = :p'),
+                                     {'p': pid}).scalar())
+
+
 def test_one_leader_and_takeover_after_the_lock_connection_dies(app, ha):
     starts = {'a': 0, 'b': 0}
     inside, gate = threading.Event(), threading.Event()
@@ -123,3 +131,26 @@ def test_without_ha_the_host_lock_is_used(app, monkeypatch, tmp_path):
         assert s._leader_lock is None and s._lock_fd is not None
     finally:
         s._release_lock()
+
+
+def test_a_lock_lost_mid_pass_stops_the_tasks_left_in_that_pass(app, ha, monkeypatch):
+    # A long retry: the node cannot take the lock back before the assertions run
+    monkeypatch.setattr(scheduler_service, 'LOCK_RETRY_SECONDS', 30)
+    runs = []
+    s = ha('node-a', lambda: None)
+    del s.tasks['tick']
+
+    def first():
+        runs.append('first')
+        pid = s._leader_lock.backend_pid
+        kill_backend(app, pid)
+        assert wait_for(lambda: not backend_alive(app, pid))  # termination is asynchronous
+
+    for name, func in (('first', first), ('second', lambda: runs.append('second'))):
+        s.register_task(name, func, interval=3600)
+        s.tasks[name]._created_at -= timedelta(seconds=7200)
+    s.start(app=app)
+
+    assert wait_for(lambda: runs and not s._owns_lock)
+    time.sleep(0.3)
+    assert runs == ['first'], 'a task started after the lock was lost'

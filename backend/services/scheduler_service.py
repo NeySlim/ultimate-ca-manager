@@ -149,6 +149,8 @@ class SchedulerService:
         self._node_id = node_id
         # HA: the PostgreSQL leader lock; None means the host lock (flock / pid file)
         self._leader_lock = None
+        # Set when the lock goes away, mid-pass or not: the next pass waits instead of retaking it
+        self._lost_lock = False
         self._started_at = utc_now()
         self._last_heartbeat = None
         self._heartbeat_error_logged = False
@@ -541,6 +543,7 @@ class SchedulerService:
             logger.error(f"Scheduler leadership lost on node {self.node_id}: no task starts here "
                          "until the lock is taken again")
             self._release_lock()
+            self._lost_lock = True
         return False
 
     def _scheduler_loop(self) -> None:
@@ -557,7 +560,9 @@ class SchedulerService:
                     break
                 lock = self._singleton_lock()
                 # A node that just lost the lock waits a retry period: another one takes over first
-                lost = self._owns_lock and not self._still_leader(lock)
+                if self._owns_lock:
+                    self._still_leader(lock)
+                lost, self._lost_lock = self._lost_lock, False
                 if not lost and not self._owns_lock and lock.acquire():
                     self._owns_lock, self._owner_pid = True, os.getpid()
                     logger.info(f"Scheduler lock acquired: pid {os.getpid()} on node {self.node_id} "
