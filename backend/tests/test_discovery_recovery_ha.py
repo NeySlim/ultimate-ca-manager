@@ -18,8 +18,9 @@ NODE = f'disc-{secrets.token_hex(3)}-'
 def runs(app):
     made = []
 
-    def add(node_id, triggered_by='manual'):
-        run = ScanRun(status='running', triggered_by=triggered_by, node_id=node_id)
+    def add(node_id, triggered_by='manual', started_at=None):
+        run = ScanRun(status='running', triggered_by=triggered_by, node_id=node_id,
+                      started_at=started_at or utc_now())
         db.session.add(run)
         db.session.commit()
         made.append(run.id)
@@ -56,20 +57,27 @@ def test_registration_on_a_single_node_recovers_as_before(app, runs, monkeypatch
 
 
 def test_takeover_fails_only_what_no_live_node_runs(app, runs, monkeypatch):
+    """A fresh node keeps its manual scans, and its scheduled ones started by its current process:
+    a former leader that only lost its lock connection still runs them."""
     monkeypatch.setattr(Config, 'HA_MODE', True)
     now = utc_now()
-    for name, seen in (('alive', now), ('gone', now - timedelta(hours=1))):
-        db.session.add(ClusterNode(node_id=NODE + name, started_at=seen, heartbeat_at=seen))
+    booted = now - timedelta(minutes=10)
+    db.session.add(ClusterNode(node_id=NODE + 'alive', started_at=booted, heartbeat_at=now))
+    db.session.add(ClusterNode(node_id=NODE + 'gone', started_at=booted - timedelta(hours=1),
+                               heartbeat_at=now - timedelta(hours=1)))
     db.session.commit()
     kept = runs(NODE + 'alive', 'manual')
-    scheduled = runs(NODE + 'alive', 'scheduled')  # only a leader runs these: the former one
+    scheduled = runs(NODE + 'alive', 'scheduled', started_at=booted + timedelta(minutes=1))
+    before_boot = runs(NODE + 'alive', 'scheduled', started_at=booted - timedelta(minutes=1))
     gone = runs(NODE + 'gone', 'manual')
+    gone_scheduled = runs(NODE + 'gone', 'scheduled', started_at=now - timedelta(minutes=5))
     legacy = runs(None, 'manual')
     scheduler = SchedulerService(wake_interval=60)
     DiscoverySchedulerTask.register(scheduler, app)
     for hook in scheduler._leadership_hooks:
         hook()
-    assert [status(r) for r in (kept, scheduled, gone, legacy)] == ['running', 'failed', 'failed', 'failed']
+    assert [status(r) for r in (kept, scheduled, before_boot, gone, gone_scheduled, legacy)] == \
+        ['running', 'running', 'failed', 'failed', 'failed', 'failed']
 
 
 def test_a_scan_records_the_node_that_runs_it(app, runs, monkeypatch):
