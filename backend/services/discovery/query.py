@@ -3,10 +3,11 @@ Query mixin — discovered certificate and scan run retrieval helpers.
 """
 import socket
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional, Tuple
 
 from models import db, DiscoveredCertificate, ScanRun
+from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ class QueryMixin:
         total = base.filter(DiscoveredCertificate.status != 'error').count()
         managed = base.filter_by(status='managed').count()
         unmanaged = base.filter_by(status='unmanaged').count()
-        now = datetime.now(timezone.utc)
+        now = utc_now()  # naive UTC, like the columns it is compared with
         expired = base.filter(
             DiscoveredCertificate.not_after < now,
             DiscoveredCertificate.status != 'error',

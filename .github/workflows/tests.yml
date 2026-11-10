@@ -331,6 +331,7 @@ jobs:
             tests/test_cluster_nodes_pg.py \
             tests/test_boot_lock_pg.py \
             tests/test_discovery_recovery_ha.py \
+            tests/test_discovery_timestamps.py \
             tests/test_health_ha.py \
             tests/test_sessions_store.py \
             tests/test_dashboard*.py \
