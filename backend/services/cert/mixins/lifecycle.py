@@ -140,7 +140,7 @@ class LifecycleMixin:
 
         if key_type is None:
             ca_row = CA.query.filter_by(refid=caref).first()
-            key_type = default_issue_key_id(ca_row.id if ca_row else None)
+            key_type = default_issue_key_id(ca_row.id if ca_row else None, template_id=template.id if template else None)
         if validity_days is None:
             validity_days = DEFAULT_CERTIFICATE_VALIDITY_DAYS
         # A digest asked for is checked; the template's (floored at the CA key's) and the default yield

@@ -542,14 +542,14 @@ def _best_eku_match(candidates, csr_eku):
 
 
 def _template_key_label(template, ca_id=None):
-    alg = key_algorithms.get(template.key_type or default_issue_key_type(ca_id))
+    alg = key_algorithms.get(template.key_type or default_issue_key_type(ca_id, template_id=template.id))
     return alg.label if alg is not None else str(template.key_type)
 
 
 def _template_takes_key(template, csr_label, ca_id=None):
     """Whether a key of ``csr_label`` fits ``template``: same curve or ML-DSA
     set, an RSA key at least as long. An unknown key fits any non-ML-DSA template."""
-    wanted = key_algorithms.get(template.key_type or default_issue_key_type(ca_id))
+    wanted = key_algorithms.get(template.key_type or default_issue_key_type(ca_id, template_id=template.id))
     got = key_algorithms.get(csr_label)
     if wanted is None:
         return True

@@ -230,14 +230,19 @@ def create_certificate():
         # request leaves them unset, for API parity with the UI prefill (issue
         # #226 follow-up); key_size only inherits when the algorithm still
         # matches (#318).
-        if template and not pair:
-            key_type_in, key_size_in = fill_key_params_from_template(
-                key_type_in, key_size_in, template.key_type)
-        if not pair:
-            key_type_in, key_size_in = fill_key_params_from_template(
-                key_type_in, key_size_in, default_issue_key_type(ca.id))
-        key_type_in = key_type_in or 'rsa'
-        key_size_in = issue_key_size(key_type_in, key_size_in, default_rsa_key_size(ca.id))
+        from services.policy_service import PolicyViolation
+        template_id = template.id if template else None
+        try:
+            if template and not pair:
+                key_type_in, key_size_in = fill_key_params_from_template(
+                    key_type_in, key_size_in, template.key_type)
+            if not pair:
+                key_type_in, key_size_in = fill_key_params_from_template(
+                    key_type_in, key_size_in, default_issue_key_type(ca.id, template_id=template_id))
+            key_type_in = key_type_in or 'rsa'
+            key_size_in = issue_key_size(key_type_in, key_size_in, default_rsa_key_size(ca.id, template_id))
+        except PolicyViolation as exc:
+            return error_response(str(exc), 400)
         try:
             # A pair names its two keys; key_type and key_size do not apply to it
             normalized_key = pair[0] if pair else parse_issue_key_type(

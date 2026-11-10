@@ -93,31 +93,37 @@ BASELINE_ISSUE_KEY = 'RSA-2048'
 _ISSUE_KEY_FALLBACKS = ('RSA-3072', 'EC-P256', 'EC-P384')
 
 
-def default_issue_key_type(ca_id=None, profile=None) -> str:
-    """Registry label of the key issued when nothing names one: the baseline, else the first
-    fallback the policies in scope (FIPS, compliance profile of *ca_id*, or *profile* for a
-    CA not created yet) allow."""
+def default_issue_key_type(ca_id=None, profile=None, template_id=None) -> str:
+    """Registry label of the key issued when nothing names one.
+
+    Candidates in order: RSA-2048, RSA-3072, EC-P256, EC-P384; the first that the policies
+    in scope allow wins. In scope: FIPS mode, the compliance profile of *ca_id* (or *profile*
+    for a CA not created yet) and the active policies of *ca_id* and *template_id* (not the
+    CN or SANs, unknown here). PolicyViolation (HTTP 400 at issuance) when no candidate passes.
+    """
     import compliance_profiles
-    from services.policy_service import PolicyEvaluationService
-    policies = PolicyEvaluationService.applicable_policies(ca_id, None, None)
+    from services.policy_service import PolicyEvaluationService, PolicyViolation
+    policies = PolicyEvaluationService.applicable_policies(ca_id, template_id, None)
     if profile:
         policies = [*policies, compliance_profiles.profile_policy(profile)]
+    refused = []
     for label in (BASELINE_ISSUE_KEY, *_ISSUE_KEY_FALLBACKS):
         violations, _, _ = PolicyEvaluationService.enforce_rules(
             policies, key_type=label, ca_id=ca_id, notify=False)
         if not violations:
             return label
-    return BASELINE_ISSUE_KEY
+        refused.append(violations[0])
+    raise PolicyViolation('Policy violation: no default key type is allowed (' + '; '.join(refused) + ')')
 
 
-def default_issue_key_id(ca_id=None, profile=None) -> str:
+def default_issue_key_id(ca_id=None, profile=None, template_id=None) -> str:
     """``default_issue_key_type`` as a TrustStore KEY_TYPES id ('2048', 'prime256v1')."""
-    return key_algorithms.get(default_issue_key_type(ca_id, profile)).trust_store_id
+    return key_algorithms.get(default_issue_key_type(ca_id, profile, template_id)).trust_store_id
 
 
-def default_rsa_key_size(ca_id=None) -> str:
+def default_rsa_key_size(ca_id=None, template_id=None) -> str:
     """RSA modulus size of the default key; the first fallback's when the default is not RSA."""
-    alg = key_algorithms.get(default_issue_key_type(ca_id))
+    alg = key_algorithms.get(default_issue_key_type(ca_id, template_id=template_id))
     if alg.family != 'RSA':
         alg = key_algorithms.get(_ISSUE_KEY_FALLBACKS[0])
     return str(alg.key_size)

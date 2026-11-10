@@ -191,3 +191,57 @@ def test_xcep_and_wstep_default_follows_the_profile_of_their_ca(app, monkeypatch
         assert _key_type_info(None, 1) == ('RSA', 3072)
         assert _template_key_label(template, 1) == 'RSA-3072'
         assert not _template_takes_key(template, 'RSA-2048', 1)
+
+
+def _scoped_policy(app, ca_id, template_id, allowed):
+    from models import CertificatePolicy, db
+    with app.app_context():
+        pol = CertificatePolicy(name=f'default-key-{ca_id}-{template_id}', policy_type='issuance',
+                                ca_id=ca_id, template_id=template_id, requires_approval=False,
+                                min_approvers=1, is_active=True, priority=100)
+        pol.set_rules({'allowed_key_types': allowed})
+        db.session.add(pol)
+        db.session.commit()
+        return pol.id
+
+
+def _drop_policy(app, pid):
+    from models import CertificatePolicy, db
+    with app.app_context():
+        db.session.delete(db.session.get(CertificatePolicy, pid))
+        db.session.commit()
+
+
+def test_default_key_honours_the_policies_of_the_template(app, create_ca):
+    from models import CertificateTemplate, db
+    ca = create_ca(cn='Default key template CA')
+    with app.app_context():
+        tpl = CertificateTemplate(name='default-key-tpl', template_type='web_server',
+                                  key_type='', validity_days=30, digest='sha256',
+                                  extensions_template='{}')
+        db.session.add(tpl)
+        db.session.commit()
+        tpl_id = tpl.id
+    pid = _scoped_policy(app, None, tpl_id, ['EC-P256'])
+    try:
+        with app.app_context():
+            assert issuance_defaults.default_issue_key_type(ca['id']) == 'RSA-2048'
+            assert issuance_defaults.default_issue_key_type(ca['id'], template_id=tpl_id) == 'EC-P256'
+    finally:
+        _drop_policy(app, pid)
+
+
+def test_default_key_with_no_allowed_candidate_is_refused_not_rsa_2048(app, auth_client, create_ca):
+    from services.policy_service import PolicyViolation
+    ca = create_ca(cn='Default key refused CA')
+    pid = _scoped_policy(app, ca['id'], None, ['RSA-4096'])
+    try:
+        with app.app_context():
+            with pytest.raises(PolicyViolation, match='no default key type is allowed'):
+                issuance_defaults.default_issue_key_type(ca['id'])
+        r = _post(auth_client, '/api/v2/certificates',
+                  {'cn': 'default-refused.example.test', 'ca_id': ca['id']})
+        assert r.status_code == 400, r.get_json()
+        assert 'RSA-2048' in json.dumps(r.get_json())
+    finally:
+        _drop_policy(app, pid)

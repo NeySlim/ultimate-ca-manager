@@ -516,9 +516,9 @@ def _issue_approved_certificate(approval):
             key_type, key_size, template.key_type)
     from utils.issuance_defaults import default_issue_key_type, default_rsa_key_size
     key_type, key_size = fill_key_params_from_template(
-        key_type, key_size, default_issue_key_type(ca.id))
+        key_type, key_size, default_issue_key_type(ca.id, template_id=template.id if template else None))
     key_type = key_type or 'RSA'
-    key_size = issue_key_size(key_type, key_size, default_rsa_key_size(ca.id))
+    key_size = issue_key_size(key_type, key_size, default_rsa_key_size(ca.id, template.id if template else None))
 
     normalized_key = parse_issue_key_type(key_type, key_size, curve=data.get('curve'))
 
