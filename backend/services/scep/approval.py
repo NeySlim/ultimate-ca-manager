@@ -5,6 +5,7 @@ the client (RFC 8894 §3.3.2.2: PENDING, then SUCCESS or FAILURE). Approving
 from the approvals queue issues through the SCEP service; the SCEP queue
 records its votes on the same approval request.
 """
+import base64
 import logging
 
 from models import Certificate, SCEPRequest, db
@@ -23,6 +24,15 @@ def _scep_request(data):
     return db.session.get(SCEPRequest, int(ref))
 
 
+def _intune_client(scep_req):
+    """The Intune client of the profile *scep_req* came through, else None."""
+    if scep_req.profile_id is None:
+        return None
+    from models.scep import ScepProfile
+    from services.scep import intune_client
+    return intune_client.client_for_profile(db.session.get(ScepProfile, scep_req.profile_id))
+
+
 def _approver(approval):
     for vote in reversed(approval.get_approvals()):
         if vote.get('action') == 'approve':
@@ -39,6 +49,8 @@ def _issue(approval, data):
         service = _issuing_service(scep_req)
     except LookupError as e:
         raise ProtocolRequestGone(str(e)) from e
+    # An Intune profile's request hears of its issuance as on auto-approval
+    service.intune_client = _intune_client(scep_req)
     from services.policy_service import PolicyViolation
     from services.scep.scep_service import SCEPRequestRefused
     from utils.request_names import RequestRejected
@@ -68,6 +80,13 @@ def _closed(approval, data):
     reason = (data.get('refusal') or {}).get('reason') or protocol_approval.decision_reason(approval)
     scep_req.rejection_reason = reason[:255]
     db.session.commit()
+    try:
+        client = _intune_client(scep_req)
+    except ValueError as e:
+        logger.error("SCEP request %s: Intune not notified of its refusal: %s", scep_req.id, e)
+        return
+    from services.scep.scep_service import notify_intune_failure
+    notify_intune_failure(client, scep_req.transaction_id, base64.b64decode(scep_req.csr), reason)
 
 
 def _gone(approval, data):

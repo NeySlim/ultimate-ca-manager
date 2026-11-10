@@ -345,3 +345,12 @@ class IntuneScepClient:
         }
         result = self._post(NOTIFY_FAILURE_URL, body)
         self._check_result(result)
+
+
+def client_for_profile(profile):
+    """The Intune client a SCEP profile validates with, None when Intune is
+    off for it; raises ValueError on an incomplete app registration."""
+    if profile is None or not profile.intune_enabled:
+        return None
+    tenant_id, client_id, client_secret = profile.intune_credentials()
+    return IntuneScepClient(tenant_id=tenant_id, client_id=client_id, client_secret=client_secret)

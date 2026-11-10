@@ -64,6 +64,20 @@ from services.scep.response_builder import (
 logger = logging.getLogger(__name__)
 
 
+def notify_intune_failure(intune_client, transaction_id, csr_data, description):
+    """Tell Intune a request it validated will not be issued; best effort."""
+    if intune_client is None:
+        return
+    try:
+        intune_client.send_failure_notification(
+            transaction_id, csr_data,
+            hresult=0x80004005,  # E_FAIL: no finer-grained mapping available
+            description=description[:255],
+        )
+    except Exception as notify_err:
+        logger.error("SCEP: Intune failure notification also failed: %s", notify_err)
+
+
 class SCEPRequestRefused(ValueError):
     """The CA refuses this request for good (revoked CA, revoked certificate
     being renewed): approving it again later cannot succeed."""
@@ -978,6 +992,19 @@ class SCEPService:
         scep_req.cert_refid = cert_refid
         scep_req.approved_by = approved_by
         scep_req.approved_at = utc_now()
+        if self.intune_client is not None:
+            # As on auto-approval: Intune hears of the certificate before it is committed
+            db.session.flush()
+            cert = Certificate.query.filter_by(refid=cert_refid).first()
+            try:
+                self.intune_client.send_success_notification(
+                    transaction_id, base64.b64decode(scep_req.csr),
+                    x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend()))
+            except Exception as e:
+                db.session.rollback()
+                logger.error("SCEP: Intune success notification failed, not issuing "
+                             "(txn_id=%s): %s", transaction_id, e)
+                raise ValueError('Intune could not be notified; the certificate was not issued') from e
         try:
             db.session.commit()
         except Exception as e:
@@ -1056,16 +1083,7 @@ class SCEPService:
 
     def _notify_intune_failure(self, transaction_id, csr_data, description):
         """Tell Intune a request it validated was refused; best effort, the device still gets the reason."""
-        if self.intune_client is None:
-            return
-        try:
-            self.intune_client.send_failure_notification(
-                transaction_id, csr_data,
-                hresult=0x80004005,  # E_FAIL: no finer-grained mapping available
-                description=description[:255],
-            )
-        except Exception as notify_err:
-            logger.error("SCEP: Intune failure notification also failed: %s", notify_err)
+        notify_intune_failure(self.intune_client, transaction_id, csr_data, description)
 
     def _validate_renewal(self, signer_cert: x509.Certificate, csr) \
             -> Optional[Tuple[int, str]]:

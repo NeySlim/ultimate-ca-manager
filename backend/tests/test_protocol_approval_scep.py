@@ -246,3 +246,86 @@ def test_a_rejection_whose_echo_was_lost_fails_the_poll(app, scep_ca):
         assert _scep_row(app, scep_ca)[1] == 'pending'
         assert _poll(app, scep_ca, identity) == FAILURE
         assert _scep_row(app, scep_ca)[1] == 'rejected'
+
+
+class _FakeIntune:
+    """Records what Intune is told about the requests it validated."""
+    calls = []
+    fail_success = False
+
+    def __init__(self, tenant_id, client_id, client_secret, provider_name=None):
+        pass
+
+    def send_success_notification(self, transaction_id, der_csr, cert):
+        if _FakeIntune.fail_success:
+            raise RuntimeError('Intune unreachable')
+        _FakeIntune.calls.append(('success', transaction_id, cert.serial_number))
+
+    def send_failure_notification(self, transaction_id, der_csr, hresult, description):
+        _FakeIntune.calls.append(('failure', transaction_id, description))
+
+
+@pytest.fixture
+def intune_held(app, scep_ca, monkeypatch):
+    """A request held on an Intune profile: the profile validates with a
+    patched Intune client."""
+    import services.scep.intune_client as intune
+    from models.scep import ScepProfile
+    monkeypatch.setattr(intune, 'IntuneScepClient', _FakeIntune)
+    monkeypatch.setattr(ScepProfile, 'intune_credentials', lambda self: ('t', 'c', 's'))
+    _FakeIntune.calls, _FakeIntune.fail_success = [], False
+    slug = f'intune-held-{uuid.uuid4().hex[:6]}'
+    with app.app_context():
+        ca = db.session.get(CA, scep_ca)
+        profile = ScepProfile(name=slug, url_slug=slug, ca_refid=ca.refid, auto_approve=True,
+                              intune_enabled=True, enabled=True)
+        db.session.add(profile)
+        db.session.commit()
+        profile_id = profile.id
+    yield profile_id
+    with app.app_context():
+        SCEPRequest.query.filter_by(profile_id=profile_id).update({'profile_id': None})
+        db.session.delete(db.session.get(ScepProfile, profile_id))
+        db.session.commit()
+
+
+def _on_profile(app, scep_ca, profile_id):
+    with app.app_context():
+        row = db.session.get(SCEPRequest, _scep_row(app, scep_ca)[0])
+        row.profile_id = profile_id
+        db.session.commit()
+
+
+def test_an_approved_intune_request_is_notified(app, auth_client, scep_ca, intune_held):
+    identity = _client_identity('scep intune approved')
+    with approval_policy(app, scep_ca, 'scep-held-intune-ok') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        _on_profile(app, scep_ca, intune_held)
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        body = approve(auth_client, approval_id)
+        assert _FakeIntune.calls == [('success', 'txn-19', int(body['certificate']['serial_number']))]
+
+
+def test_an_intune_notification_failure_keeps_the_request_pending(app, auth_client, scep_ca, intune_held):
+    identity = _client_identity('scep intune down')
+    with approval_policy(app, scep_ca, 'scep-held-intune-down') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        _on_profile(app, scep_ca, intune_held)
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        _FakeIntune.fail_success = True
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.status_code == 200 and r.get_json()['data']['certificate_issued'] is False
+        assert 'Intune' in r.get_json()['data']['issue_error']
+        assert requests_of(app, pid, 'scep_request')[0][1] == 'pending'
+        _id, status, cert_refid = _scep_row(app, scep_ca)
+        assert status == 'pending' and cert_refid is None
+
+
+def test_a_rejected_intune_request_is_notified(app, auth_client, scep_ca, intune_held):
+    identity = _client_identity('scep intune rejected')
+    with approval_policy(app, scep_ca, 'scep-held-intune-no') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        _on_profile(app, scep_ca, intune_held)
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        reject(auth_client, approval_id, 'unknown host')
+        assert _FakeIntune.calls == [('failure', 'txn-19', 'Rejected by an approver')]
