@@ -10,6 +10,7 @@ from datetime import datetime
 from models import db, CertificateTemplate, CA, CATemplatePin
 from utils.datetime_utils import utc_now
 from utils import key_algorithms
+from utils.issuance_defaults import default_issue_key_type
 import logging
 
 logger = logging.getLogger(__name__)
@@ -297,7 +298,7 @@ class TemplateService:
             name=data['name'],
             description=data.get('description', ''),
             template_type=data.get('template_type', 'custom'),
-            key_type=_required_template_key_type(data.get('key_type') or 'RSA-2048'),
+            key_type=_required_template_key_type(data.get('key_type') or default_issue_key_type()),
             validity_days=data.get('validity_days', 397),
             digest=data.get('digest', 'sha256'),
             dn_template=json.dumps(data.get('dn_template', {})),

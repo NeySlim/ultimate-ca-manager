@@ -222,18 +222,22 @@ def create_certificate():
         ca_key = get_ca_signing_key(ca)
 
         from utils.key_type import parse_issue_key_type, fill_key_params_from_template, issue_key_size
+        from utils.issuance_defaults import default_issue_key_type, default_rsa_key_size
 
         key_type_in = data.get('key_type') or data.get('keyType')
         key_size_in = data.get('key_size') or data.get('keySize')
-        # Template key params ("RSA-2048", "EC-P384") are the default when the
+        # Template key params ("EC-P384", "RSA-3072") are the default when the
         # request leaves them unset, for API parity with the UI prefill (issue
         # #226 follow-up); key_size only inherits when the algorithm still
         # matches (#318).
         if template and not pair:
             key_type_in, key_size_in = fill_key_params_from_template(
                 key_type_in, key_size_in, template.key_type)
+        if not pair:
+            key_type_in, key_size_in = fill_key_params_from_template(
+                key_type_in, key_size_in, default_issue_key_type(ca.id))
         key_type_in = key_type_in or 'rsa'
-        key_size_in = issue_key_size(key_type_in, key_size_in, '2048')
+        key_size_in = issue_key_size(key_type_in, key_size_in, default_rsa_key_size(ca.id))
         try:
             # A pair names its two keys; key_type and key_size do not apply to it
             normalized_key = pair[0] if pair else parse_issue_key_type(

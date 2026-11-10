@@ -44,6 +44,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import dsa
 from utils import key_algorithms, notices as notices_mod
+from utils.issuance_defaults import default_issue_key_id
 from websocket.emitters import on_ca_created, on_ca_updated, on_ca_deleted
 
 logger = logging.getLogger(__name__)
@@ -105,17 +106,17 @@ def _resolve_local_key_type(data):
     """(TrustStore key type, error) for a locally generated CA key.
 
     keyType is accepted as an alias of keyAlgo; a value that names no usable
-    key is an error, only a request without any key field gets RSA-2048.
+    key is an error, only a request without any key field gets the default key.
     """
     algo, alias, size = data.get('keyAlgo'), data.get('keyType'), data.get('keySize')
     if _blank(algo) and _blank(alias):
         if _blank(size):
-            return '2048', None
+            return default_issue_key_id(), None
         return None, f'keySize requires keyAlgo ({_CA_KEY_NAMES})'
     names = [v for v in (algo, alias) if not _blank(v)]
     if not all(isinstance(v, str) for v in names):
         return None, f'keyAlgo must be a string ({_CA_KEY_NAMES})'
-    # A full label ('RSA-4096', 'EC-P384', '2048', 'Ed25519') names size and curve at once
+    # A full label ('RSA-4096', 'EC-P384', 'Ed25519') names size and curve at once
     labels = {key_algorithms.get(v) for v in names}
     if len(labels) == 1 and None not in labels:
         alg = labels.pop()

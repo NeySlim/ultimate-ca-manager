@@ -26,6 +26,7 @@ from utils.csr_extensions import extensions_of
 from utils.datetime_utils import utc_now
 from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
 from utils import key_algorithms
+from utils.issuance_defaults import default_issue_key_type
 from utils.key_type import validate_enrollment_csr
 from utils.request_names import RequestRejected
 from utils.san_parse import is_valid_san_email
@@ -541,14 +542,14 @@ def _best_eku_match(candidates, csr_eku):
 
 
 def _template_key_label(template):
-    alg = key_algorithms.get(template.key_type or 'RSA-2048')
+    alg = key_algorithms.get(template.key_type or default_issue_key_type())
     return alg.label if alg is not None else str(template.key_type)
 
 
 def _template_takes_key(template, csr_label):
     """Whether a key of ``csr_label`` fits ``template``: same curve or ML-DSA
     set, an RSA key at least as long. An unknown key fits any non-ML-DSA template."""
-    wanted = key_algorithms.get(template.key_type or 'RSA-2048')
+    wanted = key_algorithms.get(template.key_type or default_issue_key_type())
     got = key_algorithms.get(csr_label)
     if wanted is None:
         return True

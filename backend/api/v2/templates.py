@@ -10,6 +10,7 @@ from utils.qc_statements import validate_policy_oids, validate_qc_statements
 from utils.custom_extensions import validate_custom_extensions
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.validity import DEFAULT_TEMPLATE_VALIDITY_DAYS
+from utils.issuance_defaults import default_issue_key_type
 from utils.db_transaction import safe_commit
 from utils.file_validation import validate_upload, JSON_EXTENSIONS
 from utils.sanitize import sanitize_filename
@@ -265,7 +266,7 @@ def create_template():
         "name": "Web Server SSL",
         "description": "Standard web server certificate",
         "template_type": "web_server",
-        "key_type": "RSA-2048",
+        "key_type": "EC-P256",
         "validity_days": 397,
         "digest": "sha256",
         "dn_template": {
@@ -332,7 +333,7 @@ def create_template():
         name=data['name'],
         description=data.get('description', ''),
         template_type=data['template_type'],
-        key_type=data.get('key_type', 'RSA-2048'),
+        key_type=data.get('key_type') or default_issue_key_type(),
         validity_days=data.get('validity_days',
                                 DEFAULT_TEMPLATE_VALIDITY_DAYS),
         digest=data.get('digest', 'sha256'),
@@ -829,7 +830,7 @@ def import_template():
                     name=tpl_data['name'],
                     description=tpl_data.get('description', ''),
                     template_type=tpl_data.get('template_type', 'custom'),
-                    key_type=tpl_data.get('key_type', 'RSA-2048'),
+                    key_type=tpl_data.get('key_type') or default_issue_key_type(),
                     validity_days=tpl_data.get(
                         'validity_days', DEFAULT_TEMPLATE_VALIDITY_DAYS),
                     digest=tpl_data.get('digest', 'sha256'),

@@ -1,0 +1,116 @@
+"""The key issued when nothing names one comes from one registry default, not from a
+literal at each path (#397): every site follows it, and the policies in scope bound it."""
+import base64
+import json
+
+import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives.asymmetric import rsa
+
+from utils import issuance_defaults
+
+
+@pytest.fixture
+def rsa3072(monkeypatch):
+    monkeypatch.setattr(issuance_defaults, 'BASELINE_ISSUE_KEY', 'RSA-3072')
+
+
+def _post(client, url, body):
+    return client.post(url, data=json.dumps(body), content_type='application/json')
+
+
+def _bits(pem_or_b64):
+    raw = pem_or_b64 if isinstance(pem_or_b64, bytes) else pem_or_b64.encode()
+    if not raw.startswith(b'-----'):
+        raw = base64.b64decode(raw)
+    obj = (x509.load_pem_x509_csr(raw) if b'REQUEST' in raw[:40] else x509.load_pem_x509_certificate(raw))
+    assert isinstance(obj.public_key(), rsa.RSAPublicKey)
+    return obj.public_key().key_size
+
+
+def test_baseline_yields_to_the_compliance_profile_of_the_ca(app, monkeypatch):
+    import compliance_profiles
+    with app.app_context():
+        assert issuance_defaults.default_issue_key_type() == 'RSA-2048'
+        assert issuance_defaults.default_issue_key_id() == '2048'
+        monkeypatch.setattr(compliance_profiles, 'profile_of_ca', lambda ca_id: 'bsi')
+        assert issuance_defaults.default_issue_key_type(1) == 'RSA-3072'
+        assert issuance_defaults.default_issue_key_id(1) == '3072'
+        assert issuance_defaults.default_rsa_key_size(1) == '3072'
+
+
+def test_rest_issue_without_key_type(app, auth_client, create_ca, rsa3072):
+    ca = create_ca(cn='Defaults REST CA')
+    r = _post(auth_client, '/api/v2/certificates', {'cn': 'defaults-rest.example.test', 'ca_id': ca['id']})
+    assert r.status_code == 201, r.get_json()
+    from models import Certificate
+    with app.app_context():
+        row = Certificate.query.get(r.get_json()['data']['id'])
+        assert _bits(row.crt) == 3072
+
+
+def test_csr_generation_without_key_type(app, auth_client, rsa3072):
+    r = _post(auth_client, '/api/v2/csrs', {'cn': 'defaults-csr.example.test'})
+    assert r.status_code in (200, 201), r.get_json()
+    from models import Certificate
+    with app.app_context():
+        row = Certificate.query.get(r.get_json()['data']['id'])
+        assert _bits(base64.b64decode(row.csr)) == 3072
+
+
+def test_ca_creation_without_key_fields(app, auth_client, rsa3072):
+    r = _post(auth_client, '/api/v2/cas', {
+        'type': 'root', 'commonName': 'Defaults CA key', 'organization': 'Test Org', 'country': 'US',
+        'validityYears': 5})
+    assert r.status_code in (200, 201), r.get_json()
+    from models import CA
+    with app.app_context():
+        assert _bits(CA.query.get(r.get_json()['data']['id']).crt) == 3072
+
+
+def test_approved_issuance_without_key_type(app, create_ca, rsa3072):
+    from tests.test_approval_template_issuance import _issue_from_request
+    ca = create_ca(cn='Defaults approval CA')
+    cert, _ = _issue_from_request(app, create_ca, {
+        'cn': 'defaults-approval.example.test', 'ca_id': ca['id'], 'cert_type': 'server'})
+    assert cert.public_key().key_size == 3072
+
+
+def test_tsa_signer_key_follows_the_default_but_never_below_3072(app, monkeypatch):
+    from services.tsa_signer_cert import _generate_key
+    with app.app_context():
+        monkeypatch.setattr(issuance_defaults, 'BASELINE_ISSUE_KEY', 'RSA-4096')
+        assert _generate_key(None, None, None).key_size == 4096
+        monkeypatch.setattr(issuance_defaults, 'BASELINE_ISSUE_KEY', 'RSA-2048')
+        assert _generate_key(None, None, None).key_size == 3072
+
+
+def test_xcep_announces_the_default_for_a_template_without_key_type(app, rsa3072):
+    from services.xcep.policy_builder import _key_type_info
+    with app.app_context():
+        assert _key_type_info(None) == ('RSA', 3072)
+
+
+def test_wstep_matches_a_template_without_key_type_against_the_default(app, rsa3072):
+    from models.certificate_template import CertificateTemplate
+    from services.wstep.wstep_service import _template_key_label, _template_takes_key
+    template = CertificateTemplate(name='defaults-wstep', template_type='custom', key_type=None)
+    with app.app_context():
+        assert _template_key_label(template) == 'RSA-3072'
+        assert not _template_takes_key(template, 'RSA-2048')
+        assert _template_takes_key(template, 'RSA-3072')
+
+
+def test_template_created_without_key_type(app, auth_client, rsa3072):
+    from models.certificate_template import CertificateTemplate
+    ext = json.dumps({'key_usage': ['digitalSignature']})
+    created = _post(auth_client, '/api/v2/templates', {
+        'name': 'defaults-created', 'template_type': 'custom', 'extensions_template': ext})
+    assert created.status_code in (200, 201), created.get_json()
+    imported = auth_client.post('/api/v2/templates/import', data={'json_content': json.dumps(
+        {'name': 'defaults-imported', 'template_type': 'custom', 'extensions_template': ext})},
+        content_type='multipart/form-data')
+    assert imported.status_code == 200, imported.get_json()
+    with app.app_context():
+        for name in ('defaults-created', 'defaults-imported'):
+            assert CertificateTemplate.query.filter_by(name=name).one().key_type == 'RSA-3072', name

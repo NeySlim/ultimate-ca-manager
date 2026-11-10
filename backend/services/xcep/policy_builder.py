@@ -260,8 +260,9 @@ def _resolve_templates_for_ca(ca, all_active_templates):
 
 def _key_type_info(key_type):
     """``(algorithm name, minimal key length)`` from the key registry, or None
-    when the template's key type cannot be announced. Unset means the column default."""
-    alg = key_algorithms.get(key_type or 'RSA-2048')
+    when the template's key type cannot be announced. Unset means the default issue key."""
+    from utils.issuance_defaults import default_issue_key_type
+    alg = key_algorithms.get(key_type or default_issue_key_type())
     if alg is None or alg.family not in _XCEP_KEY_FAMILIES:
         return None
     if alg.family == 'EC' and alg.param not in _XCEP_EC_CURVES:

@@ -80,6 +80,37 @@ def _of_strength(family, bits):
     return key_algorithms.get('EC-P256' if bits <= 128 else 'EC-P384')
 
 
+# What a leaf key is when nothing (request, template, issuer) names one; the policies bound it
+BASELINE_ISSUE_KEY = 'RSA-2048'
+_ISSUE_KEY_FALLBACKS = ('RSA-3072', 'EC-P256', 'EC-P384')
+
+
+def default_issue_key_type(ca_id=None) -> str:
+    """Registry label of the key issued when nothing names one: the baseline, else the first
+    fallback the policies in scope (FIPS, compliance profile of *ca_id*) allow."""
+    from services.policy_service import PolicyEvaluationService
+    policies = PolicyEvaluationService.applicable_policies(ca_id, None, None)
+    for label in (BASELINE_ISSUE_KEY, *_ISSUE_KEY_FALLBACKS):
+        violations, _, _ = PolicyEvaluationService.enforce_rules(
+            policies, key_type=label, ca_id=ca_id, notify=False)
+        if not violations:
+            return label
+    return BASELINE_ISSUE_KEY
+
+
+def default_issue_key_id(ca_id=None) -> str:
+    """``default_issue_key_type`` as a TrustStore KEY_TYPES id ('2048', 'prime256v1')."""
+    return key_algorithms.get(default_issue_key_type(ca_id)).trust_store_id
+
+
+def default_rsa_key_size(ca_id=None) -> str:
+    """RSA modulus size of the default key; the first fallback's when the default is not RSA."""
+    alg = key_algorithms.get(default_issue_key_type(ca_id))
+    if alg.family != 'RSA':
+        alg = key_algorithms.get(_ISSUE_KEY_FALLBACKS[0])
+    return str(alg.key_size)
+
+
 def _candidates(classical_only: bool):
     """Leaf keys UCM generates for a requester: no EdDSA (CA keys only), no Brainpool."""
     for alg in key_algorithms.algorithms():
