@@ -302,6 +302,25 @@ not a flat `bg-accent-primary`. Match this when rebuilding buttons elsewhere.
 <span className="px-2 py-px rounded-full text-2xs status-success-bg status-success-text">Active</span>
 ```
 
+## Application shell (`components/shell/`)
+
+Top bar, Modules mega-menu, account popover and status bar, styled in
+`components/shell/shell.css` with tokens only (no hex, no `rgba()`).
+
+| Part | Contract |
+|------|----------|
+| Bar | `header` landmark, `nav` "Main navigation": Dashboard, Certificates, CAs, up to three pinned modules, then the Modules button. The active entry carries `aria-current="page"` |
+| Modules menu | Disclosure, not an ARIA menu: button with `aria-expanded` + `aria-controls`, panel `nav` with one link per visible module (`groupsFor(can)`). ArrowDown opens, arrows/Home/End move, Escape closes and refocuses the button, outside click, focus leaving and a route change close it |
+| Pins | Server preference `pins`, three ids at most, shown in stored order. A fourth is refused with a status message in the menu; a module whose right was withdrawn is hidden, not an error. Dashboard, Certificates and CAs are never pinned (always in the bar) |
+| Account popover | Same disclosure pattern; theme family, mode and language groups use `aria-pressed` buttons |
+| Status bar | Only what `/api/v2/health` reports; a missing field renders nothing |
+| Phone (<= 800px) | Bar links and mega-menu give way to one native select over the same modules; touch targets are at least 44px |
+
+Aurore (`:root[data-theme="aurore"]`) adds a drifting glow behind the page and
+glass on the bars and popovers, built from `--grad-a`, `--grad-b`, `--bg` and
+`--panel` with `color-mix`. `prefers-reduced-motion` stops the drift and
+`prefers-reduced-transparency` replaces the glass with opaque panels.
+
 ## Responsive Breakpoints
 
 | Breakpoint | Min Width |

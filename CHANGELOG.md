@@ -18,6 +18,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- Console: the sidebar gives way to the Atelier shell, a horizontal bar with a Modules menu (four groups, keyboard navigable), three pinnable modules kept in your preferences, a status bar fed by `/health` and a module picker on phones; the account menu now carries theme, language and sign out.
 - Backup: archives are written as format v4, a stream of independently authenticated chunks, so creating one, decrypting it and the checks before the restore plan no longer hold it whole in memory (the plan and the writes still hold every section it carries); `BACKUP_MAX_UPLOAD_MB` now bounds only archives written before 3.0 (v1 to v3), which are still restored, and the new `BACKUP_MAX_ARCHIVE_MB` (0, no limit, by default) can bound v4 archives.
 - Breaking: the SCEP CertRep is signed with the digest of the client's request when the CA key allows it, never below the key's own (SHA-384 under a P-384 CA, where it was always SHA-256); #397.
 - Requests that name no key or hash follow one default on every issuance path: without a profile or policy it stays RSA-2048 with SHA-256, a profile or policy that refuses it moves to the first accepted type (RSA-3072, EC-P256, EC-P384) or answers 400 when none is. The hash follows the signing key, and a new intermediate CA never takes a hash below its parent's key or its own; #397.
