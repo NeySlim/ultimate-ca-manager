@@ -176,7 +176,10 @@ class APIClient {
         if (response.status === 401 && !isLoginPage && !isAuthEndpoint && !loginRedirectPending) {
           console.warn('🚪 401 Unauthorized - redirecting to login')
           loginRedirectPending = true
-          window.location.href = '/login'
+          // The page asked for comes back after sign-in; LoginPage validates it (safeNext).
+          const { pathname = '/', search = '' } = window.location
+          const back = pathname === '/' || pathname === '/dashboard' ? '' : `?next=${encodeURIComponent(pathname + search)}`
+          window.location.href = `/login${back}`
         }
         
         throw error

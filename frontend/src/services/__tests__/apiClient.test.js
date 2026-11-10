@@ -331,6 +331,18 @@ describe('API Client', () => {
       expect(window.location.href).toBe('/login')
     })
 
+    it('carries the page asked for to the login URL', async () => {
+      window.location = { pathname: '/certificates', search: '?status=expiring', href: '' }
+      global.fetch.mockResolvedValueOnce({
+        ok: false, status: 401,
+        headers: new Headers({ 'content-type': 'application/json' }),
+        json: () => Promise.resolve({ error: 'Unauthorized' })
+      })
+      const { apiClient } = await import('../apiClient')
+      await expect(apiClient.get('/certificates')).rejects.toThrow()
+      expect(window.location.href).toBe('/login?next=%2Fcertificates%3Fstatus%3Dexpiring')
+    })
+
     it('redirects once when parallel calls all get 401, and sends no call after', async () => {
       const assigned = []
       window.location = { pathname: '/dashboard', set href(v) { assigned.push(v) }, get href() { return assigned.at(-1) ?? '' } }

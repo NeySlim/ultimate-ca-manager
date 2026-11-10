@@ -144,6 +144,13 @@ export function moduleById(id) {
 
 const patternRegex = (p) => new RegExp('^' + p.replace(/:[^/]+/g, '[^/]+') + '$')
 
+/** True when `pathname` is exactly a module path, a detail route of one, or a legacy redirect source. */
+export function isKnownPath(pathname) {
+  const clean = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
+  if (REDIRECTS.some(r => r.from === clean)) return true
+  return MODULES.some(m => [m.path, ...m.paths].some(p => patternRegex(p).test(clean)))
+}
+
 /** Module owning `pathname`: exact path or detail route first, else longest parent path. */
 export function moduleForPath(pathname) {
   const clean = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
