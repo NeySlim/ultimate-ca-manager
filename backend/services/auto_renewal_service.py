@@ -256,7 +256,7 @@ class AutoRenewalService:
             except ValueError:
                 continue
             if (data.get('trigger') == 'auto' and data.get('certificate_id') == cert.id
-                    and names_certificate(data.get('serial_number'), cert)):
+                    and names_certificate(data.get('serial_number'), cert, row.created_at)):
                 return True
         return False
 

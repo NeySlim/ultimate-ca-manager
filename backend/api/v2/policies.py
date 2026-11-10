@@ -191,7 +191,8 @@ def _approval_target_gone(approval):
     if cert is None or not cert.crt:
         return ('The certificate to revoke no longer exists' if approval.request_type == 'revocation'
                 else 'The certificate to renew no longer exists')
-    if approval.request_type == 'revocation' and not names_certificate(data.get('serial_number'), cert):
+    if approval.request_type == 'revocation' and not names_certificate(
+            data.get('serial_number'), cert, approval.created_at):
         return 'The certificate was renewed since the request; request its revocation again'
     return None
 
@@ -342,7 +343,7 @@ def _revoke_approved_certificate(approval, data):
     cert = _row(Certificate, data.get('certificate_id'))
     if cert is None or not cert.crt:
         raise ValueError('The certificate to revoke no longer exists')
-    if not names_certificate(data.get('serial_number'), cert):
+    if not names_certificate(data.get('serial_number'), cert, approval.created_at):
         raise ValueError('The certificate was renewed since the request; request its revocation again')
     reason, invalidity_at = _approved_revocation_params(data)
     # On hold, a definitive reason makes the hold final (RFC 5280 §5.2.4)

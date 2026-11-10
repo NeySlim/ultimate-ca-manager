@@ -97,9 +97,41 @@ def canonical_stored_serial(stored: str | int | None, crt=None) -> str | None:
     return canonical_serial(stored)
 
 
-def names_certificate(recorded: str | int | None, cert) -> bool:
-    """True when a serial recorded before migration 144 (hex or decimal) is the
-    serial of *cert*, whose column is canonical; the certificate settles ambiguous text."""
+CANONICAL_MIGRATION = '144_canonical_certificate_serials'
+
+
+def recorded_before_canonical(recorded_at) -> bool:
+    """True when *recorded_at* (naive UTC) precedes migration 144 on this database, or
+    when either date is unknown: the hex reading of digits is then still allowed."""
+    if recorded_at is None:
+        return True
+    from datetime import datetime
+    from sqlalchemy import text
+    from models import db
+    # PostgreSQL stored CURRENT_TIMESTAMP in the session zone; read it back in UTC
+    sql = ("SELECT (applied_at AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE 'UTC'"
+           if db.engine.dialect.name == 'postgresql' else "SELECT applied_at")
+    try:
+        with db.session.begin_nested():
+            applied = db.session.execute(text(f"{sql} FROM _migrations WHERE name = :n"),
+                                         {'n': CANONICAL_MIGRATION}).scalar()
+    except Exception:
+        return True
+    if applied is None:
+        return True
+    if not isinstance(applied, datetime):
+        applied = datetime.fromisoformat(str(applied))
+    return recorded_at < applied.replace(tzinfo=None)
+
+
+def names_certificate(recorded: str | int | None, cert, recorded_at=None) -> bool:
+    """True when *recorded* is the serial of *cert*, whose column is canonical. Its decimal
+    reading decides; the certificate settles an all-digit hex spelling only for a value
+    recorded before migration 144, when every writer still stored the row's own spelling."""
+    if canonical_serial(recorded) == cert.serial_number:
+        return True
+    if not recorded_before_canonical(recorded_at):
+        return False
     return canonical_stored_serial(recorded, getattr(cert, 'crt', None)) == cert.serial_number
 
 
