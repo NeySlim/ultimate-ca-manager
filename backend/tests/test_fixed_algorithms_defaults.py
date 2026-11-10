@@ -253,3 +253,40 @@ def test_default_ca_digest_follows_the_hsm_key_algorithm(app):
         assert _default_ca_digest(None, '2048') == 'sha256'
         assert _default_ca_digest(None, '2048', hsm_key_algorithm='EC-P384') == 'sha384'
         assert _default_ca_digest(None, '2048', hsm_key_algorithm='EC-P521') == 'sha512'
+
+
+def _effective(auth_client, **args):
+    r = auth_client.get('/api/v2/policies/effective', query_string=args)
+    assert r.status_code == 200, r.get_json()
+    return r.get_json()['data']
+
+
+def test_effective_route_announces_the_default_key_of_the_ca_and_template(app, auth_client, create_ca):
+    from models import CertificateTemplate, db
+    ca = create_ca(cn='Effective default CA')
+    with app.app_context():
+        tpl = CertificateTemplate(name='effective-default-tpl', template_type='web_server',
+                                  key_type='', validity_days=30, digest='sha256',
+                                  extensions_template='{}')
+        db.session.add(tpl)
+        db.session.commit()
+        tpl_id = tpl.id
+    pid = _scoped_policy(app, None, tpl_id, ['EC-P256'])
+    try:
+        plain = _effective(auth_client, ca_id=ca['id'])
+        assert plain['default_key_type'] == 'RSA-2048'
+        assert plain['baseline_key_type'] == issuance_defaults.BASELINE_ISSUE_KEY
+        assert _effective(auth_client, ca_id=ca['id'], template_id=tpl_id)['default_key_type'] == 'EC-P256'
+    finally:
+        _drop_policy(app, pid)
+
+
+def test_effective_route_with_no_candidate_gives_a_readable_error_not_a_key(app, auth_client, create_ca):
+    ca = create_ca(cn='Effective refused CA')
+    pid = _scoped_policy(app, ca['id'], None, ['RSA-4096'])
+    try:
+        data = _effective(auth_client, ca_id=ca['id'])
+        assert data['default_key_type'] is None
+        assert 'no default key type is allowed' in data['default_key_error']
+    finally:
+        _drop_policy(app, pid)
