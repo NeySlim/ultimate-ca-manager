@@ -99,3 +99,20 @@ def test_declined_then_reissued_identically_is_superseded(app, auth_client, rule
         rules.reject(old, trigger='manual')
         db.session.commit()
         assert _kinds(auth_client, old.id) == []
+
+
+def test_a_certificate_in_two_kinds_appears_once_with_the_higher_precedence(app, auth_client, rules):
+    with app.app_context():
+        cert = rules.cert('rules-two-kinds', 5, source='scep')
+        rules.reject(cert, trigger='manual')
+        db.session.commit()
+        assert _kinds(auth_client, cert.id) == ['renewal_declined']
+
+
+def test_a_blocked_renewal_with_a_manual_refusal_appears_once(app, auth_client, rules):
+    with app.app_context():
+        ca = rules.ca('rules-offline-e', offline=True, prv='k')
+        cert = rules.cert('rules-blocked-and-refused', 10, prv='k', caref=ca.refid)
+        rules.reject(cert, trigger='manual')
+        db.session.commit()
+        assert _kinds(auth_client, cert.id) == ['auto_renewal_blocked']

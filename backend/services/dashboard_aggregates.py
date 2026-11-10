@@ -279,6 +279,10 @@ def _renewal_declined(auto_only=False):
     return select(ApprovalRequest.id).where(*conditions).exists()
 
 
+def _and_blocked(now):
+    return and_(*_blocked_conditions(now))
+
+
 def _blocked_conditions(now):
     """Due for auto-renewal (inside its days_before_expiry), which then fails on every pass
     because the CA cannot sign; only an automatic refusal parks it, not a refused manual request."""
@@ -288,12 +292,15 @@ def _blocked_conditions(now):
 
 
 def _declined_conditions(now):
-    return [*_live_until(now, EXPIRY_WINDOW_DAYS), _renewal_declined(), ~_superseded(now)]
+    """Precedence auto_renewal_blocked > renewal_declined: a certificate is queued once."""
+    return [*_live_until(now, EXPIRY_WINDOW_DAYS), _renewal_declined(), ~_superseded(now),
+            ~_and_blocked(now)]
 
 
 def _client_overdue_conditions(now):
     """A client-renewed certificate its client has not replaced a week before expiry."""
-    return [*_live_until(now, CLIENT_RENEWAL_OVERDUE_DAYS), _client_renewed(), ~_superseded(now)]
+    return [*_live_until(now, CLIENT_RENEWAL_OVERDUE_DAYS), _client_renewed(), ~_superseded(now),
+            ~_renewal_declined()]
 
 
 def _short_label(kind, label):
