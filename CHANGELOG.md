@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
-- Backup: archives are written as format v4, a stream of independently authenticated chunks, so creating and restoring one no longer holds it whole in memory; `BACKUP_MAX_UPLOAD_MB` now bounds only archives written before 3.0 (v1 to v3), which are still restored, and the new `BACKUP_MAX_ARCHIVE_MB` (0, no limit, by default) can bound v4 archives.
+- Backup: archives are written as format v4, a stream of independently authenticated chunks, so creating one, decrypting it and the checks before the restore plan no longer hold it whole in memory (the plan and the writes still hold every section it carries); `BACKUP_MAX_UPLOAD_MB` now bounds only archives written before 3.0 (v1 to v3), which are still restored, and the new `BACKUP_MAX_ARCHIVE_MB` (0, no limit, by default) can bound v4 archives.
 
 ### Fixed
 
