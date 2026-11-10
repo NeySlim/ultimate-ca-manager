@@ -725,7 +725,15 @@ def test_a_failing_restart_backs_off_and_logs_one_line_per_step(app, ha, caplog)
     clock.t += 60
     solo.run_once()
     assert len(attempts) == 10 and solo.restarting
-    assert solo._retry_delay is None  # a restart that ran starts the next failure from 2 s
+    # The signal went unheard and the process stays: its next failure starts from 2 s
+    solo._stop.clear()
+    caplog.clear()
+    fail[0] = True
+    _emit(app, cc.RESTART)
+    _fail_until(solo, clock, attempts, 11)
+    assert _failure_lines(caplog) == [logging.ERROR]
+    _fail_until(solo, clock, attempts, 12)
+    assert attempts[-1] - attempts[-2] == cc.RESTART_RETRY_FIRST
 
 
 def test_a_new_restart_after_an_unclaimed_retry_starts_its_backoff_over(app, ha, caplog):
