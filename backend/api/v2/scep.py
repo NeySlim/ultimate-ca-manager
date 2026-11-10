@@ -175,6 +175,24 @@ def _issuing_service(scep_req):
     return SCEPService(ca_refid=scep_req.ca_refid, template=template, profile_id=scep_req.profile_id)
 
 
+def _held_by_policy(scep_req):
+    """The pending approval request a policy holds *scep_req* with, else None."""
+    from services.scep.approval import linked_approval
+    return linked_approval(scep_req)
+
+
+def _vote_on_held(approval, vote):
+    """A request a policy holds is decided in the approval queue: a vote cast
+    here is recorded there, under the same rules (group, own request, one
+    vote per approver), so the two queues never disagree."""
+    from auth.unified import has_permission
+    if not has_permission('write:approvals', getattr(g, 'permissions', None) or []):
+        return error_response(
+            f'This request is held for approval by policy (request #{approval.id}): '
+            'deciding it requires the write:approvals permission', 403)
+    return vote()
+
+
 @bp.route('/api/v2/scep/<int:request_id>/approve', methods=['POST'])
 @require_auth(['write:scep'])
 def approve_scep_request(request_id):
@@ -192,6 +210,11 @@ def approve_scep_request(request_id):
     if not (hasattr(g, 'current_user') and g.current_user):
         return error_response('Authentication context required', 401)
     username = g.current_user.username
+    held = _held_by_policy(scep_req)
+    if held is not None:
+        from api.v2.policies import approve_approval_request
+        return _vote_on_held(held, lambda: approve_approval_request(
+            held.id, (request.get_json(silent=True) or {}).get('comment')))
     # Approving means issuing: the client polls for the certificate, and a
     # request flipped to "approved" without one stayed PENDING for it forever
     try:
@@ -261,6 +284,10 @@ def reject_scep_request(request_id):
     if not (hasattr(g, 'current_user') and g.current_user):
         return error_response('Authentication context required', 401)
     username = g.current_user.username
+    held = _held_by_policy(scep_req)
+    if held is not None:
+        from api.v2.policies import reject_approval_request
+        return _vote_on_held(held, lambda: reject_approval_request(held.id, reason))
 
     scep_req.status = 'rejected'
     scep_req.rejection_reason = reason

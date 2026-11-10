@@ -638,7 +638,16 @@ class SCEPService:
             )
             db.session.add(scep_req)
 
-            if self.auto_approve:
+            # A policy requiring approval holds the request whatever the
+            # profile's auto-approval: the approval queue then decides
+            held, gate_error = self._approval_gate(scep_req, csr, message_type)
+            if gate_error:
+                return self._create_error_response(
+                    self.FAIL_BAD_REQUEST, "Server error evaluating the request",
+                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                ), 200
+
+            if self.auto_approve and held is None:
                 try:
                     cert_refid = self._auto_approve_request(
                         scep_req, csr,
@@ -905,6 +914,8 @@ class SCEPService:
                 self.FAIL_BAD_CERT_ID, "Unknown transactionID",
                 transaction_id=transaction_id, recipient_nonce=sender_nonce,
             )
+        from services.scep.approval import follow_approval
+        follow_approval(existing)
         # PENDING and FAILURE carry no encrypted payload. SUCCESS is encrypted
         # to the signer certificate carried by this polling request.
         if existing.status == "approved" and existing.cert_refid:
@@ -1171,6 +1182,30 @@ class SCEPService:
         return stored.public_key().public_bytes(der, spki) == \
             csr.public_key().public_bytes(der, spki)
 
+    def _approval_gate(self, scep_req, csr, message_type):
+        """``(approval, None)`` when a policy holds the request (it stays
+        pending, linked to the approval), ``(None, None)`` otherwise,
+        ``(None, error)`` when the policies cannot be read (nothing stored)."""
+        from services import protocol_approval
+        cn, dns = protocol_approval.csr_names(csr)
+        renewal = message_type == self.MSG_TYPE_RENEWAL_REQ
+        try:
+            db.session.flush()
+            approval = protocol_approval.gate_protocol_issuance(
+                'scep', ca=self.ca, template_id=getattr(self.template, 'id', None), cn=cn, san_list=dns,
+                csr_pem=csr.public_bytes(serialization.Encoding.PEM).decode(),
+                identity=f'transaction {scep_req.transaction_id}',
+                protocol_ref=protocol_approval.make_ref('scep', scep_req.transaction_id, self.ca_refid),
+                renewal=renewal,
+                extra={'scep_request_id': scep_req.id, 'transaction_id': scep_req.transaction_id,
+                       'profile_id': self.profile_id, 'client_ip': scep_req.client_ip})
+        except protocol_approval.ApprovalGateUnavailable as e:
+            db.session.rollback()
+            return None, str(e)
+        if approval is not None:
+            logger.info("SCEP: transaction %s held for approval #%s", scep_req.transaction_id, approval.id)
+        return approval, None
+
     def _status_for_existing(
         self,
         existing: SCEPRequest,
@@ -1180,6 +1215,8 @@ class SCEPService:
         content_encryption_algorithm: str,
     ) -> bytes:
         """Return an appropriate CertRep for an already-seen transaction ID."""
+        from services.scep.approval import follow_approval
+        follow_approval(existing)
         if existing.status == "approved" and existing.cert_refid:
             cert = Certificate.query.filter_by(refid=existing.cert_refid).first()
             if cert:

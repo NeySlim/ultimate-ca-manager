@@ -1,0 +1,187 @@
+"""SCEP requests held by a policy requiring approval (RFC 8894 §3.3.2.2).
+
+The policy holds the request PENDING even on an auto-approving endpoint; the
+approval request decides, from either queue, and GetCertInitial then answers
+SUCCESS or FAILURE.
+"""
+import uuid
+
+import asn1crypto.core
+import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.x509.oid import AttributeOID
+
+from models import CA, SCEPRequest, SystemConfig, db
+from services.scep.scep_service import SCEPService
+from tests.protocol_approval_support import approval_policy, approve, expire, reject, requests_of
+from tests.test_scep_rfc8894_operations import (
+    PKI_STATUS_OID, TRANSACTION_ID_OID, _build_request, _client_identity, _load_ca_material,
+    _response_attributes, _rewrite_signed_attributes,
+)
+
+CHALLENGE = 'held horse battery staple'
+SUCCESS, FAILURE, PENDING = '0', '2', '3'
+
+
+@pytest.fixture
+def scep_ca(app, create_ca):
+    ca_data = create_ca(cn=f'SCEP approval CA {uuid.uuid4().hex[:6]}')
+    with app.app_context():
+        db.session.add(SystemConfig(key=f'scep_challenge_{ca_data["id"]}', value=CHALLENGE))
+        db.session.commit()
+    yield ca_data['id']
+    with app.app_context():
+        SystemConfig.query.filter_by(key=f'scep_challenge_{ca_data["id"]}').delete()
+        db.session.commit()
+
+
+def _service(ca_id):
+    return SCEPService(db.session.get(CA, ca_id).refid, challenge_password=CHALLENGE, auto_approve=True)
+
+
+def _enroll(app, ca_id, identity):
+    with app.app_context():
+        _ca, ca_cert, _ = _load_ca_material(ca_id)
+        key_cert, key = identity
+        csr = (x509.CertificateSigningRequestBuilder().subject_name(key_cert.subject)
+               .add_attribute(AttributeOID.CHALLENGE_PASSWORD, CHALLENGE.encode())
+               .sign(key, hashes.SHA256()))
+        message = _build_request(ca_cert, key_cert, key, 19,
+                                 csr.public_bytes(serialization.Encoding.DER), b'held-nonce-16byt')
+        response, _status = _service(ca_id).process_pkcs_req(message, '127.0.0.1')
+        return _response_attributes(response)[PKI_STATUS_OID]
+
+
+def _poll(app, ca_id, identity):
+    """GetCertInitial for the enrolment's transaction (txn-19)."""
+    def same_transaction(attrs):
+        for attr in attrs:
+            if attr['type'].dotted == TRANSACTION_ID_OID:
+                attr['values'] = [asn1crypto.core.PrintableString('txn-19')]
+        return attrs
+    with app.app_context():
+        _ca, ca_cert, _ = _load_ca_material(ca_id)
+        key_cert, key = identity
+        message = _build_request(ca_cert, key_cert, key, 20, b'issuer-and-subject', b'poll-nonce-16byt')
+        message = _rewrite_signed_attributes(message, key, same_transaction)
+        response, _status = _service(ca_id).process_pkcs_req(message, '127.0.0.1')
+        return _response_attributes(response)[PKI_STATUS_OID]
+
+
+def _scep_row(app, ca_id):
+    with app.app_context():
+        row = SCEPRequest.query.filter_by(transaction_id='txn-19',
+                                          ca_refid=db.session.get(CA, ca_id).refid).first()
+        return row.id, row.status, row.cert_refid
+
+
+def test_auto_approval_without_policy_issues(app, scep_ca):
+    assert _enroll(app, scep_ca, _client_identity('scep free')) == SUCCESS
+
+
+def test_policy_holds_an_auto_approving_endpoint(app, scep_ca):
+    identity = _client_identity('scep held')
+    with approval_policy(app, scep_ca, 'scep-held-pending') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        assert _poll(app, scep_ca, identity) == PENDING
+        (_id, status, data, _cert), = requests_of(app, pid, 'scep_request')
+        scep_id, scep_status, _ = _scep_row(app, scep_ca)
+        assert status == 'pending' and scep_status == 'pending'
+        assert data['scep_request_id'] == scep_id and data['transaction_id'] == 'txn-19'
+
+
+def test_approval_from_the_queue_issues_to_the_poll(app, auth_client, scep_ca):
+    identity = _client_identity('scep approved')
+    with approval_policy(app, scep_ca, 'scep-held-approve') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        body = approve(auth_client, approval_id)
+        _id, scep_status, cert_refid = _scep_row(app, scep_ca)
+        assert scep_status == 'approved' and cert_refid
+        assert _poll(app, scep_ca, identity) == SUCCESS
+        with app.app_context():
+            from models import Certificate
+            cert = Certificate.query.filter_by(refid=cert_refid).first()
+            assert cert.id == body['certificate']['id'] == requests_of(app, pid)[0][3]
+
+
+def test_approval_from_the_scep_queue_resolves_the_approval(app, auth_client, scep_ca):
+    identity = _client_identity('scep approved here')
+    with approval_policy(app, scep_ca, 'scep-held-approve-scep') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        scep_id, *_ = _scep_row(app, scep_ca)
+        r = auth_client.post(f'/api/v2/scep/{scep_id}/approve', json={})
+        assert r.status_code == 200, r.get_json()
+        assert requests_of(app, pid, 'scep_request')[0][1] == 'approved'
+        assert _scep_row(app, scep_ca)[1] == 'approved'
+        assert _poll(app, scep_ca, identity) == SUCCESS
+
+
+def test_rejection_from_either_queue_fails_the_poll(app, auth_client, scep_ca):
+    identity = _client_identity('scep refused')
+    with approval_policy(app, scep_ca, 'scep-held-reject') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        reject(auth_client, approval_id)
+        assert _scep_row(app, scep_ca)[1] == 'rejected'
+        assert _poll(app, scep_ca, identity) == FAILURE
+
+
+def test_rejection_from_the_scep_queue_rejects_the_approval(app, auth_client, scep_ca):
+    identity = _client_identity('scep refused here')
+    with approval_policy(app, scep_ca, 'scep-held-reject-scep') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        scep_id, *_ = _scep_row(app, scep_ca)
+        r = auth_client.post(f'/api/v2/scep/{scep_id}/reject', json={'reason': 'unknown device'})
+        assert r.status_code == 200, r.get_json()
+        assert requests_of(app, pid, 'scep_request')[0][1] == 'rejected'
+        assert _scep_row(app, scep_ca)[1] == 'rejected'
+        assert _poll(app, scep_ca, identity) == FAILURE
+
+
+def test_expiry_fails_the_poll(app, scep_ca):
+    identity = _client_identity('scep late')
+    with approval_policy(app, scep_ca, 'scep-held-expire') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        expire(app, approval_id)
+        assert _scep_row(app, scep_ca)[1] == 'rejected'
+        assert _poll(app, scep_ca, identity) == FAILURE
+
+
+def test_unreadable_policies_store_nothing(app, scep_ca, monkeypatch):
+    from services.policy_service import PolicyEvaluationService
+
+    def broken(*a, **k):
+        raise RuntimeError('policy table unreadable')
+    monkeypatch.setattr(PolicyEvaluationService, 'check_approval_required', broken)
+    assert _enroll(app, scep_ca, _client_identity('scep broken')) == FAILURE
+    with app.app_context():
+        assert SCEPRequest.query.filter_by(ca_refid=db.session.get(CA, scep_ca).refid).count() == 0
+
+
+def _issued_cert(app, ca_id):
+    import base64
+    from models import Certificate
+    _id, _status, cert_refid = _scep_row(app, ca_id)
+    with app.app_context():
+        row = Certificate.query.filter_by(refid=cert_refid).first()
+        return row.source, x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+
+
+def test_approved_request_matches_a_direct_issuance(app, auth_client, create_ca, scep_ca):
+    from tests.protocol_approval_support import profile_of
+    direct_ca = create_ca(cn=f'SCEP direct CA {uuid.uuid4().hex[:6]}')['id']
+    with app.app_context():
+        db.session.add(SystemConfig(key=f'scep_challenge_{direct_ca}', value=CHALLENGE))
+        db.session.commit()
+    assert _enroll(app, direct_ca, _client_identity('scep same')) == SUCCESS
+    with approval_policy(app, scep_ca, 'scep-held-compare') as pid:
+        assert _enroll(app, scep_ca, _client_identity('scep same')) == PENDING
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        approve(auth_client, approval_id)
+    direct_source, direct = _issued_cert(app, direct_ca)
+    held_source, held = _issued_cert(app, scep_ca)
+    assert profile_of(held) == profile_of(direct)
+    assert held_source == direct_source

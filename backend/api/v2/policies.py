@@ -1273,7 +1273,13 @@ def get_approval(request_id):
 @bp.route('/api/v2/approvals/<int:request_id>/approve', methods=['POST'])
 @require_auth(['write:approvals'])
 def approve_request(request_id):
-    """Approve a request — triggers certificate issuance if fully approved.
+    """Approve a request — triggers certificate issuance if fully approved."""
+    return approve_approval_request(request_id, (request.get_json(silent=True) or {}).get('comment'))
+
+
+def approve_approval_request(request_id, comment=None):
+    """Record the current user's approval of a request (also reached from
+    the SCEP queue for a request a policy holds).
 
     Race-safe: takes a row-level lock on the approval (Postgres SELECT
     ... FOR UPDATE; harmless no-op on SQLite which serialises writes
@@ -1282,7 +1288,6 @@ def approve_request(request_id):
       * one vote per user (idempotency for double-clicks / multiple tabs)
       * single issuance via approval.certificate_id sentinel
     """
-    data = request.get_json() or {}
     user = g.current_user if hasattr(g, 'current_user') else None
     user_id = getattr(user, 'id', None)
     username = getattr(user, 'username', None) or 'system'
@@ -1334,7 +1339,7 @@ def approve_request(request_id):
         user_id=user_id,
         username=username,
         action='approve',
-        comment=data.get('comment'),
+        comment=comment,
     )
 
     # Issue the certificate inside the SAME transaction so the row
@@ -1442,12 +1447,16 @@ def approve_request(request_id):
 @require_auth(['write:approvals'])
 def reject_request(request_id):
     """Reject a request (race-safe, single vote per user)"""
-    data = request.get_json() or {}
+    return reject_approval_request(request_id, (request.get_json(silent=True) or {}).get('comment'))
+
+
+def reject_approval_request(request_id, comment):
+    """Record the current user's rejection of a request, with its reason."""
     user = g.current_user if hasattr(g, 'current_user') else None
     user_id = getattr(user, 'id', None)
     username = getattr(user, 'username', None) or 'system'
 
-    if not data.get('comment'):
+    if not comment:
         return error_response("Rejection reason is required", 400)
 
     db.session.expire_all()
@@ -1480,7 +1489,7 @@ def reject_request(request_id):
         user_id=user_id,
         username=username,
         action='reject',
-        comment=data.get('comment'),
+        comment=comment,
     )
 
     ok, _err = safe_commit(logger, "Failed to reject request")
@@ -1492,7 +1501,7 @@ def reject_request(request_id):
         from services.protocol_approval import propagate_closed
         propagate_closed([approval])
         from services.webhook_service import emit_csr_rejected
-        emit_csr_rejected(result, reason=data.get('comment'), actor=username)
+        emit_csr_rejected(result, reason=comment, actor=username)
 
     return success_response(data=result, message="Request rejected")
 
