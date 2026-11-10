@@ -68,7 +68,7 @@ export function InspectorProvider({ children }) {
     if (entityId == null) return
     const key = keyOf(type, entityId)
     const from = origin || document.activeElement
-    // The latest opening of an object names its origin
+    // Reopening replaces the origin, unless the focus is on body or in the dock (then the old one stays)
     if (from && from !== document.body && !from.closest?.('[data-testid="inspector-dock"]')) origins.current.set(key, from)
     if (!openedRef.current.some((o) => o.key === key)) {
       const next = [...openedRef.current, { key, type, entityId, data: data || null }]
