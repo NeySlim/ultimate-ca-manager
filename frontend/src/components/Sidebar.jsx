@@ -411,7 +411,7 @@ export function Sidebar({ activePage }) {
                     className="w-3 h-3 rounded-full border border-border"
                     style={{ background: theme.accent }}
                   />
-                  <span className="flex-1">{theme.name}</span>
+                  <span className="flex-1">{t(theme.nameKey)}</span>
                   {themeFamily === theme.id && (
                     <Check size={16} weight="bold" className="text-accent-primary" />
                   )}

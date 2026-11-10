@@ -2598,6 +2598,12 @@
     "appearanceSubtitle": "UCMの外観と言語をカスタマイズ",
     "colorTheme": "カラーテーマ",
     "colorThemeDesc": "お好みの配色を選択してください",
+    "themeFamilies": {
+      "atelier": "Atelier",
+      "aurore": "Aurore",
+      "purple": "Purple Night",
+      "sunset": "Orange Sunset"
+    },
     "appearanceMode": "外観モード",
     "appearanceModeDesc": "インターフェースの明るさの調整方法を制御",
     "followSystem": "システムに従う",

@@ -2739,6 +2739,12 @@
     "appearanceSubtitle": "Personnalisez l'apparence et la langue de UCM",
     "colorTheme": "Thème de couleur",
     "colorThemeDesc": "Choisissez un schéma de couleurs selon vos préférences",
+    "themeFamilies": {
+      "atelier": "Atelier",
+      "aurore": "Aurore",
+      "purple": "Purple Night",
+      "sunset": "Orange Sunset"
+    },
     "appearanceMode": "Mode d'apparence",
     "followSystem": "Suivre le système",
     "followSystemDesc": "Basculer automatiquement selon les paramètres de votre OS",

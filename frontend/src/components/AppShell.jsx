@@ -384,7 +384,7 @@ export function AppShell() {
                   className="w-2.5 h-2.5 rounded-full border border-border"
                   style={{ background: theme.accent }}
                 />
-                {theme.name}
+                {t(theme.nameKey)}
               </button>
             ))}
             
