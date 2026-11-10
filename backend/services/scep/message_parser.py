@@ -185,6 +185,14 @@ def _check_mldsa_signer_info(signer_info, public_key, digest_name: str) -> None:
         raise ValueError(f"{label} CMS signature algorithm carries parameters")
 
 
+def request_digest_name(signed_data) -> Optional[str]:
+    """Digest named by the first SignerInfo of a request, None when absent or unreadable."""
+    try:
+        return signed_data["signer_infos"][0]["digest_algorithm"]["algorithm"].native
+    except (IndexError, KeyError, ValueError, TypeError):
+        return None
+
+
 def verify_cms_signature(signed_data, signer_cert, signer_info=None) -> None:
     """Verify the CMS SignerInfo signature against signer_cert's public key.
 

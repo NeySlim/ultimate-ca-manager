@@ -25,6 +25,14 @@ def digest_for_key(key) -> str | None:
     return key_algorithms.default_digest_for_key(_public(key))
 
 
+def stronger_digest(*digests) -> str | None:
+    """Strongest SHA-2 among *digests*, skipping None; an intermediate's default never falls
+    below its parent key's hash nor its own key's."""
+    from services.policy_service import POLICY_DIGESTS
+    known = [d for d in digests if d in POLICY_DIGESTS]
+    return max(known, key=POLICY_DIGESTS.index) if known else next((d for d in digests if d), None)
+
+
 def digest_for_label(label) -> str | None:
     """``digest_for_key`` for a key type label ('EC-P384'); SHA-256 when unknown."""
     alg = key_algorithms.get(label)
@@ -78,6 +86,67 @@ def _of_strength(family, bits):
     if family == 'RSA':
         return key_algorithms.get('RSA-2048' if bits <= 112 else 'RSA-3072')
     return key_algorithms.get('EC-P256' if bits <= 128 else 'EC-P384')
+
+
+# What a leaf key is when nothing (request, template, issuer) names one; the policies bound it
+BASELINE_ISSUE_KEY = 'RSA-2048'
+# Key type of a new ACME account when the request names none (not an issuance key)
+DEFAULT_ACME_ACCOUNT_KEY_TYPE = 'RSA-2048'
+# Key type of the certificates the ACME client orders when its setting is unset
+DEFAULT_ACME_CLIENT_CERT_KEY_TYPE = 'RSA-2048'
+_ISSUE_KEY_FALLBACKS = ('RSA-3072', 'EC-P256', 'EC-P384')
+
+
+def default_issue_key_type(ca_id=None, profile=None, template_id=None) -> str:
+    """Registry label of the key issued when nothing names one.
+
+    Candidates in order: RSA-2048, RSA-3072, EC-P256, EC-P384; the first that the policies
+    in scope allow wins. In scope: FIPS mode, the compliance profile of *ca_id* (or *profile*
+    for a CA not created yet) and the active policies of *ca_id* and *template_id* (not the
+    CN or SANs, unknown here). PolicyViolation (HTTP 400 at issuance) when no candidate passes.
+    """
+    import compliance_profiles
+    from services.policy_service import PolicyEvaluationService, PolicyViolation
+    policies = PolicyEvaluationService.applicable_policies(ca_id, template_id, None)
+    if profile:
+        policies = [*policies, compliance_profiles.profile_policy(profile)]
+    refused = []
+    for label in (BASELINE_ISSUE_KEY, *_ISSUE_KEY_FALLBACKS):
+        violations, _, _ = PolicyEvaluationService.enforce_rules(
+            policies, key_type=label, ca_id=ca_id, notify=False)
+        if not violations:
+            return label
+        refused.append(violations[0])
+    raise PolicyViolation('Policy violation: no default key type is allowed (' + '; '.join(refused) + ')')
+
+
+def default_issue_key_id(ca_id=None, profile=None, template_id=None) -> str:
+    """``default_issue_key_type`` as a TrustStore KEY_TYPES id ('2048', 'prime256v1')."""
+    return key_algorithms.get(default_issue_key_type(ca_id, profile, template_id)).trust_store_id
+
+
+def _rsa_key_size(label) -> str:
+    alg = key_algorithms.get(label)
+    if alg.family != 'RSA':
+        alg = key_algorithms.get(_ISSUE_KEY_FALLBACKS[0])
+    return str(alg.key_size)
+
+
+def default_rsa_key_size(ca_id=None, template_id=None) -> str:
+    """RSA modulus size of the default key; the first fallback's when the default is not RSA."""
+    return _rsa_key_size(default_issue_key_type(ca_id, template_id=template_id))
+
+
+def complete_issue_key(key_type, key_size, ca_id=None, template_id=None, curve=None):
+    """(key_type, key_size) of a request already filled from its template, the default key
+    filling what is still unnamed; a request naming its key never evaluates the default."""
+    from utils.key_type import fill_key_params_from_template, issue_key_size, names_its_key
+    if names_its_key(key_type, key_size, curve):
+        return key_type, key_size
+    label = default_issue_key_type(ca_id, template_id=template_id)
+    key_type, key_size = fill_key_params_from_template(key_type, key_size, label)
+    key_type = key_type or 'rsa'
+    return key_type, issue_key_size(key_type, key_size, _rsa_key_size(label))
 
 
 def _candidates(classical_only: bool):

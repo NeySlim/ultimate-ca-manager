@@ -10,6 +10,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.primitives import serialization
 from auth.unified import require_auth
 from utils.response import success_response, error_response
+from utils.issuance_defaults import DEFAULT_ACME_ACCOUNT_KEY_TYPE
 from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
 from services.acme.acme_client_service import CERT_KEY_TYPES
@@ -109,7 +110,7 @@ def create_acme_account():
         return error_response('Request body required', 400)
 
     email = data.get('email', '').strip()
-    key_type = data.get('key_type', 'RSA-2048')
+    key_type = data.get('key_type', DEFAULT_ACME_ACCOUNT_KEY_TYPE)
     agree_tos = data.get('agree_tos', False)
 
     if not email:

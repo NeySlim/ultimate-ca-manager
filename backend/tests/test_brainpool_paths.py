@@ -112,7 +112,9 @@ def test_intermediate_ca_and_leaf_chain(app, auth_client, root_label, leaf_label
         root_c = _row_cert(db.session.get(CA, root['id']))
         sub_c = _row_cert(db.session.get(CA, sub['id']))
         leaf = _row_cert(db.session.get(Certificate, r.get_json()['data']['id']))
-    assert type(sub_c.signature_hash_algorithm) is DIGESTS[leaf_label]
+    # Never below the parent's key hash nor its own
+    expected = max(DIGESTS[root_label], DIGESTS[leaf_label], key=lambda h: h.digest_size)
+    assert type(sub_c.signature_hash_algorithm) is expected
     assert type(sub_c.public_key().curve) is CURVES[leaf_label]
     assert type(leaf.public_key().curve) is CURVES[leaf_label]
     sub_c.verify_directly_issued_by(root_c)

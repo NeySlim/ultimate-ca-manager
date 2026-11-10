@@ -507,15 +507,16 @@ def _issue_approved_certificate(approval):
     # same template fill and key parse the direct route does. Without it an EC
     # template with a blank key_size silently fell back to SECP256R1 via the old
     # curve_map default (#226, #318).
-    from utils.key_type import parse_issue_key_type, fill_key_params_from_template, issue_key_size
+    from utils.key_type import parse_issue_key_type, fill_key_params_from_template
 
     key_type = data.get('key_type') or data.get('keyType')
     key_size = data.get('key_size') or data.get('keySize')
     if template:
         key_type, key_size = fill_key_params_from_template(
             key_type, key_size, template.key_type)
-    key_type = key_type or 'RSA'
-    key_size = issue_key_size(key_type, key_size, '2048')
+    from utils.issuance_defaults import complete_issue_key
+    key_type, key_size = complete_issue_key(
+        key_type, key_size, ca.id, template.id if template else None, curve=data.get('curve'))
 
     normalized_key = parse_issue_key_type(key_type, key_size, curve=data.get('curve'))
 
@@ -1328,7 +1329,7 @@ def approve_request(request_id):
             from services.cert.renewal import RenewalError
             from utils.custom_extensions import TemplateConfigError
             if isinstance(e, PolicyViolation):
-                issue_error = f'Policy violation: {e}'
+                issue_error = str(e) if str(e).startswith('Policy violation:') else f'Policy violation: {e}'
             elif isinstance(e, RenewalError):
                 issue_error = e.message
             elif isinstance(e, TemplateConfigError):

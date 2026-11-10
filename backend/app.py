@@ -1486,128 +1486,16 @@ def init_database(app):
     
     # Create system certificate templates if none exist
     try:
-        import json
         from models.certificate_template import CertificateTemplate
-        
+        from services.template_service import TemplateService
+
         if CertificateTemplate.query.count() == 0:
-            app.logger.info("Creating system certificate templates...")
-            
-            templates = [
-                {
-                    "name": "Web Server (TLS/SSL)",
-                    "description": "Standard HTTPS/TLS web server certificate",
-                    "template_type": "web_server",
-                    "key_type": "RSA-2048",
-                    "validity_days": 397,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{hostname}", "O": "Organization", "OU": "IT"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["serverAuth"],
-                        "basic_constraints": {"ca": False},
-                        "san_types": ["dns", "ip"]
-                    }),
-                    "is_system": True,
-                    "enforce_san_types": False
-                },
-                {
-                    "name": "Client Certificate",
-                    "description": "User authentication certificate for client devices",
-                    "template_type": "client_auth",
-                    "key_type": "RSA-2048",
-                    "validity_days": 365,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{username}", "emailAddress": "{email}"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["clientAuth"],
-                        "basic_constraints": {"ca": False},
-                        "san_types": ["dns", "email", "upn"]
-                    }),
-                    "is_system": True,
-                    "enforce_san_types": False
-                },
-                {
-                    "name": "VPN Server",
-                    "description": "VPN server certificate (OpenVPN, IPsec, etc.)",
-                    "template_type": "vpn_server",
-                    "key_type": "RSA-2048",
-                    "validity_days": 730,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{hostname}", "O": "Organization"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["serverAuth"],
-                        "basic_constraints": {"ca": False},
-                        "san_types": ["dns", "ip"]
-                    }),
-                    "is_system": True,
-                    "enforce_san_types": False
-                },
-                {
-                    "name": "Email (S/MIME)",
-                    "description": "Email encryption and signing certificate",
-                    "template_type": "email",
-                    "key_type": "RSA-2048",
-                    "validity_days": 365,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{username}", "emailAddress": "{email}"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["emailProtection"],
-                        "basic_constraints": {"ca": False},
-                        "san_types": ["email"]
-                    }),
-                    "is_system": True,
-                    "enforce_san_types": False
-                },
-                # CA template removed — CAs are created from the CAs page, not via templates
-                {
-                    "name": "Code Signing",
-                    "description": "Code signing certificate for software/drivers",
-                    "template_type": "code_signing",
-                    "key_type": "RSA-2048",
-                    "validity_days": 365,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{username}", "O": "Organization"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["digitalSignature"],
-                        "extended_key_usage": ["codeSigning"],
-                        "basic_constraints": {"ca": False},
-                        "san_types": []
-                    }),
-                    "is_system": True,
-                    "enforce_san_types": False
-                },
-                {
-                    "name": "Smartcard Logon",
-                    "description": "Windows smartcard / PKINIT logon certificate for Active Directory (clientAuth + msSmartcardLogin EKU, UPN otherName SAN)",
-                    "template_type": "smartcard_logon",
-                    "key_type": "RSA-2048",
-                    "validity_days": 397,
-                    "digest": "sha256",
-                    "dn_template": json.dumps({"CN": "{username}", "OU": "Users"}),
-                    "extensions_template": json.dumps({
-                        "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["clientAuth", "msSmartcardLogin"],
-                        "basic_constraints": {"ca": False},
-                        "san_types": ["upn", "email"]
-                    }),
-                    "is_system": True,
-                    "enforce_san_types": False
-                }
-            ]
-            
-            for tmpl_data in templates:
-                tmpl = CertificateTemplate(**tmpl_data)
-                db.session.add(tmpl)
-            
-            db.session.commit()
-            app.logger.info(f"✓ Created {len(templates)} system certificate templates")
+            # One list for fresh installs and upgrades: TemplateService.SYSTEM_TEMPLATES
+            created = TemplateService.seed_system_templates()
+            app.logger.info(f"✓ Created {created} system certificate templates")
 
         # System templates added after initial install (upgraded instances
         # skip the count()==0 block above) — ensure they exist by name
-        from services.template_service import TemplateService
         for _tmpl_name in ("OCSP Signing", "Smartcard Logon"):
             if CertificateTemplate.query.filter_by(name=_tmpl_name).first():
                 continue

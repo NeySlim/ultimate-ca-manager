@@ -77,7 +77,6 @@ _HASH_ALGORITHM_OIDS = {
     'sha384': ('2.16.840.1.101.3.4.2.2', 'sha384'),
     'sha512': ('2.16.840.1.101.3.4.2.3', 'sha512'),
 }
-_DEFAULT_HASH = 'sha256'
 
 # id-ce-extKeyUsage / id-ce-keyUsage (RFC 5280) -- the extension OIDs
 # referenced by attributes/extensions/extension/oIDReference. Distinct from
@@ -258,10 +257,12 @@ def _resolve_templates_for_ca(ca, all_active_templates):
     return list(all_active_templates)
 
 
-def _key_type_info(key_type):
+def _key_type_info(key_type, ca_id=None, template_id=None):
     """``(algorithm name, minimal key length)`` from the key registry, or None
-    when the template's key type cannot be announced. Unset means the column default."""
-    alg = key_algorithms.get(key_type or 'RSA-2048')
+    when the template's key type cannot be announced. Unset means the default issue key
+    of the CA and template, the one WSTEP then enforces."""
+    from utils.issuance_defaults import default_issue_key_type
+    alg = key_algorithms.get(key_type or default_issue_key_type(ca_id, template_id=template_id))
     if alg is None or alg.family not in _XCEP_KEY_FAMILIES:
         return None
     if alg.family == 'EC' and alg.param not in _XCEP_EC_CURVES:
@@ -272,20 +273,24 @@ def _key_type_info(key_type):
     return ('RSA' if alg.family == 'RSA' else f'ECDSA_{alg.param}'), alg.key_size
 
 
-def _request_hash(template, key_label=None):
+def _request_hash(template, key_label=None, ca_id=None):
     """The digest a client must sign its request with: the template's own, raised to
     the one matching its key (SHA-384 for P-384), SHA-512 for ML-DSA. Never SHA-1."""
     from services.policy_service import POLICY_DIGESTS
-    from utils.issuance_defaults import digest_for_label
+    from utils.issuance_defaults import BASELINE_ISSUE_KEY, default_issue_key_type, digest_for_label
     if key_label in _MLDSA_OIDS:
         # RFC 9882 §3.3: an ML-DSA CMS signer digests with SHA-512, the one hash it must support
         return _HASH_ALGORITHM_OIDS['sha512']
-    digest = (getattr(template, 'digest', None) or _DEFAULT_HASH).strip().lower().replace('-', '')
+    # A template without key issues the default of its CA and template, as WSTEP resolves it;
+    # a template without a usable digest takes its key's own
+    key_label = key_label or default_issue_key_type(ca_id, template_id=getattr(template, 'id', None))
+    fallback = digest_for_label(key_label) or digest_for_label(BASELINE_ISSUE_KEY)
+    digest = (getattr(template, 'digest', None) or fallback).strip().lower().replace('-', '')
     if digest not in _HASH_ALGORITHM_OIDS:
         if digest == 'sha1':
             logger.warning("XCEP: template %r digest SHA-1 not announced, using %s",
-                           getattr(template, 'name', '?'), _DEFAULT_HASH)
-        digest = _DEFAULT_HASH
+                           getattr(template, 'name', '?'), fallback)
+        digest = fallback
     floor = digest_for_label(key_label) if key_label else None
     if floor in POLICY_DIGESTS and POLICY_DIGESTS.index(floor) > POLICY_DIGESTS.index(digest):
         digest = floor
@@ -430,6 +435,7 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
     # FIPS mode: announce schema 3 + a KSP + the request hash so no client signs with SHA-1.
     pin_request_hash = fips_mode.enabled()
 
+    from services.policy_service import PolicyViolation
     from services.wstep.wstep_service import issues_only_capped_ekus
     for template in resolved_templates:
         if issues_only_capped_ekus(template):
@@ -437,7 +443,12 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
             logger.info("XCEP: template %r left out, its EKUs are never issued to an enrollee",
                         template.name)
             continue
-        key_info = _key_type_info(template.key_type)
+        try:
+            key_info = _key_type_info(template.key_type, ca.id, template.id)
+        except PolicyViolation as exc:
+            # A template without key whose default the policies refuse; the others stay offered
+            logger.warning("XCEP: template %r left out: %s", template.name, exc)
+            continue
         if key_info is None:
             # Announcing a default would have the client generate the wrong key.
             logger.warning("XCEP: template %r left out, unsupported key type %r",
@@ -545,7 +556,7 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         else:
             _nil_element(attributes, 'generalFlags')
         if schema3:
-            hash_oid, hash_name = _request_hash(template, key_algorithms.normalize_label(template.key_type))
+            hash_oid, hash_name = _request_hash(template, key_algorithms.normalize_label(template.key_type), ca.id)
             hash_ref = oids.ref(hash_oid, group=_GROUP_HASH_ALGORITHM, default_name=hash_name)
             etree.SubElement(attributes, '{%s}hashAlgorithmOIDReference' % XCEP_NS).text = str(hash_ref)
         else:

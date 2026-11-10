@@ -22,6 +22,7 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from utils import key_algorithms
+from utils.issuance_defaults import BASELINE_ISSUE_KEY
 from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
@@ -142,7 +143,7 @@ def regenerate_https_cert():
 
     try:
         # Generate private key
-        private_key = key_algorithms.generate('RSA-2048')
+        private_key = key_algorithms.generate(BASELINE_ISSUE_KEY)
 
         # Build certificate
         subject = issuer = x509.Name([

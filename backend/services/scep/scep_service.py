@@ -44,6 +44,7 @@ from services.scep.message_parser import (
     decrypt_scep_envelope,
     extract_scep_attributes,
     extract_signer_certificate,
+    request_digest_name,
     verify_cms_signature,
 )
 from services.scep.response_builder import (
@@ -190,6 +191,7 @@ class SCEPService:
         self._config_cache = {}
         # Set per request from its envelope: the reply wraps its key the same way
         self._response_key_transport = DEFAULT_KEY_TRANSPORT
+        self._request_digest = None
 
         self.ca_cert = x509.load_pem_x509_certificate(
             base64.b64decode(self.ca.crt), default_backend()
@@ -257,6 +259,7 @@ class SCEPService:
                 ), 200
 
             signed_data = content_info["content"]
+            self._request_digest = request_digest_name(signed_data)
             attrs = extract_scep_attributes(signed_data)
             transaction_id = attrs.get("transactionID") or ''
             message_type = attrs.get("messageType")
@@ -1716,6 +1719,7 @@ class SCEPService:
             challenge_password=challenge_password,
             content_encryption_algorithm=content_encryption_algorithm,
             key_transport=self._response_key_transport,
+            request_digest=self._request_digest,
         )
 
     def _create_crl_rep_success(
@@ -1737,13 +1741,15 @@ class SCEPService:
             challenge_password=challenge_password,
             content_encryption_algorithm=content_encryption_algorithm,
             key_transport=self._response_key_transport,
+            request_digest=self._request_digest,
         )
 
     def _create_cert_rep_pending(
         self, transaction_id: str, sender_nonce
     ) -> bytes:
         return build_cert_rep_pending(
-            transaction_id, sender_nonce, self.ca_key, self.ca_cert
+            transaction_id, sender_nonce, self.ca_key, self.ca_cert,
+            request_digest=self._request_digest,
         )
 
     def _create_error_response(
@@ -1757,4 +1763,5 @@ class SCEPService:
             fail_info, message, self.ca_key, self.ca_cert,
             transaction_id=transaction_id,
             recipient_nonce=recipient_nonce,
+            request_digest=self._request_digest,
         )

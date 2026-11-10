@@ -12,6 +12,8 @@ tech debt.
 """
 import base64
 import logging
+
+from flask import g, has_app_context
 import re
 
 from cryptography import x509
@@ -26,6 +28,7 @@ from utils.csr_extensions import extensions_of
 from utils.datetime_utils import utc_now
 from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
 from utils import key_algorithms
+from utils.issuance_defaults import default_issue_key_type
 from utils.key_type import validate_enrollment_csr
 from utils.request_names import RequestRejected
 from utils.san_parse import is_valid_san_email
@@ -306,7 +309,8 @@ def _match_template(ca, csr, principal=None):
         return None, None
 
     all_active = CertificateTemplate.query.filter_by(is_active=True).all()
-    candidates = _resolve_templates_for_ca(ca, all_active)
+    candidates = [t for t in _resolve_templates_for_ca(ca, all_active)
+                  if _template_key_type(t, ca.id) is not None]
     if not candidates:
         return None, None
 
@@ -316,7 +320,7 @@ def _match_template(ca, csr, principal=None):
     # is not issued under a P-256 template sharing its EKUs); a request whose
     # EKUs name only a template of another key is refused.
     csr_label = _csr_key_label(csr)
-    same = [t for t in candidates if _template_takes_key(t, csr_label)]
+    same = [t for t in candidates if _template_takes_key(t, csr_label, ca.id)]
     if principal:
         from services.ad_connector.lookup import is_machine_principal
         other_kind = 'directory' if is_machine_principal(principal) else 'machine'
@@ -328,8 +332,7 @@ def _match_template(ca, csr, principal=None):
         return best, None
     other, score = _best_eku_match([t for t in candidates if t not in same], csr_eku)
     if other is not None and score > 0:
-        return None, (f"Template '{other.name}' issues {_template_key_label(other)} keys, "
-                      f'not {csr_label}')
+        return None, _key_refusal(other, csr_label, ca.id)
     return None, None
 
 
@@ -389,9 +392,8 @@ def _named_template(ca, csr):
         return None, 'The request names two different certificate templates', True
     template = found[0]
     csr_label = _csr_key_label(csr)
-    if not _template_takes_key(template, csr_label):
-        return None, (f"Template '{template.name}' issues {_template_key_label(template)} keys, "
-                      f'not {csr_label}'), True
+    if not _template_takes_key(template, csr_label, ca.id):
+        return None, _key_refusal(template, csr_label, ca.id), True
     allowed = set(_template_configured_ekus(template))
     if allowed and (_eku_oids(csr) or set()) - allowed:
         return None, (f"Template '{template.name}' does not issue the Extended Key Usages "
@@ -492,9 +494,8 @@ def _renewal_template(ca, renewed_cert, csr):
                                 'is not offered by this CA')
     if issues_only_capped_ekus(template):
         return None, [], None, _capped_only_refusal(template)
-    if not _template_takes_key(template, _csr_key_label(csr)):
-        return None, [], None, (f"Template '{template.name}' issues {_template_key_label(template)} "
-                                f'keys, not {_csr_key_label(csr)}')
+    if not _template_takes_key(template, _csr_key_label(csr), ca.id):
+        return None, [], None, _key_refusal(template, _csr_key_label(csr), ca.id)
     extra = _template_extra_ekus(template)
     # The request may name what XCEP advertised (capped EKUs included, dropped at
     # issuance); a template without EKUs keeps the renewal within the old ones
@@ -540,15 +541,43 @@ def _best_eku_match(candidates, csr_eku):
     return (best, best_score) if best is not None and best_score >= 0 else (None, -1)
 
 
-def _template_key_label(template):
-    alg = key_algorithms.get(template.key_type or 'RSA-2048')
+def _template_key_type(template, ca_id=None):
+    """The key label *template* issues, its own or the default; None (logged) when it names
+    none and the policies allow no default: the template is then left out, not the CA."""
+    if template.key_type:
+        return template.key_type
+    try:
+        return default_issue_key_type(ca_id, template_id=template.id)
+    except PolicyViolation as exc:
+        # One line per template and request: the filter, label and refusal helpers all ask
+        seen = g.setdefault('_wstep_left_out', set()) if has_app_context() else set()
+        if template.id not in seen:
+            seen.add(template.id)
+            logger.warning("WSTEP: template %r left out: %s", template.name, exc)
+        return None
+
+
+def _template_key_label(template, ca_id=None):
+    label = _template_key_type(template, ca_id)
+    alg = key_algorithms.get(label) if label else None
     return alg.label if alg is not None else str(template.key_type)
 
 
-def _template_takes_key(template, csr_label):
+def _key_refusal(template, csr_label, ca_id=None):
+    if _template_key_type(template, ca_id) is None:
+        return (f"Template '{template.name}' names no key type and the issuance policies "
+                'allow no default one')
+    return f"Template '{template.name}' issues {_template_key_label(template, ca_id)} keys, not {csr_label}"
+
+
+def _template_takes_key(template, csr_label, ca_id=None):
     """Whether a key of ``csr_label`` fits ``template``: same curve or ML-DSA
-    set, an RSA key at least as long. An unknown key fits any non-ML-DSA template."""
-    wanted = key_algorithms.get(template.key_type or 'RSA-2048')
+    set, an RSA key at least as long. An unknown key fits any non-ML-DSA template;
+    no key fits a template whose default key the policies refuse."""
+    label = _template_key_type(template, ca_id)
+    if label is None:
+        return False
+    wanted = key_algorithms.get(label)
     got = key_algorithms.get(csr_label)
     if wanted is None:
         return True

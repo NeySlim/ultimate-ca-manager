@@ -27,6 +27,7 @@ from services.policy_service import PolicyViolation
 from utils.csr_extensions import csr_extensions
 from utils.custom_extensions import TemplateConfigError
 from fips_mode import FipsRestricted
+from utils import key_algorithms
 from utils.key_type import unsignable_csr_key
 from utils.san_parse import (general_names_from_buckets, parse_extra_san_payload,
                              san_buckets_from_general_names)
@@ -380,10 +381,12 @@ def create_csr():
             if not is_valid:
                 return error_response(error, 400)
             
-        # Parse key type (Frontend: "RSA 2048", "EC P-256", etc.)
+        # Parse key type (Frontend: "RSA <bits>", "EC P-256", etc.)
         from utils.key_type import parse_csr_key_type
+        from utils.issuance_defaults import default_issue_key_type
         try:
-            key_type = parse_csr_key_type(data.get('key_type', 'RSA 2048'))
+            key_type = parse_csr_key_type(
+                data.get('key_type') or key_algorithms.get(default_issue_key_type()).display)
         except FipsRestricted:
             raise
         except ValueError as exc:

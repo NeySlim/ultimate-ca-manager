@@ -23,7 +23,7 @@ def _template(tid=1, key_type='RSA-2048', is_active=True):
 
 
 def _build(templates, pins=()):
-    ca = SimpleNamespace(refid='ca1', descr='Test CA', crt=None, template_pins=list(pins))
+    ca = SimpleNamespace(id=None, refid='ca1', descr='Test CA', crt=None, template_pins=list(pins))
     return etree.fromstring(policy_builder.build_get_policies_response(ca, templates))
 
 

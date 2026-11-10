@@ -221,19 +221,26 @@ def create_certificate():
         from services.hsm.ca_key_loader import get_ca_signing_key
         ca_key = get_ca_signing_key(ca)
 
-        from utils.key_type import parse_issue_key_type, fill_key_params_from_template, issue_key_size
+        from utils.key_type import parse_issue_key_type, fill_key_params_from_template
+        from utils.issuance_defaults import complete_issue_key
 
         key_type_in = data.get('key_type') or data.get('keyType')
         key_size_in = data.get('key_size') or data.get('keySize')
-        # Template key params ("RSA-2048", "EC-P384") are the default when the
+        # Template key params ("EC-P384", "RSA-3072") are the default when the
         # request leaves them unset, for API parity with the UI prefill (issue
         # #226 follow-up); key_size only inherits when the algorithm still
         # matches (#318).
-        if template and not pair:
-            key_type_in, key_size_in = fill_key_params_from_template(
-                key_type_in, key_size_in, template.key_type)
-        key_type_in = key_type_in or 'rsa'
-        key_size_in = issue_key_size(key_type_in, key_size_in, '2048')
+        from services.policy_service import PolicyViolation
+        template_id = template.id if template else None
+        try:
+            if template and not pair:
+                key_type_in, key_size_in = fill_key_params_from_template(
+                    key_type_in, key_size_in, template.key_type)
+            if not pair:
+                key_type_in, key_size_in = complete_issue_key(
+                    key_type_in, key_size_in, ca.id, template_id, curve=data.get('curve'))
+        except PolicyViolation as exc:
+            return error_response(str(exc), 400)
         try:
             # A pair names its two keys; key_type and key_size do not apply to it
             normalized_key = pair[0] if pair else parse_issue_key_type(

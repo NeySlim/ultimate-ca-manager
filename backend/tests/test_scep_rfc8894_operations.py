@@ -117,6 +117,7 @@ def _build_request(
     challenge=None,
     content_encryption_algorithm="aes128_cbc",
     recipient_cert=None,
+    request_digest=None,
 ):
     encrypted_payload = encrypt_for_client(
         payload,
@@ -148,6 +149,7 @@ def _build_request(
         signer_key,
         signer_cert,
         signed_attributes=attrs,
+        request_digest=request_digest,
     )
 
 

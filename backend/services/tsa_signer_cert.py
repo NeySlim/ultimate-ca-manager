@@ -33,7 +33,7 @@ from services.tsa_service import TSA_SIGNER_FAMILIES
 from utils.datetime_utils import cert_not_before, utc_now
 from utils.db_transaction import safe_commit
 from utils import key_algorithms
-from utils.key_type import issue_key_size, parse_issue_key_type
+from utils.key_type import issue_key_size, names_its_key, parse_issue_key_type
 from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ logger = logging.getLogger(__name__)
 DEFAULT_CN = 'UCM Timestamping Authority'
 DEFAULT_VALIDITY_DAYS = 397
 DEFAULT_KEY_TYPE = 'rsa'
-DEFAULT_KEY_SIZE = '3072'
+_MIN_RSA_BITS = 3072  # a TSA signer outlives a leaf: never below this
 from utils.validity import MAX_VALIDITY_DAYS  # noqa: F401  (re-exported here)
 
 from security.encryption import encrypt_private_key
@@ -59,16 +59,26 @@ class TsaSignerIssueError(Exception):
         self.status = status
 
 
-def _generate_key(key_type, key_size, curve):
+def default_key_size(ca_id=None) -> str:
+    """RSA size of a TSA signer key when none is asked: the default issue key's, at least 3072."""
+    from utils.issuance_defaults import default_rsa_key_size
+    return str(max(int(default_rsa_key_size(ca_id)), _MIN_RSA_BITS))
+
+
+def _generate_key(key_type, key_size, curve, ca_id=None):
     # With neither curve nor size, the RSA default size would be parsed as a curve.
     if str(key_type or '').strip().lower() in ('ec', 'ecdsa') and not key_size and not curve:
         raise TsaSignerIssueError(
             'An EC key needs a curve: pass curve (P-256, P-384 or P-521, or outside FIPS mode '
             'brainpoolP256r1, brainpoolP384r1 or brainpoolP512r1)', 400)
+    # The default is only looked up when the request leaves its key unnamed
+    # (a curve names an EC key, so no size default applies then).
     try:
-        normalized = parse_issue_key_type(key_type or DEFAULT_KEY_TYPE,
-                                          issue_key_size(key_type, key_size, DEFAULT_KEY_SIZE),
-                                          curve=curve)
+        if names_its_key(key_type, key_size, curve):
+            size = key_size or None
+        else:
+            size = issue_key_size(key_type, key_size, lambda: default_key_size(ca_id))
+        normalized = parse_issue_key_type(key_type or DEFAULT_KEY_TYPE, size, curve=curve)
     except ValueError as exc:
         raise TsaSignerIssueError(str(exc), 400)
     alg = key_algorithms.get(normalized)
@@ -139,7 +149,7 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
     except ValueError as exc:
         raise TsaSignerIssueError(f'Failed to load CA signing key: {exc}', 500)
 
-    new_key = _generate_key(key_type, key_size, curve)
+    new_key = _generate_key(key_type, key_size, curve, ca.id)
     # The operator did not choose the validity in the one-click flow, so clamp
     # to the CA's own expiry instead of refusing (cert_create.py 400s here).
     not_after = clamp_not_after(now + timedelta(days=validity_days), ca_cert)

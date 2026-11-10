@@ -139,11 +139,24 @@ def parse_issue_key_type(
 
 
 def issue_key_size(key_type, key_size, default):
-    """*key_size*, else *default*; None for a label that names its own parameter ('ML-DSA-65')."""
+    """*key_size*, else *default* (called when callable); None for a label that names its own
+    parameter ('ML-DSA-65')."""
     if key_size not in (None, ''):
         return key_size
     alg = key_algorithms.get(str(key_type or '').strip())
-    return None if alg is not None and alg.family not in ('RSA', 'EC') else default
+    if alg is not None and alg.family not in ('RSA', 'EC'):
+        return None
+    return default() if callable(default) else default
+
+
+def names_its_key(key_type, key_size, curve=None) -> bool:
+    """True when a request names its key: a size, a curve for an EC family, or a label
+    that carries its own parameter ('ML-DSA-65'); bare 'rsa' or 'ec' does not."""
+    if not key_type:
+        return False
+    if key_size not in (None, '') or (curve and _request_family(key_type) == 'EC'):
+        return True
+    return issue_key_size(key_type, None, True) is None
 
 
 def fill_key_params_from_template(key_type, key_size, template_key_type):

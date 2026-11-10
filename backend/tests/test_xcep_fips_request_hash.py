@@ -23,7 +23,7 @@ def _template(tid, key_type='RSA-2048', digest='sha256', template_type='client_a
 
 
 def _build(templates):
-    ca = SimpleNamespace(refid='ca1', descr='Test CA', crt=None, template_pins=[])
+    ca = SimpleNamespace(id=None, refid='ca1', descr='Test CA', crt=None, template_pins=[])
     xml = policy_builder.build_get_policies_response(ca, templates)
     root = etree.fromstring(xml)
     oids = {o.findtext('x:oIDReferenceID', namespaces=NS): (o.findtext('x:value', namespaces=NS),
