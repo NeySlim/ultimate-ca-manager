@@ -1,17 +1,22 @@
 """The sections of a v4 archive, kept on disk while a restore reads them.
 
-Each section is written to its own JSON file as its chunks are decrypted, and
-loaded again only when the restore asks for it. The store answers what the
+Each section is written to its own file as its chunks are decrypted, sealed
+with AES-GCM under a key that lives only in this process, and loaded again
+only when the restore asks for it. The store answers what the
 restore reads of a payload dict, so the restore code is the same for v1 to v4.
 """
 import json
 import logging
 import os
 import shutil
+import struct
 import sys
 import tempfile
+import time
 from collections import OrderedDict
 from typing import Any, Dict, Iterator, List, Optional, Tuple
+
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +25,13 @@ DEFAULT_CAPACITY = 2
 # Held whole in memory and never written to disk
 PINNED = ('metadata',)
 _MISSING = object()
+STORE_PREFIX = '.ucm_restore_'
+# Plaintext sealed per frame; a frame is `len(uint32) || nonce(12) || ciphertext`
+FRAME_BYTES = 1024 * 1024
+_FRAME_LEN = struct.Struct('>I')
+_NONCE_SIZE = 12
+# A store left by a killed worker; a live restore holds the backup lock anyway
+STALE_AFTER_SECONDS = 3600
 
 
 def store_directory() -> Optional[str]:
@@ -39,6 +51,61 @@ def store_directory() -> Optional[str]:
         return path
     except (AttributeError, OSError):
         return None
+
+
+def sweep_stale_stores(directory: Optional[str]) -> None:
+    """Remove stores a killed worker left behind; skipped while a backup operation runs."""
+    if not directory or not os.path.isdir(directory):
+        return
+    from .locking import BackupBusyError, backup_operation_lock
+    try:
+        with backup_operation_lock(timeout=0, purpose='sweeping restore leftovers'):
+            limit = time.time() - STALE_AFTER_SECONDS
+            for entry in os.scandir(directory):
+                if (entry.name.startswith(STORE_PREFIX)
+                        and entry.is_dir(follow_symlinks=False)
+                        and entry.stat(follow_symlinks=False).st_mtime < limit):
+                    shutil.rmtree(entry.path, ignore_errors=True)
+    except (BackupBusyError, OSError) as exc:
+        logger.debug("Restore leftovers not swept: %s", exc)
+
+
+class _SealedWriter:
+    """Text written to it lands in its file as AES-GCM frames, never in clear."""
+
+    def __init__(self, store: 'SectionStore', fd: int, label: str):
+        self._store = store
+        self._file = os.fdopen(fd, 'wb')
+        self._label = label
+        self._index = 0
+        self._parts: List[bytes] = []
+        self._size = 0
+
+    def write(self, text: str) -> None:
+        data = text.encode('utf-8')
+        self._parts.append(data)
+        self._size += len(data)
+        if self._size >= FRAME_BYTES:
+            self._flush()
+
+    def _flush(self) -> None:
+        if not self._parts:
+            return
+        plaintext = b''.join(self._parts)
+        self._parts, self._size = [], 0
+        nonce, sealed = self._store._seal(self._label, self._index, plaintext)
+        self._file.write(_FRAME_LEN.pack(len(sealed)) + nonce + sealed)
+        self._index += 1
+
+    def close(self) -> None:
+        try:
+            self._flush()
+        finally:
+            self._file.close()
+
+    def discard(self) -> None:
+        self._parts = []
+        self._file.close()
 
 
 def section_kind(payload: Any, name: str) -> Optional[str]:
@@ -68,7 +135,10 @@ class SectionStore:
     """
 
     def __init__(self, directory: Optional[str] = None, capacity: int = DEFAULT_CAPACITY):
-        self._dir = tempfile.mkdtemp(prefix='.ucm_restore_', dir=directory or store_directory())
+        self._dir = tempfile.mkdtemp(prefix=STORE_PREFIX, dir=directory or store_directory())
+        # Held only in memory: files a killed worker leaves behind stay unreadable
+        self._aead = AESGCM(AESGCM.generate_key(bit_length=256))
+        self._nonces = 0
         self._capacity = max(1, capacity)
         self._order: List[str] = []
         self._files: Dict[str, str] = {}
@@ -113,8 +183,10 @@ class SectionStore:
     def _close_section(self) -> None:
         name, handle, kind, written = self._writing
         self._writing = None
-        handle.write('}' if kind == 'mapping' else ']')
-        handle.close()
+        try:
+            handle.write('}' if kind == 'mapping' else ']')
+        finally:
+            handle.close()
         self._shape[name] = (kind, written)
 
     def _register(self, name: str) -> None:
@@ -127,7 +199,34 @@ class SectionStore:
         path = os.path.join(self._dir, f'{len(self._files)}.json')
         fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         self._files[name] = path
-        return os.fdopen(fd, 'w', encoding='utf-8')
+        return _SealedWriter(self, fd, os.path.basename(path))
+
+    def _seal(self, label: str, index: int, plaintext: bytes) -> Tuple[bytes, bytes]:
+        # A counter never repeats a nonce under this store's key; the AAD pins
+        # each frame to its file and position
+        self._nonces += 1
+        nonce = self._nonces.to_bytes(_NONCE_SIZE, 'big')
+        return nonce, self._aead.encrypt(nonce, plaintext, _frame_aad(label, index))
+
+    def _read_sealed(self, path: str) -> Any:
+        label = os.path.basename(path)
+        plaintext = bytearray()
+        with open(path, 'rb') as handle:
+            index = 0
+            while True:
+                head = handle.read(_FRAME_LEN.size)
+                if not head:
+                    break
+                if len(head) != _FRAME_LEN.size:
+                    raise ValueError('Truncated restore section file')
+                (length,) = _FRAME_LEN.unpack(head)
+                nonce = handle.read(_NONCE_SIZE)
+                sealed = handle.read(length)
+                if len(nonce) != _NONCE_SIZE or len(sealed) != length:
+                    raise ValueError('Truncated restore section file')
+                plaintext += self._aead.decrypt(nonce, sealed, _frame_aad(label, index))
+                index += 1
+        return json.loads(plaintext)
 
     # -- what a restore reads ---------------------------------------------
 
@@ -139,8 +238,7 @@ class SectionStore:
             return self._loaded[name]
         if name not in self._files:
             raise KeyError(name)
-        with open(self._files[name], 'r', encoding='utf-8') as handle:
-            value = json.load(handle)
+        value = self._read_sealed(self._files[name])
         self._loaded[name] = value
         self._shrink()
         return value
@@ -230,9 +328,14 @@ class SectionStore:
         value = self._loaded[name]
         path = self._files[name]
         fd, temp = tempfile.mkstemp(dir=self._dir, suffix='.tmp')
+        writer = _SealedWriter(self, fd, os.path.basename(path))
         try:
-            with os.fdopen(fd, 'w', encoding='utf-8') as handle:
-                json.dump(value, handle, separators=(',', ':'))
+            try:
+                json.dump(value, writer, separators=(',', ':'))
+            except BaseException:
+                writer.discard()
+                raise
+            writer.close()
             os.replace(temp, path)
         except (TypeError, ValueError, OSError) as exc:
             # A value JSON cannot carry: the section stays loaded rather than lose it
@@ -252,7 +355,7 @@ class SectionStore:
     def close(self) -> None:
         if self._writing is not None:
             try:
-                self._writing[1].close()
+                self._writing[1].discard()
             except OSError:
                 pass
             self._writing = None
@@ -265,3 +368,7 @@ class SectionStore:
 
     def __exit__(self, *exc_info) -> None:
         self.close()
+
+
+def _frame_aad(label: str, index: int) -> bytes:
+    return label.encode('ascii') + b'#' + index.to_bytes(8, 'big')

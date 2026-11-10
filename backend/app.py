@@ -334,6 +334,8 @@ def create_app(config_name=None):
     from utils.upload_spool import SpoolingRequest, prepare_spool_dir
     app.config['UPLOAD_SPOOL_DIR'] = prepare_spool_dir(config.DATA_DIR)
     app.request_class = SpoolingRequest
+    from services.backup.section_store import sweep_stale_stores
+    sweep_stale_stores(app.config['UPLOAD_SPOOL_DIR'])
 
     # Initialize cache
     cache.init_app(app, config={

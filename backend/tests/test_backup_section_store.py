@@ -1,5 +1,4 @@
 """The sections of a v4 archive kept on disk: what the restore reads of them."""
-import json
 import os
 import stat
 
@@ -109,8 +108,8 @@ def test_a_value_json_cannot_hold_keeps_the_section_loaded(store):
 
 
 def test_a_written_file_is_the_json_of_the_section(store):
-    with open(store._files['users'], encoding='utf-8') as handle:
-        assert json.load(handle) == [{'username': 'a'}, {'username': 'b'}, {'username': 'c'}]
+    assert store._read_sealed(store._files['users']) == [
+        {'username': 'a'}, {'username': 'b'}, {'username': 'c'}]
 
 
 def test_a_section_cannot_arrive_twice(tmp_path):
@@ -119,3 +118,91 @@ def test_a_section_cannot_arrive_twice(tmp_path):
         store.add_part('groups', 0, [])
         with pytest.raises(ValueError, match='twice'):
             store.add_part('users', 0, [])
+
+
+SECRET = 'smtp-password-that-must-not-reach-the-disk'
+
+
+def _disk_bytes(directory):
+    found = b''
+    for entry in os.listdir(directory):
+        with open(os.path.join(directory, entry), 'rb') as handle:
+            found += handle.read()
+    return found
+
+
+def test_no_section_is_written_in_clear(tmp_path):
+    with SectionStore(str(tmp_path), capacity=1) as store:
+        store.add_part('smtp_config', 0, [{'password': SECRET}])
+        store.add_part('configuration', 0, {'token': SECRET})
+        store.seal()
+        assert SECRET.encode() not in _disk_bytes(store._dir)
+        store['smtp_config'][0]['password'] += '-changed'
+        store['configuration']             # evicts smtp_config, written back
+        assert 'smtp_config' not in store._loaded
+        assert SECRET.encode() not in _disk_bytes(store._dir)
+        assert store['smtp_config'] == [{'password': SECRET + '-changed'}]
+
+
+def test_a_store_cannot_read_another_stores_files(tmp_path):
+    with SectionStore(str(tmp_path)) as first, SectionStore(str(tmp_path)) as second:
+        first.add_part('users', 0, [{'username': 'a'}])
+        first.seal()
+        second._files['users'] = first._files['users']
+        second._order.append('users')
+        with pytest.raises(Exception):
+            second['users']
+
+
+def test_stale_stores_are_swept(tmp_path):
+    from services.backup.section_store import STALE_AFTER_SECONDS, sweep_stale_stores
+    stale = tmp_path / '.ucm_restore_dead'
+    stale.mkdir()
+    (stale / '0.json').write_bytes(b'x')
+    old = os.stat(stale).st_mtime - STALE_AFTER_SECONDS - 60
+    os.utime(stale, (old, old))
+    live = tmp_path / '.ucm_restore_live'
+    live.mkdir()
+    other = tmp_path / 'unrelated'
+    other.mkdir()
+    os.utime(other, (old, old))
+
+    sweep_stale_stores(str(tmp_path))
+
+    assert sorted(os.listdir(tmp_path)) == ['.ucm_restore_live', 'unrelated']
+
+
+def test_no_sweep_while_a_backup_operation_holds_the_lock(tmp_path, monkeypatch):
+    from services.backup import section_store
+    from services.backup.locking import BackupBusyError
+
+    @__import__('contextlib').contextmanager
+    def busy(**_kwargs):
+        raise BackupBusyError('busy')
+        yield
+
+    monkeypatch.setattr('services.backup.locking.backup_operation_lock', busy)
+    stale = tmp_path / '.ucm_restore_dead'
+    stale.mkdir()
+    old = os.stat(stale).st_mtime - section_store.STALE_AFTER_SECONDS - 60
+    os.utime(stale, (old, old))
+
+    section_store.sweep_stale_stores(str(tmp_path))
+
+    assert stale.exists()
+
+
+def test_app_startup_sweeps_the_spool_dir():
+    from pathlib import Path
+
+    from services.backup.section_store import STALE_AFTER_SECONDS
+    from tests.fresh_app import fresh_app
+    spool = Path(os.environ['DATA_DIR']) / 'tmp'
+    spool.mkdir(parents=True, exist_ok=True)
+    stale = spool / '.ucm_restore_from_a_killed_worker'
+    stale.mkdir(exist_ok=True)
+    old = os.stat(stale).st_mtime - STALE_AFTER_SECONDS - 60
+    os.utime(stale, (old, old))
+    with fresh_app():
+        assert not stale.exists()
+
