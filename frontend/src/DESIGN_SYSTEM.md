@@ -56,7 +56,7 @@ only, not on the family.
 
 **Rule.** No `#rrggbb`, `rgb()`/`rgba()`/`hsl()` literal and no Tailwind palette class
 (`text-red-500`, `bg-white`, `border-gray-800`) in `src`: use a token, an alias or a helper class.
-Fixed constants (`--ink`, `--paper`, `--hue-*`, `--scrim`) live in `tokens.css`; `bg-scrim-NN` is the overlay.
+Three constants (`--ink`, `--paper`, `--scrim`) are declared in each of the 8 palettes and pinned in the baseline; `bg-scrim-NN` is the overlay. There is no `--hue-*` token.
 `styles/__tests__/noHardcodedColors.test.js` enforces it and lists the exceptions with their reason.
 
 Mode resolves from `system` / `dark` / `light` (persisted in localStorage +
@@ -67,7 +67,7 @@ Documented exceptions carry fixed colors in every theme: the Ko-fi tokens
 (`--kofi-coral`, `--kofi-coral-strong`, `--kofi-coral-hover`, used by
 `.kofi-card` / `.kofi-badge` / `.kofi-button` / `.kofi-icon`) because they are a
 third party's brand, `ProviderIcons.jsx`, the theme picker swatches, the help reader's
-sepia palette, the email preview canvas, and `icon-bg-rose` / `icon-bg-sky` (see below).
+sepia palette, and the email preview canvas.
 
 ## Typography
 
@@ -169,8 +169,7 @@ Colored tile backgrounds that avoid "ton sur ton" clashes per theme:
 `icon-bg-green`, `icon-bg-teal` / `icon-bg-cyan`, `icon-bg-violet` /
 `icon-bg-purple`, backed by `--icon-{blue,orange,amber,emerald,teal,violet}-{bg,text}`.
 Derived from status tokens: `icon-bg-red` (`--accent-danger`),
-`icon-bg-gray` (`--text-tertiary`). Fixed hues in every theme: `icon-bg-rose`
-(`--hue-rose`) and `icon-bg-sky` (`--hue-sky`).
+`icon-bg-gray` (`--text-tertiary`).
 
 ### Detail panel tokens
 `tokens.css` also defines `--gradient-bg` and the `--detail-*` set

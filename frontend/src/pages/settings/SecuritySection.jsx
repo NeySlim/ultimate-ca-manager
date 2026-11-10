@@ -28,7 +28,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
         title={t('common.securitySettings')}
         subtitle={t('settings.securitySubtitle')}
       />
-      <DetailSection title={t('settings.keyEncryption')} icon={LockKey} iconClass="icon-bg-rose">
+      <DetailSection title={t('settings.keyEncryption')} icon={LockKey} iconClass="icon-bg-orange">
         {encryptionStatus ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -176,7 +176,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
           )}
         </div>
       </DetailSection>
-      <DetailSection title={t('settings.hstsTitle')} icon={Globe} iconClass="icon-bg-sky">
+      <DetailSection title={t('settings.hstsTitle')} icon={Globe} iconClass="icon-bg-blue">
         <div className="space-y-4">
           <ToggleSwitch
             checked={settings.hsts_enabled !== false}

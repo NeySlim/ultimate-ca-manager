@@ -74,29 +74,29 @@
   --kofi-coral-hover: #B8312C;
   
   /* ===== ENHANCED SHADOW SYSTEM ===== */
-  --shadow-color: 220deg 40% 2%;
+  --shadow-color: var(--ink);
   
   /* Layered shadows for realistic depth */
   --shadow-xs: 
-    0 1px 2px hsl(var(--shadow-color) / 0.1);
+    0 1px 2px color-mix(in srgb, var(--shadow-color) 10%, transparent);
   --shadow-sm: 
-    0 1px 2px hsl(var(--shadow-color) / 0.08),
-    0 2px 4px hsl(var(--shadow-color) / 0.08);
+    0 1px 2px color-mix(in srgb, var(--shadow-color) 8%, transparent),
+    0 2px 4px color-mix(in srgb, var(--shadow-color) 8%, transparent);
   --shadow-md: 
-    0 2px 4px hsl(var(--shadow-color) / 0.06),
-    0 4px 8px hsl(var(--shadow-color) / 0.08),
-    0 8px 16px hsl(var(--shadow-color) / 0.08);
+    0 2px 4px color-mix(in srgb, var(--shadow-color) 6%, transparent),
+    0 4px 8px color-mix(in srgb, var(--shadow-color) 8%, transparent),
+    0 8px 16px color-mix(in srgb, var(--shadow-color) 8%, transparent);
   --shadow-lg: 
-    0 4px 8px hsl(var(--shadow-color) / 0.04),
-    0 8px 16px hsl(var(--shadow-color) / 0.06),
-    0 16px 32px hsl(var(--shadow-color) / 0.08),
-    0 24px 48px hsl(var(--shadow-color) / 0.1);
+    0 4px 8px color-mix(in srgb, var(--shadow-color) 4%, transparent),
+    0 8px 16px color-mix(in srgb, var(--shadow-color) 6%, transparent),
+    0 16px 32px color-mix(in srgb, var(--shadow-color) 8%, transparent),
+    0 24px 48px color-mix(in srgb, var(--shadow-color) 10%, transparent);
   --shadow-xl: 
-    0 4px 8px hsl(var(--shadow-color) / 0.04),
-    0 8px 16px hsl(var(--shadow-color) / 0.05),
-    0 16px 32px hsl(var(--shadow-color) / 0.06),
-    0 32px 64px hsl(var(--shadow-color) / 0.08),
-    0 48px 96px hsl(var(--shadow-color) / 0.1);
+    0 4px 8px color-mix(in srgb, var(--shadow-color) 4%, transparent),
+    0 8px 16px color-mix(in srgb, var(--shadow-color) 5%, transparent),
+    0 16px 32px color-mix(in srgb, var(--shadow-color) 6%, transparent),
+    0 32px 64px color-mix(in srgb, var(--shadow-color) 8%, transparent),
+    0 48px 96px color-mix(in srgb, var(--shadow-color) 10%, transparent);
   
   /* Glow shadows */
   --shadow-glow-primary: 0 0 24px color-mix(in srgb, var(--accent-primary) 30%, transparent);
@@ -106,7 +106,7 @@
   
   /* Inner highlights for depth */
   --shadow-inner-highlight: inset 0 1px 0 0 color-mix(in srgb, var(--paper) 5%, transparent);
-  --shadow-inner-sm: inset 0 1px 2px hsl(var(--shadow-color) / 0.15);
+  --shadow-inner-sm: inset 0 1px 2px color-mix(in srgb, var(--shadow-color) 15%, transparent);
   
   /* ===== GLASSMORPHISM ===== */
   --glass-blur: 12px;
@@ -115,9 +115,9 @@
   --glass-shadow: 0 4px 30px color-mix(in srgb, var(--ink) 15%, transparent);
   
   /* ===== GRADIENTS ===== */
-  --gradient-primary: linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 70%, var(--hue-violet)));
-  --gradient-success: linear-gradient(135deg, var(--accent-success), color-mix(in srgb, var(--accent-success) 70%, var(--hue-emerald-deep)));
-  --gradient-danger: linear-gradient(135deg, var(--accent-danger), color-mix(in srgb, var(--accent-danger) 70%, var(--hue-red-deep)));
+  --gradient-primary: linear-gradient(135deg, var(--accent-primary), color-mix(in srgb, var(--accent-primary) 70%, var(--accent-pro)));
+  --gradient-success: linear-gradient(135deg, var(--accent-success), color-mix(in srgb, var(--accent-success) 70%, var(--accent-primary)));
+  --gradient-danger: linear-gradient(135deg, var(--accent-danger), color-mix(in srgb, var(--accent-danger) 70%, var(--accent-pro)));
   --gradient-surface: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
   --gradient-shine: linear-gradient(135deg, color-mix(in srgb, var(--paper) 12%, transparent), transparent 50%);
   
@@ -145,26 +145,26 @@
   
   
   /* Light theme shadow adjustments — stronger, colored */
-  --shadow-color: 220deg 30% 50%;
+  --shadow-color: var(--muted);
   --shadow-xs: 
-    0 1px 2px hsl(var(--shadow-color) / 0.06),
-    0 1px 3px hsl(var(--shadow-color) / 0.08);
+    0 1px 2px color-mix(in srgb, var(--shadow-color) 6%, transparent),
+    0 1px 3px color-mix(in srgb, var(--shadow-color) 8%, transparent);
   --shadow-sm: 
-    0 1px 2px hsl(var(--shadow-color) / 0.06),
-    0 2px 6px hsl(var(--shadow-color) / 0.10);
+    0 1px 2px color-mix(in srgb, var(--shadow-color) 6%, transparent),
+    0 2px 6px color-mix(in srgb, var(--shadow-color) 10%, transparent);
   --shadow-md: 
-    0 2px 4px hsl(var(--shadow-color) / 0.05),
-    0 4px 12px hsl(var(--shadow-color) / 0.08),
-    0 8px 24px hsl(var(--shadow-color) / 0.06);
+    0 2px 4px color-mix(in srgb, var(--shadow-color) 5%, transparent),
+    0 4px 12px color-mix(in srgb, var(--shadow-color) 8%, transparent),
+    0 8px 24px color-mix(in srgb, var(--shadow-color) 6%, transparent);
   --shadow-lg: 
-    0 4px 8px hsl(var(--shadow-color) / 0.04),
-    0 8px 24px hsl(var(--shadow-color) / 0.08),
-    0 16px 48px hsl(var(--shadow-color) / 0.06);
+    0 4px 8px color-mix(in srgb, var(--shadow-color) 4%, transparent),
+    0 8px 24px color-mix(in srgb, var(--shadow-color) 8%, transparent),
+    0 16px 48px color-mix(in srgb, var(--shadow-color) 6%, transparent);
   --shadow-xl: 
-    0 4px 8px hsl(var(--shadow-color) / 0.03),
-    0 8px 24px hsl(var(--shadow-color) / 0.06),
-    0 24px 64px hsl(var(--shadow-color) / 0.08),
-    0 40px 96px hsl(var(--shadow-color) / 0.06);
+    0 4px 8px color-mix(in srgb, var(--shadow-color) 3%, transparent),
+    0 8px 24px color-mix(in srgb, var(--shadow-color) 6%, transparent),
+    0 24px 64px color-mix(in srgb, var(--shadow-color) 8%, transparent),
+    0 40px 96px color-mix(in srgb, var(--shadow-color) 6%, transparent);
 
   /* Glow shadows — softer for light */
   --shadow-glow-primary: 0 0 20px color-mix(in srgb, var(--accent-primary) 20%, transparent);
@@ -179,7 +179,7 @@
   
   /* Inner highlight for light theme */
   --shadow-inner-highlight: inset 0 1px 0 0 color-mix(in srgb, var(--paper) 90%, transparent);
-  --shadow-inner-sm: inset 0 1px 3px hsl(var(--shadow-color) / 0.08);
+  --shadow-inner-sm: inset 0 1px 3px color-mix(in srgb, var(--shadow-color) 8%, transparent);
   
   /* Gradient shine for light */
   --gradient-shine: linear-gradient(135deg, color-mix(in srgb, var(--paper) 70%, transparent), transparent 50%);
@@ -1907,56 +1907,6 @@ input:focus, select:focus, textarea:focus {
    Global classes for elevating all pages
    ============================================ */
 
-/* Icon containers with colored backgrounds */
-.icon-box {
-  @apply w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-200;
-}
-.icon-box-sm {
-  @apply w-6 h-6 rounded-md flex items-center justify-center transition-colors duration-200;
-}
-.icon-box-lg {
-  @apply w-10 h-10 rounded-lg flex items-center justify-center transition-colors duration-200;
-}
-
-/* Colored icon boxes - theme aware */
-.icon-box-primary {
-  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
-  color: var(--accent-primary);
-}
-.icon-box-success {
-  background: color-mix(in srgb, var(--accent-success) 15%, transparent);
-  color: var(--accent-success);
-}
-.icon-box-warning {
-  background: color-mix(in srgb, var(--accent-warning) 15%, transparent);
-  color: var(--accent-warning);
-}
-.icon-box-danger {
-  background: color-mix(in srgb, var(--accent-danger) 15%, transparent);
-  color: var(--accent-danger);
-}
-.icon-box-purple {
-  background: color-mix(in srgb, var(--accent-purple) 15%, transparent);
-  color: var(--accent-purple);
-}
-.icon-box-neutral {
-  background: color-mix(in srgb, var(--bg-tertiary) 60%, transparent);
-  color: var(--text-secondary);
-}
-/* Additional color variants for avatars and special icons */
-.icon-box-cyan {
-  background: color-mix(in srgb, var(--hue-cyan) 15%, transparent);
-  color: var(--hue-cyan);
-}
-.icon-box-teal {
-  background: color-mix(in srgb, var(--hue-teal) 15%, transparent);
-  color: var(--hue-teal);
-}
-.icon-box-indigo {
-  background: color-mix(in srgb, var(--hue-indigo) 15%, transparent);
-  color: var(--hue-indigo);
-}
-
 /* Help panel statistics cards */
 .help-stat-card {
   @apply text-center p-3 rounded-lg transition-all duration-200;
@@ -2009,9 +1959,6 @@ input:focus, select:focus, textarea:focus {
 .table-icon-cell {
   @apply flex items-center gap-2;
 }
-.table-icon-cell .icon-box {
-  @apply shrink-0;
-}
 
 /* Gradient accent line (top of cards) */
 .accent-line-top::before {
@@ -2045,9 +1992,6 @@ input:focus, select:focus, textarea:focus {
     color-mix(in srgb, var(--bg-tertiary) 30%, transparent),
     transparent
   );
-}
-.empty-state-enhanced .icon-box {
-  @apply w-16 h-16 mx-auto mb-4 rounded-2xl;
 }
 
 /* Table name cell with icon */
@@ -2247,7 +2191,7 @@ input:focus, select:focus, textarea:focus {
   height: 3px;
   background: linear-gradient(90deg, 
     var(--accent-primary), 
-    color-mix(in srgb, var(--accent-primary) 50%, var(--hue-violet))
+    color-mix(in srgb, var(--accent-primary) 50%, var(--accent-pro))
   );
   opacity: 0.6;
 }
@@ -2276,57 +2220,14 @@ input:focus, select:focus, textarea:focus {
   box-shadow: var(--shadow-xs);
 }
 
-/* ============================================
-   ICON CONTAINERS - COLORFUL BACKGROUNDS
-   ============================================ */
-.icon-container {
-  @apply w-7 h-7 rounded-lg flex items-center justify-center shrink-0;
-}
 
-.icon-container-primary {
-  background: color-mix(in srgb, var(--accent-primary) 15%, transparent);
-  color: var(--accent-primary);
-}
 
-.icon-container-success {
-  background: color-mix(in srgb, var(--accent-success) 15%, transparent);
-  color: var(--accent-success);
-}
 
-.icon-container-warning {
-  background: color-mix(in srgb, var(--hue-amber) 15%, transparent);
-  color: var(--hue-amber);
-}
 
-.icon-container-orange {
-  background: color-mix(in srgb, var(--hue-orange) 15%, transparent);
-  color: var(--hue-orange);
-}
 
-.icon-container-danger {
-  background: color-mix(in srgb, var(--accent-danger) 15%, transparent);
-  color: var(--accent-danger);
-}
 
-.icon-container-violet {
-  background: color-mix(in srgb, var(--hue-violet) 15%, transparent);
-  color: var(--hue-violet);
-}
 
-.icon-container-amber {
-  background: color-mix(in srgb, var(--hue-amber) 15%, transparent);
-  color: var(--hue-amber);
-}
 
-.icon-container-teal {
-  background: color-mix(in srgb, var(--hue-teal) 15%, transparent);
-  color: var(--hue-teal);
-}
-
-.icon-container-neutral {
-  background: var(--bg-tertiary);
-  color: var(--text-tertiary);
-}
 
 /* ============================================
    THEME-AWARE ICON BACKGROUNDS
@@ -2377,10 +2278,6 @@ input:focus, select:focus, textarea:focus {
   color: var(--icon-teal-text);
 }
 
-.icon-bg-rose {
-  background: color-mix(in srgb, var(--hue-rose) 15%, transparent);
-  color: var(--icon-rose-text, var(--hue-rose));
-}
 
 .icon-bg-gray {
   background: color-mix(in srgb, var(--text-tertiary) 15%, transparent);
@@ -2397,7 +2294,6 @@ input:focus, select:focus, textarea:focus {
 .icon-text-green { color: var(--icon-emerald-text); }
 .icon-text-purple { color: var(--icon-violet-text); }
 .icon-text-cyan { color: var(--icon-teal-text); }
-.icon-text-rose { color: var(--icon-rose-text, var(--hue-rose)); }
 
 /* CA Type Icons - Gradient backgrounds with borders */
 .ca-icon-root {
@@ -2467,10 +2363,6 @@ input:focus, select:focus, textarea:focus {
   color: var(--accent-danger);
 }
 
-.icon-bg-sky {
-  background: color-mix(in srgb, var(--hue-sky) 15%, transparent);
-  color: var(--hue-sky);
-}
 
 /* ============================================
    CA TREE VIEW — Organigramme + Columns styles
@@ -2551,7 +2443,7 @@ input:focus, select:focus, textarea:focus {
   height: 2px;
   background: linear-gradient(90deg,
     var(--accent-primary),
-    color-mix(in srgb, var(--accent-primary) 40%, var(--hue-violet)),
+    color-mix(in srgb, var(--accent-primary) 40%, var(--accent-pro)),
     transparent
   );
 }
@@ -2583,15 +2475,6 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-primary) 30%, transparent);
 }
 
-.help-modal-btn {
-  background: var(--gradient-primary);
-  color: white;
-  box-shadow: 0 2px 8px color-mix(in srgb, var(--accent-primary) 30%, transparent);
-}
-.help-modal-btn:hover {
-  box-shadow: 0 4px 16px color-mix(in srgb, var(--accent-primary) 40%, transparent);
-  transform: translateY(-1px);
-}
 
 /* ============================================
    MOBILE PREMIUM POLISH
@@ -2823,8 +2706,8 @@ input:focus, select:focus, textarea:focus {
 
 /* Search highlight for Help reader */
 ::highlight(search-results) {
-  background-color: var(--hue-highlight);
-  color: var(--ink-highlight);
+  background-color: var(--warnbg);
+  color: var(--warn);
 }
 
 /* Keyboard shortcut indicator */

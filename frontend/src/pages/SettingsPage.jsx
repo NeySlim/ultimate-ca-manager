@@ -86,7 +86,7 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'https', labelKey: 'settings.tabs.https', icon: Lock, color: 'icon-bg-emerald' },
   { id: 'updates', labelKey: 'settings.tabs.updates', icon: Rocket, color: 'icon-bg-violet' },
   { id: 'scheduler', labelKey: 'settings.tabs.scheduler', icon: Timer, color: 'icon-bg-blue' },
-  { id: 'webhooks', labelKey: 'settings.tabs.webhooks', icon: Bell, color: 'icon-bg-rose' },
+  { id: 'webhooks', labelKey: 'settings.tabs.webhooks', icon: Bell, color: 'icon-bg-orange' },
   { id: 'ct', labelKey: 'settings.tabs.ct', icon: Eye, color: 'icon-bg-cyan' },
   { id: 'autoRenewal', labelKey: 'settings.tabs.autoRenewal', icon: ClockClockwise, color: 'icon-bg-emerald' },
   // Admin-only (#299) — hidden from non-admin roles below
@@ -94,7 +94,7 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'microsoftCA', labelKey: 'settings.tabs.microsoftCA', icon: WindowsLogo, color: 'icon-bg-indigo' },
   { id: 'adConnector', labelKey: 'settings.tabs.adConnector', icon: IdentificationBadge, color: 'icon-bg-blue' },
   { id: 'xcepWstep', labelKey: 'settings.tabs.xcepWstep', icon: WindowsLogo, color: 'icon-bg-indigo' },
-  { id: 'about', labelKey: 'settings.tabs.about', icon: Info, color: 'icon-bg-sky' },
+  { id: 'about', labelKey: 'settings.tabs.about', icon: Info, color: 'icon-bg-gray' },
 ]
 
 // SSO Provider type icons
@@ -1803,7 +1803,7 @@ export default function SettingsPage() {
           { labelKey: 'settings.groups.automation', tabs: ['autoRenewal', 'deploy'], color: 'icon-bg-emerald' },
           { labelKey: 'settings.groups.integrations', tabs: ['microsoftCA', 'adConnector', 'xcepWstep'], color: 'icon-bg-indigo' },
           { labelKey: 'settings.groups.interface', tabs: ['appearance', 'audit'], color: 'icon-bg-violet' },
-          { labelKey: 'settings.groups.about', tabs: ['about'], color: 'icon-bg-sky' },
+          { labelKey: 'settings.groups.about', tabs: ['about'], color: 'icon-bg-gray' },
         ]}
         helpPageKey="settings"
       >
