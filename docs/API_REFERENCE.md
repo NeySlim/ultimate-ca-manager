@@ -1965,7 +1965,7 @@ Scope `read:dashboard`. A `days` outside its range is refused with 400.
 | `crl_missing` | active CA with CDP and no CRL | |
 | `manual_renewal_due` | expires within 24 h | expires within 30 days |
 | `client_renewal_overdue` | | protocol certificate without a stored key, expires within 7 days |
-| `auto_renewal_blocked` | due for auto-renewal, its CA offline, revoked, expired or keyless | |
+| `auto_renewal_blocked` | within `auto_renewal_days` of expiry (due for auto-renewal), its CA offline, revoked, expired or keyless | |
 | `renewal_declined` | | renewal rejected by an approver during the current lifetime, expires within 30 days |
 | `ca_expiring` | expires within 90 days | expires within a year |
 

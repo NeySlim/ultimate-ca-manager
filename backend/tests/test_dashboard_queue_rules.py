@@ -77,3 +77,15 @@ def test_automatic_refusal_parks_a_blocked_renewal_as_declined(app, auth_client,
         queue = _queue(auth_client)
         assert _find(queue, 'renewal_declined', cert.id) is not None
         assert _find(queue, 'auto_renewal_blocked', cert.id) is None
+
+
+def test_blocked_is_bounded_by_the_auto_renewal_days(app, auth_client, rules):
+    with app.app_context():
+        rules.days(7)
+        ca = rules.ca('rules-offline-c', offline=True, prv='k')
+        far = rules.cert('rules-not-yet-due', 25, prv='k', caref=ca.refid)
+        near = rules.cert('rules-due', 5, prv='k', caref=ca.refid)
+        db.session.commit()
+        assert _kinds(auth_client, far.id) == []
+        item = _find(_queue(auth_client), 'auto_renewal_blocked', near.id)
+        assert item is not None and item['tier'] == 'critical'

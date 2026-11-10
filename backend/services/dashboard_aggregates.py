@@ -280,9 +280,10 @@ def _renewal_declined(auto_only=False):
 
 
 def _blocked_conditions(now):
-    """Due for auto-renewal, which then fails on every pass because the CA cannot sign;
-    only an automatic refusal parks it (a refused manual request does not stop the passes)."""
-    return [*_live_until(now, EXPIRY_WINDOW_DAYS), _auto_renewed(_renewal_config()),
+    """Due for auto-renewal (inside its days_before_expiry), which then fails on every pass
+    because the CA cannot sign; only an automatic refusal parks it, not a refused manual request."""
+    config = _renewal_config()
+    return [*_live_until(now, config['days_before_expiry']), _auto_renewed(config),
             _issuer_cannot_sign(now), ~_renewal_declined(auto_only=True)]
 
 
