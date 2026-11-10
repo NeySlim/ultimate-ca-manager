@@ -186,6 +186,12 @@ def on_certificate_renewed(event_type, payload, ca_refid, meta):
                 "HTTPS-bound certificate %s renewed but unusable "
                 "(missing cert or key). HTTPS files left untouched", refid)
             return
+        from utils.ha import ha_enabled
+        if ha_enabled():
+            logger.warning(
+                "bound HTTPS certificate %s renewed, files not "
+                "re-materialized on this node (HA)", refid)
+            return
         materialize_https_cert(cert)
         logger.info(
             "HTTPS-bound certificate %s renewed, re-materialized, "

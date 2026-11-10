@@ -120,3 +120,34 @@ def test_route_keeps_its_usual_answer_without_ha(auth_client, monkeypatch, path)
     r = auth_client.post(path, json=body)
     assert r.status_code == code, r.data
     assert (r.get_json() or {}).get('code') != 'ha_mode'
+
+
+def _stub_bound_renewal(monkeypatch):
+    import types
+    import services.https_binding as hb
+    import utils.service_manager as sm
+    import models
+    from services.audit_service import AuditService
+    calls = []
+    cert = types.SimpleNamespace(id=1, crt='c', prv='k', descr='d')
+    fake_q = types.SimpleNamespace(filter_by=lambda **k: types.SimpleNamespace(first=lambda: cert))
+    monkeypatch.setattr(models, 'Certificate', types.SimpleNamespace(query=fake_q))
+    monkeypatch.setattr(hb, 'get_bound_refid', lambda: 'r1')
+    monkeypatch.setattr(hb, 'materialize_https_cert', lambda c: calls.append('materialize'))
+    monkeypatch.setattr(sm, 'restart_service', lambda: calls.append('restart'))
+    monkeypatch.setattr(AuditService, 'log_action', staticmethod(lambda **k: None))
+    return hb, calls
+
+
+def test_bound_cert_renewal_not_materialized_in_ha(monkeypatch):
+    hb, calls = _stub_bound_renewal(monkeypatch)
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    hb.on_certificate_renewed('certificate.renewed', {'certificate': {'refid': 'r1'}}, None, {})
+    assert calls == []
+
+
+def test_bound_cert_renewal_materialized_without_ha(monkeypatch):
+    hb, calls = _stub_bound_renewal(monkeypatch)
+    monkeypatch.setattr(Config, 'HA_MODE', False)
+    hb.on_certificate_renewed('certificate.renewed', {'certificate': {'refid': 'r1'}}, None, {})
+    assert 'materialize' in calls
