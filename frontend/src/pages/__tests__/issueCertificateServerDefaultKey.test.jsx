@@ -122,4 +122,30 @@ describe('IssueCertificateForm server default key', () => {
     await new Promise((r) => setTimeout(r, 20))
     expect(state('common.keyType')).toBe('ml-dsa')
   })
+
+  it('returns to the server default when a keyless template replaces a keyed one', async () => {
+    mocks.templates = TEMPLATES
+    mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, default_key_type: 'RSA-3072' } })
+    renderForm()
+    pickCa('3')
+    await waitFor(() => expect(state('common.keySize')).toBe('3072'))
+    await screen.findByLabelText('certificates.templateOptional')
+    pickTemplate('7')
+    await waitFor(() => expect(state('common.keySize')).toBe('384'))
+    pickTemplate('8')
+    await waitFor(() => expect([state('common.keyType'), state('common.keySize')]).toEqual(['rsa', '3072']))
+  })
+
+  it('returns to the server default when the keyed template is cleared', async () => {
+    mocks.templates = TEMPLATES
+    mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, default_key_type: 'RSA-3072' } })
+    renderForm()
+    pickCa('3')
+    await waitFor(() => expect(state('common.keySize')).toBe('3072'))
+    await screen.findByLabelText('certificates.templateOptional')
+    pickTemplate('7')
+    await waitFor(() => expect(state('common.keySize')).toBe('384'))
+    pickTemplate('')
+    await waitFor(() => expect([state('common.keyType'), state('common.keySize')]).toEqual(['rsa', '3072']))
+  })
 })

@@ -219,23 +219,21 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   // Apply template when selected
   const handleTemplateChange = (templateId) => {
     setSelectedTemplate(templateId)
-    if (!templateId) return
-    const tpl = templates.find(t => String(t.id) === templateId)
-    if (!tpl) return
-
-    const updates = {}
-
-    // Map template key_type to form fields
-    // A keyless template releases only a template's key, never the user's own choice
-    if (keySource.current === 'template') keySource.current = null
-    if (tpl.key_type) {
-      const pair = findAlgorithm(tpl.key_type)?.issue
-      if (pair) {
-        keySource.current = 'template'
-        updates.key_type = pair[0]
-        updates.key_size = pair[1]
-      }
+    const tpl = templateId ? templates.find(t => String(t.id) === templateId) : null
+    const tplPair = tpl?.key_type ? findAlgorithm(tpl.key_type)?.issue : null
+    // A keyless template (or none) releases only a template's key, never the user's own choice,
+    // and puts back the server default; the default effect follows if the new pair's differs
+    const released = !tplPair && keySource.current === 'template'
+    if (released) keySource.current = null
+    const keyPair = tplPair || (released ? findAlgorithm(defaultKeyType)?.issue : null)
+    const keyUpdates = keyPair ? { key_type: keyPair[0], key_size: keyPair[1] } : {}
+    if (tplPair) keySource.current = 'template'
+    if (!tpl) {
+      if (keyPair) setFormData(prev => ({ ...prev, ...keyUpdates }))
+      return
     }
+
+    const updates = { ...keyUpdates }
     if (tpl.validity_days) updates.validity_days = String(tpl.validity_days)
 
     // Map template_type to cert_type (unmapped types fall back to custom:
