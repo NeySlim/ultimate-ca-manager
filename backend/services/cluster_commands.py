@@ -263,9 +263,7 @@ class CommandApplier:
         # After the rows: a newer restart committed with the node ahead's return is absorbed first;
         # one held (or failed) during this pass is retried on the next
         if held_before and self._held is not None and not self._stop.is_set():
-            held, self._held = self._held, None
-            if self._restart(conn, held) and self._held is None:
-                self._fill_hole(held.id)
+            self._restart(conn, self._held)
 
     def _drain_rows(self, conn, now):
         where, params = ['id > :seen'], {'seen': self.seen, 'n': BATCH}
@@ -277,17 +275,14 @@ class CommandApplier:
             f"WHERE {' OR '.join(where)} ORDER BY id LIMIT :n"), params).fetchall()
         for row in rows:
             if self._stop.is_set():
-                return
-            if self._held is not None and row.id == self._held.id:
-                continue
-            # Committed after this node moved past it: stays a hole until applied
-            late = row.id <= self.seen
-            if not late and row.id > self.seen + 1 and not self._gap_passed(row.id, now):
-                return
-            if not self._apply(conn, row):
-                return
-            if late and self._held is not row:
+                return  # this process is leaving
+            if row.id <= self.seen:
+                # Committed after this node moved past it. _apply settles every row for good
+                # (applied, absorbed, held in memory, or the process leaves): the hole closes now
                 self._fill_hole(row.id)
+            elif row.id > self.seen + 1 and not self._gap_passed(row.id, now):
+                return
+            self._apply(conn, row)
 
     def _gap_passed(self, next_id, now):
         first_missing = self.seen + 1
@@ -310,18 +305,19 @@ class CommandApplier:
                 return
 
     def _apply(self, conn, row):
-        """True when the cursor moves past ``row``; False stops this pass."""
+        """The cursor moves past ``row``; a restart may be held or stop this process."""
         if row.node_id and row.node_id != self.node_id:
             self._advance(conn, row.id)
-            return True
+            return
         if row.kind == RESTART:
             if self._held is not None:
                 # One restart covers both: it waits for the nodes ahead to pass the newer one
                 held = self._held
                 self._held = _Held(max(held.id, row.id), max(held.created_at, row.created_at))
                 self._advance(conn, row.id)
-                return True
-            return self._restart(conn, row)
+                return
+            self._restart(conn, row)
+            return
         handler = self.handlers.get(row.kind)
         if handler is None:
             logger.warning(f"Cluster command {row.id}: unknown kind {row.kind!r}, skipped")
@@ -339,7 +335,6 @@ class CommandApplier:
                 logger.error(f"Cluster command {row.id} ({row.kind}) failed on node "
                              f"{self.node_id}: {type(e).__name__}: {e}")
         self._advance(conn, row.id)
-        return True
 
     def _advance(self, conn, command_id):
         self.seen = max(self.seen, command_id)
@@ -361,12 +356,13 @@ class CommandApplier:
         return conn.execute(_ROW_SQL, {'n': self.node_id}).first() is None
 
     def _restart(self, conn, row):
-        """False when this process leaves; while it waits for its turn, ``row`` is held
+        """Sets _stop when this process leaves; while it waits for its turn, ``row`` is held
         (restart_seen, not command_seen, records the claim) and later reloads go on."""
         if not self.record or row.created_at <= self.started_at:
             # Started after the command (or the scheduler process): nothing to restart here
+            self._held = None
             self._advance(conn, row.id)
-            return True
+            return
         nodes = conn.execute(_NODES_SQL).fetchall()
         from services.scheduler_leader import cluster_utc_now
         pending = pending_predecessors(self.node_id, nodes, row.created_at,
@@ -378,8 +374,9 @@ class CommandApplier:
         if pending and now - since < self.guard * ahead:
             self._held = _Held(row.id, row.created_at)
             self._advance(conn, row.id)
-            return True
+            return
         self._restart_wait = None
+        self._held = None
         if pending:
             logger.warning(f"Rolling restart: {', '.join(pending)} not back after "
                            f"{self.guard * ahead:.0f}s, node {self.node_id} restarts anyway")
@@ -388,7 +385,7 @@ class CommandApplier:
         claimed = self._claim(conn, row.id)
         self._advance(conn, row.id)
         if not claimed:
-            return True
+            return
         self.restarting = True
         logger.warning(f"Rolling restart: node {self.node_id} restarts (command {row.id})")
         self._stop.set()  # this process is leaving: nothing after the restart is applied here
@@ -403,8 +400,6 @@ class CommandApplier:
             self._held = _Held(row.id, row.created_at)
             if not self._stopping:
                 self._stop.clear()
-            return True
-        return False
 
 
 _applier = None

@@ -405,6 +405,45 @@ def test_the_held_restart_waits_for_the_node_ahead_to_restart_for_the_newer_one(
     assert wait_for(lambda: ('down', 'b') in cluster.events)
 
 
+def _in_hole(applier, command_id):
+    return any(lo <= command_id <= hi for lo, hi, _ in list(applier._holes))
+
+
+def test_a_restart_committed_late_while_another_is_held_is_absorbed(app, ha):
+    """The late one fills its hole: it is neither read again nor a second restart."""
+    from sqlalchemy.orm import Session
+    from models import ClusterCommand
+    from services.scheduler_leader import _dedicated_engine, application_url
+    cluster, log = _Cluster(app), []
+    for name in ('a', 'b'):
+        _node_row(app, name)
+    b = ha('b', restart_action=cluster.action('b'), guard=30,
+           handlers={cc.RELOAD_SYSLOG: _recorder(log, 'b')})
+    b.start()
+    assert wait_for(lambda: b.seen is not None)
+    with app.app_context():
+        engine = _dedicated_engine(application_url())
+    try:
+        with Session(bind=engine) as slow, Session(bind=engine) as fast:
+            slow.add(ClusterCommand(kind=cc.RESTART, created_at=utc_now()))
+            slow.flush()  # id taken, not committed
+            late_id = slow.query(ClusterCommand).one().id
+            fast.add(ClusterCommand(kind=cc.RESTART, created_at=utc_now()))
+            fast.commit()
+            held_id = fast.query(ClusterCommand).one().id
+            assert wait_for(lambda: b._held is not None and b._held.id == held_id and _in_hole(b, late_id))
+            slow.commit()
+        assert wait_for(lambda: not _in_hole(b, late_id))
+        after = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'})
+        assert wait_for(lambda: b.seen == after and log == [('b', 'after')])
+        assert b._held.id == held_id and cluster.events == []
+        _back(app, 'a')
+        assert wait_for(lambda: ('up', 'b') in cluster.events)
+        assert cluster.events == [('down', 'b'), ('up', 'b')]
+    finally:
+        engine.dispose()
+
+
 def test_a_restart_action_that_raises_is_retried_and_reloads_go_on(app, ha):
     log, attempts, emitted = [], [], []
 
