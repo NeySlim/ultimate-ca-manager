@@ -9,6 +9,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Changed
+
+- Breaking: the SCEP CertRep is signed with the digest of the client's request when the CA key allows it, never below the key's own (SHA-384 under a P-384 CA, where it was always SHA-256), and an Ed25519 CA signs it with Ed25519 (RFC 8419); #397.
+- Requests that name no key or hash no longer fall back to RSA-2048 and SHA-256 on every issuance path: the default key comes from one place and moves to RSA-3072 under a compliance profile that refuses RSA-2048, and the hash follows the signing key; #397.
+
 ### Fixed
 
 - Certificate Transparency: `POST /api/v2/certificates/<id>/submit-ct` always failed with a server error, as it read an attribute the certificate model does not have, and the chain it built stopped at the direct issuer; the submission now sends the leaf with its full issuer chain up to the root, or the chain stored inline with the certificate, one element per certificate (RFC 6962 §4.1). Reported by Chris by e-mail.
