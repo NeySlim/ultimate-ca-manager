@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from flask import request, g
 from auth.unified import require_auth
 from utils.datetime_utils import to_naive_utc, utc_now
+from utils.serial_format import canonical_serial, serial_to_hex
 from utils.response import success_response, error_response, no_content_response
 from models import Certificate, CA, db
 from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
@@ -274,7 +275,7 @@ def unhold_certificate(cert_id):
         try:
             if caref and serial:
                 from models import RevokedSerial
-                RevokedSerial.query.filter_by(caref=caref, serial_number=serial).delete(
+                RevokedSerial.query.filter_by(caref=caref, serial_number=canonical_serial(serial)).delete(
                     synchronize_session='fetch')
             db.session.commit()
         except Exception as e:
@@ -319,7 +320,7 @@ def unhold_certificate(cert_id):
             msca = find_msca_for_cert(cert)
             if msca and MicrosoftCAService.admin_channel_available(msca):
                 try:
-                    MicrosoftCAService.unrevoke_on_ca(msca, cert.serial_number)
+                    MicrosoftCAService.unrevoke_on_ca(msca, serial_to_hex(cert.serial_number))  # certutil reads hex
                     AuditService.log_action(
                         action='msca.unrevoke_on_ca',
                         resource_type='certificate',

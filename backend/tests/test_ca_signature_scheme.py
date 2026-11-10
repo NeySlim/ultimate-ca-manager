@@ -230,7 +230,7 @@ def test_switching_drops_the_cached_ocsp_answers(app, auth_client, create_ca, cr
     ca = create_ca(cn='Scheme switch OCSP cache')
     leaf = create_cert(cn='ocsp-cache-switch.example.test', ca_id=ca['id'])
     with app.app_context():
-        serial = int(db.session.get(Certificate, leaf['id']).serial_number, 16)
+        serial = int(db.session.get(Certificate, leaf['id']).serial_number)
         OCSPService().generate_response(db.session.get(CA, ca['id']), serial)
         assert OCSPResponse.query.filter_by(ca_id=ca['id']).count() == 1
     r = auth_client.patch(f"/api/v2/cas/{ca['id']}", content_type='application/json',

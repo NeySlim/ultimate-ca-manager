@@ -74,7 +74,7 @@ def _make_msca_cert(app, cn, winrm=True):
         db.session.add(MSCARequest(msca_id=msca.id, cert_id=cert.id,
                                    template='WebServer', status='issued'))
         db.session.commit()
-        return msca.id, cert.id, cert.serial_number
+        return msca.id, cert.id, format(cert_obj.serial_number, 'X')  # the form certutil is given
 
 
 class TestSerialValidation:
@@ -131,6 +131,18 @@ class TestRevokePropagation:
         with app.app_context():
             from models import Certificate, db
             assert db.session.get(Certificate, cert_id).revoked is True
+
+    def test_unhold_msca_sends_the_hex_serial_to_the_ca(self, app, auth_client, monkeypatch):
+        msca_id, cert_id, serial = _make_msca_cert(app, 'unhold-ca.test.local')
+        scripts = []
+        from services.msca.admin_channel import MicrosoftCAAdminChannelMixin
+        monkeypatch.setattr(MicrosoftCAAdminChannelMixin, '_run_ps',
+                            staticmethod(lambda msca, script: scripts.append(script) or 'ok'))
+        r = post_json(auth_client, f'{CERTS}/{cert_id}/revoke', {'reason': 'certificateHold'})
+        assert r.status_code == 200, r.data
+        r = post_json(auth_client, f'{CERTS}/{cert_id}/unhold')
+        assert r.status_code == 200, r.data
+        assert f'-revoke {serial.lower()} -1;' in scripts[-1]  # unrevoke
 
     def test_revoke_without_channel_is_local_only(self, app, auth_client):
         _, cert_id, _ = _make_msca_cert(app, 'revoke-nochan.test.local', winrm=False)

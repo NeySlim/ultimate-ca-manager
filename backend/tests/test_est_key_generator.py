@@ -104,6 +104,9 @@ class TestLifecycle:
             row = _delegate_row(ca_id)
             delegate = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
             assert int(row.serial_number) == serial == delegate.serial_number
+            # The pointer is compared to certificates.serial_number by string equality
+            link = EstSignerCert.query.filter_by(ca_id=ca_id).one()
+            assert link.serial_number == row.serial_number == str(serial)
             assert row.source == 'est_key_generator' and row.subject_cn == 'EST key generator'
             assert not row.prv.startswith('-----')
             from models import AuditLog

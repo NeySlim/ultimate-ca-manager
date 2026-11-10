@@ -142,7 +142,7 @@ def test_merging_a_duplicate_leaves_no_orphan_rows(app):
         assert OCSPResponse.query.filter_by(ca_id=dupe_id).count() == 0
         assert CATemplatePin.query.filter_by(ca_id=dupe_id).count() == 0
         assert RevokedSerial.query.filter_by(caref=dupe_refid).count() == 0
-        assert RevokedSerial.query.filter_by(caref=keeper_refid, serial_number='02').count() == 1
+        assert RevokedSerial.query.filter_by(caref=keeper_refid, serial_number='2').count() == 1  # stored canonical
         assert Certificate.query.filter_by(descr='issued').one().caref == keeper_refid
         assert CATemplatePin.query.filter_by(ca_id=keeper_id, template_id=template.id).count() == 1
 

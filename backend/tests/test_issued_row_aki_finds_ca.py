@@ -70,7 +70,7 @@ def test_msca_import_row_aki_finds_its_ca(app, create_ca):
         cert = _ca_signed(ca, 'aki-msca-new.example.test')
         _import_signed_cert(None, cert.public_bytes(serialization.Encoding.PEM).decode(),
                             msca, 'WebServer', None)
-        row = Certificate.query.filter_by(serial_number=format(cert.serial_number, 'X')).one()
+        row = Certificate.query.filter_by(serial_number=str(cert.serial_number)).one()
         _assert_finds(row, ca, cert)
         # With a CSR row: updated in place
         pending = Certificate(refid=uuid.uuid4().hex[:8], descr='aki msca csr', csr=base64.b64encode(

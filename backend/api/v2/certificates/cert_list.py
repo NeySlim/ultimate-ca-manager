@@ -6,6 +6,7 @@ from sqlalchemy import or_, and_, case, func
 from sqlalchemy.orm import selectinload
 from auth.unified import require_auth
 from utils.response import success_response
+from utils.serial_format import serial_search_forms
 from utils.pagination import parse_request_pagination
 from models import Certificate, CA, db
 from utils.cert_status import (
@@ -151,7 +152,9 @@ def list_certificates():
                 Certificate.subject.ilike(f'%{safe_search}%', escape='\\'),
                 Certificate.issuer.ilike(f'%{safe_search}%', escape='\\'),
                 Certificate.descr.ilike(f'%{safe_search}%', escape='\\'),
-                Certificate.serial_number.ilike(f'%{safe_search}%', escape='\\')
+                Certificate.serial_number.ilike(f'%{safe_search}%', escape='\\'),
+                # A whole serial typed in hex or colon hex, as the UI shows it
+                Certificate.serial_number.in_(serial_search_forms(search)),
             )
         )
 

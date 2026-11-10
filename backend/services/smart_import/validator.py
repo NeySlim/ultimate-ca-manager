@@ -58,6 +58,10 @@ def find_existing_cert_by_identity(model_cls, serial_number: Optional[str],
     """
     if not serial_number:
         return None
+    from models import Certificate
+    from utils.serial_format import canonical_serial
+    if model_cls is Certificate:
+        serial_number = canonical_serial(serial_number)
     candidates = model_cls.query.filter_by(serial_number=serial_number).all()
     if not candidates:
         return None

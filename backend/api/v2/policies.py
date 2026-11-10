@@ -19,6 +19,7 @@ import fips_mode
 from utils.datetime_utils import cert_not_before, utc_now
 from utils.leaf_key_usage import key_usage_for_key, key_usage_notice
 from utils.revocation_reasons import revocable
+from utils.serial_format import names_certificate
 from services.audit_service import AuditService
 from services.policy_notifications import validated_emails
 from security.encryption import encrypt_private_key
@@ -190,7 +191,8 @@ def _approval_target_gone(approval):
     if cert is None or not cert.crt:
         return ('The certificate to revoke no longer exists' if approval.request_type == 'revocation'
                 else 'The certificate to renew no longer exists')
-    if approval.request_type == 'revocation' and cert.serial_number != data.get('serial_number'):
+    if approval.request_type == 'revocation' and not names_certificate(
+            data.get('serial_number'), cert, approval.created_at):
         return 'The certificate was renewed since the request; request its revocation again'
     return None
 
@@ -341,7 +343,7 @@ def _revoke_approved_certificate(approval, data):
     cert = _row(Certificate, data.get('certificate_id'))
     if cert is None or not cert.crt:
         raise ValueError('The certificate to revoke no longer exists')
-    if cert.serial_number != data.get('serial_number'):
+    if not names_certificate(data.get('serial_number'), cert, approval.created_at):
         raise ValueError('The certificate was renewed since the request; request its revocation again')
     reason, invalidity_at = _approved_revocation_params(data)
     # On hold, a definitive reason makes the hold final (RFC 5280 §5.2.4)
@@ -800,7 +802,7 @@ def _issue_approved_certificate(approval):
         cert_type=cert_type,
         subject=new_cert.subject.rfc4514_string(),
         issuer=new_cert.issuer.rfc4514_string(),
-        serial_number=format(new_cert.serial_number, 'x'),
+        serial_number=new_cert.serial_number,
         aki=cert_aki,
         ski=cert_ski,
         valid_from=now,

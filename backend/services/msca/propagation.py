@@ -22,6 +22,7 @@ import logging
 from typing import Optional, Tuple
 
 from models import db
+from utils.serial_format import serial_to_hex
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +73,7 @@ def propagate_revocation(cert, reason) -> Tuple[str, Optional[str]]:
     resource_name = cert.subject or cert.refid
     msca_name = msca.name
     try:
-        MicrosoftCAService.revoke_on_ca(msca, cert.serial_number, reason=reason)
+        MicrosoftCAService.revoke_on_ca(msca, serial_to_hex(cert.serial_number), reason=reason)  # certutil reads hex
     except MSCAAdminChannelError as e:
         logger.error(f"MS CA admin-channel revoke failed for cert {cert_id}: {e}")
         return CHANNEL_FAILED, str(e)

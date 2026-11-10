@@ -277,7 +277,7 @@ class TestApproveDenyService:
             assert cert is not None
             assert cert.source == 'msca'
             assert cert.subject_cn == 'appr-d.test.local'
-            assert (cert.serial_number or '').lower() == serial
+            assert cert.serial_number == str(int(serial, 16))
 
         # certutil got the resubmit for the right request id
         assert any('-resubmit 201' in s for s in fake_ca.calls)
@@ -299,7 +299,7 @@ class TestApproveDenyService:
 
             from models import Certificate
             matches = [c for c in Certificate.query.all()
-                       if (c.serial_number or '').lower() == serial]
+                       if c.serial_number == str(int(serial, 16))]
             assert len(matches) == 1
             assert matches[0].id == pre_id
 
@@ -451,7 +451,7 @@ class TestCaControlEndpoints:
             from models import Certificate, db
             cert = db.session.get(Certificate, data['imported_cert_id'])
             assert cert.source == 'msca'
-            assert (cert.serial_number or '').lower() == serial
+            assert cert.serial_number == str(int(serial, 16))
 
     def test_post_deny(self, app, auth_client, fake_ca):
         msca_id = _make_msca(app, 'CAC EP Deny N')

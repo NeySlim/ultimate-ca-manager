@@ -33,7 +33,6 @@ from utils.issuance_defaults import default_issue_key_type
 from utils.key_type import validate_enrollment_csr
 from utils.request_names import RequestRejected
 from utils.san_parse import is_valid_san_email
-from utils.serial_format import serial_variants
 from utils.upn_san import build_upn_other_name
 
 from . import ws_security

@@ -94,7 +94,7 @@ class TestNextUpdateBoundByResponder:
                                         serial_number=str(resp_cert.serial_number))
             db.session.add(responder_row); db.session.commit()
             _configure_delegated_responder(ca_obj, responder_row, resp_cert, key)
-            serial = int(row.serial_number, 16)
+            serial = int(row.serial_number)
             der, status = OCSPService().generate_response(ca_obj, serial)
             assert status == 'good'
             resp = ocsp.load_der_ocsp_response(der)
@@ -191,7 +191,7 @@ class TestRenewalDropsResponderCache:
                                  data=json.dumps({'certificate_id': resp_id}), content_type='application/json')
             assert r.status_code == 200, r.data
             ca_obj = _ca_model(ca)
-            serial = int(db.session.get(Certificate, leaf['id']).serial_number, 16)
+            serial = int(db.session.get(Certificate, leaf['id']).serial_number)
             OCSPService().generate_response(ca_obj, serial)
             assert OCSPResponse.query.filter_by(ca_id=ca['id']).count() >= 1
             r = auth_client.post(f"/api/v2/certificates/{resp_id}/renew", data=json.dumps({}), content_type='application/json')

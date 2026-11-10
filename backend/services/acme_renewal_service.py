@@ -190,7 +190,8 @@ def _record_replaced_serial(replaced):
     if ca is None:
         return  # an external CA publishes its own revocations
     now = utc_now()
-    row = RevokedSerial.query.filter_by(caref=ca.refid, serial_number=replaced.serial).first()
+    from utils.serial_format import canonical_serial
+    row = RevokedSerial.query.filter_by(caref=ca.refid, serial_number=canonical_serial(replaced.serial)).first()
     if row is None:
         row = RevokedSerial(caref=ca.refid, serial_number=replaced.serial)
         db.session.add(row)

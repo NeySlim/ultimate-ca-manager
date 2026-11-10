@@ -19,7 +19,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import CA, Certificate
-from utils.serial_format import serial_variants
+from utils.serial_format import canonical_serial, serial_variants
 
 logger = logging.getLogger(__name__)
 
@@ -429,7 +429,7 @@ def certificate_row_for(auth_cert) -> Optional[Certificate]:
             serial = int(raw, base)
         except ValueError:
             continue
-        readings.append((serial, serial_variants(serial)))
+        readings.append((serial, {canonical_serial(serial)}))
     if not readings:
         return None
     # Both readings in one query, then split back so decimal still wins

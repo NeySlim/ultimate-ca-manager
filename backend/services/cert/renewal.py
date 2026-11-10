@@ -38,6 +38,7 @@ from utils.qc_statements import carried_policy_oids, template_policy_oids
 from utils.leaf_key_usage import constrain_builder_key_usage
 from utils.spki_digest import certificate_key_sha256
 from utils.datetime_utils import cert_not_before, utc_isoformat, utc_now
+from utils.serial_format import canonical_serial
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window, clamp_not_after
 from utils.db_transaction import commit_or_rollback
 from utils.file_naming import cert_cert_path, cert_key_path
@@ -352,7 +353,7 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
 
     old_serial, old_valid_to = cert.serial_number, cert.valid_to
     old_digest = certificate_key_sha256(cert.crt)  # read before the row takes the new key
-    new_serial = format(renewed.serial_number, 'x')
+    new_serial = canonical_serial(renewed.serial_number)  # query.update skips the validator
     _take_serial(cert.id, old_serial, new_serial, trigger)
 
     cert_pem = renewed.public_bytes(serialization.Encoding.PEM)
@@ -644,7 +645,7 @@ def _record_superseded(cert_id, ca, old_serial, old_valid_to, now, old_digest=No
     """Keep the replaced serial on the CA's CRL until it would have expired."""
     if not old_serial or ca is None:
         return
-    row = RevokedSerial.query.filter_by(caref=ca.refid, serial_number=old_serial).first()
+    row = RevokedSerial.query.filter_by(caref=ca.refid, serial_number=canonical_serial(old_serial)).first()
     if row is None:
         row = RevokedSerial(caref=ca.refid, serial_number=old_serial)
         db.session.add(row)

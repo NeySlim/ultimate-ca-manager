@@ -3,6 +3,7 @@ Certificate Model - Certificates and CSRs
 """
 import json
 from sqlalchemy import event, text
+from sqlalchemy.orm import validates
 
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
@@ -105,12 +106,19 @@ class Certificate(db.Model):
 
     DUPLICATE_SERIAL = "already stored under this CA"
 
+    @validates('serial_number')
+    def _canonical_serial_number(self, key, value):
+        # One stored spelling per serial (utils/serial_format.py), or the unique index misses twins
+        from utils.serial_format import canonical_stored_serial
+        return canonical_stored_serial(value, self.crt)
+
     @classmethod
     def stored_under(cls, caref, serial_number):
         """The row uix_certificates_ca_serial would collide with, or None."""
+        from utils.serial_format import canonical_serial
         if not caref or not serial_number:
             return None
-        return cls.query.filter_by(caref=caref, serial_number=serial_number).first()
+        return cls.query.filter_by(caref=caref, serial_number=canonical_serial(serial_number)).first()
     
     @property
     def template_overrides_list(self) -> list:
@@ -549,6 +557,9 @@ def _key_fields_follow_crt(target, value, oldvalue, initiator):
         cert = x509.load_pem_x509_certificate(base64.b64decode(value))
     except Exception:
         return
+    from utils.serial_format import serial_readings
+    if target.serial_number and cert.serial_number in serial_readings(target.serial_number):
+        target.serial_number = str(cert.serial_number)  # set before crt: the certificate settles it
     try:
         target.key_algo = key_algo_for_certificate(cert) or target.key_algo
         target.key_bits = key_bits_for_certificate(cert)

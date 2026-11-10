@@ -258,15 +258,10 @@ def _decode_b64url(value):
 
 def _resolve_proxy_certificate(cert_obj):
     """Resolve an exact proxy-stored certificate from its DER value."""
-    serial = cert_obj.serial_number
-    serial_hex = format(serial, 'x')
-    candidates = {
-        str(serial), serial_hex, serial_hex.upper(),
-        f'0x{serial_hex}', f'0X{serial_hex.upper()}',
-    }
+    from utils.serial_format import canonical_serial
     wanted_der = cert_obj.public_bytes(serialization.Encoding.DER)
     rows = Certificate.query.filter(
-        Certificate.serial_number.in_(candidates),
+        Certificate.serial_number == canonical_serial(cert_obj.serial_number),
         Certificate.crt.isnot(None),
     ).all()
     for row in rows:

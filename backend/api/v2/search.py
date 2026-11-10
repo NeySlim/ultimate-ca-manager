@@ -8,6 +8,7 @@ from models import Certificate, CA, User, CertificateTemplate
 from utils.response import success_response
 from utils.pagination import parse_request_limit
 from utils.datetime_utils import utc_now
+from utils.serial_format import serial_search_forms
 
 bp = Blueprint('search', __name__)
 
@@ -52,7 +53,8 @@ def global_search():
             Certificate.subject.ilike(search_pattern),
             Certificate.issuer.ilike(search_pattern),
             Certificate.descr.ilike(search_pattern),
-            Certificate.serial_number.ilike(search_pattern)
+            Certificate.serial_number.ilike(search_pattern),
+            Certificate.serial_number.in_(serial_search_forms(query)),
         )
     ).limit(limit).all()
     

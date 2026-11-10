@@ -28,8 +28,8 @@ def _states_the_procedure(message):
 
 def test_the_database_listing_names_each_pair_and_its_rows():
     conn = sqlite3.connect(':memory:')
-    conn.execute("CREATE TABLE certificates (id INTEGER PRIMARY KEY, caref TEXT, serial_number TEXT)")
-    conn.executemany("INSERT INTO certificates VALUES (?, ?, ?)",
+    conn.execute("CREATE TABLE certificates (id INTEGER PRIMARY KEY, caref TEXT, serial_number TEXT, crt TEXT)")
+    conn.executemany("INSERT INTO certificates VALUES (?, ?, ?, NULL)",
                      [(1, 'ca-a', '11'), (2, 'ca-a', '11'), (3, 'ca-b', '11'), (4, 'ca-a', ''),
                       (5, 'ca-a', ''), (6, None, '12'), (7, None, '12'), (8, 'ca-a', '13')])
     conn.commit()
@@ -169,3 +169,25 @@ def test_the_pending_flag_stays_on_the_database_it_describes(app):
         finally:
             SystemConfig.query.filter_by(key=PENDING_KEY).delete()
             db.session.commit()
+
+
+def test_a_row_held_behind_a_shared_serial_is_logged_with_what_it_waits_for(app, caplog):
+    import json
+    import logging
+    from models import SystemConfig
+    from utils.serial_duplicates import PENDING_KEY, check_pending_serial_index
+    with app.app_context():
+        SystemConfig.query.filter_by(key=PENDING_KEY).delete()
+        db.session.add(SystemConfig(key=PENDING_KEY, value=json.dumps({'duplicates': [
+            {'caref': 'ca-x', 'serial_number': 'a', 'count': 1, 'waits_for': '16'}]})))
+        db.session.commit()
+    try:
+        with caplog.at_level(logging.WARNING):
+            check_pending_serial_index(app)
+        warning = next(r.getMessage() for r in caplog.records if PENDING_KEY in r.getMessage())
+        assert 'CA ca-x serial a waits for 16' in warning and 'x1' not in warning
+    finally:
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PENDING_KEY).delete()
+            db.session.commit()
+        check_pending_serial_index(app)

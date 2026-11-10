@@ -1,8 +1,9 @@
 """The integer serial a stored record actually carries.
 
-``Certificate.serial_number`` has three writers, and the columns copied from
-it (``CA.serial_number``, ``RevokedSerial.serial_number``) inherit whichever
-one wrote the row:
+Since migration 144, ``Certificate.serial_number`` and ``RevokedSerial.serial_number``
+hold the decimal string (``utils/serial_format.canonical_serial``); rows that
+migration left pending, ``CA.serial_number`` and older archives may still hold
+what the historical writers stored:
 
 - decimal, ``str(n)`` — ``services/cert/mixins/lifecycle.py``, the import
   routes, ``api/wstep_protocol.py``, OPNsense and smart import;

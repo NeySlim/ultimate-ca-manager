@@ -168,7 +168,7 @@ class TestInventorySyncService:
             from models.msca import MicrosoftCA, MSCARequest
 
             cert = Certificate.query.filter(
-                Certificate.serial_number == s1.upper()).one()
+                Certificate.serial_number == str(int(s1, 16))).one()
             assert cert.source == 'msca'
             assert cert.imported_from == 'msca:Inv Import A'
             assert cert.subject_cn == 'inv-a1.test.local'
@@ -190,7 +190,7 @@ class TestInventorySyncService:
         msca_id = _make_msca(app, 'Inv Dedup B')
         known = fake_ca.add(10, 'inv-b-known.test.local')
         fake_ca.add(11, 'inv-b-new.test.local')
-        # UCM already knows the first cert (same serial, uppercase in DB)
+        # UCM already knows the first cert (written in uppercase hex, stored canonical)
         row = fake_ca.rows[0]
         pre_id = _add_ucm_cert(app, msca_id, 'Inv Dedup B',
                                row['cn'], row['serial'], row['pem'])
@@ -205,7 +205,7 @@ class TestInventorySyncService:
 
             from models import Certificate
             matches = [c for c in Certificate.query.all()
-                       if (c.serial_number or '').lower() == known]
+                       if c.serial_number == str(int(known, 16))]
             assert len(matches) == 1  # not re-imported
             assert matches[0].id == pre_id
 

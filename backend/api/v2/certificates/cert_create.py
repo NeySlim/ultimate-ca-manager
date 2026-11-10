@@ -651,7 +651,7 @@ def create_certificate():
                 cert_type=cert_type,
                 subject=issued.subject.rfc4514_string(),
                 issuer=issued.issuer.rfc4514_string(),
-                serial_number=format(issued.serial_number, 'x'),
+                serial_number=issued.serial_number,
                 aki=cert_aki,
                 ski=cert_ski,
                 valid_from=not_before,

@@ -247,6 +247,7 @@ class AutoRenewalService:
         very certificate (same serial): a decision, kept until it changes."""
         import json as _json
         from models.policy import ApprovalRequest
+        from utils.serial_format import names_certificate
         rows = ApprovalRequest.query.filter_by(status='rejected', request_type='renewal').filter(
             ApprovalRequest.request_data.like(f'%"certificate_id": {int(cert.id)},%')).all()
         for row in rows:
@@ -255,7 +256,7 @@ class AutoRenewalService:
             except ValueError:
                 continue
             if (data.get('trigger') == 'auto' and data.get('certificate_id') == cert.id
-                    and data.get('serial_number') == cert.serial_number):
+                    and names_certificate(data.get('serial_number'), cert, row.created_at)):
                 return True
         return False
 
