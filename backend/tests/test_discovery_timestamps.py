@@ -67,3 +67,27 @@ def test_dates_are_stored_as_naive_utc_under_a_foreign_session_timezone(app, mon
         for zone in ('Pacific/Auckland', 'America/Los_Angeles'):
             db.session.execute(text(f"SET TIME ZONE '{zone}'"))
             _check(monkeypatch)
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_expiry_window_ignores_the_session_timezone(app):
+    from models import ScanProfile
+    from tests.test_scheduled_claims_pg import _pg
+    with _pg(app), app.app_context():
+        db.session.execute(text("SET TIME ZONE 'Pacific/Auckland'"))
+        profile = ScanProfile(name=f'win-{uuid.uuid4().hex[:8]}', targets='["example.test"]')
+        db.session.add(profile)
+        db.session.commit()
+        row = DiscoveredCertificate(
+            target=f'192.0.2.{uuid.uuid4().int % 200 + 1}', port=443, scan_profile_id=profile.id,
+            fingerprint_sha256=uuid.uuid4().hex * 2,
+            not_after=(utc_now() + timedelta(days=30, hours=6)).replace(microsecond=0))
+        db.session.add(row)
+        db.session.commit()
+        try:
+            assert DiscoveryService._expiring_in_window(profile.id)[0] == 0
+        finally:
+            db.session.delete(row)
+            db.session.delete(profile)
+            db.session.commit()
