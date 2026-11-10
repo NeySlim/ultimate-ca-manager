@@ -19,6 +19,7 @@ from models.crl import CRLMetadata
 from models.key_recovery import KeyRecoveryRequest, STATUS_PENDING
 from models.policy import ApprovalRequest
 from models.scep import SCEPRequest
+from services.ocsp_responder_renewal import renewed_by_responder_task
 from utils.cert_status import EXPIRY_WINDOW_DAYS, holds_certificate, orphan_condition
 from utils.datetime_utils import utc_isoformat, utc_now
 
@@ -243,6 +244,7 @@ def _manual_renewal_conditions(now):
         ~_client_renewed(),
         ~_superseded(now),
         ~_renewal_declined(),
+        ~renewed_by_responder_task(),
     ]
 
 

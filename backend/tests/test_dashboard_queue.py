@@ -24,6 +24,7 @@ URL = '/api/v2/dashboard/queue'
 _PEM = [self_signed(ec.generate_private_key(ec.SECP256R1()))]
 SETTINGS = ('auto_renewal_enabled', 'auto_renewal_sources')
 ACME_SWITCH = 'acme.client.renewal_enabled'
+OCSP_SWITCH = 'ocsp_responder_auto_renew'
 
 
 def _ca(name, **kw):
@@ -139,6 +140,10 @@ def seeded(app):
             'declined': _cert('queue-declined', now + timedelta(days=10), prv='k', caref=ca_offline.refid),
             'declined_last_cycle': _cert('queue-declined-old', now + timedelta(days=10), prv='k',
                                          caref=ca_signing.refid),
+            # a delegated OCSP responder is renewed by its own task, which needs the key
+            'ocsp_responder': _cert('queue-ocsp', now + timedelta(days=10), prv='k', source='import',
+                                    caref=ca_signing.refid),
+            'ocsp_responder_nokey': _cert('queue-ocsp-nokey', now + timedelta(days=10), caref=ca_keyless.refid),
             'no_key_12h': _cert('queue-nokey-12h', now + timedelta(hours=12)),
             'no_key_10d': _cert('queue-nokey-10d', now + timedelta(days=10)),
             'null_source_10d': _cert('queue-null-source', now + timedelta(days=10), source=None),
@@ -192,6 +197,10 @@ def seeded(app):
             request_type='renewal', status='rejected', created_at=now - timedelta(days=400),
             request_data=json.dumps({'certificate_id': certs['declined_last_cycle'].id, 'ca_id': None}))
         db.session.add_all([rejected, rejected_old])
+        bindings = [SystemConfig(key=f'ocsp_responder_cert_{ca_signing.id}', value=str(certs['ocsp_responder'].id)),
+                    SystemConfig(key=f'ocsp_responder_cert_{ca_keyless.id}',
+                                 value=str(certs['ocsp_responder_nokey'].id))]
+        db.session.add_all(bindings)
         not_renewing.certificate_id = certs['acme_client_off'].id
         db.session.commit()
         ids.update(hsm_provider=provider.id, hsm_key=hsm_key.id, rejected=rejected.id, rejected_old=rejected_old.id, ca_offline=ca_offline.id,
@@ -205,6 +214,8 @@ def seeded(app):
                    **{k: v.id for k, v in certs.items()}, account=account.id)
     yield ids
     with app.app_context():
+        SystemConfig.query.filter(SystemConfig.key.in_(
+            [f"ocsp_responder_cert_{ids[k]}" for k in ('ca_signing', 'ca_keyless')])).delete(synchronize_session=False)
         for model, keys in ((AcmeClientOrder, ('client', 'healthy', 'renewing', 'not_renewing')),
                             (Certificate, certs), (AcmeOrder, ('failed', 'old')), (ApprovalRequest, ('urgent', 'calm', 'done', 'rejected', 'rejected_old')),
                             (SCEPRequest, ('scep',)), (KeyRecoveryRequest, ('recovery',))):
@@ -265,6 +276,7 @@ def _find(data, kind, item_id):
     ('auto_renewal_blocked', 'blocked_revoked', 'critical'),
     ('auto_renewal_blocked', 'blocked_keyless', 'critical'),
     ('auto_renewal_blocked', 'blocked_lapsed_ca', 'critical'),
+    ('manual_renewal_due', 'ocsp_responder_nokey', 'warning'),
     ('renewal_declined', 'declined', 'warning'),
 ])
 def test_each_kind_with_its_tier_and_due_date(app, auth_client, seeded, kind, key, tier):
@@ -294,6 +306,7 @@ def test_crl_due_date_is_the_latest_full_crl(auth_client, seeded):
     ('manual_renewal_due', 'blocked_offline'), ('manual_renewal_due', 'under_signing'),
     ('auto_renewal_blocked', 'declined'), ('manual_renewal_due', 'declined'),
     ('renewal_declined', 'declined_last_cycle'), ('renewal_declined', 'under_signing'),
+    ('manual_renewal_due', 'ocsp_responder'),
     ('manual_renewal_due', 'acme_client'), ('manual_renewal_due', 'superseded'),
     ('crl_missing', 'no_cdp'), ('ca_expiring', 'ca_revoked'),
     ('manual_renewal_due', 'auto'), ('manual_renewal_due', 'revoked'),
@@ -329,6 +342,19 @@ def test_acme_client_renewal_switched_off_makes_it_manual(app, auth_client, seed
     finally:
         with app.app_context():
             _set(ACME_SWITCH, saved)
+            db.session.commit()
+
+
+def test_ocsp_responder_renewal_switched_off_makes_it_manual(app, auth_client, seeded):
+    with app.app_context():
+        saved = getattr(SystemConfig.query.filter_by(key=OCSP_SWITCH).first(), 'value', None)
+        _set(OCSP_SWITCH, 'false')
+        db.session.commit()
+    try:
+        assert _find(_queue(auth_client), 'manual_renewal_due', seeded['ocsp_responder']) is not None
+    finally:
+        with app.app_context():
+            _set(OCSP_SWITCH, saved)
             db.session.commit()
 
 
