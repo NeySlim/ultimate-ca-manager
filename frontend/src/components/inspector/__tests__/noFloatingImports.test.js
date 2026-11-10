@@ -38,6 +38,43 @@ describe('import statement scanner', () => {
   })
 })
 
+// Live = reached from the entry point through relative imports (barrels included),
+// never through a legacy module
+export function liveModules(files, legacy, entry = 'main.jsx') {
+  const byPath = new Map(files.map(([rel, text]) => [rel, text]))
+  const resolve = (fromRel, spec) => {
+    const base = join(dirname(fromRel), spec).split('\\').join('/')
+    return ['', '.js', '.jsx', '/index.js', '/index.jsx'].map((x) => base + x).find((c) => byPath.has(c))
+  }
+  const live = new Set()
+  const queue = [entry]
+  while (queue.length) {
+    const rel = queue.pop()
+    if (live.has(rel) || legacy.includes(rel)) continue
+    live.add(rel)
+    for (const st of importStatements(byPath.get(rel))) {
+      const spec = st.match(/['"]([^'"]+)['"]$/)?.[1]
+      const target = spec?.startsWith('.') && resolve(rel, spec)
+      if (target) queue.push(target)
+    }
+  }
+  return live
+}
+
+describe('live module walk', () => {
+  const graph = [
+    ['main.jsx', "import A from './a'\nimport L from './legacy'"],
+    ['a.jsx', 'export default 1'],
+    ['legacy.jsx', "import O from './onlyLegacy'"],
+    ['onlyLegacy.jsx', 'export default 2'],
+    ['orphan.jsx', 'export default 3'],
+  ]
+  it('keeps what the entry reaches, drops orphans and what only a legacy module imports', () => {
+    const live = liveModules(graph, ['legacy.jsx'])
+    expect([...live].sort()).toEqual(['a.jsx', 'main.jsx'])
+  })
+})
+
 describe('legacy detail windows', () => {
   const files = sources(SRC).map((p) => [relative(SRC, p), readFileSync(p, 'utf8')])
 
@@ -51,24 +88,7 @@ describe('legacy detail windows', () => {
 
   // Live = reached from the entry point through relative imports (barrels included),
   // never through a legacy module
-  const byPath = new Map(files.map(([rel]) => [rel, rel]))
-  const resolve = (fromRel, spec) => {
-    const base = join(dirname(fromRel), spec).split('\\').join('/')
-    return ['', '.js', '.jsx', '/index.js', '/index.jsx'].map((x) => base + x).find((c) => byPath.has(c))
-  }
-  const live = new Set()
-  const queue = ['main.jsx']
-  while (queue.length) {
-    const rel = queue.pop()
-    if (live.has(rel) || Object.keys(LEGACY).includes(rel)) continue
-    live.add(rel)
-    const text = files.find(([r]) => r === rel)[1]
-    for (const st of importStatements(text)) {
-      const spec = st.match(/['"]([^'"]+)['"]$/)?.[1]
-      const target = spec?.startsWith('.') && resolve(rel, spec)
-      if (target) queue.push(target)
-    }
-  }
+  const live = liveModules(files, Object.keys(LEGACY))
   const isLive = (rel) => live.has(rel)
   const importersOf = (target) => {
     const name = target.split('/').pop().replace(/\.jsx?$/, '')
