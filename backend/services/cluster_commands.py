@@ -442,7 +442,7 @@ class CommandApplier:
             self._held = _Held(row.id, row.created_at)
             self._advance(conn, row.id)
             return
-        self._restart_wait = None
+        # The wait stays spent until the restart runs: a failed attempt follows the backoff
         self._held = None
         if pending:
             logger.warning(f"Rolling restart: {', '.join(pending)} not back after "
@@ -452,6 +452,7 @@ class CommandApplier:
         claimed = self._claim(conn, row.id)
         self._advance(conn, row.id)
         if not claimed:
+            self._restart_wait = None
             self._drop_held()
             return
         self.restarting = True
@@ -459,6 +460,7 @@ class CommandApplier:
         self._stop.set()  # this process is leaving: nothing after the restart is applied here
         try:
             self.restart_action()
+            self._restart_wait = None
             self._retry_delay = None
         except Exception as e:
             # Still on the old process: the loop resumes before the claim is given back, which

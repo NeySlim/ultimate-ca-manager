@@ -801,6 +801,23 @@ def test_a_claim_not_given_back_after_a_failed_restart_is_given_back_later(app, 
     assert solo.restarting and _restart_seen(app, 'solo') == restart_id
 
 
+def test_a_restart_gone_past_a_dead_node_is_retried_after_its_backoff_not_the_guard(app, ha):
+    """The guard delay already ran out: a failed attempt is retried 2 s later."""
+    clock, attempts = _FakeMonotonic(), []
+
+    def action():
+        attempts.append(clock.t)
+        raise OSError('signal file not writable')
+    _node_row(app, 'a')  # fresh heartbeat, but nothing runs there any more
+    _node_row(app, 'b')
+    b = ha('b', monotonic=clock, restart_action=action, guard=10)
+    _emit(app, cc.RESTART)
+    b.run_once()
+    _fail_until(b, clock, attempts, 1)
+    _fail_until(b, clock, attempts, 2)
+    assert attempts[1] - attempts[0] == cc.RESTART_RETRY_FIRST
+
+
 def test_stop_during_a_failed_restart_is_not_undone(app, ha):
     """stop() lands between the failed restart's check of _stopping and its _stop.clear()."""
     clock = _FakeMonotonic()
