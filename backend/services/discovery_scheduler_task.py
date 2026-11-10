@@ -42,14 +42,17 @@ class DiscoverySchedulerTask:
         The scanner also recomputes it on completion, but a scan that crashes
         or outlives the interval must not leave next_scan_at in the past —
         that re-triggered the same giant scan on every restart (#293).
-        Claimed only while still due in the database: of two executors, only one moves it.
+        Claimed only while still due and scheduled in the database: of two executors,
+        only one moves it, and a schedule disabled meanwhile starts nothing.
         """
         seen = profile.next_scan_at
         name = profile.name
         due = (ScanProfile.next_scan_at.is_(None) if seen is None
                else ScanProfile.next_scan_at <= now)
         try:
-            claimed = ScanProfile.query.filter(ScanProfile.id == profile.id, due).update(
+            claimed = ScanProfile.query.filter(
+                ScanProfile.id == profile.id, ScanProfile.schedule_enabled == True,  # noqa: E712
+                due).update(
                 {ScanProfile.next_scan_at:
                  now + timedelta(minutes=profile.schedule_interval_minutes or 1440)},
                 synchronize_session=False)
