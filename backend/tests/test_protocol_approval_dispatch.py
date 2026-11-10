@@ -138,3 +138,39 @@ def test_expiry_reaches_the_protocol(app, gate_ca, fake_handler):
         assert fake_handler == [('closed', 'expired')]
         # An expired request is forgotten: the client's next request is a new one
         assert _gate(app, gate_ca, 'ref-expire') not in (None, approval_id)
+
+
+def test_an_owed_notice_is_sent_once_by_concurrent_senders(app, gate_ca, monkeypatch):
+    """Two senders (scheduled expiry, policy DELETE) read the same owed
+    notice: the one whose compare-and-set clears the marker sends it."""
+    import json
+    sent = []
+    handler = protocol_approval._Handler(issue=lambda a, d: {'id': None},
+                                         notice=lambda approval, data: sent.append(approval.id))
+    monkeypatch.setitem(protocol_approval._HANDLERS, 'wstep_request', handler)
+    with approval_policy(app, gate_ca, 'gate-notice-once'):
+        approval_id = _gate(app, gate_ca, 'ref-notice-once')
+        with app.app_context():
+            row = db.session.get(ApprovalRequest, approval_id)
+            row.request_data = json.dumps(dict(protocol_approval.request_data(row), notice_pending=True))
+            db.session.commit()
+        real = protocol_approval.request_data
+        raced = []
+
+        def other_sender_first(approval):
+            # The other sender clears and sends between this one's read and its write
+            if not raced and getattr(approval, 'id', None) == approval_id:
+                raced.append(True)
+                cleared = dict(real(approval))
+                cleared.pop('notice_pending')
+                with db.engine.begin() as conn:
+                    conn.execute(ApprovalRequest.__table__.update()
+                                 .where(ApprovalRequest.__table__.c.id == approval_id)
+                                 .values(request_data=json.dumps(cleared)))
+                sent.append(approval_id)
+            return real(approval)
+        monkeypatch.setattr(protocol_approval, 'request_data', other_sender_first)
+        with app.app_context():
+            protocol_approval.send_pending_notices()
+            protocol_approval.send_pending_notices()
+        assert raced and sent == [approval_id]

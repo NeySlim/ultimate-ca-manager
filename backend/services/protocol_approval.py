@@ -370,11 +370,17 @@ def send_pending_notices() -> int:
     for approval in ApprovalRequest.query.filter(
             ApprovalRequest.request_type.in_(tuple(REQUEST_TYPE_PROTOCOLS)),
             ApprovalRequest.request_data.like(f'%"{_NOTICE_PENDING}": true%')).all():
+        read = approval.request_data
         data = request_data(approval)
         if not data.pop(_NOTICE_PENDING, False):
             continue
-        approval.request_data = json.dumps(data)
+        # Compare-and-set: only the sender still finding the row as it read it clears and sends
+        cleared = db.session.query(ApprovalRequest).filter(
+            ApprovalRequest.id == approval.id, ApprovalRequest.request_data == read,
+        ).update({ApprovalRequest.request_data: json.dumps(data)}, synchronize_session=False)
         db.session.commit()
+        if cleared != 1:
+            continue
         handler = _handler(approval.request_type)
         if handler is not None and handler.notice is not None:
             try:
