@@ -1,5 +1,6 @@
 """GET /api/v2/dashboard/queue: what needs acting on, critical first, with the
 total per kind counted in SQL rather than from the truncated list."""
+import json
 import secrets
 import uuid
 from datetime import timedelta
@@ -11,6 +12,7 @@ from api.v2.dashboard import DASHBOARD_MAX_ROWS
 from models import CA, Certificate, SystemConfig, db
 from models.acme_models import AcmeAccount, AcmeClientOrder, AcmeOrder
 from models.crl import CRLMetadata
+from models.hsm import HsmKey, HsmProvider
 from models.key_recovery import KeyRecoveryRequest
 from models.policy import ApprovalRequest
 from models.scep import SCEPRequest
@@ -111,7 +113,32 @@ def seeded(app):
         ca_soon = _ca('queue-ca-60d', valid_to=now + timedelta(days=60))
         ca_later = _ca('queue-ca-200d', valid_to=now + timedelta(days=200))
         ca_revoked = _ca('queue-ca-revoked', valid_to=now + timedelta(days=60), revoked=True)
+        # auto-renewal fails on every pass under a CA that cannot sign
+        ca_offline = _ca('queue-ca-offline', offline=True, prv='k', valid_to=now + timedelta(days=3650))
+        ca_revoked_far = _ca('queue-ca-revoked-far', revoked=True, prv='k', valid_to=now + timedelta(days=3650))
+        ca_lapsed = _ca('queue-ca-lapsed', prv='k', valid_to=now - timedelta(days=1))
+        ca_keyless = _ca('queue-ca-keyless', valid_to=now + timedelta(days=3650))
+        provider = HsmProvider(name=f'queue-hsm-{uuid.uuid4()}', type='openbao', config='{}')
+        db.session.add(provider)
+        db.session.flush()
+        hsm_key = HsmKey(provider_id=provider.id, key_identifier='queue-hsm-key', label='queue-hsm-key',
+                         algorithm='EC-P256', key_type='EC', purpose='ca-signing')
+        db.session.add(hsm_key)
+        db.session.flush()
+        ca_hsm = _ca('queue-ca-hsm', hsm_key_id=hsm_key.id, valid_to=now + timedelta(days=3650))
+        ca_signing = _ca('queue-ca-signing', prv='k', valid_to=now + timedelta(days=3650))
         certs = {
+            'blocked_offline': _cert('queue-blocked-offline', now + timedelta(days=10), prv='k', caref=ca_offline.refid),
+            'blocked_revoked': _cert('queue-blocked-revoked', now + timedelta(days=10), prv='k',
+                                     caref=ca_revoked_far.refid),
+            'blocked_lapsed_ca': _cert('queue-blocked-lapsed', now + timedelta(days=10), prv='k',
+                                       caref=ca_lapsed.refid),
+            'blocked_keyless': _cert('queue-blocked-keyless', now + timedelta(days=10), prv='k', caref=ca_keyless.refid),
+            'under_hsm': _cert('queue-under-hsm', now + timedelta(days=10), prv='k', caref=ca_hsm.refid),
+            'under_signing': _cert('queue-under-signing', now + timedelta(days=10), prv='k', caref=ca_signing.refid),
+            'declined': _cert('queue-declined', now + timedelta(days=10), prv='k', caref=ca_offline.refid),
+            'declined_last_cycle': _cert('queue-declined-old', now + timedelta(days=10), prv='k',
+                                         caref=ca_signing.refid),
             'no_key_12h': _cert('queue-nokey-12h', now + timedelta(hours=12)),
             'no_key_10d': _cert('queue-nokey-10d', now + timedelta(days=10)),
             'null_source_10d': _cert('queue-null-source', now + timedelta(days=10), source=None),
@@ -158,9 +185,18 @@ def seeded(app):
                                        subject_cn='queue-revoked-succ', revoked=True),
         }
         renewing.certificate_id = certs['acme_client'].id
+        rejected = ApprovalRequest(request_type='renewal', status='rejected', created_at=now - timedelta(days=1),
+                                   request_data=json.dumps({'certificate_id': certs['declined'].id, 'ca_id': None}))
+        # rejected before the certificate was last renewed: a decision on the previous cycle
+        rejected_old = ApprovalRequest(
+            request_type='renewal', status='rejected', created_at=now - timedelta(days=400),
+            request_data=json.dumps({'certificate_id': certs['declined_last_cycle'].id, 'ca_id': None}))
+        db.session.add_all([rejected, rejected_old])
         not_renewing.certificate_id = certs['acme_client_off'].id
         db.session.commit()
-        ids.update(renewing=renewing.id, not_renewing=not_renewing.id, failed=failed.id, old=old.id, client=client.id, healthy=healthy.id, urgent=urgent.id,
+        ids.update(hsm_provider=provider.id, hsm_key=hsm_key.id, rejected=rejected.id, rejected_old=rejected_old.id, ca_offline=ca_offline.id,
+                   ca_revoked_far=ca_revoked_far.id, ca_keyless=ca_keyless.id, ca_lapsed=ca_lapsed.id, ca_hsm=ca_hsm.id,
+                   ca_signing=ca_signing.id, renewing=renewing.id, not_renewing=not_renewing.id, failed=failed.id, old=old.id, client=client.id, healthy=healthy.id, urgent=urgent.id,
                    calm=calm.id, done=done.id, scep=scep.id, recovery=recovery.id,
                    crl_daily=crl_daily.id, crl_stale=crl_stale.id, crl_6h=crl_6h.id,
                    crl_soon=crl_soon.id, crl_fresh=crl_fresh.id, crl_renewed=crl_renewed.id, crl_none=crl_none.id,
@@ -170,15 +206,18 @@ def seeded(app):
     yield ids
     with app.app_context():
         for model, keys in ((AcmeClientOrder, ('client', 'healthy', 'renewing', 'not_renewing')),
-                            (Certificate, certs), (AcmeOrder, ('failed', 'old')), (ApprovalRequest, ('urgent', 'calm', 'done')),
+                            (Certificate, certs), (AcmeOrder, ('failed', 'old')), (ApprovalRequest, ('urgent', 'calm', 'done', 'rejected', 'rejected_old')),
                             (SCEPRequest, ('scep',)), (KeyRecoveryRequest, ('recovery',))):
             for key in keys:
                 row = db.session.get(model, ids[key])
                 if row is not None:
                     db.session.delete(row)
-        cas = [ids[k] for k in ('crl_daily', 'crl_stale', 'crl_6h', 'crl_soon', 'crl_fresh', 'crl_renewed', 'crl_none', 'crl_offline', 'crl_upload', 'no_cdp', 'ca_soon', 'ca_later', 'ca_revoked')]
+        cas = [ids[k] for k in ('crl_daily', 'crl_stale', 'crl_6h', 'crl_soon', 'crl_fresh', 'crl_renewed', 'crl_none', 'crl_offline', 'crl_upload', 'no_cdp', 'ca_soon', 'ca_later', 'ca_revoked',
+                                'ca_offline', 'ca_revoked_far', 'ca_keyless', 'ca_lapsed', 'ca_hsm', 'ca_signing')]
         CRLMetadata.query.filter(CRLMetadata.ca_id.in_(cas)).delete(synchronize_session=False)
         CA.query.filter(CA.id.in_(cas)).delete(synchronize_session=False)
+        HsmKey.query.filter_by(id=ids['hsm_key']).delete(synchronize_session=False)
+        HsmProvider.query.filter_by(id=ids['hsm_provider']).delete(synchronize_session=False)
         db.session.delete(db.session.get(AcmeAccount, ids['account']))
         for key, value in saved.items():
             _set(key, value)
@@ -222,6 +261,11 @@ def _find(data, kind, item_id):
     ('ca_expiring', 'ca_soon', 'critical'),
     ('ca_expiring', 'ca_later', 'warning'),
     ('client_renewal_overdue', 'scep_nokey_5d', 'warning'),
+    ('auto_renewal_blocked', 'blocked_offline', 'critical'),
+    ('auto_renewal_blocked', 'blocked_revoked', 'critical'),
+    ('auto_renewal_blocked', 'blocked_keyless', 'critical'),
+    ('auto_renewal_blocked', 'blocked_lapsed_ca', 'critical'),
+    ('renewal_declined', 'declined', 'warning'),
 ])
 def test_each_kind_with_its_tier_and_due_date(app, auth_client, seeded, kind, key, tier):
     item = _find(_queue(auth_client), kind, seeded[key])
@@ -245,6 +289,11 @@ def test_crl_due_date_is_the_latest_full_crl(auth_client, seeded):
     ('manual_renewal_due', 'acme_nokey'), ('manual_renewal_due', 'wstep_nokey'),
     ('manual_renewal_due', 'scep_nokey_5d'), ('client_renewal_overdue', 'scep_nokey_20d'),
     ('client_renewal_overdue', 'acme_nokey'), ('client_renewal_overdue', 'no_key_12h'),
+    ('auto_renewal_blocked', 'under_hsm'), ('auto_renewal_blocked', 'under_signing'),
+    ('auto_renewal_blocked', 'auto'), ('auto_renewal_blocked', 'no_key_10d'),
+    ('manual_renewal_due', 'blocked_offline'), ('manual_renewal_due', 'under_signing'),
+    ('auto_renewal_blocked', 'declined'), ('manual_renewal_due', 'declined'),
+    ('renewal_declined', 'declined_last_cycle'), ('renewal_declined', 'under_signing'),
     ('manual_renewal_due', 'acme_client'), ('manual_renewal_due', 'superseded'),
     ('crl_missing', 'no_cdp'), ('ca_expiring', 'ca_revoked'),
     ('manual_renewal_due', 'auto'), ('manual_renewal_due', 'revoked'),

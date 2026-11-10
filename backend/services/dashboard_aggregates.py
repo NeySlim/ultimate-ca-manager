@@ -8,7 +8,7 @@ whenever a certificate is stored (``models/certificate.py``).
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import aliased
-from sqlalchemy import (DateTime, String, and_, case, func, literal, literal_column,
+from sqlalchemy import (DateTime, String, and_, case, cast, false, func, literal, literal_column,
                         or_, select, true, type_coerce, union_all)
 
 from models import CA, Certificate, SystemConfig
@@ -24,7 +24,8 @@ from utils.datetime_utils import utc_isoformat, utc_now
 
 QUEUE_KINDS = ('acme_order_failed', 'acme_client_renewal_failed', 'approval_pending',
                'scep_request_pending', 'key_recovery_pending', 'crl_due', 'crl_missing',
-               'manual_renewal_due', 'client_renewal_overdue', 'ca_expiring')
+               'manual_renewal_due', 'client_renewal_overdue', 'auto_renewal_blocked',
+               'renewal_declined', 'ca_expiring')
 ACME_FAILURE_LOOKBACK_DAYS = 7
 CRITICAL_WITHIN = timedelta(hours=24)
 DEFAULT_CRL_VALIDITY_DAYS = 7
@@ -49,6 +50,8 @@ _HREF = {
     'crl_missing': '/crl-ocsp?ca={id}',
     'manual_renewal_due': '/certificates/{id}',
     'client_renewal_overdue': '/certificates/{id}',
+    'auto_renewal_blocked': '/certificates/{id}',
+    'renewal_declined': '/certificates/{id}',
     'ca_expiring': '/cas/{id}',
 }
 
@@ -167,11 +170,14 @@ def _queue_union(now, dialect):
         due(Certificate.valid_to).label('due_at'),
     ).where(*_manual_renewal_conditions(now)))
 
-    parts.append(select(
-        _const('client_renewal_overdue').label('kind'), _WARNING.label('rank'),
-        Certificate.id.label('id'), text_label(func.coalesce(func.nullif(Certificate.subject_cn, ''), Certificate.descr)).label('label'),
-        due(Certificate.valid_to).label('due_at'),
-    ).where(*_client_overdue_conditions(now)))
+    cert_label = text_label(func.coalesce(func.nullif(Certificate.subject_cn, ''), Certificate.descr))
+    for kind, rank, conditions in (('client_renewal_overdue', _WARNING, _client_overdue_conditions(now)),
+                                   ('auto_renewal_blocked', _CRITICAL, _blocked_conditions(now)),
+                                   ('renewal_declined', _WARNING, _declined_conditions(now))):
+        parts.append(select(
+            _const(kind).label('kind'), rank.label('rank'), Certificate.id.label('id'),
+            cert_label.label('label'), due(Certificate.valid_to).label('due_at'),
+        ).where(*conditions))
 
     parts.append(select(
         _const('ca_expiring').label('kind'),
@@ -236,7 +242,46 @@ def _manual_renewal_conditions(now):
         ~_renewed_by_acme_client(),
         ~_client_renewed(),
         ~_superseded(now),
+        ~_renewal_declined(),
     ]
+
+
+def _auto_renewed(config):
+    """The certificates the auto-renewal pass picks up (stored key, a source it renews)."""
+    if not config['enabled']:
+        return false()
+    return and_(~_no_key(), Certificate.source.isnot(None),
+                Certificate.source.in_(config['renewal_sources'] or ['']))
+
+
+def _issuer_cannot_sign(now):
+    """Its CA, by refid, is offline, revoked, expired, awaiting its certificate or without
+    a key (local or HSM): renewal refuses it (services/cert/renewal.py, _signing_ca)."""
+    no_ca_key = and_(or_(CA.prv.is_(None), CA.prv == ''), CA.hsm_key_id.is_(None))
+    return select(CA.id).where(
+        CA.refid == Certificate.caref,
+        or_(CA.offline.is_(True), CA.revoked.is_(True), CA.crt.is_(None), CA.crt == '', no_ca_key,
+            CA.valid_to <= now)).exists()
+
+
+def _renewal_declined():
+    """An approver rejected a renewal of this certificate during its current lifetime
+    (the request names it in its data, as auto_renewal_service._declined reads it)."""
+    named = literal('%"certificate_id": ', String) + cast(Certificate.id, String) + literal(',%', String)
+    return select(ApprovalRequest.id).where(
+        ApprovalRequest.request_type == 'renewal', ApprovalRequest.status == 'rejected',
+        ApprovalRequest.request_data.like(named),
+        or_(Certificate.valid_from.is_(None), ApprovalRequest.created_at >= Certificate.valid_from)).exists()
+
+
+def _blocked_conditions(now):
+    """Due for auto-renewal, which then fails on every pass because the CA cannot sign."""
+    return [*_live_until(now, EXPIRY_WINDOW_DAYS), _auto_renewed(_renewal_config()),
+            _issuer_cannot_sign(now), ~_renewal_declined()]
+
+
+def _declined_conditions(now):
+    return [*_live_until(now, EXPIRY_WINDOW_DAYS), _renewal_declined()]
 
 
 def _client_overdue_conditions(now):
