@@ -24,7 +24,7 @@ import { certificatesService, casService, truststoreService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
 import { extractCN, cn, certificateNames, isOnHold } from '../lib/utils'
-import { parseOverviewFilters, toListParams, withoutFilter } from '../lib/overviewFilters'
+import { parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
 import { FilterChips } from '../components/ui/FilterChips'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
@@ -125,12 +125,18 @@ export default function CertificatesPage() {
   const savedCA = linkView ? NONE : filterCA
   const savedSource = linkView ? NONE : filterSource
   const savedTemplate = linkView ? NONE : filterTemplate
+  // The search restarts on entering a link view or when its non-status filters change;
+  // a status edit (card, selector) keeps it
+  const linkScopeKey = JSON.stringify(urlFilters.filter(([k]) => k !== 'status'))
   useEffect(() => {
     if (!linkView) return
     setPage(1)
     setSearchValue('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlFiltersKey])
+  }, [linkView, linkScopeKey])
+  useEffect(() => { if (linkView) setPage(1) }, [linkView, urlFiltersKey])
+  // A preset saved in a link view carries the link, so applying it reopens the same view
+  const presetExtras = useMemo(() => (linkView ? { link: toSearch(urlFilters) } : undefined), [linkView, urlFilters])
   // Touching a saved filter leaves the link view, so the change applies at once
   const leaveLink = useCallback(() => {
     if (linkView) navigate({ pathname: location.pathname, search: '' }, { replace: true })
@@ -139,6 +145,12 @@ export default function CertificatesPage() {
   // Apply filter preset callback
   const handleApplyFilterPreset = useCallback((filters) => {
     setPage(1) // Reset to first page when applying preset
+    // The stored link is re-validated: unknown filters or values are dropped
+    const linked = parseOverviewFilters(typeof filters.link === 'string' ? filters.link : '')
+    if (linked.length > 0) {
+      navigate({ pathname: location.pathname, search: toSearch(linked) }, { replace: true })
+      return
+    }
     leaveLink()
     if (filters.status) {
       setFilterStatus(Array.isArray(filters.status) ? filters.status : [filters.status])
@@ -149,7 +161,7 @@ export default function CertificatesPage() {
     else setFilterCA([])
     if (filters.source) setFilterSource(Array.isArray(filters.source) ? filters.source : [filters.source])
     else setFilterSource([])
-  }, [leaveLink])
+  }, [leaveLink, navigate, location.pathname])
   
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
   const { canWrite, canDelete, hasPermission } = usePermission()
@@ -574,6 +586,7 @@ export default function CertificatesPage() {
       key: 'status',
       label: t('common.status'),
       type: 'multiSelect',
+      hideChip: linkView, // the link's own chip row already shows its statuses
       // A link view shows (and a preset saves) the link's statuses, not the stored ones it sets aside
       value: linkView ? urlStatus : savedStatus,
       onChange: (val) => {
@@ -733,11 +746,13 @@ export default function CertificatesPage() {
         )}
         onSlideOverClose={() => setSelectedCert(null)}
       >
-        <FilterChips
-          filters={overviewChips}
-          onRemove={removeUrlFilter}
-          onClearAll={() => navigate({ pathname: location.pathname, search: '' }, { replace: true })}
-        />
+        <div data-testid="overview-chips">
+          <FilterChips
+            filters={overviewChips}
+            onRemove={removeUrlFilter}
+            onClearAll={() => navigate({ pathname: location.pathname, search: '' }, { replace: true })}
+          />
+        </div>
         <ResponsiveDataTable
           data={filteredCerts}
           columns={columns}
@@ -752,6 +767,7 @@ export default function CertificatesPage() {
           filterPresetsKey="ucm-certs-presets"
           densityStorageKey="ucm-certs-density"
           onApplyFilterPreset={handleApplyFilterPreset}
+          presetExtras={presetExtras}
           exportEnabled
           exportFilename="certificates"
           toolbarFilters={filters}

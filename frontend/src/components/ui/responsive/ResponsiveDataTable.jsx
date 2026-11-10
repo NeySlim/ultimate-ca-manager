@@ -53,6 +53,7 @@ export function ResponsiveDataTable({
   
   // Filter presets
   filterPresetsKey, // localStorage key for saving filter presets (e.g. 'ucm-certs-presets')
+  presetExtras, // object merged into every saved preset (state the toolbar filters do not carry)
   onApplyFilterPreset, // (preset) => void - callback when a preset is applied
   
   // Export
@@ -267,8 +268,8 @@ export function ResponsiveDataTable({
       }
     })
     if (searchValue) values._search = searchValue
-    return values
-  }, [toolbarFilters, searchValue])
+    return { ...values, ...presetExtras }
+  }, [toolbarFilters, searchValue, presetExtras])
   
   // Check if any filters are active
   const hasActiveFilters = useMemo(() => {
@@ -287,7 +288,7 @@ export function ResponsiveDataTable({
     if (!toolbarFilters) return []
     return toolbarFilters
       .filter(f => {
-        if (f.type === 'toggle') return false
+        if (f.type === 'toggle' || f.hideChip) return false // hideChip: shown elsewhere already
         if (f.type === 'multiSelect') return Array.isArray(f.value) && f.value.length > 0
         if (f.type === 'dateRange') return f.from || f.to
         return f.value !== '' && f.value !== null && f.value !== undefined

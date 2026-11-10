@@ -3,7 +3,7 @@
  * URL and leaves the stored ones alone; presets save the filters on screen.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 
 // Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
@@ -120,11 +120,93 @@ describe('CertificatesPage: status cards in a link view', () => {
     window.localStorage.setItem('ucm-filter-certs-ca', JSON.stringify(['1']))
     renderAt('/certificates?status=expiring&key_algo_prefix=RSA')
     await waitFor(() => expect(lastParams().status).toEqual(['expiring']))
-    const buttons = screen.getAllByText('table.clearFilters')
-    fireEvent.click(buttons[buttons.length - 1])
+    // The page's own chip row has a Clear filters too (it drops the whole link); this is the table's
+    const overview = screen.getByTestId('overview-chips')
+    const own = screen.getAllByText('table.clearFilters').filter((b) => !overview.contains(b))
+    expect(own).toHaveLength(1)
+    fireEvent.click(own[0])
     await settle()
     expect(JSON.parse(window.localStorage.getItem('ucm-filter-certs-status'))).toEqual(['revoked'])
     expect(JSON.parse(window.localStorage.getItem('ucm-filter-certs-ca'))).toEqual(['1'])
     expect(screen.getByTestId('where').textContent).toContain('key_algo_prefix=RSA')
+  })
+
+  it('keeps the search when a card or the status filter rewrites the link', async () => {
+    renderAt('/certificates?status=expiring&live=true')
+    await waitFor(() => expect(lastParams().status).toEqual(['expiring']))
+    fireEvent.change(screen.getByPlaceholderText(/common.search/), { target: { value: 'web' } })
+    await waitFor(() => expect(lastParams().search).toBe('web'))
+    fireEvent.click(card('common.valid'))
+    await waitFor(() => expect(lastParams().status).toEqual(['expiring', 'valid']))
+    expect(lastParams().search).toBe('web')
+  })
+
+  it('clears the search when another filter of the link changes', async () => {
+    renderAt('/certificates?status=expiring&live=true')
+    await waitFor(() => expect(lastParams().status).toEqual(['expiring']))
+    fireEvent.change(screen.getByPlaceholderText(/common.search/), { target: { value: 'web' } })
+    await waitFor(() => expect(lastParams().search).toBe('web'))
+    const chip = screen.getByText('overview.filter.live:').parentElement
+    fireEvent.click(chip.querySelector('button'))
+    await waitFor(() => expect(lastParams().search).toBeUndefined())
+  })
+
+  it('shows the status of the link once, in the overview chips', async () => {
+    // With rows, so the table draws its own chip row instead of the empty state
+    getAll.mockResolvedValue({
+      data: [{ id: 1, subject: 'CN=web', common_name: 'web', status: 'expiring', caref: 'ca-1' }],
+      meta: { total: 1 },
+    })
+    renderAt('/certificates?status=expiring&live=true')
+    await waitFor(() => expect(lastParams().status).toEqual(['expiring']))
+    expect(screen.getByText('overview.filter.status:')).toBeTruthy()
+    expect(screen.queryByText('common.status:')).toBeNull()
+  })
+
+  const savePreset = async (url, name) => {
+    renderAt(url)
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    fireEvent.click(screen.getByTitle('table.filterPresets'))
+    fireEvent.click(await screen.findByText('table.saveFilters'))
+    fireEvent.change(screen.getByPlaceholderText('table.presetName'), { target: { value: name } })
+    fireEvent.click(screen.getByText('common.save'))
+    return JSON.parse(window.localStorage.getItem('ucm-certs-presets'))
+  }
+  const applyPreset = async (name) => {
+    fireEvent.click(screen.getByTitle('table.filterPresets'))
+    fireEvent.click(await screen.findByText(name))
+  }
+
+  it('a preset saved in a link view reopens the same view', async () => {
+    const presets = await savePreset('/certificates?status=expiring&live=true&key_algo_prefix=RSA', 'rsa')
+    expect(presets[0].filters.status).toEqual(['expiring'])
+    cleanup()
+    window.localStorage.setItem('ucm-certs-presets', JSON.stringify(presets))
+    renderAt('/certificates')
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    await applyPreset('rsa')
+    await waitFor(() => expect(lastParams()).toMatchObject({ status: ['expiring'], live: 'true', key_algo_prefix: 'RSA' }))
+    expect(screen.getByTestId('where').textContent).toBe('?status=expiring&live=true&key_algo_prefix=RSA')
+  })
+
+  it('a preset saved before links existed still applies its saved filters', async () => {
+    window.localStorage.setItem('ucm-certs-presets', JSON.stringify([{ id: 1, name: 'old', filters: { status: ['revoked'] } }]))
+    renderAt('/certificates')
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    await applyPreset('old')
+    await waitFor(() => expect(lastParams().status).toEqual(['revoked']))
+    expect(screen.getByTestId('where').textContent).toBe('')
+  })
+
+  it('drops an unknown stored value when a preset reopens its link', async () => {
+    window.localStorage.setItem('ucm-certs-presets', JSON.stringify([
+      { id: 1, name: 'odd', filters: { link: '?status=bogus&live=true&nonsense=1' } },
+    ]))
+    renderAt('/certificates')
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    await applyPreset('odd')
+    await waitFor(() => expect(lastParams().live).toBe('true'))
+    expect(screen.getByTestId('where').textContent).toBe('?live=true')
+    expect(lastParams().status).toBeUndefined()
   })
 })
