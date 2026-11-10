@@ -72,7 +72,8 @@ _CERTREP_DIGESTS = ('sha256', 'sha384', 'sha512')
 
 def certrep_digest(signer_key, request_digest: Optional[str] = None) -> Optional[str]:
     """Digest of a reply signature: the client's own when the signer supports it, never below
-    the signer key's default (RFC 8894 sets no digest for the reply); None for EdDSA/ML-DSA."""
+    the signer key's default; None for EdDSA/ML-DSA. RFC 8894 leaves the reply digest open
+    (SHA-256 mandatory, SHA-1 legacy): this rule is UCM's choice."""
     floor = default_digest_for_key(signer_key)
     if floor is None:
         return None

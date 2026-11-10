@@ -78,6 +78,22 @@ def test_service_reply_for_a_p384_ca_is_sha384_whatever_the_request(app, create_
     assert info['digest_algorithm']['algorithm'].native == 'sha384'
 
 
+@pytest.mark.parametrize('request_digest', ['sha256', 'sha512'])
+def test_service_reply_of_an_rsa_ca_follows_the_request_digest(app, create_ca, request_digest):
+    from services.scep.scep_service import SCEPService
+    from tests.test_scep_rfc8894_operations import _build_request, _client_identity, _load_ca_material
+    ca_data = create_ca(cn=f'CertRep RSA CA {request_digest}')
+    with app.app_context():
+        ca, ca_cert, _ = _load_ca_material(ca_data['id'])
+        client_cert, client_key = _client_identity()
+        request = _build_request(ca_cert, client_cert, client_key, 19, b'csr', b'n' * 16,
+                                 recipient_cert=client_cert, request_digest=request_digest)
+        response, status = SCEPService(ca.refid).process_pkcs_req(request, '127.0.0.1')
+    assert status == 200
+    info = asn1crypto.cms.ContentInfo.load(response)['content']['signer_infos'][0]
+    assert info['digest_algorithm']['algorithm'].native == request_digest
+
+
 def test_certrep_of_an_hsm_key_with_a_fixed_hash_names_the_hash_it_signed(monkeypatch):
     """A provider that signs ES256 only: a SHA-512 request must not name SHA-512 in the SignerInfo."""
     from services.hsm import HsmService
