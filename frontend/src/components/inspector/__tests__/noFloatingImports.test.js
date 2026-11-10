@@ -5,7 +5,7 @@
  * and the email template editor still use them.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const SRC = join(__dirname, '../../..')
@@ -49,13 +49,44 @@ describe('legacy detail windows', () => {
     expect(users).toEqual([])
   })
 
+  // Live = reached from the entry point through relative imports (barrels included),
+  // never through a legacy module
+  const byPath = new Map(files.map(([rel]) => [rel, rel]))
+  const resolve = (fromRel, spec) => {
+    const base = join(dirname(fromRel), spec).split('\\').join('/')
+    return ['', '.js', '.jsx', '/index.js', '/index.jsx'].map((x) => base + x).find((c) => byPath.has(c))
+  }
+  const live = new Set()
+  const queue = ['main.jsx']
+  while (queue.length) {
+    const rel = queue.pop()
+    if (live.has(rel) || Object.keys(LEGACY).includes(rel)) continue
+    live.add(rel)
+    const text = files.find(([r]) => r === rel)[1]
+    for (const st of importStatements(text)) {
+      const spec = st.match(/['"]([^'"]+)['"]$/)?.[1]
+      const target = spec?.startsWith('.') && resolve(rel, spec)
+      if (target) queue.push(target)
+    }
+  }
+  const isLive = (rel) => live.has(rel)
+  const importersOf = (target) => {
+    const name = target.split('/').pop().replace(/\.jsx?$/, '')
+    return files
+      .filter(([rel]) => !Object.keys(LEGACY).includes(rel) && rel !== target)
+      .filter(([, text]) => importStatements(text).some((st) => new RegExp(`/${name}['"]`).test(st)))
+      .map(([rel]) => rel)
+  }
+
+  it('tells a live module from one only a dead module imports', () => {
+    expect(isLive('main.jsx')).toBe(true)
+    expect(isLive('components/DetailWindowLayer.jsx')).toBe(false)
+  })
+
   it.each(['ui/FloatingWindow.jsx', 'hooks/useFloatingWindow.js'])(
     'keeps %s out of the legacy set while a live module imports it', (shared) => {
-      const name = shared.split('/').pop().replace(/\.jsx?$/, '')
-      const users = files
-        .filter(([rel]) => !Object.keys(LEGACY).includes(rel) && rel !== shared)
-        .filter(([, text]) => importStatements(text).some((st) => new RegExp(`/${name}['"]`).test(st)))
-      expect(users.length).toBeGreaterThan(0)
+      const users = importersOf(`${shared.startsWith('ui/') ? 'components/' : ''}${shared}`)
+      expect(users.some((u) => isLive(u))).toBe(true)
       expect(Object.keys(LEGACY)).not.toContain(shared)
     })
 })
