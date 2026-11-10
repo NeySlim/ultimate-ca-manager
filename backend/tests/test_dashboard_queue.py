@@ -405,8 +405,7 @@ def test_kind_restricts_the_items_but_not_the_counts(auth_client, seeded):
     assert r.status_code == 200, r.data
     data = get_json(r)['data']
     assert {i['kind'] for i in data['items']} == {'crl_due', 'crl_missing'}
-    wanted = whole['counts']['crl_due'] + whole['counts']['crl_missing']
-    assert len(data['items']) == min(wanted, DASHBOARD_MAX_ROWS)
+    assert len(data['items']) == whole['counts']['crl_due'] + whole['counts']['crl_missing']
     assert data['counts'] == whole['counts']
     r = auth_client.get(f'{URL}?kind=crl_due&kind=nonsense')
     assert r.status_code == 400
