@@ -503,3 +503,40 @@ def test_a_delivered_request_is_never_judged_again(app, auth_client, scep_ca, mo
         assert _scep_row(app, scep_ca)[1] == 'approved'
         assert requests_of(app, pid, 'scep_request')[0][1] == 'approved'
         assert rejections == []
+
+
+def test_an_auto_approved_request_is_never_judged_again(app, scep_ca):
+    """Answered SUCCESS at once, with no approval to mark it delivered: a
+    poll after its certificate went away is told PENDING, never closed."""
+    from models import Certificate
+    identity = _client_identity('scep auto delivered')
+    assert _enroll(app, scep_ca, identity) == SUCCESS
+    assert _poll(app, scep_ca, identity) == SUCCESS
+    _id, status, cert_refid = _scep_row(app, scep_ca)
+    assert status == 'approved' and cert_refid
+    with app.app_context():
+        Certificate.query.filter_by(refid=cert_refid).delete()
+        db.session.commit()
+    assert _poll(app, scep_ca, identity) == PENDING
+    assert _scep_row(app, scep_ca)[1] == 'approved'
+
+
+def test_an_auto_approved_renewal_is_not_refused_once_its_renewed_is_revoked(app, scep_ca):
+    from models import Certificate
+    identity = _client_identity('scep auto renewal')
+    assert _enroll(app, scep_ca, identity) == SUCCESS
+    _source, issued = _issued_cert(app, scep_ca)
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    new_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    csr = x509.CertificateSigningRequestBuilder().subject_name(issued.subject).sign(new_key, hashes.SHA256())
+    with app.app_context():
+        _ca, ca_cert, _ = _load_ca_material(scep_ca)
+        message = _build_request(ca_cert, issued, identity[1], 17, csr.public_bytes(serialization.Encoding.DER),
+                                 b'renew-nonce-16by')
+        response, _status = _service(scep_ca).process_pkcs_req(message, '127.0.0.1')
+        assert _response_attributes(response)[PKI_STATUS_OID] == SUCCESS
+        row = Certificate.query.filter_by(serial_number=str(issued.serial_number)).first()
+        row.revoked = True
+        db.session.commit()
+    assert _poll_transaction(app, scep_ca, (issued, identity[1]), 'txn-17') == SUCCESS
+    assert _renewal_row(app, scep_ca) == 'approved'
