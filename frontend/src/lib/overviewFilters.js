@@ -3,10 +3,13 @@
  * parsed, sent to the certificate list as they are, and removable one by one.
  */
 export const OVERVIEW_FILTER_KEYS = [
-  'live', 'key_algo', 'key_algo_prefix', 'key_bits_below', 'sig_hash', 'server',
+  'status', 'live', 'key_algo', 'key_algo_prefix', 'key_bits_below', 'sig_hash', 'server',
   'lifetime_over_days', 'no_key', 'incomplete_chain', 'renewal',
 ]
-const MULTI = new Set(['key_algo', 'sig_hash', 'renewal'])
+const MULTI = new Set(['status', 'key_algo', 'sig_hash', 'renewal'])
+// The statuses the list accepts (CERTIFICATE_STATUS_FILTERS); any other is dropped from the link
+export const CERT_STATUSES = ['valid', 'expiring', 'expired', 'revoked', 'orphan', 'archived']
+const ALLOWED = { status: new Set(CERT_STATUSES) }
 
 /** Ordered [key, value] pairs of the known filters in a query string. */
 export function parseOverviewFilters(search) {
@@ -14,7 +17,9 @@ export function parseOverviewFilters(search) {
   const pairs = []
   for (const key of OVERVIEW_FILTER_KEYS) {
     const values = MULTI.has(key) ? params.getAll(key) : params.getAll(key).slice(0, 1)
-    for (const value of values) if (value !== '') pairs.push([key, value])
+    for (const value of values) {
+      if (value !== '' && (!ALLOWED[key] || ALLOWED[key].has(value))) pairs.push([key, value])
+    }
   }
   return pairs
 }

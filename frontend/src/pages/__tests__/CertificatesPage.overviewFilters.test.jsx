@@ -91,6 +91,20 @@ describe('CertificatesPage: overview filters in the URL', () => {
     expect(screen.getByTestId('where').textContent).toBe('?live=true')
   })
 
+  it('applies the status of a horizon link as a removable filter', async () => {
+    renderAt('/certificates?status=expiring')
+    await waitFor(() => expect(lastParams().status).toEqual(['expiring']))
+    fireEvent.click(screen.getByLabelText(/Remove overview.filter.status/))
+    await waitFor(() => expect(lastParams().status).toBeUndefined())
+    expect(screen.getByTestId('where').textContent).toBe('')
+  })
+
+  it('drops an unknown status from the link', async () => {
+    renderAt('/certificates?status=bogus')
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    expect(lastParams().status).toBeUndefined()
+  })
+
   it('sends none without them', async () => {
     renderAt('/certificates')
     await waitFor(() => expect(getAll).toHaveBeenCalled())

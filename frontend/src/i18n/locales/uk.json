@@ -6087,6 +6087,7 @@
       "tasks": "Tasks"
     },
     "filter": {
+      "status": "Status",
       "live": "Live",
       "key_algo": "Key algorithm",
       "key_algo_prefix": "Key family",
@@ -6103,7 +6104,13 @@
       "manual_renewal_due": "Manual renewal due",
       "client_renewal_overdue": "Client renewal overdue",
       "auto_renewal_blocked": "Auto-renewal blocked",
-      "renewal_declined": "Renewal declined"
+      "renewal_declined": "Renewal declined",
+      "valid": "Valid",
+      "expiring": "Expiring",
+      "expired": "Expired",
+      "revoked": "Revoked",
+      "orphan": "Orphan",
+      "archived": "Archived"
     },
     "hierarchy": {
       "crlOn": "CRL on",
