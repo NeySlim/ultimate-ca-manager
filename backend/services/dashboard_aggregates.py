@@ -7,6 +7,7 @@ whenever a certificate is stored (``models/certificate.py``).
 """
 from datetime import datetime, timedelta
 
+from sqlalchemy.orm import aliased
 from sqlalchemy import (DateTime, String, and_, case, func, literal, literal_column,
                         or_, select, true, type_coerce, union_all)
 
@@ -32,6 +33,8 @@ CA_EXPIRY_CRITICAL_DAYS = 90
 SERVER_LIFETIME_MAX_DAYS = 398
 RSA_MIN_BITS = 3072
 WEAK_SIG_HASHES = ('sha1', 'md5')
+# Enrolment protocols whose client holds the key and renews on its own
+CLIENT_RENEWED_SOURCES = ('acme', 'letsencrypt', 'scep', 'est', 'msca', 'wstep')
 
 _HREF = {
     'acme_order_failed': '/acme?tab=orders&order={id}',
@@ -159,16 +162,25 @@ def _queue_union(now):
 
 
 def _manual_renewal_conditions(now):
-    """Issued, live, inside the expiry window, and left alone by auto-renewal:
-    no stored key, a source it skips (NULL included), or auto-renewal off."""
+    """Issued, live, inside the expiry window, left alone by auto-renewal (no stored
+    key, a source it skips, or auto-renewal off), not renewed by its own client
+    (protocol enrolment without a stored key, UCM's ACME client), and not superseded."""
     config = _renewal_config()
-    skipped = [or_(Certificate.prv.is_(None), Certificate.prv == ''),
-               Certificate.source.is_(None), Certificate.source.notin_(config['renewal_sources'] or [''])]
+    no_key = or_(Certificate.prv.is_(None), Certificate.prv == '')
+    skipped = [no_key, Certificate.source.is_(None), Certificate.source.notin_(config['renewal_sources'] or [''])]
+    newer = aliased(Certificate)
+    superseded = (select(newer.id).where(
+        newer.subject_cn == Certificate.subject_cn, newer.caref == Certificate.caref,
+        newer.id != Certificate.id, newer.valid_to > Certificate.valid_to,
+        holds_certificate(newer), newer.revoked.is_(False), _not_archived(newer)).exists())
     return [
         holds_certificate(), Certificate.revoked.is_(False), _not_archived(),
         Certificate.valid_to.isnot(None), Certificate.valid_to > now,
         Certificate.valid_to <= now + timedelta(days=EXPIRY_WINDOW_DAYS),
         true() if not config['enabled'] else or_(*skipped),
+        or_(Certificate.source.is_(None), Certificate.source != 'acme_client'),
+        or_(Certificate.source.is_(None), Certificate.source.notin_(CLIENT_RENEWED_SOURCES), ~no_key),
+        ~superseded,
     ]
 
 

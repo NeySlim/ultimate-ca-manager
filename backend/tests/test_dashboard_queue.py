@@ -110,6 +110,16 @@ def seeded(app):
             'archived': _cert('queue-archived', now + timedelta(days=10), archived=True),
             'far': _cert('queue-far', now + timedelta(days=90)),
             'expired': _cert('queue-expired', now - timedelta(days=1)),
+            # the client holds the key and renews through its protocol, or UCM's ACME client renews it
+            'acme_nokey': _cert('queue-acme', now + timedelta(days=20), source='acme'),
+            'wstep_nokey': _cert('queue-wstep', now + timedelta(days=20), source='wstep'),
+            'acme_client': _cert('queue-acme-client', now + timedelta(days=10), prv='k', source='acme_client'),
+            'superseded': _cert('queue-superseded', now + timedelta(days=10), caref=crl_fresh.refid),
+            'successor': _cert('queue-successor', now + timedelta(days=300), caref=crl_fresh.refid,
+                               subject_cn='queue-superseded'),
+            'revoked_successor_of': _cert('queue-revoked-succ', now + timedelta(days=10), caref=crl_fresh.refid),
+            'revoked_successor': _cert('queue-revoked-succ-new', now + timedelta(days=300), caref=crl_fresh.refid,
+                                       subject_cn='queue-revoked-succ', revoked=True),
         }
         db.session.commit()
         ids.update(failed=failed.id, old=old.id, client=client.id, healthy=healthy.id, urgent=urgent.id,
@@ -158,6 +168,7 @@ def _find(data, kind, item_id):
     ('manual_renewal_due', 'no_key_12h', 'critical'),
     ('manual_renewal_due', 'no_key_10d', 'warning'),
     ('manual_renewal_due', 'excluded_source', 'warning'),
+    ('manual_renewal_due', 'revoked_successor_of', 'warning'),
     ('ca_expiring', 'ca_soon', 'critical'),
     ('ca_expiring', 'ca_later', 'warning'),
 ])
@@ -180,6 +191,8 @@ def test_crl_due_date_is_the_latest_full_crl(auth_client, seeded):
     ('crl_due', 'crl_renewed'),
     ('crl_due', 'crl_offline'), ('crl_missing', 'crl_offline'),
     ('crl_due', 'crl_upload'), ('crl_missing', 'crl_upload'),
+    ('manual_renewal_due', 'acme_nokey'), ('manual_renewal_due', 'wstep_nokey'),
+    ('manual_renewal_due', 'acme_client'), ('manual_renewal_due', 'superseded'),
     ('crl_missing', 'no_cdp'), ('ca_expiring', 'ca_revoked'),
     ('manual_renewal_due', 'auto'), ('manual_renewal_due', 'revoked'),
     ('manual_renewal_due', 'archived'), ('manual_renewal_due', 'far'), ('manual_renewal_due', 'expired'),
