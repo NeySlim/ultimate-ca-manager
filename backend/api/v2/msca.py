@@ -968,9 +968,16 @@ def check_request_status(msca_id, request_id):
                 csr = db.session.get(Certificate, req.csr_id)
                 msca = db.session.get(MicrosoftCA, msca_id)
                 if csr and msca:
+                    # A new serial on a row that already held a certificate is a renewal
+                    old_serial = str(csr.serial_number) if csr.crt else None
                     try:
                         _import_signed_cert(csr, req.cert_pem, msca, req.template, request_id)
                         result = req.to_dict()
+                        if old_serial and str(csr.serial_number) != old_serial:
+                            from services.webhook_service import emit_cert_renewed
+                            user = getattr(g, 'current_user', None)
+                            emit_cert_renewed(csr.to_dict(), ca_refid=csr.caref,
+                                              actor=getattr(user, 'username', None))
                     except Exception as imp_err:
                         logger.error(
                             f"MS CA request {request_id} issued but UCM import failed: {imp_err}",
