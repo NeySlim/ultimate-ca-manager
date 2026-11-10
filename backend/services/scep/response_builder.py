@@ -40,6 +40,7 @@ def build_cert_rep(
     ca_cert: x509.Certificate,
     fail_info: Optional[int] = None,
     fail_info_text: Optional[str] = None,
+    request_digest: Optional[str] = None,
 ) -> bytes:
     """
     Build a signed CertRep PKCS#7 response (RFC 8894 §4).
@@ -104,6 +105,7 @@ def build_cert_rep(
         ca_key,
         ca_cert,
         signed_attributes=scep_attrs,
+        request_digest=request_digest,
     )
 
 
@@ -117,6 +119,7 @@ def build_cert_rep_success(
     challenge_password: Optional[str | bytes] = None,
     content_encryption_algorithm: str = AES128_CBC,
     key_transport: tuple = DEFAULT_KEY_TRANSPORT,
+    request_digest: Optional[str] = None,
 ) -> bytes:
     """Create a successful CertRep encrypted for the SCEP client."""
     # The issued certificate only (RFC 8894 §3.3.2.1): Apple's client pairs
@@ -131,7 +134,8 @@ def build_cert_rep_success(
         key_transport=key_transport,
     )
     return build_cert_rep(
-        STATUS_SUCCESS, encrypted_data, transaction_id, sender_nonce, ca_key, ca_cert
+        STATUS_SUCCESS, encrypted_data, transaction_id, sender_nonce, ca_key, ca_cert,
+        request_digest=request_digest,
     )
 
 
@@ -145,6 +149,7 @@ def build_crl_rep_success(
     challenge_password: Optional[str | bytes] = None,
     content_encryption_algorithm: str = AES128_CBC,
     key_transport: tuple = DEFAULT_KEY_TRANSPORT,
+    request_digest: Optional[str] = None,
 ) -> bytes:
     """Create a successful CertRep carrying only the requested CRL."""
     pkcs7_data = create_degenerate_pkcs7([], crls=[crl])
@@ -156,7 +161,8 @@ def build_crl_rep_success(
         key_transport=key_transport,
     )
     return build_cert_rep(
-        STATUS_SUCCESS, encrypted_data, transaction_id, sender_nonce, ca_key, ca_cert
+        STATUS_SUCCESS, encrypted_data, transaction_id, sender_nonce, ca_key, ca_cert,
+        request_digest=request_digest,
     )
 
 
@@ -165,9 +171,11 @@ def build_cert_rep_pending(
     sender_nonce: Optional[bytes],
     ca_key,
     ca_cert: x509.Certificate,
+    request_digest: Optional[str] = None,
 ) -> bytes:
     """Create a PENDING CertRep response."""
-    return build_cert_rep(STATUS_PENDING, b'', transaction_id, sender_nonce, ca_key, ca_cert)
+    return build_cert_rep(STATUS_PENDING, b'', transaction_id, sender_nonce, ca_key, ca_cert,
+                         request_digest=request_digest)
 
 
 def build_error_response(
@@ -177,6 +185,7 @@ def build_error_response(
     ca_cert: x509.Certificate,
     transaction_id: str = '',
     recipient_nonce: Optional[bytes] = None,
+    request_digest: Optional[str] = None,
 ) -> bytes:
     """Create a FAILURE CertRep response with the given failInfo code.
 
@@ -189,4 +198,5 @@ def build_error_response(
     return build_cert_rep(
         STATUS_FAILURE, b'', transaction_id, recipient_nonce, ca_key, ca_cert,
         fail_info=fail_info, fail_info_text=message,
+        request_digest=request_digest,
     )
