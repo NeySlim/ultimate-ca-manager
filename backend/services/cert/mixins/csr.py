@@ -448,9 +448,6 @@ class CSRMixin:
         if san_email_list:
             certificate.san_email = json.dumps(san_email_list)
 
-        # Increment CA serial
-        next_ca_serial(ca)
-
         # If signing as intermediate CA, create a CA record
         new_ca = None
         if cert_type == 'intermediate_ca':
@@ -498,6 +495,9 @@ class CSRMixin:
         try:
             # RFC 9763: the request binds to this key B in the commit that stores B
             record_request_key(csr_obj.public_bytes(serialization.Encoding.DER), related_a)
+            # Every row written (A's link included) is locked before the CA row, last
+            db.session.flush()
+            next_ca_serial(ca)
             db.session.commit()
         except Exception as _commit_err:
             rollback_unless_serial_collision(_commit_err)

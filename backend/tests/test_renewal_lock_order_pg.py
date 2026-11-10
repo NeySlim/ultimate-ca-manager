@@ -306,3 +306,161 @@ def test_in_place_renewal_and_the_responder_task_on_one_responder_do_not_deadloc
     assert errors == []
     assert (stats.get('renewed'), stats.get('failed')) == (1, 0)
     assert count == 3
+
+
+def _race_with_an_in_place_renewal(app, url, monkeypatch, held_id, ca_id, other):
+    """Renew *held_id* in place, paused while it holds that row, and run *other* meanwhile.
+    Returns (other waited on a lock, errors); a lock-order inversion is a deadlock error."""
+    from services.cert import renewal
+    holds, release = threading.Event(), threading.Event()
+    errors, pids = [], {}
+    recorded = renewal._record_scts
+
+    def pause_holding_the_row(*args):
+        recorded(*args)
+        if threading.current_thread().name == 'in-place':
+            holds.set()
+            release.wait(30)
+    monkeypatch.setattr(renewal, '_record_scts', pause_holding_the_row)
+
+    def run(name, work):
+        with app.app_context():
+            engine, pids[name] = _own_session(url)
+            try:
+                work()
+            except Exception as exc:  # noqa: BLE001
+                errors.append((name, repr(exc)))
+            finally:
+                holds.set()
+                db.session.remove()
+                engine.dispose()
+
+    t_a = threading.Thread(target=run, name='in-place', args=('in-place', lambda: (
+        renewal.renew_certificate_in_place(db.session.get(Certificate, held_id),
+                                           db.session.get(CA, ca_id)))))
+    t_a.start()
+    assert holds.wait(30)
+    t_b = threading.Thread(target=run, name='other', args=('other', other))
+    t_b.start()
+    blocked = _waits_on_a_lock(url, _pid_of(pids, 'other'))
+    release.set()
+    t_a.join(60)
+    t_b.join(60)
+    return blocked, errors
+
+
+def _a_with_its_key(ca, name):
+    from cryptography.hazmat.primitives import serialization
+    from services.cert_service import CertificateService
+    from utils.key_codec import load_pem_bytes
+    row = CertificateService.create_certificate(
+        descr=name, caref=ca.refid, dn={'CN': f'{name}.example.test'},
+        san_dns=[f'{name}.example.test'], key_type='prime256v1', validity_days=30)
+    import base64
+    cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+    key = serialization.load_pem_private_key(load_pem_bytes(row.prv, context='test'), None)
+    return row.id, cert, key
+
+
+def _csr_naming_a(cert_a, key_a):
+    from utils import related_cert
+    key_b = ec.generate_private_key(ec.SECP256R1())
+    csr = (x509.CertificateSigningRequestBuilder().subject_name(cert_a.subject)
+           .add_extension(cert_a.extensions.get_extension_for_class(x509.SubjectAlternativeName).value,
+                          critical=False)
+           .sign(key_b, hashes.SHA256()))
+    request = related_cert.build_request(cert_a, key_a, related_cert.data_url_for([cert_a]))
+    return related_cert.csr_with_request(csr, key_b, request)
+
+
+def test_a_protocol_issuance_naming_a_and_an_in_place_renewal_of_a_do_not_deadlock(app, monkeypatch):
+    """The issuance of B writes A's link back: that row is locked before the CA row."""
+    from services.ca import CAService
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    with _a_schema_of_our_own(f'related_protocol_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            ca = _ca_row(*_authority())
+            ca_id = ca.id
+            a_id, cert_a, key_a = _a_with_its_key(ca, 'related-a')
+            db.session.remove()
+        csr = _csr_naming_a(cert_a, key_a)
+
+        blocked, errors = _race_with_an_in_place_renewal(
+            app, url, monkeypatch, a_id, ca_id, lambda: CAService.sign_csr_from_crypto(
+                db.session.get(CA, ca_id), csr, validity_days=30, source='est'))
+
+        with app.app_context():
+            count = db.session.get(CA, ca_id).serial
+            db.session.remove()
+    assert blocked, errors
+    assert errors == []
+    assert count == 3
+
+
+def test_a_signed_csr_naming_a_and_an_in_place_renewal_of_a_do_not_deadlock(app, monkeypatch):
+    """Signing a stored CSR that names A writes A's link back before the CA row."""
+    from cryptography.hazmat.primitives import serialization
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    with _a_schema_of_our_own(f'related_csr_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            ca = _ca_row(*_authority())
+            ca_id, ca_refid = ca.id, ca.refid
+            a_id, cert_a, key_a = _a_with_its_key(ca, 'related-a')
+            pending = Certificate(refid=uuid.uuid4().hex[:8], descr='related-b',
+                                  csr=_csr_naming_a(cert_a, key_a).public_bytes(
+                                      serialization.Encoding.PEM).decode())
+            db.session.add(pending)
+            db.session.commit()
+            csr_id = pending.id
+            db.session.remove()
+
+        blocked, errors = _race_with_an_in_place_renewal(
+            app, url, monkeypatch, a_id, ca_id, lambda: CertificateService.sign_csr(
+                cert_id=csr_id, caref=ca_refid, validity_days=30))
+
+        with app.app_context():
+            count = db.session.get(CA, ca_id).serial
+            db.session.remove()
+    assert blocked, errors
+    assert errors == []
+    assert count == 3
+
+
+def test_a_renewal_that_unlinks_a_row_and_its_in_place_renewal_do_not_deadlock(app, monkeypatch):
+    """R renewed alone unlinks the row P that names it: P is locked before the CA row,
+    or R holds the CA row while P's own renewal holds P and waits for it."""
+    from services.cert import renewal
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    with _a_schema_of_our_own(f'related_unlink_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            ca = _ca_row(*_authority())
+            ca_id = ca.id
+            r, p = (CertificateService.create_certificate(
+                descr=n, caref=ca.refid, dn={'CN': f'{n}.example.test'},
+                key_type='prime256v1', validity_days=30) for n in ('named-r', 'naming-p'))
+            p.related_certificate_id = r.id
+            r_id, p_id = r.id, p.id
+            db.session.commit()
+            db.session.remove()
+
+        blocked, errors = _race_with_an_in_place_renewal(
+            app, url, monkeypatch, p_id, ca_id, lambda: renewal.renew_certificate_in_place(
+                db.session.get(Certificate, r_id), db.session.get(CA, ca_id)))
+
+        with app.app_context():
+            count = db.session.get(CA, ca_id).serial
+            db.session.remove()
+    assert blocked, errors
+    assert errors == []
+    assert count == 4

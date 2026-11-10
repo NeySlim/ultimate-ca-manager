@@ -13,7 +13,7 @@ from datetime import timedelta
 import cryptography.x509 as x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509.oid import ExtensionOID, NameOID
-from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy.exc import InvalidRequestError, SQLAlchemyError
 
 from models import db, CA, Certificate, RevokedSerial, SystemConfig
 from security.encryption import encrypt_private_key
@@ -238,14 +238,19 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
             if pair and index == 0:
                 renewed_a = x509.load_pem_x509_certificate(staged_member['cert_pem'])
             staged_all.append(staged_member)
-        # A renewal is an issuance, counted in its commit; the CA row is locked only
-        # after every member's row, the order a protocol renewal of one member takes
-        for s in staged_all:
-            next_ca_serial(s['ca'])
         if not pair and related_to is None:
             # Renewed alone and naming none: the row leaves its pair, as its certificate has
             from services.cert.related_pair import leave_pair
             leave_pair(staged_all[0]['cert'])
+        # A renewal is an issuance, counted in its commit; the CA row is locked last,
+        # after every certificate row written (members, rows unlinked from them)
+        try:
+            db.session.flush()
+        except SQLAlchemyError as e:
+            logger.error(f'Failed to renew certificate {cert.id}: {e}', exc_info=True)
+            raise RenewalError('Failed to renew certificate', 500) from e
+        for s in staged_all:
+            next_ca_serial(s['ca'])
     except Exception:
         db.session.rollback()
         raise
