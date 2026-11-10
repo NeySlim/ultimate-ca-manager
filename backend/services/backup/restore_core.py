@@ -4,6 +4,7 @@ Core restore methods mixin for BackupService
 import json
 import hashlib
 import base64
+import io
 import logging
 from datetime import datetime
 from typing import Any, Dict, List
@@ -18,11 +19,12 @@ from models.acme_models import AcmeAccount
 from config.settings import Config
 from services.file_regen_service import insert_file_writes_suspended
 
-from . import installation
+from . import container, installation
 from .errors import BackupSchemaError
 from .restore import RestorePlan, single_transaction
 from .restore.files import StagedFiles
 from .manifest import SECTIONS
+from .section_store import SectionStore, section_kind, section_length
 from .restore.apply import apply_columns, apply_section, relink_references
 from .restore.names import rename_clashing_rows
 from .restore.orders import keep_newer_orders
@@ -148,6 +150,13 @@ RESTORED_SECTIONS = set(GENERIC_SECTIONS) | {
 }
 
 
+def _carries(backup_data, name: str) -> bool:
+    """Whether a section holds anything, asked of a v4 store without loading it."""
+    if isinstance(backup_data, SectionStore):
+        return backup_data.length(name) > 0
+    return bool(backup_data.get(name))
+
+
 class RestoreCoreMixin:
     def _check_payload_schema(self, backup_data: Dict[str, Any]) -> None:
         """Refuse a payload this version cannot restore.
@@ -195,8 +204,8 @@ class RestoreCoreMixin:
         The payload checksum says the archive is damaged; this says which
         section, which is what decides whether a restore is worth attempting.
         """
-        if digests is None:
-            return
+        if digests is None or isinstance(backup_data, SectionStore):
+            return  # a v4 archive's digests were compared as its chunks were read
         if not isinstance(digests, dict):
             raise BackupSchemaError(
                 "Invalid backup format: section digests are not an object")
@@ -233,20 +242,19 @@ class RestoreCoreMixin:
             if name not in backup_data:
                 raise BackupSchemaError(
                     f"Incomplete backup: section '{name}' is announced but missing")
-            value = backup_data[name]
-            if not isinstance(value, (list, dict)):
+            if section_kind(backup_data, name) not in ('list', 'mapping'):
                 raise BackupSchemaError(
                     f"Invalid backup format: section '{name}' is neither a list nor "
                     "an object")
-            if len(value) != expected:
+            held = section_length(backup_data, name)
+            if held != expected:
                 raise BackupSchemaError(
-                    f"Incomplete backup: section '{name}' holds {len(value)} entries, "
+                    f"Incomplete backup: section '{name}' holds {held} entries, "
                     f"{expected} were written"
                 )
 
     def restore_backup(self, backup_bytes: bytes, password: str, *, mode: str = 'replace') -> Dict[str, Any]:
-        """
-        Restore from encrypted backup. Auto-detects format v1 (legacy) or v2.
+        """Restore from an encrypted archive held in memory, any format v1 to v4.
 
         Args:
             backup_bytes: Encrypted backup file content
@@ -255,6 +263,9 @@ class RestoreCoreMixin:
         Returns:
             Dict with restore results
         """
+        if container.format_version_of(backup_bytes) == container.FORMAT_VERSION_V4:
+            return self._restore_v4(io.BytesIO(backup_bytes), password, mode)
+
         # Detect format from magic bytes
         if len(backup_bytes) >= 4 and backup_bytes[:4] == self.MAGIC:
             master_key, backup_data = self._decrypt_framed(backup_bytes, password)
@@ -276,6 +287,39 @@ class RestoreCoreMixin:
                     "Backup checksum mismatch: the archive is corrupted. "
                     "Nothing has been changed.")
 
+        return self._restore_payload(backup_data, master_key, mode)
+
+    def restore_backup_from_path(self, path, password: str, *,
+                                 mode: str = 'replace') -> Dict[str, Any]:
+        """Restore the archive at `path`: a v4 is streamed, an older one read whole."""
+        with open(path, 'rb') as stream:
+            return self.restore_backup_from_stream(stream, password, mode=mode)
+
+    def restore_backup_from_stream(self, stream, password: str, *,
+                                   mode: str = 'replace') -> Dict[str, Any]:
+        """Restore from a seekable binary stream positioned at the archive's start.
+
+        v1 to v3 are bounded by BACKUP_MAX_UPLOAD_MB before they are read into
+        memory; a v4 never is, its chunks are bounded one by one.
+        """
+        start = stream.tell()
+        head = stream.read(container.HEADER_PREFIX_SIZE)
+        stream.seek(start)
+        if container.format_version_of(head) == container.FORMAT_VERSION_V4:
+            return self._restore_v4(stream, password, mode)
+        size = stream.seek(0, io.SEEK_END) - start
+        stream.seek(start)
+        container.refuse_oversized_size(size)
+        return self.restore_backup(stream.read(), password, mode=mode)
+
+    def _restore_v4(self, stream, password: str, mode: str) -> Dict[str, Any]:
+        """Sections land on disk as their chunks are read; the restore loads them on demand."""
+        with SectionStore() as store:
+            master_key = self._read_v4(stream, password, store)
+            return self._restore_payload(store, master_key, mode)
+
+    def _restore_payload(self, backup_data, master_key: bytes, mode: str) -> Dict[str, Any]:
+        """Everything after decryption: a payload dict, or a v4 `SectionStore`."""
         # Everything the payload claims about itself is checked here, before
         # the first write: a schema this version cannot read, or a section
         # holding fewer rows than the archive says it holds, must not be
@@ -299,16 +343,16 @@ class RestoreCoreMixin:
         # over a file that changed not one row.
         carried = sorted(
             name for name in SECTIONS
-            if backup_data.get(name)
+            if _carries(backup_data, name)
         )
 
         # Named before anything is written, so the answer can say what this
         # version will not put back even though the archive carries it.
         not_restored = sorted(
-            name for name, value in backup_data.items()
+            name for name in backup_data.keys()
             if name not in ('metadata', 'checksum')
             and name not in RESTORED_SECTIONS
-            and value
+            and _carries(backup_data, name)
         )
         if not_restored:
             logger.warning(
@@ -464,7 +508,8 @@ class RestoreCoreMixin:
         """
         metadata = backup_data.get('metadata') or {}
         recorded = metadata.get('key_mismatches')
-        if isinstance(recorded, list) and recorded:
+        # A v4 archive always records the list, so an empty one is an answer
+        if isinstance(recorded, list) and (recorded or isinstance(backup_data, SectionStore)):
             return [str(item) for item in recorded]
 
         found = []
@@ -490,11 +535,11 @@ class RestoreCoreMixin:
         """
         excluded = set(
             (backup_data.get('metadata') or {}).get('excluded_sections') or [])
-        sections = {name for name, value in backup_data.items()
-                    if name in SECTIONS and isinstance(value, list)
+        sections = {name for name in backup_data.keys()
+                    if name in SECTIONS and section_kind(backup_data, name) == 'list'
                     and name not in excluded}
 
-        if 'users' in sections and not backup_data.get('users'):
+        if 'users' in sections and not section_length(backup_data, 'users'):
             raise BackupSchemaError(
                 "Refusing to restore: this archive carries no users, and a "
                 "replacing restore would remove every account on this server. "

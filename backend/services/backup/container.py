@@ -140,10 +140,15 @@ def count_containers(value: Any) -> int:
 
 
 def refuse_oversized(container: bytes) -> None:
+    refuse_oversized_size(len(container))
+
+
+def refuse_oversized_size(size: int) -> None:
+    """Refuse a v1 to v3 archive of `size` bytes above BACKUP_MAX_UPLOAD_MB."""
     limit = max_container_bytes()
-    if len(container) > limit:
+    if size > limit:
         raise ContainerError(
-            f"Backup file is too large to read ({len(container) / _MIB:.1f} MB, more than "
+            f"Backup file is too large to read ({size / _MIB:.1f} MB, more than "
             f"the {limit / _MIB:.0f} MB BACKUP_MAX_UPLOAD_MB allows)")
 
 
@@ -220,16 +225,15 @@ def format_version_of(head: bytes) -> Optional[int]:
 
 
 def parse_header(container: bytes) -> Tuple[Dict[str, Any], bytes, bytes]:
-    """Validate the framing of a v2/v3 container.
+    """Validate the framing of a v2/v3 container (or the header of a v4 one).
 
-    Returns (metadata, header_bytes, ciphertext). Nothing is derived, decrypted
-    or decompressed here: this only decides whether the framing is one this
-    reader knows, and whether its lengths are consistent with the file.
+    Returns (metadata, header_bytes, ciphertext); for a v4 the last is its
+    chunk sequence. Nothing is derived, decrypted or decompressed here: this
+    only decides whether the framing is one this reader knows, and whether
+    its lengths are consistent with the file.
     """
     refuse_oversized(container)
     version, flags, kdf_id, metadata_len = _parse_prefix(container[:HEADER_PREFIX_SIZE])
-    if version == FORMAT_VERSION_V4:
-        raise ContainerError("Invalid backup file: a v4 archive is read as a stream")
 
     header_end = HEADER_PREFIX_SIZE + metadata_len
     # The ciphertext must have room for at least the GCM tag.
@@ -529,6 +533,8 @@ def validate_v4_metadata(metadata: Dict[str, Any]) -> Tuple[int, List[str]]:
 
 
 class _SectionTally:
+    """Parts, rows and the section's digest: SHA-256 of `json.dumps(section, sort_keys=True)`,
+    the v3 section digest, computed one row at a time."""
     __slots__ = ('digest', 'parts', 'rows', 'mapping')
 
     def __init__(self):
@@ -537,8 +543,26 @@ class _SectionTally:
         self.rows = 0
         self.mapping = False
 
+    def add_row(self, encoded: bytes) -> None:
+        self.digest.update(b', ' if self.rows else b'[')
+        self.digest.update(encoded)
+        self.rows += 1
+
+    def set_mapping(self, encoded: bytes, size: int) -> None:
+        self.digest.update(encoded)
+        self.mapping = True
+        self.rows = size
+
     def record(self) -> Dict[str, Any]:
-        return {'sha256': self.digest.hexdigest(), 'parts': self.parts, 'rows': self.rows}
+        digest = self.digest.copy()
+        if not self.mapping:
+            digest.update(b']' if self.rows else b'[]')
+        return {'sha256': digest.hexdigest(), 'parts': self.parts, 'rows': self.rows}
+
+
+def _canonical(value: Any) -> bytes:
+    """A row or mapping as the section digest reads it."""
+    return json.dumps(value, sort_keys=True, default=str).encode()
 
 
 class ChunkWriter:
@@ -574,7 +598,6 @@ class ChunkWriter:
         return struct.pack('>I', len(sealed)) + sealed
 
     def _part(self, tally: _SectionTally, body: bytes) -> bytes:
-        tally.digest.update(body)
         tally.parts += 1
         return self._frame(body)
 
@@ -586,9 +609,9 @@ class ChunkWriter:
         tally = self._tallies[name] = _SectionTally()
 
         if isinstance(value, dict):
-            tally.mapping = True
-            tally.rows = len(value)
-            body = _dumps({'section': name, 'part': 0, 'rows': value})
+            encoded = json.dumps(value, sort_keys=True).encode()
+            tally.set_mapping(encoded, len(value))
+            body = _part_body(name, 0, encoded)
             if len(body) > self._chunk_max or count_containers(value) + 1 > self._containers:
                 raise ContainerError(f"Section '{name}' does not fit one chunk")
             yield self._part(tally, body)
@@ -596,23 +619,23 @@ class ChunkWriter:
 
         pending: List[bytes] = []
         size = containers = 0
-        overhead = len(_part_body(name, tally.parts, []))
+        overhead = len(_part_body(name, tally.parts, b'[]'))
         for row in value:
-            encoded = _dumps(row)
+            encoded = json.dumps(row, sort_keys=True).encode()
             weight = count_containers(row)
             if pending and (overhead + size + len(pending) + len(encoded) > self._chunk_max
                             or containers + weight + 2 > self._containers):
-                yield self._part(tally, _part_body(name, tally.parts, pending))
+                yield self._part(tally, _part_body(name, tally.parts, _rows(pending)))
                 pending, size, containers = [], 0, 0
-                overhead = len(_part_body(name, tally.parts, []))
+                overhead = len(_part_body(name, tally.parts, b'[]'))
             if overhead + len(encoded) > self._chunk_max or weight + 2 > self._containers:
                 raise ContainerError(f"A row of section '{name}' does not fit one chunk")
             pending.append(encoded)
             size += len(encoded)
             containers += weight
-            tally.rows += 1
+            tally.add_row(encoded)
         if pending or tally.parts == 0:
-            yield self._part(tally, _part_body(name, tally.parts, pending))
+            yield self._part(tally, _part_body(name, tally.parts, _rows(pending)))
 
     def finish(self, metadata: Optional[Dict[str, Any]] = None) -> bytes:
         """The end record: every section's digest, parts and rows, marked last."""
@@ -632,8 +655,12 @@ def _dumps(value: Any) -> bytes:
     return json.dumps(value, sort_keys=True, separators=(',', ':')).encode()
 
 
-def _part_body(name: str, part: int, rows: List[bytes]) -> bytes:
-    return (b'{"part":%d,"rows":[' % part + b','.join(rows) + b'],"section":'
+def _rows(encoded: List[bytes]) -> bytes:
+    return b'[' + b','.join(encoded) + b']'
+
+
+def _part_body(name: str, part: int, rows: bytes) -> bytes:
+    return (b'{"part":%d,"rows":' % part + rows + b',"section":'
             + json.dumps(name).encode() + b'}')
 
 
@@ -657,6 +684,7 @@ class ChunkReader:
         self._containers = chunk_container_limit(self._chunk_max)
         self._pending = b''
         self.end: Optional[Dict[str, Any]] = None
+        self.digests: Dict[str, str] = {}
 
     def _next_frame(self, counter: int) -> Optional[Tuple[bytes, bool]]:
         length_bytes = self._pending + (_read_exactly(self._stream, 4 - len(self._pending)) or b'')
@@ -737,9 +765,12 @@ class ChunkReader:
                 tally.mapping = True
             elif not isinstance(rows, list) or tally.mapping:
                 raise ContainerError(f"Invalid backup: section '{name}' has malformed rows")
-            tally.digest.update(plaintext)
+            if tally.mapping:
+                tally.set_mapping(_canonical(rows), len(rows))
+            else:
+                for row in rows:
+                    tally.add_row(_canonical(row))
             tally.parts += 1
-            tally.rows += len(rows)
             yield name, part, rows
 
     def _check_end(self, record: Any, tallies: Dict[str, _SectionTally], position: int) -> None:
@@ -760,3 +791,4 @@ class ChunkReader:
                     f"Corrupted backup: section '{name}' does not match the digest recorded "
                     "when it was written. Nothing has been changed.")
         self.end = record['metadata']
+        self.digests = {name: entry['sha256'] for name, entry in announced.items()}
