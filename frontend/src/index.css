@@ -2860,4 +2860,5 @@ input:focus, select:focus, textarea:focus {
 .bg-scrim-50 { background-color: color-mix(in srgb, var(--scrim) 50%, transparent); }
 .bg-scrim-60 { background-color: color-mix(in srgb, var(--scrim) 60%, transparent); }
 .bg-scrim-70 { background-color: color-mix(in srgb, var(--scrim) 70%, transparent); }
-.border-on-accent-op30 { border-color: color-mix(in srgb, var(--on-accent) 30%, transparent); }
+/* One rule for ring and arc, so no later shorthand can repaint the arc */
+.spinner-on-accent { border-color: color-mix(in srgb, var(--on-accent) 30%, transparent); border-top-color: var(--on-accent); }

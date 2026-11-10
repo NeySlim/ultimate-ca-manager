@@ -1151,7 +1151,7 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
         <Button type="submit" disabled={loading || !caId || (mode === 'sign' && !publicKey.trim())}>
           {loading ? (
             <span className="flex items-center gap-2">
-              <span className="w-3.5 h-3.5 border-2 border-on-accent-op30 border-t-on-accent rounded-full animate-spin" />
+              <span className="w-3.5 h-3.5 border-2 spinner-on-accent rounded-full animate-spin" />
               {t('sshCertificates.issueCertificate')}
             </span>
           ) : (
@@ -1333,7 +1333,7 @@ function RevokeCertificateForm({ cert, onSubmit, onCancel }) {
         <Button type="submit" variant="danger" disabled={loading}>
           {loading ? (
             <span className="flex items-center gap-2">
-              <span className="w-3.5 h-3.5 border-2 border-on-accent-op30 border-t-on-accent rounded-full animate-spin" />
+              <span className="w-3.5 h-3.5 border-2 spinner-on-accent rounded-full animate-spin" />
               {t('sshCertificates.revokeCertificate')}
             </span>
           ) : (
