@@ -100,10 +100,7 @@ def _apply(execute, executemany, stream, tables, value_param, false_literal):
     if not pending:
         return
     for d in pending:
-        if 'waits_for' in d:
-            logger.warning("Migration 144: %s (left as stored)", describe_pending(d))
-        else:
-            logger.warning("Migration 144: %s (left as stored)", describe_pending(d))
+        logger.warning("Migration 144: %s (left as stored)", describe_pending(d))
     logger.warning("Migration 144: these serials stay outside the unique index. %s", CLEANUP)
     if CONFIG in tables:
         execute(SET_PENDING.format(value=value_param, false=false_literal),
