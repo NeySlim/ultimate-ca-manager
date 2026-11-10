@@ -75,16 +75,18 @@ def delete_client_accounts(query, **kwargs):
 def delete_cas(query):
     """Delete the CAs ``query`` selects with what references them, which
     PostgreSQL would otherwise refuse: their certificates, ACME domain
-    mappings, CRLs, OCSP responses and revoked serials."""
+    mappings, CRLs, OCSP responses, SCEP requests and revoked serials."""
     from models import Certificate
     from models.acme_models import AcmeDomain, AcmeLocalDomain
     from models.crl import CRLMetadata
     from models.ocsp import OCSPResponse
     from models.revoked_serial import RevokedSerial
+    from models.scep import SCEPRequest
 
     for ca in query.all():
         Certificate.query.filter_by(caref=ca.refid).delete(synchronize_session=False)
         RevokedSerial.query.filter_by(caref=ca.refid).delete(synchronize_session=False)
+        SCEPRequest.query.filter_by(ca_refid=ca.refid).delete(synchronize_session=False)
         AcmeDomain.query.filter_by(issuing_ca_id=ca.id).update(
             {AcmeDomain.issuing_ca_id: None}, synchronize_session=False)
         AcmeLocalDomain.query.filter_by(issuing_ca_id=ca.id).delete(synchronize_session=False)
