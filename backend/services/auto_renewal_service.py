@@ -57,18 +57,23 @@ class AutoRenewalService:
             'notify_on_failure': True,
         }
 
-        enabled = SystemConfig.query.filter_by(key='auto_renewal_enabled').first()
+        # One query for the five settings: the dashboard queue reads them on every request
+        stored = {row.key: row for row in SystemConfig.query.filter(SystemConfig.key.in_((
+            'auto_renewal_enabled', 'auto_renewal_days', 'auto_renewal_sources',
+            'auto_renewal_notify_on_renewal', 'auto_renewal_notify_on_failure')))}
+
+        enabled = stored.get('auto_renewal_enabled')
         if enabled:
             config['enabled'] = enabled.value == 'true'
 
-        days = SystemConfig.query.filter_by(key='auto_renewal_days').first()
+        days = stored.get('auto_renewal_days')
         if days:
             try:
                 config['days_before_expiry'] = int(days.value)
             except (TypeError, ValueError):
                 logger.warning("Setting auto_renewal_days is not an integer; ignored")
 
-        sources = SystemConfig.query.filter_by(key='auto_renewal_sources').first()
+        sources = stored.get('auto_renewal_sources')
         if sources:
             parsed = _json_list('auto_renewal_sources', sources.value)
             if parsed is not None and all(isinstance(v, str) for v in parsed):
@@ -77,7 +82,7 @@ class AutoRenewalService:
                 logger.warning("Setting auto_renewal_sources holds non-string values; ignored")
 
         for flag in ('notify_on_renewal', 'notify_on_failure'):
-            row = SystemConfig.query.filter_by(key=f'auto_renewal_{flag}').first()
+            row = stored.get(f'auto_renewal_{flag}')
             if row:
                 config[flag] = row.value == 'true'
         return config

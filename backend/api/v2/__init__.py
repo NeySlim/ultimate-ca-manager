@@ -61,6 +61,7 @@ from api.v2.system import updates  # noqa: F401
 from api.v2.system import service  # noqa: F401
 from api.v2.system import logs  # noqa: F401
 from api.v2.dashboard import bp as dashboard_bp
+from api.v2.dashboard_overview import bp as dashboard_overview_bp
 from api.v2.crl import bp as crl_bp
 from api.v2.csrs import bp as csrs_bp
 # Users: import package (creates bp) then all route modules
@@ -125,6 +126,7 @@ API_V2_BLUEPRINTS = [
     settings_bp,
     system_bp,
     dashboard_bp,
+    dashboard_overview_bp,
     crl_bp,
     users_bp,
     templates_bp,

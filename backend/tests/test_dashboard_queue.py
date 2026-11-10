@@ -1,0 +1,236 @@
+"""GET /api/v2/dashboard/queue: what needs acting on, critical first, with the
+total per kind counted in SQL rather than from the truncated list."""
+import secrets
+import uuid
+from datetime import timedelta
+
+import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
+
+from api.v2.dashboard import DASHBOARD_MAX_ROWS
+from models import CA, Certificate, SystemConfig, db
+from models.acme_models import AcmeAccount, AcmeClientOrder, AcmeOrder
+from models.crl import CRLMetadata
+from models.key_recovery import KeyRecoveryRequest
+from models.policy import ApprovalRequest
+from models.scep import SCEPRequest
+from tests.conftest import get_json
+from tests.dashboard_pem import self_signed
+from utils.datetime_utils import utc_now
+
+URL = '/api/v2/dashboard/queue'
+_PEM = [self_signed(ec.generate_private_key(ec.SECP256R1()))]
+SETTINGS = ('auto_renewal_enabled', 'auto_renewal_sources')
+
+
+def _ca(name, **kw):
+    ca = CA(refid=str(uuid.uuid4()), descr=name, crt='placeholder', **kw)
+    db.session.add(ca)
+    db.session.flush()
+    return ca
+
+
+def _crl(ca, next_update, **kw):
+    now = utc_now()
+    number = kw.pop('crl_number', 1)
+    db.session.add(CRLMetadata(ca_id=ca.id, crl_number=number, this_update=now, next_update=next_update,
+                               crl_pem='-', crl_der=b'-', **kw))
+
+
+def _cert(name, valid_to, **kw):
+    kw.setdefault('source', 'manual')
+    row = Certificate(refid=str(uuid.uuid4()), descr=name, subject_cn=name, crt=_PEM[0],
+                      valid_from=utc_now() - timedelta(days=300), valid_to=valid_to, **kw)
+    db.session.add(row)
+    db.session.flush()
+    return row
+
+
+def _set(key, value):
+    row = SystemConfig.query.filter_by(key=key).first()
+    if value is None:
+        if row is not None:
+            db.session.delete(row)
+    elif row is None:
+        db.session.add(SystemConfig(key=key, value=value))
+    else:
+        row.value = value
+
+
+@pytest.fixture(scope='module')
+def seeded(app):
+    now = utc_now()
+    ids = {}
+    with app.app_context():
+        saved = {k: getattr(SystemConfig.query.filter_by(key=k).first(), 'value', None) for k in SETTINGS}
+        _set('auto_renewal_enabled', 'true')
+        _set('auto_renewal_sources', '["manual"]')
+        account = AcmeAccount(jwk='{}', jwk_thumbprint=secrets.token_hex(16))
+        db.session.add(account)
+        db.session.flush()
+        failed = AcmeOrder(account_id=account.account_id, status='invalid', identifiers='[{"type": "dns", '
+                           '"value": "queue-failed.test"}]', created_at=now - timedelta(days=1))
+        old = AcmeOrder(account_id=account.account_id, status='invalid', identifiers='[]',
+                        created_at=now - timedelta(days=8))
+        client = AcmeClientOrder(domains='["queue-client.test"]', renewal_failures=2, last_error_at=now)
+        healthy = AcmeClientOrder(domains='["queue-ok.test"]', renewal_failures=0)
+        urgent = ApprovalRequest(request_type='certificate', status='pending', expires_at=now + timedelta(hours=2))
+        calm = ApprovalRequest(request_type='renewal', status='pending')
+        done = ApprovalRequest(request_type='renewal', status='approved')
+        scep = SCEPRequest(transaction_id='queue-txn', csr='-', status='pending', subject='CN=queue-scep')
+        recovery = KeyRecoveryRequest(cert_id=1, reason='lost', requested_by='admin', cert_cn='queue-kr')
+        db.session.add_all([failed, old, client, healthy, urgent, calm, done, scep, recovery])
+        crl_soon = _ca('queue-crl-soon', cdp_enabled=True, valid_to=now + timedelta(days=3650))
+        _crl(crl_soon, now + timedelta(days=7), crl_number=1, created_at=now - timedelta(days=1))
+        _crl(crl_soon, now + timedelta(hours=12), crl_number=2)
+        _crl(crl_soon, now + timedelta(days=9), crl_number=3, is_delta=True)  # a delta does not count
+        crl_fresh = _ca('queue-crl-fresh', cdp_enabled=True, valid_to=now + timedelta(days=3650))
+        _crl(crl_fresh, now + timedelta(days=7))
+        crl_renewed = _ca('queue-crl-renewed', cdp_enabled=True, valid_to=now + timedelta(days=3650))
+        _crl(crl_renewed, now + timedelta(hours=12), crl_number=1)  # superseded by number 2
+        _crl(crl_renewed, now + timedelta(days=7), crl_number=2)
+        crl_none = _ca('queue-crl-none', cdp_enabled=True, valid_to=now + timedelta(days=3650))
+        no_cdp = _ca('queue-no-cdp', cdp_enabled=False, valid_to=now + timedelta(days=3650))
+        ca_soon = _ca('queue-ca-60d', valid_to=now + timedelta(days=60))
+        ca_later = _ca('queue-ca-200d', valid_to=now + timedelta(days=200))
+        ca_revoked = _ca('queue-ca-revoked', valid_to=now + timedelta(days=60), revoked=True)
+        certs = {
+            'no_key_12h': _cert('queue-nokey-12h', now + timedelta(hours=12)),
+            'no_key_10d': _cert('queue-nokey-10d', now + timedelta(days=10)),
+            'excluded_source': _cert('queue-scep', now + timedelta(days=10), prv='k', source='scep'),
+            'auto': _cert('queue-auto', now + timedelta(days=10), prv='k'),
+            'revoked': _cert('queue-revoked', now + timedelta(days=10), revoked=True),
+            'archived': _cert('queue-archived', now + timedelta(days=10), archived=True),
+            'far': _cert('queue-far', now + timedelta(days=90)),
+            'expired': _cert('queue-expired', now - timedelta(days=1)),
+        }
+        db.session.commit()
+        ids.update(failed=failed.id, old=old.id, client=client.id, healthy=healthy.id, urgent=urgent.id,
+                   calm=calm.id, done=done.id, scep=scep.id, recovery=recovery.id,
+                   crl_soon=crl_soon.id, crl_fresh=crl_fresh.id, crl_renewed=crl_renewed.id, crl_none=crl_none.id, no_cdp=no_cdp.id,
+                   ca_soon=ca_soon.id, ca_later=ca_later.id, ca_revoked=ca_revoked.id,
+                   **{k: v.id for k, v in certs.items()}, account=account.id)
+    yield ids
+    with app.app_context():
+        for model, keys in ((Certificate, certs), (AcmeOrder, ('failed', 'old')),
+                            (AcmeClientOrder, ('client', 'healthy')), (ApprovalRequest, ('urgent', 'calm', 'done')),
+                            (SCEPRequest, ('scep',)), (KeyRecoveryRequest, ('recovery',))):
+            for key in keys:
+                row = db.session.get(model, ids[key])
+                if row is not None:
+                    db.session.delete(row)
+        cas = [ids[k] for k in ('crl_soon', 'crl_fresh', 'crl_renewed', 'crl_none', 'no_cdp', 'ca_soon', 'ca_later', 'ca_revoked')]
+        CRLMetadata.query.filter(CRLMetadata.ca_id.in_(cas)).delete(synchronize_session=False)
+        CA.query.filter(CA.id.in_(cas)).delete(synchronize_session=False)
+        db.session.delete(db.session.get(AcmeAccount, ids['account']))
+        for key, value in saved.items():
+            _set(key, value)
+        db.session.commit()
+
+
+def _queue(client):
+    r = client.get(URL)
+    assert r.status_code == 200, r.data
+    return get_json(r)['data']
+
+
+def _find(data, kind, item_id):
+    return next((i for i in data['items'] if i['kind'] == kind and i['id'] == item_id), None)
+
+
+@pytest.mark.parametrize('kind, key, tier', [
+    ('acme_order_failed', 'failed', 'critical'),
+    ('acme_client_renewal_failed', 'client', 'critical'),
+    ('approval_pending', 'urgent', 'critical'),
+    ('approval_pending', 'calm', 'warning'),
+    ('scep_request_pending', 'scep', 'warning'),
+    ('key_recovery_pending', 'recovery', 'warning'),
+    ('crl_due', 'crl_soon', 'critical'),
+    ('crl_missing', 'crl_none', 'critical'),
+    ('manual_renewal_due', 'no_key_12h', 'critical'),
+    ('manual_renewal_due', 'no_key_10d', 'warning'),
+    ('manual_renewal_due', 'excluded_source', 'warning'),
+    ('ca_expiring', 'ca_soon', 'critical'),
+    ('ca_expiring', 'ca_later', 'warning'),
+])
+def test_each_kind_with_its_tier_and_due_date(app, auth_client, seeded, kind, key, tier):
+    item = _find(_queue(auth_client), kind, seeded[key])
+    assert item is not None, (kind, key)
+    assert item['tier'] == tier
+    assert item['due_at'] and item['href_hint'] and item['label']
+
+
+def test_crl_due_date_is_the_latest_full_crl(auth_client, seeded):
+    item = _find(_queue(auth_client), 'crl_due', seeded['crl_soon'])
+    due = item['due_at']
+    assert due < (utc_now() + timedelta(hours=13)).isoformat()
+
+
+@pytest.mark.parametrize('kind, key', [
+    ('acme_order_failed', 'old'), ('acme_client_renewal_failed', 'healthy'),
+    ('approval_pending', 'done'), ('crl_due', 'crl_fresh'), ('crl_missing', 'crl_fresh'),
+    ('crl_due', 'crl_renewed'),
+    ('crl_missing', 'no_cdp'), ('ca_expiring', 'ca_revoked'),
+    ('manual_renewal_due', 'auto'), ('manual_renewal_due', 'revoked'),
+    ('manual_renewal_due', 'archived'), ('manual_renewal_due', 'far'), ('manual_renewal_due', 'expired'),
+])
+def test_left_out(auth_client, seeded, kind, key):
+    assert _find(_queue(auth_client), kind, seeded[key]) is None
+
+
+def test_auto_renewal_off_makes_every_renewal_manual(app, auth_client, seeded):
+    with app.app_context():
+        _set('auto_renewal_enabled', 'false')
+        db.session.commit()
+    try:
+        assert _find(_queue(auth_client), 'manual_renewal_due', seeded['auto']) is not None
+    finally:
+        with app.app_context():
+            _set('auto_renewal_enabled', 'true')
+            db.session.commit()
+
+
+def test_sorted_critical_first_then_by_due_date(auth_client, seeded):
+    items = _queue(auth_client)['items']
+    keys = [(0 if i['tier'] == 'critical' else 1, i['due_at']) for i in items]
+    assert keys == sorted(keys)
+
+
+def test_counts_are_exact_when_the_list_is_truncated(app, auth_client, seeded):
+    before = _queue(auth_client)['counts']
+    extra = DASHBOARD_MAX_ROWS + 5
+    with app.app_context():
+        rows = [SCEPRequest(transaction_id=f'queue-bulk-{i}', csr='-', status='pending') for i in range(extra)]
+        db.session.add_all(rows)
+        db.session.commit()
+        bulk = [r.id for r in rows]
+    try:
+        data = _queue(auth_client)
+        assert len(data['items']) == DASHBOARD_MAX_ROWS
+        assert data['counts']['scep_request_pending'] == before['scep_request_pending'] + extra
+        assert data['total'] == sum(data['counts'].values()) > DASHBOARD_MAX_ROWS
+        assert len(get_json(auth_client.get(f'{URL}?limit=3'))['data']['items']) == 3
+    finally:
+        with app.app_context():
+            SCEPRequest.query.filter(SCEPRequest.id.in_(bulk)).delete(synchronize_session=False)
+            db.session.commit()
+
+
+def test_a_key_without_read_dashboard_is_refused(app, auth_client):
+    """Every built-in role holds read:dashboard, so the refusal is shown with a scoped API key."""
+    r = auth_client.post('/api/v2/account/apikeys',
+                         json={'name': 'queue-no-dashboard', 'permissions': ['read:certificates']})
+    assert r.status_code == 201, r.data
+    key = get_json(r)['data']
+    try:
+        assert app.test_client().get(URL, headers={'X-API-Key': key['key']}).status_code == 403
+    finally:
+        auth_client.delete(f"/api/v2/account/apikeys/{key['id']}")
+
+
+def test_the_viewer_role_reads_it(viewer_client):
+    assert viewer_client.get(URL).status_code == 200
+
+
+def test_requires_auth(client):
+    assert client.get(URL).status_code == 401
