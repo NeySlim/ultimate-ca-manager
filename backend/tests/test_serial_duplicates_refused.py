@@ -50,7 +50,7 @@ def duplicate_serials(app):
     with app.app_context():
         ca = _ca_row(*_authority())
         ca_id, caref = ca.id, ca.refid
-        db.session.execute(text(f'DROP INDEX {_migration().INDEX}'))
+        db.session.execute(text(f'DROP INDEX IF EXISTS {_migration().INDEX}'))
         rows = [Certificate(refid=f'dup-{uuid.uuid4().hex[:8]}-{n}', descr='duplicate serial', caref=caref,
                             serial_number=SERIAL) for n in (1, 2)]
         db.session.add_all(rows)
@@ -105,7 +105,7 @@ def test_a_target_without_the_index_restores_an_archive_with_duplicate_serials(a
     caref = create_ca(cn=f'Dup pending {uuid.uuid4().hex[:6]}')['refid']
     refids = [f'dup-pending-{uuid.uuid4().hex[:8]}' for _ in range(2)]
     with app.app_context():
-        db.session.execute(text(f'DROP INDEX {_migration().INDEX}'))
+        db.session.execute(text(f'DROP INDEX IF EXISTS {_migration().INDEX}'))
         db.session.commit()
         blob = _forged(['certificates'], certificates=[
             {'refid': r, 'descr': 'duplicate serial', 'caref': caref, 'serial_number': SERIAL,

@@ -888,3 +888,27 @@ def pg_bench_exclusive():
 
 # Post-quantum fixtures (mldsa_key, mldsa_csr, mldsa_ca), read from files made by OpenSSL 3.5
 from tests.pqc_fixtures import mldsa_ca, mldsa_csr, mldsa_key  # noqa: E402,F401
+
+
+@pytest.fixture
+def no_serial_index(app):
+    """An installation whose migration 142 is still pending: two rows may share one serial
+    under a CA (the duplicates the renewal paths claim together). Recreated afterwards."""
+    from sqlalchemy import text
+    from models import db
+    from utils.serial_duplicates import _COVERED, INDEX
+    create = f'CREATE UNIQUE INDEX IF NOT EXISTS {INDEX} ON certificates (caref, serial_number) WHERE {_COVERED}'
+    with app.app_context():
+        db.session.execute(text(f'DROP INDEX IF EXISTS {INDEX}'))
+        db.session.commit()
+    # Twins a test leaves behind would keep the index from coming back
+    purge = (f"DELETE FROM certificates WHERE {_COVERED} AND id NOT IN "
+             f"(SELECT MIN(id) FROM certificates WHERE {_COVERED} GROUP BY caref, serial_number)")
+    try:
+        yield
+    finally:
+        with app.app_context():
+            db.session.rollback()
+            db.session.execute(text(purge))
+            db.session.execute(text(create))
+            db.session.commit()

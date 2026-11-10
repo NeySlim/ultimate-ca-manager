@@ -711,7 +711,7 @@ def test_legacy_certificate_takes_a_fitting_template(app, templated_ca):
     assert _ekus(cert) == {ExtendedKeyUsageOID.CLIENT_AUTH}
 
 
-def test_restored_duplicate_beside_an_archived_original_still_renews(client, app, wstep_renew_config):
+def test_restored_duplicate_beside_an_archived_original_still_renews(client, app, wstep_renew_config, no_serial_index):
     """The live duplicate answers the status and is the row the renewal claims."""
     old_cert, old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-duplicate.example.test')
     with app.app_context():
@@ -798,7 +798,7 @@ def test_template_without_ekus_keeps_the_renewal_within_the_old_ones(app, templa
 
 
 @pytest.mark.parametrize('twin', ['same', 'hex_serial', 'crlf_pem'])
-def test_two_live_duplicates_are_claimed_together(client, app, wstep_renew_config, twin):
+def test_two_live_duplicates_are_claimed_together(client, app, wstep_renew_config, twin, no_serial_index):
     """A certificate held twice renews once, however the twin stores its serial or PEM."""
     old_cert, old_key = _issue(app, wstep_renew_config['id'], f"tls-renew-two-live-{twin.replace('_', '-')}.example.test")
     with app.app_context():
@@ -823,7 +823,7 @@ def test_two_live_duplicates_are_claimed_together(client, app, wstep_renew_confi
         assert [db.session.get(Certificate, i).archived for i in ids] == [True, True]
 
 
-def test_a_twin_claimed_by_another_renewal_loses_the_claim(app, wstep_renew_config, monkeypatch):
+def test_a_twin_claimed_by_another_renewal_loses_the_claim(app, wstep_renew_config, monkeypatch, no_serial_index):
     """One of two live rows archived between the read and the update: the claim fails."""
     from services.ca.ca_signing import _claim_superseded
     old_cert, _old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-twin-race.example.test')

@@ -50,7 +50,7 @@ def test_second_reenroll_loses_the_claim(client, app, est_config, monkeypatch):
 
 
 @pytest.mark.parametrize('twin', ['hex_serial', 'crlf_pem'])
-def test_a_twin_row_is_superseded_with_the_renewed_one(client, app, est_config, twin):
+def test_a_twin_row_is_superseded_with_the_renewed_one(client, app, est_config, twin, no_serial_index):
     """A certificate stored twice renews once, however the twin stores its serial or PEM."""
     cn = f'reenroll-{twin.replace("_", "-")}.example.test'
     leaf, key = _enrol(client, cn)
