@@ -1176,9 +1176,12 @@ def delete_policy(policy_id):
     """Delete certificate policy"""
     policy = db.get_or_404(CertificatePolicy, policy_id)
     
-    # Check for pending requests (one past its expiry does not count)
+    # Check for pending requests (one past its expiry does not count); the
+    # outside notices still owed (Intune) are sent before they are deleted below
     from services.approval_gate import expire_stale_requests
+    from services.protocol_approval import send_pending_notices
     expire_stale_requests()
+    send_pending_notices()
     pending = ApprovalRequest.query.filter_by(
         policy_id=policy_id,
         status='pending'

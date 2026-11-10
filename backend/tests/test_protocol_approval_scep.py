@@ -435,3 +435,28 @@ def test_an_expiry_seen_by_a_read_route_is_told_to_intune_by_the_scheduled_task(
         with app.app_context():
             scheduled_expiry()
         assert len(_FakeIntune.calls) == 1
+
+
+@pytest.mark.parametrize('seen_by_a_read', [False, True])
+def test_deleting_the_policy_tells_intune_of_an_expired_request(
+        app, auth_client, scep_ca, intune_held, seen_by_a_read):
+    """The DELETE removes the policy's requests: an expiry it finds, or one
+    a read left owed, is told to Intune before they go."""
+    from datetime import timedelta
+    from models.policy import ApprovalRequest
+    from utils.datetime_utils import utc_now
+    identity = _client_identity('scep intune policy gone')
+    with approval_policy(app, scep_ca, f'scep-held-intune-del-{int(seen_by_a_read)}') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        _on_profile(app, scep_ca, intune_held)
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        with app.app_context():
+            db.session.get(ApprovalRequest, approval_id).expires_at = utc_now() - timedelta(minutes=1)
+            db.session.commit()
+        if seen_by_a_read:
+            assert auth_client.get('/api/v2/approvals/stats').status_code == 200
+            assert _FakeIntune.calls == []
+        r = auth_client.delete(f'/api/v2/policies/{pid}')
+        assert r.status_code == 200, r.get_json()
+        assert requests_of(app, pid) == []
+        assert _FakeIntune.calls == [('failure', 'txn-19', 'Approval request expired')]
