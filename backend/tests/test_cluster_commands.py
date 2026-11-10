@@ -196,6 +196,52 @@ print(json.dumps(reads))
 '''
 
 
+_BOOT_SNAPSHOT = r'''
+import json, sys
+import boot_config
+
+
+class Committed:
+    def rows(self, sql, params=()):
+        return [(7,)]
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+boot_config.open_boot_database = lambda data_path: Committed()
+reads = []
+
+def recorder(name, value):
+    def read(data_path):
+        known = getattr(sys.modules.get('services.cluster_commands'), 'KNOWN_AT_START', None)
+        reads.append([name, sorted(known or [])])
+        return value
+    return read
+boot_config.wstep_enabled = recorder('wstep', False)
+boot_config.mtls_client_ca = recorder('mtls', None)
+import gunicorn_config
+print(json.dumps(reads))
+'''
+
+
+def test_the_master_reads_the_committed_restarts_before_its_settings(tmp_path):
+    """HA: a restart committed after this snapshot restarts the node, whatever the first pass sees."""
+    import json
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    backend = str(Path(__file__).resolve().parent.parent)
+    env = {k: v for k, v in os.environ.items() if k not in ('DATABASE_URL', 'DATABASE_PATH')}
+    env.update(DATA_DIR=str(tmp_path), UCM_BASE_PATH=str(tmp_path), PYTHONPATH=backend, UCM_HA='1')
+    run = subprocess.run([sys.executable, '-c', _BOOT_SNAPSHOT], cwd=backend, env=env,
+                         capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0, run.stderr
+    assert json.loads(run.stdout.strip().splitlines()[-1]) == [['wstep', [7]], ['mtls', [7]]]
+
+
 def test_the_process_start_is_stamped_before_the_master_reads_a_setting(tmp_path):
     """A restart committed after a setting was read is never judged older than the process."""
     import json
@@ -210,3 +256,65 @@ def test_the_process_start_is_stamped_before_the_master_reads_a_setting(tmp_path
                          capture_output=True, text=True, timeout=60)
     assert run.returncode == 0, run.stderr
     assert json.loads(run.stdout.strip().splitlines()[-1]) == [['wstep', True], ['mtls', True]]
+
+
+_WORKER_EXIT = r'''
+import boot_config
+boot_config.wstep_enabled = lambda data_path: False
+boot_config.mtls_client_ca = lambda data_path: None
+import gunicorn_config
+import services.cluster_commands as cc
+
+
+class Applier:
+    stopped = 0
+
+    def stop(self):
+        Applier.stopped += 1
+        raise RuntimeError('database gone')
+cc._applier = Applier()
+gunicorn_config.worker_exit(None, None)
+cc._applier = None
+gunicorn_config.worker_exit(None, None)
+print(Applier.stopped)
+'''
+
+
+def test_a_worker_that_exits_stops_its_applier_and_never_raises(tmp_path):
+    """The stop is what gives back a restart claim still pending: the next worker can then claim it."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    backend = str(Path(__file__).resolve().parent.parent)
+    env = {k: v for k, v in os.environ.items() if k not in ('DATABASE_URL', 'DATABASE_PATH')}
+    env.update(DATA_DIR=str(tmp_path), UCM_BASE_PATH=str(tmp_path), PYTHONPATH=backend)
+    run = subprocess.run([sys.executable, '-c', _WORKER_EXIT], cwd=backend, env=env,
+                         capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0, run.stderr
+    assert run.stdout.strip().splitlines()[-1] == '1'
+
+
+@pytest.fixture
+def master_on_sqlite(monkeypatch, tmp_path):
+    """The gunicorn master in HA, on a SQLite file of the test's own."""
+    monkeypatch.setenv('UCM_HA', '1')
+    monkeypatch.delenv('DATABASE_URL', raising=False)
+    monkeypatch.setenv('DATABASE_PATH', str(tmp_path / 'ucm.db'))
+    monkeypatch.setattr(cc, 'KNOWN_AT_START', None)
+    return tmp_path / 'ucm.db'
+
+
+def test_a_first_ha_start_before_the_migration_spares_nothing_in_silence(master_on_sqlite, tmp_path, capsys):
+    """Upgrade: the migrations that create cluster_commands run after this snapshot."""
+    import sqlite3
+    with sqlite3.connect(master_on_sqlite) as conn:
+        conn.execute('CREATE TABLE system_config (key TEXT, value TEXT)')
+    assert cc.snapshot_committed_restarts(str(tmp_path)) == frozenset()
+    assert capsys.readouterr().err == ''
+
+
+def test_any_other_snapshot_error_is_still_reported(master_on_sqlite, tmp_path, capsys):
+    master_on_sqlite.write_bytes(b'not a database' * 100)
+    assert cc.snapshot_committed_restarts(str(tmp_path)) == frozenset()
+    assert 'restarts not read before the settings' in capsys.readouterr().err

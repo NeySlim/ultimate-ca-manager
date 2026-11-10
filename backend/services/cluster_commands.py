@@ -8,6 +8,7 @@ import json
 import logging
 import os
 import signal
+import sys
 import threading
 import time
 from collections import namedtuple
@@ -35,9 +36,12 @@ HOLE_TTL_SECONDS = 600.0
 MAX_HOLES = 32
 # A node waits at most this long per node ahead of it in a rolling restart
 RESTART_GUARD_SECONDS = 120.0
+# A restart that fails is retried after 2 s, then twice as long each time, at most 60 s apart
+RESTART_RETRY_FIRST = 2.0
+RESTART_RETRY_MAX = 60.0
 RETENTION = timedelta(hours=24)
 # A starting process replays the reloads of this window (idempotent): one committed while it
-# read its settings is not lost. A restart in it is older than the process and never runs.
+# read its settings is not lost. A restart in it runs unless committed before that read.
 START_REPLAY = timedelta(seconds=60)
 BATCH = 200
 
@@ -47,7 +51,11 @@ _Held = namedtuple('_Held', 'id created_at')
 # Imported by gunicorn_config before the master reads a setting: a restart created later runs.
 # On this host's clock: the applier moves it onto the cluster clock before comparing.
 PROCESS_STARTED = utc_now()
+# Restart ids committed before the gunicorn master read its settings (their changes are in
+# this process); None without that snapshot: the applier reads them at its first pass
+KNOWN_AT_START = None
 
+_RESTARTS_SQL = text("SELECT id FROM cluster_commands WHERE kind = :k AND created_at > :t")
 _INITIAL_SQL = text("SELECT COALESCE(MAX(id), 0) FROM cluster_commands WHERE created_at <= :t")
 _NODES_SQL = text("SELECT node_id, started_at, heartbeat_at FROM cluster_nodes")
 _ADVANCE_SQL = text("UPDATE cluster_nodes SET command_seen = :id WHERE node_id = :n "
@@ -59,6 +67,45 @@ _CLAIM_SQL = text("UPDATE cluster_nodes SET restart_seen = :id WHERE node_id = :
 _CLAIMED_SQL = text("SELECT restart_seen FROM cluster_nodes WHERE node_id = :n")
 _RELEASE_SQL = text("UPDATE cluster_nodes SET restart_seen = :prev WHERE node_id = :n "
                     "AND restart_seen = :id")
+
+
+class _ClaimNotGivenBack(Exception):
+    """The pass stops here; _give_back already logged why."""
+
+
+def _ha_from_environment():
+    # The master reads this before config.settings: the same test as env_bool('UCM_HA')
+    return os.getenv('UCM_HA', '').strip().lower() in ('1', 'true', 'yes', 'on')
+
+
+def snapshot_committed_restarts(data_path):
+    """gunicorn master, HA only, before the mTLS and WSTEP settings are read: a restart
+    committed later is not spared by this process. Unreadable: none is spared."""
+    global KNOWN_AT_START
+    if not _ha_from_environment():
+        return None
+    from boot_config import open_boot_database
+    try:
+        database = open_boot_database(data_path)
+        if database is None:
+            raise RuntimeError('no database')
+        with database:
+            KNOWN_AT_START = frozenset(row[0] for row in database.rows(
+                "SELECT id FROM cluster_commands WHERE kind = ?", (RESTART,)))
+    except Exception as e:
+        if not _no_commands_table(e):
+            print(f"Cluster commands: restarts not read before the settings, none is spared: "
+                  f"{type(e).__name__}: {e}", file=sys.stderr)
+        KNOWN_AT_START = frozenset()
+    return KNOWN_AT_START
+
+
+def _no_commands_table(e):
+    """First HA start after an upgrade: the migrations create the table after this read."""
+    import sqlite3
+    if isinstance(e, sqlite3.OperationalError):
+        return str(e) == 'no such table: cluster_commands'
+    return getattr(e, 'sqlstate', None) == '42P01'  # psycopg UndefinedTable
 
 
 def emit(kind, payload=None, target=None):
@@ -171,12 +218,14 @@ class CommandApplier:
     """
 
     def __init__(self, app, node_id, *, started_at=None, record=True, restart_action=None,
-                 handlers=None, tick=None, guard=None, stale_seconds=None, clock=None):
+                 handlers=None, tick=None, guard=None, stale_seconds=None, clock=None,
+                 monotonic=None):
         from services.scheduler_leader import STALE_PASSES
         self.app = app
         self.node_id = node_id
         self.started_at = started_at or PROCESS_STARTED  # this host's clock until the first pass
         self.clock = clock or utc_now  # this host's clock
+        self._monotonic = monotonic or time.monotonic
         self._on_cluster_clock = False
         self.record = record
         self.restart_action = restart_action or restart_this_node
@@ -185,11 +234,15 @@ class CommandApplier:
         self.guard = RESTART_GUARD_SECONDS if guard is None else guard
         self.stale_seconds = STALE_PASSES * 60 if stale_seconds is None else stale_seconds
         self.seen = None
+        self._known_at_start = KNOWN_AT_START  # restart ids whose change this process has
         self.restarting = False
         self._holes = []  # [lo, hi, monotonic deadline]: ids passed over that may still commit
         self._gap = None  # (first missing id, monotonic time it was noticed)
         self._restart_wait = None  # (command id, monotonic first sight, nodes ahead then)
         self._held = None  # the restart waiting for this node's turn; later reloads still apply
+        self._retry_delay = None  # seconds before the next attempt of a restart that failed
+        self._retry_at = 0.0  # monotonic instant of that attempt
+        self._give_back_pending = None  # [restart_seen to restore, command id, error logged]
         self._engine = None
         self._conn = None
         self._error_logged = False
@@ -209,10 +262,25 @@ class CommandApplier:
         self._stop.set()
         if self._thread is not None and self._thread is not threading.current_thread():
             self._thread.join(timeout)
+        if self._give_back_pending is not None and not (
+                self._thread is not None and self._thread.is_alive()
+                and self._thread is not threading.current_thread()):
+            self._give_back_at_stop()
         self._close()
         if self._engine is not None:
             self._engine.dispose()
             self._engine = None
+
+    def _give_back_at_stop(self):
+        """Once, so that the process started after this one can claim the restart."""
+        command_id = self._give_back_pending[1]
+        self._give_back_pending[2] = True  # the line below is the one logged
+        try:
+            self._give_back(self._connection())
+        except Exception as e:
+            cause = e.__cause__ or e
+            logger.error(f"Rolling restart of node {self.node_id}: claim of command {command_id} "
+                         f"not given back at stop: {type(cause).__name__}: {cause}")
 
     def _loop(self):
         while not self._stop.is_set():
@@ -247,11 +315,18 @@ class CommandApplier:
                 # created_at is on the cluster clock: a host whose clock drifts compares right
                 self.started_at = self._cluster_clock(conn, self.started_at)
                 self._on_cluster_clock = True
+            if self._known_at_start is None:
+                # No master snapshot: before the cursor, once, a restart committed later is not
+                # taken for one this process already started after
+                self._known_at_start = frozenset(conn.execute(_RESTARTS_SQL, {
+                    'k': RESTART, 't': self.started_at - START_REPLAY}).scalars())
             if self.seen is None:
                 self.seen = conn.execute(_INITIAL_SQL, {'t': self.started_at - START_REPLAY}).scalar() or 0
                 self._mark_seen(conn, self.seen)
             self._drain(conn)
             self._error_logged = False
+        except _ClaimNotGivenBack:
+            self._close()  # the commands were read: no second line
         except Exception as e:
             self._close()
             if not self._error_logged:
@@ -259,13 +334,16 @@ class CommandApplier:
                 self._error_logged = True
 
     def _drain(self, conn):
-        now = time.monotonic()
+        if self._give_back_pending is not None:
+            self._give_back(conn)  # before the held restart is retried: its claim must be free
+        now = self._monotonic()
         self._holes = [h for h in self._holes if h[2] > now][-MAX_HOLES:]
         held_before = self._held is not None
         self._drain_rows(conn, now)
         # After the rows: a newer restart committed with the node ahead's return is absorbed first;
         # one held (or failed) during this pass is retried on the next
-        if held_before and self._held is not None and not self._stop.is_set():
+        if held_before and self._held is not None and not self._stop.is_set() \
+                and self._monotonic() >= self._retry_at:
             self._restart(conn, self._held)
 
     def _drain_rows(self, conn, now):
@@ -362,16 +440,16 @@ class CommandApplier:
     def _restart(self, conn, row):
         """Sets _stop when this process leaves; while it waits for its turn, ``row`` is held
         (restart_seen, not command_seen, records the claim) and later reloads go on."""
-        if not self.record or row.created_at <= self.started_at:
-            # Started after the command (or the scheduler process): nothing to restart here
-            self._held = None
+        if not self.record or (row.created_at <= self.started_at and row.id in self._known_at_start):
+            # Started after the command was committed (or the scheduler process): nothing to restart
+            self._drop_held()
             self._advance(conn, row.id)
             return
         nodes = conn.execute(_NODES_SQL).fetchall()
         from services.scheduler_leader import cluster_utc_now
         pending = pending_predecessors(self.node_id, nodes, row.created_at,
                                        cluster_utc_now(conn), self.stale_seconds)
-        now = time.monotonic()
+        now = self._monotonic()
         if self._restart_wait is None or self._restart_wait[0] != row.id:
             self._restart_wait = (row.id, now, len(pending))
         _, since, ahead = self._restart_wait
@@ -379,7 +457,7 @@ class CommandApplier:
             self._held = _Held(row.id, row.created_at)
             self._advance(conn, row.id)
             return
-        self._restart_wait = None
+        # The wait stays spent until the restart runs: a failed attempt follows the backoff
         self._held = None
         if pending:
             logger.warning(f"Rolling restart: {', '.join(pending)} not back after "
@@ -389,24 +467,76 @@ class CommandApplier:
         claimed = self._claim(conn, row.id)
         self._advance(conn, row.id)
         if not claimed:
+            self._restart_wait = None
+            self._drop_held()
             return
         self.restarting = True
         logger.warning(f"Rolling restart: node {self.node_id} restarts (command {row.id})")
         self._stop.set()  # this process is leaving: nothing after the restart is applied here
         try:
             self.restart_action()
+            self._restart_wait = None
+            self._retry_delay = None
         except Exception as e:
-            # Still on the old process: the claim is given back and the restart retried next pass
-            logger.error(f"Rolling restart of node {self.node_id} failed, retried on the next pass: "
-                         f"{type(e).__name__}: {e}")
-            conn.execute(_RELEASE_SQL, {'prev': previous, 'id': row.id, 'n': self.node_id})
+            # Still on the old process: the loop resumes before the claim is given back, which
+            # a lost database may refuse until a later pass
+            self._restart_failed(e)
             self.restarting = False
             self._held = _Held(row.id, row.created_at)
+            self._give_back_pending = [previous, row.id, False]
             if not self._stopping:
                 self._stop.clear()
+                # stop() sets _stopping before _stop: one that lands after the check is not undone
+                if self._stopping:
+                    self._stop.set()
+            self._give_back(conn)
+
+    def _give_back(self, conn):
+        previous, command_id, logged = self._give_back_pending
+        try:
+            conn.execute(_RELEASE_SQL, {'prev': previous, 'id': command_id, 'n': self.node_id})
+        except Exception as e:
+            if not logged:
+                logger.error(f"Rolling restart of node {self.node_id}: claim of command {command_id} "
+                             f"not given back, retried on the next pass: {type(e).__name__}: {e}")
+                self._give_back_pending[2] = True
+            raise _ClaimNotGivenBack() from e
+        self._give_back_pending = None
+
+    def _drop_held(self):
+        """No restart pending any more: the next one that fails starts from the first step."""
+        self._held = None
+        self._retry_delay = None
+
+    def _restart_failed(self, e):
+        """Next attempt after the backoff delay: ERROR the first time, then one line per new delay."""
+        previous = self._retry_delay
+        if previous is None:
+            self._retry_delay = RESTART_RETRY_FIRST
+        else:
+            self._retry_delay = min(previous * 2, RESTART_RETRY_MAX)
+        self._retry_at = self._monotonic() + self._retry_delay
+        reason = f"{type(e).__name__}: {e}"
+        if previous is None:
+            logger.error(f"Rolling restart of node {self.node_id} failed, retried in "
+                         f"{self._retry_delay:.0f}s: {reason}")
+        elif self._retry_delay != previous:
+            logger.warning(f"Rolling restart of node {self.node_id} failed again, next attempt in "
+                           f"{self._retry_delay:.0f}s (at most {RESTART_RETRY_MAX:.0f}s apart): {reason}")
 
 
 _applier = None
+
+
+def stop_applier():
+    """Stop this process's applier, giving back a restart claim still pending; never raises."""
+    applier = _applier
+    if applier is None:
+        return
+    try:
+        applier.stop()
+    except Exception as e:
+        logger.error(f"Cluster command applier not stopped cleanly: {type(e).__name__}")
 
 
 def start_applier(app, record=True, master_pid=None):

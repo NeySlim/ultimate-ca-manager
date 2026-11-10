@@ -323,7 +323,7 @@ def test_a_node_started_after_the_restart_command_is_spared(app, ha):
     late = ha('late', started_at=utc_now(), restart_action=cluster.action('late'),
               handlers={cc.RELOAD_SYSLOG: _recorder(log, 'late')})
     after = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'})
-    late.seen = restart_id - 1  # as if the restart committed after this process read its cursor
+    late.seen = restart_id - 1  # read, then spared: committed before the first pass (no master snapshot)
     late.start()
     assert wait_for(lambda: late.seen == after)
     assert restart_id < after and log == [('late', 'after')]
@@ -479,7 +479,8 @@ def test_a_late_restart_survives_an_error_while_it_is_applied(app, ha, monkeypat
         engine.dispose()
 
 
-def test_a_restart_action_that_raises_is_retried_and_reloads_go_on(app, ha):
+def test_a_restart_action_that_raises_is_retried_and_reloads_go_on(app, ha, monkeypatch):
+    monkeypatch.setattr(cc, 'RESTART_RETRY_FIRST', 0.1)
     log, attempts, emitted = [], [], []
 
     def flaky():
@@ -666,3 +667,363 @@ def test_the_leader_purges_commands_older_than_a_day(app, ha):
         recent_id = recent.id
         cc.purge_old_commands()
         assert [c.id for c in ClusterCommand.query.all()] == [recent_id]
+
+
+class _FakeMonotonic:
+    def __init__(self):
+        self.t = 1000.0
+
+    def __call__(self):
+        return self.t
+
+
+def _set_restart_seen(app, name, value):
+    from models import ClusterNode, db
+    with app.app_context():
+        db.session.get(ClusterNode, PREFIX + name).restart_seen = value
+        db.session.commit()
+
+
+def _fail_until(solo, clock, attempts, count):
+    """Advances the fake clock one second per pass until ``count`` attempts were made."""
+    start = clock.t
+    while len(attempts) < count:
+        clock.t += 1
+        solo.run_once()
+        assert clock.t - start <= 600
+
+
+def _failure_lines(caplog):
+    import logging
+    return [r.levelno for r in caplog.records
+            if r.name == cc.logger.name and 'failed' in r.getMessage() and r.levelno >= logging.WARNING]
+
+
+def test_a_failing_restart_backs_off_and_logs_one_line_per_step(app, ha, caplog):
+    """2 s, 4 s ... 60 s between attempts; ERROR once, then one line per step; reloads go on."""
+    import logging
+    clock, attempts, log, fail = _FakeMonotonic(), [], [], [True]
+
+    def action():
+        attempts.append(clock.t)
+        if fail[0]:
+            raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', monotonic=clock, restart_action=action,
+              handlers={cc.RELOAD_SYSLOG: _recorder(log, 'solo')})
+    caplog.set_level(logging.INFO, logger=cc.logger.name)
+    _emit(app, cc.RESTART)
+    solo.run_once()
+    _fail_until(solo, clock, attempts, 9)  # past the gap grace when earlier ids are missing
+    assert [b - a for a, b in zip(attempts, attempts[1:])] == [2, 4, 8, 16, 32, 60, 60, 60]
+    mark = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'waiting'})
+    solo.run_once()  # mid-wait: no attempt, the reload is applied
+    assert solo.seen == mark and log == [('solo', 'waiting')] and len(attempts) == 9
+    lines = [r for r in caplog.records if r.name == cc.logger.name and 'failed' in r.getMessage()]
+    assert [r.levelno for r in lines] == [logging.ERROR] + [logging.WARNING] * 5
+    fail[0] = False
+    clock.t += 60
+    solo.run_once()
+    assert len(attempts) == 10 and solo.restarting
+    # The signal went unheard and the process stays: its next failure starts from 2 s
+    solo._stop.clear()
+    caplog.clear()
+    fail[0] = True
+    _emit(app, cc.RESTART)
+    _fail_until(solo, clock, attempts, 11)
+    assert _failure_lines(caplog) == [logging.ERROR]
+    _fail_until(solo, clock, attempts, 12)
+    assert attempts[-1] - attempts[-2] == cc.RESTART_RETRY_FIRST
+
+
+def test_a_new_restart_after_an_unclaimed_retry_starts_its_backoff_over(app, ha, caplog):
+    """The held restart, claimed meanwhile by a sibling process, is dropped: the next one
+    that fails is logged at once and retried after the first step."""
+    import logging
+    clock, attempts = _FakeMonotonic(), []
+
+    def action():
+        attempts.append(clock.t)
+        raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', monotonic=clock, restart_action=action)
+    caplog.set_level(logging.INFO, logger=cc.logger.name)
+    first = _emit(app, cc.RESTART)
+    solo.run_once()
+    _fail_until(solo, clock, attempts, 7)  # 2, 4, 8, 16, 32, 60 s
+    _set_restart_seen(app, 'solo', first)  # a sibling process took it
+    clock.t += 60
+    solo.run_once()
+    assert len(attempts) == 7
+    caplog.clear()
+    _emit(app, cc.RESTART)
+    _fail_until(solo, clock, attempts, 8)
+    failed_at = attempts[-1]
+    assert _failure_lines(caplog) == [logging.ERROR]
+    _fail_until(solo, clock, attempts, 9)
+    assert attempts[-1] - failed_at == cc.RESTART_RETRY_FIRST
+
+
+def test_a_claim_not_given_back_after_a_failed_restart_is_given_back_later(app, ha, monkeypatch, caplog):
+    """The database is lost while the claim is given back: reloads go on, the claim is given
+    back on a later pass and the restart is retried after its delay."""
+    import logging
+    from sqlalchemy import text
+    clock, attempts, log = _FakeMonotonic(), [], []
+    real_release = cc._RELEASE_SQL
+
+    def action():
+        attempts.append(clock.t)
+        if len(attempts) == 1:
+            monkeypatch.setattr(cc, '_RELEASE_SQL', text('SELECT cc_no_such_function()'))
+            raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', monotonic=clock, restart_action=action,
+              handlers={cc.RELOAD_SYSLOG: _recorder(log, 'solo')})
+    caplog.set_level(logging.INFO, logger=cc.logger.name)
+    restart_id = _emit(app, cc.RESTART)
+    solo.run_once()
+    _fail_until(solo, clock, attempts, 1)
+    assert _restart_seen(app, 'solo') == restart_id  # still claimed
+    # The commands were read: the one line about the claim, none saying they were not
+    errors = [r.getMessage() for r in caplog.records if r.name == cc.logger.name and r.levelno >= logging.ERROR]
+    others = [m for m in errors if 'failed' not in m]
+    assert len(others) == 1 and others[0].startswith(
+        f"Rolling restart of node {PREFIX}solo: claim of command {restart_id} not given back, "
+        "retried on the next pass")
+    monkeypatch.setattr(cc, '_RELEASE_SQL', real_release)
+    mark = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'})
+    solo.run_once()  # same instant: the claim is given back, no attempt yet
+    assert solo.seen == mark and log == [('solo', 'after')]
+    assert _restart_seen(app, 'solo') is None and len(attempts) == 1
+    _fail_until(solo, clock, attempts, 2)
+    assert attempts[1] - attempts[0] == cc.RESTART_RETRY_FIRST
+    assert solo.restarting and _restart_seen(app, 'solo') == restart_id
+
+
+def test_a_restart_gone_past_a_dead_node_is_retried_after_its_backoff_not_the_guard(app, ha):
+    """The guard delay already ran out: a failed attempt is retried 2 s later."""
+    clock, attempts = _FakeMonotonic(), []
+
+    def action():
+        attempts.append(clock.t)
+        raise OSError('signal file not writable')
+    _node_row(app, 'a')  # fresh heartbeat, but nothing runs there any more
+    _node_row(app, 'b')
+    b = ha('b', monotonic=clock, restart_action=action, guard=10)
+    _emit(app, cc.RESTART)
+    b.run_once()
+    _fail_until(b, clock, attempts, 1)
+    _fail_until(b, clock, attempts, 2)
+    assert attempts[1] - attempts[0] == cc.RESTART_RETRY_FIRST
+
+
+@pytest.mark.parametrize('database', ['back', 'still-lost'])
+def test_stop_gives_back_a_claim_still_pending(app, ha, monkeypatch, caplog, database):
+    """A worker started after this one can claim the restart; a failure is logged, not raised."""
+    import logging
+    from sqlalchemy import text
+    real_release = cc._RELEASE_SQL
+
+    def action():
+        monkeypatch.setattr(cc, '_RELEASE_SQL', text('SELECT cc_no_such_function()'))
+        raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', monotonic=_FakeMonotonic(), restart_action=action)
+    caplog.set_level(logging.INFO, logger=cc.logger.name)
+    restart_id = _emit(app, cc.RESTART)
+    for _ in range(5):
+        solo._monotonic.t += 1
+        solo.run_once()
+    assert _restart_seen(app, 'solo') == restart_id and solo._give_back_pending is not None
+    if database == 'back':
+        monkeypatch.setattr(cc, '_RELEASE_SQL', real_release)
+    caplog.clear()
+    solo.stop()
+    if database == 'back':
+        assert _restart_seen(app, 'solo') is None and solo._give_back_pending is None
+    else:
+        assert _restart_seen(app, 'solo') == restart_id
+        assert [r.levelno for r in caplog.records if 'given back' in r.getMessage()] == [logging.ERROR]
+
+
+def test_stop_during_a_failed_restart_is_not_undone(app, ha):
+    """stop() lands between the failed restart's check of _stopping and its _stop.clear()."""
+    clock = _FakeMonotonic()
+
+    def fail():
+        raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', monotonic=clock, restart_action=fail)
+
+    class StopRacesClear(threading.Event):
+        def clear(self):
+            if not solo._stopping:
+                solo.stop()  # no thread: stop() returns without joining
+            super().clear()
+    solo._stop = StopRacesClear()
+    _emit(app, cc.RESTART)
+    solo.run_once()
+    clock.t += 1
+    solo.run_once()
+    assert solo._stopping
+    assert solo._stop.is_set()  # the applier loop ends instead of reopening a connection
+
+
+@pytest.mark.parametrize('behind_newer', [False, True], ids=['above-cursor', 'in-hole'])
+def test_a_restart_committed_after_the_node_started_runs_though_created_before(app, ha, behind_newer):
+    """Its change was not committed when the node read its settings: the node restarts."""
+    from sqlalchemy.orm import Session
+    from models import ClusterCommand
+    from services.scheduler_leader import _dedicated_engine, application_url
+    cluster, log = _Cluster(app), []
+    _node_row(app, 'n')
+    started = utc_now()
+    n = ha('n', started_at=started, restart_action=cluster.action('n'),
+           handlers={cc.RELOAD_SYSLOG: _recorder(log, 'n')})
+    with app.app_context():
+        engine = _dedicated_engine(application_url())
+    try:
+        with Session(bind=engine) as slow, Session(bind=engine) as fast:
+            slow.add(ClusterCommand(kind=cc.RESTART, created_at=started - timedelta(seconds=5)))
+            slow.flush()  # id taken before the node starts, committed after its first pass
+            n.start()
+            assert wait_for(lambda: n.seen is not None)
+            if behind_newer:
+                fast.add(ClusterCommand(kind=cc.RELOAD_SYSLOG, payload='{"mark": "fast"}',
+                                        created_at=utc_now()))
+                fast.commit()
+                assert wait_for(lambda: ('n', 'fast') in log)
+            slow.commit()
+        assert wait_for(lambda: ('down', 'n') in cluster.events)
+    finally:
+        engine.dispose()
+
+
+def test_a_late_reload_whose_handler_always_raises_closes_its_hole_and_holds_nothing(app, ha):
+    from sqlalchemy.orm import Session
+    from models import ClusterCommand
+    from services.scheduler_leader import _dedicated_engine, application_url
+    clock, log, calls = _FakeMonotonic(), [], []
+
+    def boom(payload):
+        calls.append(payload)
+        raise TypeError('invalid payload')
+    b = ha('b', monotonic=clock, handlers={cc.RELOAD_RATE_LIMITS: boom, cc.RELOAD_SYSLOG: _recorder(log, 'b')})
+    b.run_once()
+    with app.app_context():
+        engine = _dedicated_engine(application_url())
+    try:
+        with Session(bind=engine) as slow, Session(bind=engine) as fast:
+            slow.add(ClusterCommand(kind=cc.RELOAD_RATE_LIMITS, payload='"not an object"', created_at=utc_now()))
+            slow.flush()
+            late = slow.query(ClusterCommand).one().id
+            fast.add(ClusterCommand(kind=cc.RELOAD_SYSLOG, payload='{"mark": "fast"}', created_at=utc_now()))
+            fast.commit()
+            for _ in range(3):
+                clock.t += 1  # past the gap grace: the late id becomes a hole
+                b.run_once()
+            assert log == [('b', 'fast')] and _in_hole(b, late)
+            slow.commit()
+        b.run_once()
+        assert calls == ['not an object'] and not _in_hole(b, late)
+        after = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'})
+        clock.t += 1
+        b.run_once()
+        b.run_once()
+        assert b.seen == after and log == [('b', 'fast'), ('b', 'after')] and len(calls) == 1
+    finally:
+        engine.dispose()
+
+
+def test_a_hole_whose_command_never_commits_expires(app, ha):
+    from models import db
+    clock, log = _FakeMonotonic(), []
+    b = ha('b', monotonic=clock, handlers={cc.RELOAD_SYSLOG: _recorder(log, 'b')})
+    b.run_once()
+    with app.app_context():
+        lost = cc.emit(cc.RELOAD_SYSLOG, {'mark': 'rolled-back'})
+        db.session.flush()
+        lost_id = lost.id
+        db.session.rollback()
+    kept = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'kept'})
+    for _ in range(3):
+        clock.t += 1
+        b.run_once()
+    assert b.seen == kept and _in_hole(b, lost_id)
+    clock.t += cc.HOLE_TTL_SECONDS - 10
+    b.run_once()
+    assert _in_hole(b, lost_id)
+    clock.t += 20
+    b.run_once()
+    assert not _in_hole(b, lost_id) and log == [('b', 'kept')]
+
+
+@pytest.fixture
+def master_boot(app, monkeypatch):
+    """The gunicorn master's environment: HA on, the database reached through DATABASE_URL."""
+    monkeypatch.setenv('UCM_HA', '1')
+    monkeypatch.setenv('DATABASE_URL', pg_app_harness.app_url())
+    monkeypatch.setattr(cc, 'KNOWN_AT_START', None)
+
+
+@pytest.mark.parametrize('committed', ['before-settings', 'after-settings'])
+def test_only_a_restart_committed_before_the_master_read_its_settings_is_spared(
+        app, ha, master_boot, tmp_path, committed):
+    """Created before the process started either way: the snapshot taken before the settings
+    are read, not the applier's first pass, decides whether its change was seen."""
+    from sqlalchemy.orm import Session
+    from models import ClusterCommand
+    from services.scheduler_leader import _dedicated_engine, application_url
+    cluster, log = _Cluster(app), []
+    _node_row(app, 'n')
+    started = utc_now()
+    with app.app_context():
+        engine = _dedicated_engine(application_url())
+    try:
+        with Session(bind=engine) as writer:
+            writer.add(ClusterCommand(kind=cc.RESTART, created_at=started - timedelta(seconds=5)))
+            if committed == 'before-settings':
+                writer.commit()
+                cc.snapshot_committed_restarts(str(tmp_path))
+            else:
+                writer.flush()
+                cc.snapshot_committed_restarts(str(tmp_path))
+                writer.commit()  # before the applier's first pass
+    finally:
+        engine.dispose()
+    n = ha('n', started_at=started, restart_action=cluster.action('n'),
+           handlers={cc.RELOAD_SYSLOG: _recorder(log, 'n')})
+    n.start()
+    if committed == 'after-settings':
+        assert wait_for(lambda: ('down', 'n') in cluster.events)
+        return
+    assert wait_for(lambda: n.seen is not None)
+    after = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'})
+    assert wait_for(lambda: n.seen == after)
+    assert log == [('n', 'after')] and cluster.events == []
+
+
+def test_an_unreadable_snapshot_spares_no_restart(master_boot, monkeypatch, tmp_path):
+    monkeypatch.setenv('DATABASE_URL', 'postgresql://ucm@127.0.0.1:1/ucm')
+    assert cc.snapshot_committed_restarts(str(tmp_path)) == frozenset()
+
+
+def test_a_first_ha_start_before_the_migration_spares_nothing_in_silence_on_pg(
+        master_boot, monkeypatch, tmp_path, capsys):
+    """Upgrade: the migrations that create cluster_commands run after this snapshot."""
+    schema = f'{pg_app_harness.SCHEMA}_{secrets.randbelow(10**6) + 10**6}'
+    with pg_app_harness._connect() as admin:
+        admin.execute(f'CREATE SCHEMA "{schema}"')
+        try:
+            monkeypatch.setenv('DATABASE_URL', pg_app_harness.app_url(schema))
+            assert cc.snapshot_committed_restarts(str(tmp_path)) == frozenset()
+            assert capsys.readouterr().err == ''
+        finally:
+            admin.execute(f'DROP SCHEMA "{schema}" CASCADE')
+
+
+def test_no_snapshot_outside_ha(master_boot, monkeypatch, tmp_path):
+    monkeypatch.delenv('UCM_HA')
+    monkeypatch.setenv('DATABASE_URL', 'postgresql://ucm@127.0.0.1:1/ucm')
+    assert cc.snapshot_committed_restarts(str(tmp_path)) is None and cc.KNOWN_AT_START is None
