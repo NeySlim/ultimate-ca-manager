@@ -22,6 +22,7 @@ export default {
           { label: 'Renovación', text: 'Renovar un certificado, solo o de forma masiva, también se encola; una renovación que no podría atenderse (revocado, clave no en poder del servidor) se rechaza de inmediato' },
           { label: 'Revocación', text: 'Revocar un certificado (solo, de forma masiva, desde los certificados de usuario) o una CA intermedia bajo una política de revocación se encola; la aprobación revoca con el motivo indicado' },
           { label: 'Planificador', text: 'Bajo una política de renovación el planificador encola la renovación; la aprobación vuelve a firmar la clave que conserva el servidor, como habría hecho el planificador' },
+          { label: 'Enrolment protocols', text: 'An ACME finalize, an EST enrolment, re-enrolment or server key generation, a SCEP request (even on an auto-approving profile) or a WSTEP enrolment or renewal under a policy that requires approval is held: the client is told the request is pending and polls; the approval issues the certificate through that protocol, a rejection or expiry is reported to the client as a refusal' },
           { label: 'Administradores', text: 'Omiten la cola en todas las rutas, como en el formulario de emisión' },
         ]
       },

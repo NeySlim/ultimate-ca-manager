@@ -22,6 +22,7 @@ export default {
           { label: 'Renouvellement', text: 'Le renouvellement d\'un certificat, seul ou en masse, est également mis en file ; un renouvellement impossible à honorer (révoqué, clé non détenue par le serveur) est refusé immédiatement' },
           { label: 'Révocation', text: 'La révocation d\'un certificat (seul, en masse, depuis les certificats utilisateur) ou d\'une CA intermédiaire sous une politique de révocation est mise en file ; l\'approbation révoque avec le motif demandé' },
           { label: 'Planificateur', text: 'Sous une politique de renouvellement, le planificateur met le renouvellement en file ; l\'approbation re-signe la clé détenue par le serveur, comme l\'aurait fait le planificateur' },
+          { label: 'Enrolment protocols', text: 'An ACME finalize, an EST enrolment, re-enrolment or server key generation, a SCEP request (even on an auto-approving profile) or a WSTEP enrolment or renewal under a policy that requires approval is held: the client is told the request is pending and polls; the approval issues the certificate through that protocol, a rejection or expiry is reported to the client as a refusal' },
           { label: 'Administrateurs', text: 'Contournent la file sur tous les chemins, comme sur le formulaire d\'émission' },
         ]
       },

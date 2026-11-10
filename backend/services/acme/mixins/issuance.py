@@ -8,6 +8,7 @@ from models import db
 from models.acme_models import AcmeOrder
 from utils.datetime_utils import utc_now
 from utils.csr_extensions import csr_extensions
+from utils import caa_checker
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,8 @@ class IssuanceMixin:
         self,
         order_id: str,
         csr_pem: str,
-        ca_refid: str = None
+        ca_refid: str = None,
+        approval=None,
     ) -> Tuple[bool, Optional[str]]:
         """Finalize order and issue certificate
         
@@ -63,10 +65,15 @@ class IssuanceMixin:
             order_id: Order identifier
             csr_pem: PEM-encoded Certificate Signing Request
             ca_refid: CA to sign with (optional, resolved from domain config → global default → first available)
+            approval: the approved request this issuance carries out (the
+                approval gate is then passed)
             
         Returns:
-            Tuple of (success, error_message)
+            Tuple of (success, error_message); success with
+            ``self._pending_approval`` set when a policy holds the order for
+            approval (it stays ``processing``).
         """
+        self._pending_approval = None
         order = self.get_order(order_id)
         
         if not order:
@@ -177,7 +184,7 @@ class IssuanceMixin:
             except ImportError:
                 if caa_enforce:
                     logger.error("CAA check unavailable: dns.resolver import failed")
-                    return False, "CAA check failed (DNS error): resolver unavailable"
+                    return False, f"CAA check failed ({caa_checker.DNS_ERROR_MARKER}): resolver unavailable"
                 logger.error(
                     "CAA check unavailable (dns.resolver import failed); "
                     "proceeding without CAA check (soft-fail)"
@@ -185,7 +192,7 @@ class IssuanceMixin:
             except Exception as e:
                 if caa_enforce:
                     logger.warning(f"CAA check error: {e}")
-                    return False, "CAA check failed (DNS error): lookup error"
+                    return False, f"CAA check failed ({caa_checker.DNS_ERROR_MARKER}): lookup error"
                 logger.warning(f"CAA check error (non-blocking): {e}")
         
         # Resolve CA: domain-specific → global default → first available
@@ -193,7 +200,16 @@ class IssuanceMixin:
         # resolves straight to the global default (acme.issuing_ca_id)
         if not ca_refid:
             ca_refid = self._resolve_ca_for_domains(order_domains)
-        
+
+        if approval is None:
+            held, gate_error = self._approval_gate(order, csr, csr_pem, ca_refid)
+            if gate_error:
+                self._last_finalize_error_type = 'serverInternal'
+                return False, gate_error
+            if held is not None:
+                self._pending_approval = held
+                return True, None
+
         # Sign certificate with UCM CA
         self._last_signing_exception = None
         success, cert_id, error = self._sign_certificate_with_ca(
@@ -214,6 +230,9 @@ class IssuanceMixin:
             self._last_finalize_error_type = (
                 'malformed' if isinstance(self._last_signing_exception, RequestedValidityError)
                 else 'badCSR')
+            if approval is not None:
+                # The approval's caller closes the request; the order follows it
+                return False, error
             order.status = "invalid"
             order.error = json.dumps({
                 "type": f"urn:ietf:params:acme:error:{self._last_finalize_error_type}",
@@ -248,6 +267,55 @@ class IssuanceMixin:
 
         return True, None
     
+    def _approval_gate(self, order, csr, csr_pem, ca_refid):
+        """``(approval, None)`` when a policy holds the order for approval
+        (its CSR kept on it, the order left ``processing``), ``(None, None)``
+        to issue now, ``(None, error)`` when the policies cannot be read."""
+        from services import protocol_approval
+        ca = self._select_signing_ca(ca_refid, warn=False)
+        if ca is None:
+            return None, None  # the signer reports the missing CA
+        from services.acme import profiles as acme_profiles
+        template_id = acme_profiles.issuance_params(getattr(order, 'profile', None)).get('template_id')
+        cn, dns = protocol_approval.csr_names(csr)
+        try:
+            approval = protocol_approval.gate_protocol_issuance(
+                'acme', ca=ca, template_id=template_id, cn=cn, san_list=dns, csr_pem=csr_pem,
+                identity=f'account {order.account_id}', protocol_ref=order.order_id,
+                extra={'order_id': order.order_id, 'account_id': order.account_id,
+                       'base_url': self.base_url,
+                       'identifiers': json.loads(order.identifiers)})
+        except protocol_approval.ApprovalGateUnavailable as e:
+            return None, str(e)
+        if approval is None:
+            return None, None
+        db.session.refresh(order)
+        order.csr = csr_pem
+        db.session.commit()
+        logger.info("ACME order %s held for approval #%s", order.order_id, approval.id)
+        return approval, None
+
+    def _select_signing_ca(self, ca_refid, warn=True):
+        """The CA *ca_refid* names, else the first CA able to sign."""
+        from models import CA
+        if ca_refid:
+            return CA.query.filter_by(refid=ca_refid).first()
+        # No issuing CA configured: the fallback must be a CA able to
+        # sign (a key that is not an empty sentinel, not offline), chosen
+        # deterministically rather than in database order
+        candidates = CA.query.filter(
+            ((CA.prv.isnot(None) & (CA.prv != '')) | CA.hsm_key_id.isnot(None)),
+            CA.crt.isnot(None), CA.crt != '',
+            CA.offline.is_(False),
+        ).order_by(CA.id.asc()).all()
+        ca = next((c for c in candidates if not c.revoked_in_chain), None)
+        if ca is not None and warn:
+            logger.warning(
+                "ACME: no issuing CA configured, falling back to CA %s (%s)",
+                ca.id, ca.descr,
+            )
+        return ca
+
     def _auto_supersede(self, new_order, new_cert_id: int):
         """Revoke previous certificates for the same domains if revoke_on_renewal is enabled."""
         try:
@@ -544,23 +612,7 @@ class IssuanceMixin:
         import base64
         
         # Get CA (use first available if not specified)
-        if ca_refid:
-            ca = CA.query.filter_by(refid=ca_refid).first()
-        else:
-            # No issuing CA configured: the fallback must be a CA able to
-            # sign (a key that is not an empty sentinel, not offline), chosen
-            # deterministically rather than in database order
-            candidates = CA.query.filter(
-                ((CA.prv.isnot(None) & (CA.prv != '')) | CA.hsm_key_id.isnot(None)),
-                CA.crt.isnot(None), CA.crt != '',
-                CA.offline.is_(False),
-            ).order_by(CA.id.asc()).all()
-            ca = next((c for c in candidates if not c.revoked_in_chain), None)
-            if ca is not None:
-                logger.warning(
-                    "ACME: no issuing CA configured, falling back to CA %s (%s)",
-                    ca.id, ca.descr,
-                )
+        ca = self._select_signing_ca(ca_refid)
         
         if not ca:
             self._last_signing_exception = RuntimeError("No CA available for signing")

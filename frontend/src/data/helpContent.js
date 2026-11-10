@@ -1690,6 +1690,7 @@ export const helpContent = {
           { label: 'Renewal', text: 'Renewing a certificate, alone or in bulk, is queued too; a renewal that could not be honoured (revoked, key not held by the server) is refused at once' },
           { label: 'Revocation', text: 'Revoking a certificate (alone, in bulk, from the user certificates) or an intermediate CA under a revocation policy is queued; the approval revokes with the reason asked for' },
           { label: 'Scheduler', text: 'Under a renewal policy the scheduler queues the renewal; the approval re-signs the key the server holds, as the scheduler would have' },
+          { label: 'Enrolment protocols', text: 'An ACME finalize, an EST enrolment, re-enrolment or server key generation, a SCEP request (even on an auto-approving profile) or a WSTEP enrolment or renewal under a policy that requires approval is held: the client is told the request is pending and polls; the approval issues the certificate through that protocol, a rejection or expiry is reported to the client as a refusal' },
           { label: 'Administrators', text: 'Bypass the queue on every path, as on the issue form' },
         ]
       },

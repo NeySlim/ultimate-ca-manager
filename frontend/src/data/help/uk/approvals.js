@@ -22,6 +22,7 @@ export default {
           { label: 'Оновлення', text: 'Оновлення сертифіката, окремо або масово, також ставиться в чергу; оновлення, яке не можна виконати (відкликаний, ключ не зберігається сервером), відхиляється одразу' },
           { label: 'Відкликання', text: 'Відкликання сертифіката (окремо, масово, з користувацьких сертифікатів) або проміжного CA за політикою відкликання ставиться в чергу; схвалення відкликає з вказаною причиною' },
           { label: 'Планувальник', text: 'За політики оновлення планувальник ставить оновлення в чергу; схвалення повторно підписує ключ, який зберігає сервер, як це зробив би планувальник' },
+          { label: 'Enrolment protocols', text: 'An ACME finalize, an EST enrolment, re-enrolment or server key generation, a SCEP request (even on an auto-approving profile) or a WSTEP enrolment or renewal under a policy that requires approval is held: the client is told the request is pending and polls; the approval issues the certificate through that protocol, a rejection or expiry is reported to the client as a refusal' },
           { label: 'Адміністратори', text: 'Оминають чергу на кожному шляху, як і у формі видачі' },
         ]
       },

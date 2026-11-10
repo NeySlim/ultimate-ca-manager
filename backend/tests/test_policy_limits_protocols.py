@@ -4,6 +4,8 @@
 issue form, CSR signing, renewals and approvals only: ACME, EST, WSTEP and
 SCEP checked key type and hash, and issued whatever validity and name count
 was asked. The validity is now capped and an excess of names refused there.
+A policy requiring approval holds the protocol requests too: see the
+test_protocol_approval_*.py modules.
 """
 from datetime import timedelta
 

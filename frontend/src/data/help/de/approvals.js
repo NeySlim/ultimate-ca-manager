@@ -22,6 +22,7 @@ export default {
           { label: 'Erneuerung', text: 'Das Erneuern eines Zertifikats, einzeln oder in Masse, wird ebenfalls eingereiht; eine Erneuerung, die nicht ausgeführt werden könnte (widerrufen, Schlüssel nicht vom Server gehalten), wird sofort abgelehnt' },
           { label: 'Widerruf', text: 'Das Widerrufen eines Zertifikats (einzeln, in Masse, aus den Benutzerzertifikaten) oder einer Zwischen-CA unter einer Widerrufsrichtlinie wird eingereiht; die Genehmigung widerruft mit dem angegebenen Grund' },
           { label: 'Planer', text: 'Unter einer Erneuerungsrichtlinie reiht der Planer die Erneuerung ein; die Genehmigung signiert den vom Server gehaltenen Schlüssel neu, wie es der Planer getan hätte' },
+          { label: 'Enrolment protocols', text: 'An ACME finalize, an EST enrolment, re-enrolment or server key generation, a SCEP request (even on an auto-approving profile) or a WSTEP enrolment or renewal under a policy that requires approval is held: the client is told the request is pending and polls; the approval issues the certificate through that protocol, a rejection or expiry is reported to the client as a refusal' },
           { label: 'Administratoren', text: 'Umgehen die Warteschlange auf jedem Pfad, wie im Ausstellungsformular' },
         ]
       },

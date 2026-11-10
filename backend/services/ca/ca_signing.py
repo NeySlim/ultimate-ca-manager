@@ -93,6 +93,7 @@ class CASigningMixin:
         template_ekus: list = None,
         template_id: int = None,
         template_key_usage: list = None,
+        on_stored=None,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -135,6 +136,8 @@ class CASigningMixin:
                 its row (WSTEP: the one whose OID it carries).
             template_key_usage: Key Usage names that replace the CSR's, as a
                 bound template's do (WSTEP, for a request that carries none).
+            on_stored: called with the new row once flushed, so what it
+                writes is committed with the certificate (an approval's link).
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -274,6 +277,8 @@ class CASigningMixin:
             link_issued(new_cert, cert_obj, related_a)
             # RFC 9763: the request binds to this key B in the commit that stores B
             record_request_key(csr.public_bytes(serialization.Encoding.DER), related_a)
+            if on_stored is not None:
+                on_stored(new_cert)
             db.session.commit()
         except AlreadySuperseded:
             raise

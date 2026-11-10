@@ -22,6 +22,7 @@ export default {
           { label: 'Rinnovo', text: 'Anche il rinnovo di un certificato, singolo o massivo, viene messo in coda; un rinnovo che non potrebbe essere soddisfatto (revocato, chiave non detenuta dal server) viene rifiutato subito' },
           { label: 'Revoca', text: 'La revoca di un certificato (singola, massiva, dai certificati utente) o di una CA intermedia con una politica di revoca viene messa in coda; l\'approvazione revoca con il motivo richiesto' },
           { label: 'Scheduler', text: 'Con una politica di rinnovo lo scheduler mette in coda il rinnovo; l\'approvazione rifirma la chiave detenuta dal server, come avrebbe fatto lo scheduler' },
+          { label: 'Enrolment protocols', text: 'An ACME finalize, an EST enrolment, re-enrolment or server key generation, a SCEP request (even on an auto-approving profile) or a WSTEP enrolment or renewal under a policy that requires approval is held: the client is told the request is pending and polls; the approval issues the certificate through that protocol, a rejection or expiry is reported to the client as a refusal' },
           { label: 'Amministratori', text: 'Saltano la coda su ogni percorso, come nel modulo di emissione' },
         ]
       },

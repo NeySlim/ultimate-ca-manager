@@ -4403,12 +4403,19 @@
       "renewal": "更新",
       "revocation": "失効",
       "ca_revocation": "CA の失効",
-      "cross_revocation": "クロス証明書の失効"
+      "cross_revocation": "クロス証明書の失効",
+      "acme_order": "ACME order",
+      "est_enroll": "EST enrolment",
+      "scep_request": "SCEP request",
+      "wstep_request": "WSTEP request"
     },
     "revocationPerformed": "承認済み: 失効が実行されました",
     "summarySerial": "シリアル番号",
     "summaryInvalidity": "無効日",
     "summaryTrigger": "要求元",
+    "summaryProtocol": "Protocol",
+    "summaryIdentity": "Protocol identity",
+    "summaryCsr": "Certificate request (CSR)",
     "triggerScheduler": "更新スケジューラ"
   },
   "messages": {

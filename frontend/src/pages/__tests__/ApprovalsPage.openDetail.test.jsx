@@ -113,6 +113,18 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     expect(openWindow).not.toHaveBeenCalled()
   })
 
+  it('reports an approval whose issuance waits for the client as a success', async () => {
+    const showError = vi.spyOn(stable.notify, 'showError')
+    const showSuccess = vi.spyOn(stable.notify, 'showSuccess')
+    approve.mockResolvedValue({ data: { certificate_issued: false, deferred: true, status: 'approved' } })
+    renderPage()
+    await clickApproveOrReject('approve')
+    await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('approvals.approvedSuccess'))
+    expect(showError).not.toHaveBeenCalled()
+    expect(openWindow).not.toHaveBeenCalled()
+    showError.mockRestore(); showSuccess.mockRestore()
+  })
+
   it('opens nothing on reject', async () => {
     reject.mockResolvedValue({ data: {} })
     renderPage()
@@ -162,5 +174,35 @@ describe('ApprovalsPage deep link', () => {
     render(<MemoryRouter initialEntries={['/approvals?id=42']}><ApprovalsPage /></MemoryRouter>)
     await waitFor(() => expect(getById).toHaveBeenCalledWith('42'))
     expect(await screen.findByText('linked-bob')).toBeTruthy()
+  })
+})
+
+describe('ApprovalsPage — protocol requests', () => {
+  const PROTOCOL_REQUEST = {
+    ...REQUEST, id: 51, request_type: 'est_enroll', requester_username: 'est:basic:device',
+    request_summary: {
+      cn: 'device.example', protocol: 'est', operation: 'enroll', identity: 'basic:device',
+      csr: '-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----',
+    },
+  }
+
+  it('names the protocol, not the raw type', async () => {
+    list.mockResolvedValue({ data: [PROTOCOL_REQUEST] })
+    getStats.mockResolvedValue({ data: { pending: 1, approved: 0, rejected: 0, total: 1 } })
+    renderPage()
+    expect(await screen.findByText('approvals.requestType.est_enroll')).toBeTruthy()
+    expect(screen.queryByText('est_enroll')).toBeNull()
+  })
+
+  it('shows the protocol, its identity and the CSR in the detail', async () => {
+    list.mockResolvedValue({ data: [] })
+    getStats.mockResolvedValue({ data: {} })
+    getById.mockResolvedValue({ data: PROTOCOL_REQUEST })
+    render(<MemoryRouter initialEntries={['/approvals?id=51']}><ApprovalsPage /></MemoryRouter>)
+    expect(await screen.findByText('approvals.summaryProtocol')).toBeTruthy()
+    expect(screen.getByText('EST (enroll)')).toBeTruthy()
+    expect(screen.getByText('basic:device')).toBeTruthy()
+    expect(screen.getByText('approvals.summaryCsr')).toBeTruthy()
+    expect(screen.getByText(/BEGIN CERTIFICATE REQUEST/)).toBeTruthy()
   })
 })

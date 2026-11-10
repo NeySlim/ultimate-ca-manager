@@ -172,11 +172,8 @@ def get_scep_service(profile_slug=None):
 
         if profile.intune_enabled:
             try:
-                from services.scep.intune_client import IntuneScepClient
-                tenant_id, client_id, client_secret = profile.intune_credentials()
-                intune_client = IntuneScepClient(
-                    tenant_id=tenant_id, client_id=client_id, client_secret=client_secret,
-                )
+                from services.scep import intune_client as intune
+                intune_client = intune.client_for_profile(profile)
             except Exception as e:
                 return _reject(
                     f"SCEP profile {profile.name!r} has Intune validation "

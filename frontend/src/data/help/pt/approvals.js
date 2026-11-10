@@ -22,6 +22,7 @@ export default {
           { label: 'Renovação', text: 'Renovar um certificado, sozinho ou em lote, também entra na fila; uma renovação que não poderia ser atendida (revogado, chave não detida pelo servidor) é recusada de imediato' },
           { label: 'Revogação', text: 'Revogar um certificado (sozinho, em lote, a partir dos certificados de usuário) ou uma CA intermédia sob uma política de revogação entra na fila; a aprovação revoga com o motivo pedido' },
           { label: 'Agendador', text: 'Sob uma política de renovação, o agendador coloca a renovação na fila; a aprovação reassina a chave detida pelo servidor, como o agendador teria feito' },
+          { label: 'Enrolment protocols', text: 'An ACME finalize, an EST enrolment, re-enrolment or server key generation, a SCEP request (even on an auto-approving profile) or a WSTEP enrolment or renewal under a policy that requires approval is held: the client is told the request is pending and polls; the approval issues the certificate through that protocol, a rejection or expiry is reported to the client as a refusal' },
           { label: 'Administradores', text: 'Ignoram a fila em todos os caminhos, como no formulário de emissão' },
         ]
       },

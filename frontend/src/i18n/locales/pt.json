@@ -4400,12 +4400,19 @@
       "renewal": "Renovação",
       "revocation": "Revogação",
       "ca_revocation": "Revogação de CA",
-      "cross_revocation": "Revogação de certificado cruzado"
+      "cross_revocation": "Revogação de certificado cruzado",
+      "acme_order": "ACME order",
+      "est_enroll": "EST enrolment",
+      "scep_request": "SCEP request",
+      "wstep_request": "WSTEP request"
     },
     "revocationPerformed": "Aprovada: a revogação foi executada",
     "summarySerial": "Número de série",
     "summaryInvalidity": "Data de invalidade",
     "summaryTrigger": "Solicitada por",
+    "summaryProtocol": "Protocol",
+    "summaryIdentity": "Protocol identity",
+    "summaryCsr": "Certificate request (CSR)",
     "triggerScheduler": "Agendador de renovação"
   },
   "messages": {

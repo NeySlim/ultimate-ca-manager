@@ -65,6 +65,25 @@ from services.scep.response_builder import (
 logger = logging.getLogger(__name__)
 
 
+def notify_intune_failure(intune_client, transaction_id, csr_data, description):
+    """Tell Intune a request it validated will not be issued; best effort."""
+    if intune_client is None:
+        return
+    try:
+        intune_client.send_failure_notification(
+            transaction_id, csr_data,
+            hresult=0x80004005,  # E_FAIL: no finer-grained mapping available
+            description=description[:255],
+        )
+    except Exception as notify_err:
+        logger.error("SCEP: Intune failure notification also failed: %s", notify_err)
+
+
+class SCEPRequestRefused(ValueError):
+    """The CA refuses this request for good (revoked CA, revoked certificate
+    being renewed): approving it again later cannot succeed."""
+
+
 from utils.x509_aki import authority_key_identifier_from_issuer
 from services.cert.issued_lookup import find_issued_rows, san_identity_matches
 from utils.signing_hash import rsa_padding_for
@@ -641,7 +660,16 @@ class SCEPService:
             )
             db.session.add(scep_req)
 
-            if self.auto_approve:
+            # A policy requiring approval holds the request whatever the
+            # profile's auto-approval: the approval queue then decides
+            held, gate_error = self._approval_gate(scep_req, csr, message_type)
+            if gate_error:
+                return self._create_error_response(
+                    self.FAIL_BAD_REQUEST, "Server error evaluating the request",
+                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                ), 200
+
+            if self.auto_approve and held is None:
                 try:
                     cert_refid = self._auto_approve_request(
                         scep_req, csr,
@@ -910,27 +938,8 @@ class SCEPService:
             )
         # PENDING and FAILURE carry no encrypted payload. SUCCESS is encrypted
         # to the signer certificate carried by this polling request.
-        if existing.status == "approved" and existing.cert_refid:
-            cert = Certificate.query.filter_by(refid=existing.cert_refid).first()
-            if cert:
-                cert_obj = x509.load_pem_x509_certificate(
-                    base64.b64decode(cert.crt), default_backend()
-                )
-                return self._create_cert_rep_success(
-                    cert_obj,
-                    transaction_id,
-                    sender_nonce,
-                    signer_cert,
-                    challenge_password,
-                    content_encryption_algorithm,
-                )
-        if existing.status == "rejected":
-            return self._create_error_response(
-                self.FAIL_BAD_REQUEST,
-                existing.rejection_reason or "Request rejected",
-                transaction_id=transaction_id, recipient_nonce=sender_nonce,
-            )
-        return self._create_cert_rep_pending(transaction_id, sender_nonce)
+        return self._status_for_existing(
+            existing, sender_nonce, signer_cert, challenge_password, content_encryption_algorithm)
 
     def approve_request(
         self,
@@ -965,6 +974,19 @@ class SCEPService:
         scep_req.cert_refid = cert_refid
         scep_req.approved_by = approved_by
         scep_req.approved_at = utc_now()
+        if self.intune_client is not None:
+            # As on auto-approval: Intune hears of the certificate before it is committed
+            db.session.flush()
+            cert = Certificate.query.filter_by(refid=cert_refid).first()
+            try:
+                self.intune_client.send_success_notification(
+                    transaction_id, base64.b64decode(scep_req.csr),
+                    x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend()))
+            except Exception as e:
+                db.session.rollback()
+                logger.error("SCEP: Intune success notification failed, not issuing "
+                             "(txn_id=%s): %s", transaction_id, e)
+                raise ValueError('Intune could not be notified; the certificate was not issued') from e
         try:
             db.session.commit()
         except Exception as e:
@@ -1043,16 +1065,7 @@ class SCEPService:
 
     def _notify_intune_failure(self, transaction_id, csr_data, description):
         """Tell Intune a request it validated was refused; best effort, the device still gets the reason."""
-        if self.intune_client is None:
-            return
-        try:
-            self.intune_client.send_failure_notification(
-                transaction_id, csr_data,
-                hresult=0x80004005,  # E_FAIL: no finer-grained mapping available
-                description=description[:255],
-            )
-        except Exception as notify_err:
-            logger.error("SCEP: Intune failure notification also failed: %s", notify_err)
+        notify_intune_failure(self.intune_client, transaction_id, csr_data, description)
 
     def _validate_renewal(self, signer_cert: x509.Certificate, csr) \
             -> Optional[Tuple[int, str]]:
@@ -1174,6 +1187,30 @@ class SCEPService:
         return stored.public_key().public_bytes(der, spki) == \
             csr.public_key().public_bytes(der, spki)
 
+    def _approval_gate(self, scep_req, csr, message_type):
+        """``(approval, None)`` when a policy holds the request (it stays
+        pending, linked to the approval), ``(None, None)`` otherwise,
+        ``(None, error)`` when the policies cannot be read (nothing stored)."""
+        from services import protocol_approval
+        cn, dns = protocol_approval.csr_names(csr)
+        renewal = message_type == self.MSG_TYPE_RENEWAL_REQ
+        try:
+            db.session.flush()
+            approval = protocol_approval.gate_protocol_issuance(
+                'scep', ca=self.ca, template_id=getattr(self.template, 'id', None), cn=cn, san_list=dns,
+                csr_pem=csr.public_bytes(serialization.Encoding.PEM).decode(),
+                identity=f'transaction {scep_req.transaction_id}',
+                protocol_ref=protocol_approval.make_ref('scep', scep_req.transaction_id, self.ca_refid),
+                renewal=renewal,
+                extra={'scep_request_id': scep_req.id, 'transaction_id': scep_req.transaction_id,
+                       'profile_id': self.profile_id, 'client_ip': scep_req.client_ip})
+        except protocol_approval.ApprovalGateUnavailable as e:
+            db.session.rollback()
+            return None, str(e)
+        if approval is not None:
+            logger.info("SCEP: transaction %s held for approval #%s", scep_req.transaction_id, approval.id)
+        return approval, None
+
     def _status_for_existing(
         self,
         existing: SCEPRequest,
@@ -1183,19 +1220,48 @@ class SCEPService:
         content_encryption_algorithm: str,
     ) -> bytes:
         """Return an appropriate CertRep for an already-seen transaction ID."""
-        if existing.status == "approved" and existing.cert_refid:
-            cert = Certificate.query.filter_by(refid=existing.cert_refid).first()
-            if cert:
-                cert_obj = x509.load_pem_x509_certificate(
-                    base64.b64decode(cert.crt), default_backend()
-                )
+        from services.scep.approval import follow_approval
+        follow_approval(existing)
+        if existing.status == "approved":
+            from services.scep.approval import approved_request
+            approval = approved_request(existing)
+            if approval is None:
+                # Answered SUCCESS when issued (no approval held it): never judged again;
+                # a certificate gone since is refused, not left PENDING for ever
+                cert = (Certificate.query.filter_by(refid=existing.cert_refid).first()
+                        if existing.cert_refid else None)
+                if cert is None or not cert.crt:
+                    from services import protocol_approval
+                    return self._create_error_response(
+                        self.FAIL_BAD_REQUEST, protocol_approval.CERTIFICATE_WITHDRAWN,
+                        transaction_id=existing.transaction_id, recipient_nonce=sender_nonce)
                 return self._create_cert_rep_success(
+                    x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend()),
+                    existing.transaction_id, sender_nonce, signer_cert, challenge_password,
+                    content_encryption_algorithm,
+                )
+            cert_obj, undelivered = self._deliverable_certificate(existing, approval)
+            if cert_obj is not None:
+                response = self._create_cert_rep_success(
                     cert_obj,
                     existing.transaction_id,
                     sender_nonce,
                     signer_cert,
                     challenge_password,
                     content_encryption_algorithm,
+                )
+                if undelivered is not None:
+                    from services import protocol_approval
+                    protocol_approval.mark_delivered(undelivered)
+                return response
+            if existing.status == "approved":
+                # Delivered before, its certificate gone since: refused, never judged again
+                from services import protocol_approval
+                return self._create_error_response(
+                    self.FAIL_BAD_REQUEST,
+                    protocol_approval.CERTIFICATE_WITHDRAWN,
+                    transaction_id=existing.transaction_id,
+                    recipient_nonce=sender_nonce,
                 )
 
         if existing.status == "rejected":
@@ -1207,6 +1273,37 @@ class SCEPService:
             )
 
         return self._create_cert_rep_pending(existing.transaction_id, sender_nonce)
+
+    def _deliverable_certificate(self, existing: SCEPRequest, approval):
+        """``(certificate, approval still to mark delivered)`` of a request
+        *approval* approved, as EST and WSTEP deliver theirs. One delivered
+        is never judged again; otherwise no certificate when its row went
+        away or the certificate it renews was revoked, and the request (with
+        its approval) is then closed."""
+        from services import protocol_approval
+        cert = Certificate.query.filter_by(refid=existing.cert_refid).first() if existing.cert_refid else None
+        if protocol_approval.request_data(approval).get('delivered_at'):
+            if cert is None or not cert.crt:
+                return None, None
+            return x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend()), None
+        reason = None
+        if cert is None or not cert.crt:
+            reason = protocol_approval.CERTIFICATE_WITHDRAWN
+        elif existing.renewal_of:
+            # Only a revocation refuses it: expired or no longer on record still delivers
+            from services.cert.issued_lookup import REVOKED, issued_certificate_status
+            renewed = x509.load_pem_x509_certificate(base64.b64decode(existing.renewal_of), default_backend())
+            if issued_certificate_status(self.ca, renewed)[1] == REVOKED:
+                reason = protocol_approval.RENEWED_REVOKED
+        if reason is None:
+            return x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend()), approval
+        existing.status = "rejected"
+        existing.rejection_reason = reason
+        db.session.commit()
+        protocol_approval.close_withdrawn(approval, reason)
+        protocol_approval.mark_delivered(approval)
+        logger.warning("SCEP: transaction %s closed before delivery: %s", existing.transaction_id, reason)
+        return None, None
 
     def _config_value(self, key: str):
         if key not in self._config_cache:
@@ -1299,14 +1396,14 @@ class SCEPService:
                 f"CA is offline: {self.ca.offline_reason or 'no reason provided'}"
             )
         if self.ca.revoked_in_chain:
-            raise ValueError("CA is revoked and can no longer sign")
+            raise SCEPRequestRefused("CA is revoked and can no longer sign")
         from utils.ca_signing_window import check_issuer_window
         check_issuer_window(self.ca_cert)
         if renewal_of is not None:
             # A manual approval may come after the renewed certificate was revoked
             from services.cert.issued_lookup import REVOKED, issued_certificate_status
             if issued_certificate_status(self.ca, renewal_of)[1] == REVOKED:
-                raise ValueError('Signing certificate has been revoked')
+                raise SCEPRequestRefused('Signing certificate has been revoked')
 
         # Re-checked here: a manual approval may come after the policies changed
         from services.policy_service import PolicyViolation

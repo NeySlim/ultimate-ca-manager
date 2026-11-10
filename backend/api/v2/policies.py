@@ -81,6 +81,17 @@ def _approval_is_expired(approval):
     return approval_is_expired(approval)
 
 
+def _expire_request(approval, notify=True):
+    """Close a request found past its deadline; its protocol (if any) follows
+    (a read route passes *notify* False: no Intune call from a GET)."""
+    approval.status = 'expired'
+    approval.resolved_at = utc_now()
+    ok, _err = safe_commit(logger, "Failed to expire request")
+    if ok:
+        from services.protocol_approval import propagate_closed
+        propagate_closed([approval], notify=notify)
+
+
 def _link_approval(approval, certificate_id):
     """Link the approval to the certificate it produced. Only the request
     that finds the sentinel still empty keeps its certificate."""
@@ -146,6 +157,9 @@ def _approval_target_gone(approval):
     (its request row, certificate or signing CA is gone, or the certificate
     to revoke was replaced since the request), else None."""
     from services.policy_service import PolicyEvaluationService
+    from services import protocol_approval
+    if protocol_approval.is_protocol_request(approval):
+        return protocol_approval.target_gone(approval)
     if approval.request_type not in ('csr', 'renewal', 'revocation', 'ca_revocation', 'cross_revocation'):
         return None
     data = PolicyEvaluationService.get_request_data(approval) or {}
@@ -186,23 +200,10 @@ def _close_request_target_gone(approval, reason, user_id, username):
     approver who found out, with the reason; webhooks are told as for a
     rejection. Whatever the number of approvals required, the first vote
     that finds the target gone closes the request."""
-    approval.add_approval(user_id=user_id, username=username, action='reject', comment=reason)
-    approval.status = 'rejected'
-    approval.resolved_at = utc_now()
-    ok, _err = safe_commit(logger, "Failed to close approval request")
-    if not ok:
-        return _err
-    AuditService.log_action(
-        action='approval_closed',
-        resource_type='approval',
-        resource_id=str(approval.id),
-        resource_name=f'Approval #{approval.id}',
-        details=f'Closed by {username}: {reason}',
-        success=True,
-    )
-    result = approval.to_dict()
-    from services.webhook_service import emit_csr_rejected
-    emit_csr_rejected(result, reason=reason, actor=username)
+    from services.protocol_approval import close_request
+    result = close_request(approval, reason, user_id=user_id, username=username)
+    if result is None:
+        return error_response("Failed to close approval request", 500)
     result['certificate_issued'] = False
     result['request_closed'] = True
     result['issue_error'] = reason
@@ -297,6 +298,19 @@ def _issue_approved_renewal(approval, data):
         'valid_to': utc_isoformat(cert.valid_to),
         'notices': outcome.get('notices') or [],
     }
+
+
+def _issue_approved_protocol_request(approval, data):
+    """Issue an approved protocol request through its protocol's own path
+    (same source, extensions and protocol state as a direct issuance); a
+    deferred one (server-generated key) is issued at the client's next request."""
+    from services import protocol_approval
+    outcome = protocol_approval.issue_approved(approval, data)
+    # EST and WSTEP link in the commit that stores the certificate
+    if outcome.get('id') is not None and approval.certificate_id != outcome['id']:
+        _link_approval(approval, outcome['id'])
+    logger.info(f"{approval.request_type} request issued via approval #{approval.id}")
+    return outcome
 
 
 def _requester_name(approval, data):
@@ -442,6 +456,9 @@ def _issue_approved_certificate(approval):
         return _revoke_approved_ca(approval, data)
     if approval.request_type == 'cross_revocation':
         return _revoke_approved_cross_certificate(approval, data)
+    from services import protocol_approval
+    if protocol_approval.is_protocol_request(approval):
+        return _issue_approved_protocol_request(approval, data)
 
     # Resolve the template the request was made against (issue #226 semantics:
     # templates govern issuance — KU/EKU, digest, and the defaults for key
@@ -1160,9 +1177,12 @@ def delete_policy(policy_id):
     """Delete certificate policy"""
     policy = db.get_or_404(CertificatePolicy, policy_id)
     
-    # Check for pending requests (one past its expiry does not count)
+    # Check for pending requests (one past its expiry does not count); the
+    # outside notices still owed (Intune) are sent before they are deleted below
     from services.approval_gate import expire_stale_requests
+    from services.protocol_approval import send_pending_notices
     expire_stale_requests()
+    send_pending_notices()
     pending = ApprovalRequest.query.filter_by(
         policy_id=policy_id,
         status='pending'
@@ -1170,6 +1190,18 @@ def delete_policy(policy_id):
     
     if pending > 0:
         return error_response(f"Cannot delete policy with {pending} pending approval requests", 400)
+    # An approved EST, SCEP or WSTEP request still owed to its client is found by its row
+    # only; an ACME order carries its own state once approved, so it never holds a policy
+    from services.protocol_approval import PROTOCOL_REQUEST_TYPES, request_data
+    owed_types = tuple(v for k, v in PROTOCOL_REQUEST_TYPES.items() if k != 'acme')
+    undelivered = sum(1 for r in ApprovalRequest.query.filter(
+        ApprovalRequest.policy_id == policy_id,
+        ApprovalRequest.status == 'approved',
+        ApprovalRequest.request_type.in_(owed_types)).all()
+        if not request_data(r).get('delivered_at'))
+    if undelivered > 0:
+        return error_response(
+            f"Cannot delete policy with {undelivered} approved requests not yet delivered", 400)
     
     try:
         # Clean up completed/rejected approval requests
@@ -1237,16 +1269,20 @@ def get_approval(request_id):
     """Get approval request details"""
     approval = db.get_or_404(ApprovalRequest, request_id)
     if approval.status == 'pending' and _approval_is_expired(approval):
-        approval.status = 'expired'
-        approval.resolved_at = utc_now()
-        safe_commit(logger, "Failed to expire request")
+        _expire_request(approval, notify=False)
     return success_response(data=approval.to_dict())
 
 
 @bp.route('/api/v2/approvals/<int:request_id>/approve', methods=['POST'])
 @require_auth(['write:approvals'])
 def approve_request(request_id):
-    """Approve a request — triggers certificate issuance if fully approved.
+    """Approve a request — triggers certificate issuance if fully approved."""
+    return approve_approval_request(request_id, (request.get_json(silent=True) or {}).get('comment'))
+
+
+def approve_approval_request(request_id, comment=None):
+    """Record the current user's approval of a request (also reached from
+    the SCEP queue for a request a policy holds).
 
     Race-safe: takes a row-level lock on the approval (Postgres SELECT
     ... FOR UPDATE; harmless no-op on SQLite which serialises writes
@@ -1255,7 +1291,6 @@ def approve_request(request_id):
       * one vote per user (idempotency for double-clicks / multiple tabs)
       * single issuance via approval.certificate_id sentinel
     """
-    data = request.get_json() or {}
     user = g.current_user if hasattr(g, 'current_user') else None
     user_id = getattr(user, 'id', None)
     username = getattr(user, 'username', None) or 'system'
@@ -1277,9 +1312,7 @@ def approve_request(request_id):
 
     # Auto-expire if past expiry
     if _approval_is_expired(approval):
-        approval.status = 'expired'
-        approval.resolved_at = utc_now()
-        safe_commit(logger, "Failed to expire request")
+        _expire_request(approval)
         return error_response("Request has expired", 410)
 
     # Group-membership gate: enforce policy.approval_group_id
@@ -1309,7 +1342,7 @@ def approve_request(request_id):
         user_id=user_id,
         username=username,
         action='approve',
-        comment=data.get('comment'),
+        comment=comment,
     )
 
     # Issue the certificate inside the SAME transaction so the row
@@ -1327,6 +1360,7 @@ def approve_request(request_id):
                          exc_info=True)
             from services.policy_service import PolicyViolation
             from services.cert.renewal import RenewalError
+            from services.protocol_approval import GENERIC_ISSUE_ERROR, is_key_material_error
             from utils.custom_extensions import TemplateConfigError
             if isinstance(e, PolicyViolation):
                 issue_error = str(e) if str(e).startswith('Policy violation:') else f'Policy violation: {e}'
@@ -1336,16 +1370,14 @@ def approve_request(request_id):
                 issue_error = str(e)
             elif isinstance(e, RuntimeError) and 'already issued' in str(e):
                 issue_error = 'A certificate was already issued for this request by another approver; reload it'
-            elif isinstance(e, ValueError) and not any(
-                marker in str(e) for marker in ('signing key', 'KEY_ENCRYPTION_KEY', 'HSM')
-            ):
+            elif isinstance(e, ValueError) and not is_key_material_error(e):
                 # The issuance service's own refusals (CA offline, validity
                 # past the CA, template gone...): the approver needs the
                 # reason to know what to fix before retrying. Key-material
                 # failures stay generic, as on the direct route.
                 issue_error = str(e)
             else:
-                issue_error = 'Certificate issuance failed. Check server logs.'
+                issue_error = GENERIC_ISSUE_ERROR
             db.session.rollback()
             # The rollback discarded the vote along with the failed
             # issuance, and that is the point: the request stays pending so
@@ -1367,9 +1399,11 @@ def approve_request(request_id):
                     success=False,
                 )
                 return error_response(f"Request is already {approval.status}", 400)
-            if isinstance(e, ValueError) and 'no longer exists' in str(e):
-                # The target went away during the vote: closed now rather
-                # than left pending until it expires
+            from services.protocol_approval import ProtocolRequestGone, record_refusal
+            if isinstance(e, ProtocolRequestGone) or (
+                    isinstance(e, ValueError) and 'no longer exists' in str(e)):
+                # The target went away or its protocol refused it: closed now
+                record_refusal(approval, e)
                 return _close_request_target_gone(approval, issue_error, user_id, username)
 
     ok, _err = safe_commit(logger, "Failed to approve request")
@@ -1395,7 +1429,11 @@ def approve_request(request_id):
         from services.webhook_service import emit_csr_approved
         emit_csr_approved(result)
 
-    if issued_cert is not None:
+    if issued_cert is not None and issued_cert.get('deferred'):
+        # Approved only: the protocol issues when its client comes back
+        result['certificate_issued'] = False
+        result['deferred'] = True
+    elif issued_cert is not None:
         result['certificate'] = issued_cert
         result['certificate_issued'] = True
         if issued_cert.get('already_issued'):
@@ -1415,12 +1453,16 @@ def approve_request(request_id):
 @require_auth(['write:approvals'])
 def reject_request(request_id):
     """Reject a request (race-safe, single vote per user)"""
-    data = request.get_json() or {}
+    return reject_approval_request(request_id, (request.get_json(silent=True) or {}).get('comment'))
+
+
+def reject_approval_request(request_id, comment):
+    """Record the current user's rejection of a request, with its reason."""
     user = g.current_user if hasattr(g, 'current_user') else None
     user_id = getattr(user, 'id', None)
     username = getattr(user, 'username', None) or 'system'
 
-    if not data.get('comment'):
+    if not comment:
         return error_response("Rejection reason is required", 400)
 
     db.session.expire_all()
@@ -1437,9 +1479,7 @@ def reject_request(request_id):
         return error_response(f"Request is already {approval.status}", 400)
 
     if _approval_is_expired(approval):
-        approval.status = 'expired'
-        approval.resolved_at = utc_now()
-        safe_commit(logger, "Failed to expire request")
+        _expire_request(approval)
         return error_response("Request has expired", 410)
 
     allowed, reason = _user_can_act_on_approval(user, approval)
@@ -1455,7 +1495,7 @@ def reject_request(request_id):
         user_id=user_id,
         username=username,
         action='reject',
-        comment=data.get('comment'),
+        comment=comment,
     )
 
     ok, _err = safe_commit(logger, "Failed to reject request")
@@ -1464,8 +1504,10 @@ def reject_request(request_id):
 
     result = approval.to_dict()
     if approval.status == 'rejected':
+        from services.protocol_approval import propagate_closed
+        propagate_closed([approval])
         from services.webhook_service import emit_csr_rejected
-        emit_csr_rejected(result, reason=data.get('comment'), actor=username)
+        emit_csr_rejected(result, reason=comment, actor=username)
 
     return success_response(data=result, message="Request rejected")
 

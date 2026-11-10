@@ -24,6 +24,7 @@ from models import Certificate
 from services.ca.ca_signing import AlreadySuperseded
 from services.ca_service import CAService
 from services.policy_service import PolicyViolation
+from services.protocol_approval import AlreadyIssued
 from utils.csr_extensions import extensions_of
 from utils.datetime_utils import utc_now
 from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
@@ -54,6 +55,30 @@ _DN_ATTR_OIDS = {
     'ST': NameOID.STATE_OR_PROVINCE_NAME,
     'C': NameOID.COUNTRY_NAME,
 }
+
+
+class HeldForApproval(Exception):
+    """A policy holds the request: ``approval`` is the request answering it
+    (pending, or decided and not yet delivered)."""
+
+    def __init__(self, approval):
+        super().__init__(f'Held for approval #{approval.id}')
+        self.approval = approval
+
+
+def _pass_gate(gate, csr, template, subject, san, signing_cert=None):
+    """None when *gate* lets the request through, else the error to answer;
+    raises :class:`HeldForApproval` when a policy holds it."""
+    if gate is None:
+        return None
+    from services.protocol_approval import ApprovalGateUnavailable
+    try:
+        approval = gate(csr=csr, template=template, subject=subject, san=san, signing_cert=signing_cert)
+    except ApprovalGateUnavailable:
+        return ServerError('Policy evaluation failed')
+    if approval is not None:
+        raise HeldForApproval(approval)
+    return None
 
 
 class ServerError(str):
@@ -960,7 +985,7 @@ def _user_directory_subject(sam_account_name):
 
 
 def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos_principal=None,
-          outer_signed_data=None):
+          outer_signed_data=None, gate=None, on_stored=None):
     """UsernamePassword- or Kerberos-bound initial enrollment. Returns
     (cert_pem, error).
 
@@ -1135,6 +1160,12 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
                 return None, ServerError('The directory could not be reached to check enrollment rights')
             return None, 'Requester is not authorized to enroll against this template'
 
+    # The approval gate sees the subject and names the certificate will carry
+    err = _pass_gate(gate, csr, matched_template,
+                     override_subject if override_subject is not None else csr.subject, override_san)
+    if err:
+        return None, err
+
     cert_type, template_ku = _template_profile(matched_template, csr)
     try:
         cert_pem, _serial = CAService.sign_csr_from_crypto(
@@ -1153,7 +1184,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             template_ekus=_template_extra_ekus(matched_template) or None,
             policy_template_id=getattr(matched_template, 'id', None),
             template_id=getattr(matched_template, 'id', None),
-            cert_type=cert_type, template_key_usage=template_ku,
+            cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
         )
     except PolicyViolation as e:
         logger.warning('WSTEP issue refused by policy: %s', e)
@@ -1161,6 +1192,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     except RequestRejected as e:
         logger.warning('WSTEP issue refused: %s', e)
         return None, str(e)
+    except AlreadyIssued:
+        raise
     except Exception as e:
         logger.error('WSTEP issue failed: %s', e)
         return None, ServerError('Certificate issuance failed')
@@ -1169,7 +1202,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
 
 
 def renew(ca, csr_der, security_header, csr_element, validity_days, source='wstep', require_pop=True,
-          outer_signed_data=None, audit=None):
+          outer_signed_data=None, audit=None, gate=None):
     """Certificate-bound renewal: the RST is signed with the client's
     current certificate's private key. Returns (cert_pem, error).
 
@@ -1208,7 +1241,7 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
         err = _new_key_proof(csr, signing_cert, outer_signed_data)
         if err:
             return None, err
-    return _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop)
+    return _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop, gate=gate)
 
 
 def _new_key_proof(csr, renewed_cert, outer_signed_data):
@@ -1234,7 +1267,7 @@ def _new_key_proof(csr, renewed_cert, outer_signed_data):
 
 
 def renew_with_client_certificate(ca, client_cert_pem, csr_der, outer_signed_data, validity_days,
-                                  source='wstep', audit=None):
+                                  source='wstep', audit=None, gate=None):
     """Renewal on the Certificate binding as Windows sends it: authenticated by the
     TLS client certificate, which must also sign the CMS request (MS-WSTEP, RFC 5272).
     Returns (cert_pem, error); ``audit`` as in ``renew()``."""
@@ -1264,7 +1297,7 @@ def renew_with_client_certificate(ca, client_cert_pem, csr_der, outer_signed_dat
     err = _new_key_proof(csr, client_cert, outer_signed_data)
     if err:
         return None, err
-    return _sign_renewal(ca, client_cert, db_cert, csr, validity_days, source, require_pop=False)
+    return _sign_renewal(ca, client_cert, db_cert, csr, validity_days, source, require_pop=False, gate=gate)
 
 
 def _verify_renewal_signer(outer_signed_data, cert):
@@ -1339,7 +1372,8 @@ def _renewable_certificate(ca, cert):
     return db_cert, None
 
 
-def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop):
+def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop, gate=None,
+                  on_stored=None):
     """Issue the renewal once the caller has authenticated ``signing_cert``."""
     err = _validate_csr(csr, require_pop=require_pop)
     if err:
@@ -1357,6 +1391,10 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
     if matched_template is not None:
         template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(signing_cert))
 
+    err = _pass_gate(gate, csr, matched_template, csr.subject, None, signing_cert=signing_cert)
+    if err:
+        return None, err
+
     cert_type, template_ku = _template_profile(matched_template, csr)
     try:
         cert_pem, _serial = CAService.sign_csr_from_crypto(
@@ -1369,7 +1407,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
             template_ekus=issued_ekus,
             policy_template_id=getattr(matched_template, 'id', None),
             template_id=getattr(matched_template, 'id', None),
-            cert_type=cert_type, template_key_usage=template_ku,
+            cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
         )
     except AlreadySuperseded:
         return None, 'Signing certificate has been superseded by a newer one'
@@ -1379,6 +1417,8 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
     except RequestRejected as e:
         logger.warning('WSTEP renew refused: %s', e)
         return None, str(e)
+    except AlreadyIssued:
+        raise
     except Exception as e:
         logger.error('WSTEP renew failed: %s', e)
         return None, ServerError('Certificate renewal failed')
