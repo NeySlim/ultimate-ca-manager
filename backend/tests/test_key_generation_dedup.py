@@ -73,11 +73,10 @@ def test_issue_refusals_happen_before_generation(args):
 # ---------------------------------------------------------------------------
 
 def _old_tsa_generate_key(key_type, key_size, curve):
-    from services.tsa_signer_cert import (default_key_size, DEFAULT_KEY_TYPE,
-                                          TsaSignerIssueError)
+    from services.tsa_signer_cert import DEFAULT_KEY_TYPE, TsaSignerIssueError
     try:
         normalized = parse_issue_key_type(key_type or DEFAULT_KEY_TYPE,
-                                          key_size or default_key_size(), curve=curve)
+                                          key_size or '3072', curve=curve)
     except ValueError as exc:
         raise TsaSignerIssueError(str(exc), 400)
     return _old_issue_cascade(normalized)
