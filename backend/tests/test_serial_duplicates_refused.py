@@ -145,6 +145,32 @@ def test_a_pending_serial_index_is_logged_at_start_and_shown_by_health(app, clie
     assert 'serial_unique_index_pending' not in client.get('/health').get_json()
 
 
+def test_the_start_warning_names_the_rows_and_still_reads_an_entry_stored_without_them(app, caplog):
+    import json
+    import logging
+    from models import SystemConfig
+    from utils.serial_duplicates import PENDING_KEY, check_pending_serial_index
+    entries = [{'caref': 'ca-a', 'serial_number': '11', 'count': 2,
+                'rows': [{'id': 41, 'stored': '11'}, {'id': 57, 'stored': 'b'}]},
+               {'caref': 'ca-z', 'serial_number': '7', 'count': 2}]
+    with app.app_context():
+        SystemConfig.query.filter_by(key=PENDING_KEY).delete()
+        db.session.add(SystemConfig(key=PENDING_KEY, value=json.dumps({'duplicates': entries})))
+        db.session.commit()
+    try:
+        with caplog.at_level(logging.WARNING):
+            check_pending_serial_index(app)
+        warning = next(r.getMessage() for r in caplog.records if PENDING_KEY in r.getMessage())
+        assert "41 stored as '11'" in warning and "57 stored as 'b'" in warning
+        assert 'CA ca-z serial 7 x2' in warning
+        assert 'certificate ids and stored spellings' in warning
+    finally:
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PENDING_KEY).delete()
+            db.session.commit()
+        check_pending_serial_index(app)
+
+
 def test_every_start_checks_for_a_pending_serial_index(monkeypatch):
     from tests.fresh_app import fresh_app
     started = []
