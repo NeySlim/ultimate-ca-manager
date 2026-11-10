@@ -39,7 +39,7 @@ def _cluster():
 
 
 def _check_cluster():
-    """HA only: this node serves once its scheduler process registered it."""
+    """HA only: 503 until this node has ever registered; a row left by an earlier run counts."""
     from config.settings import Config
     try:
         from services.scheduler_leader import node_registered

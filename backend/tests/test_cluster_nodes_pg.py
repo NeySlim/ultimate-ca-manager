@@ -1,5 +1,5 @@
 """HA node registry: every scheduler process heartbeats, one row carries the leader flag,
-/health reports the cluster in HA only, readiness waits for this node's first heartbeat."""
+/health reports the cluster in HA only, readiness waits until this node has ever registered."""
 import secrets
 import time
 from datetime import timedelta
