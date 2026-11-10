@@ -111,6 +111,13 @@ def update_wstep_config():
                 400)
         set_config('wstep_validity_days', str(vd))
 
+    # HA: the restart is queued with the setting, or neither is saved
+    from utils.ha import ha_enabled
+    rolling = enabled_changed and ha_enabled()
+    if rolling:
+        from services.cluster_commands import RESTART, emit
+        emit(RESTART)
+
     ok, _err = safe_commit(logger, "Failed to update WSTEP configuration")
     if not ok:
         return _err
@@ -123,10 +130,12 @@ def update_wstep_config():
         success=True
     )
 
+    if rolling:
+        return success_response(message='WSTEP configuration saved. Rolling restart requested: '
+                                         'the nodes restart one at a time.')
     if enabled_changed:
         from config.settings import is_docker
-        from utils.ha import ha_enabled
-        if is_docker() and not ha_enabled():  # HA: each container exits in turn
+        if is_docker():
             return success_response(
                 message='WSTEP configuration saved. Restart the container to apply the TLS behavior change.',
                 data={'requires_container_restart': True},

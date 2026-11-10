@@ -129,6 +129,14 @@ def update_mtls_settings():
         _set_mtls_config('mtls_trusted_ca_id', ca_id)
         changes.append(f"trusted_ca_id={ca_id}")
 
+    # SSL context needs reload; HA: the restart is queued with the settings, or neither is saved
+    from utils.ha import ha_enabled
+    needs_restart = enabled is not None or required is not None or ca_id is not None
+    rolling = needs_restart and ha_enabled()
+    if rolling:
+        from services.cluster_commands import RESTART, emit
+        emit(RESTART)
+
     ok, _err = safe_commit(logger, "Failed to update mTLS settings")
     if not ok:
         return _err
@@ -141,12 +149,12 @@ def update_mtls_settings():
         success=True
     )
 
-    # Trigger restart if mTLS config changed (SSL context needs reload)
-    needs_restart = enabled is not None or required is not None or ca_id is not None
     restart_message = None
-    if needs_restart:
-        from utils.ha import ha_enabled
-        if is_docker() and not ha_enabled():  # HA: each container exits in turn
+    if rolling:
+        from services.cluster_commands import ROLLING_RESTART_MESSAGE
+        restart_message = ROLLING_RESTART_MESSAGE
+    elif needs_restart:
+        if is_docker():
             restart_message = 'Restart the container to apply mTLS changes.'
         else:
             success, msg = restart_ucm_service()

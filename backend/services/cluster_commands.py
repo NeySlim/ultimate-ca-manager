@@ -83,10 +83,13 @@ def emit_committed(kind, payload=None, target=None) -> bool:
         return False
 
 
+ROLLING_RESTART_MESSAGE = "Rolling restart requested: the nodes restart one at a time"
+
+
 def request_restart():
     """HA side of restart_service(): every node restarts, one at a time."""
     if emit_committed(RESTART):
-        return True, "Rolling restart requested: the nodes restart one at a time"
+        return True, ROLLING_RESTART_MESSAGE
     return False, "The rolling restart could not be requested"
 
 
