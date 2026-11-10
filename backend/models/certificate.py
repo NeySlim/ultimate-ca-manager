@@ -523,8 +523,8 @@ def sig_hash_for_certificate(cert):
 
 @event.listens_for(Certificate.crt, 'set')
 def _key_fields_follow_crt(target, value, oldvalue, initiator):
-    # Every issuance path sets crt; key_algo (sorting, compliance) and the
-    # AKI/SKI columns (ACME ARI, chain lookups) follow it
+    # Every issuance path sets crt; key_algo, key_bits, sig_hash (sorting, compliance)
+    # and the AKI/SKI columns (ACME ARI, chain lookups) follow it
     if not value:
         return
     import base64
@@ -536,8 +536,10 @@ def _key_fields_follow_crt(target, value, oldvalue, initiator):
         return
     try:
         target.key_algo = key_algo_for_certificate(cert) or target.key_algo
+        target.key_bits = key_bits_for_certificate(cert)
     except Exception:
         pass
+    target.sig_hash = sig_hash_for_certificate(cert)
     try:
         target.aki = authority_key_identifier_hex(cert)
         target.ski = cert.extensions.get_extension_for_class(
