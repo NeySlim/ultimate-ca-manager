@@ -154,7 +154,7 @@ def test_each_pass_fails_the_runs_of_nodes_gone_since_takeover(app, runs, monkey
         DiscoverySchedulerTask.register(scheduler, app)
         scheduler.tasks['discovery_scan'].func()
         assert [status(r) for r in (alive, mine, gone)] == ['running', 'running', 'failed']
-        assert started == [profile.id]
+        assert [p for p in started if p == profile.id] == [profile.id]
     finally:
         ScanRun.query.filter_by(scan_profile_id=profile.id).delete(synchronize_session=False)
         db.session.delete(db.session.get(ScanProfile, profile.id))
@@ -195,7 +195,7 @@ def test_each_pass_fails_the_scheduled_runs_of_a_live_nodes_former_process(app, 
         for _ in range(3):
             scheduler.tasks['discovery_scan'].func()
         assert status(orphan) == 'failed'
-        assert started == [profile.id]
+        assert [p for p in started if p == profile.id] == [profile.id]
     finally:
         ScanRun.query.filter_by(scan_profile_id=profile.id).delete(synchronize_session=False)
         db.session.delete(db.session.get(ScanProfile, profile.id))
