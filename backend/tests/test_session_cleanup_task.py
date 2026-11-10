@@ -10,16 +10,22 @@ from models import db
 from services.session_cleanup_task import SessionCleanupTask
 
 
+def _flask_sessions_table():
+    """Flask-Session 0.8's table shape, built apart from migration 138 (a no-op on SQLite)."""
+    from sqlalchemy import Column, DateTime, Integer, LargeBinary, MetaData, String, Table
+    return Table('flask_sessions', MetaData(),
+                 Column('id', Integer, primary_key=True),
+                 Column('session_id', String(255), unique=True),
+                 Column('data', LargeBinary), Column('expiry', DateTime))
+
+
 @pytest.fixture
 def sql_store(app, monkeypatch):
     """The test database with the Flask-Session table, the SQL store selected."""
-    import importlib
     monkeypatch.setitem(app.config, 'SESSION_TYPE', 'sqlalchemy')
     monkeypatch.setitem(app.config, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions')
     with app.app_context():
-        raw = db.engine.raw_connection()
-        importlib.import_module('migrations.138_flask_sessions').upgrade(raw.driver_connection)
-        raw.close()
+        _flask_sessions_table().create(db.engine, checkfirst=True)
         db.session.execute(text('DELETE FROM flask_sessions'))
         db.session.commit()
     yield
@@ -29,7 +35,6 @@ def sql_store(app, monkeypatch):
         db.session.commit()
 
 
-@pytest.mark.sqlite_only(reason='builds the table through the SQLite migration path')
 def test_sql_store_drops_only_expired_rows(app, sql_store):
     now = datetime.utcnow()
     with app.app_context():

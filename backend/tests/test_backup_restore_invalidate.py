@@ -132,7 +132,6 @@ class TestSessionFilesAreRemoved:
         assert result['caches_cleared']
 
 
-@pytest.mark.sqlite_only(reason='builds the session table through the SQLite migration path')
 class TestSqlSessionStoreIsEmptied:
     """With the SQL store the rows are the sessions: all of them die."""
 
