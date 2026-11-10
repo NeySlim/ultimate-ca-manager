@@ -212,3 +212,37 @@ def test_a_ca_revoked_while_held_closes_the_request(app, auth_client, scep_ca):
                 db.session.get(CA, scep_ca).revoked = False
                 db.session.commit()
         assert _poll(app, scep_ca, identity) == FAILURE
+
+
+def test_an_expiry_not_yet_swept_fails_the_poll(app, scep_ca):
+    """The poll reads the approval: past its deadline, it is expired on the
+    way and the client hears FAILURE without waiting for the hourly sweep."""
+    from datetime import timedelta
+    from models.policy import ApprovalRequest
+    from utils.datetime_utils import utc_now
+    identity = _client_identity('scep late unswept')
+    with approval_policy(app, scep_ca, 'scep-held-lazy-expire') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        with app.app_context():
+            db.session.get(ApprovalRequest, approval_id).expires_at = utc_now() - timedelta(minutes=1)
+            db.session.commit()
+        assert _poll(app, scep_ca, identity) == FAILURE
+        assert requests_of(app, pid, 'scep_request')[0][1] == 'expired'
+        assert _scep_row(app, scep_ca)[1] == 'rejected'
+
+
+def test_a_rejection_whose_echo_was_lost_fails_the_poll(app, scep_ca):
+    """A rejection recorded while its echo to the SCEP request failed is
+    carried over when the client polls."""
+    from models.policy import ApprovalRequest
+    identity = _client_identity('scep echo lost')
+    with approval_policy(app, scep_ca, 'scep-held-echo-lost') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        with app.app_context():
+            db.session.get(ApprovalRequest, approval_id).status = 'rejected'
+            db.session.commit()
+        assert _scep_row(app, scep_ca)[1] == 'pending'
+        assert _poll(app, scep_ca, identity) == FAILURE
+        assert _scep_row(app, scep_ca)[1] == 'rejected'
