@@ -37,6 +37,15 @@ _LABELS = {'acme': 'ACME', 'est': 'EST', 'scep': 'SCEP', 'wstep': 'WSTEP'}
 _ANSWERING = ('pending', 'approved', 'rejected')
 
 
+# Failures of the server's own key material: their text stays in the logs
+_KEY_MATERIAL_MARKERS = ('signing key', 'KEY_ENCRYPTION_KEY', 'HSM')
+GENERIC_ISSUE_ERROR = 'Certificate issuance failed. Check server logs.'
+
+
+def is_key_material_error(text) -> bool:
+    return any(marker in str(text or '') for marker in _KEY_MATERIAL_MARKERS)
+
+
 class ApprovalGateUnavailable(Exception):
     """The policies could not be evaluated: the caller must not issue."""
 

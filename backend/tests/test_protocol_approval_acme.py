@@ -246,3 +246,28 @@ def test_a_profile_withdrawn_while_held_closes_the_request(app, client, auth_cli
         read = _read(client, account, order_id).get_json()
         assert read['status'] == 'invalid'
         assert read['error']['type'] == 'urn:ietf:params:acme:error:invalidProfile'
+
+
+def test_a_key_material_refusal_reaches_nobody_raw(app, client, auth_client, acme_ca, monkeypatch):
+    from services.acme.mixins.issuance import IssuanceMixin
+    from models.policy import ApprovalRequest
+    generic = 'Certificate issuance failed. Check server logs.'
+
+    def refuse(self, order, csr_pem, ca_refid):
+        self._last_signing_exception = ValueError('KEY_ENCRYPTION_KEY rejected for /secret/path')
+        return False, None, 'KEY_ENCRYPTION_KEY rejected for /secret/path'
+    with approval_policy(app, acme_ca[0], 'acme-held-kek') as pid:
+        account, order_id, _r = _held(app, client, acme_ca)
+        (approval_id, *_), = requests_of(app, pid, 'acme_order')
+        monkeypatch.setattr(IssuanceMixin, '_sign_certificate_with_ca', refuse)
+        monkeypatch.setattr(IssuanceMixin, '_is_request_failure', lambda self, e: True)
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.status_code == 200, r.get_json()
+        assert r.get_json()['data']['issue_error'] == generic
+        read = _read(client, account, order_id).get_json()
+        assert read['status'] == 'invalid'
+        assert read['error']['detail'] == generic
+        with app.app_context():
+            row = db.session.get(ApprovalRequest, approval_id)
+            assert [v.get('comment') for v in row.get_approvals()] == [generic]
+            assert 'KEY_ENCRYPTION_KEY' not in (row.request_data or '')

@@ -64,6 +64,11 @@ def _issue(approval, data):
             raise ValueError(error)
         # Nothing is committed here: the approval route rolls the vote back
         # and closes the request, whose closed handler invalidates the order
+        if protocol_approval.is_key_material_error(error):
+            # One sanitized text for the order, the vote, the audit and the webhook
+            logger.error("ACME order %s refused at approval: %s", order_id, error)
+            generic = protocol_approval.GENERIC_ISSUE_ERROR
+            raise ProtocolRequestGone(generic, refusal={'type': error_type, 'detail': generic})
         raise ProtocolRequestGone(f'The ACME order was refused: {error}',
                                   refusal={'type': error_type, 'detail': error})
     order = AcmeOrder.query.filter_by(order_id=order_id).first()
