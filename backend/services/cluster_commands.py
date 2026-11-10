@@ -20,12 +20,11 @@ logger = logging.getLogger(__name__)
 
 RELOAD_RATE_LIMITS = 'reload_rate_limits'
 RELOAD_SYSLOG = 'reload_syslog'
-INVALIDATE_PASSWORD_POLICY = 'invalidate_password_policy'
 RELOAD_ADMIN_ALLOWLIST = 'reload_admin_allowlist'
-RELOAD_ENCRYPTION = 'reload_encryption'
 RESTART = 'restart'
-KINDS = frozenset({RELOAD_RATE_LIMITS, RELOAD_SYSLOG, INVALIDATE_PASSWORD_POLICY,
-                   RELOAD_ADMIN_ALLOWLIST, RELOAD_ENCRYPTION, RESTART})
+# No password policy kind (read from the database on every check) and no encryption kind
+# (enabling or rotating encryption is refused in HA until key envelopes ship)
+KINDS = frozenset({RELOAD_RATE_LIMITS, RELOAD_SYSLOG, RELOAD_ADMIN_ALLOWLIST, RESTART})
 
 TICK_SECONDS = 2.0
 # A missing id below a newer one is a transaction still committing (or rolled back): wait this long
@@ -142,29 +141,15 @@ def _reload_syslog(payload):
     syslog_forwarder.load_from_db()
 
 
-def _invalidate_password_policy(payload):
-    """The policy is read from the database on every check: no process holds a copy."""
-
-
 def _reload_admin_allowlist(payload):
     from utils import admin_allowlist
     admin_allowlist.invalidate_cache()
 
 
-def _reload_encryption(payload):
-    from flask import current_app
-    from security import encryption
-    encryption.key_encryption.reload()
-    current_app.config['SAFE_MODE'] = (not encryption.key_encryption.is_enabled
-                                       and encryption.has_encrypted_keys_in_db())
-
-
 HANDLERS = {
     RELOAD_RATE_LIMITS: _reload_rate_limits,
     RELOAD_SYSLOG: _reload_syslog,
-    INVALIDATE_PASSWORD_POLICY: _invalidate_password_policy,
     RELOAD_ADMIN_ALLOWLIST: _reload_admin_allowlist,
-    RELOAD_ENCRYPTION: _reload_encryption,
 }
 
 
