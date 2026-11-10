@@ -279,6 +279,9 @@ def test_effective_route_announces_the_default_key_of_the_ca_and_template(app, a
         assert _effective(auth_client, ca_id=ca['id'], template_id=tpl_id)['default_key_type'] == 'EC-P256'
     finally:
         _drop_policy(app, pid)
+        with app.app_context():
+            CertificateTemplate.query.filter_by(id=tpl_id).delete()
+            db.session.commit()
 
 
 def test_effective_route_with_no_candidate_gives_a_readable_error_not_a_key(app, auth_client, create_ca):
