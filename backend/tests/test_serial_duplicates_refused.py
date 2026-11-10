@@ -164,7 +164,8 @@ def pending_flag(app):
 
 
 @pytest.mark.parametrize('before', [None, '{"duplicates": [{"caref": "ca-k", "serial_number": "5", "count": 2}]}'])
-def test_the_pending_flag_fixture_puts_back_what_it_found(app, before):
+def test_the_pending_flag_fixture_puts_back_what_it_found(app, before, pending_flag):
+    # The outer fixture puts back the row of the shared database once this test has replaced it
     from models import SystemConfig
     from utils.serial_duplicates import PENDING_KEY
 

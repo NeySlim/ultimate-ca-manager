@@ -14,7 +14,7 @@ from fips_mode import FipsRestricted
 from services.backup.decrypt_mixin import BackupDecryptionError
 from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.restore.plan import RestoreValidationError
-from services.backup.restore_report import restore_audit_details
+from services.backup.restore_report import safe_restore_audit_details
 from services.backup.restore_completion import (
     record_failure, record_restore, request_restart, restore_message)
 from services.database_admin.lock import (
@@ -251,7 +251,7 @@ def restore_backup():
                 action='system_restore',
                 resource_type='system',
                 resource_name=file.filename,
-                details=restore_audit_details(file.filename, results),
+                details=safe_restore_audit_details(file.filename, results),
                 success=True
             )
 

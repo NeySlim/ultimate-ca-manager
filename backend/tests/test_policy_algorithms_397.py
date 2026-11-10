@@ -27,7 +27,7 @@ CONTENT_JSON = 'application/json'
 
 
 def _forget_newer_than(floor):
-    """Delete the certificates, CA dependents (purge_ca_dependents) and policies of the CAs made after `floor`, then those CAs."""
+    """Delete the certificates newer than `floor`, then the dependents (purge_ca_dependents) and policies of the CAs newer than `floor`, then those CAs."""
     from services.deletion_blockers import purge_ca_dependents
     cas = CA.query.filter(CA.id > floor[CA]).all()
     ca_ids = [row.id for row in cas]

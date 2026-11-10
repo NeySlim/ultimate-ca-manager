@@ -70,8 +70,12 @@ def plan(cert_rows, revoked_rows):
     pending = [{'caref': caref, 'serial_number': serial, 'count': len(ids), 'rows': stored_rows(ids, raw)}
                for (caref, serial), ids in shared.items()]
     # A waiting row is listed with the rows of its CA that keep the spelling it waits for
+    spelled = {}
+    if waiting:
+        for i, text in raw.items():
+            spelled.setdefault((ca[i], text), []).append(i)
     pending += [{'caref': ca[row_id], 'serial_number': raw[row_id], 'count': 1, 'waits_for': new,
-                 'rows': stored_rows([row_id] + [i for i in raw if ca[i] == ca[row_id] and raw[i] == new], raw)}
+                 'rows': stored_rows([row_id] + spelled.get((ca[row_id], new), []), raw)}
                 for row_id, new in waiting.items()]
     pending.sort(key=lambda d: (str(d['caref']), d['serial_number']))
     return cert_updates, revoked_updates, pending

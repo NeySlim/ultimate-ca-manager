@@ -13,7 +13,10 @@ def _count_statements(app, client):
     def hook(conn, cursor, statement, *rest):
         seen.append(statement)
 
+    from utils.admin_allowlist import invalidate_cache
     with app.app_context():
+        # The allowlist cache expires after seconds: read on every counted request, never on one of two
+        invalidate_cache()
         event.listen(db.engine, 'before_cursor_execute', hook)
         try:
             response = client.get('/api/v2/cas')

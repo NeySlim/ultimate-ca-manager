@@ -5,7 +5,7 @@ System Backup Operations
 from services.backup import storage
 from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.restore.plan import RestoreValidationError
-from services.backup.restore_report import restore_audit_details, with_restore_warnings
+from services.backup.restore_report import safe_restore_audit_details, with_restore_warnings
 from services.database_admin.lock import (
     MigrationBusyError,
     database_migration_lock,
@@ -471,7 +471,7 @@ def restore_backup():
                 action='system_restore',
                 resource_type='system',
                 resource_name=file.filename,
-                details=restore_audit_details(file.filename, results),
+                details=safe_restore_audit_details(file.filename, results),
                 success=True,
             )
 

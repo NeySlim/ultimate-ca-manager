@@ -150,3 +150,11 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
     if not message:
         return message
     return message if message.endswith(('.', '?', '!')) else message + '.'
+
+
+def safe_restore_audit_details(filename: str, results: Dict[str, Any]) -> str:
+    """`restore_audit_details`, or a fixed line when it cannot be built: a committed restore is always audited."""
+    try:
+        return restore_audit_details(filename, results)
+    except Exception:
+        return 'Restored from backup'

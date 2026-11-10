@@ -184,3 +184,27 @@ def test_a_failure_after_the_restore_committed_leaves_no_failure_line(auth_clien
 
     assert response.status_code == 500
     assert [(c['action'], c['success']) for c in audit] == [('system_restore', True)]
+
+
+@pytest.mark.parametrize('route', RESTORE)
+def test_a_committed_restore_is_audited_even_when_its_details_cannot_be_built(auth_client, audit, monkeypatch, route):
+    from services.backup import restore_report
+    from services.backup.restore import invalidate
+    from services.backup_service import BackupService
+    import importlib
+    module = importlib.import_module('api.v2.system.backup' if route == RESTORE[0] else 'api.v2.settings.backup')
+
+    monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
+                        lambda self, *a, **k: {'sections_carried': ['users']})
+    monkeypatch.setattr(invalidate, 'invalidate_after_restore', lambda: 0)
+    monkeypatch.setattr(module, '_request_restart_after_restore' if route == RESTORE[0] else 'request_restart',
+                        lambda: (False, 'no'))
+
+    def boom(filename, results):
+        raise RuntimeError(LEAKY)
+    monkeypatch.setattr(restore_report, 'restore_audit_details', boom)
+
+    _restore(auth_client, route, _form())
+
+    assert [(c['action'], c['success']) for c in audit] == [('system_restore', True)]
+    assert LEAKY not in str(audit)
