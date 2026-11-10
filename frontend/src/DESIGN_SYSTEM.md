@@ -38,8 +38,9 @@ next write persists `atelier`.
 | `--grad-a` `--grad-b` `--glow` | Aurore gradient and halo (accent for the other families) |
 
 `themeContrast.test.js` enforces WCAG on all 8 palettes: 4.5:1 for text pairs,
-3:1 for `--accent`, `--control` and `--warn-fill` on `--bg`, and for the button
-`--on-accent` on the accent, good and bad gradients (and on `--grad-a`/`--grad-b` for Aurore), and `--text-tertiary` on `--bg` and `--panel`. `--line` is
+3:1 for `--accent`, `--control` and `--warn-fill` on `--bg`. All text is 4.5:1, `--on-accent`
+included (on the accent, good and bad gradients, and on `--grad-a`/`--grad-b` for Aurore), as is
+`--text-tertiary` on `--bg` and `--panel`. `--line` is
 decorative and exempt. `themeBaseline.test.js` pins every value in
 `styles/tokens.baseline.json`: change a value, update the baseline in the same
 commit (`UPDATE_THEME_BASELINE=1 npx vitest run src/lib/__tests__/themeBaseline.test.js`).
