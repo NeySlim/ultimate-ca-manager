@@ -60,3 +60,15 @@ def test_an_unknown_parameter_is_ignored(auth_client, param):
 
 def test_an_invalid_value_of_a_known_filter_is_refused(auth_client):
     assert auth_client.get('/api/v2/certificates', query_string={'renewal': 'nope'}).status_code == 400
+
+
+@pytest.mark.parametrize('param', ['key_bits_below', 'lifetime_over_days'])
+@pytest.mark.parametrize('value', ['1000001', str(10 ** 30)])
+def test_a_number_above_its_bound_is_refused(auth_client, param, value):
+    r = auth_client.get('/api/v2/certificates', query_string={'live': 'true', param: value})
+    assert r.status_code == 400, r.data
+
+
+@pytest.mark.parametrize('param,value', [('key_bits_below', '1000000'), ('lifetime_over_days', '100000')])
+def test_a_number_at_its_bound_is_accepted(auth_client, param, value):
+    assert auth_client.get('/api/v2/certificates', query_string={param: value}).status_code == 200

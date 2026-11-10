@@ -1984,9 +1984,9 @@ Certificates counted are issued, not revoked, not archived and not expired. A ce
 |-----------|---------|
 | `live=true` | issued, not revoked, not archived, not expired (the set the compliance counters are taken over) |
 | `key_algo` (repeatable) | exact `key_algo` value |
-| `key_algo_prefix`, `key_bits_below` | key family (`RSA`) and a size threshold; RSA below 3072 bits is `key_algo_prefix=RSA&key_bits_below=3072` |
+| `key_algo_prefix`, `key_bits_below` | key family (`RSA`) and a size threshold; RSA below 3072 bits is `key_algo_prefix=RSA&key_bits_below=3072`; `key_bits_below` from 0 to 1000000 |
 | `sig_hash` (repeatable) | signature hash |
-| `server=true`, `lifetime_over_days=N` | server certificate (type or `web_server` template), lifetime of more than N days |
+| `server=true`, `lifetime_over_days=N` | server certificate (type or `web_server` template), lifetime of more than N days, N from 0 to 100000 |
 | `no_key=true`, `incomplete_chain=true` | no stored private key; issuing CA unknown to this instance |
 | `renewal` (repeatable) | one of `manual_renewal_due`, `client_renewal_overdue`, `auto_renewal_blocked`, `renewal_declined`: the rows of that `queue` kind. `queue` returns `filter_hints` with this parameter for each |
 

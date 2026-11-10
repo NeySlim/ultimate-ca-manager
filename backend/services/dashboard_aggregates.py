@@ -518,6 +518,9 @@ def renewal_conditions(kind, now, config, dialect):
 
 
 _BOOL = ('1', 'true', 'yes')
+# Bounds keep a number inside what both backends bind and timedelta holds: beyond them, 400 and not 500
+MAX_KEY_BITS_FILTER = 1_000_000
+MAX_LIFETIME_DAYS_FILTER = 100_000
 LIST_FILTER_PARAMS = frozenset({'live', 'key_algo', 'key_algo_prefix', 'key_bits_below', 'sig_hash', 'server',
                                 'lifetime_over_days', 'no_key', 'incomplete_chain', 'renewal'})
 
@@ -527,14 +530,14 @@ def certificate_list_conditions(args, dialect, now=None):
     now = now or utc_now()
     conditions = []
 
-    def number(name):
+    def number(name, maximum):
         raw = args.get(name)
         try:
             value = int(raw)
         except (TypeError, ValueError):
             raise ValueError(f'{name} must be a whole number') from None
-        if value < 0:
-            raise ValueError(f'{name} must not be negative')
+        if not 0 <= value <= maximum:
+            raise ValueError(f'{name} must be between 0 and {maximum}')
         return value
 
     def flag(name):
@@ -561,11 +564,11 @@ def certificate_list_conditions(args, dialect, now=None):
             raise ValueError('key_algo_prefix must be alphanumeric')
         conditions.append(Certificate.key_algo.like(f'{prefix}%'))
     if 'key_bits_below' in args:
-        conditions.append(Certificate.key_bits < number('key_bits_below'))
+        conditions.append(Certificate.key_bits < number('key_bits_below', MAX_KEY_BITS_FILTER))
     if 'sig_hash' in args:
         conditions.append(weak_hash_condition(args.getlist('sig_hash')))
     if 'lifetime_over_days' in args:
-        conditions.append(lifetime_over_condition(dialect, number('lifetime_over_days')))
+        conditions.append(lifetime_over_condition(dialect, number('lifetime_over_days', MAX_LIFETIME_DAYS_FILTER)))
     if 'renewal' in args:
         kinds = args.getlist('renewal')
         bad = [k for k in kinds if k not in RENEWAL_KINDS]
