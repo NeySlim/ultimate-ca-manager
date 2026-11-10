@@ -1,30 +1,25 @@
 export default {
   helpContent: {
-    title: '仪表板',
-    subtitle: '系统概览与监控',
-    overview: '实时查看您的 PKI 基础设施。组件显示证书状态、到期告警、系统健康状况和最近活动。布局完全可自定义，支持拖放操作。',
+    title: 'Overview',
+    subtitle: 'What needs action, and the state of the PKI',
+    overview: 'Six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every counter that has a list opens the certificate list filtered to exactly the certificates it counts.',
     sections: [
       {
-        title: '组件',
+        title: 'Cards',
         items: [
-          { label: '统计数据', text: '证书总数（含已过期和已吊销）、CA、待处理 CSR 和 ACME 账户数量；存在 SSH CA 时还包括 SSH 证书' },
-          { label: '证书活动', text: '所选时段内每天签发、吊销和过期的证书' },
-          { label: '状态分布', text: '饼图展示：有效 / 即将到期 / 已过期 / 已吊销' },
-          { label: '即将到期', text: '最先到期的六张有效证书，不论日期远近；已配置的专用 TSA 签名者会带有 "TSA signer" 标记（v2.218）' },
-          { label: '系统状态', text: '服务健康：ACME、SCEP、EST、OCSP、CRL/CDP、TSA（v2.218）、自动续期、SMTP 和 Webhook。徽章会以醒目的琥珀色显示警告状态（TSA 签名者临近到期、SMTP 已配置但被禁用），悬停可查看其状态消息' },
-          { label: '最近活动', text: '系统中的最新操作记录' },
-          { label: '最近证书', text: '最近签发或导入的证书' },
-          { label: '证书颁发机构', text: '最新的 CA，每个标记为 Root 或 Sub' },
-          { label: 'ACME 账户', text: '已注册的 ACME 客户端账户' },
-          { label: '信任库到期', text: '最先到期的受信任证书' },
+          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record; a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
+          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state' },
+          { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state and the certificates each issued over 7 days; each authority opens its page' },
+          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
+          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
+          { label: 'Latest operations', text: 'The five most recent operations; with the audit permission, a link opens the whole trail' },
         ]
       },
     ],
     tips: [
-      '点击顶部的“编辑布局”，然后拖动组件以重新排列',
-      '点击顶部的“自定义”按钮（滑块图标），再点击组件旁的眼睛即可显示或隐藏',
-      '仪表板通过 WebSocket 实时更新:, 无需手动刷新',
-      '布局保存在此浏览器中，从该浏览器登录的所有账户共用',
+      'Pick the Operator, Manager or All cards preset in the header to choose which cards are shown',
+      'The layout is saved with your account and follows you across browsers',
+      'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
     ],
   },
   helpGuides: {

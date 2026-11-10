@@ -28,7 +28,12 @@ describe('overview layout', () => {
     expect([...layout.order].sort()).toEqual([...CARD_IDS].sort())
     expect(layout.hidden).toEqual(['queue'])
   })
+  it('a card id of an earlier layout is dropped, hidden or not', () => {
+    const layout = normalizeLayout({ order: ['issuance', 'queue'], hidden: ['expiry', 'authorities', 'health'] })
+    expect(layout.order).toEqual(['queue', ...CARD_IDS.filter((id) => id !== 'queue')])
+    expect(layout.hidden).toEqual(['health'])
+  })
   it('a preset shows its cards only', () => {
-    expect(visibleCards(presetLayout('manager', null)).sort()).toEqual(['authorities', 'compliance', 'expiry', 'issuance'])
+    expect(visibleCards(presetLayout('manager', null)).sort()).toEqual(['activity', 'compliance', 'hierarchy', 'horizon'])
   })
 })

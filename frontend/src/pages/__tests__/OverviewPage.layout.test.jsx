@@ -6,7 +6,7 @@ vi.mock('../../components', () => ({ Button: ({ children, ...p }) => <button {..
 vi.mock('../../components/overview', () => {
   const card = (id) => () => <div data-testid={`card-${id}`} />
   return { QueueCard: card('queue'), HealthCard: card('health'), ComplianceCard: card('compliance'),
-    IssuanceCard: card('issuance'), ExpiryCard: card('expiry'), AuthoritiesCard: card('authorities') }
+    HierarchyCard: card('hierarchy'), HorizonCard: card('horizon'), ActivityCard: card('activity') }
 })
 const store = vi.hoisted(() => ({ prefs: {}, persist: vi.fn(), listeners: new Set() }))
 vi.mock('../../stores/userPreferencesStore', () => ({
@@ -36,8 +36,8 @@ describe('OverviewPage', () => {
   })
 
   it('starts from the stored layout', () => {
-    store.prefs = { dashboard: { order: ['expiry'], hidden: ['queue', 'health', 'compliance', 'issuance', 'authorities'] } }
+    store.prefs = { dashboard: { order: ['horizon'], hidden: ['queue', 'health', 'compliance', 'hierarchy', 'activity'] } }
     render(<OverviewPage />)
-    expect(screen.getAllByTestId(/^card-/).map((e) => e.dataset.testid)).toEqual(['card-expiry'])
+    expect(screen.getAllByTestId(/^card-/).map((e) => e.dataset.testid)).toEqual(['card-horizon'])
   })
 })

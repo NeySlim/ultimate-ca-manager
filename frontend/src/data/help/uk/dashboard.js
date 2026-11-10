@@ -1,30 +1,25 @@
 export default {
   helpContent: {
-    title: 'Панель моніторингу',
-    subtitle: 'Огляд системи та моніторинг',
-    overview: 'Огляд інфраструктури PKI в реальному часі. Віджети відображають статус сертифікатів, сповіщення про закінчення терміну дії, стан системи та останню активність. Макет повністю налаштовується перетягуванням.',
+    title: 'Overview',
+    subtitle: 'What needs action, and the state of the PKI',
+    overview: 'Six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every counter that has a list opens the certificate list filtered to exactly the certificates it counts.',
     sections: [
       {
-        title: 'Віджети',
+        title: 'Cards',
         items: [
-          { label: 'Статистика', text: 'Усього сертифікатів (разом із простроченими та відкликаними), CA, очікуючих CSR і облікових записів ACME, а також SSH-сертифікати, якщо існує SSH CA' },
-          { label: 'Активність сертифікатів', text: 'Видані, відкликані та прострочені сертифікати за день у вибраному періоді' },
-          { label: 'Розподіл за статусом', text: 'Кругова діаграма: дійсні / закінчуються / прострочені / відкликані' },
-          { label: 'Найближче закінчення', text: 'Шість дійсних сертифікатів, що закінчуються найраніше, незалежно від дати; налаштований виділений підписувач TSA позначається чипом "TSA signer" (v2.218)' },
-          { label: 'Стан системи', text: 'Стан служб: ACME, SCEP, EST, OCSP, CRL/CDP, TSA (v2.218), автоматичне оновлення, SMTP і вебхуки. Значки мають окремий бурштиновий стан попередження (підписувач TSA, термін якого скоро закінчується; SMTP налаштовано, але вимкнено) і показують своє повідомлення про статус при наведенні' },
-          { label: 'Остання активність', text: 'Останні операції в системі' },
-          { label: 'Останні сертифікати', text: 'Нещодавно видані або імпортовані сертифікати' },
-          { label: 'Центри сертифікації', text: 'Останні CA, кожен позначений як Root або Sub' },
-          { label: 'Облікові записи ACME', text: 'Зареєстровані облікові записи клієнтів ACME' },
-          { label: 'Закінчення довіреного сховища', text: 'Довірені сертифікати, що закінчуються найраніше' },
+          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record; a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
+          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state' },
+          { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state and the certificates each issued over 7 days; each authority opens its page' },
+          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
+          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
+          { label: 'Latest operations', text: 'The five most recent operations; with the audit permission, a link opens the whole trail' },
         ]
       },
     ],
     tips: [
-      'Натисніть «Редагувати макет» у заголовку, потім перетягуйте віджети, щоб змінити їх розташування',
-      'Натисніть кнопку «Налаштувати панель» (значок повзунків) у заголовку, потім око біля віджета, щоб показати або приховати його',
-      'Панель оновлюється в реальному часі через WebSocket: ручне оновлення не потрібне',
-      'Макет зберігається в цьому браузері для кожного облікового запису, що входить із нього',
+      'Pick the Operator, Manager or All cards preset in the header to choose which cards are shown',
+      'The layout is saved with your account and follows you across browsers',
+      'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
     ],
   },
   helpGuides: {

@@ -5974,10 +5974,10 @@
     "cards": {
       "queue": "To handle",
       "health": "Automation health",
+      "hierarchy": "Hierarchy",
+      "horizon": "Expiry horizon",
       "compliance": "Compliance",
-      "issuance": "Issuance",
-      "expiry": "Expiry",
-      "authorities": "Authorities"
+      "activity": "Latest operations"
     },
     "state": {
       "loading": "Loading...",
@@ -6021,18 +6021,6 @@
       "scheduler": "Scheduler",
       "tasks": "Tasks"
     },
-    "issuance": {
-      "issued": "Issued",
-      "renewed": "Renewed",
-      "bySource": "By source",
-      "byCa": "By CA"
-    },
-    "expiry": {
-      "valid": "Valid",
-      "expiring": "Expiring",
-      "expired": "Expired",
-      "revoked": "Revoked"
-    },
     "filter": {
       "live": "Live",
       "key_algo": "Key algorithm",
@@ -6051,6 +6039,21 @@
       "client_renewal_overdue": "Client renewal overdue",
       "auto_renewal_blocked": "Auto-renewal blocked",
       "renewal_declined": "Renewal declined"
+    },
+    "hierarchy": {
+      "crlOn": "CRL on",
+      "crlOff": "CRL off",
+      "ocspOn": "OCSP on",
+      "ocspOff": "OCSP off",
+      "issued7d": "Issued, 7 days:"
+    },
+    "horizon": {
+      "expiring": "Expiring",
+      "expired": "Expired",
+      "soonest": "Next to expire"
+    },
+    "activity": {
+      "all": "See all"
     }
   }
 }

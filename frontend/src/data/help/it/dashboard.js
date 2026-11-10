@@ -1,30 +1,25 @@
 export default {
   helpContent: {
-    title: 'Dashboard',
-    subtitle: 'Panoramica del sistema e monitoraggio',
-    overview: 'Panoramica in tempo reale della tua infrastruttura PKI. I widget mostrano lo stato dei certificati, gli avvisi di scadenza, lo stato del sistema e le attività recenti. Il layout è completamente personalizzabile con il trascinamento.',
+    title: 'Overview',
+    subtitle: 'What needs action, and the state of the PKI',
+    overview: 'Six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every counter that has a list opens the certificate list filtered to exactly the certificates it counts.',
     sections: [
       {
-        title: 'Widget',
+        title: 'Cards',
         items: [
-          { label: 'Statistiche', text: 'Totale certificati (scaduti e revocati inclusi), CA, CSR in attesa e account ACME, più i certificati SSH quando esiste una CA SSH' },
-          { label: 'Attività certificati', text: 'Certificati emessi, revocati e scaduti per giorno nel periodo scelto' },
-          { label: 'Distribuzione stati', text: 'Grafico a torta: validi / in scadenza / scaduti / revocati' },
-          { label: 'Prossima scadenza', text: 'I sei certificati validi che scadono per primi, qualunque sia la data; il firmatario TSA dedicato configurato è contrassegnato con un chip "TSA signer" (v2.218)' },
-          { label: 'Stato del sistema', text: 'Stato dei servizi: ACME, SCEP, EST, OCSP, CRL/CDP, TSA (v2.218), rinnovo automatico, SMTP e webhook. I badge mostrano uno stato di avviso ambra distinto (firmatario TSA prossimo alla scadenza, SMTP configurato ma disabilitato) e il relativo messaggio di stato al passaggio del mouse' },
-          { label: 'Attività recente', text: 'Ultime operazioni eseguite nel sistema' },
-          { label: 'Certificati recenti', text: 'Certificati emessi o importati di recente' },
-          { label: 'Autorità di certificazione', text: 'Ultime CA, ciascuna contrassegnata Root o Sub' },
-          { label: 'Account ACME', text: 'Account client ACME registrati' },
-          { label: 'Scadenza trust store', text: 'Certificati attendibili che scadono per primi' },
+          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record; a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
+          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state' },
+          { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state and the certificates each issued over 7 days; each authority opens its page' },
+          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
+          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
+          { label: 'Latest operations', text: 'The five most recent operations; with the audit permission, a link opens the whole trail' },
         ]
       },
     ],
     tips: [
-      'Clicca Modifica layout nell\'intestazione, poi trascina i widget per riorganizzarli',
-      'Clicca il pulsante Personalizza (icona cursori) nell\'intestazione, poi l\'occhio accanto a un widget per mostrarlo o nasconderlo',
-      'La dashboard si aggiorna in tempo reale tramite WebSocket: non è necessario aggiornare manualmente',
-      'Il layout è salvato in questo browser, per ogni account che accede da esso',
+      'Pick the Operator, Manager or All cards preset in the header to choose which cards are shown',
+      'The layout is saved with your account and follows you across browsers',
+      'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
     ],
   },
   helpGuides: {

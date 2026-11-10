@@ -5,30 +5,37 @@ import { MemoryRouter } from 'react-router-dom'
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (k, o) => (o?.defaultValue ?? k) }) }))
 const api = vi.hoisted(() => ({
   getQueue: vi.fn(), getHealth: vi.fn(), getCompliance: vi.fn(), getIssuance: vi.fn(),
-  getStats: vi.fn(), getAll: vi.fn(),
+  getStats: vi.fn(), getAll: vi.fn(), getNext: vi.fn(), getActivity: vi.fn(), can: vi.fn(),
 }))
 vi.mock('../../../services', () => ({
   overviewService: { getQueue: api.getQueue, getHealth: api.getHealth, getCompliance: api.getCompliance, getIssuance: api.getIssuance },
   certificatesService: { getStats: api.getStats },
   casService: { getAll: api.getAll },
+  dashboardService: { getNextExpirations: api.getNext, getActivityLog: api.getActivity },
 }))
+vi.mock('../../../hooks/usePermission', () => ({ usePermission: () => ({ hasPermission: api.can }) }))
 
-import { QueueCard, ComplianceCard, HealthCard, IssuanceCard, ExpiryCard, AuthoritiesCard } from '..'
+import { QueueCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, ActivityCard } from '..'
 
 const show = (ui) => render(<MemoryRouter>{ui}</MemoryRouter>)
 const item = (i) => ({ kind: 'manual_renewal_due', tier: 'warning', id: i, label: `cert-${i}`, due_at: null, href_hint: `/certificates/${i}` })
 const error = (status) => Object.assign(new Error('x'), { status })
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  api.getIssuance.mockResolvedValue({ data: { by_ca: [] } })
+  api.getNext.mockResolvedValue({ data: [] })
+  api.can.mockReturnValue(true)
+})
 
 describe('card states', () => {
   const cases = [
     ['queue', QueueCard, api.getQueue, { items: [], counts: {}, total: 0 }],
     ['compliance', ComplianceCard, api.getCompliance, { total: 0, counters: {}, by_key_algorithm: [] }],
     ['health', HealthCard, api.getHealth, { protocols: {} }],
-    ['issuance', IssuanceCard, api.getIssuance, { total: 0, renewed: 0, by_ca: [], by_source: {} }],
-    ['expiry', ExpiryCard, api.getStats, { total: 0 }],
-    ['authorities', AuthoritiesCard, api.getAll, []],
+    ['hierarchy', HierarchyCard, api.getAll, []],
+    ['horizon', HorizonCard, api.getStats, { total: 0 }],
+    ['activity', ActivityCard, api.getActivity, { activity: [] }],
   ]
   it.each(cases)('%s: loading, empty, error with retry, missing permission', async (id, Card, fetcher, empty) => {
     fetcher.mockReturnValueOnce(new Promise(() => {}))
@@ -100,17 +107,15 @@ describe('compliance card', () => {
 })
 
 describe('missing figures read as a dash on every card', () => {
-  it('issuance, expiry, authorities', async () => {
-    api.getIssuance.mockResolvedValue({ data: { by_source: { acme: 1 } } })
+  it('hierarchy, horizon', async () => {
+    api.getIssuance.mockResolvedValue({ data: {} })
     api.getStats.mockResolvedValue({ data: { total: 4 } })
-    api.getAll.mockResolvedValue({ data: [{ id: 1, descr: 'Root' }], meta: {} })
-    const a = show(<IssuanceCard />)
-    expect((await screen.findByText('overview.issuance.issued')).parentElement.textContent).toContain('–')
+    api.getAll.mockResolvedValue({ data: [{ id: 1, refid: 'r', descr: 'Root' }], meta: {} })
+    const a = show(<HierarchyCard />)
+    expect((await screen.findByText('Root')).closest('a').textContent).toContain('overview.hierarchy.issued7d –')
+    expect(a.container.querySelector('a[href="/cas"]').textContent).toBe('–')
     a.unmount()
-    const b = show(<ExpiryCard />)
-    expect((await screen.findByText('overview.expiry.valid')).parentElement.textContent).toContain('–')
-    b.unmount()
-    show(<AuthoritiesCard />)
-    expect((await screen.findByText('Root')).closest('ul').parentElement.querySelector('a[href="/cas"]').textContent).toBe('–')
+    show(<HorizonCard />)
+    expect((await screen.findByText('overview.horizon.expiring')).parentElement.textContent).toContain('–')
   })
 })

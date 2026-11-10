@@ -1,8 +1,8 @@
 /** Overview card layout: default order, presets, and the stored preference (`dashboard` key). */
-export const CARD_IDS = ['queue', 'health', 'compliance', 'issuance', 'expiry', 'authorities']
+export const CARD_IDS = ['queue', 'health', 'hierarchy', 'horizon', 'compliance', 'activity']
 export const PRESETS = {
-  operator: ['queue', 'health', 'expiry', 'authorities'],
-  manager: ['compliance', 'expiry', 'authorities', 'issuance'],
+  operator: ['queue', 'health', 'hierarchy', 'horizon'],
+  manager: ['compliance', 'horizon', 'hierarchy', 'activity'],
   all: CARD_IDS,
 }
 

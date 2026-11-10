@@ -6,14 +6,14 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../components'
 import {
-  AuthoritiesCard, ComplianceCard, ExpiryCard, HealthCard, IssuanceCard, QueueCard,
+  ActivityCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, QueueCard,
 } from '../components/overview'
 import { getPreferences, persistPreference, subscribePreferences } from '../stores/userPreferencesStore'
 import { PRESETS, normalizeLayout, presetLayout, visibleCards } from '../lib/overviewLayout'
 
 const CARDS = {
-  queue: QueueCard, health: HealthCard, compliance: ComplianceCard,
-  issuance: IssuanceCard, expiry: ExpiryCard, authorities: AuthoritiesCard,
+  queue: QueueCard, health: HealthCard, hierarchy: HierarchyCard,
+  horizon: HorizonCard, compliance: ComplianceCard, activity: ActivityCard,
 }
 
 export default function OverviewPage() {
