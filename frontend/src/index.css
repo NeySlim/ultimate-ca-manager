@@ -1375,7 +1375,7 @@ input:focus, select:focus, textarea:focus {
   background: var(--gradient-primary);
   border: none;
   border-radius: 8px;
-  color: white;
+  color: var(--on-accent);
   font-weight: 500;
   position: relative;
   overflow: hidden;

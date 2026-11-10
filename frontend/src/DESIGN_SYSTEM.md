@@ -25,7 +25,7 @@ There are **4 theme families** × **2 modes**:
 A stored `gray` (localStorage or server preference) reads as `atelier`; the
 next write persists `atelier`.
 
-### The 20 tokens
+### The 21 tokens
 
 | Token | Role |
 |-------|------|
@@ -33,13 +33,13 @@ next write persists `atelier`.
 | `--text` `--muted` | Primary and secondary text |
 | `--line` | Decorative divider |
 | `--control` | Border of controls (3:1 on `--bg`) |
-| `--accent` `--selected` | Accent and selected-row background |
+| `--accent` `--selected` `--on-accent` | Accent, selected-row background, and the text colour on accent, good and bad button fills |
 | `--good` `--goodbg` `--warn` `--warn-fill` `--warnbg` `--bad` `--badbg` | Status text, tinted backgrounds, and the amber fill |
 | `--grad-a` `--grad-b` `--glow` | Aurore gradient and halo (accent for the other families) |
 
 `themeContrast.test.js` enforces WCAG on all 8 palettes: 4.5:1 for text pairs,
 3:1 for `--accent`, `--control` and `--warn-fill` on `--bg`, and for the button
-text on `--accent` (and on `--grad-a`/`--grad-b` for Aurore). `--line` is
+`--on-accent` on the accent, good and bad gradients (and on `--grad-a`/`--grad-b` for Aurore), and `--text-tertiary` on `--bg` and `--panel`. `--line` is
 decorative and exempt. `themeBaseline.test.js` pins every value in
 `styles/tokens.baseline.json`: change a value, update the baseline in the same
 commit (`UPDATE_THEME_BASELINE=1 npx vitest run src/lib/__tests__/themeBaseline.test.js`).
@@ -49,7 +49,7 @@ commit (`UPDATE_THEME_BASELINE=1 npx vitest run src/lib/__tests__/themeBaseline.
 The pre-Atelier names (`--bg-primary`, `--text-secondary`, `--accent-danger`,
 `--border`, `--detail-*`, `--icon-*`, `--gradient-*`, `--logo-gradient-*`…) are
 defined once in `tokens.css` from the tokens above, so existing pages keep
-rendering. New code uses the 20 tokens; an alias goes away when its last
+rendering. New code uses the 21 tokens; an alias goes away when its last
 consumer does. Icon hues, `--violet` and the logo gradient depend on the mode
 only, not on the family.
 

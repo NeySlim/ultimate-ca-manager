@@ -31,7 +31,7 @@ const themeFamilies = {
     accent: '#A855F7',
     swatch: {
       dark: { surface: '#301E47', accent: '#A855F7' },
-      light: { surface: '#E8DFF5', accent: '#9f44f6' },
+      light: { surface: '#E8DFF5', accent: '#9a3ff0' },
     },
   },
   sunset: {

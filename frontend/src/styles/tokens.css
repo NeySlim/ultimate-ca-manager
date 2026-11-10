@@ -1,5 +1,5 @@
 /*
- * Theme tokens: 17 colours + 3 Aurore extras (grad-a, grad-b, glow), one block
+ * Theme tokens: 18 colours + 3 Aurore extras (grad-a, grad-b, glow), one block
  * per family x mode, selected by data-theme / data-mode on <html>.
  * Bare :root is the fallback (Atelier, dark). Changing a value here means
  * updating tokens.baseline.json in the same commit.
@@ -17,6 +17,7 @@
   --line: #35465a;
   --control: #6f859e;
   --accent: #94bfff;
+  --on-accent: #11243f;
   --selected: #273f5b;
   --good: #8bd5b2;
   --goodbg: #203b33;
@@ -41,6 +42,7 @@
   --line: #cbd6e3;
   --control: #7b8fa6;
   --accent: #245bb1;
+  --on-accent: #ffffff;
   --selected: #e0ebfc;
   --good: #1c694c;
   --goodbg: #e6f4eb;
@@ -65,6 +67,7 @@
   --line: #262d47;
   --control: #6d77a3;
   --accent: #a5b4ff;
+  --on-accent: #0b0e17;
   --selected: #26305a;
   --good: #7ee8c3;
   --goodbg: #10332c;
@@ -89,6 +92,7 @@
   --line: #d3d8ea;
   --control: #717ba3;
   --accent: #3742bd;
+  --on-accent: #ffffff;
   --selected: #e4e7fb;
   --good: #145a3f;
   --goodbg: #e6f4eb;
@@ -113,6 +117,7 @@
   --line: #442b66;
   --control: color-mix(in srgb, var(--muted) 60%, var(--bg));
   --accent: #a855f7;
+  --on-accent: var(--bg);
   --selected: color-mix(in srgb, var(--accent) 22%, var(--bg));
   --good: #22c55e;
   --goodbg: color-mix(in srgb, var(--good) 16%, var(--bg));
@@ -136,7 +141,8 @@
   --muted: #6b21a8;
   --line: #d8b4fe;
   --control: color-mix(in srgb, var(--muted) 60%, var(--bg));
-  --accent: #9f44f6;
+  --accent: #9a3ff0;
+  --on-accent: #ffffff;
   --selected: color-mix(in srgb, var(--accent) 22%, var(--bg));
   --good: #126a32;
   --goodbg: color-mix(in srgb, var(--good) 16%, var(--bg));
@@ -145,9 +151,9 @@
   --warnbg: color-mix(in srgb, var(--warn) 16%, var(--bg));
   --bad: #b30a27;
   --badbg: color-mix(in srgb, var(--bad) 16%, var(--bg));
-  --grad-a: #9f44f6;
+  --grad-a: #9a3ff0;
   --grad-b: #ec4899;
-  --glow: rgba(159, 68, 246, 0.30);
+  --glow: rgba(154, 63, 240, 0.30);
 }
 
 :root[data-theme="sunset"][data-mode="dark"] {
@@ -161,6 +167,7 @@
   --line: #4d2815;
   --control: color-mix(in srgb, var(--muted) 60%, var(--bg));
   --accent: #f97316;
+  --on-accent: var(--bg);
   --selected: color-mix(in srgb, var(--accent) 22%, var(--bg));
   --good: #22c55e;
   --goodbg: color-mix(in srgb, var(--good) 16%, var(--bg));
@@ -185,6 +192,7 @@
   --line: #fdba74;
   --control: color-mix(in srgb, var(--muted) 65%, var(--bg));
   --accent: #cd4d0b;
+  --on-accent: #ffffff;
   --selected: color-mix(in srgb, var(--accent) 22%, var(--bg));
   --good: #126a32;
   --goodbg: color-mix(in srgb, var(--good) 16%, var(--bg));
@@ -209,7 +217,7 @@
   --bg-tertiary: var(--raised);
   --text-primary: var(--text);
   --text-secondary: var(--muted);
-  --text-tertiary: color-mix(in srgb, var(--muted) 70%, var(--bg));
+  --text-tertiary: var(--muted);
   --accent-primary: var(--accent);
   --accent-success: var(--good);
   --accent-warning: var(--warn);

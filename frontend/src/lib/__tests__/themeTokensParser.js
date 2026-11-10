@@ -10,7 +10,10 @@ export const MODES = ['dark', 'light']
 export const TOKEN_NAMES = [
   'bg', 'panel', 'raised', 'hover', 'text', 'muted', 'line', 'control', 'accent', 'selected',
   'good', 'goodbg', 'warn', 'warn-fill', 'warnbg', 'bad', 'badbg', 'grad-a', 'grad-b', 'glow',
+  'on-accent',
 ]
+// Compatibility aliases resolved against each palette (defined in the shared :root block).
+export const ALIAS_NAMES = ['text-tertiary']
 
 export function hexToRgb(hex) {
   const h = hex.replace('#', '')
@@ -52,6 +55,11 @@ function resolve(value, decls) {
 
 export function parseTokens(css = fs.readFileSync(TOKENS_CSS, 'utf8')) {
   const result = {}
+  const aliasDecls = {}
+  for (const block of css.matchAll(/(:root[^{]*)\{([^}]*)\}/g)) {
+    if (/data-theme/.test(block[1])) continue
+    for (const d of block[2].matchAll(/--([a-z-]+):\s*([^;]+);/g)) aliasDecls[d[1]] = d[2].trim()
+  }
   for (const block of css.matchAll(/(:root[^{]*)\{([^}]*)\}/g)) {
     const selectors = block[1]
     const decls = {}
@@ -64,6 +72,8 @@ export function parseTokens(css = fs.readFileSync(TOKENS_CSS, 'utf8')) {
       for (const name of TOKEN_NAMES) {
         resolved[name] = name === 'glow' ? decls[name] : resolve(decls[name], decls)
       }
+      const all = { ...aliasDecls, ...decls }
+      for (const name of ALIAS_NAMES) resolved[name] = resolve(all[name], all)
       result[`${m[1]}-${m[2]}`] = resolved
     }
   }

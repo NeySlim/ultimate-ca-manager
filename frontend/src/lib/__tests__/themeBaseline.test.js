@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest'
 import fs from 'fs'
 import path from 'path'
-import { parseTokens, TOKEN_NAMES } from './themeTokensParser'
+import { parseTokens, TOKEN_NAMES, ALIAS_NAMES } from './themeTokensParser'
 
 const BASELINE = path.resolve(__dirname, '../../styles/tokens.baseline.json')
 const tokens = parseTokens()
@@ -17,10 +17,10 @@ if (process.env.UPDATE_THEME_BASELINE) {
 const baseline = JSON.parse(fs.readFileSync(BASELINE, 'utf8'))
 
 describe('theme baseline', () => {
-  it('covers 8 palettes of 20 tokens', () => {
+  it('covers 8 palettes of 21 tokens and 1 alias', () => {
     expect(Object.keys(baseline)).toHaveLength(8)
     for (const palette of Object.values(baseline)) {
-      expect(Object.keys(palette).sort()).toEqual([...TOKEN_NAMES].sort())
+      expect(Object.keys(palette).sort()).toEqual([...TOKEN_NAMES, ...ALIAS_NAMES].sort())
     }
   })
 
