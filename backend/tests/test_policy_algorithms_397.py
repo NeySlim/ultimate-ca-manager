@@ -26,6 +26,16 @@ from tests.conftest import get_json
 CONTENT_JSON = 'application/json'
 
 
+def _forget_newer_than(floor):
+    """Rows pointing at a CA without ON DELETE CASCADE go first, or PostgreSQL refuses the delete."""
+    from models import CRLMetadata, OCSPResponse
+    ca_ids = [row.id for row in CA.query.filter(CA.id > floor[CA]).all()]
+    Certificate.query.filter(Certificate.id > floor[Certificate]).delete(synchronize_session=False)
+    for model in (OCSPResponse, CRLMetadata, CertificatePolicy):
+        model.query.filter(model.ca_id.in_(ca_ids)).delete(synchronize_session=False)
+    CA.query.filter(CA.id.in_(ca_ids)).delete(synchronize_session=False)
+
+
 @pytest.fixture(autouse=True, scope='module')
 def _forget_what_the_file_made(app):
     """The CAs and certificates the tests create stay behind: remove what is newer than the file."""
@@ -35,9 +45,7 @@ def _forget_what_the_file_made(app):
     yield
     with app.app_context():
         db.session.rollback()
-        # A certificate, then its CA: rows pointing at either are the tests' own and already dropped
-        Certificate.query.filter(Certificate.id > floor[Certificate]).delete(synchronize_session=False)
-        CA.query.filter(CA.id > floor[CA]).delete(synchronize_session=False)
+        _forget_newer_than(floor)
         db.session.commit()
 
 
@@ -590,3 +598,29 @@ class TestReviewFollowups:
                 if row:
                     db.session.delete(row)
                     db.session.commit()
+
+
+def test_cleanup_removes_a_ca_that_has_crl_and_ocsp_rows(app, create_ca):
+    """With foreign keys enforced (PostgreSQL always), the dependents must go before the CA."""
+    from models import CRLMetadata, OCSPResponse
+    from utils.datetime_utils import utc_now
+    sqlite = app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite')
+    with app.app_context():
+        floor = {m: db.session.query(db.func.max(m.id)).scalar() or 0 for m in (Certificate, CA)}
+    ca = create_ca(cn='cleanup-fk.policy.test')
+    with app.app_context():
+        now = utc_now()
+        db.session.add(CRLMetadata(ca_id=ca['id'], crl_number=1, this_update=now, next_update=now,
+                                   crl_pem='x', crl_der=b'x'))
+        db.session.add(OCSPResponse(ca_id=ca['id'], cert_serial='01', status='good',
+                                    response_der=b'x', this_update=now, next_update=now))
+        db.session.commit()
+        if sqlite:
+            db.session.execute(db.text('PRAGMA foreign_keys=ON'))
+        try:
+            _forget_newer_than(floor)
+            db.session.commit()
+        finally:
+            if sqlite:
+                db.session.execute(db.text('PRAGMA foreign_keys=OFF'))
+        assert CA.query.filter_by(id=ca['id']).count() == 0
