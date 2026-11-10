@@ -99,3 +99,13 @@ def test_restart_in_ha_writes_no_signal_file(monkeypatch, tmp_path):
     monkeypatch.setattr(Config, 'HA_MODE', False)
     ok, _ = settings.restart_ucm_service()
     assert ok is True and (tmp_path / '.restart_requested').exists()
+
+
+def test_env_key_with_master_key_file_warns_file_wins(ha_cfg, monkeypatch, tmp_path, caplog):
+    mk = tmp_path / 'master.key'
+    mk.write_text('x')
+    monkeypatch.setattr('security.encryption.MASTER_KEY_PATH', mk)
+    with caplog.at_level(logging.WARNING):
+        ha.validate_ha_config(Config)
+    assert 'master.key identity between nodes is not verified' in caplog.text
+    assert 'overrides KEY_ENCRYPTION_KEY' in caplog.text

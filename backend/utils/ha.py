@@ -21,11 +21,14 @@ def validate_ha_config(config=None):
         raise SystemExit("UCM_HA=1 requires a PostgreSQL DATABASE_URL (SQLite is single-node)")
     if not os.getenv('SECRET_KEY'):
         raise SystemExit("UCM_HA=1 requires SECRET_KEY set in the environment, identical on every node")
-    if not os.getenv('KEY_ENCRYPTION_KEY'):
-        from security.encryption import MASTER_KEY_PATH
-        if not MASTER_KEY_PATH.exists():
-            raise SystemExit("UCM_HA=1 requires KEY_ENCRYPTION_KEY set in the environment, identical on every node")
+    from security.encryption import MASTER_KEY_PATH
+    if MASTER_KEY_PATH.exists():
+        # The runtime reads master.key before KEY_ENCRYPTION_KEY.
         logger.warning("HA: master.key identity between nodes is not verified")
+        if os.getenv('KEY_ENCRYPTION_KEY'):
+            logger.warning("HA: the local master.key overrides KEY_ENCRYPTION_KEY on this node")
+    elif not os.getenv('KEY_ENCRYPTION_KEY'):
+        raise SystemExit("UCM_HA=1 requires KEY_ENCRYPTION_KEY set in the environment, identical on every node")
     if not redis_url():
         logger.warning("HA: filesystem sessions are not shared between nodes, see the sessions lot")
 
