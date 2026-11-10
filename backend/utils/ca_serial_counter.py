@@ -13,16 +13,19 @@ def next_ca_serial(ca) -> int:
     """Count one more issuance under *ca* in the current transaction; return the new count."""
     from models import CA, db
     table = CA.__table__
-    # A Core statement: no autoflush, the row lock (PostgreSQL) is held until the commit
+    # The row lock (PostgreSQL) is held until the commit
     bump = (update(table).where(table.c.id == ca.id)
             .values(serial=func.coalesce(table.c.serial, 0) + 1))
-    if not db.session.get_bind().dialect.update_returning:
-        # SQLite before 3.35: no RETURNING; the UPDATE holds the write lock until the commit
-        db.session.execute(bump)
-        count = db.session.execute(
-            select(table.c.serial).where(table.c.id == ca.id)).scalar_one()
-    else:
-        count = db.session.execute(bump.returning(table.c.serial)).scalar_one()
+    # SQLAlchemy 2.1 autoflushes before a Core statement too: the pending certificate
+    # is flushed by its caller, where a refused row is handled
+    with db.session.no_autoflush:
+        if not db.session.get_bind().dialect.update_returning:
+            # SQLite before 3.35: no RETURNING; the UPDATE holds the write lock until the commit
+            db.session.execute(bump)
+            count = db.session.execute(
+                select(table.c.serial).where(table.c.id == ca.id)).scalar_one()
+        else:
+            count = db.session.execute(bump.returning(table.c.serial)).scalar_one()
     set_committed_value(ca, 'serial', count)
     return count
 
