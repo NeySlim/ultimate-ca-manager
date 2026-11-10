@@ -237,3 +237,22 @@ def test_a_failed_key_generation_keeps_the_approval(app, client, auth_client, es
         monkeypatch.setattr(est, 'sign_est_csr', real)
         assert _post_csr(client, 'serverkeygen', csr, headers=_basic_auth()).status_code == 200
         assert [r[1] for r in requests_of(app, pid, 'est_enroll')] == ['approved']
+
+
+def test_reenrolment_approved_then_revoked_is_refused(app, client, auth_client, est_config):
+    from models import db
+    csr, key = _make_csr(common_name='renew-revoked.est-approval.test')
+    leaf = _cert_of(_enroll(client, csr))
+    client_pem = leaf.public_bytes(serialization.Encoding.PEM).decode()
+    renewal = x509.CertificateSigningRequestBuilder().subject_name(leaf.subject).sign(key, hashes.SHA256())
+    with approval_policy(app, est_config['id'], 'est-held-reenroll-revoked') as pid:
+        _held(_post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem))
+        (approval_id, *_), = requests_of(app, pid, 'est_enroll')
+        approve(auth_client, approval_id)
+        with app.app_context():
+            row = Certificate.query.filter_by(serial_number=str(leaf.serial_number)).first()
+            row.revoked = True
+            db.session.commit()
+        refused = _post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem)
+        assert refused.status_code == 403, refused.data
+        assert b'revoked' in refused.data

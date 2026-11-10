@@ -670,9 +670,7 @@ def _request_ref(ca, csr, operation, identity):
 
 
 def _approved_delivery(ca, csr, operation, identity):
-    """The certificate of an approved request not yet delivered, else None.
-    A re-enrolment approved meanwhile superseded the certificate the client
-    still presents: its answer is sought before that certificate is judged."""
+    """The certificate of an approved request not yet delivered, else None."""
     from services import protocol_approval
     from models import Certificate
     approval = protocol_approval.find_protocol_request('est', _request_ref(ca, csr, operation, identity))
@@ -921,13 +919,16 @@ def simple_reenroll(label=None):
             # client holds its key, not that the certificate may still act
             # (a revoked one, or one from another CA sharing the names,
             # used to be re-enrolled and even graced its EKUs and names)
-            delivered = _approved_delivery(ca, csr, 'reenroll', _est_identity(None))
-            if delivered is not None:
-                return delivered
             from services.cert.issued_lookup import (
                 OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
             )
             renewed_row, status = issued_certificate_status(ca, client_cert_obj)
+            # An approved re-enrolment superseded the certificate the client still
+            # presents: only that state lets its answer through, never a revocation
+            if status in (OK, SUPERSEDED):
+                delivered = _approved_delivery(ca, csr, 'reenroll', _est_identity(None))
+                if delivered is not None:
+                    return delivered
             if status != OK:
                 logger.warning(
                     'EST reenroll: client certificate refused (%s), serial=%s',
