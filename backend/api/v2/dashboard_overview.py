@@ -78,7 +78,8 @@ def get_compliance():
 @require_auth(['read:dashboard'])
 def get_issuance():
     """Per CA and per UTC day over ``days`` (1-90): ``issued`` by ``created_at`` and
-    ``renewed`` in place by ``renewed_at``; ``by_source`` and ``total`` count issuances."""
+    ``renewed`` in place by ``renewed_at`` (the last renewal of each certificate, counted
+    once however often it was renewed); ``by_source`` and ``total`` count issuances."""
     days = _days(ISSUANCE_MAX_DAYS)
     if days is None:
         return _days_error(ISSUANCE_MAX_DAYS)

@@ -1971,7 +1971,7 @@ Scope `read:dashboard`. A `days` outside its range is refused with 400.
 
 Certificates counted are issued, not revoked, not archived and not expired. `manual_renewal_due` leaves out what auto-renewal, the enrolling client (ACME, SCEP, EST, WSTEP without a stored key), UCM's ACME client or the delegated OCSP responder task renews, a declined renewal, and a certificate superseded by a live one beyond the 30 days with the same subject, DNS and IP SANs from the same CA.
 
-`health` gives per protocol (`acme`, `scep`, `est`, `scheduler`) one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) and the `basis` it is measured on. `compliance` counts the live certificates by key algorithm and weakness; each counter carries `filter_available` and, when true, a `filter_hint` that the certificate list reproduces exactly (none yet). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`), and the issuances per source.
+`health` gives per protocol (`acme`, `scep`, `est`, `scheduler`) one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) and the `basis` it is measured on. `compliance` counts the live certificates by key algorithm and weakness; each counter carries `filter_available` and, when true, a `filter_hint` that the certificate list reproduces exactly (none yet). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
 
 ### Get Stats Overview
 ```http

@@ -232,9 +232,9 @@ def _live_until(now, days):
 
 
 def _manual_renewal_conditions(now):
-    """Issued, live, inside the expiry window, left alone by auto-renewal (no stored
-    key, a source it skips, or auto-renewal off), not renewed by its own client
-    (protocol enrolment without a stored key, UCM's ACME client), and not superseded."""
+    """Issued, live, inside the expiry window, left alone by auto-renewal (no stored key, a
+    source it skips, or auto-renewal off). Excludes: a declined renewal, a delegated OCSP
+    responder (its own task), client-renewed sources and UCM's ACME client, a superseded one."""
     config = _renewal_config()
     skipped = [_no_key(), Certificate.source.is_(None), Certificate.source.notin_(config['renewal_sources'] or [''])]
     return [
@@ -497,8 +497,9 @@ def _per_ca_day(session, column, start):
 
 
 def issuance(session, days, now=None):
-    """Per CA and per UTC day, certificates issued (``created_at``) and renewed in
-    place (``renewed_at``); the total per source counts issuances only."""
+    """Per CA and per UTC day, certificates issued (``created_at``) and renewed in place
+    (``renewed_at``: the last renewal of each certificate, so one renewed several times in
+    the window counts once); the total per source counts issuances only."""
     now = now or utc_now()
     start, dates = _window(days, now)
     source = func.coalesce(Certificate.source, 'manual')
