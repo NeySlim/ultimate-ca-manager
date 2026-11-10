@@ -242,14 +242,14 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
             # Renewed alone and naming none: the row leaves its pair, as its certificate has
             from services.cert.related_pair import leave_pair
             leave_pair(staged_all[0]['cert'])
-        # A renewal is an issuance, counted in its commit; the CA row is locked last,
-        # after every certificate row written (members, rows unlinked from them)
+        # A renewal is an issuance, counted in its commit; the CA rows are locked last,
+        # after every certificate row written, and by id so two pairs never cross
         try:
             db.session.flush()
         except SQLAlchemyError as e:
             logger.error(f'Failed to renew certificate {cert.id}: {e}', exc_info=True)
             raise RenewalError('Failed to renew certificate', 500) from e
-        for s in staged_all:
+        for s in sorted(staged_all, key=lambda s: s['ca'].id):
             next_ca_serial(s['ca'])
     except Exception:
         db.session.rollback()

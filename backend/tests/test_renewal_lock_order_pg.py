@@ -472,3 +472,74 @@ def test_a_renewal_that_unlinks_a_row_and_its_in_place_renewal_do_not_deadlock(a
     assert blocked, errors
     assert errors == []
     assert count == 4
+
+
+def test_two_pairs_with_crossed_cas_renewed_together_do_not_deadlock(app, monkeypatch):
+    """Pair 1 has A under X and B under Y, pair 2 the reverse: each transaction takes
+    the CA rows by id, not in member order, or each holds the counter the other needs."""
+    from services.cert import renewal
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    with _a_schema_of_our_own(f'crossed_pairs_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            x, y = _ca_row(*_authority()), _ca_row(*_authority())
+            ids = {}
+            for pair, (first, second) in (('p1', (x, y)), ('p2', (y, x))):
+                a, b = (CertificateService.create_certificate(
+                    descr=f'{pair}-{m}', caref=ca.refid, dn={'CN': f'{pair}-{m}.example.test'},
+                    key_type='prime256v1', validity_days=30)
+                    for m, ca in (('a', first), ('b', second)))
+                a.related_certificate_id, b.related_certificate_id = b.id, a.id
+                ids[pair] = a.id
+            x_id, y_id = x.id, y.id
+            db.session.commit()
+            db.session.remove()
+
+        counted, release = {'p1': threading.Event(), 'p2': threading.Event()}, threading.Event()
+        errors, pids = [], {}
+        count_under = renewal.next_ca_serial
+
+        def pause_after_the_first_count(ca):
+            value = count_under(ca)
+            name = threading.current_thread().name
+            if name in counted and not counted[name].is_set():
+                counted[name].set()
+                release.wait(30)
+            return value
+        monkeypatch.setattr(renewal, 'next_ca_serial', pause_after_the_first_count)
+
+        def run(name):
+            with app.app_context():
+                engine, pids[name] = _own_session(url)
+                try:
+                    renewal.renew_certificate_in_place(db.session.get(Certificate, ids[name]))
+                except Exception as exc:  # noqa: BLE001
+                    errors.append((name, repr(exc)))
+                finally:
+                    counted[name].set()
+                    db.session.remove()
+                    engine.dispose()
+
+        t1 = threading.Thread(target=run, args=('p1',), name='p1')
+        t1.start()
+        assert counted['p1'].wait(30)
+        t2 = threading.Thread(target=run, args=('p2',), name='p2')
+        t2.start()
+        # Pair 2 either took its first counter too or waits on the one pair 1 holds
+        deadline = time.monotonic() + 15
+        while not counted['p2'].is_set() and time.monotonic() < deadline:
+            if 'p2' in pids and _waits_on_a_lock(url, pids['p2'], timeout=0.2):
+                break
+        release.set()
+        t1.join(60)
+        t2.join(60)
+
+        with app.app_context():
+            counts = (db.session.get(CA, x_id).serial, db.session.get(CA, y_id).serial)
+            db.session.remove()
+    assert errors == []
+    # Each CA: two issuances, then one renewal per pair
+    assert counts == (4, 4)
