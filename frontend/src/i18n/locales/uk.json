@@ -6049,7 +6049,9 @@
       "error": "This card could not be loaded.",
       "retry": "Retry",
       "forbidden": "You do not have access to this card.",
-      "empty": "Nothing to show."
+      "empty": "Nothing to show.",
+      "partial": "Part of this card could not be loaded.",
+      "partialForbidden": "You do not have access to part of this card."
     },
     "queue": {
       "fold": "Fold the totals per kind",

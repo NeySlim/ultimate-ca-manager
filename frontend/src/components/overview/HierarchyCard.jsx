@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { casService, overviewService } from '../../services'
-import { CardFrame, num, useCardData } from './shared'
+import { CardFrame, num, settle, useCardData } from './shared'
 
 const DAYS = 7
 
@@ -48,13 +48,41 @@ function Node({ ca, kids, issued, t }) {
   )
 }
 
+/** Without the authorities, the issuances per CA are all the card still has. */
+function IssuedOnly({ entries, t }) {
+  return (
+    <ul>
+      {entries.map((e) => {
+        const row = (
+          <>
+            <span className="text-sm text-text-primary truncate">{e.ca_name || e.caref || '–'}</span>
+            <span className="text-xs text-text-secondary tabular-nums whitespace-nowrap">
+              {t('overview.hierarchy.issued7d')} {num(e.issued)}
+            </span>
+          </>
+        )
+        const cls = 'flex items-center justify-between gap-3 py-1'
+        return (
+          <li key={e.caref ?? e.ca_id}>
+            {e.ca_id ? <Link to={`/cas/${e.ca_id}`} className={`${cls} hover:text-accent-primary`}>{row}</Link>
+              : <div className={cls}>{row}</div>}
+          </li>
+        )
+      })}
+    </ul>
+  )
+}
+
 export function HierarchyCard() {
   const { t } = useTranslation()
   const state = useCardData(async () => {
-    const [cas, issuance] = await Promise.all([casService.getAll(), overviewService.getIssuance(DAYS)])
-    return { data: { cas: cas?.data, issuance: issuance?.data }, meta: cas?.meta }
+    const { got, missing } = await settle(
+      { cas: () => casService.getAll(), issuance: () => overviewService.getIssuance(DAYS) },
+      (g) => Boolean(g.cas) || g.issuance?.data?.by_ca?.length > 0)
+    return { data: { cas: got.cas?.data, issuance: got.issuance?.data, missing }, meta: got.cas?.meta }
   })
-  const cas = Array.isArray(state.data?.cas) ? state.data.cas : []
+  const casLoaded = Array.isArray(state.data?.cas)
+  const cas = casLoaded ? state.data.cas : []
   const byCa = state.data?.issuance?.by_ca
   // Issuances per CA in the window; null when the response carries no per-CA series at all
   const issued = Array.isArray(byCa) ? new Map(byCa.map((e) => [e.caref, e.issued])) : null
@@ -62,9 +90,12 @@ export function HierarchyCard() {
 
   return (
     <CardFrame id="hierarchy" title={t('overview.cards.hierarchy')} state={state} onRetry={state.reload}
-      empty={state.status === 'ready' && cas.length === 0}
+      missing={state.data?.missing}
+      empty={state.status === 'ready' && casLoaded && cas.length === 0}
       action={<Link to="/cas" className="text-sm font-semibold tabular-nums">{num(state.meta?.total)}</Link>}>
-      <ul>{roots.map((ca) => <Node key={ca.id} ca={ca} kids={kids} issued={issued} t={t} />)}</ul>
+      {casLoaded
+        ? <ul>{roots.map((ca) => <Node key={ca.id} ca={ca} kids={kids} issued={issued} t={t} />)}</ul>
+        : <IssuedOnly entries={Array.isArray(byCa) ? byCa : []} t={t} />}
     </CardFrame>
   )
 }

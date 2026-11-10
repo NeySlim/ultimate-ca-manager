@@ -30,7 +30,25 @@ export function useCardData(fetcher) {
   return { ...state, reload: load }
 }
 
-export function CardFrame({ id, title, state, empty, onRetry, children, action }) {
+/**
+ * A card's requests side by side: one that fails leaves what the others gave, listed in
+ * `missing`; when what is left shows nothing (`usable` false), the first failure is the card's.
+ */
+export async function settle(parts, usable) {
+  const names = Object.keys(parts)
+  const results = await Promise.allSettled(names.map((name) => parts[name]()))
+  const got = {}
+  const missing = []
+  const errors = []
+  results.forEach((r, i) => {
+    if (r.status === 'fulfilled') got[names[i]] = r.value
+    else { missing.push({ name: names[i], forbidden: r.reason?.status === 403 }); errors.push(r.reason) }
+  })
+  if (errors.length > 0 && !usable(got)) throw errors[0]
+  return { got, missing }
+}
+
+export function CardFrame({ id, title, state, empty, onRetry, children, action, missing }) {
   const { t } = useTranslation()
   const { status } = state
   let body
@@ -49,6 +67,10 @@ export function CardFrame({ id, title, state, empty, onRetry, children, action }
     body = <p className="text-sm text-text-secondary">{t('overview.state.empty')}</p>
   } else {
     body = children
+  }
+  if (status === 'ready' && missing?.length > 0) {
+    const key = missing.some((m) => m.forbidden) ? 'overview.state.partialForbidden' : 'overview.state.partial'
+    body = <>{<p role="note" className="text-xs text-status-warning">{t(key)}</p>}{body}</>
   }
   return (
     <section

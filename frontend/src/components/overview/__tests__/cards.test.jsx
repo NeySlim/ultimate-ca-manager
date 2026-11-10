@@ -150,3 +150,54 @@ describe('hierarchy card', () => {
     expect(await line('Plain')).not.toMatch(/offline|crossSigned/)
   })
 })
+
+describe('a card with two requests keeps what one of them gave', () => {
+  it('hierarchy: issuance down, the tree stays with dashes and a partial note', async () => {
+    api.getAll.mockResolvedValue({ data: [{ id: 1, refid: 'r', descr: 'Root' }], meta: { total: 1 } })
+    api.getIssuance.mockRejectedValue(error(500))
+    show(<HierarchyCard />)
+    expect((await screen.findByText('Root')).closest('a').textContent).toContain('overview.hierarchy.issued7d –')
+    expect(screen.getByRole('note').textContent).toBe('overview.state.partial')
+  })
+
+  it('hierarchy: authorities forbidden, the issuances per CA stay', async () => {
+    api.getAll.mockRejectedValue(error(403))
+    api.getIssuance.mockResolvedValue({ data: { by_ca: [{ caref: 'r', ca_id: 7, ca_name: 'Root', issued: 4 }] } })
+    show(<HierarchyCard />)
+    const row = (await screen.findByText('Root')).closest('a')
+    expect(row.getAttribute('href')).toBe('/cas/7')
+    expect(row.textContent).toContain('4')
+    expect(screen.getByRole('note').textContent).toBe('overview.state.partialForbidden')
+  })
+
+  it('hierarchy: both down is an error', async () => {
+    api.getAll.mockRejectedValue(error(500))
+    api.getIssuance.mockRejectedValue(error(500))
+    show(<HierarchyCard />)
+    expect(await screen.findByText('overview.state.retry')).toBeTruthy()
+  })
+
+  it('horizon: next expirations down, the counters stay', async () => {
+    api.getStats.mockResolvedValue({ data: { total: 4, expiring: 2, expired: 1 } })
+    api.getNext.mockRejectedValue(error(500))
+    show(<HorizonCard />)
+    expect((await screen.findByText('overview.horizon.expiring')).parentElement.textContent).toContain('2')
+    expect(screen.getByRole('note').textContent).toBe('overview.state.partial')
+  })
+
+  it('horizon: counters forbidden, the soonest list stays with dashed counters', async () => {
+    api.getStats.mockRejectedValue(error(403))
+    api.getNext.mockResolvedValue({ data: [{ id: 9, common_name: 'soon.example', valid_to: null }] })
+    show(<HorizonCard />)
+    expect(await screen.findByText('soon.example')).toBeTruthy()
+    expect(screen.getByText('overview.horizon.expiring').parentElement.textContent).toContain('–')
+    expect(screen.getByRole('note').textContent).toBe('overview.state.partialForbidden')
+  })
+
+  it('no note when both answer', async () => {
+    api.getStats.mockResolvedValue({ data: { total: 4, expiring: 2, expired: 1 } })
+    show(<HorizonCard />)
+    await screen.findByText('overview.horizon.expiring')
+    expect(screen.queryByRole('note')).toBeNull()
+  })
+})

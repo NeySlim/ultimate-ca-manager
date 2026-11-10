@@ -124,11 +124,12 @@ describe('empty state is not the error state', () => {
     await waitFor(() => expect(screen.getByText('overview.state.retry')).toBeTruthy())
   })
 
-  it('hierarchy fails as a whole when its issuance half fails', async () => {
+  it('hierarchy keeps its tree, flagged partial, when its issuance half fails', async () => {
     api.getAll.mockResolvedValue({ data: [{ id: 1, refid: 'a', descr: 'Root' }], meta: { total: 1 } })
     api.getIssuance.mockRejectedValue(Object.assign(new Error('x'), { status: 500 }))
     show(<HierarchyCard />)
-    await screen.findByRole('alert')
-    expect(screen.queryByText('Root')).toBeNull()
+    expect(await screen.findByText('Root')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByRole('note')).toBeTruthy()
   })
 })
