@@ -28,7 +28,7 @@ CREATE_INDEX = (f"CREATE UNIQUE INDEX IF NOT EXISTS {INDEX} ON {TABLE} (caref, s
 CLEAR_PENDING = f"DELETE FROM {CONFIG} WHERE key = '{PENDING_KEY}'"
 SET_PENDING = (f"INSERT INTO {CONFIG} (key, value, encrypted, description, updated_at) "
                "VALUES ('" + PENDING_KEY + "', {value}, {false}, "
-               "'Unique serial index per CA waits for duplicate certificates to be resolved', "
+               "'Migration 142 pending: the unique serial index per CA waits for duplicate certificates to be resolved', "
                "CURRENT_TIMESTAMP)")
 
 LINKS = 'acme_proxy_challenge_links'
