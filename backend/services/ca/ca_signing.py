@@ -12,7 +12,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from models import CA, Certificate, db
-from utils.ca_serial_counter import next_ca_serial, retry_on_serial_collision
+from utils.ca_serial_counter import (
+    next_ca_serial, retry_on_serial_collision, rollback_unless_serial_collision)
 from models.certificate_template import CertificateTemplate
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
@@ -276,7 +277,7 @@ class CASigningMixin:
         except AlreadySuperseded:
             raise
         except Exception as _commit_err:
-            db.session.rollback()
+            rollback_unless_serial_collision(_commit_err)
             logger.error(f"Storing the certificate signed via {source} failed: {_commit_err}", exc_info=True)
             raise
 

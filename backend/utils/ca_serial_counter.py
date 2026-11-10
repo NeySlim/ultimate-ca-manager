@@ -38,9 +38,18 @@ def is_serial_collision(exc) -> bool:
     return isinstance(exc, IntegrityError) and any(m in str(exc.orig) for m in _COLLISION_MARKERS)
 
 
+def rollback_unless_serial_collision(exc):
+    """Roll the session back, except on a serial collision: retry_on_serial_collision
+    then rolls back its savepoint only, keeping what the caller flushed before."""
+    from models import db
+    if not is_serial_collision(exc):
+        db.session.rollback()
+
+
 def retry_on_serial_collision(issue):
     """Sign once more with a fresh random serial when the first one is already
-    taken under the CA; a second collision is raised, the session rolled back."""
+    taken under the CA. Each attempt runs in a savepoint: a collision undoes that
+    attempt only, never the caller's transaction; a second collision is raised."""
     import functools
     import logging
 
@@ -48,12 +57,15 @@ def retry_on_serial_collision(issue):
     def issue_with_retry(*args, **kwargs):
         from models import db
         for attempt in (1, 2):
+            savepoint = db.session.begin_nested()
             try:
                 return issue(*args, **kwargs)
             except Exception as exc:
                 if not is_serial_collision(exc):
                     raise
-                db.session.rollback()
+                # A savepoint already released by the attempt's commit has nothing to undo
+                if db.session().get_nested_transaction() is savepoint:
+                    savepoint.rollback()
                 if attempt == 2:
                     raise
                 logging.getLogger(__name__).warning(

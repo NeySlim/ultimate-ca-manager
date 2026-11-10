@@ -75,6 +75,65 @@ def test_a_taken_random_serial_is_signed_again_once(app):
         db.session.expire_all()
         assert db.session.get(CA, ca_id).serial == 2
 
+
+def _signed_serial(row):
+    import base64
+    return x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number
+
+
+def test_a_collision_keeps_the_rows_the_caller_flushed(app):
+    """ACME flushes its request row before signing: a retry rolls back its own attempt, not that row."""
+    import base64
+    from unittest.mock import patch
+    from cryptography.hazmat.primitives import serialization
+    from services.cert_service import CertificateService
+    taken = x509.random_serial_number()
+    with app.app_context():
+        ca = _ca_row(*_authority())
+        ca_id, caref = ca.id, ca.refid
+        with patch('cryptography.x509.random_serial_number', return_value=taken):
+            _issue(ca_id, 'first-flushed.example.test')
+        csr_pem = _csr('acme-flushed.example.test').public_bytes(serialization.Encoding.PEM)
+        request = Certificate(refid=uuid.uuid4().hex[:16], descr='acme-shaped', caref=caref,
+                              csr=base64.b64encode(csr_pem).decode(), cert_type='server_cert',
+                              source='acme', created_by='acme')
+        db.session.add(request)
+        db.session.flush()
+        request_id = request.id
+        fresh = x509.random_serial_number()
+        with patch('cryptography.x509.random_serial_number', side_effect=[taken, fresh]):
+            signed = CertificateService.sign_csr(cert_id=request_id, caref=caref, validity_days=30)
+        db.session.expire_all()
+        stored = db.session.get(Certificate, request_id)
+        assert signed.id == request_id and stored is not None and stored.source == 'acme'
+        assert _signed_serial(stored) == fresh
+        assert db.session.get(CA, ca_id).serial == 2
+
+
+def test_a_second_collision_rolls_back_only_the_signing_attempt(app):
+    from unittest.mock import patch
+    from sqlalchemy.exc import IntegrityError
+    taken = x509.random_serial_number()
+    with app.app_context():
+        ca = _ca_row(*_authority())
+        ca_id, caref = ca.id, ca.refid
+        with patch('cryptography.x509.random_serial_number', return_value=taken):
+            _issue(ca_id, 'first-kept.example.test')
+        decision = Certificate(refid=uuid.uuid4().hex[:16], descr='caller row', caref=caref,
+                               cert_type='server_cert', source='test')
+        db.session.add(decision)
+        db.session.flush()
+        decision_id = decision.id
+        with patch('cryptography.x509.random_serial_number', return_value=taken), \
+                pytest.raises(IntegrityError):
+            _issue(ca_id, 'second-kept.example.test')
+        assert db.session.get(Certificate, decision_id) is not None
+        db.session.commit()
+        db.session.expire_all()
+        assert db.session.get(Certificate, decision_id).descr == 'caller row'
+        assert db.session.get(CA, ca_id).serial == 1
+
+
 def _stale(ca):
     from sqlalchemy.orm.attributes import set_committed_value
     set_committed_value(ca, 'serial', 0)  # what this worker read before another one issued

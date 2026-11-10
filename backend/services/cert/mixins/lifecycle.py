@@ -12,7 +12,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, CertificateTemplate, Certificate, SystemConfig
-from utils.ca_serial_counter import next_ca_serial, retry_on_serial_collision
+from utils.ca_serial_counter import (
+    next_ca_serial, retry_on_serial_collision, rollback_unless_serial_collision)
 from models.compromised_key import remember_if_compromised
 from utils.validity import DEFAULT_CERTIFICATE_VALIDITY_DAYS
 from utils.key_type import issue_key_type_from_template
@@ -323,7 +324,7 @@ class LifecycleMixin:
         try:
             db.session.commit()
         except Exception as _commit_err:
-            db.session.rollback()
+            rollback_unless_serial_collision(_commit_err)
             logger.error(f"Certificate creation not committed: {_commit_err}", exc_info=True)
             raise
 
