@@ -62,3 +62,18 @@ def test_scheduled_auto_update_skipped_in_ha(monkeypatch):
     monkeypatch.setattr(updates, '_cfg_get', boom)
     monkeypatch.setattr(updates, 'install_update', boom)
     updates._auto_install({'latest_version': '99.0', 'download_url': 'http://x/p.deb'})
+
+
+def test_service_restart_refused_in_ha(auth_client, monkeypatch):
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr('api.v2.system.service.is_docker', lambda: True)
+    r = auth_client.post('/api/v2/system/service/restart', json={})
+    assert r.status_code == 409, r.data
+    assert r.get_json()['code'] == 'ha_mode'
+
+
+def test_service_restart_keeps_its_usual_answer_without_ha(auth_client, monkeypatch):
+    monkeypatch.setattr(Config, 'HA_MODE', False)
+    monkeypatch.setattr('api.v2.system.service.is_docker', lambda: True)
+    r = auth_client.post('/api/v2/system/service/restart', json={})
+    assert r.status_code == 400, r.data
