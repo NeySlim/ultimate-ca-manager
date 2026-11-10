@@ -10,6 +10,7 @@ import os
 import signal
 import threading
 import time
+from collections import namedtuple
 from datetime import timedelta
 
 from sqlalchemy import text
@@ -36,6 +37,9 @@ MAX_HOLES = 32
 RESTART_GUARD_SECONDS = 120.0
 RETENTION = timedelta(hours=24)
 BATCH = 200
+
+# A held restart: the newest id and creation instant of the restarts it stands for
+_Held = namedtuple('_Held', 'id created_at')
 
 # Before create_app reads any setting: commands created up to here are already in effect.
 # On this host's clock: the applier moves it onto the cluster clock before comparing.
@@ -249,12 +253,14 @@ class CommandApplier:
     def _drain(self, conn):
         now = time.monotonic()
         self._holes = [h for h in self._holes if h[2] > now][-MAX_HOLES:]
-        if self._held is not None:
+        self._drain_rows(conn, now)
+        # After the rows: a newer restart committed with the node ahead's return is absorbed first
+        if self._held is not None and not self._stop.is_set():
             held, self._held = self._held, None
-            if not self._restart(conn, held):
-                return
-            if self._held is None:
+            if self._restart(conn, held) and self._held is None:
                 self._fill_hole(held.id)
+
+    def _drain_rows(self, conn, now):
         where, params = ['id > :seen'], {'seen': self.seen, 'n': BATCH}
         for i, (lo, hi, _) in enumerate(self._holes):
             where.append(f'id BETWEEN :lo{i} AND :hi{i}')
@@ -303,7 +309,11 @@ class CommandApplier:
             return True
         if row.kind == RESTART:
             if self._held is not None:
-                return False  # one restart at a time, in id order
+                # One restart covers both: it waits for the nodes ahead to pass the newer one
+                held = self._held
+                self._held = _Held(max(held.id, row.id), max(held.created_at, row.created_at))
+                self._advance(conn, row.id)
+                return True
             return self._restart(conn, row)
         handler = self.handlers.get(row.kind)
         if handler is None:
@@ -359,7 +369,7 @@ class CommandApplier:
             self._restart_wait = (row.id, now, len(pending))
         _, since, ahead = self._restart_wait
         if pending and now - since < self.guard * ahead:
-            self._held = row
+            self._held = _Held(row.id, row.created_at)
             self._advance(conn, row.id)
             return True
         self._restart_wait = None

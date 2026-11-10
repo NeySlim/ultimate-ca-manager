@@ -350,6 +350,61 @@ def test_a_node_waiting_its_turn_keeps_applying_reloads_in_order(app, ha):
     assert cluster.events == [('down', 'b'), ('up', 'b')]
 
 
+def _restart_seen(app, name):
+    from models import ClusterNode, db
+    with app.app_context():
+        db.session.expire_all()
+        node = db.session.get(ClusterNode, PREFIX + name)
+        return node.restart_seen if node else None
+
+
+def test_a_second_restart_while_one_is_held_is_absorbed(app, ha):
+    """The held restart covers the newer one: reloads behind it go on, the node restarts once."""
+    cluster, log = _Cluster(app), []
+    for name in ('a', 'b'):
+        _node_row(app, name)
+    b = ha('b', restart_action=cluster.action('b'), guard=30,
+           handlers={cc.RELOAD_SYSLOG: _recorder(log, 'b')})
+    _emit(app, cc.RESTART)
+    b.start()
+    assert wait_for(lambda: b._held is not None)
+    second = _emit(app, cc.RESTART)
+    started = time.monotonic()
+    _emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'})
+    assert wait_for(lambda: log == [('b', 'after')], timeout=5)
+    assert time.monotonic() - started < 5 and cluster.events == []
+    _back(app, 'a')
+    assert wait_for(lambda: ('up', 'b') in cluster.events)
+    time.sleep(0.2)
+    assert cluster.events == [('down', 'b'), ('up', 'b')]
+    assert _restart_seen(app, 'b') == second  # a sibling process cannot claim the newer one
+
+
+def test_the_held_restart_waits_for_the_node_ahead_to_restart_for_the_newer_one(app, ha):
+    """a came back for the first restart only: b, holding both, waits for a's second restart."""
+    cluster = _Cluster(app)
+    for name in ('a', 'b'):
+        _node_row(app, name)
+    b = ha('b', restart_action=cluster.action('b'), guard=30)
+    first = _emit(app, cc.RESTART)
+    b.start()
+    assert wait_for(lambda: b._held is not None)
+    from models import ClusterCommand, ClusterNode, db
+    with app.app_context():  # one commit: b never sees a back without the newer restart
+        issued = db.session.get(ClusterCommand, first).created_at
+        node = db.session.get(ClusterNode, PREFIX + 'a')
+        node.started_at = node.heartbeat_at = issued + timedelta(milliseconds=50)
+        newer = ClusterCommand(kind=cc.RESTART, created_at=issued + timedelta(milliseconds=100))
+        db.session.add(newer)
+        db.session.commit()
+        second = newer.id
+    assert wait_for(lambda: b.seen == second and b._held is not None and b._held.id == second)
+    time.sleep(0.3)
+    assert cluster.events == []
+    _back(app, 'a')
+    assert wait_for(lambda: ('down', 'b') in cluster.events)
+
+
 LAG = timedelta(hours=1)
 
 
