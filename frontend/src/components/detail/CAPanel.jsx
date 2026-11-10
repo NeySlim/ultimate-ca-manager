@@ -75,7 +75,9 @@ export function CAPanel({
 
   // Determine status
   const getStatus = () => {
+    if (ca.pending) return 'pending'
     if (ca.revoked || ca.status === 'Revoked') return 'revoked'
+    if (ca.offline) return 'offline'
     if (ca.status === 'Expired') return 'expired'
     if (expiryBucket(caDaysRemaining) === 'expiring') return 'expiring'
     return 'valid'
@@ -88,8 +90,23 @@ export function CAPanel({
     valid: { variant: 'success', label: t('common.active') },
     expiring: { variant: 'warning', label: t('common.detailsExpiring') },
     expired: { variant: 'danger', label: t('common.expired') },
-    revoked: { variant: 'danger', label: t('common.revoked') }
+    revoked: { variant: 'danger', label: t('common.revoked') },
+    pending: { variant: 'warning', label: t('cas.awaitingCertificate') },
+    offline: { variant: 'warning', label: t('cas.offline') },
   }
+  // Cross-signed count (#400) and the HSM that holds the key
+  const keyBadges = (size) => (<>
+    {ca.cross_certificate_count > 0 && (
+      <Badge variant="info" size={size} data-testid="cross-badge">
+        {t('crossCerts.badge', { count: ca.cross_certificate_count })}
+      </Badge>
+    )}
+    {ca.uses_hsm && (
+      <Badge variant="info" size={size} title={[ca.hsm_provider_name, ca.hsm_key_label].filter(Boolean).join(' / ')}>
+        {t('cas.detail.hsmBacked')}
+      </Badge>
+    )}
+  </>)
 
   return (
     <div className={cn("space-y-3 sm:space-y-4 p-3 sm:p-4", embedded && "space-y-3 p-3")}>
@@ -109,6 +126,7 @@ export function CAPanel({
             <Badge variant={statusConfig[status].variant}>
               {statusConfig[status].label}
             </Badge>
+            {keyBadges(undefined)}
             <PostQuantumBadge postQuantum={ca.post_quantum} algorithm={ca.key_type} />
           </div>
           {ca.organization && (
@@ -174,6 +192,7 @@ export function CAPanel({
           <Badge variant={statusConfig[status].variant} size="sm">
             {statusConfig[status].label}
           </Badge>
+          {keyBadges('sm')}
           <PostQuantumBadge postQuantum={ca.post_quantum} algorithm={ca.key_type} />
           <span className="text-2xs text-text-tertiary">•</span>
           <span className="text-2xs text-text-secondary">{keyAlgorithmLabel(ca.key_type, t, ca.security_level) || t('common.na')}</span>
