@@ -85,11 +85,15 @@ BASELINE_ISSUE_KEY = 'RSA-2048'
 _ISSUE_KEY_FALLBACKS = ('RSA-3072', 'EC-P256', 'EC-P384')
 
 
-def default_issue_key_type(ca_id=None) -> str:
+def default_issue_key_type(ca_id=None, profile=None) -> str:
     """Registry label of the key issued when nothing names one: the baseline, else the first
-    fallback the policies in scope (FIPS, compliance profile of *ca_id*) allow."""
+    fallback the policies in scope (FIPS, compliance profile of *ca_id*, or *profile* for a
+    CA not created yet) allow."""
+    import compliance_profiles
     from services.policy_service import PolicyEvaluationService
     policies = PolicyEvaluationService.applicable_policies(ca_id, None, None)
+    if profile:
+        policies = [*policies, compliance_profiles.profile_policy(profile)]
     for label in (BASELINE_ISSUE_KEY, *_ISSUE_KEY_FALLBACKS):
         violations, _, _ = PolicyEvaluationService.enforce_rules(
             policies, key_type=label, ca_id=ca_id, notify=False)
@@ -98,9 +102,9 @@ def default_issue_key_type(ca_id=None) -> str:
     return BASELINE_ISSUE_KEY
 
 
-def default_issue_key_id(ca_id=None) -> str:
+def default_issue_key_id(ca_id=None, profile=None) -> str:
     """``default_issue_key_type`` as a TrustStore KEY_TYPES id ('2048', 'prime256v1')."""
-    return key_algorithms.get(default_issue_key_type(ca_id)).trust_store_id
+    return key_algorithms.get(default_issue_key_type(ca_id, profile)).trust_store_id
 
 
 def default_rsa_key_size(ca_id=None) -> str:

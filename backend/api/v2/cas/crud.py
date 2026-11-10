@@ -102,7 +102,7 @@ def _blank(value):
     return value is None or (isinstance(value, str) and not value.strip())
 
 
-def _resolve_local_key_type(data):
+def _resolve_local_key_type(data, compliance_profile=None):
     """(TrustStore key type, error) for a locally generated CA key.
 
     keyType is accepted as an alias of keyAlgo; a value that names no usable
@@ -111,7 +111,12 @@ def _resolve_local_key_type(data):
     algo, alias, size = data.get('keyAlgo'), data.get('keyType'), data.get('keySize')
     if _blank(algo) and _blank(alias):
         if _blank(size):
-            return default_issue_key_id(), None
+            parent_id = data.get('parentCAId') if data.get('type') == 'intermediate' else None
+            try:
+                parent_id = int(parent_id) if parent_id else None
+            except (TypeError, ValueError):
+                parent_id = None
+            return default_issue_key_id(parent_id, compliance_profile), None
         return None, f'keySize requires keyAlgo ({_CA_KEY_NAMES})'
     names = [v for v in (algo, alias) if not _blank(v)]
     if not all(isinstance(v, str) for v in names):
@@ -398,8 +403,17 @@ def create_ca():
         if not is_valid:
             return error_response(error, 400)
 
+        # Absent means the instance default; an explicit null or '' means no profile
+        if 'complianceProfile' in data or 'compliance_profile' in data:
+            compliance_profile, profile_err = compliance_profiles.normalize(
+                data.get('complianceProfile', data.get('compliance_profile')))
+            if profile_err:
+                return error_response(profile_err, 400)
+        else:
+            compliance_profile = compliance_profiles.default_profile()
+
         # Registry sizes and curves only: no huge RSA keys, no unknown curves
-        key_type, key_err = _resolve_local_key_type(data)
+        key_type, key_err = _resolve_local_key_type(data, compliance_profile)
         if key_err:
             return error_response(key_err, 400)
 
@@ -614,15 +628,6 @@ def create_ca():
             refusal = pss_refusal(str(digest_key_type).isdigit(), hsm_type)
             if refusal:
                 return error_response(refusal, 400)
-
-        # Absent means the instance default; an explicit null or '' means no profile
-        if 'complianceProfile' in data or 'compliance_profile' in data:
-            compliance_profile, profile_err = compliance_profiles.normalize(
-                data.get('complianceProfile', data.get('compliance_profile')))
-            if profile_err:
-                return error_response(profile_err, 400)
-        else:
-            compliance_profile = compliance_profiles.default_profile()
 
         raw_ku = data.get('keyUsage')
         if raw_ku is None and data.get('key_usage') is not None:

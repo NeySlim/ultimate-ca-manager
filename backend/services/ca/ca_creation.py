@@ -292,7 +292,8 @@ class CACreationMixin:
             PolicyEvaluationService, key_label_for_public_key)
         from utils.issuance_defaults import default_issue_key_id
 
-        key_type = key_type or default_issue_key_id()
+        parent = CA.query.filter_by(refid=caref).first() if caref else None
+        key_type = key_type or default_issue_key_id(parent.id if parent else None, compliance_profile)
         if digest is None:  # nobody chose: the signer key's own, yielding to the policies
             digest, digest_explicit = _default_ca_digest(caref, key_type), False
 
@@ -636,7 +637,7 @@ class CACreationMixin:
         """
         from services.policy_service import PolicyEvaluationService, key_label_for_public_key
         from utils.issuance_defaults import default_issue_key_id
-        key_type = key_type or default_issue_key_id()
+        key_type = key_type or default_issue_key_id(None, compliance_profile)
         policies, key_label = _ca_policies(None, dn, key_type, hsm_key_id, hsm_key_algorithm,
                                            compliance_profile)
         rule_context = {'operation': 'ca_creation', 'subject': (dn or {}).get('CN')}

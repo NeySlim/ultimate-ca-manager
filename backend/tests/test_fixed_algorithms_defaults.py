@@ -149,3 +149,45 @@ def test_no_key_literal_on_an_issuance_path(path):
 @pytest.mark.parametrize('path', DIGEST_LITERAL_FILES)
 def test_no_digest_literal_on_an_issuance_path(path):
     assert _literals(path, {'sha256'}) == []
+
+
+def test_default_key_follows_the_profile_of_a_ca_not_created_yet(app):
+    with app.app_context():
+        assert issuance_defaults.default_issue_key_type(None, 'bsi') == 'RSA-3072'
+
+
+def _ca_body(cn, **extra):
+    return {'type': 'root', 'commonName': cn, 'organization': 'Test Org', 'country': 'US',
+            'validityYears': 5, **extra}
+
+
+def test_ca_creation_without_key_under_a_compliance_profile(app, auth_client):
+    r = _post(auth_client, '/api/v2/cas', _ca_body('Profile CA key', complianceProfile='bsi', signatureScheme='pss'))
+    assert r.status_code in (200, 201), r.get_json()
+    from models import CA
+    with app.app_context():
+        assert _bits(CA.query.get(r.get_json()['data']['id']).crt) == 3072
+
+
+def test_intermediate_without_key_under_a_profiled_parent(app, auth_client):
+    parent = _post(auth_client, '/api/v2/cas', _ca_body('Profile parent', complianceProfile='bsi', signatureScheme='pss'))
+    assert parent.status_code in (200, 201), parent.get_json()
+    r = _post(auth_client, '/api/v2/cas', {
+        **_ca_body('Profile child'), 'type': 'intermediate', 'parentCAId': parent.get_json()['data']['id']})
+    assert r.status_code in (200, 201), r.get_json()
+    from models import CA
+    with app.app_context():
+        assert _bits(CA.query.get(r.get_json()['data']['id']).crt) == 3072
+
+
+def test_xcep_and_wstep_default_follows_the_profile_of_their_ca(app, monkeypatch):
+    import compliance_profiles
+    from models.certificate_template import CertificateTemplate
+    from services.wstep.wstep_service import _template_key_label, _template_takes_key
+    from services.xcep.policy_builder import _key_type_info
+    template = CertificateTemplate(name='profile-wstep', template_type='custom', key_type=None)
+    monkeypatch.setattr(compliance_profiles, 'profile_of_ca', lambda ca_id: 'bsi')
+    with app.app_context():
+        assert _key_type_info(None, 1) == ('RSA', 3072)
+        assert _template_key_label(template, 1) == 'RSA-3072'
+        assert not _template_takes_key(template, 'RSA-2048', 1)

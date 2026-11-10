@@ -317,7 +317,7 @@ def _match_template(ca, csr, principal=None):
     # is not issued under a P-256 template sharing its EKUs); a request whose
     # EKUs name only a template of another key is refused.
     csr_label = _csr_key_label(csr)
-    same = [t for t in candidates if _template_takes_key(t, csr_label)]
+    same = [t for t in candidates if _template_takes_key(t, csr_label, ca.id)]
     if principal:
         from services.ad_connector.lookup import is_machine_principal
         other_kind = 'directory' if is_machine_principal(principal) else 'machine'
@@ -329,7 +329,7 @@ def _match_template(ca, csr, principal=None):
         return best, None
     other, score = _best_eku_match([t for t in candidates if t not in same], csr_eku)
     if other is not None and score > 0:
-        return None, (f"Template '{other.name}' issues {_template_key_label(other)} keys, "
+        return None, (f"Template '{other.name}' issues {_template_key_label(other, ca.id)} keys, "
                       f'not {csr_label}')
     return None, None
 
@@ -390,8 +390,8 @@ def _named_template(ca, csr):
         return None, 'The request names two different certificate templates', True
     template = found[0]
     csr_label = _csr_key_label(csr)
-    if not _template_takes_key(template, csr_label):
-        return None, (f"Template '{template.name}' issues {_template_key_label(template)} keys, "
+    if not _template_takes_key(template, csr_label, ca.id):
+        return None, (f"Template '{template.name}' issues {_template_key_label(template, ca.id)} keys, "
                       f'not {csr_label}'), True
     allowed = set(_template_configured_ekus(template))
     if allowed and (_eku_oids(csr) or set()) - allowed:
@@ -493,8 +493,8 @@ def _renewal_template(ca, renewed_cert, csr):
                                 'is not offered by this CA')
     if issues_only_capped_ekus(template):
         return None, [], None, _capped_only_refusal(template)
-    if not _template_takes_key(template, _csr_key_label(csr)):
-        return None, [], None, (f"Template '{template.name}' issues {_template_key_label(template)} "
+    if not _template_takes_key(template, _csr_key_label(csr), ca.id):
+        return None, [], None, (f"Template '{template.name}' issues {_template_key_label(template, ca.id)} "
                                 f'keys, not {_csr_key_label(csr)}')
     extra = _template_extra_ekus(template)
     # The request may name what XCEP advertised (capped EKUs included, dropped at
@@ -541,15 +541,15 @@ def _best_eku_match(candidates, csr_eku):
     return (best, best_score) if best is not None and best_score >= 0 else (None, -1)
 
 
-def _template_key_label(template):
-    alg = key_algorithms.get(template.key_type or default_issue_key_type())
+def _template_key_label(template, ca_id=None):
+    alg = key_algorithms.get(template.key_type or default_issue_key_type(ca_id))
     return alg.label if alg is not None else str(template.key_type)
 
 
-def _template_takes_key(template, csr_label):
+def _template_takes_key(template, csr_label, ca_id=None):
     """Whether a key of ``csr_label`` fits ``template``: same curve or ML-DSA
     set, an RSA key at least as long. An unknown key fits any non-ML-DSA template."""
-    wanted = key_algorithms.get(template.key_type or default_issue_key_type())
+    wanted = key_algorithms.get(template.key_type or default_issue_key_type(ca_id))
     got = key_algorithms.get(csr_label)
     if wanted is None:
         return True
