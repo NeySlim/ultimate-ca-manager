@@ -77,3 +77,39 @@ def test_service_restart_keeps_its_usual_answer_without_ha(auth_client, monkeypa
     monkeypatch.setattr('api.v2.system.service.is_docker', lambda: True)
     r = auth_client.post('/api/v2/system/service/restart', json={})
     assert r.status_code == 400, r.data
+
+
+def _no_side_effects(monkeypatch, path):
+    """Make the route refuse early without HA, so the test never mutates the host."""
+    if path == '/api/v2/database/switch':
+        monkeypatch.setattr('api.v2.database.is_docker', lambda: True)
+    elif path == '/api/v2/system/updates/install':
+        monkeypatch.setenv('UCM_DOCKER', '1')
+    elif path.endswith('/enable-encryption'):
+        monkeypatch.setattr('security.encryption.KeyEncryption.is_enabled',
+                            property(lambda self: False), raising=False)
+        monkeypatch.setattr('security.master_key_bootstrap.ephemeral_key_dir_refusal',
+                            lambda: 'test')
+    elif path.endswith('/disable-encryption'):
+        monkeypatch.setattr('security.encryption.key_encryption_required', lambda: True)
+
+
+USUAL = {
+    '/api/v2/database/switch': (400, {}),
+    '/api/v2/database/migrate': (400, {}),
+    '/api/v2/system/security/enable-encryption': (409, {}),
+    '/api/v2/system/security/disable-encryption': (409, {}),
+    '/api/v2/system/security/encrypt-all-keys': (200, {}),
+    '/api/v2/system/security/rotate-secrets': (400, {'new_secret': 'short'}),
+    '/api/v2/system/updates/install': (400, {}),
+}
+
+
+@pytest.mark.parametrize('path', list(USUAL))
+def test_route_keeps_its_usual_answer_without_ha(auth_client, monkeypatch, path):
+    monkeypatch.setattr(Config, 'HA_MODE', False)
+    _no_side_effects(monkeypatch, path)
+    code, body = USUAL[path]
+    r = auth_client.post(path, json=body)
+    assert r.status_code == code, r.data
+    assert (r.get_json() or {}).get('code') != 'ha_mode'
