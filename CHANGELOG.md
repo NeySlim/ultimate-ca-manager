@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Changed
+
+- Breaking: a policy that requires approval now holds ACME, EST, SCEP and WSTEP requests in the approval queue, so a protocol request can stay pending until an approver decides; each client is told so in its protocol's terms (ACME `processing`, EST 202 with Retry-After, SCEP PENDING, WSTEP pending RSTR and QueryTokenStatus), even on an auto-approving SCEP profile.
+
 ### Fixed
 
 - Certificate Transparency: `POST /api/v2/certificates/<id>/submit-ct` always failed with a server error, as it read an attribute the certificate model does not have, and the chain it built stopped at the direct issuer; the submission now sends the leaf with its full issuer chain up to the root, or the chain stored inline with the certificate, one element per certificate (RFC 6962 §4.1). Reported by Chris by e-mail.
