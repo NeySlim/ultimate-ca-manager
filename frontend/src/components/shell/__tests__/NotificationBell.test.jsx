@@ -7,7 +7,7 @@ import { ROLES, canFor, tStub } from './shellTestUtils'
 
 const m = vi.hoisted(() => ({
   getQueue: vi.fn(), getLogs: vi.fn(), persistPreference: vi.fn(),
-  prefs: {}, listeners: new Set(), lastEvent: null,
+  prefs: {}, listeners: new Set(), lastEvent: null, extraLogs: [],
 }))
 
 vi.mock('react-i18next', () => ({
@@ -50,11 +50,16 @@ const bell = () => screen.getByRole('button', { name: /shell\.bell\.title/ })
 beforeEach(() => {
   m.getQueue.mockReset().mockResolvedValue(QUEUE)
   // The server filters: sessions in one request, failed backups/restores in the other
+  // Newest first, filtered by the server, then cut to the page like the API does
   m.getLogs.mockReset().mockImplementation(async params => ({
-    data: LOGS.data.filter(e => params.action.includes(e.action) && (params.success === undefined || e.success === params.success)),
+    data: [...LOGS.data, ...(m.extraLogs || [])]
+      .filter(e => params.action.includes(e.action) && (params.success === undefined || e.success === params.success))
+      .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+      .slice(0, params.per_page ?? 50),
   }))
   m.persistPreference.mockReset()
   m.prefs = {}
+  m.extraLogs = []
   m.listeners.clear()
   m.lastEvent = null
 })
@@ -165,5 +170,19 @@ describe('NotificationBell', () => {
     setup()
     await waitFor(() => expect(m.getLogs).toHaveBeenCalledWith(
       expect.objectContaining({ action: ['system_backup'], success: false })))
+  })
+
+  it('keeps a failed backup in the bell when 25 newer backups succeeded', async () => {
+    m.extraLogs = Array.from({ length: 25 }, (_, i) => ({
+      id: 100 + i, action: 'system_backup', success: true, username: 'root', resource_name: null,
+      timestamp: `2026-11-10T${String(i).padStart(2, '0')}:00:00Z`,
+    }))
+    setup()
+    await waitFor(() => expect(bell()).toHaveAccessibleName(/\|4/))
+    const user = userEvent.setup()
+    await user.click(bell())
+    const rows = within(screen.getByRole('region', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    expect(rows).toContain('audit:41')
+    expect(rows).not.toContain('audit:100')
   })
 })
