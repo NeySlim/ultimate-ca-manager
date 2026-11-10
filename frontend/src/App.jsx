@@ -55,7 +55,9 @@ function PermissionRoute({ children, permission }) {
 export function guarded(guard, element) {
   if (guard === 'admin') return <AdminRoute>{element}</AdminRoute>
   if (guard && guard.permission) return <PermissionRoute permission={guard.permission}>{element}</PermissionRoute>
-  return <ProtectedRoute>{element}</ProtectedRoute>
+  if (guard === 'auth') return <ProtectedRoute>{element}</ProtectedRoute>
+  // A mistyped guard must not open the route to every signed-in user
+  throw new Error(`navigation: unknown guard ${JSON.stringify(guard)}`)
 }
 
 // Routes of every registry module and legacy redirect, under the app shell

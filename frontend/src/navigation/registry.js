@@ -115,7 +115,7 @@ export function isVisible(mod, can) {
   const { guard } = mod
   if (guard === 'admin') return !!can.isAdmin()
   if (guard && guard.permission) return !!(can.isAdmin() || can.hasPermission(guard.permission))
-  return true
+  return guard === 'auth'
 }
 
 export function visibleModules(can) {

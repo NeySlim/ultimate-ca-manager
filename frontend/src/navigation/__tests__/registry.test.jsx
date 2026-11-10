@@ -43,7 +43,7 @@ import { Routes, Route } from 'react-router-dom'
 import { pages } from '../pages'
 import {
   MODULES, GROUPS, SIDEBAR_GROUPS, REDIRECTS, visibleModules, groupsFor, sidebarGroups,
-  moduleForPath, paletteCommands,
+  moduleForPath, paletteCommands, isVisible,
 } from '../registry'
 import { PERMISSION_RESOURCES } from '../../lib/rbacPermissions'
 
@@ -181,8 +181,20 @@ describe('registry shape (b)', () => {
 
   it('imports no page', () => {
     const src = readFileSync(join(here, '../registry.js'), 'utf8')
-    const specifiers = [...src.matchAll(/from\s+'([^']+)'/g)].map(m => m[1])
+    // static, side-effect and dynamic imports, either quote
+    const specifiers = [...src.matchAll(/(?:^|[\s;}])(?:from\s*|import\s*\(?\s*)['"]([^'"]+)['"]/gm)].map(m => m[1])
     expect(specifiers).toEqual(['@phosphor-icons/react'])
+  })
+
+  it('every guard is auth, admin or a permission; any other is refused, not opened', () => {
+    for (const m of MODULES) {
+      const ok = m.guard === 'auth' || m.guard === 'admin' || typeof m.guard?.permission === 'string'
+      expect(ok, m.id).toBe(true)
+    }
+    expect(() => guarded('admn', null)).toThrow(/unknown guard/)
+    expect(() => guarded({ permisson: 'read:x' }, null)).toThrow(/unknown guard/)
+    const can = { isAdmin: () => false, hasPermission: () => true }
+    expect(isVisible({ guard: 'admn' }, can)).toBe(false)
   })
 
   it('every group reference names a declared group', () => {
