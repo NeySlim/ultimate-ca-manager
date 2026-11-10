@@ -216,8 +216,8 @@ def write_heartbeat(node_id, leader, started_at) -> None:
     if node is None:
         node = ClusterNode(node_id=node_id, started_at=started_at)
         db.session.add(node)
-    elif node.pid != os.getpid():
-        node.started_at = started_at  # a new process on the same node
+    # Unconditional: a restarted container often reuses its pid, and one process always passes the same value
+    node.started_at = started_at
     node.heartbeat_at, node.is_leader = now, bool(leader)
     node.version, node.pid = Config.APP_VERSION, os.getpid()
     if leader:

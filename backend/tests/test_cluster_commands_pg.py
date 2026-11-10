@@ -241,6 +241,28 @@ def test_rolling_restart_goes_in_node_order_one_at_a_time(app, ha):
                               ('down', 'c'), ('up', 'c')]
 
 
+def test_a_node_back_under_the_same_pid_releases_the_next_one(app, ha):
+    """A restarted container often reuses its pid: the heartbeat still carries the new started_at."""
+    from services.scheduler_leader import write_heartbeat
+    events = []
+
+    def beat(name, started_at):
+        with app.app_context():
+            write_heartbeat(PREFIX + name, False, started_at)
+
+    def restart_a():
+        events.append(('down', 'a'))
+        threading.Timer(0.3, beat, args=('a', utc_now())).start()
+    for name in ('a', 'b'):
+        beat(name, utc_now() - timedelta(seconds=60))
+    appliers = [ha('a', restart_action=restart_a, guard=30),
+                ha('b', restart_action=lambda: events.append(('down', 'b')), guard=30)]
+    _emit(app, cc.RESTART)
+    for applier in appliers:
+        applier.start()
+    assert wait_for(lambda: ('down', 'b') in events, timeout=8)
+
+
 def test_a_node_started_after_the_restart_command_is_spared(app, ha):
     cluster = _Cluster(app)
     log = []
