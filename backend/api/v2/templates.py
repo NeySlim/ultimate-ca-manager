@@ -266,7 +266,7 @@ def create_template():
         "name": "Web Server SSL",
         "description": "Standard web server certificate",
         "template_type": "web_server",
-        "key_type": "EC-P256",
+        "key_type": "RSA-2048",
         "validity_days": 397,
         "digest": "sha256",
         "dn_template": {
