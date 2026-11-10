@@ -44,7 +44,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import dsa
 from utils import key_algorithms, notices as notices_mod
-from utils.issuance_defaults import default_issue_key_id
+from utils.issuance_defaults import default_issue_key_id, digest_for_key, stronger_digest
 from websocket.emitters import on_ca_created, on_ca_updated, on_ca_deleted
 
 logger = logging.getLogger(__name__)
@@ -610,6 +610,10 @@ def create_ca():
         if digest_err:
             return error_response(digest_err, 400)
         digest_explicit = digest is not None and str(raw_digest or 'auto').strip().lower() != 'auto'
+        # 'auto' never signs an intermediate below the parent key's own hash
+        if (caref and data.get('type') != 'external' and digest is not None
+                and not digest_explicit and key_algorithms.needs_digest(parent_cert.public_key())):
+            digest = stronger_digest(digest, digest_for_key(parent_cert.public_key()))
         notices = []
         if digest is None and str(raw_digest or 'auto').strip().lower() != 'auto':
             notices.append(notices_mod.digest_ignored(

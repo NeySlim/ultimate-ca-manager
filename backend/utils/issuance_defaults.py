@@ -25,6 +25,14 @@ def digest_for_key(key) -> str | None:
     return key_algorithms.default_digest_for_key(_public(key))
 
 
+def stronger_digest(*digests) -> str | None:
+    """Strongest SHA-2 among *digests*, skipping None; an intermediate's default never falls
+    below its parent key's hash nor its own key's."""
+    from services.policy_service import POLICY_DIGESTS
+    known = [d for d in digests if d in POLICY_DIGESTS]
+    return max(known, key=POLICY_DIGESTS.index) if known else next((d for d in digests if d), None)
+
+
 def digest_for_label(label) -> str | None:
     """``digest_for_key`` for a key type label ('EC-P384'); SHA-256 when unknown."""
     alg = key_algorithms.get(label)

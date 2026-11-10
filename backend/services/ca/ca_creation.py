@@ -120,14 +120,17 @@ def _refuse_on_violations(violations):
 
 
 def _default_ca_digest(caref, key_type):
-    """Hash of a CA certificate nobody chose: the parent key's for an intermediate, else the new key's."""
+    """Hash of a CA certificate nobody chose: for an intermediate, the stronger of the parent
+    key's and the new key's (the parent's alone when only it takes one), else the new key's."""
     from utils.ca_profile import resolve_digest
-    from utils.issuance_defaults import digest_for_key
+    from utils.issuance_defaults import digest_for_key, stronger_digest
+    own = resolve_digest(None, key_type)[0]
     parent = CA.query.filter_by(refid=caref).first() if caref else None
     if parent is not None and parent.crt:
         from services.ca.helpers import get_ca_cert_pem
-        return digest_for_key(x509.load_pem_x509_certificate(get_ca_cert_pem(parent)).public_key())
-    return resolve_digest(None, key_type)[0]
+        parent_digest = digest_for_key(x509.load_pem_x509_certificate(get_ca_cert_pem(parent)).public_key())
+        return stronger_digest(parent_digest, own) if parent_digest else None
+    return own
 
 
 class CACreationMixin:

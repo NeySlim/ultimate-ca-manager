@@ -12,7 +12,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Changed
 
 - Breaking: the SCEP CertRep is signed with the digest of the client's request when the CA key allows it, never below the key's own (SHA-384 under a P-384 CA, where it was always SHA-256), and an Ed25519 CA signs it with Ed25519 (RFC 8419); #397.
-- Requests that name no key or hash no longer fall back to RSA-2048 and SHA-256 on every issuance path: the default key comes from one place and moves to RSA-3072 under a compliance profile that refuses RSA-2048, and the hash follows the signing key; #397.
+- Requests that name no key or hash no longer fall back to RSA-2048 and SHA-256 on every issuance path: the default key comes from one place and moves to RSA-3072 under a compliance profile that refuses RSA-2048, the hash follows the signing key, and a new intermediate CA never takes a hash weaker than its own key's; #397.
 
 ### Fixed
 

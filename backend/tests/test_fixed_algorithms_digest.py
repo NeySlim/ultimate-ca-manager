@@ -226,6 +226,34 @@ class TestFallbacks:
             db.session.commit()
         assert hashes_ == ['sha384', 'sha384']
 
+    def test_internal_ca_without_digest_keeps_the_child_key_hash(self, app, create_ca):
+        import base64
+        from services.ca_service import CAService
+        parent = create_ca(cn='Fallback RSA parent of P-384', hashAlgorithm=None)
+        with app.app_context():
+            child = CAService.create_internal_ca(
+                descr='fallback p384 child', dn={'CN': 'Fallback P-384 child'},
+                key_type='secp384r1', caref=db.session.get(CA, parent['id']).refid)
+            got = _hash_of(x509.load_pem_x509_certificate(base64.b64decode(child.crt)))
+            db.session.delete(child)
+            db.session.commit()
+        assert got == 'sha384'
+
+    @pytest.mark.parametrize('parent_key,child_key,digest', [
+        (('EC-P384', 'secp384r1'), ('RSA', 2048), 'sha384'),
+        (('RSA', 2048), ('EC-P384', 'secp384r1'), 'sha384')])
+    @pytest.mark.parametrize('asked', [None, 'auto'])
+    def test_api_intermediate_without_digest(self, app, create_ca, parent_key, child_key, digest, asked):
+        import base64
+        parent = create_ca(cn=f'API fallback root {parent_key} {child_key} {asked}',
+                           keyType=parent_key[0], keySize=parent_key[1], hashAlgorithm=None)
+        child = create_ca(cn=f'API fallback child {parent_key} {child_key} {asked}', type='intermediate',
+                          parentCAId=parent['id'], keyType=child_key[0], keySize=child_key[1],
+                          hashAlgorithm=asked)
+        with app.app_context():
+            row = db.session.get(CA, child['id'])
+            assert _hash_of(x509.load_pem_x509_certificate(base64.b64decode(row.crt))) == digest
+
     def test_trust_store_signers_without_digest(self):
         import datetime as dt
         from services.trust_store import TrustStoreService
