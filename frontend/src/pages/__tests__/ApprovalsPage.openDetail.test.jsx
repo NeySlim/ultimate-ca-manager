@@ -113,6 +113,18 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     expect(openWindow).not.toHaveBeenCalled()
   })
 
+  it('reports an approval whose issuance waits for the client as a success', async () => {
+    const showError = vi.spyOn(stable.notify, 'showError')
+    const showSuccess = vi.spyOn(stable.notify, 'showSuccess')
+    approve.mockResolvedValue({ data: { certificate_issued: false, deferred: true, status: 'approved' } })
+    renderPage()
+    await clickApproveOrReject('approve')
+    await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('approvals.approvedSuccess'))
+    expect(showError).not.toHaveBeenCalled()
+    expect(openWindow).not.toHaveBeenCalled()
+    showError.mockRestore(); showSuccess.mockRestore()
+  })
+
   it('opens nothing on reject', async () => {
     reject.mockResolvedValue({ data: {} })
     renderPage()

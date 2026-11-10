@@ -1427,7 +1427,11 @@ def approve_approval_request(request_id, comment=None):
         from services.webhook_service import emit_csr_approved
         emit_csr_approved(result)
 
-    if issued_cert is not None:
+    if issued_cert is not None and issued_cert.get('deferred'):
+        # Approved only: the protocol issues when its client comes back
+        result['certificate_issued'] = False
+        result['deferred'] = True
+    elif issued_cert is not None:
         result['certificate'] = issued_cert
         result['certificate_issued'] = True
         if issued_cert.get('already_issued'):

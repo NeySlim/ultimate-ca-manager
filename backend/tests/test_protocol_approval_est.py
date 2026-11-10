@@ -128,7 +128,12 @@ def test_server_key_generation_waits_then_generates(app, client, auth_client, es
         _held(_post_csr(client, 'serverkeygen', csr, headers=_basic_auth()))
         (approval_id, _s, data, _c), = requests_of(app, pid, 'est_enroll')
         assert data['operation'] == 'serverkeygen'
-        approve(auth_client, approval_id)
+        # Approved only: the key and its certificate wait for the client's retry
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.status_code == 200, r.get_json()
+        body = r.get_json()['data']
+        assert body['certificate_issued'] is False and body['deferred'] is True
+        assert body['status'] == 'approved' and 'issue_error' not in body
         response = _post_csr(client, 'serverkeygen', csr, headers=_basic_auth())
         assert response.status_code == 200, response.data
         assert len(_multipart_parts(response)) == 2
@@ -171,3 +176,64 @@ def test_unreadable_policies_refuse(app, client, est_config, monkeypatch):
     monkeypatch.setattr(PolicyEvaluationService, 'check_approval_required', broken)
     csr, _ = _make_csr(common_name='broken.est-approval.test')
     assert _enroll(client, csr).status_code == 500
+
+
+def _approved_keygen(app, client, auth_client, est_config, pid, cn):
+    csr, _ = _make_csr(common_name=cn)
+    _held(_post_csr(client, 'serverkeygen', csr, headers=_basic_auth()))
+    (approval_id, *_), = requests_of(app, pid, 'est_enroll')
+    r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+    assert r.status_code == 200, r.get_json()
+    return csr, approval_id
+
+
+def test_two_key_generation_retries_issue_one_certificate(app, client, auth_client, est_config):
+    with approval_policy(app, est_config['id'], 'est-held-keygen-twice') as pid:
+        cn = 'keygen-twice.est-approval.test'
+        csr, _approval_id = _approved_keygen(app, client, auth_client, est_config, pid, cn)
+        first = _post_csr(client, 'serverkeygen', csr, headers=_basic_auth())
+        second = _post_csr(client, 'serverkeygen', csr, headers=_basic_auth())
+        assert first.status_code == 200, first.data
+        # Delivered once: the second retry is a new request, held again
+        _held(second)
+        with app.app_context():
+            assert Certificate.query.filter(Certificate.subject.contains(cn)).count() == 1
+        assert [r[1] for r in requests_of(app, pid, 'est_enroll')] == ['approved', 'pending']
+
+
+def test_a_delivery_claimed_meanwhile_is_not_claimed_again(app, client, auth_client, est_config):
+    """The retry that waited on the row lock reads the row again: another
+    retry delivered the key meanwhile, so this one issues nothing."""
+    import json
+    from models import db
+    from models.policy import ApprovalRequest
+    from services import protocol_approval
+    with approval_policy(app, est_config['id'], 'est-held-keygen-claim') as pid:
+        _csr, approval_id = _approved_keygen(app, client, auth_client, est_config, pid,
+                                             'keygen-claim.est-approval.test')
+        with app.app_context():
+            stale = db.session.get(ApprovalRequest, approval_id)
+            assert not protocol_approval.request_data(stale).get('delivered_at')
+            data = dict(protocol_approval.request_data(stale), delivered_at='2026-01-01T00:00:00Z')
+            # Another worker's claim, committed on its own connection: this
+            # session's copy is stale
+            with db.engine.begin() as other:
+                other.execute(ApprovalRequest.__table__.update()
+                              .where(ApprovalRequest.__table__.c.id == approval_id)
+                              .values(request_data=json.dumps(data)))
+            assert protocol_approval.claim_delivery(stale) is False
+            fresh = db.session.get(ApprovalRequest, approval_id)
+            assert protocol_approval.claim_delivery(fresh) is False
+
+
+def test_a_failed_key_generation_keeps_the_approval(app, client, auth_client, est_config, monkeypatch):
+    import api.est_protocol as est
+    with approval_policy(app, est_config['id'], 'est-held-keygen-fail') as pid:
+        csr, _approval_id = _approved_keygen(app, client, auth_client, est_config, pid,
+                                             'keygen-fail.est-approval.test')
+        real = est.sign_est_csr
+        monkeypatch.setattr(est, 'sign_est_csr', lambda *a, **k: (_ for _ in ()).throw(RuntimeError('down')))
+        assert _post_csr(client, 'serverkeygen', csr, headers=_basic_auth()).status_code == 400
+        monkeypatch.setattr(est, 'sign_est_csr', real)
+        assert _post_csr(client, 'serverkeygen', csr, headers=_basic_auth()).status_code == 200
+        assert [r[1] for r in requests_of(app, pid, 'est_enroll')] == ['approved']

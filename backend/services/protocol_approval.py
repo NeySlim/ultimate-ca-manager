@@ -207,6 +207,28 @@ def mark_delivered(approval) -> None:
     db.session.commit()
 
 
+def claim_delivery(approval) -> bool:
+    """Lock *approval*'s row, read it again and mark it delivered: True for
+    the one caller that does, False when another delivered it first. Committed
+    before anything is issued, so two retries never issue twice."""
+    row = (ApprovalRequest.query.with_for_update().populate_existing()
+           .filter_by(id=approval.id).first())
+    if row is None or row.status != 'approved' or request_data(row).get('delivered_at'):
+        db.session.rollback()
+        return False
+    mark_delivered(row)
+    return True
+
+
+def release_delivery(approval) -> None:
+    """Undo :func:`claim_delivery` when nothing reached the client."""
+    db.session.rollback()
+    data = request_data(approval)
+    data.pop('delivered_at', None)
+    approval.request_data = json.dumps(data)
+    db.session.commit()
+
+
 def record_refusal(approval, error) -> None:
     """Keep the protocol's own refusal on *approval* for its closed handler."""
     refusal = getattr(error, 'refusal', None)

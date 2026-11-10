@@ -711,7 +711,10 @@ def _approval_gate(ca, csr, operation, identity, extra=None):
         return Response(protocol_approval.decision_reason(approval), status=403), None
     if approval.status == 'approved':
         if operation == 'serverkeygen':
-            return None, approval
+            if protocol_approval.claim_delivery(approval):
+                return None, approval
+            # Another retry took this approval: this one is a new request
+            return _approval_gate(ca, csr, operation, identity, extra)
         from models import Certificate
         row = db.session.get(Certificate, approval.certificate_id) if approval.certificate_id else None
         if row is not None and row.crt:
@@ -721,6 +724,13 @@ def _approval_gate(ca, csr, operation, identity, extra=None):
     logger.info('EST %s held for approval #%s', operation, approval.id)
     return Response(f'Request held for approval (#{approval.id}); retry later', status=202,
                     headers={'Retry-After': str(_retry_after_seconds())}), None
+
+
+def _release_claim(approval):
+    """An approved key generation that issued nothing waits for the next retry."""
+    if approval is not None:
+        from services import protocol_approval
+        protocol_approval.release_delivery(approval)
 
 
 def _link_issued(approval, cert, ca):
@@ -1036,6 +1046,7 @@ def server_keygen(label=None):
     remote_ip = client_ip()
     auth_method = 'mtls' if _trusted_client_cert() else 'basic'
 
+    approved = None  # an approval this request claimed, released if nothing is issued
     try:
         csr_data, err = _read_est_body_text()
         if err is not None:
@@ -1185,6 +1196,7 @@ def server_keygen(label=None):
                 )
             except Exception as e:
                 logger.error(f"EST serverkeygen: the key package could not be signed: {e}")
+                _release_claim(approved)
                 return Response(
                     'Server key generation failed: the key package could not be signed',
                     status=500,
@@ -1207,9 +1219,9 @@ def server_keygen(label=None):
 
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
         if approved is not None:
-            from services import protocol_approval
             _link_issued(approved, cert, ca)
-            protocol_approval.mark_delivered(approved)
+            db.session.commit()
+            approved = None  # issued: the claim stands whatever follows
         
         # The certificate part exactly matches /simpleenroll: one certificate.
         p7_b64 = _certs_only_base64(cert)
@@ -1241,10 +1253,13 @@ Content-Transfer-Encoding: base64\r
         
     except PolicyViolation as e:
         logger.warning(f"EST serverkeygen refused by policy: {e}")
+        _release_claim(approved)
         return Response(f"Policy violation: {e}", status=400)
     except RequestRejected as e:
         logger.warning(f"EST serverkeygen refused: {e}")
+        _release_claim(approved)
         return Response(str(e), status=400)
     except Exception as e:
         logger.error(f"EST serverkeygen failed: {e}")
+        _release_claim(approved)
         return Response("Server key generation failed", status=400)

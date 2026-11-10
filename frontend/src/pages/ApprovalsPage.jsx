@@ -248,6 +248,9 @@ export default function ApprovalsPage() {
         } else if (result?.data?.certificate_issued) {
           showSuccess(t('approvals.certificateIssued'))
           showNotices(result, showWarning)
+        } else if (result?.data?.deferred) {
+          // Approved: the protocol issues when its client comes back
+          showSuccess(t('approvals.approvedSuccess'))
         } else if (result?.data?.request_closed) {
           // Nothing can satisfy the request any more: it was closed
           showError(t('approvals.requestClosed', { reason: result.data.issue_error || '' }))
