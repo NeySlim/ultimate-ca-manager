@@ -265,6 +265,11 @@ def worker_int(worker):
 def worker_abort(worker):
     worker.log.info("Worker received SIGABRT signal")
 
+def worker_exit(server, worker):
+    # A worker leaving with a restart claim not given back would keep its successor from restarting
+    from services.cluster_commands import stop_applier
+    stop_applier()
+
 def post_worker_init(worker):
     """Post-worker initialization:
     0. Drop the database and syslog connections inherited from the master

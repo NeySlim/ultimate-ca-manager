@@ -258,6 +258,43 @@ def test_the_process_start_is_stamped_before_the_master_reads_a_setting(tmp_path
     assert json.loads(run.stdout.strip().splitlines()[-1]) == [['wstep', True], ['mtls', True]]
 
 
+_WORKER_EXIT = r'''
+import boot_config
+boot_config.wstep_enabled = lambda data_path: False
+boot_config.mtls_client_ca = lambda data_path: None
+import gunicorn_config
+import services.cluster_commands as cc
+
+
+class Applier:
+    stopped = 0
+
+    def stop(self):
+        Applier.stopped += 1
+        raise RuntimeError('database gone')
+cc._applier = Applier()
+gunicorn_config.worker_exit(None, None)
+cc._applier = None
+gunicorn_config.worker_exit(None, None)
+print(Applier.stopped)
+'''
+
+
+def test_a_worker_that_exits_stops_its_applier_and_never_raises(tmp_path):
+    """The stop is what gives back a restart claim still pending: the next worker can then claim it."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    backend = str(Path(__file__).resolve().parent.parent)
+    env = {k: v for k, v in os.environ.items() if k not in ('DATABASE_URL', 'DATABASE_PATH')}
+    env.update(DATA_DIR=str(tmp_path), UCM_BASE_PATH=str(tmp_path), PYTHONPATH=backend)
+    run = subprocess.run([sys.executable, '-c', _WORKER_EXIT], cwd=backend, env=env,
+                         capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0, run.stderr
+    assert run.stdout.strip().splitlines()[-1] == '1'
+
+
 @pytest.fixture
 def master_on_sqlite(monkeypatch, tmp_path):
     """The gunicorn master in HA, on a SQLite file of the test's own."""

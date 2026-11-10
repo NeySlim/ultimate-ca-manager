@@ -528,6 +528,17 @@ class CommandApplier:
 _applier = None
 
 
+def stop_applier():
+    """Stop this process's applier, giving back a restart claim still pending; never raises."""
+    applier = _applier
+    if applier is None:
+        return
+    try:
+        applier.stop()
+    except Exception as e:
+        logger.error(f"Cluster command applier not stopped cleanly: {type(e).__name__}")
+
+
 def start_applier(app, record=True, master_pid=None):
     """HA only: this process's applier; None (no thread, no query) outside HA."""
     global _applier
