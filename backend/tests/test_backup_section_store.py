@@ -355,3 +355,25 @@ def test_a_loosened_fallback_directory_is_closed_again(tmp_path, monkeypatch):
 
     assert section_store.fallback_directory() == directory
     assert stat.S_IMODE(os.stat(directory).st_mode) == 0o700
+
+
+def test_iter_rows_streams_a_sealed_section_without_loading_it(tmp_path, monkeypatch):
+    """Rows cross frame boundaries, a multibyte character too: every row comes
+    back whole and the section is never loaded into the store."""
+    from services.backup import section_store
+    monkeypatch.setattr(section_store, 'FRAME_BYTES', 64)
+    rows = [{'refid': f'c{i}', 'caref': 'ca', 'serial_number': str(i % 3), 'descr': 'é' * 40 + '€'}
+            for i in range(50)]
+    with SectionStore(str(tmp_path)) as store:
+        store.add_part('metadata', 0, {'schema_version': 4})
+        store.add_part('certificates', 0, rows[:20])
+        store.add_part('certificates', 1, rows[20:])
+        store.add_part('configuration', 0, {'k': 'v'})
+        store.seal()
+        assert os.path.getsize(store._files['certificates']) > 64 * 10  # many frames
+        assert list(store.iter_rows('certificates')) == rows
+        assert 'certificates' not in store._loaded
+        with pytest.raises(TypeError):
+            list(store.iter_rows('configuration'))
+        store['certificates']  # loaded: iterated in place, same rows
+        assert list(store.iter_rows('certificates')) == rows

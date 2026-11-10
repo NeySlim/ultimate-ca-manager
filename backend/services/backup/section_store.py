@@ -5,6 +5,7 @@ with AES-GCM under a key that lives only in this process, and loaded again
 only when the restore asks for it. The store answers what the
 restore reads of a payload dict, so the restore code is the same for v1 to v4.
 """
+import codecs
 import hashlib
 import json
 import logging
@@ -244,9 +245,9 @@ class SectionStore:
         nonce = self._nonces.to_bytes(_NONCE_SIZE, 'big')
         return nonce, self._aead.encrypt(nonce, plaintext, _frame_aad(label, index))
 
-    def _read_sealed(self, path: str) -> Any:
+    def _frames(self, path: str) -> Iterator[bytes]:
+        """The decrypted frames of a section file, in order."""
         label = os.path.basename(path)
-        plaintext = bytearray()
         with open(path, 'rb') as handle:
             index = 0
             while True:
@@ -260,9 +261,47 @@ class SectionStore:
                 sealed = handle.read(length)
                 if len(nonce) != _NONCE_SIZE or len(sealed) != length:
                     raise ValueError('Truncated restore section file')
-                plaintext += self._aead.decrypt(nonce, sealed, _frame_aad(label, index))
+                yield self._aead.decrypt(nonce, sealed, _frame_aad(label, index))
                 index += 1
+
+    def _read_sealed(self, path: str) -> Any:
+        plaintext = bytearray()
+        for frame in self._frames(path):
+            plaintext += frame
         return json.loads(plaintext)
+
+    def iter_rows(self, name: str) -> Iterator[Any]:
+        """The rows of a list section one at a time, without loading the section:
+        a check over every row (serial duplicates) keeps the restore's memory bound."""
+        if name in self._pinned or name in self._loaded:
+            yield from list(self[name])
+            return
+        if name not in self._files:
+            raise KeyError(name)
+        if self._shape.get(name, ('list', 0))[0] != 'list':
+            raise TypeError(f"Section '{name}' is not a list")
+        decoder = json.JSONDecoder()
+        text = codecs.getincrementaldecoder('utf-8')()
+        buffer, opened = '', False
+        for frame in self._frames(self._files[name]):
+            buffer += text.decode(frame)
+            while True:
+                i = 0
+                while i < len(buffer) and (buffer[i] in ' \t\r\n,' or (buffer[i] == '[' and not opened)):
+                    opened = opened or buffer[i] == '['
+                    i += 1
+                if i >= len(buffer):
+                    buffer = ''
+                    break
+                if buffer[i] == ']':
+                    return
+                try:
+                    row, end = decoder.raw_decode(buffer, i)
+                except ValueError:
+                    buffer = buffer[i:]    # the row continues in the next frame
+                    break
+                yield row
+                buffer = buffer[end:]
 
     # -- what a restore reads ---------------------------------------------
 

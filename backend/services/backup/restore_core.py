@@ -507,9 +507,12 @@ class RestoreCoreMixin:
         from utils.serial_duplicates import CLEANUP, INDEX, describe, duplicates_in_rows
         if not any(ix.get('name') == INDEX for ix in inspect(db.engine).get_indexes('certificates')):
             return
-        rows = backup_data.get('certificates')
-        duplicates = duplicates_in_rows(r for r in rows if isinstance(r, dict)) \
-            if isinstance(rows, list) else []
+        if section_kind(backup_data, 'certificates') != 'list':
+            return
+        # A v4 store is read row by row: the section is never loaded for this check
+        rows = (backup_data.iter_rows('certificates') if isinstance(backup_data, SectionStore)
+                else backup_data['certificates'])
+        duplicates = duplicates_in_rows(r for r in rows if isinstance(r, dict))
         if duplicates:
             raise BackupSchemaError(
                 f"The archive holds {len(duplicates)} serial number(s) shared by certificates "
