@@ -54,14 +54,20 @@ rendering. New code uses the 21 tokens; an alias goes away when its last
 consumer does. Icon hues, `--violet` and the logo gradient depend on the mode
 only, not on the family.
 
+**Rule.** No `#rrggbb`, `rgb()`/`rgba()`/`hsl()` literal and no Tailwind palette class
+(`text-red-500`, `bg-white`, `border-gray-800`) in `src`: use a token, an alias or a helper class.
+Fixed constants (`--ink`, `--paper`, `--hue-*`, `--scrim`) live in `tokens.css`; `bg-scrim-NN` is the overlay.
+`styles/__tests__/noHardcodedColors.test.js` enforces it and lists the exceptions with their reason.
+
 Mode resolves from `system` / `dark` / `light` (persisted in localStorage +
 server prefs). Every component must read tokens (`var(--…)` or the Tailwind
 aliases below) so it adapts to all 8 combinations. Never hardcode a hex.
 
-Two documented exceptions carry fixed colors in every theme: the Ko-fi tokens
+Documented exceptions carry fixed colors in every theme: the Ko-fi tokens
 (`--kofi-coral`, `--kofi-coral-strong`, `--kofi-coral-hover`, used by
 `.kofi-card` / `.kofi-badge` / `.kofi-button` / `.kofi-icon`) because they are a
-third party's brand, and `icon-bg-rose` / `icon-bg-sky` (see below).
+third party's brand, `ProviderIcons.jsx`, the theme picker swatches, the help reader's
+sepia palette, the email preview canvas, and `icon-bg-rose` / `icon-bg-sky` (see below).
 
 ## Typography
 
@@ -164,7 +170,7 @@ Colored tile backgrounds that avoid "ton sur ton" clashes per theme:
 `icon-bg-purple`, backed by `--icon-{blue,orange,amber,emerald,teal,violet}-{bg,text}`.
 Derived from status tokens: `icon-bg-red` (`--accent-danger`),
 `icon-bg-gray` (`--text-tertiary`). Fixed hues in every theme: `icon-bg-rose`
-(`#F472B6`) and `icon-bg-sky` (`#38BDF8`).
+(`--hue-rose`) and `icon-bg-sky` (`--hue-sky`).
 
 ### Detail panel tokens
 `tokens.css` also defines `--gradient-bg` and the `--detail-*` set
