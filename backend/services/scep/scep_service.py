@@ -30,6 +30,7 @@ from utils.eku_validation import add_ocsp_nocheck_if_responder
 from utils.leaf_key_usage import constrain_builder_key_usage
 from utils.key_codec import load_pem_bytes, refuse_eddsa_key
 from utils.csr_extensions import csr_extensions
+from utils.ca_serial_counter import next_ca_serial
 from utils.datetime_utils import utc_now
 from utils.file_naming import cert_cert_path
 
@@ -739,6 +740,8 @@ class SCEPService:
                         ), 200
 
                 try:
+                    # Counted after the Intune notice: the count locks the CA row until the commit
+                    next_ca_serial(self.ca)
                     db.session.commit()
                 except Exception as e:
                     db.session.rollback()
@@ -988,6 +991,8 @@ class SCEPService:
                              "(txn_id=%s): %s", transaction_id, e)
                 raise ValueError('Intune could not be notified; the certificate was not issued') from e
         try:
+            # Counted after the Intune notice: the count locks the CA row until the commit
+            next_ca_serial(self.ca)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
@@ -1778,9 +1783,6 @@ class SCEPService:
             created_by="scep",
         )
         db.session.add(cert_obj)
-        # Counted in the caller's transaction: a refused issuance rolls the count back too
-        from utils.ca_serial_counter import next_ca_serial
-        next_ca_serial(self.ca)
         if renewal_of is not None:
             # Archived in the same transaction, and claimed once: the scheduler
             # does not renew it again, nor does a concurrent renewal
