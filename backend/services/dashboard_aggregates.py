@@ -147,7 +147,7 @@ def _queue_union(now):
     parts.append(select(
         _const('manual_renewal_due').label('kind'),
         case((Certificate.valid_to < soon, _CRITICAL), else_=_WARNING).label('rank'),
-        Certificate.id.label('id'), text_label(func.coalesce(Certificate.subject_cn, Certificate.descr)).label('label'),
+        Certificate.id.label('id'), text_label(func.coalesce(func.nullif(Certificate.subject_cn, ''), Certificate.descr)).label('label'),
         due(Certificate.valid_to).label('due_at'),
     ).where(*_manual_renewal_conditions(now)))
 
@@ -181,9 +181,14 @@ def _manual_renewal_conditions(now):
     no_key = or_(Certificate.prv.is_(None), Certificate.prv == '')
     skipped = [no_key, Certificate.source.is_(None), Certificate.source.notin_(config['renewal_sources'] or [''])]
     newer = aliased(Certificate)
+    # Superseded: same non-empty CN, full subject and SANs from the same CA, by a live
+    # certificate that itself lies beyond the expiry window
     superseded = (select(newer.id).where(
         newer.subject_cn == Certificate.subject_cn, newer.caref == Certificate.caref,
-        newer.id != Certificate.id, newer.valid_to > Certificate.valid_to,
+        newer.subject.is_not_distinct_from(Certificate.subject),
+        newer.san_dns.is_not_distinct_from(Certificate.san_dns),
+        newer.san_ip.is_not_distinct_from(Certificate.san_ip),
+        newer.id != Certificate.id, newer.valid_to > now + timedelta(days=EXPIRY_WINDOW_DAYS),
         holds_certificate(newer), newer.revoked.is_(False), _not_archived(newer)).exists())
     return [
         holds_certificate(), Certificate.revoked.is_(False), _not_archived(),
@@ -192,7 +197,7 @@ def _manual_renewal_conditions(now):
         true() if not config['enabled'] else or_(*skipped),
         ~_renewed_by_acme_client(),
         or_(Certificate.source.is_(None), Certificate.source.notin_(CLIENT_RENEWED_SOURCES), ~no_key),
-        ~superseded,
+        or_(Certificate.subject_cn.is_(None), Certificate.subject_cn == '', ~superseded),
     ]
 
 
