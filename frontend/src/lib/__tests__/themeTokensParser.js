@@ -76,10 +76,14 @@ export function paletteDecls(rootCss = '', css = fs.readFileSync(TOKENS_CSS, 'ut
 
 export function parseTokens(css = fs.readFileSync(TOKENS_CSS, 'utf8')) {
   const result = {}
-  const aliasDecls = {}
+  // Shared :root aliases, plus :root[data-mode="x"] overrides that apply to mode x only.
+  const aliasDecls = { dark: {}, light: {} }
   for (const block of css.matchAll(/(:root[^{]*)\{([^}]*)\}/g)) {
     if (/data-theme/.test(block[1])) continue
-    for (const d of block[2].matchAll(/--([a-z-]+):\s*([^;]+);/g)) aliasDecls[d[1]] = d[2].trim()
+    const mode = block[1].match(/data-mode="([a-z]+)"/)?.[1]
+    for (const d of block[2].matchAll(/--([a-z-]+):\s*([^;]+);/g)) {
+      for (const m of MODES) if (!mode || mode === m) aliasDecls[m][d[1]] = d[2].trim()
+    }
   }
   for (const block of css.matchAll(/(:root[^{]*)\{([^}]*)\}/g)) {
     const selectors = block[1]
@@ -93,7 +97,7 @@ export function parseTokens(css = fs.readFileSync(TOKENS_CSS, 'utf8')) {
       for (const name of TOKEN_NAMES) {
         resolved[name] = name === 'glow' ? decls[name] : resolve(decls[name], decls)
       }
-      const all = { ...aliasDecls, ...decls }
+      const all = { ...aliasDecls[m[2]], ...decls }
       for (const name of ALIAS_NAMES) resolved[name] = resolve(all[name], all)
       result[`${m[1]}-${m[2]}`] = resolved
     }
