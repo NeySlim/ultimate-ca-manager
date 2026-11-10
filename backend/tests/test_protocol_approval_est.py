@@ -424,3 +424,33 @@ def test_a_reenrolment_refused_at_issuance_is_announced_as_such(app, client, aut
         assert r.get_json()['message'] == 'Request closed'
         refused = _post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem)
         assert refused.status_code == 403 and refused.data == b'Refused at issuance'
+
+
+def test_an_approval_already_linked_issues_no_second_certificate(app, client, est_config):
+    """Linking is a compare-and-set: a copy of the request read before
+    another issuance linked it stores no second certificate."""
+    import json
+
+    from models import db
+    from models.policy import ApprovalRequest
+    from services import protocol_approval
+    first = _cert_of(_enroll(client, _make_csr(common_name='first.est-approval.test')[0]))
+    with approval_policy(app, est_config['id'], 'est-held-linked-twice') as pid:
+        csr, _ = _make_csr(common_name='linked-twice.est-approval.test')
+        _held(_enroll(client, csr))
+        (approval_id, *_), = requests_of(app, pid, 'est_enroll')
+        with app.app_context():
+            linked_id = Certificate.query.filter_by(serial_number=str(first.serial_number)).first().id
+            stale = db.session.get(ApprovalRequest, approval_id)
+            with db.engine.begin() as conn:
+                conn.execute(ApprovalRequest.__table__.update()
+                             .where(ApprovalRequest.__table__.c.id == approval_id)
+                             .values(status='approved', certificate_id=linked_id))
+            with pytest.raises(RuntimeError, match='already issued'):
+                protocol_approval.issue_approved(stale, json.loads(stale.request_data))
+            db.session.rollback()
+            assert Certificate.query.filter(
+                Certificate.subject_cn == 'linked-twice.est-approval.test').count() == 0
+            assert Certificate.query.filter(
+                Certificate.subject_cn == 'first.est-approval.test').count() >= 1
+        assert requests_of(app, pid, 'est_enroll')[0][3] == linked_id

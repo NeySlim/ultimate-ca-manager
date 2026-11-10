@@ -210,8 +210,15 @@ def gate_protocol_issuance(protocol: str, *, ca, template_id=None, cn=None, san_
 
 def linker(approval):
     """The ``on_stored`` hook of an approved issuance: the certificate is
-    linked in the commit that stores it, never seen approved without it."""
+    linked in the commit that stores it, never seen approved without it.
+    Compare-and-set: only the issuance finding the link empty stores its certificate."""
     def link(row):
+        claimed = db.session.query(ApprovalRequest).filter(
+            ApprovalRequest.id == approval.id,
+            ApprovalRequest.certificate_id.is_(None),
+        ).update({ApprovalRequest.certificate_id: row.id}, synchronize_session=False)
+        if claimed != 1:
+            raise RuntimeError('A certificate was already issued for this approval')
         approval.certificate_id = row.id
     return link
 
