@@ -41,7 +41,7 @@ export default function ProviderTypeGrid({ label, providers, value, onChange, di
             : "border-border-op50 bg-tertiary-op40 hover:border-secondary-op40 hover:bg-tertiary-op70"
         )}
       >
-        <span className="w-8 h-8 rounded-lg flex items-center justify-center text-white shadow-sm"
+        <span className="w-8 h-8 rounded-lg flex items-center justify-center text-paper shadow-sm"
           style={{ backgroundColor: brandColor }}>
           <ProviderIcon type={pt.type} size={18} />
         </span>

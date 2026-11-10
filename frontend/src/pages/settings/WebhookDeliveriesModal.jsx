@@ -83,7 +83,7 @@ export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
           <div className="max-h-[55vh] overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-bg-secondary">
-                <tr className="text-left text-xs text-text-tertiary border-b border-white/5">
+                <tr className="text-left text-xs text-text-tertiary border-b border-border-op30">
                   <th className="py-2 pr-3 font-medium">{t('webhooks.deliveries.event')}</th>
                   <th className="py-2 px-3 font-medium">{t('webhooks.deliveries.statusCol')}</th>
                   <th className="py-2 px-3 font-medium text-right">{t('webhooks.deliveries.attempts')}</th>
@@ -93,12 +93,12 @@ export default function WebhookDeliveriesModal({ webhook, onClose, canRetry }) {
               </thead>
               <tbody>
                 {items.map((d) => (
-                  <tr key={d.id} className="border-b border-white/5 last:border-0 align-top">
+                  <tr key={d.id} className="border-b border-border-op30 last:border-0 align-top">
                     <td className="py-2 pr-3 font-mono text-xs text-text-primary">{d.event_type}</td>
                     <td className="py-2 px-3">
                       <Badge variant={STATUS_VARIANT[d.status] || 'secondary'} size="sm">{d.status}</Badge>
                       {d.last_error && (
-                        <p className="text-xs text-amber-500/90 mt-1 font-mono max-w-[260px] truncate" title={d.last_error}>
+                        <p className="text-xs text-status-warning mt-1 font-mono max-w-[260px] truncate" title={d.last_error}>
                           {d.last_response_code ? `${d.last_response_code} · ` : ''}{d.last_error}
                         </p>
                       )}

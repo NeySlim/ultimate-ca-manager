@@ -81,7 +81,7 @@ export default function DomainForm({ domain, dnsProviders, cas, onSubmit, onCanc
         description={t('acme.autoApproveDesc')}
       />
       {formData.auto_approve && (
-        <div className="p-3 rounded-md border border-yellow-500/40 bg-yellow-500/10 text-sm text-yellow-200">
+        <div className="p-3 rounded-md border border-status-warning-op40 bg-status-warning-op10 text-sm text-status-warning">
           ⚠ {t('acme.autoApproveWarning')}
         </div>
       )}

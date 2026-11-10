@@ -107,14 +107,14 @@ export default function PublicEndpointsPanel({ settings, updateSetting, refreshK
       </div>
 
       {eff.env_locked?.fqdn_env && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 mb-3 flex items-center gap-1">
+        <p className="text-xs text-status-warning mb-3 flex items-center gap-1">
           <WarningCircle size={14} />
           {t('settings.publicEndpoints.fqdnEnvLocked')}
         </p>
       )}
 
       {eff.host_role_ok === false && (
-        <p className="text-xs text-amber-600 dark:text-amber-400 mb-3 flex items-center gap-1">
+        <p className="text-xs text-status-warning mb-3 flex items-center gap-1">
           <WarningCircle size={14} />
           {t('settings.publicEndpoints.wrongHost', { host: eff.request_host, admin: eff.admin?.host })}
         </p>

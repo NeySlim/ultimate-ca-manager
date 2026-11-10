@@ -1997,9 +1997,9 @@ export default function SettingsPage() {
         maxWidth="lg"
       >
         <div className="p-4 space-y-4">
-          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+          <div className="p-3 rounded-lg bg-status-warning-op10 border border-status-warning-op30">
             <div className="flex items-start gap-2">
-              <WarningCircle size={20} className="text-amber-500 flex-shrink-0 mt-0.5" weight="fill" />
+              <WarningCircle size={20} className="text-status-warning flex-shrink-0 mt-0.5" weight="fill" />
               <div className="text-sm text-text-primary">
                 <p className="font-semibold mb-1">{t('settings.encryptionWarningTitle')}</p>
                 <p className="text-text-secondary">{t('settings.encryptionWarningDesc')}</p>

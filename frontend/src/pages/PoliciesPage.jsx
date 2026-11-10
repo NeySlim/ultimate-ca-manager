@@ -198,7 +198,7 @@ export default function PoliciesPage() {
         <div className="flex items-center gap-2">
           <div className={cn(
             'w-2 h-2 rounded-full shrink-0',
-            row.is_active ? 'bg-green-500' : 'bg-gray-400'
+            row.is_active ? 'bg-status-success' : 'bg-text-tertiary'
           )} />
           <div>
             <div className="font-medium text-text-primary">{val}</div>

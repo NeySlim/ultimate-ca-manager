@@ -573,7 +573,7 @@ export default function CRLOCSPPage() {
             {nextUpdate && (
               <span className={cn(
                 'text-2xs',
-                isExpired ? 'text-red-500 font-medium' : 'text-text-tertiary'
+                isExpired ? 'text-status-danger font-medium' : 'text-text-tertiary'
               )}>
                 → {formatDate(nextUpdate, 'short')}
               </span>
@@ -837,7 +837,7 @@ export default function CRLOCSPPage() {
                       <Copy size={14} />
                     </Button>
                     {canWrite('crl') && (
-                      <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveUrl('cdp', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
+                      <Button type="button" size="sm" variant="ghost" className="text-status-danger hover:text-status-danger" onClick={() => handleRemoveUrl('cdp', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
                         <Trash size={14} />
                       </Button>
                     )}
@@ -888,7 +888,7 @@ export default function CRLOCSPPage() {
                       <Copy size={14} />
                     </Button>
                     {canWrite('crl') && (
-                      <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveUrl('ocsp', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
+                      <Button type="button" size="sm" variant="ghost" className="text-status-danger hover:text-status-danger" onClick={() => handleRemoveUrl('ocsp', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
                         <Trash size={14} />
                       </Button>
                     )}
@@ -939,7 +939,7 @@ export default function CRLOCSPPage() {
                       <Copy size={14} />
                     </Button>
                     {canWrite('crl') && (
-                      <Button type="button" size="sm" variant="ghost" className="text-red-500 hover:text-red-600" onClick={() => handleRemoveUrl('aia', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
+                      <Button type="button" size="sm" variant="ghost" className="text-status-danger hover:text-status-danger" onClick={() => handleRemoveUrl('aia', idx)} disabled={savingUrls} aria-label={t('common.remove')}>
                         <Trash size={14} />
                       </Button>
                     )}

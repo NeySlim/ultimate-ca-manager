@@ -541,7 +541,7 @@ export default function DevShowcasePage() {
               title="Internal Root CA"
               subtitle="RSA 4096. Self-signed"
               badge={<Badge variant="success" size="sm" dot>Active</Badge>}
-              iconClass="text-violet-500"
+              iconClass="text-accent-pro"
             />
           </div>
 
@@ -787,7 +787,7 @@ export default function DevShowcasePage() {
                   style={{
                     backgroundColor: `var(${c.name})`,
                     border: '2px solid var(--border)',
-                    boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)',
+                    boxShadow: 'inset 0 0 0 1px color-mix(in srgb, var(--ink) 10%, transparent)',
                   }}
                 />
                 <span className="text-xs text-[var(--text-secondary)] font-mono">{c.label}</span>

@@ -259,12 +259,12 @@ export default function DnsUpdateKeysPanel({
                 <div className="flex gap-1 shrink-0">
                   {canDelete && key.status === 'active' && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => handleRevoke(key)} title={t('acme.dnsUpdate.revoke')}>
-                      <Trash size={14} className="text-yellow-500" />
+                      <Trash size={14} className="text-status-warning" />
                     </Button>
                   )}
                   {canDelete && key.status === 'revoked' && (
                     <Button type="button" variant="ghost" size="sm" onClick={() => handleDelete(key)} title={t('acme.dnsUpdate.delete')}>
-                      <Trash size={14} className="text-red-500" />
+                      <Trash size={14} className="text-status-danger" />
                     </Button>
                   )}
                 </div>
@@ -329,8 +329,8 @@ export default function DnsUpdateKeysPanel({
       >
         {created && (
           <div className="p-4 space-y-4">
-            <div className="rounded-lg border border-yellow-500/40 bg-yellow-500/10 p-3 flex gap-2">
-              <Warning size={20} className="text-yellow-500 shrink-0 mt-0.5" weight="duotone" />
+            <div className="rounded-lg border border-status-warning-op40 bg-status-warning-op10 p-3 flex gap-2">
+              <Warning size={20} className="text-status-warning shrink-0 mt-0.5" weight="duotone" />
               <div className="text-sm">
                 <div className="font-semibold">{t('acme.dnsUpdate.secretWarningTitle')}</div>
                 <div className="text-text-tertiary mt-1">{t('acme.dnsUpdate.secretWarning')}</div>
