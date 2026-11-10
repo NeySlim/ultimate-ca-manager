@@ -63,7 +63,7 @@ def create_degenerate_pkcs7(certs: list, crls: Optional[list] = None) -> bytes:
 
 
 # CertRep keeps its PKCS#7-era encoding: NULL digest parameters, rsaEncryption for v1.5, DSA accepted, Ed448 and ML-DSA refused
-_CERTREP_SUITE = {'hsm_digest': False, 'null_digest_params': True, 'rsa_encryption': True,
+_CERTREP_SUITE = {'hsm_digest': True, 'null_digest_params': True, 'rsa_encryption': True,
                   'accept': ('rsa', 'ec', 'dsa', 'ed25519')}
 
 

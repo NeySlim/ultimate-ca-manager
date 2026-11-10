@@ -76,3 +76,20 @@ def test_service_reply_for_a_p384_ca_is_sha384_whatever_the_request(app, create_
     assert status == 200
     info = asn1crypto.cms.ContentInfo.load(response)['content']['signer_infos'][0]
     assert info['digest_algorithm']['algorithm'].native == 'sha384'
+
+
+def test_certrep_of_an_hsm_key_with_a_fixed_hash_names_the_hash_it_signed(monkeypatch):
+    """A provider that signs ES256 only: a SHA-512 request must not name SHA-512 in the SignerInfo."""
+    from services.hsm import HsmService
+    from services.hsm.hsm_private_key import HsmECPrivateKey
+    software = ec.generate_private_key(ec.SECP256R1())
+    monkeypatch.setattr(HsmService, 'signing_hash', staticmethod(lambda *a, **k: 'sha256'))
+    monkeypatch.setattr(HsmService, 'sign', staticmethod(
+        lambda key_id, data, algo, hash_algorithm=None: software.sign(data, ec.ECDSA(hashes.SHA256()))))
+    key = HsmECPrivateKey(1, software.public_key(), 'EC-P256')
+    cert = _ca(software)
+    der = response_builder.build_cert_rep(
+        response_builder.STATUS_PENDING, b'', 'txn', b'n' * 16, key, cert, request_digest='sha512')
+    signed = asn1crypto.cms.ContentInfo.load(der)['content']
+    assert signed['signer_infos'][0]['digest_algorithm']['algorithm'].native == 'sha256'
+    verify_cms_signature(signed, cert)
