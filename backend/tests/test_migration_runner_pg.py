@@ -248,3 +248,39 @@ def test_the_ledger_records_utc_whatever_the_session_zone():
         with admin.begin() as conn:
             conn.execute(text(f"DROP SCHEMA {schema} CASCADE"))
         admin.dispose()
+
+
+@pytest.mark.skipif(not PG_URL, reason="needs UCM_TEST_POSTGRES_URL")
+def test_run_pending_pg_records_utc_whatever_the_session_zone(tmp_path, monkeypatch):
+    """The migration path itself, not only `_mark_applied`, stamps naive UTC."""
+    import uuid
+    from datetime import datetime, timezone
+
+    from sqlalchemy import create_engine, text
+
+    import migration_runner
+
+    migrations_dir = tmp_path / "migrations"
+    migrations_dir.mkdir()
+    (migrations_dir / "999_zone_path.py").write_text("pg_compatible = True\n\ndef upgrade(conn):\n    pass\n")
+    monkeypatch.setattr(migration_runner, "MIGRATIONS_DIR", migrations_dir)
+
+    schema = f"ledger_{uuid.uuid4().hex[:8]}"
+    admin = create_engine(PG_URL)
+    with admin.begin() as conn:
+        conn.execute(text(f"CREATE SCHEMA {schema}"))
+    engine = create_engine(PG_URL, connect_args={"options": f"-c search_path={schema} -c TimeZone=Pacific/Kiritimati"})
+    try:
+        # A ledger created before the UTC default existed: only the INSERT can make it UTC
+        with engine.begin() as conn:
+            conn.execute(text("CREATE TABLE _migrations (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL UNIQUE, "
+                              "applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)"))
+        assert migration_runner._run_pending_pg(engine, ["999_zone_path"], dry_run=False)
+        with engine.begin() as conn:
+            stored = conn.execute(text("SELECT applied_at FROM _migrations WHERE name = '999_zone_path'")).scalar()
+        assert abs((datetime.now(timezone.utc).replace(tzinfo=None) - stored).total_seconds()) < 120
+    finally:
+        engine.dispose()
+        with admin.begin() as conn:
+            conn.execute(text(f"DROP SCHEMA {schema} CASCADE"))
+        admin.dispose()
