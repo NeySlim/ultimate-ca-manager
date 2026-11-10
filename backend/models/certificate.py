@@ -29,8 +29,11 @@ class Certificate(db.Model):
     aki = db.Column(db.String(200))  # Authority Key Identifier (hex, colon-separated)
     ski = db.Column(db.String(200))  # Subject Key Identifier (hex, colon-separated)
     valid_from = db.Column(db.DateTime)
-    valid_to = db.Column(db.DateTime)
+    valid_to = db.Column(db.DateTime, index=True)
     key_algo = db.Column(db.String(50))  # RSA 2048, EC P-256, etc. (for sorting)
+    # Written with key_algo whenever crt is set: the dashboard counts them without parsing PEM
+    key_bits = db.Column(db.Integer)  # RSA/DSA modulus or EC field size; NULL when the key has none
+    sig_hash = db.Column(db.String(20))  # 'sha256', 'sha1'; NULL when the scheme has no separate hash
     
     # Subject Alternative Names (SAN)
     san_dns = db.Column(db.Text)  # JSON array of DNS names
@@ -58,7 +61,7 @@ class Certificate(db.Model):
     
     # Metadata
     imported_from = db.Column(db.String(50))
-    created_at = db.Column(db.DateTime, default=utc_now)
+    created_at = db.Column(db.DateTime, default=utc_now, index=True)
     created_by = db.Column(db.String(80))
     
     # Last in-place renewal (naive UTC) and how many there were
@@ -498,6 +501,24 @@ def key_algo_for_certificate(cert):
     if foreign:
         return foreign['label'][:50]
     return key_algo_for_public_key(cert.public_key())
+
+
+def key_bits_for_certificate(cert):
+    """Modulus or field size of the certificate's key; None when the key has no size."""
+    from utils.foreign_algorithms import describe_public_key
+    foreign = describe_public_key(cert)
+    if foreign:
+        return foreign['key_size'] or None
+    return getattr(cert.public_key(), 'key_size', None)
+
+
+def sig_hash_for_certificate(cert):
+    """Lowercase name of the hash the issuer signed with ('sha256'), None when the scheme has none."""
+    try:
+        algorithm = cert.signature_hash_algorithm
+    except Exception:
+        return None
+    return algorithm.name.lower()[:20] if algorithm is not None else None
 
 
 @event.listens_for(Certificate.crt, 'set')

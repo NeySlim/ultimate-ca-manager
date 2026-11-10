@@ -68,6 +68,8 @@ class AcmeAccount(db.Model):
 class AcmeOrder(db.Model):
     """ACME Order - RFC 8555 Section 7.1.3"""
     __tablename__ = 'acme_orders'
+    # The dashboard queue lists the orders that failed recently (migration 139)
+    __table_args__ = (db.Index('ix_acme_orders_status_created_at', 'status', 'created_at'),)
     
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.String(64), unique=True, nullable=False, index=True, default=lambda: secrets.token_urlsafe(32))
