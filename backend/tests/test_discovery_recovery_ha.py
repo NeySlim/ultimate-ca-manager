@@ -114,13 +114,16 @@ def test_a_starting_ha_node_fails_its_own_runs_left_by_its_previous_process(app,
 
 
 def test_the_scheduler_process_leaves_the_runs_of_live_web_workers_alone(app, runs, monkeypatch):
+    """The scheduler child starts after the workers (both env flags set, as in production):
+    recovering there would fail scans they run. The master's side is the test above."""
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.setattr(Config, 'NODE_ID', NODE + 'self')
     monkeypatch.setenv('UCM_SCHEDULER_SUPERVISED', '1')
     monkeypatch.setenv('UCM_SCHEDULER_PROCESS', '1')
-    own = runs(NODE + 'self', 'manual')
+    manual = runs(NODE + 'self', 'manual')
+    scheduled = runs(NODE + 'self', 'scheduled')
     DiscoverySchedulerTask.register(SchedulerService(wake_interval=60), app)
-    assert status(own) == 'running'
+    assert [status(manual), status(scheduled)] == ['running', 'running']
 
 
 def test_each_pass_fails_the_runs_of_nodes_gone_since_takeover(app, runs, monkeypatch):
