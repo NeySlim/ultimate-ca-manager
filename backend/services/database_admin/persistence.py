@@ -70,6 +70,22 @@ def _env_path() -> Path:
     return Path(UCM_ENV_PATH)
 
 
+_DEFAULT_ENV_PATH = Path("/etc/ucm/ucm.env")
+
+
+def env_file_path() -> Path:
+    """Env file to rewrite: a redirected UCM_ENV_PATH wins, then Docker, then /etc."""
+    configured = Path(UCM_ENV_PATH)
+    if configured != _DEFAULT_ENV_PATH:
+        return configured
+    if os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true'):
+        for candidate in ('/opt/ucm/.env', '/app/.env', '/app/backend/.env'):
+            if Path(candidate).exists():
+                return Path(candidate)
+        return Path('/opt/ucm/.env')
+    return configured
+
+
 def _read_env_text(path: Path) -> str:
     """Current content of the env file; empty string when it does not exist."""
     try:

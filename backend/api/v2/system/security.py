@@ -15,7 +15,7 @@ from services.database_admin.lock import (
     MigrationBusyError,
     database_migration_lock,
 )
-from services.database_admin.persistence import update_env_file
+from services.database_admin.persistence import update_env_file, env_file_path
 from pathlib import Path
 import os
 import shutil
@@ -481,17 +481,7 @@ def rotate_secrets():
         return error_response("Secret must be at least 32 characters", 400)
 
     if auto_apply:
-        # Determine .env path based on environment
-        is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
-        if is_docker:
-            env_path = Path('/opt/ucm/.env')
-            if not env_path.exists():
-                # Fallback for older Docker images
-                env_path = Path('/app/.env')
-                if not env_path.exists():
-                    env_path = Path('/app/backend/.env')
-        else:
-            env_path = Path('/etc/ucm/ucm.env')
+        env_path = env_file_path()
 
         if not env_path.exists():
             return error_response(f"Environment file not found: {env_path}", 500)
