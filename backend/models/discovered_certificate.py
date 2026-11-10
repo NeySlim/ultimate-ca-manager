@@ -4,7 +4,7 @@ Discovery Models — ScanProfile, ScanRun, DiscoveredCertificate
 import json
 from datetime import datetime, timezone
 from models import db
-from utils.datetime_utils import utc_isoformat
+from utils.datetime_utils import utc_isoformat, utc_now
 
 
 class ScanProfile(db.Model):
@@ -27,8 +27,8 @@ class ScanProfile(db.Model):
     resolve_dns = db.Column(db.Boolean, nullable=False, default=False)
     last_scan_at = db.Column(db.DateTime)
     next_scan_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = db.Column(db.DateTime, default=utc_now)
+    updated_at = db.Column(db.DateTime, default=utc_now)
 
     runs = db.relationship('ScanRun', backref='profile', lazy='dynamic')
     discovered = db.relationship('DiscoveredCertificate', backref='profile', lazy='dynamic')
@@ -84,7 +84,7 @@ class ScanRun(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     scan_profile_id = db.Column(db.Integer, db.ForeignKey('discovery_scan_profiles.id', ondelete='SET NULL'))
-    started_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    started_at = db.Column(db.DateTime, default=utc_now)
     completed_at = db.Column(db.DateTime)
     status = db.Column(db.String(32), nullable=False, default='running')
     total_targets = db.Column(db.Integer, nullable=False, default=0)
@@ -148,8 +148,8 @@ class DiscoveredCertificate(db.Model):
     pem_certificate = db.Column(db.Text)
     status = db.Column(db.String(32), nullable=False, default='unmanaged')
     ucm_certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id', ondelete='SET NULL'))
-    first_seen = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
-    last_seen = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    first_seen = db.Column(db.DateTime, default=utc_now)
+    last_seen = db.Column(db.DateTime, default=utc_now)
     last_changed_at = db.Column(db.DateTime)
     previous_fingerprint = db.Column(db.String(64))
     # Fingerprint whose expiry the profile's notification already reported

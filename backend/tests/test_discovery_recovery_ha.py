@@ -200,3 +200,30 @@ def test_each_pass_fails_the_scheduled_runs_of_a_live_nodes_former_process(app, 
         ScanRun.query.filter_by(scan_profile_id=profile.id).delete(synchronize_session=False)
         db.session.delete(db.session.get(ScanProfile, profile.id))
         db.session.commit()
+
+
+@pytest.mark.parametrize('zone', ['America/New_York', 'Asia/Tokyo'])
+def test_scan_start_times_compare_in_utc_whatever_the_session_time_zone(app, runs, monkeypatch, zone):
+    """ScanRun.started_at defaults to naive UTC like ClusterNode.started_at: a PostgreSQL session
+    west of UTC must not age a live scan, nor one east of it rejuvenate a former process's scan."""
+    from sqlalchemy import text
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    now = utc_now()
+    db.session.add(ClusterNode(node_id=NODE + 'live', started_at=now - timedelta(minutes=1), heartbeat_at=now))
+    db.session.add(ClusterNode(node_id=NODE + 'reborn', started_at=now, heartbeat_at=now))
+    db.session.commit()
+    if db.engine.dialect.name == 'postgresql':
+        db.session.execute(text("SELECT set_config('TimeZone', :z, true)"), {'z': zone})
+    live = ScanRun(status='running', triggered_by='scheduled', node_id=NODE + 'live')
+    old = ScanRun(status='running', triggered_by='scheduled', node_id=NODE + 'reborn')
+    db.session.add_all([live, old])
+    db.session.commit()
+    ids = [live.id, old.id]
+    try:
+        db.session.get(ClusterNode, NODE + 'reborn').started_at = utc_now() + timedelta(seconds=1)
+        db.session.commit()
+        DiscoverySchedulerTask.recover_stale_runs(live_nodes={NODE + 'live', NODE + 'reborn'})
+        assert [status(r) for r in ids] == ['running', 'failed']
+    finally:
+        ScanRun.query.filter(ScanRun.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()

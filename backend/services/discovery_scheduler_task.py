@@ -4,9 +4,10 @@ Checks for scan profiles due for execution and triggers background scans.
 Registered with SchedulerService — runs every 60 seconds.
 """
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta
 
 from models import db, ScanProfile, ScanRun
+from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,7 @@ class DiscoverySchedulerTask:
             if own_node is not None:
                 query = query.filter(ScanRun.node_id == own_node)
             stale = query.update(
-                {'status': 'failed', 'completed_at': datetime.now(timezone.utc)},
+                {'status': 'failed', 'completed_at': utc_now()},
                 synchronize_session=False,
             )
             db.session.commit()
@@ -112,7 +113,7 @@ class DiscoverySchedulerTask:
     def execute() -> None:
         """Check all enabled profiles and trigger scans for those due."""
         try:
-            now = datetime.now(timezone.utc)
+            now = utc_now()
             due_profiles = ScanProfile.query.filter(
                 ScanProfile.schedule_enabled == True,
                 ScanProfile.next_scan_at <= now,
