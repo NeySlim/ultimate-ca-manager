@@ -235,10 +235,16 @@ def seeded(app):
         db.session.commit()
 
 
-def _queue(client):
-    r = client.get(URL)
+def _queue(client, *kinds):
+    """The whole queue, or the items of *kinds* only: other files' leftovers on the same
+    worker (CAs without a CRL, pending requests) would otherwise fill the capped listing."""
+    r = client.get(URL, query_string=[('kind', k) for k in kinds])
     assert r.status_code == 200, r.data
     return get_json(r)['data']
+
+
+def _item(client, kind, item_id):
+    return _find(_queue(client, kind), kind, item_id)
 
 
 def _find(data, kind, item_id):
@@ -280,14 +286,14 @@ def _find(data, kind, item_id):
     ('renewal_declined', 'declined', 'warning'),
 ])
 def test_each_kind_with_its_tier_and_due_date(app, auth_client, seeded, kind, key, tier):
-    item = _find(_queue(auth_client), kind, seeded[key])
+    item = _item(auth_client, kind, seeded[key])
     assert item is not None, (kind, key)
     assert item['tier'] == tier
     assert item['due_at'] and item['href_hint'] and item['label']
 
 
 def test_crl_due_date_is_the_latest_full_crl(auth_client, seeded):
-    item = _find(_queue(auth_client), 'crl_due', seeded['crl_soon'])
+    item = _item(auth_client, 'crl_due', seeded['crl_soon'])
     due = item['due_at']
     assert due < (utc_now() + timedelta(hours=13)).isoformat()
 
@@ -313,7 +319,7 @@ def test_crl_due_date_is_the_latest_full_crl(auth_client, seeded):
     ('manual_renewal_due', 'archived'), ('manual_renewal_due', 'far'), ('manual_renewal_due', 'expired'),
 ])
 def test_left_out(auth_client, seeded, kind, key):
-    assert _find(_queue(auth_client), kind, seeded[key]) is None
+    assert _item(auth_client, kind, seeded[key]) is None
 
 
 def test_auto_renewal_off_makes_every_renewal_manual(app, auth_client, seeded):
@@ -321,7 +327,7 @@ def test_auto_renewal_off_makes_every_renewal_manual(app, auth_client, seeded):
         _set('auto_renewal_enabled', 'false')
         db.session.commit()
     try:
-        assert _find(_queue(auth_client), 'manual_renewal_due', seeded['auto']) is not None
+        assert _item(auth_client, 'manual_renewal_due', seeded['auto']) is not None
     finally:
         with app.app_context():
             _set('auto_renewal_enabled', 'true')
@@ -334,11 +340,11 @@ def test_acme_client_renewal_switched_off_makes_it_manual(app, auth_client, seed
         _set(ACME_SWITCH, 'false')
         db.session.commit()
     try:
-        assert _find(_queue(auth_client), 'manual_renewal_due', seeded['acme_client']) is not None
+        assert _item(auth_client, 'manual_renewal_due', seeded['acme_client']) is not None
         with app.app_context():
             _set(ACME_SWITCH, 'true')
             db.session.commit()
-        assert _find(_queue(auth_client), 'manual_renewal_due', seeded['acme_client']) is None
+        assert _item(auth_client, 'manual_renewal_due', seeded['acme_client']) is None
     finally:
         with app.app_context():
             _set(ACME_SWITCH, saved)
@@ -351,7 +357,7 @@ def test_ocsp_responder_renewal_switched_off_makes_it_manual(app, auth_client, s
         _set(OCSP_SWITCH, 'false')
         db.session.commit()
     try:
-        assert _find(_queue(auth_client), 'manual_renewal_due', seeded['ocsp_responder']) is not None
+        assert _item(auth_client, 'manual_renewal_due', seeded['ocsp_responder']) is not None
     finally:
         with app.app_context():
             _set(OCSP_SWITCH, saved)
@@ -390,7 +396,8 @@ def test_kind_restricts_the_items_but_not_the_counts(auth_client, seeded):
     assert r.status_code == 200, r.data
     data = get_json(r)['data']
     assert {i['kind'] for i in data['items']} == {'crl_due', 'crl_missing'}
-    assert len(data['items']) == whole['counts']['crl_due'] + whole['counts']['crl_missing']
+    wanted = whole['counts']['crl_due'] + whole['counts']['crl_missing']
+    assert len(data['items']) == min(wanted, DASHBOARD_MAX_ROWS)
     assert data['counts'] == whole['counts']
     r = auth_client.get(f'{URL}?kind=crl_due&kind=nonsense')
     assert r.status_code == 400

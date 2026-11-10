@@ -35,12 +35,20 @@ def _get(client, url):
     return r
 
 
+def _warm(client, url):
+    """A request that leaves every per-request cache fresh for the one measured next:
+    the admin allowlist re-reads its row every 5 s, which would add a statement."""
+    from utils import admin_allowlist
+    admin_allowlist.invalidate_cache()
+    _get(client, url)
+
+
 @pytest.fixture(scope='module')
 def empty_counts(app, auth_client):
     """Statements per route before the volume is loaded (after a warm-up request)."""
     counts = {}
     for url in ROUTES:
-        _get(auth_client, url)
+        _warm(auth_client, url)
         counts[url] = len(_count(app, lambda u=url: _get(auth_client, u))[0])
     return counts
 
@@ -77,6 +85,6 @@ def test_each_aggregate_stays_within_the_budget(app, many_certificates, name, ar
 @pytest.mark.parametrize('url', ROUTES)
 def test_a_request_runs_as_many_statements_on_5000_rows_as_on_none(app, auth_client, empty_counts,
                                                                    many_certificates, url):
-    _get(auth_client, url)
+    _warm(auth_client, url)
     statements, _ = _count(app, lambda: _get(auth_client, url))
     assert len(statements) == empty_counts[url], '\n'.join(statements)
