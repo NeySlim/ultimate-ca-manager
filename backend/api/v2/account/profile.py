@@ -32,6 +32,17 @@ def _valid_pins(v):
             and len(set(v)) == len(v))
 
 
+# The bell's read marks: item keys such as ``approval_pending:12``, newest last.
+_READ_KEY = re.compile(r'^[A-Za-z0-9_.:-]{1,120}$')
+MAX_READ_MARKS = 200
+
+
+def _valid_notifications_read(v):
+    return (isinstance(v, list) and len(v) <= MAX_READ_MARKS
+            and all(isinstance(i, str) and _READ_KEY.fullmatch(i) for i in v)
+            and len(set(v)) == len(v))
+
+
 # Whitelist of allowed preference keys + value validators. Anything not listed here is
 # silently dropped to avoid storing arbitrary blobs (a bad pin list is refused instead).
 _PREF_VALIDATORS = {
@@ -42,6 +53,7 @@ _PREF_VALIDATORS = {
     'sidebar_collapsed': lambda v: isinstance(v, bool),
     'force_desktop': lambda v: isinstance(v, bool),
     'pins': _valid_pins,
+    'notifications_read': _valid_notifications_read,
     # `date_format`, `show_time` and `timezone` are deliberately absent. They
     # are instance-wide SystemConfig rows, served at the top level of the
     # same `/auth/verify` body that carries this blob, and that top-level
@@ -181,6 +193,11 @@ def update_preferences():
     # A bad pin list is refused with 400, not silently dropped like other bad values.
     if isinstance(payload, dict) and 'pins' in payload and not _valid_pins(payload['pins']):
         return error_response('pins must be a list of at most 3 distinct module ids', 400)
+
+    if (isinstance(payload, dict) and 'notifications_read' in payload
+            and not _valid_notifications_read(payload['notifications_read'])):
+        return error_response(
+            f'notifications_read must be a list of at most {MAX_READ_MARKS} distinct item keys', 400)
 
     # PUT replaces; PATCH would merge — frontend currently uses PUT after
     # merging client-side, which keeps the contract simple.
