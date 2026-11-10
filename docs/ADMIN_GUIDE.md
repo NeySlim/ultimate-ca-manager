@@ -408,6 +408,17 @@ psql -U ucm -h db.example.com ucm < ucm-pg-backup.sql
 
 > ℹ The psycopg 3 driver is bundled with the DEB/RPM packages and the Docker image. No extra install step is needed.
 
+### HA mode (preview): scheduler and startup
+
+With `UCM_HA=1`, every node runs against the same PostgreSQL database and names itself with `UCM_NODE_ID` (default: the host name, which must differ between nodes).
+
+- **Leader.** One node at a time runs the scheduled tasks: the one whose scheduler process holds a PostgreSQL session advisory lock on a dedicated connection. The lock is checked before every task; if that connection drops, the node stops starting tasks (a task already running finishes) and another node takes over within `LOCK_RETRY_SECONDS` (5 s). No file is shared between nodes.
+- **Heartbeat.** Each node's scheduler process writes its row in `cluster_nodes` once per pass (60 s); a row older than three passes counts as stale. `/health` reports `leader` (this node) and, in HA mode only, `cluster: {leader_node_id, nodes, stale}`. `/health/ready` answers 503 until this node has written its first heartbeat. Staleness compares node clocks: keep them synchronised (NTP).
+- **Run now.** From any node, Settings > Scheduler > Run now queues a request in `scheduler_requests`; the leader claims it on its next poll (about one second), runs it once and deletes it. The page waits up to 30 s for the result, then shows the task as started. The leader also publishes the tasks' status in `system_config` (`scheduler.state`), which every node shows. A request claimed by a leader that disappears is dropped, not replayed: ask again.
+- **Startup.** Migrations and the first schema creation run under a second advisory lock: a node starting while another one migrates waits for it (at most 120 s, then refuses to start with an explicit error) and then finds nothing left to apply.
+- **Discovery scans.** Each scan run records the node that runs it. A new leader marks as failed the scheduled scans left running by the former leader and the manual scans of nodes without a fresh heartbeat; manual scans of live nodes are kept.
+- **Local files.** Tasks that write to the local disk do so on the leader only: local backups, the certificate files mirrored by renewals and session file cleanup stay on that node.
+
 ### Database Tables
 
 | Table | Purpose |
