@@ -199,13 +199,15 @@ class TestOperatorPaths:
             db.session.add(tpl)
             db.session.commit()
             tpl_id = tpl.id
+        issued = []
         try:
             payload = {'cn': 'issue.algo.test', 'ca_id': ca['id'], 'key_type': 'rsa',
                        'key_size': 2048, 'validity_days': 90, 'cert_type': 'server'}
             r = auth_client.post('/api/v2/certificates', data=json.dumps(payload),
                                  content_type=CONTENT_JSON)
             assert r.status_code in (200, 201), r.data
-            cert = _signed(app, get_json(r)['data']['id'])
+            issued.append(get_json(r)['data']['id'])
+            cert = _signed(app, issued[-1])
             assert isinstance(cert.signature_hash_algorithm, hashes.SHA384)
 
             # The template's digest is a preference too (#397 follow-up)
@@ -213,11 +215,14 @@ class TestOperatorPaths:
             r = auth_client.post('/api/v2/certificates', data=json.dumps(payload),
                                  content_type=CONTENT_JSON)
             assert r.status_code in (200, 201), r.data
-            cert = _signed(app, get_json(r)['data']['id'])
+            issued.append(get_json(r)['data']['id'])
+            cert = _signed(app, issued[-1])
             assert isinstance(cert.signature_hash_algorithm, hashes.SHA384)
             assert ('Signature digest SHA256 replaced by SHA384 by policy "algo-issue".'
                     in r.get_json()['meta']['notices'])
         finally:
+            # Certificates first: they reference the template
+            _drop(app, Certificate, *issued)
             _drop(app, CertificatePolicy, pid)
             _drop(app, CertificateTemplate, tpl_id)
 

@@ -7,7 +7,7 @@ import uuid
 import pytest
 from sqlalchemy import create_engine, text
 
-from models import Certificate, db
+from models import CA, Certificate, db
 from utils.serial_duplicates import duplicates_in_database, duplicates_in_rows
 
 from tests.test_backup_restore_failfast import PASSWORD, _forged, _service
@@ -97,6 +97,7 @@ def test_a_restore_refuses_an_archive_with_duplicate_serials(app, create_ca):
             assert Certificate.query.filter(Certificate.refid.in_(refids)).count() == 0
         finally:
             Certificate.query.filter(Certificate.refid.in_(refids)).delete()
+            CA.query.filter_by(refid=caref).delete()
             db.session.commit()
 
 
@@ -116,6 +117,7 @@ def test_a_target_without_the_index_restores_an_archive_with_duplicate_serials(a
         finally:
             db.session.rollback()
             Certificate.query.filter(Certificate.refid.in_(refids)).delete()
+            CA.query.filter_by(refid=caref).delete()
             db.session.execute(text(_migration().CREATE_INDEX))
             db.session.commit()
 

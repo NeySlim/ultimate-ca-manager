@@ -19,9 +19,11 @@ def test_it_has_a_database_of_its_own(app, create_cert):
             assert _certificate_count(other) == 0
             assert _certificate_count(app) >= 1
     finally:
-        from models import Certificate, db
+        from models import CA, Certificate, db
         with app.app_context():
             Certificate.query.filter_by(id=cert['id']).delete()
+            # The CA the factory made for it too, or the shared tables keep one more
+            CA.query.filter_by(refid=cert['caref']).delete()
             db.session.commit()
 
 

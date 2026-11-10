@@ -46,6 +46,12 @@ def _populate(app, root_id, n):
     return ids, cert_ids
 
 
+def _drop_root(app, root_id):
+    with app.app_context():
+        CA.query.filter_by(id=root_id).delete()
+        db.session.commit()
+
+
 def _drop(app, ids, cert_ids):
     with app.app_context():
         Certificate.query.filter(Certificate.id.in_(cert_ids)).delete(synchronize_session=False)
@@ -55,19 +61,22 @@ def _drop(app, ids, cert_ids):
 
 def test_statement_count_does_not_grow_with_the_number_of_cas(app, auth_client, create_ca):
     root = create_ca(cn='QC Root')
-    small_ids, small_certs = _populate(app, root['id'], 10)
     try:
-        small, _ = _count_statements(app, auth_client)
+        small_ids, small_certs = _populate(app, root['id'], 10)
+        try:
+            small, _ = _count_statements(app, auth_client)
+        finally:
+            _drop(app, small_ids, small_certs)
+        big_ids, big_certs = _populate(app, root['id'], 40)
+        try:
+            big, data = _count_statements(app, auth_client)
+            mine = [d for d in data if d['id'] in set(big_ids)]
+            assert len(mine) == 40
+            assert sum(d['certs'] for d in mine) >= len(big_certs)
+        finally:
+            _drop(app, big_ids, big_certs)
     finally:
-        _drop(app, small_ids, small_certs)
-    big_ids, big_certs = _populate(app, root['id'], 40)
-    try:
-        big, data = _count_statements(app, auth_client)
-        mine = [d for d in data if d['id'] in set(big_ids)]
-        assert len(mine) == 40
-        assert sum(d['certs'] for d in mine) >= len(big_certs)
-    finally:
-        _drop(app, big_ids, big_certs)
+        _drop_root(app, root['id'])
     assert big == small, f'{small} statements for 10 CAs, {big} for 40'
 
 
@@ -93,3 +102,4 @@ def test_the_listing_answers_what_one_by_one_computation_gave(app, auth_client, 
                 assert by_id[ca_id] == single
     finally:
         _drop(app, ids, cert_ids)
+        _drop_root(app, root['id'])
