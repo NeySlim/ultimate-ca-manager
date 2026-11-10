@@ -95,3 +95,26 @@ def test_chart_probes_use_live_and_ready():
     c = deploy['spec']['template']['spec']['containers'][0]
     assert c['livenessProbe']['httpGet']['path'] == '/health/live'
     assert c['readinessProbe']['httpGet']['path'] == '/health/ready'
+
+
+def test_a_running_loop_without_the_lock_is_not_the_leader_in_ha(app, monkeypatch):
+    """Another node's fresh state in system_config must not make this follower a leader."""
+    import services.scheduler_service as ss
+    from models import SystemConfig, db
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.delenv(ss.SUPERVISED_ENV, raising=False)
+    with app.app_context():
+        try:
+            leader = ss.SchedulerService(wake_interval=60, node_id='leader-elsewhere')
+            leader._owns_lock = True
+            leader._publish_state()
+            follower = ss.SchedulerService(wake_interval=60, node_id='follower-here')
+            follower._running = True
+            monkeypatch.setattr(ss, '_scheduler', follower)
+            assert follower.state_is_stale() is False
+            assert ss.is_leader() is False
+            follower._owns_lock = True
+            assert ss.is_leader() is True
+        finally:
+            SystemConfig.query.filter_by(key=ss.STATE_KEY).delete()
+            db.session.commit()

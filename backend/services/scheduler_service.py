@@ -921,7 +921,10 @@ def is_leader():
     if _scheduler is None:
         return None
     from utils.ha import ha_enabled
-    if ha_enabled() and not getattr(_scheduler, '_running', False):
+    if ha_enabled() and getattr(_scheduler, '_running', False):
+        # HA: the loop's own process knows; a fresh state may come from another node's leader
+        return bool(_scheduler._owns_lock)
+    if ha_enabled():
         # HA: the scheduler process of this node says in cluster_nodes whether it holds the lock
         from services.scheduler_leader import node_is_leader
         return node_is_leader(_scheduler.node_id, _scheduler.wake_interval)
