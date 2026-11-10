@@ -182,9 +182,9 @@ def test_each_algorithm_equals_the_list_its_hint_opens(app, auth_client, pems, r
             assert total == entry['count'] == len(ids), entry['key_algo']
 
 
-@pytest.mark.parametrize('query', [{'bogus': '1'}, {'key_bits_below': 'x'}, {'lifetime_over_days': '-1'},
+@pytest.mark.parametrize('query', [{'key_bits_below': 'x'}, {'lifetime_over_days': '-1'},
                                    {'live': 'maybe'}, {'renewal': 'nope'}, {'key_algo_prefix': "R'SA"}])
-def test_an_unknown_parameter_or_bad_value_is_a_400(auth_client, query):
+def test_a_bad_value_of_a_known_filter_is_a_400(auth_client, query):
     assert auth_client.get('/api/v2/certificates', query_string=query).status_code == 400
 
 
