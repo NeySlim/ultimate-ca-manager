@@ -92,21 +92,42 @@ def _recorder(log, name):
     return lambda payload: log.append((name, (payload or {}).get('mark')))
 
 
-def test_rate_limits_changed_on_a_reach_b(app, auth_client, ha):
-    from security.rate_limiter import RateLimitConfig
-    before = RateLimitConfig.snapshot()
-    b = ha('b')
-    try:
-        r = auth_client.put('/api/v2/system/security/rate-limit',
-                            json={'custom_limits': {'/api/v2/cc-test': {'rpm': 7, 'burst': 2}}})
-        assert r.status_code == 200, r.data
-        RateLimitConfig.apply_snapshot(before)  # node B's memory never saw the request
-        assert '/api/v2/cc-test' not in RateLimitConfig.snapshot()['custom_limits']
-        b.start()
-        assert wait_for(lambda: RateLimitConfig.snapshot()['custom_limits'].get('/api/v2/cc-test')
-                        == {'rpm': 7, 'burst': 2})
-    finally:
-        RateLimitConfig.apply_snapshot(before)
+@pytest.fixture
+def rate_limits(app):
+    """Puts the class-level rate limit state and the stored settings back as they were."""
+    from models import SystemConfig, db
+    from security.rate_limiter import STORED_KEY, RateLimitConfig
+    saved = (RateLimitConfig._limits_loaded, RateLimitConfig._enabled,
+             dict(RateLimitConfig._custom_limits), set(RateLimitConfig._whitelist))
+    yield RateLimitConfig
+    (RateLimitConfig._limits_loaded, RateLimitConfig._enabled,
+     RateLimitConfig._custom_limits, RateLimitConfig._whitelist) = saved
+    with app.app_context():
+        SystemConfig.query.filter_by(key=STORED_KEY).delete()
+        db.session.commit()
+
+
+def test_rate_limits_reach_b_over_b_own_environment(app, auth_client, ha, rate_limits, monkeypatch):
+    """The command carries what the API stored, not node A's effective limits."""
+    import json
+    from models import ClusterCommand
+    r = auth_client.put('/api/v2/system/security/rate-limit', json={
+        'custom_limits': {'/api/v2/cc-test': {'rpm': 7, 'burst': 2}}, 'whitelist_add': ['192.0.2.7']})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        payload = json.loads(ClusterCommand.query.one().payload)
+    assert payload == {'custom_limits': {'/api/v2/cc-test': {'rpm': 7, 'burst': 2}},
+                       'whitelist_add': ['192.0.2.7'], 'whitelist_remove': []}
+    # Node B: its own environment, booted before the change
+    monkeypatch.setenv('RATE_LIMIT_WHITELIST', '10.9.9.9')
+    monkeypatch.setenv('RATE_LIMIT_ENABLED', 'false')
+    rate_limits.compose(None)
+    assert '/api/v2/cc-test' not in rate_limits.get_config()['custom_limits']
+    ha('b').start()
+    assert wait_for(lambda: rate_limits.get_config()['custom_limits'].get('/api/v2/cc-test')
+                    == {'rpm': 7, 'burst': 2})
+    config = rate_limits.get_config()
+    assert set(config['whitelist']) == {'10.9.9.9', '192.0.2.7'} and config['enabled'] is False
 
 
 def test_syslog_changed_on_a_reaches_b(app, auth_client, ha):

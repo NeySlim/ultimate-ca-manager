@@ -25,12 +25,8 @@ def test_without_ha_no_thread_and_no_row(app, auth_client, monkeypatch):
         assert cc.emit(cc.RELOAD_SYSLOG) is None
     before = _rows(app)
     from security.rate_limiter import RateLimitConfig
-    snap = RateLimitConfig.snapshot()
-    try:
-        r = auth_client.put('/api/v2/system/security/rate-limit', json={'enabled': snap['enabled']})
-        assert r.status_code == 200, r.data
-    finally:
-        RateLimitConfig.apply_snapshot(snap)
+    r = auth_client.put('/api/v2/system/security/rate-limit', json={'enabled': RateLimitConfig.is_enabled()})
+    assert r.status_code == 200, r.data
     r = auth_client.put('/api/v2/system/audit/syslog', json={'enabled': False, 'host': '', 'port': 514})
     assert r.status_code == 200, r.data
     assert _rows(app) == before == 0

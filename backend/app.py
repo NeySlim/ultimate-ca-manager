@@ -1020,6 +1020,14 @@ def create_app(config_name=None):
             app.logger.info("Rate limiter disabled via RATE_LIMIT_ENABLED")
     except Exception as e:
         app.logger.warning(f"Rate limiter not loaded: {e}")
+    from utils.ha import ha_enabled
+    if ha_enabled():  # the settings another node stored before this one started
+        try:
+            with app.app_context():
+                from security.rate_limiter import RateLimitConfig
+                RateLimitConfig.compose(RateLimitConfig.read_stored())
+        except Exception as e:
+            app.logger.error(f"Stored rate limit settings not loaded: {e}")
     
     # Security headers and cleanup
     @app.teardown_request

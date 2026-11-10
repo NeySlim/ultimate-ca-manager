@@ -128,11 +128,10 @@ def restart_this_node(master_pid=None):
 
 
 def _reload_rate_limits(payload):
+    """The stored settings over this node's own environment (idempotent on the emitter)."""
     from security.rate_limiter import RateLimitConfig
-    if payload:
-        RateLimitConfig.apply_snapshot(payload)
-    else:
-        RateLimitConfig.reload()
+    RateLimitConfig.compose(payload if payload is not None else RateLimitConfig.read_stored())
+    logger.info("Rate limits recomposed: this node's environment plus the stored settings")
 
 
 def _reload_syslog(payload):
