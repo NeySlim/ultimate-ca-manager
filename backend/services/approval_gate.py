@@ -327,6 +327,12 @@ def expire_stale_requests(commit: bool = True) -> int:
             return 0
     if count:
         logger.info("Expired %s stale approval request(s)", count)
+        if commit:
+            # The protocols follow once the expiry is durable (ACME order invalid, SCEP request rejected)
+            from services.protocol_approval import REQUEST_TYPE_PROTOCOLS, propagate_closed
+            propagate_closed(ApprovalRequest.query.filter(
+                ApprovalRequest.id.in_(stale_ids), ApprovalRequest.status == 'expired',
+                ApprovalRequest.request_type.in_(tuple(REQUEST_TYPE_PROTOCOLS))).all())
     return count
 
 

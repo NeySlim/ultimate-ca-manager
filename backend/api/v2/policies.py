@@ -81,6 +81,16 @@ def _approval_is_expired(approval):
     return approval_is_expired(approval)
 
 
+def _expire_request(approval):
+    """Close a request found past its deadline; its protocol (if any) follows."""
+    approval.status = 'expired'
+    approval.resolved_at = utc_now()
+    ok, _err = safe_commit(logger, "Failed to expire request")
+    if ok:
+        from services.protocol_approval import propagate_closed
+        propagate_closed([approval])
+
+
 def _link_approval(approval, certificate_id):
     """Link the approval to the certificate it produced. Only the request
     that finds the sentinel still empty keeps its certificate."""
@@ -146,6 +156,9 @@ def _approval_target_gone(approval):
     (its request row, certificate or signing CA is gone, or the certificate
     to revoke was replaced since the request), else None."""
     from services.policy_service import PolicyEvaluationService
+    from services import protocol_approval
+    if protocol_approval.is_protocol_request(approval):
+        return protocol_approval.target_gone(approval)
     if approval.request_type not in ('csr', 'renewal', 'revocation', 'ca_revocation', 'cross_revocation'):
         return None
     data = PolicyEvaluationService.get_request_data(approval) or {}
@@ -192,6 +205,8 @@ def _close_request_target_gone(approval, reason, user_id, username):
     ok, _err = safe_commit(logger, "Failed to close approval request")
     if not ok:
         return _err
+    from services.protocol_approval import propagate_closed
+    propagate_closed([approval])
     AuditService.log_action(
         action='approval_closed',
         resource_type='approval',
@@ -297,6 +312,18 @@ def _issue_approved_renewal(approval, data):
         'valid_to': utc_isoformat(cert.valid_to),
         'notices': outcome.get('notices') or [],
     }
+
+
+def _issue_approved_protocol_request(approval, data):
+    """Issue an approved protocol request through its protocol's own path
+    (same source, extensions and protocol state as a direct issuance); a
+    deferred one (server-generated key) is issued at the client's next request."""
+    from services import protocol_approval
+    outcome = protocol_approval.issue_approved(approval, data)
+    if outcome.get('id') is not None:
+        _link_approval(approval, outcome['id'])
+    logger.info(f"{approval.request_type} request issued via approval #{approval.id}")
+    return outcome
 
 
 def _requester_name(approval, data):
@@ -442,6 +469,9 @@ def _issue_approved_certificate(approval):
         return _revoke_approved_ca(approval, data)
     if approval.request_type == 'cross_revocation':
         return _revoke_approved_cross_certificate(approval, data)
+    from services import protocol_approval
+    if protocol_approval.is_protocol_request(approval):
+        return _issue_approved_protocol_request(approval, data)
 
     # Resolve the template the request was made against (issue #226 semantics:
     # templates govern issuance — KU/EKU, digest, and the defaults for key
@@ -1236,9 +1266,7 @@ def get_approval(request_id):
     """Get approval request details"""
     approval = db.get_or_404(ApprovalRequest, request_id)
     if approval.status == 'pending' and _approval_is_expired(approval):
-        approval.status = 'expired'
-        approval.resolved_at = utc_now()
-        safe_commit(logger, "Failed to expire request")
+        _expire_request(approval)
     return success_response(data=approval.to_dict())
 
 
@@ -1276,9 +1304,7 @@ def approve_request(request_id):
 
     # Auto-expire if past expiry
     if _approval_is_expired(approval):
-        approval.status = 'expired'
-        approval.resolved_at = utc_now()
-        safe_commit(logger, "Failed to expire request")
+        _expire_request(approval)
         return error_response("Request has expired", 410)
 
     # Group-membership gate: enforce policy.approval_group_id
@@ -1366,7 +1392,9 @@ def approve_request(request_id):
                     success=False,
                 )
                 return error_response(f"Request is already {approval.status}", 400)
-            if isinstance(e, ValueError) and 'no longer exists' in str(e):
+            from services.protocol_approval import ProtocolRequestGone
+            if isinstance(e, ProtocolRequestGone) or (
+                    isinstance(e, ValueError) and 'no longer exists' in str(e)):
                 # The target went away during the vote: closed now rather
                 # than left pending until it expires
                 return _close_request_target_gone(approval, issue_error, user_id, username)
@@ -1436,9 +1464,7 @@ def reject_request(request_id):
         return error_response(f"Request is already {approval.status}", 400)
 
     if _approval_is_expired(approval):
-        approval.status = 'expired'
-        approval.resolved_at = utc_now()
-        safe_commit(logger, "Failed to expire request")
+        _expire_request(approval)
         return error_response("Request has expired", 410)
 
     allowed, reason = _user_can_act_on_approval(user, approval)
@@ -1463,6 +1489,8 @@ def reject_request(request_id):
 
     result = approval.to_dict()
     if approval.status == 'rejected':
+        from services.protocol_approval import propagate_closed
+        propagate_closed([approval])
         from services.webhook_service import emit_csr_rejected
         emit_csr_rejected(result, reason=data.get('comment'), actor=username)
 
