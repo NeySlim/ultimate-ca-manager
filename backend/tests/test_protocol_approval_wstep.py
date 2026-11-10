@@ -291,3 +291,27 @@ def test_renewal_approved_then_renewed_row_deleted_is_delivered(app, client, aut
         assert issued.status_code == 200, issued.data
         assert _issued_cert_from_rstr(issued.data).subject == old_cert.subject
         assert requests_of(app, pid, 'wstep_request')[0][1] == 'approved'
+
+
+def test_a_delivered_issue_is_never_judged_again(app, client, auth_client, wstep_config, monkeypatch):
+    """A second QueryTokenStatus after delivery whose certificate went away
+    is told so, without closing the delivered request or a webhook."""
+    from services import webhook_service
+    from tests.test_protocol_approval_est import _withdraw
+    emitted = []
+    monkeypatch.setattr(webhook_service, 'emit_csr_rejected',
+                        lambda *a, **k: emitted.append(a))
+    with approval_policy(app, wstep_config['id'], 'wstep-held-delivered') as pid:
+        csr, _ = _make_csr(common_name='delivered.wstep-approval.test')
+        request_id = _pending(_issue_rst(client, csr))
+        (approval_id, *_), = requests_of(app, pid, 'wstep_request')
+        approve(auth_client, approval_id)
+        first = _issued_cert_from_rstr(_query(client, request_id).data)
+        again = _issued_cert_from_rstr(_query(client, request_id).data)
+        assert again.serial_number == first.serial_number
+        _withdraw(app, approval_id)
+        reason, _invalid, echoed = _fault(_query(client, request_id))
+        assert reason == 'Certificate withdrawn' and echoed == request_id
+        (_id, status, data, _cert), = requests_of(app, pid, 'wstep_request')
+        assert status == 'approved' and data['delivered_at'] and 'closed_reason' not in data
+        assert emitted == []

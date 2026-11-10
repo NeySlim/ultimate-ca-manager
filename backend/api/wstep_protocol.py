@@ -246,6 +246,15 @@ def _answer_held(ca, parsed, approval):
     from services import protocol_approval
     from services.wstep.approval import issued_certificate
     from services.wstep.cmc_response import build_cmc_pending_response
+    if approval.status == 'approved' and protocol_approval.request_data(approval).get('delivered_at'):
+        # Delivered once: its certificate again while it exists, never judged again
+        cert = issued_certificate(approval)
+        if cert is None:
+            return _fault_response(protocol_approval.CERTIFICATE_WITHDRAWN, status=400,
+                                   relates_to=parsed.message_id, request_id=approval.id,
+                                   invalid_request=True)
+        return _rstr(build_issue_response(cert, relates_to=parsed.message_id, request_id=approval.id,
+                                          cmc_response_der=_cmc_response_der_for(ca, cert, parsed)))
     if approval.status == 'approved':
         cert = issued_certificate(approval)
         if cert is None:
