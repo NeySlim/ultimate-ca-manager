@@ -1951,7 +1951,27 @@ GET /api/v2/dashboard/health?days=7
 GET /api/v2/dashboard/compliance
 GET /api/v2/dashboard/issuance?days=7
 ```
-Scope `read:dashboard`. `queue` lists `{kind, tier, id, label, due_at, href_hint}` items (critical first, at most 100) with the total per kind in `counts`; `health` gives per protocol (`acme`, `scep`, `est`, `scheduler`) one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) and the `basis` it is measured on; `compliance` counts the live certificates by key algorithm and weakness, each with a `filter_hint`; `issuance` counts issued certificates per CA and per day (`days` 1 to 90) and per source. A `days` outside its range is refused with 400.
+Scope `read:dashboard`. A `days` outside its range is refused with 400.
+
+`queue` lists `{kind, tier, id, label, due_at, href_hint}` items, critical first then by `due_at` (at most `limit`, 100), with the full total per kind in `counts`:
+
+| kind | critical | warning |
+|------|----------|---------|
+| `acme_order_failed` | invalid server order of the last 7 days | |
+| `acme_client_renewal_failed` | client order with renewal failures | |
+| `approval_pending` | expires within 24 h | otherwise |
+| `scep_request_pending`, `key_recovery_pending` | | always |
+| `crl_due` | newest full CRL stale | `next_update` within min(24 h, half the CA's CRL validity) |
+| `crl_missing` | active CA with CDP and no CRL | |
+| `manual_renewal_due` | expires within 24 h | expires within 30 days |
+| `client_renewal_overdue` | | protocol certificate without a stored key, expires within 7 days |
+| `auto_renewal_blocked` | due for auto-renewal, its CA offline, revoked, expired or keyless | |
+| `renewal_declined` | | renewal rejected by an approver during the current lifetime, expires within 30 days |
+| `ca_expiring` | expires within 90 days | expires within a year |
+
+Certificates counted are issued, not revoked, not archived and not expired. `manual_renewal_due` leaves out what auto-renewal, the enrolling client (ACME, SCEP, EST, MSCA, WSTEP without a stored key), UCM's ACME client or the delegated OCSP responder task renews, a declined renewal, and a certificate superseded by a live one beyond the 30 days with the same subject, DNS and IP SANs from the same CA.
+
+`health` gives per protocol (`acme`, `scep`, `est`, `scheduler`) one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) and the `basis` it is measured on. `compliance` counts the live certificates by key algorithm and weakness; each counter carries `filter_available` and, when true, a `filter_hint` that the certificate list reproduces exactly (none yet). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`), and the issuances per source.
 
 ### Get Stats Overview
 ```http
