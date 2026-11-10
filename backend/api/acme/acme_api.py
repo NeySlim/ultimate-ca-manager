@@ -1196,13 +1196,16 @@ def order_info(order_id: str):
         return acme_error('unauthorized', 'Order does not belong to this account', 403)
 
     service.expire_order_if_needed(order)
+    from services.acme.approval import APPROVAL_RETRY_AFTER, held_by_approval
+    held = held_by_approval(order)
     order_url = f"{service.base_url}/acme/order/{order.order_id}"
     response = acme_response(_order_wire_dict(service, order))
     response.headers['Location'] = order_url
     
-    # Add Retry-After for pending/processing orders (RFC 8555 Section 7.4)
+    # Add Retry-After for pending/processing orders (RFC 8555 Section 7.4);
+    # an order awaiting a human decision is read again less often
     if order.status in ('pending', 'processing'):
-        response.headers['Retry-After'] = '3'
+        response.headers['Retry-After'] = str(APPROVAL_RETRY_AFTER) if held else '3'
     
     return response
 
@@ -1325,8 +1328,12 @@ def finalize_order(order_id: str):
                 error = 'Certificate signing failed on the server; retry later'
             return acme_error(error_type, error, 500 if error_type == 'serverInternal' else 400)
 
+        held = getattr(service, '_pending_approval', None)
         # Return updated order
         order = service.get_order(order_id)
+        if held is not None:
+            # RFC 8555 §7.4: the order stays processing while the approval is pending
+            db.session.refresh(order)
         order_url = f"{service.base_url}/acme/order/{order.order_id}"
 
         _audit_acme(
@@ -1338,6 +1345,9 @@ def finalize_order(order_id: str):
         
         response = acme_response(_order_wire_dict(service, order))
         response.headers['Location'] = order_url
+        if held is not None:
+            from services.acme.approval import APPROVAL_RETRY_AFTER
+            response.headers['Retry-After'] = str(APPROVAL_RETRY_AFTER)
         
         return response
         

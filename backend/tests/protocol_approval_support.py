@@ -65,3 +65,29 @@ def expire(app, approval_id):
         db.session.commit()
         assert expire_stale_requests() >= 1
         assert db.session.get(ApprovalRequest, approval_id).status == 'expired'
+
+
+def profile_of(cert):
+    """What a direct and an approved issuance must agree on: key usage,
+    extended key usage, basic constraints and the kinds of names."""
+    from cryptography import x509
+
+    def ext(cls):
+        try:
+            return cert.extensions.get_extension_for_class(cls).value
+        except x509.ExtensionNotFound:
+            return None
+    ku = ext(x509.KeyUsage)
+    eku = ext(x509.ExtendedKeyUsage)
+    san = ext(x509.SubjectAlternativeName)
+    bc = ext(x509.BasicConstraints)
+    return {
+        'ku': None if ku is None else tuple(
+            getattr(ku, f, None) for f in ('digital_signature', 'key_encipherment', 'key_agreement',
+                                           'content_commitment', 'data_encipherment',
+                                           'key_cert_sign', 'crl_sign')),
+        'eku': None if eku is None else sorted(o.dotted_string for o in eku),
+        'san_types': None if san is None else sorted({type(n).__name__ for n in san}),
+        'ca': None if bc is None else bc.ca,
+        'extensions': sorted(e.oid.dotted_string for e in cert.extensions),
+    }

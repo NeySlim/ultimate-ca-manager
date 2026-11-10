@@ -71,7 +71,7 @@ def _handler(request_type):
 
 
 # The modules that register a protocol's handlers
-_PROTOCOL_MODULES = ()
+_PROTOCOL_MODULES = ('services.acme.approval',)
 
 
 def _import_protocols():
