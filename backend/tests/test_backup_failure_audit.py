@@ -75,3 +75,89 @@ def test_failed_restore_is_audited(auth_client, audit, monkeypatch, route, error
 
     assert response.status_code in (400, 409, 500)
     _assert_failure(audit, 'system_restore')
+
+
+def _post_create(client, route, body):
+    return client.post(route, data=json.dumps(body), content_type='application/json')
+
+
+def _single_refusal(calls, action):
+    _assert_failure(calls, action)
+    assert 'refused' in calls[0]['details']
+
+
+@pytest.mark.parametrize('route', CREATE)
+def test_a_password_the_rules_refuse_is_audited(auth_client, audit, route):
+    response = _post_create(auth_client, route, {'password': 'short'})
+    assert response.status_code == 400
+    _single_refusal(audit, 'system_backup')
+
+
+@pytest.mark.parametrize('route', CREATE)
+def test_a_refused_kdf_is_audited(auth_client, audit, route):
+    response = _post_create(auth_client, route, {'password': SECRET + 'xx', 'kdf': LEAKY})
+    assert response.status_code == 400
+    _single_refusal(audit, 'system_backup')
+
+
+def test_a_missing_backup_password_is_audited(auth_client, audit):
+    response = _post_create(auth_client, CREATE[0], {})
+    assert response.status_code == 400
+    _single_refusal(audit, 'system_backup')
+
+
+@pytest.mark.parametrize('route', CREATE)
+def test_a_fips_refused_kdf_is_audited(auth_client, audit, monkeypatch, route):
+    import importlib
+    from fips_mode import FipsRestricted
+    module = importlib.import_module('api.v2.system.backup' if route == CREATE[0] else 'api.v2.settings.backup')
+
+    def refuse(kdf):
+        raise FipsRestricted(LEAKY)
+    monkeypatch.setattr(module, 'check_backup_kdf', refuse)
+    _post_create(auth_client, route, {'password': SECRET + 'xx', 'kdf': 'argon2id'})
+    _single_refusal(audit, 'system_backup')
+
+
+def _restore(client, route, data):
+    return client.post(route, data=data, content_type='multipart/form-data')
+
+
+def _form(filename='r.ucmbkp', **extra):
+    data = {'password': SECRET + 'xx', **extra}
+    if filename is not None:
+        data['file'] = (io.BytesIO(b'x'), filename)
+    return data
+
+
+@pytest.mark.parametrize('route', RESTORE)
+@pytest.mark.parametrize('case', ['no_file', 'no_name', 'no_password', 'bad_mode', 'bad_extension', 'too_large'])
+def test_a_restore_refused_before_it_starts_is_audited(auth_client, audit, monkeypatch, route, case):
+    from services.backup import storage
+    data = {
+        'no_file': _form(None),
+        'no_name': _form(''),
+        'no_password': {'file': (io.BytesIO(b'x'), 'r.ucmbkp')},
+        'bad_mode': _form(mode=LEAKY),
+        'bad_extension': _form('r.exe'),
+        'too_large': _form(),
+    }[case]
+    if case == 'too_large':
+        monkeypatch.setattr(storage, 'restore_size_refusal', lambda stream: (413, LEAKY))
+
+    response = _restore(auth_client, route, data)
+
+    assert response.status_code in (400, 413)
+    _single_refusal(audit, 'system_restore')
+
+
+@pytest.mark.parametrize('route', RESTORE)
+def test_a_fips_refused_restore_is_audited(auth_client, audit, monkeypatch, route):
+    from fips_mode import FipsRestricted
+    from services.backup_service import BackupService
+
+    def refuse(self, *a, **k):
+        raise FipsRestricted(LEAKY)
+    monkeypatch.setattr(BackupService, 'restore_backup_from_stream', refuse)
+    _restore(auth_client, route, _form())
+    _single_refusal(audit, 'system_restore')

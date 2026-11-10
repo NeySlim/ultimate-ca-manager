@@ -135,24 +135,29 @@ def create_backup():
 
     password = data.get('password')
     if not password:
+        _audit_failure('system_backup', 'manual', 'Backup refused: password missing')
         return error_response('Backup password required', 400)
     try:
         validate_backup_password(password)
     except BackupSettingError as e:
+        _audit_failure('system_backup', 'manual', 'Backup refused: password rejected')
         return error_response(str(e), 400)
 
     kdf = data.get('kdf')
     try:
         check_backup_kdf(kdf)
     except FipsRestricted:
+        _audit_failure('system_backup', 'manual', 'Backup refused: not allowed in FIPS mode')
         raise
     except ValueError as e:
+        _audit_failure('system_backup', 'manual', 'Backup refused: key derivation not accepted')
         return error_response(str(e), 400)
 
     try:
         service = BackupService()
         size, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
     except FipsRestricted:
+        _audit_failure('system_backup', 'manual', 'Backup refused: not allowed in FIPS mode')
         raise  # the application maps it to its problem type
     except BackupBusyError as busy:
         logger.info('Backup refused: %s', busy)
@@ -408,17 +413,21 @@ def restore_backup():
     # The archive's version decides the rest, once the upload is spooled.
     request.max_content_length = storage.restore_body_limit()
     if 'file' not in request.files:
+        _audit_failure('system_restore', 'upload', 'Restore refused: no file provided')
         return error_response('No backup file provided', 400)
     file = request.files['file']
     if not file.filename:
+        _audit_failure('system_restore', 'upload', 'Restore refused: no file selected')
         return error_response('No file selected', 400)
 
     password = request.form.get('password')
     if not password:
+        _audit_failure('system_restore', file.filename, 'Restore refused: password missing')
         return error_response('Backup password required', 400)
 
     mode = (request.form.get('mode') or 'replace').strip().lower()
     if mode not in ('replace', 'merge'):
+        _audit_failure('system_restore', file.filename, 'Restore refused: unknown mode')
         return error_response("mode must be 'replace' or 'merge'", 400)
 
     try:
@@ -426,11 +435,13 @@ def restore_backup():
             validate_upload_name(file, BACKUP_EXTENSIONS)
         except ValueError as exc:
             logger.warning('Backup upload refused: %s', exc)
+            _audit_failure('system_restore', file.filename, 'Restore refused: invalid file name')
             return error_response('Invalid backup file', 400)
         too_large = storage.restore_size_refusal(file.stream)
         if too_large:
             status, message = too_large
             logger.warning('Backup upload refused: %s', message)
+            _audit_failure('system_restore', file.filename, 'Restore refused: file too large')
             return error_response(message, status)
 
         # A restore landing before a pending backend switch is lost at restart.
@@ -487,6 +498,7 @@ def restore_backup():
         results['filename'] = file.filename
         return success_response(data=results, message=restore_message(results))
     except FipsRestricted:
+        _audit_failure('system_restore', file.filename, 'Restore refused: not allowed in FIPS mode')
         raise  # the application maps it to its problem type, message unchanged
     except BackupDecryptionError:
         logger.warning('Restore refused: the backup could not be decrypted')

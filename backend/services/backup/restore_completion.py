@@ -32,7 +32,11 @@ def record_restore(**fields) -> None:
 
 
 def record_failure(action: str, resource_name: str, reason: str) -> None:
-    """Audit a failed backup or restore with a fixed reason, never the exception text."""
+    """Audit a backup or restore that was refused or failed, with `success=False`.
+
+    One rule for both routes: every refused or failed attempt leaves exactly one
+    line, whose reason is a fixed phrase, never exception text, password or path.
+    """
     record_restore(action=action, resource_type='system',
                    resource_name=resource_name, details=reason, success=False)
 
