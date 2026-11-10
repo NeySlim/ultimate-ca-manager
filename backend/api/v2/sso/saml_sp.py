@@ -197,12 +197,13 @@ def _purge_expired():
     db.session.execute(delete(SAMLMessageId).where(SAMLMessageId.expires_at < utc_now()))
 
 
-def remember_request(request_id, provider_id):
-    """Record an AuthnRequest id until its response arrives or REQUEST_TTL passes."""
+def remember_request(request_id, provider_id, next_path=None):
+    """Record an AuthnRequest id, and the page to return to, until its response
+    arrives or REQUEST_TTL passes."""
     _purge_expired()
     db.session.add(SAMLMessageId(
         kind=SAMLMessageId.KIND_REQUEST, message_id=request_id,
-        provider_id=provider_id, expires_at=utc_now() + REQUEST_TTL))
+        provider_id=provider_id, expires_at=utc_now() + REQUEST_TTL, next_path=next_path))
     db.session.commit()
 
 
@@ -216,6 +217,17 @@ def request_pending(request_id, provider_id):
         SAMLMessageId.provider_id == provider_id,
         SAMLMessageId.expires_at >= utc_now(),
     ).first() is not None
+
+
+def request_next_path(request_id, provider_id):
+    """Page stored with an AuthnRequest, expired or not; only the caller whose take_request wins may use it."""
+    if not request_id or len(request_id) > MAX_MESSAGE_ID_LENGTH:
+        return None
+    return db.session.query(SAMLMessageId.next_path).filter(
+        SAMLMessageId.kind == SAMLMessageId.KIND_REQUEST,
+        SAMLMessageId.message_id == request_id,
+        SAMLMessageId.provider_id == provider_id,
+    ).scalar()
 
 
 def take_request(request_id, provider_id):

@@ -354,10 +354,12 @@ jobs:
             tests/test_migration_142*.py \
             tests/test_migration_143*.py \
             tests/test_migration_144*.py \
+            tests/test_migration_145*.py \
             tests/test_postgres_schema_of_its_own.py \
             tests/test_db_error_parameters_hidden.py \
             tests/test_audit_oversized_fields.py \
-            tests/test_sso_login_identity.py
+            tests/test_sso_login_identity.py \
+            tests/test_sso_return_path.py
   
   # Two real UCM nodes in HA mode on one PostgreSQL (docs/testing/ha-bench.md).
   # Manual only: run the workflow by hand with the `ha` input ticked.
