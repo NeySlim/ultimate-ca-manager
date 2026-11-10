@@ -210,3 +210,35 @@ describe('CSRsPage Generate CSR key types on this server', () => {
       expect((await submitGenerate()).key_type).toBe(first)
     })
 })
+
+describe('CSRsPage Generate CSR starts on the server default key', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.create.mockResolvedValue({ data: { id: 99 } })
+  })
+
+  it('preselects the key the server issues when none is named', async () => {
+    mocks.effective = { default_key_type: 'EC-P384' }
+    await openGenerate()
+    const want = findAlgorithm('EC-P384').csr
+    await waitFor(() => expect(screen.getByLabelText('common.keyType')).toHaveValue(want))
+    fireEvent.change(screen.getAllByPlaceholderText('example.com')[0], { target: { value: 'dflt.example.test' } })
+    expect((await submitGenerate()).key_type).toBe(want)
+  })
+
+  it('keeps the key the user picked when the server answer arrives', async () => {
+    mocks.effective = { default_key_type: 'EC-P384' }
+    await openGenerate()
+    const want = findAlgorithm('RSA-4096').csr
+    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: want } })
+    await new Promise((r) => setTimeout(r, 20))
+    expect(screen.getByLabelText('common.keyType')).toHaveValue(want)
+  })
+
+  it('stays on the form default when the server names none', async () => {
+    mocks.effective = { default_key_error: 'no default key type is allowed' }
+    await openGenerate()
+    await new Promise((r) => setTimeout(r, 20))
+    expect(screen.getByLabelText('common.keyType')).toHaveValue(findAlgorithm(CSR_LABELS[0]).csr)
+  })
+})

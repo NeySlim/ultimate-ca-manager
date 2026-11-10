@@ -66,7 +66,7 @@ export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
  * `mldsa` (this build has ML-DSA). A failed lookup offers everything: the server refuses anyway.
  */
 export function useKeyPlatform() {
-  const [platform, setPlatform] = useState({ fips: false, mldsa: true })
+  const [platform, setPlatform] = useState({ fips: false, mldsa: true, defaultKeyType: null })
   useEffect(() => {
     let cancelled = false
     Promise.resolve()
@@ -74,7 +74,8 @@ export function useKeyPlatform() {
       .then((res) => {
         if (cancelled) return
         const data = extractData(res) || {}
-        setPlatform({ fips: data.fips === true, mldsa: data.ml_dsa !== false })
+        // default_key_type: what the server issues for a request that names no key
+        setPlatform({ fips: data.fips === true, mldsa: data.ml_dsa !== false, defaultKeyType: data.default_key_type ?? null })
       })
       .catch(() => {})
     return () => { cancelled = true }
