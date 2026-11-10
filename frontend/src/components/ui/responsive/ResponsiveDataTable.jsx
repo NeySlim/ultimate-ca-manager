@@ -1391,7 +1391,7 @@ function DesktopTable({
                   onClick={() => sortable && col.sortable !== false && onSort(col.key)}
                   style={style}
                   className={cn(
-                    'text-left text-[11px] font-medium text-text-tertiary tracking-wide',
+                    'text-left text-xs font-medium text-text-tertiary tracking-wide',
                     'relative group',
                     col.compact ? 'px-1 py-1.5' : dStyle.header,
                     'transition-colors duration-200',

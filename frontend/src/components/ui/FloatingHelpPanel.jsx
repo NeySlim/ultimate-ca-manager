@@ -286,13 +286,13 @@ function QuickHelpContent({ content, t }) {
 
       {content.related?.length > 0 && (
         <div className="pt-3 border-t border-border">
-          <h4 className="text-[11px] font-semibold text-text-tertiary uppercase tracking-wider mb-2 flex items-center gap-1.5">
+          <h4 className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2 flex items-center gap-1.5">
             <LinkIcon size={10} weight="bold" />
             {t('help.seeAlso')}
           </h4>
           <div className="flex flex-wrap gap-1.5">
             {content.related.map((item, idx) => (
-              <span key={idx} className="px-2.5 py-1 rounded-md bg-bg-tertiary text-[11px] font-medium text-text-secondary border border-border">
+              <span key={idx} className="px-2.5 py-1 rounded-md bg-bg-tertiary text-xs font-medium text-text-secondary border border-border">
                 {item}
               </span>
             ))}
@@ -341,7 +341,7 @@ function QuickSection({ section }) {
           </dl>
         )}
         {section.example && (
-          <div className="mt-2 p-2 rounded-lg bg-bg-tertiary border border-border font-mono text-[11px] text-text-secondary overflow-x-auto whitespace-pre-wrap break-all">
+          <div className="mt-2 p-2 rounded-lg bg-bg-tertiary border border-border font-mono text-xs text-text-secondary overflow-x-auto whitespace-pre-wrap break-all">
             {section.example}
           </div>
         )}
@@ -520,7 +520,7 @@ function GuideContent({ markdown, t, isMobileView, panelWidth }) {
                   key={idx}
                   onClick={() => scrollTo(idx)}
                   className={cn(
-                    'w-full text-left px-3 py-1.5 text-[11px] leading-snug transition-colors border-l-2',
+                    'w-full text-left px-3 py-1.5 text-xs leading-snug transition-colors border-l-2',
                     activeSection === idx
                       ? 'border-accent-primary text-accent-primary bg-accent-primary-op5 font-medium'
                       : 'border-transparent text-text-tertiary hover:text-text-secondary hover:bg-tertiary-op50'
@@ -613,7 +613,7 @@ function ReaderToolbar({
               key={idx}
               onClick={() => updatePref('fontSize', idx)}
               className={cn(
-                'px-1.5 py-0.5 text-[10px] font-bold transition-colors rounded-sm',
+                'px-1.5 py-0.5 text-xs font-bold transition-colors rounded-sm',
                 readerPrefs.fontSize === idx
                   ? 'bg-accent-primary text-on-accent'
                   : 'text-text-tertiary hover:text-text-primary'
@@ -716,7 +716,7 @@ function MobileTocDropdown({ toc, activeSection, scrollTo, t }) {
         className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-tertiary-op50 transition-colors"
       >
         <List size={13} className="text-text-tertiary shrink-0" />
-        <span className="text-[11px] font-medium text-text-secondary flex-1 truncate">
+        <span className="text-xs font-medium text-text-secondary flex-1 truncate">
           {toc[activeSection] || t('help.tableOfContents', 'Contents')}
         </span>
         {open ? <CaretDown size={11} className="text-text-tertiary" /> : <CaretRight size={11} className="text-text-tertiary" />}
@@ -728,7 +728,7 @@ function MobileTocDropdown({ toc, activeSection, scrollTo, t }) {
               key={idx}
               onClick={() => { scrollTo(idx); setOpen(false) }}
               className={cn(
-                'w-full text-left px-3 py-1.5 rounded-md text-[11px] transition-colors',
+                'w-full text-left px-3 py-1.5 rounded-md text-xs transition-colors',
                 activeSection === idx
                   ? 'bg-accent-primary-op10 text-accent-primary font-medium'
                   : 'text-text-tertiary hover:bg-bg-tertiary'
@@ -813,7 +813,7 @@ function renderLines(lines) {
     const h4 = line.match(/^#### (.+)/)
     if (h4) {
       elements.push(
-        <h5 key={i} className="text-[11px] font-semibold text-text-secondary mt-2 mb-0.5">
+        <h5 key={i} className="text-xs font-semibold text-text-secondary mt-2 mb-0.5">
           {formatInline(h4[1].trim())}
         </h5>
       )
@@ -830,7 +830,7 @@ function renderLines(lines) {
       }
       i++ // skip closing ```
       elements.push(
-        <pre key={`code-${i}`} className="p-2.5 rounded-lg bg-bg-tertiary border border-border font-mono text-[11px] text-text-secondary overflow-x-auto whitespace-pre leading-relaxed">
+        <pre key={`code-${i}`} className="p-2.5 rounded-lg bg-bg-tertiary border border-border font-mono text-xs text-text-secondary overflow-x-auto whitespace-pre leading-relaxed">
           {codeLines.join('\n')}
         </pre>
       )
@@ -891,7 +891,7 @@ function renderLines(lines) {
         <ol key={`ol-${i}`} className="space-y-1">
           {listItems.map((item, j) => (
             <li key={j} className="flex items-start gap-2 text-xs text-text-secondary">
-              <span className="text-[10px] font-semibold text-text-tertiary mt-0.5 min-w-[14px] shrink-0">{j + 1}.</span>
+              <span className="text-xs font-semibold text-text-tertiary mt-0.5 min-w-[14px] shrink-0">{j + 1}.</span>
               <span className="leading-relaxed">{formatInline(item)}</span>
             </li>
           ))}
@@ -950,7 +950,7 @@ function formatInline(text) {
     if (type === 'bold') {
       parts.push(<strong key={key++} className="font-semibold text-text-primary">{earliest[1]}</strong>)
     } else if (type === 'code') {
-      parts.push(<code key={key++} className="px-1 py-0.5 rounded bg-bg-tertiary border border-border font-mono text-[10px]">{earliest[1]}</code>)
+      parts.push(<code key={key++} className="px-1 py-0.5 rounded bg-bg-tertiary border border-border font-mono text-xs">{earliest[1]}</code>)
     } else if (type === 'italic') {
       parts.push(<em key={key++} className="italic">{earliest[1]}</em>)
     }

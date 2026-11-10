@@ -116,7 +116,7 @@ function NavGroup({ group, activePage, isAdmin, hasPermission, expanded, onToggl
         onClick={onToggle}
         title={t(group.labelKey)}
         className={cn(
-          "w-full flex items-center gap-2 px-2.5 py-[7px] rounded-md text-[11px] font-semibold tracking-wide transition-colors",
+          "w-full flex items-center gap-2 px-2.5 py-[7px] rounded-md text-xs font-semibold tracking-wide transition-colors",
           groupHasActive
             ? "text-accent-primary"
             : "text-text-tertiary hover:text-text-secondary hover:bg-bg-tertiary"

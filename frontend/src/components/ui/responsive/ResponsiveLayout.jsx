@@ -527,7 +527,7 @@ function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
         {tabGroups.map((group, i) => (
           <div key={i}>
             {group.labelKey && (
-              <div className="px-2 pb-1.5 text-[11px] font-semibold tracking-wide text-text-tertiary">
+              <div className="px-2 pb-1.5 text-xs font-semibold tracking-wide text-text-tertiary">
                 {t(group.labelKey)}
               </div>
             )}

@@ -788,7 +788,7 @@ export default function OperationsPage() {
                         {testItems.map(item => (
                           <label key={item.id} className="flex items-center gap-3 px-3 py-2 hover:bg-bg-secondary cursor-pointer transition-colors">
                             <input type="checkbox" checked={item.selected} onChange={() => toggleItemSelection(item.id)} className="w-4 h-4 rounded border-border text-accent-primary shrink-0" />
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase shrink-0 ${item.type === 'CA' ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-status-info-op15 text-status-info'}`}>
+                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold uppercase shrink-0 ${item.type === 'CA' ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-status-info-op15 text-status-info'}`}>
                               {item.type}
                             </span>
                             <span className="text-sm truncate">{item.name || t('common.unnamed')}</span>
@@ -912,7 +912,7 @@ export default function OperationsPage() {
             <Certificate size={12} weight="duotone" />
           </div>
           <span className="text-sm font-medium truncate flex-1">{name}</span>
-          <span className={cn("text-[10px] font-medium uppercase", statusColors[status] || 'text-text-tertiary')}>{status}</span>
+          <span className={cn("text-xs font-medium uppercase", statusColors[status] || 'text-text-tertiary')}>{status}</span>
         </div>
       )
     }
@@ -943,7 +943,7 @@ export default function OperationsPage() {
             <PencilSimple size={12} weight="duotone" />
           </div>
           <span className="text-sm font-medium truncate flex-1">{item.name || '—'}</span>
-          <span className="text-[10px] text-text-tertiary">{item.key_type}</span>
+          <span className="text-xs text-text-tertiary">{item.key_type}</span>
         </div>
       )
     }
@@ -951,11 +951,11 @@ export default function OperationsPage() {
       const avatarColors = { admin: 'icon-bg-violet', operator: 'icon-bg-blue', auditor: 'icon-bg-orange', viewer: 'icon-bg-teal' }
       return (
         <div className="flex items-center gap-2">
-          <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0", avatarColors[item.role] || 'icon-bg-teal')}>
+          <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold shrink-0", avatarColors[item.role] || 'icon-bg-teal')}>
             {item.username?.charAt(0)?.toUpperCase() || '?'}
           </div>
           <span className="text-sm font-medium truncate flex-1">{item.username || '—'}</span>
-          <span className="text-[10px] text-text-tertiary">{item.role}</span>
+          <span className="text-xs text-text-tertiary">{item.role}</span>
         </div>
       )
     }
@@ -1016,7 +1016,7 @@ export default function OperationsPage() {
                     {t(`common.${key}Short`, key)}
                     {count !== undefined && (
                       <span className={cn(
-                        "text-[10px] font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center",
+                        "text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[18px] text-center",
                         isActive ? "bg-accent-primary-op15 text-accent-primary" : "bg-bg-tertiary text-text-tertiary"
                       )}>
                         {count}

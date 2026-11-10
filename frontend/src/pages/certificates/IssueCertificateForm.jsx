@@ -471,7 +471,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
             disabled={!!selectedTemplate}
           />
           {selectedTemplate && (
-            <p className="mt-1 text-[10px] text-text-tertiary">{t('certificates.certTypeFromTemplate')}</p>
+            <p className="mt-1 text-xs text-text-tertiary">{t('certificates.certTypeFromTemplate')}</p>
           )}
         </div>
       </div>
@@ -569,9 +569,9 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
           <div className="space-y-1">
             {autoSans.map((s, idx) => (
               <div key={`auto-${idx}`} className="flex items-center gap-2 px-2.5 py-1.5 bg-accent-primary-op10 border border-accent-primary-op20 rounded-md">
-                <span className="text-[10px] font-medium uppercase tracking-wider text-accent-primary-op60 w-12">{s.type}</span>
+                <span className="text-xs font-medium uppercase tracking-wider text-accent-primary-op60 w-12">{s.type}</span>
                 <span className="text-xs text-text-primary font-mono flex-1">{s.value}</span>
-                <span className="text-[10px] text-accent-primary-op60 italic">{t('certificates.autoIncluded')}</span>
+                <span className="text-xs text-accent-primary-op60 italic">{t('certificates.autoIncluded')}</span>
               </div>
             ))}
           </div>
@@ -580,9 +580,9 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
         {/* Wildcard base domain suggestion */}
         {wildcardSuggestion && (
           <div className="flex items-center gap-2 px-2.5 py-1.5 bg-status-warning-op10 border border-status-warning-op20 rounded-md">
-            <span className="text-[10px] font-medium uppercase tracking-wider status-warning-text w-12">dns</span>
+            <span className="text-xs font-medium uppercase tracking-wider status-warning-text w-12">dns</span>
             <span className="text-xs text-text-secondary font-mono flex-1">{wildcardSuggestion}</span>
-            <Button type="button" variant="ghost" size="sm" onClick={addWildcardBase} className="text-[10px] status-warning-text !px-1.5 !py-0.5">
+            <Button type="button" variant="ghost" size="sm" onClick={addWildcardBase} className="text-xs status-warning-text !px-1.5 !py-0.5">
               <Plus size={10} /> {t('certificates.addBaseDomain')}
             </Button>
           </div>
@@ -590,7 +590,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
 
         {/* Additional SANs label when auto-SANs present */}
         {autoSans.length > 0 && (
-          <p className="text-[10px] text-text-tertiary">{t('certificates.additionalSans')}</p>
+          <p className="text-xs text-text-tertiary">{t('certificates.additionalSans')}</p>
         )}
 
         <div className="space-y-2">

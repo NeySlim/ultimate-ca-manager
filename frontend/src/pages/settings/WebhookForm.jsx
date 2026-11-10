@@ -350,7 +350,7 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
                 <label className="block text-xs font-medium text-text-secondary">
                   <span className="flex items-center gap-1">
                     {t('webhooks.auth.token.label')}
-                    <span className="inline-flex items-center gap-1 px-1.5 text-[10px] font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
+                    <span className="inline-flex items-center gap-1 px-1.5 text-xs font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
                       <CheckCircle size={10} weight="fill" />
                       {t('common.set')}
                     </span>
@@ -394,7 +394,7 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
                 <label className="block text-xs font-medium text-text-secondary">
                   <span className="flex items-center gap-1">
                     {t('webhooks.auth.token.label')}
-                    <span className="inline-flex items-center gap-1 px-1.5 text-[10px] font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
+                    <span className="inline-flex items-center gap-1 px-1.5 text-xs font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
                       <CheckCircle size={10} weight="fill" />
                       {t('common.set')}
                     </span>
@@ -444,7 +444,7 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
                 <label className="block text-xs font-medium text-text-secondary">
                   <span className="flex items-center gap-1">
                     {t('webhooks.auth.token.label')}
-                    <span className="inline-flex items-center gap-1 px-1.5 text-[10px] font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
+                    <span className="inline-flex items-center gap-1 px-1.5 text-xs font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
                       <CheckCircle size={10} weight="fill" />
                       {t('common.set')}
                     </span>
@@ -488,7 +488,7 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
                 <label className="block text-xs font-medium text-text-secondary">
                   <span className="flex items-center gap-1">
                     {t('webhooks.auth.token.label')}
-                    <span className="inline-flex items-center gap-1 px-1.5 text-[10px] font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
+                    <span className="inline-flex items-center gap-1 px-1.5 text-xs font-medium bg-status-success-op20 text-status-success rounded leading-[16px]">
                       <CheckCircle size={10} weight="fill" />
                       {t('common.set')}
                     </span>

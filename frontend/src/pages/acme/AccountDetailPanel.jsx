@@ -225,7 +225,7 @@ export default function AccountDetailPanel({ account, orders, challenges, detail
                     {order.order_id && (
                       <div className="flex justify-between col-span-2 mt-1 pt-1 border-t border-border-op30">
                         <span className="text-text-tertiary">{t('acme.orderId')}</span>
-                        <span className="text-text-tertiary font-mono text-[10px] truncate max-w-[180px]" title={order.order_id}>
+                        <span className="text-text-tertiary font-mono text-xs truncate max-w-[180px]" title={order.order_id}>
                           {order.order_id}
                         </span>
                       </div>

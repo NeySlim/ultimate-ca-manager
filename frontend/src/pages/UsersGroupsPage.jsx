@@ -898,7 +898,7 @@ export default function UsersGroupsPage() {
                   <div key={cert.id} className="flex items-center justify-between p-2 bg-tertiary-50 border border-border rounded-lg">
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium text-text-primary truncate">{cert.name || cert.cert_subject}</p>
-                      <p className="text-[10px] text-text-tertiary">
+                      <p className="text-xs text-text-tertiary">
                         {t('common.expires')} {formatDate(cert.valid_until)}
                       </p>
                     </div>

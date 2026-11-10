@@ -133,7 +133,7 @@ function ChainCard({ chain, index }) {
       </div>
       
       {chain.trust_anchor && (
-        <div className="text-[10px] text-text-tertiary mb-1.5">
+        <div className="text-xs text-text-tertiary mb-1.5">
           {t('import.trustAnchor')}: {chain.trust_anchor}
         </div>
       )}

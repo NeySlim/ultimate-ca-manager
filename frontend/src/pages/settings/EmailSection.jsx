@@ -417,7 +417,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
               {t('settings.editTemplate')}
             </Button>
             {isMobile && (
-              <div className="absolute bottom-full right-0 mb-1 px-2 py-1 rounded bg-bg-tertiary border border-border text-[11px] text-text-secondary whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
+              <div className="absolute bottom-full right-0 mb-1 px-2 py-1 rounded bg-bg-tertiary border border-border text-xs text-text-secondary whitespace-nowrap opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity">
                 {t('settings.templateDesktopOnly')}
               </div>
             )}
