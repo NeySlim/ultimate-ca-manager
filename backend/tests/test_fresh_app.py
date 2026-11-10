@@ -38,6 +38,17 @@ def test_its_paths_and_scheduler_are_put_back(app):
     assert scheduler_service._scheduler is scheduler
 
 
+def test_its_session_store_is_its_own_even_when_the_testing_config_pins_one(app, monkeypatch, tmp_path):
+    """On PostgreSQL TestingConfig carries a SESSION_FILE_DIR of its own, which shadows Config's."""
+    from config.settings import config
+    pinned = tmp_path / 'pinned'
+    monkeypatch.setattr(config['testing'], 'SESSION_FILE_DIR', pinned, raising=False)
+    with fresh_app() as other:
+        assert str(other.config['SESSION_FILE_DIR']) != str(pinned)
+        assert str(other.config['SESSION_FILE_DIR']) != str(app.config['SESSION_FILE_DIR'])
+    assert config['testing'].SESSION_FILE_DIR == pinned
+
+
 def test_its_restores_do_not_sign_the_session_app_out(auth_client):
     from services.backup.restore.invalidate import invalidate_after_restore
     signed_in = auth_client._client  # the raw client: no silent sign-in again
