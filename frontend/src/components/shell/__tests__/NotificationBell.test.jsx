@@ -35,8 +35,8 @@ const QUEUE = { data: { counts: {}, items: [
   { kind: 'client_renewal_overdue', tier: 'warning', id: 9, label: 'noise', due_at: null, href_hint: '/certificates' },
 ] } }
 const LOGS = { data: [
-  { id: 41, action: 'backup_create', success: false, username: 'root', resource_name: null, timestamp: '2026-11-09T09:00:00Z' },
-  { id: 42, action: 'backup_create', success: true, username: 'root', resource_name: null, timestamp: '2026-11-09T08:00:00Z' },
+  { id: 41, action: 'system_backup', success: false, username: 'root', resource_name: null, timestamp: '2026-11-09T09:00:00Z' },
+  { id: 42, action: 'system_backup', success: true, username: 'root', resource_name: null, timestamp: '2026-11-09T08:00:00Z' },
   { id: 43, action: 'session_revoke', success: true, username: 'alice', resource_name: null, timestamp: '2026-11-09T07:00:00Z' },
 ] }
 
@@ -49,7 +49,10 @@ const bell = () => screen.getByRole('button', { name: /shell\.bell\.title/ })
 
 beforeEach(() => {
   m.getQueue.mockReset().mockResolvedValue(QUEUE)
-  m.getLogs.mockReset().mockResolvedValue(LOGS)
+  // The server filters: sessions in one request, failed backups/restores in the other
+  m.getLogs.mockReset().mockImplementation(async params => ({
+    data: LOGS.data.filter(e => params.action.includes(e.action) && (params.success === undefined || e.success === params.success)),
+  }))
   m.persistPreference.mockReset()
   m.prefs = {}
   m.listeners.clear()
@@ -156,5 +159,11 @@ describe('NotificationBell', () => {
     expect(screen.getByRole('heading', { name: 'shell.bell.title' })).toHaveFocus()
     await user.keyboard('{Escape}')
     expect(bell()).toHaveFocus()
+  })
+
+  it('asks for backup and restore failures in their own request', async () => {
+    setup()
+    await waitFor(() => expect(m.getLogs).toHaveBeenCalledWith(
+      expect.objectContaining({ action: ['system_backup', 'system_restore'], success: false })))
   })
 })

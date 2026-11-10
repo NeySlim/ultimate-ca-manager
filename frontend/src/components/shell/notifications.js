@@ -11,8 +11,10 @@ import { getPreferences, subscribePreferences, persistPreference } from '../../s
 
 export const BELL_KINDS = ['acme_order_failed', 'acme_client_renewal_failed', 'approval_pending', 'crl_due',
   'crl_missing', 'manual_renewal_due', 'auto_renewal_blocked', 'ca_expiring']
-// Journal events worth a notification: a failed backup, a revoked session
-const AUDIT_ACTIONS = ['backup_create', 'backup_restore', 'session_revoke', 'session_revoke_all']
+// Journal events worth a notification: a revoked session, a failed backup or restore.
+// Failures are asked for on their own so successful runs cannot push them out of the page.
+const SESSION_ACTIONS = ['session_revoke', 'session_revoke_all']
+const FAILURE_ACTIONS = ['system_backup', 'system_restore']
 const MAX_MARKS = 200
 const REFRESH_DELAY_MS = 1500
 
@@ -48,14 +50,15 @@ export function useNotifications(can) {
   const canQueue = !!can?.hasPermission?.('read:dashboard')
   const canAudit = !!can?.hasPermission?.('read:audit')
   const { lastEvent } = useWebSocket()
-  const [parts, setParts] = useState({ queue: [], audit: [] })
+  const [parts, setParts] = useState({ queue: [], audit: [], failures: [] })
   const marks = useReadMarks()
   const alive = useRef(true)
 
   const refresh = useCallback(async () => {
-    const [q, a] = await Promise.allSettled([
+    const [q, a, f] = await Promise.allSettled([
       canQueue ? dashboardService.getQueue(BELL_KINDS) : Promise.resolve(null),
-      canAudit ? auditService.getLogs({ action: AUDIT_ACTIONS, per_page: 20 }) : Promise.resolve(null),
+      canAudit ? auditService.getLogs({ action: SESSION_ACTIONS, per_page: 20 }) : Promise.resolve(null),
+      canAudit ? auditService.getLogs({ action: FAILURE_ACTIONS, success: false, per_page: 20 }) : Promise.resolve(null),
     ])
     if (!alive.current) return
     // A transient failure keeps what was shown; a refused call (rights changed) empties the source
@@ -67,6 +70,7 @@ export function useNotifications(can) {
     setParts(p => ({
       queue: next(q, p.queue, v => queueItems(v.data ?? v)),
       audit: next(a, p.audit, v => auditItems(v.data ?? v)),
+      failures: next(f, p.failures, v => auditItems(v.data ?? v)),
     }))
   }, [canQueue, canAudit])
 
@@ -83,7 +87,7 @@ export function useNotifications(can) {
     return () => clearTimeout(timer)
   }, [lastEvent, refresh])
 
-  const items = [...parts.queue, ...parts.audit]
+  const items = [...parts.queue, ...[...parts.audit, ...parts.failures].sort((x, y) => (y.at || '').localeCompare(x.at || ''))]
     .filter((item, i, all) => all.findIndex(o => o.key === item.key) === i)
     .map(item => ({ ...item, unread: !marks.includes(item.key) }))
   const unread = items.filter(i => i.unread).length

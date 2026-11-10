@@ -6086,8 +6086,8 @@
         "auto_renewal_blocked": "Automatic renewal blocked",
         "renewal_declined": "Renewal declined",
         "ca_expiring": "CA expiring",
-        "backup_create": "Backup failed",
-        "backup_restore": "Restore failed",
+        "system_backup": "Backup failed",
+        "system_restore": "Restore failed",
         "session_revoke": "Session revoked",
         "session_revoke_all": "Sessions revoked"
       }
