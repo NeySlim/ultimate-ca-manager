@@ -29,8 +29,9 @@ MAX_PINS = 3
 
 
 def _valid_pins(v):
-    return (isinstance(v, list) and len(v) <= MAX_PINS and len(set(v)) == len(v)
-            and all(isinstance(i, str) and _PIN_ID.match(i) for i in v))
+    return (isinstance(v, list) and len(v) <= MAX_PINS
+            and all(isinstance(i, str) and _PIN_ID.match(i) for i in v)
+            and len(set(v)) == len(v))
 
 
 _PREF_VALIDATORS = {

@@ -25,6 +25,8 @@ def test_empty_pins_are_accepted(auth_client):
     ['audit', 'audit'],            # duplicate
     'audit',                       # not a list
     [1],                           # not a string
+    [[1]],                         # unhashable element
+    [{}],
     [''],                          # empty id
     ['Has Space'],                 # format
     ['../etc'],
