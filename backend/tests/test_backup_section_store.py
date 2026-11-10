@@ -206,3 +206,23 @@ def test_app_startup_sweeps_the_spool_dir():
     with fresh_app():
         assert not stale.exists()
 
+
+@pytest.mark.parametrize('shift', [-2, -1, 0, 1])
+def test_eviction_does_not_depend_on_the_interpreters_reference_counts(
+        store, monkeypatch, shift):
+    """CPython 3.14 reports one reference fewer than 3.13 for the same code."""
+    import sys
+
+    from services.backup import section_store
+    real = sys.getrefcount
+    monkeypatch.setattr(section_store, 'getrefcount', lambda value: real(value) + shift)
+    monkeypatch.setattr(section_store, '_BASELINE', section_store._baseline())
+
+    held = {'users': store['users']}     # the way RestorePlan.rows holds sections
+    store['configuration']
+    store['certificates']
+    assert store['users'] is held['users']
+    del held
+    store['configuration']
+    store['certificates']
+    assert 'users' not in store._loaded

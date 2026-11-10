@@ -10,7 +10,7 @@ import logging
 import os
 import shutil
 import struct
-import sys
+from sys import getrefcount
 import tempfile
 import time
 from collections import OrderedDict
@@ -312,16 +312,8 @@ class SectionStore:
 
     def _released(self, name: str) -> bool:
         """Whether only the store holds this section and each of its rows."""
-        value = self._loaded[name]
-        # The store's own reference, this frame's, and getrefcount's argument
-        if sys.getrefcount(value) > 3:
-            return False
-        children = value.values() if isinstance(value, dict) else value
-        for child in children:
-            # The container's reference, the loop's, and getrefcount's argument
-            if isinstance(child, (dict, list)) and sys.getrefcount(child) > 3:
-                return False
-        return True
+        section, row = _reference_counts(self._loaded, name)
+        return section <= _BASELINE[0] and row <= _BASELINE[1]
 
     def _evict(self, name: str) -> None:
         """Write the section back, changes included, then let it go."""
@@ -370,5 +362,25 @@ class SectionStore:
         self.close()
 
 
+def _reference_counts(loaded: Dict[str, Any], name: str) -> Tuple[int, int]:
+    """References to a loaded section and to its most referenced row."""
+    value = loaded[name]
+    section = getrefcount(value)
+    row = 0
+    for child in (value.values() if isinstance(value, dict) else value):
+        if isinstance(child, (dict, list)):
+            row = max(row, getrefcount(child))
+    return section, row
+
+
+def _baseline() -> Tuple[int, int]:
+    # Measured on an unheld probe through the same code: interpreters differ
+    # in what getrefcount reports (3.14 borrows references 3.13 counted)
+    return _reference_counts(OrderedDict(probe=[{}]), 'probe')
+
+
 def _frame_aad(label: str, index: int) -> bytes:
     return label.encode('ascii') + b'#' + index.to_bytes(8, 'big')
+
+
+_BASELINE = _baseline()
