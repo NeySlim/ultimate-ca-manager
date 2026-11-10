@@ -468,6 +468,21 @@ class TestRefusals:
             assert err.status == 409 and 'revoked' in err.message
             assert _state(app, cid) == before
 
+    def test_a_row_archived_since_the_caller_read_it_is_refused(self, app, leaf):
+        cid = leaf()
+        before = _state(app, cid)
+        with app.app_context():
+            from sqlalchemy import update
+            row = db.session.get(Certificate, cid)
+            assert not row.archived
+            # Archived by another renewal behind the caller's back
+            db.session.execute(update(Certificate).where(Certificate.id == cid)
+                               .values(archived=True).execution_options(synchronize_session=False))
+            with pytest.raises(RenewalError) as exc:
+                renew_certificate_in_place(row, username='admin')
+        assert exc.value.status == 409 and 'renewed by another request' in exc.value.message
+        assert _state(app, cid) == before
+
     def test_preconditions_in_order(self, app, leaf):
         cid = leaf()
         with app.app_context():

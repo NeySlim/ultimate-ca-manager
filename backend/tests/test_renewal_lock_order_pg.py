@@ -229,8 +229,10 @@ def test_in_place_renewal_of_a_pair_and_a_protocol_renewal_of_b_do_not_deadlock(
             db.session.remove()
     assert settled
     assert rereads == [a_id, b_id]
-    assert errors == []
-    assert count == 5
+    # B archived by its protocol renewal meanwhile: the pair is refused, nothing revived
+    assert [(name, f'Related certificate {b_id}: Certificate was renewed by another request'
+             in error) for name, error in errors] == [('in-place', True)]
+    assert count == 3
 
 
 def test_the_responder_task_waiting_on_an_in_place_renewal_leaves_the_renewed_row(app, monkeypatch):
@@ -543,3 +545,74 @@ def test_two_pairs_with_crossed_cas_renewed_together_do_not_deadlock(app, monkey
     assert errors == []
     # Each CA: two issuances, then one renewal per pair
     assert counts == (4, 4)
+
+
+def test_an_in_place_renewal_waiting_on_a_protocol_renewal_is_refused(app, monkeypatch):
+    """The protocol side archives the row and stores its successor; the in-place side,
+    which waited on that row, finds it archived and leaves it so: one live certificate."""
+    from services.ca import CAService
+    from services.cert import related_pair, renewal
+    from services.cert_service import CertificateService
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    with _a_schema_of_our_own(f'renewal_archived_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            ca = _ca_row(*_authority())
+            ca_id = ca.id
+            cert_id = CertificateService.create_certificate(
+                descr='claimed', caref=ca.refid, dn={'CN': 'claimed.example.test'},
+                key_type='prime256v1', validity_days=30).id
+            db.session.remove()
+
+        holds, release = threading.Event(), threading.Event()
+        errors, pids = [], {}
+        link = related_pair.link_issued
+
+        def pause_holding_the_row(*args):
+            link(*args)
+            if threading.current_thread().name == 'protocol':
+                holds.set()
+                release.wait(30)
+        monkeypatch.setattr(related_pair, 'link_issued', pause_holding_the_row)
+
+        def run(name, work):
+            with app.app_context():
+                engine, pids[name] = _own_session(url)
+                try:
+                    work()
+                except Exception as exc:  # noqa: BLE001
+                    errors.append((name, repr(exc)))
+                finally:
+                    holds.set()
+                    db.session.remove()
+                    engine.dispose()
+
+        t_p = threading.Thread(target=run, name='protocol', args=('protocol', lambda: (
+            CAService.sign_csr_from_crypto(db.session.get(CA, ca_id), _csr('claimed.example.test'),
+                                           validity_days=30, source='test-renewal',
+                                           supersedes=db.session.get(Certificate, cert_id)))))
+        t_p.start()
+        assert holds.wait(30)
+        t_i = threading.Thread(target=run, name='in-place', args=('in-place', lambda: (
+            renewal.renew_certificate_in_place(db.session.get(Certificate, cert_id),
+                                               db.session.get(CA, ca_id)))))
+        t_i.start()
+        blocked = _waits_on_a_lock(url, _pid_of(pids, 'in-place'))
+        release.set()
+        t_p.join(60)
+        t_i.join(60)
+
+        with app.app_context():
+            count = db.session.get(CA, ca_id).serial
+            row = db.session.get(Certificate, cert_id)
+            archived = row.archived
+            live = Certificate.query.filter_by(caref=row.caref).filter(
+                Certificate.archived.isnot(True)).count()
+            db.session.remove()
+    assert blocked, errors
+    assert [(name, 'renewed by another request' in error) for name, error in errors] == \
+        [('in-place', True)]
+    # Created, then renewed by the protocol once; the in-place side stored nothing
+    assert (count, archived, live) == (2, True, 1)

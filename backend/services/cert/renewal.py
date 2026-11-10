@@ -379,15 +379,18 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
 
 
 def _reread(cert, known_serial, trigger):
-    """The row as stored now, locked until the commit on PostgreSQL."""
+    """The row as stored now, locked until the commit on PostgreSQL. A row renewed or
+    archived since the caller read it is refused: an archived row is renewed only by a
+    caller that read it archived, never revived behind another renewal's back."""
     try:
         expected = cert.serial_number if known_serial is SERIAL_UNSET else known_serial
+        was_archived = bool(cert.archived)
         fresh = db.session.get(Certificate, cert.id, populate_existing=True, with_for_update=True)
     except InvalidRequestError:  # deleted since the caller read it
         fresh = None
     if fresh is None:
         raise RenewalError('Certificate no longer exists', 404)
-    if fresh.serial_number != expected:
+    if fresh.serial_number != expected or bool(fresh.archived) != was_archived:
         raise RenewalError(_renewed_meanwhile_message(trigger), 409)
     return fresh
 
