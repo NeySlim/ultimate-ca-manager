@@ -226,6 +226,18 @@ def _rstr(body):
     return Response(body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
 
 
+def _renewed_certificate_standing(ca, approval):
+    """An approved renewal is delivered only while the certificate it renews
+    is OK or SUPERSEDED (by this very renewal); a revoked one refuses it."""
+    from services import protocol_approval
+    from services.cert.issued_lookup import OK, SUPERSEDED, issued_certificate_status
+    renewal_of = protocol_approval.request_data(approval).get('renewal_of')
+    if not renewal_of:
+        return True
+    _row, status = issued_certificate_status(ca, x509.load_pem_x509_certificate(renewal_of.encode()))
+    return status in (OK, SUPERSEDED)
+
+
 def _answer_held(ca, parsed, approval):
     """MS-WSTEP 3.1.4.2.1.1/3.1.4.2.1.2: a pending RSTR while the request
     waits, the certificate once approved, a fault (InvalidRequest) once
@@ -236,12 +248,15 @@ def _answer_held(ca, parsed, approval):
     from services.wstep.cmc_response import build_cmc_pending_response
     if approval.status == 'approved':
         cert = issued_certificate(approval)
-        if cert is not None:
+        if cert is None:
+            protocol_approval.close_withdrawn(approval)
+        elif not _renewed_certificate_standing(ca, approval):
+            protocol_approval.close_withdrawn(approval, protocol_approval.RENEWED_REVOKED)
+        else:
             body = build_issue_response(cert, relates_to=parsed.message_id, request_id=approval.id,
                                         cmc_response_der=_cmc_response_der_for(ca, cert, parsed))
             protocol_approval.mark_delivered(approval)
             return _rstr(body)
-        protocol_approval.close_withdrawn(approval)
     if approval.status in ('rejected', 'expired', 'cancelled'):
         protocol_approval.mark_delivered(approval)
         return _fault_response(protocol_approval.decision_reason(approval), status=400,

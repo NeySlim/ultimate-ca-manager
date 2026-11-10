@@ -202,3 +202,22 @@ def test_parsed_query_carries_its_request_id():
     parsed = parse_rst(_query_rst(65))
     assert parsed.request_type == REQUEST_TYPE_QUERY_TOKEN_STATUS
     assert parsed.request_id == '65' and parsed.csr_der is None
+
+
+def test_renewal_approved_then_revoked_is_refused(app, client, auth_client, wstep_config):
+    from models import db
+    old_cert, old_key = _issue(app, wstep_config['id'], 'renew-revoked.wstep-approval.test')
+    body = _rst(_cmc_renewal(_renewal_csr(old_cert, old_key), [(old_key, old_cert)]))
+    with approval_policy(app, wstep_config['id'], 'wstep-held-renew-revoked') as pid:
+        request_id = _pending(_post(client, body, tls_cert=old_cert))
+        (approval_id, *_), = requests_of(app, pid, 'wstep_request')
+        approve(auth_client, approval_id)
+        with app.app_context():
+            row = Certificate.query.filter_by(serial_number=str(old_cert.serial_number)).first()
+            row.revoked = True
+            db.session.commit()
+        reason, invalid, echoed = _fault(_post(client, _query_rst(request_id), tls_cert=old_cert))
+        assert reason == 'Renewed certificate revoked'
+        assert invalid == 'true' and echoed == request_id
+        (_id, status, data, _cert), = requests_of(app, pid, 'wstep_request')
+        assert status == 'rejected' and data['closed_reason'] == 'Renewed certificate revoked'

@@ -41,6 +41,7 @@ _ANSWERING = ('pending', 'approved', 'rejected')
 _KEY_MATERIAL_MARKERS = ('signing key', 'KEY_ENCRYPTION_KEY', 'HSM')
 GENERIC_ISSUE_ERROR = 'Certificate issuance failed. Check server logs.'
 CERTIFICATE_WITHDRAWN = 'Certificate withdrawn'
+RENEWED_REVOKED = 'Renewed certificate revoked'
 
 
 def is_key_material_error(text) -> bool:
@@ -239,23 +240,25 @@ def record_refusal(approval, error) -> None:
         approval.request_data = json.dumps(data)
 
 
-def close_withdrawn(approval) -> None:
-    """Close an approved request whose certificate went away before its
-    client collected it: rejected, so the client hears a refusal."""
+def close_withdrawn(approval, reason: str = CERTIFICATE_WITHDRAWN) -> None:
+    """Close an approved request that can no longer be delivered (its
+    certificate went away, the certificate it renews was revoked): rejected,
+    so the client hears *reason*, a fixed text."""
     data = request_data(approval)
-    data['closed_reason'] = CERTIFICATE_WITHDRAWN
+    data['closed_reason'] = reason
     approval.request_data = json.dumps(data)
     approval.status = 'rejected'
     approval.resolved_at = utc_now()
     db.session.commit()
-    logger.warning("Approval #%s closed: its certificate was withdrawn before delivery", approval.id)
+    logger.warning("Approval #%s closed before delivery: %s", approval.id, reason)
 
 
 def decision_reason(approval) -> str:
     """What the client is told about a request that will not be issued: a
     fixed text, the approver's comment stays server side (vote, audit, webhook)."""
-    if request_data(approval).get('closed_reason') == CERTIFICATE_WITHDRAWN:
-        return CERTIFICATE_WITHDRAWN
+    closed_reason = request_data(approval).get('closed_reason')
+    if closed_reason in (CERTIFICATE_WITHDRAWN, RENEWED_REVOKED):
+        return closed_reason
     if approval.status == 'expired':
         return 'Approval request expired'
     return 'Rejected by an approver'
