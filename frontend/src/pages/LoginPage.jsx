@@ -61,7 +61,8 @@ export default function LoginPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   // Where to go after signing in: a known internal page from ?next=, else the dashboard.
-  const landing = safeNext(searchParams.get('next')) || '/dashboard'
+  const requested = safeNext(searchParams.get('next'))
+  const landing = requested || '/dashboard'
   const [rateLimit, setRateLimit] = useState(null)
   const { login, sessionChecked } = useAuth()
   const { showError, showSuccess, showInfo } = useNotification()
@@ -238,7 +239,6 @@ export default function LoginPage() {
           const verifyData = data.data || data
           await login(verifyData?.user?.username || 'sso_user', null, verifyData)
           showSuccess(t('auth.welcomeBackUser', { username: verifyData?.user?.username || 'User' }))
-          // The server's callback redirect carries no ?next=, so an SSO sign-in always lands on /dashboard.
           navigate(landing)
         })
         .catch(() => {
@@ -441,7 +441,9 @@ export default function LoginPage() {
       setSelectedLdapProvider(provider)
       setStep('ldap')
     } else {
-      window.location.href = `/api/v2/sso/login/${provider.provider_type}`
+      // The server keeps the page with this login and hands it back on /login/sso-complete.
+      const next = requested ? `?next=${encodeURIComponent(requested)}` : ''
+      window.location.href = `/api/v2/sso/login/${provider.provider_type}${next}`
     }
   }
 
