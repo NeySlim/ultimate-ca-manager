@@ -66,11 +66,12 @@ def get_encryption_status():
 def enable_encryption():
     """
     Enable private key encryption.
-    Generates a master key, writes it to /etc/ucm/master.key,
+    Generates a master key, writes it to master.key in UCM_CONFIG_DIR,
     and encrypts all existing private keys in the database.
     """
     try:
         from security.encryption import KeyEncryption, key_encryption
+        from security import encryption as _encryption
         from security.master_key_bootstrap import (
             KeyActivationError, activate_new_master_key, ephemeral_key_dir_refusal,
         )
@@ -93,7 +94,7 @@ def enable_encryption():
 
         # Read the freshly-written key so the caller can immediately download
         # a backup. This is the ONLY chance to surface it cleanly: if the
-        # operator never backs it up and later loses /etc/ucm/master.key,
+        # operator never backs it up and later loses master.key,
         # every encrypted private key in the DB becomes unrecoverable.
         try:
             from security.encryption import MASTER_KEY_PATH
@@ -117,7 +118,7 @@ def enable_encryption():
             message=f"Encryption enabled. {encrypted} keys encrypted.",
             data={
                 'enabled': True,
-                'key_file': str(KeyEncryption.key_file_exists() and '/etc/ucm/master.key'),
+                'key_file': str(KeyEncryption.key_file_exists() and _encryption.MASTER_KEY_PATH),
                 'encrypted': encrypted,
                 'skipped': skipped,
                 'errors': errors,
@@ -129,16 +130,18 @@ def enable_encryption():
         )
 
     except PermissionError:
+        from security.encryption import MASTER_KEY_PATH
+        conf = MASTER_KEY_PATH.parent
         is_docker = os.path.exists('/.dockerenv')
         hint = (
-            " In Docker, mount a volume to /etc/ucm/ or ensure the container "
-            "runs with write access (e.g. --user root or chown 1000:1000 /etc/ucm)."
+            f" In Docker, mount a volume to {conf}/ or ensure the container "
+            f"runs with write access (e.g. --user root or chown 1000:1000 {conf})."
             if is_docker else
-            " Check that the UCM service user owns /etc/ucm/ "
-            "(sudo mkdir -p /etc/ucm && sudo chown ucm:ucm /etc/ucm)."
+            f" Check that the UCM service user owns {conf}/ "
+            f"(sudo mkdir -p {conf} && sudo chown ucm:ucm {conf})."
         )
         return error_response(
-            f"Permission denied: cannot write to /etc/ucm/master.key.{hint}", 403
+            f"Permission denied: cannot write to {MASTER_KEY_PATH}.{hint}", 403
         )
     except Exception as e:
         logger.error(f"Failed to enable encryption: {e}")
@@ -359,8 +362,8 @@ def generate_encryption_key():
             'key_file_path': str(MASTER_KEY_PATH),
             'instructions': (
                 '1. Save this key to a secure location\n'
-                '2. Write it to /etc/ucm/master.key on the server\n'
-                '3. Set permissions: chmod 600 /etc/ucm/master.key\n'
+                f'2. Write it to {MASTER_KEY_PATH} on the server\n'
+                f'3. Set permissions: chmod 600 {MASTER_KEY_PATH}\n'
                 '4. Restart UCM service'
             )
         })
@@ -555,7 +558,7 @@ def rotate_secrets():
             data={
                 'new_secret': new_secret,
                 'instructions': [
-                    '1. Edit /etc/ucm/ucm.env',
+                    f'1. Edit {env_file_path()}',
                     f'2. Set SECRET_KEY={new_secret}',
                     '3. Restart UCM: systemctl restart ucm'
                 ]
@@ -566,6 +569,11 @@ def rotate_secrets():
 
 # ============ Security Status ============
 
+def _key_file_exists():
+    from security.encryption import KeyEncryption
+    return KeyEncryption.key_file_exists()
+
+
 @bp.route('/api/v2/system/security/secrets-status', methods=['GET'])
 @require_auth(['admin:system'])
 def secrets_status():
@@ -573,7 +581,7 @@ def secrets_status():
     from config.settings import Config
 
     session_configured = bool(os.getenv('SECRET_KEY')) and Config.SECRET_KEY != "INSTALL_TIME_PLACEHOLDER"
-    encryption_configured = bool(os.getenv('KEY_ENCRYPTION_KEY')) or os.path.exists('/etc/ucm/master.key')
+    encryption_configured = bool(os.getenv('KEY_ENCRYPTION_KEY')) or _key_file_exists()
 
     return success_response(data={
         'session_secret': {

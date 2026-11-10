@@ -24,11 +24,12 @@ from sqlalchemy.pool import Pool
 from sqlalchemy.sql import sqltypes
 
 import fips_mode
+from config.paths import env_file
 from config.settings import Config, DATA_DIR
 
 logger = logging.getLogger(__name__)
 
-UCM_ENV_PATH = Path("/etc/ucm/ucm.env")
+UCM_ENV_PATH = env_file()
 BACKUP_DIR = DATA_DIR / "backups" / "db_migration"
 
 try:

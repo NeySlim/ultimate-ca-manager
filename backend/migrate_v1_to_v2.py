@@ -40,7 +40,10 @@ V1_ENV_FILE = ".env"
 # v2.0.0 paths (relative to UCM_ROOT)  
 V2_DATA_DIR = "data"
 V2_DB_PATH = "data/ucm.db"
-V2_ENV_FILE = "/etc/ucm/ucm.env"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from config.paths import env_file  # noqa: E402
+
+V2_ENV_FILE = str(env_file())
 
 # Directories to migrate
 DATA_SUBDIRS = ['ca', 'certs', 'private', 'crl', 'scep', 'backups']
@@ -195,7 +198,7 @@ def migrate_files(ucm_root, dry_run=False):
 
 
 def migrate_config(ucm_root, dry_run=False):
-    """Migrate configuration from .env to /etc/ucm/ucm.env"""
+    """Migrate configuration from .env to ucm.env in UCM_CONFIG_DIR (default /etc/ucm)"""
     ucm_root = Path(ucm_root)
     v1_env = ucm_root / V1_ENV_FILE
     v2_env = Path(V2_ENV_FILE)

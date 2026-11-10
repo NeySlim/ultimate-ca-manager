@@ -1,5 +1,5 @@
 """
-Database Admin — publish DATABASE_URL into /etc/ucm/ucm.env.
+Database Admin — publish DATABASE_URL into ucm.env (UCM_CONFIG_DIR, default /etc/ucm).
 
 ``ucm.env`` is shared installation state: besides DATABASE_URL it carries the
 key-encryption key, the listen address, the HTTPS port and whatever else the
@@ -28,6 +28,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional, Tuple
 
+from config.paths import DEFAULT_CONFIG_DIR
 from config.settings import is_docker
 from services.backup.storage import _fsync_directory
 
@@ -70,13 +71,10 @@ def _env_path() -> Path:
     return Path(UCM_ENV_PATH)
 
 
-_DEFAULT_ENV_PATH = Path("/etc/ucm/ucm.env")
-
-
 def env_file_path() -> Path:
-    """Env file to rewrite: a redirected UCM_ENV_PATH wins, then Docker, then /etc."""
+    """Env file to rewrite: a redirected UCM_ENV_PATH or UCM_CONFIG_DIR wins, then Docker, then /etc."""
     configured = Path(UCM_ENV_PATH)
-    if configured != _DEFAULT_ENV_PATH:
+    if configured != DEFAULT_CONFIG_DIR / 'ucm.env':
         return configured
     if os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true'):
         for candidate in ('/opt/ucm/.env', '/app/.env', '/app/backend/.env'):

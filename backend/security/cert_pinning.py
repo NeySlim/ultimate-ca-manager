@@ -9,8 +9,10 @@ import hashlib
 from urllib.parse import urlparse
 import json
 
+from config.paths import config_dir
+
 # Pinned certificates config file
-PINS_FILE = os.getenv('UCM_CERT_PINS_FILE', '/etc/ucm/cert-pins.json')
+PINS_FILE = os.getenv('UCM_CERT_PINS_FILE') or str(config_dir() / 'cert-pins.json')
 
 
 def get_pinned_certs():

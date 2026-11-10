@@ -1117,10 +1117,11 @@ def create_app(config_name=None):
             return None
         
         from flask import jsonify as _jsonify
+        from security import encryption as _encryption
         return _jsonify({
             'error': True,
             'message': 'UCM is in safe mode: encryption key missing. '
-                       'Place your master.key at /etc/ucm/master.key and restart UCM.',
+                       f'Place your master.key at {_encryption.MASTER_KEY_PATH} and restart UCM.',
             'safe_mode': True
         }), 503
     

@@ -26,6 +26,7 @@ Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `U
 | `HOST` | `HOST` | `0.0.0.0` | Listen address for HTTPS and the HTTP protocol port; `::` = IPv6 + IPv4 (dual-stack) |
 | `HTTPS_PORT` | `UCM_HTTPS_PORT` | `8443` | HTTPS port |
 | `DATA_DIR` | (fixed) | `/opt/ucm/data` | Data storage |
+| `UCM_CONFIG_DIR` | `UCM_CONFIG_DIR` | `/etc/ucm` | Directory holding `ucm.env` and `master.key`. Set it in the process environment (the service unit or the shell), not in `ucm.env`, which is read from it; the packages leave it unset |
 | `LOG_LEVEL` | `UCM_LOG_LEVEL` | `INFO` | Logging verbosity |
 | `UCM_LOG_FILE` | `UCM_LOG_FILE` | `/var/log/ucm/ucm.log` | Application log file (native installs). Falls back to `DATA_DIR/ucm.log` when it cannot be opened |
 | `UCM_LOG_MAX_BYTES` | `UCM_LOG_MAX_BYTES` | `10485760` | Size at which `ucm.log` is rotated by the application (10 MB) |

@@ -3,7 +3,7 @@ Private Key Encryption Module
 Encrypts private keys at rest using Fernet (AES-128-CBC with HMAC-SHA256)
 
 Key sources (in order of priority):
-1. /etc/ucm/master.key file (recommended)
+1. master.key in the configuration directory (UCM_CONFIG_DIR, default /etc/ucm)
 2. KEY_ENCRYPTION_KEY environment variable (backward compat)
 """
 
@@ -19,12 +19,13 @@ from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 
+from config.paths import master_key_file
 from utils.randomness import csp_bytes
 
 logger = logging.getLogger(__name__)
 
 ENCRYPTED_MARKER = b'ENC:'
-MASTER_KEY_PATH = Path('/etc/ucm/master.key')
+MASTER_KEY_PATH = master_key_file()
 
 
 def key_encryption_required() -> bool:

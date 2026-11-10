@@ -144,6 +144,7 @@ volumes:
 | `UCM_LOG_MAX_BYTES` | `10485760` | Size at which `/opt/ucm/data/ucm.log` is rotated (10 MB) |
 | `UCM_LOG_BACKUPS` | `5` | Generations of `ucm.log` kept in the data volume |
 | `UCM_SECRET_KEY` | auto-generated | Session secret key |
+| `UCM_CONFIG_DIR` | `/etc/ucm` | Directory holding `ucm.env` and `master.key`; the `/etc/ucm` volume follows it if you change it |
 | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use an external PostgreSQL 13+ instance instead of the bundled SQLite. |
 | `UCM_HA` | (unset) | `1` enables HA mode in preview: refuses host-local operations; full high availability arrives in later releases. Requires `DATABASE_URL` (PostgreSQL), `UCM_SECRET_KEY` and `KEY_ENCRYPTION_KEY`, identical on every node |
 | `UCM_NODE_ID` | container hostname | Node name reported as `node_id` by `/health` |
