@@ -4,6 +4,8 @@ import contextlib
 import json
 from datetime import timedelta
 
+import pytest
+
 from models import db
 from models.policy import ApprovalRequest, CertificatePolicy
 from utils.datetime_utils import utc_now
@@ -91,3 +93,43 @@ def profile_of(cert):
         'ca': None if bc is None else bc.ca,
         'extensions': sorted(e.oid.dotted_string for e in cert.extensions),
     }
+
+
+def _referencing(table_name, column_name):
+    """``(table, fk column)`` of every table pointing at *table_name.column_name*."""
+    for table in db.metadata.sorted_tables:
+        for fk in table.foreign_keys:
+            if fk.column.table.name == table_name and fk.column.name == column_name:
+                yield table, fk.parent
+
+
+def _delete_with_dependents(model, keys_by_column):
+    """Delete the rows of *model* whose columns hold the given keys, after
+    the rows of other tables that point at them."""
+    for column_name, keys in keys_by_column.items():
+        if not keys:
+            continue
+        for table, column in _referencing(model.__tablename__, column_name):
+            if table is not model.__table__:
+                db.session.execute(table.delete().where(column.in_(keys)))
+    ids = keys_by_column.get('id')
+    if ids:
+        db.session.execute(model.__table__.delete().where(model.__table__.c.id.in_(ids)))
+
+
+@pytest.fixture(scope='module', autouse=True)
+def made_rows_removed(app):
+    """The CAs and certificates a test file makes are removed with it, so the
+    shared tables stay as the file found them (conftest's leak check)."""
+    from models import CA, Certificate
+    with app.app_context():
+        last_ca = db.session.query(db.func.max(CA.id)).scalar() or 0
+        last_cert = db.session.query(db.func.max(Certificate.id)).scalar() or 0
+    yield
+    with app.app_context():
+        db.session.rollback()
+        cert_ids = [r[0] for r in db.session.query(Certificate.id).filter(Certificate.id > last_cert)]
+        cas = db.session.query(CA.id, CA.refid).filter(CA.id > last_ca).all()
+        _delete_with_dependents(Certificate, {'id': cert_ids})
+        _delete_with_dependents(CA, {'id': [c[0] for c in cas], 'refid': [c[1] for c in cas]})
+        db.session.commit()

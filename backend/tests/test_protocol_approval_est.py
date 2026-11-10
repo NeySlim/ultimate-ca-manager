@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.serialization import pkcs7
 
 from models import Certificate
+from tests.protocol_approval_support import made_rows_removed  # noqa: F401
 from tests.protocol_approval_support import (approval_policy, approve, expire, profile_of, reject,
                                              requests_of)
 from tests.test_est_rfc7030 import (  # noqa: F401

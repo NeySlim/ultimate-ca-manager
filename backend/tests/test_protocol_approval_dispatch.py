@@ -17,6 +17,7 @@ from cryptography.x509.oid import NameOID
 from models import CA, db
 from models.policy import ApprovalRequest
 from services import protocol_approval
+from tests.protocol_approval_support import made_rows_removed  # noqa: F401
 from tests.protocol_approval_support import approval_policy, expire, reject, requests_of
 
 

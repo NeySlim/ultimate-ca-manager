@@ -11,6 +11,7 @@ from lxml import etree
 
 from models import Certificate
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS, WSTEP_NS
+from tests.protocol_approval_support import made_rows_removed  # noqa: F401
 from tests.protocol_approval_support import (approval_policy, approve, expire, profile_of, reject,
                                              requests_of)
 from tests.test_wstep_issue import (  # noqa: F401

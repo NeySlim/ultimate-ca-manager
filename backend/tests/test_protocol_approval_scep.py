@@ -14,6 +14,7 @@ from cryptography.x509.oid import AttributeOID
 
 from models import CA, SCEPRequest, SystemConfig, db
 from services.scep.scep_service import SCEPService
+from tests.protocol_approval_support import made_rows_removed  # noqa: F401
 from tests.protocol_approval_support import approval_policy, approve, expire, reject, requests_of
 from tests.test_scep_rfc8894_operations import (
     PKI_STATUS_OID, TRANSACTION_ID_OID, _build_request, _client_identity, _load_ca_material,
@@ -396,6 +397,8 @@ def test_an_approved_request_whose_certificate_went_away_fails_the_poll(app, aut
         (approval_id, *_), = requests_of(app, pid, 'scep_request')
         approve(auth_client, approval_id)
         _id, _status, cert_refid = _scep_row(app, scep_ca)
+        from tests.test_protocol_approval_est import _withdraw
+        _withdraw(app, approval_id)
         with app.app_context():
             Certificate.query.filter_by(refid=cert_refid).delete()
             db.session.commit()
