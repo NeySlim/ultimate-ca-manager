@@ -39,7 +39,15 @@ def _issue(approval, data):
         service = _issuing_service(scep_req)
     except LookupError as e:
         raise ProtocolRequestGone(str(e)) from e
-    cert_refid = service.approve_request(scep_req.transaction_id, _approver(approval))
+    from services.policy_service import PolicyViolation
+    from services.scep.scep_service import SCEPRequestRefused
+    from utils.request_names import RequestRejected
+    try:
+        cert_refid = service.approve_request(scep_req.transaction_id, _approver(approval))
+    except (PolicyViolation, RequestRejected, SCEPRequestRefused) as e:
+        # A refusal for good closes the request, as on ACME; transient ones keep it pending
+        raise ProtocolRequestGone(f'The SCEP request was refused: {e}',
+                                  refusal={'reason': str(e)}) from e
     if not cert_refid:
         raise ValueError('The SCEP request could not be issued')
     cert = Certificate.query.filter_by(refid=cert_refid).first()
@@ -57,7 +65,8 @@ def _closed(approval, data):
     if scep_req is None or scep_req.status != 'pending':
         return
     scep_req.status = 'rejected'
-    scep_req.rejection_reason = protocol_approval.decision_reason(approval)[:255]
+    reason = (data.get('refusal') or {}).get('reason') or protocol_approval.decision_reason(approval)
+    scep_req.rejection_reason = reason[:255]
     db.session.commit()
 
 

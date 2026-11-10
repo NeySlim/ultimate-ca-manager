@@ -64,6 +64,11 @@ from services.scep.response_builder import (
 logger = logging.getLogger(__name__)
 
 
+class SCEPRequestRefused(ValueError):
+    """The CA refuses this request for good (revoked CA, revoked certificate
+    being renewed): approving it again later cannot succeed."""
+
+
 from utils.x509_aki import authority_key_identifier_from_issuer
 from services.cert.issued_lookup import find_issued_rows, san_identity_matches
 from utils.signing_hash import rsa_padding_for
@@ -1333,14 +1338,14 @@ class SCEPService:
                 f"CA is offline: {self.ca.offline_reason or 'no reason provided'}"
             )
         if self.ca.revoked_in_chain:
-            raise ValueError("CA is revoked and can no longer sign")
+            raise SCEPRequestRefused("CA is revoked and can no longer sign")
         from utils.ca_signing_window import check_issuer_window
         check_issuer_window(self.ca_cert)
         if renewal_of is not None:
             # A manual approval may come after the renewed certificate was revoked
             from services.cert.issued_lookup import REVOKED, issued_certificate_status
             if issued_certificate_status(self.ca, renewal_of)[1] == REVOKED:
-                raise ValueError('Signing certificate has been revoked')
+                raise SCEPRequestRefused('Signing certificate has been revoked')
 
         # Re-checked here: a manual approval may come after the policies changed
         from services.policy_service import PolicyViolation

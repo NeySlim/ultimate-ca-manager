@@ -188,3 +188,27 @@ def test_approved_request_matches_a_direct_issuance(app, auth_client, create_ca,
     held_source, held = _issued_cert(app, scep_ca)
     assert profile_of(held) == profile_of(direct)
     assert held_source == direct_source
+
+
+def test_a_ca_revoked_while_held_closes_the_request(app, auth_client, scep_ca):
+    identity = _client_identity('scep ca revoked')
+    with approval_policy(app, scep_ca, 'scep-held-ca-revoked') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        with app.app_context():
+            db.session.get(CA, scep_ca).revoked = True
+            db.session.commit()
+        try:
+            r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+            assert r.status_code == 200, r.get_json()
+            assert r.get_json()['message'] == 'Request closed'
+            assert requests_of(app, pid, 'scep_request')[0][1] == 'rejected'
+            scep_id, status, cert_refid = _scep_row(app, scep_ca)
+            assert status == 'rejected' and cert_refid is None
+            with app.app_context():
+                assert 'revoked' in db.session.get(SCEPRequest, scep_id).rejection_reason
+        finally:
+            with app.app_context():
+                db.session.get(CA, scep_ca).revoked = False
+                db.session.commit()
+        assert _poll(app, scep_ca, identity) == FAILURE
