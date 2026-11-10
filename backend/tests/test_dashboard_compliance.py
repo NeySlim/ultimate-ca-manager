@@ -93,9 +93,6 @@ def test_counters_are_exact(app, auth_client, pems, rows):
         assert {k: algos_after.get(k, 0) - algos_before.get(k, 0) for k in algos_after
                 if algos_after.get(k, 0) != algos_before.get(k, 0)} == {
             'RSA 2048': 2, 'RSA 4096': 3, 'EC secp256r1': 3}
-        for name in COUNTERS:
-            assert after['counters'][name]['filter_hint']
-        assert all(a['filter_hint']['key_algo'] == a['key_algo'] for a in after['by_key_algorithm'])
     finally:
         with app.app_context():
             Certificate.query.filter(Certificate.template_id == template_id).update(
@@ -124,6 +121,45 @@ def test_the_request_parses_no_certificate(app, auth_client, pems, rows, monkeyp
         monkeypatch.setattr(x509, loader, lambda *a, _o=original, **k: calls.append(1) or _o(*a, **k))
     _summary(auth_client)
     assert calls == []
+
+
+def _entries(data):
+    return [(name, c) for name, c in data['counters'].items()] + [
+        (f"key_algo:{a['key_algo']}", a) for a in data['by_key_algorithm']]
+
+
+# No counter has a list filter that reproduces it today: the list keeps archived
+# rows under every status and has no key, hash, lifetime or missing-key filter
+FILTERABLE = set()
+
+
+def test_a_counter_without_a_list_filter_says_so(app, auth_client, pems, rows):
+    with app.app_context():
+        rows(pems['rsa2048'])
+        rows(pems['ec'], prv=None)
+        db.session.commit()
+    data = _summary(auth_client)
+    assert data['by_key_algorithm']
+    for name, entry in _entries(data):
+        assert entry['filter_available'] is (name in FILTERABLE), name
+        if not entry['filter_available']:
+            assert entry['filter_hint'] is None, name
+
+
+def test_every_hint_given_lists_exactly_what_it_counts(app, auth_client, pems, rows):
+    """An emitted hint, passed to the certificate list as is, gives back the counter."""
+    with app.app_context():
+        rows(pems['rsa2048'])
+        rows(pems['ec'], prv=None)
+        rows(pems['rsa2048'], archived=True)
+        db.session.commit()
+    data = _summary(auth_client)
+    hinted = [(name, e) for name, e in _entries(data) if e['filter_available']]
+    assert {name for name, _ in hinted} == FILTERABLE
+    for name, entry in hinted:
+        r = auth_client.get('/api/v2/certificates', query_string={**entry['filter_hint'], 'per_page': 1})
+        assert r.status_code == 200, (name, r.data)
+        assert get_json(r)['meta']['total'] == entry['count'], name
 
 
 def test_requires_auth(client):

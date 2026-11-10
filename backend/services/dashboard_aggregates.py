@@ -385,6 +385,15 @@ def _lifetime_exceeds(session, days):
     return Certificate.valid_to - Certificate.valid_from >= timedelta(days=days + 1)
 
 
+# Only hints the certificate list applies as given and that reproduce the counter
+# exactly; none does yet, the list keeping archived rows under every status
+COMPLIANCE_LIST_FILTERS = {}
+
+
+def _list_filter(hint):
+    return {'filter_hint': hint, 'filter_available': hint is not None}
+
+
 def compliance_summary(session, now=None):
     """Counters over the live issued certificates, each with the list filter it stands for."""
     now = now or utc_now()
@@ -405,20 +414,14 @@ def compliance_summary(session, now=None):
         .where(*live)).one()
     algos = session.execute(select(Certificate.key_algo, func.count()).where(*live)
                             .group_by(Certificate.key_algo).order_by(func.count().desc())).all()
-    live_hint = {'status': ['valid', 'expiring']}
-    counters = {
-        'rsa_below_3072': (row[1], {**live_hint, 'key_family': 'RSA', 'key_bits_lt': RSA_MIN_BITS}),
-        'weak_signature_hash': (row[2], {**live_hint, 'sig_hash': list(WEAK_SIG_HASHES)}),
-        'server_lifetime_over_398_days': (
-            row[3], {**live_hint, 'server': True, 'lifetime_gt_days': SERVER_LIFETIME_MAX_DAYS}),
-        'incomplete_chain': (row[4], {'status': ['orphan']}),
-        'no_private_key': (row[5], {**live_hint, 'has_private_key': False}),
-    }
+    counters = {'rsa_below_3072': row[1], 'weak_signature_hash': row[2],
+                'server_lifetime_over_398_days': row[3], 'incomplete_chain': row[4],
+                'no_private_key': row[5]}
     return {
         'total': row[0],
-        'by_key_algorithm': [{'key_algo': algo, 'count': n,
-                              'filter_hint': {**live_hint, 'key_algo': algo}} for algo, n in algos],
-        'counters': {name: {'count': int(n), 'filter_hint': hint} for name, (n, hint) in counters.items()},
+        'by_key_algorithm': [{'key_algo': algo, 'count': n, **_list_filter(None)} for algo, n in algos],
+        'counters': {name: {'count': int(n), **_list_filter(COMPLIANCE_LIST_FILTERS.get(name))}
+                     for name, n in counters.items()},
     }
 
 
