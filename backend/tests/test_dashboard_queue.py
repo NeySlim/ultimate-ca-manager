@@ -396,8 +396,24 @@ def test_a_key_without_read_dashboard_is_refused(app, auth_client):
         auth_client.delete(f"/api/v2/account/apikeys/{key['id']}")
 
 
-def test_the_viewer_role_reads_it(viewer_client):
-    assert viewer_client.get(URL).status_code == 200
+@pytest.fixture
+def viewer(app, auth_client, request):
+    """The shared viewer client, its account removed again when this file created it."""
+    from models import User
+    with app.app_context():
+        existed = User.query.filter_by(username='viewer_test').first() is not None
+    yield request.getfixturevalue('viewer_client')
+    if not existed:
+        with app.app_context():
+            user = User.query.filter_by(username='viewer_test').first()
+            user_id = user.id if user else None
+        if user_id is not None:
+            r = auth_client.delete(f'/api/v2/users/{user_id}')
+            assert r.status_code in (200, 204), r.data
+
+
+def test_the_viewer_role_reads_it(viewer):
+    assert viewer.get(URL).status_code == 200
 
 
 def test_requires_auth(client):

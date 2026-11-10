@@ -23,7 +23,26 @@ def _columns(app, cert_id):
 
 
 @pytest.fixture
-def cleanup(app):
+def made_cas(auth_client):
+    """CAs a test creates, deleted after its certificates (``cleanup`` depends on this)."""
+    ids = []
+    yield ids
+    for ca_id in ids:
+        r = auth_client.delete(f'/api/v2/cas/{ca_id}')
+        assert r.status_code in (200, 204), r.data
+
+
+@pytest.fixture
+def own_ca(create_ca, made_cas):
+    def make(cn):
+        ca = create_ca(cn=cn)
+        made_cas.append(ca['id'])
+        return ca
+    return make
+
+
+@pytest.fixture
+def cleanup(app, made_cas):
     ids = []
     yield ids
     with app.app_context():
@@ -46,14 +65,14 @@ def test_setting_crt_sets_both_columns():
     assert (row.key_bits, row.sig_hash) == (None, None)
 
 
-def test_the_issue_form(app, create_cert, cleanup):
-    cert = create_cert(cn='kc-form.test', key_type='RSA', key_size=3072)
+def test_the_issue_form(app, create_cert, own_ca, cleanup):
+    cert = create_cert(cn='kc-form.test', ca_id=own_ca('KC Form CA')['id'], key_type='RSA', key_size=3072)
     cleanup.append(cert['id'])
     assert _columns(app, cert['id']) == (3072, 'sha256')
 
 
-def test_signing_a_request_alone_and_in_bulk(app, auth_client, create_ca, cleanup):
-    ca = create_ca(cn='KC CSR CA')
+def test_signing_a_request_alone_and_in_bulk(app, auth_client, own_ca, cleanup):
+    ca = own_ca('KC CSR CA')
     ids = []
     for i in range(2):
         key = ec.generate_private_key(ec.SECP384R1())
@@ -82,9 +101,9 @@ def test_import(app, cleanup):
     assert _columns(app, cleanup[0]) == (2048, 'sha1')
 
 
-def test_in_place_renewal(app, create_cert, cleanup):
+def test_in_place_renewal(app, create_cert, own_ca, cleanup):
     from services.cert.renewal import renew_certificate_in_place
-    cert = create_cert(cn='kc-renew.test', key_type='EC', curve='P-256')
+    cert = create_cert(cn='kc-renew.test', ca_id=own_ca('KC Renew CA')['id'], key_type='EC', curve='P-256')
     cleanup.append(cert['id'])
     with app.app_context():
         row = db.session.get(Certificate, cert['id'])
@@ -95,9 +114,9 @@ def test_in_place_renewal(app, create_cert, cleanup):
     assert _columns(app, cert['id']) == (256, 'sha256')
 
 
-def test_tsa_signer(app, create_ca, cleanup):
+def test_tsa_signer(app, own_ca, cleanup):
     from services import tsa_signer_cert
-    ca = create_ca(cn='KC TSA CA')
+    ca = own_ca('KC TSA CA')
     with app.app_context():
         issued = tsa_signer_cert.issue_tsa_signer_certificate(
             ca=db.session.get(CA, ca['id']), cn='kc-tsa.test', key_type='ec', curve='EC-P256')
