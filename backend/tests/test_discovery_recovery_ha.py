@@ -1,5 +1,5 @@
-"""Orphaned discovery runs: recovered at registration on a single node; in HA only by the
-leader when it takes over, and only the runs no live node can still be running."""
+"""Orphaned discovery runs: recovered at registration on a single node; in HA by the leader
+at takeover and on every pass, and by a node's web process for its own runs at startup."""
 import secrets
 from datetime import timedelta
 
@@ -90,4 +90,58 @@ def test_a_scan_records_the_node_that_runs_it(app, runs, monkeypatch):
         assert db.session.get(ScanRun, run_id).node_id == NODE + 'scanner'
     finally:
         db.session.delete(db.session.get(ScanRun, run_id))
+        db.session.commit()
+
+
+def test_a_starting_ha_node_fails_its_own_runs_left_by_its_previous_process(app, runs, monkeypatch):
+    """The web process of a node starts before its workers: no run of that node can be alive."""
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr(Config, 'NODE_ID', NODE + 'self')
+    monkeypatch.delenv('UCM_SCHEDULER_SUPERVISED', raising=False)
+    own = runs(NODE + 'self', 'manual')
+    other = runs(NODE + 'other', 'manual')
+    DiscoverySchedulerTask.register(SchedulerService(wake_interval=60), app)
+    assert [status(own), status(other)] == ['failed', 'running']
+
+
+def test_the_scheduler_process_leaves_the_runs_of_live_web_workers_alone(app, runs, monkeypatch):
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr(Config, 'NODE_ID', NODE + 'self')
+    monkeypatch.setenv('UCM_SCHEDULER_SUPERVISED', '1')
+    own = runs(NODE + 'self', 'manual')
+    DiscoverySchedulerTask.register(SchedulerService(wake_interval=60), app)
+    assert status(own) == 'running'
+
+
+def test_each_pass_fails_the_runs_of_nodes_gone_since_takeover(app, runs, monkeypatch):
+    """A former leader still fresh at takeover goes stale later: its orphans must not block a profile."""
+    from models import ScanProfile
+    from services.discovery_service import DiscoveryService
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr(Config, 'NODE_ID', NODE + 'leader')
+    monkeypatch.setenv('UCM_SCHEDULER_SUPERVISED', '1')  # the leader's scheduler process
+    now = utc_now()
+    for name, seen in (('leader', now), ('alive', now), ('gone', now - timedelta(hours=1))):
+        db.session.add(ClusterNode(node_id=NODE + name, started_at=seen, heartbeat_at=seen))
+    profile = ScanProfile(name=NODE + 'profile', targets='["192.0.2.1"]', ports='[443]',
+                          schedule_enabled=True, next_scan_at=now - timedelta(minutes=1))
+    db.session.add(profile)
+    db.session.commit()
+    alive = runs(NODE + 'alive', 'manual')
+    mine = runs(NODE + 'leader', 'scheduled')
+    gone = runs(NODE + 'gone', 'manual')
+    orphan = db.session.get(ScanRun, gone)
+    orphan.scan_profile_id = profile.id
+    db.session.commit()
+    started = []
+    monkeypatch.setattr(DiscoveryService, 'start_scan', lambda self, **kw: started.append(kw['profile_id']))
+    scheduler = SchedulerService(wake_interval=60)
+    try:
+        DiscoverySchedulerTask.register(scheduler, app)
+        scheduler.tasks['discovery_scan'].func()
+        assert [status(r) for r in (alive, mine, gone)] == ['running', 'running', 'failed']
+        assert started == [profile.id]
+    finally:
+        ScanRun.query.filter_by(scan_profile_id=profile.id).delete(synchronize_session=False)
+        db.session.delete(db.session.get(ScanProfile, profile.id))
         db.session.commit()

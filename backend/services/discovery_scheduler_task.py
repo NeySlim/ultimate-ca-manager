@@ -18,12 +18,29 @@ class DiscoverySchedulerTask:
     def register(scheduler, app) -> None:
         """Register the task; orphaned runs are recovered now on a single node, by the leader in HA."""
         from utils.ha import ha_enabled
+        task = DiscoverySchedulerTask.execute
         if ha_enabled():
+            from config.settings import Config
+            from services.scheduler_service import supervised
+            node_id = Config.NODE_ID
+
             def recover_after_takeover():
                 from services.scheduler_leader import fresh_node_ids
                 return DiscoverySchedulerTask.recover_stale_runs(
                     keep_nodes=fresh_node_ids(scheduler.wake_interval))
             scheduler.on_leadership(recover_after_takeover)
+
+            def recover_then_execute():
+                # A node can go stale after takeover: its runs are orphans from then on
+                from services.scheduler_leader import fresh_node_ids
+                DiscoverySchedulerTask.recover_stale_runs(
+                    live_nodes=fresh_node_ids(scheduler.wake_interval) | {node_id})
+                DiscoverySchedulerTask.execute()
+            task = recover_then_execute
+            if not supervised():
+                # The web process starts before its workers: no run of this node is alive yet
+                with app.app_context():
+                    DiscoverySchedulerTask.recover_stale_runs(own_node=node_id)
         else:
             # Scan runs orphaned by a crash/restart stay 'running' forever and
             # would block future scheduled scans of their profile (#293)
@@ -31,20 +48,22 @@ class DiscoverySchedulerTask:
                 DiscoverySchedulerTask.recover_stale_runs()
         scheduler.register_task(
             name="discovery_scan",
-            func=DiscoverySchedulerTask.execute,
+            func=task,
             interval=60,  # Check every minute for due profiles
             description="Run scheduled network discovery scans"
         )
 
     @staticmethod
-    def recover_stale_runs(keep_nodes=None) -> int:
+    def recover_stale_runs(keep_nodes=None, live_nodes=None, own_node=None) -> int:
         """Mark scan runs orphaned by a process restart as failed.
 
         A scan run lives in a daemon thread; if the process dies mid-scan the
         row stays 'running' forever and would block future scheduled scans of
-        its profile. Without ``keep_nodes`` every running scan is orphaned (one
-        node, at startup). With it (HA takeover), manual scans of those live
-        nodes are kept; scheduled scans ran on the former leader and are not.
+        its profile. With no argument every running scan is orphaned (one
+        node, at startup). HA: ``keep_nodes`` (takeover) keeps the manual scans
+        of those live nodes, scheduled ones ran on the former leader;
+        ``live_nodes`` (every pass) keeps every scan of those nodes;
+        ``own_node`` (node startup) fails only that node's scans.
         """
         try:
             query = ScanRun.query.filter_by(status='running')
@@ -52,8 +71,14 @@ class DiscoverySchedulerTask:
                 query = query.filter(db.or_(
                     ScanRun.triggered_by == 'scheduled', ScanRun.node_id.is_(None),
                     ScanRun.node_id.notin_(list(keep_nodes) or [''])))
+            if live_nodes is not None:
+                query = query.filter(db.or_(
+                    ScanRun.node_id.is_(None), ScanRun.node_id.notin_(list(live_nodes) or [''])))
+            if own_node is not None:
+                query = query.filter(ScanRun.node_id == own_node)
             stale = query.update(
-                {'status': 'failed', 'completed_at': datetime.now(timezone.utc)}
+                {'status': 'failed', 'completed_at': datetime.now(timezone.utc)},
+                synchronize_session=False,
             )
             db.session.commit()
             if stale:
