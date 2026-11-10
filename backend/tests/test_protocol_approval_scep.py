@@ -329,3 +329,77 @@ def test_a_rejected_intune_request_is_notified(app, auth_client, scep_ca, intune
         (approval_id, *_), = requests_of(app, pid, 'scep_request')
         reject(auth_client, approval_id, 'unknown host')
         assert _FakeIntune.calls == [('failure', 'txn-19', 'Rejected by an approver')]
+
+
+def _poll_transaction(app, ca_id, identity, transaction_id):
+    """GetCertInitial for *transaction_id*, signed by *identity*."""
+    def same_transaction(attrs):
+        for attr in attrs:
+            if attr['type'].dotted == TRANSACTION_ID_OID:
+                attr['values'] = [asn1crypto.core.PrintableString(transaction_id)]
+        return attrs
+    with app.app_context():
+        _ca, ca_cert, _ = _load_ca_material(ca_id)
+        key_cert, key = identity
+        message = _build_request(ca_cert, key_cert, key, 20, b'issuer-and-subject', b'poll-nonce-16byt')
+        message = _rewrite_signed_attributes(message, key, same_transaction)
+        response, _status = _service(ca_id).process_pkcs_req(message, '127.0.0.1')
+        return _response_attributes(response)[PKI_STATUS_OID]
+
+
+def _held_renewal(app, scep_ca, pid, cn):
+    """An enrolment issued directly, then its RenewalReq held: ``(issued, key, approval_id)``."""
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    identity = _client_identity(cn)
+    assert _enroll(app, scep_ca, identity) == SUCCESS
+    _source, issued = _issued_cert(app, scep_ca)
+    key = identity[1]
+    new_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    csr = x509.CertificateSigningRequestBuilder().subject_name(issued.subject).sign(new_key, hashes.SHA256())
+    with app.app_context():
+        _ca, ca_cert, _ = _load_ca_material(scep_ca)
+        message = _build_request(ca_cert, issued, key, 17, csr.public_bytes(serialization.Encoding.DER),
+                                 b'renew-nonce-16by')
+        response, _status = _service(scep_ca).process_pkcs_req(message, '127.0.0.1')
+        assert _response_attributes(response)[PKI_STATUS_OID] == PENDING
+    (approval_id, *_), = requests_of(app, pid, 'scep_request')
+    return issued, key, approval_id
+
+
+def _renewal_row(app, ca_id):
+    with app.app_context():
+        return SCEPRequest.query.filter_by(transaction_id='txn-17',
+                                           ca_refid=db.session.get(CA, ca_id).refid).first().status
+
+
+def test_an_approved_renewal_whose_signer_was_revoked_fails_the_poll(app, auth_client, scep_ca):
+    from models import Certificate
+    with approval_policy(app, scep_ca, 'scep-held-renew-revoked', operations=['renewal']) as pid:
+        issued, key, approval_id = _held_renewal(app, scep_ca, pid, 'scep renew revoked')
+        approve(auth_client, approval_id)
+        assert _poll_transaction(app, scep_ca, (issued, key), 'txn-17') == SUCCESS
+        with app.app_context():
+            row = Certificate.query.filter_by(serial_number=str(issued.serial_number)).first()
+            row.revoked = True
+            db.session.commit()
+        assert _poll_transaction(app, scep_ca, (issued, key), 'txn-17') == FAILURE
+        assert _renewal_row(app, scep_ca) == 'rejected'
+        (_id, status, data, _cert), = requests_of(app, pid, 'scep_request')
+        assert status == 'rejected' and data['closed_reason'] == 'Renewed certificate revoked'
+
+
+def test_an_approved_request_whose_certificate_went_away_fails_the_poll(app, auth_client, scep_ca):
+    from models import Certificate
+    identity = _client_identity('scep withdrawn')
+    with approval_policy(app, scep_ca, 'scep-held-withdrawn') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        approve(auth_client, approval_id)
+        _id, _status, cert_refid = _scep_row(app, scep_ca)
+        with app.app_context():
+            Certificate.query.filter_by(refid=cert_refid).delete()
+            db.session.commit()
+        assert _poll(app, scep_ca, identity) == FAILURE
+        assert _scep_row(app, scep_ca)[1] == 'rejected'
+        (_id, status, data, _cert), = requests_of(app, pid, 'scep_request')
+        assert status == 'rejected' and data['closed_reason'] == 'Certificate withdrawn'

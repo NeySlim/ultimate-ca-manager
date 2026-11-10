@@ -933,31 +933,10 @@ class SCEPService:
                 self.FAIL_BAD_CERT_ID, "Unknown transactionID",
                 transaction_id=transaction_id, recipient_nonce=sender_nonce,
             )
-        from services.scep.approval import follow_approval
-        follow_approval(existing)
         # PENDING and FAILURE carry no encrypted payload. SUCCESS is encrypted
         # to the signer certificate carried by this polling request.
-        if existing.status == "approved" and existing.cert_refid:
-            cert = Certificate.query.filter_by(refid=existing.cert_refid).first()
-            if cert:
-                cert_obj = x509.load_pem_x509_certificate(
-                    base64.b64decode(cert.crt), default_backend()
-                )
-                return self._create_cert_rep_success(
-                    cert_obj,
-                    transaction_id,
-                    sender_nonce,
-                    signer_cert,
-                    challenge_password,
-                    content_encryption_algorithm,
-                )
-        if existing.status == "rejected":
-            return self._create_error_response(
-                self.FAIL_BAD_REQUEST,
-                existing.rejection_reason or "Request rejected",
-                transaction_id=transaction_id, recipient_nonce=sender_nonce,
-            )
-        return self._create_cert_rep_pending(transaction_id, sender_nonce)
+        return self._status_for_existing(
+            existing, sender_nonce, signer_cert, challenge_password, content_encryption_algorithm)
 
     def approve_request(
         self,
@@ -1240,12 +1219,9 @@ class SCEPService:
         """Return an appropriate CertRep for an already-seen transaction ID."""
         from services.scep.approval import follow_approval
         follow_approval(existing)
-        if existing.status == "approved" and existing.cert_refid:
-            cert = Certificate.query.filter_by(refid=existing.cert_refid).first()
-            if cert:
-                cert_obj = x509.load_pem_x509_certificate(
-                    base64.b64decode(cert.crt), default_backend()
-                )
+        if existing.status == "approved":
+            cert_obj = self._deliverable_certificate(existing)
+            if cert_obj is not None:
                 return self._create_cert_rep_success(
                     cert_obj,
                     existing.transaction_id,
@@ -1264,6 +1240,32 @@ class SCEPService:
             )
 
         return self._create_cert_rep_pending(existing.transaction_id, sender_nonce)
+
+    def _deliverable_certificate(self, existing: SCEPRequest):
+        """The certificate of an approved request, as EST and WSTEP deliver
+        theirs: none when its row went away or the certificate it renews was
+        revoked since, and the request (with its approval) is then closed."""
+        from services import protocol_approval
+        cert = Certificate.query.filter_by(refid=existing.cert_refid).first() if existing.cert_refid else None
+        reason = None
+        if cert is None or not cert.crt:
+            reason = protocol_approval.CERTIFICATE_WITHDRAWN
+        elif existing.renewal_of:
+            from services.cert.issued_lookup import OK, SUPERSEDED, issued_certificate_status
+            renewed = x509.load_pem_x509_certificate(base64.b64decode(existing.renewal_of), default_backend())
+            if issued_certificate_status(self.ca, renewed)[1] not in (OK, SUPERSEDED):
+                reason = protocol_approval.RENEWED_REVOKED
+        if reason is None:
+            return x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend())
+        existing.status = "rejected"
+        existing.rejection_reason = reason
+        db.session.commit()
+        approval = protocol_approval.find_protocol_request(
+            'scep', protocol_approval.make_ref('scep', existing.transaction_id, existing.ca_refid))
+        if approval is not None and approval.status == 'approved':
+            protocol_approval.close_withdrawn(approval, reason)
+        logger.warning("SCEP: transaction %s closed before delivery: %s", existing.transaction_id, reason)
+        return None
 
     def _config_value(self, key: str):
         if key not in self._config_cache:
