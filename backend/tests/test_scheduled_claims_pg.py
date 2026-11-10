@@ -1,7 +1,7 @@
 """Two executors of the same scheduled work (two leaders in turn, a run-now beside the
 scheduler): the conditional claim lets exactly one act.
 
-Discovery claims a due profile by moving next_scan_at from the value it read; the OCSP
+Discovery claims a profile by moving next_scan_at only while it is still due; the OCSP
 responder renewal rebinds the responder only if the binding still names the old certificate.
 """
 import base64
