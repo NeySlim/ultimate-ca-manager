@@ -66,12 +66,14 @@ def test_scheduled_auto_update_skipped_in_ha(monkeypatch):
     updates._auto_install({'latest_version': '99.0', 'download_url': 'http://x/p.deb'})
 
 
-def test_service_restart_refused_in_ha(auth_client, monkeypatch):
+def test_service_restart_in_ha_is_a_rolling_restart_even_in_a_container(auth_client, monkeypatch):
+    import services.cluster_commands as cc
+    monkeypatch.setattr(cc, 'request_restart', lambda: (True, 'rolling'))
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.setattr('api.v2.system.service.is_docker', lambda: True)
     r = auth_client.post('/api/v2/system/service/restart', json={})
-    assert r.status_code == 409, r.data
-    assert r.get_json()['code'] == 'ha_mode'
+    assert r.status_code == 200, r.data
+    assert r.get_json()['message'] == 'rolling'
 
 
 def test_service_restart_keeps_its_usual_answer_without_ha(auth_client, monkeypatch):

@@ -205,19 +205,44 @@ def boot_lock(url, timeout=None, key=None):
 # A node whose scheduler process missed this many passes counts as gone
 STALE_PASSES = 3
 
+_SERVER_NOW_SQL = text("SELECT clock_timestamp() AT TIME ZONE 'UTC'")
+
+
+def cluster_utc_now(executor=None):
+    """HA on PostgreSQL: the server's clock (naive UTC), the one clock every node's instants
+    are written and compared on; otherwise this host's utc_now()."""
+    from utils.datetime_utils import utc_now
+    from utils.ha import ha_enabled
+    if not ha_enabled():
+        return utc_now()
+    if executor is None:
+        from models import db
+        executor = db.session
+    dialect = executor.dialect if hasattr(executor, 'dialect') else executor.get_bind().dialect
+    if dialect.name != 'postgresql':
+        return utc_now()
+    return executor.execute(_SERVER_NOW_SQL).scalar()
+
+
+def to_cluster_clock(local_instant, local_now, executor=None):
+    """A past instant read on this host's clock, moved onto cluster_utc_now()'s clock."""
+    return local_instant + (cluster_utc_now(executor) - local_now)
+
 
 def write_heartbeat(node_id, leader, started_at) -> None:
-    """Refresh this node's row; the leader also takes the flag off every other row."""
+    """Refresh this node's row; the leader also takes the flag off every other row.
+
+    ``started_at`` is on the cluster clock (to_cluster_clock), as heartbeat_at is.
+    """
     from config.settings import Config
     from models import ClusterNode, db
-    from utils.datetime_utils import utc_now
-    now = utc_now()
+    now = cluster_utc_now()
     node = db.session.get(ClusterNode, node_id)
     if node is None:
         node = ClusterNode(node_id=node_id, started_at=started_at)
         db.session.add(node)
-    elif node.pid != os.getpid():
-        node.started_at = started_at  # a new process on the same node
+    # Unconditional: a restarted container often reuses its pid, and one process always passes the same value
+    node.started_at = started_at
     node.heartbeat_at, node.is_leader = now, bool(leader)
     node.version, node.pid = Config.APP_VERSION, os.getpid()
     if leader:
@@ -231,14 +256,28 @@ def _is_stale(node, wake_interval, now) -> bool:
 
 
 def cluster_summary(wake_interval) -> dict:
-    """{leader_node_id, nodes, stale} as /health reports it; a stale leader is no leader."""
+    """{leader_node_id, nodes, stale, command_seen} as the public /health reports it; a stale
+    leader is no leader. The leader is the only node it names; command_seen is the answering node's."""
+    from config.settings import Config
     from models import ClusterNode
-    from utils.datetime_utils import utc_now
-    now = utc_now()
+    now = cluster_utc_now()
     nodes = ClusterNode.query.all()
     stale = {n.node_id for n in nodes if _is_stale(n, wake_interval, now)}
     leader = next((n.node_id for n in nodes if n.is_leader and n.node_id not in stale), None)
-    return {'leader_node_id': leader, 'nodes': len(nodes), 'stale': len(stale)}
+    own = next((n.command_seen for n in nodes if n.node_id == Config.NODE_ID), None)
+    return {'leader_node_id': leader, 'nodes': len(nodes), 'stale': len(stale), 'command_seen': own}
+
+
+def cluster_nodes_detail(wake_interval) -> list:
+    """Every registered node, for authenticated status pages only."""
+    from models import ClusterNode
+    from utils.datetime_utils import utc_isoformat
+    now = cluster_utc_now()
+    return [{'node_id': n.node_id, 'leader': bool(n.is_leader),
+             'stale': _is_stale(n, wake_interval, now), 'version': n.version,
+             'started_at': utc_isoformat(n.started_at), 'heartbeat_at': utc_isoformat(n.heartbeat_at),
+             'command_seen': n.command_seen}
+            for n in ClusterNode.query.order_by(ClusterNode.node_id).all()]
 
 
 def node_registered(node_id) -> bool:
@@ -249,13 +288,11 @@ def node_registered(node_id) -> bool:
 def node_is_leader(node_id, wake_interval) -> bool:
     """Whether this node's scheduler process holds the lock, as its last fresh heartbeat says."""
     from models import ClusterNode, db
-    from utils.datetime_utils import utc_now
     node = db.session.get(ClusterNode, node_id)
-    return bool(node and node.is_leader and not _is_stale(node, wake_interval, utc_now()))
+    return bool(node and node.is_leader and not _is_stale(node, wake_interval, cluster_utc_now()))
 
 
 def fresh_node_ids(wake_interval) -> set:
     from models import ClusterNode
-    from utils.datetime_utils import utc_now
-    now = utc_now()
+    now = cluster_utc_now()
     return {n.node_id for n in ClusterNode.query.all() if not _is_stale(n, wake_interval, now)}

@@ -14,6 +14,9 @@ import sys
 # tasks, which run in the scheduler process started below (when_ready)
 os.environ['UCM_SCHEDULER_SUPERVISED'] = '1'
 
+# Stamps the process start (HA cluster commands) before the mTLS and WSTEP settings are read
+import services.cluster_commands  # noqa: E402,F401
+
 # Detect environment
 base_path = os.getenv('UCM_BASE_PATH', '/opt/ucm')
 data_path = os.getenv('DATA_DIR', f'{base_path}/data')
@@ -317,3 +320,12 @@ def post_worker_init(worker):
         logging.getLogger('ucm.protocol').warning(
             "Could not initialize DNS UPDATE listener: %s", e
         )
+
+    # HA: this worker applies the cluster commands and owns this node's restart turn
+    try:
+        from services.cluster_commands import start_applier
+        from wsgi import app as flask_app
+        start_applier(flask_app, record=True, master_pid=worker.ppid)
+    except Exception as e:
+        import logging
+        logging.getLogger('ucm.cluster').error("Cluster command applier not started: %s", e)

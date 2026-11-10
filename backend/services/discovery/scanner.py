@@ -96,9 +96,11 @@ class ScannerMixin:
 
         # Create scan run record
         from config.settings import Config
+        from services.scheduler_leader import cluster_utc_now
         run = ScanRun(
             scan_profile_id=profile_id,
             node_id=Config.NODE_ID,
+            started_at=cluster_utc_now(),  # compared with cluster_nodes.started_at (HA)
             total_targets=len(jobs),
             triggered_by=triggered_by,
             triggered_by_user=triggered_by_user,

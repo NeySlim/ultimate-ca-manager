@@ -335,6 +335,7 @@ jobs:
             tests/test_revocation*.py \
             tests/test_scheduler*.py \
             tests/test_cluster_nodes_pg.py \
+            tests/test_cluster_commands_pg.py \
             tests/test_boot_lock_pg.py \
             tests/test_discovery_recovery_ha.py \
             tests/test_discovery_timestamps.py \
@@ -351,6 +352,7 @@ jobs:
             tests/test_migration_139*.py \
             tests/test_migration_141*.py \
             tests/test_migration_142*.py \
+            tests/test_migration_143*.py \
             tests/test_migration_144*.py \
             tests/test_postgres_schema_of_its_own.py \
             tests/test_db_error_parameters_hidden.py \

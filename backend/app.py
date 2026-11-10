@@ -94,7 +94,9 @@ def run_startup_housekeeping(app):
 
 def create_app(config_name=None):
     """Application factory"""
-    app = Flask(__name__, 
+    # Stamps this process's start before any setting is read (HA cluster commands)
+    import services.cluster_commands  # noqa: F401
+    app = Flask(__name__,
                 static_folder=str(BASE_DIR / "frontend" / "static"),
                 template_folder=str(BASE_DIR / "frontend" / "templates"))
     
@@ -660,6 +662,16 @@ def create_app(config_name=None):
         except ImportError:
             pass
 
+        from utils.ha import ha_enabled
+        if ha_enabled():
+            from services.cluster_commands import purge_old_commands
+            scheduler.register_task(
+                name="cluster_command_purge",
+                func=purge_old_commands,
+                interval=3600,
+                description="Delete HA cluster commands older than 24 hours"
+            )
+
         # Delivery history does not grow for ever (webhooks, deployments,
         # notifications) — every 6 hours, same cadence as the ACME purge
         try:
@@ -1011,6 +1023,14 @@ def create_app(config_name=None):
             app.logger.info("Rate limiter disabled via RATE_LIMIT_ENABLED")
     except Exception as e:
         app.logger.warning(f"Rate limiter not loaded: {e}")
+    from utils.ha import ha_enabled
+    if ha_enabled():  # the settings another node stored before this one started
+        try:
+            with app.app_context():
+                from security.rate_limiter import RateLimitConfig
+                RateLimitConfig.compose(RateLimitConfig.read_stored())
+        except Exception as e:
+            app.logger.error(f"Stored rate limit settings not loaded: {e}")
     
     # Security headers and cleanup
     @app.teardown_request

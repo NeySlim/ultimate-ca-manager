@@ -14,7 +14,7 @@ from services import compliance_preflight, fips_preflight
 import compliance_profiles
 from models import db
 from config.settings import is_docker
-from utils.ha import reject_in_ha
+from utils.ha import ha_enabled
 import os
 import psutil
 import fips_mode
@@ -161,7 +161,7 @@ def get_service_status():
         # Check if running in Docker
         is_docker_env = os.path.exists('/.dockerenv') or os.path.exists('/run/.containerenv') or os.environ.get('UCM_DOCKER') == '1'
 
-        return success_response(data={
+        data = {
             'version': get_current_version(),
             'pid': main_proc.pid,
             'uptime_seconds': uptime_seconds,
@@ -170,7 +170,14 @@ def get_service_status():
             'is_docker': is_docker_env,
             'python_version': f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
             'crypto': fips_mode.status(),
-        })
+        }
+        if ha_enabled():
+            # Per-node detail stays behind authentication; /health names no other node
+            from services.scheduler_leader import cluster_nodes_detail
+            from config.settings import Config
+            data['cluster'] = {'node_id': Config.NODE_ID,
+                               'nodes': cluster_nodes_detail(get_scheduler().wake_interval)}
+        return success_response(data=data)
     except Exception as e:
         logger.error(f"Failed to get service status: {e}")
         return error_response("Failed to get service status", 500)
@@ -219,10 +226,9 @@ def get_compliance_preflight():
 
 @bp.route('/api/v2/system/service/restart', methods=['POST'])
 @require_auth(['write:settings'])
-@reject_in_ha()
 def restart_service():
-    """Restart the UCM service"""
-    if is_docker():
+    """Restart the UCM service; in HA mode, every node in turn"""
+    if is_docker() and not ha_enabled():
         return error_response("Service restart is not available in Docker. Restart the container instead.", 400)
 
     try:

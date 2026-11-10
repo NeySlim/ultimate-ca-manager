@@ -28,6 +28,9 @@ def main() -> int:
     scheduler = get_scheduler()
     scheduler.rearm_grace()
     scheduler.start(app=app)
+    # HA: reloads this process's own copies; the web worker owns the node's restart
+    from services.cluster_commands import start_applier
+    start_applier(app, record=False)
     logger.info("Scheduler process %s started", os.getpid())
 
     parent = os.getppid()

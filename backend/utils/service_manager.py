@@ -113,31 +113,6 @@ def get_service_status() -> dict:
     return status
 
 
-def schedule_restart(delay_seconds: int = 1) -> Tuple[bool, str]:
-    """
-    Schedule a service restart after a delay.
-    Useful for applying changes that require restart.
-    
-    Args:
-        delay_seconds: Seconds to wait before restarting (default: 1)
-    
-    Returns:
-        Tuple[bool, str]: (success, message)
-    """
-    # Create restart signal file
-    from config.settings import DATA_DIR, Config
-    if Config.HA_MODE:
-        return False, "Service restart not available in HA mode. Restart the node manually."
-    
-    try:
-        restart_signal = DATA_DIR / '.restart_requested'
-        restart_signal.write_text('restart')
-        
-        return True, f"✅ Service restart scheduled in {delay_seconds}s. Please reload the page after {delay_seconds + 3} seconds."
-    except Exception as e:
-        return False, f"Failed to schedule restart: {str(e)}"
-
-
 def cancel_scheduled_restart() -> Tuple[bool, str]:
     """
     Cancel a previously scheduled restart.

@@ -155,6 +155,7 @@ class SchedulerService:
         # Set when the lock goes away, mid-pass or not: the next pass waits instead of retaking it
         self._lost_lock = False
         self._started_at = utc_now()
+        self._started_cluster = None  # _started_at on the cluster clock, set by the first heartbeat
         self._last_heartbeat = None
         self._heartbeat_error_logged = False
         self._claimed: Dict[str, list] = {}
@@ -636,9 +637,11 @@ class SchedulerService:
         if not force and self._last_heartbeat is not None \
                 and now - self._last_heartbeat < self.wake_interval:
             return
-        from services.scheduler_leader import write_heartbeat
+        from services.scheduler_leader import to_cluster_clock, write_heartbeat
         try:
-            self._in_app(write_heartbeat, self.node_id, self._owns_lock, self._started_at)
+            if self._started_cluster is None:
+                self._started_cluster = self._in_app(to_cluster_clock, self._started_at, utc_now())
+            self._in_app(write_heartbeat, self.node_id, self._owns_lock, self._started_cluster)
             self._last_heartbeat = now
             self._heartbeat_error_logged = False
         except Exception as e:

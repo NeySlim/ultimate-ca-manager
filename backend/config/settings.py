@@ -66,13 +66,14 @@ def restart_ucm_service():
     """
     Restart UCM service via signal file.
     ucm-watcher.path detects the file and ucm-watcher.service runs systemctl restart.
-    Not available in Docker — container must be restarted externally.
+    Not available in Docker — container must be restarted externally, except in HA
+    mode, where a rolling restart of every node is queued instead.
     Returns: (success: bool, message: str)
     """
     if Config.HA_MODE:
-        logging.getLogger(__name__).warning(
-            "Service restart refused in HA mode: restart the node through its orchestrator")
-        return False, "Service restart not available in HA mode. Restart the node manually."
+        # Every node restarts in turn, through its own signal file or process exit
+        from services.cluster_commands import request_restart
+        return request_restart()
     if is_docker():
         return False, "Service restart not available in Docker. Restart the container instead."
     try:

@@ -120,6 +120,8 @@ def update_syslog_config():
         set_config('syslog_tls_verify', str(tls_verify).lower())
         set_config('syslog_framing', framing)
         set_config('syslog_categories', ','.join(categories))
+        from services.cluster_commands import RELOAD_SYSLOG, emit
+        emit(RELOAD_SYSLOG)  # same transaction: the other nodes reload only a committed config
         ok, err = safe_commit(logger, "Failed to update syslog config")
         if not ok:
             return err

@@ -401,6 +401,10 @@ def update_rate_limit_config():
         from security.rate_limiter import RateLimitConfig
         data = request.get_json() or {}
 
+        from utils.ha import ha_enabled
+        if ha_enabled():
+            return _update_stored_rate_limits(data)
+
         if 'enabled' in data:
             RateLimitConfig.set_enabled(data['enabled'])
 
@@ -423,6 +427,29 @@ def update_rate_limit_config():
     except Exception as e:
         logger.error(f"Failed to update rate limit config: {e}")
         return error_response("Failed to update config", 500)
+
+
+def _update_stored_rate_limits(data):
+    """HA: the change is stored and its command emitted in one transaction, then applied here."""
+    import json
+    from models import SystemConfig
+    from security.rate_limiter import STORED_KEY, RateLimitConfig
+    from services.cluster_commands import RELOAD_RATE_LIMITS, emit
+    row = SystemConfig.query.filter_by(key=STORED_KEY).with_for_update().first()
+    stored = RateLimitConfig.merge_stored(json.loads(row.value) if row and row.value else None, data)
+    if row is None:
+        row = SystemConfig(key=STORED_KEY)
+        db.session.add(row)
+    row.value = json.dumps(stored, sort_keys=True)
+    emit(RELOAD_RATE_LIMITS, stored)
+    try:
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Rate limit config not saved: {type(e).__name__}: {e}")
+        return error_response("Failed to update config", 500)
+    RateLimitConfig.compose(stored)
+    return success_response(message="Rate limit config updated", data=RateLimitConfig.get_config())
 
 
 @bp.route('/api/v2/system/security/rate-limit/stats', methods=['GET'])

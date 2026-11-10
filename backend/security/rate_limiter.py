@@ -48,6 +48,10 @@ def _is_lan_ip(ip: str) -> bool:
     return addr.is_private or addr.is_loopback or addr.is_link_local
 
 
+# HA: the rate limit settings changed through the API, stored for every node
+STORED_KEY = 'rate_limit_overrides'
+
+
 class RateLimitConfig:
     """Rate limit configuration per endpoint pattern
     
@@ -264,6 +268,52 @@ class RateLimitConfig:
             'whitelist': list(cls._whitelist)
         }
     
+    @staticmethod
+    def merge_stored(stored: Optional[Dict[str, Any]], data: Dict[str, Any]) -> Dict[str, Any]:
+        """The settings stored in the database (HA) after a settings API request ``data``.
+
+        Only what the API changed is kept: each node adds it to its own environment.
+        """
+        out = {'custom_limits': dict((stored or {}).get('custom_limits') or {}),
+               'whitelist_add': set((stored or {}).get('whitelist_add') or []),
+               'whitelist_remove': set((stored or {}).get('whitelist_remove') or [])}
+        if 'enabled' in (stored or {}):
+            out['enabled'] = bool(stored['enabled'])
+        if 'enabled' in data:
+            out['enabled'] = bool(data['enabled'])
+        for path, limit in (data.get('custom_limits') or {}).items():
+            rpm = int(limit['rpm'])
+            out['custom_limits'][path] = {'rpm': rpm, 'burst': int(limit.get('burst', rpm // 3))}
+        for ip in data.get('whitelist_add') or []:
+            out['whitelist_add'].add(ip)
+            out['whitelist_remove'].discard(ip)
+        for ip in data.get('whitelist_remove') or []:
+            out['whitelist_remove'].add(ip)
+            out['whitelist_add'].discard(ip)
+        out['whitelist_add'] = sorted(out['whitelist_add'])
+        out['whitelist_remove'] = sorted(out['whitelist_remove'])
+        return out
+
+    @classmethod
+    def compose(cls, stored: Optional[Dict[str, Any]]):
+        """This node's environment, then the settings stored in the database (HA)."""
+        stored = stored or {}
+        cls._limits_loaded, cls._enabled, cls._whitelist = False, None, set()
+        cls._load_limits()
+        if 'enabled' in stored:
+            cls._enabled = bool(stored['enabled'])
+        cls._custom_limits = {k: {'rpm': int(v['rpm']), 'burst': int(v['burst'])}
+                              for k, v in (stored.get('custom_limits') or {}).items()}
+        cls._whitelist |= set(stored.get('whitelist_add') or [])
+        cls._whitelist -= set(stored.get('whitelist_remove') or [])
+
+    @staticmethod
+    def read_stored() -> Optional[Dict[str, Any]]:
+        import json
+        from models import SystemConfig
+        row = SystemConfig.query.filter_by(key=STORED_KEY).first()
+        return json.loads(row.value) if row and row.value else None
+
     @classmethod
     def reload(cls):
         """Reload configuration from environment"""
