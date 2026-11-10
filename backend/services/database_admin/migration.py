@@ -279,6 +279,23 @@ def _check_source_integrity() -> Dict[str, object]:
         ) from exc
 
 
+def _check_serial_duplicates() -> None:
+    """Refuse a source whose migration 142 is pending: the target's unique
+    (caref, serial_number) index would stop the copy halfway."""
+    from models import db as _db
+    from utils.serial_duplicates import CLEANUP, describe, duplicates_in_database
+
+    with _db.engine.connect() as conn:
+        if 'certificates' not in inspect(conn).get_table_names():
+            return
+        duplicates = duplicates_in_database(conn)
+    if duplicates:
+        raise PreflightError(
+            f"{len(duplicates)} serial number(s) are held by more than one certificate "
+            f"of the same CA (certificate ids): {describe(duplicates)}. The migration was "
+            f"not started: the target refuses them; {CLEANUP}.")
+
+
 def _target_has_users(target_engine) -> bool:
     """Whether the target is already a provisioned installation.
 
@@ -438,6 +455,7 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
             'tables': len(inspected), 'rows': sum(inspected.values())}
 
         # 2. The source has to be copyable before it is worth dumping.
+        _check_serial_duplicates()
         stats["source_integrity"] = _check_source_integrity()
 
         # 3. No migration without a rollback point that has been read back.

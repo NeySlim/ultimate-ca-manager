@@ -281,6 +281,7 @@ class RestoreCoreMixin:
         # holding fewer rows than the archive says it holds, must not be
         # discovered halfway through a restore.
         self._check_payload_schema(backup_data)
+        self._check_serial_duplicates(backup_data)
         upgrade_archived_permissions(backup_data)
         if mode not in ('replace', 'merge'):
             raise BackupSchemaError(
@@ -453,6 +454,20 @@ class RestoreCoreMixin:
         # restores data, and an API route is where revoking every session and
         # asking for a restart belongs (see invalidate_after_restore).
         return results
+
+    @staticmethod
+    def _check_serial_duplicates(backup_data: Dict[str, Any]) -> None:
+        """An archive of an installation whose migration 142 is pending carries
+        serials the unique (caref, serial_number) index refuses: named before any write."""
+        from utils.serial_duplicates import CLEANUP, describe, duplicates_in_rows
+        rows = backup_data.get('certificates')
+        duplicates = duplicates_in_rows(r for r in rows if isinstance(r, dict)) \
+            if isinstance(rows, list) else []
+        if duplicates:
+            raise BackupSchemaError(
+                f"The archive holds {len(duplicates)} serial number(s) shared by certificates "
+                f"of the same CA (certificate refids): {describe(duplicates)}. Nothing has been "
+                f"changed: {CLEANUP}, then take a new backup.")
 
     @staticmethod
     def _archived_key_mismatches(backup_data: Dict[str, Any]) -> List[str]:

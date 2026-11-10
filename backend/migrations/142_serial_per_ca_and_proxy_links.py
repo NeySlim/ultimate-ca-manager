@@ -13,6 +13,9 @@ import json
 import logging
 import sqlite3
 
+# The query a backend migration and a restore run on their source too
+from utils.serial_duplicates import DUPLICATES
+
 logger = logging.getLogger(__name__)
 pg_compatible = True
 
@@ -23,9 +26,6 @@ INDEX = 'uix_certificates_ca_serial'
 # Same name and predicate as the model's index, so create_all and this agree
 CREATE_INDEX = (f"CREATE UNIQUE INDEX IF NOT EXISTS {INDEX} ON {TABLE} (caref, serial_number) "
                 "WHERE caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''")
-DUPLICATES = (f"SELECT caref, serial_number, COUNT(*) FROM {TABLE} "
-              "WHERE caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> '' "
-              "GROUP BY caref, serial_number HAVING COUNT(*) > 1 ORDER BY caref, serial_number")
 CLEAR_PENDING = f"DELETE FROM {CONFIG} WHERE key = '{PENDING_KEY}'"
 SET_PENDING = (f"INSERT INTO {CONFIG} (key, value, encrypted, description, updated_at) "
                "VALUES ('" + PENDING_KEY + "', {value}, {false}, "
