@@ -75,6 +75,58 @@ def test_a_taken_random_serial_is_signed_again_once(app):
         db.session.expire_all()
         assert db.session.get(CA, ca_id).serial == 2
 
+def _stale(ca):
+    from sqlalchemy.orm.attributes import set_committed_value
+    set_committed_value(ca, 'serial', 0)  # what this worker read before another one issued
+
+
+def _by_create_certificate(ca):
+    from services.cert_service import CertificateService
+    CertificateService.create_certificate(
+        descr='stale count', caref=ca.refid, dn={'CN': 'stale-create.example.test'},
+        key_type='secp256r1', validity_days=30)
+
+
+def _by_sign_csr(ca):
+    from services.cert_service import CertificateService
+    csr_row = CertificateService.generate_csr(
+        descr='stale count csr', dn={'CN': 'stale-csr.example.test'}, key_type='2048')
+    db.session.commit()
+    _stale(ca)  # the commit reloaded the CA row
+    CertificateService.sign_csr(cert_id=csr_row.id, caref=ca.refid, validity_days=30)
+
+
+def _by_sign_csr_from_crypto(ca):
+    _issue(ca.id, 'stale-crypto.example.test')
+
+
+def _by_intermediate(ca):
+    from services.ca import CAService
+    CAService.create_internal_ca(descr='stale count sub', dn={'CN': 'stale count sub'},
+                                 key_type='secp256r1', caref=ca.refid, validity_days=365)
+
+
+def _by_increment_serial(ca):
+    from services.ca import CAService
+    CAService.increment_serial(ca.id)
+
+
+@pytest.mark.parametrize('issue', [_by_create_certificate, _by_sign_csr, _by_sign_csr_from_crypto,
+                                   _by_intermediate, _by_increment_serial])
+def test_every_site_counts_from_the_database_not_from_a_stale_row(app, create_ca, issue):
+    """Another worker counted meanwhile: the site adds one to the stored count, not to its copy."""
+    ca_id = create_ca(cn=f'Stale count {issue.__name__}')['id']
+    with app.app_context():
+        db.session.execute(CA.__table__.update().where(CA.__table__.c.id == ca_id).values(serial=10))
+        db.session.commit()
+        ca = db.session.get(CA, ca_id)
+        _stale(ca)
+        issue(ca)
+        db.session.commit()
+        db.session.expire_all()
+        assert db.session.get(CA, ca_id).serial == 11
+
+
 def _race(app, ca_id):
     errors, start = [], threading.Barrier(WORKERS)
 
