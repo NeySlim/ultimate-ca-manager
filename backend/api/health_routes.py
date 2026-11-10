@@ -72,11 +72,13 @@ def readiness():
     Returns 200 if ready, 503 if not.
     """
     if current_app.config.get('SAFE_MODE'):
+        from config.settings import Config
+        # Single node: stay in the Service so the safe-mode UI and protocol endpoints remain reachable.
         return jsonify({
             'status': 'safe_mode',
             'reason': current_app.config.get('SAFE_MODE_REASON', 'encryption_key_missing'),
             **_ha_fields(),
-        }), 503
+        }), (503 if Config.HA_MODE else 200)
 
     checks = {
         'database': _check_database(),

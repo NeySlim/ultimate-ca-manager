@@ -31,16 +31,28 @@ def test_without_ha_flag_is_false_and_legacy_keys_kept(client, monkeypatch):
     assert {'status', 'checks'} <= set(ready) and ready['ha'] is False
 
 
-def test_ready_is_503_in_safe_mode(app, client):
+def _ready_in_safe_mode(app, client):
     app.config['SAFE_MODE'] = True
     app.config['SAFE_MODE_REASON'] = 'encryption_key_missing'
     try:
-        r = client.get('/health/ready')
+        return client.get('/health/ready')
     finally:
         app.config['SAFE_MODE'] = False
+
+
+def test_ready_is_503_in_safe_mode_when_ha(app, client, monkeypatch):
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    r = _ready_in_safe_mode(app, client)
     assert r.status_code == 503
     assert r.get_json()['status'] == 'safe_mode'
     assert r.get_json()['reason'] == 'encryption_key_missing'
+
+
+def test_ready_stays_200_in_safe_mode_single_node(app, client, monkeypatch):
+    monkeypatch.setattr(Config, 'HA_MODE', False)
+    r = _ready_in_safe_mode(app, client)
+    assert r.status_code == 200
+    assert r.get_json()['status'] == 'safe_mode'
 
 
 def test_leader_follows_the_scheduler_state(monkeypatch):
