@@ -464,6 +464,32 @@ def test_a_restart_action_that_raises_is_retried_and_reloads_go_on(app, ha):
     assert attempts == ['restart', 'restart']  # a restart that ran is not repeated
 
 
+def test_a_starting_node_replays_recent_reloads_but_no_restart_older_than_itself(app, ha):
+    """A reload committed while the process read its settings is replayed; reloads are idempotent."""
+    from models import ClusterCommand, db
+    cluster, log = _Cluster(app), []
+    _node_row(app, 'n')
+    started = utc_now()
+    with app.app_context():
+        rows = [ClusterCommand(kind=cc.RELOAD_SYSLOG, payload='{"mark": "old"}',
+                               created_at=started - cc.START_REPLAY - timedelta(seconds=30)),
+                ClusterCommand(kind=cc.RESTART, created_at=started - timedelta(seconds=5)),
+                ClusterCommand(kind=cc.RELOAD_SYSLOG, payload='{"mark": "recent"}',
+                               created_at=started - timedelta(seconds=5))]
+        for row in rows:
+            db.session.add(row)
+            db.session.flush()
+        db.session.commit()
+        last = rows[-1].id
+    n = ha('n', started_at=started, restart_action=cluster.action('n'),
+           handlers={cc.RELOAD_SYSLOG: _recorder(log, 'n')})
+    n.start()
+    assert wait_for(lambda: n.seen == last)
+    assert log == [('n', 'recent')]
+    time.sleep(0.2)
+    assert cluster.events == []
+
+
 LAG = timedelta(hours=1)
 
 

@@ -14,6 +14,9 @@ import sys
 # tasks, which run in the scheduler process started below (when_ready)
 os.environ['UCM_SCHEDULER_SUPERVISED'] = '1'
 
+# Stamps the process start (HA cluster commands) before the mTLS and WSTEP settings are read
+import services.cluster_commands  # noqa: E402,F401
+
 # Detect environment
 base_path = os.getenv('UCM_BASE_PATH', '/opt/ucm')
 data_path = os.getenv('DATA_DIR', f'{base_path}/data')

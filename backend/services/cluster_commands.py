@@ -36,12 +36,15 @@ MAX_HOLES = 32
 # A node waits at most this long per node ahead of it in a rolling restart
 RESTART_GUARD_SECONDS = 120.0
 RETENTION = timedelta(hours=24)
+# A starting process replays the reloads of this window (idempotent): one committed while it
+# read its settings is not lost. A restart in it is older than the process and never runs.
+START_REPLAY = timedelta(seconds=60)
 BATCH = 200
 
 # A held restart: the newest id and creation instant of the restarts it stands for
 _Held = namedtuple('_Held', 'id created_at')
 
-# Before create_app reads any setting: commands created up to here are already in effect.
+# Imported by gunicorn_config before the master reads a setting: a restart created later runs.
 # On this host's clock: the applier moves it onto the cluster clock before comparing.
 PROCESS_STARTED = utc_now()
 
@@ -245,7 +248,7 @@ class CommandApplier:
                 self.started_at = self._cluster_clock(conn, self.started_at)
                 self._on_cluster_clock = True
             if self.seen is None:
-                self.seen = conn.execute(_INITIAL_SQL, {'t': self.started_at}).scalar() or 0
+                self.seen = conn.execute(_INITIAL_SQL, {'t': self.started_at - START_REPLAY}).scalar() or 0
                 self._mark_seen(conn, self.seen)
             self._drain(conn)
             self._error_logged = False

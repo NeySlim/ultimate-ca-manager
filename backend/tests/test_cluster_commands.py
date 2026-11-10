@@ -175,3 +175,38 @@ def test_mtls_change_not_saved_when_its_restart_is_not(app, auth_client, broken_
 def test_service_restart_route_fails_when_its_command_is_not_queued(auth_client, broken_emit):
     r = auth_client.post('/api/v2/system/service/restart', json={})
     assert r.status_code == 500 and broken_emit() == []
+
+
+_BOOT_READS = r'''
+import json, sys
+import boot_config
+from utils.datetime_utils import utc_now
+reads = []
+
+def recorder(name, value):
+    def read(data_path):
+        stamp = getattr(sys.modules.get('services.cluster_commands'), 'PROCESS_STARTED', None)
+        reads.append([name, stamp is not None and stamp <= utc_now()])
+        return value
+    return read
+boot_config.wstep_enabled = recorder('wstep', False)
+boot_config.mtls_client_ca = recorder('mtls', None)
+import gunicorn_config
+print(json.dumps(reads))
+'''
+
+
+def test_the_process_start_is_stamped_before_the_master_reads_a_setting(tmp_path):
+    """A restart committed after a setting was read is never judged older than the process."""
+    import json
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+    backend = str(Path(__file__).resolve().parent.parent)
+    env = {k: v for k, v in os.environ.items() if k not in ('DATABASE_URL', 'DATABASE_PATH')}
+    env.update(DATA_DIR=str(tmp_path), UCM_BASE_PATH=str(tmp_path), PYTHONPATH=backend)
+    run = subprocess.run([sys.executable, '-c', _BOOT_READS], cwd=backend, env=env,
+                         capture_output=True, text=True, timeout=60)
+    assert run.returncode == 0, run.stderr
+    assert json.loads(run.stdout.strip().splitlines()[-1]) == [['wstep', True], ['mtls', True]]
