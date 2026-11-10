@@ -77,6 +77,12 @@ describe('TemplateForm key types', () => {
     expect(body.digest).toBe('sha256')
   })
 
+  it('offers no empty key on an existing template, which always has one', () => {
+    render(<TemplateForm template={template('EC-P256')} onSubmit={vi.fn()} onCancel={() => {}} />)
+    expect(allKeyOptions()).not.toContain('')
+    expect(screen.getByLabelText('common.keyType')).toHaveValue('EC-P256')
+  })
+
   it('submits the key the operator picks on a new template', async () => {
     const onSubmit = vi.fn()
     render(<TemplateForm template={null} onSubmit={onSubmit} onCancel={() => {}} />)

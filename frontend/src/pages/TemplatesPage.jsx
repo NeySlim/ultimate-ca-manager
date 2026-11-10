@@ -863,11 +863,12 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
   // ML-DSA is offered: the digest is the issuing CA's signing hash, not the leaf key's.
   // An empty key type means the server default, which the backend applies at issuance
   const keyTypeOptions = useMemo(() => [
-    { value: '', label: t('templates.keyServerDefault') },
+    // Only a template without a key can stay on the default: an update cannot unset a stored key
+    ...(template?.key_type ? [] : [{ value: '', label: t('templates.keyServerDefault') }]),
     ...groupedOptions(
       KEY_ALGORITHMS.filter(a => (a.generate && isUsable(a, platform)) || a.label === formData.key_type),
       t, a => a.label),
-  ], [platform, t, formData.key_type])
+  ], [platform, t, formData.key_type, template?.key_type])
 
   useEffect(() => {
     let cancelled = false
