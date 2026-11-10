@@ -50,3 +50,34 @@ def test_refused_pins_do_not_discard_other_keys(auth_client):
     assert _put(auth_client, ['a'] * 4).status_code == 400
     data = auth_client.get('/api/v2/account/preferences').get_json()['data']
     assert data == {'language': 'fr', 'pins': ['cas']}
+
+
+# notifications_read: the bell's read marks, bounded list of item keys.
+def _put_read(client, marks):
+    return client.put('/api/v2/account/preferences', json={'notifications_read': marks})
+
+
+def test_notifications_read_roundtrip(auth_client):
+    marks = ['approval_pending:12', 'audit:345', 'crl_due:3']
+    r = _put_read(auth_client, marks)
+    assert r.status_code == 200
+    assert r.get_json()['data']['notifications_read'] == marks
+    r = auth_client.get('/api/v2/account/preferences')
+    assert r.get_json()['data']['notifications_read'] == marks
+    _put_read(auth_client, [])
+
+
+@pytest.mark.parametrize('bad', [
+    ['k:%d' % i for i in range(201)],   # over the cap
+    ['a:1', 'a:1'],                     # duplicate
+    'a:1',                              # not a list
+    [1],                                # not a string
+    [[1]],                              # unhashable element
+    ['a b'],                            # outside the key alphabet
+    ['a\n'],                            # trailing newline
+    ['x' * 121],                        # too long
+    [''],
+    {'a': 1},
+])
+def test_notifications_read_invalid_is_refused(auth_client, bad):
+    assert _put_read(auth_client, bad).status_code == 400

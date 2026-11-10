@@ -3,6 +3,7 @@ import { Suspense } from 'react'
 import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, InspectorProvider, useAuth } from './contexts'
 import { WebSocketProvider } from './hooks/useWebSocket'
 import { MODULES, REDIRECTS } from './navigation/registry'
+import { loginUrl } from './navigation/safeNext'
 import { pages, lazyWithRetry } from './navigation/pages'
 import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, ForceEnroll2FA, SafeModeOverlay, InspectorDock } from './components'
 
@@ -22,30 +23,36 @@ function PageLoader() {
 }
 
 function ProtectedRoute({ children }) {
+  const { pathname, search } = useLocation()
+  const toLogin = loginUrl(pathname, search)
   const { isAuthenticated, loading } = useAuth()
   
   if (loading) {
     return <PageLoader />
   }
   
-  return isAuthenticated ? children : <Navigate to="/login" replace />
+  return isAuthenticated ? children : <Navigate to={toLogin} replace />
 }
 
 function AdminRoute({ children }) {
+  const { pathname, search } = useLocation()
+  const toLogin = loginUrl(pathname, search)
   const { isAuthenticated, loading, permissions } = useAuth()
   
   if (loading) return <PageLoader />
-  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (!isAuthenticated) return <Navigate to={toLogin} replace />
   if (!permissions?.includes('*')) return <Navigate to="/" replace />
   
   return children
 }
 
 function PermissionRoute({ children, permission }) {
+  const { pathname, search } = useLocation()
+  const toLogin = loginUrl(pathname, search)
   const { isAuthenticated, loading, permissions } = useAuth()
   
   if (loading) return <PageLoader />
-  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (!isAuthenticated) return <Navigate to={toLogin} replace />
   if (permissions?.includes('*')) return children
   if (permission && !permissions?.includes(permission)) return <Navigate to="/" replace />
   

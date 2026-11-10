@@ -8,6 +8,8 @@ import { WebSocketIndicator } from '../WebSocketIndicator'
 import { FIXED_IDS } from './pins'
 import { ModulesMenu } from './ModulesMenu'
 import { PinnedModules } from './PinnedModules'
+import { ThemeMenu } from './ThemeMenu'
+import { NotificationBell } from './NotificationBell'
 import { UserMenu } from './UserMenu'
 import { MobileModulePicker } from './MobileModulePicker'
 import { useExpiringBadge } from './useExpiringBadge'
@@ -69,6 +71,8 @@ export function TopBar({ can, pins, onTogglePin, activeId, onOpenSearch, onOpenH
           </button>
         )}
         <WebSocketIndicator className="shell-ws" />
+        <ThemeMenu />
+        <NotificationBell can={can} />
         <UserMenu can={can} />
       </div>
     </header>

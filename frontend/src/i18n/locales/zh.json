@@ -603,7 +603,10 @@
     "samlLoginExpired": "此次登录已过期，或是在其他标签页或浏览器中发起的。请从此页面重新开始。",
     "ssoUsernameConflict": "此次登录与一个已有账户匹配，该账户为本地账户或已关联到其他身份。请联系管理员关联这些账户。",
     "ssoUnmapped": "访问被拒绝：此登录提供方的角色映射规则均不匹配您的账户。请联系管理员。",
-    "samlLogoutRejected": "无法验证身份提供方的注销请求；您仍处于登录状态。"
+    "samlLogoutRejected": "无法验证身份提供方的注销请求；您仍处于登录状态。",
+    "tooManyAttempts": "Too many failed attempts",
+    "retryAfterSeconds": "Try again in {{seconds}} seconds.",
+    "retryLater": "Try again later."
   },
   "dashboard": {
     "goodMorning": "早上好",
@@ -6016,7 +6019,37 @@
     "haLeader": "leader",
     "haFollower": "follower",
     "haNodes": "Nodes: {{count}}",
-    "haLate": "Late: {{count}}"
+    "haLate": "Late: {{count}}",
+    "theme": {
+      "menu": "Theme"
+    },
+    "bell": {
+      "title": "Notifications",
+      "unread": "{{count}} unread",
+      "allRead": "All read",
+      "markAllRead": "Mark all read",
+      "markRead": "Mark read",
+      "open": "Open",
+      "new": "New",
+      "empty": "Nothing needs your attention.",
+      "kinds": {
+        "acme_order_failed": "ACME order failed",
+        "acme_client_renewal_failed": "ACME renewal failed",
+        "approval_pending": "Approval pending",
+        "scep_request_pending": "SCEP request pending",
+        "key_recovery_pending": "Key recovery pending",
+        "crl_due": "CRL due",
+        "crl_missing": "CRL missing",
+        "manual_renewal_due": "Manual renewal due",
+        "client_renewal_overdue": "Client renewal overdue",
+        "auto_renewal_blocked": "Automatic renewal blocked",
+        "renewal_declined": "Renewal declined",
+        "ca_expiring": "CA expiring",
+        "system_backup": "Backup failed",
+        "session_revoke": "Session revoked",
+        "session_revoke_all": "Sessions revoked"
+      }
+    }
   },
   "overview": {
     "title": "Overview",

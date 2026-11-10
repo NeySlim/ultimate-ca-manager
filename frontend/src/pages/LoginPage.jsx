@@ -20,6 +20,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { authMethodsService } from '../services/auth-methods.service'
 import { authService } from '../services/auth.service'
 import { cn } from '../lib/utils'
+import { safeNext } from '../navigation/safeNext'
 
 const STORAGE_KEY = 'ucm_last_username'
 const STORAGE_AUTH_METHOD_KEY = 'ucm_last_auth_method'
@@ -59,6 +60,9 @@ export default function LoginPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  // Where to go after signing in: a known internal page from ?next=, else the dashboard.
+  const landing = safeNext(searchParams.get('next')) || '/dashboard'
+  const [rateLimit, setRateLimit] = useState(null)
   const { login, sessionChecked } = useAuth()
   const { showError, showSuccess, showInfo } = useNotification()
   const { themeFamily, setThemeFamily, mode, setMode, themes } = useTheme()
@@ -234,7 +238,8 @@ export default function LoginPage() {
           const verifyData = data.data || data
           await login(verifyData?.user?.username || 'sso_user', null, verifyData)
           showSuccess(t('auth.welcomeBackUser', { username: verifyData?.user?.username || 'User' }))
-          navigate('/dashboard')
+          // The server's callback redirect carries no ?next=, so an SSO sign-in always lands on /dashboard.
+          navigate(landing)
         })
         .catch(() => {
           showError(t('auth.ssoError'))
@@ -288,17 +293,25 @@ export default function LoginPage() {
       saveAuthMethod('webauthn')
       await login(username, null, userData)
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate('/dashboard')
+      navigate(landing)
     } catch (error) {
       // Cancelled or failed → fall to password
       setAuthMethod('password')
       setStatusMessage('')
       setLoading(false)
+      if (noteRateLimit(error)) return
       if (error.message?.includes('cancelled') || error.message?.includes('abort')) {
         showInfo(t('auth.securityKeyCancelled'))
       }
     }
   }, [username, login, navigate, showSuccess, showInfo, t]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The server's 429: shown as it sends it, with the wait only when it gives one (no local timer).
+  const noteRateLimit = (error) => {
+    if (error?.status !== 429) { setRateLimit(null); return false }
+    setRateLimit({ retryAfter: Number.isFinite(error.retryAfter) ? error.retryAfter : null })
+    return true
+  }
 
   const handleContinue = async (e) => {
     e?.preventDefault()
@@ -350,6 +363,7 @@ export default function LoginPage() {
       const userData = await authMethodsService.loginPassword(username, password)
       if (userData.requires_2fa) {
         twoFactorFrom.current = 'password'
+        setRateLimit(null)
         setStep('2fa')
         setTwoFactorMethods(userData.methods || ['totp'])
         setTotpCode('')
@@ -363,13 +377,13 @@ export default function LoginPage() {
       // #141: if 2FA enrolment is enforced, the session is established but
       // restricted; the ForceEnroll2FA overlay takes over after navigation.
       if (userData.requires_2fa_enrollment) {
-        navigate('/dashboard')
+        navigate(landing)
         return
       }
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate('/dashboard')
+      navigate(landing)
     } catch (error) {
-      showError(error.message || t('auth.invalidCredentials'))
+      if (!noteRateLimit(error)) showError(error.message || t('auth.invalidCredentials'))
       setPassword('')
     } finally {
       setLoading(false)
@@ -391,9 +405,9 @@ export default function LoginPage() {
       saveTwoFactorMethod()
       await login(username, password, userData)
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate('/dashboard')
+      navigate(landing)
     } catch (error) {
-      showError(error.message || t('auth.invalidTotpCode'))
+      if (!noteRateLimit(error)) showError(error.message || t('auth.invalidTotpCode'))
       setTotpCode('')
     } finally {
       setLoading(false)
@@ -408,9 +422,11 @@ export default function LoginPage() {
       saveTwoFactorMethod()
       await login(username, password, userData)
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate('/dashboard')
+      navigate(landing)
     } catch (error) {
-      if (error.message?.includes('cancelled') || error.message?.includes('abort') || error.name === 'NotAllowedError') {
+      if (noteRateLimit(error)) {
+        // banner shown
+      } else if (error.message?.includes('cancelled') || error.message?.includes('abort') || error.name === 'NotAllowedError') {
         showInfo(t('auth.twoFactorKeyCancelled'))
       } else {
         showError(t('auth.twoFactorKeyFailed'))
@@ -445,6 +461,7 @@ export default function LoginPage() {
       // The provider enforces 2FA: the enrolled code is asked next.
       if (responseData.requires_2fa) {
         twoFactorFrom.current = 'ldap'
+        setRateLimit(null)
         setStep('2fa')
         setTwoFactorMethods(responseData.methods || ['totp'])
         setTotpCode('')
@@ -455,9 +472,9 @@ export default function LoginPage() {
       saveAuthMethod('ldap', selectedLdapProvider?.id)
       await login(username, null, responseData)
       showSuccess(t('auth.welcomeBackUser', { username }))
-      navigate('/dashboard')
+      navigate(landing)
     } catch (error) {
-      showError(error.message || t('auth.ldapFailed'))
+      if (!noteRateLimit(error)) showError(error.message || t('auth.ldapFailed'))
       setPassword('')
     } finally {
       setLoading(false)
@@ -518,6 +535,17 @@ export default function LoginPage() {
             }
           </p>
         </div>
+
+        {rateLimit && (
+          <div role="alert" className="rounded-lg border border-status-danger bg-bg-secondary p-3 text-sm text-text-primary">
+            <strong className="block">{t('auth.tooManyAttempts')}</strong>
+            <span className="text-text-secondary">
+              {rateLimit.retryAfter != null
+                ? t('auth.retryAfterSeconds', { seconds: rateLimit.retryAfter })
+                : t('auth.retryLater')}
+            </span>
+          </div>
+        )}
 
         {/* Step 1: Username */}
         {step === 'username' && (

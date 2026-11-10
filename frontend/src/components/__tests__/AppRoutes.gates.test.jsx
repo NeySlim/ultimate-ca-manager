@@ -37,7 +37,8 @@ vi.mock('../../pages/OverviewPage', () => ({ default: () => <div>dashboard-page<
 import { AppRoutes } from '../../App'
 
 function Where() {
-  return <div data-testid="where">{useLocation().pathname}</div>
+  const l = useLocation()
+  return <div data-testid="where">{l.pathname + l.search}</div>
 }
 
 function renderAt(path, state) {
@@ -59,6 +60,12 @@ describe('AppRoutes under the forced gates', () => {
     renderAt('/login/sso-complete', { forcePasswordChange: true })
     expect((await screen.findByTestId('where')).textContent).toBe('/')
     expect(screen.queryByText('login-page')).toBeNull()
+  })
+
+  it('sends a signed-out visitor to login carrying the page asked for', async () => {
+    renderAt('/acme?tab=orders', { isAuthenticated: false })
+    await screen.findByText('login-page')
+    expect(screen.getByTestId('where').textContent).toBe('/login?next=%2Facme%3Ftab%3Dorders')
   })
 
   it('mounts the pages once nothing is pending', async () => {
