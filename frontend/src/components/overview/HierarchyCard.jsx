@@ -28,6 +28,8 @@ function Node({ ca, kids, issued, t }) {
           <span className="block text-sm text-text-primary truncate">{ca.descr || ca.common_name || '–'}</span>
           <span className="block text-xs text-text-secondary">
             {ca.status && ca.status !== 'Active' ? `${ca.status} · ` : ''}
+            {ca.offline ? `${t('overview.hierarchy.offline')} · ` : ''}
+            {ca.cross_certificate_count > 0 ? `${t('overview.hierarchy.crossSigned')} · ` : ''}
             {t(ca.cdp_enabled ? 'overview.hierarchy.crlOn' : 'overview.hierarchy.crlOff')}
             {' · '}
             {t(ca.ocsp_enabled ? 'overview.hierarchy.ocspOn' : 'overview.hierarchy.ocspOff')}

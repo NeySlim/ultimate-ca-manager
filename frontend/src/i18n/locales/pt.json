@@ -6049,7 +6049,9 @@
       "crlOff": "CRL off",
       "ocspOn": "OCSP on",
       "ocspOff": "OCSP off",
-      "issued7d": "Issued, 7 days:"
+      "issued7d": "Issued, 7 days:",
+      "offline": "Offline",
+      "crossSigned": "Cross-signed"
     },
     "horizon": {
       "expiring": "Expiring",

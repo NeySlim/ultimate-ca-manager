@@ -119,3 +119,20 @@ describe('missing figures read as a dash on every card', () => {
     expect((await screen.findByText('overview.horizon.expiring')).parentElement.textContent).toContain('–')
   })
 })
+
+describe('hierarchy card', () => {
+  it('marks an offline CA and a cross-signed one, and no other', async () => {
+    api.getAll.mockResolvedValue({ data: [
+      { id: 1, refid: 'r', descr: 'Root', offline: true, offline_label: 'Offline', cross_certificate_count: 0 },
+      { id: 2, refid: 's', descr: 'Sub', parent_id: 1, offline: false, offline_label: null, cross_certificate_count: 2 },
+      { id: 3, refid: 't', descr: 'Plain', parent_id: 1, offline: false, cross_certificate_count: 0 },
+    ], meta: { total: 3 } })
+    show(<HierarchyCard />)
+    const line = async (name) => (await screen.findByText(name)).closest('a').textContent
+    expect(await line('Root')).toContain('overview.hierarchy.offline')
+    expect(await line('Root')).not.toContain('overview.hierarchy.crossSigned')
+    expect(await line('Sub')).toContain('overview.hierarchy.crossSigned')
+    expect(await line('Sub')).not.toContain('overview.hierarchy.offline')
+    expect(await line('Plain')).not.toMatch(/offline|crossSigned/)
+  })
+})
