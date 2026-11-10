@@ -12,6 +12,8 @@ tech debt.
 """
 import base64
 import logging
+
+from flask import g, has_app_context
 import re
 
 from cryptography import x509
@@ -547,7 +549,11 @@ def _template_key_type(template, ca_id=None):
     try:
         return default_issue_key_type(ca_id, template_id=template.id)
     except PolicyViolation as exc:
-        logger.warning("WSTEP: template %r left out: %s", template.name, exc)
+        # One line per template and request: the filter, label and refusal helpers all ask
+        seen = g.setdefault('_wstep_left_out', set()) if has_app_context() else set()
+        if template.id not in seen:
+            seen.add(template.id)
+            logger.warning("WSTEP: template %r left out: %s", template.name, exc)
         return None
 
 

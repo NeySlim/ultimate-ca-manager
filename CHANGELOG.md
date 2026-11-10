@@ -13,6 +13,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Breaking: the SCEP CertRep is signed with the digest of the client's request when the CA key allows it, never below the key's own (SHA-384 under a P-384 CA, where it was always SHA-256); #397.
 - Requests that name no key or hash follow one default on every issuance path: without a profile or policy it stays RSA-2048 with SHA-256, a profile or policy that refuses it moves to the first accepted type (RSA-3072, EC-P256, EC-P384) or answers 400 when none is. The hash follows the signing key, and a new intermediate CA never takes a hash below its parent's key or its own; #397.
+- Templates: a fresh installation seeds the same system template list an upgrade completes (eight templates, Client Authentication and VPN Client among them) instead of an older seven-entry list.
 
 ### Fixed
 

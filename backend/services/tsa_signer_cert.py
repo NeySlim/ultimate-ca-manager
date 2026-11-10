@@ -33,7 +33,7 @@ from services.tsa_service import TSA_SIGNER_FAMILIES
 from utils.datetime_utils import cert_not_before, utc_now
 from utils.db_transaction import safe_commit
 from utils import key_algorithms
-from utils.key_type import issue_key_size, parse_issue_key_type
+from utils.key_type import issue_key_size, names_its_key, parse_issue_key_type
 from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
@@ -71,10 +71,14 @@ def _generate_key(key_type, key_size, curve, ca_id=None):
         raise TsaSignerIssueError(
             'An EC key needs a curve: pass curve (P-256, P-384 or P-521, or outside FIPS mode '
             'brainpoolP256r1, brainpoolP384r1 or brainpoolP512r1)', 400)
+    # The default is only looked up when the request leaves its key unnamed
+    # (a curve names an EC key, so no size default applies then).
     try:
-        normalized = parse_issue_key_type(key_type or DEFAULT_KEY_TYPE,
-                                          issue_key_size(key_type, key_size, lambda: default_key_size(ca_id)),
-                                          curve=curve)
+        if names_its_key(key_type, key_size, curve):
+            size = key_size or None
+        else:
+            size = issue_key_size(key_type, key_size, lambda: default_key_size(ca_id))
+        normalized = parse_issue_key_type(key_type or DEFAULT_KEY_TYPE, size, curve=curve)
     except ValueError as exc:
         raise TsaSignerIssueError(str(exc), 400)
     alg = key_algorithms.get(normalized)

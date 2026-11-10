@@ -92,11 +92,14 @@ def test_approved_request_of_the_only_allowed_key(app, create_ca, only):
         db.session.commit()
 
 
-def test_tsa_signer_of_the_only_allowed_key(auth_client, create_ca, only, tsa_settings):
+@pytest.mark.parametrize('allowed, body', [
+    ('RSA-4096', {'key_type': 'rsa', 'key_size': '4096'}),
+    ('EC-P521', {'key_type': 'ec', 'curve': 'P-521'}),  # the form the route's own error asks for
+])
+def test_tsa_signer_of_the_only_allowed_key(auth_client, create_ca, only, tsa_settings, allowed, body):
     ca = create_ca(cn=f'Named key TSA CA {uuid.uuid4().hex[:6]}')
-    only(['RSA-4096'], ca_id=ca['id'])
-    r = _post(auth_client, '/api/v2/tsa/signer-certificate',
-              {'ca_id': ca['id'], 'select': False, 'key_type': 'rsa', 'key_size': '4096'})
+    only([allowed], ca_id=ca['id'])
+    r = _post(auth_client, '/api/v2/tsa/signer-certificate', {'ca_id': ca['id'], 'select': False, **body})
     assert r.status_code == 200, r.get_json()
 
 

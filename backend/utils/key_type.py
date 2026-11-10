@@ -150,7 +150,8 @@ def issue_key_size(key_type, key_size, default):
 
 
 def names_its_key(key_type, key_size, curve=None) -> bool:
-    """True when a request names its key and its parameter (size, curve or full label)."""
+    """True when a request names its key: a size, a curve for an EC family, or a label
+    that carries its own parameter ('ML-DSA-65'); bare 'rsa' or 'ec' does not."""
     if not key_type:
         return False
     if key_size not in (None, '') or (curve and _request_family(key_type) == 'EC'):
