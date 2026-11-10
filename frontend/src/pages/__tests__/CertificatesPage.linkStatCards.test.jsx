@@ -114,4 +114,17 @@ describe('CertificatesPage: status cards in a link view', () => {
     const presets = JSON.parse(window.localStorage.getItem('ucm-certs-presets'))
     expect(presets[0].filters.status).toEqual(['expiring'])
   })
+
+  it('Clear filters of the table in a link view leaves the stored filters alone', async () => {
+    window.localStorage.setItem('ucm-filter-certs-status', JSON.stringify(['revoked']))
+    window.localStorage.setItem('ucm-filter-certs-ca', JSON.stringify(['1']))
+    renderAt('/certificates?status=expiring&key_algo_prefix=RSA')
+    await waitFor(() => expect(lastParams().status).toEqual(['expiring']))
+    const buttons = screen.getAllByText('table.clearFilters')
+    fireEvent.click(buttons[buttons.length - 1])
+    await settle()
+    expect(JSON.parse(window.localStorage.getItem('ucm-filter-certs-status'))).toEqual(['revoked'])
+    expect(JSON.parse(window.localStorage.getItem('ucm-filter-certs-ca'))).toEqual(['1'])
+    expect(screen.getByTestId('where').textContent).toContain('key_algo_prefix=RSA')
+  })
 })

@@ -478,17 +478,20 @@ export default function CertificatesPage() {
     return baseStats
   }, [certStats, orphanCount, t])
   
+  // A link view edits the link's own statuses in the URL; the saved ones stay untouched
+  const setUrlStatus = useCallback((next) => {
+    const params = new URLSearchParams(withoutFilter(location.search, 'status'))
+    next.forEach((v) => params.append('status', v))
+    const qs = params.toString()
+    navigate({ pathname: location.pathname, search: qs ? `?${qs}` : '' }, { replace: true })
+  }, [location.pathname, location.search, navigate])
+
   // Handle stat click to filter
   const handleStatClick = useCallback((filterValue) => {
     setPage(1) // Reset to first page when filtering
     if (linkView) {
-      // The card edits the link's own status filter; the saved one stays untouched
-      const next = filterValue === '' ? []
-        : urlStatus.includes(filterValue) ? urlStatus.filter((v) => v !== filterValue) : [...urlStatus, filterValue]
-      const params = new URLSearchParams(withoutFilter(location.search, 'status'))
-      next.forEach((v) => params.append('status', v))
-      const qs = params.toString()
-      navigate({ pathname: location.pathname, search: qs ? `?${qs}` : '' }, { replace: true })
+      setUrlStatus(filterValue === '' ? []
+        : urlStatus.includes(filterValue) ? urlStatus.filter((v) => v !== filterValue) : [...urlStatus, filterValue])
     } else if (filterValue === '') {
       setFilterStatus([]) // "Total" clears all
     } else {
@@ -499,7 +502,7 @@ export default function CertificatesPage() {
         return [...prev, filterValue]
       })
     }
-  }, [linkView, urlStatus, location.pathname, location.search, navigate])
+  }, [linkView, urlStatus, setUrlStatus])
   
   // Handle sort change (server-side)
   const handleSortChange = useCallback((newSort) => {
@@ -573,7 +576,11 @@ export default function CertificatesPage() {
       type: 'multiSelect',
       // A link view shows (and a preset saves) the link's statuses, not the stored ones it sets aside
       value: linkView ? urlStatus : savedStatus,
-      onChange: (val) => { setPage(1); leaveLink(); setFilterStatus(val) },
+      onChange: (val) => {
+        setPage(1)
+        if (linkView) setUrlStatus(val)
+        else setFilterStatus(val)
+      },
       placeholder: t('common.allStatus'),
       options: [
         { value: 'valid', label: t('common.valid') },
@@ -588,7 +595,7 @@ export default function CertificatesPage() {
       label: t('common.issuer'),
       type: 'multiSelect',
       value: savedCA,
-      onChange: (val) => { setPage(1); leaveLink(); setFilterCA(val) },
+      onChange: (val) => { if (linkView && val.length === 0) return; setPage(1); leaveLink(); setFilterCA(val) },
       placeholder: t('common.allCAs'),
       options: cas.map(ca => ({
         value: String(ca.id),
@@ -600,7 +607,7 @@ export default function CertificatesPage() {
       label: t('certificates.source'),
       type: 'multiSelect',
       value: savedSource,
-      onChange: (val) => { setPage(1); leaveLink(); setFilterSource(val) },
+      onChange: (val) => { if (linkView && val.length === 0) return; setPage(1); leaveLink(); setFilterSource(val) },
       placeholder: t('certificates.allSources'),
       options: (certStats.sources || []).map(src => ({
         value: src,
@@ -612,13 +619,13 @@ export default function CertificatesPage() {
       label: t('certificates.template'),
       type: 'multiSelect',
       value: savedTemplate,
-      onChange: (val) => { setPage(1); leaveLink(); setFilterTemplate(val) },
+      onChange: (val) => { if (linkView && val.length === 0) return; setPage(1); leaveLink(); setFilterTemplate(val) },
       placeholder: t('certificates.allTemplates'),
       options: [
         { value: 'modified', label: t('certificates.modifiedFromTemplate') }
       ]
     }
-  ], [linkView, urlStatus, savedStatus, savedCA, savedSource, savedTemplate, leaveLink, certStats.sources, cas, t])
+  ], [linkView, urlStatus, savedStatus, savedCA, savedSource, savedTemplate, leaveLink, setUrlStatus, certStats.sources, cas, t])
 
   const activeFilters = (savedStatus.length > 0 ? 1 : 0) + (savedCA.length > 0 ? 1 : 0) + (savedSource.length > 0 ? 1 : 0) + (savedTemplate.length > 0 ? 1 : 0)
 
