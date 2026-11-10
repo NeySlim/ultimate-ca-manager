@@ -306,3 +306,5 @@ class SAMLMessageId(db.Model):
     message_id = db.Column(db.String(256), nullable=False)
     provider_id = db.Column(db.Integer, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False, index=True)
+    # AuthnRequest only: the page this login returns to, checked by sso.return_path.
+    next_path = db.Column(db.String(512))

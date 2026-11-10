@@ -2,7 +2,7 @@ from . import bp, VALID_ROLES
 from .helpers import (_get_ssl_verify, _cleanup_ssl_verify, _parse_json_field,
                       _extract_saml_groups, oidc_identity, saml_identity)
 from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
-from . import saml_sp
+from . import return_path, saml_sp
 from onelogin.saml2.constants import OneLogin_Saml2_Constants
 from flask import request, redirect, session, Response, after_this_request
 from auth.unified import require_auth
@@ -56,6 +56,14 @@ def _reject_oidc_login(provider, reason):
     except Exception as audit_error:
         logger.error("Failed to audit OIDC login rejection: %s", audit_error)
     return redirect('/login?error=invalid_credentials')
+
+
+def _sso_complete(next_path):
+    """Landing of a successful SSO login, carrying the page to return to when it is still valid."""
+    next_path = return_path.safe_next(next_path)
+    if not next_path:
+        return '/login/sso-complete'
+    return '/login/sso-complete?' + urllib.parse.urlencode({'next': next_path})
 
 
 # Shown as "the login expired or was started elsewhere, start again".
@@ -213,6 +221,11 @@ def initiate_sso_login(provider_type):
     state = py_secrets.token_urlsafe(32)
     session['sso_state'] = state
     session['sso_provider_id'] = provider.id
+    # The page to return to stays server side with this login's transaction, never sent to the IdP.
+    next_path = return_path.safe_next(request.args.get('next'))
+    session.pop('sso_next', None)
+    if next_path and provider.provider_type == 'oauth2':
+        session['sso_next'] = next_path
 
     if provider.provider_type == 'oauth2':
         # Build OAuth2 / OIDC authorization URL with PKCE (RFC 7636) + nonce
@@ -248,7 +261,7 @@ def initiate_sso_login(provider_type):
             saml_auth = _get_saml_auth(request, provider, state, sign_request=True)
             redirect_url = saml_auth.login()
             request_id = saml_auth.get_last_request_id()
-            saml_sp.remember_request(request_id, provider.id)
+            saml_sp.remember_request(request_id, provider.id, next_path)
             response = redirect(redirect_url)
             saml_sp.set_request_cookie(response, request_id, saml_sp.sp_base_url(request))
             return response
@@ -275,6 +288,8 @@ def sso_callback(provider_type):
 
     # Verify state for CSRF protection (OAuth2 only — SAML uses its own mechanisms)
     if provider_type == 'oauth2':
+        # Spent by any return, used only by a successful one.
+        oauth2_next = session.pop('sso_next', None)
         state = request.args.get('state')
         stored_state = session.get('sso_state', '')
         if not state or not hmac.compare_digest(state, stored_state):
@@ -441,7 +456,7 @@ def sso_callback(provider_type):
             )
 
             # Redirect to app (session cookie is set automatically)
-            return redirect('/login/sso-complete')
+            return redirect(_sso_complete(oauth2_next))
 
         except Exception as e:
             logger.error(f"OAuth2 callback error: {e}\n{traceback.format_exc()}")
@@ -519,17 +534,20 @@ def sso_callback(provider_type):
 
             # python3-saml matched InResponseTo against request_id when both exist.
             in_response_to = saml_auth.get_last_response_in_response_to()
+            saml_next = None
             if in_response_to is None:
                 if not provider.saml_allow_idp_initiated:
                     return _reject_saml_login(provider, 'unsolicited response (IdP-initiated login is disabled)')
             elif request_id is None:
                 return _reject_saml_login(provider, 'InResponseTo matches no AuthnRequest from this browser',
                                           SAML_LOGIN_EXPIRED)
-            elif not saml_sp.take_request(request_id, provider.id):
-                drop_cookie.append(True)
-                return _reject_saml_login(provider, 'unknown, expired or already used AuthnRequest',
-                                          SAML_LOGIN_EXPIRED)
             else:
+                # Read before the take: only the response that consumes the request uses it.
+                saml_next = saml_sp.request_next_path(request_id, provider.id)
+                if not saml_sp.take_request(request_id, provider.id):
+                    drop_cookie.append(True)
+                    return _reject_saml_login(provider, 'unknown, expired or already used AuthnRequest',
+                                              SAML_LOGIN_EXPIRED)
                 drop_cookie.append(True)
 
             not_on_or_after = saml_auth.get_last_assertion_not_on_or_after()
@@ -632,7 +650,7 @@ def sso_callback(provider_type):
                 username=user.username
             )
 
-            return redirect('/login/sso-complete')
+            return redirect(_sso_complete(saml_next))
 
         except Exception as e:
             logger.error(f"SAML callback error: {e}\n{traceback.format_exc()}")
