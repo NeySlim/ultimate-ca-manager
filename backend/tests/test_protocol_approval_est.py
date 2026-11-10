@@ -280,3 +280,46 @@ def test_an_approved_enrolment_whose_certificate_went_away_is_refused(app, clien
         (_id, status, data, _cert), = requests_of(app, pid, 'est_enroll')
         assert status == 'rejected' and data['delivered_at']
         _held(_enroll(client, csr))
+
+
+def _failing_response(monkeypatch):
+    import api.est_protocol as est
+
+    def broken(*a, **k):
+        raise RuntimeError('response could not be built')
+    real = est._certs_only_response
+    monkeypatch.setattr(est, '_certs_only_response', broken)
+    return lambda: monkeypatch.setattr(est, '_certs_only_response', real)
+
+
+def test_an_enrolment_answer_that_fails_is_not_marked_delivered(app, client, auth_client, est_config,
+                                                                 monkeypatch):
+    with approval_policy(app, est_config['id'], 'est-held-answer-fails') as pid:
+        csr, _ = _make_csr(common_name='answer-fails.est-approval.test')
+        _held(_enroll(client, csr))
+        (approval_id, *_), = requests_of(app, pid, 'est_enroll')
+        approve(auth_client, approval_id)
+        restore = _failing_response(monkeypatch)
+        assert _enroll(client, csr).status_code != 200
+        restore()
+        (_id, status, data, _cert), = requests_of(app, pid, 'est_enroll')
+        assert status == 'approved' and not data.get('delivered_at')
+        _cert_of(_enroll(client, csr))
+
+
+def test_a_reenrolment_answer_that_fails_is_not_marked_delivered(app, client, auth_client, est_config,
+                                                                  monkeypatch):
+    csr, key = _make_csr(common_name='reanswer-fails.est-approval.test')
+    leaf = _cert_of(_enroll(client, csr))
+    client_pem = leaf.public_bytes(serialization.Encoding.PEM).decode()
+    renewal = x509.CertificateSigningRequestBuilder().subject_name(leaf.subject).sign(key, hashes.SHA256())
+    with approval_policy(app, est_config['id'], 'est-held-reanswer-fails') as pid:
+        _held(_post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem))
+        (approval_id, *_), = requests_of(app, pid, 'est_enroll')
+        approve(auth_client, approval_id)
+        restore = _failing_response(monkeypatch)
+        assert _post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem).status_code != 200
+        restore()
+        (_id, status, data, _cert), = requests_of(app, pid, 'est_enroll')
+        assert status == 'approved' and not data.get('delivered_at')
+        _cert_of(_post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem))

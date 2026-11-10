@@ -679,9 +679,11 @@ def _approved_delivery(ca, csr, operation, identity):
     row = db.session.get(Certificate, approval.certificate_id)
     if row is None or not row.crt:
         return None
-    protocol_approval.mark_delivered(approval)
     cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt), default_backend())
-    return _certs_only_response(cert, ca=ca)
+    # Built first: an answer that cannot be built leaves the delivery to the next retry
+    response = _certs_only_response(cert, ca=ca)
+    protocol_approval.mark_delivered(approval)
+    return response
 
 
 def _approval_gate(ca, csr, operation, identity, extra=None):
@@ -720,8 +722,9 @@ def _approval_gate(ca, csr, operation, identity, extra=None):
             protocol_approval.mark_delivered(approval)
             return Response(protocol_approval.decision_reason(approval), status=403), None
         cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt), default_backend())
+        response = _certs_only_response(cert, ca=ca)
         protocol_approval.mark_delivered(approval)
-        return _certs_only_response(cert, ca=ca), None
+        return response, None
     logger.info('EST %s held for approval #%s', operation, approval.id)
     return Response(f'Request held for approval (#{approval.id}); retry later', status=202,
                     headers={'Retry-After': str(_retry_after_seconds())}), None
