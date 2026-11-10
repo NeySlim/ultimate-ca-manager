@@ -30,6 +30,10 @@ def test_without_ha_nothing_changes_pos(ha):
     assert 'passed' in _run(env).stdout
 
 
-def test_entrypoint_runs_the_check_before_generating_a_secret():
-    text = (ROOT / 'docker' / 'entrypoint.sh').read_text()
-    assert text.index('check_ha_secret || exit 1') < text.index('UCM_SECRET_KEY:=$(generate_secret)')
+def test_entrypoint_refuses_ha_without_secret_before_going_further_neg():
+    r = subprocess.run(['bash', str(ROOT / 'docker' / 'entrypoint.sh')],
+                       env={'PATH': '/usr/bin:/bin', 'UCM_HA': '1'},
+                       capture_output=True, text=True, timeout=30)
+    out = r.stdout + r.stderr
+    assert r.returncode != 0 and 'UCM_SECRET_KEY' in out
+    assert 'Validating configuration' not in out
