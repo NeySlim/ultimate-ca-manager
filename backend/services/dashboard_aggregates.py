@@ -170,12 +170,12 @@ def _queue_union(now, dialect):
         case((Certificate.valid_to < soon, _CRITICAL), else_=_WARNING).label('rank'),
         Certificate.id.label('id'), text_label(func.coalesce(func.nullif(Certificate.subject_cn, ''), Certificate.descr)).label('label'),
         due(Certificate.valid_to).label('due_at'),
-    ).where(*_manual_renewal_conditions(now, config)))
+    ).where(*renewal_conditions('manual_renewal_due', now, config, dialect)))
 
     cert_label = text_label(func.coalesce(func.nullif(Certificate.subject_cn, ''), Certificate.descr))
-    for kind, rank, conditions in (('client_renewal_overdue', _WARNING, _client_overdue_conditions(now)),
-                                   ('auto_renewal_blocked', _CRITICAL, _blocked_conditions(now, config, dialect)),
-                                   ('renewal_declined', _WARNING, _declined_conditions(now, config, dialect))):
+    for kind, rank in (('client_renewal_overdue', _WARNING), ('auto_renewal_blocked', _CRITICAL),
+                       ('renewal_declined', _WARNING)):
+        conditions = renewal_conditions(kind, now, config, dialect)
         parts.append(select(
             _const(kind).label('kind'), rank.label('rank'), Certificate.id.label('id'),
             cert_label.label('label'), due(Certificate.valid_to).label('due_at'),
@@ -344,7 +344,8 @@ def work_queue(session, limit, now=None, kinds=None):
         'label': _short_label(r.kind, r.label), 'due_at': utc_isoformat(r.due_at),
         'href_hint': _HREF[r.kind].format(id=r.id),
     } for r in rows]
-    return {'items': items, 'counts': counts, 'total': sum(counts.values())}
+    return {'items': items, 'counts': counts, 'total': sum(counts.values()),
+            'filter_hints': {kind: {'renewal': kind} for kind in RENEWAL_KINDS}}
 
 
 # ----------------------------------------------------------------- health
@@ -453,15 +454,126 @@ def protocol_health(session, days, now=None):
 
 # ------------------------------------------------------------- compliance
 
-def _lifetime_exceeds(session, days):
-    if session.get_bind().dialect.name == 'sqlite':
+def _lifetime_exceeds(dialect, days):
+    if dialect == 'sqlite':
         return func.julianday(Certificate.valid_to) - func.julianday(Certificate.valid_from) >= days + 1
     return Certificate.valid_to - Certificate.valid_from >= timedelta(days=days + 1)
 
 
-# Only hints the certificate list applies as given and that reproduce the counter
-# exactly; none does yet, the list keeping archived rows under every status
-COMPLIANCE_LIST_FILTERS = {}
+def live_conditions(now):
+    """The set every compliance counter is taken over (and the list's ``live`` filter)."""
+    return [holds_certificate(), Certificate.revoked.is_(False), _not_archived(),
+            or_(Certificate.valid_to.is_(None), Certificate.valid_to > now)]
+
+
+def weak_rsa_condition(bits=RSA_MIN_BITS):
+    return and_(Certificate.key_algo.like('RSA%'), Certificate.key_bits < bits)
+
+
+def weak_hash_condition(hashes=WEAK_SIG_HASHES):
+    return Certificate.sig_hash.in_(list(hashes))
+
+
+def server_condition():
+    templates = select(CertificateTemplate.id).where(CertificateTemplate.template_type == 'web_server')
+    return or_(Certificate.cert_type == 'server_cert', Certificate.template_id.in_(templates))
+
+
+def long_server_condition(dialect, days=SERVER_LIFETIME_MAX_DAYS):
+    return and_(server_condition(), lifetime_over_condition(dialect, days))
+
+
+def lifetime_over_condition(dialect, days):
+    return and_(Certificate.valid_from.isnot(None), Certificate.valid_to.isnot(None),
+                _lifetime_exceeds(dialect, days))
+
+
+def no_key_condition():
+    return _no_key()
+
+
+# Counter name -> list filter that reproduces it (the list ANDs ``live`` with the rest)
+COMPLIANCE_LIST_FILTERS = {
+    'rsa_below_3072': {'live': 'true', 'key_algo_prefix': 'RSA', 'key_bits_below': str(RSA_MIN_BITS)},
+    'weak_signature_hash': {'live': 'true', 'sig_hash': list(WEAK_SIG_HASHES)},
+    'server_lifetime_over_398_days': {'live': 'true', 'server': 'true',
+                                      'lifetime_over_days': str(SERVER_LIFETIME_MAX_DAYS)},
+    'incomplete_chain': {'live': 'true', 'incomplete_chain': 'true'},
+    'no_private_key': {'live': 'true', 'no_key': 'true'},
+}
+RENEWAL_KINDS = ('manual_renewal_due', 'client_renewal_overdue', 'auto_renewal_blocked', 'renewal_declined')
+
+
+def renewal_conditions(kind, now, config, dialect):
+    """The rows of one certificate queue kind: the queue and the list's ``renewal`` filter."""
+    if kind == 'manual_renewal_due':
+        return _manual_renewal_conditions(now, config)
+    if kind == 'client_renewal_overdue':
+        return _client_overdue_conditions(now)
+    if kind == 'auto_renewal_blocked':
+        return _blocked_conditions(now, config, dialect)
+    if kind == 'renewal_declined':
+        return _declined_conditions(now, config, dialect)
+    raise ValueError(kind)
+
+
+_BOOL = ('1', 'true', 'yes')
+LIST_FILTER_PARAMS = frozenset({'live', 'key_algo', 'key_algo_prefix', 'key_bits_below', 'sig_hash', 'server',
+                                'lifetime_over_days', 'no_key', 'incomplete_chain', 'renewal'})
+
+
+def certificate_list_conditions(args, dialect, now=None):
+    """Conditions for the list filters in *args* (a werkzeug MultiDict); ValueError on a bad value."""
+    now = now or utc_now()
+    conditions = []
+
+    def number(name):
+        raw = args.get(name)
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            raise ValueError(f'{name} must be a whole number') from None
+        if value < 0:
+            raise ValueError(f'{name} must not be negative')
+        return value
+
+    def flag(name):
+        raw = args.get(name)
+        if raw is None:
+            return False
+        if raw.lower() not in _BOOL + ('0', 'false', 'no'):
+            raise ValueError(f'{name} must be true or false')
+        return raw.lower() in _BOOL
+
+    if flag('live'):
+        conditions += live_conditions(now)
+    if flag('no_key'):
+        conditions.append(no_key_condition())
+    if flag('incomplete_chain'):
+        conditions.append(orphan_condition())
+    if flag('server'):
+        conditions.append(server_condition())
+    if 'key_algo' in args:
+        conditions.append(Certificate.key_algo.in_(args.getlist('key_algo')))
+    if 'key_algo_prefix' in args:
+        prefix = args.get('key_algo_prefix')
+        if not prefix.isalnum():
+            raise ValueError('key_algo_prefix must be alphanumeric')
+        conditions.append(Certificate.key_algo.like(f'{prefix}%'))
+    if 'key_bits_below' in args:
+        conditions.append(Certificate.key_bits < number('key_bits_below'))
+    if 'sig_hash' in args:
+        conditions.append(weak_hash_condition(args.getlist('sig_hash')))
+    if 'lifetime_over_days' in args:
+        conditions.append(lifetime_over_condition(dialect, number('lifetime_over_days')))
+    if 'renewal' in args:
+        kinds = args.getlist('renewal')
+        bad = [k for k in kinds if k not in RENEWAL_KINDS]
+        if bad:
+            raise ValueError(f"Unknown renewal kind: {', '.join(bad)}")
+        config = _renewal_config()
+        conditions.append(or_(*[and_(*renewal_conditions(k, now, config, dialect)) for k in kinds]))
+    return conditions
 
 
 def _list_filter(hint):
@@ -471,31 +583,22 @@ def _list_filter(hint):
 def compliance_summary(session, now=None):
     """Counters over the live issued certificates, each with the list filter it stands for."""
     now = now or utc_now()
-    live = [holds_certificate(), Certificate.revoked.is_(False), _not_archived(),
-            or_(Certificate.valid_to.is_(None), Certificate.valid_to > now)]
-    weak_rsa = and_(Certificate.key_algo.like('RSA%'), Certificate.key_bits < RSA_MIN_BITS)
-    weak_hash = Certificate.sig_hash.in_(WEAK_SIG_HASHES)
-    server = or_(Certificate.cert_type == 'server_cert', CertificateTemplate.template_type == 'web_server')
-    long_server = and_(server, Certificate.valid_from.isnot(None), Certificate.valid_to.isnot(None),
-                       _lifetime_exceeds(session, SERVER_LIFETIME_MAX_DAYS))
-    no_key = or_(Certificate.prv.is_(None), Certificate.prv == '')
+    dialect = session.get_bind().dialect.name
+    rules = {'rsa_below_3072': weak_rsa_condition(), 'weak_signature_hash': weak_hash_condition(),
+             'server_lifetime_over_398_days': long_server_condition(dialect),
+             'incomplete_chain': orphan_condition(), 'no_private_key': no_key_condition()}
     total = lambda cond: func.coalesce(func.sum(case((cond, 1), else_=0)), 0)  # noqa: E731
     row = session.execute(
-        select(func.count(), total(weak_rsa), total(weak_hash), total(long_server),
-               total(orphan_condition()), total(no_key))
-        .select_from(Certificate)
-        .outerjoin(CertificateTemplate, CertificateTemplate.id == Certificate.template_id)
-        .where(*live)).one()
-    algos = session.execute(select(Certificate.key_algo, func.count()).where(*live)
+        select(func.count(), *[total(c) for c in rules.values()])
+        .select_from(Certificate).where(*live_conditions(now))).one()
+    algos = session.execute(select(Certificate.key_algo, func.count()).where(*live_conditions(now))
                             .group_by(Certificate.key_algo).order_by(func.count().desc())).all()
-    counters = {'rsa_below_3072': row[1], 'weak_signature_hash': row[2],
-                'server_lifetime_over_398_days': row[3], 'incomplete_chain': row[4],
-                'no_private_key': row[5]}
     return {
         'total': row[0],
-        'by_key_algorithm': [{'key_algo': algo, 'count': n, **_list_filter(None)} for algo, n in algos],
-        'counters': {name: {'count': int(n), **_list_filter(COMPLIANCE_LIST_FILTERS.get(name))}
-                     for name, n in counters.items()},
+        'by_key_algorithm': [{'key_algo': algo, 'count': n, **_list_filter(
+            {'live': 'true', 'key_algo': algo} if algo is not None else None)} for algo, n in algos],
+        'counters': {name: {'count': int(n), **_list_filter(COMPLIANCE_LIST_FILTERS[name])}
+                     for name, n in zip(rules, row[1:])},
     }
 
 
