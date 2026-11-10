@@ -40,7 +40,7 @@ RESTART_RETRY_FIRST = 2.0
 RESTART_RETRY_MAX = 60.0
 RETENTION = timedelta(hours=24)
 # A starting process replays the reloads of this window (idempotent): one committed while it
-# read its settings is not lost. A restart in it, already committed then, never runs.
+# read its settings is not lost. A restart in it, committed before the first pass, never runs.
 START_REPLAY = timedelta(seconds=60)
 BATCH = 200
 
