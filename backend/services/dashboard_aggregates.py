@@ -424,29 +424,40 @@ def compliance_summary(session, now=None):
 
 # --------------------------------------------------------------- issuance
 
-def issuance(session, days, now=None):
-    """Certificates issued per CA and per UTC day, plus the total per source."""
-    now = now or utc_now()
-    start, dates = _window(days, now)
-    issued = [holds_certificate(), Certificate.created_at >= start]
-    day = func.date(Certificate.created_at)
-    rows = session.execute(
+def _per_ca_day(session, column, start):
+    """``(caref, ca id, ca name, day, count)`` of the rows whose ``column`` falls in the window."""
+    day = func.date(column)
+    return session.execute(
         select(Certificate.caref, CA.id, CA.descr, day, func.count())
         .select_from(Certificate).outerjoin(CA, CA.refid == Certificate.caref)
-        .where(*issued).group_by(Certificate.caref, CA.id, CA.descr, day)).all()
+        .where(holds_certificate(), column >= start)
+        .group_by(Certificate.caref, CA.id, CA.descr, day)).all()
+
+
+def issuance(session, days, now=None):
+    """Per CA and per UTC day, certificates issued (``created_at``) and renewed in
+    place (``renewed_at``); the total per source counts issuances only."""
+    now = now or utc_now()
+    start, dates = _window(days, now)
     source = func.coalesce(Certificate.source, 'manual')
     by_source = {s: n for s, n in session.execute(
-        select(source, func.count()).where(*issued).group_by(source))}
+        select(source, func.count()).where(holds_certificate(), Certificate.created_at >= start)
+        .group_by(source))}
     per_ca = {}
-    for caref, ca_id, name, d, n in rows:
-        entry = per_ca.setdefault(caref, {'caref': caref, 'ca_id': ca_id, 'ca_name': name, 'counts': {}})
-        entry['counts'][_day(d)] = n
+    for counter, column in (('issued', Certificate.created_at), ('renewed', Certificate.renewed_at)):
+        for caref, ca_id, name, d, n in _per_ca_day(session, column, start):
+            entry = per_ca.setdefault(caref, {'caref': caref, 'ca_id': ca_id, 'ca_name': name,
+                                              'issued': {}, 'renewed': {}})
+            entry[counter][_day(d)] = n
     by_ca = []
     for entry in per_ca.values():
-        counts = entry.pop('counts')
-        entry['periods'] = [{'date': d, 'count': counts.get(d, 0)} for d in dates]
-        entry['total'] = sum(counts.values())
+        issued, renewed = entry.pop('issued'), entry.pop('renewed')
+        entry['periods'] = [{'date': d, 'issued': issued.get(d, 0), 'renewed': renewed.get(d, 0)}
+                            for d in dates]
+        entry['issued'], entry['renewed'] = sum(issued.values()), sum(renewed.values())
+        entry['total'] = entry['issued'] + entry['renewed']
         by_ca.append(entry)
     by_ca.sort(key=lambda e: (-e['total'], e['ca_name'] or ''))
     return {'days': days, 'from': dates[0], 'to': dates[-1], 'by_ca': by_ca,
-            'by_source': by_source, 'total': sum(by_source.values())}
+            'by_source': by_source, 'total': sum(by_source.values()),
+            'renewed': sum(e['renewed'] for e in by_ca)}

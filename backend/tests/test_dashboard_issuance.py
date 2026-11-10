@@ -38,6 +38,9 @@ def two_cas(app):
                 (cas[1], 2, 'scep'), (cas[1], 10, 'scep')]
         certs = [Certificate(refid=str(uuid.uuid4()), descr='issuance', caref=ca.refid, crt=pem,
                              source=source, created_at=noon(d)) for ca, d, source in plan]
+        # renewed in place today: a renewal on that day, not an issuance
+        certs.append(Certificate(refid=str(uuid.uuid4()), descr='issuance-renewed', caref=cas[1].refid,
+                                 crt=pem, source='manual', created_at=noon(20), renewed_at=noon(0)))
         # a pending request is not an issuance
         certs.append(Certificate(refid=str(uuid.uuid4()), descr='issuance-csr', caref=cas[0].refid,
                                  csr='-', created_at=noon(0)))
@@ -60,11 +63,16 @@ def test_per_ca_per_day_with_zeros_and_per_source(auth_client, two_cas):
     assert (first['ca_id'], first['ca_name']) == (ids['cas'][0], 'issuance-ca-0')
     expected_first = {noon(0).date().isoformat(): 2, noon(2).date().isoformat(): 1,
                       noon(4).date().isoformat(): 1}
-    assert first['periods'] == [{'date': d, 'count': expected_first.get(d, 0)} for d in dates]
-    assert first['total'] == 4
-    assert second['total'] == 1  # the one ten days back is outside the window
+    assert first['periods'] == [{'date': d, 'issued': expected_first.get(d, 0), 'renewed': 0} for d in dates]
+    assert (first['issued'], first['renewed'], first['total']) == (4, 0, 4)
+    # the one ten days back is outside the window
+    assert (second['issued'], second['renewed'], second['total']) == (1, 1, 2)
     assert [p['date'] for p in second['periods']] == dates
-    assert data['total'] >= first['total'] + second['total'] == 5
+    today = noon(0).date().isoformat()
+    assert next(p for p in second['periods'] if p['date'] == today) == {'date': today, 'issued': 0, 'renewed': 1}
+    # the per-source total counts issuances only
+    assert data['total'] >= first['issued'] + second['issued'] == 5
+    assert data['renewed'] >= 1
 
 
 def test_sources_are_totalled_and_null_reads_as_manual(app, auth_client):
