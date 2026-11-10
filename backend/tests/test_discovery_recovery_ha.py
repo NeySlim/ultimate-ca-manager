@@ -94,10 +94,11 @@ def test_a_scan_records_the_node_that_runs_it(app, runs, monkeypatch):
 
 
 def test_a_starting_ha_node_fails_its_own_runs_left_by_its_previous_process(app, runs, monkeypatch):
-    """The web process of a node starts before its workers: no run of that node can be alive."""
+    """The gunicorn master starts before its workers: no run of that node can be alive."""
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.setattr(Config, 'NODE_ID', NODE + 'self')
-    monkeypatch.delenv('UCM_SCHEDULER_SUPERVISED', raising=False)
+    monkeypatch.setenv('UCM_SCHEDULER_SUPERVISED', '1')  # set by gunicorn_config before preload
+    monkeypatch.delenv('UCM_SCHEDULER_PROCESS', raising=False)
     own = runs(NODE + 'self', 'manual')
     other = runs(NODE + 'other', 'manual')
     DiscoverySchedulerTask.register(SchedulerService(wake_interval=60), app)
@@ -108,6 +109,7 @@ def test_the_scheduler_process_leaves_the_runs_of_live_web_workers_alone(app, ru
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.setattr(Config, 'NODE_ID', NODE + 'self')
     monkeypatch.setenv('UCM_SCHEDULER_SUPERVISED', '1')
+    monkeypatch.setenv('UCM_SCHEDULER_PROCESS', '1')
     own = runs(NODE + 'self', 'manual')
     DiscoverySchedulerTask.register(SchedulerService(wake_interval=60), app)
     assert status(own) == 'running'
@@ -119,7 +121,8 @@ def test_each_pass_fails_the_runs_of_nodes_gone_since_takeover(app, runs, monkey
     from services.discovery_service import DiscoveryService
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.setattr(Config, 'NODE_ID', NODE + 'leader')
-    monkeypatch.setenv('UCM_SCHEDULER_SUPERVISED', '1')  # the leader's scheduler process
+    monkeypatch.setenv('UCM_SCHEDULER_SUPERVISED', '1')
+    monkeypatch.setenv('UCM_SCHEDULER_PROCESS', '1')  # the leader's scheduler process
     now = utc_now()
     for name, seen in (('leader', now), ('alive', now), ('gone', now - timedelta(hours=1))):
         db.session.add(ClusterNode(node_id=NODE + name, started_at=seen, heartbeat_at=seen))

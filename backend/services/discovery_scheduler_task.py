@@ -20,8 +20,8 @@ class DiscoverySchedulerTask:
         from utils.ha import ha_enabled
         task = DiscoverySchedulerTask.execute
         if ha_enabled():
+            import os
             from config.settings import Config
-            from services.scheduler_service import supervised
             node_id = Config.NODE_ID
 
             def recover_after_takeover():
@@ -37,8 +37,9 @@ class DiscoverySchedulerTask:
                     live_nodes=fresh_node_ids(scheduler.wake_interval) | {node_id})
                 DiscoverySchedulerTask.execute()
             task = recover_then_execute
-            if not supervised():
-                # The web process starts before its workers: no run of this node is alive yet
+            if os.environ.get('UCM_SCHEDULER_PROCESS') != '1':
+                # The web process (gunicorn master included) starts before its workers:
+                # no run of this node is alive yet; only the scheduler child skips this
                 with app.app_context():
                     DiscoverySchedulerTask.recover_stale_runs(own_node=node_id)
         else:
