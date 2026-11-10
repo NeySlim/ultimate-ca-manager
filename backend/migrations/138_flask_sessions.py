@@ -1,8 +1,9 @@
 """Migration 138: the server-side session table of the SQL store.
 
-Same shape as the table Flask-Session 0.8 creates itself (``flask_sessions``):
-used on PostgreSQL without Redis, so a session opened on one node is valid on
-the others. Created on PostgreSQL only: SQLite installs keep their sessions in files.
+Same shape as the table Flask-Session 0.8 creates itself (``flask_sessions``).
+SQLite: nothing is done, sessions stay in files. Existing PostgreSQL: table and
+expiry index are created here. New PostgreSQL: Flask-Session creates the table
+and ``app.py`` adds the expiry index at startup.
 """
 import logging
 import sqlite3
