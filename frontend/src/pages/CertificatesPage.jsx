@@ -24,6 +24,8 @@ import { certificatesService, casService, truststoreService } from '../services'
 import { useNotification, useMobile, useWindowManager } from '../contexts'
 import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
 import { extractCN, cn, certificateNames, isOnHold } from '../lib/utils'
+import { parseOverviewFilters, toListParams, withoutFilter } from '../lib/overviewFilters'
+import { FilterChips } from '../components/ui/FilterChips'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { IssueCertificateForm } from './certificates/IssueCertificateForm'
@@ -99,6 +101,29 @@ export default function CertificatesPage() {
   const [filterTemplate, setFilterTemplate] = usePersistedState('ucm-filter-certs-template', [])
   const [searchValue, setSearchValue] = useState('')
 
+  // Filters carried by overview links: the URL is their only state, so removing one rewrites it
+  const urlFilters = useMemo(() => parseOverviewFilters(location.search), [location.search])
+  const urlFiltersKey = JSON.stringify(urlFilters)
+  const overviewChips = useMemo(() => {
+    const byKey = {}
+    for (const [key, value] of urlFilters) (byKey[key] = byKey[key] || []).push(value)
+    return Object.entries(byKey).map(([key, value]) => ({
+      key, value, label: t(`overview.filter.${key}`),
+      optionLabels: Object.fromEntries(value.map((v) => [v, t(`overview.filterValue.${v}`, { defaultValue: v })])),
+    }))
+  }, [urlFilters, t])
+  const removeUrlFilter = useCallback((key, value) => {
+    setPage(1)
+    navigate({ pathname: location.pathname, search: withoutFilter(location.search, key, value) }, { replace: true })
+  }, [location.pathname, location.search, navigate])
+  // An overview link shows exactly what its counter counts: saved filters step aside
+  useEffect(() => {
+    if (urlFilters.length === 0) return
+    setPage(1)
+    setFilterStatus([]); setFilterCA([]); setFilterSource([]); setFilterTemplate([]); setSearchValue('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlFiltersKey])
+
   // Apply filter preset callback
   const handleApplyFilterPreset = useCallback((filters) => {
     setPage(1) // Reset to first page when applying preset
@@ -150,6 +175,7 @@ export default function CertificatesPage() {
         params.template_modified = 'true'
       }
       if (searchValue) params.search = searchValue
+      Object.assign(params, toListParams(urlFilters))
       
       const [certsRes, casRes, statsRes] = await Promise.all([
         certificatesService.getAll(params),
@@ -174,7 +200,7 @@ export default function CertificatesPage() {
       if (seq === requestSeq.current) setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), JSON.stringify(filterSource), JSON.stringify(filterTemplate), sortBy, sortOrder, searchValue, showError, t])
+  }, [page, perPage, JSON.stringify(filterStatus), JSON.stringify(filterCA), JSON.stringify(filterSource), JSON.stringify(filterTemplate), urlFiltersKey, sortBy, sortOrder, searchValue, showError, t])
 
   // Load data - reload when filters or sort change
   useEffect(() => {
@@ -680,6 +706,11 @@ export default function CertificatesPage() {
         )}
         onSlideOverClose={() => setSelectedCert(null)}
       >
+        <FilterChips
+          filters={overviewChips}
+          onRemove={removeUrlFilter}
+          onClearAll={() => navigate({ pathname: location.pathname, search: '' }, { replace: true })}
+        />
         <ResponsiveDataTable
           data={filteredCerts}
           columns={columns}

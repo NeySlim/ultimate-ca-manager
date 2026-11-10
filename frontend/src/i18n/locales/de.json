@@ -5958,5 +5958,96 @@
     "duplicateOid": "Diese OID ist bereits aufgeführt",
     "fixErrors": "Korrigieren Sie zuerst die benutzerdefinierten Erweiterungen",
     "storedInvalid": "Die gespeicherten benutzerdefinierten Erweiterungen sind ungültig: Ausstellungen aus dieser Vorlage werden abgelehnt, bis sie korrigiert oder geleert sind."
+  },
+  "overview": {
+    "title": "Overview",
+    "allHidden": "All cards are hidden. Pick a preset to show them again.",
+    "presets": {
+      "label": "Layout presets",
+      "operator": "Operator",
+      "manager": "Manager",
+      "all": "All cards"
+    },
+    "cards": {
+      "queue": "To handle",
+      "health": "Automation health",
+      "compliance": "Compliance",
+      "issuance": "Issuance",
+      "expiry": "Expiry",
+      "authorities": "Authorities"
+    },
+    "state": {
+      "loading": "Loading...",
+      "error": "This card could not be loaded.",
+      "retry": "Retry",
+      "forbidden": "You do not have access to this card.",
+      "empty": "Nothing to show."
+    },
+    "queue": {
+      "fold": "Fold the totals per kind",
+      "unfold": "Show the totals per kind",
+      "perKind": "Totals per kind"
+    },
+    "kind": {
+      "acme_order_failed": "ACME order failed",
+      "acme_client_renewal_failed": "ACME client renewal failed",
+      "approval_pending": "Approval pending",
+      "scep_request_pending": "SCEP request pending",
+      "key_recovery_pending": "Key recovery pending",
+      "crl_due": "CRL due",
+      "crl_missing": "CRL missing",
+      "manual_renewal_due": "Manual renewal due",
+      "client_renewal_overdue": "Client renewal overdue",
+      "auto_renewal_blocked": "Auto-renewal blocked",
+      "renewal_declined": "Renewal declined",
+      "ca_expiring": "CA expiring"
+    },
+    "compliance": {
+      "rsa_below_3072": "RSA below 3072 bits",
+      "weak_signature_hash": "Weak signature hash",
+      "server_lifetime_over_398_days": "Server certificates over 398 days",
+      "incomplete_chain": "Incomplete chain",
+      "no_private_key": "No private key",
+      "byAlgorithm": "Key algorithms",
+      "unknownAlgo": "Unknown"
+    },
+    "health": {
+      "acme": "ACME",
+      "scep": "SCEP",
+      "est": "EST",
+      "scheduler": "Scheduler",
+      "tasks": "Tasks"
+    },
+    "issuance": {
+      "issued": "Issued",
+      "renewed": "Renewed",
+      "bySource": "By source",
+      "byCa": "By CA"
+    },
+    "expiry": {
+      "valid": "Valid",
+      "expiring": "Expiring",
+      "expired": "Expired",
+      "revoked": "Revoked"
+    },
+    "filter": {
+      "live": "Live",
+      "key_algo": "Key algorithm",
+      "key_algo_prefix": "Key family",
+      "key_bits_below": "Key bits below",
+      "sig_hash": "Signature hash",
+      "server": "Server",
+      "lifetime_over_days": "Lifetime over (days)",
+      "no_key": "No private key",
+      "incomplete_chain": "Incomplete chain",
+      "renewal": "Renewal"
+    },
+    "filterValue": {
+      "true": "yes",
+      "manual_renewal_due": "Manual renewal due",
+      "client_renewal_overdue": "Client renewal overdue",
+      "auto_renewal_blocked": "Auto-renewal blocked",
+      "renewal_declined": "Renewal declined"
+    }
   }
 }
