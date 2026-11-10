@@ -322,6 +322,7 @@ export const helpContent = {
       'Need a non-standard EKU (Microsoft RDP, smartcard logon, document signing)? Add it via "Extra EKUs" instead of editing templates',
       'When a policy or the issuing CA\'s expiry shortens the requested validity, the result says so: "Issued for N day(s) instead of the M requested", with the reason',
       'An RSA-PSS signature is shown with its hash and salt length, e.g. RSASSA-PSS SHA-256 (salt 32)',
+      'In a link view (opened from the overview), Clear filters empties the link\'s statuses and the search; the link\'s other filters stay until you remove their chip or use the chip row\'s Clear filters, and the saved filters are left untouched',
     ],
     warnings: [
       'Revocation is generally permanent: except for "Certificate Hold" which can be removed (unhold) or made permanent with another reason',

@@ -96,6 +96,7 @@ export default {
       'Besoin d\'un EKU non-standard (Microsoft RDP, smartcard logon, document signing) ? Ajoutez-le via « EKU supplémentaires » plutôt que d\'éditer les modèles',
       'Quand une politique ou l\'expiration de la CA émettrice raccourcit la validité demandée, le résultat l\'indique : "Issued for N day(s) instead of the M requested", avec la raison',
       'Une signature RSA-PSS s\'affiche avec son hachage et la longueur du sel, p. ex. RSASSA-PSS SHA-256 (salt 32)',
+      'Dans une vue liée (ouverte depuis la vue d\'ensemble), Effacer tous les filtres vide les statuts du lien et la recherche ; les autres filtres du lien restent jusqu\'au retrait de leur puce ou au bouton Effacer tous les filtres de la rangée de puces, et les filtres enregistrés ne sont pas touchés',
     ],
     warnings: [
       'La révocation est généralement permanente : sauf pour « Suspension de certificat » qui peut être levée',

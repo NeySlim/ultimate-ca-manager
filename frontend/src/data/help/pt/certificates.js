@@ -96,6 +96,7 @@ export default {
       'Precisa de um EKU não padrão (Microsoft RDP, smartcard logon, document signing)? Adicione via "EKU extras" em vez de editar templates',
       'Quando uma política ou a expiração da CA emissora reduz a validade solicitada, o resultado informa: "Issued for N day(s) instead of the M requested", com o motivo',
       'Uma assinatura RSA-PSS é exibida com seu hash e o comprimento do salt, p. ex. RSASSA-PSS SHA-256 (salt 32)',
+      'In a link view (opened from the overview), Clear filters empties the link\'s statuses and the search; the link\'s other filters stay until you remove their chip or use the chip row\'s Clear filters, and the saved filters are left untouched',
     ],
     warnings: [
       'A revogação é geralmente permanente: exceto "Suspensão de Certificado" que pode ser removida',
