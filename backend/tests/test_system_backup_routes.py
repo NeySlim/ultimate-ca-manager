@@ -489,7 +489,7 @@ class TestCreate:
         def fake(self, password, **kwargs):
             seen.append(kwargs.get('kdf', 'absent'))
             return b'UCMB' + b'\x03' * 60
-        monkeypatch.setattr(BackupService, 'create_backup', fake)
+        monkeypatch.setattr(BackupService, 'iter_backup', fake)
         payload = {'password': PASSWORD}
         if kdf:
             payload['kdf'] = kdf
@@ -521,7 +521,7 @@ class TestCreate:
 
         def fail(self, *args, **kwargs):
             raise raised
-        monkeypatch.setattr(BackupService, 'create_backup', fail)
+        monkeypatch.setattr(BackupService, 'iter_backup', fail)
 
         response = _create(auth_client, {'password': PASSWORD})
 
@@ -535,7 +535,7 @@ class TestCreate:
 
         def fail(self, *args, **kwargs):
             raise fips_mode.FipsRestricted('Argon2id backups not available in FIPS mode')
-        monkeypatch.setattr(BackupService, 'create_backup', fail)
+        monkeypatch.setattr(BackupService, 'iter_backup', fail)
 
         response = _create(auth_client, {'password': PASSWORD})
 
@@ -559,7 +559,7 @@ class TestOneLockForArchivesAndRestores:
             self, auth_client, monkeypatch, lock_held_elsewhere, quick_export_wait, url):
         from services.backup_service import BackupService
         exported = []
-        monkeypatch.setattr(BackupService, 'create_backup',
+        monkeypatch.setattr(BackupService, 'iter_backup',
                             lambda self, *a, **k: exported.append(1) or b'UCMB' + b'\x03' * 60)
 
         response = auth_client.post(url, data=json.dumps({'password': PASSWORD}),
@@ -807,7 +807,7 @@ def audit_down(monkeypatch):
 class TestAnAuditFailureDoesNotUndoTheAnswer:
     def test_create(self, auth_client, backup_dir, audit_down, monkeypatch):
         from services.backup_service import BackupService
-        monkeypatch.setattr(BackupService, 'create_backup',
+        monkeypatch.setattr(BackupService, 'iter_backup',
                             lambda self, password, **kw: b'UCMB' + b'\x03' * 60)
 
         response = _create(auth_client, {'password': PASSWORD})
@@ -888,39 +888,24 @@ class TestRestoreUploadCeiling:
         assert storage.restore_upload_limit() == 3 * 1024 * 1024
 
     @pytest.mark.parametrize('url', ['/api/v2/system/backup', '/api/v2/settings/backup/create'])
-    def test_creating_an_archive_no_restore_accepts_warns(
-            self, auth_client, backup_dir, audit_spy, monkeypatch, url):
-        from services.backup import storage
-        monkeypatch.setattr(storage, 'restore_upload_limit', lambda: 10)
+    @pytest.mark.parametrize('ceiling', [
+        ('storage', 'restore_upload_limit', lambda: 10),
+        ('container', 'PLAINTEXT_PER_ARCHIVE_BYTE', 0),
+        ('container', 'ARCHIVE_BYTES_PER_JSON_CONTAINER', 10 ** 12),
+    ])
+    def test_the_v1_to_v3_ceilings_do_not_warn_about_a_v4_archive(
+            self, auth_client, backup_dir, audit_spy, monkeypatch, url, ceiling):
+        """A v4 archive is read chunk by chunk: none of these bound its restore."""
+        from services.backup import container, storage
+        module, name, value = ceiling
+        monkeypatch.setattr({'storage': storage, 'container': container}[module], name, value)
 
         response = _create(auth_client, {'password': PASSWORD}, url=url)
 
         assert response.status_code == 200, response.data
         body = response.get_json()
-        assert 'BACKUP_MAX_UPLOAD_MB' in body['data']['restore_limit_warning']
-        assert 'BACKUP_MAX_UPLOAD_MB' in body['message']
-
-    @pytest.mark.parametrize('url', ['/api/v2/system/backup', '/api/v2/settings/backup/create'])
-    def test_creating_an_archive_too_large_once_decompressed_warns(
-            self, auth_client, backup_dir, audit_spy, monkeypatch, url):
-        from services.backup import container
-        monkeypatch.setattr(container, 'PLAINTEXT_PER_ARCHIVE_BYTE', 0)
-
-        response = _create(auth_client, {'password': PASSWORD}, url=url)
-
-        assert response.status_code == 200, response.data
-        assert 'decompresses' in response.get_json()['data']['restore_limit_warning']
-
-    @pytest.mark.parametrize('url', ['/api/v2/system/backup', '/api/v2/settings/backup/create'])
-    def test_creating_an_archive_with_too_many_objects_warns(
-            self, auth_client, backup_dir, audit_spy, monkeypatch, url):
-        from services.backup import container
-        monkeypatch.setattr(container, 'ARCHIVE_BYTES_PER_JSON_CONTAINER', 10 ** 12)
-
-        response = _create(auth_client, {'password': PASSWORD}, url=url)
-
-        assert response.status_code == 200, response.data
-        assert 'JSON objects' in response.get_json()['data']['restore_limit_warning']
+        assert 'restore_limit_warning' not in body['data']
+        assert 'BACKUP_MAX_UPLOAD_MB' not in body['message']
 
     def test_an_archive_a_restore_accepts_carries_no_warning(
             self, auth_client, backup_dir, audit_spy):
@@ -928,3 +913,4 @@ class TestRestoreUploadCeiling:
 
         assert response.status_code == 200, response.data
         assert 'restore_limit_warning' not in response.get_json()['data']
+

@@ -160,7 +160,7 @@ class TestScheduledRunReportsOutcome:
             SystemConfig.query.filter_by(key='backup.last_run').delete()
             db.session.commit()
             monkeypatch.setattr(
-                'services.backup.schedule.BackupService.create_backup',
+                'services.backup.schedule.BackupService.iter_backup',
                 lambda self, pw, **k: (_ for _ in ()).throw(RuntimeError('disk full')))
             try:
                 with pytest.raises(RuntimeError):
@@ -324,7 +324,7 @@ class TestPublicationDecidesTheRetryGuard:
             self._enable(tmp_path, monkeypatch)
             try:
                 monkeypatch.setattr(
-                    'services.backup.schedule.BackupService.create_backup',
+                    'services.backup.schedule.BackupService.iter_backup',
                     lambda self, pw, **k: (_ for _ in ()).throw(
                         RuntimeError('transient export failure')))
                 with pytest.raises(RuntimeError):
@@ -333,7 +333,7 @@ class TestPublicationDecidesTheRetryGuard:
 
                 # One minute later the export works: nothing must stand in the way
                 monkeypatch.setattr(
-                    'services.backup.schedule.BackupService.create_backup',
+                    'services.backup.schedule.BackupService.iter_backup',
                     lambda self, pw, **k: b'archive-bytes')
                 result = schedule.run_scheduled_backup()
                 assert result['status'] == 'ok'
@@ -350,7 +350,7 @@ class TestPublicationDecidesTheRetryGuard:
             self._enable(tmp_path, monkeypatch)
             try:
                 monkeypatch.setattr(
-                    'services.backup.schedule.BackupService.create_backup',
+                    'services.backup.schedule.BackupService.iter_backup',
                     lambda self, pw, **k: b'archive-bytes')
                 monkeypatch.setattr(
                     storage, 'digest_of',
@@ -363,6 +363,72 @@ class TestPublicationDecidesTheRetryGuard:
                     'a failed validation must not leave a listed archive'
             finally:
                 self._disable()
+
+
+class TestAStreamedArchiveIsPublishedWholeOrNotAtAll:
+    """A v4 archive reaches the disk as it is produced, never held in memory."""
+
+    def test_a_stream_that_fails_midway_leaves_nothing(self, tmp_path):
+        from services.backup import storage
+
+        def chunks():
+            yield b'UCMB first half'
+            raise RuntimeError('the export died')
+
+        with pytest.raises(RuntimeError):
+            storage.create_archive(chunks(), backup_dir=tmp_path)
+        assert [p.name for p in tmp_path.iterdir() if not p.name.endswith('.lock')] == []
+
+    def test_a_stream_is_recorded_with_the_digest_of_what_was_written(self, tmp_path):
+        import hashlib
+        from services.backup import storage
+        path, name = storage.create_archive(iter([b'UCMB', b'\x04', b'rest']), backup_dir=tmp_path)
+        entry = storage.read_catalog(tmp_path)[name]
+        assert path.read_bytes() == b'UCMB\x04rest'
+        assert entry['size'] == 9
+        assert entry['sha256'] == hashlib.sha256(b'UCMB\x04rest').hexdigest()
+
+    def test_a_name_collision_retries_without_consuming_the_stream_twice(
+            self, tmp_path, monkeypatch):
+        from services.backup import storage
+        names = iter(['ucm_backup_taken.ucmbkp', 'ucm_backup_free.ucmbkp'])
+        (tmp_path / 'ucm_backup_taken.ucmbkp').write_bytes(b'someone else')
+        monkeypatch.setattr(storage, 'new_archive_filename', lambda: next(names))
+        consumed = []
+
+        def chunks():
+            consumed.append(1)
+            yield b'UCMB\x04streamed'
+
+        path, name = storage.create_archive(chunks(), backup_dir=tmp_path)
+        assert name == 'ucm_backup_free.ucmbkp'
+        assert path.read_bytes() == b'UCMB\x04streamed'
+        assert consumed == [1]
+        assert (tmp_path / 'ucm_backup_taken.ucmbkp').read_bytes() == b'someone else'
+        assert not list(tmp_path.glob('.ucm_backup_*.tmp'))
+
+    def test_a_spooled_archive_that_does_not_read_back_is_removed(self, tmp_path, monkeypatch):
+        from services.backup import storage
+        from services.backup.errors import BackupValidationError
+        monkeypatch.setattr(storage, 'digest_of', lambda path: (3, '00' * 32))
+        with pytest.raises(BackupValidationError, match='did not read back'):
+            storage.create_archive(iter([b'UCMB\x04data']), backup_dir=tmp_path)
+        assert not list(tmp_path.glob('ucm_backup_*'))
+        assert not list(tmp_path.glob('.ucm_backup_*.tmp'))
+
+    def test_the_temporary_file_is_private(self, tmp_path, monkeypatch):
+        import stat
+        from services.backup import storage
+        seen = []
+        real_link = storage.os.link
+
+        def link(source, destination):
+            seen.append(stat.S_IMODE(os.stat(source).st_mode))
+            return real_link(source, destination)
+
+        monkeypatch.setattr(storage.os, 'link', link)
+        storage.create_archive(iter([b'UCMB\x04data']), backup_dir=tmp_path)
+        assert seen == [0o600]
 
 
 class TestValidatedArchivePublication:
@@ -490,7 +556,7 @@ class TestValidatedArchivePublication:
 
         monkeypatch.setattr(Config, 'BACKUP_DIR', tmp_path, raising=False)
         monkeypatch.setattr(
-            BackupService, 'create_backup',
+            BackupService, 'iter_backup',
             lambda self, password, **kwargs: b'archive')
         monkeypatch.setattr(routes.AuditService, 'log_action',
                             lambda **kwargs: None)
@@ -580,7 +646,7 @@ class TestFailedTimestampStopsTheLoop:
             schedule._LAST_ATTEMPT['at'] = None
 
             monkeypatch.setattr(
-                'services.backup.schedule.BackupService.create_backup',
+                'services.backup.schedule.BackupService.iter_backup',
                 lambda self, pw, **k: b'archive-bytes')
             monkeypatch.setattr(
                 'services.backup.schedule._record_last_run',

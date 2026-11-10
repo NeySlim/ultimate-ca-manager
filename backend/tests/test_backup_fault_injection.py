@@ -643,7 +643,7 @@ class TestAnAuditFailureChangesNoVerdict:
         with app.app_context():
             _enable_unattended_backups()
             monkeypatch.setattr(
-                'services.backup.schedule.BackupService.create_backup',
+                'services.backup.schedule.BackupService.iter_backup',
                 lambda self, password, **kwargs: b'the archive bytes')
             _audit_is_down(monkeypatch)
 
@@ -663,7 +663,7 @@ class TestAnAuditFailureChangesNoVerdict:
         with app.app_context():
             _enable_unattended_backups()
             monkeypatch.setattr(
-                'services.backup.schedule.BackupService.create_backup',
+                'services.backup.schedule.BackupService.iter_backup',
                 lambda self, password, **kwargs: (_ for _ in ()).throw(
                     RuntimeError('the export could not be produced')))
             _audit_is_down(monkeypatch)
@@ -688,7 +688,7 @@ class TestAnAuditFailureChangesNoVerdict:
         with app.app_context():
             _enable_unattended_backups()
             monkeypatch.setattr(
-                'services.backup.schedule.BackupService.create_backup',
+                'services.backup.schedule.BackupService.iter_backup',
                 lambda self, password, **kwargs: b'the archive bytes')
             _audit_spy(monkeypatch)
 
@@ -850,7 +850,7 @@ class TestEachScheduledFailureIsReportedForWhatItIs:
             schedule, calls = self._unattended_run_fails(
                 monkeypatch,
                 lambda: monkeypatch.setattr(
-                    'services.backup.schedule.BackupService.create_backup',
+                    'services.backup.schedule.BackupService.iter_backup',
                     lambda self, password, **kwargs: (_ for _ in ()).throw(
                         RuntimeError('the export could not be produced'))))
 
@@ -874,7 +874,7 @@ class TestEachScheduledFailureIsReportedForWhatItIs:
                 monkeypatch,
                 lambda: (
                     monkeypatch.setattr(
-                        'services.backup.schedule.BackupService.create_backup',
+                        'services.backup.schedule.BackupService.iter_backup',
                         lambda self, password, **kwargs: b'the archive bytes'),
                     monkeypatch.setattr(
                         storage, 'write_archive_atomically',
@@ -904,7 +904,7 @@ class TestEachScheduledFailureIsReportedForWhatItIs:
                 monkeypatch,
                 lambda: (
                     monkeypatch.setattr(
-                        'services.backup.schedule.BackupService.create_backup',
+                        'services.backup.schedule.BackupService.iter_backup',
                         lambda self, password, **kwargs: b'the archive bytes'),
                     monkeypatch.setattr(
                         storage, 'digest_of',
@@ -934,7 +934,7 @@ class TestEachScheduledFailureIsReportedForWhatItIs:
                 monkeypatch,
                 lambda: (
                     monkeypatch.setattr(
-                        'services.backup.schedule.BackupService.create_backup',
+                        'services.backup.schedule.BackupService.iter_backup',
                         lambda self, password, **kwargs: b'the archive bytes'),
                     monkeypatch.setattr(
                         schedule_module, '_record_last_run',

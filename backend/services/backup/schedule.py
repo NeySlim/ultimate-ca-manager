@@ -477,7 +477,7 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
             kdf = None
         service = BackupService()
         # The same export and naming as every other archive, under the lock already held
-        backup_bytes, _path, filename = storage.export_archive(service, password, kdf=kdf)
+        size, _path, filename = storage.export_archive(service, password, kdf=kdf)
 
         # Only now: the archive exists, it reads back as written, and it is
         # recorded. An export or write that failed before this point leaves
@@ -486,11 +486,7 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
         # archive a minute later.
         _LAST_ATTEMPT['at'] = now
 
-        logger.info(f"Scheduled backup created: {filename} ({len(backup_bytes)} bytes)")
-        warning = storage.restore_limit_warning(len(backup_bytes), service.last_payload_size,
-                                                service.last_payload_containers)
-        if warning:
-            logger.warning("Scheduled backup %s: %s", filename, warning)
+        logger.info(f"Scheduled backup created: {filename} ({size} bytes)")
         for left_out in service.last_export_warnings:
             logger.warning("Scheduled backup %s: %s", filename, left_out)
         _audit_scheduled_backup(filename, f'Scheduled backup: {filename}',
@@ -502,7 +498,7 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
         return {
             'status': 'ok',
             'filename': filename,
-            'size': len(backup_bytes),
+            'size': size,
             'retention_removed': removed,
         }
     except Exception as e:

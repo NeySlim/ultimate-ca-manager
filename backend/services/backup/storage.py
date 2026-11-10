@@ -84,31 +84,74 @@ def _catalog_lock(backup_dir: Path):
         os.close(fd)
 
 
-def write_archive_atomically(backup_dir: Path, filename: str, data: bytes) -> Path:
+class SpooledArchive:
+    """An archive already written, fsynced and hashed in a temporary file of its directory."""
+
+    def __init__(self, path: str, size: int, sha256: str):
+        self.path = path
+        self.size = size
+        self.sha256 = sha256
+
+    def discard(self) -> None:
+        try:
+            os.unlink(self.path)
+        except FileNotFoundError:
+            pass
+        except OSError:
+            logger.warning("Could not remove temporary backup %s", self.path)
+
+
+def spool_archive(backup_dir: Path, chunks) -> SpooledArchive:
+    """Write `chunks` (bytes, or an iterable of bytes) to a private temporary file.
+
+    The archive is hashed as it is written, so it never has to be held whole.
+    """
+    backup_dir = Path(backup_dir)
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    if isinstance(chunks, (bytes, bytearray)):
+        chunks = (chunks,)
+    fd, temp_path = tempfile.mkstemp(
+        dir=str(backup_dir), prefix='.ucm_backup_', suffix='.tmp')
+    try:
+        digest = hashlib.sha256()
+        size = 0
+        with os.fdopen(fd, 'wb') as temp_file:
+            for chunk in chunks:
+                temp_file.write(chunk)
+                digest.update(chunk)
+                size += len(chunk)
+            temp_file.flush()
+            os.fsync(temp_file.fileno())
+        os.chmod(temp_path, 0o600)
+    except BaseException:
+        try:
+            os.unlink(temp_path)
+        except OSError:
+            logger.warning("Could not remove temporary backup %s", temp_path)
+        raise
+    return SpooledArchive(temp_path, size, digest.hexdigest())
+
+
+def write_archive_atomically(backup_dir: Path, filename: str, data) -> Path:
     """Write an archive whole, or not at all.
 
-    The temporary file is fsynced before it is published, and publication uses
-    a link, which fails rather than overwrite an existing archive.
+    `data` is bytes, an iterable of bytes, or a `SpooledArchive` (left to its
+    owner). The temporary file is fsynced before it is published, and
+    publication uses a link, which fails rather than overwrite an existing
+    archive.
     """
     backup_dir = Path(backup_dir)
     backup_dir.mkdir(parents=True, exist_ok=True)
 
-    temp_path = None
+    owned = not isinstance(data, SpooledArchive)
+    spooled = spool_archive(backup_dir, data) if owned else data
     destination = backup_dir / filename
     published = False
     try:
-        fd, temp_path = tempfile.mkstemp(
-            dir=str(backup_dir), prefix='.ucm_backup_', suffix='.tmp')
-        with os.fdopen(fd, 'wb') as temp_file:
-            temp_file.write(data)
-            temp_file.flush()
-            os.fsync(temp_file.fileno())
-        os.chmod(temp_path, 0o600)
-
-        os.link(temp_path, destination)
+        os.link(spooled.path, destination)
         published = True
-        os.unlink(temp_path)
-        temp_path = None
+        if owned:
+            os.unlink(spooled.path)
         _fsync_directory(backup_dir)
         return destination
     except Exception:
@@ -121,11 +164,8 @@ def write_archive_atomically(backup_dir: Path, filename: str, data: bytes) -> Pa
                     "Could not roll back backup publication %s", destination)
         raise
     finally:
-        if temp_path:
-            try:
-                os.unlink(temp_path)
-            except OSError:
-                logger.warning("Could not remove temporary backup %s", temp_path)
+        if owned:
+            spooled.discard()
 
 
 def digest_of(path) -> tuple:
@@ -191,15 +231,22 @@ def _remove_failed_archive(path: Path) -> None:
         logger.exception("Could not remove failed backup %s", path)
 
 
-def validate_and_record(path, expected: bytes) -> dict:
-    """Read the archive back and record it, or remove it."""
+def validate_and_record(path, expected) -> dict:
+    """Read the archive back and record it, or remove it.
+
+    `expected` is the bytes written, or a `SpooledArchive` hashed as it was.
+    """
     path = Path(path)
+    if isinstance(expected, SpooledArchive):
+        expected_size, expected_sha256 = expected.size, expected.sha256
+    else:
+        expected_size, expected_sha256 = len(expected), hashlib.sha256(expected).hexdigest()
     try:
         size, sha256 = digest_of(path)
-        if size != len(expected) or sha256 != hashlib.sha256(expected).hexdigest():
+        if size != expected_size or sha256 != expected_sha256:
             raise BackupValidationError(
                 f"The backup {path.name} did not read back as it was written "
-                f"({size} bytes on disk for {len(expected)} written)"
+                f"({size} bytes on disk for {expected_size} written)"
             )
 
         entry = {
@@ -229,7 +276,7 @@ def validate_and_record(path, expected: bytes) -> dict:
 
 
 def publish_validated_archive(
-        backup_dir: Path, filename: str, data: bytes) -> Path:
+        backup_dir: Path, filename: str, data) -> Path:
     """Publish an archive only if its bytes can be durably validated."""
     from .locking import backup_operation_lock
 
@@ -240,7 +287,7 @@ def publish_validated_archive(
         return _publish_validated_archive(backup_dir, filename, data)
 
 
-def _publish_validated_archive(backup_dir, filename: str, data: bytes):
+def _publish_validated_archive(backup_dir, filename: str, data):
     path = write_archive_atomically(backup_dir, filename, data)
     try:
         validate_and_record(path, data)
@@ -327,33 +374,8 @@ RESTORE_FORM_MARGIN = 1024 * 1024
 
 
 def restore_upload_limit() -> int:
-    """Bytes of archive a restore route accepts (`BACKUP_MAX_UPLOAD_MB`)."""
+    """Bytes of a v1 to v3 archive a restore route accepts (`BACKUP_MAX_UPLOAD_MB`)."""
     return int(Config.BACKUP_MAX_UPLOAD_MB) * 1024 * 1024
-
-
-def restore_limit_warning(size: int, payload_size: int = 0, containers: int = 0):
-    """What to tell whoever created an archive no restore reads, or None.
-
-    Checked against both ceilings: the archive itself, and its decompressed payload.
-    """
-    from . import container
-
-    limit = restore_upload_limit()
-    if size > limit:
-        return (f"This archive is {size / (1024 * 1024):.1f} MB, more than the "
-                f"{limit // (1024 * 1024)} MB a restore accepts: raise BACKUP_MAX_UPLOAD_MB "
-                "on the server that will restore it.")
-    ceiling = container.max_plaintext_bytes()
-    if payload_size > ceiling:
-        return (f"This archive decompresses to {payload_size / (1024 * 1024):.1f} MB, more "
-                f"than the {ceiling // (1024 * 1024)} MB a restore reads "
-                f"({container.PLAINTEXT_PER_ARCHIVE_BYTE} times BACKUP_MAX_UPLOAD_MB): raise "
-                "BACKUP_MAX_UPLOAD_MB on the server that will restore it.")
-    objects = container.max_json_containers()
-    if containers > objects:
-        return (f"This archive holds {containers} JSON objects, more than the {objects} a "
-                "restore reads: raise BACKUP_MAX_UPLOAD_MB on the server that will restore it.")
-    return None
 
 
 # Seconds a manual backup waits for the backup lock before it is refused.
@@ -361,22 +383,22 @@ EXPORT_LOCK_WAIT = 30
 
 
 def export_archive(service, password: str, *, kdf=None, timeout=None) -> tuple:
-    """Export and publish one archive under the backup lock. Returns ``(bytes, path, filename)``.
+    """Export and publish one archive under the backup lock. Returns ``(size, path, filename)``.
 
-    The export runs inside the lock too: a restore holds it until it commits, so
+    The archive is streamed to disk as it is produced, never held whole. The
+    export runs inside the lock too: a restore holds it until it commits, so
     an archive never reads half of a restore.
     """
     from .locking import backup_operation_lock
 
     wait = EXPORT_LOCK_WAIT if timeout is None else timeout
     with backup_operation_lock(timeout=wait, purpose='creating a backup'):
-        data = service.create_backup(password, kdf=kdf)
-        path, filename = _create_archive(data)
-    return data, path, filename
+        path, filename, size = _create_archive(service.iter_backup(password, kdf=kdf))
+    return size, path, filename
 
 
-def create_archive(data: bytes, backup_dir=None) -> tuple:
-    """Publish archive bytes under a new name, validated.
+def create_archive(data, backup_dir=None) -> tuple:
+    """Publish an archive (bytes, or an iterable of bytes) under a new name, validated.
 
     The one implementation behind every "create a backup" route: same
     directory, same naming, same proof that what is on disk is what was
@@ -390,17 +412,27 @@ def create_archive(data: bytes, backup_dir=None) -> tuple:
     from .locking import backup_operation_lock
 
     with backup_operation_lock(timeout=30, purpose='creating a backup'):
-        return _create_archive(data, backup_dir)
+        path, filename, _size = _create_archive(data, backup_dir)
+        return path, filename
 
 
-def _create_archive(data: bytes, backup_dir=None) -> tuple:
+def _create_archive(data, backup_dir=None) -> tuple:
     directory = Path(backup_dir) if backup_dir is not None else backup_directory()
-    for _ in range(_NAME_ATTEMPTS):
-        filename = new_archive_filename()
-        try:
-            return publish_validated_archive(directory, filename, data), filename
-        except FileExistsError:
-            continue
+    # A stream is consumed once: spooled first, so a name collision can retry
+    spooled = None
+    if not isinstance(data, (bytes, bytearray)):
+        spooled = data = spool_archive(directory, data)
+    size = spooled.size if spooled is not None else len(data)
+    try:
+        for _ in range(_NAME_ATTEMPTS):
+            filename = new_archive_filename()
+            try:
+                return publish_validated_archive(directory, filename, data), filename, size
+            except FileExistsError:
+                continue
+    finally:
+        if spooled is not None:
+            spooled.discard()
 
     logger.error("Could not allocate a unique backup filename in %d attempts",
                  _NAME_ATTEMPTS)

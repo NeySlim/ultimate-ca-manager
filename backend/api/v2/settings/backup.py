@@ -92,7 +92,7 @@ def create_backup():
 
     try:
         service = BackupService()
-        backup_bytes, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
+        size, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
     except BackupBusyError as busy:
         logger.info('Settings backup refused: %s', busy)
         return error_response(str(busy), 409)
@@ -122,15 +122,10 @@ def create_backup():
         # families also answer `size_bytes`, which means the same thing on
         # either of them. The absolute path is gone: where the instance keeps
         # its archives is not the caller's business.
-        'size': len(backup_bytes),
-        'size_bytes': len(backup_bytes),
+        'size': size,
+        'size_bytes': size,
         'download_url': f'/api/v2/settings/backup/{filename}/download',
     }
-
-    warning = storage.restore_limit_warning(len(backup_bytes), service.last_payload_size,
-                                            service.last_payload_containers)
-    if warning:
-        response_data['restore_limit_warning'] = warning
 
     # Include generated password in response so user can save it
     if generated_password:
@@ -138,8 +133,6 @@ def create_backup():
         response_data['password_generated'] = True
 
     message = 'Backup created successfully' + (' - SAVE THE PASSWORD!' if generated_password else '')
-    if warning:
-        message += (' ' if message.endswith('!') else '. ') + warning
     if service.last_export_warnings:
         response_data['export_warnings'] = list(service.last_export_warnings)
         message += (' ' if message.endswith('!') else '. ') + '; '.join(service.last_export_warnings)

@@ -4,8 +4,10 @@ The framing tests drive `ChunkWriter` and `ChunkReader` directly, with a key
 chosen here; the archive tests go through the service, password and all.
 """
 import base64
+import hashlib
 import io
 import json
+import os
 import struct
 
 import pytest
@@ -13,6 +15,11 @@ import pytest
 from services.backup import container
 from services.backup.container import ChunkAuthError, ContainerError
 
+from tests.fresh_app import fresh_app_fixtures
+
+app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
+
+PASSWORD = 'Correct-Horse-Battery-9'
 KEY = bytes(range(32))
 NONCE_BASE = b'\x01' * container.NONCE_BASE_SIZE
 SECTIONS = ['metadata', 'users', 'certificates']
@@ -211,7 +218,92 @@ class TestTamperingIsRefused:
             container.ChunkReader(io.BytesIO(b''), KEY, header, metadata, NONCE_BASE)
 
 
-def test_the_end_record_is_valid_json_for_any_section_name():
+class TestThroughTheService:
+    def test_archives_are_written_as_v4(self, app):
+        with app.app_context():
+            from services.backup_service import BackupService
+            blob = BackupService().create_backup(PASSWORD)
+        assert blob[:4] == container.MAGIC
+        assert blob[4] == container.FORMAT_VERSION_V4
+        metadata, _header = container.read_header(io.BytesIO(blob))
+        assert metadata['sections'][0] == 'metadata'
+        assert metadata['chunk_max'] == container.CHUNK_MAX_DEFAULT
+        assert 'nonce_b64' not in metadata
+
+    def test_every_archive_has_its_own_salt_and_nonce_base(self, app):
+        with app.app_context():
+            from services.backup_service import BackupService
+            service = BackupService()
+            first = container.read_header(io.BytesIO(service.create_backup(PASSWORD)))[0]
+            second = container.read_header(io.BytesIO(service.create_backup(PASSWORD)))[0]
+        assert first['salt_b64'] != second['salt_b64']
+        assert first['nonce_base_b64'] != second['nonce_base_b64']
+
+    def test_round_trip_reads_the_payload_back(self, app):
+        with app.app_context():
+            from services.backup_service import BackupService
+            service = BackupService()
+            blob = service.create_backup(PASSWORD)
+            _key, payload = service._decrypt_framed(blob, PASSWORD)
+        assert payload['metadata']['schema_version'] == service.SCHEMA_VERSION
+        assert payload['metadata']['sections']['users'] == len(payload['users'])
+        assert 'checksum' not in payload
+        # The end record's digest is the v3 section digest, so both read the same way
+        for name in ('users', 'configuration'):
+            canonical = json.dumps(payload[name], sort_keys=True, default=str).encode()
+            assert payload['metadata']['section_digests'][name] == hashlib.sha256(
+                canonical).hexdigest()
+
+    def test_a_wrong_password_is_a_decryption_failure(self, app):
+        from services.backup.decrypt_mixin import BackupDecryptionError
+        with app.app_context():
+            from services.backup_service import BackupService
+            service = BackupService()
+            blob = service.create_backup(PASSWORD)
+            with pytest.raises(BackupDecryptionError, match='wrong password'):
+                service._decrypt_framed(blob, 'Another-Horse-Battery-7')
+
+    def test_a_later_chunk_damaged_is_named_not_blamed_on_the_password(self, app):
+        with app.app_context():
+            from services.backup_service import BackupService
+            service = BackupService()
+            blob = bytearray(service.create_backup(PASSWORD))
+            blob[-20] ^= 1
+            with pytest.raises(ContainerError, match='does not authenticate'):
+                service._decrypt_framed(bytes(blob), PASSWORD)
+
+    def test_restore_from_a_path(self, app, tmp_path):
+        with app.app_context():
+            from services.backup_service import BackupService
+            service = BackupService()
+            path = tmp_path / 'archive.ucmbkp'
+            path.write_bytes(service.create_backup(PASSWORD, include={
+                name: False for name in container_sections()}))
+            results = service.restore_backup_from_path(path, PASSWORD, mode='merge')
+        assert results['sections_carried'] == []
+
+    def test_a_restore_leaves_no_section_file_behind(self, app, tmp_path, monkeypatch):
+        from services.backup import section_store
+        monkeypatch.setattr(section_store, 'store_directory', lambda: str(tmp_path))
+        with app.app_context():
+            from services.backup_service import BackupService
+            service = BackupService()
+            blob = service.create_backup(PASSWORD, include={
+                name: False for name in container_sections()})
+            service.restore_backup(blob, PASSWORD, mode='merge')
+            damaged = bytearray(blob)
+            damaged[-20] ^= 1
+            with pytest.raises(ContainerError):
+                service.restore_backup(bytes(damaged), PASSWORD, mode='merge')
+        assert os.listdir(tmp_path) == []
+
+
+def container_sections():
+    from services.backup.manifest import SECTIONS as MANIFEST
+    return list(MANIFEST)
+
+
+def test_a_part_body_is_the_json_the_writer_meant():
     """Part bodies are assembled by hand: they must still parse as the writer meant."""
-    body = container._part_body('users', 3, [b'{"a":1}', b'{"b":"\\u00e9"}'])
+    body = container._part_body('users', 3, container._rows([b'{"a": 1}', b'{"b": "\\u00e9"}']))
     assert json.loads(body) == {'section': 'users', 'part': 3, 'rows': [{'a': 1}, {'b': 'é'}]}

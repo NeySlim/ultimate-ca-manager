@@ -149,7 +149,7 @@ def create_backup():
 
     try:
         service = BackupService()
-        backup_bytes, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
+        size, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
     except FipsRestricted:
         raise  # the application maps it to its problem type
     except BackupBusyError as busy:
@@ -178,7 +178,6 @@ def create_backup():
         success=True,
     )
 
-    size = len(backup_bytes)
     data = {
         'filename': filename,
         'size': _format_size(size),
@@ -186,11 +185,6 @@ def create_backup():
         'download_url': f'/api/v2/system/backup/{filename}/download',
     }
     message = 'Backup created successfully'
-    warning = storage.restore_limit_warning(size, service.last_payload_size,
-                                            service.last_payload_containers)
-    if warning:
-        data['restore_limit_warning'] = warning
-        message = f'{message}. {warning}'
     if service.last_export_warnings:
         data['export_warnings'] = list(service.last_export_warnings)
         message = f"{message}. {'; '.join(service.last_export_warnings)}"

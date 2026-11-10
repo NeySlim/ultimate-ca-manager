@@ -125,7 +125,9 @@ class TestSitesDrawFromTheDrbg:
         with app.app_context():
             blob = BackupService().create_backup('Correct-Horse-Battery-9', include=include)
         metadata, _header, _ciphertext = container.parse_header(blob)
-        salt, nonce, _params = container.validate_kdf(metadata['kdf_id'], metadata)
+        salt, nonce, _params = container.validate_kdf(
+            metadata['kdf_id'], metadata, nonce_field='nonce_base_b64',
+            nonce_size=container.NONCE_BASE_SIZE)
         assert salt in drbg and nonce in drbg
 
     def test_backup_private_key_blob(self, drbg):

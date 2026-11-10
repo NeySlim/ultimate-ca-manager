@@ -69,7 +69,7 @@ class TestScheduledTaskGating:
             from services.backup import schedule
             _set('auto_backup_enabled', 'false')
             called = []
-            monkeypatch.setattr('services.backup_service.BackupService.create_backup',
+            monkeypatch.setattr('services.backup_service.BackupService.iter_backup',
                                 lambda self, pw, **k: called.append(1) or b'x')
             schedule.run_scheduled_backup()
             assert called == []
@@ -86,7 +86,7 @@ class TestScheduledTaskGating:
             SystemConfig.query.filter_by(key='backup.last_run').delete()
             db.session.commit()
             called = []
-            monkeypatch.setattr('services.backup_service.BackupService.create_backup',
+            monkeypatch.setattr('services.backup_service.BackupService.iter_backup',
                                 lambda self, pw, **k: called.append(1) or b'x')
             with pytest.raises(ScheduledBackupError):
                 schedule.run_scheduled_backup()
