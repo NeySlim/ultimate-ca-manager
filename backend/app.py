@@ -104,6 +104,8 @@ def create_app(config_name=None):
     
     # Load configuration
     config = get_config(config_name)
+    from utils.ha import validate_ha_config
+    validate_ha_config(config)
     app.config.from_object(config)
     
     # ── Centralized logging ──────────────────────────────────────
