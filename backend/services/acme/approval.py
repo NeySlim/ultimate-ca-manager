@@ -58,7 +58,8 @@ def _issue(approval, data):
     if not success:
         error_type = 'caa' if _is_caa_failure(error) else (
             getattr(service, '_last_finalize_error_type', None) or 'badCSR')
-        if error_type == 'serverInternal' or 'dns error' in (error or '').lower():
+        from utils import caa_checker
+        if error_type == 'serverInternal' or caa_checker.is_transient_caa_failure(error):
             # Transient (CA down, CAA lookup failed): the order stays processing
             # and the approver may try again once the cause is gone
             raise ValueError(error)

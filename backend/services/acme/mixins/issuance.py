@@ -8,6 +8,7 @@ from models import db
 from models.acme_models import AcmeOrder
 from utils.datetime_utils import utc_now
 from utils.csr_extensions import csr_extensions
+from utils import caa_checker
 
 logger = logging.getLogger(__name__)
 
@@ -183,7 +184,7 @@ class IssuanceMixin:
             except ImportError:
                 if caa_enforce:
                     logger.error("CAA check unavailable: dns.resolver import failed")
-                    return False, "CAA check failed (DNS error): resolver unavailable"
+                    return False, f"CAA check failed ({caa_checker.DNS_ERROR_MARKER}): resolver unavailable"
                 logger.error(
                     "CAA check unavailable (dns.resolver import failed); "
                     "proceeding without CAA check (soft-fail)"
@@ -191,7 +192,7 @@ class IssuanceMixin:
             except Exception as e:
                 if caa_enforce:
                     logger.warning(f"CAA check error: {e}")
-                    return False, "CAA check failed (DNS error): lookup error"
+                    return False, f"CAA check failed ({caa_checker.DNS_ERROR_MARKER}): lookup error"
                 logger.warning(f"CAA check error (non-blocking): {e}")
         
         # Resolve CA: domain-specific → global default → first available

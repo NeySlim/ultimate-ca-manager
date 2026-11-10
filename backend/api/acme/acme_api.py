@@ -178,8 +178,9 @@ def _is_caa_failure(error: Any) -> bool:
     """True only for a definitive CAA policy denial. A DNS lookup error is
     transient: it must NOT terminally invalidate the order (the client may
     retry once the resolver recovers)."""
+    from utils import caa_checker
     text = str(error or '')
-    if 'dns error' in text.lower():
+    if caa_checker.is_transient_caa_failure(text):
         return False
     return bool(re.search(r'\bcaa\b', text, re.IGNORECASE))
 

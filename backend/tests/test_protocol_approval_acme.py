@@ -271,3 +271,23 @@ def test_a_key_material_refusal_reaches_nobody_raw(app, client, auth_client, acm
             row = db.session.get(ApprovalRequest, approval_id)
             assert [v.get('comment') for v in row.get_approvals()] == [generic]
             assert 'KEY_ENCRYPTION_KEY' not in (row.request_data or '')
+
+
+def test_finalize_and_approval_agree_on_a_transient_caa_failure(app, client, auth_client, acme_ca,
+                                                                monkeypatch):
+    """One judge of a transient CAA failure: a message it calls transient
+    keeps the order retryable on both the direct finalize and the approval."""
+    import utils.caa_checker as caa
+    message = 'CAA check failed for x: resolver timed out'
+    monkeypatch.setattr(caa, 'is_transient_caa_failure', lambda text: message in str(text or ''))
+    with approval_policy(app, acme_ca[0], 'acme-held-caa-judge') as pid:
+        account, order_id, _r = _held(app, client, acme_ca)
+        (approval_id, *_), = requests_of(app, pid, 'acme_order')
+        monkeypatch.setattr(caa, 'check_caa_for_domains', lambda *a, **k: (False, message))
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.get_json()['message'] != 'Request closed', r.get_json()
+        assert requests_of(app, pid, 'acme_order')[0][1] == 'pending'
+        assert _read(client, account, order_id).get_json()['status'] == 'processing'
+    direct_account, direct_id, direct = _held(app, client, acme_ca)
+    assert direct.get_json()['type'] != 'urn:ietf:params:acme:error:caa'
+    assert _read(client, direct_account, direct_id).get_json()['status'] == 'ready'
