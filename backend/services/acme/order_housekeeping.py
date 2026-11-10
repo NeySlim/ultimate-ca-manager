@@ -39,6 +39,7 @@ def recover_interrupted_orders() -> int:
         AcmeClientOrder.renewal_of_order_id.is_(None), AcmeClientOrder._pending_key.is_(None),
     )
     idle = or_(AcmeClientOrder.updated_at.is_(None), AcmeClientOrder.updated_at < now - PROCESSING_IDLE)
+    # Already conditional: a second executor matches no row once the first committed
     count = AcmeClientOrder.query.filter(*candidates, idle).update(
         {'status': 'pending', 'error_message': INTERRUPTED}, synchronize_session=False)
     db.session.commit()

@@ -36,20 +36,32 @@ class DiscoverySchedulerTask:
             return 0
 
     @staticmethod
-    def _advance_next_scan(profile, now) -> None:
+    def _advance_next_scan(profile, now) -> bool:
         """Push next_scan_at one interval forward, BEFORE the scan runs.
 
         The scanner also recomputes it on completion, but a scan that crashes
         or outlives the interval must not leave next_scan_at in the past —
         that re-triggered the same giant scan on every restart (#293).
+        Compare-and-set on the value read: of two executors, only one claims the run.
         """
-        profile.next_scan_at = now + timedelta(minutes=profile.schedule_interval_minutes or 1440)
+        seen = profile.next_scan_at
+        name = profile.name
+        due = (ScanProfile.next_scan_at.is_(None) if seen is None
+               else ScanProfile.next_scan_at == seen)
         try:
+            claimed = ScanProfile.query.filter(ScanProfile.id == profile.id, due).update(
+                {ScanProfile.next_scan_at:
+                 now + timedelta(minutes=profile.schedule_interval_minutes or 1440)},
+                synchronize_session=False)
             db.session.commit()
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Failed to advance next_scan_at for profile '{profile.name}': {e}",
+            logger.error(f"Failed to advance next_scan_at for profile '{name}': {e}",
                          exc_info=True)
+            return False
+        if claimed != 1:
+            logger.info(f"Discovery profile '{name}' was claimed by another executor")
+        return claimed == 1
 
     @staticmethod
     def execute() -> None:
@@ -85,7 +97,8 @@ class DiscoverySchedulerTask:
                         DiscoverySchedulerTask._advance_next_scan(profile, now)
                         continue
 
-                    DiscoverySchedulerTask._advance_next_scan(profile, now)
+                    if not DiscoverySchedulerTask._advance_next_scan(profile, now):
+                        continue
 
                     logger.info(f"Starting scheduled scan for profile '{profile.name}' "
                                 f"({len(targets)} targets, ports {ports})")

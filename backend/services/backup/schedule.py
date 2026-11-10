@@ -386,6 +386,7 @@ def _record_last_run(ts: datetime) -> None:
     answer is read from this row: a silent rollback left the task due again on
     the next tick, writing one archive per minute until the disk filled.
     """
+    # Leader-only task: one writer, so last_run needs no compare-and-set
     cfg = SystemConfig.query.filter_by(key=_LAST_RUN_KEY).first()
     if cfg:
         cfg.value = utc_isoformat(ts)
