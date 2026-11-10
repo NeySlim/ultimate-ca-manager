@@ -572,7 +572,7 @@ function MobileSidebarMenu({ tabs, tabGroups, activeTab, onTabChange, t }) {
       >
         {TabIcon && (
           <span className={cn('shrink-0 w-8 h-8 rounded-lg flex items-center justify-center', tab.color || 'bg-bg-tertiary')}>
-            <TabIcon size={18} weight={isActive ? "fill" : "regular"} className={isActive ? 'text-accent-primary' : 'text-white'} />
+            <TabIcon size={18} weight={isActive ? "fill" : "regular"} className={isActive ? 'text-accent-primary' : 'text-paper'} />
           </span>
         )}
         <span className="flex-1 text-left truncate">{tab.label}</span>
@@ -807,7 +807,7 @@ function MobileSlideOver({ title, onClose, children }) {
     <div className="fixed inset-0 z-50">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/40 animate-fade-in"
+        className="absolute inset-0 bg-scrim-40 animate-fade-in"
         onClick={onClose}
       />
       
@@ -908,7 +908,7 @@ function MobileDrawer({ open, onClose, title, children }) {
     <div className="fixed inset-0 z-50">
       {/* Backdrop */}
       <div 
-        className="absolute inset-0 bg-black/40 animate-fade-in"
+        className="absolute inset-0 bg-scrim-40 animate-fade-in"
         onClick={onClose}
       />
       

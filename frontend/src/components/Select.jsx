@@ -83,7 +83,7 @@ export function SelectComponent({
 
         <Select.Portal>
           <Select.Content
-            className="bg-secondary-op95 backdrop-blur-md border border-border-op50 rounded-lg shadow-xl shadow-black/30 overflow-hidden z-50 animate-scaleIn"
+            className="bg-secondary-op95 backdrop-blur-md border border-border-op50 rounded-lg shadow-xl overflow-hidden z-50 animate-scaleIn"
             position="popper"
             sideOffset={4}
           >
@@ -216,7 +216,7 @@ function SearchableSelect({ label, options, value, onChange, placeholder, error,
       {/* Dropdown */}
       {open && (
         <div className="relative z-50">
-          <div className="absolute top-0 left-0 w-full bg-secondary-op95 backdrop-blur-md border border-border-op50 rounded-lg shadow-xl shadow-black/30 overflow-hidden animate-scaleIn">
+          <div className="absolute top-0 left-0 w-full bg-secondary-op95 backdrop-blur-md border border-border-op50 rounded-lg shadow-xl overflow-hidden animate-scaleIn">
             {/* Search input */}
             <div className="flex items-center gap-2 px-2.5 py-2 border-b border-border-op30">
               <MagnifyingGlass size={14} className="text-text-tertiary shrink-0" />

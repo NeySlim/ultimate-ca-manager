@@ -89,7 +89,7 @@ export function ForceEnroll2FA({ onComplete }) {
           <>
             <div>
               <p className="text-sm text-text-secondary mb-3">{t('account.scanQRCode')}</p>
-              <div className="flex justify-center p-4 bg-white rounded-lg">
+              <div className="flex justify-center p-4 bg-paper rounded-lg">
                 <img src={qrData.qr_code} alt="2FA QR Code" className="w-48 h-48" />
               </div>
             </div>

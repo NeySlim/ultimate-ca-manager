@@ -108,7 +108,7 @@ export function CertificateLintModal({ certId, certName, open, onClose }) {
 
             {/* Findings */}
             {findings.length > 0 && (
-              <div className="max-h-[50vh] overflow-y-auto border border-border rounded-lg divide-y divide-white/5">
+              <div className="max-h-[50vh] overflow-y-auto border border-border rounded-lg divide-y divide-border-op30">
                 {findings.map((f, i) => (
                   <div key={`${f.code}-${i}`} className="p-2.5 flex items-start gap-2">
                     <Badge variant={SEVERITY_VARIANT[f.severity] || 'secondary'} size="sm">

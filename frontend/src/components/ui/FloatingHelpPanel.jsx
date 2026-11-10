@@ -995,7 +995,7 @@ function MobileSheet({ quickContent, guideContent, onClose, t }) {
 
   return (
     <div className="fixed inset-0 z-50">
-      <div className="absolute inset-0 bg-black/40 animate-fade-in" onClick={onClose} />
+      <div className="absolute inset-0 bg-scrim-40 animate-fade-in" onClick={onClose} />
       <div
         className={cn(
           'absolute inset-x-0 bottom-0 bg-bg-primary rounded-t-2xl',

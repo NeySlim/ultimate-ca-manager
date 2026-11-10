@@ -241,7 +241,7 @@ export function CommandPalette({ open, onOpenChange }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300]" />
+        <Dialog.Overlay className="fixed inset-0 bg-scrim-60 backdrop-blur-sm z-[300]" />
         <Dialog.Content
           className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg bg-bg-secondary border border-border rounded-lg shadow-2xl z-[301] overflow-hidden"
           onKeyDown={handleKeyDown}
@@ -320,7 +320,7 @@ export function CommandPalette({ open, onOpenChange }) {
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                       >
-                        <ShieldCheck size={16} weight="duotone" className="text-violet-500" />
+                        <ShieldCheck size={16} weight="duotone" className="text-accent-pro" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm block truncate">{item.name}</span>
                           <span className="text-2xs text-text-tertiary truncate block">{item.subject}</span>
@@ -402,7 +402,7 @@ export function CommandPalette({ open, onOpenChange }) {
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                       >
-                        <FileText size={16} weight="duotone" className="text-teal-500" />
+                        <FileText size={16} weight="duotone" className="text-accent-primary" />
                         <div className="flex-1 min-w-0">
                           <span className="text-sm block truncate">{item.name}</span>
                           <span className="text-2xs text-text-tertiary truncate block">{item.subject}</span>

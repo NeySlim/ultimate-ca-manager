@@ -132,7 +132,7 @@ export function Select({
               // Glass effect
               "bg-secondary-op95 backdrop-blur-md",
               "border border-border-op50 rounded-lg",
-              "shadow-xl shadow-black/20",
+              "shadow-xl",
               "overflow-hidden",
               // Animation
               "animate-in fade-in-0 zoom-in-95",

@@ -55,7 +55,7 @@ export function ToggleSwitch({
           inline-block rounded-full shadow-sm
           transition-transform duration-200 ease-in-out
           ${s.thumb}
-          ${checked ? `${s.translate} bg-white` : 'translate-x-[3px] bg-text-tertiary'}
+          ${checked ? `${s.translate} bg-paper` : 'translate-x-[3px] bg-text-tertiary'}
         `}
       />
     </button>

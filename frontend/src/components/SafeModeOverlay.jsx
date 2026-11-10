@@ -47,10 +47,10 @@ export function SafeModeOverlay() {
   if (checking || !safeMode) return null
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-scrim-70 backdrop-blur-sm">
       <div className="max-w-lg w-full mx-4 bg-bg-primary rounded-xl shadow-2xl border border-border p-8 text-center">
-        <div className="w-16 h-16 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto mb-4">
-          <ShieldWarning size={32} className="text-amber-500" weight="fill" />
+        <div className="w-16 h-16 rounded-full bg-status-warning-op20 flex items-center justify-center mx-auto mb-4">
+          <ShieldWarning size={32} className="text-status-warning" weight="fill" />
         </div>
         
         <h2 className="text-xl font-bold text-text-primary mb-2">
