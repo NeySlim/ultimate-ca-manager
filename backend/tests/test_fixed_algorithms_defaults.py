@@ -245,3 +245,11 @@ def test_default_key_with_no_allowed_candidate_is_refused_not_rsa_2048(app, auth
         assert 'RSA-2048' in json.dumps(r.get_json())
     finally:
         _drop_policy(app, pid)
+
+
+def test_default_ca_digest_follows_the_hsm_key_algorithm(app):
+    from services.ca.ca_creation import _default_ca_digest
+    with app.app_context():
+        assert _default_ca_digest(None, '2048') == 'sha256'
+        assert _default_ca_digest(None, '2048', hsm_key_algorithm='EC-P384') == 'sha384'
+        assert _default_ca_digest(None, '2048', hsm_key_algorithm='EC-P521') == 'sha512'

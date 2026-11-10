@@ -119,12 +119,18 @@ def _refuse_on_violations(violations):
         raise PolicyViolation('Policy violation: ' + '; '.join(violations))
 
 
-def _default_ca_digest(caref, key_type):
+def _default_ca_digest(caref, key_type, hsm_key_id=None, hsm_key_algorithm=None):
     """Hash of a CA certificate nobody chose: for an intermediate, the stronger of the parent
-    key's and the new key's (the parent's alone when only it takes one), else the new key's."""
+    key's and the new key's (the parent's alone when only it takes one), else the new key's.
+    The new key's algorithm is the HSM key's when there is one, else *key_type*."""
+    from utils import key_algorithms
     from utils.ca_profile import resolve_digest
     from utils.issuance_defaults import digest_for_key, stronger_digest
-    own = resolve_digest(None, key_type)[0]
+    if hsm_key_id:
+        hsm_key = db.session.get(HsmKey, hsm_key_id)
+        hsm_key_algorithm = hsm_key.algorithm if hsm_key else None
+    alg = key_algorithms.get(hsm_key_algorithm) if hsm_key_algorithm else None
+    own = resolve_digest(None, alg.trust_store_id if alg is not None and alg.trust_store_id else key_type)[0]
     parent = CA.query.filter_by(refid=caref).first() if caref else None
     if parent is not None and parent.crt:
         from services.ca.helpers import get_ca_cert_pem
@@ -298,7 +304,8 @@ class CACreationMixin:
         parent = CA.query.filter_by(refid=caref).first() if caref else None
         key_type = key_type or default_issue_key_id(parent.id if parent else None, compliance_profile)
         if digest is None:  # nobody chose: the signer key's own, yielding to the policies
-            digest, digest_explicit = _default_ca_digest(caref, key_type), False
+            digest, digest_explicit = _default_ca_digest(
+                caref, key_type, hsm_key_id, hsm_key_algorithm), False
 
         # Issuance policies, checked before a key is generated (an HSM key is
         # created on the device), then again on the real key and signer below
