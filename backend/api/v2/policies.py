@@ -6,7 +6,7 @@ from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from utils import key_algorithms, notices as notices_mod
+from utils import issuance_defaults, key_algorithms, notices as notices_mod
 from models import db, CA, Certificate
 from models.policy import CertificatePolicy, ApprovalRequest, OPERATIONS, legacy_operations
 from models.certificate_template import CertificateTemplate
@@ -1020,7 +1020,7 @@ def effective_policy_algorithms():
     """Key types, digests, signature schemes and date horizons the active policies
     leave for a CA and template, so a form offers only what issuance will accept
     (null = unrestricted)."""
-    from services.policy_service import PolicyEvaluationService
+    from services.policy_service import PolicyEvaluationService, PolicyViolation
     ca_id = request.args.get('ca_id', type=int)
     template_id = request.args.get('template_id', type=int)
     key_types, digests = PolicyEvaluationService.effective_algorithms(ca_id, template_id)
@@ -1029,6 +1029,13 @@ def effective_policy_algorithms():
             'ml_dsa': key_algorithms.mldsa_supported()}  # whether this build can use ML-DSA keys
     if fips_mode.enabled():
         data['fips'] = True  # the FIPS system policy is part of the result
+    # The key issued when neither the request nor the template names one
+    data['baseline_key_type'] = issuance_defaults.BASELINE_ISSUE_KEY
+    try:
+        data['default_key_type'] = issuance_defaults.default_issue_key_type(ca_id, template_id=template_id)
+    except PolicyViolation as exc:
+        data['default_key_type'] = None
+        data['default_key_error'] = str(exc)
     return success_response(data=data)
 
 @bp.route('/api/v2/policies', methods=['GET'])

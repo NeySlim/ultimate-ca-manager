@@ -61,7 +61,7 @@ async function submit(onSubmit) {
   return onSubmit.mock.calls[0][0]
 }
 
-const OPEN = { allowed_key_types: null, allowed_digests: null }
+const OPEN = { allowed_key_types: null, allowed_digests: null, default_key_type: 'RSA-2048' }
 
 describe('IssueCertificateForm hybrid pair', () => {
   beforeEach(() => vi.clearAllMocks())
@@ -116,5 +116,15 @@ describe('IssueCertificateForm hybrid pair', () => {
     expect(optionValues('certificates.hybrid.pq')).toEqual(['ML-DSA-65', 'ML-DSA-87'])
     fireEvent.click(screen.getByLabelText('certificates.hybrid.toggle'))
     expect(optionValues('common.keyType')).toEqual(['ecdsa'])
+  })
+
+  it('starts the classical member on the server default key when it is a classical one', async () => {
+    const onSubmit = renderForm({ ...OPEN, default_key_type: 'EC-P384' })
+    await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
+    fireEvent.click(await screen.findByLabelText('certificates.hybrid.toggle'))
+    await waitFor(() => expect(screen.getByLabelText('certificates.hybrid.classical').value).toBe('EC-P384'))
+    // a classical default says nothing about the post-quantum side
+    expect(screen.getByLabelText('certificates.hybrid.pq').value).toBe('ML-DSA-65')
+    expect((await submit(onSubmit)).hybrid).toEqual({ classical: 'EC-P384', pq: 'ML-DSA-65' })
   })
 })

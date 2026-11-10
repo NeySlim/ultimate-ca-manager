@@ -30,7 +30,7 @@ import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { soleImported } from '../lib/importResult'
 import { CSRPanel } from '../components/detail/CSRPanel'
 import {
-  CSR_LABELS, ISSUE_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, findAlgorithm,
+  CSR_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, findAlgorithm,
   groupedOptions, isUsable, keyAlgorithmLabel, listAlgorithms,
 } from '../lib/keyAlgorithms'
 import { useKeyPlatform } from '../lib/policyAlgorithms'
@@ -125,12 +125,15 @@ export default function CSRsPage() {
   const [genCountry, setGenCountry] = useState('')
   const [genState, setGenState] = useState('')
   const [genLocality, setGenLocality] = useState('')
-  const [genKeyType, setGenKeyType] = useState(DEFAULT_CSR_KEY_TYPE)
+  // The user's pick, else the key the server issues when none is named, else the form default
+  const [genKeyChoice, setGenKeyChoice] = useState(null)
   const platform = useKeyPlatform()
+  const serverKey = CSR_LABELS.includes(platform.defaultKeyType) ? findAlgorithm(platform.defaultKeyType).csr : null
+  const genKeyType = genKeyChoice ?? serverKey ?? DEFAULT_CSR_KEY_TYPE
   const csrKeys = useMemo(() => listAlgorithms({ labels: CSR_LABELS, ...platform }), [platform])
   // Only a key this server refuses (ML-DSA or Brainpool in FIPS mode) gives way to the first offered
   useEffect(() => {
-    if (!isUsable(KEY_ALGORITHMS.find(k => k.csr === genKeyType), platform)) setGenKeyType(csrKeys[0].csr)
+    if (!isUsable(KEY_ALGORITHMS.find(k => k.csr === genKeyType), platform)) setGenKeyChoice(csrKeys[0].csr)
   }, [csrKeys, genKeyType, platform])
   const [genSans, setGenSans] = useState([{ type: 'DNS', value: '' }])
   const [generating, setGenerating] = useState(false)
@@ -482,7 +485,7 @@ export default function CSRsPage() {
 
   const resetGenerateForm = () => {
     setGenCN(''); setGenOrg(''); setGenOU(''); setGenCountry('')
-    setGenState(''); setGenLocality(''); setGenKeyType(DEFAULT_CSR_KEY_TYPE)
+    setGenState(''); setGenLocality(''); setGenKeyChoice(null)
     setGenSans([{ type: 'DNS', value: '' }])
   }
 
@@ -591,14 +594,15 @@ export default function CSRsPage() {
     setGenCountry(csr.country || '')
     setGenState(csr.state || '')
     setGenLocality(csr.locality || '')
-    setGenKeyType(mapKeyType(csr))
+    setGenKeyChoice(mapKeyType(csr))
     setGenSans(parseSansFromCSR(csr))
     setShowRekeyChoice(false)
     openModal('generate')
   }
 
   const handleRekeyAsCert = (csr) => {
-    const [keyType, keySize] = csrKeyRow(csr)?.issue || findAlgorithm(ISSUE_DEFAULT_LABELS[0]).issue
+    // A CSR key the form cannot issue leaves the choice to the server default
+    const [keyType, keySize] = csrKeyRow(csr)?.issue || []
     const prefill = {
       cn: csr.common_name || csr.cn || '',
       organization: csr.organization || '',
@@ -1265,7 +1269,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
             options={groupedOptions(csrKeys, t,
               k => algorithmName(k, t, 'csrKey'), k => k.csr)}
             value={genKeyType}
-            onChange={setGenKeyType}
+            onChange={setGenKeyChoice}
           />
           <BrainpoolNotice label={KEY_ALGORITHMS.find(k => k.csr === genKeyType)?.label} />
 

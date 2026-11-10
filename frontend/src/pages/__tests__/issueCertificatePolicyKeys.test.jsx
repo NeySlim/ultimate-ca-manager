@@ -54,7 +54,7 @@ describe('IssueCertificateForm policy key types (#397)', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('keeps every key type when the policies do not restrict them', async () => {
-    renderForm({ allowed_key_types: null, allowed_digests: null })
+    renderForm({ allowed_key_types: null, allowed_digests: null, default_key_type: 'RSA-2048' })
     await waitFor(() => expect(mocks.getEffective).toHaveBeenCalledWith({ ca_id: '3', template_id: undefined }))
     expect(optionValues('common.keyType')).toEqual(['rsa', 'ecdsa', 'ml-dsa'])
     expect(optionValues('common.keySize')).toEqual(['2048', '3072', '4096'])

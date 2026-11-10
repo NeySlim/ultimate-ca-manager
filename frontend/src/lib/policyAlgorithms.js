@@ -32,10 +32,12 @@ export function caKeyLabel(keyAlgo, keySize) {
  * A failed lookup leaves the form unrestricted: the server enforces the rules anyway.
  */
 export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
-  const [state, setState] = useState({ allowedKeyTypes: null, allowedDigests: null, fips: false, mldsa: true, pqStandalone: false })
+  const [state, setState] = useState({ allowedKeyTypes: null, allowedDigests: null, fips: false, mldsa: true, pqStandalone: false, defaultKeyType: null })
   useEffect(() => {
     if (!enabled) return undefined
     let cancelled = false
+    // The previous pair's default is stale until this pair answers
+    setState((prev) => (prev.defaultKeyType === null ? prev : { ...prev, defaultKeyType: null }))
     Promise.resolve()
       .then(() => policiesService.getEffective({ ca_id: caId || undefined, template_id: templateId || undefined }))
       .then((res) => {
@@ -47,10 +49,12 @@ export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
           fips: data.fips === true,
           mldsa: data.ml_dsa !== false,
           pqStandalone: data.pq_standalone === true,
+          // The server's own default key; its baseline stands in when only that came back
+          defaultKeyType: data.default_key_type ?? (data.default_key_error ? null : data.baseline_key_type ?? null),
         })
       })
       .catch(() => {
-        if (!cancelled) setState({ allowedKeyTypes: null, allowedDigests: null, fips: false, mldsa: true, pqStandalone: false })
+        if (!cancelled) setState({ allowedKeyTypes: null, allowedDigests: null, fips: false, mldsa: true, pqStandalone: false, defaultKeyType: null })
       })
     return () => { cancelled = true }
   }, [caId, templateId, enabled])
@@ -62,7 +66,7 @@ export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
  * `mldsa` (this build has ML-DSA). A failed lookup offers everything: the server refuses anyway.
  */
 export function useKeyPlatform() {
-  const [platform, setPlatform] = useState({ fips: false, mldsa: true })
+  const [platform, setPlatform] = useState({ fips: false, mldsa: true, defaultKeyType: null })
   useEffect(() => {
     let cancelled = false
     Promise.resolve()
@@ -70,7 +74,8 @@ export function useKeyPlatform() {
       .then((res) => {
         if (cancelled) return
         const data = extractData(res) || {}
-        setPlatform({ fips: data.fips === true, mldsa: data.ml_dsa !== false })
+        // default_key_type: what the server issues for a request that names no key
+        setPlatform({ fips: data.fips === true, mldsa: data.ml_dsa !== false, defaultKeyType: data.default_key_type ?? null })
       })
       .catch(() => {})
     return () => { cancelled = true }

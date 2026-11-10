@@ -2713,10 +2713,14 @@ GET /api/v2/policies/effective?ca_id=3&template_id=1
     "tsa_signer_key_types": ["EC-P256", "EC-P384", "EC-P521"],
     "pq_standalone": false,      # true: a post-quantum key only as a member of a hybrid pair
     "ml_dsa": true,              # false when this build's OpenSSL has no ML-DSA
+    "default_key_type": "RSA-3072",  # key issued when neither the request nor the template names one
+    "baseline_key_type": "RSA-2048", # the starting candidate of that rule
     "fips": true                 # only present in FIPS mode
   }
 }
 ```
+
+`default_key_type` is `null` when the policies leave no default candidate; `default_key_error` then holds the reason.
 
 ---
 

@@ -17,7 +17,6 @@ import { CustomExtensionsEditor } from '../../components/CustomExtensionsEditor'
 import { customExtensionsPayload } from '../../lib/customExtensions'
 
 const ISSUE_FAMILY_OPTIONS = keyFamilyOptions('issue')
-const [DEFAULT_KEY_TYPE, DEFAULT_KEY_SIZE] = findAlgorithm(ISSUE_DEFAULT_LABELS[0]).issue
 
 // Issue Certificate Form — full-featured with template, cert type, structured SANs, date picker
 export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
@@ -31,6 +30,8 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   // lands, so a state-closure guard would see the stale value.
   const [issuing, setIssuing] = useState(false)
   const issuingRef = useRef(false)
+  // Who set the current key: 'user', 'template' or null (server default applies)
+  const keySource = useRef(null)
   const [showAllTemplates, setShowAllTemplates] = useState(false)
   const [showHiddenCas, setShowHiddenCas] = useState(false)
   const [customExtRows, setCustomExtRows] = useState([])
@@ -47,8 +48,9 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     state: '',
     locality: '',
     email: '',
-    key_type: DEFAULT_KEY_TYPE,
-    key_size: DEFAULT_KEY_SIZE,
+    // Empty until the server names its default key for the CA and template
+    key_type: '',
+    key_size: '',
     validity_days: '365',
     expiry_date: '',
     ocsp_must_staple: false,
@@ -134,9 +136,10 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
         state: initialData.state || '',
         locality: initialData.locality || '',
         email: initialData.email || '',
-        key_type: initialData.key_type || DEFAULT_KEY_TYPE,
-        key_size: initialData.key_size || DEFAULT_KEY_SIZE,
+        key_type: initialData.key_type || '',
+        key_size: initialData.key_size || '',
       }))
+      keySource.current = initialData.key_type ? 'user' : null
       if (initialData.sans?.length > 0) {
         setSans(initialData.sans.filter(s => s && typeof s.type === 'string' && typeof s.value === 'string'))
       }
@@ -145,8 +148,8 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   }, [initialData])
 
   // Key types the policies of this CA/template allow (#397); the server enforces them regardless
-  const { allowedKeyTypes, fips, mldsa, pqStandalone } = useEffectiveAlgorithms({
-    caId: formData.ca_id, templateId: selectedTemplate, enabled: !!formData.ca_id,
+  const { allowedKeyTypes, fips, mldsa, pqStandalone, defaultKeyType } = useEffectiveAlgorithms({
+    caId: formData.ca_id, templateId: selectedTemplate,
   })
   const pairKeys = useMemo(
     () => ISSUE_KEY_CHOICES.filter(([type, size]) => isAllowed(allowedKeyTypes, issueKeyLabel(type, size))
@@ -163,28 +166,41 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   const hybridClassical = allowedLabels.filter(l => !isPostQuantum(l))
   const hybridPq = allowedLabels.filter(isPostQuantum)
   const hybridAvailable = hybridClassical.length > 0 && hybridPq.length > 0
-  // Each side keeps its choice while allowed, else the form's default key, else the first allowed
+  // Each side keeps its choice while allowed, else the server default when it fits that side
+  // (the form's own default until the server answers), else the first allowed
   const pickHybrid = (current, allowed) => (allowed.includes(current) ? current
-    : ISSUE_DEFAULT_LABELS.find(l => allowed.includes(l)) ?? allowed[0] ?? '')
+    : [defaultKeyType, ...ISSUE_DEFAULT_LABELS].find(l => l && allowed.includes(l)) ?? allowed[0] ?? '')
   const hybridChoice = {
     classical: pickHybrid(formData.hybrid_classical, hybridClassical),
     pq: pickHybrid(formData.hybrid_pq, hybridPq),
   }
   const isHybrid = formData.hybrid && hybridAvailable
-  // The family's default key when allowed, else its first allowed one
+  // The family's default key when allowed (the server's if it is of that family), else its first allowed one
   const sizeForType = (type) => {
-    const preferred = defaultKeyChoice('issue', type, ISSUE_DEFAULT_LABELS)?.[1]
+    const serverPair = defaultKeyType ? findAlgorithm(defaultKeyType)?.issue : null
+    const preferred = (serverPair?.[0] === type ? serverPair : defaultKeyChoice('issue', type, ISSUE_DEFAULT_LABELS))?.[1]
     if (noKeyAllowed || allowedKeys.some(([k, sz]) => k === type && sz === preferred)) return preferred
     return allowedKeys.find(([k]) => k === type)?.[1] ?? preferred
   }
 
-  // A key the policies forbid (template default, previous CA) switches to the first allowed one
+  // The server's default key for this CA and template, until the user picks another
   useEffect(() => {
-    if (noKeyAllowed) return
+    if (keySource.current) return
+    // No default (pending, failed, none allowed): no key is named, the server decides
+    const pair = (defaultKeyType && findAlgorithm(defaultKeyType)?.issue) || ['', '']
+    setFormData(prev => ({ ...prev, key_type: pair[0], key_size: pair[1] }))
+  }, [defaultKeyType])
+
+  // A key the policies forbid (template default, previous CA) switches to the first allowed one;
+  // with no key yet and no restriction, the server default or its own choice applies
+  useEffect(() => {
+    if (noKeyAllowed || (!formData.key_type && !allowedKeyTypes)) return
     if (allowedKeys.some(([k, sz]) => k === formData.key_type && sz === formData.key_size)) return
-    const [type, size] = allowedKeys.find(([k]) => k === formData.key_type) || allowedKeys[0]
+    const def = !keySource.current && findAlgorithm(defaultKeyType)?.issue
+    const [type, size] = (def && allowedKeys.some(([k, sz]) => k === def[0] && sz === def[1]) ? def : null)
+      || allowedKeys.find(([k]) => k === formData.key_type) || allowedKeys[0]
     setFormData(prev => ({ ...prev, key_type: type, key_size: size }))
-  }, [allowedKeys, noKeyAllowed, formData.key_type, formData.key_size])
+  }, [allowedKeys, allowedKeyTypes, noKeyAllowed, defaultKeyType, formData.key_type, formData.key_size])
 
   // Get selected CA's expiry for max date
   const selectedCa = useMemo(() => 
@@ -205,20 +221,21 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   // Apply template when selected
   const handleTemplateChange = (templateId) => {
     setSelectedTemplate(templateId)
-    if (!templateId) return
-    const tpl = templates.find(t => String(t.id) === templateId)
-    if (!tpl) return
-
-    const updates = {}
-
-    // Map template key_type to form fields
-    if (tpl.key_type) {
-      const pair = findAlgorithm(tpl.key_type)?.issue
-      if (pair) {
-        updates.key_type = pair[0]
-        updates.key_size = pair[1]
-      }
+    const tpl = templateId ? templates.find(t => String(t.id) === templateId) : null
+    const tplPair = tpl?.key_type ? findAlgorithm(tpl.key_type)?.issue : null
+    // A keyless template (or none) releases only a template's key, never the user's own choice;
+    // the key is blanked until the new pair's server default arrives (the effect above sets it)
+    const released = !tplPair && keySource.current === 'template'
+    if (released) keySource.current = null
+    const keyPair = tplPair || (released ? ['', ''] : null)
+    const keyUpdates = keyPair ? { key_type: keyPair[0], key_size: keyPair[1] } : {}
+    if (tplPair) keySource.current = 'template'
+    if (!tpl) {
+      if (keyPair) setFormData(prev => ({ ...prev, ...keyUpdates }))
+      return
     }
+
+    const updates = { ...keyUpdates }
     if (tpl.validity_days) updates.validity_days = String(tpl.validity_days)
 
     // Map template_type to cert_type (unmapped types fall back to custom:
@@ -356,8 +373,8 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
       state: formData.state || undefined,
       locality: formData.locality || undefined,
       email: formData.email || undefined,
-      key_type: formData.key_type,
-      key_size: formData.key_size,
+      key_type: formData.key_type || undefined,
+      key_size: formData.key_size || undefined,
       ...(isHybrid && {
         key_type: findAlgorithm(hybridChoice.classical).issue[0],
         key_size: findAlgorithm(hybridChoice.classical).issue[1],
@@ -669,6 +686,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
           label={t('common.keyType')}
           value={formData.key_type}
           onChange={(val) => {
+            keySource.current = 'user'
             update('key_type', val)
             update('key_size', sizeForType(val))
           }}
@@ -677,7 +695,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
         <Select
           label={t('common.keySize')}
           value={formData.key_size}
-          onChange={(val) => update('key_size', val)}
+          onChange={(val) => { keySource.current = 'user'; update('key_size', val) }}
           options={groupedOptions(
             KEY_ALGORITHMS.filter(k => k.generate && k.issue && k.issue[0] === formData.key_type), t,
             k => algorithmName(k, t, 'sizeKey'), k => k.issue[1],
