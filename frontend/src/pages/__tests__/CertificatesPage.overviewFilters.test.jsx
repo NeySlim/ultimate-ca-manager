@@ -29,9 +29,8 @@ let mockIsMobile = false
 vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: mockIsMobile, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
-  useWindowManager: () => ({
-    openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
-    prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
+  useInspector: () => ({
+    ...windows, windows: [], prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: () => {},
   }),
 }))
 
