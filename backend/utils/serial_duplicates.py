@@ -1,8 +1,8 @@
 """Certificates sharing one serial under one CA (RFC 5280 §4.1.2.2).
 
-Migration 142 creates ``uix_certificates_ca_serial`` only when this finds nothing;
-a backend migration or a restore onto a schema that has the index checks its source
-with the same query and refuses, naming the rows, rather than failing on the index.
+Migration 142 creates ``uix_certificates_ca_serial`` only when this finds nothing.
+A backend migration checks its source, and a restore its archive only when the target
+carries the index, refusing with the rows named rather than failing on the index.
 """
 from typing import Dict, Iterable, List
 
