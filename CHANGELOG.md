@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
-- HA preview: `UCM_HA=1` requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, refuses operations that only change the local host, and reports `ha`, `node_id` and `leader` in `/health`. `/health/ready` answers 503 in safe mode with `UCM_HA=1` **or** when a check fails, and the Helm chart probes it.
+- HA preview: `UCM_HA=1` requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, refuses operations that only change the local host, and reports `ha`, `node_id` and `leader` in `/health`. `/health/ready` answers 503 in safe mode with `UCM_HA=1` or when a check fails, and the Helm chart probes it.
 
 ### Fixed
 
