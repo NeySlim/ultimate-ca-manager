@@ -7,6 +7,8 @@ UCM stores certificate serial numbers in these forms:
   string of the integer (``"182716277442602097566978062183857154669354824224"``),
   written only through ``canonical_serial`` (a model validator enforces it), so the
   unique (caref, serial_number) index sees one spelling per serial (migration 144).
+- **est_signer_certs.serial_number**: a copy of its certificate row's serial, compared
+  to it by string equality, so the same decimal ``str(int)``.
 - **OCSP cache (OCSPResponse.cert_serial)**: lowercase hexadecimal string
   without ``0x`` prefix (e.g. ``"2008b...e0"``), matching ``format(int, 'x')``.
 - Tables never joined to certificates by string equality keep their own form
