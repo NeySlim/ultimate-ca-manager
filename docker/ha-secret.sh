@@ -4,7 +4,7 @@
 
 check_ha_secret() {
     local ha
-    ha=$(printf '%s' "${UCM_HA:-}" | tr '[:upper:]' '[:lower:]')
+    ha=$(printf '%s' "${UCM_HA:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
     case "$ha" in
         1|true|yes|on) ;;
         *) return 0 ;;

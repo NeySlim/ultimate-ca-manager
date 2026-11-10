@@ -35,3 +35,9 @@ def test_entrypoint_checks_ha_secret_before_generating_one_neg():
     text = (ROOT / 'docker' / 'entrypoint.sh').read_text()
     check = text.index('check_ha_secret || exit 1')
     assert check < text.index('generate_secret)')
+
+
+@pytest.mark.parametrize('ha', [' 1', '1 ', ' true\t'])
+def test_ha_flag_blanks_are_ignored_neg(ha):
+    r = _run({'UCM_HA': ha})
+    assert r.returncode != 0 and 'UCM_SECRET_KEY' in r.stdout + r.stderr
