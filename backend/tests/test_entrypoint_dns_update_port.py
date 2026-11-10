@@ -7,7 +7,6 @@ The listener is off when the variable is unset or 0. Otherwise the port must be
 an integer from 1024 to 65535 (the image runs as the user ucm, without
 CAP_NET_BIND_SERVICE) and must differ from the HTTPS and HTTP ports.
 """
-import os
 import pathlib
 import subprocess
 
@@ -39,20 +38,13 @@ def test_scripts_with_a_syntax_error_are_caught_neg(tmp_path):
     assert result.returncode != 0
 
 
-# The entrypoint itself stops on a bad port in its validation step, before it writes
-# anything. A good port goes on to set up /opt/ucm, so only the refusal is run here,
-# and not as root: there a regression could write to /opt/ucm.
-@pytest.mark.skipif(os.geteuid() == 0, reason='a regression could write to /opt/ucm as root')
-@pytest.mark.parametrize('env, message', [
-    ({'UCM_DNS_UPDATE_PORT': '53'}, 'Invalid DNS UPDATE port: 53'),
-    ({'UCM_DNS_UPDATE_PORT': '8443'}, 'is the same as the HTTPS or HTTP port'),
-])
-def test_entrypoint_stops_on_a_bad_port_neg(tmp_path, env, message):
-    result = subprocess.run(['timeout', '60', 'bash', str(ENTRYPOINT)], cwd=tmp_path,
-                            env={'PATH': '/usr/bin:/bin', 'HOME': str(tmp_path), **env},
-                            capture_output=True, text=True)
-    assert result.returncode == 1, result.stdout
-    assert message in result.stdout
+def test_entrypoint_checks_the_port_before_setting_up_the_data_dir_neg():
+    # test d'ordre textuel : le comportement est prouvé par les tests de dns-update-port.sh,
+    # l'entrypoint n'est jamais exécuté ici
+    text = ENTRYPOINT.read_text()
+    check = text.index('check_dns_update_port || exit 1')
+    assert text.index('dns-update-port.sh') < check
+    assert check < text.index('mkdir -p "$DATA_PATH"')
 
 
 @pytest.mark.parametrize('env', [
