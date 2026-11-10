@@ -738,3 +738,33 @@ def test_stop_during_a_failed_restart_is_not_undone(app, ha):
     solo.run_once()
     assert solo._stopping
     assert solo._stop.is_set()  # the applier loop ends instead of reopening a connection
+
+
+@pytest.mark.parametrize('behind_newer', [False, True], ids=['above-cursor', 'in-hole'])
+def test_a_restart_committed_after_the_node_started_runs_though_created_before(app, ha, behind_newer):
+    """Its change was not committed when the node read its settings: the node restarts."""
+    from sqlalchemy.orm import Session
+    from models import ClusterCommand
+    from services.scheduler_leader import _dedicated_engine, application_url
+    cluster, log = _Cluster(app), []
+    _node_row(app, 'n')
+    started = utc_now()
+    n = ha('n', started_at=started, restart_action=cluster.action('n'),
+           handlers={cc.RELOAD_SYSLOG: _recorder(log, 'n')})
+    with app.app_context():
+        engine = _dedicated_engine(application_url())
+    try:
+        with Session(bind=engine) as slow, Session(bind=engine) as fast:
+            slow.add(ClusterCommand(kind=cc.RESTART, created_at=started - timedelta(seconds=5)))
+            slow.flush()  # id taken before the node starts, committed after its first pass
+            n.start()
+            assert wait_for(lambda: n.seen is not None)
+            if behind_newer:
+                fast.add(ClusterCommand(kind=cc.RELOAD_SYSLOG, payload='{"mark": "fast"}',
+                                        created_at=utc_now()))
+                fast.commit()
+                assert wait_for(lambda: ('n', 'fast') in log)
+            slow.commit()
+        assert wait_for(lambda: ('down', 'n') in cluster.events)
+    finally:
+        engine.dispose()

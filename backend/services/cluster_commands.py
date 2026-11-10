@@ -40,7 +40,7 @@ RESTART_RETRY_FIRST = 2.0
 RESTART_RETRY_MAX = 60.0
 RETENTION = timedelta(hours=24)
 # A starting process replays the reloads of this window (idempotent): one committed while it
-# read its settings is not lost. A restart in it is older than the process and never runs.
+# read its settings is not lost. A restart in it, already committed then, never runs.
 START_REPLAY = timedelta(seconds=60)
 BATCH = 200
 
@@ -51,6 +51,7 @@ _Held = namedtuple('_Held', 'id created_at')
 # On this host's clock: the applier moves it onto the cluster clock before comparing.
 PROCESS_STARTED = utc_now()
 
+_RESTARTS_SQL = text("SELECT id FROM cluster_commands WHERE kind = :k AND created_at > :t")
 _INITIAL_SQL = text("SELECT COALESCE(MAX(id), 0) FROM cluster_commands WHERE created_at <= :t")
 _NODES_SQL = text("SELECT node_id, started_at, heartbeat_at FROM cluster_nodes")
 _ADVANCE_SQL = text("UPDATE cluster_nodes SET command_seen = :id WHERE node_id = :n "
@@ -190,6 +191,7 @@ class CommandApplier:
         self.guard = RESTART_GUARD_SECONDS if guard is None else guard
         self.stale_seconds = STALE_PASSES * 60 if stale_seconds is None else stale_seconds
         self.seen = None
+        self._known_at_start = None  # restart ids already committed at the first pass
         self.restarting = False
         self._holes = []  # [lo, hi, monotonic deadline]: ids passed over that may still commit
         self._gap = None  # (first missing id, monotonic time it was noticed)
@@ -254,6 +256,11 @@ class CommandApplier:
                 # created_at is on the cluster clock: a host whose clock drifts compares right
                 self.started_at = self._cluster_clock(conn, self.started_at)
                 self._on_cluster_clock = True
+            if self._known_at_start is None:
+                # Before the cursor, once: a restart committed later is not taken for one this
+                # process already started after
+                self._known_at_start = frozenset(conn.execute(_RESTARTS_SQL, {
+                    'k': RESTART, 't': self.started_at - START_REPLAY}).scalars())
             if self.seen is None:
                 self.seen = conn.execute(_INITIAL_SQL, {'t': self.started_at - START_REPLAY}).scalar() or 0
                 self._mark_seen(conn, self.seen)
@@ -370,8 +377,8 @@ class CommandApplier:
     def _restart(self, conn, row):
         """Sets _stop when this process leaves; while it waits for its turn, ``row`` is held
         (restart_seen, not command_seen, records the claim) and later reloads go on."""
-        if not self.record or row.created_at <= self.started_at:
-            # Started after the command (or the scheduler process): nothing to restart here
+        if not self.record or (row.created_at <= self.started_at and row.id in self._known_at_start):
+            # Started after the command was committed (or the scheduler process): nothing to restart
             self._held = None
             self._advance(conn, row.id)
             return
