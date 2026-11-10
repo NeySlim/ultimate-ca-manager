@@ -216,6 +216,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 # Copy entrypoint before switching user
 COPY --chown=ucm:ucm docker/entrypoint.sh /entrypoint.sh
 COPY --chown=ucm:ucm docker/dns-update-port.sh /dns-update-port.sh
+COPY --chown=ucm:ucm docker/ha-secret.sh /ha-secret.sh
 RUN chmod +x /entrypoint.sh
 
 # Switch to non-root user

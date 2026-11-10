@@ -35,7 +35,7 @@ Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `U
 | `DATABASE_URL` | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use PostgreSQL. When unset, UCM uses SQLite at `DATA_DIR/ucm.db`. |
 | `UCM_ADMIN_ALLOWED_NETWORKS` | `UCM_ADMIN_ALLOWED_NETWORKS` | (unset) | Comma-separated IP addresses or CIDR networks allowed to reach the web interface and the management API. When set, it wins over the setting in Settings > Security, which becomes read-only. See [Admin access allowlist](#admin-access-allowlist) |
 | `UCM_ADMIN_ALLOWLIST_DISABLE` | `UCM_ADMIN_ALLOWLIST_DISABLE` | (unset) | `1` turns the admin access allowlist off (recovery after a lock-out); a warning is logged at startup |
-| `UCM_HA` | `UCM_HA` | (unset) | `1` enables HA mode in preview: refuses host-local operations; full high availability arrives in later releases. Requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`; the node exits at startup when one is missing |
+| `UCM_HA` | `UCM_HA` | (unset) | `1` enables HA mode in preview: refuses host-local operations; full high availability arrives in later releases. Requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`; the node exits at startup when one is missing (the Docker image also refuses to generate `UCM_SECRET_KEY`) |
 | `UCM_NODE_ID` | `UCM_NODE_ID` | hostname | Node name reported as `node_id` by `/health` and `/health/ready` |
 | `BACKUP_MAX_UPLOAD_MB` | `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive a restore accepts and reads, in MB; its decompressed content may be four times that. Every other request keeps the 50 MB limit. Creating a larger archive succeeds with a warning |
 
