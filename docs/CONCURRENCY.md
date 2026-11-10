@@ -33,6 +33,8 @@ When the migration 142 finds certificate rows sharing a serial string under one 
 lists them, keeps them, and leaves the index pending under the `SystemConfig` key
 `serial_unique_index_pending`, which every start logs and `/health` reports as
 `serial_unique_index_pending` (the number of pairs). While it is pending, a backend
-migration and a restore of a backup taken from it refuse the source, naming the rows.
+migration refuses the source, and a restore of a backup taken from it is refused on an
+installation that has the index, naming the rows; the pending installation itself still
+restores its own backups. The flag never travels in a backup.
 Once they are resolved, deleting the `142_serial_per_ca_and_proxy_links` row from
 `_migrations` makes the next start run the migration again and create the index.

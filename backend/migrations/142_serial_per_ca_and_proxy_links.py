@@ -14,7 +14,7 @@ import logging
 import sqlite3
 
 # The query a backend migration and a restore run on their source too
-from utils.serial_duplicates import DUPLICATES, PENDING_KEY
+from utils.serial_duplicates import CLEANUP, DUPLICATES, PENDING_KEY
 
 logger = logging.getLogger(__name__)
 pg_compatible = True
@@ -62,8 +62,7 @@ def _apply(execute, tables, value_param, false_literal):
     for d in duplicates:
         logger.warning("Migration 142: CA %s holds %s certificates with serial %s",
                        d['caref'], d['count'], d['serial_number'])
-    logger.warning("Migration 142: unique serial index not created; resolve the duplicates "
-                   "and run migration 142 again")
+    logger.warning("Migration 142: unique serial index not created. %s", CLEANUP)
     if CONFIG in tables:
         execute(SET_PENDING.format(value=value_param, false=false_literal),
                 json.dumps({'duplicates': duplicates}))

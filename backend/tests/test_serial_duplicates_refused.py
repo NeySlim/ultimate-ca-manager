@@ -22,7 +22,7 @@ def _migration():
 def _states_the_procedure(message):
     """Packages ship no docs/: the message itself says how to clear the duplicates."""
     assert 'docs/' not in message and '.md' not in message
-    assert 'Revoke or delete' in message
+    assert 'Delete all but one' in message and 'revoked row still counts' in message
     assert "'142_serial_per_ca_and_proxy_links'" in message and '_migrations' in message
 
 
@@ -134,7 +134,7 @@ def test_a_pending_serial_index_is_logged_at_start_and_shown_by_health(app, clie
         with caplog.at_level(logging.WARNING):
             check_pending_serial_index(app)
         warning = next(r.getMessage() for r in caplog.records if PENDING_KEY in r.getMessage())
-        assert '1 serial' in warning
+        assert '1 serial' in warning and 'CA ca-a serial 11' in warning
         _states_the_procedure(warning)
         assert client.get('/health').get_json()['serial_unique_index_pending'] == 1
     finally:
@@ -151,3 +151,21 @@ def test_every_start_checks_for_a_pending_serial_index(monkeypatch):
     monkeypatch.setattr('utils.serial_duplicates.check_pending_serial_index', started.append)
     with fresh_app() as application:
         assert started == [application]
+
+
+def test_the_pending_flag_stays_on_the_database_it_describes(app):
+    """A backup carries no schema state: a restore must not revive the flag on a target with the index."""
+    import json
+    from models import SystemConfig
+    from services.backup import installation
+    from utils.serial_duplicates import PENDING_KEY
+    assert PENDING_KEY in installation.LOCAL_SETTINGS
+    with app.app_context():
+        SystemConfig.query.filter_by(key=PENDING_KEY).delete()
+        db.session.add(SystemConfig(key=PENDING_KEY, value=json.dumps({'duplicates': []})))
+        db.session.commit()
+        try:
+            assert PENDING_KEY not in _service()._export_configuration(True)['settings']
+        finally:
+            SystemConfig.query.filter_by(key=PENDING_KEY).delete()
+            db.session.commit()
