@@ -270,3 +270,24 @@ def test_a_renewal_refused_at_issuance_is_announced_as_such(app, client, auth_cl
         assert r.get_json()['message'] == 'Request closed'
         reason, invalid, _echo = _fault(_post(client, _query_rst(request_id), tls_cert=old_cert))
         assert reason == 'Refused at issuance' and invalid == 'true'
+
+
+def test_renewal_approved_then_renewed_row_deleted_is_delivered(app, client, auth_client, wstep_config):
+    """Only a revocation refuses an approved renewal: a renewed certificate
+    no longer on record (UNKNOWN) lets the approved one through."""
+    from models import db
+    from tests.protocol_approval_support import _delete_with_dependents
+    old_cert, old_key = _issue(app, wstep_config['id'], 'renew-unknown.wstep-approval.test')
+    body = _rst(_cmc_renewal(_renewal_csr(old_cert, old_key), [(old_key, old_cert)]))
+    with approval_policy(app, wstep_config['id'], 'wstep-held-renew-unknown') as pid:
+        request_id = _pending(_post(client, body, tls_cert=old_cert))
+        (approval_id, *_), = requests_of(app, pid, 'wstep_request')
+        approve(auth_client, approval_id)
+        with app.app_context():
+            old_id = Certificate.query.filter_by(serial_number=str(old_cert.serial_number)).first().id
+            _delete_with_dependents(Certificate, {'id': [old_id]})
+            db.session.commit()
+        issued = _post(client, _query_rst(request_id), tls_cert=old_cert)
+        assert issued.status_code == 200, issued.data
+        assert _issued_cert_from_rstr(issued.data).subject == old_cert.subject
+        assert requests_of(app, pid, 'wstep_request')[0][1] == 'approved'

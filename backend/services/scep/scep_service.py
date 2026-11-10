@@ -1251,9 +1251,10 @@ class SCEPService:
         if cert is None or not cert.crt:
             reason = protocol_approval.CERTIFICATE_WITHDRAWN
         elif existing.renewal_of:
-            from services.cert.issued_lookup import OK, SUPERSEDED, issued_certificate_status
+            # Only a revocation refuses it: expired or no longer on record still delivers
+            from services.cert.issued_lookup import REVOKED, issued_certificate_status
             renewed = x509.load_pem_x509_certificate(base64.b64decode(existing.renewal_of), default_backend())
-            if issued_certificate_status(self.ca, renewed)[1] not in (OK, SUPERSEDED):
+            if issued_certificate_status(self.ca, renewed)[1] == REVOKED:
                 reason = protocol_approval.RENEWED_REVOKED
         if reason is None:
             return x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend())

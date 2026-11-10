@@ -460,3 +460,20 @@ def test_deleting_the_policy_tells_intune_of_an_expired_request(
         assert r.status_code == 200, r.get_json()
         assert requests_of(app, pid) == []
         assert _FakeIntune.calls == [('failure', 'txn-19', 'Approval request expired')]
+
+
+def test_an_approved_renewal_whose_renewed_row_went_away_is_delivered(app, auth_client, scep_ca):
+    """Only a revocation refuses an approved renewal: a renewed certificate
+    no longer on record (UNKNOWN) lets the approved one through."""
+    from models import Certificate
+    from tests.protocol_approval_support import _delete_with_dependents
+    with approval_policy(app, scep_ca, 'scep-held-renew-unknown', operations=['renewal']) as pid:
+        issued, key, approval_id = _held_renewal(app, scep_ca, pid, 'scep renew unknown')
+        approve(auth_client, approval_id)
+        with app.app_context():
+            old_id = Certificate.query.filter_by(serial_number=str(issued.serial_number)).first().id
+            _delete_with_dependents(Certificate, {'id': [old_id]})
+            db.session.commit()
+        assert _poll_transaction(app, scep_ca, (issued, key), 'txn-17') == SUCCESS
+        assert _renewal_row(app, scep_ca) == 'approved'
+        assert requests_of(app, pid, 'scep_request')[0][1] == 'approved'

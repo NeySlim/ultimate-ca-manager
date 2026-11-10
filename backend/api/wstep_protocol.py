@@ -227,15 +227,15 @@ def _rstr(body):
 
 
 def _renewed_certificate_standing(ca, approval):
-    """An approved renewal is delivered only while the certificate it renews
-    is OK or SUPERSEDED (by this very renewal); a revoked one refuses it."""
+    """An approved renewal is refused only when the certificate it renews
+    was revoked; any other status (expired, no longer on record) delivers it."""
     from services import protocol_approval
-    from services.cert.issued_lookup import OK, SUPERSEDED, issued_certificate_status
+    from services.cert.issued_lookup import REVOKED, issued_certificate_status
     renewal_of = protocol_approval.request_data(approval).get('renewal_of')
     if not renewal_of:
         return True
     _row, status = issued_certificate_status(ca, x509.load_pem_x509_certificate(renewal_of.encode()))
-    return status in (OK, SUPERSEDED)
+    return status != REVOKED
 
 
 def _answer_held(ca, parsed, approval):
