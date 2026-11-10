@@ -100,3 +100,13 @@ def test_a_responder_renewal_another_runner_won_counts_nothing(app, responder, m
     with app.app_context():
         ocsp_responder_renewal.run_ocsp_responder_renewal()
     assert _count(app, ca_id) == (1, 1)
+
+
+def test_a_cross_certificate_counts_under_its_issuer(app, auth_client, create_ca):
+    issuer = create_ca(cn='Cross-signing count issuer')
+    subject = create_ca(cn='Cross-signing count subject')
+    r = auth_client.post(f"/api/v2/cas/{issuer['id']}/cross-sign",
+                         json={'subject_ca_id': subject['id']})
+    assert r.status_code == 201, r.data
+    assert _count(app, issuer['id']) == (1, 0)
+    assert _count(app, subject['id']) == (0, 0)
