@@ -922,7 +922,7 @@ def create_app(config_name=None):
                 name="session_cleanup",
                 func=SessionCleanupTask.execute,
                 interval=900,  # Every 15 minutes
-                description="Clean up expired session files"
+                description="Clean up expired sessions"
             )
             app.logger.info("Registered session cleanup task (every 15m)")
         except ImportError:
