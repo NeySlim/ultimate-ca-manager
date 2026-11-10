@@ -197,3 +197,22 @@ def test_the_store_never_waits_on_the_request_pool(monkeypatch, tmp_path):
         with app.app_context():
             db.session.remove()
             db.engine.dispose()
+
+
+def _expiry_indexed(app):
+    from sqlalchemy import inspect
+
+    from models import db
+    with app.app_context():
+        return 'ix_flask_sessions_expiry' in {
+            ix['name'] for ix in inspect(db.engine).get_indexes('flask_sessions')}
+
+
+def test_a_fresh_sqlite_store_has_the_expiry_index(sql_store_app):
+    assert _expiry_indexed(sql_store_app)
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG_URL, reason='no PostgreSQL URL for the fresh-schema index test')
+def test_a_fresh_postgresql_store_has_the_expiry_index(two_nodes):
+    assert _expiry_indexed(two_nodes[0])
