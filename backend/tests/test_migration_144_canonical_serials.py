@@ -72,6 +72,26 @@ REVOCATIONS = [  # (id, caref, serial_number, certificate_id) -> stored afterwar
     ((4, 'ca-b', '1f', 6), '31'),  # no unique index on revocations: always converted
 ]
 PENDING = [{'caref': 'ca-b', 'serial_number': '31', 'count': 2}]
+# A row whose target is the spelling a held row keeps is held too, down a chain
+BLOCKED = [
+    ((21, 'ca-x', '10', _certificate(0x10)), '10'),
+    ((22, 'ca-x', '0x10', None), '0x10'),
+    ((23, 'ca-x', 'a', None), 'a'),  # '10' is row 21's spelling
+    ((31, 'ca-y', '34', _certificate(0x34)), '34'),
+    ((32, 'ca-y', '0x34', None), '0x34'),
+    ((33, 'ca-y', '22', _certificate(0x22)), '22'),  # '34' is row 31's spelling
+    ((34, 'ca-y', '0x16', None), '0x16'),  # '22' is row 33's spelling
+    ((35, 'ca-y', 'ff', None), '255'),
+]
+BLOCKED_PENDING = [
+    {'caref': 'ca-x', 'serial_number': '16', 'count': 2},
+    {'caref': 'ca-x', 'serial_number': 'a', 'count': 1, 'waits_for': '10'},
+    {'caref': 'ca-y', 'serial_number': '0x16', 'count': 1, 'waits_for': '22'},
+    {'caref': 'ca-y', 'serial_number': '22', 'count': 1, 'waits_for': '34'},
+    {'caref': 'ca-y', 'serial_number': '52', 'count': 2},
+]
+# Once one row of each shared serial is deleted, the held chain converts
+BLOCKED_RESOLVED = {21: '16', 23: '10', 31: '52', 33: '34', 34: '22', 35: '255'}
 
 
 def _rows(cases):
@@ -125,6 +145,18 @@ def test_sqlite_a_collision_is_listed_and_left_as_stored_until_resolved():
     assert _pending(conn.execute(f"SELECT key, value FROM {CONFIG}")) == []
 
 
+def test_sqlite_a_target_taken_by_a_held_row_holds_that_row_too():
+    conn = _sqlite(_rows(BLOCKED))
+    for _ in range(2):
+        _migration().upgrade(conn)
+        assert _stored(conn, CERTS) == _expected(BLOCKED)
+        assert _pending(conn.execute(f"SELECT key, value FROM {CONFIG}")) == [{'duplicates': BLOCKED_PENDING}]
+    conn.execute(f"DELETE FROM {CERTS} WHERE id IN (22, 32)")
+    _migration().upgrade(conn)
+    assert _stored(conn, CERTS) == BLOCKED_RESOLVED
+    assert _pending(conn.execute(f"SELECT key, value FROM {CONFIG}")) == []
+
+
 def test_sqlite_creates_the_index_142_could_not_once_the_duplicates_are_gone():
     conn = _sqlite([(1, 'ca-a', '11', None), (2, 'ca-a', '11', None), (3, 'ca-a', 'b', None)], index=False)
     _migration().upgrade(conn)
@@ -143,7 +175,7 @@ def test_sqlite_without_tables_does_nothing():
 @pytest.mark.postgres
 @pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
 @pytest.mark.parametrize('certs, revoked, pending', [
-    (MIXED, REVOCATIONS[:3], []), (MIXED + COLLIDING, REVOCATIONS, PENDING)])
+    (MIXED, REVOCATIONS[:3], []), (MIXED + COLLIDING, REVOCATIONS, PENDING), (BLOCKED, [], BLOCKED_PENDING)])
 def test_postgresql(certs, revoked, pending):
     schema = f"m144_{os.getenv('PYTEST_XDIST_WORKER', 'main')}_{uuid.uuid4().hex[:6]}"
     admin = create_engine(PG_URL)
@@ -172,6 +204,13 @@ def test_postgresql(certs, revoked, pending):
             if not pending:
                 with pytest.raises(Exception):
                     conn.execute(text(f"INSERT INTO {CERTS} VALUES (99, 'ca-a', '171', NULL)"))
+        if certs is BLOCKED:
+            with engine.begin() as conn:
+                conn.execute(text(f"DELETE FROM {CERTS} WHERE id IN (22, 32)"))
+                _migration().upgrade(conn)
+            with engine.begin() as conn:
+                assert dict(conn.execute(text(f"SELECT id, serial_number FROM {CERTS}")).fetchall()) == \
+                    BLOCKED_RESOLVED
     finally:
         engine.dispose()
         with admin.begin() as conn:

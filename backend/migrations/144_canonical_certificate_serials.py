@@ -4,8 +4,9 @@ certificates.serial_number and revoked_serials.serial_number become the decimal 
 of the integer (utils/serial_format.py), read back from the row's certificate when the
 text is ambiguous, so the unique (caref, serial_number) index of migration 142 sees one
 spelling per serial. Rows of one CA that would end up sharing a serial are left as they
-are and listed under ``serial_unique_index_pending``, as migration 142 does; no row is
-ever deleted. Running it again changes nothing.
+are and listed under ``serial_unique_index_pending``, as migration 142 does, with any row
+whose decimal is still a held row's spelling; no row is ever deleted. Running it again
+changes nothing.
 """
 import json
 import logging
@@ -37,16 +38,26 @@ def plan(cert_rows, revoked_rows):
     """(certificate updates, revoked_serials updates, pending pairs) for the rows read.
 
     *cert_rows*: (id, caref, serial_number, crt); *revoked_rows*: (id, serial_number, certificate_id).
-    A CA's rows that share a canonical serial are all left unconverted and listed.
+    A CA's rows that share a canonical serial are all left unconverted and listed, and so
+    is any row whose target is the spelling a held row of its CA keeps (to a fixed point).
     """
-    target, raw, groups = {}, {}, {}
+    target, raw, ca, groups = {}, {}, {}, {}
     for row_id, caref, serial, crt in cert_rows:
         raw[row_id] = serial
+        ca[row_id] = caref
         target[row_id] = canonical_stored_serial(serial, crt)
         if caref is not None:
             groups.setdefault((caref, target[row_id]), []).append(row_id)
     shared = {key: ids for key, ids in groups.items() if len(ids) > 1}
     held = {row_id for ids in shared.values() for row_id in ids}
+    waiting = {}
+    kept = {(ca[row_id], raw[row_id]) for row_id in held}
+    while kept:
+        blocked = [row_id for row_id in target if row_id not in held and ca[row_id] is not None
+                   and target[row_id] != raw[row_id] and (ca[row_id], target[row_id]) in kept]
+        held.update(blocked)
+        waiting.update((row_id, target[row_id]) for row_id in blocked)
+        kept = {(ca[row_id], raw[row_id]) for row_id in blocked}
     cert_updates = [(row_id, new) for row_id, new in target.items()
                     if new != raw[row_id] and row_id not in held]
     revoked_updates = []
@@ -57,7 +68,10 @@ def plan(cert_rows, revoked_rows):
         if new != serial:
             revoked_updates.append((row_id, new))
     pending = [{'caref': caref, 'serial_number': serial, 'count': len(ids)}
-               for (caref, serial), ids in sorted(shared.items(), key=lambda kv: (str(kv[0][0]), kv[0][1]))]
+               for (caref, serial), ids in shared.items()]
+    pending += [{'caref': ca[row_id], 'serial_number': raw[row_id], 'count': 1, 'waits_for': new}
+                for row_id, new in waiting.items()]
+    pending.sort(key=lambda d: (str(d['caref']), d['serial_number']))
     return cert_updates, revoked_updates, pending
 
 
@@ -84,8 +98,12 @@ def _apply(execute, executemany, stream, tables, value_param, false_literal):
     if not pending:
         return
     for d in pending:
-        logger.warning("Migration 144: CA %s holds %s certificates with serial %s (left as stored)",
-                       d['caref'], d['count'], d['serial_number'])
+        if 'waits_for' in d:
+            logger.warning("Migration 144: CA %s serial %s left as stored until %s is free",
+                           d['caref'], d['serial_number'], d['waits_for'])
+        else:
+            logger.warning("Migration 144: CA %s holds %s certificates with serial %s (left as stored)",
+                           d['caref'], d['count'], d['serial_number'])
     logger.warning("Migration 144: these serials stay outside the unique index. %s", CLEANUP)
     if CONFIG in tables:
         execute(SET_PENDING.format(value=value_param, false=false_literal),
