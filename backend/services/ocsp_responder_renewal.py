@@ -162,6 +162,9 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
     )
     db.session.add(db_cert)
     db.session.flush()  # need the new id to rebind the responder pointer
+    # A renewal is an issuance: counted in the caller's commit, undone with its rollback
+    from utils.ca_serial_counter import next_ca_serial
+    next_ca_serial(ca)
     return db_cert
 
 

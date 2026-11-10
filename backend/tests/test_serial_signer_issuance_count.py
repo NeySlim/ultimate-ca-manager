@@ -63,3 +63,40 @@ def test_a_tsa_signer_whose_commit_fails_counts_nothing(app, create_ca, monkeypa
         with pytest.raises(tsa_signer_cert.TsaSignerIssueError):
             tsa_signer_cert.issue_tsa_signer_certificate(ca=db.session.get(CA, ca['id']))
     assert _count(app, ca['id']) == (0, 0)
+
+
+@pytest.fixture
+def responder(app, auth_client, create_ca):
+    """A CA whose delegated OCSP responder is due for renewal: (ca id, binding key)."""
+    from datetime import timedelta
+
+    from models import SystemConfig
+    from utils.datetime_utils import utc_now
+    ca = create_ca(cn='OCSP responder count CA')
+    cert_id = _issue(auth_client, ca['id'], 'ocsp-responder-count.example.test')
+    key = f"ocsp_responder_cert_{ca['id']}"
+    with app.app_context():
+        db.session.get(Certificate, cert_id).valid_to = utc_now() + timedelta(hours=1)
+        db.session.add(SystemConfig(key=key, value=str(cert_id)))
+        db.session.commit()
+    yield ca['id'], key
+    with app.app_context():
+        SystemConfig.query.filter_by(key=key).delete(synchronize_session=False)
+        db.session.commit()
+
+
+def test_a_renewed_ocsp_responder_counts_its_certificate(app, responder):
+    from services.ocsp_responder_renewal import run_ocsp_responder_renewal
+    ca_id, _key = responder
+    with app.app_context():
+        run_ocsp_responder_renewal()
+    assert _count(app, ca_id) == (2, 2)
+
+
+def test_a_responder_renewal_another_runner_won_counts_nothing(app, responder, monkeypatch):
+    from services import ocsp_responder_renewal
+    ca_id, _key = responder
+    monkeypatch.setattr(ocsp_responder_renewal, '_rebind', lambda *_args: False)
+    with app.app_context():
+        ocsp_responder_renewal.run_ocsp_responder_renewal()
+    assert _count(app, ca_id) == (1, 1)
