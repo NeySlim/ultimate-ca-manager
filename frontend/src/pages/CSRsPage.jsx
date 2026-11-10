@@ -585,8 +585,6 @@ export default function CSRsPage() {
     return sans.length > 0 ? sans : [{ type: 'DNS', value: '' }]
   }
 
-  const mapKeyType = (csr) => csrKeyRow(csr)?.csr || DEFAULT_CSR_KEY_TYPE
-
   const handleRekeyAsCSR = (csr) => {
     setGenCN(csr.common_name || csr.cn || '')
     setGenOrg(csr.organization || '')
@@ -594,7 +592,8 @@ export default function CSRsPage() {
     setGenCountry(csr.country || '')
     setGenState(csr.state || '')
     setGenLocality(csr.locality || '')
-    setGenKeyChoice(mapKeyType(csr))
+    // An unknown CSR key is no user choice: the server default applies
+    setGenKeyChoice(csrKeyRow(csr)?.csr ?? null)
     setGenSans(parseSansFromCSR(csr))
     setShowRekeyChoice(false)
     openModal('generate')
