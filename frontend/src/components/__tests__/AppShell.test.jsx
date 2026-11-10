@@ -62,7 +62,9 @@ describe('AppShell — icon imports', () => {
  * with a bad icon fails here rather than in the browser.
  */
 describe('AppShell — icons derived from source', () => {
-  const COMPONENTS = ['../AppShell.jsx', '../Sidebar.jsx']
+  // The nav icons are declared by the registry, the shell and sidebar only import theirs
+  const COMPONENTS = ['../AppShell.jsx', '../Sidebar.jsx', '../../navigation/registry.js']
+  const NAV_ICON_SOURCES = ['../../navigation/registry.js']
 
   async function readSource(relPath) {
     const fs = await import('fs')
@@ -109,7 +111,7 @@ describe('AppShell — icons derived from source', () => {
     }
   )
 
-  it.each(COMPONENTS)(
+  it.each(NAV_ICON_SOURCES)(
     'every `icon:` in %s refers to something that is in scope',
     async (relPath) => {
       const source = await readSource(relPath)

@@ -2,12 +2,13 @@ import { useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMobile, useWindowManager } from '../contexts'
 import { usePermission } from '.'
+import { moduleById } from '../navigation/registry'
 
 // Deep link of each type's page and the scope its detail is read with
 const ENTITIES = {
-  certificate: { route: '/certificates', resource: 'certificates' },
-  ca: { route: '/cas', resource: 'cas' },
-  truststore: { route: '/truststore', resource: 'truststore' },
+  certificate: { route: moduleById('certificates').path, resource: 'certificates' },
+  ca: { route: moduleById('cas').path, resource: 'cas' },
+  truststore: { route: moduleById('truststore').path, resource: 'truststore' },
 }
 
 /**

@@ -8,7 +8,8 @@
  * est-config / tsa-config only worked through a hand-maintained lookup table.
  */
 import { describe, it, expect } from 'vitest'
-import { resolveActivePageId, navGroups } from '../Sidebar'
+import { resolveActivePageId } from '../Sidebar'
+import { sidebarGroups } from '../../navigation/registry'
 
 describe('resolveActivePageId', () => {
   it('maps / to the dashboard id (empty string)', () => {
@@ -61,7 +62,7 @@ describe('resolveActivePageId', () => {
     // The invariant the old naming convention could not keep: adding a nav
     // entry whose id differs from its URL segment must fail here instead of
     // silently breaking the highlight in the browser.
-    for (const group of navGroups) {
+    for (const group of sidebarGroups()) {
       for (const item of group.children) {
         expect(
           resolveActivePageId(item.path),
