@@ -3,6 +3,8 @@
 Signed serials are random (RFC 5280 §4.1.2.2); this counter only counts. It is
 incremented by one UPDATE in the database, so concurrent workers never lose a count.
 """
+from contextvars import ContextVar
+
 from sqlalchemy import func, select, update
 from sqlalchemy.orm.attributes import set_committed_value
 
@@ -44,6 +46,18 @@ def rollback_unless_serial_collision(exc):
         db.session.rollback()
 
 
+# True while an attempt runs that retry_on_serial_collision signs again on a collision
+_RETRY_FOLLOWS: ContextVar[bool] = ContextVar('serial_collision_retry_follows', default=False)
+
+
+def log_commit_failure(log, message: str, exc) -> None:
+    """Log a failed issuance commit with its trace, except a collision the decorator
+    signs again: its own warning, without trace, is then the only line."""
+    if is_serial_collision(exc) and _RETRY_FOLLOWS.get():
+        return
+    log.error(f"{message}: {exc}", exc_info=True)
+
+
 def retry_on_serial_collision(issue):
     """Sign once more with a fresh random serial when the first one is already
     taken under the CA. Each attempt runs in a savepoint: a collision undoes that
@@ -56,6 +70,7 @@ def retry_on_serial_collision(issue):
         from models import db
         for attempt in (1, 2):
             savepoint = db.session.begin_nested()
+            token = _RETRY_FOLLOWS.set(attempt == 1)
             try:
                 return issue(*args, **kwargs)
             except Exception as exc:
@@ -68,4 +83,6 @@ def retry_on_serial_collision(issue):
                     raise
                 logging.getLogger(__name__).warning(
                     'Random serial already issued by this CA; signing again with a new one')
+            finally:
+                _RETRY_FOLLOWS.reset(token)
     return issue_with_retry

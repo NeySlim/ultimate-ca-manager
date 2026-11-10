@@ -11,7 +11,8 @@ from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, Certificate
 from utils.ca_serial_counter import (
-    next_ca_serial, retry_on_serial_collision, rollback_unless_serial_collision)
+    log_commit_failure, next_ca_serial, retry_on_serial_collision,
+    rollback_unless_serial_collision)
 from services.file_regen_service import mirror_private_key
 from services.trust_store import TrustStoreService
 from utils.dn_parse import subject_common_name
@@ -499,7 +500,7 @@ class CSRMixin:
             db.session.commit()
         except Exception as _commit_err:
             rollback_unless_serial_collision(_commit_err)
-            logger.error(f"Commit failed in services/cert/mixins/csr.py:303: {_commit_err}", exc_info=True)
+            log_commit_failure(logger, "Storing the signed CSR failed", _commit_err)
             raise
 
         # A request queued for approval and then signed directly is closed

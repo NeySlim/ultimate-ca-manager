@@ -302,3 +302,47 @@ def test_increment_serial_returns_its_own_count_not_a_later_one(app):
         assert CAService.increment_serial(ca_id) == 1
         db.session.expire_all()
         assert db.session.get(CA, ca_id).serial == 2
+
+
+def _issue_via(path, ca_id, caref, name):
+    import base64
+    from cryptography.hazmat.primitives import serialization
+    from services.cert_service import CertificateService
+    if path == 'ca_signing':
+        return _issue(ca_id, name)
+    if path == 'lifecycle':
+        return CertificateService.create_certificate(descr=name, caref=caref, dn={'CN': name},
+                                                     key_type='prime256v1', validity_days=30)
+    request = Certificate(refid=uuid.uuid4().hex[:16], descr=name, caref=caref, cert_type='server_cert',
+                          csr=base64.b64encode(_csr(name).public_bytes(serialization.Encoding.PEM)).decode())
+    db.session.add(request)
+    db.session.commit()
+    return CertificateService.sign_csr(cert_id=request.id, caref=caref, validity_days=30)
+
+
+@pytest.mark.parametrize('path', ['ca_signing', 'csr', 'lifecycle'])
+def test_a_retried_collision_logs_no_error_and_a_second_one_does(app, caplog, path):
+    """The first collision is signed again: a warning; only the one that is raised logs an error."""
+    import logging
+    from unittest.mock import patch
+    from sqlalchemy.exc import IntegrityError
+    taken = x509.random_serial_number()
+    with app.app_context():
+        ca = _ca_row(*_authority())
+        ca_id, caref = ca.id, ca.refid
+        with patch('cryptography.x509.random_serial_number', return_value=taken):
+            _issue(ca_id, f'{path.replace("_", "-")}-first.example.test')
+        caplog.clear()
+        with caplog.at_level(logging.WARNING), \
+                patch('cryptography.x509.random_serial_number',
+                      side_effect=[taken, x509.random_serial_number()]):
+            _issue_via(path, ca_id, caref, f'{path.replace("_", "-")}-retried.example.test')
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert [r for r in caplog.records if r.levelno == logging.WARNING and r.exc_info is None
+                and 'serial' in r.getMessage()]
+        db.session.rollback()
+        caplog.clear()
+        with caplog.at_level(logging.WARNING), pytest.raises(IntegrityError), \
+                patch('cryptography.x509.random_serial_number', return_value=taken):
+            _issue_via(path, ca_id, caref, f'{path.replace("_", "-")}-refused.example.test')
+        assert [r for r in caplog.records if r.levelno == logging.ERROR and r.exc_info]
