@@ -14,6 +14,8 @@ class ClusterNode(db.Model):
     pid = db.Column(db.Integer)
     # Last cluster_commands.id this node's applier handled (migration 143)
     command_seen = db.Column(db.Integer)
+    # Last restart command this node claimed: one process of the node acts on it (migration 143)
+    restart_seen = db.Column(db.Integer)
 
 
 class ClusterCommand(db.Model):

@@ -25,7 +25,7 @@ def test_sqlite_creates_the_table_and_column_and_is_idempotent():
     conn.execute("INSERT INTO cluster_commands (kind, payload, created_at, created_by) "
                  "VALUES ('restart', NULL, '2026-01-01', 'n1')")
     assert conn.execute("SELECT id, node_id FROM cluster_commands").fetchall() == [(1, None)]
-    assert conn.execute("SELECT command_seen FROM cluster_nodes").fetchall() == [(None,)]
+    assert conn.execute("SELECT command_seen, restart_seen FROM cluster_nodes").fetchall() == [(None, None)]
 
 
 def test_sqlite_without_the_registry_still_creates_the_commands():
@@ -58,7 +58,8 @@ def _postgres_round():
         new_id = conn.execute(text("INSERT INTO cluster_commands (kind, created_at) "
                                    "VALUES ('restart', now()) RETURNING id")).scalar()
         assert new_id == 1
-        assert conn.execute(text("SELECT command_seen FROM cluster_nodes")).fetchall() == [(None,)]
+        assert conn.execute(text("SELECT command_seen, restart_seen FROM cluster_nodes")).fetchall() \
+            == [(None, None)]
         cols = {c['name']: c for c in inspect(conn).get_columns('cluster_commands', schema=schema)}
         assert cols['kind']['nullable'] is False and cols['node_id']['nullable'] is True
     finally:
@@ -75,4 +76,4 @@ def test_the_app_schema_matches_the_migration(app):
         insp = inspect(db.engine)
         assert {'id', 'kind', 'payload', 'created_at', 'created_by', 'node_id'} <= {
             c['name'] for c in insp.get_columns('cluster_commands')}
-        assert 'command_seen' in {c['name'] for c in insp.get_columns('cluster_nodes')}
+        assert {'command_seen', 'restart_seen'} <= {c['name'] for c in insp.get_columns('cluster_nodes')}

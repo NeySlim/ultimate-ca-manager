@@ -46,6 +46,9 @@ _NODES_SQL = text("SELECT node_id, started_at, heartbeat_at FROM cluster_nodes")
 _ADVANCE_SQL = text("UPDATE cluster_nodes SET command_seen = :id WHERE node_id = :n "
                     "AND (command_seen IS NULL OR command_seen < :id)")
 _ROW_SQL = text("SELECT 1 FROM cluster_nodes WHERE node_id = :n")
+# Apart from command_seen: a restart applied late (from a hole) is behind the reload cursor
+_CLAIM_SQL = text("UPDATE cluster_nodes SET restart_seen = :id WHERE node_id = :n "
+                  "AND (restart_seen IS NULL OR restart_seen < :id)")
 
 
 def emit(kind, payload=None, target=None):
@@ -260,9 +263,10 @@ class CommandApplier:
             if self._stop.is_set():
                 return
             if row.id <= self.seen:
-                self._fill_hole(row.id)  # committed after this node moved past it
+                # Committed after this node moved past it; stays a hole until applied
                 if not self._apply(conn, row):
                     return
+                self._fill_hole(row.id)
                 continue
             if row.id > self.seen + 1 and not self._gap_passed(row.id, now):
                 return
@@ -317,13 +321,16 @@ class CommandApplier:
 
     def _advance(self, conn, command_id):
         self.seen = max(self.seen, command_id)
-        return self._mark_seen(conn, command_id)
+        self._mark_seen(conn, command_id)
 
     def _mark_seen(self, conn, command_id):
-        """Conditional UPDATE: True when this process moved the node's cursor (or the node has no row)."""
-        if not self.record:
-            return True
-        if conn.execute(_ADVANCE_SQL, {'id': command_id, 'n': self.node_id}).rowcount:
+        """Conditional UPDATE: the node's cursor only moves forward."""
+        if self.record:
+            conn.execute(_ADVANCE_SQL, {'id': command_id, 'n': self.node_id})
+
+    def _claim(self, conn, command_id):
+        """True when this process takes the node's restart ``command_id`` (or the node has no row)."""
+        if conn.execute(_CLAIM_SQL, {'id': command_id, 'n': self.node_id}).rowcount:
             return True
         return conn.execute(_ROW_SQL, {'n': self.node_id}).first() is None
 
@@ -345,8 +352,10 @@ class CommandApplier:
         if pending:
             logger.warning(f"Rolling restart: {', '.join(pending)} not back after "
                            f"{self.guard * ahead:.0f}s, node {self.node_id} restarts anyway")
-        # Moved before acting: a sibling process of this node that lost the update leaves it alone
-        if not self._advance(conn, row.id):
+        # Claimed before acting: a sibling process of this node that lost the claim leaves it alone
+        claimed = self._claim(conn, row.id)
+        self._advance(conn, row.id)
+        if not claimed:
             return True
         self.restarting = True
         logger.warning(f"Rolling restart: node {self.node_id} restarts (command {row.id})")

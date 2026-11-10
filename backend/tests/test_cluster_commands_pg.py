@@ -205,6 +205,36 @@ def test_a_command_committed_late_behind_a_newer_one_is_still_applied(app, ha):
         engine.dispose()
 
 
+def test_a_restart_committed_late_still_runs_once_the_node_ahead_is_back(app, ha):
+    """The restart lands in a hole while node a still runs its old process: b must not drop it."""
+    from sqlalchemy.orm import Session
+    from models import ClusterCommand
+    from services.scheduler_leader import _dedicated_engine, application_url
+    cluster, log = _Cluster(app), []
+    for name in ('a', 'b'):
+        _node_row(app, name)
+    b = ha('b', restart_action=cluster.action('b'), guard=30,
+           handlers={cc.RELOAD_SYSLOG: _recorder(log, 'b')})
+    b.start()
+    assert wait_for(lambda: b.seen is not None)
+    with app.app_context():
+        engine = _dedicated_engine(application_url())
+    try:
+        with Session(bind=engine) as slow, Session(bind=engine) as fast:
+            slow.add(ClusterCommand(kind=cc.RESTART, created_at=utc_now()))
+            slow.flush()  # id taken, not committed
+            fast.add(ClusterCommand(kind=cc.RELOAD_SYSLOG, payload='{"mark": "fast"}', created_at=utc_now()))
+            fast.commit()
+            assert wait_for(lambda: ('b', 'fast') in log)
+            slow.commit()
+        assert wait_for(lambda: b._restart_wait is not None)  # b saw it, a is ahead
+        assert cluster.events == []
+        _back(app, 'a')
+        assert wait_for(lambda: ('up', 'b') in cluster.events)  # nothing left to touch b's row later
+    finally:
+        engine.dispose()
+
+
 class _Cluster:
     """Restart actions that simulate the node going down, then coming back later."""
 
@@ -288,6 +318,7 @@ def test_a_dead_node_holds_the_next_one_only_for_the_guard_delay(app, ha):
     b.start()
     assert wait_for(lambda: ('down', 'b') in cluster.events, timeout=8)
     assert time.monotonic() - started >= 1.0
+    assert wait_for(lambda: ('up', 'b') in cluster.events)  # nothing left to touch b's row later
 
 
 def test_a_single_node_cluster_restarts_at_once(app, ha):

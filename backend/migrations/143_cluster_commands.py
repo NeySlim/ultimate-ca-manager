@@ -2,7 +2,8 @@
 
 ``cluster_commands`` carries a reload or restart from the node where a setting
 changed to every node (``node_id`` set: that node only); ``cluster_nodes.command_seen``
-is the last command id a node applied. Created on SQLite too, where nothing writes them.
+is the last command id a node applied, ``restart_seen`` the last restart it claimed.
+Created on SQLite too, where nothing writes them.
 """
 import logging
 import sqlite3
@@ -16,7 +17,7 @@ COMMANDS_DDL = ("CREATE TABLE IF NOT EXISTS cluster_commands ("
                 "created_at TIMESTAMP NOT NULL, created_by VARCHAR(255), node_id VARCHAR(255))")
 COMMANDS_INDEX = ("CREATE INDEX IF NOT EXISTS ix_cluster_commands_created_at "
                   "ON cluster_commands (created_at)")
-SEEN_COLUMN = f"ALTER TABLE {NODES} ADD COLUMN command_seen INTEGER"
+NODE_COLUMNS = ('command_seen', 'restart_seen')
 
 
 def _upgrade_sqlite(conn):
@@ -24,10 +25,12 @@ def _upgrade_sqlite(conn):
     conn.execute(COMMANDS_INDEX)
     if conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
                     (NODES,)).fetchone() is not None:
-        if 'command_seen' not in {row[1] for row in conn.execute(f"PRAGMA table_info({NODES})")}:
-            conn.execute(SEEN_COLUMN)
+        have = {row[1] for row in conn.execute(f"PRAGMA table_info({NODES})")}
+        for column in NODE_COLUMNS:
+            if column not in have:
+                conn.execute(f"ALTER TABLE {NODES} ADD COLUMN {column} INTEGER")
     conn.commit()
-    logger.info("[143] cluster_commands, cluster_nodes.command_seen (SQLite)")
+    logger.info("[143] cluster_commands, cluster_nodes.command_seen/restart_seen (SQLite)")
 
 
 def _upgrade_pg(conn):
@@ -37,9 +40,11 @@ def _upgrade_pg(conn):
     conn.execute(text(COMMANDS_INDEX))
     inspector = inspect(conn)
     if NODES in inspector.get_table_names():
-        if 'command_seen' not in {c['name'] for c in inspector.get_columns(NODES)}:
-            conn.execute(text(SEEN_COLUMN))
-    logger.info("[143] cluster_commands, cluster_nodes.command_seen (PostgreSQL)")
+        have = {c['name'] for c in inspector.get_columns(NODES)}
+        for column in NODE_COLUMNS:
+            if column not in have:
+                conn.execute(text(f"ALTER TABLE {NODES} ADD COLUMN {column} INTEGER"))
+    logger.info("[143] cluster_commands, cluster_nodes.command_seen/restart_seen (PostgreSQL)")
 
 
 def upgrade(conn):
