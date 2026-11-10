@@ -14,6 +14,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onChang
     onChanged,
     onClose,
     onMutate,
+    afterMutation: 'refresh',
     t,
   })
 

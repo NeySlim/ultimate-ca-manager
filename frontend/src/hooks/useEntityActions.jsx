@@ -46,11 +46,14 @@ const definedOnly = (obj) => Object.fromEntries(Object.entries(obj || {}).filter
  * @param {*} [p.entityId]  id the routes take when it differs from entity.id
  * @param {(updated: object) => void} [p.onChanged]  entity replaced in place
  * @param {() => void} [p.onClose]  the surface showing the entity should go away
+ * @param {'close'|'refresh'} [p.afterMutation]  what a surface does once an action went through:
+ *   'close' (detail window) or 'refresh' (slide-over: stay open, reload the entity via onChanged).
+ *   Deleting always closes.
  * @param {() => void} [p.onMutate]  called just before a mutating request
  * @param {object} [p.permissions]  { canWrite, canDelete, hasPermission } override
  * @param {Function} [p.t]  translator override
  */
-export function useEntityActions({ type, entity, entityId, onChanged, onClose, onMutate, permissions, t: tOverride }) {
+export function useEntityActions({ type, entity, entityId, onChanged, onClose, onMutate, afterMutation = 'close', permissions, t: tOverride }) {
   const { t: hookT } = useTranslation()
   const t = tOverride || hookT
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
@@ -82,6 +85,15 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
   const refresh = (changedType = type) =>
     window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: changedType } }))
   const close = () => onClose?.()
+  // After an action: close the surface, or keep it and reload the entity in place
+  const settle = async () => {
+    if (afterMutation !== 'refresh') return close()
+    try {
+      const res = await entityService(type)?.getById?.(id)
+      const fresh = res?.data ?? res
+      if (fresh?.id) onChanged?.({ ...data, ...fresh })
+    } catch { /* the list reload on ucm:data-changed still runs */ }
+  }
 
   const handleExport = async (format = 'pem', options = {}) => {
     try {
@@ -100,6 +112,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
     try {
       onMutate?.()
       let queued = null
+      let deleted = false
       if (isCA) {
         // Intermediate CA revoked from its parent (#343)
         const res = await casService.revoke(id, { reason })
@@ -139,12 +152,14 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
         try {
           await entityService(type).delete(id)
           showSuccess(t('common.deleted'))
+          deleted = true
         } catch (err) {
           showError(err.message || t('common.deleteFailed'))
         }
       }
       refresh()
-      close()
+      if (deleted) close()
+      else await settle()
     } catch (err) {
       showError(err.message || (isCA ? t('cas.revokeFailed', 'Failed to revoke CA') : t('messages.errors.revokeFailed.certificate')))
     } finally {
@@ -167,7 +182,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
       await certificatesService.unhold(id)
       showSuccess(t('certificates.unheld', 'Certificate hold removed'))
       refresh()
-      close()
+      await settle()
     } catch (err) {
       showError(err.message || t('certificates.unholdFailed', 'Failed to remove hold'))
     }
@@ -191,7 +206,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
         showNotices(res, showWarning)
       }
       refresh()
-      close()
+      await settle()
     } catch (err) {
       showError(err?.message || t('common.operationFailed'))
     }
@@ -269,7 +284,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
       showSuccess(t('cas.csrDownloadStarted', 'CSR generated: download started'))
       refresh('ca')
       await handleDownloadCsr()
-      close()
+      await settle()
     } catch (err) {
       showError(err?.message || t('cas.csrDownloadFailed', 'Failed to download CSR'))
     }
@@ -371,9 +386,9 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
       {isCA && (
         <>
           <ImportCaKeyModal open={importKeyOpen} onClose={() => setImportKeyOpen(false)} ca={data} onSuccess={handleKeyImported} t={t} />
-          <TakeOfflineModal open={offlineOpen} onClose={() => setOfflineOpen(false)} ca={data} onSuccess={close} />
-          <RestoreModal open={restoreOpen} onClose={() => setRestoreOpen(false)} ca={data} onSuccess={close} />
-          <UploadCACertModal open={uploadCertOpen} onClose={() => setUploadCertOpen(false)} ca={data} onSuccess={close} />
+          <TakeOfflineModal open={offlineOpen} onClose={() => setOfflineOpen(false)} ca={data} onSuccess={settle} />
+          <RestoreModal open={restoreOpen} onClose={() => setRestoreOpen(false)} ca={data} onSuccess={settle} />
+          <UploadCACertModal open={uploadCertOpen} onClose={() => setUploadCertOpen(false)} ca={data} onSuccess={settle} />
         </>
       )}
     </>

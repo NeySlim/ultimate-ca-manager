@@ -10,8 +10,8 @@ const notify = vi.hoisted(() => ({
   showConfirm: vi.fn(), showPrompt: vi.fn(),
 }))
 const svc = vi.hoisted(() => ({
-  certs: { delete: vi.fn(), revoke: vi.fn(), unhold: vi.fn(), export: vi.fn() },
-  cas: { delete: vi.fn(), revoke: vi.fn(), export: vi.fn() },
+  certs: { delete: vi.fn(), revoke: vi.fn(), unhold: vi.fn(), export: vi.fn(), renew: vi.fn(), getById: vi.fn() },
+  cas: { delete: vi.fn(), revoke: vi.fn(), export: vi.fn(), getById: vi.fn(), renewCsr: vi.fn(), downloadCsr: vi.fn() },
 }))
 
 vi.mock('react-i18next', () => ({
@@ -146,6 +146,63 @@ describe('delete guard', () => {
     const r = run('certificate', { ...CERT, status: 'revoked', revoked: true }, rights(['delete:certificates']), { onClose })
     await act(async () => { await r.actions.find(a => a.id === 'delete').onClick() })
     expect(svc.certs.delete).toHaveBeenCalledWith(4)
+    expect(onClose).toHaveBeenCalled()
+  })
+})
+
+describe('what a surface does after an action', () => {
+  const caRevoked = { id: 9, revoked: true, common_name: 'Sub CA' }
+  const confirmRevoke = async (type, entity, extra) => {
+    const onChanged = vi.fn(); const onClose = vi.fn()
+    let api
+    function Probe() {
+      api = useEntityActions({ type, entity, permissions: rights(['write:cas', 'write:certificates']), onChanged, onClose, ...extra })
+      return null
+    }
+    render(<Probe />)
+    // the confirm handler is what the revoke modal calls
+    const modalEl = api.modals.props.children.find(c => c?.props?.onConfirm)
+    await act(async () => { await modalEl.props.onConfirm('keyCompromise', {}) })
+    return { onChanged, onClose }
+  }
+
+  it('keeps a slide-over open after revoking a CA and hands it the revoked CA', async () => {
+    svc.cas.revoke.mockResolvedValue({ data: caRevoked })
+    svc.cas.getById.mockResolvedValue({ data: caRevoked })
+    const { onChanged, onClose } = await confirmRevoke('ca', CA, { afterMutation: 'refresh' })
+    expect(onClose).not.toHaveBeenCalled()
+    expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({ id: 9, revoked: true }))
+  })
+
+  it('closes the detail window after revoking a CA, as it always did', async () => {
+    svc.cas.revoke.mockResolvedValue({ data: caRevoked })
+    const { onClose } = await confirmRevoke('ca', CA)
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('closes the detail window after removing a hold and keeps a slide-over open', async () => {
+    notify.showConfirm.mockResolvedValue(true)
+    svc.certs.unhold.mockResolvedValue({})
+    svc.certs.getById.mockResolvedValue({ data: { ...CERT, revoked: false } })
+    const held = { ...CERT, revoked: true, revoke_reason: 'certificateHold', status: 'revoked' }
+    const w = rights(['write:certificates'])
+    const onClose = vi.fn(); const onChanged = vi.fn()
+    const win = run('certificate', held, w, { onClose })
+    await act(async () => { await win.handler('unhold')() })
+    expect(onClose).toHaveBeenCalled()
+    const onClose2 = vi.fn()
+    const so = run('certificate', held, w, { onClose: onClose2, onChanged, afterMutation: 'refresh' })
+    await act(async () => { await so.handler('unhold')() })
+    expect(onClose2).not.toHaveBeenCalled()
+    expect(onChanged).toHaveBeenCalled()
+  })
+
+  it('closes after a delete even on a slide-over: the entity is gone', async () => {
+    notify.showConfirm.mockResolvedValueOnce(true)
+    svc.certs.delete.mockResolvedValue({})
+    const onClose = vi.fn()
+    const r = run('certificate', { ...CERT, status: 'revoked', revoked: true }, rights(['delete:certificates']), { onClose, afterMutation: 'refresh' })
+    await act(async () => { await r.actions.find(a => a.id === 'delete').onClick() })
     expect(onClose).toHaveBeenCalled()
   })
 })
