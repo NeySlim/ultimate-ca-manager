@@ -116,3 +116,11 @@ def test_a_blocked_renewal_with_a_manual_refusal_appears_once(app, auth_client, 
         rules.reject(cert, trigger='manual')
         db.session.commit()
         assert _kinds(auth_client, cert.id) == ['auto_renewal_blocked']
+
+
+
+def test_a_keyless_msca_certificate_is_a_manual_renewal(app, auth_client, rules):
+    with app.app_context():
+        cert = rules.cert('rules-msca', 10, source='msca')
+        db.session.commit()
+        assert _kinds(auth_client, cert.id) == ['manual_renewal_due']

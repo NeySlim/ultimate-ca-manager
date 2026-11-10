@@ -36,8 +36,8 @@ CA_EXPIRY_CRITICAL_DAYS = 90
 SERVER_LIFETIME_MAX_DAYS = 398
 RSA_MIN_BITS = 3072
 WEAK_SIG_HASHES = ('sha1', 'md5')
-# Enrolment protocols whose client holds the key and renews on its own
-CLIENT_RENEWED_SOURCES = ('acme', 'letsencrypt', 'scep', 'est', 'msca', 'wstep')
+# Enrolment protocols whose client holds the key and renews on its own (not msca: UCM submits those to AD CS)
+CLIENT_RENEWED_SOURCES = ('acme', 'letsencrypt', 'scep', 'est', 'wstep')
 # Such a client still not renewed this close to expiry is overdue
 CLIENT_RENEWAL_OVERDUE_DAYS = 7
 
