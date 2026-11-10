@@ -1,25 +1,25 @@
 export default {
   helpContent: {
-    title: 'Overview',
-    subtitle: 'What needs action, and the state of the PKI',
-    overview: 'Six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every counter that has a list opens the certificate list filtered to exactly the certificates it counts.',
+    title: '概览',
+    subtitle: '需要处理的事项与 PKI 的状态',
+    overview: '六张相互独立的卡片，基于您的 PKI 实时数据。每张卡片单独加载，并各自显示加载中、为空、出错或无权限的状态。每个带列表的计数器都会打开证书列表，并精确筛选出它所统计的证书。',
     sections: [
       {
-        title: 'Cards',
+        title: '卡片',
         items: [
-          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record; a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
-          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state' },
-          { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days; each authority opens its page' },
-          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
-          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
-          { label: 'Latest operations', text: 'The five most recent operations; with the audit permission, a link opens the whole trail' },
+          { label: '待处理', text: '最紧急的六项，严重项优先，每项链接到对应记录；折叠的层级给出各类型的总数，四种续期类型会打开证书列表' },
+          { label: '自动化健康', text: '按协议（ACME、SCEP、EST）显示每日成功与失败次数，以及调度器状态' },
+          { label: '层级', text: '以树状显示各颁发机构及其上级，含 CRL 和 OCSP 状态、离线或交叉签名标记，以及各自 7 天内签发的证书数；点击颁发机构可打开其页面' },
+          { label: '到期视野', text: '即将到期和已过期的计数器（各自打开其列表），以及接下来最先到期的五张证书' },
+          { label: '合规性', text: '按密钥算法和弱点统计在用证书（RSA 低于 3072 位、弱签名哈希、服务器证书超过 398 天、证书链不完整、无私钥）；每个计数器打开对应列表' },
+          { label: '最新操作', text: '最近的五项操作；具有审计权限时，可通过链接打开完整记录' },
         ]
       },
     ],
     tips: [
-      'Pick the Operator, Manager or All cards preset in the header to choose which cards are shown',
-      'The layout is saved with your account and follows you across browsers',
-      'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
+      '在页眉选择“操作员”“管理者”或“所有卡片”预设，以决定显示哪些卡片',
+      '布局随您的账户保存，并在不同浏览器间保持一致',
+      '在证书列表中，来自概览的筛选器以标签形式显示；点击其 x 即可移除',
     ],
   },
   helpGuides: {

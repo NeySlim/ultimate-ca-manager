@@ -1,25 +1,25 @@
 export default {
   helpContent: {
-    title: 'Overview',
-    subtitle: 'What needs action, and the state of the PKI',
-    overview: 'Six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every counter that has a list opens the certificate list filtered to exactly the certificates it counts.',
+    title: 'Огляд',
+    subtitle: 'Що потребує дій і стан PKI',
+    overview: 'Шість незалежних карток над актуальними даними вашої PKI. Кожна картка завантажується окремо та показує власний стан: завантаження, порожньо, помилка або відсутність дозволу. Кожен лічильник зі списком відкриває список сертифікатів, відфільтрований саме за тими сертифікатами, які він рахує.',
     sections: [
       {
-        title: 'Cards',
+        title: 'Картки',
         items: [
-          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record; a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
-          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state' },
-          { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days; each authority opens its page' },
-          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
-          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
-          { label: 'Latest operations', text: 'The five most recent operations; with the audit permission, a link opens the whole trail' },
+          { label: 'До опрацювання', text: 'Шість найнагальніших пунктів, спершу критичні, кожен веде до свого запису; згорнутий рівень показує підсумок за видами, а чотири види оновлення відкривають список сертифікатів' },
+          { label: 'Стан автоматизації', text: 'Для кожного протоколу (ACME, SCEP, EST) щоденні успіхи та збої, а також стан планувальника' },
+          { label: 'Ієрархія', text: 'Центри сертифікації у вигляді дерева під своїм батьківським, зі станом CRL і OCSP, позначкою офлайн або перехресного підпису та кількістю сертифікатів, виданих кожним за 7 днів; кожен центр відкриває свою сторінку' },
+          { label: 'Горизонт закінчення', text: 'Лічильники тих, що закінчуються, і прострочених, кожен відкриває свій список, а також п\'ять сертифікатів, що закінчаться найближчими' },
+          { label: 'Відповідність', text: 'Чинні сертифікати за алгоритмом ключа та слабкістю (RSA менше 3072 біт, слабкий хеш підпису, серверні сертифікати понад 398 днів, неповний ланцюжок, без приватного ключа); кожен лічильник відкриває відповідний список' },
+          { label: 'Останні операції', text: 'П\'ять найновіших операцій; за наявності дозволу на аудит посилання відкриває весь журнал' },
         ]
       },
     ],
     tips: [
-      'Pick the Operator, Manager or All cards preset in the header to choose which cards are shown',
-      'The layout is saved with your account and follows you across browsers',
-      'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
+      'Виберіть у заголовку пресет «Оператор», «Керівник» або «Усі картки», щоб задати, які картки показувати',
+      'Макет зберігається разом з вашим обліковим записом і йде за вами в усі браузери',
+      'У списку сертифікатів фільтри, що надійшли з огляду, з\'являються як чипи; вилучіть чип за допомогою його x',
     ],
   },
   helpGuides: {

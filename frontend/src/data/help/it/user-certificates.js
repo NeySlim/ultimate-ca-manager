@@ -35,7 +35,7 @@ export default {
       'Iscrivi nuovi certificati mTLS da Account → scheda mTLS',
       'I certificati sono memorizzati e gestiti da UCM come qualsiasi altro certificato',
       'Usa la barra delle statistiche per filtrare rapidamente per stato',
-      'Fai clic su una riga per vedere i dettagli completi del certificato in una finestra flottante',
+      'Fai clic su una riga per vedere i dettagli completi del certificato nell\'ispettore',
     ],
     warnings: [
       'La revoca di un certificato utente impedisce immediatamente l\'accesso mTLS con quel certificato',

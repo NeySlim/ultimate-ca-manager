@@ -96,7 +96,7 @@ export default {
       '非標準の EKU(Microsoft RDP、スマートカードログオン、ドキュメント署名)が必要ですか? テンプレートを編集する代わりに「追加 EKU」から追加してください',
       'ポリシーまたは発行CAの有効期限により要求された有効期間が短縮された場合、結果にその旨が表示されます："Issued for N day(s) instead of the M requested" と理由（サーバーが英語で返すメッセージです）',
       'RSA-PSS 署名は、ハッシュとソルト長とともに表示されます（例：RSASSA-PSS SHA-256 (salt 32)）',
-      'In a link view (opened from the overview), the Clear all filters button shown when nothing matches empties the link\'s statuses and the search and keeps the link\'s other filters; removing a chip drops that filter, the Clear button of the chip row leaves the link view, and your saved filters are left untouched',
+      'リンクビュー（概要から開いたもの）では、一致するものがないときに表示される「すべてのフィルターをクリア」ボタンは、リンクのステータスと検索をクリアし、リンクのその他のフィルターは保持します。チップを削除するとそのフィルターが外れ、チップ行のクリアボタンはリンクビューを終了し、保存済みのフィルターには影響しません',
     ],
     warnings: [
       '失効は一般的に永続的です: ただし「証明書保留」は解除（保留解除）できます',
