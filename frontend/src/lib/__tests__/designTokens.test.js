@@ -1,6 +1,6 @@
 /**
- * The theme is a set of CSS variables written by `ThemeContext` and declared in
- * `index.css`, exposed to Tailwind through `tailwind.config.js`. A class or a
+ * The theme is a set of CSS variables declared in `styles/tokens.css` (selected
+ * by data-theme / data-mode) and `index.css`, exposed to Tailwind through `tailwind.config.js`. A class or a
  * `var(--x)` that names a token nobody declared produces no CSS at all: the
  * colour silently does not render, and nothing in the build complains.
  * `DESIGN_SYSTEM.md` documents the tokens this test accepts.
@@ -12,7 +12,6 @@ import tailwindConfig from '../../../tailwind.config.js'
 
 const SRC = path.resolve(__dirname, '../..')
 const INDEX_CSS = fs.readFileSync(path.join(SRC, 'index.css'), 'utf8')
-const THEME_CONTEXT = fs.readFileSync(path.join(SRC, 'contexts/ThemeContext.jsx'), 'utf8')
 
 function sourceFiles(dir, exts, acc = []) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -48,14 +47,12 @@ function report(used, declared) {
     .map((key) => `${key} — used at ${used.get(key).slice(0, 5).join(', ')}`)
 }
 
-/** `--x:` in index.css or an inline style, plus every key ThemeContext writes with setProperty. */
+/** `--x:` in tokens.css, index.css or an inline style. */
 function declaredVariables(files) {
   const found = new Set()
   for (const file of files) {
     for (const m of fs.readFileSync(file, 'utf8').matchAll(/--([a-zA-Z0-9-]+)['"]?\s*:/g)) found.add(m[1])
   }
-  // Only the quoted keys of the dark/light blocks reach setProperty; `id`, `accent`… do not.
-  for (const m of THEME_CONTEXT.matchAll(/^\s+'([a-z][a-z0-9-]*)'\s*:/gm)) found.add(m[1])
   // Tailwind's own gradient and ring internals
   found.add('tw-gradient-to').add('tw-gradient-from').add('tw-gradient-stops')
   return found
@@ -86,7 +83,7 @@ describe('design tokens', () => {
   // A `var(--x, fallback)` renders its fallback, so only the bare form is checked.
   const BARE_VAR = /var\(\s*--([a-zA-Z0-9-]+)\s*\)/g
 
-  it('every var(--x) read in the source is declared by index.css or ThemeContext', () => {
+  it('every var(--x) read in the source is declared by tokens.css or index.css', () => {
     const used = collect(styleFiles, BARE_VAR, (m) => m[1])
     const undeclared = report(used, declaredVariables(styleFiles))
     expect(
@@ -119,5 +116,19 @@ describe('design tokens', () => {
     expect(handWrittenClasses().size).toBeGreaterThan(200)
     expect(collect(styleFiles, BARE_VAR, (m) => m[1]).size).toBeGreaterThan(50)
     expect(collect(jsFiles, COLOR_CLASS, (m) => m[2]).size).toBeGreaterThan(50)
+  })
+})
+
+describe('compatibility aliases', () => {
+  const TOKENS_CSS = fs.readFileSync(path.join(SRC, 'styles/tokens.css'), 'utf8')
+
+  it('tokens.css declares every legacy colour name the Tailwind config reads', () => {
+    const wanted = new Set()
+    const config = fs.readFileSync(path.resolve(SRC, '../tailwind.config.js'), 'utf8')
+    for (const m of config.matchAll(/var\(--([a-z0-9-]+)\)/g)) wanted.add(m[1])
+    const declared = new Set([...TOKENS_CSS.matchAll(/--([a-z0-9-]+)\s*:/g)].map((m) => m[1]))
+    // border-hover reads --text-tertiary, status-* read the accent-* aliases
+    const missing = [...wanted].filter((n) => !declared.has(n))
+    expect(missing).toEqual([])
   })
 })
