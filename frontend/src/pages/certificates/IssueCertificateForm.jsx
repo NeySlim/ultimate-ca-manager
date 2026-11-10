@@ -167,17 +167,19 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   const hybridClassical = allowedLabels.filter(l => !isPostQuantum(l))
   const hybridPq = allowedLabels.filter(isPostQuantum)
   const hybridAvailable = hybridClassical.length > 0 && hybridPq.length > 0
-  // Each side keeps its choice while allowed, else the form's default key, else the first allowed
+  // Each side keeps its choice while allowed, else the server default when it fits that side
+  // (the form's own default until the server answers), else the first allowed
   const pickHybrid = (current, allowed) => (allowed.includes(current) ? current
-    : ISSUE_DEFAULT_LABELS.find(l => allowed.includes(l)) ?? allowed[0] ?? '')
+    : [defaultKeyType, ...ISSUE_DEFAULT_LABELS].find(l => l && allowed.includes(l)) ?? allowed[0] ?? '')
   const hybridChoice = {
     classical: pickHybrid(formData.hybrid_classical, hybridClassical),
     pq: pickHybrid(formData.hybrid_pq, hybridPq),
   }
   const isHybrid = formData.hybrid && hybridAvailable
-  // The family's default key when allowed, else its first allowed one
+  // The family's default key when allowed (the server's if it is of that family), else its first allowed one
   const sizeForType = (type) => {
-    const preferred = defaultKeyChoice('issue', type, ISSUE_DEFAULT_LABELS)?.[1]
+    const serverPair = defaultKeyType ? findAlgorithm(defaultKeyType)?.issue : null
+    const preferred = (serverPair?.[0] === type ? serverPair : defaultKeyChoice('issue', type, ISSUE_DEFAULT_LABELS))?.[1]
     if (noKeyAllowed || allowedKeys.some(([k, sz]) => k === type && sz === preferred)) return preferred
     return allowedKeys.find(([k]) => k === type)?.[1] ?? preferred
   }

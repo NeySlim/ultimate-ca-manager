@@ -117,4 +117,14 @@ describe('IssueCertificateForm hybrid pair', () => {
     fireEvent.click(screen.getByLabelText('certificates.hybrid.toggle'))
     expect(optionValues('common.keyType')).toEqual(['ecdsa'])
   })
+
+  it('starts the classical member on the server default key when it is a classical one', async () => {
+    const onSubmit = renderForm({ ...OPEN, default_key_type: 'EC-P384' })
+    await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
+    fireEvent.click(await screen.findByLabelText('certificates.hybrid.toggle'))
+    await waitFor(() => expect(screen.getByLabelText('certificates.hybrid.classical').value).toBe('EC-P384'))
+    // a classical default says nothing about the post-quantum side
+    expect(screen.getByLabelText('certificates.hybrid.pq').value).toBe('ML-DSA-65')
+    expect((await submit(onSubmit)).hybrid).toEqual({ classical: 'EC-P384', pq: 'ML-DSA-65' })
+  })
 })

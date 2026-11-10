@@ -242,4 +242,26 @@ describe('IssueCertificateForm server default key', () => {
     pickCa('4')
     await waitFor(() => expect(state('common.keyType')).toBe(''))
   })
+
+  it('sizes a family the user switches to on the server default when it is of that family', async () => {
+    mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, default_key_type: 'EC-P384' } })
+    renderForm()
+    pickCa('3')
+    await waitFor(() => expect([state('common.keyType'), state('common.keySize')]).toEqual(['ecdsa', '384']))
+    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'rsa' } })
+    await waitFor(() => expect(state('common.keySize')).toBe('2048'))
+    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'ecdsa' } })
+    await waitFor(() => expect(state('common.keySize')).toBe('384'))
+  })
+
+  it('sizes an RSA family from the server default when that is an RSA key', async () => {
+    mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, default_key_type: 'RSA-3072' } })
+    renderForm()
+    pickCa('3')
+    await waitFor(() => expect(state('common.keySize')).toBe('3072'))
+    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'ecdsa' } })
+    await waitFor(() => expect(state('common.keySize')).toBe('256'))
+    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'rsa' } })
+    await waitFor(() => expect(state('common.keySize')).toBe('3072'))
+  })
 })
