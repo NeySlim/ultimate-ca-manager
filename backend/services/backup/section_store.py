@@ -39,7 +39,7 @@ STALE_AFTER_SECONDS = 3600
 def store_directory(spool: Optional[str] = None) -> Optional[str]:
     """The upload spool dir, else `DATA_DIR/tmp` if the upload spool probe accepts it.
 
-    None means the system temp dir: stores are created and swept in the same place.
+    None means `fallback_directory()`: stores are created and swept in the same place.
     """
     try:
         from flask import current_app
@@ -75,7 +75,7 @@ def fallback_directory() -> Optional[str]:
 
 
 def sweep_stale_stores(directory: Optional[str] = None, spool: Optional[str] = None) -> None:
-    """Remove stores a killed worker left behind, in the directory `store_directory()` gives.
+    """Remove stores a killed worker left behind, where `SectionStore()` creates them.
 
     Closed rule: nothing is removed unless the backup lock was taken, so a restore
     still applying its plan is never swept.
