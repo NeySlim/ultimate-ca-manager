@@ -105,6 +105,27 @@ describe('CertificatesPage: overview filters in the URL', () => {
     expect(lastParams().status).toBeUndefined()
   })
 
+  it('a filtered link takes precedence over the saved filters and leaves them stored', async () => {
+    window.localStorage.setItem('ucm-filter-certs-status', JSON.stringify(['valid']))
+    window.localStorage.setItem('ucm-filter-certs-ca', JSON.stringify(['1']))
+    renderAt('/certificates?status=expiring')
+    await waitFor(() => expect(lastParams().status).toEqual(['expiring']))
+    expect(lastParams().ca_id).toBeUndefined()
+    // past the 200 ms debounce of usePersistedState
+    await new Promise((r) => setTimeout(r, 400))
+    expect(lastParams().ca_id).toBeUndefined()
+    expect(JSON.parse(window.localStorage.getItem('ucm-filter-certs-status'))).toEqual(['valid'])
+    expect(JSON.parse(window.localStorage.getItem('ucm-filter-certs-ca'))).toEqual(['1'])
+  })
+
+  it('the saved filters apply again once the link filters are gone', async () => {
+    window.localStorage.setItem('ucm-filter-certs-ca', JSON.stringify(['1']))
+    renderAt('/certificates?no_key=true')
+    await waitFor(() => expect(lastParams().no_key).toBe('true'))
+    fireEvent.click(screen.getByLabelText(/Remove overview.filter.no_key/))
+    await waitFor(() => expect(lastParams().ca_id).toEqual(['1']))
+  })
+
   it('sends none without them', async () => {
     renderAt('/certificates')
     await waitFor(() => expect(getAll).toHaveBeenCalled())
