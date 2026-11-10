@@ -136,6 +136,7 @@ def _enrollment_detail(fault, request_id, invalid_request):
     nor ErrorCode to give (nil), InvalidRequest true for a denied request."""
     detail = etree.SubElement(fault, '{%s}Detail' % SOAP_NS)
     wsdetail = etree.SubElement(detail, '{%s}CertificateEnrollmentWSDetail' % WSTEP_NS)
+    # ErrorCode nil: MS-WSTEP 3.1.4.1.3.7 allows it, AD CS sends an HRESULT
     for name in ('BinaryResponse', 'ErrorCode'):
         etree.SubElement(wsdetail, '{%s}%s' % (WSTEP_NS, name)).set('{%s}nil' % XSI_NS, 'true')
     etree.SubElement(wsdetail, '{%s}InvalidRequest' % WSTEP_NS).text = \
