@@ -139,8 +139,10 @@ def test_scheduler_reads_the_published_state(app, auth_client, monkeypatch, tmp_
     monkeypatch.setattr(scheduler_service, '_data_path', lambda name: str(tmp_path / name))
 
     def publish(published_at):
-        tasks = {names[0]: {'last_status': 'ok', 'last_run': '2026-01-01T10:00:00Z'},
-                 names[1]: {'last_status': 'failed', 'last_run': '2026-01-01T11:00:00Z', 'last_error': 'x'}}
+        # Every task is published: one left out would keep what an earlier test ran in this process
+        tasks = {name: {'last_status': None, 'last_run': None} for name in names}
+        tasks[names[0]] = {'last_status': 'ok', 'last_run': '2026-01-01T10:00:00Z'}
+        tasks[names[1]] = {'last_status': 'failed', 'last_run': '2026-01-01T11:00:00Z', 'last_error': 'x'}
         (tmp_path / scheduler_service.STATE_FILE).write_text(
             json.dumps({'pid': 1, 'published_at': published_at, 'tasks': tasks}))
 
