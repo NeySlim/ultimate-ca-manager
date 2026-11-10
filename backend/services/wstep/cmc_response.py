@@ -29,6 +29,7 @@ ID_CCT_PKIRESPONSE = '1.3.6.1.5.5.7.12.3'
 # RFC 5272 SS6.1.1 -- id-cmc-statusInfoV2 = {id-cmc 25}, id-cmc = {id-pkix 7}
 ID_CMC_STATUSINFOV2 = '1.3.6.1.5.5.7.7.25'
 CMC_STATUS_SUCCESS = 0
+CMC_STATUS_PENDING = 3
 
 # id-signedData (RFC 5652)
 ID_SIGNED_DATA = '1.2.840.113549.1.7.2'
@@ -53,6 +54,24 @@ class _CMCStatusInfoV2(asn1_core.Sequence):
         ('body_list', _BodyList),
         ('status_string', asn1_core.UTF8String, {'optional': True}),
         # otherInfo omitted -- only meaningful for non-success status.
+    ]
+
+
+class _PendInfo(asn1_core.Sequence):
+    # RFC 5272 §6.1.1: PendInfo, the otherInfo a pending status carries
+    _fields = [
+        ('pend_token', asn1_core.OctetString),
+        ('pend_time', asn1_core.GeneralizedTime),
+    ]
+
+
+class _PendingStatusInfoV2(asn1_core.Sequence):
+    # CMCStatusInfoV2 whose untagged OtherStatusInfo CHOICE is pendInfo
+    _fields = [
+        ('cmc_status', asn1_core.Integer),
+        ('body_list', _BodyList),
+        ('status_string', asn1_core.UTF8String, {'optional': True}),
+        ('pend_info', _PendInfo),
     ]
 
 
@@ -129,6 +148,47 @@ class _ContentInfo(asn1_core.Sequence):
     ]
 
 
+def build_cmc_pending_response(body_part_id, pend_token: bytes, pend_time):
+    """A CMC full PKI response marking the request pending (RFC 5272 §6.1.1:
+    status pending with its PendInfo), no certificate: the Issuer response
+    MS-WSTEP 3.1.4.2.1.1 builds the pending RSTR from."""
+    status_info = _PendingStatusInfoV2({
+        'cmc_status': CMC_STATUS_PENDING,
+        'body_list': [int(body_part_id) if body_part_id is not None else 0],
+        'status_string': 'Request held for approval',
+        'pend_info': {'pend_token': pend_token, 'pend_time': pend_time},
+    })
+    return _wrap_pki_response(status_info, [])
+
+
+def _wrap_pki_response(status_info, certificate_ders):
+    tagged_attr = _TaggedAttribute({
+        'body_part_id': 1,
+        'attr_type': ID_CMC_STATUSINFOV2,
+        'attr_values': [asn1_core.Any.load(status_info.dump())],
+    })
+    pki_response = _PKIResponse({
+        'control_sequence': [tagged_attr],
+        'cms_sequence': [],
+        'other_msg_sequence': [],
+    })
+    signed_data = _SignedData({
+        # RFC 5652 §5.1: version 3 for a non-id-data eContentType
+        'version': 3,
+        'digest_algorithms': [],
+        'encap_content_info': {
+            'content_type': ID_CCT_PKIRESPONSE,
+            'content': pki_response.dump(),
+        },
+        'certificates': [asn1_x509.Certificate.load(der) for der in certificate_ders],
+        'signer_infos': [],
+    })
+    return _ContentInfo({
+        'content_type': ID_SIGNED_DATA,
+        'content': signed_data,
+    }).dump()
+
+
 def build_cmc_full_pki_response(leaf_cert_der, chain_cert_ders, body_part_id):
     """Build a CMC full PKI response's DER bytes (the outer ContentInfo).
 
@@ -149,45 +209,4 @@ def build_cmc_full_pki_response(leaf_cert_der, chain_cert_ders, body_part_id):
         'cmc_status': CMC_STATUS_SUCCESS,
         'body_list': [int(body_part_id) if body_part_id is not None else 0],
     })
-    tagged_attr = _TaggedAttribute({
-        'body_part_id': 1,
-        'attr_type': ID_CMC_STATUSINFOV2,
-        'attr_values': [asn1_core.Any.load(status_info.dump())],
-    })
-    pki_response = _PKIResponse({
-        'control_sequence': [tagged_attr],
-        'cms_sequence': [],
-        'other_msg_sequence': [],
-    })
-
-    certificates = [
-        asn1_x509.Certificate.load(der)
-        for der in [leaf_cert_der, *chain_cert_ders]
-    ]
-
-    signed_data = _SignedData({
-        # RFC 5652 §5.1: version MUST be 3 whenever encapContentInfo's
-        # eContentType is anything other than id-data (ours is
-        # id-cct-PKIResponse) -- confirmed against a real captured Windows
-        # client request, whose own CMC-wrapped CSR envelope uses version 3
-        # for the same reason (its encapContentInfo is id-cct-PKIData,
-        # also non-id-data).
-        'version': 3,
-        'digest_algorithms': [],
-        'encap_content_info': {
-            'content_type': ID_CCT_PKIRESPONSE,
-            'content': pki_response.dump(),
-        },
-        'certificates': certificates,
-        'signer_infos': [],
-    })
-
-    # Pass the Asn1Value object itself, not a pre-wrapped Any (and not raw
-    # bytes) -- asn1crypto only applies the `explicit` tag wrap when it
-    # has to build the Any wrapper itself; handing it an already-built Any
-    # silently skips that step, producing an untagged (and unparseable)
-    # SEQUENCE.
-    return _ContentInfo({
-        'content_type': ID_SIGNED_DATA,
-        'content': signed_data,
-    }).dump()
+    return _wrap_pki_response(status_info, [leaf_cert_der, *chain_cert_ders])

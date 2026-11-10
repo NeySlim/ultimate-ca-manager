@@ -37,8 +37,9 @@ from services.kerberos import negotiate_auth
 from services.wstep import CES_CERTIFICATE_PATH, CES_KERBEROS_PATH, CES_USERNAME_PASSWORD_PATH
 from services.wstep import wstep_service
 from services.wstep.cmc_response import build_cmc_full_pki_response
-from services.wstep.rst_parser import REQUEST_TYPE_ISSUE, RSTParseError, parse_rst
-from services.wstep.rstr_builder import build_issue_response
+from services.wstep.rst_parser import (REQUEST_TYPE_ISSUE, REQUEST_TYPE_QUERY_TOKEN_STATUS, RSTParseError,
+                                      parse_rst)
+from services.wstep.rstr_builder import build_issue_response, build_pending_response
 from services.wstep.soap_envelope import DS_NS, build_soap_fault, extract_username_token, message_expired
 from utils.client_cert import trusted_client_cert
 from utils.db_transaction import safe_commit
@@ -139,11 +140,13 @@ def _validity_days():
         return 365
 
 
-def _fault_response(reason, status=500, relates_to=None, subcode=None):
+def _fault_response(reason, status=500, relates_to=None, subcode=None, request_id=None,
+                    invalid_request=None):
     # SOAP 1.2 HTTP binding: env:Sender (the request is at fault) goes as 400, env:Receiver as 500
     code = 's:Sender' if status < 500 else 's:Receiver'
     (logger.error if status >= 500 else logger.debug)("WSTEP fault (status=%s): %s", status, reason)
-    body = build_soap_fault(reason, code=code, relates_to=relates_to, subcode=subcode)
+    body = build_soap_fault(reason, code=code, relates_to=relates_to, subcode=subcode,
+                            request_id=request_id, invalid_request=invalid_request)
     return Response(body, status=status, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
 
 
@@ -158,9 +161,9 @@ def _parse_request(body):
         parsed = parse_rst(body)
     except RSTParseError as e:
         return None, _fault_response(f'Malformed request: {e}', status=400, relates_to=e.message_id)
-    if parsed.request_type != REQUEST_TYPE_ISSUE:
-        return None, _fault_response('Unsupported wst:RequestType: only Issue is served',
-                                     status=400, relates_to=parsed.message_id)
+    if parsed.request_type not in (REQUEST_TYPE_ISSUE, REQUEST_TYPE_QUERY_TOKEN_STATUS):
+        return None, _fault_response('Unsupported wst:RequestType: only Issue and QueryTokenStatus '
+                                     'are served', status=400, relates_to=parsed.message_id)
     # WSS 1.1 section 12: on SOAP 1.2 its fault codes are subcodes of env:Sender
     if message_expired(parsed.security_header):
         return None, _fault_response('The message has expired (wsu:Timestamp)', status=400,
@@ -215,6 +218,56 @@ def _audit_issuance(action, subject, username, details, success=True, resource_i
     safe_commit(logger, "WSTEP audit commit failed")
 
 
+# Seconds the pending response suggests before QueryTokenStatus (CMC pendTime)
+PENDING_RETRY_SECONDS = 300
+
+
+def _rstr(body):
+    return Response(body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
+
+
+def _answer_held(ca, parsed, approval):
+    """MS-WSTEP 3.1.4.2.1.1/3.1.4.2.1.2: a pending RSTR while the request
+    waits, the certificate once approved, a fault (InvalidRequest) once
+    denied; a decision is delivered once."""
+    from datetime import datetime, timedelta, timezone
+    from services import protocol_approval
+    from services.wstep.approval import issued_certificate
+    from services.wstep.cmc_response import build_cmc_pending_response
+    if approval.status == 'approved':
+        cert = issued_certificate(approval)
+        if cert is not None:
+            body = build_issue_response(cert, relates_to=parsed.message_id, request_id=approval.id,
+                                        cmc_response_der=_cmc_response_der_for(ca, cert, parsed))
+            protocol_approval.mark_delivered(approval)
+            return _rstr(body)
+    if approval.status in ('rejected', 'expired', 'cancelled'):
+        protocol_approval.mark_delivered(approval)
+        return _fault_response(protocol_approval.decision_reason(approval), status=400,
+                               relates_to=parsed.message_id, request_id=approval.id,
+                               invalid_request=True)
+    try:
+        cmc = build_cmc_pending_response(
+            parsed.cmc_body_part_id, str(approval.id).encode(),
+            datetime.now(timezone.utc) + timedelta(seconds=PENDING_RETRY_SECONDS))
+    except Exception as e:
+        logger.warning("WSTEP: failed to build the pending CMC response: %s", e)
+        cmc = None
+    return _rstr(build_pending_response(approval.id, relates_to=parsed.message_id,
+                                        cmc_response_der=cmc))
+
+
+def _query_token_status(ca, parsed, identity):
+    """MS-WSTEP 3.1.4.2.1.2: the status of a request answered pending, for
+    the requester that made it."""
+    from services.wstep.approval import request_for
+    approval = request_for(parsed.request_id, ca, identity)
+    if approval is None:
+        return _fault_response('Unknown RequestID', status=400, relates_to=parsed.message_id,
+                               request_id=parsed.request_id, invalid_request=False)
+    return _answer_held(ca, parsed, approval)
+
+
 def _issue_and_respond(ca, parsed, username, action='certificate.issued', kerberos_principal=None):
     """Shared issuance + RSTR-building + audit logging for every CES
     binding that issues (as opposed to renews) a certificate, once that
@@ -225,10 +278,20 @@ def _issue_and_respond(ca, parsed, username, action='certificate.issued', kerber
     ``wstep_service.issue``) -- ``issue_username_password`` has no Kerberos
     identity to give and must never pass anything into this.
     """
-    cert_pem, error = wstep_service.issue(
-        ca, parsed.csr_der, _validity_days(), require_pop=not parsed.was_pkcs7_wrapped,
-        kerberos_principal=kerberos_principal, outer_signed_data=parsed.outer_signed_data,
-    )
+    from services.wstep.approval import make_gate
+    identity = f'kerberos:{kerberos_principal}' if kerberos_principal else f'user:{username}'
+    if parsed.request_type == REQUEST_TYPE_QUERY_TOKEN_STATUS:
+        return _query_token_status(ca, parsed, identity)
+    gate = make_gate(ca, operation='issue', identity=identity, extra={
+        'kerberos_principal': kerberos_principal, 'require_pop': not parsed.was_pkcs7_wrapped})
+    try:
+        cert_pem, error = wstep_service.issue(
+            ca, parsed.csr_der, _validity_days(), require_pop=not parsed.was_pkcs7_wrapped,
+            kerberos_principal=kerberos_principal, outer_signed_data=parsed.outer_signed_data,
+            gate=gate,
+        )
+    except wstep_service.HeldForApproval as held:
+        return _answer_held(ca, parsed, held.approval)
     if error:
         logger.warning("WSTEP issuance rejected for %r: %s", username, error)
         return _fault_response(error, status=_error_status(error), relates_to=parsed.message_id)
@@ -354,6 +417,26 @@ def _carries_xml_signature(security_header):
     return security_header is not None and security_header.find(f'{{{DS_NS}}}Signature') is not None
 
 
+def _certificate_binding_identity(parsed):
+    """``(identity, fault)`` of a QueryTokenStatus on the Certificate binding:
+    the certificate that signed the RST (XML-DSig) or the TLS client certificate."""
+    from services.wstep import ws_security
+    from services.wstep.approval import certificate_identity
+    if _carries_xml_signature(parsed.security_header):
+        try:
+            signing_der, _signed = ws_security.verify_signed_request(parsed.security_header)
+            return certificate_identity(x509.load_der_x509_certificate(signing_der)), None
+        except Exception as e:
+            return None, _fault_response(f'Authentication failed: {e}', status=400,
+                                         relates_to=parsed.message_id)
+    client_pem = trusted_client_cert(logger, 'WSTEP')
+    if not client_pem:
+        return None, _fault_response('Authentication failed', status=400, relates_to=parsed.message_id)
+    cert = x509.load_pem_x509_certificate(
+        client_pem.encode() if isinstance(client_pem, str) else client_pem)
+    return certificate_identity(cert), None
+
+
 @bp.route(CES_CERTIFICATE_PATH, methods=['GET', 'POST', 'HEAD'])
 def renew_certificate_bound():
     """WSTEP RST over the Certificate-authenticated CES endpoint — renewal,
@@ -384,21 +467,33 @@ def renew_certificate_bound():
     if fault is not None:
         return fault
 
+    if parsed.request_type == REQUEST_TYPE_QUERY_TOKEN_STATUS:
+        identity, fault = _certificate_binding_identity(parsed)
+        if fault is not None:
+            return fault
+        return _query_token_status(ca, parsed, identity)
+
+    from services.wstep.approval import make_gate
     audit = {}
-    if _carries_xml_signature(parsed.security_header):
-        username = 'wstep-ws-security'
-        cert_pem, error = wstep_service.renew(
-            ca, parsed.csr_der, parsed.security_header, parsed.csr_element, _validity_days(),
-            require_pop=not parsed.was_pkcs7_wrapped, outer_signed_data=parsed.outer_signed_data,
-            audit=audit,
-        )
-    else:
-        # Windows authenticates here with its TLS client certificate, no XML-DSig
-        username = 'wstep-client-cert'
-        cert_pem, error = wstep_service.renew_with_client_certificate(
-            ca, trusted_client_cert(logger, 'WSTEP'), parsed.csr_der, parsed.outer_signed_data,
-            _validity_days(), audit=audit,
-        )
+    try:
+        if _carries_xml_signature(parsed.security_header):
+            username = 'wstep-ws-security'
+            cert_pem, error = wstep_service.renew(
+                ca, parsed.csr_der, parsed.security_header, parsed.csr_element, _validity_days(),
+                require_pop=not parsed.was_pkcs7_wrapped, outer_signed_data=parsed.outer_signed_data,
+                audit=audit, gate=make_gate(ca, operation='renew',
+                                            extra={'require_pop': not parsed.was_pkcs7_wrapped}),
+            )
+        else:
+            # Windows authenticates here with its TLS client certificate, no XML-DSig
+            username = 'wstep-client-cert'
+            cert_pem, error = wstep_service.renew_with_client_certificate(
+                ca, trusted_client_cert(logger, 'WSTEP'), parsed.csr_der, parsed.outer_signed_data,
+                _validity_days(), audit=audit,
+                gate=make_gate(ca, operation='renew', extra={'require_pop': False}),
+            )
+    except wstep_service.HeldForApproval as held:
+        return _answer_held(ca, parsed, held.approval)
     old_serial = audit.get('renewed_serial')
     if error:
         logger.warning("WSTEP renewal rejected: %s", error)
