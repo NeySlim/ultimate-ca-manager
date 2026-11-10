@@ -627,8 +627,6 @@ export default function CertificatesPage() {
     }
   ], [linkView, urlStatus, savedStatus, savedCA, savedSource, savedTemplate, leaveLink, setUrlStatus, certStats.sources, cas, t])
 
-  const activeFilters = (savedStatus.length > 0 ? 1 : 0) + (savedCA.length > 0 ? 1 : 0) + (savedSource.length > 0 ? 1 : 0) + (savedTemplate.length > 0 ? 1 : 0)
-
   // Help content
   const helpContent = (
     <div className="space-y-4">
