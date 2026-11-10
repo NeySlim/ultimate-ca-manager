@@ -1905,6 +1905,8 @@ GET /api/v2/dashboard/recent-cas?limit=5
 GET /api/v2/dashboard/activity?limit=20&offset=0
 ```
 
+A database failure returns 500, never an empty `activity` list.
+
 ### Get System Status
 ```http
 GET /api/v2/dashboard/system-status
