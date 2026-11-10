@@ -48,27 +48,18 @@ function Node({ ca, kids, issued, t }) {
   )
 }
 
-/** Without the authorities, the issuances per CA are all the card still has. */
+/** Without the authorities, the issuances per CA are all the card still has: no link to a page that may be forbidden. */
 function IssuedOnly({ entries, t }) {
   return (
     <ul>
-      {entries.map((e) => {
-        const row = (
-          <>
-            <span className="text-sm text-text-primary truncate">{e.ca_name || e.caref || '–'}</span>
-            <span className="text-xs text-text-secondary tabular-nums whitespace-nowrap">
-              {t('overview.hierarchy.issued7d')} {num(e.issued)}
-            </span>
-          </>
-        )
-        const cls = 'flex items-center justify-between gap-3 py-1'
-        return (
-          <li key={e.caref ?? e.ca_id}>
-            {e.ca_id ? <Link to={`/cas/${e.ca_id}`} className={`${cls} hover:text-accent-primary`}>{row}</Link>
-              : <div className={cls}>{row}</div>}
-          </li>
-        )
-      })}
+      {entries.map((e) => (
+        <li key={e.caref ?? e.ca_id} className="flex items-center justify-between gap-3 py-1">
+          <span className="text-sm text-text-primary truncate">{e.ca_name || e.caref || '–'}</span>
+          <span className="text-xs text-text-secondary tabular-nums whitespace-nowrap">
+            {t('overview.hierarchy.issued7d')} {num(e.issued)}
+          </span>
+        </li>
+      ))}
     </ul>
   )
 }
@@ -92,7 +83,7 @@ export function HierarchyCard() {
     <CardFrame id="hierarchy" title={t('overview.cards.hierarchy')} state={state} onRetry={state.reload}
       missing={state.data?.missing}
       empty={state.status === 'ready' && casLoaded && cas.length === 0}
-      action={<Link to="/cas" className="text-sm font-semibold tabular-nums">{num(state.meta?.total)}</Link>}>
+      action={casLoaded && <Link to="/cas" className="text-sm font-semibold tabular-nums">{num(state.meta?.total)}</Link>}>
       {casLoaded
         ? <ul>{roots.map((ca) => <Node key={ca.id} ca={ca} kids={kids} issued={issued} t={t} />)}</ul>
         : <IssuedOnly entries={Array.isArray(byCa) ? byCa : []} t={t} />}

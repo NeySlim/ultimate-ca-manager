@@ -323,7 +323,7 @@ def get_activity_log():
     except Exception as e:
         # A failure is an error, never an empty feed: the card tells the two apart
         logger.error(f"Activity log error: {e}")
-        db.session.rollback()
+        _status_rollback()
         return error_response('Activity log unavailable', 500)
 
 

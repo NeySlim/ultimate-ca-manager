@@ -164,9 +164,10 @@ describe('a card with two requests keeps what one of them gave', () => {
     api.getAll.mockRejectedValue(error(403))
     api.getIssuance.mockResolvedValue({ data: { by_ca: [{ caref: 'r', ca_id: 7, ca_name: 'Root', issued: 4 }] } })
     show(<HierarchyCard />)
-    const row = (await screen.findByText('Root')).closest('a')
-    expect(row.getAttribute('href')).toBe('/cas/7')
+    const row = (await screen.findByText('Root')).closest('li')
     expect(row.textContent).toContain('4')
+    // Nothing leads to the page the role cannot open
+    expect(document.querySelector('a[href^="/cas"]')).toBeNull()
     expect(screen.getByRole('note').textContent).toBe('overview.state.partialForbidden')
   })
 
