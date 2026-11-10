@@ -1024,7 +1024,7 @@ def effective_policy_algorithms():
             'ml_dsa': key_algorithms.mldsa_supported()}  # whether this build can use ML-DSA keys
     if fips_mode.enabled():
         data['fips'] = True  # the FIPS system policy is part of the result
-    # The key a form preselects: the same rule the server applies when no key is named
+    # The key issued when neither the request nor the template names one
     data['baseline_key_type'] = issuance_defaults.BASELINE_ISSUE_KEY
     try:
         data['default_key_type'] = issuance_defaults.default_issue_key_type(ca_id, template_id=template_id)
