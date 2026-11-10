@@ -8,38 +8,34 @@ import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend
 } from 'recharts'
-import { useTheme } from '../contexts/ThemeContext'
 
-// Get computed CSS variable value
-function getCssVar(name) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim()
+const CHART_VARS = {
+  primary: '--accent-primary',
+  success: '--accent-success',
+  warning: '--accent-warning',
+  danger: '--accent-danger',
+  pro: '--accent-pro',
 }
 
-// Hook to get chart colors from CSS variables
+function readChartColors() {
+  const style = getComputedStyle(document.documentElement)
+  const out = {}
+  for (const [key, name] of Object.entries(CHART_VARS)) out[key] = style.getPropertyValue(name).trim()
+  return out
+}
+
+// Colours are read from the CSS variables at render and re-read when data-theme / data-mode change.
 function useChartColors() {
-  const { mode } = useTheme()
-  const [colors, setColors] = useState({
-    primary: '#3b82f6',
-    success: '#22c55e',
-    warning: '#f59e0b',
-    danger: '#ef4444',
-    pro: '#8b5cf6',
-  })
-  
+  const [colors, setColors] = useState(readChartColors)
+
   useEffect(() => {
-    // Read colors from CSS variables after theme change
-    const timer = setTimeout(() => {
-      setColors({
-        primary: getCssVar('--accent-primary') || '#3b82f6',
-        success: getCssVar('--accent-success') || '#22c55e',
-        warning: getCssVar('--accent-warning') || '#f59e0b',
-        danger: getCssVar('--accent-danger') || '#ef4444',
-        pro: getCssVar('--accent-pro') || '#8b5cf6',
-      })
-    }, 50) // Small delay to ensure CSS is applied
-    return () => clearTimeout(timer)
-  }, [mode])
-  
+    const refresh = () => setColors(readChartColors())
+    const observer = new MutationObserver(refresh)
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'data-mode'] })
+    refresh()
+    return () => observer.disconnect()
+  }, [])
+
   return colors
 }
 
@@ -62,7 +58,6 @@ function CustomTooltip({ active, payload, label }) {
 // Certificate trend chart (area chart)
 export function CertificateTrendChart({ data = [], height = '100%' }) {
   const { t } = useTranslation()
-  const { mode } = useTheme()
   const colors = useChartColors()
   
   // Use provided data directly
@@ -82,7 +77,6 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
   const strokeColor = colors.primary
   const revokedColor = colors.danger
   const expiredColor = colors.warning
-  const gridColor = mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
   
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -95,13 +89,13 @@ export function CertificateTrendChart({ data = [], height = '100%' }) {
         </defs>
         <XAxis 
           dataKey="name" 
-          tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
+          tick={{ fontSize: 12, fill: 'var(--text-tertiary)' }}
           axisLine={false}
           tickLine={false}
           interval={chartData.length <= 7 ? 0 : Math.max(1, Math.floor(chartData.length / 7))}
         />
         <YAxis 
-          tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }}
+          tick={{ fontSize: 12, fill: 'var(--text-tertiary)' }}
           axisLine={false}
           tickLine={false}
           allowDecimals={false}
@@ -182,7 +176,7 @@ export function StatusPieChart({ data = {}, height = '100%', onSegmentClick }) {
           outerRadius="70%"
           paddingAngle={3}
           dataKey="value"
-          stroke="rgba(255,255,255,0.15)"
+          stroke="color-mix(in srgb, var(--text) 15%, transparent)"
           strokeWidth={1}
           style={{ filter: 'url(#donutShadow)' }}
           cornerRadius={3}
@@ -203,7 +197,7 @@ export function StatusPieChart({ data = {}, height = '100%', onSegmentClick }) {
           layout="vertical"
           iconSize={8}
           iconType="circle"
-          wrapperStyle={{ fontSize: 11, paddingLeft: 4 }}
+          wrapperStyle={{ fontSize: 12, paddingLeft: 4 }}
           formatter={(value) => <span className="text-text-secondary">{value}</span>}
         />
       </PieChart>
