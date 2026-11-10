@@ -216,3 +216,29 @@ def test_a_fresh_sqlite_store_has_the_expiry_index(sql_store_app):
 @pytest.mark.skipif(not PG_URL, reason='no PostgreSQL URL for the fresh-schema index test')
 def test_a_fresh_postgresql_store_has_the_expiry_index(two_nodes):
     assert _expiry_indexed(two_nodes[0])
+
+
+@pytest.mark.parametrize('method, args', [
+    ('_delete_expired_sessions', ()),
+    ('_retrieve_session_data', ('sid',)),
+    ('_delete_session', ('sid',)),
+    ('_upsert_session', (__import__('datetime').timedelta(hours=1), {'a': 1}, 'sid')),
+])
+def test_store_methods_retry_a_transient_database_error(sql_store_app, monkeypatch, method, args):
+    from sqlalchemy.exc import OperationalError
+
+    app = sql_store_app
+    interface = app.session_interface
+    real, calls = interface._store, []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) == 1:
+            raise OperationalError('SELECT 1', {}, Exception('connection lost'))
+        return real()
+
+    monkeypatch.setattr(interface, '_store', flaky)
+    monkeypatch.setattr('time.sleep', lambda *_: None)
+    with app.app_context():
+        getattr(interface, method)(*args)
+    assert len(calls) == 2
