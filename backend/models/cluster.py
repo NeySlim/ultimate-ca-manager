@@ -12,6 +12,21 @@ class ClusterNode(db.Model):
     is_leader = db.Column(db.Boolean, nullable=False, default=False)
     version = db.Column(db.String(32))
     pid = db.Column(db.Integer)
+    # Last cluster_commands.id this node's applier handled (migration 143)
+    command_seen = db.Column(db.Integer)
+
+
+class ClusterCommand(db.Model):
+    """A reload or restart for every node (node_id NULL) or one node, emitted in the
+    transaction that changed the setting; purged by the leader after 24 hours."""
+    __tablename__ = 'cluster_commands'
+
+    id = db.Column(db.Integer, primary_key=True)
+    kind = db.Column(db.String(64), nullable=False)
+    payload = db.Column(db.Text)  # JSON
+    created_at = db.Column(db.DateTime, nullable=False, index=True)
+    created_by = db.Column(db.String(255))
+    node_id = db.Column(db.String(255))
 
 
 class SchedulerRequest(db.Model):
