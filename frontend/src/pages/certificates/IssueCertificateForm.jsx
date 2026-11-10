@@ -30,7 +30,6 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   // lands, so a state-closure guard would see the stale value.
   const [issuing, setIssuing] = useState(false)
   const issuingRef = useRef(false)
-  // True once the user, a template or a re-key picked the key: the server default then leaves it alone
   // Who set the current key: 'user', 'template' or null (server default applies)
   const keySource = useRef(null)
   const [showAllTemplates, setShowAllTemplates] = useState(false)

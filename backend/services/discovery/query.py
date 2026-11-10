@@ -3,7 +3,7 @@ Query mixin — discovered certificate and scan run retrieval helpers.
 """
 import socket
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import List, Dict, Optional, Tuple
 
 from models import db, DiscoveredCertificate, ScanRun
