@@ -61,25 +61,22 @@ class DiscoverySchedulerTask:
         A scan run lives in a daemon thread; if the process dies mid-scan the
         row stays 'running' forever and would block future scheduled scans of
         its profile. With no argument every running scan is orphaned (one
-        node, at startup). HA: ``keep_nodes`` (takeover) keeps the scans of those
-        live nodes, scheduled ones only when started after the node's process started;
-        ``live_nodes`` (every pass) keeps every scan of those nodes;
-        ``own_node`` (node startup) fails only that node's scans.
+        node, at startup). HA: ``keep_nodes`` (takeover) and ``live_nodes`` (every
+        pass) keep the scans of those live nodes, scheduled ones only when started after
+        the node's process started; ``own_node`` (node startup) fails only that node's scans.
         """
         try:
+            from models import ClusterNode
             query = ScanRun.query.filter_by(status='running')
-            if keep_nodes is not None:
-                from models import ClusterNode
-                # A scheduled scan lives as long as the process that started it: still the node's current one
-                started_by_current = db.exists().where(db.and_(
-                    ClusterNode.node_id == ScanRun.node_id, ScanRun.started_at > ClusterNode.started_at))
-                query = query.filter(db.or_(
-                    db.and_(ScanRun.triggered_by == 'scheduled', ~started_by_current),
-                    ScanRun.node_id.is_(None),
-                    ScanRun.node_id.notin_(list(keep_nodes) or [''])))
-            if live_nodes is not None:
-                query = query.filter(db.or_(
-                    ScanRun.node_id.is_(None), ScanRun.node_id.notin_(list(live_nodes) or [''])))
+            # Only a node's scheduler process starts scheduled scans: they die with that process
+            started_by_current = db.exists().where(db.and_(
+                ClusterNode.node_id == ScanRun.node_id, ScanRun.started_at > ClusterNode.started_at))
+            for nodes in (keep_nodes, live_nodes):
+                if nodes is not None:
+                    query = query.filter(db.or_(
+                        db.and_(ScanRun.triggered_by == 'scheduled', ~started_by_current),
+                        ScanRun.node_id.is_(None),
+                        ScanRun.node_id.notin_(list(nodes) or [''])))
             if own_node is not None:
                 query = query.filter(ScanRun.node_id == own_node)
             stale = query.update(

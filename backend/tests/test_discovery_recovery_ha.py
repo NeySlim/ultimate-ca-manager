@@ -159,3 +159,44 @@ def test_each_pass_fails_the_runs_of_nodes_gone_since_takeover(app, runs, monkey
         ScanRun.query.filter_by(scan_profile_id=profile.id).delete(synchronize_session=False)
         db.session.delete(db.session.get(ScanProfile, profile.id))
         db.session.commit()
+
+
+def test_each_pass_fails_the_scheduled_runs_of_a_live_nodes_former_process(app, runs, monkeypatch):
+    """A's scheduler child dies mid-scan, B takes over while A's row is still fresh, then A's new
+    process rewrites its row: the scan belongs to no live process and must not block the profile."""
+    from models import ScanProfile
+    from services.discovery_service import DiscoveryService
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr(Config, 'NODE_ID', NODE + 'b')
+    monkeypatch.setenv('UCM_SCHEDULER_SUPERVISED', '1')
+    monkeypatch.setenv('UCM_SCHEDULER_PROCESS', '1')  # B's scheduler process
+    now = utc_now()
+    old_boot = now - timedelta(hours=1)
+    db.session.add(ClusterNode(node_id=NODE + 'a', started_at=old_boot, heartbeat_at=now, pid=1001))
+    db.session.add(ClusterNode(node_id=NODE + 'b', started_at=now, heartbeat_at=now))
+    profile = ScanProfile(name=NODE + 'profile-a', targets='["192.0.2.1"]', ports='[443]',
+                          schedule_enabled=True, next_scan_at=now - timedelta(minutes=1))
+    db.session.add(profile)
+    db.session.commit()
+    orphan = runs(NODE + 'a', 'scheduled', started_at=now - timedelta(minutes=10))
+    db.session.get(ScanRun, orphan).scan_profile_id = profile.id
+    db.session.commit()
+    started = []
+    monkeypatch.setattr(DiscoveryService, 'start_scan', lambda self, **kw: started.append(kw['profile_id']))
+    scheduler = SchedulerService(wake_interval=60)
+    try:
+        DiscoverySchedulerTask.register(scheduler, app)
+        for hook in scheduler._leadership_hooks:
+            hook()
+        assert status(orphan) == 'running'  # A's row still names the process that started it
+        node_a = db.session.get(ClusterNode, NODE + 'a')
+        node_a.started_at, node_a.pid, node_a.heartbeat_at = utc_now(), 1002, utc_now()
+        db.session.commit()
+        for _ in range(3):
+            scheduler.tasks['discovery_scan'].func()
+        assert status(orphan) == 'failed'
+        assert started == [profile.id]
+    finally:
+        ScanRun.query.filter_by(scan_profile_id=profile.id).delete(synchronize_session=False)
+        db.session.delete(db.session.get(ScanProfile, profile.id))
+        db.session.commit()
