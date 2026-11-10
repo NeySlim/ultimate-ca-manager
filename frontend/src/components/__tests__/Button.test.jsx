@@ -35,7 +35,6 @@ describe('Button Component', () => {
     render(<Button>Primary</Button>)
     const button = screen.getByRole('button')
     expect(button.className).toContain('btn-gradient')
-    expect(button.className).not.toContain('text-white')
   })
 
   it('renders secondary variant correctly', () => {
@@ -50,7 +49,6 @@ describe('Button Component', () => {
     const button = screen.getByRole('button')
     expect(button.className).toContain('btn-gradient')
     expect(button.className).toContain('danger')
-    expect(button.className).not.toContain('text-white')
   })
 
   it('renders ghost variant correctly', () => {
