@@ -77,3 +77,10 @@ def test_redis_store_is_left_to_redis(app, tmp_path, monkeypatch):
         SessionCleanupTask.execute()
 
     assert stale.exists()
+
+
+def test_sql_store_logs_only_when_rows_were_removed(app, sql_store, caplog):
+    import logging
+    with app.app_context(), caplog.at_level(logging.INFO, logger='services.session_cleanup_task'):
+        SessionCleanupTask.execute()
+    assert not [r for r in caplog.records if 'Session cleanup' in r.getMessage()]

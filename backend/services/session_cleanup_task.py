@@ -28,11 +28,12 @@ class SessionCleanupTask:
         except Exception:
             db.session.rollback()
             raise
-        logger.info(f"Session cleanup: removed {result.rowcount} expired database sessions")
+        if result.rowcount:
+            logger.info(f"Session cleanup: removed {result.rowcount} expired database sessions")
 
     @staticmethod
     def execute():
-        """Remove session files older than the max session lifetime"""
+        """Remove expired session files (file store) or expired rows (SQL store); Redis expires its own."""
         try:
             from flask import current_app
             store = current_app.config.get('SESSION_TYPE')
