@@ -36,7 +36,8 @@ def _days_error(maximum):
 @require_auth(['read:dashboard'])
 def get_queue():
     """Items to act on, ``{kind, tier, id, label, due_at, href_hint}``, critical first then
-    by ``due_at``, at most ``limit``; ``counts`` holds the full total per kind.
+    by ``due_at``, at most ``limit``; ``counts`` holds the full total per kind. A repeated
+    ``kind`` restricts the items to those kinds (an unknown one is refused with 400).
 
     critical: ``acme_order_failed`` (last 7 days), ``acme_client_renewal_failed``,
     ``approval_pending`` expiring within 24 h, ``crl_due`` stale and ``crl_missing``,
@@ -50,7 +51,11 @@ def get_queue():
     identical certificate supersedes.
     """
     limit = parse_request_limit(DASHBOARD_MAX_ROWS, DASHBOARD_MAX_ROWS)
-    return success_response(data=dashboard_aggregates.work_queue(db.session, limit))
+    kinds = request.args.getlist('kind') or None
+    unknown = sorted(set(kinds or ()) - set(dashboard_aggregates.QUEUE_KINDS))
+    if unknown:
+        return error_response(f"unknown kind: {', '.join(unknown)}", 400)
+    return success_response(data=dashboard_aggregates.work_queue(db.session, limit, kinds=kinds))
 
 
 @bp.route('/api/v2/dashboard/health', methods=['GET'])

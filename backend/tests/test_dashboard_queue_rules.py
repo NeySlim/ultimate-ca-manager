@@ -6,7 +6,8 @@ import pytest
 
 from models import CA, Certificate, SystemConfig, db
 from models.policy import ApprovalRequest
-from tests.test_dashboard_queue import SETTINGS, _ca, _cert, _find, _queue, _set
+from tests.conftest import get_json
+from tests.test_dashboard_queue import SETTINGS, URL, _ca, _cert, _find, _set
 from utils.datetime_utils import utc_now
 
 
@@ -58,8 +59,15 @@ def rules(app):
 CERT_KINDS = ('manual_renewal_due', 'client_renewal_overdue', 'auto_renewal_blocked', 'renewal_declined')
 
 
+def _queue(client):
+    """The certificate kinds only: other files' leftovers would fill the capped listing."""
+    r = client.get(URL, query_string=[('kind', k) for k in CERT_KINDS])
+    assert r.status_code == 200, r.data
+    return get_json(r)['data']
+
+
 def _kinds(client, cert_id):
-    return [i['kind'] for i in _queue(client)['items'] if i['id'] == cert_id and i['kind'] in CERT_KINDS]
+    return [i['kind'] for i in _queue(client)['items'] if i['id'] == cert_id]
 
 
 def test_manual_refusal_does_not_hide_a_blocked_renewal(app, auth_client, rules):

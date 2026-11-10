@@ -326,15 +326,19 @@ def _short_label(kind, label):
     return (label or '')[:200]
 
 
-def work_queue(session, limit, now=None):
-    """Items to act on, critical first then by due date, and the total per kind."""
+def work_queue(session, limit, now=None, kinds=None):
+    """Items to act on, critical first then by due date, and the total per kind.
+    *kinds* restricts the items (not the counts) to those kinds."""
     now = now or utc_now()
     queue = _queue_union(now, session.get_bind().dialect.name)
     counts = {kind: 0 for kind in QUEUE_KINDS}
     for kind, n in session.execute(select(queue.c.kind, func.count()).group_by(queue.c.kind)):
         counts[kind] = n
+    listing = select(queue)
+    if kinds is not None:
+        listing = listing.where(queue.c.kind.in_(list(kinds)))
     rows = session.execute(
-        select(queue).order_by(queue.c.rank, queue.c.due_at, queue.c.kind, queue.c.id).limit(limit))
+        listing.order_by(queue.c.rank, queue.c.due_at, queue.c.kind, queue.c.id).limit(limit))
     items = [{
         'kind': r.kind, 'tier': 'critical' if r.rank == 0 else 'warning', 'id': r.id,
         'label': _short_label(r.kind, r.label), 'due_at': utc_isoformat(r.due_at),

@@ -384,6 +384,19 @@ def test_counts_are_exact_when_the_list_is_truncated(app, auth_client, seeded):
             db.session.commit()
 
 
+def test_kind_restricts_the_items_but_not_the_counts(auth_client, seeded):
+    whole = _queue(auth_client)
+    r = auth_client.get(URL, query_string=[('kind', 'crl_due'), ('kind', 'crl_missing')])
+    assert r.status_code == 200, r.data
+    data = get_json(r)['data']
+    assert {i['kind'] for i in data['items']} == {'crl_due', 'crl_missing'}
+    assert len(data['items']) == whole['counts']['crl_due'] + whole['counts']['crl_missing']
+    assert data['counts'] == whole['counts']
+    r = auth_client.get(f'{URL}?kind=crl_due&kind=nonsense')
+    assert r.status_code == 400
+    assert 'nonsense' in get_json(r)['message']
+
+
 def test_a_key_without_read_dashboard_is_refused(app, auth_client):
     """Every built-in role holds read:dashboard, so the refusal is shown with a scoped API key."""
     r = auth_client.post('/api/v2/account/apikeys',

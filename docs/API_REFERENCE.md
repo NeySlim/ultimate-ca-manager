@@ -1947,13 +1947,14 @@ GET /api/v2/dashboard/certificate-trend?days=30
 ### Overview Aggregates
 ```http
 GET /api/v2/dashboard/queue?limit=100
+GET /api/v2/dashboard/queue?kind=crl_due&kind=crl_missing
 GET /api/v2/dashboard/health?days=7
 GET /api/v2/dashboard/compliance
 GET /api/v2/dashboard/issuance?days=7
 ```
 Scope `read:dashboard`. A `days` outside its range is refused with 400.
 
-`queue` lists `{kind, tier, id, label, due_at, href_hint}` items, critical first then by `due_at` (at most `limit`, 100), with the full total per kind in `counts`:
+`queue` lists `{kind, tier, id, label, due_at, href_hint}` items, critical first then by `due_at` (at most `limit`, 100), with the full total per kind in `counts`. A repeated `kind` restricts the items, not the counts, to those kinds; an unknown kind is refused with 400:
 
 | kind | critical | warning |
 |------|----------|---------|
