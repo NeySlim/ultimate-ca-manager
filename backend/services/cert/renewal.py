@@ -41,6 +41,7 @@ from utils.datetime_utils import cert_not_before, utc_isoformat, utc_now
 from utils.serial_format import canonical_serial
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window, clamp_not_after
 from utils.db_transaction import commit_or_rollback
+from utils.ca_serial_counter import next_ca_serial
 from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
 from utils import notices as notices_mod
@@ -361,6 +362,8 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     _write_row(cert, ca, ca_cert, renewed, cert_pem, key_pem, new_serial, now)
     _record_superseded(cert.id, ca, old_serial, old_valid_to, now, old_digest)
     _record_scts(cert.id, scts)
+    # A renewal is an issuance; counted in the renewal's commit, undone with it
+    next_ca_serial(ca)
     return {
         'cert': cert, 'cert_id': cert.id, 'ca': ca, 'old_serial': old_serial,
         'new_serial': new_serial, 'valid_from': cert.valid_from, 'valid_to': cert.valid_to,
