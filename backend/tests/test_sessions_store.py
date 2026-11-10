@@ -55,6 +55,16 @@ def test_configuration_picks_the_store(env, production, testing):
         assert directory == 'None', 'the SQL store has no session directory'
 
 
+@pytest.fixture(autouse=True)
+def _drop_session_table_from_metadata():
+    """The SQL store registers flask_sessions on the shared metadata; never leak it."""
+    yield
+    from models import db
+    t = db.metadata.tables.get('flask_sessions')
+    if t is not None:
+        db.metadata.remove(t)
+
+
 @pytest.fixture
 def two_nodes(monkeypatch):
     """Two applications on one PostgreSQL schema, both with the SQL session store."""
