@@ -35,6 +35,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - HA preview: two nodes started together on an empty PostgreSQL database could both try to create the session table, and one failed to start; the table is now created under the startup lock.
 - Issuance: a certificate created with `POST /api/v2/certificates` (the certificate form), issued from the form once its approval was granted, enrolled through SCEP or renewed in place, a cross-certificate, and the certificates UCM issues to its own TSA signer, EST key generator and renewed OCSP responder were never counted in their CA's issued certificates; they now are.
+- Renewal: an EST, WSTEP or SCEP renewal that waited behind an in-place renewal of the same certificate archived the certificate just renewed; it is now refused, and the OCSP responder renewal task leaves such a certificate as it is.
 - Issue form: the preselected key now comes from the server default for the chosen CA and template (new `default_key_type` in `GET /api/v2/policies/effective`) instead of a fixed RSA-2048, and a key you picked yourself is kept.
 - Discovery: certificate validity dates are stored as UTC whatever offset the probe reports, and the expired and expiring counts compare in UTC, so PostgreSQL with a non-UTC session time zone no longer shifts them.
 - Upgrade note: on PostgreSQL with a server time zone other than UTC, discovery dates stored before this release are in local time; run a scan of the discovery targets after upgrading to rewrite them.
