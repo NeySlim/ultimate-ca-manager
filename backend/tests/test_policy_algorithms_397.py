@@ -26,6 +26,21 @@ from tests.conftest import get_json
 CONTENT_JSON = 'application/json'
 
 
+@pytest.fixture(autouse=True, scope='module')
+def _forget_what_the_file_made(app):
+    """The CAs and certificates the tests create stay behind: remove what is newer than the file."""
+    with app.app_context():
+        floor = {m: db.session.query(db.func.max(m.id)).scalar() or 0
+                 for m in (Certificate, CA)}
+    yield
+    with app.app_context():
+        db.session.rollback()
+        # A certificate, then its CA: rows pointing at either are the tests' own and already dropped
+        Certificate.query.filter(Certificate.id > floor[Certificate]).delete(synchronize_session=False)
+        CA.query.filter(CA.id > floor[CA]).delete(synchronize_session=False)
+        db.session.commit()
+
+
 def _policy(app, name, ca_id=None, rules=None, template_id=None):
     with app.app_context():
         pol = CertificatePolicy(name=name, policy_type='issuance', ca_id=ca_id,
