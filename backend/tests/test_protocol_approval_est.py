@@ -78,10 +78,11 @@ def test_rejection_is_forbidden(app, client, auth_client, est_config):
         csr, _ = _make_csr(common_name='refused.est-approval.test')
         _held(_enroll(client, csr))
         (approval_id, *_), = requests_of(app, pid, 'est_enroll')
-        reject(auth_client, approval_id, 'unknown device')
+        reject(auth_client, approval_id, 'unknown host')
         refused = _enroll(client, csr)
         assert refused.status_code == 403
-        assert b'unknown device' in refused.data
+        # The approver's comment stays on the server side
+        assert refused.data == b'Rejected by an approver'
 
 
 def test_expired_request_starts_again(app, client, est_config):

@@ -104,7 +104,7 @@ def test_query_is_denied_after_rejection(app, client, auth_client, wstep_config)
         (approval_id, *_), = requests_of(app, pid, 'wstep_request')
         reject(auth_client, approval_id, 'not a known machine')
         reason, invalid, echoed = _fault(_query(client, request_id))
-        assert 'not a known machine' in reason
+        assert reason == 'Rejected by an approver'
         assert invalid == 'true' and echoed == request_id
 
 

@@ -114,7 +114,9 @@ def test_rejection_makes_the_order_invalid(app, client, auth_client, acme_ca):
         read = _read(client, account, order_id).get_json()
         assert read['status'] == 'invalid'
         assert read['error']['type'] == 'urn:ietf:params:acme:error:unauthorized'
-        assert 'rejected' in read['error']['detail']
+        # The approver's comment stays on the server side
+        assert read['error']['detail'] == 'Rejected by an approver'
+        assert 'unknown host' not in str(read)
 
 
 def test_expiry_makes_the_order_invalid(app, client, acme_ca):
@@ -126,6 +128,7 @@ def test_expiry_makes_the_order_invalid(app, client, acme_ca):
         read = _read(client, account, order_id).get_json()
         assert read['status'] == 'invalid'
         assert read['error']['type'] == 'urn:ietf:params:acme:error:unauthorized'
+        assert read['error']['detail'] == 'Approval request expired'
 
 
 def test_an_expiry_not_yet_swept_is_seen_by_the_client(app, client, acme_ca):

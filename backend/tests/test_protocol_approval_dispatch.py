@@ -127,7 +127,7 @@ def test_rejection_reaches_the_protocol(app, auth_client, gate_ca, fake_handler)
         assert fake_handler == [('closed', 'rejected')]
         with app.app_context():
             reason = protocol_approval.decision_reason(db.session.get(ApprovalRequest, approval_id))
-        assert reason == 'The request was rejected: not this one'
+        assert reason == 'Rejected by an approver'
 
 
 def test_expiry_reaches_the_protocol(app, gate_ca, fake_handler):

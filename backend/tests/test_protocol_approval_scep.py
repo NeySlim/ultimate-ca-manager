@@ -123,9 +123,12 @@ def test_rejection_from_either_queue_fails_the_poll(app, auth_client, scep_ca):
     with approval_policy(app, scep_ca, 'scep-held-reject') as pid:
         assert _enroll(app, scep_ca, identity) == PENDING
         (approval_id, *_), = requests_of(app, pid, 'scep_request')
-        reject(auth_client, approval_id)
+        reject(auth_client, approval_id, 'unknown host')
         assert _scep_row(app, scep_ca)[1] == 'rejected'
         assert _poll(app, scep_ca, identity) == FAILURE
+        with app.app_context():
+            row = db.session.get(SCEPRequest, _scep_row(app, scep_ca)[0])
+            assert row.rejection_reason == 'Rejected by an approver'
 
 
 def test_rejection_from_the_scep_queue_rejects_the_approval(app, auth_client, scep_ca):

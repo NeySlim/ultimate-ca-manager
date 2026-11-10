@@ -208,14 +208,11 @@ def record_refusal(approval, error) -> None:
 
 
 def decision_reason(approval) -> str:
-    """What the client is told about a request that will not be issued."""
+    """What the client is told about a request that will not be issued: a
+    fixed text, the approver's comment stays server side (vote, audit, webhook)."""
     if approval.status == 'expired':
-        return 'The request was not approved in time'
-    for vote in reversed(approval.get_approvals()):
-        if vote.get('action') == 'reject':
-            return f"The request was rejected: {vote.get('comment')}" if vote.get('comment') \
-                else 'The request was rejected'
-    return 'The request was rejected'
+        return 'Approval request expired'
+    return 'Rejected by an approver'
 
 
 def issue_approved(approval, data: dict) -> dict:
