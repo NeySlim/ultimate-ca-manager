@@ -200,7 +200,7 @@ export default function BackupSection({
             )}
             <div className="space-y-2">
               {backups.map((backup) => (
-                <div key={backup.filename} className="flex items-center justify-between p-3 bg-tertiary-50 border border-white/5 rounded-lg">
+                <div key={backup.filename} className="flex items-center justify-between p-3 bg-tertiary-50 border border-border-op30 rounded-lg">
                   <div className="flex items-center gap-3 min-w-0">
                     {isAdmin && (
                       <input

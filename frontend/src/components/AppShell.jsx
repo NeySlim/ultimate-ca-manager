@@ -192,13 +192,13 @@ export function AppShell() {
   return (
     <div className={cn(
       "flex h-full w-full overflow-hidden justify-center items-center",
-      isDesktopFrame ? "bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" : "bg-bg-primary"
+      isDesktopFrame ? "bg-gradient-to-br from-bg-primary via-bg-secondary to-bg-primary" : "bg-bg-primary"
     )}>
       {/* App container - frame effect on desktop (>= 900px) */}
       <div className={cn(
         "flex flex-col w-full overflow-hidden bg-bg-primary relative",
         isDesktopFrame
-          ? "max-w-[min(calc(100%-48px),1900px)] h-[calc(100%-24px)] rounded-xl shadow-2xl border border-white/10"
+          ? "max-w-[min(calc(100%-48px),1900px)] h-[calc(100%-24px)] rounded-xl shadow-2xl border border-border-op30"
           : "h-full"
       )}>
         
@@ -420,7 +420,7 @@ export function AppShell() {
         <>
           {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-scrim-60 backdrop-blur-sm z-40"
             onClick={() => setMobileMenuOpen(false)}
           />
           

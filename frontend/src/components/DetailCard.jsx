@@ -151,7 +151,7 @@ export function DetailHeader({
               "flex items-center justify-center shrink-0",
               isMobile ? "w-11 h-11" : "w-14 h-14"
             )}>
-              <Icon size={isMobile ? 22 : 28} className="text-white" weight="duotone" />
+              <Icon size={isMobile ? 22 : 28} className="text-on-accent" weight="duotone" />
             </div>
           )}
           <div className="min-w-0">

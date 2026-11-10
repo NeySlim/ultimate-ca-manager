@@ -115,7 +115,7 @@ export default function SsoSamlFields({
             helperText={t('sso.nameIdFormatHelp')}
           />
           <ToggleSwitch checked={formData.saml_verify_ssl} onChange={(val) => handleChange('saml_verify_ssl', val)} label={t('sso.verifySsl')} size="sm" />
-          {!formData.saml_verify_ssl && <p className="text-xs text-amber-500">{t('sso.sslWarning')}</p>}
+          {!formData.saml_verify_ssl && <p className="text-xs text-status-warning">{t('sso.sslWarning')}</p>}
           {formData.saml_verify_ssl && (
             <Textarea
               label={t('sso.caBundleLabel')}

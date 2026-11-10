@@ -753,7 +753,7 @@ export default function OperationsPage() {
             <span className="text-sm text-text-secondary">{t('importExport.opnsense.ignoreCert')}</span>
           </label>
           {!opnsenseVerifySsl && (
-            <p className="text-xs text-amber-500">{t('importExport.opnsense.sslWarning')}</p>
+            <p className="text-xs text-status-warning">{t('importExport.opnsense.sslWarning')}</p>
           )}
 
           {testResult && (
@@ -834,7 +834,7 @@ export default function OperationsPage() {
             className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg icon-bg-blue flex items-center justify-center">
-              <FileText size={20} weight="fill" className="text-white" />
+              <FileText size={20} weight="fill" className="text-paper" />
             </div>
             <div>
               <div className="text-sm font-semibold text-text-primary">{t('importExport.export.pemBundle')}</div>
@@ -849,7 +849,7 @@ export default function OperationsPage() {
             className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg icon-bg-violet flex items-center justify-center">
-              <Package size={20} weight="fill" className="text-white" />
+              <Package size={20} weight="fill" className="text-paper" />
             </div>
             <div>
               <div className="text-sm font-semibold text-text-primary">{t('importExport.export.p7bBundle')}</div>
@@ -869,7 +869,7 @@ export default function OperationsPage() {
             className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg icon-bg-emerald flex items-center justify-center">
-              <FileText size={20} weight="fill" className="text-white" />
+              <FileText size={20} weight="fill" className="text-paper" />
             </div>
             <div>
               <div className="text-sm font-semibold text-text-primary">{t('importExport.export.pemBundle')}</div>
@@ -884,7 +884,7 @@ export default function OperationsPage() {
             className="group flex flex-col items-start gap-3 p-4 rounded-lg border border-border bg-secondary-op50 hover:bg-bg-secondary hover:border-accent-primary-op30 transition-all text-left"
           >
             <div className="w-10 h-10 rounded-lg icon-bg-orange flex items-center justify-center">
-              <Package size={20} weight="fill" className="text-white" />
+              <Package size={20} weight="fill" className="text-paper" />
             </div>
             <div>
               <div className="text-sm font-semibold text-text-primary">{t('importExport.export.p7bBundle')}</div>

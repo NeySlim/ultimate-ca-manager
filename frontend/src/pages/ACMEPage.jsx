@@ -1400,8 +1400,8 @@ export default function ACMEPage() {
                   key={step.name}
                   className={`p-2 rounded border text-sm ${
                     step.status === 'pass'
-                      ? 'border-green-500/30 bg-green-500/5'
-                      : 'border-red-500/30 bg-red-500/5'
+                      ? 'border-status-success-op30 bg-status-success-op10'
+                      : 'border-status-danger-op30 bg-status-danger-op5'
                   }`}
                 >
                   <div className="font-medium">{step.label}</div>

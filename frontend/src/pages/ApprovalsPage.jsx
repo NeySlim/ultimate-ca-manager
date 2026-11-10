@@ -422,8 +422,8 @@ export default function ApprovalsPage() {
             {selectedRequest.approvals.map((approval, idx) => (
               <div key={idx} className="flex items-start gap-2 text-sm bg-bg-tertiary rounded-lg p-3">
                 {approval.action === 'approve'
-                  ? <CheckCircle size={16} className="text-green-500 mt-0.5 shrink-0" weight="fill" />
-                  : <XCircle size={16} className="text-red-500 mt-0.5 shrink-0" weight="fill" />
+                  ? <CheckCircle size={16} className="text-status-success mt-0.5 shrink-0" weight="fill" />
+                  : <XCircle size={16} className="text-status-danger mt-0.5 shrink-0" weight="fill" />
                 }
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
@@ -505,8 +505,8 @@ export default function ApprovalsPage() {
         <div className="p-4 space-y-4">
           <div className="flex items-center gap-2 text-sm">
             {actionModal?.type === 'approve'
-              ? <CheckCircle size={20} className="text-green-500" weight="fill" />
-              : <XCircle size={20} className="text-red-500" weight="fill" />
+              ? <CheckCircle size={20} className="text-status-success" weight="fill" />
+              : <XCircle size={20} className="text-status-danger" weight="fill" />
             }
             <span className="text-text-primary">
               {actionModal?.type === 'approve'

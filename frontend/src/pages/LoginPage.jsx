@@ -559,8 +559,8 @@ export default function LoginPage() {
                   <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-accent-op10 transition-colors" />
                   <div className="flex items-center gap-2 sm:gap-3">
                     <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-op70 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                      <User size={20} className="text-white sm:hidden" weight="bold" />
-                      <User size={24} className="text-white hidden sm:block" weight="bold" />
+                      <User size={20} className="text-on-accent sm:hidden" weight="bold" />
+                      <User size={24} className="text-on-accent hidden sm:block" weight="bold" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.continueAs')}</p>
@@ -638,8 +638,8 @@ export default function LoginPage() {
               <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-op70 flex items-center justify-center shadow-lg">
-                  <User size={20} className="text-white sm:hidden" weight="bold" />
-                  <User size={24} className="text-white hidden sm:block" weight="bold" />
+                  <User size={20} className="text-on-accent sm:hidden" weight="bold" />
+                  <User size={24} className="text-on-accent hidden sm:block" weight="bold" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.signingInAs')}</p>
@@ -802,8 +802,8 @@ export default function LoginPage() {
           <div className="space-y-3 sm:space-y-5">
             <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4">
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center shadow-lg">
-                  <Lock size={20} weight="fill" className="text-white" />
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-status-warning flex items-center justify-center shadow-lg">
+                  <Lock size={20} weight="fill" className="text-on-accent" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-text-primary text-sm sm:text-base">{t('auth.twoFactorTitle')}</h3>

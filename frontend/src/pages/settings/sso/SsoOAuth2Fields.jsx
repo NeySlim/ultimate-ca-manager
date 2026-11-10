@@ -89,14 +89,14 @@ export default function SsoOAuth2Fields({
             size="sm"
           />
           {formData.id_token_verify && !formData.oauth2_issuer && (
-            <p className="text-xs text-amber-500">{t('sso.idTokenVerifyIssuerMissing')}</p>
+            <p className="text-xs text-status-warning">{t('sso.idTokenVerifyIssuerMissing')}</p>
           )}
           {!formData.id_token_verify && (
-            <p className="text-xs text-amber-500">{t('sso.idTokenVerifyWarning')}</p>
+            <p className="text-xs text-status-warning">{t('sso.idTokenVerifyWarning')}</p>
           )}
           <CopyableUrl label={t('sso.redirectUri')} value={oauthCallbackUrl} />
           <ToggleSwitch checked={formData.oauth2_verify_ssl} onChange={(val) => handleChange('oauth2_verify_ssl', val)} label={t('sso.verifySsl')} size="sm" />
-          {!formData.oauth2_verify_ssl && <p className="text-xs text-amber-500">{t('sso.sslWarning')}</p>}
+          {!formData.oauth2_verify_ssl && <p className="text-xs text-status-warning">{t('sso.sslWarning')}</p>}
           {formData.oauth2_verify_ssl && (
             <Textarea
               label={t('sso.caBundleLabel')}

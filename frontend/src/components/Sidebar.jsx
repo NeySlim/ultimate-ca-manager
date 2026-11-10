@@ -131,7 +131,7 @@ function NavGroup({ group, activePage, isAdmin, hasPermission, expanded, onToggl
             className="w-4 h-4 rounded-full bg-status-warning flex items-center justify-center cursor-pointer hover:opacity-70"
             title={t('common.dismiss')}
           >
-            <span className="text-3xs font-bold text-black/80">{expiringCount > 9 ? '9+' : expiringCount}</span>
+            <span className="text-3xs font-bold text-on-accent">{expiringCount > 9 ? '9+' : expiringCount}</span>
           </span>
         )}
         <CaretDown
@@ -172,7 +172,7 @@ function NavGroup({ group, activePage, isAdmin, hasPermission, expanded, onToggl
                 <ChildIcon size={15} weight={isActive ? 'fill' : 'regular'} className="shrink-0" />
                 <span className="truncate">{label}</span>
                 {showCertBadge && (
-                  <span className="ml-auto text-3xs px-1 py-0.5 rounded-full bg-status-warning text-black/80 font-bold shrink-0">
+                  <span className="ml-auto text-3xs px-1 py-0.5 rounded-full bg-status-warning text-on-accent font-bold shrink-0">
                     {expiringCount > 9 ? '9+' : expiringCount}
                   </span>
                 )}

@@ -514,10 +514,10 @@ export default function HSMPage() {
         const usesLocalPkcs11 = providers.some(p => (p.provider_type || p.type) === 'pkcs11')
         if (!usesLocalPkcs11) return null
         return (
-        <div className="mx-4 mt-4 mb-0 p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 flex items-start gap-3">
-          <Warning size={20} className="text-yellow-500 shrink-0 mt-0.5" weight="bold" />
+        <div className="mx-4 mt-4 mb-0 p-3 rounded-lg border border-status-warning-op30 bg-status-warning-op10 flex items-start gap-3">
+          <Warning size={20} className="text-status-warning shrink-0 mt-0.5" weight="bold" />
           <div className="text-sm">
-            <p className="font-medium text-yellow-600 dark:text-yellow-400 mb-1">
+            <p className="font-medium text-status-warning mb-1">
               {t('hsm.pkcs11Unavailable')}
             </p>
             <ul className="text-text-secondary space-y-0.5 text-xs">
@@ -765,10 +765,10 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
       {formData.provider_type === 'pkcs11' && (
         <div className="space-y-4">
           {hsmStatus && !hsmStatus.ready && (
-            <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 flex items-start gap-3">
-              <Warning size={18} className="text-yellow-500 shrink-0 mt-0.5" weight="bold" />
+            <div className="p-3 rounded-lg border border-status-warning-op30 bg-status-warning-op10 flex items-start gap-3">
+              <Warning size={18} className="text-status-warning shrink-0 mt-0.5" weight="bold" />
               <div className="text-xs">
-                <p className="font-medium text-yellow-600 dark:text-yellow-400 mb-1">
+                <p className="font-medium text-status-warning mb-1">
                   {t('hsm.pkcs11Unavailable')}
                 </p>
                 <ul className="text-text-secondary space-y-0.5">

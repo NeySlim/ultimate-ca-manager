@@ -550,7 +550,7 @@ export default function DiscoveryPage() {
         <div className="flex items-center gap-2">
           <div className={cn(
             "w-6 h-6 rounded-lg flex items-center justify-center shrink-0",
-            row.status === 'completed' ? 'icon-bg-emerald' : row.status === 'running' ? 'icon-bg-blue' : 'icon-bg-rose'
+            row.status === 'completed' ? 'icon-bg-emerald' : row.status === 'running' ? 'icon-bg-blue' : 'icon-bg-red'
           )}>
             <ClockCounterClockwise size={14} weight="duotone" />
           </div>

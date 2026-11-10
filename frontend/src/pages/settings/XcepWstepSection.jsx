@@ -41,9 +41,9 @@ function StatusRow({ ok, label, actionLabel, onAction }) {
     <div className="flex items-center justify-between gap-2 py-1.5">
       <div className="flex items-center gap-2">
         {ok ? (
-          <CheckCircle size={16} weight="fill" className="text-emerald-500 shrink-0" />
+          <CheckCircle size={16} weight="fill" className="text-status-success shrink-0" />
         ) : (
-          <WarningCircle size={16} weight="fill" className="text-amber-500 shrink-0" />
+          <WarningCircle size={16} weight="fill" className="text-status-warning shrink-0" />
         )}
         <span className="text-sm text-text-primary">{label}</span>
       </div>

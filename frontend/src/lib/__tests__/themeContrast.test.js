@@ -38,7 +38,7 @@ function gradientButton(key, variant) {
 
 const TEXT_PAIRS = [
   ['text', 'bg'], ['text', 'panel'], ['text', 'raised'], ['muted', 'bg'], ['muted', 'panel'],
-  ['good', 'goodbg'], ['warn', 'warnbg'], ['bad', 'badbg'],
+  ['good', 'goodbg'], ['warn', 'warnbg'], ['bad', 'badbg'], ['on-accent', 'warn'], ['paper', 'scrim'],
   ['text-tertiary', 'bg'], ['text-tertiary', 'panel'],
 ]
 const FILL_PAIRS = [['accent', 'bg'], ['control', 'bg'], ['warn-fill', 'bg']]

@@ -452,10 +452,10 @@ export function CertificatePanel({
                   <div
                     className={cn(
                       "h-full rounded-full transition-all",
-                      cert.compliance.score >= 85 ? "bg-emerald-500" :
-                      cert.compliance.score >= 70 ? "bg-blue-500" :
-                      cert.compliance.score >= 55 ? "bg-amber-500" :
-                      "bg-red-500"
+                      cert.compliance.score >= 85 ? "bg-status-success" :
+                      cert.compliance.score >= 70 ? "bg-status-info" :
+                      cert.compliance.score >= 55 ? "bg-status-warning" :
+                      "bg-status-danger"
                     )}
                     style={{ width: `${cert.compliance.score}%` }}
                   />
@@ -472,9 +472,9 @@ export function CertificatePanel({
                       <div className="flex items-center gap-2">
                         <span className={cn(
                           "font-mono font-medium",
-                          item.score >= (item.max || 1) * 0.8 ? "text-emerald-500" :
-                          item.score >= (item.max || 1) * 0.5 ? "text-amber-500" :
-                          "text-red-500"
+                          item.score >= (item.max || 1) * 0.8 ? "text-status-success" :
+                          item.score >= (item.max || 1) * 0.5 ? "text-status-warning" :
+                          "text-status-danger"
                         )}>
                           {item.score}/{item.max}
                         </span>

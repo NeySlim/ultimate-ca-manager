@@ -429,7 +429,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
         <EmailTemplateWindow onClose={() => setShowTemplateEditor(false)} />
       )}
 
-      <DetailSection title={t('settings.expiryAlerts')} icon={Bell} iconClass="icon-bg-rose">
+      <DetailSection title={t('settings.expiryAlerts')} icon={Bell} iconClass="icon-bg-orange">
         {!settings.smtp_host ? (
           <div className="flex items-center gap-3 p-3 rounded-lg bg-bg-tertiary text-text-secondary text-sm">
             <Warning size={20} className="text-status-warning shrink-0" />

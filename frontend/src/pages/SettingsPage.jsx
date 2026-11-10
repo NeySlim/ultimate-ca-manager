@@ -86,7 +86,7 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'https', labelKey: 'settings.tabs.https', icon: Lock, color: 'icon-bg-emerald' },
   { id: 'updates', labelKey: 'settings.tabs.updates', icon: Rocket, color: 'icon-bg-violet' },
   { id: 'scheduler', labelKey: 'settings.tabs.scheduler', icon: Timer, color: 'icon-bg-blue' },
-  { id: 'webhooks', labelKey: 'settings.tabs.webhooks', icon: Bell, color: 'icon-bg-rose' },
+  { id: 'webhooks', labelKey: 'settings.tabs.webhooks', icon: Bell, color: 'icon-bg-orange' },
   { id: 'ct', labelKey: 'settings.tabs.ct', icon: Eye, color: 'icon-bg-cyan' },
   { id: 'autoRenewal', labelKey: 'settings.tabs.autoRenewal', icon: ClockClockwise, color: 'icon-bg-emerald' },
   // Admin-only (#299) — hidden from non-admin roles below
@@ -94,7 +94,7 @@ const BASE_SETTINGS_CATEGORIES = [
   { id: 'microsoftCA', labelKey: 'settings.tabs.microsoftCA', icon: WindowsLogo, color: 'icon-bg-indigo' },
   { id: 'adConnector', labelKey: 'settings.tabs.adConnector', icon: IdentificationBadge, color: 'icon-bg-blue' },
   { id: 'xcepWstep', labelKey: 'settings.tabs.xcepWstep', icon: WindowsLogo, color: 'icon-bg-indigo' },
-  { id: 'about', labelKey: 'settings.tabs.about', icon: Info, color: 'icon-bg-sky' },
+  { id: 'about', labelKey: 'settings.tabs.about', icon: Info, color: 'icon-bg-gray' },
 ]
 
 // SSO Provider type icons
@@ -1803,7 +1803,7 @@ export default function SettingsPage() {
           { labelKey: 'settings.groups.automation', tabs: ['autoRenewal', 'deploy'], color: 'icon-bg-emerald' },
           { labelKey: 'settings.groups.integrations', tabs: ['microsoftCA', 'adConnector', 'xcepWstep'], color: 'icon-bg-indigo' },
           { labelKey: 'settings.groups.interface', tabs: ['appearance', 'audit'], color: 'icon-bg-violet' },
-          { labelKey: 'settings.groups.about', tabs: ['about'], color: 'icon-bg-sky' },
+          { labelKey: 'settings.groups.about', tabs: ['about'], color: 'icon-bg-gray' },
         ]}
         helpPageKey="settings"
       >
@@ -1997,9 +1997,9 @@ export default function SettingsPage() {
         maxWidth="lg"
       >
         <div className="p-4 space-y-4">
-          <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30">
+          <div className="p-3 rounded-lg bg-status-warning-op10 border border-status-warning-op30">
             <div className="flex items-start gap-2">
-              <WarningCircle size={20} className="text-amber-500 flex-shrink-0 mt-0.5" weight="fill" />
+              <WarningCircle size={20} className="text-status-warning flex-shrink-0 mt-0.5" weight="fill" />
               <div className="text-sm text-text-primary">
                 <p className="font-semibold mb-1">{t('settings.encryptionWarningTitle')}</p>
                 <p className="text-text-secondary">{t('settings.encryptionWarningDesc')}</p>

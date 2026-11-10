@@ -846,7 +846,7 @@ function StoredExtensionsError({ error }) {
   const { t } = useTranslation()
   if (!error) return null
   return (
-    <div className="p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-xs text-text-secondary" role="alert"
+    <div className="p-3 rounded-lg border border-status-danger-op30 bg-status-danger-op10 text-xs text-text-secondary" role="alert"
       data-testid="custom-extensions-stored-error">
       <div>{t('customExtensions.storedInvalid')}</div>
       <div className="font-mono mt-1 break-all">{error}</div>
@@ -1119,8 +1119,8 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
       <div className="border-t border-border pt-4 space-y-4">
         <h4 className={sectionTitle}>{t('templates.qc.title')}</h4>
         <p className="text-xs text-text-secondary">{t('templates.qc.hint')}</p>
-        <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 flex items-start gap-2 text-xs text-text-secondary">
-          <Warning size={16} className="text-yellow-500 shrink-0 mt-0.5" weight="bold" />
+        <div className="p-3 rounded-lg border border-status-warning-op30 bg-status-warning-op10 flex items-start gap-2 text-xs text-text-secondary">
+          <Warning size={16} className="text-status-warning shrink-0 mt-0.5" weight="bold" />
           <span>{t('templates.qc.legalWarning')}</span>
         </div>
 

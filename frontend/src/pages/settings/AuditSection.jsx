@@ -119,7 +119,7 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
                 />
               )}
               {syslogConfig.tls && syslogConfig.tls_verify === false && (
-                <p className="text-xs text-amber-500">{t('settings.syslogTlsVerifyWarning')}</p>
+                <p className="text-xs text-status-warning">{t('settings.syslogTlsVerifyWarning')}</p>
               )}
               <Select
                 label={t('settings.syslogFraming')}

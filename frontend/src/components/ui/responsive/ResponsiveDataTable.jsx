@@ -901,7 +901,7 @@ function SearchBar({
                       'w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0',
                       checked ? 'bg-accent-primary border-accent-primary' : 'border-text-tertiary'
                     )}>
-                      {checked && <Check size={10} weight="bold" className="text-white" />}
+                      {checked && <Check size={10} weight="bold" className="text-on-accent" />}
                     </span>
                     {filter.label}
                   </button>

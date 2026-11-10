@@ -133,7 +133,7 @@ export default function SchedulerSection({ hasPermission }) {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-xs text-text-tertiary border-b border-white/5">
+                <tr className="text-left text-xs text-text-tertiary border-b border-border-op30">
                   <th className="py-2 pr-3 font-medium">{t('scheduler.colTask')}</th>
                   <th className="py-2 px-3 font-medium">{t('scheduler.colSchedule')}</th>
                   <th className="py-2 px-3 font-medium">{t('scheduler.colLastRun')}</th>
@@ -145,23 +145,23 @@ export default function SchedulerSection({ hasPermission }) {
               </thead>
               <tbody>
                 {tasks.map((task) => (
-                  <tr key={task.name} className="border-b border-white/5 last:border-0">
+                  <tr key={task.name} className="border-b border-border-op30 last:border-0">
                     <td className="py-2.5 pr-3">
                       <div className="flex items-center gap-2">
                         {task.last_error || task.last_status === 'warning' ? (
-                          <WarningCircle size={16} className="text-amber-500 shrink-0" weight="fill" />
+                          <WarningCircle size={16} className="text-status-warning shrink-0" weight="fill" />
                         ) : task.last_status === 'skipped' ? (
                           <MinusCircle size={16} className="text-text-tertiary shrink-0" weight="fill" />
                         ) : (
-                          <CheckCircle size={16} className="text-emerald-500 shrink-0" weight="fill" />
+                          <CheckCircle size={16} className="text-status-success shrink-0" weight="fill" />
                         )}
                         <div>
                           <p className="font-medium text-text-primary">{task.label}</p>
                           {task.last_error && (
-                            <p className="text-xs text-amber-500/90 mt-0.5 font-mono">{task.last_error}</p>
+                            <p className="text-xs text-status-warning mt-0.5 font-mono">{task.last_error}</p>
                           )}
                           {!task.last_error && task.last_status === 'warning' && task.last_reason && (
-                            <p className="text-xs text-amber-500/90 mt-0.5">{task.last_reason}</p>
+                            <p className="text-xs text-status-warning mt-0.5">{task.last_reason}</p>
                           )}
                           {!task.last_error && task.last_status === 'skipped' && (
                             <p className="text-xs text-text-tertiary mt-0.5">

@@ -10,7 +10,7 @@ export const MODES = ['dark', 'light']
 export const TOKEN_NAMES = [
   'bg', 'panel', 'raised', 'hover', 'text', 'muted', 'line', 'control', 'accent', 'selected',
   'good', 'goodbg', 'warn', 'warn-fill', 'warnbg', 'bad', 'badbg', 'grad-a', 'grad-b', 'glow',
-  'on-accent',
+  'on-accent', 'ink', 'paper', 'scrim',
 ]
 // Compatibility aliases resolved against each palette (defined in the shared :root block).
 export const ALIAS_NAMES = ['text-tertiary']

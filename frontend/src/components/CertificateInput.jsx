@@ -292,7 +292,7 @@ export function CertificateInput({
           {/* Upload result */}
           {uploadedFile?.parsed && (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-bg-secondary">
-              <CheckCircle size={16} className="text-green-500 shrink-0" />
+              <CheckCircle size={16} className="text-status-success shrink-0" />
               <File size={14} className="text-text-tertiary shrink-0" />
               <span className="text-sm text-text-primary flex-1 truncate">{uploadedFile.name}</span>
               <button
@@ -306,7 +306,7 @@ export function CertificateInput({
           )}
 
           {uploadedFile?.error && (
-            <div className="text-xs text-red-500 px-1">{uploadedFile.error}</div>
+            <div className="text-xs text-status-danger px-1">{uploadedFile.error}</div>
           )}
 
           {/* Show parsed PEM preview (read-only) */}
@@ -319,7 +319,7 @@ export function CertificateInput({
               {value.key_pem && (
                 <>
                   <div className="text-xs text-text-tertiary">{effectiveKeyLabel}</div>
-                  <div className="text-xs text-green-600 flex items-center gap-1">
+                  <div className="text-xs text-status-success flex items-center gap-1">
                     <LockSimple size={12} /> {t('certInput.keyExtracted')}
                   </div>
                 </>
@@ -351,11 +351,11 @@ export function CertificateInput({
           {/* Show what was selected */}
           {value.cert_pem && (
             <div className="space-y-1">
-              <div className="flex items-center gap-1 text-xs text-green-600">
+              <div className="flex items-center gap-1 text-xs text-status-success">
                 <CheckCircle size={12} /> {t('certInput.certLoaded')}
               </div>
               {value.key_pem && (
-                <div className="flex items-center gap-1 text-xs text-green-600">
+                <div className="flex items-center gap-1 text-xs text-status-success">
                   <LockSimple size={12} /> {t('certInput.keyLoaded')}
                 </div>
               )}

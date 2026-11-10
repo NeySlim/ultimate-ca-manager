@@ -144,10 +144,10 @@ export default function RequestCertificateForm({
   return (
     <form className="p-4 space-y-4">
       {isProductionContext && (
-        <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-start gap-2">
-          <Warning size={18} className="text-yellow-500 shrink-0 mt-0.5" />
+        <div className="p-3 bg-status-warning-op10 border border-status-warning-op30 rounded-lg flex items-start gap-2">
+          <Warning size={18} className="text-status-warning shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-yellow-600 dark:text-yellow-400">{t('acme.productionWarningTitle')}</p>
+            <p className="text-sm font-medium text-status-warning">{t('acme.productionWarningTitle')}</p>
             <p className="text-xs text-text-secondary mt-1">{t('acme.productionWarningDesc')}</p>
           </div>
         </div>
@@ -155,7 +155,7 @@ export default function RequestCertificateForm({
 
       <div>
         <label className="block text-sm font-medium text-text-primary mb-1">
-          {t('acme.domains')} <span className="text-red-500">*</span>
+          {t('acme.domains')} <span className="text-status-danger">*</span>
         </label>
         <textarea
           className="w-full h-24 px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary text-sm resize-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary"
@@ -251,7 +251,7 @@ export default function RequestCertificateForm({
       {formData.key_source === 'csr' && (
         <div>
           <label className="block text-sm font-medium text-text-primary mb-1">
-            {t('acme.csrPem')} <span className="text-red-500">*</span>
+            {t('acme.csrPem')} <span className="text-status-danger">*</span>
           </label>
           <textarea
             className="w-full h-32 px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary text-sm font-mono resize-none focus:ring-2 focus:ring-accent-primary-op50 focus:border-accent-primary"

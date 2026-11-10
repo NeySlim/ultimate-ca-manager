@@ -21,6 +21,9 @@
     "grad-b": "#94bfff",
     "glow": "rgba(148, 191, 255, 0.30)",
     "on-accent": "#11243f",
+    "ink": "#000000",
+    "paper": "#ffffff",
+    "scrim": "#000000",
     "text-tertiary": "#a9b9cd"
   },
   "atelier-light": {
@@ -45,6 +48,9 @@
     "grad-b": "#245bb1",
     "glow": "rgba(36, 91, 177, 0.30)",
     "on-accent": "#ffffff",
+    "ink": "#000000",
+    "paper": "#ffffff",
+    "scrim": "#000000",
     "text-tertiary": "#51647c"
   },
   "aurore-dark": {
@@ -69,6 +75,9 @@
     "grad-b": "#5fa7dc",
     "glow": "rgba(107, 120, 224, 0.30)",
     "on-accent": "#0b0e17",
+    "ink": "#000000",
+    "paper": "#ffffff",
+    "scrim": "#000000",
     "text-tertiary": "#a3acc9"
   },
   "aurore-light": {
@@ -93,6 +102,9 @@
     "grad-b": "#2a6db0",
     "glow": "rgba(79, 91, 213, 0.28)",
     "on-accent": "#ffffff",
+    "ink": "#000000",
+    "paper": "#ffffff",
+    "scrim": "#000000",
     "text-tertiary": "#4a5372"
   },
   "purple-dark": {
@@ -117,6 +129,9 @@
     "grad-b": "#ec4899",
     "glow": "rgba(168, 85, 247, 0.30)",
     "on-accent": "#1a0b2e",
+    "ink": "#000000",
+    "paper": "#ffffff",
+    "scrim": "#000000",
     "text-tertiary": "#d4c5e9"
   },
   "purple-light": {
@@ -141,6 +156,9 @@
     "grad-b": "#ec4899",
     "glow": "rgba(154, 63, 240, 0.30)",
     "on-accent": "#ffffff",
+    "ink": "#000000",
+    "paper": "#ffffff",
+    "scrim": "#000000",
     "text-tertiary": "#6b21a8"
   },
   "sunset-dark": {
@@ -165,6 +183,9 @@
     "grad-b": "#a855f7",
     "glow": "rgba(249, 115, 22, 0.30)",
     "on-accent": "#1f0f0a",
+    "ink": "#000000",
+    "paper": "#ffffff",
+    "scrim": "#000000",
     "text-tertiary": "#d9a688"
   },
   "sunset-light": {
@@ -189,6 +210,9 @@
     "grad-b": "#a855f7",
     "glow": "rgba(205, 77, 11, 0.30)",
     "on-accent": "#ffffff",
+    "ink": "#000000",
+    "paper": "#ffffff",
+    "scrim": "#000000",
     "text-tertiary": "#9a3412"
   }
 }

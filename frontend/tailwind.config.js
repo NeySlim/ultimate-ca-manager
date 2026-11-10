@@ -29,6 +29,8 @@ export default {
         'accent-pro': 'var(--accent-pro)',
         // Text on an accent fill; contrast checked per palette in themeContrast.test.js
         'on-accent': 'var(--on-accent)',
+        // Fixed in every theme: QR backing, knobs, fixed-colour tiles
+        'paper': 'var(--paper)',
         
         // Status colors - these map to theme variables
         'status-success': 'var(--accent-success)',

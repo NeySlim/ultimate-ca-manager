@@ -108,7 +108,7 @@ export default function SsoLdapFields({
             />
           )}
           {!formData.ldap_use_ssl && !formData.ldap_start_tls && (
-            <p className="text-xs text-amber-500">{t('sso.ldapPlainWarning')}</p>
+            <p className="text-xs text-status-warning">{t('sso.ldapPlainWarning')}</p>
           )}
           {(formData.ldap_use_ssl || formData.ldap_start_tls) && (
             <>
@@ -119,7 +119,7 @@ export default function SsoLdapFields({
                 size="sm"
               />
               {!formData.ldap_verify_ssl && (
-                <p className="text-xs text-amber-500">{t('sso.sslWarning')}</p>
+                <p className="text-xs text-status-warning">{t('sso.sslWarning')}</p>
               )}
             </>
           )}
@@ -189,7 +189,7 @@ export default function SsoLdapFields({
           {/* Default-deny: Required groups */}
           <div className="p-3 rounded-lg border border-border bg-bg-tertiary">
             <div className="flex items-center gap-2 mb-1">
-              <ShieldWarning size={16} className="text-amber-500" />
+              <ShieldWarning size={16} className="text-status-warning" />
               <p className="text-sm font-medium text-text-secondary">{t('sso.requiredGroups')}</p>
             </div>
             <p className="text-xs text-text-tertiary mb-2">{t('sso.requiredGroupsHelp')}</p>
