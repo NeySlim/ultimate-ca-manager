@@ -249,6 +249,11 @@ class TestLifecycle:
             # The loser's certificate row went with its savepoint
             ours = competitor['ours'][0]
             assert Certificate.query.filter_by(serial_number=str(ours.serial_number)).count() == 0
+        # The same issuance, unraced this time, counts one
+        _reset(app, ca_id)
+        with app.app_context():
+            est_key_generator.key_generator(db.session.get(CA, ca_id), ca_cert)
+            assert (db.session.get(CA, ca_id, populate_existing=True).serial or 0) == counted + 1
 
 
 def _ca_like(key, *, hsm_key_id=None, name=None, days=3650, extensions=()):

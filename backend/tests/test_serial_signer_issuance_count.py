@@ -39,6 +39,11 @@ def test_a_renewal_whose_commit_fails_counts_nothing(app, auth_client, create_ca
         with pytest.raises(renewal.RenewalError):
             renewal.renew_certificate_in_place(db.session.get(Certificate, cert_id))
     assert _count(app, ca['id']) == (1, 1)
+    # The same renewal, committed this time, counts one
+    monkeypatch.undo()
+    with app.app_context():
+        renewal.renew_certificate_in_place(db.session.get(Certificate, cert_id))
+    assert _count(app, ca['id']) == (2, 1)
 
 
 def test_a_tsa_signer_counts_its_certificate(app, create_ca):
@@ -63,6 +68,11 @@ def test_a_tsa_signer_whose_commit_fails_counts_nothing(app, create_ca, monkeypa
         with pytest.raises(tsa_signer_cert.TsaSignerIssueError):
             tsa_signer_cert.issue_tsa_signer_certificate(ca=db.session.get(CA, ca['id']))
     assert _count(app, ca['id']) == (0, 0)
+    # The same issuance, committed this time, counts one
+    monkeypatch.undo()
+    with app.app_context():
+        tsa_signer_cert.issue_tsa_signer_certificate(ca=db.session.get(CA, ca['id']))
+    assert _count(app, ca['id']) == (1, 1)
 
 
 @pytest.fixture
@@ -98,8 +108,13 @@ def test_a_responder_renewal_another_runner_won_counts_nothing(app, responder, m
     ca_id, _key = responder
     monkeypatch.setattr(ocsp_responder_renewal, '_rebind', lambda *_args: False)
     with app.app_context():
-        ocsp_responder_renewal.run_ocsp_responder_renewal()
+        assert ocsp_responder_renewal.run_ocsp_responder_renewal()['renewed'] == 0
     assert _count(app, ca_id) == (1, 1)
+    # The same run, winning this time, counts one
+    monkeypatch.undo()
+    with app.app_context():
+        assert ocsp_responder_renewal.run_ocsp_responder_renewal()['renewed'] == 1
+    assert _count(app, ca_id) == (2, 2)
 
 
 def test_a_cross_certificate_counts_under_its_issuer(app, auth_client, create_ca):
