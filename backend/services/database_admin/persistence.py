@@ -343,7 +343,7 @@ def persist_database_url_with_backup(
 
 def persist_database_url(database_url: Optional[str]) -> Tuple[bool, str]:
     """
-    Write DATABASE_URL to /etc/ucm/ucm.env (set/update/remove).
+    Write DATABASE_URL to ucm.env under UCM_CONFIG_DIR (set/update/remove).
     Pass None or empty string to remove (= use SQLite default).
     Refuses in Docker (caller must check first).
 
