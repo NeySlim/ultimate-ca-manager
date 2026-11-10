@@ -153,3 +153,12 @@ def test_a_column_left_empty_is_one_written_down(both_archives):
     """A column the seeder could not fill is a column the comparison cannot see."""
     _archived, _restored, refused = both_archives
     assert refused == UNFILLABLE, f'columns the seeder could not fill: {refused}'
+
+
+
+def test_columns_derived_from_the_certificate_do_not_travel(both_archives):
+    """key_bits and sig_hash are set again from crt when the restore stores it."""
+    archived, _restored, _refused = both_archives
+    assert archived['certificates']
+    for row in archived['certificates']:
+        assert not {'key_bits', 'sig_hash'} & set(row), sorted(row)
