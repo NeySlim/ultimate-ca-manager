@@ -32,7 +32,7 @@ export function caKeyLabel(keyAlgo, keySize) {
  * A failed lookup leaves the form unrestricted: the server enforces the rules anyway.
  */
 export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
-  const [state, setState] = useState({ allowedKeyTypes: null, allowedDigests: null, fips: false, mldsa: true, pqStandalone: false })
+  const [state, setState] = useState({ allowedKeyTypes: null, allowedDigests: null, fips: false, mldsa: true, pqStandalone: false, defaultKeyType: null })
   useEffect(() => {
     if (!enabled) return undefined
     let cancelled = false
@@ -47,10 +47,12 @@ export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
           fips: data.fips === true,
           mldsa: data.ml_dsa !== false,
           pqStandalone: data.pq_standalone === true,
+          // The server's own default key; its baseline stands in when only that came back
+          defaultKeyType: data.default_key_type ?? (data.default_key_error ? null : data.baseline_key_type ?? null),
         })
       })
       .catch(() => {
-        if (!cancelled) setState({ allowedKeyTypes: null, allowedDigests: null, fips: false, mldsa: true, pqStandalone: false })
+        if (!cancelled) setState({ allowedKeyTypes: null, allowedDigests: null, fips: false, mldsa: true, pqStandalone: false, defaultKeyType: null })
       })
     return () => { cancelled = true }
   }, [caId, templateId, enabled])

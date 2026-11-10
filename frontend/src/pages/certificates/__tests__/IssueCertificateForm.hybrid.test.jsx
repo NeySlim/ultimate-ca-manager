@@ -61,7 +61,7 @@ async function submit(onSubmit) {
   return onSubmit.mock.calls[0][0]
 }
 
-const OPEN = { allowed_key_types: null, allowed_digests: null }
+const OPEN = { allowed_key_types: null, allowed_digests: null, default_key_type: 'RSA-2048' }
 
 describe('IssueCertificateForm hybrid pair', () => {
   beforeEach(() => vi.clearAllMocks())

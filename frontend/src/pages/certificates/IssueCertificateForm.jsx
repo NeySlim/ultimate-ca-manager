@@ -17,7 +17,6 @@ import { CustomExtensionsEditor } from '../../components/CustomExtensionsEditor'
 import { customExtensionsPayload } from '../../lib/customExtensions'
 
 const ISSUE_FAMILY_OPTIONS = keyFamilyOptions('issue')
-const [DEFAULT_KEY_TYPE, DEFAULT_KEY_SIZE] = findAlgorithm(ISSUE_DEFAULT_LABELS[0]).issue
 
 // Issue Certificate Form — full-featured with template, cert type, structured SANs, date picker
 export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
@@ -31,6 +30,8 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   // lands, so a state-closure guard would see the stale value.
   const [issuing, setIssuing] = useState(false)
   const issuingRef = useRef(false)
+  // True once the user, a template or a re-key picked the key: the server default then leaves it alone
+  const keyChosen = useRef(false)
   const [showAllTemplates, setShowAllTemplates] = useState(false)
   const [showHiddenCas, setShowHiddenCas] = useState(false)
   const [customExtRows, setCustomExtRows] = useState([])
@@ -47,8 +48,9 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     state: '',
     locality: '',
     email: '',
-    key_type: DEFAULT_KEY_TYPE,
-    key_size: DEFAULT_KEY_SIZE,
+    // Empty until the server names its default key for the CA and template
+    key_type: '',
+    key_size: '',
     validity_days: '365',
     expiry_date: '',
     ocsp_must_staple: false,
@@ -134,9 +136,10 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
         state: initialData.state || '',
         locality: initialData.locality || '',
         email: initialData.email || '',
-        key_type: initialData.key_type || DEFAULT_KEY_TYPE,
-        key_size: initialData.key_size || DEFAULT_KEY_SIZE,
+        key_type: initialData.key_type || '',
+        key_size: initialData.key_size || '',
       }))
+      keyChosen.current = !!initialData.key_type
       if (initialData.sans?.length > 0) {
         setSans(initialData.sans.filter(s => s && typeof s.type === 'string' && typeof s.value === 'string'))
       }
@@ -145,8 +148,8 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   }, [initialData])
 
   // Key types the policies of this CA/template allow (#397); the server enforces them regardless
-  const { allowedKeyTypes, fips, mldsa, pqStandalone } = useEffectiveAlgorithms({
-    caId: formData.ca_id, templateId: selectedTemplate, enabled: !!formData.ca_id,
+  const { allowedKeyTypes, fips, mldsa, pqStandalone, defaultKeyType } = useEffectiveAlgorithms({
+    caId: formData.ca_id, templateId: selectedTemplate,
   })
   const pairKeys = useMemo(
     () => ISSUE_KEY_CHOICES.filter(([type, size]) => isAllowed(allowedKeyTypes, issueKeyLabel(type, size))
@@ -178,13 +181,21 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     return allowedKeys.find(([k]) => k === type)?.[1] ?? preferred
   }
 
-  // A key the policies forbid (template default, previous CA) switches to the first allowed one
+  // The server's default key for this CA and template, until the user picks another
   useEffect(() => {
-    if (noKeyAllowed) return
+    if (keyChosen.current || !defaultKeyType) return
+    const pair = findAlgorithm(defaultKeyType)?.issue
+    if (pair) setFormData(prev => ({ ...prev, key_type: pair[0], key_size: pair[1] }))
+  }, [defaultKeyType])
+
+  // A key the policies forbid (template default, previous CA) switches to the first allowed one;
+  // with no key yet and no restriction, the server default or its own choice applies
+  useEffect(() => {
+    if (noKeyAllowed || (!formData.key_type && !allowedKeyTypes)) return
     if (allowedKeys.some(([k, sz]) => k === formData.key_type && sz === formData.key_size)) return
     const [type, size] = allowedKeys.find(([k]) => k === formData.key_type) || allowedKeys[0]
     setFormData(prev => ({ ...prev, key_type: type, key_size: size }))
-  }, [allowedKeys, noKeyAllowed, formData.key_type, formData.key_size])
+  }, [allowedKeys, allowedKeyTypes, noKeyAllowed, formData.key_type, formData.key_size])
 
   // Get selected CA's expiry for max date
   const selectedCa = useMemo(() => 
@@ -212,9 +223,11 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     const updates = {}
 
     // Map template key_type to form fields
+    keyChosen.current = false
     if (tpl.key_type) {
       const pair = findAlgorithm(tpl.key_type)?.issue
       if (pair) {
+        keyChosen.current = true
         updates.key_type = pair[0]
         updates.key_size = pair[1]
       }
@@ -356,8 +369,8 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
       state: formData.state || undefined,
       locality: formData.locality || undefined,
       email: formData.email || undefined,
-      key_type: formData.key_type,
-      key_size: formData.key_size,
+      key_type: formData.key_type || undefined,
+      key_size: formData.key_size || undefined,
       ...(isHybrid && {
         key_type: findAlgorithm(hybridChoice.classical).issue[0],
         key_size: findAlgorithm(hybridChoice.classical).issue[1],
@@ -669,6 +682,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
           label={t('common.keyType')}
           value={formData.key_type}
           onChange={(val) => {
+            keyChosen.current = true
             update('key_type', val)
             update('key_size', sizeForType(val))
           }}
@@ -677,7 +691,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
         <Select
           label={t('common.keySize')}
           value={formData.key_size}
-          onChange={(val) => update('key_size', val)}
+          onChange={(val) => { keyChosen.current = true; update('key_size', val) }}
           options={groupedOptions(
             KEY_ALGORITHMS.filter(k => k.generate && k.issue && k.issue[0] === formData.key_type), t,
             k => algorithmName(k, t, 'sizeKey'), k => k.issue[1],

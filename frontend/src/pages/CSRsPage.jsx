@@ -30,7 +30,7 @@ import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { soleImported } from '../lib/importResult'
 import { CSRPanel } from '../components/detail/CSRPanel'
 import {
-  CSR_LABELS, ISSUE_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, findAlgorithm,
+  CSR_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, findAlgorithm,
   groupedOptions, isUsable, keyAlgorithmLabel, listAlgorithms,
 } from '../lib/keyAlgorithms'
 import { useKeyPlatform } from '../lib/policyAlgorithms'
@@ -598,7 +598,8 @@ export default function CSRsPage() {
   }
 
   const handleRekeyAsCert = (csr) => {
-    const [keyType, keySize] = csrKeyRow(csr)?.issue || findAlgorithm(ISSUE_DEFAULT_LABELS[0]).issue
+    // A CSR key the form cannot issue leaves the choice to the server default
+    const [keyType, keySize] = csrKeyRow(csr)?.issue || []
     const prefill = {
       cn: csr.common_name || csr.cn || '',
       organization: csr.organization || '',
