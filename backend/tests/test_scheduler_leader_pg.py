@@ -122,6 +122,25 @@ def test_still_held_asks_the_server(app, ha, monkeypatch):
         other.dispose()
 
 
+def test_the_lock_session_has_server_side_dead_peer_timeouts(app, ha):
+    """The server, not only the client, must drop the session of a leader whose host vanished."""
+    from models import db
+    with app.app_context():
+        url = db.engine.url
+    lock = scheduler_leader.PgAdvisoryLock(url)
+    try:
+        assert lock.acquire()
+        shown = {name: lock._conn.execute(text(f'SHOW {name}')).scalar()
+                 for name in ('tcp_keepalives_idle', 'tcp_keepalives_interval',
+                              'tcp_keepalives_count', 'tcp_user_timeout')}
+        search_path = lock._conn.execute(text('SHOW search_path')).scalar()
+    finally:
+        lock.dispose()
+    assert shown == {'tcp_keepalives_idle': '30', 'tcp_keepalives_interval': '10',
+                     'tcp_keepalives_count': '3', 'tcp_user_timeout': '60000'}
+    assert pg_app_harness.SCHEMA in search_path  # the URL's own options are kept
+
+
 def test_without_ha_the_host_lock_is_used(app, monkeypatch, tmp_path):
     monkeypatch.setattr(Config, 'HA_MODE', False)
     monkeypatch.setattr('config.settings.DATA_DIR', tmp_path, raising=False)

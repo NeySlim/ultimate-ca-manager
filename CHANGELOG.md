@@ -12,7 +12,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Added
 
 - HA preview: `UCM_HA=1` enables an HA preview: the node requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, refuses operations that only change the local host, and reports `ha`, `node_id` and `leader` in `/health`. Full high availability arrives in later releases. The Helm chart now probes readiness on `/health/ready` (503 in safe mode only with `UCM_HA=1`) and liveness on `/health/live`.
-- HA preview: one node runs the scheduled tasks, elected by a PostgreSQL advisory lock and replaced within seconds when its connection drops; nodes heartbeat in `cluster_nodes` (reported under `cluster` in `/health`), "run now" works from any node, and startup migrations run on one node at a time (migration 141).
+- HA preview: one node runs the scheduled tasks, elected by a PostgreSQL advisory lock and replaced within seconds when its connection drops, or about a minute after its host vanishes; nodes heartbeat in `cluster_nodes` (reported under `cluster` in `/health`), "run now" works from any node, and startup migrations run on one node at a time (migration 141).
 
 ### Fixed
 

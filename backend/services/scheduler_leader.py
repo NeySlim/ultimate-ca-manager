@@ -18,9 +18,17 @@ BOOT_LOCK_KEY = 0x55434D626F6F7421
 # How long a starting node waits for another one's migrations before it gives up
 BOOT_LOCK_TIMEOUT_SECONDS = 120
 
-# A dead peer must not keep the session (and its lock) open for the kernel's default hours
+# Client side: this node notices a dead server within about a minute
 _KEEPALIVE_ARGS = {'keepalives': 1, 'keepalives_idle': 30, 'keepalives_interval': 10,
                    'keepalives_count': 3, 'connect_timeout': 10}
+
+# Server side: PostgreSQL drops the lock session of a vanished node (power loss, partition)
+# within about a minute instead of its kernel's default two hours, which frees the lock
+_SERVER_TIMEOUTS_SQL = text(
+    "SELECT set_config('tcp_keepalives_idle', '30', false),"
+    " set_config('tcp_keepalives_interval', '10', false),"
+    " set_config('tcp_keepalives_count', '3', false),"
+    " set_config('tcp_user_timeout', '60000', false)")
 
 _HELD_SQL = text(
     "SELECT pg_backend_pid() = :pid AND EXISTS ("
@@ -67,6 +75,10 @@ class PgAdvisoryLock:
                 self._connect_error_logged = True
             return False
         self._connect_error_logged = False
+        try:
+            conn.execute(_SERVER_TIMEOUTS_SQL)
+        except Exception as e:
+            logger.warning(f"Scheduler leader lock: server-side keepalives not set ({type(e).__name__})")
         try:
             got = conn.execute(text('SELECT pg_try_advisory_lock(:k)'), {'k': self.key}).scalar()
             pid = conn.execute(text('SELECT pg_backend_pid()')).scalar()
