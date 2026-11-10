@@ -32,7 +32,8 @@ def duplicates_in_database(conn) -> List[Dict]:
     """(caref, serial_number, ids) of every serial held twice under one CA, read through *conn*."""
     from sqlalchemy import text
     groups: Dict = {}
-    for row_id, caref, serial, crt in conn.execute(text(_ROWS)):
+    # Streamed: one batch of PEMs in memory at a time, as in migration 144
+    for row_id, caref, serial, crt in conn.execute(text(_ROWS), execution_options={'yield_per': 500}):
         groups.setdefault((caref, canonical_stored_serial(serial, crt)), []).append(row_id)
     return _shared(groups)
 

@@ -294,3 +294,30 @@ def test_search_finds_a_serial_in_the_spelling_the_ui_shows(app, auth_client, ow
             assert [c['id'] for c in found['data']['certificates']] == [cert['id']], typed
     finally:
         _drop(app, cert['id'])
+
+
+def test_a_backend_migration_streams_and_decodes_only_ambiguous_serials(monkeypatch):
+    import sqlite3
+    from sqlalchemy import create_engine, event
+    import utils.serial_format as serial_format
+    from utils.serial_duplicates import duplicates_in_database
+    digits = _digit_hex_serial()
+    crt = _b64(_self_signed(digits))
+    conn = sqlite3.connect(':memory:')
+    conn.execute(f"CREATE TABLE {Certificate.__tablename__} "
+                 "(id INTEGER PRIMARY KEY, caref TEXT, serial_number TEXT, crt TEXT)")
+    conn.executemany(f"INSERT INTO {Certificate.__tablename__} VALUES (?, ?, ?, ?)",
+                     [(1, 'ca-a', 'ab', crt), (2, 'ca-a', '171', None), (3, 'ca-a', 'AB:CD', crt),
+                      (4, 'ca-b', format(digits, 'x'), crt), (5, 'ca-b', str(digits), crt)])
+    conn.commit()
+    decoded, streamed = [], []
+    real = serial_format.certificate_serial
+    monkeypatch.setattr(serial_format, 'certificate_serial', lambda c: decoded.append(c) or real(c))
+    engine = create_engine('sqlite://', creator=lambda: conn)
+    event.listen(engine, 'before_cursor_execute',
+                 lambda c, cur, stmt, p, ctx, many: streamed.append(ctx.execution_options.get('yield_per')))
+    with engine.connect() as c:
+        assert duplicates_in_database(c) == [{'caref': 'ca-a', 'serial_number': '171', 'ids': [1, 2]},
+                                             {'caref': 'ca-b', 'serial_number': str(digits), 'ids': [4, 5]}]
+    assert len([c for c in decoded if c]) == 2  # rows 4 and 5: digits only, read in either base
+    assert streamed and all(streamed)

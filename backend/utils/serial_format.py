@@ -91,8 +91,10 @@ def certificate_serial(crt) -> int | None:
 def canonical_stored_serial(stored: str | int | None, crt=None) -> str | None:
     """``canonical_serial`` of a stored value, settled by the row's certificate when
     one of the value's readings is that certificate's serial (never reinterpreted otherwise)."""
-    actual = certificate_serial(crt) if stored not in (None, '') else None
-    if actual is not None and actual in serial_readings(stored):
+    readings = serial_readings(stored)
+    # Text with one reading needs no certificate: only digits read in both bases
+    actual = certificate_serial(crt) if len(readings) > 1 else None
+    if actual is not None and actual in readings:
         return str(actual)
     return canonical_serial(stored)
 
