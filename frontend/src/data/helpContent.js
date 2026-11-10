@@ -87,6 +87,7 @@ export const helpContent = {
         icon: Stack,
         items: [
           { label: 'Bell', text: 'The count is the number of unread items in the panel: critical items and approvals from the dashboard queue, and failed scheduled backups or revoked sessions from the audit log' },
+          { label: 'Order', text: 'The queue items come first, then the audit log items, newest first' },
           { label: 'Rights', text: 'You only see items from sources you may read; a source you have no right on shows nothing' },
           { label: 'Read', text: 'Mark an item or all of them read; the marks are saved with your preferences, and an item that resolves leaves the panel' },
           { label: 'Open', text: 'Open goes to the page of the item; nothing is approved or retried from the panel' },
@@ -321,6 +322,7 @@ export const helpContent = {
       'Need a non-standard EKU (Microsoft RDP, smartcard logon, document signing)? Add it via "Extra EKUs" instead of editing templates',
       'When a policy or the issuing CA\'s expiry shortens the requested validity, the result says so: "Issued for N day(s) instead of the M requested", with the reason',
       'An RSA-PSS signature is shown with its hash and salt length, e.g. RSASSA-PSS SHA-256 (salt 32)',
+      'In a link view (opened from the overview), the Clear all filters button shown when nothing matches empties the link\'s statuses and the search and keeps the link\'s other filters; removing a chip drops that filter, the Clear button of the chip row leaves the link view, and your saved filters are left untouched',
     ],
     warnings: [
       'Revocation is generally permanent: except for "Certificate Hold" which can be removed (unhold) or made permanent with another reason',

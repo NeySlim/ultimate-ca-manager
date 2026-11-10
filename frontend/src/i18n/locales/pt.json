@@ -1229,6 +1229,7 @@
     "pinnedSubjectBadge": "Fixado",
     "pinnedSubjectBadgeTooltip": "Alguns campos do assunto estão fixados e são aplicados na emissão WSTEP",
     "keySettings": "Definições de chave",
+    "keyServerDefault": "Server default",
     "extensions": "Extensões",
     "noTemplates": "Sem modelos",
     "noTemplatesDescription": "Crie o seu primeiro modelo",
@@ -6010,7 +6011,8 @@
       "webauthn": "security key",
       "session": "browser session"
     },
-    "expiringBadge": "{{count}} certificates expiring or expired. Dismiss.",
+    "expiringBadge_one": "{{count}} certificate expiring or expired. Dismiss.",
+    "expiringBadge_other": "{{count}} certificates expiring or expired. Dismiss.",
     "statusRunning": "Service running",
     "statusUnreachable": "Service unreachable",
     "statusSafeMode": "Safe mode",
@@ -6018,8 +6020,10 @@
     "haNode": "HA node {{node}}",
     "haLeader": "leader",
     "haFollower": "follower",
-    "haNodes": "Nodes: {{count}}",
-    "haLate": "Late: {{count}}",
+    "haNodes_one": "{{count}} node",
+    "haNodes_other": "{{count}} nodes",
+    "haLate_one": "{{count}} late",
+    "haLate_other": "{{count}} late",
     "theme": {
       "menu": "Theme"
     },

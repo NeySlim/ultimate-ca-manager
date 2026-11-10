@@ -24,7 +24,7 @@ import { certificatesService, casService, truststoreService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
 import { extractCN, cn, certificateNames, isOnHold } from '../lib/utils'
-import { parseOverviewFilters, toListParams, withoutFilter } from '../lib/overviewFilters'
+import { parseOverviewFilters, toListParams, toSearch, withoutFilter } from '../lib/overviewFilters'
 import { FilterChips } from '../components/ui/FilterChips'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
@@ -120,16 +120,23 @@ export default function CertificatesPage() {
   // An overview link shows exactly what its counter counts: the saved filters step aside
   // while it is open, unapplied but kept in storage, and return once its filters are gone
   const linkView = urlFilters.length > 0
+  const urlStatus = useMemo(() => urlFilters.filter(([k]) => k === 'status').map(([, v]) => v), [urlFilters])
   const savedStatus = linkView ? NONE : filterStatus
   const savedCA = linkView ? NONE : filterCA
   const savedSource = linkView ? NONE : filterSource
   const savedTemplate = linkView ? NONE : filterTemplate
+  // The search restarts on entering a link view or when its non-status filters change;
+  // a status edit (card, selector) keeps it
+  const linkScopeKey = JSON.stringify(urlFilters.filter(([k]) => k !== 'status'))
   useEffect(() => {
     if (!linkView) return
     setPage(1)
     setSearchValue('')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [urlFiltersKey])
+  }, [linkView, linkScopeKey])
+  useEffect(() => { if (linkView) setPage(1) }, [linkView, urlFiltersKey])
+  // A preset saved in a link view carries the link, so applying it reopens the same view
+  const presetExtras = useMemo(() => (linkView ? { link: toSearch(urlFilters) } : undefined), [linkView, urlFilters])
   // Touching a saved filter leaves the link view, so the change applies at once
   const leaveLink = useCallback(() => {
     if (linkView) navigate({ pathname: location.pathname, search: '' }, { replace: true })
@@ -138,6 +145,12 @@ export default function CertificatesPage() {
   // Apply filter preset callback
   const handleApplyFilterPreset = useCallback((filters) => {
     setPage(1) // Reset to first page when applying preset
+    // The stored link is re-validated: unknown filters or values are dropped
+    const linked = parseOverviewFilters(typeof filters.link === 'string' ? filters.link : '')
+    if (linked.length > 0) {
+      navigate({ pathname: location.pathname, search: toSearch(linked) }, { replace: true })
+      return
+    }
     leaveLink()
     if (filters.status) {
       setFilterStatus(Array.isArray(filters.status) ? filters.status : [filters.status])
@@ -148,7 +161,7 @@ export default function CertificatesPage() {
     else setFilterCA([])
     if (filters.source) setFilterSource(Array.isArray(filters.source) ? filters.source : [filters.source])
     else setFilterSource([])
-  }, [leaveLink])
+  }, [leaveLink, navigate, location.pathname])
   
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
   const { canWrite, canDelete, hasPermission } = usePermission()
@@ -477,12 +490,20 @@ export default function CertificatesPage() {
     return baseStats
   }, [certStats, orphanCount, t])
   
+  // A link view edits the link's own statuses in the URL; the saved ones stay untouched
+  const setUrlStatus = useCallback((next) => {
+    const params = new URLSearchParams(withoutFilter(location.search, 'status'))
+    next.forEach((v) => params.append('status', v))
+    const qs = params.toString()
+    navigate({ pathname: location.pathname, search: qs ? `?${qs}` : '' }, { replace: true })
+  }, [location.pathname, location.search, navigate])
+
   // Handle stat click to filter
   const handleStatClick = useCallback((filterValue) => {
     setPage(1) // Reset to first page when filtering
     if (linkView) {
-      leaveLink()
-      setFilterStatus(filterValue === '' ? [] : [filterValue])
+      setUrlStatus(filterValue === '' ? []
+        : urlStatus.includes(filterValue) ? urlStatus.filter((v) => v !== filterValue) : [...urlStatus, filterValue])
     } else if (filterValue === '') {
       setFilterStatus([]) // "Total" clears all
     } else {
@@ -493,7 +514,7 @@ export default function CertificatesPage() {
         return [...prev, filterValue]
       })
     }
-  }, [linkView, leaveLink])
+  }, [linkView, urlStatus, setUrlStatus])
   
   // Handle sort change (server-side)
   const handleSortChange = useCallback((newSort) => {
@@ -565,8 +586,14 @@ export default function CertificatesPage() {
       key: 'status',
       label: t('common.status'),
       type: 'multiSelect',
-      value: savedStatus,
-      onChange: (val) => { setPage(1); leaveLink(); setFilterStatus(val) },
+      hideChip: linkView, // the link's own chip row already shows its statuses
+      // A link view shows (and a preset saves) the link's statuses, not the stored ones it sets aside
+      value: linkView ? urlStatus : savedStatus,
+      onChange: (val) => {
+        setPage(1)
+        if (linkView) setUrlStatus(val)
+        else setFilterStatus(val)
+      },
       placeholder: t('common.allStatus'),
       options: [
         { value: 'valid', label: t('common.valid') },
@@ -581,7 +608,7 @@ export default function CertificatesPage() {
       label: t('common.issuer'),
       type: 'multiSelect',
       value: savedCA,
-      onChange: (val) => { setPage(1); leaveLink(); setFilterCA(val) },
+      onChange: (val) => { if (linkView && val.length === 0) return; setPage(1); leaveLink(); setFilterCA(val) },
       placeholder: t('common.allCAs'),
       options: cas.map(ca => ({
         value: String(ca.id),
@@ -593,7 +620,7 @@ export default function CertificatesPage() {
       label: t('certificates.source'),
       type: 'multiSelect',
       value: savedSource,
-      onChange: (val) => { setPage(1); leaveLink(); setFilterSource(val) },
+      onChange: (val) => { if (linkView && val.length === 0) return; setPage(1); leaveLink(); setFilterSource(val) },
       placeholder: t('certificates.allSources'),
       options: (certStats.sources || []).map(src => ({
         value: src,
@@ -605,15 +632,13 @@ export default function CertificatesPage() {
       label: t('certificates.template'),
       type: 'multiSelect',
       value: savedTemplate,
-      onChange: (val) => { setPage(1); leaveLink(); setFilterTemplate(val) },
+      onChange: (val) => { if (linkView && val.length === 0) return; setPage(1); leaveLink(); setFilterTemplate(val) },
       placeholder: t('certificates.allTemplates'),
       options: [
         { value: 'modified', label: t('certificates.modifiedFromTemplate') }
       ]
     }
-  ], [savedStatus, savedCA, savedSource, savedTemplate, leaveLink, certStats.sources, cas, t])
-
-  const activeFilters = (savedStatus.length > 0 ? 1 : 0) + (savedCA.length > 0 ? 1 : 0) + (savedSource.length > 0 ? 1 : 0) + (savedTemplate.length > 0 ? 1 : 0)
+  ], [linkView, urlStatus, savedStatus, savedCA, savedSource, savedTemplate, leaveLink, setUrlStatus, certStats.sources, cas, t])
 
   // Help content
   const helpContent = (
@@ -687,7 +712,7 @@ export default function CertificatesPage() {
         icon={Certificate}
         stats={stats}
         onStatClick={handleStatClick}
-        activeStatFilter={linkView ? urlFilters.filter(([k]) => k === 'status').map(([, v]) => v) : filterStatus}
+        activeStatFilter={linkView ? urlStatus : filterStatus}
         helpPageKey="certificates"
         splitView={isMobile}
         splitEmptyContent={isMobile ? (
@@ -721,11 +746,13 @@ export default function CertificatesPage() {
         )}
         onSlideOverClose={() => setSelectedCert(null)}
       >
-        <FilterChips
-          filters={overviewChips}
-          onRemove={removeUrlFilter}
-          onClearAll={() => navigate({ pathname: location.pathname, search: '' }, { replace: true })}
-        />
+        <div data-testid="overview-chips">
+          <FilterChips
+            filters={overviewChips}
+            onRemove={removeUrlFilter}
+            onClearAll={() => navigate({ pathname: location.pathname, search: '' }, { replace: true })}
+          />
+        </div>
         <ResponsiveDataTable
           data={filteredCerts}
           columns={columns}
@@ -740,6 +767,7 @@ export default function CertificatesPage() {
           filterPresetsKey="ucm-certs-presets"
           densityStorageKey="ucm-certs-density"
           onApplyFilterPreset={handleApplyFilterPreset}
+          presetExtras={presetExtras}
           exportEnabled
           exportFilename="certificates"
           toolbarFilters={filters}

@@ -74,7 +74,7 @@ describe('inspector focus origins', () => {
     expect(opener).toHaveFocus()
   })
 
-  it('uses the latest opening of an object as its origin', async () => {
+  it('replaces the origin of an object reopened from another control', async () => {
     render(<InspectorProvider><Probe /><button>first</button><button>second</button></InspectorProvider>)
     screen.getByText('first').focus()
     act(() => api.openEntity('certificate', 1))
@@ -84,6 +84,18 @@ describe('inspector focus origins', () => {
     act(() => api.closeEntity('certificate:1'))
     await flush()
     expect(screen.getByText('second')).toHaveFocus()
+    expect(screen.getByText('first')).not.toHaveFocus()
+  })
+
+  it('keeps the previous origin when the object is reopened with the focus on the body', async () => {
+    render(<InspectorProvider><Probe /><button>first</button></InspectorProvider>)
+    screen.getByText('first').focus()
+    act(() => api.openEntity('certificate', 1))
+    screen.getByText('first').blur()
+    act(() => api.openEntity('certificate', 1))
+    act(() => api.closeEntity('certificate:1'))
+    await flush()
+    expect(screen.getByText('first')).toHaveFocus()
   })
 
   it('forgets the origin of an object pushed out by the limit', async () => {

@@ -167,6 +167,15 @@ describe('CSRsPage re-key key type', () => {
     expect((await submitGenerate()).key_type).toBe('RSA 3072')
   })
 
+  it('re-keys a CSR with an unknown key on the server default, not a frontend literal', async () => {
+    mocks.effective = { default_key_type: 'EC-P384' }
+    await openRekey({ id: 25, cn: 'odd.example.test', common_name: 'odd.example.test', key_type: 'Falcon-512', key_algorithm: 'Falcon', key_size: null })
+    fireEvent.click(screen.getByText('csrs.rekeyAsCSR'))
+    const want = findAlgorithm('EC-P384').csr
+    await waitFor(() => expect(screen.getByLabelText('common.keyType')).toHaveValue(want))
+    expect((await submitGenerate()).key_type).toBe(want)
+  })
+
   it('keeps the curve of an EC CSR re-keyed as a certificate', async () => {
     await openRekey(EC_CSR)
     fireEvent.click(screen.getByText('csrs.rekeyAsCert'))

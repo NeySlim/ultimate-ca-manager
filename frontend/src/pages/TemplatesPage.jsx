@@ -21,7 +21,7 @@ import { useNotification, useMobile } from '../contexts'
 import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { VALIDITY } from '../constants/config'
-import { KEY_ALGORITHMS, isUsable, listAlgorithms, groupedOptions } from '../lib/keyAlgorithms'
+import { KEY_ALGORITHMS, isUsable, groupedOptions } from '../lib/keyAlgorithms'
 import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { ekuService } from '../services/eku.service'
@@ -747,9 +747,7 @@ const TEMPLATE_TYPE_OPTIONS = [
   'code_signing', 'client_auth', 'ocsp_signing', 'smartcard_logon', 'custom'
 ]
 const DIGEST_OPTIONS = ['sha256', 'sha384', 'sha512']
-// A new template takes the registry's first generated key. The digest is the issuing CA's
-// signing hash, whatever the leaf key: it stays editable even for an ML-DSA or EdDSA leaf.
-const DEFAULT_KEY = listAlgorithms({ generate: true })[0]
+// The digest is the issuing CA's signing hash, whatever the leaf key: it stays editable even for an ML-DSA or EdDSA leaf.
 const DEFAULT_DIGEST = 'sha256'
 const KEY_USAGE_OPTIONS = [
   'digitalSignature', 'keyEncipherment', 'contentCommitment',
@@ -793,7 +791,7 @@ function buildInitialState(template) {
   if (!template) {
     return {
       name: '', description: '', template_type: 'web_server',
-      key_type: DEFAULT_KEY.label, digest: DEFAULT_DIGEST,
+      key_type: '', digest: DEFAULT_DIGEST,
       validity_days: VALIDITY.TEMPLATE_DEFAULT_DAYS,
       subject: { C: '', ST: '', L: '', O: '', OU: '', CN: '', emailAddress: '' },
       key_usage: ['digitalSignature', 'keyEncipherment'],
@@ -816,7 +814,7 @@ function buildInitialState(template) {
     name: template.name || '',
     description: template.description || '',
     template_type: template.template_type || 'web_server',
-    key_type: template.key_type || DEFAULT_KEY.label,
+    key_type: template.key_type || '',
     digest: template.digest || DEFAULT_DIGEST,
     validity_days: template.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS,
     subject: {
@@ -862,9 +860,14 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
   const platform = useKeyPlatform()
   // The key already on the template stays listed, so FIPS mode or a key not generated yet never blanks the field.
   // ML-DSA is offered: the digest is the issuing CA's signing hash, not the leaf key's.
-  const keyTypeOptions = useMemo(() => groupedOptions(
-    KEY_ALGORITHMS.filter(a => (a.generate && isUsable(a, platform)) || a.label === formData.key_type),
-    t, a => a.label), [platform, t, formData.key_type])
+  // An empty key type means the server default, which the backend resolves and stores when the template is created
+  const keyTypeOptions = useMemo(() => [
+    // Only a template without a key can stay on the default: an update cannot unset a stored key
+    ...(template?.key_type ? [] : [{ value: '', label: t('templates.keyServerDefault') }]),
+    ...groupedOptions(
+      KEY_ALGORITHMS.filter(a => (a.generate && isUsable(a, platform)) || a.label === formData.key_type),
+      t, a => a.label),
+  ], [platform, t, formData.key_type, template?.key_type])
 
   useEffect(() => {
     let cancelled = false
@@ -915,7 +918,7 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
         name: formData.name,
         description: formData.description,
         template_type: formData.template_type,
-        key_type: formData.key_type,
+        ...(formData.key_type ? { key_type: formData.key_type } : {}),
         digest: formData.digest,
         validity_days: formData.validity_days,
         dn_template: { ...formData.subject },

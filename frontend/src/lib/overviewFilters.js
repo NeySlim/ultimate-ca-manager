@@ -53,3 +53,11 @@ export function withoutFilter(search, key, value) {
   const qs = params.toString()
   return qs ? `?${qs}` : ''
 }
+
+/** The query string (`?a=1&b=2`, or '') of known-filter pairs. */
+export function toSearch(pairs) {
+  const params = new URLSearchParams()
+  for (const [key, value] of pairs) params.append(key, value)
+  const qs = params.toString()
+  return qs ? `?${qs}` : ''
+}

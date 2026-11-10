@@ -3766,6 +3766,7 @@
     "pinnedSubjectBadge": "Épinglé",
     "pinnedSubjectBadgeTooltip": "Certains champs du sujet sont épinglés et appliqués lors de l'émission WSTEP",
     "keySettings": "Paramètres de clé",
+    "keyServerDefault": "Défaut du serveur",
     "extensions": "Extensions",
     "noTemplates": "Aucun modèle",
     "serverAuth": "Authentification serveur",
@@ -6013,7 +6014,8 @@
       "webauthn": "security key",
       "session": "browser session"
     },
-    "expiringBadge": "{{count}} certificates expiring or expired. Dismiss.",
+    "expiringBadge_one": "{{count}} certificat expire ou a expiré. Fermer.",
+    "expiringBadge_other": "{{count}} certificats expirent ou ont expiré. Fermer.",
     "statusRunning": "Service running",
     "statusUnreachable": "Service unreachable",
     "statusSafeMode": "Safe mode",
@@ -6021,8 +6023,10 @@
     "haNode": "HA node {{node}}",
     "haLeader": "leader",
     "haFollower": "follower",
-    "haNodes": "Nodes: {{count}}",
-    "haLate": "Late: {{count}}",
+    "haNodes_one": "{{count}} nœud",
+    "haNodes_other": "{{count}} nœuds",
+    "haLate_one": "{{count}} en retard",
+    "haLate_other": "{{count}} en retard",
     "theme": {
       "menu": "Theme"
     },

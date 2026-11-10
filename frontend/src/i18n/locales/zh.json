@@ -1229,6 +1229,7 @@
     "pinnedSubjectBadge": "已固定",
     "pinnedSubjectBadgeTooltip": "部分主题字段已固定,并在 WSTEP 颁发时强制执行",
     "keySettings": "密钥设置",
+    "keyServerDefault": "Server default",
     "extensions": "扩展",
     "noTemplates": "没有模板",
     "noTemplatesDescription": "创建您的第一个模板",
@@ -6010,7 +6011,8 @@
       "webauthn": "security key",
       "session": "browser session"
     },
-    "expiringBadge": "{{count}} certificates expiring or expired. Dismiss.",
+    "expiringBadge_one": "{{count}} certificate expiring or expired. Dismiss.",
+    "expiringBadge_other": "{{count}} certificates expiring or expired. Dismiss.",
     "statusRunning": "Service running",
     "statusUnreachable": "Service unreachable",
     "statusSafeMode": "Safe mode",
@@ -6018,8 +6020,10 @@
     "haNode": "HA node {{node}}",
     "haLeader": "leader",
     "haFollower": "follower",
-    "haNodes": "Nodes: {{count}}",
-    "haLate": "Late: {{count}}",
+    "haNodes_one": "{{count}} node",
+    "haNodes_other": "{{count}} nodes",
+    "haLate_one": "{{count}} late",
+    "haLate_other": "{{count}} late",
     "theme": {
       "menu": "Theme"
     },

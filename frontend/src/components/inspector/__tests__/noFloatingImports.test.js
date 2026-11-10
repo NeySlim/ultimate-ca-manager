@@ -5,7 +5,7 @@
  * and the email template editor still use them.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { dirname, join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const SRC = join(__dirname, '../../..')
@@ -38,6 +38,43 @@ describe('import statement scanner', () => {
   })
 })
 
+// Live = reached from the entry point through relative imports (barrels included),
+// never through a legacy module
+export function liveModules(files, legacy, entry = 'main.jsx') {
+  const byPath = new Map(files.map(([rel, text]) => [rel, text]))
+  const resolve = (fromRel, spec) => {
+    const base = join(dirname(fromRel), spec).split('\\').join('/')
+    return ['', '.js', '.jsx', '/index.js', '/index.jsx'].map((x) => base + x).find((c) => byPath.has(c))
+  }
+  const live = new Set()
+  const queue = [entry]
+  while (queue.length) {
+    const rel = queue.pop()
+    if (live.has(rel) || legacy.includes(rel)) continue
+    live.add(rel)
+    for (const st of importStatements(byPath.get(rel))) {
+      const spec = st.match(/['"]([^'"]+)['"]$/)?.[1]
+      const target = spec?.startsWith('.') && resolve(rel, spec)
+      if (target) queue.push(target)
+    }
+  }
+  return live
+}
+
+describe('live module walk', () => {
+  const graph = [
+    ['main.jsx', "import A from './a'\nimport L from './legacy'"],
+    ['a.jsx', 'export default 1'],
+    ['legacy.jsx', "import O from './onlyLegacy'"],
+    ['onlyLegacy.jsx', 'export default 2'],
+    ['orphan.jsx', 'export default 3'],
+  ]
+  it('keeps what the entry reaches, drops orphans and what only a legacy module imports', () => {
+    const live = liveModules(graph, ['legacy.jsx'])
+    expect([...live].sort()).toEqual(['a.jsx', 'main.jsx'])
+  })
+})
+
 describe('legacy detail windows', () => {
   const files = sources(SRC).map((p) => [relative(SRC, p), readFileSync(p, 'utf8')])
 
@@ -49,13 +86,26 @@ describe('legacy detail windows', () => {
     expect(users).toEqual([])
   })
 
+  // Live = reached from the entry point through relative imports (barrels included),
+  // never through a legacy module
+  const live = liveModules(files, Object.keys(LEGACY))
+  const importersOf = (target) => {
+    const name = target.split('/').pop().replace(/\.jsx?$/, '')
+    return files
+      .filter(([rel]) => !Object.keys(LEGACY).includes(rel) && rel !== target)
+      .filter(([, text]) => importStatements(text).some((st) => new RegExp(`/${name}['"]`).test(st)))
+      .map(([rel]) => rel)
+  }
+
+  it('tells a live module from one only a dead module imports', () => {
+    expect(live.has('main.jsx')).toBe(true)
+    expect(live.has('components/DetailWindowLayer.jsx')).toBe(false)
+  })
+
   it.each(['ui/FloatingWindow.jsx', 'hooks/useFloatingWindow.js'])(
     'keeps %s out of the legacy set while a live module imports it', (shared) => {
-      const name = shared.split('/').pop().replace(/\.jsx?$/, '')
-      const users = files
-        .filter(([rel]) => !Object.keys(LEGACY).includes(rel) && rel !== shared)
-        .filter(([, text]) => importStatements(text).some((st) => new RegExp(`/${name}['"]`).test(st)))
-      expect(users.length).toBeGreaterThan(0)
+      const users = importersOf(`${shared.startsWith('ui/') ? 'components/' : ''}${shared}`)
+      expect(users.some((u) => live.has(u))).toBe(true)
       expect(Object.keys(LEGACY)).not.toContain(shared)
     })
 })
