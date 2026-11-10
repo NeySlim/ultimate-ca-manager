@@ -231,14 +231,18 @@ def _is_stale(node, wake_interval, now) -> bool:
 
 
 def cluster_summary(wake_interval) -> dict:
-    """{leader_node_id, nodes, stale} as /health reports it; a stale leader is no leader."""
+    """{leader_node_id, nodes, stale, command_seen} as /health reports it; a stale leader is no leader.
+
+    command_seen maps each node to the last cluster command it applied.
+    """
     from models import ClusterNode
     from utils.datetime_utils import utc_now
     now = utc_now()
     nodes = ClusterNode.query.all()
     stale = {n.node_id for n in nodes if _is_stale(n, wake_interval, now)}
     leader = next((n.node_id for n in nodes if n.is_leader and n.node_id not in stale), None)
-    return {'leader_node_id': leader, 'nodes': len(nodes), 'stale': len(stale)}
+    return {'leader_node_id': leader, 'nodes': len(nodes), 'stale': len(stale),
+            'command_seen': {n.node_id: n.command_seen for n in nodes}}
 
 
 def node_registered(node_id) -> bool:

@@ -413,6 +413,10 @@ def update_rate_limit_config():
             for ip in data['whitelist_remove']:
                 RateLimitConfig.remove_whitelist(ip)
 
+        # HA: the other nodes take the same limits; they live in memory only
+        from services.cluster_commands import RELOAD_RATE_LIMITS, emit_committed
+        emit_committed(RELOAD_RATE_LIMITS, RateLimitConfig.snapshot())
+
         return success_response(
             message="Rate limit config updated",
             data=RateLimitConfig.get_config()

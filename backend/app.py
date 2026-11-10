@@ -94,7 +94,9 @@ def run_startup_housekeeping(app):
 
 def create_app(config_name=None):
     """Application factory"""
-    app = Flask(__name__, 
+    # Stamps this process's start before any setting is read (HA cluster commands)
+    import services.cluster_commands  # noqa: F401
+    app = Flask(__name__,
                 static_folder=str(BASE_DIR / "frontend" / "static"),
                 template_folder=str(BASE_DIR / "frontend" / "templates"))
     
@@ -656,6 +658,16 @@ def create_app(config_name=None):
             )
         except ImportError:
             pass
+
+        from utils.ha import ha_enabled
+        if ha_enabled():
+            from services.cluster_commands import purge_old_commands
+            scheduler.register_task(
+                name="cluster_command_purge",
+                func=purge_old_commands,
+                interval=3600,
+                description="Delete HA cluster commands older than 24 hours"
+            )
 
         # Delivery history does not grow for ever (webhooks, deployments,
         # notifications) — every 6 hours, same cadence as the ACME purge

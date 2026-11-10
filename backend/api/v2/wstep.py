@@ -125,7 +125,8 @@ def update_wstep_config():
 
     if enabled_changed:
         from config.settings import is_docker
-        if is_docker():
+        from utils.ha import ha_enabled
+        if is_docker() and not ha_enabled():  # HA: each container exits in turn
             return success_response(
                 message='WSTEP configuration saved. Restart the container to apply the TLS behavior change.',
                 data={'requires_container_restart': True},

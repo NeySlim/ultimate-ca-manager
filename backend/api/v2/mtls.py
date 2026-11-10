@@ -145,7 +145,8 @@ def update_mtls_settings():
     needs_restart = enabled is not None or required is not None or ca_id is not None
     restart_message = None
     if needs_restart:
-        if is_docker():
+        from utils.ha import ha_enabled
+        if is_docker() and not ha_enabled():  # HA: each container exits in turn
             restart_message = 'Restart the container to apply mTLS changes.'
         else:
             success, msg = restart_ucm_service()

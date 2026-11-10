@@ -14,7 +14,7 @@ from services import compliance_preflight, fips_preflight
 import compliance_profiles
 from models import db
 from config.settings import is_docker
-from utils.ha import reject_in_ha
+from utils.ha import ha_enabled
 import os
 import psutil
 import fips_mode
@@ -219,10 +219,9 @@ def get_compliance_preflight():
 
 @bp.route('/api/v2/system/service/restart', methods=['POST'])
 @require_auth(['write:settings'])
-@reject_in_ha()
 def restart_service():
-    """Restart the UCM service"""
-    if is_docker():
+    """Restart the UCM service; in HA mode, every node in turn"""
+    if is_docker() and not ha_enabled():
         return error_response("Service restart is not available in Docker. Restart the container instead.", 400)
 
     try:

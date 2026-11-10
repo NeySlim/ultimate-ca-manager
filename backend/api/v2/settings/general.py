@@ -451,6 +451,10 @@ def update_general_settings():
                 value = encrypt_if_needed(value)
             set_config(key, value)
 
+    if allowlist_change is not None:
+        from services.cluster_commands import RELOAD_ADMIN_ALLOWLIST, emit
+        emit(RELOAD_ADMIN_ALLOWLIST)  # committed with the list, or not at all
+
     try:
         db.session.commit()
     except Exception as e:

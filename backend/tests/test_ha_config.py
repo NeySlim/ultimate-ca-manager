@@ -89,12 +89,15 @@ def test_node_id_defaults_to_hostname_and_ha_flag_parsed():
     assert _import_config({**base, 'UCM_HA': 'yes', 'UCM_NODE_ID': 'n2'}) == ['True', 'n2']
 
 
-def test_restart_in_ha_writes_no_signal_file(monkeypatch, tmp_path):
+def test_restart_in_ha_queues_a_rolling_restart_instead_of_the_signal_file(monkeypatch, tmp_path):
+    import services.cluster_commands as cc
+    asked = []
+    monkeypatch.setattr(cc, 'request_restart', lambda: asked.append(1) or (True, 'rolling'))
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.setattr(settings, 'DATA_DIR', tmp_path)
     monkeypatch.setattr(settings, 'is_docker', lambda: False)
     ok, _ = settings.restart_ucm_service()
-    assert ok is False
+    assert ok is True and asked == [1]
     assert not (tmp_path / '.restart_requested').exists()
     monkeypatch.setattr(Config, 'HA_MODE', False)
     ok, _ = settings.restart_ucm_service()

@@ -265,6 +265,23 @@ class RateLimitConfig:
         }
     
     @classmethod
+    def snapshot(cls) -> Dict[str, Any]:
+        """What the settings API changes, as another node applies it (cluster commands)."""
+        cls._load_limits()
+        return {'enabled': cls.is_enabled(),
+                'custom_limits': {k: dict(v) for k, v in cls._custom_limits.items()},
+                'whitelist': sorted(cls._whitelist)}
+
+    @classmethod
+    def apply_snapshot(cls, snap: Dict[str, Any]):
+        cls._load_limits()
+        cls._enabled = bool(snap.get('enabled', cls.is_enabled()))
+        cls._custom_limits = {k: {'rpm': int(v['rpm']), 'burst': int(v['burst'])}
+                              for k, v in (snap.get('custom_limits') or {}).items()}
+        cls._whitelist = set(snap.get('whitelist') or [])
+        logger.info("Rate limit configuration applied from another node")
+
+    @classmethod
     def reload(cls):
         """Reload configuration from environment"""
         cls._limits_loaded = False
