@@ -38,7 +38,8 @@ RESTART_GUARD_SECONDS = 120.0
 RETENTION = timedelta(hours=24)
 BATCH = 200
 
-# Before create_app reads any setting: commands created up to here are already in effect
+# Before create_app reads any setting: commands created up to here are already in effect.
+# On this host's clock: the applier moves it onto the cluster clock before comparing.
 PROCESS_STARTED = utc_now()
 
 _INITIAL_SQL = text("SELECT COALESCE(MAX(id), 0) FROM cluster_commands WHERE created_at <= :t")
@@ -60,7 +61,8 @@ def emit(kind, payload=None, target=None):
         return None
     from config.settings import Config
     from models import ClusterCommand, db
-    command = ClusterCommand(kind=kind, created_at=utc_now(), created_by=Config.NODE_ID,
+    from services.scheduler_leader import cluster_utc_now
+    command = ClusterCommand(kind=kind, created_at=cluster_utc_now(), created_by=Config.NODE_ID,
                              payload=None if payload is None else json.dumps(payload),
                              node_id=target)
     db.session.add(command)
@@ -91,7 +93,8 @@ def request_restart():
 def purge_old_commands():
     """Leader task: commands older than RETENTION are dropped."""
     from models import ClusterCommand, db
-    removed = ClusterCommand.query.filter(ClusterCommand.created_at < utc_now() - RETENTION) \
+    from services.scheduler_leader import cluster_utc_now
+    removed = ClusterCommand.query.filter(ClusterCommand.created_at < cluster_utc_now() - RETENTION) \
         .delete(synchronize_session=False)
     db.session.commit()
     if removed:
@@ -171,11 +174,13 @@ class CommandApplier:
     """
 
     def __init__(self, app, node_id, *, started_at=None, record=True, restart_action=None,
-                 handlers=None, tick=None, guard=None, stale_seconds=None):
+                 handlers=None, tick=None, guard=None, stale_seconds=None, clock=None):
         from services.scheduler_leader import STALE_PASSES
         self.app = app
         self.node_id = node_id
-        self.started_at = started_at or PROCESS_STARTED
+        self.started_at = started_at or PROCESS_STARTED  # this host's clock until the first pass
+        self.clock = clock or utc_now  # this host's clock
+        self._on_cluster_clock = False
         self.record = record
         self.restart_action = restart_action or restart_this_node
         self.handlers = dict(HANDLERS if handlers is None else handlers)
@@ -238,6 +243,10 @@ class CommandApplier:
         """Apply what is new; errors are logged once and retried on the next tick."""
         try:
             conn = self._connection()
+            if not self._on_cluster_clock:
+                # created_at is on the cluster clock: a host whose clock drifts compares right
+                self.started_at = self._cluster_clock(conn, self.started_at)
+                self._on_cluster_clock = True
             if self.seen is None:
                 self.seen = conn.execute(_INITIAL_SQL, {'t': self.started_at}).scalar() or 0
                 self._mark_seen(conn, self.seen)
@@ -328,6 +337,10 @@ class CommandApplier:
         if self.record:
             conn.execute(_ADVANCE_SQL, {'id': command_id, 'n': self.node_id})
 
+    def _cluster_clock(self, conn, local_instant):
+        from services.scheduler_leader import to_cluster_clock
+        return to_cluster_clock(local_instant, self.clock(), conn)
+
     def _claim(self, conn, command_id):
         """True when this process takes the node's restart ``command_id`` (or the node has no row)."""
         if conn.execute(_CLAIM_SQL, {'id': command_id, 'n': self.node_id}).rowcount:
@@ -340,8 +353,9 @@ class CommandApplier:
             self._advance(conn, row.id)
             return True
         nodes = conn.execute(_NODES_SQL).fetchall()
-        pending = pending_predecessors(self.node_id, nodes, row.created_at, utc_now(),
-                                       self.stale_seconds)
+        from services.scheduler_leader import cluster_utc_now
+        pending = pending_predecessors(self.node_id, nodes, row.created_at,
+                                       cluster_utc_now(conn), self.stale_seconds)
         now = time.monotonic()
         if self._restart_wait is None or self._restart_wait[0] != row.id:
             self._restart_wait = (row.id, now, len(pending))

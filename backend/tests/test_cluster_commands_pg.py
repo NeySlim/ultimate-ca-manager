@@ -286,7 +286,8 @@ def test_a_node_back_under_the_same_pid_releases_the_next_one(app, ha):
     for name in ('a', 'b'):
         beat(name, utc_now() - timedelta(seconds=60))
     appliers = [ha('a', restart_action=restart_a, guard=30),
-                ha('b', restart_action=lambda: events.append(('down', 'b')), guard=30)]
+                ha('b', clock=lambda: utc_now() + LAG, restart_action=lambda: events.append(('down', 'b')),
+                   guard=30)]
     _emit(app, cc.RESTART)
     for applier in appliers:
         applier.start()
@@ -306,6 +307,62 @@ def test_a_node_started_after_the_restart_command_is_spared(app, ha):
     assert wait_for(lambda: late.seen == after)
     assert restart_id < after and log == [('late', 'after')]
     assert cluster.events == []
+
+
+LAG = timedelta(hours=1)
+
+
+def _lagging():
+    return utc_now() - LAG
+
+
+def test_a_node_whose_clock_lags_is_spared_by_a_restart_older_than_its_process(app, ha):
+    cluster, log = _Cluster(app), []
+    restart_id = _emit(app, cc.RESTART)
+    _node_row(app, 'n', started_at=utc_now())
+    n = ha('n', clock=_lagging, started_at=_lagging(), restart_action=cluster.action('n'),
+           handlers={cc.RELOAD_SYSLOG: _recorder(log, 'n')})
+    n.start()
+    assert wait_for(lambda: n.seen is not None)
+    after = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'})  # emitted once n runs: never in its start cursor
+    assert wait_for(lambda: n.seen == after)
+    assert restart_id < after and log == [('n', 'after')]
+    assert cluster.events == []
+
+
+def test_skewed_clocks_keep_the_rolling_restart_in_turn(app, ha, monkeypatch):
+    """Node a's host clock is an hour late, b's an hour early: a's heartbeat and start time,
+    read by b, still say whether a is back."""
+    from services import scheduler_service
+    from services.scheduler_service import SchedulerService
+    monkeypatch.setattr(scheduler_service, 'utc_now', _lagging)  # only node a runs a scheduler here
+    events = []
+
+    def beat_a(started_ago):
+        sched = SchedulerService(node_id=PREFIX + 'a')
+        sched._app = app
+        sched._started_at -= started_ago
+        sched._heartbeat(force=True)
+
+    def restart_a():
+        events.append(('down', 'a'))
+
+        def back():
+            time.sleep(0.3)
+            events.append(('up', 'a'))
+            beat_a(timedelta(0))
+        threading.Thread(target=back, daemon=True).start()
+    beat_a(timedelta(seconds=60))
+    _node_row(app, 'b')
+    appliers = [ha('a', clock=_lagging, started_at=_lagging() - timedelta(seconds=30),
+                   restart_action=restart_a, guard=30),
+                ha('b', clock=lambda: utc_now() + LAG, restart_action=lambda: events.append(('down', 'b')),
+                   guard=30)]
+    _emit(app, cc.RESTART)
+    for applier in appliers:
+        applier.start()
+    assert wait_for(lambda: ('down', 'b') in events, timeout=8)
+    assert events == [('down', 'a'), ('up', 'a'), ('down', 'b')]
 
 
 def test_a_dead_node_holds_the_next_one_only_for_the_guard_delay(app, ha):
