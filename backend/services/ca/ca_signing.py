@@ -265,8 +265,6 @@ class CASigningMixin:
         )
         db.session.add(new_cert)
 
-        # Increment CA serial
-        next_ca_serial(ca)
         try:
             db.session.flush()
             # The renewed row is archived in the commit that stores its successor,
@@ -274,6 +272,8 @@ class CASigningMixin:
             if supersedes is not None and not _claim_superseded(supersedes):
                 db.session.rollback()
                 raise AlreadySuperseded('the renewed certificate is already superseded')
+            # Certificate rows before the CA row, as an in-place renewal locks them
+            next_ca_serial(ca)
             link_issued(new_cert, cert_obj, related_a)
             # RFC 9763: the request binds to this key B in the commit that stores B
             record_request_key(csr.public_bytes(serialization.Encoding.DER), related_a)
