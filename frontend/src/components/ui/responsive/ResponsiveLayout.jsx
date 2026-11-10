@@ -527,7 +527,7 @@ function SidebarNav({ tabs, tabGroups, activeTab, onTabChange, t }) {
         {tabGroups.map((group, i) => (
           <div key={i}>
             {group.labelKey && (
-              <div className="px-2 pb-1.5 text-[11px] font-semibold tracking-wide text-text-tertiary">
+              <div className="px-2 pb-1.5 text-xs font-semibold tracking-wide text-text-tertiary">
                 {t(group.labelKey)}
               </div>
             )}
@@ -1020,7 +1020,7 @@ function FilterContent({ filters, onClearFilters, onClose }) {
           type="button"
           onClick={onClose}
           className={cn(
-            'flex-1 h-11 rounded-lg bg-accent-primary text-white',
+            'flex-1 h-11 rounded-lg bg-accent-primary text-on-accent',
             'font-medium text-sm hover:bg-accent-primary-op90 transition-colors'
           )}
         >

@@ -2636,6 +2636,12 @@
     "appearanceSubtitle": "Налаштуйте вигляд і мову UCM",
     "colorTheme": "Кольорова тема",
     "colorThemeDesc": "Виберіть кольорову схему за вашими вподобаннями",
+    "themeFamilies": {
+      "atelier": "Atelier",
+      "aurore": "Aurore",
+      "purple": "Purple Night",
+      "sunset": "Orange Sunset"
+    },
     "appearanceMode": "Режим вигляду",
     "appearanceModeDesc": "Контролюйте як адаптується яскравість інтерфейсу",
     "followSystem": "За системою",

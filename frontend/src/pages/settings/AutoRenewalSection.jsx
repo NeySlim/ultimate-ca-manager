@@ -107,7 +107,7 @@ export default function AutoRenewalSection({
                       onClick={() => toggleSource(src)}
                       className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
                         active
-                          ? 'bg-accent-primary text-white border-accent-primary'
+                          ? 'bg-accent-primary text-on-accent border-accent-primary'
                           : 'bg-tertiary-50 text-text-secondary border-border hover:border-accent-primary'
                       }`}
                     >

@@ -48,14 +48,14 @@ export default function AppearanceSettings() {
                   className="w-5 h-5 rounded-full shadow-inner"
                   style={{ background: theme.accent }}
                 />
-                <span className="font-medium text-sm text-text-primary">{theme.name}</span>
+                <span className="font-medium text-sm text-text-primary">{t(theme.nameKey)}</span>
               </div>
               <div className="flex gap-1">
                 {/* Preview colors - show accent and distinct bg colors */}
-                <div className="w-6 h-3 rounded-sm" style={{ background: theme.accent }} />
-                <div className="w-6 h-3 rounded-sm" style={{ background: theme.dark['bg-tertiary'] }} />
-                <div className="w-6 h-3 rounded-sm" style={{ background: theme.light['bg-tertiary'] }} />
-                <div className="w-6 h-3 rounded-sm" style={{ background: theme.light['accent-primary'] || theme.accent }} />
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.swatch.dark.accent }} />
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.swatch.dark.surface }} />
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.swatch.light.surface }} />
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.swatch.light.accent }} />
               </div>
             </button>
           ))}
@@ -83,7 +83,7 @@ export default function AppearanceSettings() {
               >
                 <div className={`
                   w-10 h-10 rounded-lg flex items-center justify-center
-                  ${mode === opt.id ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}
+                  ${mode === opt.id ? 'bg-accent-primary text-on-accent' : 'bg-bg-secondary text-text-secondary'}
                 `}>
                   <Icon size={20} weight={mode === opt.id ? 'fill' : 'regular'} />
                 </div>
@@ -120,7 +120,7 @@ export default function AppearanceSettings() {
         >
           <div className={`
             w-10 h-10 rounded-lg flex items-center justify-center
-            ${forceDesktop ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}
+            ${forceDesktop ? 'bg-accent-primary text-on-accent' : 'bg-bg-secondary text-text-secondary'}
           `}>
             <Desktop size={20} weight={forceDesktop ? 'fill' : 'regular'} />
           </div>
@@ -165,7 +165,7 @@ export default function AppearanceSettings() {
         <div className="p-4 rounded-lg bg-bg-tertiary border border-border">
           <p className="text-sm text-text-secondary mb-2">{t('settings.currentSettings')}:</p>
           <p className="text-text-primary">
-            <span className="font-medium">{themes.find(th => th.id === themeFamily)?.name}</span>
+            <span className="font-medium">{t(themes.find(th => th.id === themeFamily)?.nameKey)}</span>
             {' · '}
             <span className="text-text-secondary">
               {mode === 'system' ? t('settings.followingSystemPreference') : mode === 'dark' ? t('settings.darkMode') : t('settings.lightMode')}

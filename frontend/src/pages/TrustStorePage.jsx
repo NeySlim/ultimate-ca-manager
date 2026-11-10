@@ -721,7 +721,7 @@ export default function TrustStorePage() {
                         <div className="text-sm font-medium truncate">{ca.descr || ca.common_name}</div>
                         {ca.organization && <div className="text-xs text-text-tertiary truncate">{ca.organization}</div>}
                       </div>
-                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase shrink-0 ${ca.is_root ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-status-info-op15 text-status-info'}`}>
+                      <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold uppercase shrink-0 ${ca.is_root ? 'bg-accent-primary-op15 text-accent-primary' : 'bg-status-info-op15 text-status-info'}`}>
                         {ca.is_root ? 'Root' : 'Inter'}
                       </span>
                       {ca.alreadyInTruststore && (

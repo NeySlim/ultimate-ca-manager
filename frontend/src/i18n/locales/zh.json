@@ -2598,6 +2598,12 @@
     "appearanceSubtitle": "自定义UCM的外观和语言",
     "colorTheme": "颜色主题",
     "colorThemeDesc": "选择适合您偏好的配色方案",
+    "themeFamilies": {
+      "atelier": "Atelier",
+      "aurore": "Aurore",
+      "purple": "Purple Night",
+      "sunset": "Orange Sunset"
+    },
     "appearanceMode": "外观模式",
     "appearanceModeDesc": "控制界面亮度的适应方式",
     "followSystem": "跟随系统",

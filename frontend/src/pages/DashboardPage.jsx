@@ -592,7 +592,7 @@ export default function DashboardPage() {
                           onClick={() => setTrendDays(d)}
                           className={`px-2 py-0.5 text-xs rounded-md transition-colors ${
                             trendDays === d
-                              ? 'bg-accent-primary text-white'
+                              ? 'bg-accent-primary text-on-accent'
                               : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'
                           }`}
                         >
@@ -694,12 +694,12 @@ export default function DashboardPage() {
                                 {cert.common_name || cert.descr || cert.subject || '—'}
                               </span>
                               {cert.is_tsa_signer && (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap bg-status-info-op10 text-status-info">
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap bg-status-info-op10 text-status-info">
                                   {t('dashboard.tsaSigner')}
                                 </span>
                               )}
                               {daysLeft !== null && daysLeft <= 30 ? (
-                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
+                                <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
                                   daysLeft <= 7
                                     ? 'bg-status-warning text-black/80'
                                     : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
@@ -707,7 +707,7 @@ export default function DashboardPage() {
                                   {t('dashboard.expiresInDays', { count: daysLeft })}
                                 </span>
                               ) : (
-                                <span className={`text-[10px] font-semibold whitespace-nowrap text-text-secondary`}>
+                                <span className={`text-xs font-semibold whitespace-nowrap text-text-secondary`}>
                                   {daysLeft !== null ? t('dashboard.daysRemaining', { count: daysLeft }) : '—'}
                                 </span>
                               )}
@@ -769,7 +769,7 @@ export default function DashboardPage() {
                               {cert.revoked ? t('common.revoked') : (cert.valid_to && new Date(cert.valid_to) < new Date()) ? t('common.expired') : t('common.valid')}
                             </Badge>
                           </div>
-                          <div className="text-[10px] text-text-tertiary mt-0.5">
+                          <div className="text-xs text-text-tertiary mt-0.5">
                             {formatRelativeTime(cert.created_at, t)}
                           </div>
                         </div>
@@ -872,9 +872,9 @@ export default function DashboardPage() {
                                 {activity.message || activity.action}
                               </p>
                               <div className="flex items-center gap-1.5 mt-0.5">
-                                <span className="text-[10px] text-text-secondary font-medium">{activity.user || 'System'}</span>
-                                <span className="text-text-tertiary text-[10px]">•</span>
-                                <span className="text-[10px] text-text-tertiary">
+                                <span className="text-xs text-text-secondary font-medium">{activity.user || 'System'}</span>
+                                <span className="text-text-tertiary text-xs">•</span>
+                                <span className="text-xs text-text-tertiary">
                                   {formatRelativeTime(activity.timestamp, t)}
                                 </span>
                               </div>
@@ -932,7 +932,7 @@ export default function DashboardPage() {
                       status="online" 
                     />
                   </div>
-                  <div className="text-[10px] font-semibold text-text-secondary uppercase tracking-wide mb-0.5">
+                  <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-0.5">
                     {t('dashboard.services')}
                   </div>
                   <div className="grid grid-cols-4 gap-1">
@@ -1024,7 +1024,7 @@ export default function DashboardPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <span className="text-xs font-medium text-text-primary truncate block">{cert.name}</span>
-                            <span className="text-[10px] text-status-danger">{t('common.expired')}</span>
+                            <span className="text-xs text-status-danger">{t('common.expired')}</span>
                           </div>
                         </div>
                       ))}
@@ -1035,7 +1035,7 @@ export default function DashboardPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <span className="text-xs font-medium text-text-primary truncate block">{cert.name}</span>
-                            <span className="text-[10px] text-accent-warning">{cert.days_remaining}d</span>
+                            <span className="text-xs text-accent-warning">{cert.days_remaining}d</span>
                           </div>
                         </div>
                       ))}
@@ -1107,7 +1107,7 @@ export default function DashboardPage() {
                           <div className="flex items-center justify-between gap-2 mb-1">
                             <span className="text-xs font-medium text-text-primary truncate flex-1">{cert.common_name || cert.descr || cert.subject || '—'}</span>
                             {daysLeft !== null && daysLeft <= 30 ? (
-                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
+                              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
                                 daysLeft <= 7
                                   ? 'bg-status-warning text-black/80'
                                   : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
@@ -1115,7 +1115,7 @@ export default function DashboardPage() {
                                 {t('dashboard.expiresInDays', { count: daysLeft })}
                               </span>
                             ) : (
-                              <span className={`text-[10px] font-semibold whitespace-nowrap text-text-secondary`}>
+                              <span className={`text-xs font-semibold whitespace-nowrap text-text-secondary`}>
                                 {daysLeft !== null ? t('dashboard.daysRemaining', { count: daysLeft }) : '—'}
                               </span>
                             )}
@@ -1151,7 +1151,7 @@ export default function DashboardPage() {
                             {cert.revoked ? t('common.revoked') : (cert.valid_to && new Date(cert.valid_to) < new Date()) ? t('common.expired') : t('common.valid')}
                           </Badge>
                         </div>
-                        <div className="text-[10px] text-text-tertiary mt-0.5">{formatRelativeTime(cert.created_at, t)}</div>
+                        <div className="text-xs text-text-tertiary mt-0.5">{formatRelativeTime(cert.created_at, t)}</div>
                       </div>
                     </div>
                   ))
@@ -1203,9 +1203,9 @@ export default function DashboardPage() {
                           <div className="flex-1 min-w-0">
                             <p className="text-xs text-text-primary leading-tight truncate">{activity.message || activity.action}</p>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="text-[10px] text-text-secondary font-medium">{activity.user || 'System'}</span>
-                              <span className="text-text-tertiary text-[10px]">•</span>
-                              <span className="text-[10px] text-text-tertiary">{formatRelativeTime(activity.timestamp, t)}</span>
+                              <span className="text-xs text-text-secondary font-medium">{activity.user || 'System'}</span>
+                              <span className="text-text-tertiary text-xs">•</span>
+                              <span className="text-xs text-text-tertiary">{formatRelativeTime(activity.timestamp, t)}</span>
                             </div>
                           </div>
                         </div>
@@ -1227,7 +1227,7 @@ export default function DashboardPage() {
                   <SystemStat icon={Clock} label={t('common.lastUpdate')} value={formatRelativeTime(lastUpdate, t)} status="online" />
                   <SystemStat icon={Lightning} label={t('dashboard.api')} value={t('common.online')} status="online" />
                 </div>
-                <div className="text-[10px] font-semibold text-text-secondary uppercase tracking-wide mb-0.5">{t('dashboard.services')}</div>
+                <div className="text-xs font-semibold text-text-secondary uppercase tracking-wide mb-0.5">{t('dashboard.services')}</div>
                 <div className="grid grid-cols-4 gap-1">
                   <ServiceBadge name="ACME" status={systemStatus?.acme} />
                   <ServiceBadge name="SCEP" status={systemStatus?.scep} />
@@ -1283,7 +1283,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <span className="text-xs font-medium text-text-primary truncate block">{cert.name}</span>
-                          <span className="text-[10px] text-status-danger">{t('common.expired')}</span>
+                          <span className="text-xs text-status-danger">{t('common.expired')}</span>
                         </div>
                       </div>
                     ))}
@@ -1294,7 +1294,7 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <span className="text-xs font-medium text-text-primary truncate block">{cert.name}</span>
-                          <span className="text-[10px] text-accent-warning">{cert.days_remaining}d</span>
+                          <span className="text-xs text-accent-warning">{cert.days_remaining}d</span>
                         </div>
                       </div>
                     ))}
@@ -1383,7 +1383,7 @@ function WidgetSettingsModal({ open, onClose, widgets, onSave }) {
               className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-bg-tertiary transition-colors"
             >
               <div className={`w-5 h-5 rounded flex items-center justify-center transition-colors ${
-                widget.visible ? 'bg-accent-primary text-white' : 'bg-bg-tertiary text-text-tertiary'
+                widget.visible ? 'bg-accent-primary text-on-accent' : 'bg-bg-tertiary text-text-tertiary'
               }`}>
                 {widget.visible ? <Eye size={14} /> : <EyeSlash size={14} />}
               </div>
@@ -1452,7 +1452,7 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
     >
       {live && (
         <div className="absolute top-1.5 right-1.5 sm:top-2.5 sm:right-2.5 flex items-center gap-1.5 z-10">
-          <span className="text-[10px] status-success-text font-medium opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline">Live</span>
+          <span className="text-xs status-success-text font-medium opacity-0 group-hover:opacity-100 transition-opacity hidden sm:inline">Live</span>
           <div className="w-2 h-2 rounded-full status-success-bg-solid animate-pulse-soft" />
         </div>
       )}
@@ -1468,7 +1468,7 @@ function StatCard({ icon: Icon, label, value, color, onClick, live, badge }) {
               <Badge variant="warning" size="sm" dot pulse className="hidden sm:inline-flex">{badge}</Badge>
             )}
           </div>
-          <p className="text-[9px] sm:text-[11px] text-text-secondary font-medium leading-tight line-clamp-2 sm:truncate sm:line-clamp-none">{label}</p>
+          <p className="text-xs sm:text-xs text-text-secondary font-medium leading-tight line-clamp-2 sm:truncate sm:line-clamp-none">{label}</p>
         </div>
       </div>
       
@@ -1494,9 +1494,9 @@ function SystemStat({ icon: Icon, label, value, status }) {
         }`}>
           <Icon size={10} className={status === 'online' ? 'status-success-text' : 'status-danger-text'} weight="bold" />
         </div>
-        <span className="text-[10px] text-text-tertiary uppercase tracking-wide font-medium">{label}</span>
+        <span className="text-xs text-text-tertiary uppercase tracking-wide font-medium">{label}</span>
       </div>
-      <p className={`text-[11px] font-semibold mt-0.5 ${
+      <p className={`text-xs font-semibold mt-0.5 ${
         status === 'online' ? 'status-success-text' : 'status-danger-text'
       }`}>{value}</p>
     </div>

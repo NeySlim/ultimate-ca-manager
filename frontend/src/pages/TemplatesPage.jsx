@@ -699,7 +699,7 @@ export default function TemplatesPage() {
               type="file"
               accept=".json"
               onChange={(e) => { setImportFile(e.target.files[0]); setImportJson('') }}
-              className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-white hover:file:bg-accent-primary-op80"
+              className="w-full text-sm text-text-secondary file:mr-4 file:py-1.5 file:px-3 file:rounded-sm file:border-0 file:text-sm file:bg-accent-primary file:text-on-accent hover:file:bg-accent-primary-op80"
             />
           </div>
           

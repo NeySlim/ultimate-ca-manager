@@ -2599,6 +2599,12 @@
     "appearanceSubtitle": "Customize UCM appearance and language",
     "colorTheme": "Color Theme",
     "colorThemeDesc": "Choose a color scheme according to your preferences",
+    "themeFamilies": {
+      "atelier": "Atelier",
+      "aurore": "Aurore",
+      "purple": "Purple Night",
+      "sunset": "Orange Sunset"
+    },
     "appearanceMode": "Appearance Mode",
     "appearanceModeDesc": "Control how the interface brightness adapts",
     "followSystem": "Follow System",

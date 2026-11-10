@@ -85,7 +85,7 @@ export default function UserSecurityKeys({ user }) {
               <div key={key.id} className="flex items-center justify-between p-2 bg-tertiary-50 border border-border rounded-lg">
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-medium text-text-primary truncate">{key.name}</p>
-                  <p className="text-[10px] text-text-tertiary">
+                  <p className="text-xs text-text-tertiary">
                     {t('common.created')} {formatDate(key.created_at)}
                   </p>
                 </div>

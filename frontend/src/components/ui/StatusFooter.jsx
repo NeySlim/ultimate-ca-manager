@@ -49,7 +49,7 @@ export function StatusFooter() {
             {/* Window count badge */}
             <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-accent-primary-op10 mr-0.5">
               <SquaresFour size={12} weight="duotone" className="text-accent-primary" />
-              <span className="text-[11px] font-semibold text-accent-primary">{windowCount}</span>
+              <span className="text-xs font-semibold text-accent-primary">{windowCount}</span>
             </div>
 
             <button
@@ -77,7 +77,7 @@ export function StatusFooter() {
             </button>
           </>
         ) : (
-          <span className="text-[11px] text-text-tertiary">{t('windows.noWindows', 'No windows open')}</span>
+          <span className="text-xs text-text-tertiary">{t('windows.noWindows', 'No windows open')}</span>
         )}
       </div>
 
@@ -91,7 +91,7 @@ export function StatusFooter() {
             onChange={toggleSameWindow}
             className="w-3 h-3 rounded border-border accent-accent-primary cursor-pointer"
           />
-          <span className="text-[11px] text-text-tertiary group-hover:text-text-secondary transition-colors">
+          <span className="text-xs text-text-tertiary group-hover:text-text-secondary transition-colors">
             {t('windows.sameWindow', 'Same window')}
           </span>
         </label>
@@ -104,7 +104,7 @@ export function StatusFooter() {
             onChange={toggleCloseOnNav}
             className="w-3 h-3 rounded border-border accent-accent-primary cursor-pointer"
           />
-          <span className="text-[11px] text-text-tertiary group-hover:text-text-secondary transition-colors">
+          <span className="text-xs text-text-tertiary group-hover:text-text-secondary transition-colors">
             {t('windows.closeOnNav', 'Close on navigate')}
           </span>
         </label>

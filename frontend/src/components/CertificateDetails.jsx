@@ -449,12 +449,12 @@ export function CertificateDetails({
             )}
             {cert.chain_status.chain?.length > 0 && (
               <div className="flex items-center gap-1 text-xs flex-wrap mt-1">
-                <span className="px-2 py-0.5 rounded icon-bg-blue text-[10px]">{cert.common_name || 'Leaf'}</span>
+                <span className="px-2 py-0.5 rounded icon-bg-blue text-xs">{cert.common_name || 'Leaf'}</span>
                 {cert.chain_status.chain.map((link, i) => (
                   <span key={i} className="flex items-center gap-1">
                     <span className="text-text-tertiary">→</span>
                     <span className={cn(
-                      "px-2 py-0.5 rounded text-[10px]",
+                      "px-2 py-0.5 rounded text-xs",
                       link.type === 'trust_store' ? 'icon-bg-amber' : 'icon-bg-emerald'
                     )}>{link.name}</span>
                   </span>
@@ -463,7 +463,7 @@ export function CertificateDetails({
             )}
             {cert.chain_status.status === 'incomplete' && (
               <div className="mt-2 p-2 rounded-lg bg-accent-warning-op5 border border-accent-warning-op20">
-                <p className="text-[11px] text-text-secondary">
+                <p className="text-xs text-text-secondary">
                   {t('details.chainIncompleteHint')}
                 </p>
                 {onAddToTrustStore && cert.caref && (

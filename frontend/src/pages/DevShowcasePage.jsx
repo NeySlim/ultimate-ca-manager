@@ -819,7 +819,7 @@ export default function DevShowcasePage() {
                     opacity: 0.7,
                   }}
                 />
-                <span className="text-[10px] text-[var(--text-tertiary)]">{s * 4}px</span>
+                <span className="text-xs text-[var(--text-tertiary)]">{s * 4}px</span>
               </div>
             ))}
           </div>

@@ -998,7 +998,7 @@ function SearchBar({
                       'w-4 h-4 rounded border flex items-center justify-center',
                       hiddenColumns?.includes(col.key)
                         ? 'border-border bg-bg-secondary'
-                        : 'border-accent-primary bg-accent-primary text-white'
+                        : 'border-accent-primary bg-accent-primary text-on-accent'
                     )}>
                       {!hiddenColumns?.includes(col.key) && <Check size={10} weight="bold" />}
                     </span>
@@ -1105,7 +1105,7 @@ function SearchBar({
                       <button
                         onClick={savePreset}
                         disabled={!presetName?.trim()}
-                        className="flex-1 h-6 text-xs rounded bg-accent-primary text-white hover:bg-accent-primary-op90 disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex-1 h-6 text-xs rounded bg-accent-primary text-on-accent hover:bg-accent-primary-op90 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         {t('common.save')}
                       </button>
@@ -1391,7 +1391,7 @@ function DesktopTable({
                   onClick={() => sortable && col.sortable !== false && onSort(col.key)}
                   style={style}
                   className={cn(
-                    'text-left text-[11px] font-medium text-text-tertiary tracking-wide',
+                    'text-left text-xs font-medium text-text-tertiary tracking-wide',
                     'relative group',
                     col.compact ? 'px-1 py-1.5' : dStyle.header,
                     'transition-colors duration-200',

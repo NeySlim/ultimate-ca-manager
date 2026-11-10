@@ -495,7 +495,7 @@ export default function CAsPage() {
                         className={cn(
                           'flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium transition-colors',
                           viewMode === mode
-                            ? 'bg-accent-primary text-white'
+                            ? 'bg-accent-primary text-on-accent'
                             : 'text-text-secondary hover:text-text-primary hover:bg-bg-tertiary'
                         )}
                         title={tip}
