@@ -457,9 +457,12 @@ class RestoreCoreMixin:
 
     @staticmethod
     def _check_serial_duplicates(backup_data: Dict[str, Any]) -> None:
-        """An archive of an installation whose migration 142 is pending carries
-        serials the unique (caref, serial_number) index refuses: named before any write."""
-        from utils.serial_duplicates import CLEANUP, describe, duplicates_in_rows
+        """Refused before any write only when the target carries the unique
+        (caref, serial_number) index; a target whose migration 142 is pending accepts them."""
+        from sqlalchemy import inspect
+        from utils.serial_duplicates import CLEANUP, INDEX, describe, duplicates_in_rows
+        if not any(ix.get('name') == INDEX for ix in inspect(db.engine).get_indexes('certificates')):
+            return
         rows = backup_data.get('certificates')
         duplicates = duplicates_in_rows(r for r in rows if isinstance(r, dict)) \
             if isinstance(rows, list) else []

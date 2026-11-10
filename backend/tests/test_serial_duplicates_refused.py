@@ -91,6 +91,26 @@ def test_a_restore_refuses_an_archive_with_duplicate_serials(app, create_ca):
             db.session.commit()
 
 
+def test_a_target_without_the_index_restores_an_archive_with_duplicate_serials(app, create_ca):
+    """An installation whose migration 142 is pending restores its own backups."""
+    caref = create_ca(cn=f'Dup pending {uuid.uuid4().hex[:6]}')['refid']
+    refids = [f'dup-pending-{uuid.uuid4().hex[:8]}' for _ in range(2)]
+    with app.app_context():
+        db.session.execute(text(f'DROP INDEX {_migration().INDEX}'))
+        db.session.commit()
+        blob = _forged(['certificates'], certificates=[
+            {'refid': r, 'descr': 'duplicate serial', 'caref': caref, 'serial_number': SERIAL,
+             'cert_type': 'server_cert'} for r in refids])
+        try:
+            _service().restore_backup(blob, PASSWORD, mode='merge')
+            assert Certificate.query.filter(Certificate.refid.in_(refids)).count() == 2
+        finally:
+            db.session.rollback()
+            Certificate.query.filter(Certificate.refid.in_(refids)).delete()
+            db.session.execute(text(_migration().CREATE_INDEX))
+            db.session.commit()
+
+
 def test_a_pending_serial_index_is_logged_at_start_and_shown_by_health(app, client, caplog):
     import json
     import logging
