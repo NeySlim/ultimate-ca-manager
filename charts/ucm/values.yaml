@@ -1,7 +1,8 @@
 # Default values for the UCM Helm chart.
-# UCM is a single-instance application: it ships a background scheduler that is
-# not yet HA-safe and defaults to a local SQLite database. Keep replicaCount at
-# 1 (see the HA note in README.md).
+# UCM defaults to a single instance on a local SQLite database: keep replicaCount
+# at 1. UCM_HA=1 (extraEnv) is an HA preview: the node requires PostgreSQL,
+# SECRET_KEY and KEY_ENCRYPTION_KEY, refuses host-local operations and reports
+# ha, node_id and leader in its probes. Full HA arrives in later releases.
 
 image:
   repository: neyslim/ultimate-ca-manager
@@ -154,7 +155,7 @@ resources:
   limits:
     memory: 1Gi
 
-## Probes hit https://:8443/health (UCM serves a self-signed cert; the HTTPS
+## Liveness hits /health/live and readiness /health/ready on https://:8443 (UCM serves a self-signed cert; the HTTPS
 ## scheme tells the kubelet to skip verification).
 livenessProbe:
   enabled: true

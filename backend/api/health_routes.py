@@ -15,6 +15,17 @@ health_bp = Blueprint('health', __name__)
 _started_at = time.time()
 
 
+def _ha_fields():
+    from config.settings import Config
+    leader = None
+    try:
+        from services.scheduler_service import is_leader
+        leader = is_leader()
+    except Exception:
+        pass
+    return {'ha': bool(Config.HA_MODE), 'node_id': Config.NODE_ID, 'leader': leader}
+
+
 @health_bp.route('/api/v2/health')
 @health_bp.route('/api/health')
 @health_bp.route('/health')
@@ -42,6 +53,7 @@ def health():
         'started_at': _started_at,
         'websocket': ws_ready,
         'fips_active': fips_mode.enabled(),
+        **_ha_fields(),
     }
     if current_app.config.get('SAFE_MODE'):
         result['safe_mode'] = True
@@ -59,6 +71,13 @@ def readiness():
     Checks database connectivity and required services.
     Returns 200 if ready, 503 if not.
     """
+    if current_app.config.get('SAFE_MODE'):
+        return jsonify({
+            'status': 'safe_mode',
+            'reason': current_app.config.get('SAFE_MODE_REASON', 'encryption_key_missing'),
+            **_ha_fields(),
+        }), 503
+
     checks = {
         'database': _check_database(),
         'filesystem': _check_filesystem(),
@@ -73,7 +92,8 @@ def readiness():
     
     return jsonify({
         'status': 'ready' if all_ok else 'not_ready',
-        'checks': checks
+        'checks': checks,
+        **_ha_fields(),
     }), 200 if all_ok else 503
 
 

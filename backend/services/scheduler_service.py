@@ -667,6 +667,18 @@ def _read_state() -> dict:
         return {}
 
 
+def is_leader():
+    """Whether this node's scheduler loop is live: True/False, None when unknown.
+
+    Under gunicorn the loop lives in another process, so its fresh state file is the evidence.
+    """
+    if _scheduler is None:
+        return None
+    if _scheduler._delegated():
+        return not _scheduler.state_is_stale()
+    return bool(_scheduler._owns_lock)
+
+
 def start_scheduler(app) -> bool:
     """Start the loop in this process, unless the scheduler process runs it.
 
