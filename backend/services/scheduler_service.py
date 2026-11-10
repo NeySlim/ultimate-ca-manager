@@ -130,14 +130,18 @@ class SchedulerService:
     - Integration with Flask app context
     """
     
-    def __init__(self, wake_interval: int = 60):
+    def __init__(self, wake_interval: int = 60, node_id: Optional[str] = None):
         """
         Initialize scheduler
         
         Args:
             wake_interval: How often scheduler wakes up to check tasks (in seconds)
+            node_id: This node's name in HA mode (default: Config.NODE_ID)
         """
         self.wake_interval = wake_interval
+        self._node_id = node_id
+        # HA: the PostgreSQL leader lock; None means the host lock (flock / pid file)
+        self._leader_lock = None
         self.tasks: Dict[str, ScheduledTask] = {}
         self.tasks_lock = Lock()
         self._thread: Optional[threading.Thread] = None
@@ -414,6 +418,38 @@ class SchedulerService:
                 return status, result.get('reason')
         return 'ok', None
 
+    @property
+    def node_id(self) -> str:
+        if self._node_id:
+            return self._node_id
+        from config.settings import Config
+        return Config.NODE_ID
+
+    def _singleton_lock(self):
+        """SingletonLock: the PostgreSQL advisory lock in HA mode, the host lock otherwise."""
+        from utils.ha import ha_enabled
+        if not ha_enabled():
+            return _HostLock(self)
+        if self._leader_lock is None:
+            from services.scheduler_leader import PgAdvisoryLock, application_url
+            if self._app is not None:
+                with self._app.app_context():
+                    url = application_url()
+            else:
+                url = application_url()
+            self._leader_lock = PgAdvisoryLock(url)
+        return self._leader_lock
+
+    def _still_leader(self, lock) -> bool:
+        """Checked before every task: once the lock is gone no task starts here."""
+        if lock.still_held():
+            return True
+        if self._owns_lock:
+            logger.error(f"Scheduler leadership lost on node {self.node_id}: no task starts here "
+                         "until the lock is taken again")
+            self._release_lock()
+        return False
+
     def _scheduler_loop(self) -> None:
         """Main scheduler loop - runs in background thread"""
         logger.info("Scheduler thread started")
@@ -426,11 +462,17 @@ class SchedulerService:
                     logger.info("Scheduler loop detected in a forked process; exiting")
                     self._running = False
                     break
+                lock = self._singleton_lock()
+                if self._owns_lock and not self._still_leader(lock):
+                    self._wake.wait(LOCK_RETRY_SECONDS)
+                    continue
                 if not self._owns_lock:
-                    if not self._acquire_singleton_lock():
+                    if not lock.acquire():
                         self._wake.wait(LOCK_RETRY_SECONDS)
                         continue
-                    logger.info(f"Scheduler lock acquired: pid {os.getpid()} runs the scheduled tasks")
+                    self._owns_lock, self._owner_pid = True, os.getpid()
+                    logger.info(f"Scheduler lock acquired: pid {os.getpid()} on node {self.node_id} "
+                                "runs the scheduled tasks")
                     self._publish_state()
                 try:
                     requested = self._take_requests() if supervised() else []
@@ -442,7 +484,7 @@ class SchedulerService:
 
                     # Execute tasks outside of lock
                     for task in tasks_to_run:
-                        if not self._running:
+                        if not self._running or not self._still_leader(lock):
                             break
                         try:
                             self._run_task(task)
@@ -549,6 +591,8 @@ class SchedulerService:
         if not self._owns_lock or self._owner_pid != os.getpid():
             return
         self._owns_lock = False
+        if self._leader_lock is not None:
+            self._leader_lock.release()
         if self._lock_fd is not None:
             fd, self._lock_fd = self._lock_fd, None
             try:
@@ -617,6 +661,22 @@ class SchedulerService:
         self._release_lock()
         logger.info("Scheduler stopped")
         return True
+
+
+class _HostLock:
+    """SingletonLock on this host: the scheduler's flock, or its pid file without flock."""
+
+    def __init__(self, scheduler: SchedulerService):
+        self._scheduler = scheduler
+
+    def acquire(self) -> bool:
+        return self._scheduler._acquire_singleton_lock()
+
+    def still_held(self) -> bool:
+        return self._scheduler._owns_lock  # the kernel keeps an flock for as long as the fd
+
+    def release(self) -> None:
+        self._scheduler._release_lock()
 
 
 # Global scheduler instance
