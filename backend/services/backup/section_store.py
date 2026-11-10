@@ -35,7 +35,10 @@ STALE_AFTER_SECONDS = 3600
 
 
 def store_directory(spool: Optional[str] = None) -> Optional[str]:
-    """`DATA_DIR/tmp`, where uploads already spool; the system temp dir (None) otherwise."""
+    """The upload spool dir, else `DATA_DIR/tmp` if the upload spool probe accepts it.
+
+    None means the system temp dir: stores are created and swept in the same place.
+    """
     try:
         from flask import current_app
         spool = spool or current_app.config.get('UPLOAD_SPOOL_DIR')
@@ -46,10 +49,9 @@ def store_directory(spool: Optional[str] = None) -> Optional[str]:
         pass
     try:
         from config.settings import Config
-        path = os.path.join(str(Config.DATA_DIR), 'tmp')
-        os.makedirs(path, 0o700, exist_ok=True)
-        return path
-    except (AttributeError, OSError):
+        from utils import upload_spool
+        return upload_spool.prepare_spool_dir(Config.DATA_DIR)
+    except (AttributeError, ImportError):
         return None
 
 

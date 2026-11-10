@@ -231,21 +231,42 @@ def test_eviction_does_not_depend_on_the_interpreters_reference_counts(
     assert 'users' not in store._loaded
 
 
-def test_startup_sweeps_the_fallback_directory_when_no_spool_dir(monkeypatch):
-    from pathlib import Path
+def test_startup_sweeps_the_fallback_directory_when_no_spool_dir(tmp_path, monkeypatch):
+    import tempfile
 
-    from config.settings import Config
     from services.backup.section_store import STALE_AFTER_SECONDS
     from tests.fresh_app import fresh_app
     monkeypatch.setattr('utils.upload_spool.prepare_spool_dir', lambda _d: None)
-    fallback = Path(Config.DATA_DIR) / 'tmp'
-    fallback.mkdir(parents=True, exist_ok=True)
-    stale = fallback / '.ucm_restore_from_a_killed_worker'
-    stale.mkdir(exist_ok=True)
+    monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
+    stale = tmp_path / '.ucm_restore_from_a_killed_worker'
+    stale.mkdir()
     old = os.stat(stale).st_mtime - STALE_AFTER_SECONDS - 60
     os.utime(stale, (old, old))
     with fresh_app():
         assert not stale.exists()
+
+
+def test_store_directory_is_none_when_the_spool_probe_fails(monkeypatch):
+    from services.backup import section_store
+    monkeypatch.setattr('utils.upload_spool.prepare_spool_dir', lambda _d: None)
+    assert section_store.store_directory() is None
+
+
+def test_an_unwritable_data_tmp_is_not_a_store_directory(tmp_path, monkeypatch):
+    from config.settings import Config
+    from services.backup import section_store
+    spool = tmp_path / 'tmp'
+    spool.mkdir()
+    spool.chmod(0o500)
+    try:
+        if os.access(spool, os.W_OK):
+            pytest.skip('this process writes into a 0500 directory (root)')
+        monkeypatch.setattr(Config, 'DATA_DIR', tmp_path)
+        assert section_store.store_directory() is None
+    finally:
+        spool.chmod(0o700)
+
+
 def test_no_sweep_when_the_lock_cannot_be_taken(tmp_path, monkeypatch):
     from services.backup import section_store
 

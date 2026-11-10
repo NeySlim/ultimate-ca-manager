@@ -298,6 +298,33 @@ class TestThroughTheService:
         assert os.listdir(tmp_path) == []
 
 
+    def test_a_restore_runs_in_the_system_temp_dir_when_the_spool_is_unusable(
+            self, app, tmp_path, monkeypatch):
+        import tempfile
+
+        from services.backup import section_store
+        monkeypatch.setattr('utils.upload_spool.prepare_spool_dir', lambda _d: None)
+        monkeypatch.setitem(app.config, 'UPLOAD_SPOOL_DIR', None)
+        monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
+        made = []
+        real = tempfile.mkdtemp
+
+        def spy(*args, **kwargs):
+            path = real(*args, **kwargs)
+            if kwargs.get('prefix') == section_store.STORE_PREFIX:
+                made.append(path)
+            return path
+
+        monkeypatch.setattr(tempfile, 'mkdtemp', spy)
+        with app.app_context():
+            from services.backup_service import BackupService
+            service = BackupService()
+            blob = service.create_backup(PASSWORD, include={
+                name: False for name in container_sections()})
+            service.restore_backup(blob, PASSWORD, mode='merge')
+        assert made
+        assert all(path.startswith(str(tmp_path) + os.sep) for path in made)
+
 def container_sections():
     from services.backup.manifest import SECTIONS as MANIFEST
     return list(MANIFEST)
