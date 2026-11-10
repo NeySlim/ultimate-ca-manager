@@ -690,9 +690,10 @@ def _approval_gate(ca, csr, operation, identity, extra=None):
     """``(response, approval)``: the answer for a request a policy holds
     (RFC 7030 §4.2.3: 202 with Retry-After while pending, the certificate
     once approved, 403 once rejected), or ``(None, None)`` to issue now;
-    ``(None, approval)`` for an approved server key generation, issued now
-    and then marked delivered. The client sends the same request again: it
-    is found by its CSR, CA, operation and identity."""
+    ``(None, approval)`` for an approved server key generation, claimed
+    (marked delivered) before its key is generated, so two retries never
+    generate twice. The client sends the same request again: it is found by
+    its CSR, CA, operation and identity."""
     from services import protocol_approval
     cn, dns = protocol_approval.csr_names(csr)
     ref = _request_ref(ca, csr, operation, identity)
