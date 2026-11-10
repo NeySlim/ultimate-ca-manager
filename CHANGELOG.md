@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- HA preview: `UCM_HA=1` enables an HA preview: the node requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, refuses operations that only change the local host, and reports `ha`, `node_id` and `leader` in `/health`. Full high availability arrives in later releases. The Helm chart now probes readiness on `/health/ready` (503 in safe mode) and liveness on `/health/live`.
+
 ### Fixed
 
 - Certificate Transparency: `POST /api/v2/certificates/<id>/submit-ct` always failed with a server error, as it read an attribute the certificate model does not have, and the chain it built stopped at the direct issuer; the submission now sends the leaf with its full issuer chain up to the root, or the chain stored inline with the certificate, one element per certificate (RFC 6962 §4.1). Reported by Chris by e-mail.

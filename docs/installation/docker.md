@@ -145,6 +145,8 @@ volumes:
 | `UCM_LOG_BACKUPS` | `5` | Generations of `ucm.log` kept in the data volume |
 | `UCM_SECRET_KEY` | auto-generated | Session secret key |
 | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use an external PostgreSQL 13+ instance instead of the bundled SQLite. |
+| `UCM_HA` | (unset) | `1` enables HA mode in preview: refuses host-local operations; full high availability arrives in later releases. Requires `DATABASE_URL` (PostgreSQL), `SECRET_KEY` and `KEY_ENCRYPTION_KEY` |
+| `UCM_NODE_ID` | container hostname | Node name reported as `node_id` by `/health` |
 | `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive a restore accepts and reads, in MB; its decompressed content may be four times that. Every other request keeps the 50 MB limit. |
 
 See full list in [docker-compose.yml](../../docker-compose.yml). SMTP, ACME, the session timeout and the other application settings are configured in the web interface.

@@ -41,6 +41,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `image.repository` | `neyslim/ultimate-ca-manager` | Image repo |
 | `image.tag` | `""` (→ chart `appVersion`) | Image tag |
 | `replicaCount` | `1` | Keep at 1 (see above) |
+| `extraEnv` `UCM_HA` / `UCM_NODE_ID` | unset | `UCM_HA=1`: HA mode in preview: refuses host-local operations; full high availability arrives in later releases. Needs `database.type=postgresql`, `secrets.secretKey` and `KEY_ENCRYPTION_KEY`. `UCM_NODE_ID` defaults to the pod name |
 | `fqdn` | `ucm.local` | FQDN for the self-signed UI cert / default AIA-CRL-OCSP base URL |
 | `initialAdminPassword` | `""` (→ image default `changeme123`) | First-boot admin password |
 | `secrets.secretKey` | `""` (auto-generated + persisted) | Flask session secret |
