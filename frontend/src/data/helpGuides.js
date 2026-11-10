@@ -780,7 +780,7 @@ UCM caches OCSP responses for performance. The cache is:
 
 ### Delegated OCSP Responder
 
-By default, OCSP responses are signed with the CA key itself. A **delegated responder** uses a dedicated certificate with the **OCSPSigning** EKU instead: assign one per CA from the CA in the inspector (only certificates carrying the OCSPSigning EKU and a private key are eligible).
+By default, OCSP responses are signed with the CA key itself. A **delegated responder** uses a dedicated certificate with the **OCSPSigning** EKU instead: assign one per CA: select the CA in the list on this page and use its **Delegated OCSP Responder** section (only certificates carrying the OCSPSigning EKU and a private key are eligible).
 
 **Automatic renewal**: a daily task re-issues the responder certificate before it expires, same key pair and extensions, renewed at par, and rebinds the CA's responder configuration to the new certificate. Short-lived OCSP signing certificates (e.g. a 90-day template) rotate without manual action. Enabled by default; it can be disabled and the renewal window tuned in Settings › Security.
 
@@ -798,7 +798,7 @@ http://your-server:8080/ca/{ca_refid}.cer   (DER format)
 http://your-server:8080/ca/{ca_refid}.pem   (PEM format)
 \`\`\`
 
-Enable CA Issuers per CA in the **AIA CA Issuers** section of the CA in the inspector. The URL is automatically generated using the HTTP protocol server and the configured FQDN.
+Enable CA Issuers per CA in the **AIA CA Issuers** section of that CA's panel on this page. The URL is automatically generated using the HTTP protocol server and the configured FQDN.
 
 > ⚠️ **Prerequisite**: Protocol URLs (CDP, OCSP, AIA) require a valid **FQDN** or a configured **Protocol Base URL** in Settings → General. If you access UCM via \`localhost\`, enabling these features will fail, set the FQDN first.
 

@@ -28,7 +28,7 @@ const entries = [
   ...Object.entries(helpContent).map(([k, v]) => [`content ${k}`, v]),
 ]
 
-// The SSH CAs page keeps its own detail panel, outside the inspector
+// The SSH CAs and CRL & OCSP pages keep their own CA panel, outside the inspector
 const INSPECTOR_ONLY = /CA'?s? detail panels?/i
 
 describe('English help vs the 3.0 interface', () => {
@@ -36,8 +36,13 @@ describe('English help vs the 3.0 interface', () => {
     let text = strings(entry).join('\n')
     ALLOWED.forEach((re) => { text = text.replace(re, '') })
     const hits = RETIRED.filter((re) => re.test(text)).map(String)
-    if (!/sshCas$/.test(_name) && INSPECTOR_ONLY.test(text)) hits.push(String(INSPECTOR_ONLY))
+    if (!/(sshCas|crlocsp)$/.test(_name) && INSPECTOR_ONLY.test(text)) hits.push(String(INSPECTOR_ONLY))
     expect(hits).toEqual([])
+  })
+
+  it('crlocsp points to the page CA panel, not the inspector', () => {
+    const text = [...strings(helpGuides.crlocsp), ...strings(helpContent.crlocsp)].join('\n')
+    expect(text).not.toMatch(/CA in the inspector/i)
   })
 
   it('no entry still labels the overview "Dashboard"', () => {

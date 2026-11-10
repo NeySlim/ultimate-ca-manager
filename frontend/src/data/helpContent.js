@@ -511,7 +511,7 @@ export const helpContent = {
           { label: 'Cache', text: 'Response cache with automatic daily cleanup of expired entries' },
           { label: 'Total Queries', text: 'Number of OCSP requests answered since the service started, and how many were served from the cache' },
           { label: 'HTTP caching', text: 'An answer without a nonce can be kept by HTTP caches until its nextUpdate, an hour at most (RFC 5019 §6.2: Expires, Last-Modified, ETag); an answer with a nonce is not reused' },
-          { label: 'Delegated Responder', text: 'Sign responses with a dedicated OCSPSigning certificate instead of the CA key, assign one per CA from the CA in the inspector' },
+          { label: 'Delegated Responder', text: 'Sign responses with a dedicated OCSPSigning certificate instead of the CA key, assign one per CA from its panel on this page' },
           { label: 'Responder Auto-Renewal', text: 'A daily task re-issues the delegated responder certificate before expiry (same key pair, renewed at par) and rebinds it, enabled by default. The switch and its window (days before expiry, default 30) are in Settings › Security' },
         ]
       },
