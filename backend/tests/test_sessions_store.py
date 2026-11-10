@@ -167,3 +167,33 @@ def test_a_failing_request_does_not_commit_its_pending_work_through_the_store(sq
 
     with app.app_context():
         assert SystemConfig.query.filter_by(key='zz_probe').count() == 0
+
+
+def test_the_store_never_waits_on_the_request_pool(monkeypatch, tmp_path):
+    """A request holding its one pool connection can still save its session."""
+    from config.settings import TestingConfig
+    from tests import pg_app_harness
+    from tests.conftest import clear_admin_password_flag
+
+    if pg_app_harness.ENABLED:
+        pytest.skip('file-database fixture, not meaningful in PostgreSQL mode')
+    monkeypatch.setattr(TestingConfig, 'SQLALCHEMY_DATABASE_URI', f'sqlite:///{tmp_path / "p.db"}')
+    monkeypatch.setattr(TestingConfig, 'SQLALCHEMY_ENGINE_OPTIONS',
+                        {'pool_size': 1, 'max_overflow': 0, 'pool_timeout': 2})
+    monkeypatch.setattr(TestingConfig, 'SESSION_TYPE', 'sqlalchemy')
+    monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions', raising=False)
+    from app import create_app
+    from models import db
+    app = create_app('testing')
+    app.config['PROPAGATE_EXCEPTIONS'] = False
+    try:
+        clear_admin_password_flag(app)
+        client = app.test_client()
+        login = client.post('/api/v2/auth/login/password', content_type='application/json',
+                            data=json.dumps({'username': 'admin', 'password': 'changeme123'}))
+        assert login.status_code == 200, login.data
+        assert client.get('/api/v2/account/profile').status_code == 200
+    finally:
+        with app.app_context():
+            db.session.remove()
+            db.engine.dispose()
