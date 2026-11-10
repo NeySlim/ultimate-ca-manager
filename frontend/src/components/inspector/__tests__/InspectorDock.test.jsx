@@ -175,6 +175,20 @@ describe('InspectorDock', () => {
     expect(screen.queryByTestId('inspector-dock')).toBeNull()
   })
 
+  it('keeps the focus in the dock when an inactive object closes from its own button', async () => {
+    renderDock()
+    fireEvent.click(screen.getByText('open-1'))
+    await screen.findByText('one.example.com:overview')
+    fireEvent.click(screen.getByText('open-2'))
+    await screen.findByText('two.example.com:overview')
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'two.example.com' })).toHaveFocus())
+    const closeOne =screen.getAllByRole('button', { name: 'inspector.closeTab' })[0]
+    closeOne.focus()
+    fireEvent.click(closeOne)
+    await waitFor(() => expect(screen.queryByRole('tab', { name: 'one.example.com' })).toBeNull())
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'two.example.com' })).toHaveFocus())
+  })
+
   it('resizes from the keyboard within its limits and remembers the size', async () => {
     renderDock()
     fireEvent.click(screen.getByText('open-1'))

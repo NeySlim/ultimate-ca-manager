@@ -85,13 +85,16 @@ export function InspectorProvider({ children }) {
     const next = list.filter((o) => o.key !== key)
     const origin = origins.current.get(key)
     origins.current.delete(key)
+    const focused = document.activeElement
+    const focusInDock = !focused || focused === document.body || !!focused.closest?.('[data-testid="inspector-dock"]')
     openedRef.current = next
     setOpened(next)
     setActiveKey((cur) => (cur === key ? (next[Math.min(idx, next.length - 1)]?.key ?? null) : cur))
     // Last object closed: the focus goes back to the control that opened it
     if (!next.length && origin?.isConnected) queueMicrotask(() => origin.focus())
-    // Another object stays open: its tab takes the focus the closed one held
-    else if (next.length && key === activeRef.current) setFocusToken((n) => n + 1)
+    // Another object stays open: the active tab takes the focus if the closed object
+    // held it or the focus sat in the dock (an inactive tab's own close button)
+    else if (next.length && (key === activeRef.current || focusInDock)) setFocusToken((n) => n + 1)
   }, [])
 
   const closeAll = useCallback(() => {
