@@ -125,7 +125,9 @@ def schedule_restart(delay_seconds: int = 1) -> Tuple[bool, str]:
         Tuple[bool, str]: (success, message)
     """
     # Create restart signal file
-    from config.settings import DATA_DIR
+    from config.settings import DATA_DIR, Config
+    if Config.HA_MODE:
+        return False, "Service restart not available in HA mode. Restart the node manually."
     
     try:
         restart_signal = DATA_DIR / '.restart_requested'

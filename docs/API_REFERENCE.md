@@ -4005,7 +4005,10 @@ GET /api/v2/health
   "version": "2.1.0",
   "started_at": 1707123456.789,
   "websocket": true,
-  "fips_active": false
+  "fips_active": false,
+  "ha": false,
+  "node_id": "ucm-1",
+  "leader": true
 }
 ```
 
@@ -4017,13 +4020,17 @@ GET /api/v2/health
 | `started_at` | Unix timestamp when the service started |
 | `websocket` | Indicates whether the WebSocket (Socket.IO) server is initialized and ready to accept connections |
 | `fips_active` | `true` when FIPS mode is in force (`UCM_FIPS=1` on an active FIPS provider); versions are only in the authenticated service status |
+| `ha` | `true` when the node runs with `UCM_HA` |
+| `node_id` | Node identifier (`UCM_NODE_ID`, defaults to the hostname) |
+| `leader` | `true` when this node runs the scheduler, `false` when it does not, `null` when unknown |
+| `safe_mode`, `safe_mode_reason` | Present only in safe mode |
 
 ### Readiness Check
 ```http
 GET /api/v2/health/ready
 ```
 
-Verifies the application can serve traffic (database, filesystem). Returns 200 if ready, 503 if not.
+Verifies the application can serve traffic (database, filesystem, Redis when configured). Returns 200 if ready, 503 if not. The response also carries `ha`, `node_id` and `leader` as above.
 
 **Response:**
 ```json
@@ -4032,9 +4039,14 @@ Verifies the application can serve traffic (database, filesystem). Returns 200 i
   "checks": {
     "database": { "status": "ok" },
     "filesystem": { "status": "ok" }
-  }
+  },
+  "ha": false,
+  "node_id": "ucm-1",
+  "leader": true
 }
 ```
+
+In safe mode, `status` is `"safe_mode"`, `reason` gives the cause and `checks` is still reported. The code is 503 with `UCM_HA` or when a check fails, otherwise 200 so a single node keeps serving the safe-mode UI.
 
 ### Liveness Check
 ```http

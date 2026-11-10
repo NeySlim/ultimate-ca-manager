@@ -5,6 +5,7 @@ System Security Operations
 from . import bp
 from flask import request, current_app, Response
 from auth.unified import require_auth
+from utils.ha import reject_in_ha
 from config.settings import Config
 from utils.response import success_response, error_response
 from utils.trusted_proxy import client_ip
@@ -14,7 +15,7 @@ from services.database_admin.lock import (
     MigrationBusyError,
     database_migration_lock,
 )
-from services.database_admin.persistence import update_env_file
+from services.database_admin.persistence import update_env_file, env_file_path
 from pathlib import Path
 import os
 import shutil
@@ -61,6 +62,7 @@ def get_encryption_status():
 
 @bp.route('/api/v2/system/security/enable-encryption', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def enable_encryption():
     """
     Enable private key encryption.
@@ -209,6 +211,7 @@ def download_master_key():
 
 @bp.route('/api/v2/system/security/disable-encryption', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def disable_encryption():
     """
     Disable private key encryption.
@@ -301,6 +304,7 @@ def disable_encryption():
 
 @bp.route('/api/v2/system/security/encrypt-all-keys', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def encrypt_all_keys():
     """Encrypt all unencrypted private keys in the database"""
     try:
@@ -455,6 +459,7 @@ def reset_rate_limits():
 
 @bp.route('/api/v2/system/security/rotate-secrets', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def rotate_secrets():
     """
     Rotate session secret key with automatic .env update.
@@ -476,17 +481,7 @@ def rotate_secrets():
         return error_response("Secret must be at least 32 characters", 400)
 
     if auto_apply:
-        # Determine .env path based on environment
-        is_docker = os.environ.get('UCM_DOCKER', '').lower() in ('1', 'true')
-        if is_docker:
-            env_path = Path('/opt/ucm/.env')
-            if not env_path.exists():
-                # Fallback for older Docker images
-                env_path = Path('/app/.env')
-                if not env_path.exists():
-                    env_path = Path('/app/backend/.env')
-        else:
-            env_path = Path('/etc/ucm/ucm.env')
+        env_path = env_file_path()
 
         if not env_path.exists():
             return error_response(f"Environment file not found: {env_path}", 500)

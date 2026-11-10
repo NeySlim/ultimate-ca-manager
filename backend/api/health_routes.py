@@ -15,6 +15,17 @@ health_bp = Blueprint('health', __name__)
 _started_at = time.time()
 
 
+def _ha_fields():
+    from config.settings import Config
+    leader = None
+    try:
+        from services.scheduler_service import is_leader
+        leader = is_leader()
+    except Exception:
+        pass
+    return {'ha': bool(Config.HA_MODE), 'node_id': Config.NODE_ID, 'leader': leader}
+
+
 @health_bp.route('/api/v2/health')
 @health_bp.route('/api/health')
 @health_bp.route('/health')
@@ -42,6 +53,7 @@ def health():
         'started_at': _started_at,
         'websocket': ws_ready,
         'fips_active': fips_mode.enabled(),
+        **_ha_fields(),
     }
     if current_app.config.get('SAFE_MODE'):
         result['safe_mode'] = True
@@ -57,23 +69,36 @@ def readiness():
     """
     Readiness check - verifies the app can serve traffic.
     Checks database connectivity and required services.
-    Returns 200 if ready, 503 if not.
+    Returns 200 if ready, 503 if a check fails. In safe mode the status is
+    'safe_mode' and the code is 503 under UCM_HA or on a failed check, else 200.
     """
+    from config.settings import Config
     checks = {
         'database': _check_database(),
         'filesystem': _check_filesystem(),
     }
-    
+
     # Optional: check Redis if configured
     redis_url = config_redis_url()
     if redis_url:
         checks['redis'] = _check_redis(redis_url)
-    
+
     all_ok = all(c.get('status') in ('ok', 'skipped') for c in checks.values())
-    
+
+    if current_app.config.get('SAFE_MODE'):
+        # Single node stays in the Service so the safe-mode UI remains reachable,
+        # but never with a broken dependency.
+        return jsonify({
+            'status': 'safe_mode',
+            'reason': current_app.config.get('SAFE_MODE_REASON', 'encryption_key_missing'),
+            'checks': checks,
+            **_ha_fields(),
+        }), (200 if all_ok and not Config.HA_MODE else 503)
+
     return jsonify({
         'status': 'ready' if all_ok else 'not_ready',
-        'checks': checks
+        'checks': checks,
+        **_ha_fields(),
     }), 200 if all_ok else 503
 
 

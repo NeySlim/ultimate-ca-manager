@@ -45,9 +45,10 @@ export function useServiceReconnect() {
 
     // Capture current started_at before restart
     let initialStartedAt = null
+    let initialNodeId = null
     fetch(HEALTH_URL, { cache: 'no-store' })
       .then(r => r.json())
-      .then(d => { initialStartedAt = d.started_at })
+      .then(d => { initialStartedAt = d.started_at; initialNodeId = d.node_id ?? null })
       .catch(() => {})
 
     // Phase 1: Countdown
@@ -59,13 +60,13 @@ export function useServiceReconnect() {
         clearInterval(countdownRef.current)
         countdownRef.current = null
         if (!cancelledRef.current) {
-          startPolling(initialStartedAt, expectedVersion)
+          startPolling(initialStartedAt, expectedVersion, initialNodeId)
         }
       }
     }, 1000)
 
     // Phase 2: Polling
-    const startPolling = (initStartedAt, expVersion) => {
+    const startPolling = (initStartedAt, expVersion, initNodeId) => {
       setStatus('connecting')
       let attempts = 0
       const deadline = Date.now() + maxWaitMs
@@ -90,7 +91,12 @@ export function useServiceReconnect() {
 
           if (resp.ok) {
             const data = await resp.json()
-            // Wait until started_at changes (service actually restarted)
+            // Another node behind a balancer has its own started_at: not a restart
+            if (initNodeId && data.node_id && data.node_id !== initNodeId) {
+              setTimeout(poll, POLL_INTERVAL)
+              return
+            }
+            // Wait until started_at changes of the same node (service actually restarted)
             if (initStartedAt && data.started_at && data.started_at <= initStartedAt) {
               setTimeout(poll, POLL_INTERVAL)
               return

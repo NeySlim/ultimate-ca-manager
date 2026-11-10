@@ -698,6 +698,10 @@ def _auto_install(result):
     latest = result['latest_version']
     if os.getenv('UCM_DOCKER') == '1' or not result.get('download_url'):
         return
+    from utils.ha import ha_enabled
+    if ha_enabled():
+        logger.info("Auto-update skipped: not available in HA mode")
+        return
     if _cfg_get(_ATTEMPTED_VERSION_KEY) == latest:
         return  # one attempt per version — no overnight crash loops
 

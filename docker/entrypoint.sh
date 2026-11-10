@@ -53,6 +53,7 @@ validate_fqdn() {
 
 # DNS UPDATE (RFC 2136) listener port check
 . "$(dirname "${BASH_SOURCE[0]}")/dns-update-port.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/ha-secret.sh"
 
 # =============================================================================
 # FIPS MODE (UCM_FIPS=1): module configuration written at every start
@@ -167,6 +168,7 @@ fi
 : "${UCM_LOG_LEVEL:="INFO"}"
 
 # Security
+check_ha_secret || exit 1
 : "${UCM_SECRET_KEY:=$(generate_secret)}"
 
 # Database

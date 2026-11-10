@@ -2,7 +2,9 @@
 Ultimate Certificate Manager - Configuration Management
 Handles all application settings with web UI configuration support
 """
+import logging
 import os
+import socket
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -36,6 +38,14 @@ def redis_url() -> Optional[str]:
     return os.getenv("REDIS_URL") or os.getenv("UCM_REDIS_URL") or None
 
 
+def env_bool(name: str, default: bool = False) -> bool:
+    """Boolean environment variable: 1/true/yes/on (any case) are true."""
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
+
+
 def is_docker():
     """Detect if running in Docker container"""
     return os.path.exists('/.dockerenv') or os.environ.get('UCM_DOCKER') == '1'
@@ -48,6 +58,10 @@ def restart_ucm_service():
     Not available in Docker — container must be restarted externally.
     Returns: (success: bool, message: str)
     """
+    if Config.HA_MODE:
+        logging.getLogger(__name__).warning(
+            "Service restart refused in HA mode: restart the node through its orchestrator")
+        return False, "Service restart not available in HA mode. Restart the node manually."
     if is_docker():
         return False, "Service restart not available in Docker. Restart the container instead."
     try:
@@ -160,6 +174,10 @@ class Config:
     # The restore routes alone accept an archive up to this size, in MiB
     BACKUP_MAX_UPLOAD_MB = backup_max_upload_mb()
     
+    # HA preview: multi-node mode refuses host-local operations (see utils/ha.py)
+    HA_MODE = env_bool("UCM_HA")
+    NODE_ID = os.getenv("UCM_NODE_ID") or socket.gethostname()
+
     # Database
     # Supports SQLite (default) or PostgreSQL for high availability
     # DATABASE_URL takes precedence (PostgreSQL), else fallback to SQLite

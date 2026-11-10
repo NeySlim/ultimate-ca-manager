@@ -112,7 +112,7 @@ spec:
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:
             httpGet:
-              path: /health
+              path: /health/live
               port: https
               scheme: HTTPS
             initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
@@ -123,7 +123,7 @@ spec:
           {{- if .Values.readinessProbe.enabled }}
           readinessProbe:
             httpGet:
-              path: /health
+              path: /health/ready
               port: https
               scheme: HTTPS
             initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
