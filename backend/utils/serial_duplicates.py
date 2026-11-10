@@ -15,8 +15,11 @@ DUPLICATES = (f"SELECT caref, serial_number, COUNT(*) FROM certificates WHERE {_
               "GROUP BY caref, serial_number HAVING COUNT(*) > 1 ORDER BY caref, serial_number")
 _IDS = (f"SELECT id FROM certificates WHERE {_COVERED} "
         "AND caref = :caref AND serial_number = :serial ORDER BY id")
-CLEANUP = ("resolve them on the source and run migration 142 again there, "
-           "as docs/CONCURRENCY.md describes")
+# Self-contained: packages ship no docs/, so the message is the procedure
+CLEANUP = ("Revoke or delete the certificates listed on the installation that holds them, until "
+           "each serial appears once under its CA. Then delete the row "
+           "'142_serial_per_ca_and_proxy_links' from the _migrations table, so the next start "
+           "runs migration 142 again and creates the index.")
 
 
 def duplicates_in_database(conn) -> List[Dict]:
@@ -66,5 +69,5 @@ def check_pending_serial_index(app) -> int:
     if count:
         logging.getLogger(__name__).warning(
             "%s: %d serial number(s) are shared by certificates of one CA, so the unique "
-            "serial index is not in place; %s", PENDING_KEY, count, CLEANUP)
+            "serial index is not in place. %s", PENDING_KEY, count, CLEANUP)
     return count

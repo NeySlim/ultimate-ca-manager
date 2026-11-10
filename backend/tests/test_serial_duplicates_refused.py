@@ -19,6 +19,13 @@ def _migration():
     return importlib.import_module('migrations.142_serial_per_ca_and_proxy_links')
 
 
+def _states_the_procedure(message):
+    """Packages ship no docs/: the message itself says how to clear the duplicates."""
+    assert 'docs/' not in message and '.md' not in message
+    assert 'Revoke or delete' in message
+    assert "'142_serial_per_ca_and_proxy_links'" in message and '_migrations' in message
+
+
 def test_the_database_listing_names_each_pair_and_its_rows():
     conn = sqlite3.connect(':memory:')
     conn.execute("CREATE TABLE certificates (id INTEGER PRIMARY KEY, caref TEXT, serial_number TEXT)")
@@ -69,6 +76,7 @@ def test_a_backend_migration_refuses_a_source_with_duplicate_serials(app, duplic
     assert not ok and stats['refusal'] == 'preflight' and stats['target_written'] is False
     assert caref in message and SERIAL in message and all(str(i) in message for i in ids)
     assert 'migration 142' in message
+    _states_the_procedure(message)
 
 
 def test_a_restore_refuses_an_archive_with_duplicate_serials(app, create_ca):
@@ -85,6 +93,7 @@ def test_a_restore_refuses_an_archive_with_duplicate_serials(app, create_ca):
             assert caref in str(refusal.value) and SERIAL in str(refusal.value)
             assert all(r in str(refusal.value) for r in refids)
             assert 'migration 142' in str(refusal.value)
+            _states_the_procedure(str(refusal.value))
             assert Certificate.query.filter(Certificate.refid.in_(refids)).count() == 0
         finally:
             Certificate.query.filter(Certificate.refid.in_(refids)).delete()
@@ -124,8 +133,9 @@ def test_a_pending_serial_index_is_logged_at_start_and_shown_by_health(app, clie
     try:
         with caplog.at_level(logging.WARNING):
             check_pending_serial_index(app)
-        assert any(PENDING_KEY in r.getMessage() and '1 serial' in r.getMessage()
-                   for r in caplog.records)
+        warning = next(r.getMessage() for r in caplog.records if PENDING_KEY in r.getMessage())
+        assert '1 serial' in warning
+        _states_the_procedure(warning)
         assert client.get('/health').get_json()['serial_unique_index_pending'] == 1
     finally:
         with app.app_context():

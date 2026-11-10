@@ -293,7 +293,7 @@ def _check_serial_duplicates() -> None:
         raise PreflightError(
             f"{len(duplicates)} serial number(s) are held by more than one certificate "
             f"of the same CA (certificate ids): {describe(duplicates)}. The migration was "
-            f"not started: the target refuses them; {CLEANUP}.")
+            f"not started: the target refuses them. {CLEANUP}")
 
 
 def _target_has_users(target_engine) -> bool:

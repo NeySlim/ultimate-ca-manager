@@ -470,7 +470,7 @@ class RestoreCoreMixin:
             raise BackupSchemaError(
                 f"The archive holds {len(duplicates)} serial number(s) shared by certificates "
                 f"of the same CA (certificate refids): {describe(duplicates)}. Nothing has been "
-                f"changed: {CLEANUP}, then take a new backup.")
+                f"changed. {CLEANUP} Then take a new backup.")
 
     @staticmethod
     def _archived_key_mismatches(backup_data: Dict[str, Any]) -> List[str]:
