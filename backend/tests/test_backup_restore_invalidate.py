@@ -10,6 +10,7 @@ import pytest
 from models import SSOSession, UserSession, User, db
 from services.backup.restore import invalidate as invalidate_module
 from services.backup.restore.invalidate import invalidate_after_restore
+from tests.test_session_cleanup_task import sql_store  # noqa: F401 (fixture)
 
 
 @pytest.fixture(autouse=True)
@@ -129,6 +130,28 @@ class TestSessionFilesAreRemoved:
 
         assert result['session_files_removed'] == 0
         assert result['caches_cleared']
+
+
+@pytest.mark.sqlite_only(reason='builds the session table through the SQLite migration path')
+class TestSqlSessionStoreIsEmptied:
+    """With the SQL store the rows are the sessions: all of them die."""
+
+    def test_flask_session_rows_are_deleted_and_counted(self, app, user_id, sql_store):
+        with app.app_context():
+            for sid in ('one', 'two', 'three'):
+                db.session.execute(db.text(
+                    "INSERT INTO flask_sessions (session_id, data, expiry) "
+                    "VALUES (:s, :d, '2999-01-01')"), {'s': sid, 'd': b'x'})
+            db.session.commit()
+
+            result = invalidate_after_restore()
+
+            assert result['flask_sessions_revoked'] == 3
+            assert db.session.execute(db.text('SELECT COUNT(*) FROM flask_sessions')).scalar() == 0
+
+    def test_other_stores_report_zero(self, app, user_id):
+        with app.app_context():
+            assert invalidate_after_restore()['flask_sessions_revoked'] == 0
 
 
 class TestCachesArePurged:

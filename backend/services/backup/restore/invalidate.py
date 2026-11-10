@@ -67,6 +67,26 @@ def _revoke_database_sessions() -> Dict[str, int]:
     return revoked
 
 
+def _revoke_flask_sessions() -> int:
+    """Empty the SQL session store, or raise; 0 when sessions live elsewhere.
+
+    The table is excluded from the archive, so it survives a restore with
+    every session opened before it: all of them are deleted here.
+    """
+    if current_app.config.get('SESSION_TYPE') != 'sqlalchemy':
+        return 0
+    table = current_app.config.get('SESSION_SQLALCHEMY_TABLE', 'flask_sessions')
+    try:
+        count = db.session.execute(db.text(f'DELETE FROM "{table}"')).rowcount
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        logger.error("Restore: the session table %s could not be emptied; access "
+                     "granted before the restore may still be usable", table)
+        raise
+    return count
+
+
 def _session_directory() -> Optional[Path]:
     """The server-side session store, when it is a directory on this host."""
     try:
@@ -301,6 +321,7 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
 
         {'sessions_revoked': int,       # rows deleted from user_sessions
          'sso_sessions_revoked': int,   # rows deleted from pro_sso_sessions
+         'flask_sessions_revoked': int, # rows deleted from the SQL session store
          'session_files_removed': int,  # files deleted from the session store
          'caches_cleared': [str],       # caches really dropped
          'caches_failed': [str],        # caches that refused to drop
@@ -311,6 +332,7 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
     summary: Dict[str, Any] = {
         'sessions_revoked': revoked['user_sessions'],
         'sso_sessions_revoked': revoked['sso_sessions'],
+        'flask_sessions_revoked': _revoke_flask_sessions(),
         'session_files_removed': _remove_session_files(),
         'caches_cleared': [],
         'caches_failed': [],
