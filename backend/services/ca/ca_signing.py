@@ -150,7 +150,7 @@ class CASigningMixin:
 
         # Convert CSR object to PEM bytes
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)
-        # RFC 9763: A is found before signing, so linking after it cannot fail
+        # RFC 9763: A is found before signing; linking refuses only an A renewed since
         from services.cert.related_pair import link_issued, record_request_key, requested_by_csr
         related_a = requested_by_csr(csr.public_bytes(serialization.Encoding.DER))
 

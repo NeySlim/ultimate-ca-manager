@@ -729,6 +729,48 @@ def test_b_is_stored_and_linked_when_a_changes_after_signing(app, auth_client, c
             db.session.commit()
 
 
+@pytest.mark.parametrize('path', ['est', 'sign_route'])
+def test_no_link_is_written_onto_an_a_renewed_after_signing(app, auth_client, cert_a, monkeypatch, path):
+    """B's extension hashes the A it was signed against: an A renewed in place meanwhile
+    holds another certificate, so the linked issuance is refused rather than linked wrong."""
+    row_id, cert, key = cert_a
+    real_sign = TrustStoreService.sign_csr
+    other_key = ec.generate_private_key(ec.SECP256R1())
+    other = _self_signed(other_key, hashes.SHA256(), serial=cert.serial_number + 1)
+    csr_id = _generate_b(app, row_id) if path == 'sign_route' else None
+
+    def sign_then_renew_a(*args, **kwargs):
+        pem = real_sign(*args, **kwargs)
+        a_row = db.session.get(Certificate, row_id)
+        a_row.crt = base64.b64encode(other.public_bytes(serialization.Encoding.PEM)).decode()
+        a_row.serial_number = str(other.serial_number)
+        return pem
+
+    monkeypatch.setattr(TrustStoreService, 'sign_csr', staticmethod(sign_then_renew_a))
+    try:
+        if path == 'est':
+            with app.app_context():
+                with pytest.raises(RelatedCertificateRefused, match='not held by this instance'):
+                    _est_sign(_signing_ca(row_id)[0], x509.load_pem_x509_csr(_csr_b(cert, key)))
+        else:
+            with app.app_context():
+                ca_id = _signing_ca(row_id)[0].id
+            r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={'ca_id': ca_id, 'validity_days': 30})
+            assert r.status_code == 400, r.data
+            assert 'not held by this instance' in json.loads(r.data)['message']
+        with app.app_context():
+            a_row = db.session.get(Certificate, row_id)
+            assert (a_row.serial_number, a_row.related_certificate_id) == (str(cert.serial_number), None)
+            assert Certificate.query.filter_by(related_certificate_id=row_id).count() == 0
+    finally:
+        monkeypatch.undo()
+        with app.app_context():
+            a_row = db.session.get(Certificate, row_id)
+            a_row.crt = base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode()
+            a_row.serial_number, a_row.related_certificate_id = str(cert.serial_number), None
+            db.session.commit()
+
+
 def test_a_related_certificate_under_an_expired_ca_certificate_is_refused(app, create_ca, create_cert):
     """RFC 9763 §3.2 asks for RFC 5280 path validation of A: its CA must be valid now."""
     from services.hsm.ca_key_loader import get_ca_signing_key

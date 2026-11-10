@@ -384,7 +384,8 @@ def _csr_naming_a(cert_a, key_a):
 
 
 def test_a_protocol_issuance_naming_a_and_an_in_place_renewal_of_a_do_not_deadlock(app, monkeypatch):
-    """The issuance of B writes A's link back: that row is locked before the CA row."""
+    """The issuance of B writes A's link back: that row is locked before the CA row, and
+    an A renewed while B waited is refused."""
     from services.ca import CAService
     from tests.test_backup_cross_installation import _bound_to
     from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
@@ -404,14 +405,16 @@ def test_a_protocol_issuance_naming_a_and_an_in_place_renewal_of_a_do_not_deadlo
 
         with app.app_context():
             count = db.session.get(CA, ca_id).serial
+            a_link = db.session.get(Certificate, a_id).related_certificate_id
             db.session.remove()
     assert blocked, errors
-    assert errors == []
-    assert count == 3
+    # A renewed while B waited: B's extension hashes the old A, so no B and no link
+    assert [(name, 'not held by this instance' in error) for name, error in errors] == [('other', True)]
+    assert (count, a_link) == (2, None)
 
 
 def test_a_signed_csr_naming_a_and_an_in_place_renewal_of_a_do_not_deadlock(app, monkeypatch):
-    """Signing a stored CSR that names A writes A's link back before the CA row."""
+    """Signing a stored CSR that names A locks A before the CA row; a renewed A is refused."""
     from cryptography.hazmat.primitives import serialization
     from services.cert_service import CertificateService
     from tests.test_backup_cross_installation import _bound_to
@@ -437,10 +440,12 @@ def test_a_signed_csr_naming_a_and_an_in_place_renewal_of_a_do_not_deadlock(app,
 
         with app.app_context():
             count = db.session.get(CA, ca_id).serial
+            a_link = db.session.get(Certificate, a_id).related_certificate_id
             db.session.remove()
     assert blocked, errors
-    assert errors == []
-    assert count == 3
+    # A renewed while B waited: B's extension hashes the old A, so no B and no link
+    assert [(name, 'not held by this instance' in error) for name, error in errors] == [('other', True)]
+    assert (count, a_link) == (2, None)
 
 
 def test_a_renewal_that_unlinks_a_row_and_its_in_place_renewal_do_not_deadlock(app, monkeypatch):

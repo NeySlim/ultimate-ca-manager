@@ -296,7 +296,7 @@ class CSRMixin:
         except Exception as e:
             raise ValueError(f"Failed to verify CSR signature: {e}")
 
-        # RFC 9763: A is found before signing, so linking after it cannot fail
+        # RFC 9763: A is found before signing; linking refuses only an A renewed since
         from services.cert.related_pair import link_issued, record_request_key, requested_by_csr
         related_a = requested_by_csr(csr_obj.public_bytes(serialization.Encoding.DER))
 
@@ -437,8 +437,12 @@ class CSRMixin:
                 digest=digest if cert.signature_hash_algorithm is not None else None,
             )
 
-        # RFC 9763: the A the request named and the certificate now names
-        link_issued(certificate, cert, related_a)
+        # RFC 9763: the A the request named and the certificate now names, refused if renewed since
+        try:
+            link_issued(certificate, cert, related_a)
+        except Exception:
+            db.session.rollback()
+            raise
 
         # Store SANs
         if san_dns_list:

@@ -339,6 +339,20 @@ def _names_its_link(row, cert):
     return other is not None and related_cert.references(cert, other)
 
 
+def _still_holding(a_row, cert_a):
+    """*a_row* locked and re-read, refused unless it still holds *cert_a*: B's extension
+    hashes that certificate (RFC 9763), so an A renewed meanwhile is not B's A."""
+    from sqlalchemy.exc import InvalidRequestError
+    try:
+        fresh = db.session.get(Certificate, a_row.id, populate_existing=True, with_for_update=True)
+    except InvalidRequestError:  # deleted since it was found
+        fresh = None
+    if fresh is None or not fresh.crt or row_certificate(fresh) != cert_a:
+        raise RelatedCertificateRefused(
+            'The related certificate named by the request is not held by this instance')
+    return fresh
+
+
 def link_issued(b_row, cert_b, requested):
     """Record on *b_row* the A (*requested*, from ``requested_by_csr``) its
     certificate names, and on A the way back: the newest B takes A from the
@@ -348,6 +362,7 @@ def link_issued(b_row, cert_b, requested):
     a_row, cert_a = requested
     if not related_cert.references(cert_b, cert_a):
         return None
+    a_row = _still_holding(a_row, cert_a)
     b_row.related_certificate_id = a_row.id
     b_row.hybrid_role = role_for_public_key(cert_b.public_key())
     if not _names_its_link(a_row, cert_a):
