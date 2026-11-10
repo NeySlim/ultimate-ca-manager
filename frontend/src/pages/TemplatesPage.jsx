@@ -747,8 +747,7 @@ const TEMPLATE_TYPE_OPTIONS = [
   'code_signing', 'client_auth', 'ocsp_signing', 'smartcard_logon', 'custom'
 ]
 const DIGEST_OPTIONS = ['sha256', 'sha384', 'sha512']
-// A new template takes the registry's first generated key. The digest is the issuing CA's
-// signing hash, whatever the leaf key: it stays editable even for an ML-DSA or EdDSA leaf.
+// The digest is the issuing CA's signing hash, whatever the leaf key: it stays editable even for an ML-DSA or EdDSA leaf.
 const DEFAULT_DIGEST = 'sha256'
 const KEY_USAGE_OPTIONS = [
   'digitalSignature', 'keyEncipherment', 'contentCommitment',
@@ -861,7 +860,7 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
   const platform = useKeyPlatform()
   // The key already on the template stays listed, so FIPS mode or a key not generated yet never blanks the field.
   // ML-DSA is offered: the digest is the issuing CA's signing hash, not the leaf key's.
-  // An empty key type means the server default, which the backend applies at issuance
+  // An empty key type means the server default, which the backend resolves and stores when the template is created
   const keyTypeOptions = useMemo(() => [
     // Only a template without a key can stay on the default: an update cannot unset a stored key
     ...(template?.key_type ? [] : [{ value: '', label: t('templates.keyServerDefault') }]),
