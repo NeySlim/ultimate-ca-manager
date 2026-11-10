@@ -335,6 +335,7 @@ jobs:
             tests/test_sessions_store.py \
             tests/test_dashboard*.py \
             tests/test_protocol_approval_*.py \
+            tests/test_approval_legacy_hex_serial.py \
             tests/test_serial*.py \
             tests/test_scheduled_claims_pg.py \
             tests/test_renewal_concurrency_pg.py \

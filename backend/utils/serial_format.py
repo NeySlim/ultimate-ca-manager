@@ -123,9 +123,12 @@ def recorded_before_canonical(recorded_at) -> bool:
         return True
     if applied is None:
         return True
-    if not isinstance(applied, datetime):
-        applied = datetime.fromisoformat(str(applied))
-    return recorded_at < applied.replace(tzinfo=None)
+    try:
+        if not isinstance(applied, datetime):
+            applied = datetime.fromisoformat(str(applied))
+        return recorded_at < applied.replace(tzinfo=None)
+    except (TypeError, ValueError):
+        return True
 
 
 def names_certificate(recorded: str | int | None, cert, recorded_at=None) -> bool:

@@ -197,3 +197,16 @@ def test_the_migration_date_is_read_in_utc(app, migrated):
         assert recorded_before_canonical(utc_now() - timedelta(minutes=5)) is True
         assert recorded_before_canonical(utc_now() + timedelta(minutes=5)) is False
         db.session.rollback()
+
+
+def test_an_unreadable_migration_date_allows_the_hex_reading(app, migrated):
+    from sqlalchemy import text
+    from utils.serial_format import CANONICAL_MIGRATION, recorded_before_canonical
+    from utils.datetime_utils import utc_now
+    with app.app_context():
+        if db.engine.dialect.name != 'sqlite':
+            pytest.skip('only SQLite stores the date as free text')
+        db.session.execute(text("UPDATE _migrations SET applied_at = 'not a date' WHERE name = :n"),
+                           {'n': CANONICAL_MIGRATION})
+        assert recorded_before_canonical(utc_now()) is True
+        db.session.rollback()

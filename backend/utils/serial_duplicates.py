@@ -81,9 +81,11 @@ def check_pending_serial_index(app) -> int:
             count = len(pairs) or 1
     app.config['SERIAL_INDEX_PENDING'] = count
     if count:
-        listed = '; '.join(f"CA {d.get('caref')} serial {d.get('serial_number')} x{d.get('count', '?')}"
-                           for d in pairs[:10]) or 'see the migration 142 and 144 log'
+        listed = '; '.join(
+            f"CA {d.get('caref')} serial {d.get('serial_number')} waits for {d['waits_for']}" if d.get('waits_for')
+            else f"CA {d.get('caref')} serial {d.get('serial_number')} x{d.get('count', '?')}"
+            for d in pairs[:10]) or 'see the migration 142 and 144 log'
         logging.getLogger(__name__).warning(
-            "%s: %d serial number(s) are shared by certificates of one CA (%s), so the unique "
+            "%s: %d serial number(s) are shared by certificates of one CA or wait for one that is (%s), so the unique "
             "serial index does not cover them. %s", PENDING_KEY, count, listed, CLEANUP)
     return count
