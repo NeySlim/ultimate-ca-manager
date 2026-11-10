@@ -38,6 +38,25 @@ export function InspectorDock() {
     requestAnimationFrame(() => dock.current?.querySelector('[data-testid="inspector-object-tabs"] [aria-selected="true"]')?.focus())
   }, [focusToken])
 
+  // The page makes room for the dock (padding on #root, see index.css) instead of sitting under it
+  const shown = opened.length > 0 && !isMobile
+  const rightDock = position === 'right' && viewport.w >= RIGHT_MIN_VIEWPORT
+  const reserve = !shown ? null : rightDock
+    ? { bottom: 0, right: clamp(width, SIZE_LIMITS.width[0], SIZE_LIMITS.width[1]) }
+    : { bottom: clamp(height, SIZE_LIMITS.height[0], Math.max(SIZE_LIMITS.height[0], Math.floor(viewport.h * 0.6))), right: 0 }
+  const reserveBottom = reserve?.bottom
+  const reserveRight = reserve?.right
+  useEffect(() => {
+    if (reserveBottom === undefined) return undefined
+    const root = document.documentElement.style
+    root.setProperty('--inspector-reserve-bottom', `${reserveBottom}px`)
+    root.setProperty('--inspector-reserve-right', `${reserveRight}px`)
+    return () => {
+      root.removeProperty('--inspector-reserve-bottom')
+      root.removeProperty('--inspector-reserve-right')
+    }
+  }, [reserveBottom, reserveRight])
+
   const onTitle = useCallback((key, title) => setTitles((prev) => (prev[key] === title ? prev : { ...prev, [key]: title })), [])
 
   if (!opened.length) return null
