@@ -275,3 +275,27 @@ def test_an_acme_order_carries_its_pending_key_and_link_not_its_lease(app):
             db.session.delete(child)
             db.session.delete(parent)
             db.session.commit()
+
+
+class TestClusterStateStaysLocal:
+    def test_scheduler_state_is_neither_exported_nor_restored(self, app, monkeypatch):
+        """Another cluster's scheduler state must not come back with a restore."""
+        from types import SimpleNamespace
+        from models import SystemConfig
+        from services.backup import BackupService, export_core
+        from services.scheduler_service import STATE_KEY
+
+        with app.app_context():
+            SystemConfig.query.filter_by(key=STATE_KEY).delete()
+            db.session.commit()
+            row = SystemConfig(key=STATE_KEY, value='{"pid": 1, "tasks": {}}', encrypted=False)
+            monkeypatch.setattr(export_core, 'SystemConfig', SimpleNamespace(
+                query=SimpleNamespace(all=lambda: [row])))
+            exported = BackupService()._export_configuration(True)
+            monkeypatch.undo()
+            assert STATE_KEY not in exported['settings']
+
+            configuration = {'settings': {STATE_KEY: '{"pid": 1, "tasks": {}}'}}
+            BackupService()._restore_settings({'configuration': configuration}, {'settings': 0})
+            db.session.commit()
+            assert SystemConfig.query.filter_by(key=STATE_KEY).first() is None
