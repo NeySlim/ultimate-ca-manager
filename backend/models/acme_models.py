@@ -437,6 +437,8 @@ class AcmeClientOrder(db.Model):
     dns_provider = db.relationship('DnsProvider', back_populates='client_orders')
     certificate = db.relationship('Certificate', foreign_keys=[certificate_id])
     account = db.relationship('AcmeAccount', foreign_keys=[account_id])
+    # SQLite does not honour the link's ondelete: the ORM deletes them with the order
+    proxy_links = db.relationship('AcmeProxyChallengeLink', cascade='all, delete-orphan')
     acme_client_account = db.relationship(
         'AcmeClientAccount', foreign_keys=[acme_client_account_id]
     )
