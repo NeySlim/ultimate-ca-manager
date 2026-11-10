@@ -34,11 +34,11 @@ _NONCE_SIZE = 12
 STALE_AFTER_SECONDS = 3600
 
 
-def store_directory() -> Optional[str]:
-    """`DATA_DIR/tmp`, where uploads already spool; the system temp dir otherwise."""
+def store_directory(spool: Optional[str] = None) -> Optional[str]:
+    """`DATA_DIR/tmp`, where uploads already spool; the system temp dir (None) otherwise."""
     try:
         from flask import current_app
-        spool = current_app.config.get('UPLOAD_SPOOL_DIR')
+        spool = spool or current_app.config.get('UPLOAD_SPOOL_DIR')
         if spool:
             os.makedirs(spool, 0o700, exist_ok=True)
             return spool
@@ -53,9 +53,10 @@ def store_directory() -> Optional[str]:
         return None
 
 
-def sweep_stale_stores(directory: Optional[str]) -> None:
-    """Remove stores a killed worker left behind; skipped while a backup operation runs."""
-    if not directory or not os.path.isdir(directory):
+def sweep_stale_stores(directory: Optional[str] = None, spool: Optional[str] = None) -> None:
+    """Remove stores a killed worker left behind, in the directory `store_directory()` gives."""
+    directory = directory or store_directory(spool) or tempfile.gettempdir()
+    if not os.path.isdir(directory):
         return
     from .locking import BackupBusyError, backup_operation_lock
     try:

@@ -1,4 +1,5 @@
 """The sections of a v4 archive kept on disk: what the restore reads of them."""
+import errno
 import os
 import stat
 
@@ -228,3 +229,20 @@ def test_eviction_does_not_depend_on_the_interpreters_reference_counts(
     store['configuration']
     store['certificates']
     assert 'users' not in store._loaded
+
+
+def test_startup_sweeps_the_fallback_directory_when_no_spool_dir(monkeypatch):
+    from pathlib import Path
+
+    from config.settings import Config
+    from services.backup.section_store import STALE_AFTER_SECONDS
+    from tests.fresh_app import fresh_app
+    monkeypatch.setattr('utils.upload_spool.prepare_spool_dir', lambda _d: None)
+    fallback = Path(Config.DATA_DIR) / 'tmp'
+    fallback.mkdir(parents=True, exist_ok=True)
+    stale = fallback / '.ucm_restore_from_a_killed_worker'
+    stale.mkdir(exist_ok=True)
+    old = os.stat(stale).st_mtime - STALE_AFTER_SECONDS - 60
+    os.utime(stale, (old, old))
+    with fresh_app():
+        assert not stale.exists()
