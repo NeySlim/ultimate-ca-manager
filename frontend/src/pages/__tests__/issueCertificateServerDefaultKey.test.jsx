@@ -34,6 +34,8 @@ vi.mock('../../components', () => ({
 
 import { IssueCertificateForm } from '../certificates/IssueCertificateForm'
 
+const deferred = () => { let resolve; const promise = new Promise((r) => { resolve = r }); return { promise, resolve } }
+
 const t = (key) => key
 const state = (label) => screen.getByLabelText(label).dataset.stateValue
 const CAS = [{ id: 3, descr: 'CA three', has_private_key: true }, { id: 4, descr: 'CA four', has_private_key: true }]
@@ -147,5 +149,97 @@ describe('IssueCertificateForm server default key', () => {
     await waitFor(() => expect(state('common.keySize')).toBe('384'))
     pickTemplate('')
     await waitFor(() => expect([state('common.keyType'), state('common.keySize')]).toEqual(['rsa', '3072']))
+  })
+
+  it('keeps the key of a template over the server default of its CA and template', async () => {
+    mocks.templates = TEMPLATES
+    mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, default_key_type: 'RSA-3072' } })
+    renderForm()
+    pickCa('3')
+    await waitFor(() => expect(state('common.keySize')).toBe('3072'))
+    await screen.findByLabelText('certificates.templateOptional')
+    pickTemplate('7')
+    await waitFor(() => expect(mocks.getEffective).toHaveBeenCalledWith({ ca_id: '3', template_id: '7' }))
+    await new Promise((r) => setTimeout(r, 20))
+    expect([state('common.keyType'), state('common.keySize')]).toEqual(['ecdsa', '384'])
+  })
+
+  it('shows no key, not the old pair default, while the new pair answer is pending or fails', async () => {
+    mocks.templates = TEMPLATES
+    const late = deferred()
+    mocks.getEffective.mockImplementation(async ({ template_id }) => {
+      if (template_id === '8') return late.promise
+      return { data: { allowed_key_types: null, default_key_type: 'RSA-3072' } }
+    })
+    const onSubmit = renderForm()
+    pickCa('3')
+    await waitFor(() => expect(state('common.keySize')).toBe('3072'))
+    await screen.findByLabelText('certificates.templateOptional')
+    pickTemplate('7')
+    await waitFor(() => expect(state('common.keySize')).toBe('384'))
+    pickTemplate('8')
+    await waitFor(() => expect(mocks.getEffective).toHaveBeenCalledWith({ ca_id: '3', template_id: '8' }))
+    expect(state('common.keyType')).toBe('')
+    late.resolve({ data: { allowed_key_types: null, default_key_type: 'EC-P256' } })
+    await waitFor(() => expect([state('common.keyType'), state('common.keySize')]).toEqual(['ecdsa', '256']))
+    // a failing answer leaves no stale key to submit
+    mocks.getEffective.mockImplementation(async ({ template_id }) => {
+      if (template_id === '7') return { data: { allowed_key_types: null, default_key_type: 'EC-P384' } }
+      throw new Error('down')
+    })
+    pickTemplate('7')
+    await waitFor(() => expect(state('common.keySize')).toBe('384'))
+    pickTemplate('8')
+    await waitFor(() => expect(state('common.keyType')).toBe(''))
+    fireEvent.change(screen.getByPlaceholderText('example.com'), { target: { value: 'host.example.test' } })
+    fireEvent.submit(screen.getByPlaceholderText('example.com').closest('form'))
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1))
+    expect(onSubmit.mock.calls[0][0].key_type).toBeUndefined()
+  })
+
+  it('keeps the key the user chose through two template changes', async () => {
+    mocks.templates = TEMPLATES
+    mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, default_key_type: 'RSA-3072' } })
+    renderForm()
+    pickCa('3')
+    await waitFor(() => expect(state('common.keyType')).toBe('rsa'))
+    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'ml-dsa' } })
+    await screen.findByLabelText('certificates.templateOptional')
+    pickTemplate('8')
+    await waitFor(() => expect(mocks.getEffective).toHaveBeenCalledWith({ ca_id: '3', template_id: '8' }))
+    pickTemplate('')
+    await waitFor(() => expect(mocks.getEffective).toHaveBeenCalledTimes(4))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(state('common.keyType')).toBe('ml-dsa')
+  })
+
+  it('keeps a re-keyed key through a CA change and takes the default when the re-key names none', async () => {
+    mocks.getEffective.mockImplementation(async ({ ca_id }) => ({
+      data: { allowed_key_types: null, default_key_type: ca_id === '4' ? 'EC-P384' : 'RSA-3072' },
+    }))
+    const { unmount } = render(<IssueCertificateForm cas={CAS} initialData={{ cn: 'a.test', key_type: 'ecdsa', key_size: '521' }}
+      onSubmit={vi.fn()} onCancel={() => {}} t={t} />)
+    pickCa('3')
+    await waitFor(() => expect(mocks.getEffective).toHaveBeenCalledWith({ ca_id: '3', template_id: undefined }))
+    pickCa('4')
+    await waitFor(() => expect(mocks.getEffective).toHaveBeenCalledWith({ ca_id: '4', template_id: undefined }))
+    await new Promise((r) => setTimeout(r, 20))
+    expect([state('common.keyType'), state('common.keySize')]).toEqual(['ecdsa', '521'])
+    unmount()
+    render(<IssueCertificateForm cas={CAS} initialData={{ cn: 'b.test' }} onSubmit={vi.fn()} onCancel={() => {}} t={t} />)
+    pickCa('4')
+    await waitFor(() => expect([state('common.keyType'), state('common.keySize')]).toEqual(['ecdsa', '384']))
+  })
+
+  it('drops the default of the previous CA when the new CA gives none', async () => {
+    mocks.getEffective.mockImplementation(async ({ ca_id }) => {
+      if (ca_id === '4') throw new Error('down')
+      return { data: { allowed_key_types: null, default_key_type: 'RSA-3072' } }
+    })
+    renderForm()
+    pickCa('3')
+    await waitFor(() => expect(state('common.keySize')).toBe('3072'))
+    pickCa('4')
+    await waitFor(() => expect(state('common.keyType')).toBe(''))
   })
 })

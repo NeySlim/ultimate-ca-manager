@@ -36,6 +36,8 @@ export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
   useEffect(() => {
     if (!enabled) return undefined
     let cancelled = false
+    // The previous pair's default is stale until this pair answers
+    setState((prev) => (prev.defaultKeyType === null ? prev : { ...prev, defaultKeyType: null }))
     Promise.resolve()
       .then(() => policiesService.getEffective({ ca_id: caId || undefined, template_id: templateId || undefined }))
       .then((res) => {

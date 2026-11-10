@@ -184,9 +184,10 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
 
   // The server's default key for this CA and template, until the user picks another
   useEffect(() => {
-    if (keySource.current || !defaultKeyType) return
-    const pair = findAlgorithm(defaultKeyType)?.issue
-    if (pair) setFormData(prev => ({ ...prev, key_type: pair[0], key_size: pair[1] }))
+    if (keySource.current) return
+    // No default (pending, failed, none allowed): no key is named, the server decides
+    const pair = (defaultKeyType && findAlgorithm(defaultKeyType)?.issue) || ['', '']
+    setFormData(prev => ({ ...prev, key_type: pair[0], key_size: pair[1] }))
   }, [defaultKeyType])
 
   // A key the policies forbid (template default, previous CA) switches to the first allowed one;
@@ -221,11 +222,11 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     setSelectedTemplate(templateId)
     const tpl = templateId ? templates.find(t => String(t.id) === templateId) : null
     const tplPair = tpl?.key_type ? findAlgorithm(tpl.key_type)?.issue : null
-    // A keyless template (or none) releases only a template's key, never the user's own choice,
-    // and puts back the server default; the default effect follows if the new pair's differs
+    // A keyless template (or none) releases only a template's key, never the user's own choice;
+    // the key is blanked until the new pair's server default arrives (the effect above sets it)
     const released = !tplPair && keySource.current === 'template'
     if (released) keySource.current = null
-    const keyPair = tplPair || (released ? findAlgorithm(defaultKeyType)?.issue : null)
+    const keyPair = tplPair || (released ? ['', ''] : null)
     const keyUpdates = keyPair ? { key_type: keyPair[0], key_size: keyPair[1] } : {}
     if (tplPair) keySource.current = 'template'
     if (!tpl) {
