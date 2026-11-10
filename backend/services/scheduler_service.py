@@ -596,6 +596,8 @@ class SchedulerService:
                         if self._claimed:
                             self._finish_request(task)
                         self._publish_state()
+                        # Throttled: a pass longer than the stale window keeps this row fresh
+                        self._heartbeat()
                 except Exception as e:
                     logger.error(f"Error in scheduler loop: {e}", exc_info=True)
                 self._publish_state()  # every pass: the web workers judge staleness by it

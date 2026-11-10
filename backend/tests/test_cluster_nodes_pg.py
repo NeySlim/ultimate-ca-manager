@@ -126,3 +126,35 @@ def test_a_new_leader_clears_the_flag_a_crashed_one_left(app, ha):
         db.session.commit()
     ha('b').start(app=app)
     assert wait_for(lambda: rows(app) == {PREFIX + 'crashed': False, PREFIX + 'b': True})
+
+
+def test_a_pass_longer_than_the_stale_window_keeps_the_leader_fresh(app, ha, monkeypatch):
+    """A task that outlasts three passes must not leave the cluster without a leader."""
+    import time as real_time
+    import types
+    import utils.datetime_utils as dtu
+    shift = {'s': 0.0}
+    real_now = dtu.utc_now
+    monkeypatch.setattr(scheduler_service, 'time', types.SimpleNamespace(
+        time=real_time.time, monotonic=lambda: real_time.monotonic() + shift['s']))
+    monkeypatch.setattr(dtu, 'utc_now', lambda: real_now() + timedelta(seconds=shift['s']))
+    seen = []
+
+    def slow():
+        if not seen:
+            shift['s'] += 200  # beyond STALE_PASSES * wake_interval
+
+    def probe():
+        if not seen:
+            seen.append(scheduler_leader.cluster_summary(60)['leader_node_id'])
+
+    s = SchedulerService(wake_interval=60, node_id=PREFIX + 'slow')
+    for name, func in (('slow', slow), ('probe', probe)):
+        s.register_task(name, func, interval=0)
+        s.tasks[name]._created_at -= timedelta(seconds=60)
+    s.start(app=app)
+    try:
+        assert wait_for(lambda: seen)
+    finally:
+        s.stop(timeout=10)
+    assert seen == [PREFIX + 'slow']
