@@ -1778,6 +1778,9 @@ class SCEPService:
             created_by="scep",
         )
         db.session.add(cert_obj)
+        # Counted in the caller's transaction: a refused issuance rolls the count back too
+        from utils.ca_serial_counter import next_ca_serial
+        next_ca_serial(self.ca)
         if renewal_of is not None:
             # Archived in the same transaction, and claimed once: the scheduler
             # does not renew it again, nor does a concurrent renewal
