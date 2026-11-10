@@ -279,13 +279,14 @@ class CommandApplier:
         for row in rows:
             if self._stop.is_set():
                 return  # this process is leaving
-            if row.id <= self.seen:
-                # Committed after this node moved past it. _apply settles every row for good
-                # (applied, absorbed, held in memory, or the process leaves): the hole closes now
-                self._fill_hole(row.id)
-            elif row.id > self.seen + 1 and not self._gap_passed(row.id, now):
+            # Committed after this node moved past it: its hole closes once it is applied,
+            # so an error while applying leaves it to the next pass
+            late = row.id <= self.seen
+            if not late and row.id > self.seen + 1 and not self._gap_passed(row.id, now):
                 return
             self._apply(conn, row)
+            if late:
+                self._fill_hole(row.id)
 
     def _gap_passed(self, next_id, now):
         first_missing = self.seen + 1

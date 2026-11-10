@@ -444,6 +444,41 @@ def test_a_restart_committed_late_while_another_is_held_is_absorbed(app, ha):
         engine.dispose()
 
 
+def test_a_late_restart_survives_an_error_while_it_is_applied(app, ha, monkeypatch):
+    """The hole stays open until the command is applied: a failed pass reads it again."""
+    from sqlalchemy.orm import Session
+    from models import ClusterCommand
+    from services.scheduler_leader import _dedicated_engine, application_url
+    log, restarts, calls = [], [], []
+    real = cc.pending_predecessors
+
+    def once_broken(*args, **kwargs):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError('database went away')
+        return real(*args, **kwargs)
+    monkeypatch.setattr(cc, 'pending_predecessors', once_broken)
+    _node_row(app, 'solo')
+    solo = ha('solo', restart_action=lambda: restarts.append('restart'),
+              handlers={cc.RELOAD_SYSLOG: _recorder(log, 'solo')})
+    solo.start()
+    assert wait_for(lambda: solo.seen is not None)
+    with app.app_context():
+        engine = _dedicated_engine(application_url())
+    try:
+        with Session(bind=engine) as slow, Session(bind=engine) as fast:
+            slow.add(ClusterCommand(kind=cc.RESTART, created_at=utc_now()))
+            slow.flush()  # id taken, not committed
+            fast.add(ClusterCommand(kind=cc.RELOAD_SYSLOG, payload='{"mark": "fast"}', created_at=utc_now()))
+            fast.commit()
+            assert wait_for(lambda: ('solo', 'fast') in log)
+            slow.commit()
+        assert wait_for(lambda: restarts == ['restart'])
+        assert len(calls) >= 2
+    finally:
+        engine.dispose()
+
+
 def test_a_restart_action_that_raises_is_retried_and_reloads_go_on(app, ha):
     log, attempts, emitted = [], [], []
 
