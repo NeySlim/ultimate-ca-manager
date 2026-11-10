@@ -32,23 +32,12 @@ def _shape(inspector, schema=None):
             for c in inspector.get_columns(TABLE, schema=schema)}
 
 
-def test_sqlite_creates_the_table_and_index_and_reruns():
+def test_sqlite_creates_nothing_and_reruns():
+    """SQLite keeps sessions in files: no table, so a PostgreSQL switch is never blocked."""
     conn = sqlite3.connect(':memory:')
     _migration().upgrade(conn)
-    conn.execute(f"INSERT INTO {TABLE} (session_id, data, expiry) VALUES ('a', x'00', '2030-01-01')")
     _migration().upgrade(conn)
-    assert conn.execute(f"SELECT session_id FROM {TABLE}").fetchall() == [('a',)]
-    indexes = {r[1] for r in conn.execute(f"PRAGMA index_list({TABLE})")}
-    assert 'ix_flask_sessions_expiry' in indexes
-
-
-def test_sqlite_table_has_the_library_columns(tmp_path):
-    path = tmp_path / 'm.db'
-    conn = sqlite3.connect(path)
-    _migration().upgrade(conn)
-    conn.close()
-    got = _shape(inspect(create_engine(f'sqlite:///{path}')))
-    assert got == _library_columns()
+    assert conn.execute("SELECT name FROM sqlite_master WHERE name = ?", (TABLE,)).fetchall() == []
 
 
 @pytest.mark.postgres

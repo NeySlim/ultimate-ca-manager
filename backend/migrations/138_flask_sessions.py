@@ -2,7 +2,7 @@
 
 Same shape as the table Flask-Session 0.8 creates itself (``flask_sessions``):
 used on PostgreSQL without Redis, so a session opened on one node is valid on
-the others. Created everywhere and left empty where files hold the sessions.
+the others. Created on PostgreSQL only: SQLite installs keep their sessions in files.
 """
 import logging
 import sqlite3
@@ -15,11 +15,8 @@ INDEX = 'ix_flask_sessions_expiry'
 
 
 def _upgrade_sqlite(conn):
-    conn.execute(f"CREATE TABLE IF NOT EXISTS {TABLE} (id INTEGER NOT NULL PRIMARY KEY, "
-                 "session_id VARCHAR(255) UNIQUE, data BLOB, expiry DATETIME)")
-    conn.execute(f"CREATE INDEX IF NOT EXISTS {INDEX} ON {TABLE} (expiry)")
-    conn.commit()
-    logger.info("[138] flask_sessions (SQLite)")
+    """SQLite never uses the SQL store; a stray table would block a switch to PostgreSQL."""
+    logger.info("[138] flask_sessions: nothing to do on SQLite")
 
 
 def _upgrade_pg(conn):
