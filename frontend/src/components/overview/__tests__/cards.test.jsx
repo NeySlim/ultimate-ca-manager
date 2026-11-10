@@ -77,6 +77,20 @@ describe('queue card', () => {
   })
 })
 
+describe('queue card preference', () => {
+  it('follows the saved fold state when the preference arrives after mounting', async () => {
+    api.getQueue.mockResolvedValue({ data: {
+      items: [1, 2, 3, 4, 5, 6, 7, 8].map(item), counts: { manual_renewal_due: 8 }, total: 8,
+    } })
+    const view = show(<QueueCard defaultOpen={false} />)
+    await screen.findByText('cert-1')
+    expect(screen.queryByText('cert-8')).toBeNull()
+    view.rerender(<MemoryRouter><QueueCard defaultOpen /></MemoryRouter>)
+    expect(await screen.findByText('cert-8')).toBeTruthy()
+    expect(screen.getByText('overview.queue.fold').getAttribute('aria-expanded')).toBe('true')
+  })
+})
+
 describe('compliance card', () => {
   const entry = (count, hint) => ({ count, filter_available: Boolean(hint), filter_hint: hint })
   it('links a counter to the list its hint names, and not one without a filter', async () => {

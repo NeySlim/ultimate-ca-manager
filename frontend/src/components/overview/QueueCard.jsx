@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { overviewService } from '../../services'
@@ -12,6 +12,8 @@ export function QueueCard({ defaultOpen = false, onToggle }) {
   const { t } = useTranslation()
   const state = useCardData(() => overviewService.getQueue())
   const [open, setOpen] = useState(defaultOpen)
+  // The saved preference may arrive after mounting: it wins over the initial state
+  useEffect(() => { setOpen(defaultOpen) }, [defaultOpen])
   const data = state.data || {}
   const items = Array.isArray(data.items) ? data.items : []
   const counts = data.counts && typeof data.counts === 'object' ? data.counts : {}
