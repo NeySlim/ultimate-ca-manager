@@ -32,9 +32,9 @@ services:
           cpus: '1'
           memory: 1G
       
-      # Restart policy
+      # Restart policy: "any", since an HA rolling restart exits with code 0
       restart_policy:
-        condition: on-failure
+        condition: any
         delay: 5s
         max_attempts: 3
         window: 120s
