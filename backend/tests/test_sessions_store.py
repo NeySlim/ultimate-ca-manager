@@ -121,3 +121,49 @@ def test_a_session_opened_on_one_node_is_valid_on_the_other(two_nodes):
         assert db.session.execute(text('SELECT COUNT(*) FROM flask_sessions')).scalar() == 0
     assert client_b.get('/api/v2/account/profile').status_code == 401
     assert client_a.get('/api/v2/account/profile').status_code == 401
+
+
+@pytest.fixture
+def sql_store_app(monkeypatch, tmp_path):
+    """One application with the SQL session store on a file database."""
+    from config.settings import TestingConfig
+    from tests import pg_app_harness
+
+    if pg_app_harness.ENABLED:
+        pytest.skip('file-database fixture, not meaningful in PostgreSQL mode')
+    monkeypatch.setattr(TestingConfig, 'SQLALCHEMY_DATABASE_URI', f'sqlite:///{tmp_path / "s.db"}')
+    monkeypatch.setattr(TestingConfig, 'SESSION_TYPE', 'sqlalchemy')
+    monkeypatch.setattr(TestingConfig, 'SESSION_SQLALCHEMY_TABLE', 'flask_sessions', raising=False)
+    from app import create_app
+    application = create_app('testing')
+    application.config['PROPAGATE_EXCEPTIONS'] = False
+    yield application
+    from models import db
+    with application.app_context():
+        db.session.remove()
+        db.engine.dispose()
+
+
+def test_a_failing_request_does_not_commit_its_pending_work_through_the_store(sql_store_app):
+    from models import db
+    from models.system_config import SystemConfig
+    from tests.conftest import clear_admin_password_flag
+
+    app = sql_store_app
+    assert app.config['SESSION_TYPE'] == 'sqlalchemy'
+
+    @app.route('/zz-boom', methods=['POST'])
+    def zz_boom():
+        db.session.add(SystemConfig(key='zz_probe', value='x'))
+        db.session.flush()
+        raise RuntimeError('boom')
+
+    clear_admin_password_flag(app)
+    client = app.test_client()
+    login = client.post('/api/v2/auth/login/password', content_type='application/json',
+                        data=json.dumps({'username': 'admin', 'password': 'changeme123'}))
+    assert login.status_code == 200, login.data
+    assert client.post('/zz-boom').status_code == 500
+
+    with app.app_context():
+        assert SystemConfig.query.filter_by(key='zz_probe').count() == 0

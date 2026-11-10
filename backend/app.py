@@ -300,6 +300,10 @@ def create_app(config_name=None):
             db.metadata.remove(stale)
     
     Session(app)
+    if app.config.get('SESSION_TYPE') == 'sqlalchemy':
+        from utils.session_store import IsolatedSqlSessionInterface
+        # Same object and model, only the transaction handling differs
+        app.session_interface.__class__ = IsolatedSqlSessionInterface
     
     # Ensure session directory exists with correct permissions (filesystem mode).
     # Session files contain CSRF tokens and authenticated user IDs — anyone with
