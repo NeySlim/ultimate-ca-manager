@@ -1069,7 +1069,6 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
         cert_pem_bytes = cert_obj.public_bytes(encoding=Encoding.PEM)
         cert_pem_b64 = base64.b64encode(cert_pem_bytes).decode('utf-8')
 
-
         # Validity dates: cert_obj exposes tz-aware UTC datetimes; UCM stores
         # naive UTC everywhere, so strip tzinfo here.
         valid_from = cert_obj.not_valid_before_utc.replace(tzinfo=None)
