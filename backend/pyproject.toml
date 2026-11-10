@@ -7,6 +7,7 @@ addopts = "--ignore=tests/e2e_test_suite.py"
 markers = [
     "postgres: marks tests requiring a real PostgreSQL instance (set UCM_TEST_POSTGRES_URL)",
     "sqlite_only(reason): skipped when the session app runs on PostgreSQL (UCM_TEST_APP_PG_URL)",
+    "slow: a test that takes more than a minute; still part of the suite",
 ]
 
 [tool.coverage.run]

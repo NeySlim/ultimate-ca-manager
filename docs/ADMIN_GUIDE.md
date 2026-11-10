@@ -38,6 +38,8 @@ Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `U
 | `UCM_HA` | `UCM_HA` | (unset) | `1` enables HA mode in preview: refuses host-local operations; full high availability arrives in later releases. Requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, identical on every node (the native packages generate a random key per node); the node exits at startup when one is missing (the Docker image also refuses to generate `UCM_SECRET_KEY`) |
 | `UCM_NODE_ID` | `UCM_NODE_ID` | hostname | Node name reported as `node_id` by `/health` and `/health/ready` |
 | `BACKUP_MAX_UPLOAD_MB` | `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive a restore accepts and reads, in MB; its decompressed content may be four times that. Every other request keeps the 50 MB limit. Creating a larger archive succeeds with a warning |
+| `BACKUP_MAX_UPLOAD_MB` | `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive written before 3.0 (format v1 to v3) a restore accepts and reads, in MB; its decompressed content may be four times that. Archives written since 3.0 (v4) are read in chunks and not bound by it. Every other request keeps the 50 MB limit |
+| `BACKUP_MAX_ARCHIVE_MB` | `BACKUP_MAX_ARCHIVE_MB` | `0` | Largest v4 archive a restore accepts, in MB; `0` accepts any size |
 
 ### Systemd Service
 
@@ -300,7 +302,7 @@ A restore **replaces** the instance with the archive: for every section the arch
 - ACME client orders: a merge keeps the order here when it is further along, was renewed or is being finalized since the archive was taken; a replacement restores the archived one and names the certificate it gives up.
 - Every session is revoked and a restart is requested. A restore is refused (409) while a backend migration, another restore or a backup is running.
 
-The upload accepts archives up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), their decompressed content up to four times that, and one JSON object per 100 bytes of it; a reverse proxy in front of UCM applies its own body limit. A restore holds the whole archive in memory: plan for a peak of several times its size. Creating a backup larger than the limit warns that it cannot be restored as is.
+Archives are written as format v4: a sequence of chunks of at most 8 MB, each authenticated on its own, so a backup is created and read section by section without ever being held whole. The upload is spooled to `DATA_DIR/tmp` and each section is kept there, encrypted under a key held only in memory, until the restore needs it. When `DATA_DIR/tmp` is missing and cannot be created, or is not writable, the upload is spooled to the system temporary directory and the sections to a directory of the instance's own under it, named after a hash of `DATA_DIR`. At startup each worker removes stale stores from the directory its restores use, and only after taking the backup lock: when the lock cannot be taken, nothing is removed. Decryption and the checks made before the restore plan hold about one section at a time; the plan and the writes hold every section the archive carries. A v4 archive has no size limit unless `BACKUP_MAX_ARCHIVE_MB` sets one. Archives written before 3.0 (v1 to v3) are still restored, up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), their decompressed content up to four times that, and one JSON object per 100 bytes of it. A reverse proxy in front of UCM applies its own body limit.
 
 ### Backup Contents
 

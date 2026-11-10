@@ -364,6 +364,8 @@ def create_app(config_name=None):
     from utils.upload_spool import SpoolingRequest, prepare_spool_dir
     app.config['UPLOAD_SPOOL_DIR'] = prepare_spool_dir(config.DATA_DIR)
     app.request_class = SpoolingRequest
+    from services.backup.section_store import sweep_stale_stores
+    sweep_stale_stores(spool=app.config['UPLOAD_SPOOL_DIR'])
 
     # Initialize cache
     cache.init_app(app, config={
@@ -1184,11 +1186,10 @@ def create_app(config_name=None):
     @app.errorhandler(413)
     def handle_413(e):
         if request.path.startswith('/api/'):
-            from services.backup.storage import RESTORE_FORM_MARGIN, restore_upload_limit
-            if request.max_content_length == restore_upload_limit() + RESTORE_FORM_MARGIN:
-                return _json_error(413, 'Backup archive too large: a restore accepts up to '
-                                        f'{restore_upload_limit() // (1024 * 1024)} MB '
-                                        '(BACKUP_MAX_UPLOAD_MB)')
+            from services.backup.storage import restore_body_limit, restore_body_too_large_message
+            # A restore route's body ceiling exists only when BACKUP_MAX_ARCHIVE_MB is set
+            if request.max_content_length == restore_body_limit():
+                return _json_error(413, restore_body_too_large_message())
             return _json_error(413, 'Request too large')
         return e
     

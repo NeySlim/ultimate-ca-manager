@@ -64,7 +64,8 @@ def operation_lock_depth() -> int:
 
 
 @contextmanager
-def backup_operation_lock(*, timeout: float = 0, purpose: str = 'backup'):
+def backup_operation_lock(*, timeout: float = 0, purpose: str = 'backup',
+                          fail_open: bool = True):
     """Hold the backup lock for the duration of the block.
 
     Every path that creates, validates or deletes an archive takes this same
@@ -73,5 +74,6 @@ def backup_operation_lock(*, timeout: float = 0, purpose: str = 'backup'):
     without flock are documented on ``utils.process_lock.process_lock``.
     """
     with process_lock(operation_lock_path(), timeout=timeout, purpose=purpose,
-                      subject=_SUBJECT, busy_error=BackupBusyError):
+                      subject=_SUBJECT, busy_error=BackupBusyError,
+                      fail_open=fail_open):
         yield

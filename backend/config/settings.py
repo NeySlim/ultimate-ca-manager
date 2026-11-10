@@ -130,6 +130,18 @@ def backup_max_upload_mb() -> int:
         return 512
 
 
+def backup_max_archive_mb() -> int:
+    """`BACKUP_MAX_ARCHIVE_MB`: the largest v4 archive a restore accepts; 0 (default) for no limit."""
+    raw = os.getenv("BACKUP_MAX_ARCHIVE_MB", "0")
+    try:
+        return max(0, int(raw))
+    except ValueError:
+        import logging
+        logging.getLogger(__name__).warning(
+            "BACKUP_MAX_ARCHIVE_MB=%r is not a whole number of MB: no limit", raw)
+        return 0
+
+
 class Config:
     """Base configuration - values can be overridden by database settings"""
     
@@ -183,6 +195,8 @@ class Config:
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max (base64 inflates ~33%)
     # The restore routes alone accept an archive up to this size, in MiB
     BACKUP_MAX_UPLOAD_MB = backup_max_upload_mb()
+    # v4 archives are streamed and not bound by the above; 0 accepts any size
+    BACKUP_MAX_ARCHIVE_MB = backup_max_archive_mb()
     
     # HA preview: multi-node mode refuses host-local operations (see utils/ha.py)
     HA_MODE = env_bool("UCM_HA")

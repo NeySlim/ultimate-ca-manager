@@ -59,7 +59,7 @@ class ExportExtendedMixin:
                 'created_by': getattr(ca, 'created_by', None),
                 'owner_group_id': getattr(ca, 'owner_group_id', None),
             }
-            # Private key: re-encrypt with master key in _encrypt_private_keys
+            # Private key: re-encrypt with master key in _encrypt_section_keys
             # pass. SSH CAs store base64 of the OpenSSH PEM, and the restore
             # puts that same encoding back, so the archive keeps it as stored —
             # but a key that cannot be decrypted aborts the backup rather than
@@ -105,34 +105,3 @@ class ExportExtendedMixin:
                     "exists but could not be read"
                 ) from exc
         return result
-
-    def _encrypt_private_keys(self, backup_data: Dict, master_key: bytes) -> Dict:
-        """Encrypt all private keys in the backup data"""
-        # Encrypt CA private keys
-        for ca in backup_data.get('certificate_authorities', []):
-            if '_private_key_plaintext' in ca:
-                ca['private_key_pem_encrypted'] = self._encrypt_private_key(
-                    ca['_private_key_plaintext'],
-                    master_key
-                )
-                del ca['_private_key_plaintext']
-
-        # Encrypt certificate private keys
-        for cert in backup_data.get('certificates', []):
-            if '_private_key_plaintext' in cert:
-                cert['private_key_pem_encrypted'] = self._encrypt_private_key(
-                    cert['_private_key_plaintext'],
-                    master_key
-                )
-                del cert['_private_key_plaintext']
-
-        # Encrypt SSH CA private keys
-        for ssh_ca in backup_data.get('ssh_cas', []):
-            if '_private_key_plaintext' in ssh_ca:
-                ssh_ca['private_key_pem_encrypted'] = self._encrypt_private_key(
-                    ssh_ca['_private_key_plaintext'],
-                    master_key
-                )
-                del ssh_ca['_private_key_plaintext']
-
-        return backup_data

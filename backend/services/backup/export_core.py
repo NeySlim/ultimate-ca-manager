@@ -36,7 +36,7 @@ class ExportCoreMixin:
         """Generate backup metadata.
 
         The schema fields (version, dialect, sections, counts, exclusions) are
-        added by _schema_metadata() once the payload is known.
+        added by iter_backup() before the sections are written.
         """
         return {
             'version': '1.0',
@@ -152,7 +152,7 @@ class ExportCoreMixin:
                 # A CA awaiting its external certificate keeps its request:
                 # without it the restored CA can never be completed (#298)
                 'csr_pem': ca.csr,
-                'private_key_pem_encrypted': None  # Will be set in _encrypt_private_keys
+                'private_key_pem_encrypted': None  # Will be set in _encrypt_section_keys
             }
 
             # Decrypt at-rest encryption before export (backup uses its own
@@ -237,7 +237,7 @@ class ExportCoreMixin:
                 'owner_group_id': cert.owner_group_id,
                 'certificate_pem': base64.b64decode(cert.crt).decode() if cert.crt else None,
                 'csr_pem': base64.b64decode(cert.csr).decode() if cert.csr else None,
-                'private_key_pem_encrypted': None  # Will be set in _encrypt_private_keys
+                'private_key_pem_encrypted': None  # Will be set in _encrypt_section_keys
             }
 
             # Decrypt at-rest encryption before export (see _export_cas)

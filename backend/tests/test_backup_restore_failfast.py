@@ -25,6 +25,7 @@ from models import db
 from services.backup import manifest
 from services.backup.errors import BackupSchemaError
 
+from tests.backup_v3 import v3_header
 from tests.fresh_app import fresh_app_fixtures
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
@@ -51,8 +52,7 @@ def _reseal(original_blob, data):
     restorer under test.
     """
     svc = _service()
-    metadata_len = struct.unpack('>H', original_blob[8:10])[0]
-    header = original_blob[:10 + metadata_len]
+    header = v3_header(original_blob)
     metadata = json.loads(header[10:].decode())
     salt = base64.b64decode(metadata['salt_b64'])
     nonce = base64.b64decode(metadata['nonce_b64'])

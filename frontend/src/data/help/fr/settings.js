@@ -60,7 +60,7 @@ export default {
         items: [
           { label: "Remplacer ou fusionner", text: "Restaurer depuis une sauvegarde remplace les données d'ici par celles de l'archive et supprime ce que l'archive ne contient pas ; l'entrée d'audit liste ce qui a été supprimé. L'API accepte aussi mode=merge, qui ajoute l'archive aux données d'ici" },
           { label: "Verrou partagé", text: "Sauvegardes et restaurations partagent un même verrou : une restauration est refusée (409) pendant une sauvegarde, et une sauvegarde manuelle attend la fin d'une restauration en cours" },
-          { label: "Limite de téléversement", text: "Une restauration accepte une archive jusqu'à BACKUP_MAX_UPLOAD_MB (512 Mo par défaut), défini dans l'environnement du serveur, et un refus nomme ce paramètre. Un reverse proxy placé devant UCM garde sa propre limite de corps de requête" },
+          { label: "Limite de téléversement", text: "An archive created since 3.0 is restored in chunks and has no size limit unless BACKUP_MAX_ARCHIVE_MB sets one. An older archive is accepted up to BACKUP_MAX_UPLOAD_MB (512 MB by default). Both are set in the server environment and a refusal names its setting. A reverse proxy in front of UCM keeps its own body limit" },
           { label: "Contenu d'une archive", text: "Les archives incluent les orders du client ACME, les demandes d'approbation et les demandes de récupération de clé. Restaurer une archive écrite avant cette version laisse ces lignes ici telles quelles" },
           { label: "Mêmes noms", text: "Un fournisseur DNS, un compte CA ACME ou un webhook dont le nom est déjà porté par une autre ligne ici est restauré sous « nom (2) », et le résultat de restauration renvoyé par l'API le liste" },
           { label: "Paramètres qui désignent une ligne", text: "Les AC émettrices SCEP et ACME, les répondeurs OCSP et paramètres similaires suivent les lignes archivées. Depuis une archive plus ancienne restaurée sur une autre installation, ils sont vidés et doivent être choisis de nouveau" },
@@ -298,7 +298,7 @@ Configurez des sauvegardes automatiques :
 Téléversez un fichier de sauvegarde pour restaurer UCM à un état précédent.
 
 - Sauvegardes et restaurations partagent un même verrou : une restauration est refusée (409) pendant une sauvegarde, et une sauvegarde manuelle attend la fin d'une restauration en cours
-- Le téléversement est accepté jusqu'à \`BACKUP_MAX_UPLOAD_MB\` (512 Mo par défaut, défini dans l'environnement du serveur) ; un reverse proxy placé devant UCM garde sa propre limite de corps de requête
+- An archive created since 3.0 is restored in chunks, with no size limit unless \`BACKUP_MAX_ARCHIVE_MB\` sets one; an older archive is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default). Both are set in the server environment; a reverse proxy in front of UCM keeps its own body limit
 - Les archives contiennent les orders du client ACME, les demandes d'approbation et les demandes de récupération de clé (v2.251)
 - Un fournisseur DNS, un compte CA ACME ou un webhook dont le nom est déjà porté par une autre ligne ici est restauré sous \`nom (2)\`
 - L'API accepte aussi \`mode=merge\`, qui ajoute l'archive aux données d'ici au lieu de les remplacer

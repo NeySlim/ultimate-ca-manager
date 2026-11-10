@@ -16,6 +16,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - HA preview: `UCM_HA=1` enables an HA preview: the node requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, refuses operations that only change the local host, and reports `ha`, `node_id` and `leader` in `/health`. Full high availability arrives in later releases. The Helm chart now probes readiness on `/health/ready` (503 in safe mode only with `UCM_HA=1`) and liveness on `/health/live`.
 - HA preview: one node runs the scheduled tasks, elected by a PostgreSQL advisory lock and replaced within seconds when its connection drops, or about a minute after its host vanishes; nodes heartbeat in `cluster_nodes` (reported under `cluster` in `/health`), "run now" works from any node, and startup migrations run on one node at a time (migration 141).
 - Dashboard: `GET /api/v2/dashboard/queue`, `/health`, `/compliance` and `/issuance` (scope `read:dashboard`, now held by every built-in role and grantable to groups) return the work queue, per-protocol health, compliance counters and issuances and in-place renewals per CA, computed in SQL without parsing certificates. Certificates gain `key_bits` and `sig_hash` columns, backfilled by migration 139.
+### Changed
+
+- Backup: archives are written as format v4, a stream of independently authenticated chunks, so creating one, decrypting it and the checks before the restore plan no longer hold it whole in memory (the plan and the writes still hold every section it carries); `BACKUP_MAX_UPLOAD_MB` now bounds only archives written before 3.0 (v1 to v3), which are still restored, and the new `BACKUP_MAX_ARCHIVE_MB` (0, no limit, by default) can bound v4 archives.
 
 ### Fixed
 

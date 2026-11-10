@@ -371,12 +371,10 @@ def _reseal(svc, original_blob, data):
     """Rewrite an archive's payload, keeping its container and password."""
     import gzip
     import hashlib
-    import struct
     from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    from services.backup import container
+    from tests.backup_v3 import v3_header
 
-    metadata_len = struct.unpack('>H', original_blob[8:10])[0]
-    header = original_blob[:10 + metadata_len]
+    header = v3_header(original_blob)
     metadata = json.loads(header[10:].decode())
     salt = base64.b64decode(metadata['salt_b64'])
     nonce = base64.b64decode(metadata['nonce_b64'])

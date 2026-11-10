@@ -93,7 +93,7 @@ def create_backup():
 
     try:
         service = BackupService()
-        backup_bytes, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
+        size, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
     except BackupBusyError as busy:
         logger.info('Settings backup refused: %s', busy)
         return error_response(str(busy), 409)
@@ -123,15 +123,10 @@ def create_backup():
         # families also answer `size_bytes`, which means the same thing on
         # either of them. The absolute path is gone: where the instance keeps
         # its archives is not the caller's business.
-        'size': len(backup_bytes),
-        'size_bytes': len(backup_bytes),
+        'size': size,
+        'size_bytes': size,
         'download_url': f'/api/v2/settings/backup/{filename}/download',
     }
-
-    warning = storage.restore_limit_warning(len(backup_bytes), service.last_payload_size,
-                                            service.last_payload_containers)
-    if warning:
-        response_data['restore_limit_warning'] = warning
 
     # Include generated password in response so user can save it
     if generated_password:
@@ -139,8 +134,6 @@ def create_backup():
         response_data['password_generated'] = True
 
     message = 'Backup created successfully' + (' - SAVE THE PASSWORD!' if generated_password else '')
-    if warning:
-        message += (' ' if message.endswith('!') else '. ') + warning
     if service.last_export_warnings:
         response_data['export_warnings'] = list(service.last_export_warnings)
         message += (' ' if message.endswith('!') else '. ') + '; '.join(service.last_export_warnings)
@@ -160,9 +153,9 @@ def restore_backup():
     takes a `mode` for the rare case of merging an archive into a live
     instance; this one always replaces.
     """
-    limit = storage.restore_upload_limit()
-    # Before anything reads the body: this route's ceiling, not the global one
-    request.max_content_length = limit + storage.RESTORE_FORM_MARGIN
+    # Before anything reads the body: this route's ceiling, not the global one.
+    # The archive's version decides the rest, once the upload is spooled.
+    request.max_content_length = storage.restore_body_limit()
     if 'file' not in request.files:
         return error_response('No backup file provided', 400)
 
@@ -186,19 +179,20 @@ def restore_backup():
             "rows to a live instance.", 400)
 
     try:
-        from utils.file_validation import validate_upload, BACKUP_EXTENSIONS
+        from utils.file_validation import validate_upload_name, BACKUP_EXTENSIONS
 
-        # Read + size-cap the upload as bytes (restore_backup expects bytes, not
-        # a path). Reading in memory also avoids leaving the encrypted backup on
-        # disk in /tmp, which the previous NamedTemporaryFile(delete=False) path
-        # did on every failed attempt.
+        # The upload is read from its spool, never whole into memory: a v4
+        # archive is restored chunk by chunk, an older one is bounded first.
         try:
-            backup_bytes, _ = validate_upload(
-                file, BACKUP_EXTENSIONS, max_size=limit
-            )
+            validate_upload_name(file, BACKUP_EXTENSIONS)
         except ValueError as exc:
             logger.warning(f"Backup upload validation error: {exc}")
             return error_response('Invalid backup file', 400)
+        too_large = storage.restore_size_refusal(file.stream)
+        if too_large:
+            status, message = too_large
+            logger.warning('Backup upload refused: %s', message)
+            return error_response(message, status)
 
         # Between a backend switch being written and the service restarting
         # onto it, this instance still runs on the backend being left behind:
@@ -216,7 +210,7 @@ def restore_backup():
         try:
             with database_migration_lock(purpose='the restore'), \
                     backup_operation_lock(purpose='the restore'):
-                results = service.restore_backup(backup_bytes, password)
+                results = service.restore_backup_from_stream(file.stream, password)
         except MigrationBusyError as busy:
             return error_response(
                 f"{busy} A backend migration or another restore is still "

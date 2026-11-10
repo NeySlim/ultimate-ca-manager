@@ -60,7 +60,7 @@ export default {
         items: [
           { label: "Sostituire o unire", text: "Ripristina da backup sostituisce i dati presenti con quelli dell'archivio e rimuove ciò che l'archivio non contiene; la voce di audit elenca cosa è stato rimosso. L'API accetta anche mode=merge, che aggiunge l'archivio ai dati presenti" },
           { label: "Blocco condiviso", text: "Backup e ripristini condividono un solo blocco: un ripristino viene rifiutato (409) mentre un backup è in corso, e un backup manuale attende un ripristino in corso" },
-          { label: "Limite di caricamento", text: "Un ripristino accetta un archivio fino a BACKUP_MAX_UPLOAD_MB (512 MB per impostazione predefinita), definito nell'ambiente del server, e il rifiuto cita questa impostazione. Un reverse proxy davanti a UCM ha un proprio limite sul corpo della richiesta" },
+          { label: "Limite di caricamento", text: "An archive created since 3.0 is restored in chunks and has no size limit unless BACKUP_MAX_ARCHIVE_MB sets one. An older archive is accepted up to BACKUP_MAX_UPLOAD_MB (512 MB by default). Both are set in the server environment and a refusal names its setting. A reverse proxy in front of UCM keeps its own body limit" },
           { label: "Cosa contiene un archivio", text: "Gli archivi includono gli ordini del client ACME, le richieste di approvazione e le richieste di recupero chiavi. Il ripristino di un archivio scritto prima di questa versione lascia queste righe com'erano" },
           { label: "Stessi nomi", text: "Un provider DNS, un account CA ACME o un webhook il cui nome è già usato da un'altra riga viene ripristinato come «nome (2)», e il risultato del ripristino restituito dall'API lo elenca" },
           { label: "Impostazioni che indicano una riga", text: "Le CA emittenti SCEP e ACME, i risponditori OCSP e impostazioni analoghe seguono le righe archiviate. Da un archivio più vecchio ripristinato su un'altra installazione vengono svuotate e vanno scelte di nuovo" },
@@ -298,7 +298,7 @@ Configura backup automatici:
 Carica un file di backup per ripristinare UCM a uno stato precedente.
 
 - Backup e ripristini condividono un solo blocco: un ripristino viene rifiutato (409) mentre un backup è in corso, e un backup manuale attende un ripristino in corso
-- Il caricamento è accettato fino a \`BACKUP_MAX_UPLOAD_MB\` (512 MB per impostazione predefinita, definito nell'ambiente del server); un reverse proxy davanti a UCM ha un proprio limite sul corpo della richiesta
+- An archive created since 3.0 is restored in chunks, with no size limit unless \`BACKUP_MAX_ARCHIVE_MB\` sets one; an older archive is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default). Both are set in the server environment; a reverse proxy in front of UCM keeps its own body limit
 - Gli archivi contengono gli ordini del client ACME, le richieste di approvazione e le richieste di recupero chiavi (v2.251)
 - Un provider DNS, un account CA ACME o un webhook il cui nome è già usato da un'altra riga viene ripristinato come \`nome (2)\`
 - L'API accetta anche \`mode=merge\`, che aggiunge l'archivio ai dati presenti invece di sostituirli

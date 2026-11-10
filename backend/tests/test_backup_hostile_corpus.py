@@ -37,6 +37,7 @@ from models import db
 from services.backup import container, manifest
 from services.backup.restore import RestorePlan, RestoreValidationError
 
+from tests.backup_v3 import as_v3, v3_header
 from tests.fresh_app import fresh_app_fixtures
 
 app, auth_client, create_ca, create_cert, create_user = fresh_app_fixtures()
@@ -77,8 +78,8 @@ def _only(*names):
 
 
 def _header_of(blob):
-    metadata_len = struct.unpack('>H', blob[8:10])[0]
-    return blob[:10 + metadata_len]
+    """A v3 header for `blob`: forged payloads are sealed as one v3 ciphertext."""
+    return v3_header(blob)
 
 
 def _key_of(header):
@@ -201,6 +202,13 @@ def archive(app):
         return _service().create_backup(PASSWORD, include=_only(SECTION))
 
 
+@pytest.fixture
+def v3_archive(app, archive):
+    """The same archive as v3, still read: one ciphertext, one tag."""
+    with app.app_context():
+        return as_v3(archive, PASSWORD)
+
+
 @pytest.fixture(autouse=True)
 def no_forged_rows_left(app):
     """Whatever a case wrote, the next file must not find it."""
@@ -256,7 +264,7 @@ class TestATruncatedArchiveIsNotAWrongPassword:
         ('one byte from the end', lambda blob, header: blob[:-1]),
     ])
     def test_a_truncation_only_the_tag_can_see_names_both_causes(
-            self, app, archive, auth_client, where, cut):
+            self, app, v3_archive, auth_client, where, cut):
         """Past the header, the two are the same event to AES-GCM.
 
         The tag fails identically for a wrong key and for bytes that were cut,
@@ -264,7 +272,7 @@ class TestATruncatedArchiveIsNotAWrongPassword:
         the answer must therefore never do is pick one: it names both, so the
         administrator checks the file as well as the password.
         """
-        blob = cut(archive, _header_of(archive))
+        blob = cut(v3_archive, _header_of(v3_archive))
         with app.app_context():
             before = _census()
 
@@ -292,6 +300,103 @@ class TestATruncatedArchiveIsNotAWrongPassword:
             after = _census()
         _assert_refused_cleanly(response, before, after)
         assert response.status_code == 400, response.data
+
+
+def _v4_frames(blob):
+    """The header of a v4 archive, then its framed chunks."""
+    stream = io.BytesIO(blob)
+    _metadata, header = container.read_header(stream)
+    frames = []
+    while True:
+        length = stream.read(4)
+        if not length:
+            return header, frames
+        frames.append(length + stream.read(struct.unpack('>I', length)[0]))
+
+
+class TestAV4ArchiveCutOrRearranged:
+    """A v4 archive is chunks, each bound to its position and to the header.
+
+    Whatever is cut, swapped or rewritten past the first chunk, the refusal
+    says what happened to the file, never that the password is wrong, and
+    nothing is written.
+    """
+
+    @pytest.mark.parametrize('where, cut', [
+        ('in the middle of a chunk', lambda header, frames: header + b''.join(frames)[:-7]),
+        ('after a whole chunk, the end record gone',
+         lambda header, frames: header + b''.join(frames[:-1])),
+        ('inside a chunk length', lambda header, frames: header + frames[0] + frames[1][:2]),
+    ])
+    def test_a_truncation_is_named(self, app, archive, auth_client, where, cut):
+        header, frames = _v4_frames(archive)
+        with app.app_context():
+            before = _census()
+        response = _restore(auth_client, cut(header, frames))
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        message = _message(response).lower()
+        assert 'truncated' in message, (where, message)
+        assert 'password' not in message, (where, message)
+
+    @pytest.mark.parametrize('where, rearrange', [
+        ('two chunks swapped', lambda frames: [frames[0], frames[2], frames[1]] + frames[3:]),
+        ('a chunk left out', lambda frames: frames[:1] + frames[2:]),
+        ('a chunk repeated', lambda frames: frames[:2] + frames[1:]),
+    ])
+    def test_a_rearranged_archive_is_named(self, app, archive, auth_client, where, rearrange):
+        header, frames = _v4_frames(archive)
+        with app.app_context():
+            before = _census()
+        response = _restore(auth_client, header + b''.join(rearrange(frames)))
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        message = _message(response).lower()
+        assert 'does not authenticate' in message, (where, message)
+        assert 'password' not in message, (where, message)
+
+    def test_an_edited_header_is_refused_before_anything_is_read(self, app, archive, auth_client):
+        header, frames = _v4_frames(archive)
+        metadata = json.loads(header[10:].decode())
+        metadata['backup_type'] = 'databases'[:len(metadata['backup_type'])]
+        metadata['sections'] = list(reversed(metadata['sections']))
+        edited = container.build_header(format_version=4, flags=header[5], kdf_id=header[6],
+                                        metadata=metadata)
+        with app.app_context():
+            before = _census()
+        response = _restore(auth_client, edited + b''.join(frames))
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+
+    def test_a_chunk_announcing_more_than_its_header_allows(self, app, archive, auth_client):
+        header, frames = _v4_frames(archive)
+        oversized = struct.pack('>I', 2 ** 32 - 1) + frames[1][4:]
+        with app.app_context():
+            before = _census()
+        response = _restore(auth_client, header + frames[0] + oversized)
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        assert 'header allows' in _message(response)
+
+    def test_a_future_container_version_is_refused(self, app, archive, auth_client):
+        blob = bytearray(archive)
+        blob[4] = 5
+        with app.app_context():
+            before = _census()
+        response = _restore(auth_client, bytes(blob))
+        with app.app_context():
+            after = _census()
+        _assert_refused_cleanly(response, before, after)
+        assert response.status_code == 400, response.data
+        assert 'Unsupported backup format version: 5' in _message(response)
 
 
 # ---------------------------------------------------------------------------

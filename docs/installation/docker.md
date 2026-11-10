@@ -148,6 +148,8 @@ volumes:
 | `UCM_HA` | (unset) | `1` enables HA mode in preview: refuses host-local operations; full high availability arrives in later releases. Requires `DATABASE_URL` (PostgreSQL), `UCM_SECRET_KEY` and `KEY_ENCRYPTION_KEY`, identical on every node |
 | `UCM_NODE_ID` | container hostname | Node name reported as `node_id` by `/health` |
 | `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive a restore accepts and reads, in MB; its decompressed content may be four times that. Every other request keeps the 50 MB limit. |
+| `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive written before 3.0 (format v1 to v3) a restore accepts and reads, in MB; its decompressed content may be four times that. Every other request keeps the 50 MB limit. |
+| `BACKUP_MAX_ARCHIVE_MB` | `0` | Largest v4 archive (written since 3.0) a restore accepts, in MB; `0` accepts any size. |
 
 See full list in [docker-compose.yml](../../docker-compose.yml). SMTP, ACME, the session timeout and the other application settings are configured in the web interface.
 

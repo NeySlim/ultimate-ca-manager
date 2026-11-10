@@ -19,7 +19,7 @@ def _spool_dir():
 def seen(monkeypatch):
     """Record where the restore route's upload is spooled, then let the route go on."""
     import api.v2.system.backup as route
-    original = route.validate_upload
+    original = route.validate_upload_name
     records = []
 
     def spy(file, *args, **kwargs):
@@ -31,7 +31,7 @@ def seen(monkeypatch):
                         'links': os.fstat(fd).st_nlink})
         return original(file, *args, **kwargs)
 
-    monkeypatch.setattr(route, 'validate_upload', spy)
+    monkeypatch.setattr(route, 'validate_upload_name', spy)
     return records
 
 
@@ -65,7 +65,7 @@ def test_an_upload_spools_under_data_dir_and_is_released_on_success(
 def test_an_upload_is_released_when_the_request_fails(auth_client, seen):
     before = set(os.listdir(_spool_dir()))
 
-    response = _restore(auth_client, name='r.exe')   # refused by validate_upload
+    response = _restore(auth_client, name='r.exe')   # refused by validate_upload_name
 
     assert response.status_code == 400
     assert seen and seen[0]['dir'] == _spool_dir()

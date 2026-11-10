@@ -2087,7 +2087,7 @@ Configure automatic backups:
 Upload a backup file to restore UCM to a previous state.
 
 - Backups and restores share one lock: a restore is refused (409) while a backup runs, and a manual backup waits for a running restore
-- The upload is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default, set in the server environment); a reverse proxy in front of UCM keeps its own body limit
+- An archive created since 3.0 is restored in chunks, with no size limit unless \`BACKUP_MAX_ARCHIVE_MB\` sets one; an older archive is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default). Both are set in the server environment; a reverse proxy in front of UCM keeps its own body limit
 - Archives carry ACME client orders, approval requests and key recovery requests (v2.251)
 - A DNS provider, ACME CA account or webhook whose name another row holds here is restored as \`name (2)\`
 - The API also accepts \`mode=merge\`, which adds the archive to the data here instead of replacing it
