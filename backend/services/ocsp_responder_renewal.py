@@ -174,11 +174,11 @@ def _rebind(key, old_cert_id, new_cert_id) -> bool:
 
 
 def _archive(cert_id, serial) -> bool:
-    """Archive the old responder row only if it still holds the serial this run renewed:
-    re-checked after any lock wait, so a row renewed in place meanwhile is left as it is."""
+    """Archive the old responder row only if it still holds the serial this run renewed
+    (a row already archived included): re-checked after any lock wait, so a row renewed
+    in place meanwhile is left as it is."""
     archived = Certificate.query.filter(
         Certificate.id == cert_id, Certificate.serial_number == serial,
-        Certificate.archived.isnot(True),
     ).update({Certificate.archived: True}, synchronize_session=False) == 1
     if archived:
         from sqlalchemy.orm.attributes import set_committed_value
