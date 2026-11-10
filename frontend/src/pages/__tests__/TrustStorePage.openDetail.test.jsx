@@ -12,7 +12,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 let mockIsMobile = false
-const openWindow = vi.fn()
+const openEntity = vi.fn()
 let mockCanRead = true
 
 vi.mock('../../contexts', () => ({
@@ -21,12 +21,12 @@ vi.mock('../../contexts', () => ({
     showConfirm: vi.fn().mockResolvedValue(false),
   }),
   useMobile: () => ({ isMobile: mockIsMobile }),
-  useWindowManager: () => ({ openWindow, closeWindow: vi.fn(), windows: [] }),
+  useInspector: () => ({ openEntity, closeWindow: vi.fn(), windows: [] }),
 }))
 
 // TrustStorePage imports these two directly by path — same spies
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({ openWindow, closeWindow: vi.fn(), windows: [] }),
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({ openEntity, closeWindow: vi.fn(), windows: [] }),
 }))
 vi.mock('../../contexts/MobileContext', () => ({
   useMobile: () => ({ isMobile: mockIsMobile }),
@@ -92,7 +92,7 @@ describe('TrustStorePage — opens detail after add/import', () => {
   beforeEach(() => {
     mockIsMobile = false
     mockCanRead = true
-    openWindow.mockReset()
+    openEntity.mockReset()
     getAll.mockReset()
     add.mockReset()
     exportCA.mockReset()
@@ -114,7 +114,7 @@ describe('TrustStorePage — opens detail after add/import', () => {
     fireEvent.click(checkboxes[1])
     fireEvent.click(screen.getByText('trustStore.addSelected:1'))
     await waitFor(() => expect(add).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('truststore', 101))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('truststore', 101))
   })
 
   it('adding two managed CAs opens nothing', async () => {
@@ -127,7 +127,7 @@ describe('TrustStorePage — opens detail after add/import', () => {
     fireEvent.click(checkboxes[2])
     fireEvent.click(screen.getByText('trustStore.addSelected:2'))
     await waitFor(() => expect(add).toHaveBeenCalledTimes(2))
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
   })
 
   it('Smart Import of a single CA opens it', async () => {
@@ -135,7 +135,7 @@ describe('TrustStorePage — opens detail after add/import', () => {
     renderPage()
     fireEvent.click(await screen.findByText('common.import'))
     fireEvent.click(await screen.findByText('fire-import-complete'))
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('ca', 55))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('ca', 55))
   })
 
   it('Smart Import opening a CA is blocked without read permission', async () => {
@@ -145,6 +145,6 @@ describe('TrustStorePage — opens detail after add/import', () => {
     fireEvent.click(await screen.findByText('common.import'))
     fireEvent.click(await screen.findByText('fire-import-complete'))
     await waitFor(() => expect(screen.queryByText('fire-import-complete')).not.toBeInTheDocument())
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
   })
 })

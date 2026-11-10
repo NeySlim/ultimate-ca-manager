@@ -4316,6 +4316,33 @@
     "restore": "还原",
     "maximize": "最大化"
   },
+  "inspector": {
+    "region": "Inspector",
+    "objectsLabel": "Open objects",
+    "sectionsLabel": "Sections",
+    "closeTab": "Close {{name}}",
+    "close": "Close inspector",
+    "more": "All open objects",
+    "dockBottom": "Dock at the bottom",
+    "dockRight": "Dock on the right",
+    "grow": "Enlarge the inspector",
+    "shrink": "Reduce the inspector",
+    "resizeHeight": "Inspector height",
+    "resizeWidth": "Inspector width",
+    "loadFailed": "This object could not be loaded.",
+    "types": {
+      "certificate": "Certificate",
+      "ca": "CA",
+      "truststore": "Trusted certificate",
+      "user_certificate": "User certificate"
+    },
+    "sections": {
+      "overview": "Overview",
+      "chain": "Chain",
+      "extensions": "Extensions",
+      "pem": "PEM"
+    }
+  },
   "table": {
     "noResults": "没有匹配的结果",
     "adjustFilters": "请尝试调整筛选条件或搜索词",

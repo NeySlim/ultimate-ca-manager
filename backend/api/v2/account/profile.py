@@ -32,6 +32,17 @@ def _valid_pins(v):
             and len(set(v)) == len(v))
 
 
+def _valid_inspector(v):
+    if not isinstance(v, dict) or set(v) - {'position', 'height', 'width'}:
+        return False
+    if 'position' in v and v['position'] not in ('bottom', 'right'):
+        return False
+    for key, lo, hi in (('height', 160, 4000), ('width', 280, 4000)):
+        if key in v and not (type(v[key]) is int and lo <= v[key] <= hi):
+            return False
+    return True
+
+
 # Whitelist of allowed preference keys + value validators. Anything not listed here is
 # silently dropped to avoid storing arbitrary blobs (a bad pin list is refused instead).
 _PREF_VALIDATORS = {
@@ -54,6 +65,8 @@ _PREF_VALIDATORS = {
     'update_popup_seen_version': lambda v: isinstance(v, str) and 1 <= len(v) <= 32,
     # Last version for which the admin dismissed the Ko-fi support card
     'kofi_seen_version': lambda v: isinstance(v, str) and 1 <= len(v) <= 32,
+    # Inspector dock: anchor side and size; a malformed value is refused (400)
+    'inspector': lambda v: _valid_inspector(v),
 }
 
 
@@ -185,6 +198,8 @@ def update_preferences():
     # PUT replaces; PATCH would merge — frontend currently uses PUT after
     # merging client-side, which keeps the contract simple.
     cleaned = _sanitize_preferences(payload)
+    if isinstance(payload, dict) and 'inspector' in payload and 'inspector' not in cleaned:
+        return error_response('Invalid inspector preference', 400)
     try:
         user.set_preferences(cleaned)
         db.session.commit()

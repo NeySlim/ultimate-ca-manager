@@ -1,10 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Suspense } from 'react'
-import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, WindowManagerProvider, useAuth } from './contexts'
+import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, InspectorProvider, useAuth } from './contexts'
 import { WebSocketProvider } from './hooks/useWebSocket'
 import { MODULES, REDIRECTS } from './navigation/registry'
 import { pages, lazyWithRetry } from './navigation/pages'
-import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, ForceEnroll2FA, SafeModeOverlay, DetailWindowLayer } from './components'
+import { AppShell, ErrorBoundary, LoadingSpinner, SessionWarning, ForcePasswordChange, ForceEnroll2FA, SafeModeOverlay, InspectorDock } from './components'
 
 // Lazy load pages for code splitting (module pages are bound in navigation/pages.js)
 const LoginPage = lazyWithRetry(() => import('./pages/LoginPage'))
@@ -137,11 +137,11 @@ export default function App() {
             <NotificationProvider>
             <WebSocketProvider>
               <MobileProvider>
-                <WindowManagerProvider>
+                <InspectorProvider>
                   <SafeModeOverlay />
                   <AppRoutes />
-                  <DetailWindowLayer />
-                </WindowManagerProvider>
+                  <InspectorDock />
+                </InspectorProvider>
               </MobileProvider>
             </WebSocketProvider>
             </NotificationProvider>

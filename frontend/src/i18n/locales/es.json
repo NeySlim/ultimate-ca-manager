@@ -4316,6 +4316,33 @@
     "restore": "Restaurar",
     "maximize": "Maximizar"
   },
+  "inspector": {
+    "region": "Inspector",
+    "objectsLabel": "Open objects",
+    "sectionsLabel": "Sections",
+    "closeTab": "Close {{name}}",
+    "close": "Close inspector",
+    "more": "All open objects",
+    "dockBottom": "Dock at the bottom",
+    "dockRight": "Dock on the right",
+    "grow": "Enlarge the inspector",
+    "shrink": "Reduce the inspector",
+    "resizeHeight": "Inspector height",
+    "resizeWidth": "Inspector width",
+    "loadFailed": "This object could not be loaded.",
+    "types": {
+      "certificate": "Certificate",
+      "ca": "CA",
+      "truststore": "Trusted certificate",
+      "user_certificate": "User certificate"
+    },
+    "sections": {
+      "overview": "Overview",
+      "chain": "Chain",
+      "extensions": "Extensions",
+      "pem": "PEM"
+    }
+  },
   "table": {
     "noResults": "Sin resultados coincidentes",
     "adjustFilters": "Intente ajustar sus filtros o términos de búsqueda",

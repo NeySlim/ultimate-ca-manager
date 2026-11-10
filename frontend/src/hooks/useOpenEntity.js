@@ -1,29 +1,23 @@
 import { useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useMobile, useWindowManager } from '../contexts'
+import { useInspector } from '../contexts'
 import { usePermission } from '.'
-import { moduleById } from '../navigation/registry'
 
-// Deep link of each type's page and the scope its detail is read with
-const ENTITIES = {
-  certificate: { route: moduleById('certificates').path, resource: 'certificates' },
-  ca: { route: moduleById('cas').path, resource: 'cas' },
-  truststore: { route: moduleById('truststore').path, resource: 'truststore' },
+// The scope each type's detail is read with
+const RESOURCES = {
+  certificate: 'certificates',
+  ca: 'cas',
+  truststore: 'truststore',
 }
 
-/**
- * Open an entity's detail from any page: a floating window on desktop, its
- * page's deep link on mobile, where floating windows are not shown.
- */
+/** Open an entity's detail in the inspector, from any page. */
 export function useOpenEntity() {
-  const { isMobile } = useMobile()
-  const { openWindow } = useWindowManager()
+  const { openEntity } = useInspector()
   const { canRead } = usePermission()
-  const navigate = useNavigate()
-  return useCallback((type, id) => {
-    const entity = ENTITIES[type]
-    if (!id || !entity || !canRead(entity.resource)) return
-    if (isMobile) navigate(`${entity.route}/${id}`)
-    else openWindow(type, id)
-  }, [isMobile, openWindow, canRead, navigate])
+  return useCallback((type, id, opts) => {
+    const resource = RESOURCES[type]
+    if (!id || !resource || !canRead(resource)) return
+    // The options argument is passed only when there is one
+    if (opts) openEntity(type, id, opts)
+    else openEntity(type, id)
+  }, [openEntity, canRead])
 }

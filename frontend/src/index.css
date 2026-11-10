@@ -314,6 +314,12 @@ html, body, #root {
   width: 100%;
 }
 
+/* Room for the inspector dock, set by InspectorDock while it is open */
+#root {
+  padding-bottom: var(--inspector-reserve-bottom, 0);
+  padding-right: var(--inspector-reserve-right, 0);
+}
+
 @layer base {
   * {
     @apply border-border;

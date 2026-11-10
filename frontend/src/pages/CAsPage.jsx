@@ -13,7 +13,6 @@ import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout } from '../components/ui/responsive'
 import { casService } from '../services'
 import { useNotification } from '../contexts'
-import { useWindowManager } from '../contexts/WindowManagerContext'
 import { usePermission, useModals, useRecentHistory, useWebSocket, usePersistedState } from '../hooks'
 import { useMobile } from '../contexts/MobileContext'
 import { extractData, cn } from '../lib/utils'
@@ -33,7 +32,6 @@ export default function CAsPage() {
   const { id: urlCAId } = useParams()
   const navigate = useNavigate()
   const { isMobile } = useMobile()
-  const { openWindow } = useWindowManager()
   const openEntity = useOpenEntity()
   const { showSuccess, showError, showWarning, showConfirm } = useNotification()
   const { canWrite, canDelete, hasPermission } = usePermission()
@@ -114,7 +112,7 @@ export default function CAsPage() {
     }
   }, [])
 
-  // Reload when floating window actions change data. loadCAs must be in the
+  // Reload when inspector actions change data. loadCAs must be in the
   // dependencies: a listener registered once keeps the loader captured at
   // mount and reloads with the state of that moment (#345).
   useEffect(() => {
@@ -125,7 +123,7 @@ export default function CAsPage() {
     return () => window.removeEventListener('ucm:data-changed', handler)
   }, [loadCAs])
 
-  // Handle open pins modal event from floating window
+  // Handle open pins modal event from inspector
   useEffect(() => {
     const handler = (e) => {
       if (e.detail?.caId) {
@@ -160,7 +158,7 @@ export default function CAsPage() {
       const id = parseInt(urlCAId, 10)
       if (!isNaN(id)) {
         if (!isMobile) {
-          openWindow('ca', id)
+          openEntity('ca', id)
         } else {
           loadCADetails({ id })
         }
@@ -188,9 +186,9 @@ export default function CAsPage() {
   }
 
   const loadCADetails = async (ca) => {
-    // Desktop: open floating window
+    // Desktop: open inspector
     if (!isMobile) {
-      openWindow('ca', ca.id)
+      openEntity('ca', ca.id)
       addToHistory({
         id: ca.id,
         name: ca.common_name || ca.descr || `CA ${ca.id}`,

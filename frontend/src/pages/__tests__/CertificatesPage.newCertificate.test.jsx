@@ -24,14 +24,14 @@ vi.mock('react-i18next', () => ({
 }))
 
 let mockIsMobile = false
-const openWindow = vi.fn()
+const openEntity = vi.fn()
 const create = vi.fn()
 
 vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: mockIsMobile, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
-  useWindowManager: () => ({
-    openWindow, closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity, closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
 }))
@@ -96,7 +96,7 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
   beforeEach(() => {
     window.localStorage.clear()
     mockIsMobile = false
-    openWindow.mockReset()
+    openEntity.mockReset()
     create.mockReset()
     getAll.mockReset()
     getAll.mockResolvedValue({ data: [], meta: { total: 0 } })
@@ -115,7 +115,7 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
     create.mockResolvedValue({ data: { id: 99, cn: 'new.example.com' } })
     renderPage()
     await issue()
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('certificate', 99))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('certificate', 99))
   })
 
   it('opens nothing while the request waits for approval', async () => {
@@ -125,7 +125,7 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
     renderPage()
     await issue()
     await waitFor(() => expect(create).toHaveBeenCalled())
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
   })
 
   it('Smart Import of a single certificate opens it', async () => {
@@ -134,7 +134,7 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
     await waitFor(() => expect(getAll).toHaveBeenCalled())
     fireEvent.click(screen.getAllByText('common.import')[0])
     fireEvent.click(await screen.findByText('fire-import-complete'))
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('certificate', 13))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('certificate', 13))
   })
 
   it('Smart Import of a single CA opens it', async () => {
@@ -143,7 +143,7 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
     await waitFor(() => expect(getAll).toHaveBeenCalled())
     fireEvent.click(screen.getAllByText('common.import')[0])
     fireEvent.click(await screen.findByText('fire-import-complete'))
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('ca', 21))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('ca', 21))
   })
 
   it('Smart Import of several objects opens nothing', async () => {
@@ -153,7 +153,7 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
     fireEvent.click(screen.getAllByText('common.import')[0])
     fireEvent.click(await screen.findByText('fire-import-complete'))
     await waitFor(() => expect(screen.queryByText('fire-import-complete')).not.toBeInTheDocument())
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
   })
 
   it('a deep link opens the certificate even when filters hide its row', async () => {

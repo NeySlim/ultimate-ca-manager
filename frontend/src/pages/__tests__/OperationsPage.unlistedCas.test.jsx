@@ -16,7 +16,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 let mockIsMobile = false
-const openWindow = vi.fn()
+const openEntity = vi.fn()
 
 vi.mock('../../contexts', () => ({
   useNotification: () => ({
@@ -28,8 +28,8 @@ vi.mock('../../contexts', () => ({
     isLargeScreen: !mockIsMobile, screenWidth: mockIsMobile ? 375 : 1440,
     sidebarOpen: true, setSidebarOpen: vi.fn(),
   }),
-  useWindowManager: () => ({
-    openWindow, closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity, closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
 }))

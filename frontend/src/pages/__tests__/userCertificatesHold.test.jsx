@@ -37,12 +37,12 @@ vi.mock('../../contexts', () => ({
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
 }))
 
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({
-    openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({
+    openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
-  WindowManagerProvider: ({ children }) => children,
+  InspectorProvider: ({ children }) => children,
 }))
 
 vi.mock('../../hooks', async () => {

@@ -1,7 +1,7 @@
 /**
  * UserCertificatesPage - Manage user/client certificates (mTLS)
  * 
- * Follows CertificatesPage patterns: stats bar, floating windows, rowActions, server-side pagination.
+ * Follows CertificatesPage patterns: stats bar, inspectors, rowActions, server-side pagination.
  * RBAC: viewers see own, operators/admins manage all, auditors read-only
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
@@ -17,7 +17,7 @@ import { userCertificatesService } from '../services'
 import { RevokeCertificateModal } from '../components/RevokeCertificateModal'
 import { ExportModal } from '../components/ExportModal'
 import { useNotification, useMobile } from '../contexts'
-import { useWindowManager } from '../contexts/WindowManagerContext'
+import { useInspector } from '../contexts/InspectorContext'
 import { usePermission, usePersistedState } from '../hooks'
 import { formatDate, extractCN, isOnHold } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
@@ -28,7 +28,7 @@ export default function UserCertificatesPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
-  const { openWindow } = useWindowManager()
+  const { openEntity } = useInspector()
   const { canWrite, canDelete, hasPermission } = usePermission()
 
   // Data
@@ -78,7 +78,7 @@ export default function UserCertificatesPage() {
 
   useEffect(() => { loadData() }, [loadData])
 
-  // Listen for data change events (from floating windows)
+  // Listen for data change events (from inspectors)
   useEffect(() => {
     const handler = (e) => {
       if (e.detail?.type === 'user_certificate') loadData()
@@ -111,12 +111,12 @@ export default function UserCertificatesPage() {
     }
   }, [])
 
-  // Row click → open floating window (desktop) or slide-over (mobile)
+  // Row click → open inspector (desktop) or slide-over (mobile)
   const handleSelectCert = useCallback(async (row) => {
     if (!row) { setSelectedCert(null); return }
 
     if (!isMobile) {
-      openWindow('user_certificate', row.id)
+      openEntity('user_certificate', row.id)
       return
     }
 
@@ -127,7 +127,7 @@ export default function UserCertificatesPage() {
     } catch {
       setSelectedCert(row)
     }
-  }, [isMobile, openWindow])
+  }, [isMobile, openEntity])
 
   // Status badge helper
   const getStatusBadge = useCallback((row) => {

@@ -3,6 +3,7 @@
  */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useOpenEntity } from '../hooks/useOpenEntity'
 import * as Dialog from '@radix-ui/react-dialog'
 import {
   MagnifyingGlass,
@@ -27,6 +28,10 @@ const COMMANDS = paletteCommands()
 
 export function CommandPalette({ open, onOpenChange }) {
   const navigate = useNavigate()
+  const openInInspector = useOpenEntity()
+  // The control focused before the palette opened, and whether the palette handed over to the inspector
+  const returnTo = useRef(null)
+  const openedInspector = useRef(false)
   const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const [selectedIndex, setSelectedIndex] = useState(0)
@@ -50,6 +55,18 @@ export function CommandPalette({ open, onOpenChange }) {
     }
   }
   
+  // Certificates and CAs open in the inspector; the other types still go to their page
+  const INSPECTOR_TYPE = { certificates: 'certificate', certificate: 'certificate', cas: 'ca', ca: 'ca' }
+  const openItem = (type, id) => {
+    const inspectorType = INSPECTOR_TYPE[type]
+    if (inspectorType) {
+      openedInspector.current = true
+      openInInspector(inspectorType, id, { origin: returnTo.current })
+    }
+    else navigate(getTypePath(type, id))
+    onOpenChange(false)
+  }
+
   // Get path for item type
   const getTypePath = (type, id) => {
     switch (type) {
@@ -219,6 +236,8 @@ export function CommandPalette({ open, onOpenChange }) {
         <Dialog.Content
           className="fixed top-[20%] left-1/2 -translate-x-1/2 w-full max-w-lg bg-bg-secondary border border-border rounded-lg shadow-2xl z-[301] overflow-hidden"
           onKeyDown={handleKeyDown}
+          onOpenAutoFocus={() => { returnTo.current = document.activeElement; openedInspector.current = false }}
+          onCloseAutoFocus={(e) => { if (openedInspector.current) e.preventDefault() }}
           aria-describedby={undefined}
         >
           {/* Search Input */}
@@ -257,8 +276,7 @@ export function CommandPalette({ open, onOpenChange }) {
                       <button
                         key={`cert-${item.id}`}
                         onClick={() => {
-                          navigate(`/certificates?selected=${item.id}`)
-                          onOpenChange(false)
+                          openItem('certificate', item.id)
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                       >
@@ -289,8 +307,7 @@ export function CommandPalette({ open, onOpenChange }) {
                       <button
                         key={`ca-${item.id}`}
                         onClick={() => {
-                          navigate(`/cas?selected=${item.id}`)
-                          onOpenChange(false)
+                          openItem('ca', item.id)
                         }}
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                       >
@@ -421,8 +438,7 @@ export function CommandPalette({ open, onOpenChange }) {
                     <button
                       key={`fav-${item.type}-${item.id}`}
                       onClick={() => {
-                        navigate(getTypePath(item.type, item.id))
-                        onOpenChange(false)
+                        openItem(item.type, item.id)
                       }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                     >
@@ -453,8 +469,7 @@ export function CommandPalette({ open, onOpenChange }) {
                     <button
                       key={`recent-${item.type}-${item.id}`}
                       onClick={() => {
-                        navigate(getTypePath(item.type, item.id))
-                        onOpenChange(false)
+                        openItem(item.type, item.id)
                       }}
                       className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors text-text-secondary hover:bg-bg-tertiary"
                     >

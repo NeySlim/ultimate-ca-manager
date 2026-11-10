@@ -12,7 +12,7 @@ vi.mock('../../contexts', () => ({
   ThemeProvider: ({ children }) => children,
   NotificationProvider: ({ children }) => children,
   MobileProvider: ({ children }) => children,
-  WindowManagerProvider: ({ children }) => children,
+  InspectorProvider: ({ children }) => children,
 }))
 vi.mock('../../hooks/useWebSocket', () => ({ WebSocketProvider: ({ children }) => children }))
 vi.mock('../../components', async () => {

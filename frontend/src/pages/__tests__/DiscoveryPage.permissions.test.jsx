@@ -36,8 +36,8 @@ vi.mock('../../contexts', () => ({
   useAuth: () => ({ user: { id: 1, username: 'probe' }, permissions: authState.permissions }),
   useMobile: () => ({ isMobile: false, isTablet: false, isDesktop: true, isTouch: false, isLargeScreen: true, screenWidth: 1440, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useTheme: () => ({ theme: 'dark', setTheme: vi.fn(), resolvedTheme: 'dark', themes: ['light', 'dark'] }),
-  useWindowManager: () => ({
-    openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
 }))

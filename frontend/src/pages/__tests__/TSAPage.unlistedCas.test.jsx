@@ -20,15 +20,15 @@ vi.mock('../../contexts', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn() }),
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useTheme: () => ({ theme: 'dark', setTheme: vi.fn(), resolvedTheme: 'dark', themes: ['light', 'dark'] }),
-  useWindowManager: () => ({
-    openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
   AuthProvider: ({ children }) => children,
   ThemeProvider: ({ children }) => children,
   NotificationProvider: ({ children }) => children,
   MobileProvider: ({ children }) => children,
-  WindowManagerProvider: ({ children }) => children,
+  InspectorProvider: ({ children }) => children,
 }))
 
 vi.mock('../../contexts/AuthContext', () => ({

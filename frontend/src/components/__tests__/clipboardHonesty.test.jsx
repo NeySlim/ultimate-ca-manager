@@ -46,7 +46,7 @@ vi.mock('../../contexts', () => ({
   useMobile: () => ({ isMobile: false, isTablet: false }),
   useTheme: () => ({ theme: 'dark', setTheme: vi.fn() }),
   useAuth: () => ({ user: { role: 'admin' }, permissions: ['*'], isAuthenticated: true }),
-  useWindowManager: () => ({ windows: [], openWindow: vi.fn(), closeWindow: vi.fn() }),
+  useInspector: () => ({ windows: [], openEntity: vi.fn(), closeWindow: vi.fn() }),
 }))
 
 vi.mock('../../services', () => ({
