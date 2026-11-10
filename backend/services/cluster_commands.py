@@ -69,6 +69,10 @@ _RELEASE_SQL = text("UPDATE cluster_nodes SET restart_seen = :prev WHERE node_id
                     "AND restart_seen = :id")
 
 
+class _ClaimNotGivenBack(Exception):
+    """The pass stops here; _give_back already logged why."""
+
+
 def _ha_from_environment():
     # The master reads this before config.settings: the same test as env_bool('UCM_HA')
     return os.getenv('UCM_HA', '').strip().lower() in ('1', 'true', 'yes', 'on')
@@ -297,6 +301,8 @@ class CommandApplier:
                 self._mark_seen(conn, self.seen)
             self._drain(conn)
             self._error_logged = False
+        except _ClaimNotGivenBack:
+            self._close()  # the commands were read: no second line
         except Exception as e:
             self._close()
             if not self._error_logged:
@@ -468,7 +474,7 @@ class CommandApplier:
                 logger.error(f"Rolling restart of node {self.node_id}: claim of command {command_id} "
                              f"not given back, retried on the next pass: {type(e).__name__}: {e}")
                 self._give_back_pending[2] = True
-            raise
+            raise _ClaimNotGivenBack() from e
         self._give_back_pending = None
 
     def _drop_held(self):

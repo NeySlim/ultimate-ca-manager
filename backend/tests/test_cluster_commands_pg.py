@@ -785,7 +785,12 @@ def test_a_claim_not_given_back_after_a_failed_restart_is_given_back_later(app, 
     solo.run_once()
     _fail_until(solo, clock, attempts, 1)
     assert _restart_seen(app, 'solo') == restart_id  # still claimed
-    assert any(r.levelno == logging.ERROR and 'given back' in r.getMessage() for r in caplog.records)
+    # The commands were read: the one line about the claim, none saying they were not
+    errors = [r.getMessage() for r in caplog.records if r.name == cc.logger.name and r.levelno >= logging.ERROR]
+    others = [m for m in errors if 'failed' not in m]
+    assert len(others) == 1 and others[0].startswith(
+        f"Rolling restart of node {PREFIX}solo: claim of command {restart_id} not given back, "
+        "retried on the next pass")
     monkeypatch.setattr(cc, '_RELEASE_SQL', real_release)
     mark = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'})
     solo.run_once()  # same instant: the claim is given back, no attempt yet
