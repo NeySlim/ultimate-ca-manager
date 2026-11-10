@@ -89,3 +89,13 @@ def test_blocked_is_bounded_by_the_auto_renewal_days(app, auth_client, rules):
         assert _kinds(auth_client, far.id) == []
         item = _find(_queue(auth_client), 'auto_renewal_blocked', near.id)
         assert item is not None and item['tier'] == 'critical'
+
+
+def test_declined_then_reissued_identically_is_superseded(app, auth_client, rules):
+    with app.app_context():
+        ca = rules.ca('rules-ca-d', prv='k')
+        old = rules.cert('rules-reissued', 10, prv='k', caref=ca.refid)
+        rules.cert('rules-reissued', 300, prv='k', caref=ca.refid)
+        rules.reject(old, trigger='manual')
+        db.session.commit()
+        assert _kinds(auth_client, old.id) == []

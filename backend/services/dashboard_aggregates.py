@@ -288,7 +288,7 @@ def _blocked_conditions(now):
 
 
 def _declined_conditions(now):
-    return [*_live_until(now, EXPIRY_WINDOW_DAYS), _renewal_declined()]
+    return [*_live_until(now, EXPIRY_WINDOW_DAYS), _renewal_declined(), ~_superseded(now)]
 
 
 def _client_overdue_conditions(now):
