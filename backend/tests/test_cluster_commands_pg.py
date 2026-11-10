@@ -818,6 +818,35 @@ def test_a_restart_gone_past_a_dead_node_is_retried_after_its_backoff_not_the_gu
     assert attempts[1] - attempts[0] == cc.RESTART_RETRY_FIRST
 
 
+@pytest.mark.parametrize('database', ['back', 'still-lost'])
+def test_stop_gives_back_a_claim_still_pending(app, ha, monkeypatch, caplog, database):
+    """A worker started after this one can claim the restart; a failure is logged, not raised."""
+    import logging
+    from sqlalchemy import text
+    real_release = cc._RELEASE_SQL
+
+    def action():
+        monkeypatch.setattr(cc, '_RELEASE_SQL', text('SELECT cc_no_such_function()'))
+        raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', monotonic=_FakeMonotonic(), restart_action=action)
+    caplog.set_level(logging.INFO, logger=cc.logger.name)
+    restart_id = _emit(app, cc.RESTART)
+    for _ in range(5):
+        solo._monotonic.t += 1
+        solo.run_once()
+    assert _restart_seen(app, 'solo') == restart_id and solo._give_back_pending is not None
+    if database == 'back':
+        monkeypatch.setattr(cc, '_RELEASE_SQL', real_release)
+    caplog.clear()
+    solo.stop()
+    if database == 'back':
+        assert _restart_seen(app, 'solo') is None and solo._give_back_pending is None
+    else:
+        assert _restart_seen(app, 'solo') == restart_id
+        assert [r.levelno for r in caplog.records if 'given back' in r.getMessage()] == [logging.ERROR]
+
+
 def test_stop_during_a_failed_restart_is_not_undone(app, ha):
     """stop() lands between the failed restart's check of _stopping and its _stop.clear()."""
     clock = _FakeMonotonic()

@@ -262,10 +262,25 @@ class CommandApplier:
         self._stop.set()
         if self._thread is not None and self._thread is not threading.current_thread():
             self._thread.join(timeout)
+        if self._give_back_pending is not None and not (
+                self._thread is not None and self._thread.is_alive()
+                and self._thread is not threading.current_thread()):
+            self._give_back_at_stop()
         self._close()
         if self._engine is not None:
             self._engine.dispose()
             self._engine = None
+
+    def _give_back_at_stop(self):
+        """Once, so that the process started after this one can claim the restart."""
+        command_id = self._give_back_pending[1]
+        self._give_back_pending[2] = True  # the line below is the one logged
+        try:
+            self._give_back(self._connection())
+        except Exception as e:
+            cause = e.__cause__ or e
+            logger.error(f"Rolling restart of node {self.node_id}: claim of command {command_id} "
+                         f"not given back at stop: {type(cause).__name__}: {cause}")
 
     def _loop(self):
         while not self._stop.is_set():
