@@ -22,7 +22,7 @@ export default {
           { label: '续期', text: '续期证书，无论单独还是批量，同样会排队；无法执行的续期（已吊销、服务器不持有密钥）会被立即拒绝' },
           { label: '吊销', text: '在吊销策略下，吊销证书（单个、批量、用户证书）或中间 CA 会被排队；审批完成后按所要求的原因执行吊销' },
           { label: '调度器', text: '在续期策略下，调度器会将续期排队；审批完成后使用服务器持有的密钥重新签署，与调度器原本的做法一致' },
-          { label: 'Enrolment protocols', text: 'An ACME finalize, an EST enrolment, re-enrolment or server key generation, a SCEP request (even on an auto-approving profile) or a WSTEP enrolment or renewal under a policy that requires approval is held: the client is told the request is pending and polls; the approval issues the certificate through that protocol, a rejection or expiry is reported to the client as a refusal' },
+          { label: '注册协议', text: '在要求审批的策略下，ACME finalize、EST 注册、重新注册或服务器密钥生成、SCEP 请求（即使配置文件为自动批准）以及 WSTEP 注册或续订都会被暂时保留：客户端会被告知请求处于待处理状态并持续轮询；批准后将通过该协议签发证书，拒绝或过期则会向客户端报告为拒绝' },
           { label: '管理员', text: '在所有路径上绕过队列，与签发表单一致' },
         ]
       },

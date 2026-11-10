@@ -862,7 +862,7 @@
       "renewedWithRelated": "証明書を更新しました（リンクされた証明書 #{{id}} も更新）",
       "bulkRelatedRenewed": "選択した証明書と共に、リンクされた証明書 {{count}} 件を更新しました"
     },
-    "renewed": "Certificate renewed"
+    "renewed": "証明書を更新しました"
   },
   "cas": {
     "chainRevoked": "上位で失効",
@@ -4074,12 +4074,12 @@
     },
     "subjectAltNames": "サブジェクト代替名",
     "entityTitle": {
-      "certificate": "Certificate #{{id}}",
+      "certificate": "証明書 #{{id}}",
       "ca": "CA #{{id}}",
-      "truststore": "Trust Store #{{id}}",
-      "userCertificate": "User Certificate #{{id}}"
+      "truststore": "トラストストア #{{id}}",
+      "userCertificate": "ユーザー証明書 #{{id}}"
     },
-    "ownerLabel": "Owner: {{owner}}"
+    "ownerLabel": "所有者: {{owner}}"
   },
   "compare": {
     "title": "証明書の比較",
@@ -4404,18 +4404,18 @@
       "revocation": "失効",
       "ca_revocation": "CA の失効",
       "cross_revocation": "クロス証明書の失効",
-      "acme_order": "ACME order",
-      "est_enroll": "EST enrolment",
-      "scep_request": "SCEP request",
-      "wstep_request": "WSTEP request"
+      "acme_order": "ACMEオーダー",
+      "est_enroll": "EST登録",
+      "scep_request": "SCEPリクエスト",
+      "wstep_request": "WSTEPリクエスト"
     },
     "revocationPerformed": "承認済み: 失効が実行されました",
     "summarySerial": "シリアル番号",
     "summaryInvalidity": "無効日",
     "summaryTrigger": "要求元",
-    "summaryProtocol": "Protocol",
-    "summaryIdentity": "Protocol identity",
-    "summaryCsr": "Certificate request (CSR)",
+    "summaryProtocol": "プロトコル",
+    "summaryIdentity": "プロトコルID",
+    "summaryCsr": "証明書リクエスト（CSR）",
     "triggerScheduler": "更新スケジューラ"
   },
   "messages": {

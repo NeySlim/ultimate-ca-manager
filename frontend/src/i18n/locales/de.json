@@ -862,7 +862,7 @@
       "renewedWithRelated": "Zertifikat erneuert, zusammen mit seinem verknüpften Zertifikat #{{id}}",
       "bulkRelatedRenewed": "{{count}} verknüpfte Zertifikate zusammen mit der Auswahl erneuert"
     },
-    "renewed": "Certificate renewed"
+    "renewed": "Zertifikat erneuert"
   },
   "cas": {
     "chainRevoked": "Übergeordnet gesperrt",
@@ -4071,12 +4071,12 @@
     },
     "subjectAltNames": "Alternative Antragstellernamen",
     "entityTitle": {
-      "certificate": "Certificate #{{id}}",
+      "certificate": "Zertifikat #{{id}}",
       "ca": "CA #{{id}}",
-      "truststore": "Trust Store #{{id}}",
-      "userCertificate": "User Certificate #{{id}}"
+      "truststore": "Vertrauensspeicher #{{id}}",
+      "userCertificate": "Benutzerzertifikat #{{id}}"
     },
-    "ownerLabel": "Owner: {{owner}}"
+    "ownerLabel": "Besitzer: {{owner}}"
   },
   "compare": {
     "title": "Zertifikate vergleichen",
@@ -4401,18 +4401,18 @@
       "revocation": "Widerruf",
       "ca_revocation": "CA-Widerruf",
       "cross_revocation": "Widerruf eines Cross-Zertifikats",
-      "acme_order": "ACME order",
-      "est_enroll": "EST enrolment",
-      "scep_request": "SCEP request",
-      "wstep_request": "WSTEP request"
+      "acme_order": "ACME-Bestellung",
+      "est_enroll": "EST-Registrierung",
+      "scep_request": "SCEP-Anfrage",
+      "wstep_request": "WSTEP-Anfrage"
     },
     "revocationPerformed": "Genehmigt: der Widerruf wurde ausgeführt",
     "summarySerial": "Seriennummer",
     "summaryInvalidity": "Ungültigkeitsdatum",
     "summaryTrigger": "Angefordert von",
-    "summaryProtocol": "Protocol",
-    "summaryIdentity": "Protocol identity",
-    "summaryCsr": "Certificate request (CSR)",
+    "summaryProtocol": "Protokoll",
+    "summaryIdentity": "Protokollidentität",
+    "summaryCsr": "Zertifikatsanfrage (CSR)",
     "triggerScheduler": "Erneuerungsplaner"
   },
   "messages": {

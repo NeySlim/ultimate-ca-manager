@@ -866,7 +866,7 @@
       "renewedWithRelated": "Сертифікат поновлено разом із пов'язаним сертифікатом #{{id}}",
       "bulkRelatedRenewed": "Разом із вибраними поновлено пов'язаних сертифікатів: {{count}}"
     },
-    "renewed": "Certificate renewed"
+    "renewed": "Сертифікат поновлено"
   },
   "cas": {
     "chainRevoked": "Відкликано вище",
@@ -4127,12 +4127,12 @@
     },
     "subjectAltNames": "Альтернативні імена суб'єкта",
     "entityTitle": {
-      "certificate": "Certificate #{{id}}",
-      "ca": "CA #{{id}}",
-      "truststore": "Trust Store #{{id}}",
-      "userCertificate": "User Certificate #{{id}}"
+      "certificate": "Сертифікат №{{id}}",
+      "ca": "CA №{{id}}",
+      "truststore": "Сховище довіри №{{id}}",
+      "userCertificate": "Сертифікат користувача №{{id}}"
     },
-    "ownerLabel": "Owner: {{owner}}"
+    "ownerLabel": "Власник: {{owner}}"
   },
   "compare": {
     "title": "Compare Сертифікатs",
@@ -4463,18 +4463,18 @@
       "revocation": "Відкликання",
       "ca_revocation": "Відкликання ЦС",
       "cross_revocation": "Відкликання перехресного сертифіката",
-      "acme_order": "ACME order",
-      "est_enroll": "EST enrolment",
-      "scep_request": "SCEP request",
-      "wstep_request": "WSTEP request"
+      "acme_order": "Замовлення ACME",
+      "est_enroll": "Реєстрація EST",
+      "scep_request": "Запит SCEP",
+      "wstep_request": "Запит WSTEP"
     },
     "revocationPerformed": "Схвалено: відкликання виконано",
     "summarySerial": "Серійний номер",
     "summaryInvalidity": "Дата недійсності",
     "summaryTrigger": "Запит від",
-    "summaryProtocol": "Protocol",
-    "summaryIdentity": "Protocol identity",
-    "summaryCsr": "Certificate request (CSR)",
+    "summaryProtocol": "Протокол",
+    "summaryIdentity": "Ідентичність протоколу",
+    "summaryCsr": "Запит на сертифікат (CSR)",
     "triggerScheduler": "Планувальник оновлень"
   },
   "messages": {

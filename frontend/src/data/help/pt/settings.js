@@ -60,7 +60,7 @@ export default {
         items: [
           { label: 'Substituir ou mesclar', text: 'Restore from Backup substitui os dados daqui pelos do arquivo e remove o que o arquivo não contém; a entrada de auditoria lista o que foi removido. A API também aceita mode=merge, que adiciona o arquivo aos dados daqui' },
           { label: 'Bloqueio compartilhado', text: 'Backups e restaurações compartilham um só bloqueio: uma restauração é recusada (409) enquanto um backup está em curso, e um backup manual espera por uma restauração em curso' },
-          { label: 'Limite de envio', text: "An archive created since 3.0 is restored in chunks and has no size limit unless BACKUP_MAX_ARCHIVE_MB sets one. An older archive is accepted up to BACKUP_MAX_UPLOAD_MB (512 MB by default). Both are set in the server environment and a refusal names its setting. A reverse proxy in front of UCM keeps its own body limit" },
+          { label: 'Limite de envio', text: "Um arquivo criado desde a 3.0 é restaurado por partes e não tem limite de tamanho, a menos que BACKUP_MAX_ARCHIVE_MB defina um. Um arquivo mais antigo é aceite até BACKUP_MAX_UPLOAD_MB (512 MB por predefinição). Ambos são definidos no ambiente do servidor e uma recusa indica o parâmetro em causa. Um reverse proxy à frente do UCM mantém o seu próprio limite de corpo" },
           { label: 'O que um arquivo contém', text: 'Os arquivos incluem pedidos do cliente ACME, pedidos de aprovação e pedidos de recuperação de chaves. Restaurar um arquivo gravado antes desta versão deixa essas linhas daqui como estão' },
           { label: 'Mesmos nomes', text: 'Um provedor DNS, conta CA ACME ou webhook cujo nome outra linha já tem aqui é restaurado como "nome (2)", e o resultado da restauração devolvido pela API o lista' },
           { label: 'Configurações que nomeiam uma linha', text: 'As CAs emissoras de SCEP e ACME, os responders OCSP e configurações semelhantes seguem as linhas do arquivo. Num arquivo mais antigo restaurado noutra instalação, ficam vazias e devem ser escolhidas de novo' },
@@ -298,7 +298,7 @@ Configure backups automáticos:
 Envie um arquivo de backup para restaurar o UCM a um estado anterior.
 
 - Backups e restaurações compartilham um só bloqueio: uma restauração é recusada (409) enquanto um backup está em curso, e um backup manual espera por uma restauração em curso
-- An archive created since 3.0 is restored in chunks, with no size limit unless \`BACKUP_MAX_ARCHIVE_MB\` sets one; an older archive is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default). Both are set in the server environment; a reverse proxy in front of UCM keeps its own body limit
+- Um arquivo criado desde a 3.0 é restaurado por partes, sem limite de tamanho, a menos que \`BACKUP_MAX_ARCHIVE_MB\` defina um; um arquivo mais antigo é aceite até \`BACKUP_MAX_UPLOAD_MB\` (512 MB por predefinição). Ambos são definidos no ambiente do servidor, e uma recusa indica o parâmetro em causa; um reverse proxy à frente do UCM mantém o seu próprio limite de corpo
 - Os arquivos contêm pedidos do cliente ACME, pedidos de aprovação e pedidos de recuperação de chaves (v2.251)
 - Um provedor DNS, conta CA ACME ou webhook cujo nome outra linha já tem aqui é restaurado como \`nome (2)\`
 - A API também aceita \`mode=merge\`, que adiciona o arquivo aos dados daqui em vez de os substituir

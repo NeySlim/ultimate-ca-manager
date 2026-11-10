@@ -862,7 +862,7 @@
       "renewedWithRelated": "Certificado renovado, com o certificado ligado #{{id}}",
       "bulkRelatedRenewed": "{{count}} certificados ligados renovados com a seleção"
     },
-    "renewed": "Certificate renewed"
+    "renewed": "Certificado renovado"
   },
   "cas": {
     "chainRevoked": "Revogada a montante",
@@ -4071,12 +4071,12 @@
     },
     "subjectAltNames": "Nomes alternativos do sujeito",
     "entityTitle": {
-      "certificate": "Certificate #{{id}}",
+      "certificate": "Certificado #{{id}}",
       "ca": "CA #{{id}}",
-      "truststore": "Trust Store #{{id}}",
-      "userCertificate": "User Certificate #{{id}}"
+      "truststore": "Loja de confiança #{{id}}",
+      "userCertificate": "Certificado de usuário #{{id}}"
     },
-    "ownerLabel": "Owner: {{owner}}"
+    "ownerLabel": "Proprietário: {{owner}}"
   },
   "compare": {
     "title": "Compare Certificados",
@@ -4401,18 +4401,18 @@
       "revocation": "Revogação",
       "ca_revocation": "Revogação de CA",
       "cross_revocation": "Revogação de certificado cruzado",
-      "acme_order": "ACME order",
-      "est_enroll": "EST enrolment",
-      "scep_request": "SCEP request",
-      "wstep_request": "WSTEP request"
+      "acme_order": "Pedido ACME",
+      "est_enroll": "Inscrição EST",
+      "scep_request": "Pedido SCEP",
+      "wstep_request": "Pedido WSTEP"
     },
     "revocationPerformed": "Aprovada: a revogação foi executada",
     "summarySerial": "Número de série",
     "summaryInvalidity": "Data de invalidade",
     "summaryTrigger": "Solicitada por",
-    "summaryProtocol": "Protocol",
-    "summaryIdentity": "Protocol identity",
-    "summaryCsr": "Certificate request (CSR)",
+    "summaryProtocol": "Protocolo",
+    "summaryIdentity": "Identidade do protocolo",
+    "summaryCsr": "Pedido de certificado (CSR)",
     "triggerScheduler": "Agendador de renovação"
   },
   "messages": {

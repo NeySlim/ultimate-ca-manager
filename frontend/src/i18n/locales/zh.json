@@ -862,7 +862,7 @@
       "renewedWithRelated": "证书已续期，其关联证书 #{{id}} 一并续期",
       "bulkRelatedRenewed": "已随所选项一并续期 {{count}} 张关联证书"
     },
-    "renewed": "Certificate renewed"
+    "renewed": "证书已续期"
   },
   "cas": {
     "chainRevoked": "上游已吊销",
@@ -4071,12 +4071,12 @@
     },
     "subjectAltNames": "主题备用名称",
     "entityTitle": {
-      "certificate": "Certificate #{{id}}",
+      "certificate": "证书 #{{id}}",
       "ca": "CA #{{id}}",
-      "truststore": "Trust Store #{{id}}",
-      "userCertificate": "User Certificate #{{id}}"
+      "truststore": "信任存储 #{{id}}",
+      "userCertificate": "用户证书 #{{id}}"
     },
-    "ownerLabel": "Owner: {{owner}}"
+    "ownerLabel": "所有者：{{owner}}"
   },
   "compare": {
     "title": "比较证书",
@@ -4401,18 +4401,18 @@
       "revocation": "吊销",
       "ca_revocation": "CA 吊销",
       "cross_revocation": "交叉证书吊销",
-      "acme_order": "ACME order",
-      "est_enroll": "EST enrolment",
-      "scep_request": "SCEP request",
-      "wstep_request": "WSTEP request"
+      "acme_order": "ACME 订单",
+      "est_enroll": "EST 注册",
+      "scep_request": "SCEP 请求",
+      "wstep_request": "WSTEP 请求"
     },
     "revocationPerformed": "已批准：吊销已执行",
     "summarySerial": "序列号",
     "summaryInvalidity": "失效日期",
     "summaryTrigger": "请求方",
-    "summaryProtocol": "Protocol",
-    "summaryIdentity": "Protocol identity",
-    "summaryCsr": "Certificate request (CSR)",
+    "summaryProtocol": "协议",
+    "summaryIdentity": "协议身份",
+    "summaryCsr": "证书请求 (CSR)",
     "triggerScheduler": "续期调度器"
   },
   "messages": {

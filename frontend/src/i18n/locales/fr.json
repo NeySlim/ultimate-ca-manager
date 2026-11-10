@@ -1240,7 +1240,7 @@
       "renewedWithRelated": "Certificat renouvelé, avec son certificat lié n°{{id}}",
       "bulkRelatedRenewed": "{{count}} certificats liés renouvelés avec la sélection"
     },
-    "renewed": "Certificate renewed"
+    "renewed": "Certificat renouvelé"
   },
   "common": {
     "saved": "Paramètres enregistrés",
@@ -2185,12 +2185,12 @@
     },
     "subjectAltNames": "Noms alternatifs du sujet",
     "entityTitle": {
-      "certificate": "Certificate #{{id}}",
-      "ca": "CA #{{id}}",
-      "truststore": "Trust Store #{{id}}",
-      "userCertificate": "User Certificate #{{id}}"
+      "certificate": "Certificat n° {{id}}",
+      "ca": "AC n° {{id}}",
+      "truststore": "Magasin de confiance n° {{id}}",
+      "userCertificate": "Certificat utilisateur n° {{id}}"
     },
-    "ownerLabel": "Owner: {{owner}}"
+    "ownerLabel": "Propriétaire : {{owner}}"
   },
   "groups": {
     "group": "Groupe",
@@ -4475,18 +4475,18 @@
       "revocation": "Révocation",
       "ca_revocation": "Révocation de CA",
       "cross_revocation": "Révocation de certificat croisé",
-      "acme_order": "ACME order",
-      "est_enroll": "EST enrolment",
-      "scep_request": "SCEP request",
-      "wstep_request": "WSTEP request"
+      "acme_order": "Commande ACME",
+      "est_enroll": "Enrôlement EST",
+      "scep_request": "Demande SCEP",
+      "wstep_request": "Demande WSTEP"
     },
     "revocationPerformed": "Approuvée : la révocation a été effectuée",
     "summarySerial": "Numéro de série",
     "summaryInvalidity": "Date d'invalidité",
     "summaryTrigger": "Demandé par",
-    "summaryProtocol": "Protocol",
-    "summaryIdentity": "Protocol identity",
-    "summaryCsr": "Certificate request (CSR)",
+    "summaryProtocol": "Protocole",
+    "summaryIdentity": "Identité du protocole",
+    "summaryCsr": "Demande de certificat (CSR)",
     "triggerScheduler": "Planificateur de renouvellement"
   },
   "reports": {
