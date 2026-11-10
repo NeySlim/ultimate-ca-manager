@@ -187,6 +187,9 @@ def key_generator(ca, ca_cert):
             if previous is not None and previous.caref == ca.refid and not previous.revoked:
                 previous.archived = True  # still valid until it expires, as a renewed responder
             db.session.flush()  # a concurrent pointer fails here, before the audit entry is staged
+            # The delegate is an issuance of the CA; a lost race rolls the count back with it
+            from utils.ca_serial_counter import next_ca_serial
+            next_ca_serial(ca)
             stage_audit_entry(
                 action='est_key_generator.issued' if link is None else 'est_key_generator.reissued',
                 resource_type='ca', resource_id=ca.id, resource_name=ca.descr,

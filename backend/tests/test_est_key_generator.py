@@ -187,17 +187,16 @@ class TestLifecycle:
                 db.session.get(Certificate, row_id).prv = readable
                 db.session.commit()
 
-    def test_listed_like_a_certificate_without_consuming_a_ca_serial(self, app, client, use):
+    def test_listed_like_a_certificate_and_counted_as_an_issuance(self, app, client, use):
         ca_id, _ = use('main')
         _reset(app, ca_id)
         with app.app_context():
             before = db.session.get(CA, ca_id).serial
         _signer_serial(client, 'uncounted.generator.test')
         with app.app_context():
-            # The transport and the generated key's certificate count; the delegate, like a
-            # renewed OCSP responder, does not
+            # The transport, the delegate and the generated key's certificate each count
             ca = db.session.get(CA, ca_id)
-            assert ca.serial == (before or 0) + 2
+            assert ca.serial == (before or 0) + 3
             assert Certificate.query.filter_by(caref=ca.refid, subject_cn='EST key generator',
                                                archived=False, revoked=False).count() >= 1
 
@@ -240,9 +239,12 @@ class TestLifecycle:
         _reset(app, ca_id)
         with app.app_context():
             ca = db.session.get(CA, ca_id)
+            counted = ca.serial or 0
             with patch.object(est_key_generator, '_issue', side_effect=racing_issue):
                 _key, cert = est_key_generator.key_generator(ca, ca_cert)
             assert cert == competitor['cert']
+            # The loser's count went with its savepoint too
+            assert (db.session.get(CA, ca_id, populate_existing=True).serial or 0) == counted
             assert EstSignerCert.query.filter_by(ca_id=ca_id).count() == 1
             # The loser's certificate row went with its savepoint
             ours = competitor['ours'][0]
