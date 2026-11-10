@@ -18,7 +18,26 @@ from models import CA, Certificate, db
 from tests.test_crl_number_monotonic import _authority, _ca_row
 
 _PG_URL = os.environ.get('UCM_TEST_PG_URL')
-WORKERS, EACH = 4, 25
+# Eight workers, each on an engine (a connection) of its own, as eight processes would be
+WORKERS, EACH = 8, 13
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _rows_issued_here_are_removed(app):
+    """The shared tables leave this file as they came in."""
+    from sqlalchemy import text
+    tables = ('certificates', 'certificate_authorities')
+    with app.app_context():
+        before = {t: {i for (i,) in db.session.execute(text(f'SELECT id FROM {t}'))} for t in tables}
+        db.session.remove()
+    yield
+    with app.app_context():
+        db.session.rollback()
+        for table in tables:
+            for (row_id,) in db.session.execute(text(f'SELECT id FROM {table}')).fetchall():
+                if row_id not in before[table]:
+                    db.session.execute(text(f'DELETE FROM {table} WHERE id = :i'), {'i': row_id})
+        db.session.commit()
 
 
 def _csr(name):
@@ -186,25 +205,35 @@ def test_every_site_counts_from_the_database_not_from_a_stale_row(app, create_ca
         assert db.session.get(CA, ca_id).serial == 11
 
 
-def _race(app, ca_id):
-    errors, start = [], threading.Barrier(WORKERS)
+def _race(app, url, ca_id):
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import Session
+    from sqlalchemy import text
+    errors, backends, start = [], set(), threading.Barrier(WORKERS)
 
     def worker(n):
+        engine = create_engine(url, pool_size=1, max_overflow=0)
         try:
             with app.app_context():
+                # This thread's db.session is a session on its own engine
+                db.session.registry.set(Session(bind=engine))
+                backends.add(db.session.execute(text('SELECT pg_backend_pid()')).scalar())
+                db.session.commit()
                 start.wait(10)
                 for i in range(EACH):
                     _issue(ca_id, f'w{n}-{i}.example.test')
                 db.session.remove()
         except Exception as exc:  # noqa: BLE001
             errors.append(repr(exc))
+        finally:
+            engine.dispose()
 
     threads = [threading.Thread(target=worker, args=(n,)) for n in range(WORKERS)]
     for t in threads:
         t.start()
     for t in threads:
-        t.join(120)
-    return errors
+        t.join(180)
+    return errors, backends
 
 
 @pytest.mark.postgres
@@ -219,13 +248,14 @@ def test_concurrent_issuance_on_postgresql_keeps_serials_and_count(app):
             ca = _ca_row(*_authority())
             ca_id, caref = ca.id, ca.refid
             db.session.remove()
-        errors = _race(app, ca_id)
+        errors, backends = _race(app, url, ca_id)
         with app.app_context():
             serials = [s for (s,) in db.session.query(Certificate.serial_number)
                        .filter_by(caref=caref)]
             count = db.session.get(CA, ca_id).serial
             db.session.remove()
     assert errors == []
+    assert len(backends) == WORKERS
     assert len(serials) == len(set(serials)) == WORKERS * EACH
     assert count == WORKERS * EACH
 
