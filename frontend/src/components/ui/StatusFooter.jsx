@@ -47,7 +47,8 @@ export function StatusFooter() {
             </div>
 
             <button
-              onClick={closeAll}
+              onClick={() => closeAll()}
+              data-inspector-control
               className="h-6 px-1.5 rounded flex items-center gap-1 text-text-secondary hover:text-status-danger hover:bg-status-danger-op10 transition-colors"
               title={t('windows.closeAll', 'Close All')}
             >

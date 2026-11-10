@@ -46,6 +46,23 @@ describe('inspector focus origins', () => {
     expect(opener).not.toHaveFocus()
   })
 
+  it('gives the focus back to the opener when the footer button closes everything', async () => {
+    render(
+      <MemoryRouter initialEntries={['/certificates']}>
+        <InspectorProvider><Probe /><button>opener</button><StatusFooter /></InspectorProvider>
+      </MemoryRouter>,
+    )
+    const opener = screen.getByText('opener')
+    opener.focus()
+    act(() => api.openEntity('certificate', 1))
+    const closeAll = screen.getByTitle('Close All')
+    closeAll.focus()
+    fireEvent.click(closeAll)
+    await flush()
+    expect(api.openCount).toBe(0)
+    expect(opener).toHaveFocus()
+  })
+
   it('gives the focus back to the opener when the focus is nowhere', async () => {
     render(<InspectorProvider><Probe /><button>opener</button></InspectorProvider>)
     const opener = screen.getByText('opener')

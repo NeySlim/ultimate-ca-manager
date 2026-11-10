@@ -69,7 +69,7 @@ export function InspectorProvider({ children }) {
     const key = keyOf(type, entityId)
     const from = origin || document.activeElement
     // The latest opening of an object names its origin
-    if (from && from !== document.body && !from.closest?.('[data-testid="inspector-dock"]')) origins.current.set(key, from)
+    if (from && from !== document.body && !from.closest?.('[data-testid="inspector-dock"], [data-inspector-control]')) origins.current.set(key, from)
     if (!openedRef.current.some((o) => o.key === key)) {
       const next = [...openedRef.current, { key, type, entityId, data: data || null }]
       openedRef.current = next.length > MAX_OPEN ? next.slice(next.length - MAX_OPEN) : next
@@ -89,7 +89,7 @@ export function InspectorProvider({ children }) {
     const origin = origins.current.get(key)
     origins.current.delete(key)
     const focused = document.activeElement
-    const focusInDock = !focused || focused === document.body || !!focused.closest?.('[data-testid="inspector-dock"]')
+    const focusInDock = !focused || focused === document.body || !!focused.closest?.('[data-testid="inspector-dock"], [data-inspector-control]')
     openedRef.current = next
     setOpened(next)
     setActiveKey((cur) => (cur === key ? (next[Math.min(idx, next.length - 1)]?.key ?? null) : cur))
@@ -105,9 +105,11 @@ export function InspectorProvider({ children }) {
     const cands = [origins.current.get(activeRef.current), ...[...origins.current.values()].reverse()]
     const origin = cands.find((o) => o?.isConnected)
     origins.current.clear()
-    // Focus the operator moved elsewhere (a link, a field) is left alone
+    // Focus the operator moved elsewhere (a link, a field) is left alone; a control
+    // that closes the inspector goes away with it and does not count
     const focused = document.activeElement
-    const free = !focused || focused === document.body || !focused.isConnected || !!focused.closest?.('[data-testid="inspector-dock"]')
+    const free = !focused || focused === document.body || !focused.isConnected
+      || !!focused.closest?.('[data-testid="inspector-dock"], [data-inspector-control]')
     if (origin && free) queueMicrotask(() => origin.focus())
     openedRef.current = []
     setOpened([])
