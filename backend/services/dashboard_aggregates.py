@@ -521,8 +521,6 @@ _BOOL = ('1', 'true', 'yes')
 # Bounds keep a number inside what both backends bind and timedelta holds: beyond them, 400 and not 500
 MAX_KEY_BITS_FILTER = 1_000_000
 MAX_LIFETIME_DAYS_FILTER = 100_000
-LIST_FILTER_PARAMS = frozenset({'live', 'key_algo', 'key_algo_prefix', 'key_bits_below', 'sig_hash', 'server',
-                                'lifetime_over_days', 'no_key', 'incomplete_chain', 'renewal'})
 
 
 def certificate_list_conditions(args, dialect, now=None):
