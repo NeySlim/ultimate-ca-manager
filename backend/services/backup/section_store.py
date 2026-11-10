@@ -93,7 +93,10 @@ def sweep_stale_stores(directory: Optional[str] = None, spool: Optional[str] = N
                         and entry.is_dir(follow_symlinks=False)
                         and entry.stat(follow_symlinks=False).st_mtime < limit):
                     shutil.rmtree(entry.path, ignore_errors=True)
-    except (BackupBusyError, OSError) as exc:
+    except BackupBusyError as exc:
+        # process_lock has already logged why the lock was not taken
+        logger.debug("Restore leftovers not swept: %s", exc)
+    except OSError as exc:
         logger.info("Restore leftovers not swept: %s", exc)
 
 

@@ -269,8 +269,11 @@ def test_an_unwritable_data_tmp_is_not_a_store_directory(tmp_path, monkeypatch):
         spool.chmod(0o700)
 
 
-def test_no_sweep_when_the_lock_cannot_be_taken(tmp_path, monkeypatch):
+def test_no_sweep_when_the_lock_cannot_be_taken(tmp_path, monkeypatch, caplog):
+    import logging
+
     from services.backup import section_store
+    caplog.set_level(logging.DEBUG)
 
     def no_flock(_path):
         raise OSError(errno.ENOLCK, 'no locks available')
@@ -284,6 +287,26 @@ def test_no_sweep_when_the_lock_cannot_be_taken(tmp_path, monkeypatch):
     section_store.sweep_stale_stores(str(tmp_path))
 
     assert stale.exists()
+    assert len([r for r in caplog.records if r.levelno >= logging.INFO]) == 1
+
+
+def test_a_busy_lock_logs_one_line(tmp_path, caplog):
+    import fcntl
+    import logging
+
+    from services.backup import section_store
+    from services.backup.locking import operation_lock_path
+    caplog.set_level(logging.DEBUG)
+    stale = _stale_store(str(tmp_path))
+    path = operation_lock_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    # flock conflicts between two descriptors even within one process
+    with open(path, 'a') as holder:
+        fcntl.flock(holder, fcntl.LOCK_EX)
+        section_store.sweep_stale_stores(str(tmp_path))
+
+    assert os.path.exists(stale)
+    assert len([r for r in caplog.records if r.levelno >= logging.INFO]) == 1
 
 
 def _stale_store(directory, name='.ucm_restore_dead'):
