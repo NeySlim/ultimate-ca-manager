@@ -245,53 +245,60 @@ def restore_backup():
         # which of the two happened, because an entry reading "Restored from
         # backup" beside a response reading "nothing was restored" is a trail
         # that has to be argued with.
-        _carried = bool((results or {}).get('sections_carried'))
-        record_restore(
-            action='system_restore',
-            resource_type='system',
-            resource_name=file.filename,
-            details=restore_audit_details(file.filename, results),
-            success=True
-        )
-
-        # An archive that carried no section changed nothing, so there is
-        # nothing to invalidate and no reason to sign everyone out and ask for
-        # a restart. Announced as a restore, it revoked every session that was
-        # open, the caller's included, for a file that touched not one row.
-        if not _carried:
-            logger.warning('Restore: the archive carried no data section')
-            return success_response(
-                data=results,
-                message=('The archive carried no data: nothing was restored, '
-                         'no session was revoked and no restart is needed.'),
+        try:
+            _carried = bool((results or {}).get('sections_carried'))
+            record_restore(
+                action='system_restore',
+                resource_type='system',
+                resource_name=file.filename,
+                details=restore_audit_details(file.filename, results),
+                success=True
             )
 
-        from services.backup.restore.invalidate import invalidate_after_restore
-        try:
-            invalidate_after_restore()
+            # An archive that carried no section changed nothing, so there is
+            # nothing to invalidate and no reason to sign everyone out and ask for
+            # a restart. Announced as a restore, it revoked every session that was
+            # open, the caller's included, for a file that touched not one row.
+            if not _carried:
+                logger.warning('Restore: the archive carried no data section')
+                return success_response(
+                    data=results,
+                    message=('The archive carried no data: nothing was restored, '
+                             'no session was revoked and no restart is needed.'),
+                )
+
+            from services.backup.restore.invalidate import invalidate_after_restore
+            try:
+                invalidate_after_restore()
+            except Exception:
+                logger.exception("Restore: sessions could not be revoked")
+                return error_response(
+                    'Backup restored, but the sessions opened before it could not '
+                    'be revoked. Restart the application before using it.', 500)
+
+            # The restart is part of the restore, not homework for the operator:
+            # the workers hold the authorities, the keys and the identities the
+            # restore has just replaced. The System route had always asked for it
+            # while this one told the operator to do it themselves, so the same
+            # archive left the service running or not depending on the page.
+            restart_ok, restart_detail = request_restart()
+            results['restart_requested'] = restart_ok
+            results['restart_detail'] = restart_detail
+
+            # And the whole of `results`, not a two-key summary: what the archive
+            # said about itself, the sections this version does not restore
+            # included, reached a client from one page and not the other.
+            results['filename'] = file.filename
+            return success_response(
+                data=results,
+                message=restore_message(results),
+            )
         except Exception:
-            logger.exception("Restore: sessions could not be revoked")
+            # The restore is committed and already audited as a success: no second, contradicting line
+            logger.exception('Restore: finishing after the restore failed')
             return error_response(
-                'Backup restored, but the sessions opened before it could not '
-                'be revoked. Restart the application before using it.', 500)
-
-        # The restart is part of the restore, not homework for the operator:
-        # the workers hold the authorities, the keys and the identities the
-        # restore has just replaced. The System route had always asked for it
-        # while this one told the operator to do it themselves, so the same
-        # archive left the service running or not depending on the page.
-        restart_ok, restart_detail = request_restart()
-        results['restart_requested'] = restart_ok
-        results['restart_detail'] = restart_detail
-
-        # And the whole of `results`, not a two-key summary: what the archive
-        # said about itself, the sections this version does not restore
-        # included, reached a client from one page and not the other.
-        results['filename'] = file.filename
-        return success_response(
-            data=results,
-            message=restore_message(results),
-        )
+                'Backup restored, but finishing the restore failed. '
+                'Restart the application before using it.', 500)
     except FipsRestricted:
         record_failure('system_restore', file.filename, 'Restore refused: not allowed in FIPS mode')
         raise  # the app maps it to its problem type, message unchanged

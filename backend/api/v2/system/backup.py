@@ -465,38 +465,45 @@ def restore_backup():
             _audit_failure('system_restore', file.filename, 'Restore refused: a backup or another restore is running')
             return error_response(f'{busy} Retry once it has finished.', 409)
 
-        carried = bool((results or {}).get('sections_carried'))
-        _safe_audit_log(
-            action='system_restore',
-            resource_type='system',
-            resource_name=file.filename,
-            details=restore_audit_details(file.filename, results),
-            success=True,
-        )
-
-        # Nothing changed, so no session is revoked and no restart is asked.
-        if not carried:
-            logger.warning('Restore: the archive carried no data section')
-            return success_response(
-                data=results,
-                message=('The archive carried no data: nothing was restored, '
-                         'no session was revoked and no restart is needed.'),
+        try:
+            carried = bool((results or {}).get('sections_carried'))
+            _safe_audit_log(
+                action='system_restore',
+                resource_type='system',
+                resource_name=file.filename,
+                details=restore_audit_details(file.filename, results),
+                success=True,
             )
 
-        from services.backup.restore.invalidate import invalidate_after_restore
-        try:
-            results['invalidated'] = invalidate_after_restore()
-        except Exception:
-            logger.exception('Restore: sessions could not be revoked')
-            return error_response(
-                'Backup restored, but the sessions opened before it could not '
-                'be revoked. Restart the application before using it.', 500)
+            # Nothing changed, so no session is revoked and no restart is asked.
+            if not carried:
+                logger.warning('Restore: the archive carried no data section')
+                return success_response(
+                    data=results,
+                    message=('The archive carried no data: nothing was restored, '
+                             'no session was revoked and no restart is needed.'),
+                )
 
-        restart_ok, restart_detail = _request_restart_after_restore()
-        results['restart_requested'] = restart_ok
-        results['restart_detail'] = restart_detail
-        results['filename'] = file.filename
-        return success_response(data=results, message=restore_message(results))
+            from services.backup.restore.invalidate import invalidate_after_restore
+            try:
+                results['invalidated'] = invalidate_after_restore()
+            except Exception:
+                logger.exception('Restore: sessions could not be revoked')
+                return error_response(
+                    'Backup restored, but the sessions opened before it could not '
+                    'be revoked. Restart the application before using it.', 500)
+
+            restart_ok, restart_detail = _request_restart_after_restore()
+            results['restart_requested'] = restart_ok
+            results['restart_detail'] = restart_detail
+            results['filename'] = file.filename
+            return success_response(data=results, message=restore_message(results))
+        except Exception:
+            # The restore is committed and already audited as a success: no second, contradicting line
+            logger.exception('Restore: finishing after the restore failed')
+            return error_response(
+                'Backup restored, but finishing the restore failed. '
+                'Restart the application before using it.', 500)
     except FipsRestricted:
         _audit_failure('system_restore', file.filename, 'Restore refused: not allowed in FIPS mode')
         raise  # the application maps it to its problem type, message unchanged

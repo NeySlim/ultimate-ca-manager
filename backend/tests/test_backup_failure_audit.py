@@ -161,3 +161,26 @@ def test_a_fips_refused_restore_is_audited(auth_client, audit, monkeypatch, rout
     monkeypatch.setattr(BackupService, 'restore_backup_from_stream', refuse)
     _restore(auth_client, route, _form())
     _single_refusal(audit, 'system_restore')
+
+
+@pytest.mark.parametrize('route', RESTORE)
+def test_a_failure_after_the_restore_committed_leaves_no_failure_line(auth_client, audit, monkeypatch, route):
+    import importlib
+    from services.backup.restore import invalidate
+    from services.backup_service import BackupService
+    module = importlib.import_module('api.v2.system.backup' if route == RESTORE[0] else 'api.v2.settings.backup')
+
+    monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
+                        lambda self, *a, **k: {'sections_carried': ['users']})
+    monkeypatch.setattr(invalidate, 'invalidate_after_restore', lambda: 0)
+    monkeypatch.setattr(module, '_request_restart_after_restore' if route == RESTORE[0] else 'request_restart',
+                        lambda: (False, 'no'))
+
+    def boom(results):
+        raise RuntimeError(LEAKY)
+    monkeypatch.setattr(module, 'restore_message', boom)
+
+    response = _restore(auth_client, route, _form())
+
+    assert response.status_code == 500
+    assert [(c['action'], c['success']) for c in audit] == [('system_restore', True)]
