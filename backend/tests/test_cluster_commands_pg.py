@@ -715,3 +715,26 @@ def test_a_failing_restart_backs_off_and_logs_one_line_per_step(app, ha, caplog)
     solo.run_once()
     assert len(attempts) == 10 and solo.restarting
     assert solo._retry_delay is None  # a restart that ran starts the next failure from 2 s
+
+
+def test_stop_during_a_failed_restart_is_not_undone(app, ha):
+    """stop() lands between the failed restart's check of _stopping and its _stop.clear()."""
+    clock = _FakeMonotonic()
+
+    def fail():
+        raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', monotonic=clock, restart_action=fail)
+
+    class StopRacesClear(threading.Event):
+        def clear(self):
+            if not solo._stopping:
+                solo.stop()  # no thread: stop() returns without joining
+            super().clear()
+    solo._stop = StopRacesClear()
+    _emit(app, cc.RESTART)
+    solo.run_once()
+    clock.t += 1
+    solo.run_once()
+    assert solo._stopping
+    assert solo._stop.is_set()  # the applier loop ends instead of reopening a connection

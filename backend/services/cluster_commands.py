@@ -412,6 +412,9 @@ class CommandApplier:
             self._held = _Held(row.id, row.created_at)
             if not self._stopping:
                 self._stop.clear()
+                # stop() sets _stopping before _stop: one that lands after the check is not undone
+                if self._stopping:
+                    self._stop.set()
 
     def _restart_failed(self, e):
         """Next attempt after the backoff delay: ERROR the first time, then one line per new delay."""
