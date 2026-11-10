@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 # other, and the difference showed up as a restore that behaved differently
 # depending on which page had asked for it.
 from services.backup.restore_completion import (
+    record_failure as _audit_failure,
     record_restore as _safe_audit_log,
     request_restart as _request_restart_after_restore,
     restore_message,
@@ -155,20 +156,26 @@ def create_backup():
         raise  # the application maps it to its problem type
     except BackupBusyError as busy:
         logger.info('Backup refused: %s', busy)
+        _audit_failure('system_backup', 'manual', 'Backup refused: another backup or restore is running')
         return error_response(str(busy), 409)
     except BackupPasswordError as e:
+        _audit_failure('system_backup', 'manual', 'Backup refused: password rejected')
         return error_response(str(e), 400)
     except BackupExportError as e:
         logger.error('Backup aborted: %s', e)
+        _audit_failure('system_backup', 'manual', 'Backup failed: export aborted')
         return error_response(f'Backup aborted: {e}', 500)
     except BackupValidationError as e:
         logger.error('Backup written but not validated: %s', e)
+        _audit_failure('system_backup', 'manual', 'Backup failed: archive could not be validated')
         return error_response(f'Backup could not be validated: {e}', 500)
     except ValueError:
         logger.exception('Backup refused: invalid parameters')
+        _audit_failure('system_backup', 'manual', 'Backup refused: invalid parameters')
         return error_response('Invalid backup parameters', 400)
     except Exception:
         logger.exception('Backup failed')
+        _audit_failure('system_backup', 'manual', 'Backup failed: unexpected error')
         return error_response('Backup failed', 500)
 
     _safe_audit_log(
@@ -429,6 +436,7 @@ def restore_backup():
         # A restore landing before a pending backend switch is lost at restart.
         pending = pending_switch_refusal()
         if pending:
+            _audit_failure('system_restore', file.filename, 'Restore refused: a backend switch is pending')
             return error_response(pending, 409)
 
         try:
@@ -438,10 +446,12 @@ def restore_backup():
                 results = BackupService().restore_backup_from_stream(
                     file.stream, password, mode=mode)
         except MigrationBusyError as busy:
+            _audit_failure('system_restore', file.filename, 'Restore refused: a backend migration or another restore is running')
             return error_response(
                 f'{busy} A backend migration or another restore is still '
                 'running.', 409)
         except BackupBusyError as busy:
+            _audit_failure('system_restore', file.filename, 'Restore refused: a backup or another restore is running')
             return error_response(f'{busy} Retry once it has finished.', 409)
 
         carried = bool((results or {}).get('sections_carried'))
@@ -480,19 +490,24 @@ def restore_backup():
         raise  # the application maps it to its problem type, message unchanged
     except BackupDecryptionError:
         logger.warning('Restore refused: the backup could not be decrypted')
+        _audit_failure('system_restore', file.filename, 'Restore refused: wrong password or invalid backup')
         return error_response(
             'Wrong backup password, or the file is not a valid backup', 400)
     except (ContainerError, BackupSchemaError, RestoreValidationError) as e:
         logger.warning('Restore refused: %s', e)
+        _audit_failure('system_restore', file.filename, 'Restore refused: the archive failed validation')
         return error_response(str(e), 400)
     except OverflowError as e:
         logger.warning('Restore refused: a value is out of range (%s)', e)
+        _audit_failure('system_restore', file.filename, 'Restore refused: a value is out of range')
         return error_response(
             'The archive carries a numeric value this database cannot '
             'store; the file is not a valid backup', 400)
     except ValueError as e:
         logger.warning('Restore refused: %s', e)
+        _audit_failure('system_restore', file.filename, 'Restore refused: the archive could not be read')
         return error_response(f'The archive could not be read: {e}', 400)
     except Exception:
         logger.exception('Restore failed')
+        _audit_failure('system_restore', file.filename, 'Restore failed: unexpected error')
         return error_response('Restore failed', 500)

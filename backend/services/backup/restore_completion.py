@@ -31,6 +31,12 @@ def record_restore(**fields) -> None:
         logger.exception("Operation completed but audit logging failed")
 
 
+def record_failure(action: str, resource_name: str, reason: str) -> None:
+    """Audit a failed backup or restore with a fixed reason, never the exception text."""
+    record_restore(action=action, resource_type='system',
+                   resource_name=resource_name, details=reason, success=False)
+
+
 def request_restart() -> tuple:
     """Ask the service to restart, the one way this project restarts.
 

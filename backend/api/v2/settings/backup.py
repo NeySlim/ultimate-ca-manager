@@ -16,7 +16,7 @@ from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.restore.plan import RestoreValidationError
 from services.backup.restore_report import restore_audit_details
 from services.backup.restore_completion import (
-    record_restore, request_restart, restore_message)
+    record_failure, record_restore, request_restart, restore_message)
 from services.database_admin.lock import (
     MigrationBusyError,
     database_migration_lock,
@@ -96,17 +96,22 @@ def create_backup():
         size, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
     except BackupBusyError as busy:
         logger.info('Settings backup refused: %s', busy)
+        record_failure('system_backup', 'manual', 'Backup refused: another backup or restore is running')
         return error_response(str(busy), 409)
     except BackupPasswordError as e:
+        record_failure('system_backup', 'manual', 'Backup refused: password rejected')
         return error_response(str(e), 400)
     except BackupExportError as e:
         logger.error(f"Settings backup aborted: {e}")
+        record_failure('system_backup', 'manual', 'Backup failed: export aborted')
         return error_response(f'Backup aborted: {e}', 500)
     except BackupValidationError as e:
         logger.error(f"Settings backup written but not validated: {e}")
+        record_failure('system_backup', 'manual', 'Backup failed: archive could not be validated')
         return error_response(f'Backup could not be validated: {e}', 500)
     except Exception as e:
         logger.error(f"Settings backup failed: {e}")
+        record_failure('system_backup', 'manual', 'Backup failed: unexpected error')
         return error_response('Backup failed', 500)
 
     AuditService.log_action(
@@ -201,6 +206,7 @@ def restore_backup():
         # whether their restore survived.
         pending = pending_switch_refusal()
         if pending:
+            record_failure('system_restore', file.filename, 'Restore refused: a backend switch is pending')
             return error_response(pending, 409)
 
         # A restore rewrites the whole database, which is the largest
@@ -212,10 +218,12 @@ def restore_backup():
                     backup_operation_lock(purpose='the restore'):
                 results = service.restore_backup_from_stream(file.stream, password)
         except MigrationBusyError as busy:
+            record_failure('system_restore', file.filename, 'Restore refused: a backend migration or another restore is running')
             return error_response(
                 f"{busy} A backend migration or another restore is still "
                 "running.", 409)
         except BackupBusyError as busy:
+            record_failure('system_restore', file.filename, 'Restore refused: a backup or another restore is running')
             return error_response(f"{busy} Retry once it has finished.", 409)
 
         # Recorded before the archive is judged empty or not, as the system
@@ -276,6 +284,7 @@ def restore_backup():
         raise  # the app maps it to its problem type, message unchanged
     except BackupDecryptionError:
         logger.warning("Settings restore refused: the backup could not be decrypted")
+        record_failure('system_restore', file.filename, 'Restore refused: wrong password or invalid backup')
         return error_response(
             'Wrong backup password, or the file is not a valid backup', 400)
     except (ContainerError, BackupSchemaError, RestoreValidationError) as e:
@@ -284,17 +293,21 @@ def restore_backup():
         # failed" on the other, so which endpoint an operator had reached
         # decided what they were told about their own file.
         logger.warning(f"Settings restore refused: {e}")
+        record_failure('system_restore', file.filename, 'Restore refused: the archive failed validation')
         return error_response(str(e), 400)
     except OverflowError as e:
         logger.warning(f"Settings restore refused: a value is out of range ({e})")
+        record_failure('system_restore', file.filename, 'Restore refused: a value is out of range')
         return error_response(
             'The archive carries a numeric value this database cannot '
             'store; the file is not a valid backup', 400)
     except ValueError as e:
         logger.warning(f"Settings restore validation error: {e}")
+        record_failure('system_restore', file.filename, 'Restore refused: the archive could not be read')
         return error_response(f'The archive could not be read: {e}', 400)
     except Exception as e:
         logger.error(f"Settings restore failed: {e}")
+        record_failure('system_restore', file.filename, 'Restore failed: unexpected error')
         return error_response('Restore failed', 500)
 
 
