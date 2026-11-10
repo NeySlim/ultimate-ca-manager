@@ -30,7 +30,7 @@ vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: mockIsMobile, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useInspector: () => ({
-    ...windows, windows: [], prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: () => {},
+    openEntity: vi.fn(), closeEntity: vi.fn(), closeAll: vi.fn(), windows: [], prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: () => {},
   }),
 }))
 
