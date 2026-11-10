@@ -69,29 +69,32 @@ def readiness():
     """
     Readiness check - verifies the app can serve traffic.
     Checks database connectivity and required services.
-    Returns 200 if ready, 503 if not.
+    Returns 200 if ready, 503 if a check fails. In safe mode the status is
+    'safe_mode' and the code is 503 under UCM_HA or on a failed check, else 200.
     """
-    if current_app.config.get('SAFE_MODE'):
-        from config.settings import Config
-        # Single node: stay in the Service so the safe-mode UI and protocol endpoints remain reachable.
-        return jsonify({
-            'status': 'safe_mode',
-            'reason': current_app.config.get('SAFE_MODE_REASON', 'encryption_key_missing'),
-            **_ha_fields(),
-        }), (503 if Config.HA_MODE else 200)
-
+    from config.settings import Config
     checks = {
         'database': _check_database(),
         'filesystem': _check_filesystem(),
     }
-    
+
     # Optional: check Redis if configured
     redis_url = config_redis_url()
     if redis_url:
         checks['redis'] = _check_redis(redis_url)
-    
+
     all_ok = all(c.get('status') in ('ok', 'skipped') for c in checks.values())
-    
+
+    if current_app.config.get('SAFE_MODE'):
+        # Single node stays in the Service so the safe-mode UI remains reachable,
+        # but never with a broken dependency.
+        return jsonify({
+            'status': 'safe_mode',
+            'reason': current_app.config.get('SAFE_MODE_REASON', 'encryption_key_missing'),
+            'checks': checks,
+            **_ha_fields(),
+        }), (200 if all_ok and not Config.HA_MODE else 503)
+
     return jsonify({
         'status': 'ready' if all_ok else 'not_ready',
         'checks': checks,

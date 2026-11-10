@@ -53,6 +53,19 @@ def test_ready_stays_200_in_safe_mode_single_node(app, client, monkeypatch):
     r = _ready_in_safe_mode(app, client)
     assert r.status_code == 200
     assert r.get_json()['status'] == 'safe_mode'
+    assert r.get_json()['checks']['database']['status'] == 'ok'
+
+
+@pytest.mark.parametrize('ha', [False, True])
+def test_ready_is_503_in_safe_mode_when_a_check_fails(app, client, monkeypatch, ha):
+    import api.health_routes as hr
+    monkeypatch.setattr(Config, 'HA_MODE', ha)
+    monkeypatch.setattr(hr, '_check_database', lambda: {'status': 'error', 'message': 'down'})
+    r = _ready_in_safe_mode(app, client)
+    assert r.status_code == 503
+    body = r.get_json()
+    assert body['status'] == 'safe_mode'
+    assert body['checks']['database']['status'] == 'error'
 
 
 def test_leader_follows_the_scheduler_state(monkeypatch):
