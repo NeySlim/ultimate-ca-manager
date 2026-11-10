@@ -120,6 +120,7 @@ export default function CertificatesPage() {
   // An overview link shows exactly what its counter counts: the saved filters step aside
   // while it is open, unapplied but kept in storage, and return once its filters are gone
   const linkView = urlFilters.length > 0
+  const urlStatus = useMemo(() => urlFilters.filter(([k]) => k === 'status').map(([, v]) => v), [urlFilters])
   const savedStatus = linkView ? NONE : filterStatus
   const savedCA = linkView ? NONE : filterCA
   const savedSource = linkView ? NONE : filterSource
@@ -481,8 +482,13 @@ export default function CertificatesPage() {
   const handleStatClick = useCallback((filterValue) => {
     setPage(1) // Reset to first page when filtering
     if (linkView) {
-      leaveLink()
-      setFilterStatus(filterValue === '' ? [] : [filterValue])
+      // The card edits the link's own status filter; the saved one stays untouched
+      const next = filterValue === '' ? []
+        : urlStatus.includes(filterValue) ? urlStatus.filter((v) => v !== filterValue) : [...urlStatus, filterValue]
+      const params = new URLSearchParams(withoutFilter(location.search, 'status'))
+      next.forEach((v) => params.append('status', v))
+      const qs = params.toString()
+      navigate({ pathname: location.pathname, search: qs ? `?${qs}` : '' }, { replace: true })
     } else if (filterValue === '') {
       setFilterStatus([]) // "Total" clears all
     } else {
@@ -493,7 +499,7 @@ export default function CertificatesPage() {
         return [...prev, filterValue]
       })
     }
-  }, [linkView, leaveLink])
+  }, [linkView, urlStatus, location.pathname, location.search, navigate])
   
   // Handle sort change (server-side)
   const handleSortChange = useCallback((newSort) => {
@@ -565,7 +571,8 @@ export default function CertificatesPage() {
       key: 'status',
       label: t('common.status'),
       type: 'multiSelect',
-      value: savedStatus,
+      // A link view shows (and a preset saves) the link's statuses, not the stored ones it sets aside
+      value: linkView ? urlStatus : savedStatus,
       onChange: (val) => { setPage(1); leaveLink(); setFilterStatus(val) },
       placeholder: t('common.allStatus'),
       options: [
@@ -611,7 +618,7 @@ export default function CertificatesPage() {
         { value: 'modified', label: t('certificates.modifiedFromTemplate') }
       ]
     }
-  ], [savedStatus, savedCA, savedSource, savedTemplate, leaveLink, certStats.sources, cas, t])
+  ], [linkView, urlStatus, savedStatus, savedCA, savedSource, savedTemplate, leaveLink, certStats.sources, cas, t])
 
   const activeFilters = (savedStatus.length > 0 ? 1 : 0) + (savedCA.length > 0 ? 1 : 0) + (savedSource.length > 0 ? 1 : 0) + (savedTemplate.length > 0 ? 1 : 0)
 
@@ -687,7 +694,7 @@ export default function CertificatesPage() {
         icon={Certificate}
         stats={stats}
         onStatClick={handleStatClick}
-        activeStatFilter={linkView ? urlFilters.filter(([k]) => k === 'status').map(([, v]) => v) : filterStatus}
+        activeStatFilter={linkView ? urlStatus : filterStatus}
         helpPageKey="certificates"
         splitView={isMobile}
         splitEmptyContent={isMobile ? (
