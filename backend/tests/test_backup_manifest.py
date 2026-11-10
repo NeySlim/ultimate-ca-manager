@@ -45,7 +45,7 @@ class TestEveryTableIsDecidedAbout:
 
     def test_excluded_tables_still_exist(self, registered_tables):
         stale = sorted(set(manifest.EXCLUDED_TABLES) - registered_tables
-                       - {'schema_migrations', 'alembic_version'})
+                       - {'schema_migrations', 'alembic_version', 'flask_sessions'})
         assert not stale, f"the manifest excludes tables that are gone: {stale}"
 
 

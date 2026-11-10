@@ -62,7 +62,10 @@ class PreflightError(Exception):
 #       own schema (``migrations/``, tracked in ``_migrations``), so the stamp
 #       describes a history the target does not share; copying it would tell a
 #       future Alembic run that migrations it never applied are already done.
-IGNORED_TABLES = frozenset({"alembic_version"})
+#   flask_sessions — the SQL session store: live sessions of the old database,
+#       meaningless on the new one and never copied; a non-empty table on the
+#       target still fails check_target_is_empty.
+IGNORED_TABLES = frozenset({"alembic_version", "flask_sessions"})
 
 # Tables that live outside ``db.metadata`` and ARE copied.
 #

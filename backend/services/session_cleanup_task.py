@@ -1,6 +1,6 @@
 """
-Session Cleanup Task — removes expired filesystem sessions
-Runs every 15 minutes to clean up stale session files.
+Session Cleanup Task: removes expired sessions from the file or SQL store.
+Runs every 15 minutes; Redis expires its own keys.
 """
 import os
 import time
@@ -10,13 +10,38 @@ logger = logging.getLogger(__name__)
 
 
 class SessionCleanupTask:
-    """Clean up expired session files from the filesystem store"""
+    """Clean up expired sessions from the filesystem or database store"""
+
+    @staticmethod
+    def _purge_database_sessions(app):
+        """Delete the rows whose expiry has passed, in one statement."""
+        from datetime import datetime
+        from sqlalchemy import text
+        from models import db
+
+        table = app.config.get('SESSION_SQLALCHEMY_TABLE', 'flask_sessions')
+        try:
+            # Flask-Session stores naive UTC expiries
+            result = db.session.execute(
+                text(f'DELETE FROM "{table}" WHERE expiry < :now'), {'now': datetime.utcnow()})
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+        if result.rowcount:
+            logger.info(f"Session cleanup: removed {result.rowcount} expired database sessions")
 
     @staticmethod
     def execute():
-        """Remove session files older than the max session lifetime"""
+        """Remove expired session files (file store) or expired rows (SQL store); Redis expires its own."""
         try:
             from flask import current_app
+            store = current_app.config.get('SESSION_TYPE')
+            if store == 'sqlalchemy':
+                SessionCleanupTask._purge_database_sessions(current_app)
+                return
+            if store == 'redis':
+                return
             data_dir = current_app.config.get('SESSION_FILE_DIR')
             if not data_dir or not os.path.isdir(data_dir):
                 data_dir = os.path.join(

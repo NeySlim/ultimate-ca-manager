@@ -10,6 +10,7 @@ import pytest
 from models import SSOSession, UserSession, User, db
 from services.backup.restore import invalidate as invalidate_module
 from services.backup.restore.invalidate import invalidate_after_restore
+from tests.test_session_cleanup_task import sql_store  # noqa: F401 (fixture)
 
 
 @pytest.fixture(autouse=True)
@@ -131,6 +132,27 @@ class TestSessionFilesAreRemoved:
         assert result['caches_cleared']
 
 
+class TestSqlSessionStoreIsEmptied:
+    """With the SQL store the rows are the sessions: all of them die."""
+
+    def test_flask_session_rows_are_deleted_and_counted(self, app, user_id, sql_store):
+        with app.app_context():
+            for sid in ('one', 'two', 'three'):
+                db.session.execute(db.text(
+                    "INSERT INTO flask_sessions (session_id, data, expiry) "
+                    "VALUES (:s, :d, '2999-01-01')"), {'s': sid, 'd': b'x'})
+            db.session.commit()
+
+            result = invalidate_after_restore()
+
+            assert result['flask_sessions_revoked'] == 3
+            assert db.session.execute(db.text('SELECT COUNT(*) FROM flask_sessions')).scalar() == 0
+
+    def test_other_stores_report_zero(self, app, user_id):
+        with app.app_context():
+            assert invalidate_after_restore()['flask_sessions_revoked'] == 0
+
+
 class TestCachesArePurged:
     """A stale cache is a wrong answer with a bounded lifetime: worth
     dropping, never worth failing a committed restore for."""
@@ -226,3 +248,17 @@ class TestRestartIsCentralizedAndOptIn:
             result = invalidate_after_restore(request_restart=True)
 
         assert result['restart_requested'] is False
+
+
+def test_summary_line_reports_database_session_rows(app, user_id, sql_store, caplog):
+    import logging
+    with app.app_context():
+        for sid in ('one', 'two', 'three'):
+            db.session.execute(db.text(
+                "INSERT INTO flask_sessions (session_id, data, expiry) "
+                "VALUES (:s, :d, '2999-01-01')"), {'s': sid, 'd': b'x'})
+        db.session.commit()
+        with caplog.at_level(logging.INFO):
+            invalidate_after_restore()
+    line = next(r.getMessage() for r in caplog.records if r.getMessage().startswith('Restore: revoked'))
+    assert '3 database session rows' in line

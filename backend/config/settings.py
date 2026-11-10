@@ -33,6 +33,16 @@ except PermissionError:
     pass  # Directory should already exist from package install
 
 
+SESSION_TABLE = 'flask_sessions'
+
+
+def session_store(redis, database_type):
+    """Redis wins, then the shared database on PostgreSQL, else files."""
+    if redis:
+        return 'redis'
+    return 'sqlalchemy' if database_type == 'postgresql' else 'filesystem'
+
+
 def redis_url() -> Optional[str]:
     """REDIS_URL, or UCM_REDIS_URL, the name the Redis guide and compose overlay used."""
     return os.getenv("REDIS_URL") or os.getenv("UCM_REDIS_URL") or None
@@ -224,7 +234,7 @@ class Config:
     # Session settings
     
     # Session Configuration - Flask server-side sessions
-    # Supports filesystem (default) or Redis (HA mode)
+    # Redis first, else the database on PostgreSQL, else the filesystem
     _redis_url = redis_url()
     
     if _redis_url:
@@ -232,6 +242,11 @@ class Config:
         SESSION_TYPE = 'redis'
         SESSION_REDIS = _redis_url  # Will be converted to Redis connection in app.py
         SESSION_KEY_PREFIX = os.getenv("SESSION_KEY_PREFIX", "ucm:session:")
+    elif session_store(None, DATABASE_TYPE) == 'sqlalchemy':
+        # PostgreSQL without Redis: sessions live in the shared database (app.py binds `db`)
+        SESSION_TYPE = 'sqlalchemy'
+        SESSION_SQLALCHEMY_TABLE = SESSION_TABLE
+        SESSION_CLEANUP_N_REQUESTS = 500
     else:
         # Filesystem sessions for standalone deployment
         SESSION_TYPE = 'filesystem'
@@ -324,6 +339,10 @@ class TestingConfig(Config):
     SQLALCHEMY_ENGINE_OPTIONS = {"hide_parameters": True}
     # The suite starts unencrypted; the tests of the first-start key turn it on
     AUTO_MASTER_KEY = False
+    # The suite keeps file sessions unless a test forces the database store
+    if Config.SESSION_TYPE == 'sqlalchemy':
+        SESSION_TYPE = 'filesystem'
+        SESSION_FILE_DIR = Config.DATA_DIR / 'sessions'
 
 
 # Configuration dictionary

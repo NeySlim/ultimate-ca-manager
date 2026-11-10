@@ -109,9 +109,15 @@ Configure in **Settings** > **Security**:
 | Max Sessions | 5 | Per-user session limit |
 | Require 2FA | No | Force MFA for all users |
 
+#### Session store
+
+On PostgreSQL without Redis, sessions are in the database (`flask_sessions` table) and shared between nodes; with `REDIS_URL` they are in Redis; otherwise they are files on disk, as below.
+
+The database session store opens its own connection pool, so a worker process can hold up to 2x (`DB_POOL_SIZE` + `DB_MAX_OVERFLOW`) connections: size PostgreSQL `max_connections` accordingly.
+
 #### Filesystem permissions (since v2.142)
 
-UCM enforces `0o700` on its session directory at boot. If the directory is group- or world-readable, the service refuses to start:
+When sessions are files, UCM enforces `0o700` on its session directory at boot. If the directory is group- or world-readable, the service refuses to start:
 
 ```
 RuntimeError: Refusing to boot: session dir <path> has perms 0o755, expected 0o700

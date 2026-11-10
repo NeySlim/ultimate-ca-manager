@@ -674,3 +674,18 @@ def test_copy_plan_leaves_both_databases_untouched(app, sqlite_source, sqlite_ta
 
         assert _table_names(source) == before_source
         assert _table_names(target) == before_target
+
+
+def test_copy_plan_ignores_the_session_store_table(app, sqlite_source, sqlite_target):
+    """Live sessions are never copied, and their table never blocks a switch."""
+    with app.app_context(), _engine(sqlite_source) as source, _engine(sqlite_target) as target:
+        _create_ucm_schema(app, source)
+        _execute(source, "CREATE TABLE flask_sessions (id INTEGER PRIMARY KEY, "
+                         "session_id VARCHAR(255), data BLOB, expiry DATETIME)",
+                 "INSERT INTO flask_sessions (session_id) VALUES ('live')")
+        _create_ucm_schema(app, target)
+
+        plan = build_copy_plan(source, target)
+
+    assert 'flask_sessions' not in [entry.name for entry in plan]
+    assert 'flask_sessions' in IGNORED_TABLES
