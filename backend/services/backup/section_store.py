@@ -60,7 +60,8 @@ def sweep_stale_stores(directory: Optional[str] = None, spool: Optional[str] = N
         return
     from .locking import BackupBusyError, backup_operation_lock
     try:
-        with backup_operation_lock(timeout=0, purpose='sweeping restore leftovers'):
+        with backup_operation_lock(timeout=0, purpose='sweeping restore leftovers',
+                                   fail_open=False):
             limit = time.time() - STALE_AFTER_SECONDS
             for entry in os.scandir(directory):
                 if (entry.name.startswith(STORE_PREFIX)
@@ -68,7 +69,7 @@ def sweep_stale_stores(directory: Optional[str] = None, spool: Optional[str] = N
                         and entry.stat(follow_symlinks=False).st_mtime < limit):
                     shutil.rmtree(entry.path, ignore_errors=True)
     except (BackupBusyError, OSError) as exc:
-        logger.debug("Restore leftovers not swept: %s", exc)
+        logger.info("Restore leftovers not swept: %s", exc)
 
 
 class _SealedWriter:

@@ -246,3 +246,18 @@ def test_startup_sweeps_the_fallback_directory_when_no_spool_dir(monkeypatch):
     os.utime(stale, (old, old))
     with fresh_app():
         assert not stale.exists()
+def test_no_sweep_when_the_lock_cannot_be_taken(tmp_path, monkeypatch):
+    from services.backup import section_store
+
+    def no_flock(_path):
+        raise OSError(errno.ENOLCK, 'no locks available')
+
+    monkeypatch.setattr('utils.process_lock._open_lock_file', no_flock)
+    stale = tmp_path / '.ucm_restore_dead'
+    stale.mkdir()
+    old = os.stat(stale).st_mtime - section_store.STALE_AFTER_SECONDS - 60
+    os.utime(stale, (old, old))
+
+    section_store.sweep_stale_stores(str(tmp_path))
+
+    assert stale.exists()
