@@ -131,55 +131,88 @@ def test_a_target_without_the_index_restores_an_archive_with_duplicate_serials(a
             db.session.commit()
 
 
-def test_a_pending_serial_index_is_logged_at_start_and_shown_by_health(app, client, caplog):
+def _pending_flag(app):
+    """Generator: yields a setter for the shared `serial_unique_index_pending` row, puts the value found back."""
     import json
-    import logging
     from models import SystemConfig
     from utils.serial_duplicates import PENDING_KEY, check_pending_serial_index
-    with app.app_context():
+
+    def write(value):
         SystemConfig.query.filter_by(key=PENDING_KEY).delete()
-        db.session.add(SystemConfig(key=PENDING_KEY, value=json.dumps({'duplicates': [
-            {'caref': 'ca-a', 'serial_number': '11', 'count': 2}]})))
+        if value is not None:
+            db.session.add(SystemConfig(key=PENDING_KEY, value=value))
         db.session.commit()
-    try:
-        with caplog.at_level(logging.WARNING):
-            check_pending_serial_index(app)
-        warning = next(r.getMessage() for r in caplog.records if PENDING_KEY in r.getMessage())
-        assert '1 serial' in warning and 'CA ca-a serial 11' in warning
-        _states_the_procedure(warning)
-        assert client.get('/health').get_json()['serial_unique_index_pending'] == 1
-    finally:
+
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key=PENDING_KEY).first()
+        original = None if row is None else row.value
+
+    def set_entries(entries):
         with app.app_context():
-            SystemConfig.query.filter_by(key=PENDING_KEY).delete()
-            db.session.commit()
+            write(json.dumps({'duplicates': entries}))
+
+    yield set_entries
+    with app.app_context():
+        db.session.rollback()
+        write(original)
     check_pending_serial_index(app)
-    assert 'serial_unique_index_pending' not in client.get('/health').get_json()
 
 
-def test_the_start_warning_names_the_rows_and_still_reads_an_entry_stored_without_them(app, caplog):
-    import json
-    import logging
+@pytest.fixture
+def pending_flag(app):
+    yield from _pending_flag(app)
+
+
+@pytest.mark.parametrize('before', [None, '{"duplicates": [{"caref": "ca-k", "serial_number": "5", "count": 2}]}'])
+def test_the_pending_flag_fixture_puts_back_what_it_found(app, before):
     from models import SystemConfig
-    from utils.serial_duplicates import PENDING_KEY, check_pending_serial_index
-    entries = [{'caref': 'ca-a', 'serial_number': '11', 'count': 2,
-                'rows': [{'id': 41, 'stored': '11'}, {'id': 57, 'stored': 'b'}]},
-               {'caref': 'ca-z', 'serial_number': '7', 'count': 2}]
+    from utils.serial_duplicates import PENDING_KEY
+
+    def stored():
+        with app.app_context():
+            row = SystemConfig.query.filter_by(key=PENDING_KEY).first()
+            return None if row is None else row.value
+
     with app.app_context():
         SystemConfig.query.filter_by(key=PENDING_KEY).delete()
-        db.session.add(SystemConfig(key=PENDING_KEY, value=json.dumps({'duplicates': entries})))
+        if before is not None:
+            db.session.add(SystemConfig(key=PENDING_KEY, value=before))
         db.session.commit()
     try:
-        with caplog.at_level(logging.WARNING):
-            check_pending_serial_index(app)
-        warning = next(r.getMessage() for r in caplog.records if PENDING_KEY in r.getMessage())
-        assert "41 stored as '11'" in warning and "57 stored as 'b'" in warning
-        assert 'CA ca-z serial 7 x2' in warning
-        assert 'certificate ids and stored spellings shown with it' in warning
+        cycle = _pending_flag(app)
+        next(cycle)(['changed'])
+        assert stored() != before
+        next(cycle, None)
+        assert stored() == before
     finally:
         with app.app_context():
             SystemConfig.query.filter_by(key=PENDING_KEY).delete()
             db.session.commit()
+
+def test_a_pending_serial_index_is_logged_at_start_and_shown_by_health(app, client, caplog, pending_flag):
+    import logging
+    from utils.serial_duplicates import PENDING_KEY, check_pending_serial_index
+    pending_flag([{'caref': 'ca-a', 'serial_number': '11', 'count': 2}])
+    with caplog.at_level(logging.WARNING):
         check_pending_serial_index(app)
+    warning = next(r.getMessage() for r in caplog.records if PENDING_KEY in r.getMessage())
+    assert '1 serial' in warning and 'CA ca-a serial 11' in warning
+    _states_the_procedure(warning)
+    assert client.get('/health').get_json()['serial_unique_index_pending'] == 1
+
+
+def test_the_start_warning_names_the_rows_and_still_reads_an_entry_stored_without_them(app, caplog, pending_flag):
+    import logging
+    from utils.serial_duplicates import PENDING_KEY, check_pending_serial_index
+    pending_flag([{'caref': 'ca-a', 'serial_number': '11', 'count': 2,
+                   'rows': [{'id': 41, 'stored': '11'}, {'id': 57, 'stored': 'b'}]},
+                  {'caref': 'ca-z', 'serial_number': '7', 'count': 2}])
+    with caplog.at_level(logging.WARNING):
+        check_pending_serial_index(app)
+    warning = next(r.getMessage() for r in caplog.records if PENDING_KEY in r.getMessage())
+    assert "41 stored as '11'" in warning and "57 stored as 'b'" in warning
+    assert 'CA ca-z serial 7 x2' in warning
+    assert 'certificate ids and stored spellings shown with it' in warning
 
 
 def test_every_start_checks_for_a_pending_serial_index(monkeypatch):
@@ -190,41 +223,21 @@ def test_every_start_checks_for_a_pending_serial_index(monkeypatch):
         assert started == [application]
 
 
-def test_the_pending_flag_stays_on_the_database_it_describes(app):
+def test_the_pending_flag_stays_on_the_database_it_describes(app, pending_flag):
     """A backup carries no schema state: a restore must not revive the flag on a target with the index."""
-    import json
-    from models import SystemConfig
     from services.backup import installation
     from utils.serial_duplicates import PENDING_KEY
     assert PENDING_KEY in installation.LOCAL_SETTINGS
+    pending_flag([])
     with app.app_context():
-        SystemConfig.query.filter_by(key=PENDING_KEY).delete()
-        db.session.add(SystemConfig(key=PENDING_KEY, value=json.dumps({'duplicates': []})))
-        db.session.commit()
-        try:
-            assert PENDING_KEY not in _service()._export_configuration(True)['settings']
-        finally:
-            SystemConfig.query.filter_by(key=PENDING_KEY).delete()
-            db.session.commit()
+        assert PENDING_KEY not in _service()._export_configuration(True)['settings']
 
 
-def test_a_row_held_behind_a_shared_serial_is_logged_with_what_it_waits_for(app, caplog):
-    import json
+def test_a_row_held_behind_a_shared_serial_is_logged_with_what_it_waits_for(app, caplog, pending_flag):
     import logging
-    from models import SystemConfig
     from utils.serial_duplicates import PENDING_KEY, check_pending_serial_index
-    with app.app_context():
-        SystemConfig.query.filter_by(key=PENDING_KEY).delete()
-        db.session.add(SystemConfig(key=PENDING_KEY, value=json.dumps({'duplicates': [
-            {'caref': 'ca-x', 'serial_number': 'a', 'count': 1, 'waits_for': '16'}]})))
-        db.session.commit()
-    try:
-        with caplog.at_level(logging.WARNING):
-            check_pending_serial_index(app)
-        warning = next(r.getMessage() for r in caplog.records if PENDING_KEY in r.getMessage())
-        assert 'CA ca-x serial a waits for 16' in warning and 'x1' not in warning
-    finally:
-        with app.app_context():
-            SystemConfig.query.filter_by(key=PENDING_KEY).delete()
-            db.session.commit()
+    pending_flag([{'caref': 'ca-x', 'serial_number': 'a', 'count': 1, 'waits_for': '16'}])
+    with caplog.at_level(logging.WARNING):
         check_pending_serial_index(app)
+    warning = next(r.getMessage() for r in caplog.records if PENDING_KEY in r.getMessage())
+    assert 'CA ca-x serial a waits for 16' in warning and 'x1' not in warning
