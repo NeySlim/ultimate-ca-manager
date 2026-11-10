@@ -165,6 +165,7 @@ describe('InspectorDock', () => {
     expect(root.getPropertyValue('--inspector-reserve-bottom')).toBe('0px')
     fireEvent.click(screen.getByRole('button', { name: 'inspector.close' }))
     await waitFor(() => expect(root.getPropertyValue('--inspector-reserve-right')).toBe(''))
+    expect(root.getPropertyValue('--inspector-reserve-bottom')).toBe('')
   })
 
   it('closes an object from its own close button', async () => {

@@ -68,10 +68,13 @@ export function InspectorProvider({ children }) {
     if (entityId == null) return
     const key = keyOf(type, entityId)
     const from = origin || document.activeElement
+    // The latest opening of an object names its origin
     if (from && from !== document.body && !from.closest?.('[data-testid="inspector-dock"]')) origins.current.set(key, from)
     if (!openedRef.current.some((o) => o.key === key)) {
       const next = [...openedRef.current, { key, type, entityId, data: data || null }]
       openedRef.current = next.length > MAX_OPEN ? next.slice(next.length - MAX_OPEN) : next
+      // An object pushed out by the limit takes its origin with it
+      for (const k of [...origins.current.keys()]) if (!openedRef.current.some((o) => o.key === k)) origins.current.delete(k)
       setOpened(openedRef.current)
     }
     setActiveKey(key)
@@ -102,7 +105,10 @@ export function InspectorProvider({ children }) {
     const cands = [origins.current.get(activeRef.current), ...[...origins.current.values()].reverse()]
     const origin = cands.find((o) => o?.isConnected)
     origins.current.clear()
-    if (origin) queueMicrotask(() => origin.focus())
+    // Focus the operator moved elsewhere (a link, a field) is left alone
+    const focused = document.activeElement
+    const free = !focused || focused === document.body || !focused.isConnected || !!focused.closest?.('[data-testid="inspector-dock"]')
+    if (origin && free) queueMicrotask(() => origin.focus())
     openedRef.current = []
     setOpened([])
     setActiveKey(null)
