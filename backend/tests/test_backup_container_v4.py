@@ -323,7 +323,7 @@ class TestThroughTheService:
                 name: False for name in container_sections()})
             service.restore_backup(blob, PASSWORD, mode='merge')
         assert made
-        assert all(path.startswith(str(tmp_path) + os.sep) for path in made)
+        assert all(os.path.dirname(path) == section_store.fallback_directory() for path in made)
 
 def container_sections():
     from services.backup.manifest import SECTIONS as MANIFEST

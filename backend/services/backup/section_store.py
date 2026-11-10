@@ -5,10 +5,12 @@ with AES-GCM under a key that lives only in this process, and loaded again
 only when the restore asks for it. The store answers what the
 restore reads of a payload dict, so the restore code is the same for v1 to v4.
 """
+import hashlib
 import json
 import logging
 import os
 import shutil
+import stat
 import struct
 from sys import getrefcount
 import tempfile
@@ -55,14 +57,31 @@ def store_directory(spool: Optional[str] = None) -> Optional[str]:
         return None
 
 
+def fallback_directory() -> Optional[str]:
+    """This instance's own directory in the system temp dir, named after its DATA_DIR,
+    so instances sharing that dir never sweep each other's stores; None if unusable."""
+    try:
+        from config.settings import Config
+        digest = hashlib.sha256(os.path.realpath(str(Config.DATA_DIR)).encode()).hexdigest()
+        path = os.path.join(tempfile.gettempdir(), f'ucm-restore-{digest[:12]}')
+        os.makedirs(path, 0o700, exist_ok=True)
+        info = os.lstat(path)
+    except (AttributeError, OSError):
+        return None
+    # Another user's directory could remove or swap the stores under us
+    if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid():
+        return None
+    return path
+
+
 def sweep_stale_stores(directory: Optional[str] = None, spool: Optional[str] = None) -> None:
     """Remove stores a killed worker left behind, in the directory `store_directory()` gives.
 
     Closed rule: nothing is removed unless the backup lock was taken, so a restore
     still applying its plan is never swept.
     """
-    directory = directory or store_directory(spool) or tempfile.gettempdir()
-    if not os.path.isdir(directory):
+    directory = directory or store_directory(spool) or fallback_directory()
+    if not directory or not os.path.isdir(directory):
         return
     from .locking import BackupBusyError, backup_operation_lock
     try:
@@ -143,7 +162,8 @@ class SectionStore:
     """
 
     def __init__(self, directory: Optional[str] = None, capacity: int = DEFAULT_CAPACITY):
-        self._dir = tempfile.mkdtemp(prefix=STORE_PREFIX, dir=directory or store_directory())
+        self._dir = tempfile.mkdtemp(
+            prefix=STORE_PREFIX, dir=directory or store_directory() or fallback_directory())
         # Held only in memory: files a killed worker leaves behind stay unreadable
         self._aead = AESGCM(AESGCM.generate_key(bit_length=256))
         self._nonces = 0

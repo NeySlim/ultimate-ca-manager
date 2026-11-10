@@ -233,12 +233,14 @@ def test_eviction_does_not_depend_on_the_interpreters_reference_counts(
 
 def test_startup_sweeps_the_fallback_directory_when_no_spool_dir(tmp_path, monkeypatch):
     import tempfile
+    from pathlib import Path
 
     from services.backup.section_store import STALE_AFTER_SECONDS
     from tests.fresh_app import fresh_app
     monkeypatch.setattr('utils.upload_spool.prepare_spool_dir', lambda _d: None)
     monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
-    stale = tmp_path / '.ucm_restore_from_a_killed_worker'
+    from services.backup.section_store import fallback_directory
+    stale = Path(fallback_directory()) / '.ucm_restore_from_a_killed_worker'
     stale.mkdir()
     old = os.stat(stale).st_mtime - STALE_AFTER_SECONDS - 60
     os.utime(stale, (old, old))
@@ -282,3 +284,36 @@ def test_no_sweep_when_the_lock_cannot_be_taken(tmp_path, monkeypatch):
     section_store.sweep_stale_stores(str(tmp_path))
 
     assert stale.exists()
+
+
+def _stale_store(directory, name='.ucm_restore_dead'):
+    from services.backup.section_store import STALE_AFTER_SECONDS
+    stale = os.path.join(directory, name)
+    os.mkdir(stale)
+    old = os.stat(stale).st_mtime - STALE_AFTER_SECONDS - 60
+    os.utime(stale, (old, old))
+    return stale
+
+
+def test_each_instance_sweeps_only_its_own_fallback_directory(tmp_path, monkeypatch):
+    import tempfile
+
+    from config.settings import Config
+    from services.backup import section_store
+    monkeypatch.setattr('utils.upload_spool.prepare_spool_dir', lambda _d: None)
+    monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
+    monkeypatch.setattr(Config, 'DATA_DIR', tmp_path / 'other')
+    theirs = _stale_store(section_store.fallback_directory(), '.ucm_restore_theirs')
+    shared = _stale_store(str(tmp_path), '.ucm_restore_shared')
+    monkeypatch.setattr(Config, 'DATA_DIR', tmp_path / 'mine')
+    directory = section_store.fallback_directory()
+    mine = _stale_store(directory)
+
+    section_store.sweep_stale_stores()
+
+    assert not os.path.exists(mine)
+    assert os.path.exists(theirs) and os.path.exists(shared)
+    assert os.path.dirname(directory) == str(tmp_path)
+    assert stat.S_IMODE(os.stat(directory).st_mode) == 0o700
+    with SectionStore() as store:
+        assert os.path.dirname(store._dir) == directory
