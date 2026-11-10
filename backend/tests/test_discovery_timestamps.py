@@ -91,3 +91,29 @@ def test_expiry_window_ignores_the_session_timezone(app):
             db.session.delete(row)
             db.session.delete(profile)
             db.session.commit()
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_stats_expiring_count_ignores_the_session_timezone(app):
+    from models import ScanProfile
+    from tests.test_scheduled_claims_pg import _pg
+    with _pg(app), app.app_context():
+        db.session.execute(text("SET TIME ZONE 'Pacific/Auckland'"))
+        profile = ScanProfile(name=f'stat-{uuid.uuid4().hex[:8]}', targets='["example.test"]')
+        db.session.add(profile)
+        db.session.commit()
+        before = DiscoveryService().get_stats()['expiring_soon']
+        # 30 days 6 hours out is beyond the window in UTC, inside it if read in Auckland time
+        row = DiscoveredCertificate(
+            target=f'192.0.2.{uuid.uuid4().int % 200 + 1}', port=443, scan_profile_id=profile.id,
+            fingerprint_sha256=uuid.uuid4().hex * 2,
+            not_after=(utc_now() + timedelta(days=30, hours=6)).replace(microsecond=0))
+        db.session.add(row)
+        db.session.commit()
+        try:
+            assert DiscoveryService().get_stats()['expiring_soon'] - before == 0
+        finally:
+            db.session.delete(row)
+            db.session.delete(profile)
+            db.session.commit()
