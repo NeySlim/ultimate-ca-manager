@@ -222,6 +222,22 @@
   --accent-success: var(--good);
   --accent-warning: var(--warn);
   --accent-danger: var(--bad);
+  /* Fixed constants, identical in every theme: shadow and highlight ink, fixed hues. */
+  --ink: #000000;
+  --paper: #ffffff;
+  --hue-violet: #8b5cf6;
+  --hue-emerald-deep: #059669;
+  --hue-red-deep: #dc2626;
+  --hue-orange: #f97316;
+  --hue-amber: #f59e0b;
+  --hue-teal: #14b8a6;
+  --hue-cyan: #06b6d4;
+  --hue-indigo: #6366f1;
+  --hue-rose: #f472b6;
+  --hue-sky: #38bdf8;
+  --hue-highlight: #fbbf24;
+  --ink-highlight: #1a1a1a;
+  --scrim: var(--ink);
   --violet: #A78BFA;
   --accent-purple: var(--violet);
   --accent-pro: color-mix(in srgb, var(--accent) 40%, var(--violet));
