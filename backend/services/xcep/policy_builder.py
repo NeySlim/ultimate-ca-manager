@@ -433,6 +433,7 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
     # FIPS mode: announce schema 3 + a KSP + the request hash so no client signs with SHA-1.
     pin_request_hash = fips_mode.enabled()
 
+    from services.policy_service import PolicyViolation
     from services.wstep.wstep_service import issues_only_capped_ekus
     for template in resolved_templates:
         if issues_only_capped_ekus(template):
@@ -440,7 +441,12 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
             logger.info("XCEP: template %r left out, its EKUs are never issued to an enrollee",
                         template.name)
             continue
-        key_info = _key_type_info(template.key_type, ca.id)
+        try:
+            key_info = _key_type_info(template.key_type, ca.id)
+        except PolicyViolation as exc:
+            # A template without key whose default the policies refuse; the others stay offered
+            logger.warning("XCEP: template %r left out: %s", template.name, exc)
+            continue
         if key_info is None:
             # Announcing a default would have the client generate the wrong key.
             logger.warning("XCEP: template %r left out, unsupported key type %r",

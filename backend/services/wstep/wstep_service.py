@@ -307,7 +307,8 @@ def _match_template(ca, csr, principal=None):
         return None, None
 
     all_active = CertificateTemplate.query.filter_by(is_active=True).all()
-    candidates = _resolve_templates_for_ca(ca, all_active)
+    candidates = [t for t in _resolve_templates_for_ca(ca, all_active)
+                  if _template_key_type(t, ca.id) is not None]
     if not candidates:
         return None, None
 
@@ -329,8 +330,7 @@ def _match_template(ca, csr, principal=None):
         return best, None
     other, score = _best_eku_match([t for t in candidates if t not in same], csr_eku)
     if other is not None and score > 0:
-        return None, (f"Template '{other.name}' issues {_template_key_label(other, ca.id)} keys, "
-                      f'not {csr_label}')
+        return None, _key_refusal(other, csr_label, ca.id)
     return None, None
 
 
@@ -391,8 +391,7 @@ def _named_template(ca, csr):
     template = found[0]
     csr_label = _csr_key_label(csr)
     if not _template_takes_key(template, csr_label, ca.id):
-        return None, (f"Template '{template.name}' issues {_template_key_label(template, ca.id)} keys, "
-                      f'not {csr_label}'), True
+        return None, _key_refusal(template, csr_label, ca.id), True
     allowed = set(_template_configured_ekus(template))
     if allowed and (_eku_oids(csr) or set()) - allowed:
         return None, (f"Template '{template.name}' does not issue the Extended Key Usages "
@@ -494,8 +493,7 @@ def _renewal_template(ca, renewed_cert, csr):
     if issues_only_capped_ekus(template):
         return None, [], None, _capped_only_refusal(template)
     if not _template_takes_key(template, _csr_key_label(csr), ca.id):
-        return None, [], None, (f"Template '{template.name}' issues {_template_key_label(template, ca.id)} "
-                                f'keys, not {_csr_key_label(csr)}')
+        return None, [], None, _key_refusal(template, _csr_key_label(csr), ca.id)
     extra = _template_extra_ekus(template)
     # The request may name what XCEP advertised (capped EKUs included, dropped at
     # issuance); a template without EKUs keeps the renewal within the old ones
@@ -541,15 +539,39 @@ def _best_eku_match(candidates, csr_eku):
     return (best, best_score) if best is not None and best_score >= 0 else (None, -1)
 
 
+def _template_key_type(template, ca_id=None):
+    """The key label *template* issues, its own or the default; None (logged) when it names
+    none and the policies allow no default: the template is then left out, not the CA."""
+    if template.key_type:
+        return template.key_type
+    try:
+        return default_issue_key_type(ca_id, template_id=template.id)
+    except PolicyViolation as exc:
+        logger.warning("WSTEP: template %r left out: %s", template.name, exc)
+        return None
+
+
 def _template_key_label(template, ca_id=None):
-    alg = key_algorithms.get(template.key_type or default_issue_key_type(ca_id, template_id=template.id))
+    label = _template_key_type(template, ca_id)
+    alg = key_algorithms.get(label) if label else None
     return alg.label if alg is not None else str(template.key_type)
+
+
+def _key_refusal(template, csr_label, ca_id=None):
+    if _template_key_type(template, ca_id) is None:
+        return (f"Template '{template.name}' names no key type and the issuance policies "
+                'allow no default one')
+    return f"Template '{template.name}' issues {_template_key_label(template, ca_id)} keys, not {csr_label}"
 
 
 def _template_takes_key(template, csr_label, ca_id=None):
     """Whether a key of ``csr_label`` fits ``template``: same curve or ML-DSA
-    set, an RSA key at least as long. An unknown key fits any non-ML-DSA template."""
-    wanted = key_algorithms.get(template.key_type or default_issue_key_type(ca_id, template_id=template.id))
+    set, an RSA key at least as long. An unknown key fits any non-ML-DSA template;
+    no key fits a template whose default key the policies refuse."""
+    label = _template_key_type(template, ca_id)
+    if label is None:
+        return False
+    wanted = key_algorithms.get(label)
     got = key_algorithms.get(csr_label)
     if wanted is None:
         return True

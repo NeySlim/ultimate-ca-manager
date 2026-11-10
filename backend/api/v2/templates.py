@@ -18,6 +18,7 @@ from models import db, Certificate, CA
 from models.certificate_template import CertificateTemplate
 from models.policy import CertificatePolicy
 from services.audit_service import AuditService
+from services.policy_service import PolicyViolation
 from services.deletion_blockers import (
     first_blocker, parse_bulk_ids, template_deletion_blockers,
 )
@@ -328,12 +329,17 @@ def create_template():
                 "basic_constraints": {"ca": False}
             }
     
+    try:
+        key_type = data.get('key_type') or default_issue_key_type()
+    except PolicyViolation as exc:
+        return error_response(str(exc), 400)
+
     # Create template
     template = CertificateTemplate(
         name=data['name'],
         description=data.get('description', ''),
         template_type=data['template_type'],
-        key_type=data.get('key_type') or default_issue_key_type(),
+        key_type=key_type,
         validity_days=data.get('validity_days',
                                 DEFAULT_TEMPLATE_VALIDITY_DAYS),
         digest=data.get('digest', 'sha256'),
@@ -887,6 +893,9 @@ def import_template():
         db.session.rollback()
         logger.error(f'Template import invalid JSON: {e}')
         return error_response('Invalid JSON format', 400)
+    except PolicyViolation as e:
+        db.session.rollback()
+        return error_response(str(e), 400)
     except Exception as e:
         db.session.rollback()
         logger.error(f"Template Import Error: {str(e)}")
