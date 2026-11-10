@@ -20,8 +20,6 @@ logger = logging.getLogger(__name__)
 # across browsers and devices instead of being limited to localStorage.
 # ---------------------------------------------------------------------------
 
-# Whitelist of allowed preference keys + value validators.
-# Anything not listed here is silently dropped to avoid storing arbitrary blobs.
 # Registry ids as the shell pins them: the server does not know the frontend
 # registry, only the id format and the cap of three.
 _PIN_ID = re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,39}$')
@@ -30,10 +28,12 @@ MAX_PINS = 3
 
 def _valid_pins(v):
     return (isinstance(v, list) and len(v) <= MAX_PINS
-            and all(isinstance(i, str) and _PIN_ID.match(i) for i in v)
+            and all(isinstance(i, str) and _PIN_ID.fullmatch(i) for i in v)
             and len(set(v)) == len(v))
 
 
+# Whitelist of allowed preference keys + value validators. Anything not listed here is
+# silently dropped to avoid storing arbitrary blobs (a bad pin list is refused instead).
 _PREF_VALIDATORS = {
     'language': lambda v: isinstance(v, str) and 1 <= len(v) <= 10,
     'theme_family': lambda v: isinstance(v, str) and 1 <= len(v) <= 30,
@@ -178,7 +178,7 @@ def update_preferences():
     if not user:
         return error_response('User not found', 404)
 
-    # A bad pin list is refused, not dropped: the shell must not believe it saved it.
+    # A bad pin list is refused with 400, not silently dropped like other bad values.
     if isinstance(payload, dict) and 'pins' in payload and not _valid_pins(payload['pins']):
         return error_response('pins must be a list of at most 3 distinct module ids', 400)
 

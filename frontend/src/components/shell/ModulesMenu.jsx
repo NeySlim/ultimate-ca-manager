@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { PushPin, Stack, CaretDown, Question } from '@phosphor-icons/react'
 import { groupsFor } from '../../navigation/registry'
-import { canPinModule, MAX_PINS } from './pins'
+import { canPinModule, MAX_PINS, FIXED_IDS } from './pins'
 import { useDisclosure, moveFocus } from './useDisclosure'
 
 export function ModulesMenu({ can, pins, onTogglePin, activeId, onOpenHelp }) {
@@ -17,7 +17,8 @@ export function ModulesMenu({ can, pins, onTogglePin, activeId, onOpenHelp }) {
   const [notice, setNotice] = useState('')
   const groups = groupsFor(can)
   const full = pins.length >= MAX_PINS
-  const activeInMenu = groups.some(g => g.modules.some(m => m.id === activeId))
+  // The fixed links carry their own highlight: Modules lights up for a module view only
+  const activeInMenu = !FIXED_IDS.includes(activeId) && groups.some(g => g.modules.some(m => m.id === activeId))
   const activeIsPinned = pins.includes(activeId)
   const links = () => [...(menuRef.current?.querySelectorAll('a[data-module]') || [])]
 

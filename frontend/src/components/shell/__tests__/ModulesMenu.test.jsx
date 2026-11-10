@@ -3,7 +3,7 @@
  * Ported from the sidebar tests: rights per entry, active entry, SSH split.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, within, act } from '@testing-library/react'
+import { cleanup, render, screen, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { useState } from 'react'
@@ -90,6 +90,17 @@ describe('Modules menu: what each role sees', () => {
     await user.click(button())
     const current = within(menu()).getAllByRole('link').filter(a => a.getAttribute('aria-current') === 'page')
     expect(current.map(a => a.getAttribute('data-module'))).toEqual(['cas'])
+  })
+
+  it('highlights the Modules button for a module view, not for a fixed link or a pinned module', () => {
+    setup({ activeId: 'audit' })
+    expect(button().className).toContain('is-active')
+    cleanup()
+    setup({ activeId: 'cas' })
+    expect(button().className).not.toContain('is-active')
+    cleanup()
+    setup({ activeId: 'audit', initialPins: ['audit'] })
+    expect(button().className).not.toContain('is-active')
   })
 })
 
