@@ -88,6 +88,41 @@ def test_a_stale_profile_is_not_claimed_twice(app):
         assert DiscoverySchedulerTask._advance_next_scan(stale, now) is False
 
 
+def _claim_after_reload(app, monkeypatch):
+    """Two profiles due; while P1 starts, another executor claims P2 and commits."""
+    from sqlalchemy import update
+    started = []
+    with app.app_context():
+        past = datetime.now(timezone.utc) - timedelta(minutes=5)
+        p1 = _make_profile(f'claim-{uuid.uuid4().hex[:6]}', past).id
+        p2 = _make_profile(f'claim-{uuid.uuid4().hex[:6]}', past - timedelta(minutes=1)).id
+
+        def start_scan(self, **kw):
+            started.append(kw['profile_id'])
+            if kw['profile_id'] == p1:
+                with db.engine.begin() as other:
+                    other.execute(update(ScanProfile).where(ScanProfile.id == p2).values(
+                        next_scan_at=datetime.now(timezone.utc) + timedelta(minutes=60)))
+            return 1
+        monkeypatch.setattr(DiscoveryService, 'start_scan', start_scan)
+        DiscoverySchedulerTask.execute()
+        db.session.remove()
+    return [pid for pid in started if pid in (p1, p2)], p1
+
+
+def test_a_profile_claimed_elsewhere_after_the_due_query_is_not_scanned(app, monkeypatch):
+    started, p1 = _claim_after_reload(app, monkeypatch)
+    assert started == [p1]
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_a_profile_claimed_elsewhere_is_not_scanned_on_postgresql(app, monkeypatch):
+    with _pg(app):
+        started, p1 = _claim_after_reload(app, monkeypatch)
+    assert started == [p1]
+
+
 def _discovery_race(app, monkeypatch):
     started = []
     monkeypatch.setattr(DiscoveryService, 'start_scan', lambda self, **kw: started.append(kw) or 1)

@@ -42,12 +42,12 @@ class DiscoverySchedulerTask:
         The scanner also recomputes it on completion, but a scan that crashes
         or outlives the interval must not leave next_scan_at in the past —
         that re-triggered the same giant scan on every restart (#293).
-        Compare-and-set on the value read: of two executors, only one claims the run.
+        Claimed only while still due in the database: of two executors, only one moves it.
         """
         seen = profile.next_scan_at
         name = profile.name
         due = (ScanProfile.next_scan_at.is_(None) if seen is None
-               else ScanProfile.next_scan_at == seen)
+               else ScanProfile.next_scan_at <= now)
         try:
             claimed = ScanProfile.query.filter(ScanProfile.id == profile.id, due).update(
                 {ScanProfile.next_scan_at:
