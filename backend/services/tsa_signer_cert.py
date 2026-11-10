@@ -73,7 +73,7 @@ def _generate_key(key_type, key_size, curve, ca_id=None):
             'brainpoolP256r1, brainpoolP384r1 or brainpoolP512r1)', 400)
     try:
         normalized = parse_issue_key_type(key_type or DEFAULT_KEY_TYPE,
-                                          issue_key_size(key_type, key_size, default_key_size(ca_id)),
+                                          issue_key_size(key_type, key_size, lambda: default_key_size(ca_id)),
                                           curve=curve)
     except ValueError as exc:
         raise TsaSignerIssueError(str(exc), 400)

@@ -123,12 +123,28 @@ def default_issue_key_id(ca_id=None, profile=None, template_id=None) -> str:
     return key_algorithms.get(default_issue_key_type(ca_id, profile, template_id)).trust_store_id
 
 
-def default_rsa_key_size(ca_id=None, template_id=None) -> str:
-    """RSA modulus size of the default key; the first fallback's when the default is not RSA."""
-    alg = key_algorithms.get(default_issue_key_type(ca_id, template_id=template_id))
+def _rsa_key_size(label) -> str:
+    alg = key_algorithms.get(label)
     if alg.family != 'RSA':
         alg = key_algorithms.get(_ISSUE_KEY_FALLBACKS[0])
     return str(alg.key_size)
+
+
+def default_rsa_key_size(ca_id=None, template_id=None) -> str:
+    """RSA modulus size of the default key; the first fallback's when the default is not RSA."""
+    return _rsa_key_size(default_issue_key_type(ca_id, template_id=template_id))
+
+
+def complete_issue_key(key_type, key_size, ca_id=None, template_id=None, curve=None):
+    """(key_type, key_size) of a request already filled from its template, the default key
+    filling what is still unnamed; a request naming its key never evaluates the default."""
+    from utils.key_type import fill_key_params_from_template, issue_key_size, names_its_key
+    if names_its_key(key_type, key_size, curve):
+        return key_type, key_size
+    label = default_issue_key_type(ca_id, template_id=template_id)
+    key_type, key_size = fill_key_params_from_template(key_type, key_size, label)
+    key_type = key_type or 'rsa'
+    return key_type, issue_key_size(key_type, key_size, _rsa_key_size(label))
 
 
 def _candidates(classical_only: bool):

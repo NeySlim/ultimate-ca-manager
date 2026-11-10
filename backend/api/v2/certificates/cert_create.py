@@ -221,8 +221,8 @@ def create_certificate():
         from services.hsm.ca_key_loader import get_ca_signing_key
         ca_key = get_ca_signing_key(ca)
 
-        from utils.key_type import parse_issue_key_type, fill_key_params_from_template, issue_key_size
-        from utils.issuance_defaults import default_issue_key_type, default_rsa_key_size
+        from utils.key_type import parse_issue_key_type, fill_key_params_from_template
+        from utils.issuance_defaults import complete_issue_key
 
         key_type_in = data.get('key_type') or data.get('keyType')
         key_size_in = data.get('key_size') or data.get('keySize')
@@ -237,10 +237,8 @@ def create_certificate():
                 key_type_in, key_size_in = fill_key_params_from_template(
                     key_type_in, key_size_in, template.key_type)
             if not pair:
-                key_type_in, key_size_in = fill_key_params_from_template(
-                    key_type_in, key_size_in, default_issue_key_type(ca.id, template_id=template_id))
-            key_type_in = key_type_in or 'rsa'
-            key_size_in = issue_key_size(key_type_in, key_size_in, default_rsa_key_size(ca.id, template_id))
+                key_type_in, key_size_in = complete_issue_key(
+                    key_type_in, key_size_in, ca.id, template_id, curve=data.get('curve'))
         except PolicyViolation as exc:
             return error_response(str(exc), 400)
         try:
