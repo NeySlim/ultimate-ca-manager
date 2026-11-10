@@ -39,3 +39,27 @@ def test_a_renewal_whose_commit_fails_counts_nothing(app, auth_client, create_ca
         with pytest.raises(renewal.RenewalError):
             renewal.renew_certificate_in_place(db.session.get(Certificate, cert_id))
     assert _count(app, ca['id']) == (1, 1)
+
+
+def test_a_tsa_signer_counts_its_certificate(app, create_ca):
+    from models import CA
+    from services.tsa_signer_cert import issue_tsa_signer_certificate
+    ca = create_ca(cn='TSA signer count CA')
+    with app.app_context():
+        issue_tsa_signer_certificate(ca=db.session.get(CA, ca['id']), cn='tsa-count.example.test')
+    assert _count(app, ca['id']) == (1, 1)
+
+
+def test_a_tsa_signer_whose_commit_fails_counts_nothing(app, create_ca, monkeypatch):
+    from models import CA
+    from services import tsa_signer_cert
+
+    def refused(*_args):
+        db.session.rollback()
+        return False, None
+    monkeypatch.setattr(tsa_signer_cert, 'safe_commit', refused)
+    ca = create_ca(cn='Failed TSA signer count CA')
+    with app.app_context():
+        with pytest.raises(tsa_signer_cert.TsaSignerIssueError):
+            tsa_signer_cert.issue_tsa_signer_certificate(ca=db.session.get(CA, ca['id']))
+    assert _count(app, ca['id']) == (0, 0)
