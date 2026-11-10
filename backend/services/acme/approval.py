@@ -3,7 +3,8 @@
 The order stays ``processing`` while its request is pending; the approval
 issues it as finalize would have (``valid`` with its certificate), and a
 rejection or an expiry makes it ``invalid`` with an ``unauthorized`` error:
-the server refuses to issue for this client's request (§6.7).
+the server refuses to issue for this client's request (§6.7). A request the
+issuance itself refuses (CAA, bad CSR) closes with that refusal's error.
 """
 import logging
 
@@ -52,8 +53,10 @@ def _issue(approval, data):
         if error_type == 'serverInternal':
             # The order stays processing: the approver may try again once the CA is back
             raise ValueError(error)
-        service.invalidate_processing_order(order_id, error_type, error)
-        raise ProtocolRequestGone(f'The ACME order was refused: {error}')
+        # Nothing is committed here: the approval route rolls the vote back
+        # and closes the request, whose closed handler invalidates the order
+        raise ProtocolRequestGone(f'The ACME order was refused: {error}',
+                                  refusal={'type': error_type, 'detail': error})
     order = AcmeOrder.query.filter_by(order_id=order_id).first()
     return {'id': order.certificate_id, 'cn': data.get('cn'), 'order_id': order_id,
             'protocol': 'acme'}
@@ -63,8 +66,12 @@ def _closed(approval, data):
     order = _held_order(data)
     if order is None:
         return
-    _service(data).invalidate_processing_order(
-        order.order_id, 'unauthorized', protocol_approval.decision_reason(approval))
+    refusal = data.get('refusal') or {}
+    if refusal.get('type'):
+        error_type, detail = refusal['type'], refusal.get('detail') or ''
+    else:
+        error_type, detail = 'unauthorized', protocol_approval.decision_reason(approval)
+    _service(data).invalidate_processing_order(order.order_id, error_type, detail)
 
 
 def _gone(approval, data):

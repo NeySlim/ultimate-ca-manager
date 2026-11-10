@@ -43,7 +43,12 @@ class ApprovalGateUnavailable(Exception):
 
 class ProtocolRequestGone(ValueError):
     """The protocol request an approval names can no longer be issued
-    (order finalized or invalidated, SCEP request closed elsewhere)."""
+    (order finalized or invalidated, SCEP request closed elsewhere).
+    *refusal* is what the protocol tells its client once the request is closed."""
+
+    def __init__(self, message, refusal: dict = None):
+        super().__init__(message)
+        self.refusal = refusal
 
 
 @dataclass
@@ -191,6 +196,15 @@ def mark_delivered(approval) -> None:
     data['delivered_at'] = utc_isoformat(utc_now())
     approval.request_data = json.dumps(data)
     db.session.commit()
+
+
+def record_refusal(approval, error) -> None:
+    """Keep the protocol's own refusal on *approval* for its closed handler."""
+    refusal = getattr(error, 'refusal', None)
+    if refusal:
+        data = request_data(approval)
+        data['refusal'] = refusal
+        approval.request_data = json.dumps(data)
 
 
 def decision_reason(approval) -> str:

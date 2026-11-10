@@ -171,3 +171,42 @@ def test_approved_order_matches_a_direct_issuance(app, client, auth_client, acme
         (approval_id, *_), = requests_of(app, pid, 'acme_order')
         approve(auth_client, approval_id)
     assert profile_of(_order_certificate(app, held_id)) == profile_of(_order_certificate(app, direct_id))
+
+
+def test_a_refusal_at_approval_closes_the_request(app, client, auth_client, acme_ca, monkeypatch):
+    import utils.caa_checker as caa
+    with approval_policy(app, acme_ca[0], 'acme-held-caa-refused') as pid:
+        account, order_id, _r = _held(app, client, acme_ca)
+        (approval_id, *_), = requests_of(app, pid, 'acme_order')
+        monkeypatch.setattr(caa, 'check_caa_for_domains', lambda *a, **k: (False, 'issuance forbidden'))
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.status_code == 200, r.get_json()
+        assert r.get_json()['message'] == 'Request closed'
+        assert r.get_json()['data']['certificate_issued'] is False
+
+        (_id, status, _data, cert_id), = requests_of(app, pid, 'acme_order')
+        assert status == 'rejected' and cert_id is None
+        read = _read(client, account, order_id).get_json()
+        assert read['status'] == 'invalid'
+        assert read['error']['type'] == 'urn:ietf:params:acme:error:caa'
+        assert 'issuance forbidden' in read['error']['detail']
+
+
+def test_a_bad_csr_at_approval_closes_the_request(app, client, auth_client, acme_ca, monkeypatch):
+    from services.acme.mixins.issuance import IssuanceMixin
+
+    def refuse(self, order, csr_pem, ca_refid):
+        self._last_signing_exception = ValueError('key too weak')
+        return False, None, 'key too weak'
+    with approval_policy(app, acme_ca[0], 'acme-held-badcsr') as pid:
+        account, order_id, _r = _held(app, client, acme_ca)
+        (approval_id, *_), = requests_of(app, pid, 'acme_order')
+        monkeypatch.setattr(IssuanceMixin, '_sign_certificate_with_ca', refuse)
+        monkeypatch.setattr(IssuanceMixin, '_is_request_failure', lambda self, e: True)
+        r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+        assert r.status_code == 200, r.get_json()
+        assert r.get_json()['message'] == 'Request closed'
+        assert requests_of(app, pid, 'acme_order')[0][1] == 'rejected'
+        read = _read(client, account, order_id).get_json()
+        assert read['status'] == 'invalid'
+        assert read['error']['type'] == 'urn:ietf:params:acme:error:badCSR'

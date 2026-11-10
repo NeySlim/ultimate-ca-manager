@@ -229,6 +229,9 @@ class IssuanceMixin:
             self._last_finalize_error_type = (
                 'malformed' if isinstance(self._last_signing_exception, RequestedValidityError)
                 else 'badCSR')
+            if approval is not None:
+                # The approval's caller closes the request; the order follows it
+                return False, error
             order.status = "invalid"
             order.error = json.dumps({
                 "type": f"urn:ietf:params:acme:error:{self._last_finalize_error_type}",

@@ -1397,11 +1397,12 @@ def approve_approval_request(request_id, comment=None):
                     success=False,
                 )
                 return error_response(f"Request is already {approval.status}", 400)
-            from services.protocol_approval import ProtocolRequestGone
+            from services.protocol_approval import ProtocolRequestGone, record_refusal
             if isinstance(e, ProtocolRequestGone) or (
                     isinstance(e, ValueError) and 'no longer exists' in str(e)):
                 # The target went away during the vote: closed now rather
                 # than left pending until it expires
+                record_refusal(approval, e)
                 return _close_request_target_gone(approval, issue_error, user_id, username)
 
     ok, _err = safe_commit(logger, "Failed to approve request")
