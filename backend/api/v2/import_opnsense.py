@@ -685,6 +685,12 @@ def import_items():
                 caref = attached_refids.get(caref, caref)
                 if caref and not CA.query.filter_by(refid=caref).first():
                     caref = None
+                # uix_certificates_ca_serial: a config may hold the same certificate twice
+                if Certificate.stored_under(caref, cert_info['serial_number']):
+                    stats['certs_skipped'] += 1
+                    stats['errors'].append(f"Certificate '{_display_name(cert_data, item_id)}': serial "
+                                           f"{cert_info['serial_number']} {Certificate.DUPLICATE_SERIAL}")
+                    continue
                  
                 # Create certificate
                 cert = Certificate(

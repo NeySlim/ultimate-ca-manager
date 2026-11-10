@@ -99,6 +99,15 @@ class Certificate(db.Model):
     # Relationships
     ca = db.relationship("CA", back_populates="certificates")
     template = db.relationship("CertificateTemplate", foreign_keys=[template_id])
+
+    DUPLICATE_SERIAL = "already stored under this CA"
+
+    @classmethod
+    def stored_under(cls, caref, serial_number):
+        """The row uix_certificates_ca_serial would collide with, or None."""
+        if not caref or not serial_number:
+            return None
+        return cls.query.filter_by(caref=caref, serial_number=serial_number).first()
     
     @property
     def template_overrides_list(self) -> list:
