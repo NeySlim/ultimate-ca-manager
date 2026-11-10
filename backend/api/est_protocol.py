@@ -669,16 +669,22 @@ def _request_ref(ca, csr, operation, identity):
     return protocol_approval.make_ref('est', operation, ca.id, identity, protocol_approval.csr_ref(csr))
 
 
-def _approved_delivery(ca, csr, operation, identity):
-    """The certificate of an approved request not yet delivered, else None."""
+def _approved_delivery(ca, csr, operation, identity, renewed_revoked=False):
+    """The answer to an approved request not yet delivered, else None: its
+    certificate, or a 403 once it is closed because the renewed certificate
+    was revoked or its own went away (delivered, so never judged again)."""
     from services import protocol_approval
     from models import Certificate
     approval = protocol_approval.find_protocol_request('est', _request_ref(ca, csr, operation, identity))
-    if approval is None or approval.status != 'approved' or not approval.certificate_id:
+    if approval is None or approval.status != 'approved':
         return None
-    row = db.session.get(Certificate, approval.certificate_id)
-    if row is None or not row.crt:
-        return None
+    row = db.session.get(Certificate, approval.certificate_id) if approval.certificate_id else None
+    if renewed_revoked or row is None or not row.crt:
+        protocol_approval.close_withdrawn(
+            approval, protocol_approval.RENEWED_REVOKED if renewed_revoked
+            else protocol_approval.CERTIFICATE_WITHDRAWN)
+        protocol_approval.mark_delivered(approval)
+        return Response(protocol_approval.decision_reason(approval), status=403)
     cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt), default_backend())
     # Built first: an answer that cannot be built leaves the delivery to the next retry
     response = _certs_only_response(cert, ca=ca)
@@ -940,9 +946,10 @@ def simple_reenroll(label=None):
             )
             renewed_row, status = issued_certificate_status(ca, client_cert_obj)
             # An approved re-enrolment superseded the certificate the client still
-            # presents: only that state lets its answer through, never a revocation
-            if status in (OK, SUPERSEDED):
-                delivered = _approved_delivery(ca, csr, 'reenroll', _est_identity(None))
+            # presents: only that state lets its answer through; a revocation closes it
+            if status in (OK, SUPERSEDED, REVOKED):
+                delivered = _approved_delivery(ca, csr, 'reenroll', _est_identity(None),
+                                               renewed_revoked=status == REVOKED)
                 if delivered is not None:
                     return delivered
             if status != OK:

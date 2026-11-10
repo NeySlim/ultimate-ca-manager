@@ -257,6 +257,10 @@ def test_reenrolment_approved_then_revoked_is_refused(app, client, auth_client, 
         refused = _post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem)
         assert refused.status_code == 403, refused.data
         assert b'revoked' in refused.data
+        # Closed and delivered: it never waits approved for a client that cannot have it
+        (_id, status, data, _cert), = requests_of(app, pid, 'est_enroll')
+        assert status == 'rejected' and data['delivered_at']
+        assert data['closed_reason'] == 'Renewed certificate revoked'
 
 
 def _withdraw(app, approval_id):
@@ -454,3 +458,24 @@ def test_an_approval_already_linked_issues_no_second_certificate(app, client, es
             assert Certificate.query.filter(
                 Certificate.subject_cn == 'first.est-approval.test').count() >= 1
         assert requests_of(app, pid, 'est_enroll')[0][3] == linked_id
+
+
+def test_an_approved_reenrolment_whose_certificate_went_away_is_closed(app, client, auth_client, est_config):
+    from models import db
+    csr, key = _make_csr(common_name='renew-withdrawn.est-approval.test')
+    leaf = _cert_of(_enroll(client, csr))
+    client_pem = leaf.public_bytes(serialization.Encoding.PEM).decode()
+    renewal = x509.CertificateSigningRequestBuilder().subject_name(leaf.subject).sign(key, hashes.SHA256())
+    with approval_policy(app, est_config['id'], 'est-held-reenroll-withdrawn') as pid:
+        _held(_post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem))
+        (approval_id, *_), = requests_of(app, pid, 'est_enroll')
+        cert_id = approve(auth_client, approval_id)['certificate']['id']
+        _withdraw(app, approval_id)
+        with app.app_context():
+            Certificate.query.filter_by(id=cert_id).delete()
+            db.session.commit()
+        refused = _post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem)
+        assert refused.status_code == 403, refused.data
+        (_id, status, data, _cert), = requests_of(app, pid, 'est_enroll')
+        assert status == 'rejected' and data['delivered_at']
+        assert data['closed_reason'] == 'Certificate withdrawn'
