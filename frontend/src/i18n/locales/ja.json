@@ -4065,7 +4065,14 @@
         "semantics": "セマンティクス識別子"
       }
     },
-    "subjectAltNames": "サブジェクト代替名"
+    "subjectAltNames": "サブジェクト代替名",
+    "entityTitle": {
+      "certificate": "Certificate #{{id}}",
+      "ca": "CA #{{id}}",
+      "truststore": "Trust Store #{{id}}",
+      "userCertificate": "User Certificate #{{id}}"
+    },
+    "ownerLabel": "Owner: {{owner}}"
   },
   "compare": {
     "title": "証明書の比較",

@@ -4118,7 +4118,14 @@
         "semantics": "Ідентифікатор семантики"
       }
     },
-    "subjectAltNames": "Альтернативні імена суб'єкта"
+    "subjectAltNames": "Альтернативні імена суб'єкта",
+    "entityTitle": {
+      "certificate": "Certificate #{{id}}",
+      "ca": "CA #{{id}}",
+      "truststore": "Trust Store #{{id}}",
+      "userCertificate": "User Certificate #{{id}}"
+    },
+    "ownerLabel": "Owner: {{owner}}"
   },
   "compare": {
     "title": "Compare Сертифікатs",
