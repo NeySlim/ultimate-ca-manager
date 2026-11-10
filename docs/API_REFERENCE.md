@@ -1976,7 +1976,7 @@ Certificates counted are issued, not revoked, not archived and not expired. A ce
 
 #### Certificate list filters
 
-`GET /api/v2/certificates` accepts the filters below, ANDed with the existing ones. A counter and its filter are built from the same SQL expression (`services/dashboard_aggregates.py`). An unknown parameter or an invalid value is refused with 400.
+`GET /api/v2/certificates` accepts the filters below, ANDed with the existing ones. A counter and its filter are built from the same SQL expression (`services/dashboard_aggregates.py`). An unknown parameter is ignored; an invalid value of a known filter is refused with 400.
 
 | Parameter | Meaning |
 |-----------|---------|

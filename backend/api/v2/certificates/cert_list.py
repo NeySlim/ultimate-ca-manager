@@ -16,13 +16,10 @@ from utils.cert_status import (
 from utils.response import error_response
 from services.compliance_service import calculate_compliance_score, key_algo_sort_levels, key_algo_sort_points
 from utils.datetime_utils import utc_now
-from services.dashboard_aggregates import LIST_FILTER_PARAMS, certificate_list_conditions
+from services.dashboard_aggregates import certificate_list_conditions
 from . import bp
 
 logger = logging.getLogger(__name__)
-
-LIST_PARAMS = frozenset({'page', 'per_page', 'status', 'ca_id', 'source', 'search', 'template_modified',
-                         'sort_by', 'sort_order', 'has_private_key'}) | LIST_FILTER_PARAMS
 
 
 def key_strength_order(column):
@@ -42,9 +39,6 @@ def key_level_order(column):
 def list_certificates():
     """List certificates"""
 
-    unknown = sorted(set(request.args) - LIST_PARAMS)
-    if unknown:
-        return error_response(f"Unknown filter: {', '.join(unknown)}", 400)
     page, per_page = parse_request_pagination(default_per_page=20)
     # supports multi-select: ?status=valid&status=expired
     status_list, unknown_status = normalize_status_filters(

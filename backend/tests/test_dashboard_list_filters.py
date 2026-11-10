@@ -51,3 +51,12 @@ def test_a_certificate_is_listed_under_its_own_kind_only(app, auth_client, seede
     for kind, cid in seeded.items():
         for other in CERT_KINDS:
             assert (cid in _list(auth_client, other)[0]) is (other == kind), (kind, other)
+
+
+@pytest.mark.parametrize('param', ['foo', '_'])
+def test_an_unknown_parameter_is_ignored(auth_client, param):
+    assert auth_client.get('/api/v2/certificates', query_string={param: '1'}).status_code == 200
+
+
+def test_an_invalid_value_of_a_known_filter_is_refused(auth_client):
+    assert auth_client.get('/api/v2/certificates', query_string={'renewal': 'nope'}).status_code == 400
