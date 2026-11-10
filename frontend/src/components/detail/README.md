@@ -4,7 +4,11 @@ Rule: a panel is pure, actions live in the hook, content is split in sections.
 
 - **Pure panel.** `CertificatePanel`, `CAPanel`, `TrustCertPanel` and `CSRPanel`
   only render the entity they are given. No service call, no modal, no action
-  button (a static test checks that nothing here imports a service).
+  button (a static test checks that nothing here imports a service). The rule
+  covers direct imports: field components that load their own data are known
+  exceptions, to be absorbed at the inspector lot: `SignatureSchemeField`,
+  `ComplianceProfileField`, `IssuanceVisibilityField`, `CrossCertificatesSection`,
+  `CACrlSection`, `ChainUsageSection` and `CertDeploySection`.
 - **Actions in the hook.** `hooks/useEntityActions` returns `{ actions, modals,
   refresh, handler }` for a `type` and an `entity`: the ordered action list
   (with visibility from permissions and entity state), the modals they open,

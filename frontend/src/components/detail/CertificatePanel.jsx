@@ -1,6 +1,8 @@
 /**
  * CertificatePanel: pure presentation of one certificate. No service call, no
- * modal, no action button; actions live in hooks/useEntityActions.
+ * modal, no action button; actions live in hooks/useEntityActions. The rule
+ * covers direct imports: self-loading field components (see README.md) are
+ * known exceptions until the inspector lot.
  * `section` limits the output to one named part (see ./sections.js).
  */
 import { useState } from 'react'
