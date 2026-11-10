@@ -175,6 +175,8 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
       const res = await certificatesService.renew(id, body)
       if (res?.data?.approval_required) {
         showWarning(t('certificates.approvalRequired', { policy: res.data.policy_name }))
+      } else if (res?.meta?.msca_status === 'pending') {
+        showSuccess(t('certificates.renewPendingMsca'))
       } else {
         const relatedRenewed = res?.data?.related_renewed
         showSuccess(relatedRenewed?.length
