@@ -12,6 +12,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, CertificateTemplate, Certificate, SystemConfig
+from utils.ca_serial_counter import next_ca_serial
 from models.compromised_key import remember_if_compromised
 from utils.validity import DEFAULT_CERTIFICATE_VALIDITY_DAYS
 from utils.key_type import issue_key_type_from_template
@@ -278,7 +279,7 @@ class LifecycleMixin:
             cert_pem = cert.public_bytes(serialization.Encoding.PEM)
 
         # Increment CA serial
-        ca.serial = (ca.serial or 0) + 1
+        next_ca_serial(ca)
 
         # Encrypt private key if encryption is enabled and key is stored
         prv_encoded = None

@@ -10,6 +10,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, Certificate
+from utils.ca_serial_counter import next_ca_serial
 from services.file_regen_service import mirror_private_key
 from services.trust_store import TrustStoreService
 from utils.dn_parse import subject_common_name
@@ -444,7 +445,7 @@ class CSRMixin:
             certificate.san_email = json.dumps(san_email_list)
 
         # Increment CA serial
-        ca.serial = (ca.serial or 0) + 1
+        next_ca_serial(ca)
 
         # If signing as intermediate CA, create a CA record
         new_ca = None

@@ -8,6 +8,7 @@ import logging
 from typing import List
 
 from models import CA, db
+from utils.ca_serial_counter import next_ca_serial
 
 logger = logging.getLogger(__name__)
 
@@ -227,7 +228,7 @@ class CAOperationsMixin:
         if not ca:
             raise ValueError("CA not found")
 
-        ca.serial = (ca.serial or 0) + 1
+        next_ca_serial(ca)
         try:
             db.session.commit()
         except Exception as _commit_err:

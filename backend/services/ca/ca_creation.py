@@ -16,6 +16,7 @@ from cryptography.hazmat.backends import default_backend
 import compliance_profiles
 from fips_mode import FipsRestricted
 from models import CA, db
+from utils.ca_serial_counter import next_ca_serial
 from models.hsm import HsmKey
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
@@ -379,7 +380,7 @@ class CACreationMixin:
                 private_key = bind_signature_scheme(private_key, signature_scheme)
             subject = TrustStoreService.build_subject(dn)
             if caref:
-                parent_ca.serial = (parent_ca.serial or 0) + 1
+                next_ca_serial(parent_ca)
 
             # A root's new HSM key may sign with a provider-bound hash
             _refuse_on_violations(PolicyEvaluationService.checked_signing_hash(

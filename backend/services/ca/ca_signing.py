@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from models import CA, Certificate, db
+from utils.ca_serial_counter import next_ca_serial
 from models.certificate_template import CertificateTemplate
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
@@ -259,7 +260,7 @@ class CASigningMixin:
         db.session.add(new_cert)
 
         # Increment CA serial
-        ca.serial = (ca.serial or 0) + 1
+        next_ca_serial(ca)
         try:
             db.session.flush()
             # The renewed row is archived in the commit that stores its successor,
