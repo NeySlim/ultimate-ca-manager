@@ -14,14 +14,13 @@ import logging
 import sqlite3
 
 # The query a backend migration and a restore run on their source too
-from utils.serial_duplicates import DUPLICATES
+from utils.serial_duplicates import DUPLICATES, PENDING_KEY
 
 logger = logging.getLogger(__name__)
 pg_compatible = True
 
 TABLE = 'certificates'
 CONFIG = 'system_config'
-PENDING_KEY = 'serial_unique_index_pending'
 INDEX = 'uix_certificates_ca_serial'
 # Same name and predicate as the model's index, so create_all and this agree
 CREATE_INDEX = (f"CREATE UNIQUE INDEX IF NOT EXISTS {INDEX} ON {TABLE} (caref, serial_number) "

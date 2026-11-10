@@ -7,6 +7,8 @@ with the same query and refuses, naming the rows, rather than failing on the ind
 from typing import Dict, Iterable, List
 
 INDEX = 'uix_certificates_ca_serial'
+# SystemConfig key migration 142 leaves while duplicates keep it from creating the index
+PENDING_KEY = 'serial_unique_index_pending'
 # Rows the index covers: CSRs carry no serial, imported certificates no CA
 _COVERED = "caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''"
 DUPLICATES = (f"SELECT caref, serial_number, COUNT(*) FROM certificates WHERE {_COVERED} "
@@ -44,3 +46,25 @@ def describe(duplicates: List[Dict], limit: int = 10) -> str:
                       for d in duplicates[:limit])
     more = f" (and {len(duplicates) - limit} more)" if len(duplicates) > limit else ''
     return shown + more
+
+
+def check_pending_serial_index(app) -> int:
+    """At start: log the pairs migration 142 left pending and keep their count for /health.
+    The flag changes only when migrations run, that is at start."""
+    import json
+    import logging
+    from models import SystemConfig
+    count = 0
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key=PENDING_KEY).first()
+        if row is not None:
+            try:
+                count = len(json.loads(row.value or '{}').get('duplicates') or []) or 1
+            except (ValueError, AttributeError):
+                count = 1
+    app.config['SERIAL_INDEX_PENDING'] = count
+    if count:
+        logging.getLogger(__name__).warning(
+            "%s: %d serial number(s) are shared by certificates of one CA, so the unique "
+            "serial index is not in place; %s", PENDING_KEY, count, CLEANUP)
+    return count

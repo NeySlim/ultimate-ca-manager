@@ -950,6 +950,12 @@ def create_app(config_name=None):
     except Exception as e:
         app.logger.debug(f"HSM check skipped: {e}")
 
+    try:
+        from utils.serial_duplicates import check_pending_serial_index
+        check_pending_serial_index(app)
+    except Exception as e:
+        app.logger.debug(f"Serial index check skipped: {e}")
+
     # Auto-register SoftHSM provider if Docker entrypoint initialized a token
     try:
         with app.app_context():

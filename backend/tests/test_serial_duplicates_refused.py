@@ -89,3 +89,35 @@ def test_a_restore_refuses_an_archive_with_duplicate_serials(app, create_ca):
         finally:
             Certificate.query.filter(Certificate.refid.in_(refids)).delete()
             db.session.commit()
+
+
+def test_a_pending_serial_index_is_logged_at_start_and_shown_by_health(app, client, caplog):
+    import json
+    import logging
+    from models import SystemConfig
+    from utils.serial_duplicates import PENDING_KEY, check_pending_serial_index
+    with app.app_context():
+        SystemConfig.query.filter_by(key=PENDING_KEY).delete()
+        db.session.add(SystemConfig(key=PENDING_KEY, value=json.dumps({'duplicates': [
+            {'caref': 'ca-a', 'serial_number': '11', 'count': 2}]})))
+        db.session.commit()
+    try:
+        with caplog.at_level(logging.WARNING):
+            check_pending_serial_index(app)
+        assert any(PENDING_KEY in r.getMessage() and '1 serial' in r.getMessage()
+                   for r in caplog.records)
+        assert client.get('/health').get_json()['serial_unique_index_pending'] == 1
+    finally:
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PENDING_KEY).delete()
+            db.session.commit()
+    check_pending_serial_index(app)
+    assert 'serial_unique_index_pending' not in client.get('/health').get_json()
+
+
+def test_every_start_checks_for_a_pending_serial_index(monkeypatch):
+    from tests.fresh_app import fresh_app
+    started = []
+    monkeypatch.setattr('utils.serial_duplicates.check_pending_serial_index', started.append)
+    with fresh_app() as application:
+        assert started == [application]

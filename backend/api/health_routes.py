@@ -59,6 +59,8 @@ def health():
         result['safe_mode'] = True
         result['safe_mode_reason'] = current_app.config.get('SAFE_MODE_REASON',
                                                             'encryption_key_missing')
+    if current_app.config.get('SERIAL_INDEX_PENDING'):
+        result['serial_unique_index_pending'] = current_app.config['SERIAL_INDEX_PENDING']
     return jsonify(result)
 
 
