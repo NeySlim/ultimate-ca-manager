@@ -1,5 +1,5 @@
 /**
- * Tests for resolveActivePageId — the sidebar/mobile-nav highlight derives
+ * Tests for resolveActivePageId — the shell's active entry derives
  * the active item from the URL by path matching, not by a "first URL segment
  * === item id" naming convention.
  *
@@ -8,8 +8,8 @@
  * est-config / tsa-config only worked through a hand-maintained lookup table.
  */
 import { describe, it, expect } from 'vitest'
-import { resolveActivePageId } from '../Sidebar'
-import { sidebarGroups } from '../../navigation/registry'
+import { resolveActivePageId } from '../activePage'
+import { MODULES } from '../../../navigation/registry'
 
 describe('resolveActivePageId', () => {
   it('maps / to the dashboard id (empty string)', () => {
@@ -62,13 +62,11 @@ describe('resolveActivePageId', () => {
     // The invariant the old naming convention could not keep: adding a nav
     // entry whose id differs from its URL segment must fail here instead of
     // silently breaking the highlight in the browser.
-    for (const group of sidebarGroups()) {
-      for (const item of group.children) {
-        expect(
-          resolveActivePageId(item.path),
-          `nav item '${item.id}' (path ${item.path}) does not resolve to itself`
-        ).toBe(item.id)
-      }
+    for (const item of MODULES.filter(m => m.path !== '/' && m.id !== 'dashboard')) {
+      expect(
+        resolveActivePageId(item.path),
+        `module '${item.id}' (path ${item.path}) does not resolve to itself`
+      ).toBe(item.id)
     }
   })
 })

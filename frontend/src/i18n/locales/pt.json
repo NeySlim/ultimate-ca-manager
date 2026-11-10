@@ -5958,5 +5958,37 @@
     "duplicateOid": "Este OID já está na lista",
     "fixErrors": "Corrija primeiro as extensões personalizadas",
     "storedInvalid": "As extensões personalizadas guardadas são inválidas: a emissão a partir deste modelo é recusada até serem corrigidas ou esvaziadas."
+  },
+  "shell": {
+    "mainNav": "Main navigation",
+    "modules": "Modules",
+    "modulesMenuLabel": "Product modules",
+    "pinCount": "{{count}} / {{max}} pinned in the bar",
+    "pinModule": "Pin {{name}}",
+    "pinAdd": "Pin to the bar",
+    "pinRemove": "Remove from the bar",
+    "pinFull": "Three modules at most: unpin one to pin another.",
+    "pinHint": "Pin up to three modules: they appear next to the main pages in the top bar.",
+    "navHelp": "How navigation works",
+    "search": "Search and navigate",
+    "searchPlaceholder": "Search…",
+    "navigate": "Navigate",
+    "signedInWith": "Signed in with {{method}}",
+    "method": {
+      "password": "password",
+      "mtls": "client certificate",
+      "webauthn": "security key",
+      "session": "browser session"
+    },
+    "expiringBadge": "{{count}} certificates expiring or expired. Dismiss.",
+    "statusRunning": "Service running",
+    "statusUnreachable": "Service unreachable",
+    "statusSafeMode": "Safe mode",
+    "version": "UCM {{version}}",
+    "haNode": "HA node {{node}}",
+    "haLeader": "leader",
+    "haFollower": "follower",
+    "haNodes": "Nodes: {{count}}",
+    "haLate": "Late: {{count}}"
   }
 }

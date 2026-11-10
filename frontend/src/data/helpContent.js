@@ -47,6 +47,45 @@ export const helpContent = {
     related: ['Certificates', 'CAs', 'Settings']
   },
 
+  // ===== NAVIGATION =====
+  navigation: {
+    title: 'Navigation',
+    subtitle: 'The top bar, the Modules menu and pinned modules',
+    overview: 'The top bar holds the main pages, up to three modules you pin, the Modules menu, search and your account. The Modules menu lists every page you may open, in four groups; pages you have no right to are not shown.',
+    sections: [
+      {
+        title: 'Modules menu',
+        icon: ListChecks,
+        items: [
+          { label: 'Open', text: 'Select Modules, or press Down Arrow on the button; focus moves to the first page' },
+          { label: 'Move', text: 'Up Arrow, Down Arrow, Home and End move between pages; Escape closes the menu and returns to the button' },
+          { label: 'Pin', text: 'The pin button next to a page keeps it in the top bar; three at most, and the menu says so when you try a fourth' },
+        ]
+      },
+      {
+        title: 'Search and shortcuts',
+        icon: Stack,
+        items: [
+          { label: 'Search', text: 'Press Ctrl K (Cmd K on macOS) or select the search field to jump to a page or find a certificate' },
+          { label: 'Help', text: 'Press ? outside a text field to open the help of the current page' },
+          { label: 'Phone width', text: 'The top bar shows a single list of pages instead of the links and the menu' },
+        ]
+      },
+      {
+        title: 'Account menu',
+        icon: Users,
+        items: [
+          { label: 'Account', text: 'Your profile and settings, theme, appearance mode, language and sign out' },
+        ]
+      },
+    ],
+    tips: [
+      'Your pins follow you to every browser and device you sign in from',
+      'A pinned page you lose the right to open is hidden, and returns if the right is restored',
+    ],
+    related: ['Dashboard', 'Certificates', 'Settings']
+  },
+
   // ===== CERTIFICATE AUTHORITIES =====
   cas: {
     title: 'Certificate Authorities',

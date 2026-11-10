@@ -34,6 +34,8 @@ export function AuthProvider({ children }) {
   const [sessionChecked, setSessionChecked] = useState(false)
   const [permissions, setPermissions] = useState([])
   const [role, setRole] = useState(null)
+  // How this session was opened; a restore only knows it is a session
+  const [authMethod, setAuthMethod] = useState(null)
   const [forcePasswordChange, setForcePasswordChange] = useState(false)
   // #141: session authenticated but must enrol TOTP before full access.
   const [mustEnroll2fa, setMustEnroll2fa] = useState(false)
@@ -53,6 +55,7 @@ export function AuthProvider({ children }) {
         setIsAuthenticated(false)
         setPermissions([])
         setRole(null)
+        setAuthMethod(null)
         setMustEnroll2fa(false)
         setForcePasswordChange(false)
         setPrefsAuthenticated(false)
@@ -63,6 +66,7 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true)
       setPermissions(userData.permissions || [])
       setRole(userData.role || null)
+      setAuthMethod(prev => prev || userData.auth_method || null)
       setMustEnroll2fa(userData.must_enroll_2fa || false)
       // A session restore must reach the same conclusion the login response
       // did. Without this a reload — and every SSO login, which reaches the
@@ -86,6 +90,7 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(false)
       setPermissions([])
       setRole(null)
+      setAuthMethod(null)
       setMustEnroll2fa(false)
       setPrefsAuthenticated(false)
       return false
@@ -126,6 +131,7 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(true)
       setPermissions(response.data?.permissions || response.permissions || [])
       setRole(response.data?.role || response.role || null)
+      setAuthMethod(response.data?.auth_method || response.auth_method || null)
       setForcePasswordChange(response.data?.force_password_change || false)
       // Apply display settings from login response (timezone, date_format, show_time)
       const loginData = response.data || response
@@ -175,6 +181,7 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(false)
       setPermissions([])
       setRole(null)
+      setAuthMethod(null)
       setForcePasswordChange(false)
       setMustEnroll2fa(false)
       setPrefsAuthenticated(false)
@@ -192,6 +199,7 @@ export function AuthProvider({ children }) {
     sessionChecked,
     permissions,
     role,
+    authMethod,
     forcePasswordChange,
     mustEnroll2fa,
     login,
