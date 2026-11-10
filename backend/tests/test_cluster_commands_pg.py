@@ -405,6 +405,26 @@ def test_the_held_restart_waits_for_the_node_ahead_to_restart_for_the_newer_one(
     assert wait_for(lambda: ('down', 'b') in cluster.events)
 
 
+def test_a_restart_action_that_raises_is_retried_and_reloads_go_on(app, ha):
+    log, attempts, emitted = [], [], []
+
+    def flaky():
+        attempts.append('restart')
+        if len(attempts) == 1:
+            emitted.append(_emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'}))  # before the retry
+            raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', restart_action=flaky,
+              handlers={cc.RELOAD_SYSLOG: lambda payload: log.append((payload['mark'], solo.restarting))})
+    restart_id = _emit(app, cc.RESTART)
+    solo.start()
+    assert wait_for(lambda: len(attempts) == 2)
+    assert log == [('after', False)] and solo.seen == emitted[0]
+    assert solo.restarting is True and _restart_seen(app, 'solo') == restart_id
+    time.sleep(0.2)
+    assert attempts == ['restart', 'restart']  # a restart that ran is not repeated
+
+
 LAG = timedelta(hours=1)
 
 

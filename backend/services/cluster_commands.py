@@ -53,6 +53,9 @@ _ROW_SQL = text("SELECT 1 FROM cluster_nodes WHERE node_id = :n")
 # Apart from command_seen: a restart applied late (from a hole) is behind the reload cursor
 _CLAIM_SQL = text("UPDATE cluster_nodes SET restart_seen = :id WHERE node_id = :n "
                   "AND (restart_seen IS NULL OR restart_seen < :id)")
+_CLAIMED_SQL = text("SELECT restart_seen FROM cluster_nodes WHERE node_id = :n")
+_RELEASE_SQL = text("UPDATE cluster_nodes SET restart_seen = :prev WHERE node_id = :n "
+                    "AND restart_seen = :id")
 
 
 def emit(kind, payload=None, target=None):
@@ -188,6 +191,7 @@ class CommandApplier:
         self._conn = None
         self._error_logged = False
         self._stop = threading.Event()
+        self._stopping = False  # stop() was called: a failed restart does not resume the loop
         self._thread = None
 
     # -- lifecycle -------------------------------------------------------
@@ -198,6 +202,7 @@ class CommandApplier:
         return self
 
     def stop(self, timeout=10):
+        self._stopping = True
         self._stop.set()
         if self._thread is not None and self._thread is not threading.current_thread():
             self._thread.join(timeout)
@@ -253,9 +258,11 @@ class CommandApplier:
     def _drain(self, conn):
         now = time.monotonic()
         self._holes = [h for h in self._holes if h[2] > now][-MAX_HOLES:]
+        held_before = self._held is not None
         self._drain_rows(conn, now)
-        # After the rows: a newer restart committed with the node ahead's return is absorbed first
-        if self._held is not None and not self._stop.is_set():
+        # After the rows: a newer restart committed with the node ahead's return is absorbed first;
+        # one held (or failed) during this pass is retried on the next
+        if held_before and self._held is not None and not self._stop.is_set():
             held, self._held = self._held, None
             if self._restart(conn, held) and self._held is None:
                 self._fill_hole(held.id)
@@ -377,6 +384,7 @@ class CommandApplier:
             logger.warning(f"Rolling restart: {', '.join(pending)} not back after "
                            f"{self.guard * ahead:.0f}s, node {self.node_id} restarts anyway")
         # Claimed before acting: a sibling process of this node that lost the claim leaves it alone
+        previous = conn.execute(_CLAIMED_SQL, {'n': self.node_id}).scalar()
         claimed = self._claim(conn, row.id)
         self._advance(conn, row.id)
         if not claimed:
@@ -387,7 +395,15 @@ class CommandApplier:
         try:
             self.restart_action()
         except Exception as e:
-            logger.error(f"Rolling restart of node {self.node_id} failed: {type(e).__name__}: {e}")
+            # Still on the old process: the claim is given back and the restart retried next pass
+            logger.error(f"Rolling restart of node {self.node_id} failed, retried on the next pass: "
+                         f"{type(e).__name__}: {e}")
+            conn.execute(_RELEASE_SQL, {'prev': previous, 'id': row.id, 'n': self.node_id})
+            self.restarting = False
+            self._held = _Held(row.id, row.created_at)
+            if not self._stopping:
+                self._stop.clear()
+            return True
         return False
 
 
