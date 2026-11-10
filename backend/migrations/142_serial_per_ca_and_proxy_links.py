@@ -1,9 +1,12 @@
-"""Migration 142: one certificate per (issuing CA, serial number).
+"""Migration 142: one certificate per (issuing CA, serial number); proxy challenge links.
 
 RFC 5280 §4.1.2.2: a CA never issues two certificates with the same serial.
 Existing duplicates are listed, never deleted: the index is created only on a
 clean table; otherwise the pairs are logged and kept under the SystemConfig key
 ``serial_unique_index_pending`` until an operator resolves them and runs this again.
+
+``acme_proxy_challenge_links`` records which proxy order a challenge belongs to, so
+any worker or node answers the challenge POST that another one's authz fetch prepared.
 """
 import json
 import logging
@@ -27,6 +30,22 @@ SET_PENDING = (f"INSERT INTO {CONFIG} (key, value, encrypted, description, updat
                "VALUES ('" + PENDING_KEY + "', {value}, {false}, "
                "'Unique serial index per CA waits for duplicate certificates to be resolved', "
                "CURRENT_TIMESTAMP)")
+
+LINKS = 'acme_proxy_challenge_links'
+ORDERS = 'acme_client_orders'
+
+
+def _links_ddl(pk, ts):
+    return [f"""CREATE TABLE IF NOT EXISTS {LINKS} (
+        id {pk},
+        key_sha256 VARCHAR(64) NOT NULL UNIQUE,
+        order_id INTEGER NOT NULL REFERENCES {ORDERS} (id) ON DELETE CASCADE,
+        identifier VARCHAR(255),
+        authz_url TEXT,
+        created_at {ts} NOT NULL
+    )""",
+            f"CREATE INDEX IF NOT EXISTS ix_{LINKS}_order_id ON {LINKS} (order_id)",
+            f"CREATE INDEX IF NOT EXISTS ix_{LINKS}_created_at ON {LINKS} (created_at)"]
 
 
 def _apply(execute, tables, value_param, false_literal):
@@ -52,6 +71,9 @@ def _apply(execute, tables, value_param, false_literal):
 
 def _upgrade_sqlite(conn):
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if ORDERS in tables:
+        for ddl in _links_ddl('INTEGER PRIMARY KEY AUTOINCREMENT', 'DATETIME'):
+            conn.execute(ddl)
     _apply(lambda sql, value: conn.execute(sql) if value is None else conn.execute(sql, (value,)),
            tables, '?', '0')
     conn.commit()
@@ -61,6 +83,9 @@ def _upgrade_pg(conn):
     from sqlalchemy import inspect, text
 
     tables = set(inspect(conn).get_table_names())
+    if ORDERS in tables:
+        for ddl in _links_ddl('SERIAL PRIMARY KEY', 'TIMESTAMP WITHOUT TIME ZONE'):
+            conn.execute(text(ddl))
     _apply(lambda sql, value: conn.execute(text(sql)) if value is None
            else conn.execute(text(sql), {'v': value}),
            tables, ':v', 'FALSE')

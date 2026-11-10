@@ -187,6 +187,7 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'acme_authorizations': 'in-flight protocol state, tied to orders',
     'acme_challenges': 'in-flight protocol state, tied to authorizations',
     'acme_proxy_dns_challenges': 'expected TXT values of in-flight proxy orders',
+    'acme_proxy_challenge_links': 'which in-flight proxy order a challenge belongs to',
     # Carried by default since 2.250, so pruned with the rest; listed for an
     # archive without them (older, or an include map). Unlinked as deleting
     # the certificate, account or user they name does.

@@ -570,16 +570,17 @@ class TestCaches:
         with app.app_context():
             svc = AcmeProxyService('https://ucm.example/acme/proxy')
             svc._ensure_directory()
+            proxy_mod._challenge_order_cache.put('k', (_order().id, DOMAIN, AUTHZ_URL))
         proxy_mod._finalize_url_cache.put(ORDER_URL, f'{ORDER_URL}/finalize')
-        proxy_mod._challenge_order_cache.put('k', (1, DOMAIN, AUTHZ_URL))
         outbound.nonce_pool_push(DIRECTORY_URL, 'pooled')
 
-        reset_proxy_caches()
-        reset_proxy_caches()
+        with app.app_context():
+            reset_proxy_caches()
+            reset_proxy_caches()
+            assert proxy_mod._challenge_order_cache.get('k') is None
 
         assert proxy_mod._directory_cache.get(DIRECTORY_URL) is None
         assert proxy_mod._finalize_url_cache.get(ORDER_URL) is None
-        assert proxy_mod._challenge_order_cache.get('k') is None
         assert outbound.nonce_pool_pop(DIRECTORY_URL) is None
 
     def test_cache_bound_evicts_the_oldest(self):

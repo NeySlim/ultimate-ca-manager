@@ -116,3 +116,44 @@ def test_postgresql(rows, pending):
             conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
         admin.dispose()
 
+
+def test_sqlite_creates_the_proxy_challenge_links_with_the_orders():
+    conn = sqlite3.connect(':memory:')
+    _migration().upgrade(conn)  # no orders table: nothing to link to
+    conn.execute("CREATE TABLE acme_client_orders (id INTEGER PRIMARY KEY)")
+    for _ in range(2):
+        _migration().upgrade(conn)
+    columns = {r[1] for r in conn.execute(f"PRAGMA table_info({_migration().LINKS})")}
+    assert columns == {'id', 'key_sha256', 'order_id', 'identifier', 'authz_url', 'created_at'}
+    conn.execute(f"INSERT INTO {_migration().LINKS} (key_sha256, order_id, created_at) "
+                 "VALUES ('k', 1, CURRENT_TIMESTAMP)")
+    with pytest.raises(sqlite3.IntegrityError):
+        conn.execute(f"INSERT INTO {_migration().LINKS} (key_sha256, order_id, created_at) "
+                     "VALUES ('k', 1, CURRENT_TIMESTAMP)")
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_postgresql_creates_the_proxy_challenge_links():
+    schema = f"m142l_{os.getenv('PYTEST_XDIST_WORKER', 'main')}_{uuid.uuid4().hex[:6]}"
+    admin = create_engine(PG_URL)
+    with admin.begin() as conn:
+        conn.execute(text(f'CREATE SCHEMA {schema}'))
+    engine = create_engine(PG_URL, connect_args={'options': f'-csearch_path={schema}'})
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("CREATE TABLE acme_client_orders (id SERIAL PRIMARY KEY)"))
+            conn.execute(text("INSERT INTO acme_client_orders (id) VALUES (1)"))
+        for _ in range(2):
+            with engine.begin() as conn:
+                _migration().upgrade(conn)
+        with engine.begin() as conn:
+            conn.execute(text(f"INSERT INTO {_migration().LINKS} (key_sha256, order_id, created_at) "
+                              "VALUES ('k', 1, now())"))
+            conn.execute(text("DELETE FROM acme_client_orders"))
+            assert conn.execute(text(f"SELECT COUNT(*) FROM {_migration().LINKS}")).scalar() == 0
+    finally:
+        engine.dispose()
+        with admin.begin() as conn:
+            conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
+        admin.dispose()
