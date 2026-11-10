@@ -256,3 +256,28 @@ def test_the_process_start_is_stamped_before_the_master_reads_a_setting(tmp_path
                          capture_output=True, text=True, timeout=60)
     assert run.returncode == 0, run.stderr
     assert json.loads(run.stdout.strip().splitlines()[-1]) == [['wstep', True], ['mtls', True]]
+
+
+@pytest.fixture
+def master_on_sqlite(monkeypatch, tmp_path):
+    """The gunicorn master in HA, on a SQLite file of the test's own."""
+    monkeypatch.setenv('UCM_HA', '1')
+    monkeypatch.delenv('DATABASE_URL', raising=False)
+    monkeypatch.setenv('DATABASE_PATH', str(tmp_path / 'ucm.db'))
+    monkeypatch.setattr(cc, 'KNOWN_AT_START', None)
+    return tmp_path / 'ucm.db'
+
+
+def test_a_first_ha_start_before_the_migration_spares_nothing_in_silence(master_on_sqlite, tmp_path, capsys):
+    """Upgrade: the migrations that create cluster_commands run after this snapshot."""
+    import sqlite3
+    with sqlite3.connect(master_on_sqlite) as conn:
+        conn.execute('CREATE TABLE system_config (key TEXT, value TEXT)')
+    assert cc.snapshot_committed_restarts(str(tmp_path)) == frozenset()
+    assert capsys.readouterr().err == ''
+
+
+def test_any_other_snapshot_error_is_still_reported(master_on_sqlite, tmp_path, capsys):
+    master_on_sqlite.write_bytes(b'not a database' * 100)
+    assert cc.snapshot_committed_restarts(str(tmp_path)) == frozenset()
+    assert 'restarts not read before the settings' in capsys.readouterr().err

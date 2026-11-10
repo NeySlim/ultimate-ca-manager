@@ -93,10 +93,19 @@ def snapshot_committed_restarts(data_path):
             KNOWN_AT_START = frozenset(row[0] for row in database.rows(
                 "SELECT id FROM cluster_commands WHERE kind = ?", (RESTART,)))
     except Exception as e:
-        print(f"Cluster commands: restarts not read before the settings, none is spared: "
-              f"{type(e).__name__}: {e}", file=sys.stderr)
+        if not _no_commands_table(e):
+            print(f"Cluster commands: restarts not read before the settings, none is spared: "
+                  f"{type(e).__name__}: {e}", file=sys.stderr)
         KNOWN_AT_START = frozenset()
     return KNOWN_AT_START
+
+
+def _no_commands_table(e):
+    """First HA start after an upgrade: the migrations create the table after this read."""
+    import sqlite3
+    if isinstance(e, sqlite3.OperationalError):
+        return str(e) == 'no such table: cluster_commands'
+    return getattr(e, 'sqlstate', None) == '42P01'  # psycopg UndefinedTable
 
 
 def emit(kind, payload=None, target=None):

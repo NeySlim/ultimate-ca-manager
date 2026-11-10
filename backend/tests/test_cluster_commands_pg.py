@@ -963,6 +963,20 @@ def test_an_unreadable_snapshot_spares_no_restart(master_boot, monkeypatch, tmp_
     assert cc.snapshot_committed_restarts(str(tmp_path)) == frozenset()
 
 
+def test_a_first_ha_start_before_the_migration_spares_nothing_in_silence_on_pg(
+        master_boot, monkeypatch, tmp_path, capsys):
+    """Upgrade: the migrations that create cluster_commands run after this snapshot."""
+    schema = f'{pg_app_harness.SCHEMA}_{secrets.randbelow(10**6) + 10**6}'
+    with pg_app_harness._connect() as admin:
+        admin.execute(f'CREATE SCHEMA "{schema}"')
+        try:
+            monkeypatch.setenv('DATABASE_URL', pg_app_harness.app_url(schema))
+            assert cc.snapshot_committed_restarts(str(tmp_path)) == frozenset()
+            assert capsys.readouterr().err == ''
+        finally:
+            admin.execute(f'DROP SCHEMA "{schema}" CASCADE')
+
+
 def test_no_snapshot_outside_ha(master_boot, monkeypatch, tmp_path):
     monkeypatch.delenv('UCM_HA')
     monkeypatch.setenv('DATABASE_URL', 'postgresql://ucm@127.0.0.1:1/ucm')
