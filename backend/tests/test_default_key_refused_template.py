@@ -118,3 +118,23 @@ def test_xcep_leaves_out_a_template_whose_default_is_refused(app, monkeypatch):
             ca, [_tpl(9101, None), _tpl(9102, 'RSA-2048')]))
     names = [e.text for e in root.iter(f'{{{policy_builder.XCEP_NS}}}commonName')]
     assert names == ['T9102']
+
+
+def test_xcep_announces_the_template_scoped_default_wstep_enforces(app, monkeypatch):
+    from services.wstep import wstep_service
+    from services.xcep import policy_builder
+
+    def default(ca_id=None, profile=None, template_id=None):
+        return 'EC-P384' if template_id == 9201 else 'RSA-2048'
+    monkeypatch.setattr(issuance_defaults, 'default_issue_key_type', default)
+    monkeypatch.setattr(wstep_service, 'default_issue_key_type', default)
+    ca = SimpleNamespace(id=None, refid='ca-xcep-scoped', descr='Test CA', crt=None, template_pins=[])
+    template = _tpl(9201, None)
+    with app.app_context():
+        xml = policy_builder.build_get_policies_response(ca, [template])
+    root = etree.fromstring(xml)
+    ns = {'x': policy_builder.XCEP_NS}
+    values = {o.findtext('x:value', namespaces=ns) for o in root.iter(f'{{{policy_builder.XCEP_NS}}}oID')}
+    assert '1.3.132.0.34' in values  # secp384r1, the key WSTEP accepts for this template
+    assert '2.16.840.1.101.3.4.2.2' in values  # SHA-384 request hash
+    assert wstep_service._template_key_label(template) == 'EC-P384'

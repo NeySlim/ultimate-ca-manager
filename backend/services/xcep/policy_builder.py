@@ -257,11 +257,12 @@ def _resolve_templates_for_ca(ca, all_active_templates):
     return list(all_active_templates)
 
 
-def _key_type_info(key_type, ca_id=None):
+def _key_type_info(key_type, ca_id=None, template_id=None):
     """``(algorithm name, minimal key length)`` from the key registry, or None
-    when the template's key type cannot be announced. Unset means the default issue key."""
+    when the template's key type cannot be announced. Unset means the default issue key
+    of the CA and template, the one WSTEP then enforces."""
     from utils.issuance_defaults import default_issue_key_type
-    alg = key_algorithms.get(key_type or default_issue_key_type(ca_id))
+    alg = key_algorithms.get(key_type or default_issue_key_type(ca_id, template_id=template_id))
     if alg is None or alg.family not in _XCEP_KEY_FAMILIES:
         return None
     if alg.family == 'EC' and alg.param not in _XCEP_EC_CURVES:
@@ -276,13 +277,14 @@ def _request_hash(template, key_label=None, ca_id=None):
     """The digest a client must sign its request with: the template's own, raised to
     the one matching its key (SHA-384 for P-384), SHA-512 for ML-DSA. Never SHA-1."""
     from services.policy_service import POLICY_DIGESTS
-    from utils.issuance_defaults import default_issue_key_type, digest_for_label
+    from utils.issuance_defaults import BASELINE_ISSUE_KEY, default_issue_key_type, digest_for_label
     if key_label in _MLDSA_OIDS:
         # RFC 9882 §3.3: an ML-DSA CMS signer digests with SHA-512, the one hash it must support
         return _HASH_ALGORITHM_OIDS['sha512']
-    # A template without a usable digest takes its key's own
-    fallback = (digest_for_label(key_label or default_issue_key_type(ca_id))
-                or digest_for_label(default_issue_key_type(ca_id)))
+    # A template without key issues the default of its CA and template, as WSTEP resolves it;
+    # a template without a usable digest takes its key's own
+    key_label = key_label or default_issue_key_type(ca_id, template_id=getattr(template, 'id', None))
+    fallback = digest_for_label(key_label) or digest_for_label(BASELINE_ISSUE_KEY)
     digest = (getattr(template, 'digest', None) or fallback).strip().lower().replace('-', '')
     if digest not in _HASH_ALGORITHM_OIDS:
         if digest == 'sha1':
@@ -442,7 +444,7 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
                         template.name)
             continue
         try:
-            key_info = _key_type_info(template.key_type, ca.id)
+            key_info = _key_type_info(template.key_type, ca.id, template.id)
         except PolicyViolation as exc:
             # A template without key whose default the policies refuse; the others stay offered
             logger.warning("XCEP: template %r left out: %s", template.name, exc)
