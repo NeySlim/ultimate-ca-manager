@@ -358,8 +358,8 @@ def test_a_loosened_fallback_directory_is_closed_again(tmp_path, monkeypatch):
 
 
 def test_iter_rows_streams_a_sealed_section_without_loading_it(tmp_path, monkeypatch):
-    """Rows cross frame boundaries, a multibyte character too: every row comes
-    back whole and the section is never loaded into the store."""
+    """Rows cross frame boundaries (json.dump escapes to ASCII, so no multibyte sequence
+    is ever cut): every row comes back whole and the section is never loaded into the store."""
     from services.backup import section_store
     monkeypatch.setattr(section_store, 'FRAME_BYTES', 64)
     rows = [{'refid': f'c{i}', 'caref': 'ca', 'serial_number': str(i % 3), 'descr': 'é' * 40 + '€'}
@@ -377,3 +377,16 @@ def test_iter_rows_streams_a_sealed_section_without_loading_it(tmp_path, monkeyp
             list(store.iter_rows('configuration'))
         store['certificates']  # loaded: iterated in place, same rows
         assert list(store.iter_rows('certificates')) == rows
+
+
+
+def test_iter_rows_refuses_a_section_cut_before_its_closing_bracket(tmp_path, monkeypatch):
+    """A list that never closes is not a shorter list: the rows after the cut would
+    escape the check that reads them (serial duplicates)."""
+    with SectionStore(str(tmp_path)) as store:
+        store.add_part('metadata', 0, {'schema_version': 4})
+        store.add_part('certificates', 0, [{'refid': 'c1'}])
+        store.seal()
+        monkeypatch.setattr(store, '_frames', lambda path: iter([b'[{"refid": "c1"}, {"refid": "c2"', b', 3']))
+        with pytest.raises(ValueError, match='closing bracket'):
+            list(store.iter_rows('certificates'))

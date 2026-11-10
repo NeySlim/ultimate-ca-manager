@@ -51,7 +51,7 @@ def get_queue():
     identical certificate supersedes.
     """
     limit = parse_request_limit(DASHBOARD_MAX_ROWS, DASHBOARD_MAX_ROWS)
-    kinds = request.args.getlist('kind') or None
+    kinds = [k for k in request.args.getlist('kind') if k] or None
     unknown = sorted(set(kinds or ()) - set(dashboard_aggregates.QUEUE_KINDS))
     if unknown:
         return error_response(f"unknown kind: {', '.join(unknown)}", 400)

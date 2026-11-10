@@ -402,6 +402,9 @@ def test_kind_restricts_the_items_but_not_the_counts(auth_client, seeded):
     r = auth_client.get(f'{URL}?kind=crl_due&kind=nonsense')
     assert r.status_code == 400
     assert 'nonsense' in get_json(r)['message']
+    r = auth_client.get(f'{URL}?kind=&kind=crl_missing')  # an empty value is no kind
+    assert r.status_code == 200, r.data
+    assert {i['kind'] for i in get_json(r)['data']['items']} == {'crl_missing'}
 
 
 def test_a_key_without_read_dashboard_is_refused(app, auth_client):

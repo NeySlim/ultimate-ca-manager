@@ -285,23 +285,23 @@ class SectionStore:
         buffer, opened = '', False
         for frame in self._frames(self._files[name]):
             buffer += text.decode(frame)
+            pos = 0    # one slice per frame, not per row: a frame holds thousands of rows
             while True:
-                i = 0
-                while i < len(buffer) and (buffer[i] in ' \t\r\n,' or (buffer[i] == '[' and not opened)):
-                    opened = opened or buffer[i] == '['
-                    i += 1
-                if i >= len(buffer):
+                while pos < len(buffer) and (buffer[pos] in ' \t\r\n,' or (buffer[pos] == '[' and not opened)):
+                    opened = opened or buffer[pos] == '['
+                    pos += 1
+                if pos >= len(buffer):
                     buffer = ''
                     break
-                if buffer[i] == ']':
+                if buffer[pos] == ']':
                     return
                 try:
-                    row, end = decoder.raw_decode(buffer, i)
+                    row, pos = decoder.raw_decode(buffer, pos)
                 except ValueError:
-                    buffer = buffer[i:]    # the row continues in the next frame
+                    buffer = buffer[pos:]    # the row continues in the next frame
                     break
                 yield row
-                buffer = buffer[end:]
+        raise ValueError(f"Section '{name}' ends before its closing bracket")
 
     # -- what a restore reads ---------------------------------------------
 
