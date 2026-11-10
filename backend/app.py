@@ -104,8 +104,6 @@ def create_app(config_name=None):
     
     # Load configuration
     config = get_config(config_name)
-    from utils.ha import validate_ha_config
-    validate_ha_config(config)
     app.config.from_object(config)
     
     # ── Centralized logging ──────────────────────────────────────
@@ -153,6 +151,10 @@ def create_app(config_name=None):
         _logging.getLogger(_lib).setLevel(_logging.WARNING)
 
     app.logger.setLevel(_log_level)
+
+    # Before any database work, after logging so its warnings reach the handlers
+    from utils.ha import validate_ha_config
+    validate_ha_config(config)
     # ─────────────────────────────────────────────────────────────
     # Here, not where settings read the URL: logging did not exist yet
     log_normalised_scheme(os.getenv('DATABASE_URL', ''), _logging.getLogger('utils.db_url'))

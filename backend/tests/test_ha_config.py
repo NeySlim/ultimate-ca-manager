@@ -109,3 +109,30 @@ def test_env_key_with_master_key_file_warns_file_wins(ha_cfg, monkeypatch, tmp_p
         ha.validate_ha_config(Config)
     assert 'master.key identity between nodes is not verified' in caplog.text
     assert 'overrides KEY_ENCRYPTION_KEY' in caplog.text
+
+
+def test_validation_runs_after_logging_is_configured(monkeypatch):
+    import app as app_module
+    seen = []
+    real_add = logging.Logger.addHandler
+    monkeypatch.setattr(logging.Logger, 'addHandler',
+                        lambda self, h: (seen.append('handler') if self is logging.getLogger() else None, real_add(self, h))[1])
+
+    class Stop(Exception):
+        pass
+
+    def spy(config=None):
+        seen.append('validate')
+        raise Stop
+
+    monkeypatch.setattr(ha, 'validate_ha_config', spy)
+    root = logging.getLogger()
+    before = list(root.handlers)
+    try:
+        with pytest.raises(Stop):
+            app_module.create_app('testing')
+    finally:
+        for h in list(root.handlers):
+            if h not in before:
+                root.removeHandler(h)
+    assert 'handler' in seen and seen.index('handler') < seen.index('validate')
