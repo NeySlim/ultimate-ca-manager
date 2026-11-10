@@ -21,7 +21,7 @@ from flasgger import Swagger
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config.settings import get_config, BASE_DIR, redis_url as config_redis_url
+from config.settings import get_config, BASE_DIR, redis_url as config_redis_url, session_store, SESSION_TABLE
 from config.https_manager import HTTPSManager
 from models import db, User, SystemConfig
 from websocket import socketio, init_websocket
@@ -285,9 +285,19 @@ def create_app(config_name=None):
             app.logger.info("✓ Redis session store enabled")
         except (ImportError, ValueError) as exc:
             reason = "redis library not installed" if isinstance(exc, ImportError) else "unsupported Redis URL"
-            app.logger.warning(f"⚠ {reason}, falling back to filesystem sessions")
-            app.config['SESSION_TYPE'] = 'filesystem'
+            fallback = session_store(None, config.DATABASE_TYPE)
+            app.logger.warning(f"⚠ {reason}, falling back to {fallback} sessions")
+            app.config['SESSION_TYPE'] = fallback
             app.config['SESSION_FILE_DIR'] = config.DATA_DIR / 'sessions'
+            app.config['SESSION_SQLALCHEMY_TABLE'] = SESSION_TABLE
+            app.config.pop('SESSION_REDIS', None)
+    if app.config.get('SESSION_TYPE') == 'sqlalchemy':
+        app.config['SESSION_SQLALCHEMY'] = db
+        app.config.pop('SESSION_FILE_DIR', None)  # no directory to harden
+        # Flask-Session defines its model on each call; a second app in this process must not clash
+        stale = db.metadata.tables.get(app.config['SESSION_SQLALCHEMY_TABLE'])
+        if stale is not None:
+            db.metadata.remove(stale)
     
     Session(app)
     
