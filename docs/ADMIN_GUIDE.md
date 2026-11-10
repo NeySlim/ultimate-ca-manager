@@ -111,7 +111,7 @@ Configure in **Settings** > **Security**:
 
 On PostgreSQL without Redis, sessions are in the database (`flask_sessions` table) and shared between nodes; with `REDIS_URL` they are in Redis; otherwise they are files on disk, as below.
 
-The database session store opens its own connection pool (up to 2x (`DB_POOL_SIZE` + `DB_MAX_OVERFLOW`) connections per worker process): size PostgreSQL `max_connections` accordingly.
+The database session store opens its own connection pool, so a worker process can hold up to 2x (`DB_POOL_SIZE` + `DB_MAX_OVERFLOW`) connections: size PostgreSQL `max_connections` accordingly.
 
 #### Filesystem permissions (since v2.142)
 
