@@ -60,7 +60,7 @@ export default {
         items: [
           { label: 'Ersetzen oder zusammenführen', text: 'Wiederherstellen aus Backup ersetzt die Daten hier durch die des Archivs und entfernt, was das Archiv nicht enthält; der Audit-Eintrag listet das Entfernte auf. Die API akzeptiert auch mode=merge, das das Archiv zu den Daten hier hinzufügt' },
           { label: 'Gemeinsame Sperre', text: 'Backups und Wiederherstellungen teilen eine Sperre: Eine Wiederherstellung wird abgelehnt (409), solange ein Backup läuft, und ein manuelles Backup wartet auf eine laufende Wiederherstellung' },
-          { label: 'Upload-Limit', text: 'Eine Wiederherstellung akzeptiert ein Archiv bis BACKUP_MAX_UPLOAD_MB (standardmäßig 512 MB), gesetzt in der Server-Umgebung; eine Ablehnung nennt diese Einstellung. Ein Reverse-Proxy vor UCM hat sein eigenes Body-Limit' },
+          { label: 'Upload-Limit', text: "An archive created since 3.0 is restored in chunks and has no size limit unless BACKUP_MAX_ARCHIVE_MB sets one. An older archive is accepted up to BACKUP_MAX_UPLOAD_MB (512 MB by default). Both are set in the server environment and a refusal names its setting. A reverse proxy in front of UCM keeps its own body limit" },
           { label: 'Inhalt eines Archivs', text: 'Archive enthalten ACME-Client-Orders, Genehmigungsanfragen und Schlüsselwiederherstellungsanfragen. Beim Wiederherstellen eines Archivs, das vor dieser Version geschrieben wurde, bleiben diese Zeilen hier unverändert' },
           { label: 'Gleiche Namen', text: 'Ein DNS-Anbieter, ACME-CA-Konto oder Webhook, dessen Namen hier eine andere Zeile trägt, wird als „Name (2)“ wiederhergestellt, und das von der API zurückgegebene Ergebnis listet ihn auf' },
           { label: 'Einstellungen, die eine Zeile benennen', text: 'Die SCEP- und ACME-Ausstellungs-CAs, OCSP-Responder und ähnliche Einstellungen folgen den archivierten Zeilen. Aus einem älteren Archiv auf einer anderen Installation wiederhergestellt, werden sie geleert und müssen neu gewählt werden' },
@@ -298,7 +298,7 @@ Automatische Sicherungen konfigurieren:
 Laden Sie eine Sicherungsdatei hoch, um UCM auf einen früheren Zustand zurückzusetzen.
 
 - Backups und Wiederherstellungen teilen eine Sperre: Eine Wiederherstellung wird abgelehnt (409), solange ein Backup läuft, und ein manuelles Backup wartet auf eine laufende Wiederherstellung
-- Der Upload wird bis \`BACKUP_MAX_UPLOAD_MB\` akzeptiert (standardmäßig 512 MB, gesetzt in der Server-Umgebung); ein Reverse-Proxy vor UCM hat sein eigenes Body-Limit
+- An archive created since 3.0 is restored in chunks, with no size limit unless \`BACKUP_MAX_ARCHIVE_MB\` sets one; an older archive is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default). Both are set in the server environment; a reverse proxy in front of UCM keeps its own body limit
 - Archive enthalten ACME-Client-Orders, Genehmigungsanfragen und Schlüsselwiederherstellungsanfragen (v2.251)
 - Ein DNS-Anbieter, ACME-CA-Konto oder Webhook, dessen Namen hier eine andere Zeile trägt, wird als \`name (2)\` wiederhergestellt
 - Die API akzeptiert auch \`mode=merge\`, das das Archiv zu den Daten hier hinzufügt, statt sie zu ersetzen

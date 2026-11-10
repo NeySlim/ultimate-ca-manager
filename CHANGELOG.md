@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Changed
+
+- Backup: archives are written as format v4, a stream of independently authenticated chunks, so creating and restoring one no longer holds it whole in memory; `BACKUP_MAX_UPLOAD_MB` now bounds only archives written before 3.0 (v1 to v3), which are still restored, and the new `BACKUP_MAX_ARCHIVE_MB` (0, no limit, by default) can bound v4 archives.
+
 ### Fixed
 
 - Certificate Transparency: `POST /api/v2/certificates/<id>/submit-ct` always failed with a server error, as it read an attribute the certificate model does not have, and the chain it built stopped at the direct issuer; the submission now sends the leaf with its full issuer chain up to the root, or the chain stored inline with the certificate, one element per certificate (RFC 6962 §4.1). Reported by Chris by e-mail.

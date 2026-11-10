@@ -60,7 +60,7 @@ export default {
         items: [
           { label: '置き換えとマージ', text: 'バックアップからの復元は、ここのデータをアーカイブの内容で置き換え、アーカイブにないものは削除します。監査エントリに削除されたものが一覧表示されます。API は mode=merge も受け付け、その場合はアーカイブをここのデータに追加します' },
           { label: '共有ロック', text: 'バックアップと復元は 1 つのロックを共有します。バックアップの実行中は復元が拒否され (409)、復元の実行中は手動バックアップが待機します' },
-          { label: 'アップロード上限', text: '復元は BACKUP_MAX_UPLOAD_MB（既定は 512 MB）までのアーカイブを受け付けます。この値はサーバー環境で設定され、拒否メッセージにこの設定名が示されます。UCM の前段にあるリバースプロキシには、独自のボディ上限があります' },
+          { label: 'アップロード上限', text: "An archive created since 3.0 is restored in chunks and has no size limit unless BACKUP_MAX_ARCHIVE_MB sets one. An older archive is accepted up to BACKUP_MAX_UPLOAD_MB (512 MB by default). Both are set in the server environment and a refusal names its setting. A reverse proxy in front of UCM keeps its own body limit" },
           { label: 'アーカイブの内容', text: 'アーカイブには、ACME クライアントの注文、承認リクエスト、鍵回復リクエストが含まれます。このバージョンより前に作成されたアーカイブを復元しても、これらの行はここにあるまま変更されません' },
           { label: '同じ名前', text: 'ここの別の行が同じ名前を持つ DNS プロバイダー、ACME CA アカウント、Webhook は「name (2)」として復元され、API が返す復元結果にその一覧が含まれます' },
           { label: '行を指す設定', text: 'SCEP と ACME の発行 CA、OCSP レスポンダーなどの設定は、アーカイブされた行に従います。古いアーカイブを別のインストールに復元した場合、これらは空になるため、選び直す必要があります' },
@@ -298,7 +298,7 @@ Webインターフェースと管理APIを、リストに載せたIPアドレス
 バックアップファイルをアップロードしてUCMを以前の状態に復元します。
 
 - バックアップと復元は 1 つのロックを共有します。バックアップの実行中は復元が拒否され (409)、復元の実行中は手動バックアップが待機します
-- アップロードは \`BACKUP_MAX_UPLOAD_MB\`（既定は 512 MB、サーバー環境で設定）まで受け付けます。UCM の前段にあるリバースプロキシには、独自のボディ上限があります
+- An archive created since 3.0 is restored in chunks, with no size limit unless \`BACKUP_MAX_ARCHIVE_MB\` sets one; an older archive is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default). Both are set in the server environment; a reverse proxy in front of UCM keeps its own body limit
 - アーカイブには ACME クライアントの注文、承認リクエスト、鍵回復リクエストが含まれます (v2.251)
 - ここの別の行が同じ名前を持つ DNS プロバイダー、ACME CA アカウント、Webhook は \`name (2)\` として復元されます
 - API は \`mode=merge\` も受け付け、置き換えではなくアーカイブをここのデータに追加します

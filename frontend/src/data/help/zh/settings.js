@@ -60,7 +60,7 @@ export default {
         items: [
           { label: "替换或合并", text: "从备份恢复会用归档中的数据替换此处的数据，并移除归档中没有的内容；审计条目会列出被移除的内容。API 还接受 mode=merge，将归档添加到此处的数据中" },
           { label: "共享锁", text: "备份和恢复共用一个锁：备份运行期间恢复会被拒绝 (409)，手动备份则等待正在运行的恢复完成" },
-          { label: "上传限制", text: "恢复接受不超过 BACKUP_MAX_UPLOAD_MB（默认 512 MB，在服务器环境中设置）的归档，被拒绝时会指明该设置。UCM 前面的反向代理有其自己的请求体限制" },
+          { label: "上传限制", text: "An archive created since 3.0 is restored in chunks and has no size limit unless BACKUP_MAX_ARCHIVE_MB sets one. An older archive is accepted up to BACKUP_MAX_UPLOAD_MB (512 MB by default). Both are set in the server environment and a refusal names its setting. A reverse proxy in front of UCM keeps its own body limit" },
           { label: "归档包含的内容", text: "归档包含 ACME 客户端订单、批准请求和密钥恢复请求。恢复在此版本之前写入的归档时，这些行会保持此处的原样" },
           { label: "同名", text: "其名称已被此处另一行占用的 DNS 提供商、ACME CA 账户或 Webhook，会恢复为“名称 (2)”，API 返回的恢复结果会列出它" },
           { label: "指向某行的设置", text: "SCEP 和 ACME 签发 CA、OCSP 响应者等设置会跟随归档中的行。从较旧的归档恢复到另一个安装时，它们会被清空，需要重新选择" },
@@ -298,7 +298,7 @@ export default {
 上传备份文件将 UCM 恢复到之前的状态。
 
 - 备份和恢复共用一个锁：备份运行期间恢复会被拒绝 (409)，手动备份则等待正在运行的恢复完成
-- 上传接受不超过 \`BACKUP_MAX_UPLOAD_MB\`（默认 512 MB，在服务器环境中设置）的文件；UCM 前面的反向代理有其自己的请求体限制
+- An archive created since 3.0 is restored in chunks, with no size limit unless \`BACKUP_MAX_ARCHIVE_MB\` sets one; an older archive is accepted up to \`BACKUP_MAX_UPLOAD_MB\` (512 MB by default). Both are set in the server environment; a reverse proxy in front of UCM keeps its own body limit
 - 归档包含 ACME 客户端订单、批准请求和密钥恢复请求 (v2.251)
 - 其名称已被此处另一行占用的 DNS 提供商、ACME CA 账户或 Webhook 会恢复为 \`名称 (2)\`
 - API 还接受 \`mode=merge\`，将归档添加到此处的数据中而不是替换
