@@ -15,14 +15,16 @@ def test_deleting_an_order_removes_its_challenge_links(app):
                                 finalize_url='https://up.example/finalize')
         db.session.add(order)
         db.session.flush()
-        for n in range(2):
-            db.session.add(AcmeProxyChallengeLink(key_sha256=uuid.uuid4().hex + uuid.uuid4().hex,
-                                                  order_id=order.id, identifier='links.example',
-                                                  authz_url=f'https://up.example/authz/{n}'))
+        links = [AcmeProxyChallengeLink(key_sha256=uuid.uuid4().hex + uuid.uuid4().hex,
+                                        order_id=order.id, identifier='links.example',
+                                        authz_url=f'https://up.example/authz/{n}') for n in range(2)]
+        db.session.add_all(links)
         db.session.commit()
         order_id = order.id
-        assert AcmeProxyChallengeLink.query.filter_by(order_id=order_id).count() == 2
+        # By id: a deleted order's id is reused, and rows other files left under it are not ours
+        link_ids = [link.id for link in links]
+        assert AcmeProxyChallengeLink.query.filter(AcmeProxyChallengeLink.id.in_(link_ids)).count() == 2
 
         db.session.delete(db.session.get(AcmeClientOrder, order_id))
         db.session.commit()
-        assert AcmeProxyChallengeLink.query.filter_by(order_id=order_id).count() == 0
+        assert AcmeProxyChallengeLink.query.filter(AcmeProxyChallengeLink.id.in_(link_ids)).count() == 0

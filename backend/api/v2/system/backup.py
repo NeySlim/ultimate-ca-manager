@@ -5,7 +5,7 @@ System Backup Operations
 from services.backup import storage
 from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.restore.plan import RestoreValidationError
-from services.backup.restore_report import restore_audit_details, with_restore_warnings
+from services.backup.restore_report import safe_restore_audit_details, with_restore_warnings
 from services.database_admin.lock import (
     MigrationBusyError,
     database_migration_lock,
@@ -44,6 +44,7 @@ logger = logging.getLogger(__name__)
 # other, and the difference showed up as a restore that behaved differently
 # depending on which page had asked for it.
 from services.backup.restore_completion import (
+    record_failure as _audit_failure,
     record_restore as _safe_audit_log,
     request_restart as _request_restart_after_restore,
     restore_message,
@@ -134,41 +135,52 @@ def create_backup():
 
     password = data.get('password')
     if not password:
+        _audit_failure('system_backup', 'manual', 'Backup refused: password missing')
         return error_response('Backup password required', 400)
     try:
         validate_backup_password(password)
     except BackupSettingError as e:
+        _audit_failure('system_backup', 'manual', 'Backup refused: password rejected')
         return error_response(str(e), 400)
 
     kdf = data.get('kdf')
     try:
         check_backup_kdf(kdf)
     except FipsRestricted:
+        _audit_failure('system_backup', 'manual', 'Backup refused: not allowed in FIPS mode')
         raise
     except ValueError as e:
+        _audit_failure('system_backup', 'manual', 'Backup refused: key derivation not accepted')
         return error_response(str(e), 400)
 
     try:
         service = BackupService()
         size, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
     except FipsRestricted:
+        _audit_failure('system_backup', 'manual', 'Backup refused: not allowed in FIPS mode')
         raise  # the application maps it to its problem type
     except BackupBusyError as busy:
         logger.info('Backup refused: %s', busy)
+        _audit_failure('system_backup', 'manual', 'Backup refused: another backup or restore is running')
         return error_response(str(busy), 409)
     except BackupPasswordError as e:
+        _audit_failure('system_backup', 'manual', 'Backup refused: password rejected')
         return error_response(str(e), 400)
     except BackupExportError as e:
         logger.error('Backup aborted: %s', e)
+        _audit_failure('system_backup', 'manual', 'Backup failed: export aborted')
         return error_response(f'Backup aborted: {e}', 500)
     except BackupValidationError as e:
         logger.error('Backup written but not validated: %s', e)
+        _audit_failure('system_backup', 'manual', 'Backup failed: archive could not be validated')
         return error_response(f'Backup could not be validated: {e}', 500)
     except ValueError:
         logger.exception('Backup refused: invalid parameters')
+        _audit_failure('system_backup', 'manual', 'Backup refused: invalid parameters')
         return error_response('Invalid backup parameters', 400)
     except Exception:
         logger.exception('Backup failed')
+        _audit_failure('system_backup', 'manual', 'Backup failed: unexpected error')
         return error_response('Backup failed', 500)
 
     _safe_audit_log(
@@ -401,17 +413,21 @@ def restore_backup():
     # The archive's version decides the rest, once the upload is spooled.
     request.max_content_length = storage.restore_body_limit()
     if 'file' not in request.files:
+        _audit_failure('system_restore', 'upload', 'Restore refused: no file provided')
         return error_response('No backup file provided', 400)
     file = request.files['file']
     if not file.filename:
+        _audit_failure('system_restore', 'upload', 'Restore refused: no file selected')
         return error_response('No file selected', 400)
 
     password = request.form.get('password')
     if not password:
+        _audit_failure('system_restore', file.filename, 'Restore refused: password missing')
         return error_response('Backup password required', 400)
 
     mode = (request.form.get('mode') or 'replace').strip().lower()
     if mode not in ('replace', 'merge'):
+        _audit_failure('system_restore', file.filename, 'Restore refused: unknown mode')
         return error_response("mode must be 'replace' or 'merge'", 400)
 
     try:
@@ -419,16 +435,19 @@ def restore_backup():
             validate_upload_name(file, BACKUP_EXTENSIONS)
         except ValueError as exc:
             logger.warning('Backup upload refused: %s', exc)
+            _audit_failure('system_restore', file.filename, 'Restore refused: invalid file name')
             return error_response('Invalid backup file', 400)
         too_large = storage.restore_size_refusal(file.stream)
         if too_large:
             status, message = too_large
             logger.warning('Backup upload refused: %s', message)
+            _audit_failure('system_restore', file.filename, 'Restore refused: file too large')
             return error_response(message, status)
 
         # A restore landing before a pending backend switch is lost at restart.
         pending = pending_switch_refusal()
         if pending:
+            _audit_failure('system_restore', file.filename, 'Restore refused: a backend switch is pending')
             return error_response(pending, 409)
 
         try:
@@ -438,61 +457,76 @@ def restore_backup():
                 results = BackupService().restore_backup_from_stream(
                     file.stream, password, mode=mode)
         except MigrationBusyError as busy:
+            _audit_failure('system_restore', file.filename, 'Restore refused: a backend migration or another restore is running')
             return error_response(
                 f'{busy} A backend migration or another restore is still '
                 'running.', 409)
         except BackupBusyError as busy:
+            _audit_failure('system_restore', file.filename, 'Restore refused: a backup or another restore is running')
             return error_response(f'{busy} Retry once it has finished.', 409)
 
-        carried = bool((results or {}).get('sections_carried'))
-        _safe_audit_log(
-            action='system_restore',
-            resource_type='system',
-            resource_name=file.filename,
-            details=restore_audit_details(file.filename, results),
-            success=True,
-        )
-
-        # Nothing changed, so no session is revoked and no restart is asked.
-        if not carried:
-            logger.warning('Restore: the archive carried no data section')
-            return success_response(
-                data=results,
-                message=('The archive carried no data: nothing was restored, '
-                         'no session was revoked and no restart is needed.'),
+        try:
+            carried = bool((results or {}).get('sections_carried'))
+            _safe_audit_log(
+                action='system_restore',
+                resource_type='system',
+                resource_name=file.filename,
+                details=safe_restore_audit_details(file.filename, results),
+                success=True,
             )
 
-        from services.backup.restore.invalidate import invalidate_after_restore
-        try:
-            results['invalidated'] = invalidate_after_restore()
-        except Exception:
-            logger.exception('Restore: sessions could not be revoked')
-            return error_response(
-                'Backup restored, but the sessions opened before it could not '
-                'be revoked. Restart the application before using it.', 500)
+            # Nothing changed, so no session is revoked and no restart is asked.
+            if not carried:
+                logger.warning('Restore: the archive carried no data section')
+                return success_response(
+                    data=results,
+                    message=('The archive carried no data: nothing was restored, '
+                             'no session was revoked and no restart is needed.'),
+                )
 
-        restart_ok, restart_detail = _request_restart_after_restore()
-        results['restart_requested'] = restart_ok
-        results['restart_detail'] = restart_detail
-        results['filename'] = file.filename
-        return success_response(data=results, message=restore_message(results))
+            from services.backup.restore.invalidate import invalidate_after_restore
+            try:
+                results['invalidated'] = invalidate_after_restore()
+            except Exception:
+                logger.exception('Restore: sessions could not be revoked')
+                return error_response(
+                    'Backup restored, but the sessions opened before it could not '
+                    'be revoked. Restart the application before using it.', 500)
+
+            restart_ok, restart_detail = _request_restart_after_restore()
+            results['restart_requested'] = restart_ok
+            results['restart_detail'] = restart_detail
+            results['filename'] = file.filename
+            return success_response(data=results, message=restore_message(results))
+        except Exception:
+            # The restore is committed and already audited as a success: no second, contradicting line
+            logger.exception('Restore: finishing after the restore failed')
+            return error_response(
+                'Backup restored, but finishing the restore failed. '
+                'Restart the application before using it.', 500)
     except FipsRestricted:
+        _audit_failure('system_restore', file.filename, 'Restore refused: not allowed in FIPS mode')
         raise  # the application maps it to its problem type, message unchanged
     except BackupDecryptionError:
         logger.warning('Restore refused: the backup could not be decrypted')
+        _audit_failure('system_restore', file.filename, 'Restore refused: wrong password or invalid backup')
         return error_response(
             'Wrong backup password, or the file is not a valid backup', 400)
     except (ContainerError, BackupSchemaError, RestoreValidationError) as e:
         logger.warning('Restore refused: %s', e)
+        _audit_failure('system_restore', file.filename, 'Restore refused: the archive failed validation')
         return error_response(str(e), 400)
     except OverflowError as e:
         logger.warning('Restore refused: a value is out of range (%s)', e)
+        _audit_failure('system_restore', file.filename, 'Restore refused: a value is out of range')
         return error_response(
             'The archive carries a numeric value this database cannot '
             'store; the file is not a valid backup', 400)
     except ValueError as e:
         logger.warning('Restore refused: %s', e)
+        _audit_failure('system_restore', file.filename, 'Restore refused: the archive could not be read')
         return error_response(f'The archive could not be read: {e}', 400)
     except Exception:
         logger.exception('Restore failed')
+        _audit_failure('system_restore', file.filename, 'Restore failed: unexpected error')
         return error_response('Restore failed', 500)

@@ -348,19 +348,19 @@ def list_cas():
         # pagination controls) doesn't silently truncate the list. See issue #89.
         paginated_cas = filtered_cas
 
-    # Add certificate count for each CA
+    # Grouped queries for the whole page: the cost does not grow with the CA count
+    from services.ca import list_prefetch
+    prefetched = list_prefetch.build(paginated_cas)
+    by_issuer = None
     result = []
     for ca in paginated_cas:
-        ca_dict = ca.to_dict()
+        ca_dict = ca.to_dict(prefetched=prefetched)
         # Count certificates by refid first, then by issuer CN
-        cert_count = Certificate.query.filter_by(caref=ca.refid).count()
+        cert_count = ca_dict['certs']
         if cert_count == 0 and ca_dict.get('common_name'):
-            cn = ca_dict.get('common_name')
-            cert_count = Certificate.query.filter(
-                Certificate.issuer.ilike(f'CN={cn},%') |
-                Certificate.issuer.ilike(f'%,CN={cn},%') |
-                Certificate.issuer.ilike(f'%,CN={cn}')
-            ).count()
+            if by_issuer is None:
+                by_issuer = list_prefetch.issuer_counts()
+            cert_count = list_prefetch.count_by_issuer_cn(by_issuer, ca_dict['common_name'])
         ca_dict['certs'] = cert_count
         result.append(ca_dict)
 

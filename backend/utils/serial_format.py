@@ -112,12 +112,11 @@ def recorded_before_canonical(recorded_at) -> bool:
     from datetime import datetime
     from sqlalchemy import text
     from models import db
-    # PostgreSQL stored CURRENT_TIMESTAMP in the session zone; read it back in UTC
-    sql = ("SELECT (applied_at AT TIME ZONE current_setting('TimeZone')) AT TIME ZONE 'UTC'"
-           if db.engine.dialect.name == 'postgresql' else "SELECT applied_at")
+    # `_migrations.applied_at` is naive UTC on both backends (migration_runner writes it so, and a
+    # backend switch copies it as is); a row written before that on PostgreSQL holds session time.
     try:
         with db.session.begin_nested():
-            applied = db.session.execute(text(f"{sql} FROM _migrations WHERE name = :n"),
+            applied = db.session.execute(text("SELECT applied_at FROM _migrations WHERE name = :n"),
                                          {'n': CANONICAL_MIGRATION}).scalar()
     except Exception:
         return True

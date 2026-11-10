@@ -19,9 +19,11 @@ def test_it_has_a_database_of_its_own(app, create_cert):
             assert _certificate_count(other) == 0
             assert _certificate_count(app) >= 1
     finally:
-        from models import Certificate, db
+        from models import CA, Certificate, db
         with app.app_context():
             Certificate.query.filter_by(id=cert['id']).delete()
+            # The CA the factory made for it too, or the shared tables keep one more
+            CA.query.filter_by(refid=cert['caref']).delete()
             db.session.commit()
 
 
@@ -34,6 +36,17 @@ def test_its_paths_and_scheduler_are_put_back(app):
         assert Config.BACKUP_DIR == other.config['BACKUP_DIR']
     assert {name: getattr(Config, name) for name in before} == before
     assert scheduler_service._scheduler is scheduler
+
+
+def test_its_session_store_is_its_own_even_when_the_testing_config_pins_one(app, monkeypatch, tmp_path):
+    """On PostgreSQL TestingConfig carries a SESSION_FILE_DIR of its own, which shadows Config's."""
+    from config.settings import config
+    pinned = tmp_path / 'pinned'
+    monkeypatch.setattr(config['testing'], 'SESSION_FILE_DIR', pinned, raising=False)
+    with fresh_app() as other:
+        assert str(other.config['SESSION_FILE_DIR']) != str(pinned)
+        assert str(other.config['SESSION_FILE_DIR']) != str(app.config['SESSION_FILE_DIR'])
+    assert config['testing'].SESSION_FILE_DIR == pinned
 
 
 def test_its_restores_do_not_sign_the_session_app_out(auth_client):

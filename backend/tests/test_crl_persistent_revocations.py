@@ -752,9 +752,11 @@ class TestMigratedRows:
     def test_twins_stay_pending_and_a_revoked_one_is_still_listed(self, app, backend):
         ca, ca_key, ca_cert = _make_ca()
         leaf = _issue(ca_key, ca_cert, SERIAL_C)
-        _store(ca, leaf, str(SERIAL_C))
+        first = _store(ca, leaf, str(SERIAL_C))
         twin = _store(ca, leaf, format(SERIAL_C, 'x'), revoked=True)
-        assert _migrate_rows_of(ca) == [{'caref': ca.refid, 'serial_number': str(SERIAL_C), 'count': 2}]
+        assert _migrate_rows_of(ca) == [{
+            'caref': ca.refid, 'serial_number': str(SERIAL_C), 'count': 2,
+            'rows': [{'id': first.id, 'stored': str(SERIAL_C)}, {'id': twin.id, 'stored': format(SERIAL_C, 'x')}]}]
         assert db.session.get(Certificate, twin.id).serial_number == format(SERIAL_C, 'x')
         assert SERIAL_C in _entries(_full_crl(ca))
         assert _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.REVOKED

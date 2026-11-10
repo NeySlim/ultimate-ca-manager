@@ -130,7 +130,7 @@ _DDL_PG = """
 CREATE TABLE IF NOT EXISTS _migrations (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL UNIQUE,
-    applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    applied_at TIMESTAMP DEFAULT (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
 )
 """
 
@@ -143,6 +143,10 @@ CREATE TABLE IF NOT EXISTS _migrations (
 """
 
 
+# `_migrations.applied_at` is naive UTC on both backends, so a copy between them keeps its meaning.
+_PG_NOW_UTC = "(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')"
+
+
 def _ensure_tracking_table(engine, is_pg: bool):
     with engine.begin() as conn:
         conn.execute(text(_DDL_PG if is_pg else _DDL_SQLITE))
@@ -152,7 +156,7 @@ def _mark_applied(engine, names, is_pg: bool):
     if not names:
         return
     sql = (
-        "INSERT INTO _migrations (name) VALUES (:n) ON CONFLICT (name) DO NOTHING"
+        f"INSERT INTO _migrations (name, applied_at) VALUES (:n, {_PG_NOW_UTC}) ON CONFLICT (name) DO NOTHING"
         if is_pg
         else "INSERT OR IGNORE INTO _migrations (name) VALUES (:n)"
     )
@@ -376,7 +380,7 @@ def _run_pending_pg(engine, pending, dry_run) -> bool:
                     say("(SQLite-only, skipped)")
                 conn.execute(
                     text(
-                        "INSERT INTO _migrations (name) VALUES (:n) "
+                        f"INSERT INTO _migrations (name, applied_at) VALUES (:n, {_PG_NOW_UTC}) "
                         "ON CONFLICT (name) DO NOTHING"
                     ),
                     {"n": name},

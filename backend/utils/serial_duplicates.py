@@ -18,10 +18,11 @@ PENDING_KEY = 'serial_unique_index_pending'
 _COVERED = "caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''"
 DUPLICATES = (f"SELECT caref, serial_number, COUNT(*) FROM certificates WHERE {_COVERED} "
               "GROUP BY caref, serial_number HAVING COUNT(*) > 1 ORDER BY caref, serial_number")
+ROWS_OF_COVERED = f"SELECT id, caref, serial_number FROM certificates WHERE {_COVERED} ORDER BY id"
 _ROWS = f"SELECT id, caref, serial_number, crt FROM certificates WHERE {_COVERED} ORDER BY id"
 # Self-contained: packages ship no docs/, so the message is the procedure
 CLEANUP = ("Delete all but one certificate of each listed serial on the installation that holds "
-           "them (revoke it first if it is in use; a revoked row still counts), until each serial "
+           "them, found by the certificate ids and stored spellings shown with it where there are any (revoke it first if it is in use; a revoked row still counts), until each serial "
            "appears once under its CA. Then delete the rows '142_serial_per_ca_and_proxy_links' "
            "and '144_canonical_certificate_serials' from the _migrations table, so the next start "
            "runs migration 142 and migration 144 again, which create the index and store every "
@@ -34,7 +35,7 @@ def duplicates_in_database(conn) -> List[Dict]:
     groups: Dict = {}
     # Streamed: one batch of PEMs in memory at a time, as in migration 144
     for row_id, caref, serial, crt in conn.execute(text(_ROWS), execution_options={'yield_per': 500}):
-        groups.setdefault((caref, canonical_stored_serial(serial, crt)), []).append(row_id)
+        groups.setdefault((caref, canonical_stored_serial(serial, crt)), []).append((row_id, serial))
     return _shared(groups)
 
 
@@ -45,21 +46,40 @@ def duplicates_in_rows(rows: Iterable[Dict], id_key: str = 'refid') -> List[Dict
         caref, serial = row.get('caref'), row.get('serial_number')
         if caref is None or serial is None or serial == '':
             continue
-        serial = canonical_stored_serial(serial, row.get('certificate_pem'))
-        groups.setdefault((caref, serial), []).append(row.get(id_key))
+        canonical = canonical_stored_serial(serial, row.get('certificate_pem'))
+        groups.setdefault((caref, canonical), []).append((row.get(id_key), serial))
     return _shared(groups)
 
 
 def _shared(groups: Dict) -> List[Dict]:
-    return [{'caref': caref, 'serial_number': serial, 'ids': ids}
-            for (caref, serial), ids in sorted(groups.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1])))
-            if len(ids) > 1]
+    return [{'caref': caref, 'serial_number': serial, 'ids': [i for i, _ in held], 'stored': [s for _, s in held]}
+            for (caref, serial), held in sorted(groups.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1])))
+            if len(held) > 1]
+
+
+def stored_rows(ids, raw) -> List[Dict]:
+    """The rows a pending entry points at: certificate id and the spelling stored now."""
+    return [{'id': row_id, 'stored': raw[row_id]} for row_id in ids]
+
+
+def describe_pending(entry: Dict) -> str:
+    """One pending entry as the log shows it; entries stored without `rows` still read."""
+    head = (f"CA {entry.get('caref')} serial {entry.get('serial_number')} waits for {entry['waits_for']}"
+            if entry.get('waits_for')
+            else f"CA {entry.get('caref')} serial {entry.get('serial_number')} x{entry.get('count', '?')}")
+    rows = entry.get('rows') or []
+    if not rows:
+        return head
+    return head + ' [certificate ids ' + ', '.join(f"{r.get('id')} stored as '{r.get('stored')}'" for r in rows) + ']'
 
 
 def describe(duplicates: List[Dict], limit: int = 10) -> str:
-    """One line per pair, for a refusal message."""
-    shown = '; '.join(f"CA {d['caref']} serial {d['serial_number']}: {', '.join(map(str, d['ids']))}"
-                      for d in duplicates[:limit])
+    """One line per pair, each id with the spelling it stores, for a refusal message."""
+    def rows(d):
+        stored = d.get('stored')
+        return ', '.join(f"{i} (stored as '{s}')" for i, s in zip(d['ids'], stored)) if stored \
+            else ', '.join(map(str, d['ids']))
+    shown = '; '.join(f"CA {d['caref']} serial {d['serial_number']}: {rows(d)}" for d in duplicates[:limit])
     more = f" (and {len(duplicates) - limit} more)" if len(duplicates) > limit else ''
     return shown + more
 
@@ -81,10 +101,7 @@ def check_pending_serial_index(app) -> int:
             count = len(pairs) or 1
     app.config['SERIAL_INDEX_PENDING'] = count
     if count:
-        listed = '; '.join(
-            f"CA {d.get('caref')} serial {d.get('serial_number')} waits for {d['waits_for']}" if d.get('waits_for')
-            else f"CA {d.get('caref')} serial {d.get('serial_number')} x{d.get('count', '?')}"
-            for d in pairs[:10]) or 'see the migration 142 and 144 log'
+        listed = '; '.join(describe_pending(d) for d in pairs[:10]) or 'see the migration 142 and 144 log'
         logging.getLogger(__name__).warning(
             "%s: %d serial number(s) are shared by certificates of one CA or wait for one that is (%s), so the unique "
             "serial index does not cover them. %s", PENDING_KEY, count, listed, CLEANUP)

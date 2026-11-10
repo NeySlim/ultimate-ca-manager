@@ -278,8 +278,9 @@ def test_a_backend_migration_compares_canonical_serials():
                       (4, 'ca-b', format(digits, 'x'), _b64(_self_signed(digits))), (5, 'ca-b', str(digits), None)])
     conn.commit()
     with create_engine('sqlite://', creator=lambda: conn).connect() as c:
-        assert duplicates_in_database(c) == [{'caref': 'ca-a', 'serial_number': '171', 'ids': [1, 2]},
-                                             {'caref': 'ca-b', 'serial_number': str(digits), 'ids': [4, 5]}]
+        assert duplicates_in_database(c) == [
+            {'caref': 'ca-a', 'serial_number': '171', 'ids': [1, 2], 'stored': ['ab', '171']},
+            {'caref': 'ca-b', 'serial_number': str(digits), 'ids': [4, 5], 'stored': [format(digits, 'x'), str(digits)]}]
 
 
 def test_search_finds_a_serial_in_the_spelling_the_ui_shows(app, auth_client, own_ca, create_cert, fixed_serial):
@@ -317,7 +318,8 @@ def test_a_backend_migration_streams_and_decodes_only_ambiguous_serials(monkeypa
     event.listen(engine, 'before_cursor_execute',
                  lambda c, cur, stmt, p, ctx, many: streamed.append(ctx.execution_options.get('yield_per')))
     with engine.connect() as c:
-        assert duplicates_in_database(c) == [{'caref': 'ca-a', 'serial_number': '171', 'ids': [1, 2]},
-                                             {'caref': 'ca-b', 'serial_number': str(digits), 'ids': [4, 5]}]
+        assert duplicates_in_database(c) == [
+            {'caref': 'ca-a', 'serial_number': '171', 'ids': [1, 2], 'stored': ['ab', '171']},
+            {'caref': 'ca-b', 'serial_number': str(digits), 'ids': [4, 5], 'stored': [format(digits, 'x'), str(digits)]}]
     assert len([c for c in decoded if c]) == 2  # rows 4 and 5: digits only, read in either base
     assert streamed and all(streamed)

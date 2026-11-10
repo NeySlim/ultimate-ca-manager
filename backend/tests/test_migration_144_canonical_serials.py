@@ -71,7 +71,8 @@ REVOCATIONS = [  # (id, caref, serial_number, certificate_id) -> stored afterwar
     ((3, 'ca-a', 'ab', 1), '171'),
     ((4, 'ca-b', '1f', 6), '31'),  # no unique index on revocations: always converted
 ]
-PENDING = [{'caref': 'ca-b', 'serial_number': '31', 'count': 2}]
+PENDING = [{'caref': 'ca-b', 'serial_number': '31', 'count': 2,
+            'rows': [{'id': 6, 'stored': '1f'}, {'id': 7, 'stored': '31'}]}]
 # A row whose target is the spelling a held row keeps is held too, down a chain
 BLOCKED = [
     ((21, 'ca-x', '10', _certificate(0x10)), '10'),
@@ -84,11 +85,16 @@ BLOCKED = [
     ((35, 'ca-y', 'ff', None), '255'),
 ]
 BLOCKED_PENDING = [
-    {'caref': 'ca-x', 'serial_number': '16', 'count': 2},
-    {'caref': 'ca-x', 'serial_number': 'a', 'count': 1, 'waits_for': '10'},
-    {'caref': 'ca-y', 'serial_number': '0x16', 'count': 1, 'waits_for': '22'},
-    {'caref': 'ca-y', 'serial_number': '22', 'count': 1, 'waits_for': '34'},
-    {'caref': 'ca-y', 'serial_number': '52', 'count': 2},
+    {'caref': 'ca-x', 'serial_number': '16', 'count': 2,
+     'rows': [{'id': 21, 'stored': '10'}, {'id': 22, 'stored': '0x10'}]},
+    {'caref': 'ca-x', 'serial_number': 'a', 'count': 1, 'waits_for': '10',
+     'rows': [{'id': 23, 'stored': 'a'}, {'id': 21, 'stored': '10'}]},
+    {'caref': 'ca-y', 'serial_number': '0x16', 'count': 1, 'waits_for': '22',
+     'rows': [{'id': 34, 'stored': '0x16'}, {'id': 33, 'stored': '22'}]},
+    {'caref': 'ca-y', 'serial_number': '22', 'count': 1, 'waits_for': '34',
+     'rows': [{'id': 33, 'stored': '22'}, {'id': 31, 'stored': '34'}]},
+    {'caref': 'ca-y', 'serial_number': '52', 'count': 2,
+     'rows': [{'id': 31, 'stored': '34'}, {'id': 32, 'stored': '0x34'}]},
 ]
 # Once one row of each shared serial is deleted, the held chain converts
 BLOCKED_RESOLVED = {21: '16', 23: '10', 31: '52', 33: '34', 34: '22', 35: '255'}
@@ -161,7 +167,8 @@ def test_sqlite_creates_the_index_142_could_not_once_the_duplicates_are_gone():
     conn = _sqlite([(1, 'ca-a', '11', None), (2, 'ca-a', '11', None), (3, 'ca-a', 'b', None)], index=False)
     _migration().upgrade(conn)
     assert _pending(conn.execute(f"SELECT key, value FROM {CONFIG}")) == [
-        {'duplicates': [{'caref': 'ca-a', 'serial_number': '11', 'count': 3}]}]
+        {'duplicates': [{'caref': 'ca-a', 'serial_number': '11', 'count': 3,
+                         'rows': [{'id': 1, 'stored': '11'}, {'id': 2, 'stored': '11'}, {'id': 3, 'stored': 'b'}]}]}]
     assert _stored(conn, CERTS) == {1: '11', 2: '11', 3: 'b'}
     conn.execute(f"DELETE FROM {CERTS} WHERE id IN (2, 3)")
     _migration().upgrade(conn)

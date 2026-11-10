@@ -53,7 +53,8 @@ def test_sqlite_duplicates_are_listed_kept_and_then_resolved():
     for _ in range(2):
         _migration().upgrade(conn)
     assert _pending(conn.execute(f"SELECT key, value FROM {CONFIG}")) == [
-        {'duplicates': [{'caref': 'ca-b', 'serial_number': '11', 'count': 2}]}]
+        {'duplicates': [{'caref': 'ca-b', 'serial_number': '11', 'count': 2,
+                    'rows': [{'id': 3, 'stored': '11'}, {'id': 10, 'stored': '11'}]}]}]
     assert conn.execute(f"SELECT COUNT(*) FROM {CERTS}").fetchone() == (len(DUPLICATE),)
     conn.execute(f"INSERT INTO {CERTS} VALUES (99, 'ca-a', '11')")  # no index yet
     conn.execute(f"DELETE FROM {CERTS} WHERE id IN (10, 99)")
@@ -109,7 +110,8 @@ def test_postgresql(rows, pending):
         assert (_migration().INDEX in indexes) is not pending
         assert bool(listed) is pending
         if pending:
-            assert listed[0]['duplicates'] == [{'caref': 'ca-b', 'serial_number': '11', 'count': 2}]
+            assert listed[0]['duplicates'] == [{'caref': 'ca-b', 'serial_number': '11', 'count': 2,
+                    'rows': [{'id': 3, 'stored': '11'}, {'id': 10, 'stored': '11'}]}]
     finally:
         engine.dispose()
         with admin.begin() as conn:

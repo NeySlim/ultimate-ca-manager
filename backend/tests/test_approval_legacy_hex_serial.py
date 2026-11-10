@@ -50,7 +50,8 @@ def migrated(app):
         before = db.session.execute(text("SELECT applied_at FROM _migrations WHERE name = :n"),
                                     {'n': CANONICAL_MIGRATION}).fetchall()
         db.session.execute(text("DELETE FROM _migrations WHERE name = :n"), {'n': CANONICAL_MIGRATION})
-        db.session.execute(text("INSERT INTO _migrations (name) VALUES (:n)"), {'n': CANONICAL_MIGRATION})
+        db.session.execute(text("INSERT INTO _migrations (name, applied_at) VALUES (:n, :a)"),
+                           {'n': CANONICAL_MIGRATION, 'a': datetime.now(timezone.utc).replace(tzinfo=None)})
         db.session.commit()
     yield
     with app.app_context():
@@ -190,10 +191,12 @@ def test_the_migration_date_is_read_in_utc(app, migrated):
     from utils.datetime_utils import utc_now
     with app.app_context():
         if db.engine.dialect.name == 'postgresql':
-            # One transaction: the row is written and read back in a zone far from UTC
+            # One transaction: the row is written as the runner writes it, and read back in a zone far from UTC
+            from migration_runner import _PG_NOW_UTC
             db.session.execute(text("SET LOCAL TIME ZONE 'Pacific/Kiritimati'"))
             db.session.execute(text("DELETE FROM _migrations WHERE name = :n"), {'n': CANONICAL_MIGRATION})
-            db.session.execute(text("INSERT INTO _migrations (name) VALUES (:n)"), {'n': CANONICAL_MIGRATION})
+            db.session.execute(text(f"INSERT INTO _migrations (name, applied_at) VALUES (:n, {_PG_NOW_UTC})"),
+                               {'n': CANONICAL_MIGRATION})
         assert recorded_before_canonical(utc_now() - timedelta(minutes=5)) is True
         assert recorded_before_canonical(utc_now() + timedelta(minutes=5)) is False
         db.session.rollback()

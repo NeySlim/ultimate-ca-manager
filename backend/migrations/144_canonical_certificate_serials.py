@@ -12,7 +12,7 @@ import json
 import logging
 import sqlite3
 
-from utils.serial_duplicates import CLEANUP, DUPLICATES, PENDING_KEY
+from utils.serial_duplicates import CLEANUP, DUPLICATES, PENDING_KEY, describe_pending, stored_rows
 from utils.serial_format import canonical_serial, canonical_stored_serial
 
 logger = logging.getLogger(__name__)
@@ -67,9 +67,15 @@ def plan(cert_rows, revoked_rows):
                else canonical_serial(serial))
         if new != serial:
             revoked_updates.append((row_id, new))
-    pending = [{'caref': caref, 'serial_number': serial, 'count': len(ids)}
+    pending = [{'caref': caref, 'serial_number': serial, 'count': len(ids), 'rows': stored_rows(ids, raw)}
                for (caref, serial), ids in shared.items()]
-    pending += [{'caref': ca[row_id], 'serial_number': raw[row_id], 'count': 1, 'waits_for': new}
+    # A waiting row is listed with the rows of its CA that keep the spelling it waits for
+    spelled = {}
+    if waiting:
+        for i, text in raw.items():
+            spelled.setdefault((ca[i], text), []).append(i)
+    pending += [{'caref': ca[row_id], 'serial_number': raw[row_id], 'count': 1, 'waits_for': new,
+                 'rows': stored_rows([row_id] + spelled.get((ca[row_id], new), []), raw)}
                 for row_id, new in waiting.items()]
     pending.sort(key=lambda d: (str(d['caref']), d['serial_number']))
     return cert_updates, revoked_updates, pending
@@ -98,12 +104,7 @@ def _apply(execute, executemany, stream, tables, value_param, false_literal):
     if not pending:
         return
     for d in pending:
-        if 'waits_for' in d:
-            logger.warning("Migration 144: CA %s serial %s left as stored until %s is free",
-                           d['caref'], d['serial_number'], d['waits_for'])
-        else:
-            logger.warning("Migration 144: CA %s holds %s certificates with serial %s (left as stored)",
-                           d['caref'], d['count'], d['serial_number'])
+        logger.warning("Migration 144: %s (left as stored)", describe_pending(d))
     logger.warning("Migration 144: these serials stay outside the unique index. %s", CLEANUP)
     if CONFIG in tables:
         execute(SET_PENDING.format(value=value_param, false=false_literal),

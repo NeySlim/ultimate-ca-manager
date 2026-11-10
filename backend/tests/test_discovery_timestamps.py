@@ -43,12 +43,13 @@ def _scan_one(monkeypatch, host, not_after_wire):
 def _check(monkeypatch):
     host = f'192.0.2.{uuid.uuid4().int % 200 + 1}'
     soon = (utc_now() + timedelta(days=10)).replace(microsecond=0)
+    before = DiscoveryService().get_stats()['expiring_soon']
     row = _scan_one(monkeypatch, host, soon.isoformat() + '+00:00')
     try:
         assert row.not_before == NOT_BEFORE_UTC and row.not_before.tzinfo is None
         assert row.not_after == soon
         # the "expires within 30 days" count sees it, with a session zone far from UTC
-        assert DiscoveryService().get_stats()['expiring_soon'] >= 1
+        assert DiscoveryService().get_stats()['expiring_soon'] == before + 1
     finally:
         db.session.delete(row)
         db.session.commit()

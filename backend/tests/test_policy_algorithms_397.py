@@ -26,6 +26,32 @@ from tests.conftest import get_json
 CONTENT_JSON = 'application/json'
 
 
+def _forget_newer_than(floor):
+    """Delete the certificates newer than `floor`, then the dependents (purge_ca_dependents) and policies of the CAs newer than `floor`, then those CAs."""
+    from services.deletion_blockers import purge_ca_dependents
+    cas = CA.query.filter(CA.id > floor[CA]).all()
+    ca_ids = [row.id for row in cas]
+    Certificate.query.filter(Certificate.id > floor[Certificate]).delete(synchronize_session=False)
+    # Dependents first, or PostgreSQL refuses the CA delete
+    for ca in cas:
+        purge_ca_dependents(ca)
+    CertificatePolicy.query.filter(CertificatePolicy.ca_id.in_(ca_ids)).delete(synchronize_session=False)
+    CA.query.filter(CA.id.in_(ca_ids)).delete(synchronize_session=False)
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _forget_what_the_file_made(app):
+    """The CAs and certificates the tests create stay behind: remove what is newer than the file."""
+    with app.app_context():
+        floor = {m: db.session.query(db.func.max(m.id)).scalar() or 0
+                 for m in (Certificate, CA)}
+    yield
+    with app.app_context():
+        db.session.rollback()
+        _forget_newer_than(floor)
+        db.session.commit()
+
+
 def _policy(app, name, ca_id=None, rules=None, template_id=None):
     with app.app_context():
         pol = CertificatePolicy(name=name, policy_type='issuance', ca_id=ca_id,
@@ -199,13 +225,15 @@ class TestOperatorPaths:
             db.session.add(tpl)
             db.session.commit()
             tpl_id = tpl.id
+        issued = []
         try:
             payload = {'cn': 'issue.algo.test', 'ca_id': ca['id'], 'key_type': 'rsa',
                        'key_size': 2048, 'validity_days': 90, 'cert_type': 'server'}
             r = auth_client.post('/api/v2/certificates', data=json.dumps(payload),
                                  content_type=CONTENT_JSON)
             assert r.status_code in (200, 201), r.data
-            cert = _signed(app, get_json(r)['data']['id'])
+            issued.append(get_json(r)['data']['id'])
+            cert = _signed(app, issued[-1])
             assert isinstance(cert.signature_hash_algorithm, hashes.SHA384)
 
             # The template's digest is a preference too (#397 follow-up)
@@ -213,11 +241,14 @@ class TestOperatorPaths:
             r = auth_client.post('/api/v2/certificates', data=json.dumps(payload),
                                  content_type=CONTENT_JSON)
             assert r.status_code in (200, 201), r.data
-            cert = _signed(app, get_json(r)['data']['id'])
+            issued.append(get_json(r)['data']['id'])
+            cert = _signed(app, issued[-1])
             assert isinstance(cert.signature_hash_algorithm, hashes.SHA384)
             assert ('Signature digest SHA256 replaced by SHA384 by policy "algo-issue".'
                     in r.get_json()['meta']['notices'])
         finally:
+            # Certificates first: they reference the template
+            _drop(app, Certificate, *issued)
             _drop(app, CertificatePolicy, pid)
             _drop(app, CertificateTemplate, tpl_id)
 
@@ -570,3 +601,33 @@ class TestReviewFollowups:
                 if row:
                     db.session.delete(row)
                     db.session.commit()
+
+
+def test_cleanup_removes_a_ca_that_has_crl_and_ocsp_rows(app, create_ca):
+    """With foreign keys enforced (PostgreSQL always), the CRL, OCSP and revoked-serial rows go before the CA."""
+    from models import CRLMetadata, OCSPResponse
+    from models.revoked_serial import RevokedSerial
+    from utils.datetime_utils import utc_now
+    sqlite = app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite')
+    with app.app_context():
+        floor = {m: db.session.query(db.func.max(m.id)).scalar() or 0 for m in (Certificate, CA)}
+    ca = create_ca(cn='cleanup-fk.policy.test')
+    with app.app_context():
+        now = utc_now()
+        db.session.add(CRLMetadata(ca_id=ca['id'], crl_number=1, this_update=now, next_update=now,
+                                   crl_pem='x', crl_der=b'x'))
+        db.session.add(OCSPResponse(ca_id=ca['id'], cert_serial='01', status='good',
+                                    response_der=b'x', this_update=now, next_update=now))
+        # A renewal records the superseded serial: revoked_serials.caref references the CA
+        db.session.add(RevokedSerial(caref=db.session.get(CA, ca['id']).refid, serial_number='02',
+                                     valid_to=now))
+        db.session.commit()
+        if sqlite:
+            db.session.execute(db.text('PRAGMA foreign_keys=ON'))
+        try:
+            _forget_newer_than(floor)
+            db.session.commit()
+        finally:
+            if sqlite:
+                db.session.execute(db.text('PRAGMA foreign_keys=OFF'))
+        assert CA.query.filter_by(id=ca['id']).count() == 0

@@ -545,8 +545,12 @@ class CA(db.Model):
             return None
         return self.crl_digest or default_digest_for_key(key) or 'sha256'
 
-    def to_dict(self, include_private=False):
-        """Convert to dictionary"""
+    def to_dict(self, include_private=False, prefetched=None):
+        """Convert to dictionary.
+
+        `prefetched` (services.ca.list_prefetch.build) supplies the parent id,
+        certificate and cross-certificate counts of a whole listing at once.
+        """
         # Determine CA type (lowercase for frontend)
         ca_type = "root" if self.is_root else "intermediate"
         key_facts = self.key_facts
@@ -579,15 +583,22 @@ class CA(db.Model):
         
         # Get parent_id (numeric id) from caref (uuid)
         parent_id = None
-        if self.caref:
+        if self.caref and prefetched is not None:
+            parent_id = prefetched['parent_ids'].get(self.caref)
+        elif self.caref:
             parent_ca = CA.query.filter_by(refid=self.caref).first()
             parent_id = parent_ca.id if parent_ca else None
         
         # Aggregates, so the rows are not loaded into the session
         from models.ca_cross_certificate import CACrossCertificate as _Cross
-        cross_total = 0 if self.id is None else db.session.query(db.func.count(_Cross.id)).filter(
-            _Cross.ca_id == self.id).scalar()
-        if cross_total:
+        if prefetched is not None:
+            cross_total = prefetched['cross_totals'].get(self.id, 0)
+        else:
+            cross_total = 0 if self.id is None else db.session.query(db.func.count(_Cross.id)).filter(
+                _Cross.ca_id == self.id).scalar()
+        if prefetched is not None:
+            cross_served = self.id in prefetched['cross_served']
+        elif cross_total:
             from services.ca import cross_certs
             cross_served = cross_certs.served_for(self) is not None
         else:
@@ -638,7 +649,8 @@ class CA(db.Model):
             # External-CSR lifecycle (#298)
             "pending": self.is_pending,
             "has_csr": bool(self.csr),
-            "certs": self.certificates.count() if self.certificates else 0,  # Count of issued certificates
+            "certs": (prefetched['cert_counts'].get(self.refid, 0) if prefetched is not None
+                      else self.certificates.count() if self.certificates else 0),  # Count of issued certificates
             "cross_certificate_count": cross_total,
             "cross_certificate_served": bool(cross_served),
             "key_type": key_facts['key_type'],

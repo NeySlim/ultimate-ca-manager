@@ -28,6 +28,23 @@ from services.acme.ari import find_certificate
 from services.crl_service import CRLService
 from services.ocsp_service import OCSPService
 
+@pytest.fixture(autouse=True)
+def _remove_what_the_test_stored(app):
+    """Every CA and certificate here has a `serial-` refid; they go with their dependents."""
+    yield
+    from models import CRLMetadata, OCSPResponse
+    with app.app_context():
+        db.session.rollback()
+        ca_ids = [c.id for c in CA.query.filter(CA.refid.like('serial-%')).all()]
+        carefs = [c.refid for c in CA.query.filter(CA.refid.like('serial-%')).all()]
+        Certificate.query.filter(Certificate.refid.like('serial-%')).delete(synchronize_session=False)
+        RevokedSerial.query.filter(RevokedSerial.caref.in_(carefs)).delete(synchronize_session=False)
+        for model in (OCSPResponse, CRLMetadata):
+            model.query.filter(model.ca_id.in_(ca_ids)).delete(synchronize_session=False)
+        CA.query.filter(CA.id.in_(ca_ids)).delete(synchronize_session=False)
+        db.session.commit()
+
+
 # format(0x12345, 'x') == '12345', which reads back as decimal 12345.
 AMBIGUOUS_SERIAL = 0x12345
 DECIMAL_MISREADING = 12345
