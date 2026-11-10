@@ -49,6 +49,11 @@ def is_key_material_error(text) -> bool:
     return any(marker in str(text or '') for marker in _KEY_MATERIAL_MARKERS)
 
 
+class AlreadyIssued(RuntimeError):
+    """Another issuance linked its certificate to the approval first: the
+    protocols let it through so the approver reads this cause."""
+
+
 class ApprovalGateUnavailable(Exception):
     """The policies could not be evaluated: the caller must not issue."""
 
@@ -218,7 +223,7 @@ def linker(approval):
             ApprovalRequest.certificate_id.is_(None),
         ).update({ApprovalRequest.certificate_id: row.id}, synchronize_session=False)
         if claimed != 1:
-            raise RuntimeError('A certificate was already issued for this approval')
+            raise AlreadyIssued('A certificate was already issued for this approval')
         approval.certificate_id = row.id
     return link
 

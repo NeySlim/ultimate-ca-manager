@@ -315,3 +315,47 @@ def test_a_delivered_issue_is_never_judged_again(app, client, auth_client, wstep
         (_id, status, data, _cert), = requests_of(app, pid, 'wstep_request')
         assert status == 'approved' and data['delivered_at'] and 'closed_reason' not in data
         assert emitted == []
+
+
+def _issue_already_linked(app, approval_id, linked_serial):
+    """Issue *approval_id* from a copy read before another issuance linked
+    it to the certificate *linked_serial*."""
+    import json
+
+    import pytest
+
+    from models import db
+    from models.policy import ApprovalRequest
+    from services import protocol_approval
+    with app.app_context():
+        linked_id = Certificate.query.filter_by(serial_number=str(linked_serial)).first().id
+        stale = db.session.get(ApprovalRequest, approval_id)
+        with db.engine.begin() as conn:
+            conn.execute(ApprovalRequest.__table__.update()
+                         .where(ApprovalRequest.__table__.c.id == approval_id)
+                         .values(status='approved', certificate_id=linked_id))
+        with pytest.raises(RuntimeError, match='already issued'):
+            protocol_approval.issue_approved(stale, json.loads(stale.request_data))
+        db.session.rollback()
+    return linked_id
+
+
+def test_an_issue_already_linked_tells_the_approver_why(app, client, wstep_config):
+    first = _issued_cert_from_rstr(_issue_rst(client, _make_csr(common_name='first.wstep-approval.test')[0]).data)
+    with approval_policy(app, wstep_config['id'], 'wstep-held-linked-twice') as pid:
+        csr, _ = _make_csr(common_name='linked-twice.wstep-approval.test')
+        _pending(_issue_rst(client, csr))
+        (approval_id, *_), = requests_of(app, pid, 'wstep_request')
+        linked_id = _issue_already_linked(app, approval_id, first.serial_number)
+        assert requests_of(app, pid, 'wstep_request')[0][3] == linked_id
+
+
+def test_a_renewal_already_linked_tells_the_approver_why(app, client, wstep_config):
+    old_cert, old_key = _issue(app, wstep_config['id'], 'renew-linked.wstep-approval.test')
+    other, _k = _issue(app, wstep_config['id'], 'renew-linked-other.wstep-approval.test')
+    body = _rst(_cmc_renewal(_renewal_csr(old_cert, old_key), [(old_key, old_cert)]))
+    with approval_policy(app, wstep_config['id'], 'wstep-held-renew-linked') as pid:
+        _pending(_post(client, body, tls_cert=old_cert))
+        (approval_id, *_), = requests_of(app, pid, 'wstep_request')
+        linked_id = _issue_already_linked(app, approval_id, other.serial_number)
+        assert requests_of(app, pid, 'wstep_request')[0][3] == linked_id

@@ -22,6 +22,7 @@ from models import Certificate
 from services.ca.ca_signing import AlreadySuperseded
 from services.ca_service import CAService
 from services.policy_service import PolicyViolation
+from services.protocol_approval import AlreadyIssued
 from utils.csr_extensions import extensions_of
 from utils.datetime_utils import utc_now
 from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
@@ -1162,6 +1163,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     except RequestRejected as e:
         logger.warning('WSTEP issue refused: %s', e)
         return None, str(e)
+    except AlreadyIssued:
+        raise
     except Exception as e:
         logger.error('WSTEP issue failed: %s', e)
         return None, ServerError('Certificate issuance failed')
@@ -1385,6 +1388,8 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
     except RequestRejected as e:
         logger.warning('WSTEP renew refused: %s', e)
         return None, str(e)
+    except AlreadyIssued:
+        raise
     except Exception as e:
         logger.error('WSTEP renew failed: %s', e)
         return None, ServerError('Certificate renewal failed')
