@@ -96,7 +96,7 @@ export default {
       '当策略或签发 CA 的到期日缩短了请求的有效期时，结果会说明原因：“Issued for N day(s) instead of the M requested”',
       'RSA-PSS 签名会与其哈希和盐长度一同显示，例如 RSASSA-PSS SHA-256 (salt 32)',
       '需要非标准 EKU（Microsoft RDP、智能卡登录、文档签名）？通过"额外 EKU"添加，而不是编辑模板',
-      'In a link view (opened from the overview), the Clear all filters button shown when nothing matches empties the link\'s statuses and the search and keeps the link\'s other filters; removing a chip drops that filter, the Clear button of the chip row leaves the link view, and your saved filters are left untouched',
+      '在链接视图（从概览打开）中，无匹配结果时显示的“清除所有筛选器”按钮会清空该链接的状态和搜索，但保留链接的其他筛选器；移除某个筛选标签只会去掉对应筛选器，筛选标签行的“清除”按钮会退出链接视图，您已保存的筛选器不受影响',
     ],
     warnings: [
       '吊销通常是永久性的:, 除了"证书挂起"可以解除（取消挂起）',

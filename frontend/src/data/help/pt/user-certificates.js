@@ -35,7 +35,7 @@ export default {
       'Inscreva novos certificados mTLS em Conta → aba mTLS',
       'Os certificados são armazenados e gerenciados pelo UCM como qualquer outro certificado',
       'Use a barra de estatísticas para filtrar rapidamente por status',
-      'Clique em uma linha para ver os detalhes completos do certificado em uma janela flutuante',
+      'Clique em uma linha para ver os detalhes completos do certificado no inspetor',
     ],
     warnings: [
       'Revogar um certificado de usuário impede imediatamente o login mTLS com esse certificado',

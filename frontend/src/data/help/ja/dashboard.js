@@ -1,25 +1,25 @@
 export default {
   helpContent: {
-    title: 'Overview',
-    subtitle: 'What needs action, and the state of the PKI',
-    overview: 'Six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every counter that has a list opens the certificate list filtered to exactly the certificates it counts.',
+    title: '概要',
+    subtitle: '対応が必要な項目とPKIの状態',
+    overview: 'PKIのライブデータに基づく6つの独立したカード。各カードは個別に読み込まれ、読み込み中、空、エラー、権限なしの状態をそれぞれ表示します。一覧を持つカウンターはすべて、そのカウンターが数えた証明書だけに絞り込んだ証明書一覧を開きます。',
     sections: [
       {
-        title: 'Cards',
+        title: 'カード',
         items: [
-          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record; a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
-          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state' },
-          { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days; each authority opens its page' },
-          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
-          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
-          { label: 'Latest operations', text: 'The five most recent operations; with the audit permission, a link opens the whole trail' },
+          { label: '要対応', text: '緊急度の高いものから順に6件を表示し、それぞれのレコードへリンクします。折りたたみ部分には種類ごとの合計が表示され、4種類の更新は証明書一覧を開きます' },
+          { label: '自動化の状態', text: 'プロトコル（ACME、SCEP、EST）ごとの1日の成功数と失敗数、およびスケジューラーの状態' },
+          { label: '階層', text: '認証局を親の下にツリーで表示し、CRLとOCSPの状態、オフラインまたはクロス署名のマーク、各CAが7日間に発行した証明書数を示します。各認証局をクリックするとそのページが開きます' },
+          { label: '有効期限の見通し', text: '期限切れ間近と期限切れのカウンター（それぞれ一覧を開きます）、および次に期限が切れる5件の証明書' },
+          { label: 'コンプライアンス', text: '有効な証明書を鍵アルゴリズムと弱点（3072ビット未満のRSA、弱い署名ハッシュ、398日を超えるサーバー証明書、不完全なチェーン、秘密鍵なし）別に集計します。各カウンターは対応する一覧を開きます' },
+          { label: '最新の操作', text: '直近5件の操作。監査権限があれば、リンクから全履歴を開けます' },
         ]
       },
     ],
     tips: [
-      'Pick the Operator, Manager or All cards preset in the header to choose which cards are shown',
-      'The layout is saved with your account and follows you across browsers',
-      'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
+      'ヘッダーでオペレーター、マネージャー、すべてのカードのプリセットを選ぶと、表示するカードを切り替えられます',
+      'レイアウトはアカウントに保存され、ブラウザをまたいで引き継がれます',
+      '証明書一覧では、概要から渡されたフィルターがチップとして表示されます。チップの×で解除できます',
     ],
   },
   helpGuides: {

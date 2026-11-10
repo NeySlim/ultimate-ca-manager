@@ -1,25 +1,25 @@
 export default {
   helpContent: {
-    title: 'Overview',
-    subtitle: 'What needs action, and the state of the PKI',
-    overview: 'Six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every counter that has a list opens the certificate list filtered to exactly the certificates it counts.',
+    title: 'Übersicht',
+    subtitle: 'Was zu tun ist und wie es um die PKI steht',
+    overview: 'Sechs voneinander unabhängige Karten über den Live-Daten Ihrer PKI. Jede Karte lädt für sich und zeigt ihren eigenen Zustand für Laden, Leer, Fehler oder fehlende Berechtigung. Jeder Zähler mit einer Liste öffnet die Zertifikatsliste, gefiltert auf genau die Zertifikate, die er zählt.',
     sections: [
       {
-        title: 'Cards',
+        title: 'Karten',
         items: [
-          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record; a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
-          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state' },
-          { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days; each authority opens its page' },
-          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
-          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
-          { label: 'Latest operations', text: 'The five most recent operations; with the audit permission, a link opens the whole trail' },
+          { label: 'Zu bearbeiten', text: 'Die sechs dringendsten Einträge, kritische zuerst, jeweils mit Link zum Datensatz; eine eingeklappte Ebene zeigt die Summe je Art, und die vier Erneuerungsarten öffnen die Zertifikatsliste' },
+          { label: 'Automatisierungsstatus', text: 'Je Protokoll (ACME, SCEP, EST) die täglichen Erfolge und Fehler sowie der Zustand des Planers' },
+          { label: 'Hierarchie', text: 'Die Zertifizierungsstellen als Baum unter ihrer übergeordneten CA, mit CRL- und OCSP-Status, einer Offline- oder Cross-signed-Markierung und den Zertifikaten, die jede in 7 Tagen ausgestellt hat; jede CA öffnet ihre Seite' },
+          { label: 'Ablaufhorizont', text: 'Die Zähler für ablaufende und abgelaufene Zertifikate, die jeweils ihre Liste öffnen, und die fünf Zertifikate, die als Nächste ablaufen' },
+          { label: 'Compliance', text: 'Aktive Zertifikate nach Schlüsselalgorithmus und Schwäche (RSA unter 3072 Bit, schwacher Signatur-Hash, Serverzertifikate über 398 Tage, unvollständige Kette, kein privater Schlüssel); jeder Zähler öffnet die passende Liste' },
+          { label: 'Letzte Vorgänge', text: 'Die fünf neuesten Vorgänge; mit der Audit-Berechtigung öffnet ein Link das gesamte Protokoll' },
         ]
       },
     ],
     tips: [
-      'Pick the Operator, Manager or All cards preset in the header to choose which cards are shown',
-      'The layout is saved with your account and follows you across browsers',
-      'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
+      'Wählen Sie in der Kopfzeile die Voreinstellung Operator, Manager oder Alle Karten, um festzulegen, welche Karten angezeigt werden',
+      'Das Layout wird mit Ihrem Konto gespeichert und folgt Ihnen in jeden Browser',
+      'In der Zertifikatsliste erscheinen Filter aus der Übersicht als Chips; entfernen Sie einen mit seinem x',
     ],
   },
   helpGuides: {

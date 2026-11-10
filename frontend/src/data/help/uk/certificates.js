@@ -96,7 +96,7 @@ export default {
       'Потрібен нестандартний EKU (Microsoft RDP, smartcard logon, document signing)? Додайте через "Додаткові EKU" замість редагування шаблонів',
       'Якщо політика або строк дії видавця CA скорочує запитаний термін дії, результат про це повідомляє: "Issued for N day(s) instead of the M requested" із зазначенням причини',
       'Підпис RSA-PSS показується з хешем і довжиною солі, напр. RSASSA-PSS SHA-256 (salt 32)',
-      'In a link view (opened from the overview), the Clear all filters button shown when nothing matches empties the link\'s statuses and the search and keeps the link\'s other filters; removing a chip drops that filter, the Clear button of the chip row leaves the link view, and your saved filters are left untouched',
+      'У поданні за посиланням (відкритому з огляду) кнопка «Очистити всі фільтри», що з\'являється, коли нічого не знайдено, скидає статуси посилання та пошук, а решту фільтрів посилання зберігає; вилучення чипа прибирає цей фільтр, кнопка очищення в рядку чипів виходить із подання за посиланням, а ваші збережені фільтри лишаються недоторканими',
     ],
     warnings: [
       'Відкликання зазвичай незворотне: за винятком «Утримання сертифіката», яке можна зняти',

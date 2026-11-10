@@ -35,7 +35,7 @@ export default {
       'Registrieren Sie neue mTLS-Zertifikate unter Konto → mTLS-Tab',
       'Zertifikate werden von UCM wie jedes andere Zertifikat gespeichert und verwaltet',
       'Verwenden Sie die Statistikleiste, um schnell nach Status zu filtern',
-      'Klicken Sie auf eine Zeile, um die vollständigen Zertifikatsdetails in einem schwebenden Fenster anzuzeigen',
+      'Klicken Sie auf eine Zeile, um die vollständigen Zertifikatsdetails im Inspektor anzuzeigen',
     ],
     warnings: [
       'Der Widerruf eines Benutzerzertifikats verhindert sofort die mTLS-Anmeldung mit diesem Zertifikat',
