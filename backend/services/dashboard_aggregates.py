@@ -266,20 +266,24 @@ def _issuer_cannot_sign(now):
             CA.valid_to <= now)).exists()
 
 
-def _renewal_declined():
-    """An approver rejected a renewal of this certificate during its current lifetime
-    (the request names it in its data, as auto_renewal_service._declined reads it)."""
+def _renewal_declined(auto_only=False):
+    """Any rejected renewal request naming the certificate in its current lifetime, whatever
+    its trigger (not checked); ``auto_only`` keeps the scheduler's own requests."""
     named = literal('%"certificate_id": ', String) + cast(Certificate.id, String) + literal(',%', String)
-    return select(ApprovalRequest.id).where(
+    conditions = [
         ApprovalRequest.request_type == 'renewal', ApprovalRequest.status == 'rejected',
         ApprovalRequest.request_data.like(named),
-        or_(Certificate.valid_from.is_(None), ApprovalRequest.created_at >= Certificate.valid_from)).exists()
+        or_(Certificate.valid_from.is_(None), ApprovalRequest.created_at >= Certificate.valid_from)]
+    if auto_only:
+        conditions.append(ApprovalRequest.request_data.like('%"trigger": "auto"%'))
+    return select(ApprovalRequest.id).where(*conditions).exists()
 
 
 def _blocked_conditions(now):
-    """Due for auto-renewal, which then fails on every pass because the CA cannot sign."""
+    """Due for auto-renewal, which then fails on every pass because the CA cannot sign;
+    only an automatic refusal parks it (a refused manual request does not stop the passes)."""
     return [*_live_until(now, EXPIRY_WINDOW_DAYS), _auto_renewed(_renewal_config()),
-            _issuer_cannot_sign(now), ~_renewal_declined()]
+            _issuer_cannot_sign(now), ~_renewal_declined(auto_only=True)]
 
 
 def _declined_conditions(now):

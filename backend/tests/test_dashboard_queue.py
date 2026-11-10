@@ -191,7 +191,7 @@ def seeded(app):
         }
         renewing.certificate_id = certs['acme_client'].id
         rejected = ApprovalRequest(request_type='renewal', status='rejected', created_at=now - timedelta(days=1),
-                                   request_data=json.dumps({'certificate_id': certs['declined'].id, 'ca_id': None}))
+                                   request_data=json.dumps({'certificate_id': certs['declined'].id, 'ca_id': None, 'trigger': 'auto'}))
         # rejected before the certificate was last renewed: a decision on the previous cycle
         rejected_old = ApprovalRequest(
             request_type='renewal', status='rejected', created_at=now - timedelta(days=400),
