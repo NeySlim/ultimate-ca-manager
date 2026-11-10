@@ -7,7 +7,7 @@ import pytest
 from models import CA, Certificate, SystemConfig, db
 from models.policy import ApprovalRequest
 from tests.conftest import get_json
-from tests.test_dashboard_queue import SETTINGS, URL, _ca, _cert, _find, _set
+from tests.test_dashboard_queue import SETTINGS, URL, _ca, _cert, _find, _set, _uncapped_listing  # noqa: F401
 from utils.datetime_utils import utc_now
 
 

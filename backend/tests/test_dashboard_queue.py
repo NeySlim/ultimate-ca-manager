@@ -62,6 +62,15 @@ def _set(key, value):
         row.value = value
 
 
+@pytest.fixture(autouse=True, scope='module')
+def _uncapped_listing():
+    """Other files on the same worker leave hundreds of CAs without a CRL and pending
+    requests: the listing must hold them all for the seeded rows to be found."""
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr('api.v2.dashboard_overview.DASHBOARD_MAX_ROWS', 10_000)
+        yield
+
+
 @pytest.fixture(scope='module')
 def seeded(app):
     now = utc_now()
@@ -379,7 +388,7 @@ def test_counts_are_exact_when_the_list_is_truncated(app, auth_client, seeded):
         db.session.commit()
         bulk = [r.id for r in rows]
     try:
-        data = _queue(auth_client)
+        data = get_json(auth_client.get(f'{URL}?limit={DASHBOARD_MAX_ROWS}'))['data']
         assert len(data['items']) == DASHBOARD_MAX_ROWS
         assert data['counts']['scep_request_pending'] == before['scep_request_pending'] + extra
         assert data['total'] == sum(data['counts'].values()) > DASHBOARD_MAX_ROWS

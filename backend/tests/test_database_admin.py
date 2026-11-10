@@ -36,7 +36,14 @@ def sqlite_target():
 
 @pytest.fixture
 def populated_app(app):
-    """App with the auto-created admin user — enough for migration tests."""
+    """App with the auto-created admin user — enough for migration tests. Other files on the
+    same worker delete ACME client orders in bulk, which SQLite never cascades to their proxy
+    challenge links; the migration refuses such orphans, so they are removed first."""
+    from models import db
+    with app.app_context():
+        db.session.execute(text('DELETE FROM acme_proxy_challenge_links WHERE order_id NOT IN '
+                                '(SELECT id FROM acme_client_orders)'))
+        db.session.commit()
     return app
 
 
