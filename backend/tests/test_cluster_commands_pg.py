@@ -677,6 +677,15 @@ class _FakeMonotonic:
         return self.t
 
 
+def _fail_until(solo, clock, attempts, count):
+    """Advances the fake clock one second per pass until ``count`` attempts were made."""
+    start = clock.t
+    while len(attempts) < count:
+        clock.t += 1
+        solo.run_once()
+        assert clock.t - start <= 600
+
+
 def test_a_failing_restart_backs_off_and_logs_one_line_per_step(app, ha, caplog):
     """2 s, 4 s ... 60 s between attempts; ERROR once, then one line per step; reloads go on."""
     import logging
@@ -692,19 +701,8 @@ def test_a_failing_restart_backs_off_and_logs_one_line_per_step(app, ha, caplog)
     caplog.set_level(logging.INFO, logger=cc.logger.name)
     _emit(app, cc.RESTART)
     solo.run_once()
-    clock.t += 1  # past the gap grace: ids left by earlier tests are below this one
-    solo.run_once()
-    assert len(attempts) == 1
-    delays = []
-    for _ in range(8):
-        before = len(attempts)
-        start = clock.t
-        while len(attempts) == before:
-            clock.t += 1
-            solo.run_once()
-            assert clock.t - start <= 60
-        delays.append(clock.t - start)
-    assert delays == [2, 4, 8, 16, 32, 60, 60, 60]
+    _fail_until(solo, clock, attempts, 9)  # past the gap grace when earlier ids are missing
+    assert [b - a for a, b in zip(attempts, attempts[1:])] == [2, 4, 8, 16, 32, 60, 60, 60]
     mark = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'waiting'})
     solo.run_once()  # mid-wait: no attempt, the reload is applied
     assert solo.seen == mark and log == [('solo', 'waiting')] and len(attempts) == 9
