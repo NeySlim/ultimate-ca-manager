@@ -51,7 +51,10 @@ def _registry_paths():
     text = (Path(__file__).resolve().parents[2] / 'frontend/src/navigation/registry.js').read_text()
     modules = text[text.index('const RAW_MODULES'):text.index('export const MODULES')]
     paths = set()
-    for m in re.finditer(r"^  \{ id: '[^']+', path: '([^']+)'(?:, paths: \[([^\]]*)\])?", modules, re.M):
+    found = list(re.finditer(r"^  \{ id: '[^']+', path: '([^']+)'(?:, paths: \[([^\]]*)\])?", modules, re.M))
+    # Every module entry is read: one written in another shape would be missing on both sides
+    assert len(found) == len(re.findall(r"\{\s*id:", modules)), 'a registry module is written in a shape this test cannot read'
+    for m in found:
         paths.add(m.group(1))
         paths.update(re.findall(r"'([^']+)'", m.group(2) or ''))
     paths.update(re.findall(r"\{ from: '([^']+)'", text))

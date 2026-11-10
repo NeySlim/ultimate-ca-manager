@@ -220,7 +220,7 @@ def request_pending(request_id, provider_id):
 
 
 def request_next_path(request_id, provider_id):
-    """Page stored with a pending AuthnRequest; only the caller whose take_request wins may use it."""
+    """Page stored with an AuthnRequest, expired or not; only the caller whose take_request wins may use it."""
     if not request_id or len(request_id) > MAX_MESSAGE_ID_LENGTH:
         return None
     return db.session.query(SAMLMessageId.next_path).filter(
