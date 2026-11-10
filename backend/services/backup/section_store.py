@@ -54,7 +54,11 @@ def store_directory(spool: Optional[str] = None) -> Optional[str]:
 
 
 def sweep_stale_stores(directory: Optional[str] = None, spool: Optional[str] = None) -> None:
-    """Remove stores a killed worker left behind, in the directory `store_directory()` gives."""
+    """Remove stores a killed worker left behind, in the directory `store_directory()` gives.
+
+    Closed rule: nothing is removed unless the backup lock was taken, so a restore
+    still applying its plan is never swept.
+    """
     directory = directory or store_directory(spool) or tempfile.gettempdir()
     if not os.path.isdir(directory):
         return
