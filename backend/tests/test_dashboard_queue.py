@@ -88,6 +88,13 @@ def seeded(app):
         _crl(crl_soon, now + timedelta(days=7), crl_number=1, created_at=now - timedelta(days=1))
         _crl(crl_soon, now + timedelta(hours=12), crl_number=2)
         _crl(crl_soon, now + timedelta(days=9), crl_number=3, is_delta=True)  # a delta does not count
+        # validity 1 day, just regenerated: half its life is still ahead
+        crl_daily = _ca('queue-crl-daily', cdp_enabled=True, crl_validity_days=1, valid_to=now + timedelta(days=3650))
+        _crl(crl_daily, now + timedelta(hours=24))
+        crl_stale = _ca('queue-crl-stale', cdp_enabled=True, valid_to=now + timedelta(days=3650))
+        _crl(crl_stale, now - timedelta(hours=1))
+        crl_6h = _ca('queue-crl-6h', cdp_enabled=True, crl_validity_days=7, valid_to=now + timedelta(days=3650))
+        _crl(crl_6h, now + timedelta(hours=6))
         crl_fresh = _ca('queue-crl-fresh', cdp_enabled=True, valid_to=now + timedelta(days=3650))
         _crl(crl_fresh, now + timedelta(days=7))
         crl_renewed = _ca('queue-crl-renewed', cdp_enabled=True, valid_to=now + timedelta(days=3650))
@@ -155,6 +162,7 @@ def seeded(app):
         db.session.commit()
         ids.update(renewing=renewing.id, not_renewing=not_renewing.id, failed=failed.id, old=old.id, client=client.id, healthy=healthy.id, urgent=urgent.id,
                    calm=calm.id, done=done.id, scep=scep.id, recovery=recovery.id,
+                   crl_daily=crl_daily.id, crl_stale=crl_stale.id, crl_6h=crl_6h.id,
                    crl_soon=crl_soon.id, crl_fresh=crl_fresh.id, crl_renewed=crl_renewed.id, crl_none=crl_none.id,
                    crl_offline=crl_offline.id, crl_upload=crl_upload.id, no_cdp=no_cdp.id,
                    ca_soon=ca_soon.id, ca_later=ca_later.id, ca_revoked=ca_revoked.id,
@@ -168,7 +176,7 @@ def seeded(app):
                 row = db.session.get(model, ids[key])
                 if row is not None:
                     db.session.delete(row)
-        cas = [ids[k] for k in ('crl_soon', 'crl_fresh', 'crl_renewed', 'crl_none', 'crl_offline', 'crl_upload', 'no_cdp', 'ca_soon', 'ca_later', 'ca_revoked')]
+        cas = [ids[k] for k in ('crl_daily', 'crl_stale', 'crl_6h', 'crl_soon', 'crl_fresh', 'crl_renewed', 'crl_none', 'crl_offline', 'crl_upload', 'no_cdp', 'ca_soon', 'ca_later', 'ca_revoked')]
         CRLMetadata.query.filter(CRLMetadata.ca_id.in_(cas)).delete(synchronize_session=False)
         CA.query.filter(CA.id.in_(cas)).delete(synchronize_session=False)
         db.session.delete(db.session.get(AcmeAccount, ids['account']))
@@ -194,7 +202,9 @@ def _find(data, kind, item_id):
     ('approval_pending', 'calm', 'warning'),
     ('scep_request_pending', 'scep', 'warning'),
     ('key_recovery_pending', 'recovery', 'warning'),
-    ('crl_due', 'crl_soon', 'critical'),
+    ('crl_due', 'crl_soon', 'warning'),
+    ('crl_due', 'crl_6h', 'warning'),
+    ('crl_due', 'crl_stale', 'critical'),
     ('crl_missing', 'crl_none', 'critical'),
     ('manual_renewal_due', 'no_key_12h', 'critical'),
     ('manual_renewal_due', 'no_key_10d', 'warning'),
@@ -229,7 +239,7 @@ def test_crl_due_date_is_the_latest_full_crl(auth_client, seeded):
 @pytest.mark.parametrize('kind, key', [
     ('acme_order_failed', 'old'), ('acme_client_renewal_failed', 'healthy'),
     ('approval_pending', 'done'), ('crl_due', 'crl_fresh'), ('crl_missing', 'crl_fresh'),
-    ('crl_due', 'crl_renewed'),
+    ('crl_due', 'crl_renewed'), ('crl_due', 'crl_daily'), ('crl_missing', 'crl_daily'),
     ('crl_due', 'crl_offline'), ('crl_missing', 'crl_offline'),
     ('crl_due', 'crl_upload'), ('crl_missing', 'crl_upload'),
     ('manual_renewal_due', 'acme_nokey'), ('manual_renewal_due', 'wstep_nokey'),

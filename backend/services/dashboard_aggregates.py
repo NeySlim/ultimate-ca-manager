@@ -27,6 +27,7 @@ QUEUE_KINDS = ('acme_order_failed', 'acme_client_renewal_failed', 'approval_pend
                'manual_renewal_due', 'client_renewal_overdue', 'ca_expiring')
 ACME_FAILURE_LOOKBACK_DAYS = 7
 CRITICAL_WITHIN = timedelta(hours=24)
+DEFAULT_CRL_VALIDITY_DAYS = 7
 CA_EXPIRY_WARNING_DAYS = 365
 CA_EXPIRY_CRITICAL_DAYS = 90
 # Python's compliance grade calls a lifetime long from 399 whole days on
@@ -89,7 +90,15 @@ def _renewal_config():
 
 # ------------------------------------------------------------------ queue
 
-def _queue_union(now):
+def _within_half_validity(next_update, now, dialect):
+    """``next_update`` comes before now + half the CA's CRL validity (7 days when unset or 0, as the CA reports it)."""
+    days = func.coalesce(func.nullif(CA.crl_validity_days, 0), DEFAULT_CRL_VALIDITY_DAYS)
+    if dialect == 'sqlite':
+        return (func.julianday(next_update) - func.julianday(literal(now, DateTime))) * 2 < days
+    return next_update < literal(now, DateTime) + func.make_interval(0, 0, 0, 0, days * 12)
+
+
+def _queue_union(now, dialect):
     """One SELECT per kind, all shaped (kind, rank, id, label, due_at); rank 0 is critical."""
     soon = now + CRITICAL_WITHIN
     # type_coerce, not CAST: SQLite would turn CAST(... AS DATETIME) into a number
@@ -138,14 +147,18 @@ def _queue_union(now):
     latest = (select(CRLMetadata.ca_id.label('ca_id'), CRLMetadata.next_update.label('next_update'))
               .join(newest, and_(newest.c.ca_id == CRLMetadata.ca_id, newest.c.number == CRLMetadata.crl_number))
               .subquery())
+    # Critical once stale or missing; a warning within min(24 h, half the CA's CRL validity)
+    stale = or_(latest.c.next_update.is_(None), latest.c.next_update < now)
     parts.append(select(
         case((latest.c.next_update.is_(None), _const('crl_missing')),
              else_=_const('crl_due')).label('kind'),
-        _CRITICAL.label('rank'), CA.id.label('id'), text_label(CA.descr).label('label'),
+        case((stale, _CRITICAL), else_=_WARNING).label('rank'),
+        CA.id.label('id'), text_label(CA.descr).label('label'),
         due(func.coalesce(latest.c.next_update, literal(now, DateTime))).label('due_at'),
     ).select_from(CA).outerjoin(latest, latest.c.ca_id == CA.id)
      .where(_active_ca(now), CA.cdp_enabled.is_(True),
-            or_(latest.c.next_update.is_(None), latest.c.next_update < soon)))
+            or_(stale, and_(latest.c.next_update < soon,
+                            _within_half_validity(latest.c.next_update, now, dialect)))))
 
     parts.append(select(
         _const('manual_renewal_due').label('kind'),
@@ -246,7 +259,7 @@ def _short_label(kind, label):
 def work_queue(session, limit, now=None):
     """Items to act on, critical first then by due date, and the total per kind."""
     now = now or utc_now()
-    queue = _queue_union(now)
+    queue = _queue_union(now, session.get_bind().dialect.name)
     counts = {kind: 0 for kind in QUEUE_KINDS}
     for kind, n in session.execute(select(queue.c.kind, func.count()).group_by(queue.c.kind)):
         counts[kind] = n
