@@ -1220,15 +1220,28 @@ class SCEPService:
         from services.scep.approval import follow_approval
         follow_approval(existing)
         if existing.status == "approved":
-            cert_obj = self._deliverable_certificate(existing)
+            cert_obj, undelivered = self._deliverable_certificate(existing)
             if cert_obj is not None:
-                return self._create_cert_rep_success(
+                response = self._create_cert_rep_success(
                     cert_obj,
                     existing.transaction_id,
                     sender_nonce,
                     signer_cert,
                     challenge_password,
                     content_encryption_algorithm,
+                )
+                if undelivered is not None:
+                    from services import protocol_approval
+                    protocol_approval.mark_delivered(undelivered)
+                return response
+            if existing.status == "approved":
+                # Delivered before, its certificate gone since: refused, never judged again
+                from services import protocol_approval
+                return self._create_error_response(
+                    self.FAIL_BAD_REQUEST,
+                    protocol_approval.CERTIFICATE_WITHDRAWN,
+                    transaction_id=existing.transaction_id,
+                    recipient_nonce=sender_nonce,
                 )
 
         if existing.status == "rejected":
@@ -1242,11 +1255,19 @@ class SCEPService:
         return self._create_cert_rep_pending(existing.transaction_id, sender_nonce)
 
     def _deliverable_certificate(self, existing: SCEPRequest):
-        """The certificate of an approved request, as EST and WSTEP deliver
-        theirs: none when its row went away or the certificate it renews was
-        revoked since, and the request (with its approval) is then closed."""
+        """``(certificate, approval still to mark delivered)`` of an approved
+        request, as EST and WSTEP deliver theirs. One its approval delivered
+        is never judged again; otherwise no certificate when its row went
+        away or the certificate it renews was revoked, and the request (with
+        its approval) is then closed."""
         from services import protocol_approval
+        from services.scep.approval import approved_request
         cert = Certificate.query.filter_by(refid=existing.cert_refid).first() if existing.cert_refid else None
+        approval = approved_request(existing)
+        if approval is not None and protocol_approval.request_data(approval).get('delivered_at'):
+            if cert is None or not cert.crt:
+                return None, None
+            return x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend()), None
         reason = None
         if cert is None or not cert.crt:
             reason = protocol_approval.CERTIFICATE_WITHDRAWN
@@ -1257,16 +1278,15 @@ class SCEPService:
             if issued_certificate_status(self.ca, renewed)[1] == REVOKED:
                 reason = protocol_approval.RENEWED_REVOKED
         if reason is None:
-            return x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend())
+            return x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend()), approval
         existing.status = "rejected"
         existing.rejection_reason = reason
         db.session.commit()
-        approval = protocol_approval.find_protocol_request(
-            'scep', protocol_approval.make_ref('scep', existing.transaction_id, existing.ca_refid))
-        if approval is not None and approval.status == 'approved':
+        if approval is not None:
             protocol_approval.close_withdrawn(approval, reason)
+            protocol_approval.mark_delivered(approval)
         logger.warning("SCEP: transaction %s closed before delivery: %s", existing.transaction_id, reason)
-        return None
+        return None, None
 
     def _config_value(self, key: str):
         if key not in self._config_cache:

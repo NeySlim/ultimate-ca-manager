@@ -378,7 +378,6 @@ def test_an_approved_renewal_whose_signer_was_revoked_fails_the_poll(app, auth_c
     with approval_policy(app, scep_ca, 'scep-held-renew-revoked', operations=['renewal']) as pid:
         issued, key, approval_id = _held_renewal(app, scep_ca, pid, 'scep renew revoked')
         approve(auth_client, approval_id)
-        assert _poll_transaction(app, scep_ca, (issued, key), 'txn-17') == SUCCESS
         with app.app_context():
             row = Certificate.query.filter_by(serial_number=str(issued.serial_number)).first()
             row.revoked = True
@@ -477,3 +476,30 @@ def test_an_approved_renewal_whose_renewed_row_went_away_is_delivered(app, auth_
         assert _poll_transaction(app, scep_ca, (issued, key), 'txn-17') == SUCCESS
         assert _renewal_row(app, scep_ca) == 'approved'
         assert requests_of(app, pid, 'scep_request')[0][1] == 'approved'
+
+
+def test_a_delivered_request_is_never_judged_again(app, auth_client, scep_ca, monkeypatch):
+    """Delivered once: a poll after its certificate went away changes
+    neither the request nor its approval, and emits no webhook."""
+    import services.webhook_service as webhooks
+    from models import Certificate
+    rejections = []
+    monkeypatch.setattr(webhooks, 'emit_csr_rejected', lambda *a, **k: rejections.append(a))
+    identity = _client_identity('scep delivered once')
+    with approval_policy(app, scep_ca, 'scep-held-delivered') as pid:
+        assert _enroll(app, scep_ca, identity) == PENDING
+        (approval_id, *_), = requests_of(app, pid, 'scep_request')
+        approve(auth_client, approval_id)
+        assert _poll(app, scep_ca, identity) == SUCCESS
+        (_id, status, data, _cert), = requests_of(app, pid, 'scep_request')
+        assert status == 'approved' and data['delivered_at']
+        _id, _status, cert_refid = _scep_row(app, scep_ca)
+        from tests.test_protocol_approval_est import _withdraw
+        _withdraw(app, approval_id)
+        with app.app_context():
+            Certificate.query.filter_by(refid=cert_refid).delete()
+            db.session.commit()
+        assert _poll(app, scep_ca, identity) == FAILURE
+        assert _scep_row(app, scep_ca)[1] == 'approved'
+        assert requests_of(app, pid, 'scep_request')[0][1] == 'approved'
+        assert rejections == []

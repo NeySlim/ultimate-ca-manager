@@ -116,6 +116,20 @@ def linked_approval(scep_req):
     return approval
 
 
+def approved_request(scep_req):
+    """The approved request that held *scep_req*, delivered or not; None when none did."""
+    from models.policy import ApprovalRequest
+    ref = protocol_approval.make_ref('scep', scep_req.transaction_id, scep_req.ca_refid)
+    for approval in ApprovalRequest.query.filter(
+            ApprovalRequest.request_type == 'scep_request',
+            ApprovalRequest.status == 'approved',
+            ApprovalRequest.request_data.like(f'%"{ref}"%'),
+    ).order_by(ApprovalRequest.id.desc()).all():
+        if protocol_approval.request_data(approval).get('protocol_ref') == ref:
+            return approval
+    return None
+
+
 def follow_approval(scep_req):
     """Bring a pending SCEP request in line with the approval holding it
     (closed by a rejection or an expiry the sweep has not echoed yet)."""
