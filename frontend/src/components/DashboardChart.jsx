@@ -25,7 +25,7 @@ function readChartColors() {
 }
 
 // Colours are read from the CSS variables at render and re-read when data-theme / data-mode change.
-function useChartColors() {
+export function useChartColors() {
   const [colors, setColors] = useState(readChartColors)
 
   useEffect(() => {
