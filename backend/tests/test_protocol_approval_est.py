@@ -323,3 +323,26 @@ def test_a_reenrolment_answer_that_fails_is_not_marked_delivered(app, client, au
         (_id, status, data, _cert), = requests_of(app, pid, 'est_enroll')
         assert status == 'approved' and not data.get('delivered_at')
         _cert_of(_post_csr(client, 'simplereenroll', renewal, client_cert_pem=client_pem))
+
+
+@pytest.mark.parametrize('refusal', ['policy', 'content'])
+def test_a_key_generation_refused_at_issuance_closes_the_request(app, client, auth_client, est_config,
+                                                                 monkeypatch, refusal):
+    """A refusal for good on the approved retry closes the request: the
+    next retry is a new request, not the same refusal forever."""
+    import api.est_protocol as est
+    from services.policy_service import PolicyViolation
+    from utils.request_names import RequestRejected
+    error = (PolicyViolation if refusal == 'policy' else RequestRejected)('refused for good')
+    with approval_policy(app, est_config['id'], f'est-held-keygen-refused-{refusal}') as pid:
+        csr, _approval_id = _approved_keygen(app, client, auth_client, est_config, pid,
+                                             f'keygen-refused-{refusal}.est-approval.test')
+
+        def refused(*a, **k):
+            raise error
+        monkeypatch.setattr(est, 'sign_est_csr', refused)
+        assert _post_csr(client, 'serverkeygen', csr, headers=_basic_auth()).status_code == 400
+        (_id, status, data, _cert), = requests_of(app, pid, 'est_enroll')
+        assert status == 'rejected' and data['closed_reason'] == 'Refused at issuance'
+        _held(_post_csr(client, 'serverkeygen', csr, headers=_basic_auth()))
+        assert [r[1] for r in requests_of(app, pid, 'est_enroll')] == ['rejected', 'pending']

@@ -42,6 +42,7 @@ _KEY_MATERIAL_MARKERS = ('signing key', 'KEY_ENCRYPTION_KEY', 'HSM')
 GENERIC_ISSUE_ERROR = 'Certificate issuance failed. Check server logs.'
 CERTIFICATE_WITHDRAWN = 'Certificate withdrawn'
 RENEWED_REVOKED = 'Renewed certificate revoked'
+REFUSED_AT_ISSUANCE = 'Refused at issuance'
 
 
 def is_key_material_error(text) -> bool:
@@ -257,7 +258,7 @@ def decision_reason(approval) -> str:
     """What the client is told about a request that will not be issued: a
     fixed text, the approver's comment stays server side (vote, audit, webhook)."""
     closed_reason = request_data(approval).get('closed_reason')
-    if closed_reason in (CERTIFICATE_WITHDRAWN, RENEWED_REVOKED):
+    if closed_reason in (CERTIFICATE_WITHDRAWN, RENEWED_REVOKED, REFUSED_AT_ISSUANCE):
         return closed_reason
     if approval.status == 'expired':
         return 'Approval request expired'

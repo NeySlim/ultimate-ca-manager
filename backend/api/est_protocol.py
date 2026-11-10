@@ -737,6 +737,15 @@ def _release_claim(approval):
         protocol_approval.release_delivery(approval)
 
 
+def _refuse_claim(approval):
+    """An approved key generation refused for good at issuance is closed:
+    the client's next retry is a new request, not the same refusal again."""
+    if approval is not None:
+        from services import protocol_approval
+        db.session.rollback()
+        protocol_approval.close_withdrawn(approval, protocol_approval.REFUSED_AT_ISSUANCE)
+
+
 def _link_issued(approval, cert, ca):
     """Link an approved server key generation to the certificate issued for it."""
     from models import Certificate
@@ -1260,11 +1269,11 @@ Content-Transfer-Encoding: base64\r
         
     except PolicyViolation as e:
         logger.warning(f"EST serverkeygen refused by policy: {e}")
-        _release_claim(approved)
+        _refuse_claim(approved)
         return Response(f"Policy violation: {e}", status=400)
     except RequestRejected as e:
         logger.warning(f"EST serverkeygen refused: {e}")
-        _release_claim(approved)
+        _refuse_claim(approved)
         return Response(str(e), status=400)
     except Exception as e:
         logger.error(f"EST serverkeygen failed: {e}")
