@@ -238,6 +238,7 @@ export default function LoginPage() {
           const verifyData = data.data || data
           await login(verifyData?.user?.username || 'sso_user', null, verifyData)
           showSuccess(t('auth.welcomeBackUser', { username: verifyData?.user?.username || 'User' }))
+          // The server's callback redirect carries no ?next=, so an SSO sign-in always lands on /dashboard.
           navigate(landing)
         })
         .catch(() => {
