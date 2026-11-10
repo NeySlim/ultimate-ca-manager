@@ -100,3 +100,21 @@ def test_a_failed_export_leaves_no_temporary_file(app, small_chunks, monkeypatch
         with pytest.raises(BackupExportError):
             storage.export_archive(BackupService(), PASSWORD)
     assert [p.name for p in small_chunks.iterdir() if not p.name.endswith('.lock')] == []
+
+
+def test_a_failed_scheduled_backup_is_audited_as_system_backup(app, small_chunks, monkeypatch):
+    """The action name the notification bell asks for is the one the backend writes."""
+    from services.backup import schedule
+    from models import AuditLog
+
+    def broken(service, password, **kwargs):
+        raise RuntimeError('disk full')
+
+    monkeypatch.setattr(storage, 'export_archive', broken)
+    monkeypatch.setattr(schedule, '_record_outcome', lambda *args: None)
+    with app.app_context():
+        from utils.datetime_utils import utc_now
+        with pytest.raises(RuntimeError):
+            schedule._create_scheduled_backup({}, utc_now(), PASSWORD)
+        row = AuditLog.query.filter_by(action='system_backup', success=False).first()
+        assert row is not None and row.username == 'system'
