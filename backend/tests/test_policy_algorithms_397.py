@@ -28,11 +28,14 @@ CONTENT_JSON = 'application/json'
 
 def _forget_newer_than(floor):
     """Rows pointing at a CA without ON DELETE CASCADE go first, or PostgreSQL refuses the delete."""
-    from models import CRLMetadata, OCSPResponse
-    ca_ids = [row.id for row in CA.query.filter(CA.id > floor[CA]).all()]
+    from services.deletion_blockers import purge_ca_dependents
+    cas = CA.query.filter(CA.id > floor[CA]).all()
+    ca_ids = [row.id for row in cas]
     Certificate.query.filter(Certificate.id > floor[Certificate]).delete(synchronize_session=False)
-    for model in (OCSPResponse, CRLMetadata, CertificatePolicy):
-        model.query.filter(model.ca_id.in_(ca_ids)).delete(synchronize_session=False)
+    # The product's own list of CA dependents (revoked serials, CRL, OCSP, SCEP...)
+    for ca in cas:
+        purge_ca_dependents(ca)
+    CertificatePolicy.query.filter(CertificatePolicy.ca_id.in_(ca_ids)).delete(synchronize_session=False)
     CA.query.filter(CA.id.in_(ca_ids)).delete(synchronize_session=False)
 
 
@@ -603,6 +606,7 @@ class TestReviewFollowups:
 def test_cleanup_removes_a_ca_that_has_crl_and_ocsp_rows(app, create_ca):
     """With foreign keys enforced (PostgreSQL always), the dependents must go before the CA."""
     from models import CRLMetadata, OCSPResponse
+    from models.revoked_serial import RevokedSerial
     from utils.datetime_utils import utc_now
     sqlite = app.config['SQLALCHEMY_DATABASE_URI'].startswith('sqlite')
     with app.app_context():
@@ -614,6 +618,9 @@ def test_cleanup_removes_a_ca_that_has_crl_and_ocsp_rows(app, create_ca):
                                    crl_pem='x', crl_der=b'x'))
         db.session.add(OCSPResponse(ca_id=ca['id'], cert_serial='01', status='good',
                                     response_der=b'x', this_update=now, next_update=now))
+        # A renewal records the superseded serial: revoked_serials.caref references the CA
+        db.session.add(RevokedSerial(caref=db.session.get(CA, ca['id']).refid, serial_number='02',
+                                     valid_to=now))
         db.session.commit()
         if sqlite:
             db.session.execute(db.text('PRAGMA foreign_keys=ON'))
