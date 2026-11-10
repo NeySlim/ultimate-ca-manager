@@ -304,7 +304,8 @@ jobs:
             tests/test_database_migration_scale.py \
             tests/test_database_admin.py \
             tests/test_migration_036.py \
-            tests/test_migration_runner_pg.py
+            tests/test_migration_runner_pg.py \
+            tests/test_scep_intune_ca_lock_pg.py
 
       # The application itself on PostgreSQL: the session `app` fixture builds
       # it in a schema of its own (docs/testing/postgres-harness.md), so the
