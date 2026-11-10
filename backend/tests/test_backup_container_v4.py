@@ -297,7 +297,6 @@ class TestThroughTheService:
                 service.restore_backup(bytes(damaged), PASSWORD, mode='merge')
         assert os.listdir(tmp_path) == []
 
-
     def test_a_restore_runs_in_the_system_temp_dir_when_the_spool_is_unusable(
             self, app, tmp_path, monkeypatch):
         import tempfile
@@ -324,6 +323,7 @@ class TestThroughTheService:
             service.restore_backup(blob, PASSWORD, mode='merge')
         assert made
         assert all(os.path.dirname(path) == section_store.fallback_directory() for path in made)
+
 
 def container_sections():
     from services.backup.manifest import SECTIONS as MANIFEST
