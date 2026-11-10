@@ -12,7 +12,7 @@ from cryptography import x509
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 
-from models import CA
+from models import CA, db
 from models.ca_cross_certificate import CACrossCertificate
 from services.ca import cross_certs
 from services.ca.cross_certs import CrossCertError
@@ -190,7 +190,11 @@ def cross_sign(issuer: CA, subject: CA, validity_days=DEFAULT_VALIDITY_DAYS, pat
         copied_extensions=copied, subject_key_identifier=ski,
         key_usage=_key_usage_names(subject_cert))
     cert = x509.load_pem_x509_certificate(pem)
-    row, warnings = cross_certs.attach_certificate(subject, cert, username)
+    # A cross-certificate is an issuance of the issuer, counted in the commit that stores it
+    from utils.ca_serial_counter import next_ca_serial
+    row, warnings = cross_certs.attach_certificate(subject, cert, username, commit=False)
+    next_ca_serial(issuer)
+    db.session.commit()
     notices = []
     if capped_by and validity_days < requested_days:
         notices.append(notices_mod.validity_shortened(

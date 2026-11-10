@@ -296,7 +296,7 @@ class CSRMixin:
         except Exception as e:
             raise ValueError(f"Failed to verify CSR signature: {e}")
 
-        # RFC 9763: A is found before signing, so linking after it cannot fail
+        # RFC 9763: A is found before signing; linking refuses only an A renewed since
         from services.cert.related_pair import link_issued, record_request_key, requested_by_csr
         related_a = requested_by_csr(csr_obj.public_bytes(serialization.Encoding.DER))
 
@@ -437,8 +437,12 @@ class CSRMixin:
                 digest=digest if cert.signature_hash_algorithm is not None else None,
             )
 
-        # RFC 9763: the A the request named and the certificate now names
-        link_issued(certificate, cert, related_a)
+        # RFC 9763: the A the request named and the certificate now names, refused if renewed since
+        try:
+            link_issued(certificate, cert, related_a)
+        except Exception:
+            db.session.rollback()
+            raise
 
         # Store SANs
         if san_dns_list:
@@ -447,9 +451,6 @@ class CSRMixin:
             certificate.san_ip = json.dumps(san_ip_list)
         if san_email_list:
             certificate.san_email = json.dumps(san_email_list)
-
-        # Increment CA serial
-        next_ca_serial(ca)
 
         # If signing as intermediate CA, create a CA record
         new_ca = None
@@ -498,6 +499,9 @@ class CSRMixin:
         try:
             # RFC 9763: the request binds to this key B in the commit that stores B
             record_request_key(csr_obj.public_bytes(serialization.Encoding.DER), related_a)
+            # Every row written (A's link included) is locked before the CA row, last
+            db.session.flush()
+            next_ca_serial(ca)
             db.session.commit()
         except Exception as _commit_err:
             rollback_unless_serial_collision(_commit_err)

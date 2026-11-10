@@ -13,7 +13,7 @@ from datetime import timedelta
 import cryptography.x509 as x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509.oid import ExtensionOID, NameOID
-from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy.exc import InvalidRequestError, SQLAlchemyError
 
 from models import db, CA, Certificate, RevokedSerial, SystemConfig
 from security.encryption import encrypt_private_key
@@ -41,6 +41,7 @@ from utils.datetime_utils import cert_not_before, utc_isoformat, utc_now
 from utils.serial_format import canonical_serial
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window, clamp_not_after
 from utils.db_transaction import commit_or_rollback
+from utils.ca_serial_counter import next_ca_serial
 from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
 from utils import notices as notices_mod
@@ -241,6 +242,15 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
             # Renewed alone and naming none: the row leaves its pair, as its certificate has
             from services.cert.related_pair import leave_pair
             leave_pair(staged_all[0]['cert'])
+        # A renewal is an issuance, counted in its commit; the CA rows are locked last,
+        # after every certificate row written, and by id so two pairs never cross
+        try:
+            db.session.flush()
+        except SQLAlchemyError as e:
+            logger.error(f'Failed to renew certificate {cert.id}: {e}', exc_info=True)
+            raise RenewalError('Failed to renew certificate', 500) from e
+        for s in sorted(staged_all, key=lambda s: s['ca'].id):
+            next_ca_serial(s['ca'])
     except Exception:
         db.session.rollback()
         raise
@@ -369,15 +379,18 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
 
 
 def _reread(cert, known_serial, trigger):
-    """The row as stored now, locked until the commit on PostgreSQL."""
+    """The row as stored now, locked until the commit on PostgreSQL. A row renewed or
+    archived since the caller read it is refused: an archived row is renewed only by a
+    caller that read it archived, never revived behind another renewal's back."""
     try:
         expected = cert.serial_number if known_serial is SERIAL_UNSET else known_serial
+        was_archived = bool(cert.archived)
         fresh = db.session.get(Certificate, cert.id, populate_existing=True, with_for_update=True)
     except InvalidRequestError:  # deleted since the caller read it
         fresh = None
     if fresh is None:
         raise RenewalError('Certificate no longer exists', 404)
-    if fresh.serial_number != expected:
+    if fresh.serial_number != expected or bool(fresh.archived) != was_archived:
         raise RenewalError(_renewed_meanwhile_message(trigger), 409)
     return fresh
 

@@ -32,21 +32,25 @@ class AlreadySuperseded(Exception):
     """The certificate being renewed was superseded by a concurrent renewal."""
 
 
-def _claim_superseded(row):
-    """Archive every live row holding *row*'s certificate (same DER, under any CA: it is
-    replaced everywhere); False when another renewal got there first. One row at a time
-    in id order, so two concurrent claims never lock in opposite orders."""
+def _claim_superseded(row, presented=None):
+    """Archive every live row holding *presented*, the certificate the client renews (by
+    default *row*'s), same DER under any CA: it is replaced everywhere. False when another
+    renewal got there first. One row at a time in id order, so two claims never cross."""
     from sqlalchemy import update
     from sqlalchemy.orm.attributes import set_committed_value
     from services.cert.issued_lookup import _rows_holding
-    held = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+    from utils.serial_format import serial_variants
+    held = presented if presented is not None else \
+        x509.load_pem_x509_certificate(base64.b64decode(row.crt))
     live = sorted(r.id for r in _rows_holding(held, Certificate.archived.isnot(True)))
     if row.id not in live:
         return False
     for row_id in live:
+        # Re-checked after any lock wait: a row renewed in place meanwhile holds another serial
         result = db.session.execute(
             update(Certificate)
-            .where(Certificate.id == row_id, Certificate.archived.isnot(True))
+            .where(Certificate.id == row_id, Certificate.archived.isnot(True),
+                   Certificate.serial_number.in_(serial_variants(held.serial_number)))
             .values(archived=True)
             .execution_options(synchronize_session=False)
         )
@@ -146,7 +150,7 @@ class CASigningMixin:
 
         # Convert CSR object to PEM bytes
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)
-        # RFC 9763: A is found before signing, so linking after it cannot fail
+        # RFC 9763: A is found before signing; linking refuses only an A renewed since
         from services.cert.related_pair import link_issued, record_request_key, requested_by_csr
         related_a = requested_by_csr(csr.public_bytes(serialization.Encoding.DER))
 
@@ -265,13 +269,11 @@ class CASigningMixin:
         )
         db.session.add(new_cert)
 
-        # Increment CA serial
-        next_ca_serial(ca)
         try:
             db.session.flush()
             # The renewed row is archived in the commit that stores its successor,
             # compare-and-set: of two concurrent renewals, only one stores a certificate
-            if supersedes is not None and not _claim_superseded(supersedes):
+            if supersedes is not None and not _claim_superseded(supersedes, renewal_of):
                 db.session.rollback()
                 raise AlreadySuperseded('the renewed certificate is already superseded')
             link_issued(new_cert, cert_obj, related_a)
@@ -279,6 +281,9 @@ class CASigningMixin:
             record_request_key(csr.public_bytes(serialization.Encoding.DER), related_a)
             if on_stored is not None:
                 on_stored(new_cert)
+            # Every row written (A's link included) is locked before the CA row, last
+            db.session.flush()
+            next_ca_serial(ca)
             db.session.commit()
         except AlreadySuperseded:
             raise

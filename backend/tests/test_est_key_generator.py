@@ -187,17 +187,16 @@ class TestLifecycle:
                 db.session.get(Certificate, row_id).prv = readable
                 db.session.commit()
 
-    def test_listed_like_a_certificate_without_consuming_a_ca_serial(self, app, client, use):
+    def test_listed_like_a_certificate_and_counted_as_an_issuance(self, app, client, use):
         ca_id, _ = use('main')
         _reset(app, ca_id)
         with app.app_context():
             before = db.session.get(CA, ca_id).serial
         _signer_serial(client, 'uncounted.generator.test')
         with app.app_context():
-            # The transport and the generated key's certificate count; the delegate, like a
-            # renewed OCSP responder, does not
+            # The transport, the delegate and the generated key's certificate each count
             ca = db.session.get(CA, ca_id)
-            assert ca.serial == (before or 0) + 2
+            assert ca.serial == (before or 0) + 3
             assert Certificate.query.filter_by(caref=ca.refid, subject_cn='EST key generator',
                                                archived=False, revoked=False).count() >= 1
 
@@ -240,13 +239,57 @@ class TestLifecycle:
         _reset(app, ca_id)
         with app.app_context():
             ca = db.session.get(CA, ca_id)
+            counted = ca.serial or 0
             with patch.object(est_key_generator, '_issue', side_effect=racing_issue):
                 _key, cert = est_key_generator.key_generator(ca, ca_cert)
             assert cert == competitor['cert']
+            # The loser's count went with its savepoint too
+            assert (db.session.get(CA, ca_id, populate_existing=True).serial or 0) == counted
             assert EstSignerCert.query.filter_by(ca_id=ca_id).count() == 1
             # The loser's certificate row went with its savepoint
             ours = competitor['ours'][0]
             assert Certificate.query.filter_by(serial_number=str(ours.serial_number)).count() == 0
+        # The same issuance, unraced this time, counts one
+        _reset(app, ca_id)
+        with app.app_context():
+            est_key_generator.key_generator(db.session.get(CA, ca_id), ca_cert)
+            assert (db.session.get(CA, ca_id, populate_existing=True).serial or 0) == counted + 1
+
+
+def test_a_delegate_renewed_in_place_meanwhile_is_not_archived(app, use):
+    """The replaced delegate is archived only if it still holds the serial read: a row
+    renewed in place meanwhile is left live, and this replacement goes with its savepoint."""
+    ca_id, ca_cert = use('main')
+    with app.app_context():
+        est_key_generator.key_generator(db.session.get(CA, ca_id), ca_cert)
+        row = _delegate_row(ca_id)
+        row.valid_to = utc_now() + datetime.timedelta(days=10)
+        db.session.commit()
+        old_id, old_serial = row.id, row.serial_number
+        counted = db.session.get(CA, ca_id).serial or 0
+        db.session.remove()
+    original = est_key_generator._certificate_row
+    renewed = str(x509.random_serial_number())
+
+    def renewed_in_place_meanwhile(*args):
+        from sqlalchemy import update
+        with db.engine.begin() as conn:
+            conn.execute(update(Certificate.__table__).where(Certificate.__table__.c.id == old_id)
+                         .values(serial_number=renewed))
+        return original(*args)
+
+    with app.app_context():
+        with patch.object(est_key_generator, '_certificate_row', side_effect=renewed_in_place_meanwhile):
+            with pytest.raises(RuntimeError):
+                est_key_generator.key_generator(db.session.get(CA, ca_id), ca_cert)
+        db.session.rollback()
+        db.session.expire_all()
+        row = db.session.get(Certificate, old_id)
+        link = EstSignerCert.query.filter_by(ca_id=ca_id).one()
+        assert (row.serial_number, bool(row.archived)) == (renewed, False)
+        assert (link.certificate_id, link.serial_number) == (old_id, old_serial)
+        assert (db.session.get(CA, ca_id).serial or 0) == counted
+    _reset(app, ca_id)
 
 
 def _ca_like(key, *, hsm_key_id=None, name=None, days=3650, extensions=()):

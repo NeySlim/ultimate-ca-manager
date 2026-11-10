@@ -468,6 +468,43 @@ class TestRefusals:
             assert err.status == 409 and 'revoked' in err.message
             assert _state(app, cid) == before
 
+    def test_a_row_archived_since_the_caller_read_it_is_refused(self, app, leaf):
+        cid = leaf()
+        before = _state(app, cid)
+        with app.app_context():
+            from sqlalchemy import update
+            row = db.session.get(Certificate, cid)
+            assert not row.archived
+            # Archived by another renewal behind the caller's back
+            db.session.execute(update(Certificate).where(Certificate.id == cid)
+                               .values(archived=True).execution_options(synchronize_session=False))
+            with pytest.raises(RenewalError) as exc:
+                renew_certificate_in_place(row, username='admin')
+        assert exc.value.status == 409 and 'renewed by another request' in exc.value.message
+        assert _state(app, cid) == before
+
+    def test_a_protocol_renewal_of_a_row_renewed_in_place_since_its_lookup_is_refused(
+            self, app, ca, leaf):
+        from services.ca import CAService
+        from services.ca.ca_signing import AlreadySuperseded
+        cid = leaf()
+        with app.app_context():
+            row = db.session.get(Certificate, cid)
+            presented = _x509(row)
+            renew_certificate_in_place(row, username='admin')  # the row now holds another serial
+            renewed = row.serial_number
+            csr = (x509.CertificateSigningRequestBuilder()
+                   .subject_name(presented.subject)
+                   .sign(ec.generate_private_key(ec.SECP256R1()), hashes.SHA256()))
+            with pytest.raises(AlreadySuperseded):
+                CAService.sign_csr_from_crypto(db.session.get(CA, ca['id']), csr, validity_days=30,
+                                               source='test-renewal', renewal_of=presented,
+                                               supersedes=row)
+            db.session.expire_all()
+            row = db.session.get(Certificate, cid)
+            assert (row.serial_number, bool(row.archived)) == (renewed, False)
+            assert Certificate.query.filter_by(caref=ca['refid']).count() == 1
+
     def test_preconditions_in_order(self, app, leaf):
         cid = leaf()
         with app.app_context():

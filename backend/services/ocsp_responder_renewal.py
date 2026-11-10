@@ -173,6 +173,19 @@ def _rebind(key, old_cert_id, new_cert_id) -> bool:
     ).update({SystemConfig.value: str(new_cert_id)}, synchronize_session=False) == 1
 
 
+def _archive(cert_id, serial) -> bool:
+    """Archive the old responder row only if it still holds the serial this run renewed
+    (a row already archived included): re-checked after any lock wait, so a row renewed
+    in place meanwhile is left as it is."""
+    archived = Certificate.query.filter(
+        Certificate.id == cert_id, Certificate.serial_number == serial,
+    ).update({Certificate.archived: True}, synchronize_session=False) == 1
+    if archived:
+        from sqlalchemy.orm.attributes import set_committed_value
+        set_committed_value(db.session.get(Certificate, cert_id), 'archived', True)
+    return archived
+
+
 def run_ocsp_responder_renewal():
     """Scheduled task: renew delegated OCSP responder certs nearing expiry."""
     if _get_config('ocsp_responder_auto_renew', 'true') != 'true':
@@ -238,7 +251,17 @@ def run_ocsp_responder_renewal():
                 logger.info("OCSP responder of CA %s already renewed by another runner", ca_id)
                 stats['skipped'] += 1
                 continue
-            cert.archived = True
+            if not _archive(cert_id, cert.serial_number):
+                db.session.rollback()
+                logger.info("OCSP responder %s of CA %s renewed meanwhile; left as it is",
+                            cert_id, ca_id)
+                stats['skipped'] += 1
+                continue
+            # A renewal is an issuance, counted in this commit; the CA row is locked only
+            # after the responder row, the order an in-place renewal of that row takes
+            db.session.flush()
+            from utils.ca_serial_counter import next_ca_serial
+            next_ca_serial(ca)
             from services.audit.staging import stage_audit_entry
             stage_audit_entry(
                 action='ocsp_responder.auto_renewed',

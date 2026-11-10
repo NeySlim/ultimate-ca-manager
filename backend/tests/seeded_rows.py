@@ -3,6 +3,7 @@
 What the two seeding helpers create is recorded and removed after the module
 (`remove_seeded`, called from conftest).
 """
+import pytest
 from flask import current_app
 from sqlalchemy import text
 
@@ -75,8 +76,10 @@ def delete_client_accounts(query, **kwargs):
 def delete_cas(query):
     """Delete the CAs ``query`` selects with what references them, which
     PostgreSQL would otherwise refuse: their certificates, ACME domain
-    mappings, CRLs, OCSP responses, SCEP requests and revoked serials."""
+    mappings, CRLs, OCSP responses, SCEP requests, revoked serials and
+    cross-certificates."""
     from models import Certificate
+    from models.ca_cross_certificate import CACrossCertificate
     from models.acme_models import AcmeDomain, AcmeLocalDomain
     from models.crl import CRLMetadata
     from models.ocsp import OCSPResponse
@@ -85,6 +88,9 @@ def delete_cas(query):
 
     for ca in query.all():
         Certificate.query.filter_by(caref=ca.refid).delete(synchronize_session=False)
+        CACrossCertificate.query.filter(
+            (CACrossCertificate.ca_id == ca.id) | (CACrossCertificate.issuer_caref == ca.refid)
+        ).delete(synchronize_session=False)
         RevokedSerial.query.filter_by(caref=ca.refid).delete(synchronize_session=False)
         SCEPRequest.query.filter_by(ca_refid=ca.refid).delete(synchronize_session=False)
         AcmeDomain.query.filter_by(issuing_ca_id=ca.id).update(
@@ -93,3 +99,36 @@ def delete_cas(query):
         CRLMetadata.query.filter_by(ca_id=ca.id).delete(synchronize_session=False)
         OCSPResponse.query.filter_by(ca_id=ca.id).delete(synchronize_session=False)
         db.session.delete(ca)
+
+
+@pytest.fixture(autouse=True)
+def _remove_what_the_test_created(app):
+    """Delete the CAs, approval requests and policies the test created, with what
+    references the CAs; a failed cleanup is rolled back, never left pending."""
+    from models import CA
+    from models.policy import ApprovalRequest, CertificatePolicy
+
+    def ids(model):
+        with app.app_context():
+            return {r.id for r in model.query.with_entities(model.id)}
+    before = {m: ids(m) for m in (CA, ApprovalRequest, CertificatePolicy)}
+    yield
+    with app.app_context():
+        try:
+            for m in (ApprovalRequest, CertificatePolicy):
+                new = {r.id for r in m.query.with_entities(m.id)} - before[m]
+                if new:
+                    m.query.filter(m.id.in_(new)).delete(synchronize_session=False)
+            delete_cas(CA.query.filter(CA.id.notin_(before[CA])))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+
+
+def issuance_count(app, ca_id):
+    """(the CA's issuance counter, the certificates stored under it)."""
+    from models import CA, Certificate
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        return ca.serial or 0, Certificate.query.filter_by(caref=ca.refid).count()

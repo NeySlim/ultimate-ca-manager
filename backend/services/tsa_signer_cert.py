@@ -260,6 +260,9 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
         created_by=actor,
     )
     db.session.add(db_cert)
+    # Counted in the commit that writes the certificate, undone with it
+    from utils.ca_serial_counter import next_ca_serial
+    next_ca_serial(ca)
     ok, _err = safe_commit(logger, 'Failed to persist TSA signer certificate')
     if not ok:
         raise TsaSignerIssueError('Failed to persist TSA signer certificate', 500)

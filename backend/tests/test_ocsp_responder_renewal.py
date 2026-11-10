@@ -165,6 +165,27 @@ class TestOcspResponderRenewal:
         assert stats['renewed'] == 0
         assert int(_binding_value(app, ca['id'])) == cert_id
 
+    def test_archived_bound_responder_is_renewed(self, app, auth_client, create_ca):
+        # An archived row stays eligible as a responder and can be bound again
+        ca = create_ca(cn='OCSP Archived CA')
+        cert_id = _issue_responder_cert(auth_client, ca['id'], 'ocsp-archived.test')
+        _bind_responder(app, ca['id'], cert_id)
+        _set_cert_window(app, cert_id,
+                         utc_now() - timedelta(days=85),
+                         utc_now() + timedelta(days=5))
+        with app.app_context():
+            from models import Certificate, db
+            db.session.get(Certificate, cert_id).archived = True
+            db.session.commit()
+
+        stats = _run(app)
+        new_id = int(_binding_value(app, ca['id']))
+        assert new_id != cert_id, stats
+        with app.app_context():
+            from models import Certificate, db
+            assert db.session.get(Certificate, cert_id).archived is True
+            assert db.session.get(Certificate, new_id).archived in (False, None)
+
 
 class TestNocheckOnRenewal:
     """Self-review of #347: a responder issued before id-pkix-ocsp-nocheck was
