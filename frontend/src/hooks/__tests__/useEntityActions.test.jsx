@@ -149,3 +149,12 @@ describe('delete guard', () => {
     expect(onClose).toHaveBeenCalled()
   })
 })
+
+describe('permissions override', () => {
+  it('keeps the ambient function when a caller passes undefined for it', () => {
+    const r = () => renderHook(() => useEntityActions({
+      type: 'certificate', entity: CERT, permissions: { canWrite: undefined, canDelete: undefined, hasPermission: undefined }, onClose: vi.fn(),
+    })).result.current
+    expect(r().actions.length).toBeGreaterThan(0)
+  })
+})

@@ -36,6 +36,9 @@ import { showNotices } from '../lib/notices'
 // Entity type -> messages.confirm.delete.* key; every locale defines these
 const CONFIRM_DELETE_KEY = { certificate: 'certificate', user_certificate: 'certificate', ca: 'ca', truststore: 'truststore' }
 
+// A caller passing `undefined` for a right must not shadow the ambient one
+const definedOnly = (obj) => Object.fromEntries(Object.entries(obj || {}).filter(([, v]) => v !== undefined))
+
 /**
  * @param {object} p
  * @param {string} p.type  certificate | ca | truststore | user_certificate
@@ -52,7 +55,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
   const t = tOverride || hookT
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
   const ambient = usePermission()
-  const { canWrite, canDelete, hasPermission } = { ...ambient, ...permissions }
+  const { canWrite, canDelete, hasPermission } = { ...ambient, ...definedOnly(permissions) }
 
   const [exportOpen, setExportOpen] = useState(false)
   const [lintOpen, setLintOpen] = useState(false)
