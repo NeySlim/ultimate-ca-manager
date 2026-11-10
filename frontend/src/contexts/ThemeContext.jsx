@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { subscribePreferences, persistPreference, getPreferences } from '../stores/userPreferencesStore'
 
 // Colours live in styles/tokens.css, selected by data-theme / data-mode on <html>.
-// Here only what the pickers need: id, label key and a per-mode preview (surface, accent).
+// Here only what the pickers need: id, name, label key and a per-mode preview (surface, accent).
 const themeFamilies = {
   atelier: {
     id: 'atelier',

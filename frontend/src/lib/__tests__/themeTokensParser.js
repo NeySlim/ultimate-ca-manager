@@ -53,22 +53,34 @@ export function resolve(value, decls) {
   return v.toLowerCase()
 }
 
-// Every custom property in effect per palette: shared :root aliases, then `rootCss` :root
-// declarations (index.css, imported after tokens.css), then the palette block itself.
-export function paletteDecls(rootCss = '', css = fs.readFileSync(TOKENS_CSS, 'utf8')) {
-  const shared = {}
-  for (const src of [css, rootCss]) {
-    for (const block of src.matchAll(/(:root)\s*\{([^}]*)\}/g)) {
-      for (const d of block[2].matchAll(/--([a-z-]+):\s*([^;]+);/g)) shared[d[1]] = d[2].trim()
+// Alias declarations per mode: bare `:root` blocks apply to both modes, `:root[data-mode="x"]`
+// blocks to mode x only. Blocks that name a theme are palettes, not aliases.
+function aliasesByMode(css, into = { dark: {}, light: {} }) {
+  for (const block of css.matchAll(/(:root[^{]*)\{([^}]*)\}/g)) {
+    if (/data-theme/.test(block[1])) continue
+    const modes = new Set()
+    for (const sel of block[1].split(',')) {
+      const mode = sel.match(/data-mode="([a-z]+)"/)?.[1]
+      for (const m of MODES) if (!mode || mode === m) modes.add(m)
+    }
+    for (const d of block[2].matchAll(/--([a-z-]+):\s*([^;]+);/g)) {
+      for (const m of modes) into[m][d[1]] = d[2].trim()
     }
   }
+  return into
+}
+
+// Every custom property in effect per palette: shared aliases of the palette's mode, then
+// `rootCss` declarations (index.css, imported after tokens.css), then the palette block itself.
+export function paletteDecls(rootCss = '', css = fs.readFileSync(TOKENS_CSS, 'utf8')) {
+  const shared = aliasesByMode(rootCss, aliasesByMode(css))
   const out = {}
   for (const block of css.matchAll(/(:root[^{]*)\{([^}]*)\}/g)) {
     const decls = {}
     for (const d of block[2].matchAll(/--([a-z-]+):\s*([^;]+);/g)) decls[d[1]] = d[2].trim()
     for (const sel of block[1].split(',')) {
       const m = sel.match(/data-theme="([a-z]+)"\]\[data-mode="([a-z]+)"/)
-      if (m) out[`${m[1]}-${m[2]}`] = { ...shared, ...decls }
+      if (m) out[`${m[1]}-${m[2]}`] = { ...shared[m[2]], ...decls }
     }
   }
   return out
@@ -76,15 +88,7 @@ export function paletteDecls(rootCss = '', css = fs.readFileSync(TOKENS_CSS, 'ut
 
 export function parseTokens(css = fs.readFileSync(TOKENS_CSS, 'utf8')) {
   const result = {}
-  // Shared :root aliases, plus :root[data-mode="x"] overrides that apply to mode x only.
-  const aliasDecls = { dark: {}, light: {} }
-  for (const block of css.matchAll(/(:root[^{]*)\{([^}]*)\}/g)) {
-    if (/data-theme/.test(block[1])) continue
-    const mode = block[1].match(/data-mode="([a-z]+)"/)?.[1]
-    for (const d of block[2].matchAll(/--([a-z-]+):\s*([^;]+);/g)) {
-      for (const m of MODES) if (!mode || mode === m) aliasDecls[m][d[1]] = d[2].trim()
-    }
-  }
+  const aliasDecls = aliasesByMode(css)
   for (const block of css.matchAll(/(:root[^{]*)\{([^}]*)\}/g)) {
     const selectors = block[1]
     const decls = {}

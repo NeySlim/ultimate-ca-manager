@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseTokens } from './themeTokensParser'
+import { parseTokens, paletteDecls } from './themeTokensParser'
 
 const palette = (family, mode) => `
 :root[data-theme="${family}"][data-mode="${mode}"] {
@@ -18,5 +18,24 @@ describe('parseTokens alias blocks', () => {
     const t = parseTokens(css)
     expect(t['atelier-dark']['text-tertiary']).toBe('#cccccc')
     expect(t['atelier-light']['text-tertiary']).toBe('#3366ff')
+  })
+})
+
+describe('paletteDecls alias blocks', () => {
+  const css = `${palette('atelier', 'dark')}${palette('atelier', 'light')}
+:root { --violet: #111111; }
+:root[data-mode="light"] { --violet: #222222; }
+:root, :root[data-mode="dark"] { --grouped: #333333; }`
+
+  it('scopes a mode alias override to palettes of that mode', () => {
+    const d = paletteDecls('', css)
+    expect(d['atelier-dark'].violet).toBe('#111111')
+    expect(d['atelier-light'].violet).toBe('#222222')
+  })
+
+  it('reads a grouped selector list: a bare :root applies to both modes', () => {
+    const d = paletteDecls('', css)
+    expect(d['atelier-dark'].grouped).toBe('#333333')
+    expect(d['atelier-light'].grouped).toBe('#333333')
   })
 })

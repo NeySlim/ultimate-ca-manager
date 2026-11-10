@@ -78,8 +78,8 @@ third party's brand, and `icon-bg-rose` / `icon-bg-sky` (see below).
 | `text-2xl` | 24px | Page titles |
 
 `minFontSize.test.js` fails if `index.css`, `tokens.css` or `tailwind.config.js`
-declare a size below 12px. Arbitrary `text-[Npx]` classes in components are not
-covered yet.
+declare a size below 12px, or if a component uses an arbitrary `text-[N]` class
+below 12px. Inline `fontSize` styles are not covered.
 
 ### Font Families
 - `font-sans` — Inter (UI text), self-hosted (`/fonts/Inter-*.woff2`)

@@ -52,7 +52,7 @@ export default function AppearanceSettings() {
               </div>
               <div className="flex gap-1">
                 {/* Preview colors - show accent and distinct bg colors */}
-                <div className="w-6 h-3 rounded-sm" style={{ background: theme.accent }} />
+                <div className="w-6 h-3 rounded-sm" style={{ background: theme.swatch.dark.accent }} />
                 <div className="w-6 h-3 rounded-sm" style={{ background: theme.swatch.dark.surface }} />
                 <div className="w-6 h-3 rounded-sm" style={{ background: theme.swatch.light.surface }} />
                 <div className="w-6 h-3 rounded-sm" style={{ background: theme.swatch.light.accent }} />
