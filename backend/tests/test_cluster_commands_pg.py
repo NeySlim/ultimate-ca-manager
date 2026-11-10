@@ -441,10 +441,23 @@ def test_service_restart_route_is_allowed_in_ha_even_in_a_container(app, auth_cl
         assert [c.kind for c in ClusterCommand.query.all()] == [cc.RESTART]
 
 
-def test_health_reports_command_seen_per_node(app, client, ha, monkeypatch):
+def test_health_reports_only_the_answering_node_command_seen(app, client, ha, monkeypatch):
+    monkeypatch.setattr(Config, 'NODE_ID', PREFIX + 'h')
     _node_row(app, 'h', seen=7)
+    _node_row(app, 'other', seen=5)
     cluster = client.get('/health').get_json()['cluster']
-    assert cluster['command_seen'][PREFIX + 'h'] == 7
+    assert cluster['command_seen'] == 7
+    assert PREFIX + 'other' not in str(cluster)  # the probe is public: no other node is named
+
+
+def test_service_status_lists_every_node_to_an_admin_only(app, client, auth_client, ha):
+    _node_row(app, 'h', seen=7)
+    _node_row(app, 'other', seen=5)
+    assert client.get('/api/v2/system/service/status').status_code == 401
+    r = auth_client.get('/api/v2/system/service/status')
+    assert r.status_code == 200, r.data
+    nodes = {n['node_id']: n for n in r.get_json()['data']['cluster']['nodes']}
+    assert nodes[PREFIX + 'h']['command_seen'] == 7 and nodes[PREFIX + 'other']['command_seen'] == 5
 
 
 def test_the_leader_purges_commands_older_than_a_day(app, ha):

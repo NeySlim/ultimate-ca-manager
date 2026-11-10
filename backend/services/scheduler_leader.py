@@ -256,17 +256,28 @@ def _is_stale(node, wake_interval, now) -> bool:
 
 
 def cluster_summary(wake_interval) -> dict:
-    """{leader_node_id, nodes, stale, command_seen} as /health reports it; a stale leader is no leader.
-
-    command_seen maps each node to the last cluster command it applied.
-    """
+    """{leader_node_id, nodes, stale, command_seen} as the public /health reports it; a stale
+    leader is no leader. command_seen is the answering node's own: no other node is named."""
+    from config.settings import Config
     from models import ClusterNode
     now = cluster_utc_now()
     nodes = ClusterNode.query.all()
     stale = {n.node_id for n in nodes if _is_stale(n, wake_interval, now)}
     leader = next((n.node_id for n in nodes if n.is_leader and n.node_id not in stale), None)
-    return {'leader_node_id': leader, 'nodes': len(nodes), 'stale': len(stale),
-            'command_seen': {n.node_id: n.command_seen for n in nodes}}
+    own = next((n.command_seen for n in nodes if n.node_id == Config.NODE_ID), None)
+    return {'leader_node_id': leader, 'nodes': len(nodes), 'stale': len(stale), 'command_seen': own}
+
+
+def cluster_nodes_detail(wake_interval) -> list:
+    """Every registered node, for authenticated status pages only."""
+    from models import ClusterNode
+    from utils.datetime_utils import utc_isoformat
+    now = cluster_utc_now()
+    return [{'node_id': n.node_id, 'leader': bool(n.is_leader),
+             'stale': _is_stale(n, wake_interval, now), 'version': n.version,
+             'started_at': utc_isoformat(n.started_at), 'heartbeat_at': utc_isoformat(n.heartbeat_at),
+             'command_seen': n.command_seen}
+            for n in ClusterNode.query.order_by(ClusterNode.node_id).all()]
 
 
 def node_registered(node_id) -> bool:
