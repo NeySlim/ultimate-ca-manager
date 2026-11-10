@@ -107,6 +107,7 @@ def seeded(app):
         certs = {
             'no_key_12h': _cert('queue-nokey-12h', now + timedelta(hours=12)),
             'no_key_10d': _cert('queue-nokey-10d', now + timedelta(days=10)),
+            'null_source_10d': _cert('queue-null-source', now + timedelta(days=10), source=None),
             'excluded_source': _cert('queue-scep', now + timedelta(days=10), prv='k', source='scep'),
             'auto': _cert('queue-auto', now + timedelta(days=10), prv='k'),
             'revoked': _cert('queue-revoked', now + timedelta(days=10), revoked=True),
@@ -116,6 +117,9 @@ def seeded(app):
             # the client holds the key and renews through its protocol, or UCM's ACME client renews it
             'acme_nokey': _cert('queue-acme', now + timedelta(days=20), source='acme'),
             'wstep_nokey': _cert('queue-wstep', now + timedelta(days=20), source='wstep'),
+            # a client that has not renewed a week before expiry is overdue
+            'scep_nokey_5d': _cert('queue-scep-5d', now + timedelta(days=5), source='scep'),
+            'scep_nokey_20d': _cert('queue-scep-20d', now + timedelta(days=20), source='scep'),
             'acme_client': _cert('queue-acme-client', now + timedelta(days=10), prv='k', source='acme_client'),
             # UCM's ACME client renews only through an issued order with renewal on
             'acme_client_off': _cert('queue-acme-off', now + timedelta(days=10), prv='k', source='acme_client'),
@@ -194,6 +198,7 @@ def _find(data, kind, item_id):
     ('crl_missing', 'crl_none', 'critical'),
     ('manual_renewal_due', 'no_key_12h', 'critical'),
     ('manual_renewal_due', 'no_key_10d', 'warning'),
+    ('manual_renewal_due', 'null_source_10d', 'warning'),
     ('manual_renewal_due', 'excluded_source', 'warning'),
     ('manual_renewal_due', 'revoked_successor_of', 'warning'),
     ('manual_renewal_due', 'acme_client_off', 'warning'),
@@ -206,6 +211,7 @@ def _find(data, kind, item_id):
     ('manual_renewal_due', 'acme_client_orphan', 'warning'),
     ('ca_expiring', 'ca_soon', 'critical'),
     ('ca_expiring', 'ca_later', 'warning'),
+    ('client_renewal_overdue', 'scep_nokey_5d', 'warning'),
 ])
 def test_each_kind_with_its_tier_and_due_date(app, auth_client, seeded, kind, key, tier):
     item = _find(_queue(auth_client), kind, seeded[key])
@@ -227,6 +233,8 @@ def test_crl_due_date_is_the_latest_full_crl(auth_client, seeded):
     ('crl_due', 'crl_offline'), ('crl_missing', 'crl_offline'),
     ('crl_due', 'crl_upload'), ('crl_missing', 'crl_upload'),
     ('manual_renewal_due', 'acme_nokey'), ('manual_renewal_due', 'wstep_nokey'),
+    ('manual_renewal_due', 'scep_nokey_5d'), ('client_renewal_overdue', 'scep_nokey_20d'),
+    ('client_renewal_overdue', 'acme_nokey'), ('client_renewal_overdue', 'no_key_12h'),
     ('manual_renewal_due', 'acme_client'), ('manual_renewal_due', 'superseded'),
     ('crl_missing', 'no_cdp'), ('ca_expiring', 'ca_revoked'),
     ('manual_renewal_due', 'auto'), ('manual_renewal_due', 'revoked'),

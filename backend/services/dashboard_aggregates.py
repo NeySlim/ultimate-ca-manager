@@ -24,7 +24,7 @@ from utils.datetime_utils import utc_isoformat, utc_now
 
 QUEUE_KINDS = ('acme_order_failed', 'acme_client_renewal_failed', 'approval_pending',
                'scep_request_pending', 'key_recovery_pending', 'crl_due', 'crl_missing',
-               'manual_renewal_due', 'ca_expiring')
+               'manual_renewal_due', 'client_renewal_overdue', 'ca_expiring')
 ACME_FAILURE_LOOKBACK_DAYS = 7
 CRITICAL_WITHIN = timedelta(hours=24)
 CA_EXPIRY_WARNING_DAYS = 365
@@ -35,6 +35,8 @@ RSA_MIN_BITS = 3072
 WEAK_SIG_HASHES = ('sha1', 'md5')
 # Enrolment protocols whose client holds the key and renews on its own
 CLIENT_RENEWED_SOURCES = ('acme', 'letsencrypt', 'scep', 'est', 'msca', 'wstep')
+# Such a client still not renewed this close to expiry is overdue
+CLIENT_RENEWAL_OVERDUE_DAYS = 7
 
 _HREF = {
     'acme_order_failed': '/acme?tab=orders&order={id}',
@@ -45,6 +47,7 @@ _HREF = {
     'crl_due': '/crl-ocsp?ca={id}',
     'crl_missing': '/crl-ocsp?ca={id}',
     'manual_renewal_due': '/certificates/{id}',
+    'client_renewal_overdue': '/certificates/{id}',
     'ca_expiring': '/cas/{id}',
 }
 
@@ -152,6 +155,12 @@ def _queue_union(now):
     ).where(*_manual_renewal_conditions(now)))
 
     parts.append(select(
+        _const('client_renewal_overdue').label('kind'), _WARNING.label('rank'),
+        Certificate.id.label('id'), text_label(func.coalesce(func.nullif(Certificate.subject_cn, ''), Certificate.descr)).label('label'),
+        due(Certificate.valid_to).label('due_at'),
+    ).where(*_client_overdue_conditions(now)))
+
+    parts.append(select(
         _const('ca_expiring').label('kind'),
         case((CA.valid_to < now + timedelta(days=CA_EXPIRY_CRITICAL_DAYS), _CRITICAL), else_=_WARNING).label('rank'),
         CA.id.label('id'), text_label(CA.descr).label('label'), due(CA.valid_to).label('due_at'),
@@ -173,32 +182,53 @@ def _renewed_by_acme_client():
     return and_(Certificate.source == 'acme_client', order, ~switch_off)
 
 
-def _manual_renewal_conditions(now):
-    """Issued, live, inside the expiry window, left alone by auto-renewal (no stored
-    key, a source it skips, or auto-renewal off), not renewed by its own client
-    (protocol enrolment without a stored key, UCM's ACME client), and not superseded."""
-    config = _renewal_config()
-    no_key = or_(Certificate.prv.is_(None), Certificate.prv == '')
-    skipped = [no_key, Certificate.source.is_(None), Certificate.source.notin_(config['renewal_sources'] or [''])]
+def _no_key():
+    return or_(Certificate.prv.is_(None), Certificate.prv == '')
+
+
+def _superseded(now):
+    """Same non-empty CN, full subject and SANs from the same CA, by a live
+    certificate that itself lies beyond the expiry window."""
     newer = aliased(Certificate)
-    # Superseded: same non-empty CN, full subject and SANs from the same CA, by a live
-    # certificate that itself lies beyond the expiry window
-    superseded = (select(newer.id).where(
+    exists = (select(newer.id).where(
         newer.subject_cn == Certificate.subject_cn, newer.caref == Certificate.caref,
         newer.subject.is_not_distinct_from(Certificate.subject),
         newer.san_dns.is_not_distinct_from(Certificate.san_dns),
         newer.san_ip.is_not_distinct_from(Certificate.san_ip),
         newer.id != Certificate.id, newer.valid_to > now + timedelta(days=EXPIRY_WINDOW_DAYS),
         holds_certificate(newer), newer.revoked.is_(False), _not_archived(newer)).exists())
+    return and_(Certificate.subject_cn.isnot(None), Certificate.subject_cn != '', exists)
+
+
+def _client_renewed():
+    """Protocol enrolment without a stored key: the client renews it itself."""
+    return and_(Certificate.source.isnot(None), Certificate.source.in_(CLIENT_RENEWED_SOURCES), _no_key())
+
+
+def _live_until(now, days):
+    return [holds_certificate(), Certificate.revoked.is_(False), _not_archived(),
+            Certificate.valid_to.isnot(None), Certificate.valid_to > now,
+            Certificate.valid_to <= now + timedelta(days=days)]
+
+
+def _manual_renewal_conditions(now):
+    """Issued, live, inside the expiry window, left alone by auto-renewal (no stored
+    key, a source it skips, or auto-renewal off), not renewed by its own client
+    (protocol enrolment without a stored key, UCM's ACME client), and not superseded."""
+    config = _renewal_config()
+    skipped = [_no_key(), Certificate.source.is_(None), Certificate.source.notin_(config['renewal_sources'] or [''])]
     return [
-        holds_certificate(), Certificate.revoked.is_(False), _not_archived(),
-        Certificate.valid_to.isnot(None), Certificate.valid_to > now,
-        Certificate.valid_to <= now + timedelta(days=EXPIRY_WINDOW_DAYS),
+        *_live_until(now, EXPIRY_WINDOW_DAYS),
         true() if not config['enabled'] else or_(*skipped),
         ~_renewed_by_acme_client(),
-        or_(Certificate.source.is_(None), Certificate.source.notin_(CLIENT_RENEWED_SOURCES), ~no_key),
-        or_(Certificate.subject_cn.is_(None), Certificate.subject_cn == '', ~superseded),
+        ~_client_renewed(),
+        ~_superseded(now),
     ]
+
+
+def _client_overdue_conditions(now):
+    """A client-renewed certificate its client has not replaced a week before expiry."""
+    return [*_live_until(now, CLIENT_RENEWAL_OVERDUE_DAYS), _client_renewed(), ~_superseded(now)]
 
 
 def _short_label(kind, label):
