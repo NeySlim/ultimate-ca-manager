@@ -5,6 +5,7 @@ System Updates Operations
 from . import bp
 from flask import request, g
 from auth.unified import require_auth
+from utils.ha import reject_in_ha
 from utils.response import success_response, error_response
 from services.audit_service import AuditService
 import os
@@ -48,6 +49,7 @@ def check_updates():
 
 @bp.route('/api/v2/system/updates/install', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def install_update():
     """Download and install an update"""
     if os.getenv('UCM_DOCKER') == '1':

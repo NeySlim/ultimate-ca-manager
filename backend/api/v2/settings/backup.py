@@ -4,6 +4,7 @@ Settings - Backup management + schedule + history routes
 
 from flask import request, send_file
 from auth.unified import require_auth
+from utils.ha import reject_in_ha
 from utils.pagination import parse_request_pagination
 from utils.response import success_response, error_response, no_content_response
 from models import db, SystemConfig
@@ -148,6 +149,7 @@ def create_backup():
 
 @bp.route('/api/v2/settings/backup/restore', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def restore_backup():
     """Restore from backup file.
 

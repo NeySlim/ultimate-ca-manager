@@ -18,6 +18,7 @@ from flask import Blueprint, request
 import logging
 
 from auth.unified import require_auth
+from utils.ha import reject_in_ha
 from utils.response import success_response, error_response
 from services import database_admin_service as svc
 from services.database_admin.lock import (
@@ -134,6 +135,7 @@ def test_connection():
 
 @bp.route('/api/v2/database/switch', methods=['POST'])
 @require_auth(['admin:settings'])
+@reject_in_ha()
 def switch_backend():
     """
     Switch database backend WITHOUT migrating data.
@@ -248,6 +250,7 @@ def _undo_configuration(env_backup, reason: str, summary: str):
 
 @bp.route('/api/v2/database/migrate', methods=['POST'])
 @require_auth(['admin:settings'])
+@reject_in_ha()
 def migrate_data():
     """
     Migrate all data from current backend → target_url.

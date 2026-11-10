@@ -41,7 +41,10 @@ def ha_refusal(reason):
     return resp, 409
 
 
-def reject_in_ha(reason):
+LOCAL_ONLY = "Not available in HA mode: this operation only changes the local host"
+
+
+def reject_in_ha(reason=LOCAL_ONLY):
     """Route decorator: answer 409 ha_mode when the node runs with UCM_HA=1."""
     def deco(fn):
         @wraps(fn)

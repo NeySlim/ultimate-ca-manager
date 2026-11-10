@@ -20,6 +20,7 @@ from services.backup.settings_contract import (
 from . import bp
 from flask import send_file, request
 from auth.unified import require_auth
+from utils.ha import reject_in_ha
 from utils.response import success_response, error_response
 from utils.pagination import parse_request_pagination
 from services.audit_service import AuditService
@@ -395,6 +396,7 @@ def run_retention_now():
 @bp.route('/api/v2/system/restore', methods=['POST'])
 @bp.route('/api/v2/system/backup/restore', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def restore_backup():
     """Restore an uploaded archive, replacing (default) or merging.
 

@@ -5,6 +5,7 @@ System Security Operations
 from . import bp
 from flask import request, current_app, Response
 from auth.unified import require_auth
+from utils.ha import reject_in_ha
 from config.settings import Config
 from utils.response import success_response, error_response
 from utils.trusted_proxy import client_ip
@@ -61,6 +62,7 @@ def get_encryption_status():
 
 @bp.route('/api/v2/system/security/enable-encryption', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def enable_encryption():
     """
     Enable private key encryption.
@@ -209,6 +211,7 @@ def download_master_key():
 
 @bp.route('/api/v2/system/security/disable-encryption', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def disable_encryption():
     """
     Disable private key encryption.
@@ -301,6 +304,7 @@ def disable_encryption():
 
 @bp.route('/api/v2/system/security/encrypt-all-keys', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def encrypt_all_keys():
     """Encrypt all unencrypted private keys in the database"""
     try:
@@ -455,6 +459,7 @@ def reset_rate_limits():
 
 @bp.route('/api/v2/system/security/rotate-secrets', methods=['POST'])
 @require_auth(['admin:system'])
+@reject_in_ha()
 def rotate_secrets():
     """
     Rotate session secret key with automatic .env update.
