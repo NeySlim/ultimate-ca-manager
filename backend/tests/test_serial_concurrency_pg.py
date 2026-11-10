@@ -253,3 +253,22 @@ def test_next_ca_serial_counts_on_a_dialect_without_update_returning(app, monkey
         db.session.commit()
         db.session.expire_all()
         assert db.session.get(CA, ca.id).serial == 2
+
+
+def test_increment_serial_returns_its_own_count_not_a_later_one(app):
+    """Another worker counts right after this commit: the value returned is still this call's."""
+    from sqlalchemy import event
+    from services.ca import CAService
+    with app.app_context():
+        ca_id = _ca_row(*_authority()).id
+        session, engine = db.session(), db.engine
+
+        def another_worker_counts(_session):
+            with engine.begin() as other:
+                other.execute(CA.__table__.update().where(CA.__table__.c.id == ca_id)
+                              .values(serial=CA.__table__.c.serial + 1))
+
+        event.listen(session, 'after_commit', another_worker_counts, once=True)
+        assert CAService.increment_serial(ca_id) == 1
+        db.session.expire_all()
+        assert db.session.get(CA, ca_id).serial == 2
