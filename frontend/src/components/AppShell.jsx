@@ -5,15 +5,22 @@ import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Outlet, useLocation, Link, useNavigate } from 'react-router-dom'
 import { persistPreference } from '../stores/userPreferencesStore'
-import { 
-  List, X, MagnifyingGlass,
-  House, Certificate, ShieldCheck, FileText, List as ListIcon, User, Key, Gear,
-  Lightning, ClockCounterClockwise, Robot, FileX, Vault, Shield, Lock, Wrench,
-  UserCircle, Palette, Question, SignOut, Globe, Check, CaretRight,
-  Gavel, Stamp, ChartBar, Broadcast
+import {
+  List,
+  X,
+  MagnifyingGlass,
+  Gear,
+  UserCircle,
+  Palette,
+  Question,
+  SignOut,
+  Globe,
+  Check,
+  CaretRight
 } from '@phosphor-icons/react'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Sidebar, navGroups, resolveActivePageId } from './Sidebar'
+import { Sidebar, resolveActivePageId } from './Sidebar'
+import { moduleById, moduleForPath, sidebarGroups } from '../navigation/registry'
 import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { WebSocketIndicator } from './WebSocketIndicator'
 import { FloatingHelpPanel } from './ui/FloatingHelpPanel'
@@ -30,27 +37,7 @@ import { usePermission } from '../hooks'
 import { certificatesService } from '../services'
 import { languages } from '../i18n'
 
-// Mobile nav: Dashboard (direct) + grouped items from Sidebar navGroups
-// Also build flat lookup for page title derivation
-const mobileNavDashboard = { id: '', icon: House, labelKey: 'common.dashboard', shortKey: 'common.dashboardShort', path: '/' }
-
-// Short label keys for mobile grid (keep compact)
-const mobileShortKeys = {
-  certificates: 'common.certificatesShort', cas: 'common.casShort', csrs: 'common.csrsShort',
-  templates: 'common.templatesShort', acme: 'common.acmeShort', scep: 'common.scepShort',
-  est: 'common.estShort', 'crl-ocsp': 'common.crlOcspShort', truststore: 'common.trustStoreShort',
-  operations: 'common.operationsShort', tools: 'common.toolsShort', policies: 'common.policiesShort',
-  approvals: 'common.approvalsShort', reports: 'common.reportsShort', users: 'common.usersShort',
-  rbac: 'common.rbacShort', hsm: 'common.hsmShort', audit: 'common.auditShort', settings: 'common.settingsShort'
-}
-
-// Flat lookup of all nav items for page title
-const allNavItemsFlat = [
-  mobileNavDashboard,
-  ...navGroups.flatMap(g => g.children),
-  { id: 'settings', icon: Gear, labelKey: 'common.settings', path: '/settings', adminOnly: true },
-  { id: 'account', icon: UserCircle, labelKey: 'common.account', path: '/account' }
-]
+const mobileNavDashboard = moduleById('dashboard')
 
 export function AppShell() {
   const { t, i18n } = useTranslation()
@@ -177,14 +164,7 @@ export function AppShell() {
   }, [])
 
   // Mobile nav groups filtered by permissions
-  const filteredMobileGroups = useMemo(() => navGroups.map(group => ({
-    ...group,
-    children: group.children.filter(item => {
-      if (item.adminOnly && !isAdmin()) return false
-      if (item.permission && !isAdmin() && !hasPermission(item.permission)) return false
-      return true
-    })
-  })).filter(g => g.children.length > 0), [isAdmin, hasPermission])
+  const filteredMobileGroups = useMemo(() => sidebarGroups({ isAdmin, hasPermission }), [isAdmin, hasPermission])
 
   // Settings item for mobile (admin/operator only)
   const showSettings = isAdmin() || hasPermission('read:settings')
@@ -216,7 +196,7 @@ export function AppShell() {
           {/* Page title - use nav item labels for consistency */}
           <span className="text-xs font-medium text-text-primary truncate max-w-[140px]">
             {(() => {
-              const navItem = allNavItemsFlat.find(item => item.id === activePage)
+              const navItem = moduleForPath(location.pathname)
               return navItem ? t(navItem.labelKey) : activePage.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
             })()}
           </span>
@@ -458,7 +438,7 @@ export function AppShell() {
                     {group.children.map((item) => {
                       const Icon = item.icon
                       const isActive = activePage === item.id
-                      const shortKey = mobileShortKeys[item.id] || item.labelKey
+                      const shortKey = item.shortKey || item.labelKey
                       return (
                         <Link
                           key={item.id}

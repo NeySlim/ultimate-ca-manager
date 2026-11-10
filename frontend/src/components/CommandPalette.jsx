@@ -5,51 +5,25 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as Dialog from '@radix-ui/react-dialog'
 import {
-  MagnifyingGlass, House, Certificate, ShieldCheck, FileText, List,
-  User, Key, Gear, Robot, UploadSimple, ClockCounterClockwise,
-  UsersThree, Shield, Lock, UserCircle, ArrowRight, Command, Clock, Star,
-  Spinner, Database, Wrench, Lightning, Gavel, Stamp, ChartBar, Globe, Terminal
+  MagnifyingGlass,
+  Certificate,
+  ShieldCheck,
+  FileText,
+  List,
+  User,
+  ArrowRight,
+  Clock,
+  Star,
+  Spinner,
+  Database
 } from '@phosphor-icons/react'
 import { cn } from '../lib/utils'
 import { useTranslation } from 'react-i18next'
 import { useAllRecentHistory, useAllFavorites } from '../hooks'
 import { searchService } from '../services'
+import { paletteCommands } from '../navigation/registry'
 
-const COMMANDS = [
-  // Navigation
-  { id: 'dashboard', labelKey: 'commands.nav.dashboard', icon: House, path: '/', categoryKey: 'commands.categories.navigation' },
-  { id: 'certificates', labelKey: 'commands.nav.certificates', icon: Certificate, path: '/certificates', categoryKey: 'commands.categories.navigation' },
-  { id: 'cas', labelKey: 'commands.nav.cas', icon: ShieldCheck, path: '/cas', categoryKey: 'commands.categories.navigation' },
-  { id: 'csrs', labelKey: 'commands.nav.csrs', icon: FileText, path: '/csrs', categoryKey: 'commands.categories.navigation' },
-  { id: 'templates', labelKey: 'commands.nav.templates', icon: List, path: '/templates', categoryKey: 'commands.categories.navigation' },
-  { id: 'users', labelKey: 'commands.nav.users', icon: User, path: '/users', categoryKey: 'commands.categories.navigation' },
-  { id: 'acme', labelKey: 'commands.nav.acme', icon: Key, path: '/acme', categoryKey: 'commands.categories.navigation' },
-  { id: 'scep', labelKey: 'commands.nav.scep', icon: Robot, path: '/scep-config', categoryKey: 'commands.categories.navigation' },
-  { id: 'est', labelKey: 'commands.nav.est', icon: Globe, path: '/est-config', categoryKey: 'commands.categories.navigation' },
-  { id: 'import', labelKey: 'commands.nav.operations', icon: Lightning, path: '/operations', categoryKey: 'commands.categories.navigation' },
-  { id: 'tools', labelKey: 'commands.nav.tools', icon: Wrench, path: '/tools', categoryKey: 'commands.categories.navigation' },
-  { id: 'audit', labelKey: 'commands.nav.audit', icon: ClockCounterClockwise, path: '/audit', categoryKey: 'commands.categories.navigation' },
-  { id: 'settings', labelKey: 'commands.nav.settings', icon: Gear, path: '/settings', categoryKey: 'commands.categories.navigation' },
-  { id: 'account', labelKey: 'commands.nav.account', icon: UserCircle, path: '/account', categoryKey: 'commands.categories.navigation' },
-  { id: 'groups', labelKey: 'commands.nav.groups', icon: UsersThree, path: '/users?tab=groups', categoryKey: 'commands.categories.navigation' },
-  
-  // Pro Navigation
-  { id: 'rbac', labelKey: 'commands.nav.rbac', icon: Shield, path: '/rbac', categoryKey: 'commands.categories.proFeatures', pro: true },
-  { id: 'sso', labelKey: 'commands.nav.sso', icon: Key, path: '/sso', categoryKey: 'commands.categories.proFeatures', pro: true },
-  { id: 'hsm', labelKey: 'commands.nav.hsm', icon: Lock, path: '/hsm', categoryKey: 'commands.categories.proFeatures', pro: true },
-  { id: 'policies', labelKey: 'commands.nav.policies', icon: Gavel, path: '/policies', categoryKey: 'commands.categories.governance' },
-  { id: 'approvals', labelKey: 'commands.nav.approvals', icon: Stamp, path: '/approvals', categoryKey: 'commands.categories.governance' },
-  { id: 'reports', labelKey: 'commands.nav.reports', icon: ChartBar, path: '/reports', categoryKey: 'commands.categories.governance' },
-  
-  // SSH
-  { id: 'ssh-cas', labelKey: 'commands.nav.sshCas', icon: Terminal, path: '/ssh/cas', categoryKey: 'commands.categories.navigation' },
-  { id: 'ssh-certificates', labelKey: 'commands.nav.sshCertificates', icon: Terminal, path: '/ssh/certificates', categoryKey: 'commands.categories.navigation' },
-  
-  // Actions
-  { id: 'new-cert', labelKey: 'commands.actions.newCertificate', icon: Certificate, path: '/certificates', action: 'new', categoryKey: 'commands.categories.actions' },
-  { id: 'new-ca', labelKey: 'commands.actions.newCA', icon: ShieldCheck, path: '/cas', action: 'new', categoryKey: 'commands.categories.actions' },
-  { id: 'upload-csr', labelKey: 'commands.actions.uploadCSR', icon: FileText, path: '/csrs', action: 'upload', categoryKey: 'commands.categories.actions' },
-]
+const COMMANDS = paletteCommands()
 
 export function CommandPalette({ open, onOpenChange }) {
   const navigate = useNavigate()

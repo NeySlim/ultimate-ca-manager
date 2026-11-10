@@ -5,12 +5,15 @@
  */
 import { useState, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { 
-  House, Certificate, ShieldCheck, FileText, List, User, Key, Gear,
-  SignOut, Check, UserCircle, Lightning, ClockCounterClockwise, Robot,
-  UsersThree, Shield, Lock, FileX, Vault, Wrench, Globe, CaretRight,
-  Gavel, Stamp, ChartBar, Stack, Broadcast, CaretDown, MagnifyingGlass,
-  Clock, Terminal
+import {
+  House,
+  Gear,
+  SignOut,
+  Check,
+  UserCircle,
+  Globe,
+  CaretRight,
+  CaretDown
 } from '@phosphor-icons/react'
 import { Link, useNavigate } from 'react-router-dom'
 import { persistPreference } from '../stores/userPreferencesStore'
@@ -24,83 +27,12 @@ import { WebSocketIndicator } from './WebSocketIndicator'
 import { useMobile } from '../contexts/MobileContext'
 import { certificatesService } from '../services'
 import { languages } from '../i18n'
+import { sidebarGroups, isVisible } from '../navigation/registry'
 
-// Navigation groups — each has a trigger icon and child items
-const navGroups = [
-  {
-    id: 'pki',
-    icon: Certificate,
-    labelKey: 'common.navPki',
-    children: [
-      { id: 'certificates', icon: Certificate, labelKey: 'common.certificates', path: '/certificates' },
-      { id: 'cas', icon: ShieldCheck, labelKey: 'common.cas', path: '/cas' },
-      { id: 'csrs', icon: FileText, labelKey: 'common.csrs', path: '/csrs' },
-      { id: 'templates', icon: List, labelKey: 'common.templates', path: '/templates' },
-    ]
-  },
-  {
-    id: 'ssh',
-    icon: Terminal,
-    labelKey: 'common.navSsh',
-    children: [
-      { id: 'ssh-cas', icon: Key, labelKey: 'common.sshCas', path: '/ssh/cas', permission: 'read:ssh_cas' },
-      { id: 'ssh-certificates', icon: Certificate, labelKey: 'common.sshCertificates', path: '/ssh/certificates', permission: 'read:ssh' },
-    ]
-  },
-  {
-    id: 'protocols',
-    icon: Broadcast,
-    labelKey: 'common.navProtocols',
-    children: [
-      { id: 'acme', icon: Key, labelKey: 'common.acme', path: '/acme', permission: 'read:acme' },
-      { id: 'scep', icon: Robot, labelKey: 'common.scep', path: '/scep-config', permission: 'read:scep' },
-      { id: 'est', icon: Globe, labelKey: 'common.est', path: '/est-config', permission: 'read:est' },
-      { id: 'tsa', icon: Clock, labelKey: 'common.tsa', path: '/tsa-config', permission: 'read:settings' },
-      { id: 'crl-ocsp', icon: FileX, labelKey: 'common.crlOcsp', path: '/crl-ocsp', permission: 'read:crl' },
-    ]
-  },
-  {
-    id: 'tools',
-    icon: Wrench,
-    labelKey: 'common.navTools',
-    children: [
-      { id: 'truststore', icon: Vault, labelKey: 'common.trustStore', path: '/truststore', permission: 'read:truststore' },
-      { id: 'operations', icon: Lightning, labelKey: 'common.operations', path: '/operations', adminOnly: true },
-      { id: 'tools', icon: Wrench, labelKey: 'common.tools', path: '/tools' },
-    ]
-  },
-  {
-    id: 'governance',
-    icon: Gavel,
-    labelKey: 'common.navGovernance',
-    children: [
-      { id: 'policies', icon: Gavel, labelKey: 'common.policies', path: '/policies', permission: 'read:policies' },
-      { id: 'approvals', icon: Stamp, labelKey: 'common.approvals', path: '/approvals', permission: 'read:approvals' },
-      { id: 'keyRecovery', icon: Vault, labelKey: 'common.keyRecovery', path: '/key-recovery', permission: 'read:key_recovery' },
-      { id: 'reports', icon: ChartBar, labelKey: 'common.reports', path: '/reports', permission: 'read:audit' },
-      { id: 'discovery', icon: MagnifyingGlass, labelKey: 'common.discovery', path: '/discovery', permission: 'read:certificates' },
-    ]
-  },
-  {
-    id: 'admin',
-    icon: Shield,
-    labelKey: 'common.navAdmin',
-    children: [
-      { id: 'users', icon: User, labelKey: 'common.users', path: '/users', adminOnly: true },
-      { id: 'rbac', icon: Shield, labelKey: 'common.rbac', path: '/rbac', adminOnly: true },
-      { id: 'hsm', icon: Lock, labelKey: 'common.hsm', path: '/hsm', permission: 'read:hsm' },
-      { id: 'audit', icon: ClockCounterClockwise, labelKey: 'common.audit', path: '/audit', permission: 'read:audit' },
-      { id: 'logs', icon: Stack, labelKey: 'common.systemLogs', path: '/logs', adminOnly: true },
-    ]
-  },
-]
+const navGroups = sidebarGroups()
 
 function NavGroup({ group, activePage, isAdmin, hasPermission, expanded, onToggle, expiringCount, isBadgeDismissed, dismissBadge, t }) {
-  const visibleChildren = group.children.filter(child => {
-    if (child.adminOnly && !isAdmin()) return false
-    if (child.permission && !isAdmin() && !hasPermission(child.permission)) return false
-    return true
-  })
+  const visibleChildren = group.children.filter(child => isVisible(child, { isAdmin, hasPermission }))
 
   if (visibleChildren.length === 0) return null
 
@@ -492,9 +424,6 @@ export function Sidebar({ activePage }) {
     </div>
   )
 }
-
-// Export navGroups for use by AppShell mobile nav
-export { navGroups }
 
 // Derive the active nav item id from the current pathname. The URL is the
 // single source of truth: match on each item's `path` (exact first, then
