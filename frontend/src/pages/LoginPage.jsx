@@ -421,7 +421,9 @@ export default function LoginPage() {
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate(landing)
     } catch (error) {
-      if (error.message?.includes('cancelled') || error.message?.includes('abort') || error.name === 'NotAllowedError') {
+      if (noteRateLimit(error)) {
+        // banner shown
+      } else if (error.message?.includes('cancelled') || error.message?.includes('abort') || error.name === 'NotAllowedError') {
         showInfo(t('auth.twoFactorKeyCancelled'))
       } else {
         showError(t('auth.twoFactorKeyFailed'))
@@ -468,7 +470,7 @@ export default function LoginPage() {
       showSuccess(t('auth.welcomeBackUser', { username }))
       navigate(landing)
     } catch (error) {
-      showError(error.message || t('auth.ldapFailed'))
+      if (!noteRateLimit(error)) showError(error.message || t('auth.ldapFailed'))
       setPassword('')
     } finally {
       setLoading(false)
