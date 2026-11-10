@@ -10,7 +10,7 @@ from datetime import datetime
 from models import db, CertificateTemplate, CA, CATemplatePin
 from utils.datetime_utils import utc_now
 from utils import key_algorithms
-from utils.issuance_defaults import default_issue_key_type
+from utils.issuance_defaults import BASELINE_ISSUE_KEY, default_issue_key_type
 import logging
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ class TemplateService:
             "name": "Web Server (TLS/SSL)",
             "description": "SSL/TLS certificate for web servers (HTTPS). Compatible with Apache, Nginx, IIS. Validity: 397 days (Apple/Chrome limit).",
             "template_type": "web_server",
-            "key_type": "RSA-2048",
+            "key_type": BASELINE_ISSUE_KEY,
             "validity_days": 397,
             "digest": "sha256",
             "dn_template": json.dumps({
@@ -67,7 +67,7 @@ class TemplateService:
             "name": "Email Certificate (S/MIME)",
             "description": "S/MIME certificate for email encryption and digital signatures. Compatible with Outlook, Thunderbird, Apple Mail.",
             "template_type": "email",
-            "key_type": "RSA-2048",
+            "key_type": BASELINE_ISSUE_KEY,
             "validity_days": 397,
             "digest": "sha256",
             "dn_template": json.dumps({
@@ -92,7 +92,7 @@ class TemplateService:
             "name": "VPN Server",
             "description": "VPN server certificate for OpenVPN, IPsec, WireGuard. Includes serverAuth and ipsecEndSystem extended key usage.",
             "template_type": "vpn_server",
-            "key_type": "RSA-2048",
+            "key_type": BASELINE_ISSUE_KEY,
             "validity_days": 825,
             "digest": "sha256",
             "dn_template": json.dumps({
@@ -117,7 +117,7 @@ class TemplateService:
             "name": "VPN Client",
             "description": "VPN client certificate for user authentication. Compatible with OpenVPN, IPsec clients.",
             "template_type": "vpn_client",
-            "key_type": "RSA-2048",
+            "key_type": BASELINE_ISSUE_KEY,
             "validity_days": 397,
             "digest": "sha256",
             "dn_template": json.dumps({
@@ -142,7 +142,7 @@ class TemplateService:
             "name": "Code Signing",
             "description": "Code signing certificate for software developers. Sign executables, scripts, packages. Validity: 3 years max.",
             "template_type": "code_signing",
-            "key_type": "RSA-2048",
+            "key_type": BASELINE_ISSUE_KEY,
             "validity_days": 1095,
             "digest": "sha256",
             "dn_template": json.dumps({
@@ -167,7 +167,7 @@ class TemplateService:
             "name": "OCSP Signing",
             "description": "Delegated OCSP responder signing certificate (RFC 6960). Short validity recommended; issue from the CA whose responses it signs.",
             "template_type": "ocsp_signing",
-            "key_type": "RSA-2048",
+            "key_type": BASELINE_ISSUE_KEY,
             "validity_days": 90,
             "digest": "sha256",
             "dn_template": json.dumps({
@@ -192,7 +192,7 @@ class TemplateService:
             "name": "Client Authentication",
             "description": "Client authentication certificate for user/device authentication. Compatible with 802.1X, RADIUS, mTLS.",
             "template_type": "client_auth",
-            "key_type": "RSA-2048",
+            "key_type": BASELINE_ISSUE_KEY,
             "validity_days": 397,
             "digest": "sha256",
             "dn_template": json.dumps({
@@ -217,7 +217,7 @@ class TemplateService:
             "name": "Smartcard Logon",
             "description": "Windows smartcard / PKINIT logon certificate for Active Directory. Pairs clientAuth with the Microsoft Smartcard Logon EKU and carries the user's UPN as an otherName SAN.",
             "template_type": "smartcard_logon",
-            "key_type": "RSA-2048",
+            "key_type": BASELINE_ISSUE_KEY,
             "validity_days": 397,
             "digest": "sha256",
             "dn_template": json.dumps({
