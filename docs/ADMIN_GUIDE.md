@@ -414,6 +414,17 @@ psql -U ucm -h db.example.com ucm < ucm-pg-backup.sql
 
 > ℹ The psycopg 3 driver is bundled with the DEB/RPM packages and the Docker image. No extra install step is needed.
 
+### HA mode (preview): scheduler and startup
+
+With `UCM_HA=1`, every node runs against the same PostgreSQL database and names itself with `UCM_NODE_ID` (default: the host name, which must differ between nodes).
+
+- **Leader.** One node at a time runs the scheduled tasks: the one whose scheduler process holds a PostgreSQL session advisory lock on a dedicated connection. The lock is checked before every task; if that connection drops, the node stops starting tasks (a task already running finishes) and another node takes over within `LOCK_RETRY_SECONDS` (5 s). If the leader's host vanishes without closing it (power loss, network partition), PostgreSQL drops the session after about a minute of silence (server-side TCP keepalives and user timeout set on that session), then another node takes over. No file is shared between nodes.
+- **Heartbeat.** Each node's scheduler process writes its row in `cluster_nodes` once per pass (60 s); a row older than three passes counts as stale. `/health` reports `leader` (this node) and, in HA mode only, `cluster: {leader_node_id, nodes, stale}`. `/health/ready` answers 503 until this node has ever registered in `cluster_nodes`: a row left by an earlier run counts, so a restarted node is ready before its new scheduler process writes again. Staleness compares node clocks: keep them synchronised (NTP).
+- **Run now.** From any node, Settings > Scheduler > Run now queues a request in `scheduler_requests`; the leader claims it on its next poll (about one second), runs it once and deletes it. The page waits up to 30 s for the result, then shows the task as started. The leader also publishes the tasks' status in `system_config` (`scheduler.state`), which every node shows. A request claimed by a leader that disappears is dropped, not replayed: ask again.
+- **Startup.** Migrations and the first schema creation run under a second advisory lock: a node starting while another one migrates waits for it (at most 120 s, then refuses to start with an explicit error) and then finds nothing left to apply.
+- **Discovery scans.** Each scan run records the node that runs it. A new leader marks as failed the scans of nodes without a fresh heartbeat and the scheduled scans a live node started before its current scheduler process; the other scans of live nodes are kept (a former leader that only lost its lock connection still runs them). The leader also fails, on every pass, the scans of nodes that have gone stale since and the scheduled scans a live node's former scheduler process left, and a node's web process fails that node's own scans when it starts: under gunicorn the master does it once, before forking its workers (`preload_app = True`); without preload each worker would do it again and fail the scans its siblings already run.
+- **Local files.** Tasks that write to the local disk do so on the leader only: local backups, the certificate files mirrored by renewals and session file cleanup stay on that node.
+
 ### Database Tables
 
 | Table | Purpose |

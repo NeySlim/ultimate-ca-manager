@@ -6,11 +6,12 @@ import threading
 import time
 import ipaddress
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
 from typing import List, Tuple, Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed, wait, FIRST_COMPLETED
 
 from models import db, ScanRun, DiscoveredCertificate, ScanProfile
+from utils.datetime_utils import utc_now
 
 from .helpers import (_validate_port, _scan_semaphore, _MAX_CONCURRENT_SCANS,
                       _MAX_SCAN_HOSTS, _MAX_SCAN_JOBS, _parse_target, _parse_iso)
@@ -94,8 +95,10 @@ class ScannerMixin:
             )
 
         # Create scan run record
+        from config.settings import Config
         run = ScanRun(
             scan_profile_id=profile_id,
+            node_id=Config.NODE_ID,
             total_targets=len(jobs),
             triggered_by=triggered_by,
             triggered_by_user=triggered_by_user,
@@ -191,7 +194,7 @@ class ScannerMixin:
         errors_real = 0
         new_certs = 0
         changed_certs = 0
-        now = datetime.now(timezone.utc)
+        now = utc_now()
         last_progress = time.time()
 
         # Submit probes in a bounded window instead of all at once: queueing
@@ -364,7 +367,7 @@ class ScannerMixin:
                     on_discovery_new_cert(r['target'], r['port'], r.get('subject', ''))
 
         # Finalize scan run
-        run.completed_at = datetime.now(timezone.utc)
+        run.completed_at = utc_now()
         run.status = 'completed'
         run.targets_scanned = scanned
         run.certs_found = found
@@ -433,7 +436,7 @@ class ScannerMixin:
         run = db.session.get(ScanRun, run_id)
         if run:
             run.status = 'failed'
-            run.completed_at = datetime.now(timezone.utc)
+            run.completed_at = utc_now()
             try:
                 db.session.commit()
             except Exception as _commit_err:
