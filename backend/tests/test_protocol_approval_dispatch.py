@@ -74,6 +74,10 @@ def test_policy_holds_the_request_once(app, gate_ca):
             row = db.session.get(ApprovalRequest, first)
             assert row.request_type == 'wstep_request' and row.requester_id is None
             assert row.to_dict()['requester_username'] == 'wstep:tester'
+            # The approvals page shows who asked through which protocol, with which CSR
+            summary = row.to_dict()['request_summary']
+            assert summary['protocol'] == 'wstep' and summary['identity'] == 'tester'
+            assert summary['csr'].startswith('-----BEGIN CERTIFICATE REQUEST-----')
 
 
 def test_a_delivered_decision_is_forgotten(app, gate_ca, fake_handler):

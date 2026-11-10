@@ -4460,12 +4460,19 @@
       "renewal": "Renouvellement",
       "revocation": "Révocation",
       "ca_revocation": "Révocation de CA",
-      "cross_revocation": "Révocation de certificat croisé"
+      "cross_revocation": "Révocation de certificat croisé",
+      "acme_order": "ACME order",
+      "est_enroll": "EST enrolment",
+      "scep_request": "SCEP request",
+      "wstep_request": "WSTEP request"
     },
     "revocationPerformed": "Approuvée : la révocation a été effectuée",
     "summarySerial": "Numéro de série",
     "summaryInvalidity": "Date d'invalidité",
     "summaryTrigger": "Demandé par",
+    "summaryProtocol": "Protocol",
+    "summaryIdentity": "Protocol identity",
+    "summaryCsr": "Certificate request (CSR)",
     "triggerScheduler": "Planificateur de renouvellement"
   },
   "reports": {

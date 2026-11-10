@@ -4447,12 +4447,19 @@
       "renewal": "Renewal",
       "revocation": "Revocation",
       "ca_revocation": "CA revocation",
-      "cross_revocation": "Cross-certificate revocation"
+      "cross_revocation": "Cross-certificate revocation",
+      "acme_order": "ACME order",
+      "est_enroll": "EST enrolment",
+      "scep_request": "SCEP request",
+      "wstep_request": "WSTEP request"
     },
     "revocationPerformed": "Approved: the revocation was performed",
     "summarySerial": "Serial number",
     "summaryInvalidity": "Invalidity date",
     "summaryTrigger": "Requested by",
+    "summaryProtocol": "Protocol",
+    "summaryIdentity": "Protocol identity",
+    "summaryCsr": "Certificate request (CSR)",
     "triggerScheduler": "Renewal scheduler"
   },
   "reports": {

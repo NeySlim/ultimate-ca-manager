@@ -164,3 +164,33 @@ describe('ApprovalsPage deep link', () => {
     expect(await screen.findByText('linked-bob')).toBeTruthy()
   })
 })
+
+describe('ApprovalsPage — protocol requests', () => {
+  const PROTOCOL_REQUEST = {
+    ...REQUEST, id: 51, request_type: 'est_enroll', requester_username: 'est:basic:device',
+    request_summary: {
+      cn: 'device.example', protocol: 'est', operation: 'enroll', identity: 'basic:device',
+      csr: '-----BEGIN CERTIFICATE REQUEST-----\nMIIB\n-----END CERTIFICATE REQUEST-----',
+    },
+  }
+
+  it('names the protocol, not the raw type', async () => {
+    list.mockResolvedValue({ data: [PROTOCOL_REQUEST] })
+    getStats.mockResolvedValue({ data: { pending: 1, approved: 0, rejected: 0, total: 1 } })
+    renderPage()
+    expect(await screen.findByText('approvals.requestType.est_enroll')).toBeTruthy()
+    expect(screen.queryByText('est_enroll')).toBeNull()
+  })
+
+  it('shows the protocol, its identity and the CSR in the detail', async () => {
+    list.mockResolvedValue({ data: [] })
+    getStats.mockResolvedValue({ data: {} })
+    getById.mockResolvedValue({ data: PROTOCOL_REQUEST })
+    render(<MemoryRouter initialEntries={['/approvals?id=51']}><ApprovalsPage /></MemoryRouter>)
+    expect(await screen.findByText('approvals.summaryProtocol')).toBeTruthy()
+    expect(screen.getByText('EST (enroll)')).toBeTruthy()
+    expect(screen.getByText('basic:device')).toBeTruthy()
+    expect(screen.getByText('approvals.summaryCsr')).toBeTruthy()
+    expect(screen.getByText(/BEGIN CERTIFICATE REQUEST/)).toBeTruthy()
+  })
+})

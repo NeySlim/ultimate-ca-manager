@@ -28,6 +28,11 @@ const REQUEST_TYPES = {
   revocation: { labelKey: 'approvals.requestType.revocation', variant: 'danger' },
   ca_revocation: { labelKey: 'approvals.requestType.ca_revocation', variant: 'danger' },
   cross_revocation: { labelKey: 'approvals.requestType.cross_revocation', variant: 'danger' },
+  // Held by a policy on an enrolment protocol; the approval issues through that protocol
+  acme_order: { labelKey: 'approvals.requestType.acme_order', variant: 'primary' },
+  est_enroll: { labelKey: 'approvals.requestType.est_enroll', variant: 'primary' },
+  scep_request: { labelKey: 'approvals.requestType.scep_request', variant: 'primary' },
+  wstep_request: { labelKey: 'approvals.requestType.wstep_request', variant: 'primary' },
 }
 
 function RequestTypeBadge({ type, t }) {
@@ -332,6 +337,17 @@ export default function ApprovalsPage() {
                   <div className="text-text-primary">{t('approvals.triggerScheduler')}</div>
                 </>
               )}
+              {selectedRequest.request_summary.protocol && (
+                <>
+                  <div className="text-text-tertiary">{t('approvals.summaryProtocol')}</div>
+                  <div className="text-text-primary">
+                    {selectedRequest.request_summary.protocol.toUpperCase()}
+                    {selectedRequest.request_summary.operation ? ` (${selectedRequest.request_summary.operation})` : ''}
+                  </div>
+                  <div className="text-text-tertiary">{t('approvals.summaryIdentity')}</div>
+                  <div className="text-text-primary font-mono break-all">{selectedRequest.request_summary.identity || '—'}</div>
+                </>
+              )}
               {selectedRequest.request_summary.validity_days && (
                 <>
                   <div className="text-text-tertiary">{t('approvals.summaryValidity')}</div>
@@ -374,6 +390,16 @@ export default function ApprovalsPage() {
           )}
         </div>
       </div>
+
+      {/* The CSR a protocol request carries */}
+      {selectedRequest.request_summary?.csr && (
+        <div className="border-t border-border pt-3">
+          <h4 className="text-sm font-semibold text-text-primary mb-2">{t('approvals.summaryCsr')}</h4>
+          <pre className="text-xs font-mono text-text-secondary bg-bg-tertiary rounded-lg p-3 overflow-x-auto whitespace-pre">
+            {selectedRequest.request_summary.csr}
+          </pre>
+        </div>
+      )}
 
       {/* Requester Comment */}
       {selectedRequest.requester_comment && (

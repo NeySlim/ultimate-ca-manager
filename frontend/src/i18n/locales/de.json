@@ -4386,12 +4386,19 @@
       "renewal": "Erneuerung",
       "revocation": "Widerruf",
       "ca_revocation": "CA-Widerruf",
-      "cross_revocation": "Widerruf eines Cross-Zertifikats"
+      "cross_revocation": "Widerruf eines Cross-Zertifikats",
+      "acme_order": "ACME order",
+      "est_enroll": "EST enrolment",
+      "scep_request": "SCEP request",
+      "wstep_request": "WSTEP request"
     },
     "revocationPerformed": "Genehmigt: der Widerruf wurde ausgeführt",
     "summarySerial": "Seriennummer",
     "summaryInvalidity": "Ungültigkeitsdatum",
     "summaryTrigger": "Angefordert von",
+    "summaryProtocol": "Protocol",
+    "summaryIdentity": "Protocol identity",
+    "summaryCsr": "Certificate request (CSR)",
     "triggerScheduler": "Erneuerungsplaner"
   },
   "messages": {

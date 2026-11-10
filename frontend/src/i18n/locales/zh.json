@@ -4386,12 +4386,19 @@
       "renewal": "续期",
       "revocation": "吊销",
       "ca_revocation": "CA 吊销",
-      "cross_revocation": "交叉证书吊销"
+      "cross_revocation": "交叉证书吊销",
+      "acme_order": "ACME order",
+      "est_enroll": "EST enrolment",
+      "scep_request": "SCEP request",
+      "wstep_request": "WSTEP request"
     },
     "revocationPerformed": "已批准：吊销已执行",
     "summarySerial": "序列号",
     "summaryInvalidity": "失效日期",
     "summaryTrigger": "请求方",
+    "summaryProtocol": "Protocol",
+    "summaryIdentity": "Protocol identity",
+    "summaryCsr": "Certificate request (CSR)",
     "triggerScheduler": "续期调度器"
   },
   "messages": {

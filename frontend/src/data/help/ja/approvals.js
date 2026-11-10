@@ -22,6 +22,7 @@ export default {
           { label: '更新', text: '証明書の更新も、単独でも一括でもキューに入ります。実行できない更新（失効済み、サーバーが鍵を保持していない）は即座に拒否されます' },
           { label: '失効', text: '失効ポリシーの下での証明書（単独、一括、ユーザー証明書から）または中間 CA の失効はキューに入ります。承認が、要求された理由で失効させます' },
           { label: 'スケジューラ', text: '更新ポリシーの下では、スケジューラが更新をキューに入れます。承認が、スケジューラが行うはずだった通りに、サーバーの保持する鍵で再署名します' },
+          { label: 'Enrolment protocols', text: 'An ACME finalize, an EST enrolment, re-enrolment or server key generation, a SCEP request (even on an auto-approving profile) or a WSTEP enrolment or renewal under a policy that requires approval is held: the client is told the request is pending and polls; the approval issues the certificate through that protocol, a rejection or expiry is reported to the client as a refusal' },
           { label: '管理者', text: '発行フォームと同様に、すべての経路でキューをバイパスします' },
         ]
       },

@@ -139,7 +139,9 @@ class ApprovalRequest(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
-    request_type = db.Column(db.String(50), nullable=False)  # certificate, csr, renewal, revocation, ca_revocation
+    # certificate, csr, renewal, revocation, ca_revocation, cross_revocation; the enrolment
+    # protocols' acme_order, est_enroll, scep_request, wstep_request (services/protocol_approval.py)
+    request_type = db.Column(db.String(50), nullable=False)
     
     # What needs approval (certificate ID, which can be a CSR or issued cert)
     certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'), nullable=True)
@@ -239,6 +241,11 @@ class ApprovalRequest(db.Model):
                     'reason': rd.get('reason'),
                     'invalidity_at': rd.get('invalidity_at'),
                     'trigger': rd.get('trigger'),
+                    # Enrolment protocols: who asked, through which protocol, with which CSR
+                    'protocol': rd.get('protocol'),
+                    'identity': rd.get('identity'),
+                    'operation': rd.get('operation'),
+                    'csr': rd.get('csr'),
                 }
                 if self.requester is None and rd.get('requested_by'):
                     result['requester_username'] = rd['requested_by']
