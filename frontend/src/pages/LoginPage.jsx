@@ -779,18 +779,18 @@ export default function LoginPage() {
         {step === 'auth' && userMethods && (
           <div className="flex justify-center gap-1.5 sm:gap-2 pt-1 sm:pt-2">
             {userMethods.mtls && (
-              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'mtls' ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}`}>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'mtls' ? 'bg-accent-primary text-on-accent' : 'bg-bg-secondary text-text-secondary'}`}>
                 <ShieldCheck size={12} weight="fill" />
                 <span>mTLS</span>
               </div>
             )}
             {userMethods.webauthn && authMethodsService.isWebAuthnSupported() && (
-              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'webauthn' ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}`}>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'webauthn' ? 'bg-accent-primary text-on-accent' : 'bg-bg-secondary text-text-secondary'}`}>
                 <Fingerprint size={12} weight="fill" />
                 <span>{t('common.key')}</span>
               </div>
             )}
-            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'password' ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}`}>
+            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'password' ? 'bg-accent-primary text-on-accent' : 'bg-bg-secondary text-text-secondary'}`}>
               <Key size={12} weight="fill" />
               <span>{t('common.password')}</span>
             </div>

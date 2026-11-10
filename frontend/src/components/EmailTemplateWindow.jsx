@@ -178,12 +178,12 @@ export default function EmailTemplateWindow({ onClose }) {
             <div className="flex items-center gap-1 bg-bg-tertiary rounded-md p-0.5">
               <button type="button" onClick={() => setTab('html')}
                 className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
-                  tab === 'html' ? 'bg-accent-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}>
+                  tab === 'html' ? 'bg-accent-primary text-on-accent shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}>
                 <Code size={14} /> HTML
               </button>
               <button type="button" onClick={() => setTab('text')}
                 className={`px-2.5 py-1 text-xs rounded transition-colors flex items-center gap-1.5 ${
-                  tab === 'text' ? 'bg-accent-primary text-white shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}>
+                  tab === 'text' ? 'bg-accent-primary text-on-accent shadow-sm' : 'text-text-secondary hover:text-text-primary'}`}>
                 <TextT size={14} /> {t('settings.templatePlainText')}
               </button>
             </div>

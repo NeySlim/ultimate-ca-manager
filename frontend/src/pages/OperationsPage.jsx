@@ -1072,7 +1072,7 @@ export default function OperationsPage() {
                   onClick={() => setBulkViewMode('table')}
                   className={cn(
                     "p-1.5 rounded-md transition-all",
-                    bulkViewMode === 'table' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+                    bulkViewMode === 'table' ? "bg-accent-primary text-on-accent shadow-sm" : "text-text-secondary hover:text-text-primary"
                   )}
                   title={t('operations.tableView', 'Table View')}
                 >
@@ -1082,7 +1082,7 @@ export default function OperationsPage() {
                   onClick={() => setBulkViewMode('basket')}
                   className={cn(
                     "p-1.5 rounded-md transition-all",
-                    bulkViewMode === 'basket' ? "bg-accent-primary text-white shadow-sm" : "text-text-secondary hover:text-text-primary"
+                    bulkViewMode === 'basket' ? "bg-accent-primary text-on-accent shadow-sm" : "text-text-secondary hover:text-text-primary"
                   )}
                   title={t('operations.basketView', 'Basket View')}
                 >

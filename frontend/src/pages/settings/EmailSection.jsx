@@ -71,7 +71,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
                   }}
                   className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                     (settings.smtp_auth_method || 'password') === method
-                      ? 'bg-accent-primary text-white'
+                      ? 'bg-accent-primary text-on-accent'
                       : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
                   }`}
                 >
@@ -130,7 +130,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
                       onClick={() => applyOAuthProviderPreset(provider)}
                       className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                         (settings.smtp_oauth_provider || 'google') === provider
-                          ? 'bg-accent-primary text-white'
+                          ? 'bg-accent-primary text-on-accent'
                           : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
                       }`}
                     >
@@ -334,7 +334,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
                     onClick={() => updateSetting('smtp_security', mode)}
                     className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                       (settings.smtp_security || 'starttls') === mode
-                        ? 'bg-accent-primary text-white'
+                        ? 'bg-accent-primary text-on-accent'
                         : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
                     }`}
                   >
@@ -351,7 +351,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
                     onClick={() => updateSetting('smtp_content_type', fmt)}
                     className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
                       (settings.smtp_content_type || 'html') === fmt
-                        ? 'bg-accent-primary text-white'
+                        ? 'bg-accent-primary text-on-accent'
                         : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
                     }`}
                   >
@@ -462,7 +462,7 @@ export default function EmailSection({ settings, savedEmail, updateSetting, hand
                   }}
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     expiryAlerts.alert_days.includes(d)
-                      ? 'bg-accent-primary text-white'
+                      ? 'bg-accent-primary text-on-accent'
                       : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
                   }`}
                 >

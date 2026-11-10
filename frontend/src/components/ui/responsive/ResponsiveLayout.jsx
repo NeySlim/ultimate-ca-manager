@@ -1020,7 +1020,7 @@ function FilterContent({ filters, onClearFilters, onClose }) {
           type="button"
           onClick={onClose}
           className={cn(
-            'flex-1 h-11 rounded-lg bg-accent-primary text-white',
+            'flex-1 h-11 rounded-lg bg-accent-primary text-on-accent',
             'font-medium text-sm hover:bg-accent-primary-op90 transition-colors'
           )}
         >

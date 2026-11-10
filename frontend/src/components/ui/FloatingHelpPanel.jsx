@@ -615,7 +615,7 @@ function ReaderToolbar({
               className={cn(
                 'px-1.5 py-0.5 text-[10px] font-bold transition-colors rounded-sm',
                 readerPrefs.fontSize === idx
-                  ? 'bg-accent-primary text-white'
+                  ? 'bg-accent-primary text-on-accent'
                   : 'text-text-tertiary hover:text-text-primary'
               )}
               style={{ fontSize: idx === 0 ? '9px' : idx === 2 ? '12px' : '10px' }}

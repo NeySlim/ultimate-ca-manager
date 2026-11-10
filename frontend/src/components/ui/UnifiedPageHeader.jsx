@@ -127,7 +127,7 @@ export function UnifiedPageHeader({
             >
               <Funnel size={16} className="text-text-secondary" />
               {activeFilters > 0 && (
-                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent-primary text-white text-2xs flex items-center justify-center">
+                <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-accent-primary text-on-accent text-2xs flex items-center justify-center">
                   {activeFilters}
                 </span>
               )}

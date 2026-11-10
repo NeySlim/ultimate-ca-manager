@@ -27,6 +27,8 @@ export default {
         // Accent colors with RGB for opacity support
         'accent-primary': 'var(--accent-primary)',
         'accent-pro': 'var(--accent-pro)',
+        // Text on an accent fill; contrast checked per palette in themeContrast.test.js
+        'on-accent': 'var(--on-accent)',
         
         // Status colors - these map to theme variables
         'status-success': 'var(--accent-success)',
