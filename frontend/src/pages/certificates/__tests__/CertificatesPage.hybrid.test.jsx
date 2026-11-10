@@ -165,7 +165,7 @@ describe('CertificatesPage and a hybrid pair', () => {
     fireEvent.click(screen.getByText('common.revoke'))
     fireEvent.click(await screen.findByText('confirm-revoke'))
     await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('revocation.relatedNotRevoked'))
-    expect(mocks.showSuccess).toHaveBeenCalledWith('certificates.revoked')
+    expect(mocks.showSuccess).toHaveBeenCalledWith('messages.success.other.revoked')
   })
 
   it.each([

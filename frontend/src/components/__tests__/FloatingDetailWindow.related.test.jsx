@@ -95,7 +95,7 @@ describe('FloatingDetailWindow of a hybrid pair member', () => {
 
   it.each([
     [{ id: 4, related_renewed: [5] }, 'certificates.hybrid.renewedWithRelated'],
-    [{ id: 4 }, 'Certificate renewed'],
+    [{ id: 4 }, 'certificates.renewed'],
   ])('names the linked certificate renewed with it (%o)', async (answer, toast) => {
     mocks.certificatesService.getById.mockImplementation((id) =>
       Promise.resolve({ data: id === 5 ? PARTNER : { ...MEMBER, has_private_key: true } }))

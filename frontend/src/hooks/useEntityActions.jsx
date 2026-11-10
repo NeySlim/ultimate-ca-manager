@@ -33,6 +33,9 @@ import { askRenewal } from '../lib/renewalPrompt'
 import { renameCertificate } from '../lib/certificateRename'
 import { showNotices } from '../lib/notices'
 
+// Entity type -> messages.confirm.delete.* key; every locale defines these
+const CONFIRM_DELETE_KEY = { certificate: 'certificate', user_certificate: 'certificate', ca: 'ca', truststore: 'truststore' }
+
 /**
  * @param {object} p
  * @param {string} p.type  certificate | ca | truststore | user_certificate
@@ -110,7 +113,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
         // certificates route would look it up in a different table.
         const res = await userCertificatesService.revoke(id, reason)
         if (res?.data?.approval_required) queued = t('certificates.revocationApprovalRequired', { policy: res.data.policy_name })
-        else showSuccess(t('certificates.revoked', 'Certificate revoked'))
+        else showSuccess(t('messages.success.other.revoked'))
       } else {
         const res = await certificatesService.revoke(id, reason, options)
         const relatedRevoked = res?.data?.related_revoked
@@ -118,7 +121,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
         else {
           showSuccess(relatedRevoked != null
             ? t('revocation.revokedWithRelated', { id: relatedRevoked })
-            : t('certificates.revoked', 'Certificate revoked'))
+            : t('messages.success.other.revoked'))
           if (res?.data?.related_not_revoked != null) {
             showWarning(t('revocation.relatedRevokeFailed', { id: res.data.related_not_revoked }))
           } else if (options?.revokeRelated && relatedRevoked == null) showWarning(t('revocation.relatedNotRevoked'))
@@ -140,7 +143,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
       refresh()
       close()
     } catch (err) {
-      showError(err.message || (isCA ? t('cas.revokeFailed', 'Failed to revoke CA') : t('certificates.revokeFailed', 'Revoke failed')))
+      showError(err.message || (isCA ? t('cas.revokeFailed', 'Failed to revoke CA') : t('messages.errors.revokeFailed.certificate')))
     } finally {
       setRevoking(false)
     }
@@ -181,13 +184,13 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
         const relatedRenewed = res?.data?.related_renewed
         showSuccess(relatedRenewed?.length
           ? t('certificates.hybrid.renewedWithRelated', { id: relatedRenewed.join(', #') })
-          : t('certificates.renewed', 'Certificate renewed'))
+          : t('certificates.renewed'))
         showNotices(res, showWarning)
       }
       refresh()
       close()
     } catch (err) {
-      showError(err?.message || t('certificates.renewFailed', 'Renew failed'))
+      showError(err?.message || t('common.operationFailed'))
     }
   }
 
@@ -218,7 +221,7 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
       return
     }
     const confirmed = await showConfirm(
-      t('common.confirmDeleteMessage', 'Are you sure you want to delete this item? This action cannot be undone.'),
+      t(`messages.confirm.delete.${CONFIRM_DELETE_KEY[type] || 'generic'}`),
       {
         title: t('common.confirmDelete', 'Confirm Delete'),
         confirmText: t('common.delete', 'Delete'),

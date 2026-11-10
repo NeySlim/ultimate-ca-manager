@@ -861,7 +861,8 @@
       "pairIssued": "Coppia ibrida emessa: certificati #{{classical}} e #{{pq}}",
       "renewedWithRelated": "Certificato rinnovato, insieme al certificato collegato #{{id}}",
       "bulkRelatedRenewed": "{{count}} certificati collegati rinnovati con la selezione"
-    }
+    },
+    "renewed": "Certificate renewed"
   },
   "cas": {
     "chainRevoked": "Revocata a monte",

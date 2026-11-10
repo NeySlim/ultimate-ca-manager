@@ -865,7 +865,8 @@
       "pairIssued": "Гібридну пару видано: сертифікати #{{classical}} і #{{pq}}",
       "renewedWithRelated": "Сертифікат поновлено разом із пов'язаним сертифікатом #{{id}}",
       "bulkRelatedRenewed": "Разом із вибраними поновлено пов'язаних сертифікатів: {{count}}"
-    }
+    },
+    "renewed": "Certificate renewed"
   },
   "cas": {
     "chainRevoked": "Відкликано вище",

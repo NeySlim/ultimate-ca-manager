@@ -861,7 +861,8 @@
       "pairIssued": "Par híbrido emitido: certificados n.º {{classical}} y n.º {{pq}}",
       "renewedWithRelated": "Certificado renovado, junto con su certificado vinculado n.º {{id}}",
       "bulkRelatedRenewed": "{{count}} certificados vinculados renovados con la selección"
-    }
+    },
+    "renewed": "Certificate renewed"
   },
   "cas": {
     "chainRevoked": "Revocada aguas arriba",

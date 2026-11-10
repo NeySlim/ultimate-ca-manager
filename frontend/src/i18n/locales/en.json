@@ -861,7 +861,8 @@
       "pairIssued": "Hybrid pair issued: certificates #{{classical}} and #{{pq}}",
       "renewedWithRelated": "Certificate renewed, with its linked certificate #{{id}}",
       "bulkRelatedRenewed": "{{count}} linked certificates renewed with the selection"
-    }
+    },
+    "renewed": "Certificate renewed"
   },
   "cas": {
     "chainRevoked": "Revoked upstream",

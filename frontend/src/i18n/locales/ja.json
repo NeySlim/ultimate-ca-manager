@@ -861,7 +861,8 @@
       "pairIssued": "ハイブリッドペアを発行しました：証明書 #{{classical}} と #{{pq}}",
       "renewedWithRelated": "証明書を更新しました（リンクされた証明書 #{{id}} も更新）",
       "bulkRelatedRenewed": "選択した証明書と共に、リンクされた証明書 {{count}} 件を更新しました"
-    }
+    },
+    "renewed": "Certificate renewed"
   },
   "cas": {
     "chainRevoked": "上位で失効",

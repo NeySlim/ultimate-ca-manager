@@ -861,7 +861,8 @@
       "pairIssued": "Hybrides Paar ausgestellt: Zertifikate #{{classical}} und #{{pq}}",
       "renewedWithRelated": "Zertifikat erneuert, zusammen mit seinem verknüpften Zertifikat #{{id}}",
       "bulkRelatedRenewed": "{{count}} verknüpfte Zertifikate zusammen mit der Auswahl erneuert"
-    }
+    },
+    "renewed": "Certificate renewed"
   },
   "cas": {
     "chainRevoked": "Übergeordnet gesperrt",

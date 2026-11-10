@@ -861,7 +861,8 @@
       "pairIssued": "已签发混合证书对：证书 #{{classical}} 和 #{{pq}}",
       "renewedWithRelated": "证书已续期，其关联证书 #{{id}} 一并续期",
       "bulkRelatedRenewed": "已随所选项一并续期 {{count}} 张关联证书"
-    }
+    },
+    "renewed": "Certificate renewed"
   },
   "cas": {
     "chainRevoked": "上游已吊销",

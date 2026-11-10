@@ -1239,7 +1239,8 @@
       "pairIssued": "Paire hybride émise : certificats n°{{classical}} et n°{{pq}}",
       "renewedWithRelated": "Certificat renouvelé, avec son certificat lié n°{{id}}",
       "bulkRelatedRenewed": "{{count}} certificats liés renouvelés avec la sélection"
-    }
+    },
+    "renewed": "Certificate renewed"
   },
   "common": {
     "saved": "Paramètres enregistrés",
