@@ -677,6 +677,13 @@ class _FakeMonotonic:
         return self.t
 
 
+def _set_restart_seen(app, name, value):
+    from models import ClusterNode, db
+    with app.app_context():
+        db.session.get(ClusterNode, PREFIX + name).restart_seen = value
+        db.session.commit()
+
+
 def _fail_until(solo, clock, attempts, count):
     """Advances the fake clock one second per pass until ``count`` attempts were made."""
     start = clock.t
@@ -684,6 +691,12 @@ def _fail_until(solo, clock, attempts, count):
         clock.t += 1
         solo.run_once()
         assert clock.t - start <= 600
+
+
+def _failure_lines(caplog):
+    import logging
+    return [r.levelno for r in caplog.records
+            if r.name == cc.logger.name and 'failed' in r.getMessage() and r.levelno >= logging.WARNING]
 
 
 def test_a_failing_restart_backs_off_and_logs_one_line_per_step(app, ha, caplog):
@@ -713,6 +726,34 @@ def test_a_failing_restart_backs_off_and_logs_one_line_per_step(app, ha, caplog)
     solo.run_once()
     assert len(attempts) == 10 and solo.restarting
     assert solo._retry_delay is None  # a restart that ran starts the next failure from 2 s
+
+
+def test_a_new_restart_after_an_unclaimed_retry_starts_its_backoff_over(app, ha, caplog):
+    """The held restart, claimed meanwhile by a sibling process, is dropped: the next one
+    that fails is logged at once and retried after the first step."""
+    import logging
+    clock, attempts = _FakeMonotonic(), []
+
+    def action():
+        attempts.append(clock.t)
+        raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', monotonic=clock, restart_action=action)
+    caplog.set_level(logging.INFO, logger=cc.logger.name)
+    first = _emit(app, cc.RESTART)
+    solo.run_once()
+    _fail_until(solo, clock, attempts, 7)  # 2, 4, 8, 16, 32, 60 s
+    _set_restart_seen(app, 'solo', first)  # a sibling process took it
+    clock.t += 60
+    solo.run_once()
+    assert len(attempts) == 7
+    caplog.clear()
+    _emit(app, cc.RESTART)
+    _fail_until(solo, clock, attempts, 8)
+    failed_at = attempts[-1]
+    assert _failure_lines(caplog) == [logging.ERROR]
+    _fail_until(solo, clock, attempts, 9)
+    assert attempts[-1] - failed_at == cc.RESTART_RETRY_FIRST
 
 
 def test_stop_during_a_failed_restart_is_not_undone(app, ha):

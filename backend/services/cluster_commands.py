@@ -379,7 +379,7 @@ class CommandApplier:
         (restart_seen, not command_seen, records the claim) and later reloads go on."""
         if not self.record or (row.created_at <= self.started_at and row.id in self._known_at_start):
             # Started after the command was committed (or the scheduler process): nothing to restart
-            self._held = None
+            self._drop_held()
             self._advance(conn, row.id)
             return
         nodes = conn.execute(_NODES_SQL).fetchall()
@@ -404,6 +404,7 @@ class CommandApplier:
         claimed = self._claim(conn, row.id)
         self._advance(conn, row.id)
         if not claimed:
+            self._drop_held()
             return
         self.restarting = True
         logger.warning(f"Rolling restart: node {self.node_id} restarts (command {row.id})")
@@ -422,6 +423,11 @@ class CommandApplier:
                 # stop() sets _stopping before _stop: one that lands after the check is not undone
                 if self._stopping:
                     self._stop.set()
+
+    def _drop_held(self):
+        """No restart pending any more: the next one that fails starts from the first step."""
+        self._held = None
+        self._retry_delay = None
 
     def _restart_failed(self, e):
         """Next attempt after the backoff delay: ERROR the first time, then one line per new delay."""
