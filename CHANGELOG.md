@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
-- Dashboard: `GET /api/v2/dashboard/queue`, `/health`, `/compliance` and `/issuance` (scope `read:dashboard`, now held by every built-in role) return the work queue, per-protocol health, compliance counters and issuance per CA, computed in SQL without parsing certificates; certificates gain `key_bits` and `sig_hash` columns, backfilled by migration 139.
+- Dashboard: `GET /api/v2/dashboard/queue`, `/health`, `/compliance` and `/issuance` (scope `read:dashboard`, now held by every built-in role and grantable to groups) return the work queue, per-protocol health, compliance counters and issuance per CA, computed in SQL without parsing certificates; certificates gain `key_bits` and `sig_hash` columns, backfilled by migration 139.
 
 ### Fixed
 
