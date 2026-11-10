@@ -22,6 +22,17 @@ logger = logging.getLogger(__name__)
 
 # Whitelist of allowed preference keys + value validators.
 # Anything not listed here is silently dropped to avoid storing arbitrary blobs.
+# Registry ids as the shell pins them: the server does not know the frontend
+# registry, only the id format and the cap of three.
+_PIN_ID = re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,39}$')
+MAX_PINS = 3
+
+
+def _valid_pins(v):
+    return (isinstance(v, list) and len(v) <= MAX_PINS and len(set(v)) == len(v)
+            and all(isinstance(i, str) and _PIN_ID.match(i) for i in v))
+
+
 _PREF_VALIDATORS = {
     'language': lambda v: isinstance(v, str) and 1 <= len(v) <= 10,
     'theme_family': lambda v: isinstance(v, str) and 1 <= len(v) <= 30,
@@ -29,6 +40,7 @@ _PREF_VALIDATORS = {
     'density': lambda v: v in ('compact', 'comfortable', 'spacious'),
     'sidebar_collapsed': lambda v: isinstance(v, bool),
     'force_desktop': lambda v: isinstance(v, bool),
+    'pins': _valid_pins,
     # `date_format`, `show_time` and `timezone` are deliberately absent. They
     # are instance-wide SystemConfig rows, served at the top level of the
     # same `/auth/verify` body that carries this blob, and that top-level
@@ -164,6 +176,10 @@ def update_preferences():
     user = db.session.get(User, g.current_user.id)
     if not user:
         return error_response('User not found', 404)
+
+    # A bad pin list is refused, not dropped: the shell must not believe it saved it.
+    if isinstance(payload, dict) and 'pins' in payload and not _valid_pins(payload['pins']):
+        return error_response('pins must be a list of at most 3 distinct module ids', 400)
 
     # PUT replaces; PATCH would merge — frontend currently uses PUT after
     # merging client-side, which keeps the contract simple.
