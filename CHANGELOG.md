@@ -11,16 +11,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
-- HA preview: `UCM_HA=1` requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, refuses operations that only change the local host, and reports `ha`, `node_id` and `leader` in `/health`. `/health/ready` answers 503 in safe mode with `UCM_HA=1` or when a check fails, and the Helm chart probes it.
 - Sessions: on PostgreSQL without Redis, server-side sessions are stored in the database (migration 138) so a session opened on one node is valid on the others; expired rows are purged by the scheduler and every row is deleted after a restore.
 - HA preview: `UCM_HA=1` enables an HA preview: the node requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, refuses operations that only change the local host, and reports `ha`, `node_id` and `leader` in `/health`. Full high availability arrives in later releases. The Helm chart now probes readiness on `/health/ready` (503 in safe mode only with `UCM_HA=1`) and liveness on `/health/live`.
 - HA preview: one node runs the scheduled tasks, elected by a PostgreSQL advisory lock and replaced within seconds when its connection drops, or about a minute after its host vanishes; nodes heartbeat in `cluster_nodes` (reported under `cluster` in `/health`), "run now" works from any node, and startup migrations run on one node at a time (migration 141).
 - Dashboard: `GET /api/v2/dashboard/queue`, `/health`, `/compliance` and `/issuance` (scope `read:dashboard`, now held by every built-in role and grantable to groups) return the work queue, per-protocol health, compliance counters and issuances and in-place renewals per CA, computed in SQL without parsing certificates. Certificates gain `key_bits` and `sig_hash` columns, backfilled by migration 139.
+
 ### Changed
 
 - Backup: archives are written as format v4, a stream of independently authenticated chunks, so creating one, decrypting it and the checks before the restore plan no longer hold it whole in memory (the plan and the writes still hold every section it carries); `BACKUP_MAX_UPLOAD_MB` now bounds only archives written before 3.0 (v1 to v3), which are still restored, and the new `BACKUP_MAX_ARCHIVE_MB` (0, no limit, by default) can bound v4 archives.
-### Changed
-
 - Breaking: the SCEP CertRep is signed with the digest of the client's request when the CA key allows it, never below the key's own (SHA-384 under a P-384 CA, where it was always SHA-256); #397.
 - Requests that name no key or hash follow one default on every issuance path: without a profile or policy it stays RSA-2048 with SHA-256, a profile or policy that refuses it moves to the first accepted type (RSA-3072, EC-P256, EC-P384) or answers 400 when none is. The hash follows the signing key, and a new intermediate CA never takes a hash below its parent's key or its own; #397.
 - Templates: a fresh installation seeds the same system template list an upgrade completes (eight templates, Client Authentication and VPN Client among them) instead of an older seven-entry list.
@@ -29,7 +27,6 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Concurrency: two workers or nodes issuing under one CA no longer lose counts of the CA's issued certificates, and the database refuses a second certificate stored with the same serial under one CA (migration 142, which lists existing duplicates and reports them in `/health` instead of creating the index). A discovery scan, a delegated OCSP responder renewal and an ACME proxy challenge now behave the same whichever worker or node handles them.
 - Certificate Transparency: `POST /api/v2/certificates/<id>/submit-ct` always failed with a server error, as it read an attribute the certificate model does not have, and the chain it built stopped at the direct issuer; the submission now sends the leaf with its full issuer chain up to the root, or the chain stored inline with the certificate, one element per certificate (RFC 6962 §4.1). Reported by Chris by e-mail.
-
 ## [2.252] - 2026-11-08
 
 ### Added
