@@ -195,9 +195,11 @@ def test_no_sweep_while_a_backup_operation_holds_the_lock(tmp_path, monkeypatch)
 def test_app_startup_sweeps_the_spool_dir():
     from pathlib import Path
 
+    from config.settings import Config
     from services.backup.section_store import STALE_AFTER_SECONDS
     from tests.fresh_app import fresh_app
-    spool = Path(os.environ['DATA_DIR']) / 'tmp'
+    # create_app sweeps Config.DATA_DIR/tmp, which the session sandbox may have moved.
+    spool = Path(Config.DATA_DIR) / 'tmp'
     spool.mkdir(parents=True, exist_ok=True)
     stale = spool / '.ucm_restore_from_a_killed_worker'
     stale.mkdir(exist_ok=True)
