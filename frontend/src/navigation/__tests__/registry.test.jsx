@@ -30,6 +30,13 @@ vi.mock('../../components', async () => {
 })
 
 vi.mock('../../pages/DashboardPage', () => ({ default: () => <div>dashboard-page</div> }))
+// Same keys as the real binding, each page a stub naming its module
+vi.mock('../pages', async () => {
+  const actual = await vi.importActual('../pages')
+  const stubs = Object.fromEntries(Object.keys(actual.pages)
+    .map(id => [id, () => <div data-testid="module-page">{id}</div>]))
+  return { ...actual, pages: stubs }
+})
 
 import { AppRoutes, moduleRoutes, guarded } from '../../App'
 import { Routes, Route } from 'react-router-dom'
@@ -72,6 +79,22 @@ describe('registry and router agree (a)', () => {
       const { unmount } = render(<MemoryRouter initialEntries={[m.path]}><AppRoutes /><Where /></MemoryRouter>)
       await waitFor(() => expect(screen.getByTestId('where').textContent, m.id).toBe('/'))
       unmount()
+    }
+  })
+
+  it('an auth module route admits a signed-in user without permissions, in the rendered tree', async () => {
+    const Where = () => <div data-testid="where">{useLocation().pathname}</div>
+    const authModules = MODULES.filter(x => x.guard === 'auth')
+    expect(authModules.length).toBeGreaterThan(0)
+    for (const m of authModules) {
+      for (const p of [m.path, ...m.paths]) {
+        const path = p.replace(/:[^/]+/g, '7')
+        auth.value = { isAuthenticated: true, loading: false, sessionChecked: true, permissions: ['read:other'] }
+        const { unmount } = render(<MemoryRouter initialEntries={[path]}><AppRoutes /><Where /></MemoryRouter>)
+        expect((await screen.findByTestId('module-page')).textContent, path).toBe(m.id)
+        expect(screen.getByTestId('where').textContent, path).toBe(path)
+        unmount()
+      }
     }
   })
 })
