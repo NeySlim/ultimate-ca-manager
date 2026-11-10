@@ -2,7 +2,7 @@ name: Tests & Quality Checks
 
 on:
   push:
-    branches: [main, master, develop, dev, test, 'v*', '*-dev', 'feature/**']
+    branches: [main, master, develop, dev, test, sextant, 'v*', '*-dev', 'feature/**']
     # Prose-only commits do not need the suite (no required checks on any
     # branch), except the two files tests read.
     paths:
