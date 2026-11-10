@@ -331,6 +331,7 @@ jobs:
             tests/test_cluster_nodes_pg.py \
             tests/test_boot_lock_pg.py \
             tests/test_discovery_recovery_ha.py \
+            tests/test_health_ha.py \
             tests/test_postgres_schema_of_its_own.py \
             tests/test_db_error_parameters_hidden.py \
             tests/test_audit_oversized_fields.py \

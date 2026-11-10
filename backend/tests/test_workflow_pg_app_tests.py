@@ -6,7 +6,7 @@ import re
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 STEP = 'Run the application tests on PostgreSQL'
 # Not gated on the variable, but HA code whose PostgreSQL behaviour must be exercised too
-ALSO_ON_PG = ('tests/test_discovery_recovery_ha.py',)
+ALSO_ON_PG = ('tests/test_discovery_recovery_ha.py', 'tests/test_health_ha.py')
 
 
 def _step_patterns():
