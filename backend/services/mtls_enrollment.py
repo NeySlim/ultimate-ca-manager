@@ -471,21 +471,16 @@ def _revocation_held(actor) -> bool:
     return actor is not None and getattr(actor, 'role', None) != 'admin'
 
 
-def remove_enrolment(auth_cert, username: str = 'system', actor=None):
-    """Revoke the certificate an enrolment names, then delete both.
+def revoke_for_removal(auth_cert, username: str = 'system', actor=None):
+    """Revoke the certificate an enrolment names, ahead of removing it.
 
-    Returns ``(True, None)`` or ``(False, response)``. Deleting the
-    ``AuthCertificate`` row is what withdraws access to UCM, and that is all
-    these routes used to do: the certificate stayed valid for every other
-    service trusting the same authority, with nothing on the CRL or at the
-    responder to say otherwise. It is revoked first so the withdrawal is
-    published, and the operator keeps a single gesture.
+    Returns ``(certificate_id, None)``, the id being None when no row of
+    this server backs the enrolment, or ``(None, (message, status))`` when the
+    enrolment must stay: a revocation that fails or needs approval.
     """
     from models import db
     from services.cert_service import CertificateService
     from utils.datetime_utils import utc_now
-    from utils.db_transaction import safe_commit
-    from utils.response import error_response
 
     certificate = certificate_row_for(auth_cert)
     certificate_id = certificate.id if certificate else None
@@ -502,10 +497,9 @@ def remove_enrolment(auth_cert, username: str = 'system', actor=None):
             policy = revocation_policy_for(certificate)
         except Exception as error:
             logger.error('Enrolment %s: policy evaluation failed: %s', auth_cert.id, error)
-            return False, error_response(
-                'Policy evaluation failed; the enrolment was not removed', 500)
+            return None, ('Policy evaluation failed; the enrolment was not removed', 500)
         if policy is not None:
-            return False, error_response(
+            return None, (
                 f'Revoking this certificate requires approval per policy "{policy.name}": '
                 'request its revocation, then remove the enrolment once it is revoked', 409)
     if needs_revoking:
@@ -520,10 +514,31 @@ def remove_enrolment(auth_cert, username: str = 'system', actor=None):
             logger.error('Enrolment %s: revocation refused: %s',
                          auth_cert.id, error)
             db.session.rollback()
-            return False, error_response(
+            return None, (
                 'The certificate could not be revoked, so it was not deleted: '
                 'it would stay valid for anything else trusting its authority. '
                 'Check that the issuing CA can sign, then try again', 409)
+    return certificate_id, None
+
+
+def remove_enrolment(auth_cert, username: str = 'system', actor=None):
+    """Revoke the certificate an enrolment names, then delete both.
+
+    Returns ``(True, None)`` or ``(False, response)``. Deleting the
+    ``AuthCertificate`` row is what withdraws access to UCM, and that is all
+    these routes used to do: the certificate stayed valid for every other
+    service trusting the same authority, with nothing on the CRL or at the
+    responder to say otherwise. It is revoked first so the withdrawal is
+    published, and the operator keeps a single gesture.
+    """
+    from models import db
+    from services.cert_service import CertificateService
+    from utils.db_transaction import safe_commit
+    from utils.response import error_response
+
+    certificate_id, refusal = revoke_for_removal(auth_cert, username=username, actor=actor)
+    if refusal is not None:
+        return False, error_response(*refusal)
 
     # The enrolment goes first: it is what mTLS authenticates against.
     db.session.delete(auth_cert)

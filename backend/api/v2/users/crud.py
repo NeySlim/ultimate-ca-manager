@@ -43,6 +43,30 @@ def _pending_approvals_count(user_id):
         return 0
 
 
+def _revoke_enrolled_certificates(user_id, actor):
+    """Revoke each certificate the user enrolled for mTLS, as removing the
+    enrolment does. Returns ``(certificate_ids, None)`` or ``(None, refusal)``:
+    on a refusal the user and every enrolment stay in place."""
+    from models import AuthCertificate
+    from services.mtls_enrollment import revoke_for_removal
+    certificate_ids = []
+    for enrolment in AuthCertificate.query.filter_by(user_id=user_id).order_by(AuthCertificate.id).all():
+        certificate_id, refusal = revoke_for_removal(
+            enrolment, username=actor.username, actor=actor)
+        if refusal is not None:
+            return None, refusal
+        if certificate_id:
+            certificate_ids.append(certificate_id)
+    return certificate_ids, None
+
+
+def _delete_withdrawn_certificates(certificate_ids, username):
+    """Delete the revoked certificate rows once the user is gone; ids left behind."""
+    from services.cert_service import CertificateService
+    return [cid for cid in certificate_ids
+            if not CertificateService.delete_certificate(cid, username=username)]
+
+
 def _purge_user_dependencies(user_id):
     """Clean up all FK dependencies before hard-deleting a user.
 
@@ -440,6 +464,10 @@ def delete_user(user_id):
         )
 
     username = user.username
+    certificate_ids, refusal = _revoke_enrolled_certificates(user_id, g.current_user)
+    if refusal is not None:
+        message, status = refusal
+        return error_response(f'User not deleted: {message}', status)
     try:
         sessions_deleted = _purge_user_dependencies(user_id)
         db.session.delete(user)
@@ -448,6 +476,7 @@ def delete_user(user_id):
         db.session.rollback()
         logger.error(f"Failed to delete user {user_id}: {e}", exc_info=True)
         return error_response('Failed to delete user', 500)
+    kept = _delete_withdrawn_certificates(certificate_ids, g.current_user.username)
 
     if sessions_deleted > 0:
         logger.info(f"Invalidated {sessions_deleted} sessions for deleted user {username}")
@@ -467,6 +496,10 @@ def delete_user(user_id):
     except Exception:
         pass
 
+    if kept:
+        return success_response(message=(
+            f'User {username} deleted; its revoked mTLS certificate(s) {kept} '
+            'could not be deleted and are still listed under Certificates'))
     return success_response(
         message=f'User {username} deleted successfully'
     )
@@ -505,6 +538,10 @@ def bulk_delete_users():
             results['failed'].append({'id': user_id, 'error': 'User has pending approval requests'})
             continue
 
+        certificate_ids, refusal = _revoke_enrolled_certificates(user_id, g.current_user)
+        if refusal is not None:
+            results['failed'].append({'id': user_id, 'error': refusal[0]})
+            continue
         try:
             sessions_deleted = _purge_user_dependencies(user_id)
             db.session.delete(user)
@@ -518,6 +555,9 @@ def bulk_delete_users():
             results['failed'].append({'id': user_id, 'error': 'Deletion failed'})
             continue
         total_sessions_invalidated += sessions_deleted
+        kept = _delete_withdrawn_certificates(certificate_ids, g.current_user.username)
+        if kept:
+            logger.warning(f"User {user_id} deleted, revoked certificate(s) {kept} not deleted")
         results['success'].append(user_id)
 
     AuditService.log_action(
