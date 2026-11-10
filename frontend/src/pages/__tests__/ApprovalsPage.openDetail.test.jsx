@@ -23,13 +23,13 @@ vi.mock('react-i18next', () => ({
 }))
 
 let mockCanRead = true
-const openWindow = vi.fn()
+const openEntity = vi.fn()
 
 vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
-  useWindowManager: () => ({
-    openWindow, closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity, closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
 }))
@@ -75,7 +75,7 @@ const clickApproveOrReject = async (label) => {
 describe('ApprovalsPage — opening what an approval issued', () => {
   beforeEach(() => {
     mockCanRead = true
-    openWindow.mockReset()
+    openEntity.mockReset()
     list.mockReset(); getStats.mockReset(); approve.mockReset(); reject.mockReset()
     list.mockResolvedValue({ data: [REQUEST] })
     getStats.mockResolvedValue({ data: { pending: 1, approved: 0, rejected: 0, total: 1 } })
@@ -86,7 +86,7 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     renderPage()
     await clickApproveOrReject('approve')
     await waitFor(() => expect(approve).toHaveBeenCalled())
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('certificate', 7))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('certificate', 7))
   })
 
   it('opens the issued intermediate CA', async () => {
@@ -94,7 +94,7 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     renderPage()
     await clickApproveOrReject('approve')
     await waitFor(() => expect(approve).toHaveBeenCalled())
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('ca', 9))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('ca', 9))
   })
 
   it('opens nothing when the certificate was not issued', async () => {
@@ -102,7 +102,7 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     renderPage()
     await clickApproveOrReject('approve')
     await waitFor(() => expect(approve).toHaveBeenCalled())
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
   })
 
   it('opens nothing when the request was closed instead of issued', async () => {
@@ -110,7 +110,7 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     renderPage()
     await clickApproveOrReject('approve')
     await waitFor(() => expect(approve).toHaveBeenCalled())
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
   })
 
   it('reports an approval whose issuance waits for the client as a success', async () => {
@@ -121,7 +121,7 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     await clickApproveOrReject('approve')
     await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('approvals.approvedSuccess'))
     expect(showError).not.toHaveBeenCalled()
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
     showError.mockRestore(); showSuccess.mockRestore()
   })
 
@@ -130,7 +130,7 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     renderPage()
     await clickApproveOrReject('reject')
     await waitFor(() => expect(reject).toHaveBeenCalled())
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
   })
 
   it('opens nothing when the approver lacks read:certificates', async () => {
@@ -139,7 +139,7 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     renderPage()
     await clickApproveOrReject('approve')
     await waitFor(() => expect(approve).toHaveBeenCalled())
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
   })
 })
 

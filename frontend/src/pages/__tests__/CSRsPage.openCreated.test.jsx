@@ -28,7 +28,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 let mockIsMobile = false
-const openWindow = vi.fn()
+const openEntity = vi.fn()
 const showWarning = vi.fn()
 const navigate = vi.fn()
 
@@ -47,8 +47,8 @@ vi.mock('../../contexts', () => ({
     isLargeScreen: !mockIsMobile, screenWidth: mockIsMobile ? 375 : 1440,
     sidebarOpen: true, setSidebarOpen: vi.fn(),
   }),
-  useWindowManager: () => ({
-    openWindow, closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity, closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
 }))
@@ -122,7 +122,7 @@ const renderPage = (initialEntries = ['/csrs']) => render(
 describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
   beforeEach(() => {
     mockIsMobile = false
-    openWindow.mockReset()
+    openEntity.mockReset()
     navigate.mockReset()
     getAll.mockReset().mockResolvedValue({ data: [PENDING_CSR] })
     getHistory.mockReset().mockResolvedValue({ data: [] })
@@ -196,7 +196,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
 
     clickSignSubmit()
     await waitFor(() => expect(sign).toHaveBeenCalled())
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('certificate', 201))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('certificate', 201))
   })
 
   it('opens the CA signed locally as an intermediate CA', async () => {
@@ -212,7 +212,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
 
     clickSignSubmit()
     await waitFor(() => expect(sign).toHaveBeenCalled())
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('ca', 202))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('ca', 202))
   })
 
   it('opens nothing when local signing is queued for approval', async () => {
@@ -224,7 +224,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
 
     clickSignSubmit()
     await waitFor(() => expect(sign).toHaveBeenCalled())
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
   })
 
   it('tells the requester a queued signing was shortened by policy', async () => {
@@ -298,7 +298,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     clickSignSubmit()
 
     await waitFor(() => expect(signCSR).toHaveBeenCalled())
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('certificate', 11))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('certificate', 11))
   })
 
   it('opens nothing when an MSCA signing comes back pending', async () => {
@@ -318,7 +318,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     clickSignSubmit()
 
     await waitFor(() => expect(signCSR).toHaveBeenCalled())
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
   })
 
   const openImport = () => {
@@ -342,7 +342,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     await waitFor(() => expect(getAll).toHaveBeenCalled())
     openImport()
     fireEvent.click(await screen.findByText('do-import'))
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('certificate', 304))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('certificate', 304))
   })
 
   it('smart import: two objects opens nothing', async () => {
@@ -352,11 +352,11 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     openImport()
     fireEvent.click(await screen.findByText('do-import'))
     await waitFor(() => expect(getAll).toHaveBeenCalledTimes(2)) // reload after import
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
     expect(getById).not.toHaveBeenCalledWith(305)
   })
 
-  it('on mobile, signing locally navigates to the certificate route instead of opening a window', async () => {
+  it('on mobile, signing locally opens the certificate in the full-screen inspector', async () => {
     mockIsMobile = true
     const user = userEvent.setup()
     sign.mockResolvedValue({ data: { id: 401 } })
@@ -371,7 +371,7 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
 
     clickSignSubmit()
     await waitFor(() => expect(sign).toHaveBeenCalled())
-    await waitFor(() => expect(navigate).toHaveBeenCalledWith('/certificates/401'))
-    expect(openWindow).not.toHaveBeenCalled()
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('certificate', 401))
+    expect(navigate).not.toHaveBeenCalled()
   })
 })

@@ -1,18 +1,15 @@
 /**
- * StatusFooter — Fixed footer bar for window management & options
+ * StatusFooter — Fixed footer bar for the inspector
  * 
- * Left: window controls (count badge, tile, cascade, close all)
- * Right: options (same window, close on navigate)
+ * Left: open object count and close all
+ * Right: option (close on navigate)
  * Hidden on dashboard and mobile.
  */
 import { useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import {
-  X, GridFour, Stack, SquaresFour,
-  ArrowsInLineHorizontal, NavigationArrow,
-} from '@phosphor-icons/react'
-import { useWindowManager } from '../../contexts/WindowManagerContext'
+import { X, SquaresFour } from '@phosphor-icons/react'
+import { useInspector } from '../../contexts/InspectorContext'
 import { cn } from '../../lib/utils'
 
 // A detail URL (/certificates/12) belongs to its list page: opening one is no page change
@@ -23,10 +20,7 @@ export function StatusFooter() {
   const location = useLocation()
   const page = pageOf(location.pathname)
   const prevPage = useRef(page)
-  const {
-    windowCount, closeAll, tileWindows, stackWindows,
-    sameWindow, closeOnNav, toggleSameWindow, toggleCloseOnNav,
-  } = useWindowManager()
+  const { openCount: windowCount, closeAll, closeOnNav, toggleCloseOnNav } = useInspector()
 
   // Close windows on navigation if option enabled
   useEffect(() => {
@@ -53,22 +47,6 @@ export function StatusFooter() {
             </div>
 
             <button
-              onClick={tileWindows}
-              className="h-6 px-1.5 rounded flex items-center gap-1 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
-              title={t('windows.tile', 'Tile')}
-            >
-              <GridFour size={13} weight="duotone" />
-            </button>
-
-            <button
-              onClick={stackWindows}
-              className="h-6 px-1.5 rounded flex items-center gap-1 text-text-secondary hover:text-text-primary hover:bg-bg-tertiary transition-colors"
-              title={t('windows.stack', 'Cascade')}
-            >
-              <Stack size={13} weight="duotone" />
-            </button>
-
-            <button
               onClick={closeAll}
               className="h-6 px-1.5 rounded flex items-center gap-1 text-text-secondary hover:text-status-danger hover:bg-status-danger-op10 transition-colors"
               title={t('windows.closeAll', 'Close All')}
@@ -83,19 +61,6 @@ export function StatusFooter() {
 
       {/* Right: Options */}
       <div className="flex items-center gap-3">
-        {/* Same window toggle */}
-        <label className="flex items-center gap-1.5 cursor-pointer group">
-          <input
-            type="checkbox"
-            checked={sameWindow}
-            onChange={toggleSameWindow}
-            className="w-3 h-3 rounded border-border accent-accent-primary cursor-pointer"
-          />
-          <span className="text-xs text-text-tertiary group-hover:text-text-secondary transition-colors">
-            {t('windows.sameWindow', 'Same window')}
-          </span>
-        </label>
-
         {/* Close on navigate toggle */}
         <label className="flex items-center gap-1.5 cursor-pointer group">
           <input

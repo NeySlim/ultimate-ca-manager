@@ -21,7 +21,7 @@ import { RevokeCertificateModal } from '../components/RevokeCertificateModal'
 import { SmartImportModal } from '../components/SmartImport'
 import { showNotices } from '../lib/notices'
 import { certificatesService, casService, truststoreService } from '../services'
-import { useNotification, useMobile, useWindowManager } from '../contexts'
+import { useNotification, useMobile } from '../contexts'
 import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
 import { extractCN, cn, certificateNames, isOnHold } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
@@ -63,7 +63,6 @@ export default function CertificatesPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { isMobile } = useMobile()
-  const { openWindow } = useWindowManager()
   const openEntity = useOpenEntity()
   const { addToHistory } = useRecentHistory('certificates')
   const { isFavorite, toggleFavorite } = useFavorites('certificates')
@@ -207,7 +206,7 @@ export default function CertificatesPage() {
   }, [location.state])
 
 
-  // Load cert details — floating window on desktop, slide-over on mobile
+  // Load cert details — inspector on desktop, slide-over on mobile
   const handleSelectCert = useCallback(async (cert) => {
     if (!cert) {
       setSelectedCert(null)
@@ -216,7 +215,7 @@ export default function CertificatesPage() {
 
     // Desktop: open floating detail window
     if (!isMobile) {
-      openWindow('certificate', cert.id)
+      openEntity('certificate', cert.id)
       // Add to recent history
       addToHistory({
         id: cert.id,
@@ -239,7 +238,7 @@ export default function CertificatesPage() {
     } catch {
       setSelectedCert(cert)
     }
-  }, [addToHistory, isMobile, openWindow])
+  }, [addToHistory, isMobile, openEntity])
 
   // Deep-link: auto-select certificate from URL param
   useEffect(() => {
@@ -248,7 +247,7 @@ export default function CertificatesPage() {
       const id = parseInt(urlCertId, 10)
       if (!isNaN(id)) {
         if (!isMobile) {
-          openWindow('certificate', id)
+          openEntity('certificate', id)
         } else {
           handleSelectCert({ id })
         }

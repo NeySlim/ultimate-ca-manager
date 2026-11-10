@@ -32,8 +32,8 @@ vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: layout.isMobile, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
 }))
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({ openWindow: vi.fn(), closeWindow: vi.fn(), windows: [] }),
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({ openEntity: vi.fn(), closeWindow: vi.fn(), windows: [] }),
 }))
 vi.mock('../../hooks', async () => {
   const actual = await vi.importActual('../../hooks/usePersistedState')

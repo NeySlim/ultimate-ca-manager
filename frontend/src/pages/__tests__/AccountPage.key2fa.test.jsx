@@ -37,7 +37,7 @@ vi.mock('../../contexts', () => ({
     showSuccess: vi.fn(), showError: vi.fn(), showConfirm: vi.fn(), showPrompt: m.showPrompt,
   }),
   useMobile: () => ({ isMobile: false, isDesktop: true, screenWidth: 1280, sidebarOpen: true, setSidebarOpen: vi.fn() }),
-  useWindowManager: () => ({ openWindow: vi.fn(), closeWindow: vi.fn(), windows: [], prefs: {}, updatePrefs: vi.fn() }),
+  useInspector: () => ({ openEntity: vi.fn(), closeWindow: vi.fn(), windows: [], prefs: {}, updatePrefs: vi.fn() }),
 }))
 
 const auth = { user: { id: 1, username: 'alice', role: 'operator' }, isAuthenticated: true, sessionChecked: true }
@@ -54,9 +54,9 @@ vi.mock('../../contexts/ThemeContext', () => ({
   useTheme: () => ({ theme: 'dark', setTheme: vi.fn(), resolvedTheme: 'dark', themes: [], colors: {} }),
   ThemeProvider: ({ children }) => children,
 }))
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({ openWindow: vi.fn(), closeWindow: vi.fn(), windows: [], prefs: {}, updatePrefs: vi.fn() }),
-  WindowManagerProvider: ({ children }) => children,
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({ openEntity: vi.fn(), closeWindow: vi.fn(), windows: [], prefs: {}, updatePrefs: vi.fn() }),
+  InspectorProvider: ({ children }) => children,
 }))
 
 import AccountPage from '../AccountPage'

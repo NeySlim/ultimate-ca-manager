@@ -29,9 +29,9 @@ vi.mock('../../contexts', () => ({
   useMobile: () => ({ isMobile: false, isTablet: false }),
 }))
 
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({
-    closeWindow: () => {}, focusWindow: () => {}, sameWindow: true, openWindow: () => {}, windows: [],
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({
+    closeEntity: () => {}, setEntityData: () => {}, openEntity: () => {},
   }),
 }))
 
@@ -46,11 +46,11 @@ vi.mock('../../services', () => ({
   truststoreService: { getById: vi.fn(), delete: vi.fn() },
 }))
 
-import { FloatingDetailWindow } from '../FloatingDetailWindow'
+import { InspectorObject } from '../inspector/InspectorObject'
 import { ActionsHarness } from '../detail/__tests__/ActionsHarness'
 
 const CERT = { id: 4, common_name: 'web.example.com', descr: 'Front door', status: 'valid' }
-const WINDOW = { id: 'w1', type: 'certificate', entityId: 4, defaultPos: { x: 0, y: 0 } }
+const WINDOW = { key: 'certificate:4', type: 'certificate', entityId: 4, data: null }
 
 describe('rename in the floating detail window', () => {
   beforeEach(() => {
@@ -64,7 +64,7 @@ describe('rename in the floating detail window', () => {
     certs.rename.mockResolvedValue({ data: { ...CERT, descr: 'Back door' } })
     const changed = vi.fn()
     window.addEventListener('ucm:data-changed', changed)
-    render(<FloatingDetailWindow windowInfo={WINDOW} />)
+    render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
     fireEvent.click(await screen.findByText('certificates.rename'))
     await waitFor(() => expect(certs.rename).toHaveBeenCalledWith(4, 'Back door'))
     await waitFor(() => expect(changed).toHaveBeenCalled())
@@ -75,7 +75,7 @@ describe('rename in the floating detail window', () => {
   it('does not call the route when the name is unchanged', async () => {
     authState.permissions = ['read:certificates', 'write:certificates']
     notify.showPrompt.mockResolvedValueOnce('Front door ')
-    render(<FloatingDetailWindow windowInfo={WINDOW} />)
+    render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
     fireEvent.click(await screen.findByText('certificates.rename'))
     await waitFor(() => expect(notify.showPrompt).toHaveBeenCalled())
     expect(certs.rename).not.toHaveBeenCalled()
@@ -83,7 +83,7 @@ describe('rename in the floating detail window', () => {
 
   it('is absent for a read-only operator', async () => {
     authState.permissions = ['read:certificates']
-    render(<FloatingDetailWindow windowInfo={WINDOW} />)
+    render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
     await screen.findByText('export.title')
     expect(screen.queryByText('certificates.rename')).not.toBeInTheDocument()
   })

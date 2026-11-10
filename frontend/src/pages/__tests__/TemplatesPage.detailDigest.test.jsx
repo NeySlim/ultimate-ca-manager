@@ -24,8 +24,8 @@ const notification = vi.hoisted(() => ({
 vi.mock('../../contexts', () => ({
   useNotification: () => notification,
   useMobile: () => ({ isMobile: false, isDesktop: true, isTouch: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
-  useWindowManager: () => ({
-    openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
 }))

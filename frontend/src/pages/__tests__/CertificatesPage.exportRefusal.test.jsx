@@ -33,8 +33,8 @@ vi.mock('../../contexts', () => ({
   useNotification: () => stable.notify,
   // On a phone the detail opens in the page itself, with this page's export handler
   useMobile: () => ({ isMobile: true, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
-  useWindowManager: () => ({
-    openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
 }))

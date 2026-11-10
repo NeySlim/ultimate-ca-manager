@@ -1,5 +1,5 @@
 /**
- * The floating window judges an entry by its own resource (DUP-FE-020).
+ * The inspector judges an entry by its own resource (DUP-FE-020).
  *
  * The window opens certificates, CAs, user certificates and trust store
  * entries, but derived the RBAC resource from only the first three:
@@ -45,11 +45,8 @@ vi.mock('../../contexts', () => ({
   useMobile: () => ({ isMobile: false, isTablet: false }),
 }))
 
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({
-    closeWindow: vi.fn(), focusWindow: vi.fn(), sameWindow: true,
-    openWindow: vi.fn(), windows: [],
-  }),
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({ closeEntity: vi.fn(), setEntityData: vi.fn(), openEntity: vi.fn() }),
 }))
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -63,7 +60,7 @@ vi.mock('../../services', () => ({
   truststoreService: truststoreMocks,
 }))
 
-import { FloatingDetailWindow } from '../FloatingDetailWindow'
+import { InspectorObject } from '../inspector/InspectorObject'
 
 const ENTRY = {
   id: 9,
@@ -72,14 +69,14 @@ const ENTRY = {
   purpose: 'tls',
 }
 
-const WINDOW = { id: 'w1', type: 'truststore', entityId: 9, defaultPos: { x: 0, y: 0 } }
+const WINDOW = { key: 'truststore:9', type: 'truststore', entityId: 9, data: null }
 
 const renderWindow = async () => {
-  render(<FloatingDetailWindow windowInfo={WINDOW} />)
+  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
   await screen.findByText(ENTRY.name)
 }
 
-describe('deleting a trust store entry from the floating window', () => {
+describe('deleting a trust store entry from the inspector', () => {
   beforeEach(() => {
     Object.values(notify).forEach(fn => fn.mockReset())
     truststoreMocks.getById.mockReset()
@@ -118,7 +115,7 @@ describe('deleting a trust store entry from the floating window', () => {
     userCertificatesService.revoke = vi.fn().mockResolvedValue({})
     certificatesService.revoke = vi.fn().mockResolvedValue({})
 
-    render(<FloatingDetailWindow windowInfo={{ ...WINDOW, id: 'w3', type: 'user_certificate', entityId: 11 }} />)
+    render(<InspectorObject entry={{ ...WINDOW, id: 'w3', type: 'user_certificate', entityId: 11 }} onTitle={() => {}} />)
     await screen.findAllByText('alice@example.test')
     fireEvent.click(screen.getByText('Revoke'))
     fireEvent.submit(await screen.findByText('revocation.confirm').then(el => el.closest('form')))
@@ -132,7 +129,7 @@ describe('deleting a trust store entry from the floating window', () => {
     authState.permissions = ['read:certificates', 'delete:certificates']
     const { certificatesService } = await import('../../services')
     certificatesService.getById.mockResolvedValue({ data: { id: 4, common_name: 'web.example.com' } })
-    render(<FloatingDetailWindow windowInfo={{ ...WINDOW, id: 'w2', type: 'certificate', entityId: 4 }} />)
+    render(<InspectorObject entry={{ ...WINDOW, id: 'w2', type: 'certificate', entityId: 4 }} onTitle={() => {}} />)
     await screen.findAllByText('web.example.com')
     expect(screen.getByLabelText('common.delete')).toBeInTheDocument()
   })

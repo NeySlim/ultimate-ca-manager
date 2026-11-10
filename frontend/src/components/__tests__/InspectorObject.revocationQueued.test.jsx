@@ -29,11 +29,8 @@ vi.mock('../../contexts', () => ({
   useMobile: () => ({ isMobile: false, isTablet: false }),
 }))
 
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({
-    closeWindow: vi.fn(), focusWindow: vi.fn(), sameWindow: true,
-    openWindow: vi.fn(), windows: [],
-  }),
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({ closeEntity: vi.fn(), setEntityData: vi.fn(), openEntity: vi.fn() }),
 }))
 
 vi.mock('../../contexts/AuthContext', () => ({
@@ -47,9 +44,9 @@ vi.mock('../../services', () => ({
   truststoreService: truststoreMocks,
 }))
 
-import { FloatingDetailWindow } from '../FloatingDetailWindow'
+import { InspectorObject } from '../inspector/InspectorObject'
 
-const WINDOW = { id: 'w1', type: 'certificate', entityId: 4, defaultPos: { x: 0, y: 0 } }
+const WINDOW = { key: 'certificate:4', type: 'certificate', entityId: 4, data: null }
 
 async function revokeThenDelete(revokeResult) {
   authState.permissions = ['read:certificates', 'write:certificates', 'delete:certificates']
@@ -58,7 +55,7 @@ async function revokeThenDelete(revokeResult) {
   certificatesService.revoke = vi.fn().mockResolvedValue(revokeResult)
   certificatesService.delete.mockResolvedValue({})
   notify.showConfirm.mockResolvedValue(true)
-  render(<FloatingDetailWindow windowInfo={WINDOW} />)
+  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
   await screen.findAllByText('web.example.com')
   fireEvent.click(screen.getByLabelText('common.delete'))
   fireEvent.submit(await screen.findByText('revocation.confirm').then(el => el.closest('form')))

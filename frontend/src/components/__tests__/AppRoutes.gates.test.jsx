@@ -15,7 +15,7 @@ vi.mock('../../contexts', () => ({
   ThemeProvider: ({ children }) => children,
   NotificationProvider: ({ children }) => children,
   MobileProvider: ({ children }) => children,
-  WindowManagerProvider: ({ children }) => children,
+  InspectorProvider: ({ children }) => children,
 }))
 vi.mock('../../hooks/useWebSocket', () => ({ WebSocketProvider: ({ children }) => children }))
 vi.mock('../../components', async () => {
@@ -28,7 +28,7 @@ vi.mock('../../components', async () => {
     ForcePasswordChange: () => <div>password-prompt</div>,
     ForceEnroll2FA: () => <div>enrol-prompt</div>,
     SafeModeOverlay: () => null,
-    DetailWindowLayer: () => null,
+    InspectorDock: () => null,
   }
 })
 vi.mock('../../pages/LoginPage', () => ({ default: () => <div>login-page</div> }))

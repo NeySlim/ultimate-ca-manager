@@ -7,7 +7,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  openWindow: vi.fn(),
+  openEntity: vi.fn(),
   notify: { showSuccess: vi.fn(), showError: vi.fn(), showWarning: vi.fn(), showConfirm: vi.fn(), showPrompt: vi.fn() },
   certificatesService: { getById: vi.fn(), delete: vi.fn(), export: vi.fn(), revoke: vi.fn(), renew: vi.fn() },
 }))
@@ -24,10 +24,8 @@ vi.mock('../../contexts', () => ({
   useNotification: () => mocks.notify,
   useMobile: () => ({ isMobile: false, isTablet: false }),
 }))
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({
-    closeWindow: vi.fn(), focusWindow: vi.fn(), sameWindow: true, openWindow: mocks.openWindow, windows: [],
-  }),
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({ closeEntity: vi.fn(), setEntityData: vi.fn(), openEntity: mocks.openEntity }),
 }))
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ permissions: ['read:certificates', 'write:certificates', 'delete:certificates'] }),
@@ -40,9 +38,9 @@ vi.mock('../../services', () => ({
 }))
 vi.mock('../deploy/CertDeploySection', () => ({ CertDeploySection: () => null }))
 
-import { FloatingDetailWindow } from '../FloatingDetailWindow'
+import { InspectorObject } from '../inspector/InspectorObject'
 
-const WINDOW = { id: 'w1', type: 'certificate', entityId: 4, defaultPos: { x: 0, y: 0 } }
+const WINDOW = { key: 'certificate:4', type: 'certificate', entityId: 4, data: null }
 const MEMBER = {
   id: 4, common_name: 'pair.example.com', status: 'valid', key_algorithm: 'EC-P256',
   related_certificate_id: 5, hybrid_role: 'classical',
@@ -51,11 +49,11 @@ const MEMBER = {
 const PARTNER = { id: 5, common_name: 'pair.example.com', related_certificate_id: 4, revoked: false, hybrid_role: 'pq' }
 
 const open = async () => {
-  render(<FloatingDetailWindow windowInfo={WINDOW} />)
+  render(<InspectorObject entry={WINDOW} onTitle={() => {}} />)
   await screen.findAllByText('pair.example.com')
 }
 
-describe('FloatingDetailWindow of a hybrid pair member', () => {
+describe('InspectorObject of a hybrid pair member', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.certificatesService.getById.mockImplementation((id) => Promise.resolve({ data: id === 5 ? PARTNER : MEMBER }))
@@ -65,7 +63,7 @@ describe('FloatingDetailWindow of a hybrid pair member', () => {
   it('opens the linked certificate in a window', async () => {
     await open()
     fireEvent.click(screen.getByRole('link', { name: 'certificates.hybrid.openRelated' }))
-    expect(mocks.openWindow).toHaveBeenCalledWith('certificate', 5)
+    expect(mocks.openEntity).toHaveBeenCalledWith('certificate', 5)
   })
 
   it('offers the hybrid bundle', async () => {

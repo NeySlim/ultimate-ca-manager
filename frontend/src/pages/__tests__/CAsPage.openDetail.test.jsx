@@ -12,7 +12,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 let mockIsMobile = false
-const openWindow = vi.fn()
+const openEntity = vi.fn()
 let mockCanRead = true
 
 vi.mock('../../contexts', () => ({
@@ -21,12 +21,12 @@ vi.mock('../../contexts', () => ({
     showConfirm: vi.fn().mockResolvedValue(false),
   }),
   useMobile: () => ({ isMobile: mockIsMobile }),
-  useWindowManager: () => ({ openWindow, closeWindow: vi.fn(), windows: [] }),
+  useInspector: () => ({ openEntity, closeWindow: vi.fn(), windows: [] }),
 }))
 
 // CAsPage imports these two directly by path — same spies, same module instances
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({ openWindow, closeWindow: vi.fn(), windows: [] }),
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({ openEntity, closeWindow: vi.fn(), windows: [] }),
 }))
 vi.mock('../../contexts/MobileContext', () => ({
   useMobile: () => ({ isMobile: mockIsMobile }),
@@ -94,7 +94,7 @@ describe('CAsPage — opens detail after create/import', () => {
   beforeEach(() => {
     mockIsMobile = false
     mockCanRead = true
-    openWindow.mockReset()
+    openEntity.mockReset()
     getAll.mockReset()
     getAll.mockResolvedValue({ data: [] })
     importResult = null
@@ -105,7 +105,7 @@ describe('CAsPage — opens detail after create/import', () => {
     await waitFor(() => expect(getAll).toHaveBeenCalled())
     fireEvent.click(await screen.findByText('common.create'))
     fireEvent.click(await screen.findByText('fire-create-success'))
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('ca', 42))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('ca', 42))
   })
 
   it('Smart Import of a single CA opens it', async () => {
@@ -114,7 +114,7 @@ describe('CAsPage — opens detail after create/import', () => {
     await waitFor(() => expect(getAll).toHaveBeenCalled())
     fireEvent.click(await screen.findByText('common.import'))
     fireEvent.click(await screen.findByText('fire-import-complete'))
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('ca', 7))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('ca', 7))
   })
 
   it('Smart Import of a single certificate opens it', async () => {
@@ -123,7 +123,7 @@ describe('CAsPage — opens detail after create/import', () => {
     await waitFor(() => expect(getAll).toHaveBeenCalled())
     fireEvent.click(await screen.findByText('common.import'))
     fireEvent.click(await screen.findByText('fire-import-complete'))
-    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('certificate', 9))
+    await waitFor(() => expect(openEntity).toHaveBeenCalledWith('certificate', 9))
   })
 
   it('Smart Import of two objects opens nothing', async () => {
@@ -133,6 +133,6 @@ describe('CAsPage — opens detail after create/import', () => {
     fireEvent.click(await screen.findByText('common.import'))
     fireEvent.click(await screen.findByText('fire-import-complete'))
     await waitFor(() => expect(screen.queryByText('fire-import-complete')).not.toBeInTheDocument())
-    expect(openWindow).not.toHaveBeenCalled()
+    expect(openEntity).not.toHaveBeenCalled()
   })
 })

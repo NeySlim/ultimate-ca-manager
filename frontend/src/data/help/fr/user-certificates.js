@@ -35,7 +35,7 @@ export default {
       'Enrôlez de nouveaux certificats mTLS depuis Compte → onglet mTLS',
       'Les certificats sont stockés et gérés par UCM comme n\'importe quel autre certificat',
       'Utilisez la barre de statistiques pour filtrer rapidement par statut',
-      'Cliquez sur une ligne pour afficher les détails complets du certificat dans une fenêtre flottante',
+      'Cliquez sur une ligne pour afficher les détails complets du certificat dans l\'inspecteur',
     ],
     warnings: [
       'Révoquer un certificat utilisateur empêche immédiatement la connexion mTLS avec ce certificat',

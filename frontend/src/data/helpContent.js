@@ -317,7 +317,7 @@ export const helpContent = {
       'Enroll new mTLS certificates from Account → mTLS tab',
       'Certificates are stored and managed by UCM like any other certificate',
       'Use the stats bar to quickly filter by status',
-      'Click a row to view full certificate details in a floating window',
+      'Click a row to view full certificate details in the inspector',
     ],
     warnings: [
       'Revoking a user certificate immediately prevents mTLS login with that certificate',

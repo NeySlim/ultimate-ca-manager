@@ -35,14 +35,14 @@ const auth = vi.hoisted(() => ({
 }))
 const env = vi.hoisted(() => ({
   mobile: { isMobile: false, isDesktop: true, screenWidth: 1280, sidebarOpen: true, setSidebarOpen: () => {} },
-  windows: { openWindow: () => {}, closeWindow: () => {}, windows: [], prefs: {}, updatePrefs: () => {} },
+  windows: { openEntity: () => {}, closeWindow: () => {}, windows: [], prefs: {}, updatePrefs: () => {} },
 }))
 
 vi.mock('../../contexts', () => ({
   useAuth: () => auth,
   useNotification: () => notify,
   useMobile: () => env.mobile,
-  useWindowManager: () => env.windows,
+  useInspector: () => env.windows,
 }))
 vi.mock('../../contexts/AuthContext', () => ({ useAuth: () => auth, AuthProvider: ({ children }) => children }))
 vi.mock('../../contexts/NotificationContext', () => ({
@@ -53,8 +53,8 @@ vi.mock('../../contexts/ThemeContext', () => ({
   useTheme: () => ({ theme: 'dark', setTheme: vi.fn(), resolvedTheme: 'dark', themes: [], colors: {} }),
   ThemeProvider: ({ children }) => children,
 }))
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => env.windows, WindowManagerProvider: ({ children }) => children,
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => env.windows, InspectorProvider: ({ children }) => children,
 }))
 // A native select stands in for the portal one; the help card reads translated arrays
 vi.mock('../../components', async (orig) => ({

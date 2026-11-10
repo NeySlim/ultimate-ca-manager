@@ -18,7 +18,6 @@ import { SmartImportModal } from '../components/SmartImport'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
 import { truststoreService, casService } from '../services'
 import { useNotification } from '../contexts'
-import { useWindowManager } from '../contexts/WindowManagerContext'
 import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useModals, usePersistedState } from '../hooks'
 import { formatDate, cn, downloadBlob } from '../lib/utils'
@@ -32,7 +31,6 @@ export default function TrustStorePage() {
   const { id: urlCertId } = useParams()
   const navigate = useNavigate()
   const { isMobile } = useMobile()
-  const { openWindow } = useWindowManager()
   const openEntity = useOpenEntity()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
@@ -89,7 +87,7 @@ export default function TrustStorePage() {
     loadCertificates()
   }, [])
 
-  // Reload when floating window actions change data. loadCertificates must be
+  // Reload when inspector actions change data. loadCertificates must be
   // in the dependencies: a listener registered once keeps the loader captured
   // at mount and reloads with the state of that moment (#345).
   useEffect(() => {
@@ -112,9 +110,9 @@ export default function TrustStorePage() {
   }, [certificates, filterPurpose, filterExpiryStatus])
 
   const handleSelectCert = async (cert) => {
-    // Desktop: floating window
+    // Desktop: inspector
     if (!isMobile) {
-      openWindow('truststore', cert.id)
+      openEntity('truststore', cert.id)
       return
     }
     // Mobile: slide-over
@@ -133,7 +131,7 @@ export default function TrustStorePage() {
       const id = parseInt(urlCertId, 10)
       if (!isNaN(id)) {
         if (!isMobile) {
-          openWindow('truststore', id)
+          openEntity('truststore', id)
         } else {
           handleSelectCert({ id })
         }

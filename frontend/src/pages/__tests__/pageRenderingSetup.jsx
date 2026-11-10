@@ -289,14 +289,14 @@ vi.mock('../../contexts', () => ({
   ThemeProvider: ({ children }) => children,
   NotificationProvider: ({ children }) => children,
   MobileProvider: ({ children }) => children,
-  useWindowManager: () => ({
-    openWindow: vi.fn(),
+  useInspector: () => ({
+    openEntity: vi.fn(),
     closeWindow: vi.fn(),
     windows: [],
     prefs: { sameWindow: true, closeOnNav: true },
     updatePrefs: vi.fn(),
   }),
-  WindowManagerProvider: ({ children }) => children,
+  InspectorProvider: ({ children }) => children,
 }))
 
 vi.mock('../../contexts/ThemeContext', () => ({
@@ -351,15 +351,15 @@ vi.mock('../../contexts/MobileContext', () => ({
   MobileProvider: ({ children }) => children,
 }))
 
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({
-    openWindow: vi.fn(),
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({
+    openEntity: vi.fn(),
     closeWindow: vi.fn(),
     windows: [],
     prefs: { sameWindow: true, closeOnNav: true },
     updatePrefs: vi.fn(),
   }),
-  WindowManagerProvider: ({ children }) => children,
+  InspectorProvider: ({ children }) => children,
 }))
 
 // ── Shared test wrapper ────────────────────────────────────────────

@@ -31,10 +31,10 @@ vi.mock('../../contexts', () => ({
     showConfirm: vi.fn().mockResolvedValue(false),
   }),
   useMobile: () => ({ isMobile: true }),
-  useWindowManager: () => ({ openWindow: vi.fn(), closeWindow: vi.fn(), windows: [] }),
+  useInspector: () => ({ openEntity: vi.fn(), closeWindow: vi.fn(), windows: [] }),
 }))
-vi.mock('../../contexts/WindowManagerContext', () => ({
-  useWindowManager: () => ({ openWindow: vi.fn(), closeWindow: vi.fn(), windows: [] }),
+vi.mock('../../contexts/InspectorContext', () => ({
+  useInspector: () => ({ openEntity: vi.fn(), closeWindow: vi.fn(), windows: [] }),
 }))
 vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => ({ isMobile: true }) }))
 vi.mock('../../hooks', async () => {

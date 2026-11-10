@@ -5,7 +5,7 @@
  *     That string exists nowhere else in the repo: the only types dispatched
  *     are `certificate`, `ca`, `truststore` and `user_certificate`, all from
  *     the floating detail window and the CA modals — and SSH certificates are
- *     never opened in a floating window (no openWindow('ssh-certificate', ...),
+ *     never opened in a floating window (no openEntity('ssh-certificate', ...),
  *     no entry in FloatingDetailWindow's DetailContent). The listener could
  *     never fire, and repointing it at `certificate` would reload the SSH list
  *     on unrelated X.509 events.
@@ -51,17 +51,17 @@ const mobile = {
   screenWidth: 1280, sidebarOpen: true, setSidebarOpen: vi.fn(),
 }
 const windowManager = {
-  openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
+  openEntity: vi.fn(), closeWindow: vi.fn(), windows: [],
   prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
 }
 
 vi.mock('../../contexts', () => ({
   useNotification: () => notification,
   useMobile: () => mobile,
-  useWindowManager: () => windowManager,
+  useInspector: () => windowManager,
 }))
 vi.mock('../../contexts/MobileContext', () => ({ useMobile: () => mobile }))
-vi.mock('../../contexts/WindowManagerContext', () => ({ useWindowManager: () => windowManager }))
+vi.mock('../../contexts/InspectorContext', () => ({ useInspector: () => windowManager }))
 
 const permission = {
   canWrite: () => true, canDelete: () => true, hasPermission: () => true, canRead: () => true,

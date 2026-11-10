@@ -14,7 +14,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 const mocks = vi.hoisted(() => ({
-  isMobile: false, openWindow: vi.fn(), create: vi.fn(), getAll: vi.fn(), getById: vi.fn(),
+  isMobile: false, openEntity: vi.fn(), create: vi.fn(), getAll: vi.fn(), getById: vi.fn(),
   revoke: vi.fn(), renew: vi.fn(), showSuccess: vi.fn(), showWarning: vi.fn(), revokeOptions: { revokeRelated: false },
 }))
 // Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
@@ -32,8 +32,8 @@ const stable = vi.hoisted(() => ({
 vi.mock('../../../contexts', () => ({
   useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: mocks.isMobile, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
-  useWindowManager: () => ({
-    openWindow: mocks.openWindow, closeWindow: vi.fn(), windows: [],
+  useInspector: () => ({
+    openEntity: mocks.openEntity, closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
 }))
@@ -128,7 +128,7 @@ describe('CertificatesPage and a hybrid pair', () => {
 
   it('opens the classical member of the pair it has just issued', async () => {
     await issuePair()
-    await waitFor(() => expect(mocks.openWindow).toHaveBeenCalledWith('certificate', 11))
+    await waitFor(() => expect(mocks.openEntity).toHaveBeenCalledWith('certificate', 11))
   })
 
   it('forwards the revocation answer about the linked certificate', async () => {
