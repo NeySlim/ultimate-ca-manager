@@ -199,6 +199,7 @@ class CommandApplier:
         self._held = None  # the restart waiting for this node's turn; later reloads still apply
         self._retry_delay = None  # seconds before the next attempt of a restart that failed
         self._retry_at = 0.0  # monotonic instant of that attempt
+        self._give_back_pending = None  # [restart_seen to restore, command id, error logged]
         self._engine = None
         self._conn = None
         self._error_logged = False
@@ -273,6 +274,8 @@ class CommandApplier:
                 self._error_logged = True
 
     def _drain(self, conn):
+        if self._give_back_pending is not None:
+            self._give_back(conn)  # before the held restart is retried: its claim must be free
         now = self._monotonic()
         self._holes = [h for h in self._holes if h[2] > now][-MAX_HOLES:]
         held_before = self._held is not None
@@ -413,16 +416,30 @@ class CommandApplier:
             self.restart_action()
             self._retry_delay = None
         except Exception as e:
-            # Still on the old process: the claim is given back and the restart retried later
+            # Still on the old process: the loop resumes before the claim is given back, which
+            # a lost database may refuse until a later pass
             self._restart_failed(e)
-            conn.execute(_RELEASE_SQL, {'prev': previous, 'id': row.id, 'n': self.node_id})
             self.restarting = False
             self._held = _Held(row.id, row.created_at)
+            self._give_back_pending = [previous, row.id, False]
             if not self._stopping:
                 self._stop.clear()
                 # stop() sets _stopping before _stop: one that lands after the check is not undone
                 if self._stopping:
                     self._stop.set()
+            self._give_back(conn)
+
+    def _give_back(self, conn):
+        previous, command_id, logged = self._give_back_pending
+        try:
+            conn.execute(_RELEASE_SQL, {'prev': previous, 'id': command_id, 'n': self.node_id})
+        except Exception as e:
+            if not logged:
+                logger.error(f"Rolling restart of node {self.node_id}: claim of command {command_id} "
+                             f"not given back, retried on the next pass: {type(e).__name__}: {e}")
+                self._give_back_pending[2] = True
+            raise
+        self._give_back_pending = None
 
     def _drop_held(self):
         """No restart pending any more: the next one that fails starts from the first step."""

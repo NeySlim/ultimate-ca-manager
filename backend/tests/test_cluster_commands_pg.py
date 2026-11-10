@@ -756,6 +756,38 @@ def test_a_new_restart_after_an_unclaimed_retry_starts_its_backoff_over(app, ha,
     assert attempts[-1] - failed_at == cc.RESTART_RETRY_FIRST
 
 
+def test_a_claim_not_given_back_after_a_failed_restart_is_given_back_later(app, ha, monkeypatch, caplog):
+    """The database is lost while the claim is given back: reloads go on, the claim is given
+    back on a later pass and the restart is retried after its delay."""
+    import logging
+    from sqlalchemy import text
+    clock, attempts, log = _FakeMonotonic(), [], []
+    real_release = cc._RELEASE_SQL
+
+    def action():
+        attempts.append(clock.t)
+        if len(attempts) == 1:
+            monkeypatch.setattr(cc, '_RELEASE_SQL', text('SELECT cc_no_such_function()'))
+            raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', monotonic=clock, restart_action=action,
+              handlers={cc.RELOAD_SYSLOG: _recorder(log, 'solo')})
+    caplog.set_level(logging.INFO, logger=cc.logger.name)
+    restart_id = _emit(app, cc.RESTART)
+    solo.run_once()
+    _fail_until(solo, clock, attempts, 1)
+    assert _restart_seen(app, 'solo') == restart_id  # still claimed
+    assert any(r.levelno == logging.ERROR and 'given back' in r.getMessage() for r in caplog.records)
+    monkeypatch.setattr(cc, '_RELEASE_SQL', real_release)
+    mark = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'after'})
+    solo.run_once()  # same instant: the claim is given back, no attempt yet
+    assert solo.seen == mark and log == [('solo', 'after')]
+    assert _restart_seen(app, 'solo') is None and len(attempts) == 1
+    _fail_until(solo, clock, attempts, 2)
+    assert attempts[1] - attempts[0] == cc.RESTART_RETRY_FIRST
+    assert solo.restarting and _restart_seen(app, 'solo') == restart_id
+
+
 def test_stop_during_a_failed_restart_is_not_undone(app, ha):
     """stop() lands between the failed restart's check of _stopping and its _stop.clear()."""
     clock = _FakeMonotonic()
