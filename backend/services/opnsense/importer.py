@@ -158,6 +158,12 @@ class ImportMixin:
                         stats['errors'].append(f"Cert {refid}: CA {caref} not found")
                         continue
 
+                serial = cert_data.get('serial_number', '')
+                if Certificate.stored_under(caref, serial):  # uix_certificates_ca_serial
+                    stats['skipped'] += 1
+                    stats['errors'].append(f"Cert {refid}: serial {serial} {Certificate.DUPLICATE_SERIAL}")
+                    continue
+
                 san_dns_list = []
                 san_ip_list = []
                 san_email_list = []
@@ -195,7 +201,7 @@ class ImportMixin:
                     cert_type=cert_data.get('type', 'server_cert'),
                     subject=cert_data.get('subject', ''),
                     issuer=cert_data.get('issuer', ''),
-                    serial_number=cert_data.get('serial_number', ''),
+                    serial_number=serial,
                     valid_from=cert_data.get('valid_from'),
                     valid_to=cert_data.get('valid_to'),
                     san_dns=json.dumps(san_dns_list) if san_dns_list else None,

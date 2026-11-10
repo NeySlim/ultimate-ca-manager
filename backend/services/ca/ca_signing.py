@@ -12,6 +12,9 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from models import CA, Certificate, db
+from utils.ca_serial_counter import (
+    log_commit_failure, next_ca_serial, retry_on_serial_collision,
+    rollback_unless_serial_collision)
 from models.certificate_template import CertificateTemplate
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
@@ -71,6 +74,7 @@ class CASigningMixin:
             )
 
     @staticmethod
+    @retry_on_serial_collision
     def sign_csr_from_crypto(
         ca: CA,
         csr: x509.CertificateSigningRequest,
@@ -259,7 +263,7 @@ class CASigningMixin:
         db.session.add(new_cert)
 
         # Increment CA serial
-        ca.serial = (ca.serial or 0) + 1
+        next_ca_serial(ca)
         try:
             db.session.flush()
             # The renewed row is archived in the commit that stores its successor,
@@ -274,8 +278,8 @@ class CASigningMixin:
         except AlreadySuperseded:
             raise
         except Exception as _commit_err:
-            db.session.rollback()
-            logger.error(f"Storing the certificate signed via {source} failed: {_commit_err}", exc_info=True)
+            rollback_unless_serial_collision(_commit_err)
+            log_commit_failure(logger, f"Storing the certificate signed via {source} failed", _commit_err)
             raise
 
         logger.info(f"Signed CSR via {source}: CN={cn}, serial={serial}, CA={ca.descr}")

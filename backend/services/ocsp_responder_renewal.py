@@ -153,6 +153,14 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
     return db_cert
 
 
+def _rebind(key, old_cert_id, new_cert_id) -> bool:
+    """Point the responder binding at the new certificate only if it still names the old
+    one: of two runners renewing the same responder, one rebinds and the other rolls back."""
+    return SystemConfig.query.filter(
+        SystemConfig.key == key, SystemConfig.value == str(old_cert_id),
+    ).update({SystemConfig.value: str(new_cert_id)}, synchronize_session=False) == 1
+
+
 def run_ocsp_responder_renewal():
     """Scheduled task: renew delegated OCSP responder certs nearing expiry."""
     if _get_config('ocsp_responder_auto_renew', 'true') != 'true':
@@ -211,8 +219,13 @@ def run_ocsp_responder_renewal():
             continue
 
         try:
+            binding_key = binding.key
             new_row = _renew_responder_cert(ca, cert)
-            binding.value = str(new_row.id)
+            if not _rebind(binding_key, cert_id, new_row.id):
+                db.session.rollback()
+                logger.info("OCSP responder of CA %s already renewed by another runner", ca_id)
+                stats['skipped'] += 1
+                continue
             cert.archived = True
             from services.audit.staging import stage_audit_entry
             stage_audit_entry(

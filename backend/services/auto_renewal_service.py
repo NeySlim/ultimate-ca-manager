@@ -477,4 +477,5 @@ class AutoRenewalService:
 # Scheduler task function
 def run_auto_renewal_task():
     """Scheduled task for auto-renewal"""
+    # Leader-only; each certificate is also claimed FOR UPDATE by renewal._reread (409 to a second renewer)
     return AutoRenewalService.run_auto_renewal()

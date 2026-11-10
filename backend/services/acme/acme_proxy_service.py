@@ -3,13 +3,14 @@ ACME Proxy Service
 Acts as a gateway between internal ACME clients and upstream ACME providers (Let's Encrypt)
 """
 import base64
+import contextlib
 import copy
 import json
 import logging
 import secrets
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Tuple, Union
 from urllib.parse import urlsplit
 
@@ -17,7 +18,7 @@ import requests
 
 from flask import current_app
 from sqlalchemy import and_, or_, inspect as sa_inspect
-from sqlalchemy.exc import NoInspectionAvailable
+from sqlalchemy.exc import NoInspectionAvailable, SQLAlchemyError
 from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
 from services.acme.dns_txt_lock import txt_record_lock as _txt_record_lock
@@ -57,8 +58,8 @@ _CERT_FALLBACK_SCAN_LIMIT = 25
 # the upstream CA may still be reading it. The order lists it, flagged, until deleted; a
 # deletion a restart lost runs at the order's next read or housekeeping pass one delay later.
 _SUBMITTED_RECORD_LINGER = 120
-# The dns-01 threads of one order run in the worker that started them: one lock per
-# order id (striped) orders their writes to the row, a row lock covers PostgreSQL too.
+# SQLite only (one node): the dns-01 threads of one order run in the worker that started
+# them, one lock per order id (striped) orders their writes; PostgreSQL locks the row.
 _ORDER_ROW_LOCKS = tuple(threading.RLock() for _ in range(64))
 # Upstream authz reads for one challenge request the local cache cannot place:
 # each costs a request on the shared upstream account.
@@ -210,8 +211,73 @@ class _TtlCache:
 _directory_cache = _TtlCache(ttl_seconds=3600, max_entries=64)
 # Upstream finalize URL, keyed by upstream order URL.
 _finalize_url_cache = _TtlCache(ttl_seconds=24 * 3600, max_entries=4096)
-# (order id, identifier, authz URL) keyed by _challenge_cache_key().
-_challenge_order_cache = _TtlCache(ttl_seconds=24 * 3600, max_entries=8192)
+
+
+class _ChallengeOrderLinks:
+    """(order id, identifier, authz URL) keyed by _challenge_cache_key(), stored in the
+    database: the worker or node that answers the challenge POST need not be the one
+    that served the authorization. Best effort: a failed write leaves the upstream read."""
+
+    TTL = timedelta(hours=24)
+
+    @staticmethod
+    def _digest(key):
+        import hashlib
+        return hashlib.sha256(key.encode('utf-8')).hexdigest()
+
+    def get(self, key):
+        from models import AcmeProxyChallengeLink
+        if not key:
+            return None
+        row = AcmeProxyChallengeLink.query.filter_by(key_sha256=self._digest(key)).first()
+        if row is None or row.created_at < utc_now() - self.TTL:
+            return None
+        return row.order_id, row.identifier, row.authz_url
+
+    def put(self, key, value) -> None:
+        from models import AcmeProxyChallengeLink
+        if not key or value is None:
+            return
+        order_id, identifier, authz_url = value
+        digest = self._digest(key)
+        try:
+            with db.session.begin_nested():
+                AcmeProxyChallengeLink.query.filter(
+                    (AcmeProxyChallengeLink.key_sha256 == digest)
+                    | (AcmeProxyChallengeLink.created_at < utc_now() - self.TTL)
+                ).delete(synchronize_session=False)
+                db.session.add(AcmeProxyChallengeLink(
+                    key_sha256=digest, order_id=order_id, identifier=identifier,
+                    authz_url=authz_url, created_at=utc_now()))
+        except SQLAlchemyError as exc:
+            # A concurrent writer recorded the same link: only the savepoint is undone
+            logger.debug("[ACME Proxy] challenge link not recorded: %s", type(exc).__name__)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            raise
+
+    def pop(self, key) -> None:
+        from models import AcmeProxyChallengeLink
+        if not key:
+            return
+        AcmeProxyChallengeLink.query.filter_by(key_sha256=self._digest(key)).delete(
+            synchronize_session=False)
+
+    def clear(self) -> None:
+        from flask import has_app_context
+        from models import AcmeProxyChallengeLink
+        if not has_app_context():  # nothing is held in the process itself
+            return
+        try:
+            AcmeProxyChallengeLink.query.delete(synchronize_session=False)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+
+
+_challenge_order_cache = _ChallengeOrderLinks()
 # Upstream RenewalInfo and its retry instant, keyed by (directory URL, certID): kept for
 # the upstream Retry-After, within these bounds (RFC 9773 §4.3).
 _RENEWAL_INFO_CACHE_MIN, _RENEWAL_INFO_CACHE_MAX = 60, 3600
@@ -233,7 +299,10 @@ def _update_order_row(order, change):
     thread's commit would overwrite it."""
     try:
         db.session.commit()  # no transaction held while waiting for the lock
-        with _ORDER_ROW_LOCKS[order.id % len(_ORDER_ROW_LOCKS)]:
+        # PostgreSQL: the row lock orders every worker and node; SQLite ignores FOR UPDATE
+        lock = (contextlib.nullcontext() if db.engine.dialect.name == 'postgresql'
+                else _ORDER_ROW_LOCKS[order.id % len(_ORDER_ROW_LOCKS)])
+        with lock:
             db.session.refresh(order, with_for_update=True)
             result = change(order)
             db.session.commit()
@@ -1740,7 +1809,9 @@ class AcmeProxyService:
         if cached:
             order_id, domain, authz_url = cached
             order = db.session.get(AcmeClientOrder, order_id)
-            if order is not None and order.is_proxy_order:
+            # A deleted order's id can be reused (SQLite): the link holds only on its authorization
+            if (order is not None and order.is_proxy_order
+                    and authz_url in self._recorded_authz_urls(order)):
                 return order, domain, authz_url
             _challenge_order_cache.pop(cache_key)
 

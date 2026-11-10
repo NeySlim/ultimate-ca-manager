@@ -10,6 +10,9 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, Certificate
+from utils.ca_serial_counter import (
+    log_commit_failure, next_ca_serial, retry_on_serial_collision,
+    rollback_unless_serial_collision)
 from services.file_regen_service import mirror_private_key
 from services.trust_store import TrustStoreService
 from utils.dn_parse import subject_common_name
@@ -187,6 +190,7 @@ class CSRMixin:
         return certificate
 
     @staticmethod
+    @retry_on_serial_collision
     def sign_csr(
         cert_id: int,
         caref: str,
@@ -444,7 +448,7 @@ class CSRMixin:
             certificate.san_email = json.dumps(san_email_list)
 
         # Increment CA serial
-        ca.serial = (ca.serial or 0) + 1
+        next_ca_serial(ca)
 
         # If signing as intermediate CA, create a CA record
         new_ca = None
@@ -495,8 +499,8 @@ class CSRMixin:
             record_request_key(csr_obj.public_bytes(serialization.Encoding.DER), related_a)
             db.session.commit()
         except Exception as _commit_err:
-            db.session.rollback()
-            logger.error(f"Commit failed in services/cert/mixins/csr.py:303: {_commit_err}", exc_info=True)
+            rollback_unless_serial_collision(_commit_err)
+            log_commit_failure(logger, "Storing the signed CSR failed", _commit_err)
             raise
 
         # A request queued for approval and then signed directly is closed

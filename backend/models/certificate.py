@@ -2,7 +2,7 @@
 Certificate Model - Certificates and CSRs
 """
 import json
-from sqlalchemy import event
+from sqlalchemy import event, text
 
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
@@ -11,6 +11,12 @@ from utils.datetime_utils import utc_now, utc_isoformat
 class Certificate(db.Model):
     """Certificate model"""
     __tablename__ = "certificates"
+    # RFC 5280 §4.1.2.2: one serial per issuing CA (migration 142 on existing installations)
+    __table_args__ = (
+        db.Index('uix_certificates_ca_serial', 'caref', 'serial_number', unique=True,
+                 sqlite_where=text("caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''"),
+                 postgresql_where=text("caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''")),
+    )
     
     id = db.Column(db.Integer, primary_key=True)
     refid = db.Column(db.String(36), unique=True, nullable=False, index=True)
@@ -93,6 +99,15 @@ class Certificate(db.Model):
     # Relationships
     ca = db.relationship("CA", back_populates="certificates")
     template = db.relationship("CertificateTemplate", foreign_keys=[template_id])
+
+    DUPLICATE_SERIAL = "already stored under this CA"
+
+    @classmethod
+    def stored_under(cls, caref, serial_number):
+        """The row uix_certificates_ca_serial would collide with, or None."""
+        if not caref or not serial_number:
+            return None
+        return cls.query.filter_by(caref=caref, serial_number=serial_number).first()
     
     @property
     def template_overrides_list(self) -> list:

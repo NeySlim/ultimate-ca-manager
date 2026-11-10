@@ -360,6 +360,7 @@ class MicrosoftCAInventoryMixin:
 
 def scheduled_msca_inventory_sync():
     """Scheduler entry point: incremental inventory sync for opted-in connections."""
+    # Leader-only: one scheduler runs it, so the sync needs no claim of its own
     connections = MicrosoftCA.query.filter_by(
         enabled=True, inventory_sync_enabled=True
     ).all()

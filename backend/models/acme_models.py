@@ -594,6 +594,21 @@ class AcmeClientOrder(db.Model):
         return f'<AcmeClientOrder {self.primary_domain} status={self.status}>'
 
 
+class AcmeProxyChallengeLink(db.Model):
+    """Which proxy order, identifier and authorization an upstream challenge belongs to,
+    per requester: shared by every worker and node, unlike a process cache."""
+    __tablename__ = 'acme_proxy_challenge_links'
+
+    id = db.Column(db.Integer, primary_key=True)
+    # SHA-256 of (challenge URL, requester account, requester thumbprint)
+    key_sha256 = db.Column(db.String(64), unique=True, nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('acme_client_orders.id', ondelete='CASCADE'),
+                         nullable=False, index=True)
+    identifier = db.Column(db.String(255))
+    authz_url = db.Column(db.Text)
+    created_at = db.Column(db.DateTime, default=utc_now, nullable=False, index=True)
+
+
 class AcmeDomain(db.Model):
     """ACME Domain - Maps domains to DNS providers and issuing CAs"""
     __tablename__ = 'acme_domains'

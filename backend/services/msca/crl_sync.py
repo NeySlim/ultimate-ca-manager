@@ -289,6 +289,7 @@ class MicrosoftCACRLSyncMixin:
 
 def scheduled_msca_crl_sync():
     """Scheduler entry point: sync every enabled connection that opted in."""
+    # Leader-only: one scheduler runs it, so the sync needs no claim of its own
     connections = MicrosoftCA.query.filter_by(enabled=True, crl_sync_enabled=True).all()
     if not connections:
         return

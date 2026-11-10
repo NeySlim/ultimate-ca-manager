@@ -19,6 +19,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
 from flask import has_request_context, request
+from sqlalchemy.exc import IntegrityError
 from fips_mode import FipsRestricted
 from utils.key_codec import refuse_eddsa_key
 from utils.trusted_proxy import client_ip
@@ -314,7 +315,6 @@ class SmartImporter:
             # (CAs live in a separate table and have their own ca.created event)
             try:
                 from services.webhook_service import emit_cert_imported
-                from models import Certificate
                 for cid in result.imported_ids.get('certificates', []):
                     obj = db.session.get(Certificate, cid)
                     if obj:
@@ -325,6 +325,12 @@ class SmartImporter:
         except FipsRestricted:
             db.session.rollback()
             raise
+        except IntegrityError:
+            # A row stored concurrently under the same (CA, serial): no SQL reaches the user
+            db.session.rollback()
+            logger.warning("Smart import refused by a unique constraint", exc_info=True)
+            result.success = False
+            result.errors.append(f"Import failed: a certificate is {Certificate.DUPLICATE_SERIAL}")
         except Exception as e:
             db.session.rollback()
             result.success = False
@@ -533,6 +539,12 @@ class SmartImporter:
                 if ca:
                     caref = ca.refid
             
+            # The unique (caref, serial_number) index holds whatever skip_duplicates says
+            if Certificate.stored_under(caref, cert_obj.serial_number):
+                result.warnings.append(f"Skipped certificate {self._get_cn(cert_obj.subject)}: "
+                                       f"serial {cert_obj.serial_number} {Certificate.DUPLICATE_SERIAL}")
+                continue
+
             # Find matching private key
             prv = None
             key_pem = None
