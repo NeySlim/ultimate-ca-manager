@@ -1,6 +1,8 @@
 /**
  * CAPanel: pure presentation of one Certificate Authority. Actions and their
  * modals live in hooks/useEntityActions; `section` picks one named part.
+ * The rule covers direct imports: self-loading field components (see
+ * README.md) are known exceptions until the inspector lot.
  */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'

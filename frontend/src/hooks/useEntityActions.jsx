@@ -47,8 +47,7 @@ const definedOnly = (obj) => Object.fromEntries(Object.entries(obj || {}).filter
  * @param {(updated: object) => void} [p.onChanged]  entity replaced in place
  * @param {() => void} [p.onClose]  the surface showing the entity should go away
  * @param {'close'|'refresh'} [p.afterMutation]  what a surface does once an action went through:
- *   'close' (detail window) or 'refresh' (slide-over: stay open, reload the entity via onChanged).
- *   Deleting always closes.
+ *   'close' (default) or 'refresh' (stay open, reload the entity via onChanged). Deleting always closes.
  * @param {() => void} [p.onMutate]  called just before a mutating request
  * @param {object} [p.permissions]  { canWrite, canDelete, hasPermission } override
  * @param {Function} [p.t]  translator override
