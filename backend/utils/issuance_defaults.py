@@ -92,6 +92,8 @@ def _of_strength(family, bits):
 BASELINE_ISSUE_KEY = 'RSA-2048'
 # Key type of a new ACME account when the request names none (not an issuance key)
 DEFAULT_ACME_ACCOUNT_KEY_TYPE = 'RSA-2048'
+# Key type of the certificates the ACME client orders when its setting is unset
+DEFAULT_ACME_CLIENT_CERT_KEY_TYPE = 'RSA-2048'
 _ISSUE_KEY_FALLBACKS = ('RSA-3072', 'EC-P256', 'EC-P384')
 
 
