@@ -249,6 +249,33 @@ def record_refusal(approval, error) -> None:
         approval.request_data = json.dumps(data)
 
 
+def close_request(approval, reason: str, *, user_id=None, username: str = 'system') -> Optional[dict]:
+    """The one way a request nothing can satisfy any more is closed: a
+    rejecting vote with *reason*, its protocol's echo, an audit entry and the
+    rejection webhook. The request's snapshot, None when it could not be stored."""
+    from services.audit_service import AuditService
+    from services.webhook_service import emit_csr_rejected
+    from utils.db_transaction import safe_commit
+    approval.add_approval(user_id=user_id, username=username, action='reject', comment=reason)
+    approval.status = 'rejected'
+    approval.resolved_at = utc_now()
+    ok, _err = safe_commit(logger, "Failed to close approval request")
+    if not ok:
+        return None
+    propagate_closed([approval])
+    AuditService.log_action(
+        action='approval_closed',
+        resource_type='approval',
+        resource_id=str(approval.id),
+        resource_name=f'Approval #{approval.id}',
+        details=f'Closed by {username}: {reason}',
+        success=True,
+    )
+    result = approval.to_dict()
+    emit_csr_rejected(result, reason=reason, actor=username)
+    return result
+
+
 def close_withdrawn(approval, reason: str = CERTIFICATE_WITHDRAWN) -> None:
     """Close an approved request that can no longer be delivered (its
     certificate went away, the certificate it renews was revoked): rejected,
@@ -256,10 +283,8 @@ def close_withdrawn(approval, reason: str = CERTIFICATE_WITHDRAWN) -> None:
     data = request_data(approval)
     data['closed_reason'] = reason
     approval.request_data = json.dumps(data)
-    approval.status = 'rejected'
-    approval.resolved_at = utc_now()
-    db.session.commit()
     logger.warning("Approval #%s closed before delivery: %s", approval.id, reason)
+    close_request(approval, reason)
 
 
 def decision_reason(approval) -> str:

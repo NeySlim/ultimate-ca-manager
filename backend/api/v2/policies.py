@@ -199,25 +199,10 @@ def _close_request_target_gone(approval, reason, user_id, username):
     approver who found out, with the reason; webhooks are told as for a
     rejection. Whatever the number of approvals required, the first vote
     that finds the target gone closes the request."""
-    approval.add_approval(user_id=user_id, username=username, action='reject', comment=reason)
-    approval.status = 'rejected'
-    approval.resolved_at = utc_now()
-    ok, _err = safe_commit(logger, "Failed to close approval request")
-    if not ok:
-        return _err
-    from services.protocol_approval import propagate_closed
-    propagate_closed([approval])
-    AuditService.log_action(
-        action='approval_closed',
-        resource_type='approval',
-        resource_id=str(approval.id),
-        resource_name=f'Approval #{approval.id}',
-        details=f'Closed by {username}: {reason}',
-        success=True,
-    )
-    result = approval.to_dict()
-    from services.webhook_service import emit_csr_rejected
-    emit_csr_rejected(result, reason=reason, actor=username)
+    from services.protocol_approval import close_request
+    result = close_request(approval, reason, user_id=user_id, username=username)
+    if result is None:
+        return error_response("Failed to close approval request", 500)
     result['certificate_issued'] = False
     result['request_closed'] = True
     result['issue_error'] = reason

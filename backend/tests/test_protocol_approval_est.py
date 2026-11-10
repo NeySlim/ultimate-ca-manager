@@ -376,3 +376,29 @@ def test_an_approval_is_never_seen_without_its_certificate(app, client, auth_cli
         assert _cert_of(heard[0]).public_key() == csr.public_key()
         (_id, status, data, cert_id), = requests_of(app, pid, 'est_enroll')
         assert status == 'approved' and cert_id is not None and data['delivered_at']
+
+
+def test_a_withdrawn_certificate_closes_the_request_as_any_closure(app, client, auth_client, est_config,
+                                                                   monkeypatch):
+    """Vote, audit and webhook, as when an approver finds the target gone."""
+    from models import AuditLog
+    from services import webhook_service
+    emitted = []
+    monkeypatch.setattr(webhook_service, 'emit_csr_rejected',
+                        lambda csr, reason=None, actor=None: emitted.append((csr['id'], reason, actor)))
+    with approval_policy(app, est_config['id'], 'est-held-withdrawn-audit') as pid:
+        csr, _ = _make_csr(common_name='withdrawn-audit.est-approval.test')
+        _held(_enroll(client, csr))
+        (approval_id, *_), = requests_of(app, pid, 'est_enroll')
+        approve(auth_client, approval_id)
+        _withdraw(app, approval_id)
+        assert _enroll(client, csr).status_code == 403
+        assert emitted == [(approval_id, 'Certificate withdrawn', 'system')]
+        with app.app_context():
+            from models import db
+            from models.policy import ApprovalRequest
+            entry = (AuditLog.query.filter_by(action='approval_closed', resource_id=str(approval_id))
+                     .order_by(AuditLog.id.desc()).first())
+            assert entry is not None and 'Certificate withdrawn' in entry.details
+            votes = db.session.get(ApprovalRequest, approval_id).get_approvals()
+            assert votes[-1]['action'] == 'reject' and votes[-1]['comment'] == 'Certificate withdrawn'
