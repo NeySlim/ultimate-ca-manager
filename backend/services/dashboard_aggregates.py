@@ -11,7 +11,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy import (DateTime, String, and_, case, func, literal, literal_column,
                         or_, select, true, type_coerce, union_all)
 
-from models import CA, Certificate
+from models import CA, Certificate, SystemConfig
 from models.acme_models import AcmeClientOrder, AcmeOrder
 from models.audit_log import AuditLog
 from models.certificate_template import CertificateTemplate
@@ -161,6 +161,18 @@ def _queue_union(now):
     return union_all(*parts).subquery('queue')
 
 
+def _renewed_by_acme_client():
+    """UCM's ACME client renews a certificate only through its issued order with renewal
+    on, and only while the global switch, when set, reads 'true' (acme_renewal_service)."""
+    switch_off = select(SystemConfig.id).where(
+        SystemConfig.key == 'acme.client.renewal_enabled',
+        or_(SystemConfig.value.is_(None), func.lower(SystemConfig.value) != 'true')).exists()
+    order = select(AcmeClientOrder.id).where(
+        AcmeClientOrder.certificate_id == Certificate.id, AcmeClientOrder.renewal_enabled.is_(True),
+        AcmeClientOrder.status == 'issued').exists()
+    return and_(Certificate.source == 'acme_client', order, ~switch_off)
+
+
 def _manual_renewal_conditions(now):
     """Issued, live, inside the expiry window, left alone by auto-renewal (no stored
     key, a source it skips, or auto-renewal off), not renewed by its own client
@@ -178,7 +190,7 @@ def _manual_renewal_conditions(now):
         Certificate.valid_to.isnot(None), Certificate.valid_to > now,
         Certificate.valid_to <= now + timedelta(days=EXPIRY_WINDOW_DAYS),
         true() if not config['enabled'] else or_(*skipped),
-        or_(Certificate.source.is_(None), Certificate.source != 'acme_client'),
+        ~_renewed_by_acme_client(),
         or_(Certificate.source.is_(None), Certificate.source.notin_(CLIENT_RENEWED_SOURCES), ~no_key),
         ~superseded,
     ]

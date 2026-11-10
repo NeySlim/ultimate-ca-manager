@@ -21,6 +21,7 @@ from utils.datetime_utils import utc_now
 URL = '/api/v2/dashboard/queue'
 _PEM = [self_signed(ec.generate_private_key(ec.SECP256R1()))]
 SETTINGS = ('auto_renewal_enabled', 'auto_renewal_sources')
+ACME_SWITCH = 'acme.client.renewal_enabled'
 
 
 def _ca(name, **kw):
@@ -75,12 +76,14 @@ def seeded(app):
                         created_at=now - timedelta(days=8))
         client = AcmeClientOrder(domains='["queue-client.test"]', renewal_failures=2, last_error_at=now)
         healthy = AcmeClientOrder(domains='["queue-ok.test"]', renewal_failures=0)
+        renewing = AcmeClientOrder(domains='["queue-acme-client.test"]', status='issued', renewal_enabled=True)
+        not_renewing = AcmeClientOrder(domains='["queue-acme-off.test"]', status='issued', renewal_enabled=False)
         urgent = ApprovalRequest(request_type='certificate', status='pending', expires_at=now + timedelta(hours=2))
         calm = ApprovalRequest(request_type='renewal', status='pending')
         done = ApprovalRequest(request_type='renewal', status='approved')
         scep = SCEPRequest(transaction_id='queue-txn', csr='-', status='pending', subject='CN=queue-scep')
         recovery = KeyRecoveryRequest(cert_id=1, reason='lost', requested_by='admin', cert_cn='queue-kr')
-        db.session.add_all([failed, old, client, healthy, urgent, calm, done, scep, recovery])
+        db.session.add_all([failed, old, client, healthy, renewing, not_renewing, urgent, calm, done, scep, recovery])
         crl_soon = _ca('queue-crl-soon', cdp_enabled=True, valid_to=now + timedelta(days=3650))
         _crl(crl_soon, now + timedelta(days=7), crl_number=1, created_at=now - timedelta(days=1))
         _crl(crl_soon, now + timedelta(hours=12), crl_number=2)
@@ -114,6 +117,10 @@ def seeded(app):
             'acme_nokey': _cert('queue-acme', now + timedelta(days=20), source='acme'),
             'wstep_nokey': _cert('queue-wstep', now + timedelta(days=20), source='wstep'),
             'acme_client': _cert('queue-acme-client', now + timedelta(days=10), prv='k', source='acme_client'),
+            # UCM's ACME client renews only through an issued order with renewal on
+            'acme_client_off': _cert('queue-acme-off', now + timedelta(days=10), prv='k', source='acme_client'),
+            'acme_client_orphan': _cert('queue-acme-orphan', now + timedelta(days=10), prv='k',
+                                        source='acme_client'),
             'superseded': _cert('queue-superseded', now + timedelta(days=10), caref=crl_fresh.refid),
             'successor': _cert('queue-successor', now + timedelta(days=300), caref=crl_fresh.refid,
                                subject_cn='queue-superseded'),
@@ -121,8 +128,10 @@ def seeded(app):
             'revoked_successor': _cert('queue-revoked-succ-new', now + timedelta(days=300), caref=crl_fresh.refid,
                                        subject_cn='queue-revoked-succ', revoked=True),
         }
+        renewing.certificate_id = certs['acme_client'].id
+        not_renewing.certificate_id = certs['acme_client_off'].id
         db.session.commit()
-        ids.update(failed=failed.id, old=old.id, client=client.id, healthy=healthy.id, urgent=urgent.id,
+        ids.update(renewing=renewing.id, not_renewing=not_renewing.id, failed=failed.id, old=old.id, client=client.id, healthy=healthy.id, urgent=urgent.id,
                    calm=calm.id, done=done.id, scep=scep.id, recovery=recovery.id,
                    crl_soon=crl_soon.id, crl_fresh=crl_fresh.id, crl_renewed=crl_renewed.id, crl_none=crl_none.id,
                    crl_offline=crl_offline.id, crl_upload=crl_upload.id, no_cdp=no_cdp.id,
@@ -130,8 +139,8 @@ def seeded(app):
                    **{k: v.id for k, v in certs.items()}, account=account.id)
     yield ids
     with app.app_context():
-        for model, keys in ((Certificate, certs), (AcmeOrder, ('failed', 'old')),
-                            (AcmeClientOrder, ('client', 'healthy')), (ApprovalRequest, ('urgent', 'calm', 'done')),
+        for model, keys in ((AcmeClientOrder, ('client', 'healthy', 'renewing', 'not_renewing')),
+                            (Certificate, certs), (AcmeOrder, ('failed', 'old')), (ApprovalRequest, ('urgent', 'calm', 'done')),
                             (SCEPRequest, ('scep',)), (KeyRecoveryRequest, ('recovery',))):
             for key in keys:
                 row = db.session.get(model, ids[key])
@@ -169,6 +178,8 @@ def _find(data, kind, item_id):
     ('manual_renewal_due', 'no_key_10d', 'warning'),
     ('manual_renewal_due', 'excluded_source', 'warning'),
     ('manual_renewal_due', 'revoked_successor_of', 'warning'),
+    ('manual_renewal_due', 'acme_client_off', 'warning'),
+    ('manual_renewal_due', 'acme_client_orphan', 'warning'),
     ('ca_expiring', 'ca_soon', 'critical'),
     ('ca_expiring', 'ca_later', 'warning'),
 ])
@@ -210,6 +221,23 @@ def test_auto_renewal_off_makes_every_renewal_manual(app, auth_client, seeded):
     finally:
         with app.app_context():
             _set('auto_renewal_enabled', 'true')
+            db.session.commit()
+
+
+def test_acme_client_renewal_switched_off_makes_it_manual(app, auth_client, seeded):
+    with app.app_context():
+        saved = getattr(SystemConfig.query.filter_by(key=ACME_SWITCH).first(), 'value', None)
+        _set(ACME_SWITCH, 'false')
+        db.session.commit()
+    try:
+        assert _find(_queue(auth_client), 'manual_renewal_due', seeded['acme_client']) is not None
+        with app.app_context():
+            _set(ACME_SWITCH, 'true')
+            db.session.commit()
+        assert _find(_queue(auth_client), 'manual_renewal_due', seeded['acme_client']) is None
+    finally:
+        with app.app_context():
+            _set(ACME_SWITCH, saved)
             db.session.commit()
 
 
