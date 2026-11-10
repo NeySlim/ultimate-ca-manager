@@ -5,14 +5,18 @@ node whose dedicated connection still holds it; nothing on disk is shared.
 """
 import logging
 import os
+from contextlib import contextmanager
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.pool import NullPool
 
 logger = logging.getLogger(__name__)
 
-# Advisory lock key, database wide: the ASCII of 'UCMsched'
+# Advisory lock keys, database wide: the ASCII of 'UCMsched' and 'UCMboot!'
 LEADER_LOCK_KEY = 0x55434D7363686564
+BOOT_LOCK_KEY = 0x55434D626F6F7421
+# How long a starting node waits for another one's migrations before it gives up
+BOOT_LOCK_TIMEOUT_SECONDS = 120
 
 # A dead peer must not keep the session (and its lock) open for the kernel's default hours
 _KEEPALIVE_ARGS = {'keepalives': 1, 'keepalives_idle': 30, 'keepalives_interval': 10,
@@ -26,7 +30,9 @@ _HELD_SQL = text(
 
 def _dedicated_engine(url):
     """An engine outside the application pool: its one connection lives as long as the lock."""
-    from utils.db_url import postgres_connect_args
+    from utils.db_url import postgres_connect_args, sqlalchemy_url
+    if isinstance(url, str):
+        url = sqlalchemy_url(url)
     url_text = url if isinstance(url, str) else url.render_as_string(hide_password=False)
     args = dict(_KEEPALIVE_ARGS, **postgres_connect_args(url_text))
     return create_engine(url, poolclass=NullPool, hide_parameters=True, connect_args=args)
@@ -115,6 +121,53 @@ class PgAdvisoryLock:
         except Exception:
             pass
 
+
+
+
+class BootLockTimeout(RuntimeError):
+    """Another node held the startup lock longer than BOOT_LOCK_TIMEOUT_SECONDS."""
+
+
+@contextmanager
+def boot_lock(url, timeout=None, key=None):
+    """Serialise migrations and schema initialisation between nodes (HA only).
+
+    Blocks on a session advisory lock, at most ``timeout`` seconds, then fails explicitly.
+    """
+    from utils.ha import ha_enabled
+    if not ha_enabled():
+        yield
+        return
+    timeout = BOOT_LOCK_TIMEOUT_SECONDS if timeout is None else timeout
+    key = BOOT_LOCK_KEY if key is None else key
+    engine = _dedicated_engine(url)
+    try:
+        conn = engine.connect().execution_options(isolation_level='AUTOCOMMIT')
+        try:
+            conn.execute(text("SELECT set_config('lock_timeout', :v, false)"),
+                         {'v': f'{int(timeout * 1000)}ms'})
+            logger.info("Waiting for the cluster startup lock (migrations)...")
+            try:
+                conn.execute(text('SELECT pg_advisory_lock(:k)'), {'k': key})
+            except Exception as e:
+                if getattr(getattr(e, 'orig', None), 'sqlstate', None) == '55P03':
+                    raise BootLockTimeout(
+                        f"Another node held the startup lock for more than {timeout}s: "
+                        "its migrations are still running or it is stuck. Refusing to start."
+                    ) from None
+                raise
+            logger.info("Cluster startup lock acquired")
+            try:
+                yield
+            finally:
+                try:
+                    conn.execute(text('SELECT pg_advisory_unlock(:k)'), {'k': key})
+                except Exception:
+                    pass  # closing the session frees it anyway
+        finally:
+            conn.close()
+    finally:
+        engine.dispose()
 
 
 # A node whose scheduler process missed this many passes counts as gone

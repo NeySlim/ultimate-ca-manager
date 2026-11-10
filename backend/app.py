@@ -232,11 +232,15 @@ def create_app(config_name=None):
     # Failure here MUST stop startup: continuing with a broken schema causes
     # silent data corruption or 500s on every request. Operators should see
     # the failure immediately and fix it before the service comes back up.
-    from migration_runner import run_all_migrations
+    from migration_runner import run_all_migrations, _get_db_url
+    from services.scheduler_leader import boot_lock
     db_path = config.DATABASE_PATH
     if db_path:
         os.environ.setdefault('DATABASE_PATH', str(db_path))
-    if not run_all_migrations(dry_run=False, verbose=False):
+    # HA: one node at a time migrates; the next one finds nothing left to apply
+    with boot_lock(_get_db_url()):
+        migrated = run_all_migrations(dry_run=False, verbose=False)
+    if not migrated:
         raise RuntimeError(
             "Schema migration failed at startup. Refusing to start with an "
             "inconsistent database. Check the migration log and fix the issue "
@@ -480,7 +484,8 @@ def create_app(config_name=None):
     
     lock_file = os.path.join(DATA_DIR, '.db_init.lock')
     
-    with app.app_context():
+    # The host flock orders this node's processes, the HA boot lock the other nodes
+    with app.app_context(), boot_lock(_get_db_url()):
         # Acquire exclusive lock to ensure only one worker initializes DB
         with open(lock_file, 'w') as lock:
             app.logger.info("Waiting for database initialization lock...")
