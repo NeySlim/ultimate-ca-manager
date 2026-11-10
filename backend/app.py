@@ -307,19 +307,22 @@ def create_app(config_name=None):
         if stale is not None:
             db.metadata.remove(stale)
     
-    Session(app)
-    if app.config.get('SESSION_TYPE') == 'sqlalchemy':
-        from utils.session_store import IsolatedSqlSessionInterface
-        # Same object and model, only the transaction handling differs
-        app.session_interface.__class__ = IsolatedSqlSessionInterface
-        # The purge filters on expiry; fresh or switched installs never ran migration 138
-        from sqlalchemy import Index
-        model = app.session_interface.sql_session_model
-        try:
-            with app.app_context():
-                Index(f'ix_{model.__tablename__}_expiry', model.expiry).create(db.engine, checkfirst=True)
-        except Exception as exc:  # a node starting alongside may have just created it
-            app.logger.warning("Could not create the session expiry index: %s", exc)
+    # Flask-Session creates its table here: under the HA boot lock, or two nodes
+    # starting on an empty schema both try to create it and one fails
+    with boot_lock(_get_db_url()):
+        Session(app)
+        if app.config.get('SESSION_TYPE') == 'sqlalchemy':
+            from utils.session_store import IsolatedSqlSessionInterface
+            # Same object and model, only the transaction handling differs
+            app.session_interface.__class__ = IsolatedSqlSessionInterface
+            # The purge filters on expiry; fresh or switched installs never ran migration 138
+            from sqlalchemy import Index
+            model = app.session_interface.sql_session_model
+            try:
+                with app.app_context():
+                    Index(f'ix_{model.__tablename__}_expiry', model.expiry).create(db.engine, checkfirst=True)
+            except Exception as exc:
+                app.logger.warning("Could not create the session expiry index: %s", exc)
     
     # Ensure session directory exists with correct permissions (filesystem mode).
     # Session files contain CSRF tokens and authenticated user IDs — anyone with
