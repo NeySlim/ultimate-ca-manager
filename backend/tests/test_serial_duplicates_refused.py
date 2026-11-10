@@ -28,8 +28,8 @@ def _states_the_procedure(message):
 
 def test_the_database_listing_names_each_pair_and_its_rows():
     conn = sqlite3.connect(':memory:')
-    conn.execute("CREATE TABLE certificates (id INTEGER PRIMARY KEY, caref TEXT, serial_number TEXT)")
-    conn.executemany("INSERT INTO certificates VALUES (?, ?, ?)",
+    conn.execute("CREATE TABLE certificates (id INTEGER PRIMARY KEY, caref TEXT, serial_number TEXT, crt TEXT)")
+    conn.executemany("INSERT INTO certificates VALUES (?, ?, ?, NULL)",
                      [(1, 'ca-a', '11'), (2, 'ca-a', '11'), (3, 'ca-b', '11'), (4, 'ca-a', ''),
                       (5, 'ca-a', ''), (6, None, '12'), (7, None, '12'), (8, 'ca-a', '13')])
     conn.commit()

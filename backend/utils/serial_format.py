@@ -1,18 +1,100 @@
 """
 Serial number format helpers.
 
-UCM stores certificate serial numbers in two formats depending on the layer:
+UCM stores certificate serial numbers in these forms:
 
-- **Database (Certificate.serial_number)**: decimal string
-  (e.g. ``"182716277442602097566978062183857154669354824224"``).
+- **certificates.serial_number and revoked_serials.serial_number**: the decimal
+  string of the integer (``"182716277442602097566978062183857154669354824224"``),
+  written only through ``canonical_serial`` (a model validator enforces it), so the
+  unique (caref, serial_number) index sees one spelling per serial (migration 144).
 - **OCSP cache (OCSPResponse.cert_serial)**: lowercase hexadecimal string
   without ``0x`` prefix (e.g. ``"2008b...e0"``), matching ``format(int, 'x')``.
+- Tables never joined to certificates by string equality keep their own form
+  (auth_certificates, trusted_certificates, discovered_certificates,
+  ca_cross_certificates, certificate_authorities); ``serial_variants`` reads them.
 
-This helper converts between the two so cache invalidation on revoke does
-not silently fail (RFC 6960 §2.2 — a revoked certificate MUST stop being
-reported as ``good`` immediately).
+The API keeps returning the stored string; the UI renders it as colon hex.
 """
 from __future__ import annotations
+
+import base64
+import re
+
+_DECIMAL = re.compile(r'-?[0-9]+')
+_HEX = re.compile(r'[0-9a-fA-F]+')
+
+
+def canonical_serial(value: str | int | None) -> str | None:
+    """The one stored form of a serial: the decimal string of its integer.
+
+    An int is exact. Text is hexadecimal when it says so (``0x``, colons, or a
+    letter a-f) and decimal otherwise; an all-digit hex spelling is therefore
+    ambiguous and writers pass the integer. Unreadable text comes back unchanged.
+    """
+    if value is None or isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return str(value)
+    raw = str(value).strip()
+    if not raw:
+        return raw
+    s = raw.replace(':', '').replace(' ', '')
+    marked = s[:2].lower() == '0x' or ':' in raw
+    if marked:
+        s = s[2:] if s[:2].lower() == '0x' else s
+    if not marked and _DECIMAL.fullmatch(s):
+        return str(int(s, 10))
+    if s and _HEX.fullmatch(s):
+        return str(int(s, 16))
+    return raw
+
+
+def serial_readings(value: str | int | None) -> set[int]:
+    """Every integer *value* may spell: its decimal and its hexadecimal reading."""
+    if value is None or isinstance(value, bool):
+        return set()
+    if isinstance(value, int):
+        return {value}
+    s = str(value).strip().replace(':', '').replace(' ', '')
+    if s[:2].lower() == '0x':
+        s = s[2:]
+    found = set()
+    for base in (10, 16):
+        try:
+            found.add(int(s, base))
+        except ValueError:
+            continue
+    return found
+
+
+def serial_search_forms(text: str | None) -> list[str]:
+    """Stored forms of every serial *text* may name in full (decimal, hex, colon hex)."""
+    return sorted(str(n) for n in serial_readings(text) if n >= 0)
+
+
+def certificate_serial(crt) -> int | None:
+    """The serial of a stored certificate (base64 of PEM, PEM or DER), or None."""
+    if not crt:
+        return None
+    from cryptography import x509
+    data = crt.encode() if isinstance(crt, str) else bytes(crt)
+    try:
+        if b'-----BEGIN' not in data:
+            data = base64.b64decode(data, validate=False)
+        if b'-----BEGIN' in data:
+            return x509.load_pem_x509_certificate(data).serial_number
+        return x509.load_der_x509_certificate(data).serial_number
+    except Exception:
+        return None
+
+
+def canonical_stored_serial(stored: str | int | None, crt=None) -> str | None:
+    """``canonical_serial`` of a stored value, settled by the row's certificate when
+    one of the value's readings is that certificate's serial (never reinterpreted otherwise)."""
+    actual = certificate_serial(crt) if stored not in (None, '') else None
+    if actual is not None and actual in serial_readings(stored):
+        return str(actual)
+    return canonical_serial(stored)
 
 
 def serial_to_int(serial: str | int | None) -> int | None:
@@ -42,11 +124,9 @@ def serial_to_int(serial: str | int | None) -> int | None:
 
 
 def serial_variants(serial: int) -> set[str]:
-    """DB string forms a given integer serial might be stored under.
+    """String forms a serial may take in a table that is not canonicalised.
 
-    Rows are a historical mix of decimal and hex (upper/lower) strings;
-    querying with all three catches every legacy encoding of the same
-    certificate.
+    Only for columns outside certificates/revoked_serials (see module docstring).
     """
     return {str(serial), format(serial, 'x'), format(serial, 'X')}
 

@@ -1,11 +1,15 @@
 """Certificates sharing one serial under one CA (RFC 5280 §4.1.2.2).
 
-Migration 142 creates ``uix_certificates_ca_serial`` only when this finds nothing.
+Migration 142 creates ``uix_certificates_ca_serial`` only when this finds nothing, and
+migration 144 leaves unconverted the rows that would share a serial once canonical.
 A backend migration checks its source, and a restore its archive only when the target
-carries the index, refusing with the rows named rather than failing on the index.
+carries the index, refusing with the rows named rather than failing on the index; both
+compare canonical serials (utils/serial_format.py), whatever spelling a row holds.
 The pending flag describes this database's schema and never travels in a backup.
 """
 from typing import Dict, Iterable, List
+
+from utils.serial_format import canonical_stored_serial
 
 INDEX = 'uix_certificates_ca_serial'
 # SystemConfig key migration 142 leaves while duplicates keep it from creating the index
@@ -14,22 +18,23 @@ PENDING_KEY = 'serial_unique_index_pending'
 _COVERED = "caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''"
 DUPLICATES = (f"SELECT caref, serial_number, COUNT(*) FROM certificates WHERE {_COVERED} "
               "GROUP BY caref, serial_number HAVING COUNT(*) > 1 ORDER BY caref, serial_number")
-_IDS = (f"SELECT id FROM certificates WHERE {_COVERED} "
-        "AND caref = :caref AND serial_number = :serial ORDER BY id")
+_ROWS = f"SELECT id, caref, serial_number, crt FROM certificates WHERE {_COVERED} ORDER BY id"
 # Self-contained: packages ship no docs/, so the message is the procedure
 CLEANUP = ("Delete all but one certificate of each listed serial on the installation that holds "
            "them (revoke it first if it is in use; a revoked row still counts), until each serial "
-           "appears once under its CA. Then delete the row '142_serial_per_ca_and_proxy_links' "
-           "from the _migrations table, so the next start runs migration 142 again and creates "
-           "the index.")
+           "appears once under its CA. Then delete the rows '142_serial_per_ca_and_proxy_links' "
+           "and '144_canonical_certificate_serials' from the _migrations table, so the next start "
+           "runs migration 142 and migration 144 again, which create the index and store every "
+           "serial in decimal.")
 
 
 def duplicates_in_database(conn) -> List[Dict]:
     """(caref, serial_number, ids) of every serial held twice under one CA, read through *conn*."""
     from sqlalchemy import text
-    return [{'caref': caref, 'serial_number': serial,
-             'ids': [i for (i,) in conn.execute(text(_IDS), {'caref': caref, 'serial': serial})]}
-            for caref, serial, _ in conn.execute(text(DUPLICATES)).fetchall()]
+    groups: Dict = {}
+    for row_id, caref, serial, crt in conn.execute(text(_ROWS)):
+        groups.setdefault((caref, canonical_stored_serial(serial, crt)), []).append(row_id)
+    return _shared(groups)
 
 
 def duplicates_in_rows(rows: Iterable[Dict], id_key: str = 'refid') -> List[Dict]:
@@ -39,7 +44,12 @@ def duplicates_in_rows(rows: Iterable[Dict], id_key: str = 'refid') -> List[Dict
         caref, serial = row.get('caref'), row.get('serial_number')
         if caref is None or serial is None or serial == '':
             continue
+        serial = canonical_stored_serial(serial, row.get('certificate_pem'))
         groups.setdefault((caref, serial), []).append(row.get(id_key))
+    return _shared(groups)
+
+
+def _shared(groups: Dict) -> List[Dict]:
     return [{'caref': caref, 'serial_number': serial, 'ids': ids}
             for (caref, serial), ids in sorted(groups.items(), key=lambda kv: (str(kv[0][0]), str(kv[0][1])))
             if len(ids) > 1]
@@ -71,8 +81,8 @@ def check_pending_serial_index(app) -> int:
     app.config['SERIAL_INDEX_PENDING'] = count
     if count:
         listed = '; '.join(f"CA {d.get('caref')} serial {d.get('serial_number')} x{d.get('count', '?')}"
-                           for d in pairs[:10]) or 'see the migration 142 log'
+                           for d in pairs[:10]) or 'see the migration 142 and 144 log'
         logging.getLogger(__name__).warning(
             "%s: %d serial number(s) are shared by certificates of one CA (%s), so the unique "
-            "serial index is not in place. %s", PENDING_KEY, count, listed, CLEANUP)
+            "serial index does not cover them. %s", PENDING_KEY, count, listed, CLEANUP)
     return count

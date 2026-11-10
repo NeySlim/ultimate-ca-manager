@@ -4,6 +4,8 @@ One row per serial a CA has revoked. It outlives the certificate row, so the
 CRL and the OCSP responder keep answering "revoked" once the certificate is
 deleted. Deleting the CA purges its rows (services/deletion_blockers.py).
 """
+from sqlalchemy.orm import validates
+
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -28,6 +30,12 @@ class RevokedSerial(db.Model):
     certificate_id = db.Column(db.Integer, index=True)
     # SHA-256 of the revoked key's SubjectPublicKeyInfo: a compromise outlives the certificate row
     public_key_sha256 = db.Column(db.String(64), index=True)
+
+    @validates('serial_number')
+    def _canonical_serial_number(self, key, value):
+        # Same spelling as certificates.serial_number, which revocations are matched against
+        from utils.serial_format import canonical_serial
+        return canonical_serial(value)
 
     def to_dict(self):
         return {

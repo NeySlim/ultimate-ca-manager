@@ -107,13 +107,13 @@ class MTLSAuthService:
                     revoked = issued_certificate_status(issuer, enrolled)[1] == REVOKED
                 elif issuer is not None:
                     from models import RevokedSerial as _RevokedSerial
-                    from utils.serial_format import serial_variants
+                    from utils.serial_format import canonical_serial
                     # No PEM to tell the records of one name apart: any of them closes it
                     refids = [r for (r,) in _CA.query.filter(_CA.subject == issuer.subject).with_entities(_CA.refid)]
                     variants = set()
                     for base in (10, 16):
                         try:
-                            variants |= serial_variants(int(str(auth_cert.cert_serial), base))
+                            variants.add(canonical_serial(int(str(auth_cert.cert_serial), base)))
                         except ValueError:
                             continue
                     revoked = bool(variants) and _RevokedSerial.query.filter(

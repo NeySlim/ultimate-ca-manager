@@ -800,7 +800,7 @@ def _issue_approved_certificate(approval):
         cert_type=cert_type,
         subject=new_cert.subject.rfc4514_string(),
         issuer=new_cert.issuer.rfc4514_string(),
-        serial_number=format(new_cert.serial_number, 'x'),
+        serial_number=new_cert.serial_number,
         aki=cert_aki,
         ski=cert_ski,
         valid_from=now,

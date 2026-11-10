@@ -289,7 +289,7 @@ class TestInPlace:
             assert json.loads(row.san_upn) == ['svc@corp.test']
             assert (row.revoked, row.revoked_at, row.revoke_reason, row.invalidity_at, row.archived) == \
                 (False, None, None, None, False)
-            assert row.serial_number == format(cert.serial_number, 'x')
+            assert row.serial_number == str(cert.serial_number)
             assert row.issuer == ca_cert.subject.rfc4514_string()
             ski = cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value.digest
             assert ski == x509.SubjectKeyIdentifier.from_public_key(cert.public_key()).digest

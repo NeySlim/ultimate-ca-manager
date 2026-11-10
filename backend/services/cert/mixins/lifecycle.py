@@ -26,6 +26,7 @@ from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, clea
 from utils.datetime_utils import utc_now, to_naive_utc
 from utils.issuance_defaults import default_issue_key_id, template_digest
 from utils.spki_digest import certificate_key_sha256
+from utils.serial_format import canonical_serial
 from utils.revocation_reasons import revocable
 
 logger = logging.getLogger(__name__)
@@ -425,8 +426,9 @@ class LifecycleMixin:
             # A Microsoft certificate has no caref: nothing for a UCM CRL to publish
             if ca is not None:
                 valid_to = to_naive_utc(certificate.valid_to) or now + timedelta(days=365)
+                # A row migration 144 left pending keeps its spelling; records never do
                 record = RevokedSerial.query.filter_by(
-                    caref=certificate.caref, serial_number=certificate.serial_number).first()
+                    caref=certificate.caref, serial_number=canonical_serial(certificate.serial_number)).first()
                 if record is None:
                     record = RevokedSerial(caref=certificate.caref,
                                            serial_number=certificate.serial_number)
@@ -594,7 +596,7 @@ class LifecycleMixin:
             if digest:  # a record older than the column learns the key before the row goes
                 # Only the row's own serial: an earlier one, renewed in place, had another key
                 RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id,
-                                           RevokedSerial.serial_number == certificate.serial_number,
+                                           RevokedSerial.serial_number == canonical_serial(certificate.serial_number),
                                            RevokedSerial.public_key_sha256.is_(None)).update(
                     {RevokedSerial.public_key_sha256: digest}, synchronize_session='fetch')
             RevokedSerial.query.filter(RevokedSerial.certificate_id == cert_id).update(

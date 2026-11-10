@@ -143,10 +143,12 @@ def _issue(ca_key, ca_cert, serial):
 def _store(ca, leaf, column=None, *, revoked=False, reason='keyCompromise',
            valid_to='default', revoked_at=None):
     now = _now()
+    # A spelling other than the canonical one is a row migration 144 left pending: raw SQL
+    legacy = column is not None and column != str(leaf.serial_number)
     row = Certificate(
         refid=f'b6-cert-{uuid.uuid4().hex[:10]}', descr='b6', caref=ca.refid,
         crt=base64.b64encode(leaf.public_bytes(serialization.Encoding.PEM)).decode(),
-        serial_number=column if column is not None else str(leaf.serial_number),
+        serial_number=None if legacy else str(leaf.serial_number),
         subject=leaf.subject.rfc4514_string(), issuer=leaf.issuer.rfc4514_string(),
         revoked=revoked,
         revoked_at=(revoked_at or now) if revoked else None,
@@ -156,6 +158,11 @@ def _store(ca, leaf, column=None, *, revoked=False, reason='keyCompromise',
     )
     db.session.add(row)
     db.session.commit()
+    if legacy:
+        db.session.execute(text(f'UPDATE {Certificate.__tablename__} SET serial_number = :s WHERE id = :i'),
+                           {'s': column, 'i': row.id})
+        db.session.commit()
+        db.session.refresh(row)
     return row
 
 
@@ -685,3 +692,4 @@ class TestAutoDeleteEndToEnd:
                 caref=ca_row.refid, serial_number=serial).all()
             assert len(records) == 1
             assert records[0].certificate_id is None
+

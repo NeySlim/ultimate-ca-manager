@@ -21,7 +21,7 @@ from models import Certificate
 from models.acme_models import AcmeOrder
 from utils.datetime_utils import utc_now
 from services.cert.serial_resolution import resolve_record_serial
-from utils.serial_format import serial_variants
+from utils.serial_format import canonical_serial
 
 # How often a client should re-poll the renewalInfo resource (RFC 9773 §4.2
 # recommends advertising this via Retry-After).
@@ -76,14 +76,11 @@ def find_certificates(aki_hex: str, serial_int: int) -> list:
     """Every stored row of the certificate with this AKI + serial, oldest first: an
     imported certificate may be stored again, by each proxy download for instance.
 
-    Serial numbers are stored inconsistently (decimal or hex) across the
-    DB's history, so we match on the integer value and confirm the AKI to
-    avoid cross-CA collisions.
+    The serial alone may be another CA's too: the AKI is confirmed.
     """
-    candidates = serial_variants(serial_int)
     rows = (Certificate.query
             .filter(Certificate.crt.isnot(None))
-            .filter(Certificate.serial_number.in_(candidates))
+            .filter(Certificate.serial_number == canonical_serial(serial_int))
             .order_by(Certificate.id.asc())
             .all())
     # Against the stored certificate, not the column: an all-digit column

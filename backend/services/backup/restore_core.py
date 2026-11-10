@@ -746,6 +746,7 @@ class RestoreCoreMixin:
         is not reached when a later section refuses the archive.
         """
         from models.revoked_serial import RevokedSerial
+        from utils.serial_format import canonical_serial
         from .restore.plan import RestorePlan
         from .restore_extended import reindex_reference_targets
 
@@ -760,7 +761,8 @@ class RestoreCoreMixin:
         known.update(c.get('refid') for c in backup_data.get('certificate_authorities', []) if c.get('refid'))
         for position, rs_data in enumerate(backup_data.get('revoked_serials', [])):
             caref = rs_data.get('caref')
-            serial = rs_data.get('serial_number')
+            # An older archive holds any spelling: matched and written in the stored one
+            serial = canonical_serial(rs_data.get('serial_number'))
             if not caref or not serial:
                 # Both columns are NOT NULL on the model, so no export writes
                 # such a row: it used to be dropped without a word, which for

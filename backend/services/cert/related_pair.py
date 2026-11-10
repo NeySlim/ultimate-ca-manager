@@ -26,7 +26,7 @@ from utils.ca_signing_window import IssuerWindowError, check_issuer_window
 from utils.cert_issuer import is_self_signed
 from utils.datetime_utils import utc_now
 from utils.leaf_key_usage import key_usage_for_key
-from utils.serial_format import serial_variants
+from utils.serial_format import canonical_serial
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def find_requested(req):
     if serial < 0:
         raise RelatedCertificateRefused('The related certificate serial is negative')
     matches = {}
-    rows = Certificate.query.filter(Certificate.serial_number.in_(serial_variants(serial)),
+    rows = Certificate.query.filter(Certificate.serial_number == canonical_serial(serial),
                                     Certificate.crt.isnot(None)).order_by(Certificate.id).all()
     for row in rows:
         try:

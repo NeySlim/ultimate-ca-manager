@@ -816,18 +816,11 @@ class SCEPService:
                 transaction_id=transaction_id, recipient_nonce=sender_nonce,
             )
 
-        serial_hex = format(requested_serial, "x")
-        serial_candidates = {
-            str(requested_serial),
-            serial_hex,
-            serial_hex.upper(),
-            f"0x{serial_hex}",
-            f"0X{serial_hex.upper()}",
-        }
+        from utils.serial_format import canonical_serial
         cert_rows = Certificate.query.filter(
             Certificate.caref == self.ca_refid,
             Certificate.crt.isnot(None),
-            Certificate.serial_number.in_(serial_candidates),
+            Certificate.serial_number == canonical_serial(requested_serial),
         ).all()
         for cert_row in cert_rows:
             try:

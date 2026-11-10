@@ -66,7 +66,7 @@ class MicrosoftCACRLSyncMixin:
             newly_revoked = []
             for cert in candidates:
                 try:
-                    serial_int = int(cert.serial_number, 16)
+                    serial_int = int(cert.serial_number, 10)  # canonical decimal (utils/serial_format.py)
                 except (TypeError, ValueError):
                     continue
                 if serial_int not in revoked_entries:

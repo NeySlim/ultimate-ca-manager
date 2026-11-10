@@ -21,7 +21,7 @@ from cryptography.hazmat.primitives.serialization import Encoding
 
 from models import CA, Certificate, RevokedSerial
 from utils.datetime_utils import utc_now
-from utils.serial_format import serial_variants
+from utils.serial_format import canonical_serial, serial_variants
 
 OK = 'ok'
 UNKNOWN = 'unknown'
@@ -48,6 +48,7 @@ def _rows_holding(cert: x509.Certificate, *criteria) -> list:
     presented = cert.public_bytes(Encoding.DER)
     candidates = Certificate.query.filter(
         *criteria,
+        # Every spelling: rows migration 144 left pending may hold the revoked twin
         Certificate.serial_number.in_(serial_variants(cert.serial_number)),
         Certificate.crt.isnot(None),
     ).all()
@@ -76,11 +77,10 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
     record, and answers REVOKED rather than UNKNOWN."""
     rows = find_issued_rows(ca, cert)
     row = rows[0] if rows else None
-    variants = serial_variants(cert.serial_number)
     from utils.cert_issuer import same_key_refids
     persistent = RevokedSerial.query.filter(
         RevokedSerial.caref.in_(same_key_refids(ca)),
-        RevokedSerial.serial_number.in_(variants),
+        RevokedSerial.serial_number == canonical_serial(cert.serial_number),
     ).first()
     if row is None:
         return None, (REVOKED if persistent is not None else UNKNOWN)

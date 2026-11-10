@@ -323,7 +323,7 @@ class CA(db.Model):
         if parent is None:
             return None
         from models.revoked_serial import RevokedSerial
-        from utils.serial_format import serial_to_int, serial_variants
+        from utils.serial_format import canonical_serial, serial_to_int
         serial = serial_to_int(self.serial_number) if self.serial_number else None
         if serial is None:
             try:
@@ -334,7 +334,7 @@ class CA(db.Model):
                 return None
         return RevokedSerial.query.filter(
             RevokedSerial.caref == parent.refid,
-            RevokedSerial.serial_number.in_(serial_variants(serial)),
+            RevokedSerial.serial_number == canonical_serial(serial),
         ).first()
 
     @property
