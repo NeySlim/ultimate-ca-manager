@@ -12,14 +12,19 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 from models import CA, Certificate, db
-from models.acme_models import AcmeLocalDomain, AcmeOrder
+from models.acme_models import AcmeAccount, AcmeLocalDomain, AcmeOrder
 from tests.protocol_approval_support import approval_policy, approve, expire, reject, requests_of
 from tests.test_acme_server_rfc_conformance import _b64u, _csr_pem, _new_account, _ready_order, _signed
 
 
+# Accounts _held made: their orders, and the certificates of the CA, go with the CA
+_ACCOUNTS = []
+
+
 @pytest.fixture
 def acme_ca(app, create_ca, monkeypatch):
-    """A CA serving one ACME domain, with CAA checks off."""
+    """A CA serving one ACME domain, with CAA checks off; removed afterwards
+    with the accounts, orders and certificates made on it."""
     import utils.caa_checker as caa
     monkeypatch.setattr(caa, 'check_caa_for_domains', lambda *a, **k: (True, 'test'))
     ca = create_ca(cn=f'ACME approval CA {uuid.uuid4().hex[:6]}')
@@ -29,7 +34,17 @@ def acme_ca(app, create_ca, monkeypatch):
         db.session.commit()
     yield ca['id'], domain
     with app.app_context():
+        db.session.rollback()
         AcmeLocalDomain.query.filter_by(domain=domain).delete()
+        for account_id in _ACCOUNTS:
+            account = AcmeAccount.query.filter_by(account_id=account_id).first()
+            if account is not None:
+                db.session.delete(account)
+        _ACCOUNTS.clear()
+        db.session.flush()
+        refid = db.session.get(CA, ca['id']).refid
+        Certificate.query.filter_by(caref=refid).delete(synchronize_session=False)
+        CA.query.filter_by(id=ca['id']).delete(synchronize_session=False)
         db.session.commit()
 
 
@@ -47,6 +62,7 @@ def _read(client, account, order_id):
 def _held(app, client, acme_ca):
     ca_id, domain = acme_ca
     account = _new_account(app)
+    _ACCOUNTS.append(account['account_id'])
     order_id = _ready_order(app, account, [{'type': 'dns', 'value': domain}])
     r = _finalize(client, account, order_id, domain)
     return account, order_id, r
