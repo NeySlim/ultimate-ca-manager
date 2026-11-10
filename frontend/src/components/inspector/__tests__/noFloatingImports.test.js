@@ -1,7 +1,8 @@
 /**
- * The floating-window modules are no longer imported by the application: the
- * inspector replaced them. Their files stay until they are deleted.
- * ui/FloatingWindow is still used by the two non-detail windows below.
+ * The detail-window modules are no longer imported by the application: the
+ * inspector replaced them. Their files stay until A-08 deletes them.
+ * ui/FloatingWindow and useFloatingWindow are not in that set: the help panel
+ * and the email template editor still use them.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -12,10 +13,7 @@ const LEGACY = {
   'components/FloatingDetailWindow.jsx': /\bFloatingDetailWindow\b/,
   'components/DetailWindowLayer.jsx': /\bDetailWindowLayer\b/,
   'contexts/WindowManagerContext.jsx': /\bWindowManagerContext\b|\buseWindowManager\b|\bWindowManagerProvider\b/,
-  'hooks/useFloatingWindow.js': /\buseFloatingWindow\b/,
-  'components/ui/FloatingWindow.jsx': /\/FloatingWindow['"]/,
 }
-const ALLOWED = { 'components/ui/FloatingWindow.jsx': ['components/EmailTemplateWindow.jsx', 'components/ui/FloatingHelpPanel.jsx'] }
 
 function sources(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -26,14 +24,33 @@ function sources(dir, out = []) {
   return out
 }
 
-describe('legacy floating windows', () => {
+// Whole import/export-from statements and dynamic imports, however many lines they span
+export function importStatements(text) {
+  return text.match(/\b(?:import|export)\b[^;'"`]*?\bfrom\s*['"][^'"]+['"]|\bimport\s*\(?\s*['"][^'"]+['"]/g) || []
+}
+
+describe('import statement scanner', () => {
+  it('sees a multi-line import and a dynamic one, not a bare mention', () => {
+    const text = "import {\n  useWindowManager,\n} from '../contexts'\nconst x = import('./Foo')\n// useWindowManager"
+    const found = importStatements(text)
+    expect(found).toHaveLength(2)
+    expect(LEGACY['contexts/WindowManagerContext.jsx'].test(found[0])).toBe(true)
+  })
+})
+
+describe('legacy detail windows', () => {
   const files = sources(SRC).map((p) => [relative(SRC, p), readFileSync(p, 'utf8')])
 
   it.each(Object.entries(LEGACY))('%s is imported by no live module', (legacy, pattern) => {
     const users = files
-      .filter(([rel]) => !Object.keys(LEGACY).includes(rel) && !(ALLOWED[legacy] || []).includes(rel))
-      .filter(([, text]) => text.split('\n').some((l) => /['"]/.test(l) && /\bfrom\b|^\s*import\b|\bimport\(/.test(l) && pattern.test(l)))
+      .filter(([rel]) => !Object.keys(LEGACY).includes(rel))
+      .filter(([, text]) => importStatements(text).some((st) => pattern.test(st)))
       .map(([rel]) => rel)
     expect(users).toEqual([])
+  })
+
+  it('keeps the still-used floating modules out of the legacy set', () => {
+    const live = files.filter(([, text]) => importStatements(text).some((st) => /\/FloatingWindow['"]|useFloatingWindow/.test(st)))
+    expect(live.length).toBeGreaterThan(0)
   })
 })
