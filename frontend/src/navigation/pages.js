@@ -19,7 +19,7 @@ export function lazyWithRetry(importFn) {
 }
 
 export const pages = {
-  dashboard: lazyWithRetry(() => import('../pages/DashboardPage')),
+  dashboard: lazyWithRetry(() => import('../pages/OverviewPage')),
   certificates: lazyWithRetry(() => import('../pages/CertificatesPage')),
   'user-certificates': lazyWithRetry(() => import('../pages/UserCertificatesPage')),
   cas: lazyWithRetry(() => import('../pages/CAsPage')),

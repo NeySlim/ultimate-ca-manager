@@ -29,7 +29,7 @@ vi.mock('../../components', async () => {
   }
 })
 
-vi.mock('../../pages/DashboardPage', () => ({ default: () => <div>dashboard-page</div> }))
+vi.mock('../../pages/OverviewPage', () => ({ default: () => <div>dashboard-page</div> }))
 // Same keys as the real binding, each page a stub naming its module
 vi.mock('../pages', async () => {
   const actual = await vi.importActual('../pages')

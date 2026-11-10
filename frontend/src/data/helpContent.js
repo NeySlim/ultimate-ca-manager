@@ -17,32 +17,27 @@ export const helpContent = {
 
   // ===== DASHBOARD =====
   dashboard: {
-    title: 'Dashboard',
-    subtitle: 'System overview and monitoring',
-    overview: 'Real-time overview of your PKI infrastructure. Widgets display certificate status, expiry alerts, system health, and recent activity. The layout is fully customizable with drag-and-drop.',
+    title: 'Overview',
+    subtitle: 'What needs action, and the state of the PKI',
+    overview: 'Six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every counter that has a list opens the certificate list filtered to exactly the certificates it counts.',
     sections: [
       {
-        title: 'Widgets',
+        title: 'Cards',
         icon: ListChecks,
         items: [
-          { label: 'Statistics', text: 'Total certificates (expired and revoked included), CAs, pending CSRs and ACME accounts, plus SSH certificates when an SSH CA exists' },
-          { label: 'Certificate Activity', text: 'Issued, revoked and expired certificates per day over the chosen period' },
-          { label: 'Status Distribution', text: 'Pie chart breakdown: valid / expiring / expired / revoked' },
-          { label: 'Next Expiry', text: 'The six valid certificates that expire soonest, whatever their date; the configured dedicated TSA signer is tagged with a "TSA signer" chip (v2.218)' },
-          { label: 'System Status', text: 'Service health: ACME, SCEP, EST, OCSP, CRL/CDP, TSA (v2.218), auto-renewal, SMTP and webhooks. Badges show a distinct amber warning state (near-expiry TSA signer, SMTP configured but disabled) and their status message on hover' },
-          { label: 'Recent Activity', text: 'Latest operations across the system with read:audit; without it, your own events only' },
-          { label: 'Recent Certificates', text: 'Recently issued or imported certificates' },
-          { label: 'Certificate Authorities', text: 'Latest CAs, each marked Root or Sub' },
-          { label: 'ACME Accounts', text: 'Registered ACME client accounts' },
-          { label: 'Trust Store Expiry', text: 'Trusted certificates that expire soonest' },
+          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record; a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
+          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state' },
+          { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days; each authority opens its page' },
+          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
+          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
+          { label: 'Latest operations', text: 'The five most recent operations; with the audit permission, a link opens the whole trail' },
         ]
       },
     ],
     tips: [
-      'Click Edit layout in the header, then drag widgets to rearrange them',
-      'Click the Customize button (sliders icon) in the header, then the eye next to a widget to show or hide it',
-      'The dashboard updates in real-time via WebSocket, no manual refresh needed',
-      'The layout is saved in this browser, for every account that signs in from it',
+      'Pick the Operator, Manager or All cards preset in the header to choose which cards are shown',
+      'The layout is saved with your account and follows you across browsers',
+      'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
     ],
     related: ['Certificates', 'CAs', 'Settings']
   },

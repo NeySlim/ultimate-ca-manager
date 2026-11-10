@@ -1905,6 +1905,8 @@ GET /api/v2/dashboard/recent-cas?limit=5
 GET /api/v2/dashboard/activity?limit=20&offset=0
 ```
 
+A database failure returns 500, never an empty `activity` list.
+
 ### Get System Status
 ```http
 GET /api/v2/dashboard/system-status
@@ -1972,7 +1974,21 @@ Scope `read:dashboard`. A `days` outside its range is refused with 400.
 
 Certificates counted are issued, not revoked, not archived and not expired. A certificate appears under one kind only, by precedence `auto_renewal_blocked` > `renewal_declined` > `manual_renewal_due` > `client_renewal_overdue`. `manual_renewal_due` leaves out what auto-renewal, the enrolling client (ACME, SCEP, EST, WSTEP without a stored key), UCM's ACME client or the delegated OCSP responder task renews, a declined renewal, and a certificate superseded by a live one beyond the 30 days with the same subject, DNS and IP SANs from the same CA.
 
-`health` gives per protocol (`acme`, `scep`, `est`, `scheduler`) one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) and the `basis` it is measured on. `compliance` counts the live certificates by key algorithm and weakness; each counter carries `filter_available` and, when true, a `filter_hint` that the certificate list reproduces exactly (none yet). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
+`health` gives per protocol (`acme`, `scep`, `est`, `scheduler`) one `{date, ok, failed}` entry per UTC day (`days` 1 to 30) and the `basis` it is measured on. `compliance` counts the live certificates by key algorithm and weakness; each counter, and each key algorithm, carries `filter_available` and a `filter_hint`: query parameters that the certificate list applies as given and that reproduce the count exactly (see below). `issuance` gives per CA and per day (`days` 1 to 90) `issued` (by `created_at`) and `renewed` (in place, by `renewed_at`: the last renewal of each certificate in the window, so a certificate renewed several times counts once), and the issuances per source.
+
+#### Certificate list filters
+
+`GET /api/v2/certificates` accepts the filters below, ANDed with the existing ones. A counter and its filter are built from the same SQL expression (`services/dashboard_aggregates.py`). An unknown parameter is ignored; an invalid value of a known filter is refused with 400.
+
+| Parameter | Meaning |
+|-----------|---------|
+| `live=true` | issued, not revoked, not archived, not expired (the set the compliance counters are taken over) |
+| `key_algo` (repeatable) | exact `key_algo` value |
+| `key_algo_prefix`, `key_bits_below` | key family (`RSA`) and a size threshold; RSA below 3072 bits is `key_algo_prefix=RSA&key_bits_below=3072`; `key_bits_below` from 0 to 1000000 |
+| `sig_hash` (repeatable) | signature hash |
+| `server=true`, `lifetime_over_days=N` | server certificate (type or `web_server` template), lifetime of more than N days, N from 0 to 100000 |
+| `no_key=true`, `incomplete_chain=true` | no stored private key; issuing CA unknown to this instance |
+| `renewal` (repeatable) | one of `manual_renewal_due`, `client_renewal_overdue`, `auto_renewal_blocked`, `renewal_declined`: the rows of that `queue` kind. `queue` returns `filter_hints` with this parameter for each |
 
 ### Get Stats Overview
 ```http

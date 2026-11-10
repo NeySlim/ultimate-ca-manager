@@ -68,3 +68,17 @@ def test_without_read_audit_only_own_events(account, typed_name):
 def test_with_read_audit_the_whole_trail(account, typed_name):
     _name, auditor = account('auditor')
     assert typed_name in json.dumps(_feed(auditor))
+
+
+def test_a_database_error_is_an_error_not_an_empty_feed(auth_client, monkeypatch):
+    real = db.session.execute
+
+    def failing(statement, *args, **kwargs):
+        if 'FROM audit_logs' in str(statement):
+            raise RuntimeError('database down')
+        return real(statement, *args, **kwargs)
+
+    monkeypatch.setattr(db.session, 'execute', failing)
+    r = auth_client.get('/api/v2/dashboard/activity')
+    assert r.status_code == 500, r.data
+    assert 'database down' not in r.get_data(as_text=True)

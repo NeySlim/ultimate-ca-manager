@@ -9,7 +9,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 from auth.unified import require_auth
-from utils.response import success_response
+from utils.response import error_response, success_response
 from utils.pagination import parse_request_limit
 
 # The dashboard widgets show a handful of rows each. The number is the
@@ -321,8 +321,10 @@ def get_activity_log():
         
         return success_response(data={'activity': activity})
     except Exception as e:
+        # A failure is an error, never an empty feed: the card tells the two apart
         logger.error(f"Activity log error: {e}")
-        return success_response(data={'activity': []})
+        _status_rollback()
+        return error_response('Activity log unavailable', 500)
 
 
 @bp.route('/api/v2/dashboard/certificate-trend', methods=['GET'])

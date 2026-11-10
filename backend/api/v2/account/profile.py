@@ -43,6 +43,15 @@ def _valid_inspector(v):
     return True
 
 
+def _valid_dashboard(value):
+    """Overview layout: card ids in display order, hidden card ids, and two flags."""
+    ids = lambda v: isinstance(v, list) and len(v) <= 20 and all(  # noqa: E731
+        isinstance(i, str) and 1 <= len(i) <= 30 for i in v)
+    return (isinstance(value, dict) and set(value) <= {'order', 'hidden', 'queueShowAll'}
+            and ids(value.get('order', [])) and ids(value.get('hidden', []))
+            and isinstance(value.get('queueShowAll', False), bool))
+
+
 # Whitelist of allowed preference keys + value validators. Anything not listed here is
 # silently dropped to avoid storing arbitrary blobs (a bad pin list is refused instead).
 _PREF_VALIDATORS = {
@@ -51,6 +60,7 @@ _PREF_VALIDATORS = {
     'theme_mode': lambda v: v in ('light', 'dark', 'system'),
     'density': lambda v: v in ('compact', 'comfortable', 'spacious'),
     'sidebar_collapsed': lambda v: isinstance(v, bool),
+    'dashboard': _valid_dashboard,
     'force_desktop': lambda v: isinstance(v, bool),
     'pins': _valid_pins,
     # `date_format`, `show_time` and `timezone` are deliberately absent. They

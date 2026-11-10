@@ -128,38 +128,64 @@ def _entries(data):
         (f"key_algo:{a['key_algo']}", a) for a in data['by_key_algorithm']]
 
 
-# No counter has a list filter that reproduces it today: the list keeps archived
-# rows under every status and has no key, hash, lifetime or missing-key filter
-FILTERABLE = set()
+def _list_ids(client, hint):
+    ids, page = [], 1
+    while True:
+        r = client.get('/api/v2/certificates', query_string={**hint, 'per_page': 100, 'page': page})
+        assert r.status_code == 200, (hint, r.data)
+        body = get_json(r)
+        ids += [c['id'] for c in body['data']]
+        if len(ids) >= body['meta']['total']:
+            return ids, body['meta']['total']
+        page += 1
 
 
-def test_a_counter_without_a_list_filter_says_so(app, auth_client, pems, rows):
+def _seed_for_every_counter(rows, pems):
+    """Each rule gets rows it counts and rows it must not."""
+    mine = {
+        'rsa_below_3072': rows(pems['rsa2048']).id,
+        'weak_signature_hash': rows(pems['sha1']).id,
+        'server_lifetime_over_398_days': rows(pems['rsa4096'], lifetime_days=400, cert_type='server_cert').id,
+        'no_private_key': rows(pems['ec'], prv=None).id,
+    }
+    rows(pems['rsa4096'])
+    rows(pems['rsa4096'], lifetime_days=400, cert_type='client_cert')
+    rows(pems['rsa2048'], archived=True)
+    rows(pems['sha1'], revoked=True)
+    rows(pems['rsa2048'], lifetime_days=-5, prv=None)
+    return mine
+
+
+@pytest.mark.parametrize('name', COUNTERS)
+def test_each_counter_equals_the_list_its_hint_opens(app, auth_client, pems, rows, name):
     with app.app_context():
-        rows(pems['rsa2048'])
-        rows(pems['ec'], prv=None)
+        mine = _seed_for_every_counter(rows, pems)
         db.session.commit()
-    data = _summary(auth_client)
-    assert data['by_key_algorithm']
-    for name, entry in _entries(data):
-        assert entry['filter_available'] is (name in FILTERABLE), name
-        if not entry['filter_available']:
-            assert entry['filter_hint'] is None, name
+    entry = _summary(auth_client)['counters'][name]
+    assert entry['filter_available'] is True
+    ids, total = _list_ids(auth_client, entry['filter_hint'])
+    assert total == entry['count'] == len(ids)
+    if name in mine:
+        assert mine[name] in ids
 
 
-def test_every_hint_given_lists_exactly_what_it_counts(app, auth_client, pems, rows):
-    """An emitted hint, passed to the certificate list as is, gives back the counter."""
+def test_each_algorithm_equals_the_list_its_hint_opens(app, auth_client, pems, rows):
     with app.app_context():
-        rows(pems['rsa2048'])
-        rows(pems['ec'], prv=None)
-        rows(pems['rsa2048'], archived=True)
+        _seed_for_every_counter(rows, pems)
         db.session.commit()
-    data = _summary(auth_client)
-    hinted = [(name, e) for name, e in _entries(data) if e['filter_available']]
-    assert {name for name, _ in hinted} == FILTERABLE
-    for name, entry in hinted:
-        r = auth_client.get('/api/v2/certificates', query_string={**entry['filter_hint'], 'per_page': 1})
-        assert r.status_code == 200, (name, r.data)
-        assert get_json(r)['meta']['total'] == entry['count'], name
+    algos = _summary(auth_client)['by_key_algorithm']
+    assert algos
+    for entry in algos:
+        assert entry['filter_available'] is (entry['key_algo'] is not None)
+        if entry['filter_available']:
+            ids, total = _list_ids(auth_client, entry['filter_hint'])
+            assert total == entry['count'] == len(ids), entry['key_algo']
+
+
+@pytest.mark.parametrize('query', [{'key_bits_below': 'x'}, {'lifetime_over_days': '-1'},
+                                   {'live': 'maybe'}, {'renewal': 'nope'}, {'key_algo_prefix': "R'SA"}])
+def test_a_bad_value_of_a_known_filter_is_a_400(auth_client, query):
+    assert auth_client.get('/api/v2/certificates', query_string=query).status_code == 400
 
 
 def test_requires_auth(client):

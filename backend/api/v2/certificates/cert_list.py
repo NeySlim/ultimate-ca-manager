@@ -16,6 +16,7 @@ from utils.cert_status import (
 from utils.response import error_response
 from services.compliance_service import calculate_compliance_score, key_algo_sort_levels, key_algo_sort_points
 from utils.datetime_utils import utc_now
+from services.dashboard_aggregates import certificate_list_conditions
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -118,6 +119,12 @@ def list_certificates():
     # Filtered here, not on the page received, so pagination and total agree
     if request.args.get('has_private_key', '').lower() in ('1', 'true', 'yes'):
         query = query.filter(Certificate.prv.isnot(None), Certificate.prv != '')
+
+    # Compliance and renewal filters share their SQL with the dashboard counters
+    try:
+        query = query.filter(*certificate_list_conditions(request.args, db.session.get_bind().dialect.name))
+    except ValueError as exc:
+        return error_response(str(exc), 400)
 
     # Certificates issued from a template but diverging from its defaults (#258)
     if template_modified:

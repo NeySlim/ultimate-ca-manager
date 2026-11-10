@@ -1,30 +1,25 @@
 export default {
   helpContent: {
-    title: 'Panel de control',
-    subtitle: 'Vista general del sistema y supervisión',
-    overview: 'Vista general en tiempo real de su infraestructura PKI. Los widgets muestran el estado de los certificados, las alertas de expiración, el estado del sistema y la actividad reciente. El diseño es totalmente personalizable con arrastrar y soltar.',
+    title: 'Overview',
+    subtitle: 'What needs action, and the state of the PKI',
+    overview: 'Six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every counter that has a list opens the certificate list filtered to exactly the certificates it counts.',
     sections: [
       {
-        title: 'Widgets',
+        title: 'Cards',
         items: [
-          { label: 'Estadísticas', text: 'Total de certificados (expirados y revocados incluidos), CA, CSR pendientes y cuentas ACME, más los certificados SSH cuando existe una CA SSH' },
-          { label: 'Actividad de certificados', text: 'Certificados emitidos, revocados y expirados por día durante el período elegido' },
-          { label: 'Distribución de estados', text: 'Gráfico circular: válido / por expirar / expirado / revocado' },
-          { label: 'Próxima expiración', text: 'Los seis certificados válidos que expiran antes, sea cual sea su fecha; el firmante TSA dedicado configurado se identifica con un chip "TSA signer" (v2.218)' },
-          { label: 'Estado del sistema', text: 'Estado de los servicios: ACME, SCEP, EST, OCSP, CRL/CDP, TSA (v2.218), renovación automática, SMTP y webhooks. Las insignias muestran un estado de advertencia ámbar diferenciado (firmante TSA próximo a expirar, SMTP configurado pero desactivado) y su mensaje de estado al pasar el cursor' },
-          { label: 'Actividad reciente', text: 'Últimas operaciones en todo el sistema con read:audit; sin él, solo sus propios eventos' },
-          { label: 'Certificados recientes', text: 'Certificados emitidos o importados recientemente' },
-          { label: 'Autoridades de certificación', text: 'Últimas CA, cada una marcada como Root o Sub' },
-          { label: 'Cuentas ACME', text: 'Cuentas de clientes ACME registradas' },
-          { label: 'Expiración del almacén de confianza', text: 'Certificados de confianza que expiran antes' },
+          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record; a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
+          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state' },
+          { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days; each authority opens its page' },
+          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
+          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
+          { label: 'Latest operations', text: 'The five most recent operations; with the audit permission, a link opens the whole trail' },
         ]
       },
     ],
     tips: [
-      'Haga clic en Editar diseño en el encabezado y arrastre los widgets para reorganizarlos',
-      'Haga clic en el botón Personalizar (icono de controles deslizantes) en el encabezado y luego en el ojo junto a un widget para mostrarlo u ocultarlo',
-      'El panel de control se actualiza en tiempo real mediante WebSocket, no es necesario actualizar manualmente',
-      'El diseño se guarda en este navegador, para todas las cuentas que inician sesión desde él',
+      'Pick the Operator, Manager or All cards preset in the header to choose which cards are shown',
+      'The layout is saved with your account and follows you across browsers',
+      'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
     ],
   },
   helpGuides: {

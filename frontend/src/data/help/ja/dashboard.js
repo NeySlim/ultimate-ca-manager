@@ -1,30 +1,25 @@
 export default {
   helpContent: {
-    title: 'ダッシュボード',
-    subtitle: 'システム概要と監視',
-    overview: 'PKIインフラストラクチャのリアルタイム概要。ウィジェットは証明書のステータス、有効期限アラート、システムヘルス、最近のアクティビティを表示します。レイアウトはドラッグ＆ドロップで完全にカスタマイズ可能です。',
+    title: 'Overview',
+    subtitle: 'What needs action, and the state of the PKI',
+    overview: 'Six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state. Every counter that has a list opens the certificate list filtered to exactly the certificates it counts.',
     sections: [
       {
-        title: 'ウィジェット',
+        title: 'Cards',
         items: [
-          { label: '統計情報', text: '証明書の総数（期限切れ・失効済みを含む）、CA数、保留中のCSR数、ACMEアカウント数。SSH CAがある場合はSSH証明書数も表示' },
-          { label: '証明書アクティビティ', text: '選択した期間の日ごとの発行・失効・期限切れ証明書数' },
-          { label: 'ステータス分布', text: '円グラフの内訳：有効 / 期限切れ間近 / 期限切れ / 失効済み' },
-          { label: '次の有効期限', text: '有効期限が最も近い有効な証明書6件（日付に関係なく）。設定済みの専用 TSA 署名者には「TSA signer」チップが付きます (v2.218)' },
-          { label: 'システムステータス', text: 'サービスヘルス：ACME、SCEP、EST、OCSP、CRL/CDP、TSA (v2.218)、自動更新、SMTP、Webhook。バッジは琥珀色の警告状態（期限切れ間近の TSA 署名者、SMTP が設定済みだが無効）を区別して表示し、ホバーするとステータスメッセージが確認できます' },
-          { label: '最近のアクティビティ', text: 'システム全体の最新操作' },
-          { label: '最近の証明書', text: '最近発行またはインポートされた証明書' },
-          { label: '認証局', text: '最新のCA。それぞれルートまたはSubと表示' },
-          { label: 'ACMEアカウント', text: '登録済みACMEクライアントアカウント' },
-          { label: 'トラストストアの有効期限', text: '有効期限が最も近い信頼済み証明書' },
+          { label: 'To handle', text: 'The six most urgent items, critical first, each linking to its record; a folded tier gives the total per kind, and the four renewal kinds open the certificate list' },
+          { label: 'Automation health', text: 'Per protocol (ACME, SCEP, EST) the daily successes and failures, and the scheduler state' },
+          { label: 'Hierarchy', text: 'The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days; each authority opens its page' },
+          { label: 'Expiry horizon', text: 'The expiring and expired counters, each opening its list, and the five certificates that expire next' },
+          { label: 'Compliance', text: 'Live certificates by key algorithm and weakness (RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key); each counter opens the matching list' },
+          { label: 'Latest operations', text: 'The five most recent operations; with the audit permission, a link opens the whole trail' },
         ]
       },
     ],
     tips: [
-      'ヘッダーの「レイアウトを編集」をクリックしてから、ウィジェットをドラッグして並べ替えます',
-      'ヘッダーの「カスタマイズ」ボタン（スライダーのアイコン）をクリックし、ウィジェット横の目のアイコンで表示/非表示を切り替えます',
-      'ダッシュボードはWebSocket経由でリアルタイム更新されます: 手動更新は不要です',
-      'レイアウトはこのブラウザに保存され、このブラウザからサインインするすべてのアカウントで共有されます',
+      'Pick the Operator, Manager or All cards preset in the header to choose which cards are shown',
+      'The layout is saved with your account and follows you across browsers',
+      'On the certificate list, filters coming from the overview appear as chips; remove one with its x',
     ],
   },
   helpGuides: {
