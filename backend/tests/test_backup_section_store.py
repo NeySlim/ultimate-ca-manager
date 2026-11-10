@@ -340,3 +340,18 @@ def test_each_instance_sweeps_only_its_own_fallback_directory(tmp_path, monkeypa
     assert stat.S_IMODE(os.stat(directory).st_mode) == 0o700
     with SectionStore() as store:
         assert os.path.dirname(store._dir) == directory
+
+
+def test_a_loosened_fallback_directory_is_closed_again(tmp_path, monkeypatch):
+    import tempfile
+
+    from config.settings import Config
+    from services.backup import section_store
+    monkeypatch.setattr('utils.upload_spool.prepare_spool_dir', lambda _d: None)
+    monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
+    monkeypatch.setattr(Config, 'DATA_DIR', tmp_path / 'mine')
+    directory = section_store.fallback_directory()
+    os.chmod(directory, 0o777)
+
+    assert section_store.fallback_directory() == directory
+    assert stat.S_IMODE(os.stat(directory).st_mode) == 0o700

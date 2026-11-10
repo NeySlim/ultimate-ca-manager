@@ -71,6 +71,11 @@ def fallback_directory() -> Optional[str]:
     # Another user's directory could remove or swap the stores under us
     if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid():
         return None
+    if stat.S_IMODE(info.st_mode) & 0o077:  # a manual chmod must not expose the stores
+        try:
+            os.chmod(path, 0o700)
+        except OSError:
+            return None
     return path
 
 
