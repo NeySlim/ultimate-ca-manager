@@ -17,16 +17,49 @@ function walk(dir, out = []) {
   return out
 }
 
-// Class lists of every spinning element whose ring uses the on-accent ink.
+// className={...} expressions: the balanced braces after `className=`.
+function braceExpressions(text) {
+  const out = []
+  for (const m of text.matchAll(/className=\{/g)) {
+    let depth = 1
+    let i = m.index + m[0].length
+    const start = i
+    for (; i < text.length && depth > 0; i++) {
+      if (text[i] === '{') depth++
+      else if (text[i] === '}') depth--
+    }
+    out.push(text.slice(start, i - 1))
+  }
+  return out
+}
+
+// Spinning elements whose ring uses the on-accent ink, from "literal" and {expression} classNames.
+// An expression that interpolates (`${...}`) next to animate-spin cannot be read: it is reported.
+export function scanSpinners(text) {
+  const found = []
+  const unreadable = []
+  const lists = [...text.matchAll(/className="([^"]*)"/g)].map((m) => m[1])
+  for (const expr of braceExpressions(text)) {
+    if (!expr.includes('animate-spin')) continue
+    if (expr.includes('${')) unreadable.push(expr.trim())
+    lists.push([...expr.matchAll(/(['"`])((?:(?!\1).)*)\1/g)].map((m) => m[2]).join(' '))
+  }
+  for (const list of lists) {
+    if (list.includes('animate-spin') && list.includes('on-accent')) found.push(list.split(/\s+/))
+  }
+  return { found, unreadable }
+}
+
 function onAccentSpinners() {
   const found = []
+  const unreadable = []
   for (const file of walk(SRC)) {
-    const text = fs.readFileSync(file, 'utf8')
-    for (const m of text.matchAll(/className="([^"]*animate-spin[^"]*)"/g)) {
-      if (m[1].includes('on-accent')) found.push({ file: path.relative(SRC, file), classes: m[1].split(/\s+/) })
-    }
+    const rel = path.relative(SRC, file)
+    const r = scanSpinners(fs.readFileSync(file, 'utf8'))
+    found.push(...r.found.map((classes) => ({ file: rel, classes })))
+    unreadable.push(...r.unreadable.map((expr) => `${rel}: ${expr}`))
   }
-  return found
+  return { found, unreadable }
 }
 
 // Built CSS with the same Tailwind config, scanned over the spinner markup only.
@@ -67,9 +100,25 @@ function effectiveBorderTop(root, classes) {
   return value
 }
 
+describe('spinner scan', () => {
+  it('reads literal, expression, template and cn() classNames', () => {
+    const text = [
+      '<i className="animate-spin border-on-accent" />',
+      "<i className={cn('animate-spin rounded-full', 'border-on-accent', busy && 'x')} />",
+      '<i className={`animate-spin border-on-accent ${size}`} />',
+      "<i className={busy ? 'animate-spin border-on-accent' : ''} />",
+      "<i className={busy ? 'animate-spin' : ''} />",
+    ].join('\n')
+    const { found, unreadable } = scanSpinners(text)
+    expect(found).toHaveLength(4)
+    expect(unreadable).toHaveLength(1)
+  })
+})
+
 describe('on-accent spinners', () => {
   it('keep a solid top arc over the translucent ring', async () => {
-    const spinners = onAccentSpinners()
+    const { found: spinners, unreadable } = onAccentSpinners()
+    expect(unreadable).toEqual([])
     expect(spinners.length).toBeGreaterThan(0)
     const root = await buildCss(spinners.flatMap((s) => s.classes))
     for (const s of spinners) {
