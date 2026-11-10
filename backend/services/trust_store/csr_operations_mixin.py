@@ -501,8 +501,10 @@ class CSROperationsMixin:
         """Generate a Certificate Signing Request. With *related_certificate* (A) and
         its *related_private_key*, the request carries an RFC 9763 relatedCertRequest."""
         # Generate private key
-        from utils.issuance_defaults import default_issue_key_id
-        private_key = KeyOperationsMixin.generate_private_key(key_type or default_issue_key_id())
+        # No database here: callers that know a CA, template or policy pass the resolved key
+        from utils import issuance_defaults, key_algorithms
+        private_key = KeyOperationsMixin.generate_private_key(
+            key_type or key_algorithms.get(issuance_defaults.BASELINE_ISSUE_KEY).trust_store_id)
 
         # Build CSR
         builder = x509.CertificateSigningRequestBuilder()

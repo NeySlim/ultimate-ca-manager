@@ -113,10 +113,11 @@ class CSRMixin:
         related_row, related_certificate, related_key = (
             _related_signer(related_to) if related_to is not None else (None, None, None))
 
-        # Generate CSR
+        # Generate CSR; the default key is the one the global policies allow
+        from utils.issuance_defaults import default_issue_key_id
         csr_pem, key_pem = TrustStoreService.generate_csr(
             subject=subject,
-            key_type=key_type,
+            key_type=key_type or default_issue_key_id(),
             digest=digest,
             san_dns=san_dns,
             san_ip=san_ip,
