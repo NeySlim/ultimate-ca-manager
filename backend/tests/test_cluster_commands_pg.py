@@ -479,7 +479,8 @@ def test_a_late_restart_survives_an_error_while_it_is_applied(app, ha, monkeypat
         engine.dispose()
 
 
-def test_a_restart_action_that_raises_is_retried_and_reloads_go_on(app, ha):
+def test_a_restart_action_that_raises_is_retried_and_reloads_go_on(app, ha, monkeypatch):
+    monkeypatch.setattr(cc, 'RESTART_RETRY_FIRST', 0.1)
     log, attempts, emitted = [], [], []
 
     def flaky():
@@ -666,3 +667,51 @@ def test_the_leader_purges_commands_older_than_a_day(app, ha):
         recent_id = recent.id
         cc.purge_old_commands()
         assert [c.id for c in ClusterCommand.query.all()] == [recent_id]
+
+
+class _FakeMonotonic:
+    def __init__(self):
+        self.t = 1000.0
+
+    def __call__(self):
+        return self.t
+
+
+def test_a_failing_restart_backs_off_and_logs_one_line_per_step(app, ha, caplog):
+    """2 s, 4 s ... 60 s between attempts; ERROR once, then one line per step; reloads go on."""
+    import logging
+    clock, attempts, log, fail = _FakeMonotonic(), [], [], [True]
+
+    def action():
+        attempts.append(clock.t)
+        if fail[0]:
+            raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', monotonic=clock, restart_action=action,
+              handlers={cc.RELOAD_SYSLOG: _recorder(log, 'solo')})
+    caplog.set_level(logging.INFO, logger=cc.logger.name)
+    _emit(app, cc.RESTART)
+    solo.run_once()
+    clock.t += 1  # past the gap grace: ids left by earlier tests are below this one
+    solo.run_once()
+    assert len(attempts) == 1
+    delays = []
+    for _ in range(8):
+        before = len(attempts)
+        start = clock.t
+        while len(attempts) == before:
+            clock.t += 1
+            solo.run_once()
+            assert clock.t - start <= 60
+        delays.append(clock.t - start)
+    assert delays == [2, 4, 8, 16, 32, 60, 60, 60]
+    mark = _emit(app, cc.RELOAD_SYSLOG, {'mark': 'waiting'})
+    solo.run_once()  # mid-wait: no attempt, the reload is applied
+    assert solo.seen == mark and log == [('solo', 'waiting')] and len(attempts) == 9
+    lines = [r for r in caplog.records if r.name == cc.logger.name and 'failed' in r.getMessage()]
+    assert [r.levelno for r in lines] == [logging.ERROR] + [logging.WARNING] * 5
+    fail[0] = False
+    clock.t += 60
+    solo.run_once()
+    assert len(attempts) == 10 and solo.restarting
+    assert solo._retry_delay is None  # a restart that ran starts the next failure from 2 s

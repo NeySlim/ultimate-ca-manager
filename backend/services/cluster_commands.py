@@ -35,6 +35,9 @@ HOLE_TTL_SECONDS = 600.0
 MAX_HOLES = 32
 # A node waits at most this long per node ahead of it in a rolling restart
 RESTART_GUARD_SECONDS = 120.0
+# A restart that fails is retried after 2 s, then twice as long each time, at most 60 s apart
+RESTART_RETRY_FIRST = 2.0
+RESTART_RETRY_MAX = 60.0
 RETENTION = timedelta(hours=24)
 # A starting process replays the reloads of this window (idempotent): one committed while it
 # read its settings is not lost. A restart in it is older than the process and never runs.
@@ -171,12 +174,14 @@ class CommandApplier:
     """
 
     def __init__(self, app, node_id, *, started_at=None, record=True, restart_action=None,
-                 handlers=None, tick=None, guard=None, stale_seconds=None, clock=None):
+                 handlers=None, tick=None, guard=None, stale_seconds=None, clock=None,
+                 monotonic=None):
         from services.scheduler_leader import STALE_PASSES
         self.app = app
         self.node_id = node_id
         self.started_at = started_at or PROCESS_STARTED  # this host's clock until the first pass
         self.clock = clock or utc_now  # this host's clock
+        self._monotonic = monotonic or time.monotonic
         self._on_cluster_clock = False
         self.record = record
         self.restart_action = restart_action or restart_this_node
@@ -190,6 +195,8 @@ class CommandApplier:
         self._gap = None  # (first missing id, monotonic time it was noticed)
         self._restart_wait = None  # (command id, monotonic first sight, nodes ahead then)
         self._held = None  # the restart waiting for this node's turn; later reloads still apply
+        self._retry_delay = None  # seconds before the next attempt of a restart that failed
+        self._retry_at = 0.0  # monotonic instant of that attempt
         self._engine = None
         self._conn = None
         self._error_logged = False
@@ -259,13 +266,14 @@ class CommandApplier:
                 self._error_logged = True
 
     def _drain(self, conn):
-        now = time.monotonic()
+        now = self._monotonic()
         self._holes = [h for h in self._holes if h[2] > now][-MAX_HOLES:]
         held_before = self._held is not None
         self._drain_rows(conn, now)
         # After the rows: a newer restart committed with the node ahead's return is absorbed first;
         # one held (or failed) during this pass is retried on the next
-        if held_before and self._held is not None and not self._stop.is_set():
+        if held_before and self._held is not None and not self._stop.is_set() \
+                and self._monotonic() >= self._retry_at:
             self._restart(conn, self._held)
 
     def _drain_rows(self, conn, now):
@@ -371,7 +379,7 @@ class CommandApplier:
         from services.scheduler_leader import cluster_utc_now
         pending = pending_predecessors(self.node_id, nodes, row.created_at,
                                        cluster_utc_now(conn), self.stale_seconds)
-        now = time.monotonic()
+        now = self._monotonic()
         if self._restart_wait is None or self._restart_wait[0] != row.id:
             self._restart_wait = (row.id, now, len(pending))
         _, since, ahead = self._restart_wait
@@ -395,15 +403,31 @@ class CommandApplier:
         self._stop.set()  # this process is leaving: nothing after the restart is applied here
         try:
             self.restart_action()
+            self._retry_delay = None
         except Exception as e:
-            # Still on the old process: the claim is given back and the restart retried next pass
-            logger.error(f"Rolling restart of node {self.node_id} failed, retried on the next pass: "
-                         f"{type(e).__name__}: {e}")
+            # Still on the old process: the claim is given back and the restart retried later
+            self._restart_failed(e)
             conn.execute(_RELEASE_SQL, {'prev': previous, 'id': row.id, 'n': self.node_id})
             self.restarting = False
             self._held = _Held(row.id, row.created_at)
             if not self._stopping:
                 self._stop.clear()
+
+    def _restart_failed(self, e):
+        """Next attempt after the backoff delay: ERROR the first time, then one line per new delay."""
+        previous = self._retry_delay
+        if previous is None:
+            self._retry_delay = RESTART_RETRY_FIRST
+        else:
+            self._retry_delay = min(previous * 2, RESTART_RETRY_MAX)
+        self._retry_at = self._monotonic() + self._retry_delay
+        reason = f"{type(e).__name__}: {e}"
+        if previous is None:
+            logger.error(f"Rolling restart of node {self.node_id} failed, retried in "
+                         f"{self._retry_delay:.0f}s: {reason}")
+        elif self._retry_delay != previous:
+            logger.warning(f"Rolling restart of node {self.node_id} failed again, next attempt in "
+                           f"{self._retry_delay:.0f}s (at most {RESTART_RETRY_MAX:.0f}s apart): {reason}")
 
 
 _applier = None
