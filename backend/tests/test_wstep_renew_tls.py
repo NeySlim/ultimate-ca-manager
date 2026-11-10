@@ -18,8 +18,9 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
-from sqlalchemy import update
+from sqlalchemy import text, update
 from sqlalchemy.orm.attributes import set_committed_value
+from utils.serial_duplicates import INDEX as SERIAL_INDEX
 
 from models import CA, AuditLog, CATemplatePin, Certificate, db
 from models.certificate_template import CertificateTemplate
@@ -502,6 +503,8 @@ def test_two_claims_never_lock_in_opposite_orders(app):
             columns = {c.name: getattr(row, c.name) for c in Certificate.__table__.columns
                        if c.name not in ('id', 'refid')}
             twin = Certificate(refid=str(uuid.uuid4()), **columns)
+            # A twin exists only where migration 142 is pending; this schema is dropped afterwards
+            db.session.execute(text(f'DROP INDEX IF EXISTS {SERIAL_INDEX}'))
             db.session.add(twin)
             db.session.commit()
             row_id = row.id

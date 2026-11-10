@@ -57,7 +57,7 @@ def events(app):
     """Audit, SCEP and EST rows at known times, removed afterwards."""
     now = utc_now()
     times = {'ok': now - timedelta(seconds=30), 'old_fail': now - timedelta(days=2),
-             'outside': now - timedelta(days=10), 'last': now - timedelta(seconds=5)}
+             'outside': now - timedelta(days=10), 'last': now}  # newer than any other file's entry
     with app.app_context():
         audit = [
             AuditLog(username=USER, action='acme.order.create', success=True, timestamp=times['ok']),

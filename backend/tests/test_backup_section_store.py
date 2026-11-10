@@ -254,19 +254,13 @@ def test_store_directory_is_none_when_the_spool_probe_fails(monkeypatch):
     assert section_store.store_directory() is None
 
 
-def test_an_unwritable_data_tmp_is_not_a_store_directory(tmp_path, monkeypatch):
+def test_an_unusable_data_tmp_is_not_a_store_directory(tmp_path, monkeypatch):
+    """A file where DATA_DIR/tmp should be: the probe cannot make it a directory, whoever runs it."""
     from config.settings import Config
     from services.backup import section_store
-    spool = tmp_path / 'tmp'
-    spool.mkdir()
-    spool.chmod(0o500)
-    try:
-        if os.access(spool, os.W_OK):
-            pytest.skip('this process writes into a 0500 directory (root)')
-        monkeypatch.setattr(Config, 'DATA_DIR', tmp_path)
-        assert section_store.store_directory() is None
-    finally:
-        spool.chmod(0o700)
+    (tmp_path / 'tmp').write_text('not a directory')
+    monkeypatch.setattr(Config, 'DATA_DIR', tmp_path)
+    assert section_store.store_directory() is None
 
 
 def test_no_sweep_when_the_lock_cannot_be_taken(tmp_path, monkeypatch, caplog):
@@ -351,7 +345,7 @@ def test_a_loosened_fallback_directory_is_closed_again(tmp_path, monkeypatch):
     monkeypatch.setattr(tempfile, 'tempdir', str(tmp_path))
     monkeypatch.setattr(Config, 'DATA_DIR', tmp_path / 'mine')
     directory = section_store.fallback_directory()
-    os.chmod(directory, 0o777)
+    os.chmod(directory, 0o777)  # nosec B103
 
     assert section_store.fallback_directory() == directory
     assert stat.S_IMODE(os.stat(directory).st_mode) == 0o700
