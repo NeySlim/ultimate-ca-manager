@@ -94,8 +94,10 @@ class ScannerMixin:
             )
 
         # Create scan run record
+        from config.settings import Config
         run = ScanRun(
             scan_profile_id=profile_id,
+            node_id=Config.NODE_ID,
             total_targets=len(jobs),
             triggered_by=triggered_by,
             triggered_by_user=triggered_by_user,

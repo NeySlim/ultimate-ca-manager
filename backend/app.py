@@ -769,16 +769,7 @@ def create_app(config_name=None):
         # Register discovery scheduler task (checks every 60s for due profiles)
         try:
             from services.discovery_scheduler_task import DiscoverySchedulerTask
-            # Scan runs orphaned by a crash/restart stay 'running' forever and
-            # would block future scheduled scans of their profile (#293)
-            with app.app_context():
-                DiscoverySchedulerTask.recover_stale_runs()
-            scheduler.register_task(
-                name="discovery_scan",
-                func=DiscoverySchedulerTask.execute,
-                interval=60,  # Check every minute for due profiles
-                description="Run scheduled network discovery scans"
-            )
+            DiscoverySchedulerTask.register(scheduler, app)
             app.logger.info("Registered discovery scan scheduler task (every 60s)")
         except ImportError:
             pass

@@ -15,15 +15,44 @@ class DiscoverySchedulerTask:
     """Automatic discovery scan scheduler."""
 
     @staticmethod
-    def recover_stale_runs() -> int:
+    def register(scheduler, app) -> None:
+        """Register the task; orphaned runs are recovered now on a single node, by the leader in HA."""
+        from utils.ha import ha_enabled
+        if ha_enabled():
+            def recover_after_takeover():
+                from services.scheduler_leader import fresh_node_ids
+                return DiscoverySchedulerTask.recover_stale_runs(
+                    keep_nodes=fresh_node_ids(scheduler.wake_interval))
+            scheduler.on_leadership(recover_after_takeover)
+        else:
+            # Scan runs orphaned by a crash/restart stay 'running' forever and
+            # would block future scheduled scans of their profile (#293)
+            with app.app_context():
+                DiscoverySchedulerTask.recover_stale_runs()
+        scheduler.register_task(
+            name="discovery_scan",
+            func=DiscoverySchedulerTask.execute,
+            interval=60,  # Check every minute for due profiles
+            description="Run scheduled network discovery scans"
+        )
+
+    @staticmethod
+    def recover_stale_runs(keep_nodes=None) -> int:
         """Mark scan runs orphaned by a process restart as failed.
 
         A scan run lives in a daemon thread; if the process dies mid-scan the
         row stays 'running' forever and would block future scheduled scans of
-        its profile. Called once at startup, before the scheduler starts.
+        its profile. Without ``keep_nodes`` every running scan is orphaned (one
+        node, at startup). With it (HA takeover), manual scans of those live
+        nodes are kept; scheduled scans ran on the former leader and are not.
         """
         try:
-            stale = ScanRun.query.filter_by(status='running').update(
+            query = ScanRun.query.filter_by(status='running')
+            if keep_nodes is not None:
+                query = query.filter(db.or_(
+                    ScanRun.triggered_by == 'scheduled', ScanRun.node_id.is_(None),
+                    ScanRun.node_id.notin_(list(keep_nodes) or [''])))
+            stale = query.update(
                 {'status': 'failed', 'completed_at': datetime.now(timezone.utc)}
             )
             db.session.commit()

@@ -153,6 +153,7 @@ class SchedulerService:
         self._last_heartbeat = None
         self._heartbeat_error_logged = False
         self._claimed: Dict[str, list] = {}
+        self._leadership_hooks: list = []
         self.tasks: Dict[str, ScheduledTask] = {}
         self.tasks_lock = Lock()
         self._thread: Optional[threading.Thread] = None
@@ -599,16 +600,21 @@ class SchedulerService:
             self._release_lock()
             self._heartbeat(force=True)
 
+    def on_leadership(self, hook: Callable[[], Any]) -> None:
+        """HA: run ``hook`` in the app context each time this process becomes the leader."""
+        self._leadership_hooks.append(hook)
+
     def _took_leadership(self) -> None:
         """HA: requests a former leader claimed and never finished are dropped, not replayed."""
         if not _ha():
             return
         self._claimed.clear()
-        try:
-            self._in_app(_drop_abandoned_requests)
-        except Exception as e:
-            self._in_app(_rollback)
-            logger.error(f"Abandoned scheduler requests not dropped: {type(e).__name__}: {e}")
+        for hook in [_drop_abandoned_requests] + self._leadership_hooks:
+            try:
+                self._in_app(hook)
+            except Exception as e:
+                self._in_app(_rollback)
+                logger.error(f"Leadership takeover step failed: {type(e).__name__}: {e}")
 
     def _heartbeat(self, force: bool = False) -> None:
         """HA: this node's row in cluster_nodes, at most once a pass unless leadership changed."""
