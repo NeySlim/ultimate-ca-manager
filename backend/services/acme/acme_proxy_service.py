@@ -18,7 +18,7 @@ import requests
 
 from flask import current_app
 from sqlalchemy import and_, or_, inspect as sa_inspect
-from sqlalchemy.exc import NoInspectionAvailable
+from sqlalchemy.exc import NoInspectionAvailable, SQLAlchemyError
 from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
 from services.acme.dns_txt_lock import txt_record_lock as _txt_record_lock
@@ -249,10 +249,14 @@ class _ChallengeOrderLinks:
                 db.session.add(AcmeProxyChallengeLink(
                     key_sha256=digest, order_id=order_id, identifier=identifier,
                     authz_url=authz_url, created_at=utc_now()))
-            db.session.commit()
-        except Exception as exc:  # a concurrent writer recorded the same link
-            db.session.rollback()
+        except SQLAlchemyError as exc:
+            # A concurrent writer recorded the same link: only the savepoint is undone
             logger.debug("[ACME Proxy] challenge link not recorded: %s", type(exc).__name__)
+        try:
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            raise
 
     def pop(self, key) -> None:
         from models import AcmeProxyChallengeLink

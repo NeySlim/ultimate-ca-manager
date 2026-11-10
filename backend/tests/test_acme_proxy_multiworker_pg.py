@@ -130,3 +130,31 @@ def test_two_workers_on_postgresql(app, monkeypatch):
     with _a_schema_of_our_own(f'proxy_workers_{uuid.uuid4().hex[:6]}') as url, \
             _bound_to(app, url, is_postgresql=True):
         _scenario(app, monkeypatch)
+
+
+def test_a_link_another_worker_recorded_first_keeps_the_callers_work(app, monkeypatch):
+    """Two workers serving one authorization record the same link: the loser's insert is
+    refused, and only that insert is undone, not what its request had pending."""
+    from sqlalchemy.orm import Query
+    from models import AcmeProxyChallengeLink, SystemConfig
+
+    links = proxy_mod._challenge_order_cache
+    key = f'race-{uuid.uuid4().hex}'
+    marker = f'proxy-race-{uuid.uuid4().hex[:8]}'
+    with app.app_context():
+        order = _order(upstream_authz_urls=json.dumps([AUTHZ['a']]))
+        db.session.add(AcmeProxyChallengeLink(key_sha256=links._digest(key), order_id=order.id,
+                                              identifier='race.multiworker.example',
+                                              authz_url=AUTHZ['a']))
+        db.session.commit()
+        db.session.add(SystemConfig(key=marker, value='pending work of the request'))
+        # The other worker's row lands between this worker's delete and insert
+        monkeypatch.setattr(Query, 'delete', lambda self, **kw: 0)
+        links.put(key, (order.id, 'race.multiworker.example', AUTHZ['a']))
+        monkeypatch.undo()
+        db.session.commit()
+        db.session.expire_all()
+        assert SystemConfig.query.filter_by(key=marker).count() == 1
+        assert links.get(key) == (order.id, 'race.multiworker.example', AUTHZ['a'])
+        SystemConfig.query.filter_by(key=marker).delete()
+        db.session.commit()
