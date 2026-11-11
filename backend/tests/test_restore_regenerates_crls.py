@@ -73,7 +73,7 @@ def test_a_publishing_authority_gets_a_new_crl_and_its_delta(app, create_ca, mon
                for kind, payload in events), events
 
 
-def test_a_delta_that_fails_after_its_base_reports_the_authority(app, create_ca, monkeypatch):
+def test_a_delta_that_fails_after_its_base_reports_the_authority(app, create_ca, monkeypatch, caplog):
     """The served delta would be older than the new base: the authority is not fully re-signed."""
     from services.crl.generation import CRLGenerationMixin
     from services.crl_service import CRLService
@@ -84,9 +84,16 @@ def test_a_delta_that_fails_after_its_base_reports_the_authority(app, create_ca,
         def refused(*a, **kw):
             raise RuntimeError('HSM session lost')
         monkeypatch.setattr(CRLGenerationMixin, 'generate_delta_crl', staticmethod(refused))
-        result = invalidate_after_restore()
+        with caplog.at_level('INFO'):
+            result = invalidate_after_restore()
         assert name in result['crls_delta_failed'], result
         assert name not in result['crls_failed'] and name not in result['crls_regenerated'], result
+        messages = [r.getMessage() for r in caplog.records
+                    if r.name == 'services.backup.restore.invalidate']
+        mine = [m for m in messages if f'CA {name}' in m]
+        assert len(mine) == 1 and 'base CRL was signed' in mine[0] and 'not regenerated' not in mine[0], mine
+        summary = next(m for m in messages if m.startswith('Restore: revoked'))
+        assert '(0 failed, 1 with a delta CRL failed)' in summary, summary
 
 
 def test_an_authority_that_cannot_sign_is_reported_and_the_others_still_get_theirs(
