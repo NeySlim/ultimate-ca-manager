@@ -229,3 +229,21 @@ class TestCertInfoNamesTheBoundCertificate:
         bound = r.get_json()['data']['bound_certificate']
         assert bound['common_name'] == 'bound-https.example.com'
         assert bound['descr'] == 'Renamed web UI'
+
+
+class TestLeftBehindBannerSuperseded:
+    def test_an_archived_successor_is_flagged(self, app, clean_binding, create_cert):
+        from api.v2.system.https import _https_attention
+        from models import Certificate, db
+        from services.binding_attention import HTTPS_LEFT_BEHIND_KEY
+        from models import SystemConfig
+        succ = create_cert(cn='https-successor.example.com')
+        with app.app_context():
+            db.session.add(SystemConfig(key=HTTPS_LEFT_BEHIND_KEY, value=succ['refid']))
+            db.session.commit()
+            assert _https_attention()['successor_archived'] is False
+            db.session.get(Certificate, succ['id']).archived = True
+            db.session.commit()
+            assert _https_attention()['successor_archived'] is True
+            SystemConfig.query.filter_by(key=HTTPS_LEFT_BEHIND_KEY).delete()
+            db.session.commit()

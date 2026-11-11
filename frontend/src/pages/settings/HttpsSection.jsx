@@ -70,7 +70,9 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
               <div className="min-w-0 space-y-1">
                 <p className="text-sm font-medium text-text-primary">{t('settings.httpsLeftBehind')}</p>
                 <p className="text-xs text-text-secondary">
-                  {attention.successor_has_key ? t('settings.httpsLeftBehindKeyed') : t('settings.httpsLeftBehindNoKey')}
+                  {attention.successor_archived
+                    ? t('settings.httpsLeftBehindSuperseded')
+                    : attention.successor_has_key ? t('settings.httpsLeftBehindKeyed') : t('settings.httpsLeftBehindNoKey')}
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   {attention.successor_id && (
@@ -78,7 +80,7 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
                       {t('settings.httpsOpenRenewed')}
                     </a>
                   )}
-                  {attention.successor_has_key && attention.successor_id && (
+                  {attention.successor_has_key && !attention.successor_archived && attention.successor_id && (
                     <Button type="button" variant="secondary" size="sm"
                       onClick={() => setSelectedHttpsCert({
                         id: attention.successor_id, common_name: attention.successor_descr || attention.successor_refid,

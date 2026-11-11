@@ -41,6 +41,7 @@ def _https_attention():
         'successor_refid': refid,
         'successor_descr': successor.descr if successor else None,
         'successor_has_key': bool(successor and successor.has_private_key),
+        'successor_archived': bool(successor and successor.archived),
     }
 
 
