@@ -135,3 +135,41 @@ class TestASessionOpenedBeforeTheUpdate:
             assert stored.pop(ACCOUNT_KEY, None) is not None
             assert stored.pop('login_time', None) is not None
         assert client.get(PROTECTED).status_code == 401
+
+
+class TestAPending2faSessionOpenedBeforeTheUpdate:
+    """Known effect of the update: a second-factor step begun before it holds no
+    proof and no login time, so it is refused and the password is asked again."""
+
+    def test_is_refused_and_a_new_login_completes(self, app, create_user, cleanup):
+        import pyotp
+        from auth.session_start import ACCOUNT_KEY
+        cleanup.append('proofless_pending_2fa')
+        made = create_user(username='proofless_pending_2fa', role='operator')
+        secret = pyotp.random_base32()
+        with app.app_context():
+            user = db.session.get(User, made['id'])
+            user.totp_secret, user.totp_confirmed = secret, True
+            db.session.commit()
+
+        def _password_step():
+            client = app.test_client()
+            answer = client.post('/api/v2/auth/login', content_type='application/json', data=json.dumps(
+                {'username': 'proofless_pending_2fa', 'password': 'TestPass123!'}))
+            assert json.loads(answer.data)['data'].get('requires_2fa') is True, answer.data[:300]
+            return client
+
+        def _second_step(client):
+            return client.post('/api/v2/auth/login/2fa', content_type='application/json',
+                               data=json.dumps({'code': pyotp.TOTP(secret).now()}))
+
+        pending = _password_step()
+        with pending.session_transaction() as stored:
+            assert stored.pop(ACCOUNT_KEY, None) is not None
+        assert _second_step(pending).status_code == 401
+        with pending.session_transaction() as stored:
+            assert 'pending_2fa_user_id' not in stored
+
+        fresh = _password_step()
+        assert _second_step(fresh).status_code == 200
+        assert fresh.get(PROTECTED).status_code == 200
