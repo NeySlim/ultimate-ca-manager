@@ -181,3 +181,52 @@ class TestDeletingAUser:
             assert data['acme_upstream_pending'] == [bench.cert_id]
         finally:
             _drop_enrolment(enrolment_id)
+
+
+def _es256_revocation(client, key, pem, reason):
+    """A revokeCert to UCM's own ACME server, signed by the certificate's key (RFC 8555 §7.6)."""
+    import base64
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+
+    def b64(raw):
+        return base64.urlsafe_b64encode(raw).rstrip(b'=').decode()
+
+    numbers = key.public_key().public_numbers()
+    jwk = {'kty': 'EC', 'crv': 'P-256', 'x': b64(numbers.x.to_bytes(32, 'big')),
+           'y': b64(numbers.y.to_bytes(32, 'big'))}
+    der = x509.load_pem_x509_certificate(pem).public_bytes(serialization.Encoding.DER)
+    nonce = client.get('/acme/new-nonce').headers.get('Replay-Nonce')
+    protected = b64(json.dumps({'alg': 'ES256', 'nonce': nonce, 'jwk': jwk,
+                                'url': 'http://localhost/acme/revoke-cert'}).encode())
+    payload = b64(json.dumps({'certificate': b64(der), 'reason': reason}).encode())
+    r, s = decode_dss_signature(key.sign(f'{protected}.{payload}'.encode(), ec.ECDSA(hashes.SHA256())))
+    jws = {'protected': protected, 'payload': payload,
+           'signature': b64(r.to_bytes(32, 'big') + s.to_bytes(32, 'big'))}
+    return client.post('/acme/revoke-cert', data=json.dumps(jws),
+                       content_type='application/jose+json')
+
+
+class TestRevokeCertAtUcmsOwnAcmeServer:
+    """The key holder may revoke there a certificate UCM obtained from an ACME CA."""
+
+    def test_the_issuing_ca_is_told(self, app, client, bench):  # noqa: F811
+        answer = _es256_revocation(client, bench.key, bench.old_pem, 1)
+        assert answer.status_code == 200, answer.data[:300]
+        assert bench.row().revoked is True
+        sent = bench.client.revoke_certificate.call_args
+        assert sent.args[0] == bench.old_pem and sent.kwargs == {'reason': 1}
+
+    def test_a_ca_that_does_not_answer_is_owed(self, app, client, bench):  # noqa: F811
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        answer = _es256_revocation(client, bench.key, bench.old_pem, 4)
+        assert answer.status_code == 200, answer.data[:300]
+        assert [(e['serial'], e['reason']) for e in _owed(bench)] == [(bench.old_serial, 4)]
+
+    def test_a_hold_is_never_sent(self, app, client, bench):  # noqa: F811
+        answer = _es256_revocation(client, bench.key, bench.old_pem, 6)
+        assert answer.status_code == 200, answer.data[:300]
+        bench.client.revoke_certificate.assert_not_called()
+        assert _owed(bench) == []
