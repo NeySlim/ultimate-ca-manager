@@ -40,7 +40,7 @@ describe('acme.dnsUpdate i18n keys (9 locales)', () => {
   it('the other locales are translated, not copied from English', () => {
     // Product names and short cognates (Active, Notes) can match English. A sentence cannot.
     const PRODUCT_TABS = new Set(['tabAcmesh', 'tabCertbot', 'tabLego', 'tabCertManager', 'tabWinAcme', 'tabPoshAcme'])
-    for (const code of HELP_TRANSLATED_LANGUAGES) {
+    for (const code of LOCALE_CODES.filter((c) => c !== 'en')) {
       const bundle = load(code).acme.dnsUpdate
       const same = Object.keys(en).filter((k) => !PRODUCT_TABS.has(k) && bundle[k] === en[k])
       for (const key of same) {
