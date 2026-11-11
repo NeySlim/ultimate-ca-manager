@@ -210,7 +210,6 @@ def test_a_committed_restore_is_audited_even_when_its_details_cannot_be_built(au
     assert LEAKY not in str(audit)
 
 
-
 def _raw_restore(client, route, filename, **fields):
     """A multipart restore whose file name travels as RFC 2231 filename*, CR and LF included."""
     from urllib.parse import quote

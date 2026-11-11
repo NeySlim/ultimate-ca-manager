@@ -820,7 +820,6 @@ def test_a_restart_gone_past_a_dead_node_is_retried_after_its_backoff_not_the_gu
     assert attempts[1] - attempts[0] == cc.RESTART_RETRY_FIRST
 
 
-
 def test_a_restart_gone_past_a_dead_node_says_so_once(app, ha, caplog):
     """One "restarts anyway" line per restart decided past the guard, not one per retry."""
     import logging
@@ -838,6 +837,7 @@ def test_a_restart_gone_past_a_dead_node_says_so_once(app, ha, caplog):
     _fail_until(b, clock, attempts, 4)
     assert len([r for r in caplog.records if r.name == cc.logger.name
                 and 'restarts anyway' in r.getMessage()]) == 1
+
 
 @pytest.mark.parametrize('database', ['back', 'still-lost'])
 def test_stop_gives_back_a_claim_still_pending(app, ha, monkeypatch, caplog, database):
@@ -868,7 +868,6 @@ def test_stop_gives_back_a_claim_still_pending(app, ha, monkeypatch, caplog, dat
         assert [r.levelno for r in caplog.records if 'given back' in r.getMessage()] == [logging.ERROR]
 
 
-
 def test_stop_during_a_failed_give_back_logs_it_once(app, ha, monkeypatch, caplog):
     """The applier thread fails to give the claim back while stop() waits for it: stop()
     tries once more and that failure is the only line."""
@@ -889,6 +888,7 @@ def test_stop_during_a_failed_give_back_logs_it_once(app, ha, monkeypatch, caplo
     solo.start()
     assert wait_for(lambda: stopper and not stopper[0].is_alive(), timeout=15)
     assert [r.levelno for r in caplog.records if 'given back' in r.getMessage()] == [logging.ERROR]
+
 
 def test_stop_during_a_failed_restart_is_not_undone(app, ha):
     """stop() lands between the failed restart's check of _stopping and its _stop.clear()."""
