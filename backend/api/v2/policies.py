@@ -847,7 +847,11 @@ def _issue_approved_certificate(approval):
         # issuance; returning the Flask error tuple here used to land it in
         # the JSON response as `certificate`
         raise RuntimeError('Failed to link approval to certificate')
-    
+
+    # The event the issue form fires, once the row is committed
+    from services.webhook_service import emit_cert_issued
+    emit_cert_issued(db_cert.to_dict(), ca_refid=ca.refid, actor=db_cert.created_by)
+
     logger.info(f"Certificate CN={data['cn']} issued via approval #{approval.id}")
     
     return {
