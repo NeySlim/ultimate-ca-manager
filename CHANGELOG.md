@@ -21,6 +21,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Dashboard: `GET /api/v2/dashboard/queue`, `/health`, `/compliance` and `/issuance` (scope `read:dashboard`, now held by every built-in role and grantable to groups) return the work queue, per-protocol health, compliance counters and issuances and in-place renewals per CA, computed in SQL without parsing certificates. A repeated `kind` parameter restricts the queue items to those kinds. Certificates gain `key_bits` and `sig_hash` columns, backfilled by migration 139.
 - Overview: the home page is now six independent cards (work queue, automation health, hierarchy, expiry horizon, compliance, latest operations) with layout presets saved per user; each compliance counter and renewal kind opens the certificate list filtered to exactly what it counts, shown as removable chips. The list accepts the matching filters and refuses an invalid filter value with 400.
 
+- Renewal: a deploy binding or the HTTPS binding that an EST, SCEP or WSTEP renewal leaves on the previous certificate (no key in UCM) is now flagged in the API (`needs_attention`, migration 151), the bell, the overview queue and a `certificate.binding_left_behind` event; it can be reattached once UCM holds the key, and importing that key moves it.
+
 ### Changed
 
 - Console: the sidebar gives way to the Atelier shell, a horizontal bar with a Modules menu (four groups, keyboard navigable), three pinnable modules kept in your preferences, a status bar fed by `/health` and a module picker on phones; the account menu now carries theme, language and sign out.
