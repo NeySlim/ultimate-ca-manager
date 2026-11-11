@@ -12,6 +12,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - Certificate Transparency: `POST /api/v2/certificates/<id>/submit-ct` always failed with a server error, as it read an attribute the certificate model does not have, and the chain it built stopped at the direct issuer; the submission now sends the leaf with its full issuer chain up to the root, or the chain stored inline with the certificate, one element per certificate (RFC 6962 §4.1). Reported by Chris by e-mail.
+- Users: deleting a user, alone or in bulk, dropped its mTLS enrolments without revoking their certificates, which stayed valid for anything else trusting the CA; each is now revoked (cessationOfOperation) and deleted as when removing the enrolment, and a certificate that cannot be revoked no longer blocks the deletion but is named in the answer and the audit log.
+- mTLS: the self-service routes that list, assign and enrol a user's own certificates relied on the username alone; a certificate recorded before the current account was created is no longer treated as its own, and an administrator can still assign it.
+- Sessions: a session is now bound to the account it was opened for, not only to its id, so it no longer outlives that account on SQLite; sessions opened before the update stay open, but a login waiting on its second factor at the update has to enter the password again.
+- Import: re-importing a certificate under a new serial updated the stored one but left its deploy bindings idle; it now counts as a renewal and queues them, while re-importing the same serial stays silent (discussion #440).
 
 ## [2.252] - 2026-11-08
 

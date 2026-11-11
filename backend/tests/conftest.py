@@ -399,6 +399,25 @@ def _shared_tables_stay_in_their_module(request):
     warnings.warn(message, stacklevel=1)
 
 
+@pytest.fixture(scope='module')
+def drop_new_cas_and_certificates(app):
+    """Deletes the certificates then the CAs a module created, with their dependent rows."""
+    from models import db, CA, Certificate
+    from services.ca_service import CAService
+    from services.cert_service import CertificateService
+
+    def _top(model):
+        with app.app_context():
+            return db.session.query(db.func.max(model.id)).scalar() or 0
+    floors = {Certificate: _top(Certificate), CA: _top(CA)}
+    yield
+    for model, delete in ((Certificate, CertificateService.delete_certificate),
+                          (CA, CAService.delete_ca)):
+        with app.app_context():
+            for row_id in [row.id for row in model.query.filter(model.id > floors[model])]:
+                delete(row_id)
+
+
 def sandbox_paths(application, replaced=None):
     """Point the file paths at a temp tree; returns it and the Config values replaced.
     `replaced` may be the caller's dict, filled as it goes, for a partial undo.

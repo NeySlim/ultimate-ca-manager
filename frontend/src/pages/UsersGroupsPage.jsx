@@ -32,7 +32,7 @@ export default function UsersGroupsPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
+  const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const { muteToasts } = useWebSocket()
   
@@ -161,8 +161,10 @@ export default function UsersGroupsPage() {
     if (!confirmed) return
     try {
       muteToasts()
-      await usersService.delete(user.id)
-      showSuccess(t('messages.success.delete.user'))
+      const result = await usersService.delete(user.id)
+      // The user is gone but some mTLS certificates could not be revoked: say so
+      if (result?.data?.unrevoked_certificates?.length) showWarning(result.message)
+      else showSuccess(t('messages.success.delete.user'))
       if (selectedUser?.id === user.id) setSelectedUser(null)
       loadData()
     } catch (error) {

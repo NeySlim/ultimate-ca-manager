@@ -43,6 +43,37 @@ def _pending_approvals_count(user_id):
         return 0
 
 
+def _withdraw_enrolments(user_id, actor):
+    """Remove each mTLS enrolment of the user as its own route does (revoke, then
+    delete). Each removal commits on its own; returns the certificates left valid,
+    which never block the deletion: [{'id', 'serial_number', 'name'}]."""
+    from models import AuthCertificate, Certificate
+    from services.mtls_enrollment import certificate_row_for, remove_enrolment
+    unrevoked = []
+    enrolment_ids = [row.id for row in AuthCertificate.query.filter_by(user_id=user_id)
+                     .order_by(AuthCertificate.id)]
+    for enrolment_id in enrolment_ids:
+        enrolment = db.session.get(AuthCertificate, enrolment_id)
+        if enrolment is None:
+            continue
+        certificate = certificate_row_for(enrolment)
+        certificate_id = certificate.id if certificate is not None else None
+        removed, _failure = remove_enrolment(enrolment, username=actor.username, actor=actor)
+        if removed or certificate_id is None:
+            continue
+        kept = db.session.get(Certificate, certificate_id)
+        if kept is not None and not kept.revoked:
+            unrevoked.append({'id': kept.id, 'serial_number': kept.serial_number,
+                              'name': kept.descr or kept.subject_cn or f'Certificate #{kept.id}'})
+        if kept is not None and kept.revoked:
+            logger.warning(f"User {user_id}: revoked mTLS certificate #{kept.id} not deleted")
+    return unrevoked
+
+
+def _unrevoked_text(unrevoked):
+    return ', '.join(f"#{c['id']} (serial {c['serial_number']})" for c in unrevoked)
+
+
 def _purge_user_dependencies(user_id):
     """Clean up all FK dependencies before hard-deleting a user.
 
@@ -440,7 +471,9 @@ def delete_user(user_id):
         )
 
     username = user.username
+    unrevoked = _withdraw_enrolments(user_id, g.current_user)
     try:
+        user = db.session.get(User, user_id)
         sessions_deleted = _purge_user_dependencies(user_id)
         db.session.delete(user)
         db.session.commit()
@@ -452,12 +485,15 @@ def delete_user(user_id):
     if sessions_deleted > 0:
         logger.info(f"Invalidated {sessions_deleted} sessions for deleted user {username}")
 
+    details = f'Deleted user: {username} ({sessions_deleted} sessions invalidated)'
+    if unrevoked:
+        details += f'; mTLS certificates not revoked: {_unrevoked_text(unrevoked)}'
     AuditService.log_action(
         action='user_delete',
         resource_type='user',
         resource_id=str(user_id),
         resource_name=username,
-        details=f'Deleted user: {username} ({sessions_deleted} sessions invalidated)',
+        details=details,
         success=True
     )
 
@@ -467,6 +503,11 @@ def delete_user(user_id):
     except Exception:
         pass
 
+    if unrevoked:
+        return success_response(
+            data={'unrevoked_certificates': unrevoked},
+            message=(f'User {username} deleted; its mTLS certificate(s) {_unrevoked_text(unrevoked)} '
+                     'could not be revoked and remain valid: revoke them under Certificates'))
     return success_response(
         message=f'User {username} deleted successfully'
     )
@@ -487,7 +528,7 @@ def bulk_delete_users():
     if ids_error:
         return ids_error
 
-    results = {'success': [], 'failed': []}
+    results = {'success': [], 'failed': [], 'unrevoked': []}
     total_sessions_invalidated = 0
 
     for user_id in ids:
@@ -505,7 +546,9 @@ def bulk_delete_users():
             results['failed'].append({'id': user_id, 'error': 'User has pending approval requests'})
             continue
 
+        unrevoked = _withdraw_enrolments(user_id, g.current_user)
         try:
+            user = db.session.get(User, user_id)
             sessions_deleted = _purge_user_dependencies(user_id)
             db.session.delete(user)
         except Exception as e:
@@ -519,14 +562,25 @@ def bulk_delete_users():
             continue
         total_sessions_invalidated += sessions_deleted
         results['success'].append(user_id)
+        # Named only once the user is gone: a failed deletion reports nothing as deleted
+        if unrevoked:
+            results['unrevoked'].append({'user_id': user_id, 'certificates': unrevoked})
 
+    details = f'Bulk deleted {len(results["success"])} users ({total_sessions_invalidated} sessions invalidated)'
+    left_valid = [c for entry in results['unrevoked'] for c in entry['certificates']]
+    if left_valid:
+        details += f'; mTLS certificates not revoked: {_unrevoked_text(left_valid)}'
     AuditService.log_action(
         action='users_bulk_deleted',
         resource_type='user',
         resource_id=','.join(str(i) for i in results['success']),
         resource_name=f'{len(results["success"])} users',
-        details=f'Bulk deleted {len(results["success"])} users ({total_sessions_invalidated} sessions invalidated)',
+        details=details,
         success=True
     )
 
-    return success_response(data=results, message=f'{len(results["success"])} users deleted')
+    message = f'{len(results["success"])} users deleted'
+    if left_valid:
+        message += (f'; mTLS certificate(s) {_unrevoked_text(left_valid)} could not be revoked '
+                    'and remain valid: revoke them under Certificates')
+    return success_response(data=results, message=message)

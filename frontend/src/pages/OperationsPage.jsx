@@ -586,6 +586,8 @@ export default function OperationsPage() {
         action: bulkAction, count: successCount,
         defaultValue: `${bulkAction}: ${successCount} succeeded${failedCount ? `, ${failedCount} failed` : ''}`
       }))
+      // Users deleted whose mTLS certificates could not be revoked stay valid
+      if (data?.unrevoked?.length > 0 && result?.message) showWarning(result.message)
       if (failedCount > 0) {
         showError(t('operations.bulkPartialFail', {
           count: failedCount,
