@@ -245,6 +245,17 @@ class TestAnApprovedRevocation:
         assert result['acme_local_only'] is True
         assert [e['serial'] for e in _owed(bench)] == [bench.old_serial]
 
+    def test_an_owed_revocation_says_what_the_single_route_says(self, app, auth_client, bench):
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        result = self._approve(app, bench)
+        assert result['acme_upstream_pending'] is True
+        assert 'sent again automatically' in result['acme_message']
+        assert 'HTTP 503' in result['acme_message']
+
+    def test_a_revocation_the_ca_confirmed_has_nothing_to_say(self, app, bench):
+        result = self._approve(app, bench)
+        assert result['acme_upstream_pending'] is False and result['acme_message'] is None
+
 
 def test_an_entry_without_fingerprint_is_matched_by_id_and_serial():
     order = AcmeClientOrder(replaced_certificates='[{"certificate_id": 7, "serial": "12"}]')
