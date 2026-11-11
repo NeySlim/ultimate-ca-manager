@@ -257,16 +257,13 @@ def test_an_unreadable_stored_template_does_not_move_the_binding_or_abort(app, c
 
 
 def test_the_warning_agrees_with_one_binding_left_behind(app, create_ca, https, caplog):
-    from types import SimpleNamespace
-    from services.ca.ca_signing import _bindings_follow
     from services.https_binding import set_bound_refid
     ca = create_ca(cn='follow singular CA')
     old_id, _, keyed_id = _bound_row(app, ca['id'], 'follow-singular.example.test')
     with app.app_context():
         set_bound_refid('')  # the HTTPS listener is bound to no row here
-        keyless = SimpleNamespace(id=2 ** 30, has_private_key=False, refid='keyless-successor')
-        with caplog.at_level('WARNING'):
-            _bindings_follow([old_id], keyless)
-        db.session.rollback()
+        db.session.commit()
+    with caplog.at_level('WARNING'):
+        _protocol_renewal(app, old_id, 'est')
     message = next(r.getMessage() for r in caplog.records if 'has no private key in UCM' in r.getMessage())
     assert message.endswith(f'deploy binding {keyed_id} stays on the previous certificate'), message
