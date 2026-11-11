@@ -1911,7 +1911,7 @@
     "leftBehindHelp": "Ce certificat a été renouvelé, mais UCM ne détient pas la clé du certificat renouvelé et ce déploiement envoie la clé. Il déploie toujours ce certificat, qui va expirer.",
     "leftBehindNoKey": "Importez la clé privée du certificat renouvelé, ou cessez d'envoyer la clé (videz le chemin de la clé, ou retirez key_pem du modèle de la cible HTTP), puis rattachez.",
     "leftBehindTargetTaken": "Cette cible est déjà liée au certificat renouvelé : supprimez ce déploiement.",
-    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
+    "leftBehindSuperseded": "Le certificat renouvelé a lui-même été remplacé : liez cette cible au certificat actuel, ou supprimez ce déploiement.",
     "openRenewed": "Ouvrir le certificat renouvelé",
     "reattach": "Rattacher au certificat renouvelé",
     "reattached": "{{name}} déploie désormais le certificat renouvelé",
@@ -2118,12 +2118,12 @@
     "revokedWithRelated": "Certificat révoqué, avec son certificat lié n°{{id}}",
     "relatedNotRevoked": "Le certificat lié n'a pas été révoqué : il ne désigne pas ce certificat comme son pair, ou il était déjà révoqué.",
     "relatedRevokeFailed": "Certificat révoqué, mais son certificat lié n°{{id}} n'a pas pu être révoqué : révoquez-le séparément.",
-    "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
+    "revokedLocallyOnly": "Certificat révoqué dans UCM uniquement : l'AC émettrice n'a pas été informée.",
     "revokeRelatedBulk": "Révoquer aussi les certificats liés",
     "revokeRelatedBulkHint": "Les membres sélectionnés d'une paire hybride entraînent l'autre membre. Décochez pour conserver valides les autres membres.",
     "bulkRelatedRevoked": "{{count}} certificats liés révoqués avec la sélection",
     "bulkRelatedRevokeFailed": "{{count}} certificats liés n'ont pas pu être révoqués avec la sélection ({{ids}}) : révoquez-les séparément",
-    "bulkRevokedLocallyOnly": "{{count}} certificates revoked in UCM only ({{ids}}): the issuing CA did not confirm. A revocation an ACME CA did not confirm is sent again automatically; otherwise revoke them with the CA directly."
+    "bulkRevokedLocallyOnly": "{{count}} certificats révoqués dans UCM uniquement ({{ids}}) : l'AC émettrice n'a pas confirmé. Une révocation qu'une AC ACME n'a pas confirmée est renvoyée automatiquement ; sinon, révoquez-les directement auprès de l'AC."
   },
   "details": {
     "pemCertificate": "Certificat PEM",
@@ -3244,7 +3244,7 @@
     "updateReleaseNotes": "Nouveautés de la v{{version}}",
     "httpProtocolPort": "Port HTTP protocole",
     "httpProtocolPortHelper": "Port du serveur HTTP non chiffré pour les points d'accès CDP/OCSP. Mettre à 0 pour désactiver. Nécessite un redémarrage.",
-    "httpProtocolPortEnvLocked": "Set by HTTP_PROTOCOL_PORT in the service environment (ucm.env): remove it there to manage the port here.",
+    "httpProtocolPortEnvLocked": "Défini par HTTP_PROTOCOL_PORT dans l'environnement du service (ucm.env) : retirez-le de là pour gérer le port ici.",
     "ct": "Transparence des certificats",
     "ctDescription": "Soumettre les certificats aux journaux CT publics pour la transparence et l'auditabilité",
     "ctEnabled": "Activer la transparence des certificats",
@@ -3554,7 +3554,7 @@
     "httpsLeftBehind": "Le certificat lié a été renouvelé sans sa clé",
     "httpsLeftBehindNoKey": "UCM ne détient pas la clé privée du certificat renouvelé : HTTPS sert toujours le certificat précédent, qui va expirer. Importez la clé du certificat renouvelé : HTTPS le suivra alors.",
     "httpsLeftBehindKeyed": "UCM détient désormais la clé du certificat renouvelé : sélectionnez-le ci-dessous et appliquez-le à HTTPS.",
-    "httpsLeftBehindSuperseded": "The renewed certificate was itself superseded: select the current certificate below and apply it to HTTPS.",
+    "httpsLeftBehindSuperseded": "Le certificat renouvelé a lui-même été remplacé : sélectionnez le certificat actuel ci-dessous et appliquez-le à HTTPS.",
     "httpsSelectRenewed": "Sélectionner le certificat renouvelé",
     "httpsOpenRenewed": "Ouvrir le certificat renouvelé"
   },

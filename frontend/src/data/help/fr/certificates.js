@@ -35,6 +35,7 @@ export default {
           { label: 'Révoquer', text: 'Marquer comme révoqué avec un motif, apparaîtra dans la CRL' },
           { label: 'Lever la suspension', text: 'Annuler la suspension d\'un certificat révoqué avec le motif « Suspension de certificat », restaure le statut valide' },
           { label: 'Révoquer un certificat suspendu', text: 'Un certificat suspendu peut aussi être révoqué définitivement avec un autre motif, sans repasser par valide. La CRL et l\'OCSP donnent alors le nouveau motif, et la date d\'invalidité est le début de la suspension sauf si une est fournie' },
+          { label: 'Révocation auprès de l\'AC ACME', text: "Révoquer un certificat obtenu via ACME (par le client, ou par le proxy sous un compte amont détenu par UCM) le révoque aussi auprès de cette AC, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l'AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, il reste local et un avertissement indique de le révoquer directement auprès de l'AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn" },
           { label: 'Exporter', text: 'Télécharger au format PEM, DER, PKCS#12 ou JKS' },
           { label: 'Mode compatibilité PKCS#12 (v2.222)', text: 'Les dialogues d\'export proposent un profil 3DES/SHA-1 pour les importeurs qui refusent l\'archive AES-256 par défaut comme un mot de passe incorrect : Android 15 et antérieur, macOS 14 et antérieur, Windows Server 2016 et antérieur, Java ancien. Désactivé par défaut, il protège moins bien le fichier' },
           { label: 'Comparer', text: 'Comparaison côte à côte de deux certificats' },
@@ -85,6 +86,7 @@ export default {
           { label: 'Automatique', text: "À l'émission et au renouvellement, les fichiers liés sont transférés à nouveau et la commande de rechargement de ce déploiement de certificat s'exécute ; les livraisons sont mises en file avec réessais" },
           { label: 'Fichiers', text: "Écrits de façon atomique aux chemins exacts configurés (le répertoire parent doit exister) : clé 0600, certificat/chaîne 0644" },
           { label: 'Déployer maintenant', text: "Envoi manuel depuis le panneau de détails, avec le statut de livraison et la dernière erreur affichés par cible" },
+          { label: 'Renouvellement sans la clé', text: "Un renouvellement EST, SCEP ou WSTEP déplace les déploiements vers le nouveau certificat, sauf celui qui envoie la clé privée quand UCM ne détient pas la nouvelle clé : il affiche Ne suit pas le renouvellement, apparaît dans la cloche et la vue d'ensemble, et propose Rattacher au certificat renouvelé dès qu'UCM détient la clé ou que le déploiement cesse de l'envoyer. Importer la clé le déplace de lui-même" },
         ]
       },
 
@@ -153,6 +155,7 @@ Depuis la v2.214, le renouvellement met à jour le certificat **en place** :
 - \`renewed_at\` / \`renewed_times\` tracent l'historique des renouvellements
 - Un certificat révoqué ne peut pas être renouvelé (409) : émettez-en un nouveau à la place
 - **Renouveler** demande la validité du nouveau certificat en jours, préremplie avec la durée actuelle ; les politiques d'émission et l'expiration de la CA la plafonnent toujours
+- **Renouvellement par EST, SCEP ou WSTEP** enregistre un nouveau certificat : ses déploiements et la liaison HTTPS se déplacent vers lui. Un déploiement qui envoie la clé privée, ainsi que la liaison HTTPS, restent sur le certificat précédent quand UCM ne détient pas la nouvelle clé : le déploiement affiche **Ne suit pas le renouvellement**, la cloche et la vue d'ensemble le listent, et l'événement \`certificate.binding_left_behind\` est envoyé. **Rattacher au certificat renouvelé** dès qu'UCM détient sa clé ou que le déploiement cesse d'envoyer la clé ; importer la clé du certificat renouvelé les déplace de lui-même
 
 **Suppression** : un certificat valide non révoqué ne peut pas être supprimé seul : **Supprimer** explique pourquoi et propose **Révoquer, puis supprimer**, pour que les parties utilisatrices voient le changement. Les révocations sont persistées indépendamment de l'enregistrement du certificat et survivent à la suppression.
 
@@ -163,6 +166,8 @@ Depuis la v2.214, le renouvellement met à jour le certificat **en place** :
 3. Confirmez la révocation
 
 Les certificats révoqués sont publiés dans la CRL lors de la prochaine régénération.
+
+Un certificat obtenu via ACME (par le client ACME, ou par le proxy sous un compte amont détenu par UCM) est aussi révoqué auprès de cette AC, qu'il soit révoqué seul, en masse, par une demande approuvée, comme certificat utilisateur, avec l'inscription ou l'utilisateur auquel il appartient, comme membre lié d'une paire, ou par sa clé auprès du serveur ACME propre à UCM. Si l'AC ne confirme pas, la révocation reste due et est renvoyée par la tâche de renouvellement jusqu'à ce que l'AC confirme ou que le certificat expire ; une suspension reste dans UCM, ACME n'en ayant pas. Si aucun compte d'UCM ne peut parler pour lui, la révocation reste locale et un avertissement indique de la révoquer directement auprès de l'AC. Le motif est envoyé quand il vaut keyCompromise, affiliationChanged, superseded, cessationOfOperation ou privilegeWithdrawn.
 
 > ⚠ La révocation est généralement permanente : sauf pour la **Suspension de certificat** qui peut être levée.
 

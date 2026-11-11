@@ -2324,7 +2324,7 @@
     "leftBehindHelp": "この証明書は更新されましたが、UCM は更新後の証明書の鍵を保持しておらず、このデプロイは鍵を送信します。期限切れになるこの証明書を引き続きデプロイしています。",
     "leftBehindNoKey": "更新後の証明書の秘密鍵をインポートするか、鍵の送信をやめてから（鍵のパスを空にするか、HTTP ターゲットのテンプレートから key_pem を削除）、再バインドしてください。",
     "leftBehindTargetTaken": "このターゲットはすでに更新後の証明書にバインドされています。このデプロイを削除してください。",
-    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
+    "leftBehindSuperseded": "更新後の証明書もすでに新しい証明書に置き換えられています。このターゲットを最新の証明書にバインドするか、このデプロイを削除してください。",
     "openRenewed": "更新後の証明書を開く",
     "reattach": "更新後の証明書に再バインド",
     "reattached": "{{name}} は更新後の証明書をデプロイするようになりました",
@@ -3093,7 +3093,7 @@
     "updateReleaseNotes": "v{{version}} の新機能",
     "httpProtocolPort": "HTTPプロトコルポート",
     "httpProtocolPortHelper": "CDP/OCSPエンドポイント用のプレーンHTTPサーバーポート。0で無効化。再起動が必要です。",
-    "httpProtocolPortEnvLocked": "Set by HTTP_PROTOCOL_PORT in the service environment (ucm.env): remove it there to manage the port here.",
+    "httpProtocolPortEnvLocked": "サービス環境（ucm.env）の HTTP_PROTOCOL_PORT で設定されています。ここでポートを管理するには、そちらから削除してください。",
     "ct": "証明書の透明性",
     "ctDescription": "透明性と監査性のために証明書を公開CTログに送信",
     "ctEnabled": "証明書の透明性を有効化",
@@ -3404,7 +3404,7 @@
     "httpsLeftBehind": "バインドされた証明書が鍵なしで更新されました",
     "httpsLeftBehindNoKey": "UCM は更新後の証明書の秘密鍵を保持していないため、HTTPS は期限切れになる以前の証明書を引き続き提供しています。更新後の証明書の鍵をインポートすると、HTTPS はそれに追従します。",
     "httpsLeftBehindKeyed": "UCM は更新後の証明書の鍵を保持しました。下で選択して HTTPS に適用してください。",
-    "httpsLeftBehindSuperseded": "The renewed certificate was itself superseded: select the current certificate below and apply it to HTTPS.",
+    "httpsLeftBehindSuperseded": "更新後の証明書もすでに新しい証明書に置き換えられています。下で最新の証明書を選択して HTTPS に適用してください。",
     "httpsSelectRenewed": "更新後の証明書を選択",
     "httpsOpenRenewed": "更新後の証明書を開く"
   },
@@ -4017,12 +4017,12 @@
     "revokedWithRelated": "証明書を失効させました（リンクされた証明書 #{{id}} も失効）",
     "relatedNotRevoked": "リンクされた証明書は失効しませんでした：この証明書をペアとして指していないか、すでに失効済みです。",
     "relatedRevokeFailed": "証明書を失効させましたが、リンクされた証明書 #{{id}} を失効できませんでした：個別に失効させてください。",
-    "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
+    "revokedLocallyOnly": "証明書は UCM 内でのみ失効しました。発行元の CA には通知されていません。",
     "revokeRelatedBulk": "リンクされた証明書も失効させる",
     "revokeRelatedBulkHint": "選択したハイブリッドペアのメンバーは、もう一方も一緒に失効します。チェックを外すと、他のメンバーは有効なまま残ります。",
     "bulkRelatedRevoked": "選択した証明書と共に、リンクされた証明書 {{count}} 件を失効させました",
     "bulkRelatedRevokeFailed": "選択した証明書と共に、リンクされた証明書 {{count}} 件を失効できませんでした（{{ids}}）：個別に失効させてください",
-    "bulkRevokedLocallyOnly": "{{count}} certificates revoked in UCM only ({{ids}}): the issuing CA did not confirm. A revocation an ACME CA did not confirm is sent again automatically; otherwise revoke them with the CA directly."
+    "bulkRevokedLocallyOnly": "{{count}} 件の証明書を UCM 内でのみ失効しました（{{ids}}）。発行元の CA は確認していません。ACME CA が確認していない失効は自動的に再送されます。それ以外は CA 側で直接失効させてください。"
   },
   "details": {
     "pemCertificate": "PEM証明書",

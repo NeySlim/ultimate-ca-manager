@@ -2324,7 +2324,7 @@
     "leftBehindHelp": "Dieses Zertifikat wurde erneuert, aber UCM besitzt den Schlüssel des erneuerten Zertifikats nicht, und diese Bereitstellung sendet den Schlüssel. Sie stellt weiterhin dieses Zertifikat bereit, das ablaufen wird.",
     "leftBehindNoKey": "Importieren Sie den privaten Schlüssel des erneuerten Zertifikats oder senden Sie den Schlüssel nicht mehr (Schlüsselpfad leeren oder key_pem aus der Vorlage des HTTP-Ziels entfernen) und binden Sie dann neu.",
     "leftBehindTargetTaken": "Dieses Ziel ist bereits an das erneuerte Zertifikat gebunden: Entfernen Sie diese Bereitstellung.",
-    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
+    "leftBehindSuperseded": "Das erneuerte Zertifikat wurde selbst ersetzt: Binden Sie dieses Ziel an das aktuelle Zertifikat oder entfernen Sie diese Bereitstellung.",
     "openRenewed": "Erneuertes Zertifikat öffnen",
     "reattach": "An das erneuerte Zertifikat binden",
     "reattached": "{{name}} stellt jetzt das erneuerte Zertifikat bereit",
@@ -3093,7 +3093,7 @@
     "updateReleaseNotes": "Neuerungen in v{{version}}",
     "httpProtocolPort": "HTTP-Protokoll-Port",
     "httpProtocolPortHelper": "Port für den unverschlüsselten HTTP-Server für CDP/OCSP-Endpunkte. Auf 0 setzen zum Deaktivieren. Neustart erforderlich.",
-    "httpProtocolPortEnvLocked": "Set by HTTP_PROTOCOL_PORT in the service environment (ucm.env): remove it there to manage the port here.",
+    "httpProtocolPortEnvLocked": "Durch HTTP_PROTOCOL_PORT in der Dienstumgebung (ucm.env) festgelegt: Entfernen Sie die Variable dort, um den Port hier zu verwalten.",
     "ct": "Zertifikatstransparenz",
     "ctDescription": "Zertifikate an öffentliche CT-Logs übermitteln für Transparenz und Nachvollziehbarkeit",
     "ctEnabled": "Zertifikatstransparenz aktivieren",
@@ -3403,7 +3403,7 @@
     "httpsLeftBehind": "Das gebundene Zertifikat wurde ohne seinen Schlüssel erneuert",
     "httpsLeftBehindNoKey": "UCM besitzt den privaten Schlüssel des erneuerten Zertifikats nicht, daher liefert HTTPS weiterhin das vorherige Zertifikat aus, das ablaufen wird. Importieren Sie den Schlüssel des erneuerten Zertifikats: HTTPS folgt ihm dann.",
     "httpsLeftBehindKeyed": "UCM besitzt jetzt den Schlüssel des erneuerten Zertifikats: Wählen Sie es unten aus und wenden Sie es auf HTTPS an.",
-    "httpsLeftBehindSuperseded": "The renewed certificate was itself superseded: select the current certificate below and apply it to HTTPS.",
+    "httpsLeftBehindSuperseded": "Das erneuerte Zertifikat wurde selbst ersetzt: Wählen Sie unten das aktuelle Zertifikat aus und wenden Sie es auf HTTPS an.",
     "httpsSelectRenewed": "Erneuertes Zertifikat auswählen",
     "httpsOpenRenewed": "Erneuertes Zertifikat öffnen"
   },
@@ -4014,12 +4014,12 @@
     "revokedWithRelated": "Zertifikat widerrufen, zusammen mit seinem verknüpften Zertifikat #{{id}}",
     "relatedNotRevoked": "Das verknüpfte Zertifikat wurde nicht widerrufen: Es nennt dieses Zertifikat nicht als sein Paar oder wurde bereits widerrufen.",
     "relatedRevokeFailed": "Zertifikat widerrufen, aber das verknüpfte Zertifikat #{{id}} konnte nicht widerrufen werden: Widerrufen Sie es separat.",
-    "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
+    "revokedLocallyOnly": "Zertifikat nur in UCM widerrufen: Die ausstellende CA wurde nicht benachrichtigt.",
     "revokeRelatedBulk": "Auch die verknüpften Zertifikate widerrufen",
     "revokeRelatedBulkHint": "Ausgewählte Mitglieder eines hybriden Paars ziehen das andere Mitglied mit. Deaktivieren, damit die anderen Mitglieder gültig bleiben.",
     "bulkRelatedRevoked": "{{count}} verknüpfte Zertifikate zusammen mit der Auswahl widerrufen",
     "bulkRelatedRevokeFailed": "{{count}} verknüpfte Zertifikate konnten nicht zusammen mit der Auswahl widerrufen werden ({{ids}}): Widerrufen Sie sie separat",
-    "bulkRevokedLocallyOnly": "{{count}} certificates revoked in UCM only ({{ids}}): the issuing CA did not confirm. A revocation an ACME CA did not confirm is sent again automatically; otherwise revoke them with the CA directly."
+    "bulkRevokedLocallyOnly": "{{count}} Zertifikate nur in UCM widerrufen ({{ids}}): Die ausstellende CA hat nicht bestätigt. Ein von einer ACME-CA nicht bestätigter Widerruf wird automatisch erneut gesendet; andernfalls widerrufen Sie die Zertifikate direkt bei der CA."
   },
   "details": {
     "pemCertificate": "PEM-Zertifikat",

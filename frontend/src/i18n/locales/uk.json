@@ -2356,7 +2356,7 @@
     "leftBehindHelp": "Цей сертифікат поновлено, але UCM не має ключа поновленого сертифіката, а це розгортання надсилає ключ. Воно й далі розгортає цей сертифікат, термін дії якого закінчиться.",
     "leftBehindNoKey": "Імпортуйте закритий ключ поновленого сертифіката або припиніть надсилати ключ (очистьте шлях до ключа чи вилучіть key_pem із шаблону цілі HTTP), а потім прив'яжіть знову.",
     "leftBehindTargetTaken": "Ця ціль уже прив'язана до поновленого сертифіката: видаліть це розгортання.",
-    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
+    "leftBehindSuperseded": "Поновлений сертифікат сам було замінено: прив'яжіть цю ціль до поточного сертифіката або видаліть це розгортання.",
     "openRenewed": "Відкрити поновлений сертифікат",
     "reattach": "Прив'язати до поновленого сертифіката",
     "reattached": "{{name}} тепер розгортає поновлений сертифікат",
@@ -3131,7 +3131,7 @@
     "updateReleaseNotes": "Що нового у v{{version}}",
     "httpProtocolPort": "HTTP порт протоколу",
     "httpProtocolPortHelper": "Порт HTTP-сервера без шифрування для CDP/OCSP. Встановіть 0 для вимкнення. Потрібен перезапуск.",
-    "httpProtocolPortEnvLocked": "Set by HTTP_PROTOCOL_PORT in the service environment (ucm.env): remove it there to manage the port here.",
+    "httpProtocolPortEnvLocked": "Задано змінною HTTP_PROTOCOL_PORT у середовищі служби (ucm.env): приберіть її там, щоб керувати портом тут.",
     "ct": "Прозорість сертифікатів",
     "ctDescription": "Надсилати сертифікати до публічних журналів CT для прозорості та можливості аудиту",
     "ctEnabled": "Увімкнути прозорість сертифікатів",
@@ -3447,7 +3447,7 @@
     "httpsLeftBehind": "Прив'язаний сертифікат поновлено без його ключа",
     "httpsLeftBehindNoKey": "UCM не має закритого ключа поновленого сертифіката, тому HTTPS і далі обслуговує попередній сертифікат, термін дії якого закінчиться. Імпортуйте ключ поновленого сертифіката: тоді HTTPS перейде на нього.",
     "httpsLeftBehindKeyed": "UCM тепер має ключ поновленого сертифіката: виберіть його нижче й застосуйте до HTTPS.",
-    "httpsLeftBehindSuperseded": "The renewed certificate was itself superseded: select the current certificate below and apply it to HTTPS.",
+    "httpsLeftBehindSuperseded": "Поновлений сертифікат сам було замінено: виберіть нижче поточний сертифікат і застосуйте його до HTTPS.",
     "httpsSelectRenewed": "Вибрати поновлений сертифікат",
     "httpsOpenRenewed": "Відкрити поновлений сертифікат"
   },
@@ -4070,10 +4070,10 @@
     "revokeRelatedBulk": "Також відкликати пов'язані сертифікати",
     "revokeRelatedBulkHint": "Вибрані учасники гібридної пари забирають із собою другого учасника. Зніміть позначку, щоб інші учасники залишилися чинними.",
     "relatedRevokeFailed": "Сертифікат відкликано, але пов'язаний сертифікат #{{id}} відкликати не вдалося: відкличте його окремо.",
-    "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
+    "revokedLocallyOnly": "Сертифікат відкликано лише в UCM: центр сертифікації-видавець не отримав повідомлення.",
     "bulkRelatedRevoked": "Разом із вибраними відкликано пов'язаних сертифікатів: {{count}}",
     "bulkRelatedRevokeFailed": "Разом із вибраними не вдалося відкликати пов'язані сертифікати: {{count}} ({{ids}}): відкличте їх окремо",
-    "bulkRevokedLocallyOnly": "{{count}} certificates revoked in UCM only ({{ids}}): the issuing CA did not confirm. A revocation an ACME CA did not confirm is sent again automatically; otherwise revoke them with the CA directly."
+    "bulkRevokedLocallyOnly": "{{count}} сертифікатів відкликано лише в UCM ({{ids}}): центр сертифікації-видавець не підтвердив. Відкликання, яке ACME CA не підтвердив, надсилається повторно автоматично; в іншому разі відкличте їх безпосередньо в центрі сертифікації."
   },
   "details": {
     "pemCertificate": "PEM Сертифікат",

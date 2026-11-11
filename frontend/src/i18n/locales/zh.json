@@ -2324,7 +2324,7 @@
     "leftBehindHelp": "此证书已续期，但 UCM 没有续期后证书的密钥，而此部署会发送密钥。它仍在部署此证书，而此证书即将过期。",
     "leftBehindNoKey": "请导入续期后证书的私钥，或停止发送密钥（清空密钥路径，或从 HTTP 目标模板中删除 key_pem），然后重新绑定。",
     "leftBehindTargetTaken": "此目标已绑定到续期后的证书：请删除此部署。",
-    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
+    "leftBehindSuperseded": "续期后的证书本身已被取代：请将此目标绑定到当前证书，或移除此部署。",
     "openRenewed": "打开续期后的证书",
     "reattach": "重新绑定到续期后的证书",
     "reattached": "{{name}} 现在部署续期后的证书",
@@ -3093,7 +3093,7 @@
     "updateReleaseNotes": "v{{version}} 新功能",
     "httpProtocolPort": "HTTP协议端口",
     "httpProtocolPortHelper": "用于CDP/OCSP端点的HTTP明文服务器端口。设为0禁用。需要重启。",
-    "httpProtocolPortEnvLocked": "Set by HTTP_PROTOCOL_PORT in the service environment (ucm.env): remove it there to manage the port here.",
+    "httpProtocolPortEnvLocked": "由服务环境（ucm.env）中的 HTTP_PROTOCOL_PORT 设置：请在该处移除它，以便在此管理端口。",
     "ct": "证书透明度",
     "ctDescription": "将证书提交到公共CT日志以提高透明度和可审计性",
     "ctEnabled": "启用证书透明度",
@@ -3403,7 +3403,7 @@
     "httpsLeftBehind": "已绑定的证书在没有密钥的情况下续期",
     "httpsLeftBehindNoKey": "UCM 没有续期后证书的私钥，因此 HTTPS 仍在提供即将过期的先前证书。导入续期后证书的密钥后，HTTPS 将跟随它。",
     "httpsLeftBehindKeyed": "UCM 现已持有续期后证书的密钥：请在下方选择它并应用到 HTTPS。",
-    "httpsLeftBehindSuperseded": "The renewed certificate was itself superseded: select the current certificate below and apply it to HTTPS.",
+    "httpsLeftBehindSuperseded": "续期后的证书本身已被取代：请在下方选择当前证书并将其应用到 HTTPS。",
     "httpsSelectRenewed": "选择续期后的证书",
     "httpsOpenRenewed": "打开续期后的证书"
   },
@@ -4016,10 +4016,10 @@
     "revokeRelatedBulk": "同时吊销关联证书",
     "revokeRelatedBulkHint": "所选的混合证书对成员会连同另一成员一起吊销。取消勾选可使其他成员保持有效。",
     "relatedRevokeFailed": "证书已吊销，但其关联证书 #{{id}} 无法吊销：请单独吊销。",
-    "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
+    "revokedLocallyOnly": "证书仅在 UCM 中吊销：签发 CA 未收到通知。",
     "bulkRelatedRevoked": "已随所选项一并吊销 {{count}} 张关联证书",
     "bulkRelatedRevokeFailed": "有 {{count}} 张关联证书无法随所选项一并吊销（{{ids}}）：请单独吊销",
-    "bulkRevokedLocallyOnly": "{{count}} certificates revoked in UCM only ({{ids}}): the issuing CA did not confirm. A revocation an ACME CA did not confirm is sent again automatically; otherwise revoke them with the CA directly."
+    "bulkRevokedLocallyOnly": "{{count}} 张证书仅在 UCM 中吊销（{{ids}}）：签发 CA 未确认。ACME CA 未确认的吊销会自动再次发送；否则请直接在该 CA 处吊销。"
   },
   "details": {
     "pemCertificate": "PEM 证书",

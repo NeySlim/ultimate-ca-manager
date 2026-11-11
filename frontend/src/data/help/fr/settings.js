@@ -100,7 +100,7 @@ export default {
           { label: 'Audit', text: 'Rétention des journaux, transfert syslog, vérification d\'intégrité' },
           { label: 'Base de données', text: 'Backend actif (SQLite ou PostgreSQL), taille, nombre de tables, tester/basculer/migrer entre les backends' },
           { label: "Schéma PostgreSQL (v2.251)", text: "Une URL PostgreSQL dont le search_path désigne un schéma autre que public est prise en charge : le contrôle d'intégrité compte les tables de ce schéma, et une migration vers lui réaligne ses séquences" },
-          { label: 'HTTPS', text: 'Certificat TLS pour l\'interface web UCM. Le certificat appliqué est mémorisé et réappliqué lors de son renouvellement (v2.217) ; le certificat lié est affiché avec un bouton pour le délier et ne plus suivre les renouvellements (v2.218)' },
+          { label: 'HTTPS', text: 'Certificat TLS pour l\'interface web UCM. Le certificat appliqué est mémorisé et réappliqué lors de son renouvellement (v2.217) ; le certificat lié est affiché avec un bouton pour le délier et ne plus suivre les renouvellements (v2.218). Un renouvellement par protocole dont UCM ne détient pas la clé laisse HTTPS sur le certificat précédent et le signale, jusqu\'à l\'import de la clé du certificat renouvelé' },
           { label: 'Mises à jour', text: 'Vérifier les nouvelles versions, voir le journal des modifications, vérification quotidienne planifiée avec installation sans surveillance en opt-in (DEB/RPM)' },
           { label: 'Webhooks', text: 'Webhooks HTTP pour les événements de certificat (émission, révocation, expiration). Authentification sortante optionnelle : Bearer, Basic, API key ou en-tête personnalisé' },
           { label: "Noms de webhooks uniques (v2.251)", text: "Un nom de webhook déjà utilisé est refusé (409), à la création comme au renommage. La mise à jour a renommé les doublons existants « nom (2) », « nom (3) », du plus ancien au plus récent" },
@@ -358,6 +358,7 @@ Gérez le certificat TLS utilisé par l'interface web UCM :
 - Voir les détails du certificat actuel
 - Importer un nouveau certificat (PEM ou PKCS#12)
 - Générer un certificat auto-signé
+- Quand le certificat lié est renouvelé par un protocole sans que sa clé parvienne à UCM, la page le signale : HTTPS continue de servir le certificat précédent jusqu'à l'import de la clé du certificat renouvelé, ce qui l'applique
 
 > ⚠ Le changement du certificat HTTPS nécessite un redémarrage du service.
 

@@ -2324,7 +2324,7 @@
     "leftBehindHelp": "Questo certificato è stato rinnovato, ma UCM non possiede la chiave del certificato rinnovato e questa distribuzione invia la chiave. Continua a distribuire questo certificato, che scadrà.",
     "leftBehindNoKey": "Importa la chiave privata del certificato rinnovato oppure smetti di inviare la chiave (svuota il percorso della chiave o rimuovi key_pem dal modello della destinazione HTTP), poi riassocia.",
     "leftBehindTargetTaken": "Questa destinazione è già associata al certificato rinnovato: rimuovi questa distribuzione.",
-    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
+    "leftBehindSuperseded": "Il certificato rinnovato è stato a sua volta sostituito: associa questa destinazione al certificato corrente oppure rimuovi questa distribuzione.",
     "openRenewed": "Apri il certificato rinnovato",
     "reattach": "Associa al certificato rinnovato",
     "reattached": "{{name}} ora distribuisce il certificato rinnovato",
@@ -3093,7 +3093,7 @@
     "updateReleaseNotes": "Novità nella v{{version}}",
     "httpProtocolPort": "Porta HTTP protocollo",
     "httpProtocolPortHelper": "Porta del server HTTP non crittografato per gli endpoint CDP/OCSP. Impostare su 0 per disabilitare. Richiede riavvio.",
-    "httpProtocolPortEnvLocked": "Set by HTTP_PROTOCOL_PORT in the service environment (ucm.env): remove it there to manage the port here.",
+    "httpProtocolPortEnvLocked": "Impostata da HTTP_PROTOCOL_PORT nell'ambiente del servizio (ucm.env): rimuovila lì per gestire la porta da qui.",
     "ct": "Trasparenza dei certificati",
     "ctDescription": "Invia certificati ai registri CT pubblici per trasparenza e verificabilità",
     "ctEnabled": "Abilita trasparenza dei certificati",
@@ -3403,7 +3403,7 @@
     "httpsLeftBehind": "Il certificato associato è stato rinnovato senza la sua chiave",
     "httpsLeftBehindNoKey": "UCM non possiede la chiave privata del certificato rinnovato, quindi HTTPS serve ancora il certificato precedente, che scadrà. Importa la chiave del certificato rinnovato: HTTPS lo seguirà.",
     "httpsLeftBehindKeyed": "UCM ora possiede la chiave del certificato rinnovato: selezionalo qui sotto e applicalo a HTTPS.",
-    "httpsLeftBehindSuperseded": "The renewed certificate was itself superseded: select the current certificate below and apply it to HTTPS.",
+    "httpsLeftBehindSuperseded": "Il certificato rinnovato è stato a sua volta sostituito: seleziona qui sotto il certificato corrente e applicalo a HTTPS.",
     "httpsSelectRenewed": "Seleziona il certificato rinnovato",
     "httpsOpenRenewed": "Apri il certificato rinnovato"
   },
@@ -4014,12 +4014,12 @@
     "revokedWithRelated": "Certificato revocato, insieme al certificato collegato #{{id}}",
     "relatedNotRevoked": "Il certificato collegato non è stato revocato: non indica questo certificato come proprio partner, oppure era già revocato.",
     "relatedRevokeFailed": "Certificato revocato, ma non è stato possibile revocare il certificato collegato #{{id}}: revocalo separatamente.",
-    "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
+    "revokedLocallyOnly": "Certificato revocato solo in UCM: la CA emittente non è stata avvisata.",
     "revokeRelatedBulk": "Revoca anche i certificati collegati",
     "revokeRelatedBulkHint": "I membri selezionati di una coppia ibrida trascinano con sé l'altro membro. Deseleziona per mantenere validi gli altri membri.",
     "bulkRelatedRevoked": "{{count}} certificati collegati revocati con la selezione",
     "bulkRelatedRevokeFailed": "Non è stato possibile revocare {{count}} certificati collegati con la selezione ({{ids}}): revocali separatamente",
-    "bulkRevokedLocallyOnly": "{{count}} certificates revoked in UCM only ({{ids}}): the issuing CA did not confirm. A revocation an ACME CA did not confirm is sent again automatically; otherwise revoke them with the CA directly."
+    "bulkRevokedLocallyOnly": "{{count}} certificati revocati solo in UCM ({{ids}}): la CA emittente non ha confermato. Una revoca non confermata da una CA ACME viene reinviata automaticamente; altrimenti revocali direttamente presso la CA."
   },
   "details": {
     "pemCertificate": "Certificato PEM",
