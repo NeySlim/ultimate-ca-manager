@@ -182,7 +182,10 @@ def broken_pair(app, create_ca):
 
     yield refid
 
+    from models.crl import CRLMetadata
     with app.app_context():
+        # A CRL signed meanwhile (restore, scheduler) holds a foreign key to the CA
+        CRLMetadata.query.filter_by(ca_id=created['id']).delete(synchronize_session=False)
         CA.query.filter_by(refid=refid).delete(synchronize_session=False)
         db.session.commit()
 
