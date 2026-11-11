@@ -41,7 +41,16 @@ def _pkce_pair():
 logger = logging.getLogger(__name__)
 
 
-def _reject_oidc_login(provider, reason):
+def _login_error(error, next_path=None):
+    """The login page showing *error*, carrying the page asked for while it is still valid."""
+    query = {'error': error}
+    next_path = return_path.safe_next(next_path)
+    if next_path:
+        query['next'] = next_path
+    return '/login?' + urllib.parse.urlencode(query)
+
+
+def _reject_oidc_login(provider, reason, next_path=None):
     """Fail closed with a generic client error and a clear internal audit trail."""
     logger.error("OIDC login rejected for provider %s: %s", provider.name, reason)
     try:
@@ -55,7 +64,7 @@ def _reject_oidc_login(provider, reason):
         )
     except Exception as audit_error:
         logger.error("Failed to audit OIDC login rejection: %s", audit_error)
-    return redirect('/login?error=invalid_credentials')
+    return redirect(_login_error('invalid_credentials', next_path))
 
 
 def _sso_complete(next_path):
@@ -70,7 +79,7 @@ def _sso_complete(next_path):
 SAML_LOGIN_EXPIRED = 'saml_login_expired'
 
 
-def _reject_saml_login(provider, reason, error='saml_validation_failed'):
+def _reject_saml_login(provider, reason, error='saml_validation_failed', next_path=None):
     """Refuse a SAML response with a generic client error and an audited reason."""
     logger.error("SAML login rejected for provider %s: %s", provider.name, reason)
     AuditService.log_action(
@@ -79,7 +88,7 @@ def _reject_saml_login(provider, reason, error='saml_validation_failed'):
         details=f'SAML response rejected for provider {provider.name}: {reason}',
         success=False
     )
-    return redirect(f'/login?error={error}')
+    return redirect(_login_error(error, next_path))
 
 def _saml_logout_request(provider):
     """IdP-initiated Single Logout over HTTP-Redirect (SAML Profiles §4.4).
@@ -293,14 +302,14 @@ def sso_callback(provider_type):
         state = request.args.get('state')
         stored_state = session.get('sso_state', '')
         if not state or not hmac.compare_digest(state, stored_state):
-            return redirect('/login?error=invalid_state')
+            return redirect(_login_error('invalid_state', oauth2_next))
 
     if provider.provider_type == 'oauth2':
         verify = True
         code = request.args.get('code')
         if not code:
             error = request.args.get('error', 'no_code')
-            return redirect(f'/login?error={error}')
+            return redirect(_login_error(error, oauth2_next))
 
         try:
             # Exchange code for token
@@ -331,23 +340,23 @@ def sso_callback(provider_type):
                     allow_redirects=False,
                 )
             except (ValueError, TypeError) as token_error:
-                return _reject_oidc_login(provider, f'token endpoint rejected: {token_error}')
+                return _reject_oidc_login(provider, f'token endpoint rejected: {token_error}', oauth2_next)
 
             if not token_response.ok:
                 logger.error("OAuth2 token exchange failed for provider %s", provider.name)
-                return redirect('/login?error=token_exchange_failed')
+                return redirect(_login_error('token_exchange_failed', oauth2_next))
 
             tokens = token_response.json()
             access_token = tokens.get('access_token')
 
             if not access_token:
-                return redirect('/login?error=no_access_token')
+                return redirect(_login_error('no_access_token', oauth2_next))
 
             id_token = tokens.get('id_token')
             verification_enabled = provider.id_token_verify is not False
             trusted_id_claims = None
             if verification_enabled and (not id_token or not expected_nonce):
-                return _reject_oidc_login(provider, 'missing ID token or session nonce')
+                return _reject_oidc_login(provider, 'missing ID token or session nonce', oauth2_next)
             if id_token:
                 try:
                     trusted_id_claims = verify_id_token(
@@ -358,7 +367,7 @@ def sso_callback(provider_type):
                         ssl_verify=verify,
                     )
                 except OIDCValidationError as validation_error:
-                    return _reject_oidc_login(provider, str(validation_error))
+                    return _reject_oidc_login(provider, str(validation_error), oauth2_next)
 
             # Get user info. Revalidate and pin the IdP URL for every fetch.
             try:
@@ -371,28 +380,28 @@ def sso_callback(provider_type):
                     allow_redirects=False,
                 )
             except (ValueError, TypeError) as userinfo_error:
-                return _reject_oidc_login(provider, f'userinfo endpoint rejected: {userinfo_error}')
+                return _reject_oidc_login(provider, f'userinfo endpoint rejected: {userinfo_error}', oauth2_next)
 
             if not userinfo_response.ok:
-                return redirect('/login?error=userinfo_failed')
+                return redirect(_login_error('userinfo_failed', oauth2_next))
 
             userinfo = userinfo_response.json()
             if trusted_id_claims is not None and verification_enabled:
                 if userinfo.get('sub') != trusted_id_claims.get('sub'):
-                    return _reject_oidc_login(provider, 'userinfo subject mismatch')
+                    return _reject_oidc_login(provider, 'userinfo subject mismatch', oauth2_next)
 
             # Map attributes
             attr_mapping = _parse_json_field(provider.attribute_mapping)
             username, email, fullname = oidc_identity(userinfo, attr_mapping)
 
             if not username:
-                return redirect('/login?error=no_username')
+                return redirect(_login_error('no_username', oauth2_next))
 
             # Create or update user
             user, error_code = _get_or_create_sso_user(provider, username, email, fullname, userinfo)
 
             if not user:
-                return redirect(f'/login?error={error_code or "user_creation_failed"}')
+                return redirect(_login_error(error_code or 'user_creation_failed', oauth2_next))
 
             # SECURITY: Block disabled accounts (admin can disable SSO users locally)
             if not user.active:
@@ -406,7 +415,7 @@ def sso_callback(provider_type):
                     success=False,
                     username=username
                 )
-                return redirect('/login?error=account_disabled')
+                return redirect(_login_error('account_disabled', oauth2_next))
 
             # Create or update SSO session for audit
             session_id = userinfo.get('sub', username)
@@ -424,7 +433,7 @@ def sso_callback(provider_type):
                 db.session.add(sso_session)
             ok, err = safe_commit(logger, "SSO login failed - session save error")
             if not ok:
-                return redirect('/login?error=callback_error')
+                return redirect(_login_error('callback_error', oauth2_next))
 
             # Establish Flask session under a new identifier (no session fixation)
             _sso_now = utc_now()
@@ -472,7 +481,7 @@ def sso_callback(provider_type):
                 details=f'OAuth2 callback error for provider {provider.name}',
                 success=False
             )
-            return redirect('/login?error=callback_error')
+            return redirect(_login_error('callback_error', oauth2_next))
         finally:
             _cleanup_ssl_verify(verify)
 
@@ -490,6 +499,8 @@ def sso_callback(provider_type):
                 saml_sp.clear_request_cookie(response, sp_base)
             return response
 
+        # The page this browser's AuthnRequest asked for: a failed login sends it back too
+        back = None
         try:
             saml_auth = _get_saml_auth(request, provider)
             attrs = {}
@@ -497,10 +508,11 @@ def sso_callback(provider_type):
 
             # The AuthnRequest this browser started; consumed only by a valid response.
             request_id = request.cookies.get(saml_sp.REQUEST_COOKIE) or None
+            back = saml_sp.request_next_path(request_id, provider.id)
             if request_id and not saml_sp.request_pending(request_id, provider.id):
                 drop_cookie.append(True)
                 return _reject_saml_login(provider, 'unknown, expired or already used AuthnRequest',
-                                          SAML_LOGIN_EXPIRED)
+                                          SAML_LOGIN_EXPIRED, next_path=back)
 
             # SECURITY: NEVER fall back to an unsigned XML parser here.
             # python3-saml handles signature + assertion validation. If it raises,
@@ -516,7 +528,7 @@ def sso_callback(provider_type):
                     details=f'SAML response rejected (parse error) for provider {provider.name}',
                     success=False
                 )
-                return redirect('/login?error=saml_validation_failed')
+                return redirect(_login_error('saml_validation_failed', back))
 
             errors = saml_auth.get_errors()
             if errors:
@@ -530,35 +542,37 @@ def sso_callback(provider_type):
                 )
                 # A response to another AuthnRequest: a second tab, or a login started elsewhere.
                 code = SAML_LOGIN_EXPIRED if 'InResponseTo' in reason else 'saml_validation_failed'
-                return redirect(f'/login?error={code}')
+                return redirect(_login_error(code, back))
 
             # python3-saml matched InResponseTo against request_id when both exist.
             in_response_to = saml_auth.get_last_response_in_response_to()
             saml_next = None
             if in_response_to is None:
                 if not provider.saml_allow_idp_initiated:
-                    return _reject_saml_login(provider, 'unsolicited response (IdP-initiated login is disabled)')
+                    return _reject_saml_login(provider, 'unsolicited response (IdP-initiated login is disabled)',
+                                              next_path=back)
             elif request_id is None:
                 return _reject_saml_login(provider, 'InResponseTo matches no AuthnRequest from this browser',
-                                          SAML_LOGIN_EXPIRED)
+                                          SAML_LOGIN_EXPIRED, next_path=back)
             else:
                 # Read before the take: only the response that consumes the request uses it.
-                saml_next = saml_sp.request_next_path(request_id, provider.id)
+                saml_next = back
                 if not saml_sp.take_request(request_id, provider.id):
                     drop_cookie.append(True)
                     return _reject_saml_login(provider, 'unknown, expired or already used AuthnRequest',
-                                              SAML_LOGIN_EXPIRED)
+                                              SAML_LOGIN_EXPIRED, next_path=back)
                 drop_cookie.append(True)
 
             not_on_or_after = saml_auth.get_last_assertion_not_on_or_after()
             if not not_on_or_after:
-                return _reject_saml_login(provider, 'SubjectConfirmationData has no NotOnOrAfter')
+                return _reject_saml_login(provider, 'SubjectConfirmationData has no NotOnOrAfter', next_path=back)
             assertion_id = saml_auth.get_last_assertion_id()
             if not assertion_id or len(assertion_id) > saml_sp.MAX_MESSAGE_ID_LENGTH:
                 return _reject_saml_login(
-                    provider, f'assertion ID missing or longer than {saml_sp.MAX_MESSAGE_ID_LENGTH} characters')
+                    provider, f'assertion ID missing or longer than {saml_sp.MAX_MESSAGE_ID_LENGTH} characters',
+                    next_path=back)
             if not saml_sp.consume_assertion(assertion_id, provider.id, not_on_or_after):
-                return _reject_saml_login(provider, 'assertion already consumed (replay)')
+                return _reject_saml_login(provider, 'assertion already consumed (replay)', next_path=back)
 
             # Only reached after signature + assertion verification succeeded
             attrs = saml_auth.get_attributes()
@@ -574,7 +588,7 @@ def sso_callback(provider_type):
             username, email, fullname = saml_identity(attrs, name_id, attr_mapping)
 
             if not username:
-                return redirect('/login?error=no_username')
+                return redirect(_login_error('no_username', back))
 
             # Create or update user
             user, error_code = _get_or_create_sso_user(
@@ -586,7 +600,7 @@ def sso_callback(provider_type):
             )
 
             if not user:
-                return redirect(f'/login?error={error_code or "user_creation_failed"}')
+                return redirect(_login_error(error_code or 'user_creation_failed', back))
 
             # SECURITY: Block disabled accounts (admin can disable SSO users locally)
             if not user.active:
@@ -600,7 +614,7 @@ def sso_callback(provider_type):
                     success=False,
                     username=username
                 )
-                return redirect('/login?error=account_disabled')
+                return redirect(_login_error('account_disabled', back))
 
             # Track SSO session
             sso_session = SSOSession.query.filter_by(session_id=name_id).first()
@@ -617,7 +631,7 @@ def sso_callback(provider_type):
                 db.session.add(sso_session)
             ok, err = safe_commit(logger, "SSO login failed - session save error")
             if not ok:
-                return redirect('/login?error=callback_error')
+                return redirect(_login_error('callback_error', back))
 
             # Establish Flask session under a new identifier (no session fixation)
             _saml_now = utc_now()
@@ -666,6 +680,6 @@ def sso_callback(provider_type):
                 details=f'SAML callback error for provider {provider.name}',
                 success=False
             )
-            return redirect('/login?error=callback_error')
+            return redirect(_login_error('callback_error', back))
 
     return redirect('/login?error=unknown_provider_type')

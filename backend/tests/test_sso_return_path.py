@@ -193,10 +193,52 @@ def test_oidc_value_is_used_once(app, oidc):
 def test_oidc_bad_state_spends_the_value(app, oidc):
     client = app.test_client()
     _, state = _oidc_start(client, '/cas')
-    assert _location(client.get('/api/v2/sso/callback/oauth2',
-                                query_string={'state': 'forged', 'code': 'c'})) == '/login?error=invalid_state'
+    assert _login_error(_location(client.get('/api/v2/sso/callback/oauth2',
+                                             query_string={'state': 'forged', 'code': 'c'}))) == \
+        ('invalid_state', '/cas')
     with client.session_transaction() as s:
         assert 'sso_next' not in s
+
+
+def _login_error(location):
+    """``(error, next)`` of a redirect back to the login page."""
+    parts = urlsplit(location)
+    assert parts.path == '/login', location
+    query = parse_qs(parts.query)
+    return query['error'][0], query.get('next', [None])[0]
+
+
+def _unknown_user(monkeypatch):
+    from api.v2.sso import login_routes
+    monkeypatch.setattr(login_routes, '_get_or_create_sso_user',
+                        lambda *_a, **_k: (None, 'auto_create_disabled'))
+
+
+def _token_refused(monkeypatch):
+    from api.v2.sso import login_routes
+    from services.oidc_id_token import OIDCValidationError
+
+    def refuse(*_a, **_k):
+        raise OIDCValidationError('signature does not verify')
+    monkeypatch.setattr(login_routes, 'verify_id_token', refuse)
+
+
+@pytest.mark.parametrize('failure, error', [(_token_refused, 'invalid_credentials'),
+                                            (_unknown_user, 'auto_create_disabled')])
+def test_oidc_failure_keeps_the_page_for_the_next_login(app, oidc, monkeypatch, failure, error):
+    client = app.test_client()
+    _, state = _oidc_start(client, '/certificates/12?tab=chain')
+    failure(monkeypatch)
+    assert _login_error(_oidc_return(client, state)) == (error, '/certificates/12?tab=chain')
+
+
+def test_oidc_failure_revalidates_the_page(app, oidc, monkeypatch):
+    client = app.test_client()
+    _, state = _oidc_start(client)
+    with client.session_transaction() as s:
+        s['sso_next'] = '//evil.example'
+    _unknown_user(monkeypatch)
+    assert _login_error(_oidc_return(client, state)) == ('auto_create_disabled', None)
 
 
 # --- SAML ------------------------------------------------------------------
@@ -264,3 +306,30 @@ def test_saml_value_is_used_once(app, provider, idp_signer):
     with app.app_context():
         assert SAMLMessageId.query.filter_by(kind=SAMLMessageId.KIND_REQUEST,
                                              message_id=request_id).count() == 0
+
+
+@pytest.mark.parametrize('case, error', [('audience', 'saml_validation_failed'),
+                                         ('no-expiry', 'saml_validation_failed'),
+                                         ('unknown-user', 'auto_create_disabled')])
+def test_saml_failure_keeps_the_page_for_the_next_login(app, provider, idp_signer, monkeypatch,
+                                                        case, error):
+    request_id = _saml_start(app.test_client(), '/ssh/certificates?x=1')
+    if case == 'unknown-user':
+        _unknown_user(monkeypatch)
+    client = app.test_client()
+    client.set_cookie(saml_sp.REQUEST_COOKIE, request_id, domain='ucm.example.test', path=ACS)
+    response = _response(idp_signer, in_response_to=request_id,
+                         audience='https://other.example/sp' if case == 'audience' else None,
+                         scd_expiry=case != 'no-expiry')
+    location = _location(client.post(ACS, base_url=SP_BASE, data={'SAMLResponse': response}))
+    assert _login_error(location) == (error, '/ssh/certificates?x=1')
+
+
+def test_saml_failure_revalidates_the_page(app, provider, idp_signer, monkeypatch):
+    request_id = _saml_start(app.test_client())
+    with app.app_context():
+        SAMLMessageId.query.filter_by(kind=SAMLMessageId.KIND_REQUEST, message_id=request_id).one() \
+            .next_path = '//evil.example'
+        db.session.commit()
+    _unknown_user(monkeypatch)
+    assert _login_error(_saml_return(app, request_id, idp_signer)) == ('auto_create_disabled', None)
