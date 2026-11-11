@@ -61,3 +61,36 @@ def test_inventory_import_fires_nothing(app, events):
         db.session.commit()
         cert_id = cert.id
     assert cert_events(events, cert_id) == []
+
+
+def test_approval_from_ucm_renews_the_requests_row_once(app, auth_client, monkeypatch, events):
+    """A pending renewal approved from UCM lands in its request's row; the later poll adds nothing."""
+    from unittest.mock import patch
+    from models import Certificate, MSCARequest, db
+    from services.msca.admin_channel import MicrosoftCAAdminChannelMixin
+    from services.msca.inventory import MicrosoftCAInventoryMixin
+    from services.msca_service import MicrosoftCAService
+    cert_id, msca_id, _ = _create_msca_cert(app, 'ev-approve.test.local')
+    _, _, new_pem = _make_key_csr_cert('ev-approve.test.local', days=730)
+    with app.app_context():
+        req = MSCARequest(msca_id=msca_id, csr_id=cert_id, template='WebServer',
+                          status='pending', request_id=91)
+        db.session.add(req)
+        db.session.commit()
+        req_id = req.id
+    monkeypatch.setattr(MicrosoftCAAdminChannelMixin, '_run_ps', staticmethod(lambda *a, **k: ''))
+    monkeypatch.setattr(MicrosoftCAInventoryMixin, '_fetch_cert_pem', staticmethod(lambda *a, **k: new_pem))
+    with app.app_context():
+        result = MicrosoftCAService.approve_request(msca_id, 91)
+    assert result['imported_cert_id'] == cert_id
+    poll = {'status': 'issued', 'cert_pem': new_pem}
+    with patch('api.v2.msca.MicrosoftCAService.check_request', return_value=poll):
+        r = auth_client.get(f'/api/v2/microsoft-cas/{msca_id}/requests/{req_id}')
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        rows = Certificate.query.filter_by(imported_from='msca:Test ADCS ev-approve.test.local').all()
+        assert [row.id for row in rows] == [cert_id]
+        assert base64.b64decode(rows[0].crt).decode() == new_pem
+        assert db.session.get(MSCARequest, req_id).cert_id == cert_id
+    assert [e for e, _ in events if e.startswith('certificate.')] == ['certificate.renewed']
+    assert cert_events(events, cert_id) == [('certificate.renewed', cert_id)]
