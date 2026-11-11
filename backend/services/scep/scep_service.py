@@ -1782,7 +1782,7 @@ class SCEPService:
             from services.ca.ca_signing import _claim_superseded
             rows = find_issued_rows(self.ca, renewal_of)
             live = next((r for r in rows if not r.archived), None)
-            if rows and (live is None or not _claim_superseded(live, renewal_of)):
+            if rows and (live is None or not _claim_superseded(live, renewal_of, cert_obj)):
                 raise ValueError('Signing certificate has been superseded by a newer one')
 
         Config.CERT_DIR.mkdir(parents=True, exist_ok=True)
