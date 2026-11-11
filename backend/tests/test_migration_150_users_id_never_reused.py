@@ -16,6 +16,7 @@ TABLE = User.__tablename__
 SESSIONS = 'user_sessions'
 EAB = 'acme_eab_credentials'
 APPROVALS = 'approval_requests'
+AUDIT = 'audit_logs'
 
 # The users table as SQLite installations hold it before 150: no AUTOINCREMENT
 _LEGACY = f"""
@@ -36,6 +37,7 @@ CREATE TABLE {SESSIONS} (id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL
     REFERENCES {TABLE}(id) ON DELETE CASCADE, session_id TEXT);
 CREATE TABLE {EAB} (id INTEGER PRIMARY KEY, created_by_user_id INTEGER, revoked_by_user_id INTEGER);
 CREATE TABLE {APPROVALS} (id INTEGER PRIMARY KEY, requester_id INTEGER, approvals TEXT);
+CREATE TABLE {AUDIT} (id INTEGER PRIMARY KEY, resource_type VARCHAR(50), resource_id TEXT);
 """
 _USERS = [(1, 'admin', 'a@x', 'local', None, None), (2, 'bob', 'b@x', 'ldap', None, 'kept'),
           (5, 'carol', 'c@x', 'local', None, None)]
@@ -112,6 +114,16 @@ class TestSQLite:
         conn.commit()
         _migration().upgrade(conn)
         assert _create(conn, 'dave') == 13
+
+    @pytest.mark.parametrize('resource_id, expected', [('7', 8), ('3,9,4', 10), (' 11 ', 12)])
+    def test_the_counter_starts_above_user_ids_the_audit_trail_names(self, resource_id, expected):
+        conn = _legacy_database()
+        conn.executemany(f"INSERT INTO {AUDIT} (resource_type, resource_id) VALUES (?, ?)",
+                         [('user', resource_id), ('user', 'bob'), ('user', None), ('user', ''),
+                          ('user', '99999999999'), ('certificate', '40')])
+        conn.commit()
+        _migration().upgrade(conn)
+        assert _create(conn, 'dave') == expected
 
     def test_an_empty_table_is_ready_too(self):
         conn = sqlite3.connect(':memory:')
@@ -229,6 +241,12 @@ def test_postgresql_never_reused_an_id_and_the_counter_passes_surviving_referenc
                 _migration().upgrade(conn)
                 assert _next('f') == 10
                 assert [r[0] for r in conn.execute(text(f"SELECT id FROM {TABLE} ORDER BY id"))] == [1, 2, 10]
+                # A bulk delete recorded in the audit trail names ids no other row keeps
+                conn.execute(text(f"CREATE TABLE {AUDIT} (id SERIAL PRIMARY KEY, resource_type VARCHAR(50), "
+                                  "resource_id TEXT)"))
+                conn.execute(text(f"INSERT INTO {AUDIT} (resource_type, resource_id) VALUES ('user', '14,12')"))
+                _migration().upgrade(conn)
+                assert _next('g') == 15
         finally:
             engine.dispose()
 

@@ -40,6 +40,19 @@ def _ids_in_approvals(rows):
                 yield value
 
 
+# Above the int4 range PostgreSQL's users sequence cannot take it: not an id it handed out
+_MAX_ID = 2 ** 31 - 1
+
+
+def _ids_in_audit(rows):
+    """User ids in ``audit_logs.resource_id``: one id, or a comma list for a bulk delete."""
+    for (value,) in rows:
+        for part in (value or '').split(','):
+            part = part.strip()
+            if part.isascii() and part.isdigit() and int(part) <= _MAX_ID:
+                yield int(part)
+
+
 def _highest_named(scalar, rows, has_column):
     """The highest user id the database still names anywhere (0 if none)."""
     highest = scalar(f"SELECT MAX(id) FROM {TABLE}") or 0
@@ -48,6 +61,9 @@ def _highest_named(scalar, rows, has_column):
             highest = max(highest, scalar(f"SELECT MAX({column}) FROM {table}") or 0)
     if has_column('approval_requests', 'approvals'):
         highest = max([highest, *_ids_in_approvals(rows("SELECT approvals FROM approval_requests"))])
+    if has_column('audit_logs', 'resource_id') and has_column('audit_logs', 'resource_type'):
+        highest = max([highest, *_ids_in_audit(rows(
+            "SELECT resource_id FROM audit_logs WHERE resource_type = 'user'"))])
     return int(highest)
 
 
