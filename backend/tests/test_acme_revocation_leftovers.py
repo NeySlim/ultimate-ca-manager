@@ -64,6 +64,30 @@ def test_the_proxy_certificate_is_the_row_an_order_names(twin_rows):
     assert acme_proxy_api._resolve_proxy_certificate(cert_obj).id == copy_id
 
 
+def test_a_proxy_certificate_prefers_the_row_a_proxy_order_names(twin_rows):
+    """A proxy whose upstream is UCM itself: the server order's row must not hide the proxy's."""
+    from api.acme import acme_proxy_api
+    from models import AcmeAccount, AcmeOrder
+    (named_id, copy_id), orders = twin_rows
+    named = db.session.get(Certificate, named_id)
+    suffix = uuid.uuid4().hex
+    account = AcmeAccount(jwk='{}', jwk_thumbprint=suffix)
+    db.session.add(account)
+    db.session.commit()
+    server_order = AcmeOrder(account_id=account.account_id, identifiers='[]', certificate_id=named_id)
+    db.session.add(server_order)
+    db.session.commit()
+    proxy_order = _order(certificate_id=copy_id, is_proxy_order=True)
+    orders.append(proxy_order.id)
+    try:
+        cert_obj = x509.load_pem_x509_certificate(base64.b64decode(named.crt))
+        assert acme_proxy_api._resolve_proxy_certificate(cert_obj, None).id == copy_id
+    finally:
+        db.session.delete(server_order)
+        db.session.delete(account)
+        db.session.commit()
+
+
 def test_the_related_answer_is_a_new_sentence():
     answer = {'message': 'Certificate revoked in UCM and at the ACME CA', 'meta': {}}
     out = upstream_revocation.with_related_answer(
