@@ -46,6 +46,8 @@ class User(db.Model):
                  sqlite_where=db.text("auth_source = 'local'"),
                  postgresql_where=db.text("auth_source = 'local'")),
         db.Index('ix_users_sso_identity', 'sso_provider_id', 'sso_external_id'),
+        # A deleted account's id is never handed out again (migration 150 on upgrades)
+        {'sqlite_autoincrement': True},
     )
 
     id = db.Column(db.Integer, primary_key=True)

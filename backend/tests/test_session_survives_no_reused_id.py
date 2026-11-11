@@ -1,10 +1,12 @@
 """A session of a deleted account does not open the account that takes its id.
 
-SQLite gives a new row the id of the last one deleted (INTEGER PRIMARY KEY
-without AUTOINCREMENT), and the session cookie only held that id and a session
-version both accounts start at 0. The session now also carries the account's
-creation time, compared on every request.
+SQLite used to give a new row the id of the last one deleted, and the session
+cookie only held that id and a session version both accounts start at 0. The
+session now also carries the account's creation time, compared on every
+request. Ids are no longer reused (migration 150): the scenarios move the new
+account onto the old id themselves, so this defence stays proven on its own.
 """
+from sqlalchemy import text
 import json
 
 import pytest
@@ -30,10 +32,13 @@ def _delete_last(app, auth_client, user_id):
         assert db.session.get(User, user_id) is None
 
 
-def _reuses(app, old_id, new_id):
+def _reuses(app, old, new):
+    """Give the new account the old one's id, as SQLite did before migration 150."""
     with app.app_context():
-        if db.engine.dialect.name == 'sqlite':
-            assert new_id == old_id, 'the scenario needs the id handed out again'
+        db.session.execute(text(f'UPDATE {User.__tablename__} SET id = :old WHERE id = :new'),
+                           {'old': old['id'], 'new': new['id']})
+        db.session.commit()
+    new['id'] = old['id']
 
 
 @pytest.fixture
@@ -58,7 +63,7 @@ class TestAReusedIdIsAnotherAccount:
 
         _delete_last(app, auth_client, first['id'])
         second = create_user(username='reused_id_second', role='admin')
-        _reuses(app, first['id'], second['id'])
+        _reuses(app, first, second)
 
         assert old_session.get(PROTECTED).status_code == 401
         # The new account's own login is unaffected
@@ -76,7 +81,7 @@ class TestAReusedIdIsAnotherAccount:
 
         _delete_last(app, auth_client, first['id'])
         second = create_user(username='reused_key_second', role='admin')
-        _reuses(app, first['id'], second['id'])
+        _reuses(app, first, second)
         with app.app_context():
             assert APIKey.query.filter_by(user_id=second['id']).count() == 0
         assert app.test_client().get('/api/v2/certificates', headers={'X-API-Key': key}).status_code == 401
@@ -104,7 +109,7 @@ class TestASessionOpenedBeforeTheUpdate:
 
         _delete_last(app, auth_client, first['id'])
         second = create_user(username='proofless_second', role='admin')
-        _reuses(app, first['id'], second['id'])
+        _reuses(app, first, second)
 
         assert old_session.get(PROTECTED).status_code == 401
         with old_session.session_transaction() as stored:
@@ -121,7 +126,7 @@ class TestASessionOpenedBeforeTheUpdate:
 
         _delete_last(app, auth_client, first['id'])
         second = create_user(username='proofless_namesake', role='admin')
-        _reuses(app, first['id'], second['id'])
+        _reuses(app, first, second)
 
         assert old_session.get(PROTECTED).status_code == 401
         assert _login(app, 'proofless_namesake').get(PROTECTED).status_code == 200
@@ -137,7 +142,7 @@ class TestASessionOpenedBeforeTheUpdate:
 
         _delete_last(app, auth_client, first['id'])
         second = create_user(username='proofless_undated', role='admin')
-        _reuses(app, first['id'], second['id'])
+        _reuses(app, first, second)
         with app.app_context():
             db.session.get(User, second['id']).created_at = None
             db.session.commit()
