@@ -31,6 +31,8 @@ const mocks = vi.hoisted(() => ({
     { id: 5, cn: 'old.example.com', related_certificate_id: 6 },
     { id: 6, cn: 'old.example.com', related_certificate_id: 5, revoked: true },
     { id: 7, cn: 'far.example.com', related_certificate_id: 8 },
+    { id: 9, cn: 'old2.example.com', related_certificate_id: 10 },
+    { id: 10, cn: 'old2.example.com', related_certificate_id: 9, archived: true },
   ],
 }))
 
@@ -165,6 +167,7 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
   it.each([
     ['names it one way', 4],
     ['is already revoked', 5],
+    ['was superseded', 9],
   ])('asks nothing when the other certificate %s', async (_case, id) => {
     mocks.selection = [id]
     mocks.bulkRevoke.mockResolvedValue({ data: { success: [id], failed: [] } })
