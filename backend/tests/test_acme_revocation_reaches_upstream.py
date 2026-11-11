@@ -142,14 +142,27 @@ class TestTheSingleRoute:
         assert 'hold' in body['message']
         assert _owed(bench) == []
 
-    def test_a_certificate_not_from_acme_is_left_alone(self, auth_client, bench, create_cert):
-        other = create_cert(cn='not-acme-upstream.example')
-        answer = auth_client.post(f"/api/v2/certificates/{other['id']}/revoke",
-                                  data=json.dumps({'reason': 'keyCompromise'}),
-                                  content_type='application/json')
-        assert answer.status_code == 200
-        assert 'meta' not in json.loads(answer.data)
-        bench.client.revoke_certificate.assert_not_called()
+    def test_a_certificate_not_from_acme_is_left_alone(
+            self, app, auth_client, bench, create_ca, create_cert):
+        from services.ca_service import CAService
+        from services.cert_service import CertificateService
+        # A CA of its own: the session's default CA is shared and never deleted
+        ca = create_ca(cn='Not ACME upstream CA')
+        other = None
+        try:
+            other = create_cert(cn='not-acme-upstream.example', ca_id=ca['id'])
+            answer = auth_client.post(f"/api/v2/certificates/{other['id']}/revoke",
+                                      data=json.dumps({'reason': 'keyCompromise'}),
+                                      content_type='application/json')
+            assert answer.status_code == 200
+            assert 'meta' not in json.loads(answer.data)
+            bench.client.revoke_certificate.assert_not_called()
+        finally:
+            with app.app_context():
+                # The certificate before its CA: PostgreSQL enforces the foreign key
+                if other is not None:
+                    assert CertificateService.delete_certificate(other['id'], username='admin')
+                assert CAService.delete_ca(ca['id'], username='admin')
 
 
 class TestTheBulkRoute:

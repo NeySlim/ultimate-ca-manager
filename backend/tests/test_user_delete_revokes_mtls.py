@@ -15,7 +15,31 @@ from cryptography import x509
 from models import db, User, Certificate, CA
 from models.auth_certificate import AuthCertificate
 from models.revoked_serial import RevokedSerial
+from tests.conftest import cert_factory
 from tests.test_user_certificate_key_export_guard import _enrolment_for
+
+
+@pytest.fixture(scope='module')
+def create_cert(app, auth_client, create_ca):
+    """Certificates under a CA of this module, deleted with it at the end:
+    the session's default CA is shared with other files and never removed."""
+    from services.ca_service import CAService
+    from services.cert_service import CertificateService
+    ca = create_ca(cn='mTLS user-delete CA')
+    made = []
+    issue = cert_factory(auth_client, create_ca)
+
+    def _create(cn=None, **kwargs):
+        cert = issue(cn=cn, ca_id=ca['id'], **kwargs)
+        made.append(cert['id'])
+        return cert
+    yield _create
+    with app.app_context():
+        # Certificates first: on PostgreSQL their foreign key holds the CA
+        for cid in made:
+            if db.session.get(Certificate, cid) is not None:
+                assert CertificateService.delete_certificate(cid, username='admin')
+        assert CAService.delete_ca(ca['id'], username='admin')
 
 
 def _enrolled_user(app, create_user, create_cert, username):
