@@ -323,6 +323,7 @@ def test_serverkeygen_answers_409_when_its_delegate_was_renewed_meanwhile(app, c
         assert Certificate.query.filter_by(subject_cn='renewed.generator.test').count() == 0
     _reset(app, ca_id)
 
+
 def _ca_like(key, *, hsm_key_id=None, name=None, days=3650, extensions=()):
     from utils.key_codec import store_pem_bytes
     name = name or x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Generator Org'),

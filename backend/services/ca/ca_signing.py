@@ -73,8 +73,7 @@ def _pushes_key(binding):
         return False
     from services.deploy import http as deploy_http
     try:
-        names = {name for source in (target.url, target.body_template)
-                 for name, _ in deploy_http.template_variables(source or '')}
+        names = deploy_http.template_names(target)
     except ValueError:
         return True  # an unreadable template must not move a binding or abort the renewal
     return 'key_pem' in names
@@ -109,7 +108,7 @@ def _bindings_follow(old_ids, successor):
     if stayed:
         logger.warning(
             f"Renewed certificate {successor.refid} has no private key in UCM: "
-            f"{', '.join(stayed)} stay on the previous certificate")
+            f"{', '.join(stayed)} {'stays' if len(stayed) == 1 else 'stay'} on the previous certificate")
 
 
 class CASigningMixin:

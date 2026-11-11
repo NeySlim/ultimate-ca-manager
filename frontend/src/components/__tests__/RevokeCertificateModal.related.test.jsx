@@ -63,6 +63,14 @@ describe('RevokeCertificateModal and a hybrid pair', () => {
     expect(onConfirm).toHaveBeenCalledWith('unspecified')
   })
 
+  it('does not offer it when the other certificate was superseded', async () => {
+    getById.mockResolvedValue({ data: { id: 12, related_certificate_id: 11, revoked: false, archived: true } })
+    const onConfirm = renderModal(member)
+    await submit()
+    expect(screen.queryByLabelText('revocation.revokeRelated')).toBeNull()
+    expect(onConfirm).toHaveBeenCalledWith('unspecified')
+  })
+
   it('leaves the choice to the operator when the other certificate cannot be read', async () => {
     getById.mockImplementation(() => Promise.reject(new Error('forbidden')))
     renderModal(member)

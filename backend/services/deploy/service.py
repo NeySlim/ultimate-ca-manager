@@ -665,9 +665,7 @@ class DeployService:
         for field in ('cert_path', 'key_path', 'fullchain_path', 'reload_command'):
             if fields.get(field):
                 raise ValueError(f'{field} does not apply to an HTTP target')
-        names = {name for source in (target.url, target.body_template)
-                 for name, _ in deploy_http.template_variables(source or '')}
-        if 'key_pem' in names and not certificate.prv:
+        if 'key_pem' in deploy_http.template_names(target) and not certificate.prv:
             raise ValueError("This certificate has no private key in UCM, "
                              "but the target's body template sends one")
 

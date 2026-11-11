@@ -512,13 +512,13 @@ export default function OperationsPage() {
   // ===== BULK ACTION HANDLERS =====
   const relatedOf = (id) => seenItemsRef.current.get(id)?.related_certificate_id
   // The other member the server revokes or renews with id: it names id back and is not
-  // revoked. null when there is none, undefined when it could not be read.
+  // revoked or superseded. null when there is none, undefined when it could not be read.
   const livePartner = (id) => {
     const other = relatedOf(id)
     if (other == null) return null
     const item = seenItemsRef.current.get(other)
     if (!item) return undefined
-    return item.related_certificate_id === id && !item.revoked ? other : null
+    return item.related_certificate_id === id && !item.revoked && !item.archived ? other : null
   }
   const pairAction = bulkResourceType === 'certificates' && (bulkAction === 'revoke' || bulkAction === 'renew')
   const selectionHasPairs = bulkResourceType === 'certificates'

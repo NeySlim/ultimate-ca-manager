@@ -210,7 +210,6 @@ def test_a_committed_restore_is_audited_even_when_its_details_cannot_be_built(au
     assert LEAKY not in str(audit)
 
 
-
 def _raw_restore(client, route, filename, **fields):
     """A multipart restore whose file name travels as RFC 2231 filename*, CR and LF included."""
     from urllib.parse import quote
@@ -249,7 +248,9 @@ def test_the_audited_file_name_is_its_base_name_on_one_line(auth_client, audit, 
 
 @pytest.mark.parametrize('raw, audited', [
     ('../../x\r\nforged', 'xforged'), ('C:\\dir\\b.ucmbkp', 'b.ucmbkp'),
-    ('a\x00\x1b\x7f\x85\u2028b', 'ab'), ('n' * 300, 'n' * 255), ('../\r\n', 'upload')])
+    ('a\x00\x1b\x7f\x85\u2028b', 'ab'), ('n' * 300, 'n' * 255), ('../\r\n', 'upload'),
+    ('evil\u202egpj.exe', 'evilgpj.exe'), ('a\u200bb\ufeff', 'ab'), ('  ', 'upload'),
+    (' . x.ucmbkp. ', 'x.ucmbkp')])
 def test_client_filename(raw, audited):
     from utils.sanitize import client_filename
     assert client_filename(raw) == audited

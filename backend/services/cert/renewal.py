@@ -304,8 +304,8 @@ def renewal_partner(cert):
 
 
 def _current_related(row):
-    """The certificate A that *row*'s certificate names, while A is held, valid and
-    unrevoked; None otherwise (the renewed certificate then names nothing)."""
+    """The certificate A that *row*'s certificate names, while A is held, valid,
+    unrevoked and not superseded; None otherwise (the renewed certificate then names nothing)."""
     from services.cert.related_pair import row_certificate
     try:
         if not row.related_certificate_id or not row.crt:
@@ -318,7 +318,7 @@ def _current_related(row):
     except x509.ExtensionNotFound:
         return None
     a_row = db.session.get(Certificate, row.related_certificate_id)
-    if a_row is None or a_row.revoked or not a_row.crt:
+    if a_row is None or a_row.revoked or a_row.archived or not a_row.crt:
         return None
     cert_a = row_certificate(a_row)
     if cert_a.not_valid_after_utc.replace(tzinfo=None) < utc_now():

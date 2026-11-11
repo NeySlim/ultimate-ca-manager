@@ -200,6 +200,17 @@ def test_oidc_bad_state_spends_the_value(app, oidc):
         assert 'sso_next' not in s
 
 
+def test_oidc_provider_gone_spends_the_value_and_keeps_the_page(app, oidc):
+    client = app.test_client()
+    _, state = _oidc_start(client, '/cas')
+    with app.app_context():
+        db.session.get(SSOProvider, oidc).enabled = False
+        db.session.commit()
+    assert _login_error(_oidc_return(client, state)) == ('provider_not_found', '/cas')
+    with client.session_transaction() as s:
+        assert 'sso_next' not in s
+
+
 def _login_error(location):
     """``(error, next)`` of a redirect back to the login page."""
     parts = urlsplit(location)

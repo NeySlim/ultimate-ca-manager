@@ -23,7 +23,7 @@ from utils.key_codec import load_pem_bytes
 from services.audit_service import AuditService
 from services.cert_service import CertificateService
 from services.approval_gate import PairApprovalConflict, approval_payload, queue_revocation
-from services.cert.related_pair import mutual_partner
+from services.cert.related_pair import revocation_partner
 from services.mtls_enrollment import remove_enrolment
 from services.acme.upstream_revocation import propagate_acme_revocation, revocation_answer
 from utils.pagination import parse_request_pagination
@@ -529,7 +529,7 @@ def revoke_user_certificate(cert_id):
     if not revocable(cert, reason):
         return error_response('Certificate already revoked', 400)
 
-    partner = mutual_partner(cert)
+    partner = revocation_partner(cert)
     try:
         policy, approval = queue_revocation(user, cert, reason=reason,
                                             comment=data.get('approval_comment'),

@@ -20,7 +20,7 @@ from services.msca.propagation import propagate_revocation, PROPAGATED
 from services.acme.upstream_revocation import (
     NOT_ACME as ACME_NOT_ACME, REVOKED as ACME_REVOKED, propagate_acme_revocation, related_untold)
 from services.approval_gate import PairApprovalConflict, queue_revocation
-from services.cert.related_pair import mutual_partner
+from services.cert.related_pair import revocation_partner
 from api.v2.certificates.cert_lifecycle import _related_choice_refusal
 from utils.export_options import json_boolean
 from services.audit_service import AuditService
@@ -81,7 +81,7 @@ def bulk_revoke_certificates():
                 else:
                     results['failed'].append({'id': cert_id, 'error': 'Already revoked'})
                 continue
-            partner = mutual_partner(cert)
+            partner = revocation_partner(cert)
             partner_id = partner.id if partner is not None and revocable(partner, reason) else None
             refusal = _related_choice_refusal(cert, partner_id, revoke_related)
             if refusal is not None:

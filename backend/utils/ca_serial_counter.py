@@ -55,12 +55,11 @@ _RETRY_FOLLOWS: ContextVar[bool] = ContextVar('serial_collision_retry_follows', 
 
 def log_commit_failure(log, message: str, exc) -> None:
     """Log a failed issuance commit with its trace, except a collision the decorator
-    signs again (its own warning is then the only line) and an RFC 9763 refusal (a warning)."""
+    signs again (its own warning is then the only line) and an RFC 9763 refusal (the caller reports it)."""
     if is_serial_collision(exc) and _RETRY_FOLLOWS.get():
         return
     from services.cert.related_pair import RelatedCertificateRefused
     if isinstance(exc, RelatedCertificateRefused):  # an expected refusal, answered 400
-        log.warning(f"{message}: {exc}")
         return
     log.error(f"{message}: {exc}", exc_info=True)
 

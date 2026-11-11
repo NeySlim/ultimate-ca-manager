@@ -216,3 +216,54 @@ def test_an_http_binding_sending_the_key_stays_on_a_keyless_renewal(app, create_
         assert DeployDelivery.query.filter_by(binding_id=http_id).count() == 0
     warning = next(r.getMessage() for r in caplog.records if 'has no private key in UCM' in r.getMessage())
     assert f'deploy binding {http_id}' in warning
+
+
+def _http_binding(app, old_id, body_template):
+    """A binding of *old_id* on an HTTP target; the template is set on the model, unchecked."""
+    with app.app_context():
+        target = DeployTarget(name=f'follow-http-{uuid.uuid4().hex[:8]}', kind=DeployTarget.KIND_HTTP,
+                              host='api.example.test', port=443, username='', private_key='',
+                              url='https://api.example.test/certs', http_method='POST',
+                              body_template=body_template, allow_private_key=True)
+        db.session.add(target)
+        db.session.flush()
+        binding = DeployBinding(target_id=target.id, certificate_id=old_id)
+        db.session.add(binding)
+        db.session.commit()
+        return binding.id
+
+
+def test_an_http_binding_not_naming_the_key_follows_a_keyless_renewal(app, create_ca, https):
+    ca = create_ca(cn='follow http nokey CA')
+    old_id, _, _ = _bound_row(app, ca['id'], 'follow-http-nokey.example.test')
+    http_id = _http_binding(app, old_id, '{"cert": "{{cert_pem|json}}"}')
+    _protocol_renewal(app, old_id, 'est')
+    with app.app_context():
+        moved = db.session.get(DeployBinding, http_id)
+        assert moved.certificate_id != old_id and not db.session.get(Certificate, moved.certificate_id).prv
+        assert [d.event_type for d in DeployDelivery.query.filter_by(binding_id=http_id)] == [
+            'certificate.renewed']
+
+
+def test_an_unreadable_stored_template_does_not_move_the_binding_or_abort(app, create_ca, https):
+    ca = create_ca(cn='follow http unreadable CA')
+    old_id, _, _ = _bound_row(app, ca['id'], 'follow-http-unreadable.example.test')
+    http_id = _http_binding(app, old_id, '{{nosuchvar|json}}')
+    _protocol_renewal(app, old_id, 'est')
+    with app.app_context():
+        assert db.session.get(Certificate, old_id).archived is True
+        assert db.session.get(DeployBinding, http_id).certificate_id == old_id
+        assert DeployDelivery.query.filter_by(binding_id=http_id).count() == 0
+
+
+def test_the_warning_agrees_with_one_binding_left_behind(app, create_ca, https, caplog):
+    from services.https_binding import set_bound_refid
+    ca = create_ca(cn='follow singular CA')
+    old_id, _, keyed_id = _bound_row(app, ca['id'], 'follow-singular.example.test')
+    with app.app_context():
+        set_bound_refid('')  # the HTTPS listener is bound to no row here
+        db.session.commit()
+    with caplog.at_level('WARNING'):
+        _protocol_renewal(app, old_id, 'est')
+    message = next(r.getMessage() for r in caplog.records if 'has no private key in UCM' in r.getMessage())
+    assert message.endswith(f'deploy binding {keyed_id} stays on the previous certificate'), message

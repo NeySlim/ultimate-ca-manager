@@ -48,7 +48,7 @@ export function RevokeCertificateModal({ open, onClose, onConfirm, certificate, 
     }
   }, [open])
 
-  // The server revokes the other member only when it names this one back and is not revoked yet
+  // The server revokes the other member only when it names this one back and is neither revoked nor superseded
   useEffect(() => {
     if (!open || relatedId == null) { setRelated('none'); return undefined }
     let live = true
@@ -56,7 +56,7 @@ export function RevokeCertificateModal({ open, onClose, onConfirm, certificate, 
     certificatesService.getById(relatedId)
       .then((res) => {
         const other = res?.data ?? res
-        if (live) setRelated(other && other.related_certificate_id === certId && !other.revoked ? 'revocable' : 'none')
+        if (live) setRelated(other && other.related_certificate_id === certId && !other.revoked && !other.archived ? 'revocable' : 'none')
       })
       .catch(() => { if (live) setRelated('unknown') })
     return () => { live = false }

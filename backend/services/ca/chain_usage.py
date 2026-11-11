@@ -151,8 +151,7 @@ def _sends_chain(target) -> bool:
     """An HTTP target (#428) pushes the chain when its template names it."""
     from services.deploy import http as deploy_http
     try:
-        names = {n for source in (target.url, target.body_template)
-                 for n, _ in deploy_http.template_variables(source or '')}
+        names = deploy_http.template_names(target)
     except ValueError:
         return False
     return bool(names & {'chain_pem', 'fullchain_pem'})

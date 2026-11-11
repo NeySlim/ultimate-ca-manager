@@ -1,5 +1,8 @@
 """After a restore, every authority that publishes a CRL and can sign gets a fresh one at once,
 and one that cannot sign is reported, never a failed restore."""
+import contextlib
+import logging
+
 import pytest
 
 from models import CA, db
@@ -73,6 +76,27 @@ def test_a_publishing_authority_gets_a_new_crl_and_its_delta(app, create_ca, mon
                for kind, payload in events), events
 
 
+@contextlib.contextmanager
+def _logged(name):
+    """The messages of one logger, whatever level or switch another test left on it."""
+    log = logging.getLogger(name)
+    messages = []
+
+    class Keep(logging.Handler):
+        def emit(self, record):
+            messages.append(record.getMessage())
+    handler = Keep(logging.DEBUG)
+    saved = log.level, log.disabled
+    log.addHandler(handler)
+    log.setLevel(logging.DEBUG)
+    log.disabled = False
+    try:
+        yield messages
+    finally:
+        log.removeHandler(handler)
+        log.level, log.disabled = saved
+
+
 def test_a_delta_that_fails_after_its_base_reports_the_authority(app, create_ca, monkeypatch):
     """The served delta would be older than the new base: the authority is not fully re-signed."""
     from services.crl.generation import CRLGenerationMixin
@@ -84,9 +108,16 @@ def test_a_delta_that_fails_after_its_base_reports_the_authority(app, create_ca,
         def refused(*a, **kw):
             raise RuntimeError('HSM session lost')
         monkeypatch.setattr(CRLGenerationMixin, 'generate_delta_crl', staticmethod(refused))
-        result = invalidate_after_restore()
+        with _logged('services.backup.restore.invalidate') as messages:
+            result = invalidate_after_restore()
         assert name in result['crls_delta_failed'], result
         assert name not in result['crls_failed'] and name not in result['crls_regenerated'], result
+        mine = [m for m in messages if f'CA {name}' in m]
+        assert len(mine) == 1 and 'base CRL was signed' in mine[0] and 'not regenerated' not in mine[0], mine
+        summary = next(m for m in messages if m.startswith('Restore: revoked'))
+        # Other publishing authorities in the shared database count too: compare with the result
+        assert f"{len(result['crls_failed'])} failed, {len(result['crls_delta_failed'])} with a delta CRL failed)" \
+            in summary, summary
 
 
 def test_an_authority_that_cannot_sign_is_reported_and_the_others_still_get_theirs(

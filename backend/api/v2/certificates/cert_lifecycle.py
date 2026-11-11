@@ -11,7 +11,7 @@ from utils.revocation_reasons import normalize_revocation_reason, invalid_reason
 from services.cert_service import CertificateService
 from services.approval_gate import (PairApprovalConflict, approval_payload, queue_revocation,
                                     revocation_policy_for)
-from services.cert.related_pair import mutual_partner
+from services.cert.related_pair import revocation_partner
 from utils.export_options import json_boolean
 from services.deletion_blockers import certificate_deletion_blockers, first_blocker
 from services.ocsp_service import OCSPService
@@ -94,7 +94,7 @@ def revoke_certificate(cert_id):
         revoke_related = json_boolean(data or {}, 'revoke_related', True)
     except ValueError as e:
         return error_response(str(e), 400)
-    partner = mutual_partner(cert)
+    partner = revocation_partner(cert)
     partner_id = partner.id if partner is not None and revocable(partner, reason) else None
     refusal = _related_choice_refusal(cert, partner_id, revoke_related)
     if refusal:

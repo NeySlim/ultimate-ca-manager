@@ -291,14 +291,15 @@ def sso_callback(provider_type):
     if provider_type not in ('saml', 'oauth2'):
         return redirect('/login?error=invalid_provider_type')
 
+    # Spent by any OAuth2 return, used only by a successful one.
+    oauth2_next = session.pop('sso_next', None) if provider_type == 'oauth2' else None
+
     provider = SSOProvider.query.filter_by(provider_type=provider_type, enabled=True).first()
     if not provider:
-        return redirect('/login?error=provider_not_found')
+        return redirect(_login_error('provider_not_found', oauth2_next))
 
     # Verify state for CSRF protection (OAuth2 only — SAML uses its own mechanisms)
     if provider_type == 'oauth2':
-        # Spent by any return, used only by a successful one.
-        oauth2_next = session.pop('sso_next', None)
         state = request.args.get('state')
         stored_state = session.get('sso_state', '')
         if not state or not hmac.compare_digest(state, stored_state):
