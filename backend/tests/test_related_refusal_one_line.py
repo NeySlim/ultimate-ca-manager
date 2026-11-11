@@ -19,6 +19,21 @@ def _refused_at_commit(monkeypatch):
     monkeypatch.setattr(related_pair, 'record_request_key', refuse)
 
 
+@pytest.fixture(autouse=True, scope='module')
+def _no_leftover_rows(app):
+    """Rows these tests create (CA, certificates) go away with them."""
+    from models import CA, Certificate, db
+    models = (Certificate, CA)
+    with app.app_context():
+        before = {m: {i for (i,) in db.session.query(m.id)} for m in models}
+    yield
+    with app.app_context():
+        for m in models:
+            for row in db.session.query(m).filter(m.id.notin_(before[m]) if before[m] else True):
+                db.session.delete(row)
+        db.session.commit()
+
+
 def _one_line(caplog):
     lines = [(r.levelname, r.exc_info) for r in caplog.records
              if r.levelno >= 30 and TEXT in r.getMessage()]
