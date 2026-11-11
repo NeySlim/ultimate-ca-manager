@@ -636,6 +636,12 @@ class RestoreCoreMixin:
                 continue
             results[name] = apply_section(name, rows, plan)
 
+        # Rows of another installation can name user ids this one has not handed out yet
+        from services.backup import user_id_counter
+        if any(_carries(backup_data, name) for name in user_id_counter.SECTIONS):
+            db.session.flush()
+            user_id_counter.advance_users_counter()
+
     def _restore_users(self, backup_data: Dict, results: Dict, plan) -> None:
         """Restore users from backup data.
 

@@ -348,6 +348,7 @@ jobs:
             tests/test_serial*.py \
             tests/test_scheduled_claims_pg.py \
             tests/test_renewal_concurrency_pg.py \
+            tests/test_renewal_bindings_follow.py \
             tests/test_import_ca_serial_unique.py \
             tests/test_migration_138*.py \
             tests/test_migration_139*.py \

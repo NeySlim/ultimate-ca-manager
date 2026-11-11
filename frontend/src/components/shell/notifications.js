@@ -37,7 +37,7 @@ export function queueItems(data) {
 // A restore refused before the archive was read is not a failed restore: the backend
 // marks it (services/backup/restore_completion.py); older rows carry their fixed phrase.
 export const REQUEST_REFUSED = 'Restore request refused: '
-const LEGACY_REFUSAL = /^Restore refused: (no file|password missing|unknown mode|invalid file name|file too large|a backend (switch|migration)|a backup or)/
+const LEGACY_REFUSAL = /^Restore refused: (no file|password missing|unknown mode|mode not allowed|invalid file name|file too large|a backend (switch|migration)|a backup or)/
 const requestRefused = (details = '') => details.startsWith(REQUEST_REFUSED) || LEGACY_REFUSAL.test(details)
 
 export function auditItems(rows) {

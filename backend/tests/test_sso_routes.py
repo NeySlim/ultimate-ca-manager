@@ -11,6 +11,22 @@ import pytest
 import json
 from tests.conftest import get_json
 
+@pytest.fixture(scope='module', autouse=True)
+def _own_saml_provider(app):
+    """One provider per type is allowed: a SAML row another file of the worker left would
+    fail the CRUD tests, so the module starts without one and leaves none."""
+    from models import SSOProvider, db
+
+    def clear():
+        with app.app_context():
+            SSOProvider.query.filter_by(provider_type='saml').delete()
+            db.session.commit()
+
+    clear()
+    yield
+    clear()
+
+
 def _post(client, url, data=None):
     return client.post(
         url,

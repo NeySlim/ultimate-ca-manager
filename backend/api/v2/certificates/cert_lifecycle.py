@@ -7,11 +7,11 @@ from utils.datetime_utils import to_naive_utc, utc_now
 from utils.serial_format import canonical_serial, serial_to_hex
 from utils.response import success_response, error_response, no_content_response
 from models import Certificate, CA, db
-from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable
+from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable, HOLD_REASONS
 from services.cert_service import CertificateService
 from services.approval_gate import (PairApprovalConflict, approval_payload, queue_revocation,
                                     revocation_policy_for)
-from services.cert.related_pair import HOLD_REASONS, revocation_partner, unhold_partner
+from services.cert.related_pair import revocation_partner, unhold_partner
 from utils.export_options import json_boolean
 from services.deletion_blockers import certificate_deletion_blockers, first_blocker
 from services.ocsp_service import OCSPService
@@ -60,7 +60,7 @@ def revoke_certificate(cert_id):
     """Revoke certificate"""
 
     data = request.json
-    if data is not None and not isinstance(data, dict):
+    if not isinstance(data, dict):
         return error_response('Request body must be a JSON object', 400)
     reason = data.get('reason', 'unspecified') if data else 'unspecified'
     # RFC 5280 reason names only, stored in canonical spelling (#334)
@@ -243,8 +243,9 @@ def unhold_certificate(cert_id):
         )
 
     # A body that is present is read strictly (400/415): an unreadable refusal must not lift the pair
-    body = request.get_json() if request.get_data(cache=True) else None
-    if body is not None and not isinstance(body, dict):
+    present = bool(request.get_data(cache=True))
+    body = request.get_json() if present else None
+    if present and not isinstance(body, dict):
         return error_response('Request body must be a JSON object', 400)
     try:
         unhold_related = json_boolean(body or {}, 'unhold_related', True)

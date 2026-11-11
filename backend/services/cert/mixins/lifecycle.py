@@ -27,13 +27,12 @@ from utils.datetime_utils import utc_now, to_naive_utc
 from utils.issuance_defaults import default_issue_key_id, template_digest
 from utils.spki_digest import certificate_key_sha256
 from utils.serial_format import canonical_serial
-from utils.revocation_reasons import revocable
+from utils.revocation_reasons import HOLD_REASONS, revocable
 
 logger = logging.getLogger(__name__)
 
 from security.encryption import decrypt_private_key, encrypt_private_key
 
-_HOLD_REASONS = ('certificateHold', 'certificate_hold')
 _REVOCATION_FIELDS = ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at')
 
 
@@ -423,7 +422,7 @@ class LifecycleMixin:
             raise ValueError("Certificate already revoked")
 
         ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
-        is_hold = reason in _HOLD_REASONS
+        is_hold = reason in HOLD_REASONS
         # A hold made final: dated now, so the delta lists the change; invalid since the hold
         held_since = certificate.revoked_at if certificate.revoked else None
         previous = {field: getattr(certificate, field) for field in _REVOCATION_FIELDS}

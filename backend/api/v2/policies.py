@@ -359,7 +359,7 @@ def _revoke_approved_certificate(approval, data):
         invalidity_at=invalidity_at, related_acme=related_acme)
     cert_id, serial, msca = cert.id, cert.serial_number, cert.source == 'msca'
     msca_local_only, acme_local_only, enrolment = False, False, None
-    acme_pending, acme_message = False, None
+    acme_pending, acme_message, related_local_only = False, None, None
     if msca:
         from services.msca.propagation import propagate_revocation, PROPAGATED
         msca_local_only = propagate_revocation(cert, reason)[0] != PROPAGATED
@@ -372,8 +372,8 @@ def _revoke_approved_certificate(approval, data):
         # The single route's warning, owed or local only, for the approver to read
         acme_pending, acme_message = acme_outcome == OWED, local_only_message(acme_outcome, acme_detail)
         if related_untold(related_acme):
-            # The other member of the pair, which the CA was not told of
-            acme_local_only = True
+            # The other member of the pair, which the CA was not told of: named apart
+            related_local_only = related_untold(related_acme)[0][0]
             acme_pending = acme_pending or any(e[1] == OWED for e in related_untold(related_acme))
             acme_message = with_related_answer(
                 {'message': acme_message or REVOKED_MESSAGE}, related_acme)['message']
@@ -389,7 +389,8 @@ def _revoke_approved_certificate(approval, data):
     logger.info(f"Certificate {cert_id} revoked via approval #{approval.id}")
     result = {'id': cert_id, 'cn': data.get('cn'), 'serial_number': serial,
               'revoked': True, 'reason': reason, 'msca_local_only': msca_local_only,
-              'acme_local_only': acme_local_only, 'acme_upstream_pending': acme_pending,
+              'acme_local_only': acme_local_only, 'related_acme_local_only': related_local_only,
+              'acme_upstream_pending': acme_pending,
               'acme_message': acme_message}
     if enrolment:
         # The direct route's entry, recorded by approve_request after its commit

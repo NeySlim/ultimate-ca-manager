@@ -169,6 +169,62 @@ class TestACertificateThatCannotBeRevokedNeverBlocksTheDeletion:
         assert f"#{probe['certificate_id']}" in _last_audit(app, 'users_bulk_deleted')
 
 
+class TestARevocationFailingAfterItsCommitIsStillARevocation:
+    @staticmethod
+    def _fail_after_the_commit(monkeypatch):
+        from services.ocsp_service import OCSPService
+
+        real = OCSPService.responder_cas_for_certificate
+        calls = []
+
+        def _broken_once(cert_id):
+            # The revocation's own lookup; the deletion that follows reads it normally
+            if not calls:
+                calls.append(cert_id)
+                raise RuntimeError('responder lookup failed')
+            return real(cert_id)
+        monkeypatch.setattr(OCSPService, 'responder_cas_for_certificate', staticmethod(_broken_once))
+
+    @staticmethod
+    def _spy_on_the_acme_propagation(monkeypatch):
+        from services.acme import upstream_revocation
+        told = []
+        real = upstream_revocation.propagate_acme_revocation
+
+        def spy(certificate, reason):
+            told.append(certificate.id)
+            return real(certificate, reason)
+        monkeypatch.setattr(upstream_revocation, 'propagate_acme_revocation', spy)
+        return told
+
+    def test_unit_delete_does_not_call_it_valid(self, app, auth_client, probe, monkeypatch):
+        self._fail_after_the_commit(monkeypatch)
+        told = self._spy_on_the_acme_propagation(monkeypatch)
+        answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+        assert answer.status_code == 200, answer.data[:300]
+        body = json.loads(answer.data)
+        assert not (body.get('data') or {}).get('unrevoked_certificates')
+        assert 'could not be revoked' not in body['message']
+        assert told == [probe['certificate_id']]
+        with app.app_context():
+            assert db.session.get(User, probe['user_id']) is None
+            assert db.session.get(Certificate, probe['certificate_id']) is None
+        assert 'could not be revoked' not in _last_audit(app, 'user_delete')
+
+    def test_bulk_delete_does_not_call_it_valid(self, app, auth_client, probe, monkeypatch):
+        self._fail_after_the_commit(monkeypatch)
+        told = self._spy_on_the_acme_propagation(monkeypatch)
+        answer = auth_client.post('/api/v2/users/bulk/delete',
+                                  data=json.dumps({'ids': [probe['user_id']]}),
+                                  content_type='application/json')
+        assert answer.status_code == 200, answer.data[:300]
+        data = json.loads(answer.data)['data']
+        assert data['success'] == [probe['user_id']] and not data.get('unrevoked')
+        assert told == [probe['certificate_id']]
+        with app.app_context():
+            assert db.session.get(Certificate, probe['certificate_id']) is None
+
+
 class TestAFailureLeavesAConsistentState:
     def test_the_user_stays_when_its_own_deletion_fails(self, app, auth_client, probe, monkeypatch):
         from api.v2.users import crud
@@ -183,6 +239,42 @@ class TestAFailureLeavesAConsistentState:
             assert db.session.get(User, probe['user_id']) is not None
             assert db.session.get(AuthCertificate, probe['enrolment_id']) is None
         _assert_published_as_revoked(app, probe)
+
+    @staticmethod
+    def _break_the_purge(monkeypatch):
+        from api.v2.users import crud
+
+        def _broken(_user_id):
+            raise RuntimeError('database went away')
+        monkeypatch.setattr(crud, '_purge_user_dependencies', _broken)
+
+    def test_a_failed_purge_says_the_certificate_rows_are_deleted(
+            self, app, auth_client, probe, monkeypatch):
+        self._break_the_purge(monkeypatch)
+        answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+        assert answer.status_code == 500, answer.data[:300]
+        message = json.loads(answer.data)['message']
+        assert f"row(s) of #{probe['certificate_id']} are already deleted" in message
+
+    def test_a_failed_purge_names_the_rows_that_could_not_be_deleted(
+            self, app, auth_client, probe, monkeypatch):
+        from services.cert_service import CertificateService
+        self._break_the_purge(monkeypatch)
+        monkeypatch.setattr(CertificateService, 'delete_certificate', staticmethod(lambda *a, **k: False))
+        answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+        assert answer.status_code == 500, answer.data[:300]
+        message = json.loads(answer.data)['message']
+        assert f"certificate(s) #{probe['certificate_id']} could not be deleted and are still listed" in message
+        assert 'already deleted' not in message
+
+    def test_bulk_failed_purge_says_the_certificate_rows_are_deleted(
+            self, app, auth_client, probe, monkeypatch):
+        self._break_the_purge(monkeypatch)
+        answer = auth_client.post('/api/v2/users/bulk/delete',
+                                  data=json.dumps({'ids': [probe['user_id']]}),
+                                  content_type='application/json')
+        failed = json.loads(answer.data)['data']['failed']
+        assert f"row(s) of #{probe['certificate_id']} are already deleted" in failed[0]['error']
 
     def test_bulk_does_not_name_a_user_it_failed_to_delete(
             self, app, auth_client, create_user, probe, monkeypatch):

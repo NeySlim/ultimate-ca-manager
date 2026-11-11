@@ -284,3 +284,38 @@ def test_with_a_message_queue_nothing_is_relayed(app, monkeypatch, relay_db):
     monkeypatch.setattr(socketio, 'emit', lambda *a, **kw: seen.append((a, kw)))
     emitters.on_ca_created(5, 'queued-ca', 'queued-ca', 'system')
     assert len(seen) == 1 and _rows(engine) == []
+
+
+def test_the_newest_id_falls_back_to_the_table_when_the_sequence_cannot_be_read():
+    """On PostgreSQL a role without SELECT on the sequence still gets a cursor, from MAX(id)."""
+    from contextlib import contextmanager
+    from types import SimpleNamespace
+    from sqlalchemy.exc import ProgrammingError
+
+    class Result:
+        def __init__(self, value):
+            self.value = value
+
+        def scalar(self):
+            return self.value
+
+    class Conn:
+        dialect = SimpleNamespace(name='postgresql')
+        savepoints = 0
+
+        def execute(self, statement):
+            sql = str(statement)
+            if 'MAX(id)' in sql:
+                return Result(41)
+            if 'pg_get_serial_sequence' in sql:
+                return Result('public.websocket_relay_id_seq')
+            raise ProgrammingError(sql, {}, Exception('permission denied for sequence'))
+
+        @contextmanager
+        def begin_nested(self):
+            self.savepoints += 1
+            yield
+
+    conn = Conn()
+    assert ws_relay._newest_id(conn) == 41
+    assert conn.savepoints == 1

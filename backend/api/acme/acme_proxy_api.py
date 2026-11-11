@@ -256,8 +256,9 @@ def _decode_b64url(value):
         raise ValueError("Invalid base64url value") from exc
 
 
-def _resolve_proxy_certificate(cert_obj):
-    """Resolve an exact proxy-stored certificate from its DER value."""
+def _resolve_proxy_certificate(cert_obj, upstream_account_id=None):
+    """Resolve an exact proxy-stored certificate from its DER value; the row a proxy
+    order of this upstream names comes before one only an ACME server order names."""
     from utils.serial_format import canonical_serial
     wanted_der = cert_obj.public_bytes(serialization.Encoding.DER)
     rows = Certificate.query.filter(
@@ -266,7 +267,9 @@ def _resolve_proxy_certificate(cert_obj):
     ).all()
     # A copy stored again must not stand in for the row a proxy order names
     from services.cert import issued_lookup
-    for row in issued_lookup.acme_ordered_first(rows):
+    ordered = issued_lookup.acme_ordered_first(rows)
+    ordered.sort(key=lambda row: not _revocation_orders(row.id, upstream_account_id))
+    for row in ordered:
         try:
             stored = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
         except (ValueError, TypeError, base64.binascii.Error):
@@ -1015,7 +1018,7 @@ def revoke_cert(slug=None):
 
     try:
         svc = get_proxy_service(slug)
-        cert = _resolve_proxy_certificate(cert_obj)
+        cert = _resolve_proxy_certificate(cert_obj, svc.account.id)
         if cert is None:
             return proxy_error("malformed", "Certificate not found", 404)
 

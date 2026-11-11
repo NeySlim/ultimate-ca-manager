@@ -760,6 +760,8 @@ def resubmit_csr(csr_id):
         details=f'Request of certificate {signed.id} pending again as request {row.id}',
         success=True,
     )
+    from services.webhook_service import emit_csr_submitted
+    emit_csr_submitted(row.to_dict(), actor=g.current_user.username)
     return created_response(data=row.to_dict(), message='Request pending again')
 
 

@@ -243,7 +243,7 @@ class TestUpstreamProblemRelayed:
             account=SimpleNamespace(id=1),
             revoke_certificate=lambda *_a, **_k: _Resp(already, 400))
         cert = SimpleNamespace(id=7, revoked=False)
-        monkeypatch.setattr(acme_proxy_api, '_resolve_proxy_certificate', lambda _c: cert)
+        monkeypatch.setattr(acme_proxy_api, '_resolve_proxy_certificate', lambda *_a: cert)
         monkeypatch.setattr(acme_proxy_api, '_revocation_orders',
                             lambda *_a: [SimpleNamespace(account_id='owner')])
         monkeypatch.setattr(acme_proxy_api, '_decode_b64url', lambda _v: b'der')

@@ -209,7 +209,7 @@ describe('NotificationBell', () => {
 
   it('ignores a restore the form refused before it started', async () => {
     const refused = ['Restore request refused: no file provided', 'Restore request refused: mode not allowed here',
-      'Restore request refused: a future refusal', 'Restore refused: password missing']
+      'Restore request refused: a future refusal', 'Restore refused: password missing', 'Restore refused: mode not allowed here']
     m.extraLogs = [
       ...refused.map((details, i) => ({ id: 70 + i, action: 'system_restore', success: false, username: 'root',
         resource_name: 'upload', details, timestamp: '2026-11-09T11:00:00Z' })),

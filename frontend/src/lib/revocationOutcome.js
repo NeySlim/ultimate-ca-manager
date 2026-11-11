@@ -27,7 +27,8 @@ export function bulkLocalOnlyRevocationWarning(data, t, reason) {
 
 // An approved revocation flags the certificate it returns, with the single route's ACME warning
 export function approvedLocalOnlyRevocationWarning(certificate, t) {
-  const acme = !!certificate?.acme_local_only && !isHoldReason(certificate?.reason)
+  const acme = !!(certificate?.acme_local_only || certificate?.related_acme_local_only)
+    && !isHoldReason(certificate?.reason)
   if (acme && certificate?.acme_message) return certificate.acme_message
   if (!acme && !certificate?.msca_local_only) return null
   return t('revocation.revokedLocallyOnly')

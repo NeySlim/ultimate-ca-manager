@@ -42,8 +42,7 @@ def record_failure(action: str, resource_name: str, reason: str) -> None:
                    resource_name=resource_name, details=reason, success=False)
 
 
-# Stable prefix of a restore refused before the archive was read: the request,
-# not the archive, was at fault, so nothing failed (the bell keys on it).
+# Stable prefix of a restore refused before the archive was read (the bell keys on it).
 REQUEST_REFUSED = 'Restore request refused: '
 
 

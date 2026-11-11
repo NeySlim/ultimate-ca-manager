@@ -57,6 +57,23 @@ def test_an_imported_request_is_announced(auth_client, seen):
     assert sent[0][1]['csr']['created_by'] == 'admin'
 
 
+def test_a_request_put_back_in_the_pending_list_is_announced_once(auth_client, create_ca, seen):
+    ca = create_ca(cn='Resubmit Event CA')
+    csr_id = auth_client.post('/api/v2/csrs/upload',
+                              json={'pem': _pem('resubmit-evt.example.test')}).get_json()['data']['id']
+    assert auth_client.post(f'/api/v2/csrs/{csr_id}/sign',
+                            json={'ca_id': ca['id'], 'validity_days': 30}).status_code == 200
+    before = len(_of(seen, 'csr.submitted'))
+    r = auth_client.post(f'/api/v2/csrs/{csr_id}/resubmit')
+    assert r.status_code == 201, r.data
+    sent = _of(seen, 'csr.submitted')[before:]
+    assert len(sent) == 1 and sent[0][1]['csr']['id'] == r.get_json()['data']['id']
+    assert sent[0][2].get('actor') == 'admin'
+    # Already pending: nothing new entered, nothing announced
+    assert auth_client.post(f'/api/v2/csrs/{csr_id}/resubmit').status_code == 200
+    assert len(_of(seen, 'csr.submitted')) == before + 1
+
+
 def test_signing_a_request_as_a_ca_announces_the_new_ca(auth_client, create_ca, seen):
     ca = create_ca(cn='Sign Event CA')
     up = auth_client.post('/api/v2/csrs/upload', json={'pem': _pem('Sub Event CA')})

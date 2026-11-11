@@ -165,7 +165,9 @@ class TestTheRelatedMemberOfARevokedPair:
         try:
             with app.test_request_context():
                 result = _revoke_approved_certificate(approval, data)
-            assert result['acme_local_only'] is True and result['acme_upstream_pending'] is True
+            assert result['acme_local_only'] is False
+            assert result['related_acme_local_only'] == bench.cert_id
+            assert result['acme_upstream_pending'] is True
             assert f'#{bench.cert_id}' in result['acme_message']
         finally:
             db.session.delete(db.session.get(ApprovalRequest, approval.id))

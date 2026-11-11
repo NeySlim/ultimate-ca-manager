@@ -27,6 +27,7 @@ from utils.cert_issuer import is_self_signed
 from utils.datetime_utils import utc_now
 from utils.leaf_key_usage import key_usage_for_key
 from utils.serial_format import canonical_serial
+from utils.revocation_reasons import HOLD_REASONS
 
 logger = logging.getLogger(__name__)
 
@@ -315,9 +316,6 @@ def revocation_partner(row):
     """The mutual partner a revocation follows: a superseded (archived) one is left alone."""
     partner = mutual_partner(row)
     return None if partner is not None and partner.archived else partner
-
-
-HOLD_REASONS = ('certificate_hold', 'certificateHold')
 
 
 def unhold_partner(row):
