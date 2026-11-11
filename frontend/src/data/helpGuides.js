@@ -33,7 +33,7 @@ The expiring and expired counters, each opening its list, and the five certifica
 Live certificates by key algorithm and weakness: RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key. Each counter opens the matching list.
 
 ### Latest operations
-The five most recent operations. With **read:audit**, a link opens the whole trail on the Audit Logs page.
+The five most recent operations. Without **read:audit** you only see your own events; with it, a link opens the whole trail on the Audit Logs page.
 
 ## Opening a filtered list
 Every counter that has a list opens the Certificates page filtered to exactly the certificates it counts. The filter appears as a chip above the table; remove it with its x.
