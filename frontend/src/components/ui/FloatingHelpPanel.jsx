@@ -91,12 +91,15 @@ function useHelpTranslation(lang, pageKey) {
       setTranslation(sectionCache[cacheKey])
       return
     }
+    // A superseded load must not overwrite the current language's state.
+    let live = true
     loadHelpPage(langKey, pageKey)
       .then(mod => {
         sectionCache[cacheKey] = mod.default
-        setTranslation(mod.default)
+        if (live) setTranslation(mod.default)
       })
-      .catch(() => setTranslation(null))
+      .catch(() => { if (live) setTranslation(null) })
+    return () => { live = false }
   }, [langKey, pageKey])
 
   return translation
@@ -105,8 +108,8 @@ function useHelpTranslation(lang, pageKey) {
 export function FloatingHelpPanel({ isOpen, onClose, pageKey }) {
   const { t, i18n } = useTranslation()
   const { isMobile } = useMobile()
-  const translation = useHelpTranslation(i18n.language, pageKey)
-  const langKey = i18n.language?.substring(0, 2)
+  const translation = useHelpTranslation(i18n.resolvedLanguage, pageKey)
+  const langKey = i18n.resolvedLanguage?.substring(0, 2)
   const englishNotice = !!langKey && langKey !== 'en' && !HELP_TRANSLATED_LANGUAGES.includes(langKey)
 
   const quickContent = useMemo(() => {
