@@ -269,7 +269,7 @@ def restore_backup():
 
             from services.backup.restore.invalidate import invalidate_after_restore
             try:
-                invalidate_after_restore()
+                invalidated = invalidate_after_restore()
             except Exception:
                 logger.exception("Restore: sessions could not be revoked")
                 return error_response(
@@ -281,6 +281,7 @@ def restore_backup():
             # restore has just replaced. The System route had always asked for it
             # while this one told the operator to do it themselves, so the same
             # archive left the service running or not depending on the page.
+            results['invalidated'] = invalidated
             restart_ok, restart_detail = request_restart()
             results['restart_requested'] = restart_ok
             results['restart_detail'] = restart_detail

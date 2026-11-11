@@ -127,6 +127,10 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
         message += _clause('Rows the archive does not carry lost their link to a removed row: '
                            + _listing([f'{name} ({count})' for name, count in sorted(unlinked.items())]))
 
+    unsigned = ((results or {}).get('invalidated') or {}).get('crls_failed') or []
+    if unsigned:
+        message += _clause('No new CRL could be signed after the restore for: ' + _listing(unsigned))
+
     warnings = (results or {}).get('warnings') or []
     if warnings:
         message += _clause('The archive also warned: ' + _listing(warnings))

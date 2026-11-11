@@ -277,6 +277,27 @@ CACHE_PURGES: Tuple[Tuple[str, Callable[[], None]], ...] = (
 )
 
 
+def _regenerate_crls() -> Tuple[list, list]:
+    """A fresh CRL (and delta) for each publishing authority that can sign: the one served
+    may list the revocations of the replaced instance. Returns (regenerated, failed) names."""
+    from models import CA
+    from services.crl_service import CRLService
+    regenerated, failed = [], []
+    for ca in CA.query.filter_by(cdp_enabled=True).order_by(CA.id).all():
+        if not (ca.has_private_key and ca.crt) or ca.offline:
+            continue  # signed elsewhere or not yet issued: the CDP keeps what it has
+        name = ca.descr
+        try:
+            CRLService.generate_crl(ca.id, username='system')
+        except Exception as exc:
+            db.session.rollback()
+            logger.warning("Restore: the CRL of CA %s was not regenerated: %s", name, exc)
+            failed.append(name)
+        else:
+            regenerated.append(name)
+    return regenerated, failed
+
+
 def _request_restart() -> bool:
     """Ask the centralized mechanism to restart, and say whether it accepted.
 
@@ -325,6 +346,8 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
          'session_files_removed': int,  # files deleted from the session store
          'caches_cleared': [str],       # caches really dropped
          'caches_failed': [str],        # caches that refused to drop
+         'crls_regenerated': [str],     # CAs whose CRL was signed again
+         'crls_failed': [str],          # CAs that could not sign one (HSM absent...)
          'restart_requested': bool}     # the mechanism accepted the request
     """
     revoked = _revoke_database_sessions()
@@ -350,16 +373,24 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
         else:
             summary['caches_cleared'].append(name)
 
+    try:
+        summary['crls_regenerated'], summary['crls_failed'] = _regenerate_crls()
+    except Exception as exc:
+        db.session.rollback()
+        logger.warning("Restore: the CRLs were not regenerated: %s", exc)
+        summary['crls_regenerated'], summary['crls_failed'] = [], []
+
     if request_restart:
         summary['restart_requested'] = _request_restart()
 
     logger.info(
         "Restore: revoked %s sessions and %s SSO sessions, removed %s session "
-        "files and %s database session rows, cleared %s caches (%s failed), restart requested: %s",
+        "files and %s database session rows, cleared %s caches (%s failed), regenerated %s CRLs "
+        "(%s failed), restart requested: %s",
         summary['sessions_revoked'], summary['sso_sessions_revoked'],
         summary['session_files_removed'], summary['flask_sessions_revoked'],
-        len(summary['caches_cleared']),
-        len(summary['caches_failed']), summary['restart_requested'],
+        len(summary['caches_cleared']), len(summary['caches_failed']),
+        len(summary['crls_regenerated']), len(summary['crls_failed']), summary['restart_requested'],
     )
     return summary
 
