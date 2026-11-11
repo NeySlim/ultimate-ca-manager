@@ -669,4 +669,7 @@ class CSRMixin:
                 f'(private key {"kept" if certificate.prv else "absent"})',
                 username=username,
             )
+            # The Smart Import (commit=False) fires it after its own commit
+            from services.webhook_service import emit_cert_imported
+            emit_cert_imported(certificate.to_dict(), ca_refid=certificate.caref, actor=username)
         return certificate

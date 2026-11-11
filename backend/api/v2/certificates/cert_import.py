@@ -336,14 +336,14 @@ def import_certificate():
                 success=True
             )
 
-            # A new serial is a renewal: deploy bindings, webhooks and HTTPS
-            # binding follow; the same serial re-imported stays silent.
+            # A new serial is a renewal (deploy bindings, webhooks and HTTPS binding
+            # follow), a first certificate an import; the same serial stays silent
             cert_dict = existing_cert.to_dict()
-            if serial_changed:
-                from services.webhook_service import emit_cert_renewed
-                user = getattr(g, 'current_user', None)
-                emit_cert_renewed(cert_dict, ca_refid=existing_cert.caref,
-                                  actor=getattr(user, 'username', None))
+            from services.webhook_service import WebhookService, emit_cert_stored
+            user = getattr(g, 'current_user', None)
+            emit_cert_stored(cert_dict, old_serial, cert.serial_number,
+                             first_event=WebhookService.CERT_IMPORTED,
+                             ca_refid=existing_cert.caref, actor=getattr(user, 'username', None))
 
             message = f'Certificate "{existing_cert.descr}" updated (already existed)'
             if key_dropped:
@@ -389,9 +389,13 @@ def import_certificate():
             details=f'Imported certificate: {certificate.descr}',
             success=True
         )
+        cert_dict = certificate.to_dict()
+        from services.webhook_service import emit_cert_imported
+        emit_cert_imported(cert_dict, ca_refid=certificate.caref,
+                           actor=getattr(getattr(g, 'current_user', None), 'username', None))
 
         return created_response(
-            data=certificate.to_dict(),
+            data=cert_dict,
             message=f'Certificate "{certificate.descr}" imported successfully'
         )
 
