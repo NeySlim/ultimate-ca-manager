@@ -73,13 +73,14 @@ REVOKED_THEN_DELETED = ('Certificate {id} was revoked, then deleted: automatic r
 
 
 def _propagate_to_acme_ca(partner, reason):
-    """The related member obtained over ACME is revoked at its CA too; the caller
-    answers for the member it named, so this one's outcome is logged."""
+    """The related member obtained over ACME is revoked at its CA too; ``(outcome, detail)``
+    of :func:`propagate_acme_revocation`, logged when the CA was not told."""
     from services.acme.upstream_revocation import (
         NOT_ACME, REVOKED, local_only_message, propagate_acme_revocation)
     outcome, detail = propagate_acme_revocation(partner, reason)
     if outcome not in (NOT_ACME, REVOKED):
         logger.warning("Related certificate %s: %s", partner.id, local_only_message(outcome, detail))
+    return outcome, detail
 
 
 class LifecycleMixin:
@@ -394,6 +395,7 @@ class LifecycleMixin:
         username: str = 'system',
         invalidity_at=None,
         revoke_related: bool = True,
+        related_acme: Optional[list] = None,
     ) -> Certificate:
         """
         Revoke a certificate, and the other member of its related pair unless
@@ -404,6 +406,8 @@ class LifecycleMixin:
             reason: Revocation reason
             username: User revoking
             invalidity_at: Optional RFC 5280 §5.3.2 invalidityDate (datetime)
+            related_acme: When given, receives ``(partner_id, outcome, detail)`` of the
+                related member's propagation to its ACME CA
 
         Returns:
             Updated certificate
@@ -529,7 +533,9 @@ class LifecycleMixin:
                     logger.error("Certificate %s revoked, its related certificate %s was not",
                                  cert_id, partner_id, exc_info=True)
                 else:
-                    _propagate_to_acme_ca(partner, reason)
+                    outcome, detail = _propagate_to_acme_ca(partner, reason)
+                    if related_acme is not None:
+                        related_acme.append((partner_id, outcome, detail))
         else:
             from services.cert.related_pair import hand_over_link
             try:

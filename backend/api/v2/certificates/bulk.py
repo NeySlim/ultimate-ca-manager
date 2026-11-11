@@ -18,7 +18,7 @@ from services.cert.renewal import (
 )
 from services.msca.propagation import propagate_revocation, PROPAGATED
 from services.acme.upstream_revocation import (
-    NOT_ACME as ACME_NOT_ACME, REVOKED as ACME_REVOKED, propagate_acme_revocation)
+    NOT_ACME as ACME_NOT_ACME, REVOKED as ACME_REVOKED, propagate_acme_revocation, related_untold)
 from services.approval_gate import PairApprovalConflict, queue_revocation
 from services.cert.related_pair import mutual_partner
 from api.v2.certificates.cert_lifecycle import _related_choice_refusal
@@ -105,8 +105,11 @@ def bulk_revoke_certificates():
                 if revoke_related and partner_id:
                     queued_with_pair[partner_id] = results['pending_approval'][-1]
                 continue
+            related_acme = []
             cert = CertificateService.revoke_certificate(
-                cert_id=cert_id, reason=reason, username=username, revoke_related=revoke_related)
+                cert_id=cert_id, reason=reason, username=username, revoke_related=revoke_related,
+                related_acme=related_acme)
+            acme_local_only.extend(pid for pid, _o, _d in related_untold(related_acme))
             if revoke_related and partner_id:
                 left = db.session.get(Certificate, partner_id)
                 if left is None or not revocable(left, reason):

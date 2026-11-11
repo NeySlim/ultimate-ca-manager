@@ -324,3 +324,41 @@ class TestTheRelatedMemberOfAPair:
                 row.related_certificate_id = None
             db.session.commit()
             assert CertificateService.delete_certificate(other['id'], username='admin')
+
+    @pytest.mark.parametrize('route', ['single', 'bulk'])
+    def test_a_partner_the_ca_was_not_told_of_is_said(
+            self, app, auth_client, bench, create_cert, route):  # noqa: F811
+        from models import Certificate
+        from services.cert_service import CertificateService
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        other = create_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        a, b = bench.row(), db.session.get(Certificate, other['id'])
+        a.related_certificate_id, b.related_certificate_id = b.id, a.id
+        db.session.commit()
+        try:
+            if route == 'single':
+                answer = auth_client.post(f"/api/v2/certificates/{other['id']}/revoke",
+                                          data=json.dumps({'reason': 'keyCompromise'}),
+                                          content_type='application/json')
+            else:
+                answer = auth_client.post('/api/v2/certificates/bulk/revoke',
+                                          data=json.dumps({'ids': [other['id']],
+                                                           'reason': 'keyCompromise'}),
+                                          content_type='application/json')
+            assert answer.status_code == 200, answer.data[:300]
+            body = json.loads(answer.data)
+            if route == 'single':
+                assert body['data']['related_revoked'] == bench.cert_id
+                assert body['meta']['acme_local_only'] is True
+                assert body['meta']['related_acme_local_only'] == bench.cert_id
+                assert f'#{bench.cert_id}' in body['message']
+                assert 'sent again automatically' in body['message']
+            else:
+                assert body['data']['acme_local_only'] == [bench.cert_id]
+        finally:
+            db.session.rollback()
+            for row in (db.session.get(Certificate, bench.cert_id),
+                        db.session.get(Certificate, other['id'])):
+                row.related_certificate_id = None
+            db.session.commit()
+            assert CertificateService.delete_certificate(other['id'], username='admin')
