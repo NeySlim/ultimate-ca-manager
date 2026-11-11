@@ -29,6 +29,18 @@ ACCOUNT = 'c1-multiworker'
 _Thread = threading.Thread
 
 
+@pytest.fixture(autouse=True)
+def _drop_orders_created_here(app):
+    """Orders a test creates leave with it: a later proxy lookup would read them."""
+    with app.app_context():
+        floor = db.session.query(db.func.max(AcmeClientOrder.id)).scalar() or 0
+    yield
+    with app.app_context():
+        db.session.rollback()
+        AcmeClientOrder.query.filter(AcmeClientOrder.id > floor).delete(synchronize_session=False)
+        db.session.commit()
+
+
 def _authz(name):
     return _Resp({'status': 'pending', 'identifier': {'type': 'dns', 'value': DOMAIN[name]},
                   'challenges': [{'type': 'dns-01', 'url': CHALL[name], 'status': 'pending',
