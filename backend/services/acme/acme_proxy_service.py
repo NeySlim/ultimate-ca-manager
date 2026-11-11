@@ -5,6 +5,7 @@ Acts as a gateway between internal ACME clients and upstream ACME providers (Let
 import base64
 import contextlib
 import copy
+import hashlib
 import json
 import logging
 import secrets
@@ -17,7 +18,7 @@ from urllib.parse import urlsplit
 import requests
 
 from flask import current_app
-from sqlalchemy import and_, or_, inspect as sa_inspect
+from sqlalchemy import and_, or_, inspect as sa_inspect, text as sa_text
 from sqlalchemy.exc import NoInspectionAvailable, SQLAlchemyError
 from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
@@ -1268,7 +1269,8 @@ class AcmeProxyService:
             return
         raise PermissionError(f"{resource} belongs to another account")
 
-    def _orders_by_authz_url(self, authz_url: str):
+    @classmethod
+    def _orders_by_authz_url(cls, authz_url: str):
         """Every proxy order that recorded this exact upstream authz URL.
 
         The proxy signs upstream with one shared account, so Let's Encrypt
@@ -1286,7 +1288,7 @@ class AcmeProxyService:
                             authz_url, autoescape=True))
                 .order_by(AcmeClientOrder.id.asc())
                 .all())
-        return [row for row in rows if authz_url in self._recorded_authz_urls(row)]
+        return [row for row in rows if authz_url in cls._recorded_authz_urls(row)]
 
     @staticmethod
     def _recorded_authz_urls(order):
@@ -1510,7 +1512,7 @@ class AcmeProxyService:
 
                         # Mark as initiated to avoid redundant threads
                         try:
-                            if self._mark_initiated(order, chall_url):
+                            if self._mark_initiated(order, chall_url, authz_url):
                                 thread.start()
                                 logger.info(f"[ACME Proxy] Triggered auto-DNS for {domain} via authz fetch")
                         except Exception as e:
@@ -1723,7 +1725,7 @@ class AcmeProxyService:
         # sharing this upstream challenge (#307) does not launch a second one.
         # Mirror get_authz: only start the thread once the flag is committed.
         try:
-            if self._mark_initiated(order, chall_url):
+            if self._mark_initiated(order, chall_url, authz_url):
                 thread.start()
         except Exception as exc:
             logger.error(f"Failed to start dns-01 automation: {exc}")
@@ -2025,19 +2027,41 @@ class AcmeProxyService:
             order, chall_url, domain, None if resp is None else UpstreamProblem.from_response(resp),
             linger=records if taken is None and not refused else ())
 
-    @staticmethod
-    def _mark_initiated(order, chall_url):
-        """Flag a challenge's automation as started; False when it already was."""
-        def _flag(row):
-            challenges_data = row.challenges_dict
-            if (challenges_data.get(chall_url) or {}).get('status') in ('initiated', 'submitted'):
-                return False
-            challenges_data[chall_url] = {'status': 'initiated',
-                                          'started_at': datetime.now().isoformat()}
-            row.set_challenges_dict(challenges_data)
-            return True
-
-        return _update_order_row(order, _flag)
+    @classmethod
+    def _mark_initiated(cls, order, chall_url, authz_url=None):
+        """Flag a challenge's automation as started; False when it already was, on this
+        order or on a sibling order sharing the upstream challenge (#307)."""
+        from models import AcmeClientOrder
+        table = AcmeClientOrder.__table__
+        try:
+            db.session.commit()  # no transaction held while waiting for the lock
+            pg = db.engine.dialect.name == 'postgresql'
+            lock = (contextlib.nullcontext() if pg
+                    else _ORDER_ROW_LOCKS[order.id % len(_ORDER_ROW_LOCKS)])
+            with lock:
+                # Held to the commit, before any read: PostgreSQL locks the challenge
+                # for every node, SQLite takes its database write lock
+                if pg:
+                    key = int.from_bytes(hashlib.sha256(chall_url.encode()).digest()[:8],
+                                         'big', signed=True)
+                    db.session.execute(sa_text('SELECT pg_advisory_xact_lock(:k)'), {'k': key})
+                else:
+                    db.session.execute(table.update().where(table.c.id == order.id)
+                                       .values(id=table.c.id))
+                db.session.refresh(order, with_for_update=True)
+                siblings = [o for o in cls._orders_by_authz_url(authz_url) if o.id != order.id]
+                if cls._challenge_automation_started(chall_url, [order] + siblings):
+                    db.session.commit()
+                    return False
+                challenges_data = order.challenges_dict
+                challenges_data[chall_url] = {'status': 'initiated',
+                                              'started_at': datetime.now().isoformat()}
+                order.set_challenges_dict(challenges_data)
+                db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+        return True
 
     @staticmethod
     def _mark_submitted(order, chall_url, records):

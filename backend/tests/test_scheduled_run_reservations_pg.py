@@ -162,3 +162,70 @@ def test_two_backup_runners_write_one_archive_on_postgresql(app, monkeypatch, tm
                                  schedule, 'config_compare_and_set')
     assert len(exported) == 1, results
     assert sorted(r['status'] for r in results) == ['ok', 'skipped']
+
+
+# ------------------------------------------------------------------ ACME proxy
+
+def _sibling_orders(app):
+    """Two local orders sharing one upstream authorization and challenge (#307)."""
+    from tests.test_acme_proxy_resolution import _order
+    authz = f'https://ca-reserve.example/authz/{uuid.uuid4().hex[:8]}'
+    chall = f'{authz}/chall'
+    with app.app_context():
+        ids = [_order(order_url=f'{authz}/order-{n}', upstream_order_url=f'{authz}/order-{n}',
+                      upstream_authz_urls=json.dumps([authz])).id for n in range(2)]
+        db.session.remove()
+    return ids, authz, chall
+
+
+def _drop_orders(app, ids):
+    with app.app_context():
+        AcmeClientOrder.query.filter(AcmeClientOrder.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()
+        db.session.remove()
+
+
+def _mark_both_at_once(app, ids, authz, chall):
+    from services.acme.acme_proxy_service import AcmeProxyService
+    both, results, errors = threading.Barrier(2, timeout=10), [], []
+
+    def mark(order_id):
+        try:
+            with app.app_context():
+                order = db.session.get(AcmeClientOrder, order_id)
+                both.wait()
+                results.append(AcmeProxyService._mark_initiated(order, chall, authz))
+                db.session.remove()
+        except Exception as exc:  # noqa: BLE001
+            errors.append(repr(exc))
+
+    threads = [threading.Thread(target=mark, args=(i,)) for i in ids]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(60)
+    assert errors == []
+    return results
+
+
+def test_a_sibling_order_already_initiated_is_not_initiated_again(app):
+    from services.acme.acme_proxy_service import AcmeProxyService
+    ids, authz, chall = _sibling_orders(app)
+    try:
+        with app.app_context():
+            first, second = (db.session.get(AcmeClientOrder, i) for i in ids)
+            svc = AcmeProxyService('https://ucm.example/acme/proxy')
+            assert svc._mark_initiated(first, chall, authz) is True
+            assert svc._mark_initiated(second, chall, authz) is False
+            db.session.remove()
+    finally:
+        _drop_orders(app, ids)
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_two_nodes_on_sibling_orders_start_one_automation_on_postgresql(app):
+    with _pg(app):
+        ids, authz, chall = _sibling_orders(app)
+        results = _mark_both_at_once(app, ids, authz, chall)
+    assert sorted(results) == [False, True]
