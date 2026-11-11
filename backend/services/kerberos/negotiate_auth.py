@@ -194,7 +194,7 @@ def write_stored_keytab():
     Raises ValueError when the stored keytab cannot be decrypted on this node.
     """
     from services import shared_files
-    data = shared_files.get(shared_files.KERBEROS_KEYTAB)
+    data = shared_files.read_file(shared_files.KERBEROS_KEYTAB)
     if data is None:
         if KEYTAB_PATH.exists():
             KEYTAB_PATH.unlink()
@@ -228,7 +228,7 @@ def restore_keytab_at_start(app):
                 logger.warning("Kerberos keytab found on this node only: upload it again "
                                "to serve it from every node")
                 return
-            shared_files.put(shared_files.KERBEROS_KEYTAB, KEYTAB_PATH.read_bytes(), actor='system')
+            shared_files.store_file(shared_files.KERBEROS_KEYTAB, KEYTAB_PATH.read_bytes(), actor='system')
             db.session.commit()
             logger.info("Kerberos keytab stored in the database")
         except Exception as e:

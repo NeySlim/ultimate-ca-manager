@@ -207,11 +207,11 @@ def regenerate_https_cert():
         try:
             if ha_enabled():
                 import json
-                shared_files.put(shared_files.HTTPS_GENERATED,
+                shared_files.store_file(shared_files.HTTPS_GENERATED,
                                  json.dumps({'crt': cert_pem, 'key': key_pem}).encode('utf-8'),
                                  actor=_actor())
             else:
-                shared_files.drop(shared_files.HTTPS_GENERATED)
+                shared_files.drop_file(shared_files.HTTPS_GENERATED)
             set_bound_refid('')
         except Exception as e:
             db.session.rollback()

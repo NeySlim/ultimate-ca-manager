@@ -6,7 +6,7 @@ KERBEROS_KEYTAB = 'kerberos.keytab'
 HTTPS_GENERATED = 'https.generated'
 
 
-def put(name, data: bytes, actor=None):
+def store_file(name, data: bytes, actor=None):
     """Store ``data`` under ``name`` in the caller's transaction (the caller commits)."""
     from models import SharedFile, db
     from utils.key_codec import store_pem_bytes
@@ -20,7 +20,7 @@ def put(name, data: bytes, actor=None):
     return row
 
 
-def get(name):
+def read_file(name):
     """The stored bytes, or None. Raises ValueError when they cannot be decrypted here."""
     from models import SharedFile, db
     from utils.key_codec import load_pem_bytes
@@ -30,7 +30,7 @@ def get(name):
     return load_pem_bytes(row.content, context=f"shared file {name}")
 
 
-def drop(name):
+def drop_file(name):
     """Remove ``name`` in the caller's transaction; True when a row was there."""
     from models import SharedFile, db
     row = db.session.get(SharedFile, name)

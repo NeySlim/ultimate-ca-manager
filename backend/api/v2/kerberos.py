@@ -146,7 +146,7 @@ def upload_kerberos_keytab():
     # The database holds the keytab every node writes; reload_keytab reaches the others (HA)
     from services import cluster_commands, shared_files
     user = getattr(g, 'current_user', None)
-    shared_files.put(shared_files.KERBEROS_KEYTAB, file_content,
+    shared_files.store_file(shared_files.KERBEROS_KEYTAB, file_content,
                      actor=getattr(user, 'username', None))
     cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
     ok, _err = safe_commit(logger, "Failed to store Kerberos keytab")

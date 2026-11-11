@@ -105,7 +105,7 @@ def set_bound_refid(refid, chain=None):
     _set_config(BOUND_REFID_KEY, refid or '', 'Certificate bound to the HTTPS listener')
     remember_chain(chain if refid else '')
     if refid:
-        shared_files.drop(shared_files.HTTPS_GENERATED)
+        shared_files.drop_file(shared_files.HTTPS_GENERATED)
     # Any rebinding settles a renewal the binding could not follow
     from services.binding_attention import clear_https
     clear_https()

@@ -179,7 +179,7 @@ def https_files(app, monkeypatch, tmp_path):
     from services import shared_files
     from services.https_binding import set_bound_refid
     with app.app_context():
-        shared_files.drop(shared_files.HTTPS_GENERATED)
+        shared_files.drop_file(shared_files.HTTPS_GENERATED)
         set_bound_refid('')
         ClusterCommand.query.delete()
         db.session.commit()
@@ -206,7 +206,7 @@ def test_https_regenerate_in_ha_stores_the_pair_for_every_node(app, auth_client,
     r = auth_client.post('/api/v2/system/https/regenerate', json={'common_name': 'ucm-ha.test'})
     assert r.status_code == 200, r.data
     with app.app_context():
-        pair = json.loads(shared_files.get(shared_files.HTTPS_GENERATED))
+        pair = json.loads(shared_files.read_file(shared_files.HTTPS_GENERATED))
         assert pair == {'crt': (https_files / 'https_cert.pem').read_text(),
                         'key': (https_files / 'https_key.pem').read_text()}
         assert get_bound_refid() == ''

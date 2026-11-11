@@ -53,7 +53,7 @@ def node_b(app, monkeypatch):
         applier.stop()
     with app.app_context():
         ClusterCommand.query.delete()
-        shared_files.drop(shared_files.KERBEROS_KEYTAB)
+        shared_files.drop_file(shared_files.KERBEROS_KEYTAB)
         db.session.commit()
 
 

@@ -28,7 +28,7 @@ def keytab_on(monkeypatch, tmp_path, app):
     yield point
     from models import ClusterCommand, db
     with app.app_context():
-        shared_files.drop(shared_files.KERBEROS_KEYTAB)
+        shared_files.drop_file(shared_files.KERBEROS_KEYTAB)
         ClusterCommand.query.filter_by(kind=cc.RELOAD_KEYTAB).delete()
         db.session.commit()
 
@@ -52,7 +52,7 @@ def test_upload_stores_the_keytab_under_the_master_key(app, auth_client, keytab_
     content = _stored_content(app)
     assert content and encryption_enabled.key_encryption.is_encrypted(content)
     with app.app_context():
-        assert shared_files.get(shared_files.KERBEROS_KEYTAB) == KEYTAB
+        assert shared_files.read_file(shared_files.KERBEROS_KEYTAB) == KEYTAB
 
 
 def test_upload_in_ha_queues_reload_keytab_with_no_payload(app, auth_client, keytab_on, monkeypatch):
@@ -85,13 +85,13 @@ def test_reload_writes_the_stored_keytab_then_removes_it_once_dropped(app, keyta
     from models import db
     path = keytab_on('b')
     with app.app_context():
-        shared_files.put(shared_files.KERBEROS_KEYTAB, KEYTAB)
+        shared_files.store_file(shared_files.KERBEROS_KEYTAB, KEYTAB)
         db.session.commit()
         cc.HANDLERS[cc.RELOAD_KEYTAB](None)
         assert path.read_bytes() == KEYTAB
         assert path.stat().st_mode & 0o777 == 0o600
         assert negotiate_auth.write_stored_keytab() == 'unchanged'
-        shared_files.drop(shared_files.KERBEROS_KEYTAB)
+        shared_files.drop_file(shared_files.KERBEROS_KEYTAB)
         db.session.commit()
         cc.HANDLERS[cc.RELOAD_KEYTAB](None)
     assert not path.exists()
@@ -103,7 +103,7 @@ def test_start_imports_the_file_of_a_single_node_once(app, keytab_on, monkeypatc
     path.write_bytes(KEYTAB)
     negotiate_auth.restore_keytab_at_start(app)
     with app.app_context():
-        assert shared_files.get(shared_files.KERBEROS_KEYTAB) == KEYTAB
+        assert shared_files.read_file(shared_files.KERBEROS_KEYTAB) == KEYTAB
     path.write_bytes(b'changed by hand')
     negotiate_auth.restore_keytab_at_start(app)  # the database wins from now on
     assert path.read_bytes() == KEYTAB
@@ -121,7 +121,7 @@ def test_start_in_ha_never_shares_a_local_file(app, keytab_on, monkeypatch):
 def test_start_writes_the_stored_keytab_on_a_node_without_it(app, keytab_on):
     from models import db
     with app.app_context():
-        shared_files.put(shared_files.KERBEROS_KEYTAB, KEYTAB)
+        shared_files.store_file(shared_files.KERBEROS_KEYTAB, KEYTAB)
         db.session.commit()
     path = keytab_on('new-node')
     negotiate_auth.restore_keytab_at_start(app)
@@ -131,7 +131,7 @@ def test_start_writes_the_stored_keytab_on_a_node_without_it(app, keytab_on):
 def test_start_without_the_master_key_keeps_the_file(app, keytab_on, encryption_enabled, monkeypatch):
     from models import db
     with app.app_context():
-        shared_files.put(shared_files.KERBEROS_KEYTAB, KEYTAB)
+        shared_files.store_file(shared_files.KERBEROS_KEYTAB, KEYTAB)
         db.session.commit()
     path = keytab_on('keyless')
     path.write_bytes(b'previous keytab')
