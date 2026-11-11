@@ -27,7 +27,7 @@ import { useNotification, useMobile } from '../contexts'
 import { usePermission, useWebSocket, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { reportSilentFailure } from '../lib/silentFailure'
-import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
+import { deletedUserWarning, localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import UserSecuritySection from './users/UserSecuritySection'
 export default function UsersGroupsPage() {
   const { t } = useTranslation()
@@ -162,9 +162,9 @@ export default function UsersGroupsPage() {
     if (!confirmed) return
     try {
       muteToasts()
-      // Its enrolled certificates are revoked first: their ACME CA may not have been told
-      const localOnly = localOnlyRevocationWarning(await usersService.delete(user.id), t)
-      if (localOnly) showWarning(localOnly)
+      // Its enrolled certificates are revoked first: one may stay valid, or its ACME CA untold
+      const warning = deletedUserWarning(await usersService.delete(user.id), t)
+      if (warning) showWarning(warning)
       else showSuccess(t('messages.success.delete.user'))
       if (selectedUser?.id === user.id) setSelectedUser(null)
       loadData()

@@ -10,6 +10,13 @@ export function localOnlyRevocationWarning(res, t) {
   return res?.message || t('revocation.revokedLocallyOnly')
 }
 
+// A deleted user's mTLS certificate the CA could not revoke stays valid: the server's
+// message names it, with any CA-not-told note, so it is the one warning to show
+export function deletedUserWarning(res, t) {
+  if (res?.data?.unrevoked_certificates?.length) return res.message
+  return localOnlyRevocationWarning(res, t)
+}
+
 // A bulk revocation lists in `data` the certificates whose issuing CA was not told
 export function bulkLocalOnlyRevocationWarning(data, t, reason) {
   const acme = isHoldReason(reason) ? [] : (data?.acme_local_only || [])
