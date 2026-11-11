@@ -187,3 +187,27 @@ def test_a_reload_at_staging_keeps_the_callers_transaction(app):
         with app.app_context():
             SystemConfig.query.filter_by(key=key).delete()
             db.session.commit()
+
+
+def test_an_entry_staged_after_a_change_saved_elsewhere_reaches_the_new_target(
+        app, collector, stored_syslog, clock, monkeypatch):
+    """The commit hook runs no SQL: the change is picked up when the entry is staged."""
+    from models import AuditLog
+    from services.audit.staging import stage_audit_entry
+    stored_syslog(enabled='false', host='', port='514', protocol='udp')
+    run = uuid.uuid4().hex[:8]
+    with app.app_context():
+        scheduler = _process()
+        scheduler.load_from_db()
+        monkeypatch.setattr(syslog_service, 'syslog_forwarder', scheduler)
+        stored_syslog(enabled='true', host='127.0.0.1', port=str(collector.getsockname()[1]))
+        clock[0] += syslog_service.REFRESH_SECONDS + 1
+        try:
+            assert stage_audit_entry(action=f'xp_{run}', resource_type='system',
+                                     resource_name=run, username='tester') is not None
+            db.session.commit()
+        finally:
+            scheduler._close()
+            AuditLog.query.filter_by(resource_name=run).delete()
+            db.session.commit()
+    assert any(f'xp_{run}' in p for p in _received(collector))
