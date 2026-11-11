@@ -4,7 +4,7 @@ The user routes dropped the enrolment rows with a bare query delete, so the
 X.509 certificate stayed "good" on the CRL and at the responder for every
 other service trusting the same authority. They now go through the same
 withdrawal as removing one enrolment: revoked (cessationOfOperation), then
-deleted; a revocation that fails keeps the user.
+deleted; a certificate that cannot be revoked never blocks the deletion and is named.
 """
 import base64
 import json
@@ -12,7 +12,7 @@ import json
 import pytest
 from cryptography import x509
 
-from models import db, User, Certificate, CA
+from models import db, User, Certificate, CA, AuditLog
 from models.auth_certificate import AuthCertificate
 from models.revoked_serial import RevokedSerial
 from tests.conftest import cert_factory
@@ -115,42 +115,102 @@ class TestDeletingAUserRevokesTheirMtlsCertificate:
         _assert_published_as_revoked(app, probe)
 
 
-class TestAFailedRevocationKeepsTheUser:
-    @staticmethod
-    def _refuse(monkeypatch):
-        from services.cert_service import CertificateService
+def _refuse_revocation(monkeypatch):
+    from services.cert_service import CertificateService
 
-        def _offline(**_kwargs):
-            raise ValueError('CA is offline and cannot sign')
-        monkeypatch.setattr(CertificateService, 'revoke_certificate', _offline)
+    def _offline(**_kwargs):
+        raise ValueError('CA is offline and cannot sign')
+    monkeypatch.setattr(CertificateService, 'revoke_certificate', _offline)
 
-    def test_unit_delete_is_refused(self, app, auth_client, probe, monkeypatch):
-        self._refuse(monkeypatch)
+
+def _last_audit(app, action):
+    with app.app_context():
+        row = AuditLog.query.filter_by(action=action).order_by(AuditLog.id.desc()).first()
+        return row.details if row else ''
+
+
+class TestACertificateThatCannotBeRevokedNeverBlocksTheDeletion:
+    def test_unit_delete_names_it(self, app, auth_client, probe, monkeypatch):
+        _refuse_revocation(monkeypatch)
         answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
-        assert answer.status_code == 409, answer.data[:300]
-        assert b'could not be revoked' in answer.data
+        assert answer.status_code == 200, answer.data[:300]
+        body = json.loads(answer.data)
+        assert 'could not be revoked' in body['message']
+        assert f"#{probe['certificate_id']}" in body['message']
+        assert [c['id'] for c in body['data']['unrevoked_certificates']] == [probe['certificate_id']]
         with app.app_context():
-            assert db.session.get(User, probe['user_id']) is not None
-            assert db.session.get(AuthCertificate, probe['enrolment_id']) is not None
-            assert db.session.get(Certificate, probe['certificate_id']) is not None
+            assert db.session.get(User, probe['user_id']) is None
+            assert db.session.get(AuthCertificate, probe['enrolment_id']) is None
+            kept = db.session.get(Certificate, probe['certificate_id'])
+            assert kept is not None and not kept.revoked
+        assert f"#{probe['certificate_id']}" in _last_audit(app, 'user_delete')
 
-    def test_bulk_lists_the_refused_user_and_deletes_the_others(
+    def test_bulk_names_it_and_deletes_everyone(
             self, app, auth_client, create_user, probe, monkeypatch):
         plain = create_user(username='mtls_del_bulk_plain', role='viewer')
-        self._refuse(monkeypatch)
+        _refuse_revocation(monkeypatch)
         answer = auth_client.post(
             '/api/v2/users/bulk/delete',
             data=json.dumps({'ids': [probe['user_id'], plain['id']]}),
             content_type='application/json')
         assert answer.status_code == 200, answer.data[:300]
-        data = json.loads(answer.data)['data']
-        assert data['success'] == [plain['id']]
-        assert [f['id'] for f in data['failed']] == [probe['user_id']]
-        assert 'could not be revoked' in data['failed'][0]['error']
+        body = json.loads(answer.data)
+        data = body['data']
+        assert sorted(data['success']) == sorted([probe['user_id'], plain['id']])
+        assert data['failed'] == []
+        assert [(w['user_id'], [c['id'] for c in w['certificates']]) for w in data['unrevoked']] == [
+            (probe['user_id'], [probe['certificate_id']])]
+        assert f"#{probe['certificate_id']}" in body['message']
+        with app.app_context():
+            assert db.session.get(User, probe['user_id']) is None
+            assert db.session.get(AuthCertificate, probe['enrolment_id']) is None
+            assert db.session.get(User, plain['id']) is None
+            assert not db.session.get(Certificate, probe['certificate_id']).revoked
+        assert f"#{probe['certificate_id']}" in _last_audit(app, 'users_bulk_deleted')
+
+
+class TestAFailureLeavesAConsistentState:
+    def test_the_user_stays_when_its_own_deletion_fails(self, app, auth_client, probe, monkeypatch):
+        from api.v2.users import crud
+
+        def _broken(_user_id):
+            raise RuntimeError('database went away')
+        monkeypatch.setattr(crud, '_purge_user_dependencies', _broken)
+        answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+        assert answer.status_code == 500, answer.data[:300]
+        with app.app_context():
+            # Access withdrawn and published; the account is still there to delete again
+            assert db.session.get(User, probe['user_id']) is not None
+            assert db.session.get(AuthCertificate, probe['enrolment_id']) is None
+        _assert_published_as_revoked(app, probe)
+
+    def test_bulk_does_not_name_a_user_it_failed_to_delete(
+            self, app, auth_client, create_user, probe, monkeypatch):
+        from api.v2.users import crud
+        plain = create_user(username='mtls_del_bulk_survivor', role='viewer')
+        real_purge = crud._purge_user_dependencies
+
+        def _broken_for_probe(user_id):
+            if user_id == probe['user_id']:
+                raise RuntimeError('database went away')
+            return real_purge(user_id)
+        monkeypatch.setattr(crud, '_purge_user_dependencies', _broken_for_probe)
+        _refuse_revocation(monkeypatch)
+        answer = auth_client.post(
+            '/api/v2/users/bulk/delete',
+            data=json.dumps({'ids': [probe['user_id'], plain['id']]}),
+            content_type='application/json')
+        assert answer.status_code == 200, answer.data[:300]
+        body = json.loads(answer.data)
+        assert body['data']['success'] == [plain['id']]
+        assert [f['id'] for f in body['data']['failed']] == [probe['user_id']]
+        assert body['data']['unrevoked'] == []
+        assert f"#{probe['certificate_id']}" not in body['message']
+        assert f"#{probe['certificate_id']}" not in _last_audit(app, 'users_bulk_deleted')
         with app.app_context():
             assert db.session.get(User, probe['user_id']) is not None
+            # Its enrolment stays with it: the certificate it names is still valid
             assert db.session.get(AuthCertificate, probe['enrolment_id']) is not None
-            assert db.session.get(User, plain['id']) is None
 
 
 class TestAUserWithoutEnrolment:
@@ -210,7 +270,7 @@ class TestAllOrNothingAcrossEnrolments:
         with app.app_context():
             assert db.session.get(User, first['user_id']) is not None
 
-    def test_a_revocation_failing_after_another_names_the_revoked_one(
+    def test_a_revocation_failing_after_another_names_only_the_unrevoked_one(
             self, app, auth_client, two, monkeypatch):
         from services.cert_service import CertificateService
         first, second = two
@@ -222,12 +282,16 @@ class TestAllOrNothingAcrossEnrolments:
             return original(**kwargs)
         monkeypatch.setattr(CertificateService, 'revoke_certificate', _second_fails)
         answer = auth_client.delete(f"/api/v2/users/{first['user_id']}")
-        assert answer.status_code == 409, answer.data[:300]
-        message = json.loads(answer.data)['message']
-        assert f"#{first['certificate_id']}" in message, message
-        assert self._revoked(app, first) and not self._revoked(app, second)
+        assert answer.status_code == 200, answer.data[:300]
+        body = json.loads(answer.data)
+        assert [c['id'] for c in body['data']['unrevoked_certificates']] == [second['certificate_id']]
+        assert f"#{second['certificate_id']}" in body['message']
+        assert not self._revoked(app, second)
         with app.app_context():
-            assert db.session.get(User, first['user_id']) is not None
+            assert db.session.get(User, first['user_id']) is None
+            # The revoked one is withdrawn as usual, the other stays listed
+            assert db.session.get(Certificate, first['certificate_id']) is None
+        _assert_published_as_revoked(app, first)
 
 
 class TestAFailureAfterTheRevocations:
@@ -249,7 +313,8 @@ class TestAFailureAfterTheRevocations:
         assert f"#{probe['certificate_id']}" in message, message
         with app.app_context():
             assert db.session.get(User, probe['user_id']) is not None
-            assert db.session.get(Certificate, probe['certificate_id']).revoked
+            assert db.session.get(AuthCertificate, probe['enrolment_id']) is None
+        _assert_published_as_revoked(app, probe)
 
     def test_bulk_names_the_revoked_certificate(self, app, auth_client, probe, monkeypatch):
         self._purge_fails(monkeypatch)

@@ -318,6 +318,52 @@ class TestDeletingAUser:
         finally:
             _drop_enrolment(enrolment_id)
 
+    @pytest.mark.parametrize('bulk', [False, True])
+    def test_a_certificate_left_valid_is_named_beside_what_the_ca_was_not_told(
+            self, app, auth_client, bench, owner, pair_cert, monkeypatch, bulk):  # noqa: F811
+        from models import Certificate
+        from services.cert_service import CertificateService
+        from tests.test_user_certificate_key_export_guard import _enrolment_for
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        enrolment_id = _enrol(app, bench, owner[1])
+        other_enrolment, _ = _enrolment_for(app, pair_cert, owner[1], f'left-{uuid.uuid4().hex[:6]}')
+        from services.mtls_enrollment import certificate_row_for
+        from models.auth_certificate import AuthCertificate
+        other_id = certificate_row_for(db.session.get(AuthCertificate, other_enrolment)).id
+        original = CertificateService.revoke_certificate
+
+        def _other_fails(**kwargs):
+            if kwargs['cert_id'] == other_id:
+                raise RuntimeError('CA is offline and cannot sign')
+            return original(**kwargs)
+        monkeypatch.setattr(CertificateService, 'revoke_certificate', _other_fails)
+        try:
+            if bulk:
+                answer = auth_client.post('/api/v2/users/bulk/delete',
+                                          data=json.dumps({'ids': [owner[0]['id']]}),
+                                          content_type='application/json')
+            else:
+                answer = auth_client.delete(f"/api/v2/users/{owner[0]['id']}")
+            assert answer.status_code == 200, answer.data[:300]
+            body = json.loads(answer.data)
+            if bulk:
+                assert body['data']['success'] == [owner[0]['id']]
+                assert body['data']['acme_local_only'] == [bench.cert_id]
+                assert [[c['id'] for c in w['certificates']] for w in body['data']['unrevoked']] == [
+                    [other_id]]
+            else:
+                assert body['meta'] == {'acme_local_only': [bench.cert_id],
+                                        'acme_upstream_pending': [bench.cert_id]}
+                assert [c['id'] for c in body['data']['unrevoked_certificates']] == [other_id]
+                assert 'sent again automatically' in body['message']
+            assert f'#{other_id}' in body['message']
+        finally:
+            monkeypatch.undo()
+            _drop_enrolment(enrolment_id)
+            _drop_enrolment(other_enrolment)
+            if db.session.get(Certificate, other_id) is not None:
+                assert CertificateService.delete_certificate(other_id, username='admin')
+
 
 def _es256_revocation(client, key, pem, reason):
     """A revokeCert to UCM's own ACME server, signed by the certificate's key (RFC 8555 §7.6)."""

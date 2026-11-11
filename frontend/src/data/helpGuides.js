@@ -1692,7 +1692,7 @@ Admins can reset any user's password. The user is not asked to change it at the 
 In a user's details, administrators see that user's security keys and can disable or remove one, typically a lost key, which otherwise still signs in without a password. Removing the last second factor of an account that requires one asks for a second confirmation; the user then enrols a factor again at the next login.
 
 ### Deleting a User
-Deleting a user revokes the certificates they enrolled for mTLS (reason cessationOfOperation), then deletes them. A revocation that fails keeps the user. If the deletion fails after some revocations, the message names the certificates already revoked: they stay revoked.
+Deleting a user revokes the certificates they enrolled for mTLS (reason cessationOfOperation), then deletes them. A certificate the CA cannot revoke does not block the deletion: it stays valid, the warning and the audit log name it, and you revoke it under Certificates. If the deletion fails after some revocations, the message names the certificates already revoked: they stay revoked.
 
 ### API Keys
 Each user can have multiple API keys for programmatic access. API keys inherit the user's role permissions. See the Account page for managing your own keys.

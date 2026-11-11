@@ -84,17 +84,19 @@ def test_only_the_related_member_raises_the_local_only_warning():
     assert 'acme_local_only' not in meta and meta['acme_ca_revoked'] is True
 
 
-def test_a_refused_user_deletion_ends_its_message_before_the_acme_note(auth_client, create_user,
-                                                                     monkeypatch):
+def test_a_user_deleted_with_a_certificate_left_valid_ends_its_message_before_the_acme_note(
+        auth_client, create_user, monkeypatch):
     from api.v2.users import crud
     user = create_user()
 
-    def refuse(user_id, actor, upstream=None):
+    def withdraw(user_id, actor, upstream=None):
         upstream.append((5, upstream_revocation.UNRESOLVED, 'no order'))
-        return None, None, ('A certificate could not be revoked', 409)
+        return [5], [{'id': 6, 'serial_number': '0A', 'name': 'left'}], [], None
 
-    monkeypatch.setattr(crud, '_revoke_enrolled_certificates', refuse)
+    monkeypatch.setattr(crud, '_withdraw_enrolled_certificates', withdraw)
     response = auth_client.delete(f"/api/v2/users/{user['id']}")
-    assert response.status_code == 409
-    message = response.get_json()['message']
-    assert message.startswith('User not deleted: A certificate could not be revoked. Certificate #5:')
+    assert response.status_code == 200
+    body = response.get_json()
+    assert body['meta']['acme_local_only'] == [5]
+    assert body['data']['unrevoked_certificates'][0]['id'] == 6
+    assert 'revoke them under Certificates. Certificate #5:' in body['message']

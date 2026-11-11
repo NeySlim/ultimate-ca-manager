@@ -603,6 +603,8 @@ export default function OperationsPage() {
       const localOnly = revokes
         ? bulkLocalOnlyRevocationWarning(data, t, bulkAction === 'revoke' ? bulkRevokeReason : undefined) : null
       if (localOnly) showWarning(localOnly)
+      // Users deleted whose mTLS certificates could not be revoked: those stay valid
+      if (bulkAction === 'delete' && data?.unrevoked?.length > 0 && result?.message) showWarning(result.message)
       if (notRevoked.length > 0) {
         showWarning(t('revocation.bulkRelatedRevokeFailed', { count: notRevoked.length, ids: notRevoked.map(id => `#${id}`).join(', ') }))
       }
