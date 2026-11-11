@@ -220,12 +220,28 @@ class TestSSOProviderValidation:
         assert r.status_code == 400
 
     def test_create_duplicate_type(self, auth_client):
-        """Only one provider per type allowed."""
-        r = _post(auth_client, '/api/v2/sso/providers', {
-            'name': 'Another SAML',
-            'provider_type': 'saml',
-        })
-        assert r.status_code == 400
+        """Only one provider per type allowed: the one it needs is its own, removed afterwards."""
+        listed = get_json(auth_client.get('/api/v2/sso/providers')).get('data', [])
+        own = None
+        if not any(p['provider_type'] == 'saml' for p in listed):
+            r = _post(auth_client, '/api/v2/sso/providers', {
+                'name': 'Duplicate type first', 'provider_type': 'saml', 'enabled': False,
+                'saml_entity_id': 'dup', 'saml_sso_url': 'https://idp.example.com/sso',
+                'saml_certificate': 'dup',
+            })
+            assert r.status_code in (200, 201), r.data
+            own = get_json(r)['data']['id']
+        try:
+            r = _post(auth_client, '/api/v2/sso/providers', {
+                'name': 'Another SAML', 'provider_type': 'saml', 'enabled': False,
+                'saml_entity_id': 'dup2', 'saml_sso_url': 'https://idp.example.com/sso',
+                'saml_certificate': 'dup2',
+            })
+            assert r.status_code == 400, r.data
+            assert 'Only one provider per type' in get_json(r)['message'], r.data
+        finally:
+            if own is not None:
+                assert auth_client.delete(f'/api/v2/sso/providers/{own}').status_code == 200
 
 
 # ============================================================
