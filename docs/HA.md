@@ -50,6 +50,14 @@ The render fails with an explicit message when the database is not PostgreSQL or
 - passes `redis.url` as `REDIS_URL` when set;
 - uses an `emptyDir` data volume per pod, with a warning in the release notes, unless `persistence.data.existingClaim` names a ReadWriteMany claim.
 
+### From a single node
+
+Moving an existing single-node release to `ha.enabled=true` needs three steps, because the data volume is no longer mounted and the key comes from the Secret:
+
+1. Copy the content of `/etc/ucm/master.key` (the `etc` volume) into `secrets.keyEncryptionKey`. A new key cannot decrypt the existing database.
+2. Back up the data volume. The chart keeps the old claim (`helm.sh/resource-policy: keep`) but HA pods no longer mount it, so SoftHSM tokens, an uploaded HTTPS certificate and local backups stay behind in it.
+3. Run `helm upgrade` with `ha.enabled=true`, then check `/health/ready`.
+
 ## Deployment 2: Docker Compose
 
 `docker-compose.ha.yml` at the root of the repository starts PostgreSQL, two nodes and an HAProxy balancer with cookie affinity and a `/health/ready` probe. Create a `.env` file next to it with `POSTGRES_PASSWORD`, `UCM_SECRET_KEY`, `KEY_ENCRYPTION_KEY`, `HA_LB_CERT` (a PEM file with the certificate and key for the balancer) and `UCM_FQDN`, then:

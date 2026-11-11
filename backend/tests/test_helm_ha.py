@@ -107,3 +107,9 @@ def test_secret_with_a_key_is_kept_on_uninstall_pos():
     for args in (HA, ['--set', 'secrets.keyEncryptionKey=K']):
         ann = _docs(*args)['Secret']['metadata'].get('annotations', {})
         assert ann.get('helm.sh/resource-policy') == 'keep'
+
+
+def test_data_pvc_survives_a_switch_to_ha_pos():
+    pvcs = [d for d in yaml.safe_load_all(_helm(*PG).stdout) if d and d['kind'] == 'PersistentVolumeClaim']
+    pvc = next(d for d in pvcs if d['metadata']['name'] == 't-ucm-data')
+    assert pvc['metadata']['annotations']['helm.sh/resource-policy'] == 'keep'
