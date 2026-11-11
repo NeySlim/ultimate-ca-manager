@@ -570,6 +570,15 @@ class AcmeProxyService:
         )
         return False
 
+    @staticmethod
+    def _announce_stored(cert_id: int) -> None:
+        """certificate.issued for a certificate the proxy just stored, after its order's commit."""
+        from models import Certificate
+        row = db.session.get(Certificate, cert_id)
+        if row is not None:
+            from services.webhook_service import emit_cert_issued
+            emit_cert_issued(row.to_dict(), ca_refid=row.caref, actor='acme_proxy')
+
     def _prune_replaced_certificates(self, order, new_certificate_id: int) -> int:
         """Delete proxy-imported certificates superseded by this renewal (#240).
 
@@ -2612,6 +2621,7 @@ class AcmeProxyService:
             response_body = cert_pem
 
             stored_cert = None
+            newly_stored = False
             # Store the certificate in the database
             try:
                 # The response usually contains full chain, extract first cert
@@ -2636,14 +2646,21 @@ class AcmeProxyService:
                         descr,
                     )
 
-                    stored_cert = CertificateService.import_certificate(
-                        descr=descr,
-                        cert_pem=first_cert,
-                        chain_pem=chain,
-                        source='acme_client',
-                        username='acme_proxy'
-                    )
-                    logger.info(f"[ACME Proxy] Certificate stored with ID: {stored_cert.id}")
+                    # A second download of the order's certificate is the same row, not a new one
+                    from services.import_service import stored_certificate_serial
+                    held = db.session.get(Certificate, order.certificate_id) if order.certificate_id else None
+                    if held is not None and stored_certificate_serial(held) == cert_obj.serial_number:
+                        stored_cert = held
+                    else:
+                        stored_cert = CertificateService.import_certificate(
+                            descr=descr,
+                            cert_pem=first_cert,
+                            chain_pem=chain,
+                            source='acme_client',
+                            username='acme_proxy'
+                        )
+                        newly_stored = True
+                        logger.info(f"[ACME Proxy] Certificate stored with ID: {stored_cert.id}")
             except Exception as e:
                 # Log but don't fail - cert was obtained
                 logger.error(f"[ACME Proxy] Error storing certificate: {e}")
@@ -2672,6 +2689,8 @@ class AcmeProxyService:
                     logger.error(f"Failed to update order status: {e}")
                 else:
                     _dns_rows_hook('close_for_order', order.id)
+                    if newly_stored:
+                        self._announce_stored(stored_cert.id)
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Failed during certificate cleanup: {e}")
