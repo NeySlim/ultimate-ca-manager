@@ -21,6 +21,9 @@ negotiable:
   restore into an error: each purge is isolated, a failure is logged, and
   only the caches that were really dropped are reported.
 
+Each publishing CA that can sign gets a fresh CRL (and delta); one that cannot is
+reported, never a failed restore.
+
 The restart is asked for last and only when the caller asks for it, through
 ``utils.service_manager`` -- the one mechanism that works across packagings
 (systemd, DEB/RPM, container) and needs no privilege of its own. A restart
