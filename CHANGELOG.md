@@ -35,7 +35,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - Syslog: a change or a deactivation of the remote syslog target now reaches the scheduled tasks within seconds; their audit entries kept going to the previous target until the service restarted.
-- Backup: a restore now signs a fresh CRL (and delta CRL) for every CA that publishes one and whose key matches its certificate, instead of serving the previous one until its renewal threshold; a CA that cannot sign (HSM missing, mismatched key, failed delta) is named in the restore result. No CRL is signed any more with a key that is not the CA certificate's, whether by the scheduler or a manual regeneration, which now says why.
+- Backup: a restore now signs a fresh CRL (and delta CRL) for every CA that publishes one and whose key matches its certificate, instead of serving the previous one until its renewal threshold. A CA that cannot sign (HSM missing, mismatched key) or whose delta failed is named in the restore result.
+- CRL: no CRL is signed any more with a key that is not the CA certificate's, whether by the scheduler or a manual full or delta regeneration, which answers 409 and says why.
 - Settings: changing the HTTP protocol port now asks for the service restart it needs (a rolling restart in HA), and when `HTTP_PROTOCOL_PORT` in the service environment pins the port, as the DEB and RPM packages do, the field is read-only, shows the port really bound and a save says the stored value is not used.
 - HA preview: two nodes started together on an empty PostgreSQL database could both try to create the session table, and one failed to start; the table is now created under the startup lock.
 - Issuance: a certificate created with `POST /api/v2/certificates` (the certificate form), issued from the form once its approval was granted, or enrolled through SCEP was never counted in its CA's issued certificates; it now is.
