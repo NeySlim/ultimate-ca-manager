@@ -5,21 +5,12 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
 
-from models import CA, Certificate, db
+from tests.deploy_leftovers import delete_leftovers
 from services.events import event_bus
 
 
-@pytest.fixture(autouse=True)
-def _rows_made_here_go(app):
-    with app.app_context():
-        first_cert = db.session.query(db.func.max(Certificate.id)).scalar() or 0
-        first_ca = db.session.query(db.func.max(CA.id)).scalar() or 0
-    yield
-    with app.app_context():
-        db.session.rollback()
-        Certificate.query.filter(Certificate.id > first_cert).delete()
-        CA.query.filter(CA.id > first_ca).delete()
-        db.session.commit()
+# FK-aware purge: crl_metadata and other children go with their CA.
+_cleanup = pytest.fixture(autouse=True)(delete_leftovers)
 
 
 @pytest.fixture
