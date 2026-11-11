@@ -661,7 +661,8 @@ def test_a_protocol_renewal_of_b_naming_a_and_an_in_place_renewal_of_a_do_not_de
 
 
 def test_two_protocol_renewals_of_a_bound_row_move_its_bindings_once(app):
-    """The bindings and the HTTPS binding follow the renewal that won, in its commit."""
+    """The binding follows the renewal that won, in its commit; the HTTPS binding needs a
+    key the protocol renewal leaves with the client, so it stays on the old row."""
     from models import DeployBinding, DeployTarget, SystemConfig
     from services.ca import CAService
     from services.https_binding import BOUND_REFID_KEY
@@ -683,7 +684,7 @@ def test_two_protocol_renewals_of_a_bound_row_move_its_bindings_once(app):
             binding = DeployBinding(target_id=target.id, certificate_id=row.id, cert_path='/srv/c.pem')
             db.session.add_all([binding, SystemConfig(key=BOUND_REFID_KEY, value=row.refid)])
             db.session.commit()
-            cert_id, binding_id = row.id, binding.id
+            cert_id, binding_id, old_refid = row.id, binding.id, row.refid
             db.session.remove()
 
         start, errors, stored = threading.Barrier(2), [], []
@@ -713,7 +714,7 @@ def test_two_protocol_renewals_of_a_bound_row_move_its_bindings_once(app):
             winner = Certificate.query.filter_by(serial_number=stored[0]).one() if stored else None
             bound_to = db.session.get(DeployBinding, binding_id).certificate_id
             https = SystemConfig.query.filter_by(key=BOUND_REFID_KEY).one().value
-            result = (winner.id, winner.refid) if winner else (None, None)
+            result = (winner.id, old_refid) if winner else (None, None)
             db.session.remove()
     assert len(stored) == 1 and len(errors) == 1 and 'AlreadySuperseded' in errors[0], errors
     assert (bound_to, https) == result

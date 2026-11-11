@@ -99,7 +99,8 @@ def create_user_mtls_certificate(user_id):
         existing_cert = find_existing_cert_by_identity(
             Certificate, serial, issuer_dn, pem_text
         )
-        if not existing_cert:
+        created = existing_cert is None
+        if created:
             from utils.cert_issuer import self_signed_first
             from services.mtls_enrollment import issuing_ca_for
             issuer_ca = issuing_ca_for(cert_obj) or next(iter(self_signed_first(
@@ -145,6 +146,10 @@ def create_user_mtls_certificate(user_id):
             details=f'Admin imported mTLS cert for user {target_user.username}',
             success=True,
         )
+        if created:
+            from services.webhook_service import emit_cert_imported
+            emit_cert_imported(existing_cert.to_dict(), ca_refid=existing_cert.caref,
+                               actor=g.current_user.username)
         return created_response(data=auth_cert.to_dict(), message='Certificate imported')
 
     else:

@@ -552,6 +552,8 @@ def import_items():
         "certs_skipped": 0,
         "errors": []
     }
+    # Announced once committed: certificate.imported per row created
+    created_certs = []
     
     try:
         ca_rows = _fetch_rows(session, base_url, api_key, api_secret, 'ca', pin)
@@ -716,6 +718,7 @@ def import_items():
                 )
                 
                 db.session.add(cert)
+                created_certs.append(cert)
                 stats['certs_imported'] += 1
         
         # Commit all changes
@@ -724,6 +727,9 @@ def import_items():
             return _err
         for ca, row in attached_cross:
             cross_certs.announce(ca, 'attached', row, 'import')
+        from services.webhook_service import emit_cert_imported
+        for cert in created_certs:
+            emit_cert_imported(cert.to_dict(), ca_refid=cert.caref, actor=g.current_user.username)
         for ca in keys_stored:
             AuditService.log_action(action='ca_key_imported', resource_type='ca', resource_id=ca.id,
                                     resource_name=ca.descr, details=f'Private key imported for CA: {ca.descr}',

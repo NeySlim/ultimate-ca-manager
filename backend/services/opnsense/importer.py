@@ -132,6 +132,7 @@ class ImportMixin:
         from cryptography import x509
         from cryptography.hazmat.backends import default_backend
 
+        created = []
         stats = {
             'total': len(certs_data),
             'imported': 0,
@@ -214,6 +215,7 @@ class ImportMixin:
 
                 db.session.add(cert)
                 db.session.flush()
+                created.append(cert)
 
                 if cert_data.get('crt'):
                     data_dir = os.path.join(
@@ -250,7 +252,11 @@ class ImportMixin:
         except Exception as e:
             db.session.rollback()
             stats['errors'].append(f"Database commit failed: {e}")
+            return stats
 
+        from services.webhook_service import emit_cert_imported
+        for cert in created:
+            emit_cert_imported(cert.to_dict(), ca_refid=cert.caref)
         return stats
 
     def full_import(self, skip_existing: bool = True) -> Dict:
