@@ -204,7 +204,6 @@ def test_a_successor_closed_by_a_credential_change_is_not_joined(app, cert_user)
     assert r.status_code == 200 and _sid(late) not in (sid, _sid(first))
 
 
-
 def test_a_successor_of_another_account_with_the_same_id_is_not_joined(app, cert_user):
     """An id handed out again names another account: its successor is not taken over."""
     from datetime import timedelta
@@ -217,6 +216,7 @@ def test_a_successor_of_another_account_with_the_same_id_is_not_joined(app, cert
         db.session.commit()
     late, r = _call(app, sid)
     assert r.status_code == 200 and _sid(late) not in (sid, _sid(first))
+
 
 @pytest.fixture
 def expired_cert_session(app, cert_user):
