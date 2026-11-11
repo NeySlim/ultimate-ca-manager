@@ -411,7 +411,8 @@ class AcmeClientOrder(db.Model):
     renewal_claimed_at = db.Column(db.DateTime)
     # JSON list of replaced certificates whose revocation the CA has not confirmed yet
     upstream_revocations = db.Column(db.Text)
-    # JSON list of {certificate_id, serial} a renewal moved off into a new row: still this account's
+    # JSON list of {certificate_id, serial, fingerprint} a renewal moved off into a new row:
+    # still this account's. Matched by serial and SHA-256 fingerprint, the id is informative
     replaced_certificates = db.Column(db.Text)
     # On the order a renewal opens: the order it renews
     renewal_of_order_id = db.Column(
@@ -482,25 +483,40 @@ class AcmeClientOrder(db.Model):
     def upstream_revocations_list(self, entries):
         self.upstream_revocations = json.dumps(entries) if entries else None
 
-    def names_replaced(self, certificate) -> bool:
-        """Whether a renewal of this order moved off ``certificate`` (same id and serial)."""
+    @staticmethod
+    def _fingerprint(certificate) -> str:
+        return (getattr(certificate, 'thumbprint_sha256', '') or '').replace(':', '').lower()
+
+    def _replaced_entries(self) -> list:
         try:
             entries = json.loads(self.replaced_certificates) if self.replaced_certificates else []
         except ValueError:
-            return False
-        return any(isinstance(e, dict) and e.get('certificate_id') == certificate.id
-                   and e.get('serial') == certificate.serial_number
-                   for e in (entries if isinstance(entries, list) else []))
+            return []
+        return [e for e in entries if isinstance(e, dict)] if isinstance(entries, list) else []
+
+    def names_replaced(self, certificate) -> bool:
+        """Whether a renewal of this order moved off ``certificate``.
+
+        Serial and fingerprint survive a restore elsewhere; an entry without a
+        fingerprint (written before 2.253) falls back on the row number.
+        """
+        fingerprint = self._fingerprint(certificate)
+        for entry in self._replaced_entries():
+            if entry.get('serial') != certificate.serial_number:
+                continue
+            if entry.get('fingerprint') and fingerprint:
+                if entry['fingerprint'] == fingerprint:
+                    return True
+            elif entry.get('certificate_id') == certificate.id:
+                return True
+        return False
 
     def add_replaced(self, certificate) -> None:
         if certificate is None or self.names_replaced(certificate):
             return
-        try:
-            entries = json.loads(self.replaced_certificates) if self.replaced_certificates else []
-        except ValueError:
-            entries = []
-        entries = entries if isinstance(entries, list) else []
-        entries.append({'certificate_id': certificate.id, 'serial': certificate.serial_number})
+        entries = self._replaced_entries()
+        entries.append({'certificate_id': certificate.id, 'serial': certificate.serial_number,
+                        'fingerprint': self._fingerprint(certificate) or None})
         self.replaced_certificates = json.dumps(entries)
 
     @property

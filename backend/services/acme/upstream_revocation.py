@@ -43,8 +43,12 @@ def _order_for(cert) -> Optional[AcmeClientOrder]:
              .order_by(AcmeClientOrder.id.desc()).first())
     if order is not None:
         return order
+    if not cert.serial_number:
+        return None
+    # Serial, not row number: a restore on another installation renumbers the row
     candidates = (AcmeClientOrder.query
-                  .filter(AcmeClientOrder.replaced_certificates.like(f'%"certificate_id": {int(cert.id)},%'))
+                  .filter(AcmeClientOrder.replaced_certificates.contains(
+                      cert.serial_number, autoescape=True))
                   .order_by(AcmeClientOrder.id.desc()).all())
     return next((o for o in candidates if o.names_replaced(cert)), None)
 
