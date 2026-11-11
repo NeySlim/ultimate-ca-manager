@@ -533,12 +533,16 @@ def revoke_checked(auth_cert, certificate_id, username: str = 'system', upstream
             cert_id=certificate_id, reason=REMOVAL_REASON, username=username,
             revoke_related=False)
     except Exception as error:
-        logger.error('Enrolment %s: revocation refused: %s', auth_cert.id, error)
         db.session.rollback()
-        # A failure after the commit still left it revoked: the row, read again, says so
-        certificate = db.session.get(Certificate, certificate_id)
-        if certificate is None or not certificate.revoked:
+        # A failure after the commit still left it revoked for removal: the row, read again,
+        # says so; any other revocation (a concurrent hold) is not this one
+        certificate = db.session.get(Certificate, certificate_id, populate_existing=True)
+        if certificate is None or not certificate.revoked \
+                or certificate.revoke_reason != REMOVAL_REASON:
+            logger.error('Enrolment %s: revocation refused: %s', auth_cert.id, error)
             return REVOCATION_FAILED, 409
+        logger.warning('Enrolment %s: revoked, a step after the commit failed: %s',
+                       auth_cert.id, error)
     outcome, detail = propagate_acme_revocation(certificate, REMOVAL_REASON)
     if upstream is not None:
         upstream.append((certificate_id, outcome, detail))
