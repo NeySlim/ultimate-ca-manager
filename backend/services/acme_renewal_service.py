@@ -335,21 +335,28 @@ def update_owed(order_id, change):
     raise RuntimeError(f'Revocations owed for order {order_id} kept changing: not written')
 
 
-def _owe_upstream_revocation(order, entry, error) -> None:
-    """Keep ``entry`` on ``order`` for the next pass, and announce the failure."""
+def _owe_upstream_revocation(order, entry, error) -> bool:
+    """Keep ``entry`` on ``order`` for the next pass, and announce the failure;
+    True once the entry is committed on the order."""
     entry.update(attempts=entry.get('attempts', 0) + 1, error=error,
                  last_attempt_at=utc_now().isoformat())
     order_id = order.id
     try:
-        update_owed(order_id, lambda owed: [e for e in owed if e.get('serial') != entry['serial']] + [entry])
+        kept = update_owed(
+            order_id, lambda owed: [e for e in owed if e.get('serial') != entry['serial']] + [entry])
     except Exception as exc:
         db.session.rollback()
         logger.error("Revocation owed by the CA for order %s not kept: %s", order_id, exc)
-        return
-    if commit_or_rollback(logger, f"Revocation owed by the CA for order {order_id} not kept"):
-        payload = order.to_dict()
-        payload.pop('challenges', None)
-        emit_acme_revocation_failed(payload, entry['serial'], error, entry['attempts'])
+        return False
+    if kept is None:  # the order is gone
+        logger.error("Revocation owed by the CA for order %s not kept: no such order", order_id)
+        return False
+    if not commit_or_rollback(logger, f"Revocation owed by the CA for order {order_id} not kept"):
+        return False
+    payload = order.to_dict()
+    payload.pop('challenges', None)
+    emit_acme_revocation_failed(payload, entry['serial'], error, entry['attempts'])
+    return True
 
 
 def _revocation_due(entry, now) -> bool:

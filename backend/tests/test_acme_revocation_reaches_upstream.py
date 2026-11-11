@@ -307,3 +307,27 @@ class TestWhatLeavesTheServer:
         assert 'secret_column' not in json.dumps(body)
         assert 'Database error' in body['message']
         assert 'secret_column' in caplog.text
+
+
+class TestADebtThatCouldNotBeKept:
+    """'Sent again automatically' only once the debt is on the order; else the CA is unaware."""
+
+    @pytest.mark.parametrize('broken', [
+        {'update_owed': MagicMock(side_effect=RuntimeError('kept changing'))},
+        {'commit_or_rollback': MagicMock(side_effect=lambda *_a: db.session.rollback() or False)},
+    ], ids=['write', 'commit'])
+    def test_a_ca_failure_whose_debt_is_lost(self, auth_client, bench, broken):
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        with patch.multiple('services.acme_renewal_service', **broken):
+            body = _revoke(auth_client, bench, 'keyCompromise')
+        assert body['meta'] == {'acme_local_only': True}
+        assert 'CA not notified' in body['message']
+        assert 'sent again automatically' not in body['message']
+        assert _owed(bench) == []
+
+    def test_an_account_not_resolved_whose_debt_is_lost(self, auth_client, bench):
+        with patch('services.acme.upstream_revocation._client_for', side_effect=OSError('locked')), \
+                patch('services.acme_renewal_service.update_owed', side_effect=RuntimeError('x')):
+            body = _revoke(auth_client, bench, 'keyCompromise')
+        assert body['meta'] == {'acme_local_only': True}
+        assert 'CA not notified' in body['message']

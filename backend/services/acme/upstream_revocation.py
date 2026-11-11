@@ -82,10 +82,11 @@ def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
         db.session.rollback()
         logger.error("Upstream account of certificate %s not resolved: %s", cert.id, exc)
         if order_id is None:
-            return UNRESOLVED, _error_text(exc)
+            return UNRESOLVED, ('the ACME order it was issued under could not be determined: '
+                                f'{_error_text(exc)}')
         # The order is known: owed, so the scheduler sends it once the account resolves
         error = f"upstream account not resolved: {_error_text(exc)}"
-        return OWED, _owe(cert, order_id, reason, error)
+        return _owe(cert, order_id, reason, error)
     if order is None:
         return NO_ORDER, None
     if client is None:
@@ -105,7 +106,7 @@ def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
     if error is None:
         return REVOKED, None
     logger.warning("Upstream revocation of %s failed: %s", label, error)
-    return OWED, _owe(cert, order.id, reason, error)
+    return _owe(cert, order.id, reason, error)
 
 
 def _error_text(exc) -> str:
@@ -121,7 +122,8 @@ def _sent_code(reason):
 
 
 def _owe(cert, order_id, reason, error):
-    """Keep the revocation of ``cert`` owed on the order; returns ``error``."""
+    """``(OWED, error)`` once the revocation of ``cert`` is kept owed on the order;
+    ``(UNRESOLVED, why)`` when it is not, nothing then sending it again."""
     from services.acme_renewal_service import _owe_upstream_revocation
     label = f"certificate {cert.id} (serial {cert.serial_number})"
     not_after = cert.valid_to or utc_now() + timedelta(days=90)
@@ -129,11 +131,14 @@ def _owe(cert, order_id, reason, error):
              'reason': _sent_code(reason), 'not_after': not_after.isoformat()}
     # Compare-and-set inside: safe without the order's lease, which a renewal may hold
     try:
-        _owe_upstream_revocation(db.session.get(AcmeClientOrder, order_id), entry, error)
+        kept = _owe_upstream_revocation(db.session.get(AcmeClientOrder, order_id), entry, error)
     except Exception as exc:
         db.session.rollback()
         logger.error("Revocation owed by the CA for %s not kept: %s", label, exc)
-    return error
+        kept = False
+    if kept:
+        return OWED, error
+    return UNRESOLVED, f'{error}; the retry could not be recorded'
 
 
 def local_only_message(outcome, detail) -> Optional[str]:
@@ -153,9 +158,8 @@ def local_only_message(outcome, detail) -> Optional[str]:
                 'issued under, so it does not know which CA account to revoke it with. '
                 'Revoke it with the CA directly.')
     if outcome == UNRESOLVED:
-        return ('Certificate revoked in UCM only: the ACME order it was issued under could not '
-                f'be determined ({detail}), so the CA was not notified. Revoke it with the CA '
-                'directly.')
+        return (f'Certificate revoked in UCM only, ACME CA not notified ({detail}). '
+                'Revoke it with the CA directly.')
     if outcome == HOLD:
         return ('Certificate put on hold in UCM only: ACME has no hold, so the CA was not '
                 'notified. Revoke it with a final reason to revoke it at the CA.')
