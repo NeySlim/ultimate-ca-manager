@@ -237,13 +237,18 @@ class TestLeftBehindBannerSuperseded:
         from models import Certificate, db
         from services.binding_attention import HTTPS_LEFT_BEHIND_KEY
         from models import SystemConfig
+        from services.cert_service import CertificateService
         succ = create_cert(cn='https-successor.example.com')
         with app.app_context():
             db.session.add(SystemConfig(key=HTTPS_LEFT_BEHIND_KEY, value=succ['refid']))
             db.session.commit()
-            assert _https_attention()['successor_archived'] is False
-            db.session.get(Certificate, succ['id']).archived = True
-            db.session.commit()
-            assert _https_attention()['successor_archived'] is True
-            SystemConfig.query.filter_by(key=HTTPS_LEFT_BEHIND_KEY).delete()
-            db.session.commit()
+            try:
+                assert _https_attention()['successor_archived'] is False
+                db.session.get(Certificate, succ['id']).archived = True
+                db.session.commit()
+                assert _https_attention()['successor_archived'] is True
+            finally:
+                db.session.rollback()
+                SystemConfig.query.filter_by(key=HTTPS_LEFT_BEHIND_KEY).delete()
+                db.session.commit()
+                CertificateService.delete_certificate(succ['id'])

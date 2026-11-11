@@ -99,7 +99,7 @@ function useHelpTranslation(lang, pageKey) {
         sectionCache[cacheKey] = mod.default
         if (live) setTranslation(mod.default)
       })
-      .catch(() => { if (live) setTranslation(null) })
+      .catch(() => {}) // the translation is already null: English stays
     return () => { live = false }
   }, [langKey, pageKey])
 

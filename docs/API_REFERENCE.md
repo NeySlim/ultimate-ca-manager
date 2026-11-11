@@ -922,8 +922,9 @@ private key stays on the previous certificate. Each binding carries `needs_atten
 can_reattach}`. `reattach` (scope `write:deploy`) moves the binding to the renewed certificate, clears the state and
 deploys it; it answers 409 when the renewed certificate was itself superseded, while it has no key and the binding
 sends one, or when the target is already bound to it. A later renewal of the renewed certificate moves the state to
-the newest successor and sends a new `certificate.binding_left_behind` event when that one has no key either; a
-successor that holds a key takes the binding, clears the state and sends no event. Uploading or
+the newest successor and sends a new `certificate.binding_left_behind` event when that one has no key either and the
+binding sends the key; otherwise the state is cleared without an event and the binding moves to the successor, unless
+its target is already bound to it. Uploading or
 importing the renewed certificate's key moves such bindings on its own; deleting the binding or the renewed
 certificate clears the state.
 
@@ -2322,7 +2323,7 @@ Content-Type: application/json
 
 ### HTTPS Certificate
 `cert-info` returns `bound_certificate.needs_attention` (`reason`, `successor_id`, `successor_refid`, `successor_descr`,
-`successor_has_key`) when a renewal left the HTTPS binding on the previous certificate, else `null`; applying a
+`successor_has_key`, `successor_archived`) when a renewal left the HTTPS binding on the previous certificate, else `null`; applying a
 certificate or unbinding clears it, and importing the renewed certificate's key moves the binding to it.
 ```http
 # Get current certificate info
