@@ -181,6 +181,8 @@ def import_certificate():
                     details=f'Updated CA via import: {existing_ca.descr}',
                     success=True
                 )
+                from services.webhook_service import emit_ca_updated
+                emit_ca_updated(existing_ca.to_dict(), actor=username, changes={'certificate': 'imported'})
 
                 message = f'CA certificate "{existing_ca.descr}" updated (already existed)'
                 if key_dropped:
@@ -228,6 +230,8 @@ def import_certificate():
                 details=f'Imported CA (auto-detected): {ca.descr}',
                 success=True
             )
+            from services.webhook_service import emit_ca_created
+            emit_ca_created(ca.to_dict(), actor=username)
 
             message = f'CA certificate "{ca.descr}" imported successfully (detected as CA)'
             if fulfilled:

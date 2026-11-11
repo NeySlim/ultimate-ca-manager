@@ -311,10 +311,13 @@ class SmartImporter:
             for target, row in self._attached_cross:
                 cross_certs.announce(target, 'attached', row, username)
 
-            # Fire certificate.imported for each successfully imported certificate
-            # (CAs live in a separate table and have their own ca.created event)
+            # ca.created for each imported CA, certificate.imported for each certificate
             try:
-                from services.webhook_service import emit_cert_imported
+                from services.webhook_service import emit_ca_created, emit_cert_imported
+                for ca_id in result.imported_ids.get('cas', []):
+                    ca_obj = db.session.get(CA, ca_id)
+                    if ca_obj:
+                        emit_ca_created(ca_obj.to_dict(), actor=username)
                 for cid in result.imported_ids.get('certificates', []):
                     obj = db.session.get(Certificate, cid)
                     if obj:
