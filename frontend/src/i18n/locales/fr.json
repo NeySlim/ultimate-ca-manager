@@ -1906,7 +1906,15 @@
     "httpBinding": "API HTTP : requête construite à partir du modèle de corps de la cible",
     "httpBindingHint": "Cette cible envoie une requête construite à partir de son modèle de corps ; aucun chemin ni commande de rechargement à définir. Les options de chaîne ci-dessous s'appliquent à {{chainVariable}} et {{fullchainVariable}}.",
     "httpBindingKeyHint": "La cible est autorisée à envoyer la clé privée.",
-    "httpHeadersRemoved": "Les en-têtes enregistrés seront supprimés à l'enregistrement."
+    "httpHeadersRemoved": "Les en-têtes enregistrés seront supprimés à l'enregistrement.",
+    "leftBehind": "Ne suit pas le renouvellement",
+    "leftBehindHelp": "Ce certificat a été renouvelé, mais UCM ne détient pas la clé du certificat renouvelé et ce déploiement envoie la clé. Il déploie toujours ce certificat, qui va expirer.",
+    "leftBehindNoKey": "Importez la clé privée du certificat renouvelé, ou cessez d'envoyer la clé (videz le chemin de la clé, ou retirez key_pem du modèle de la cible HTTP), puis rattachez.",
+    "leftBehindTargetTaken": "Cette cible est déjà liée au certificat renouvelé : supprimez ce déploiement.",
+    "openRenewed": "Ouvrir le certificat renouvelé",
+    "reattach": "Rattacher au certificat renouvelé",
+    "reattached": "{{name}} déploie désormais le certificat renouvelé",
+    "reattachFailed": "Impossible de rattacher le déploiement"
   },
   "csrs": {
     "uploadCSR": "Téléverser une CSR",
@@ -2542,7 +2550,8 @@
     "serverError": "Erreur serveur. Veuillez réessayer.",
     "certificatesExpiredAndExpiring": "{{expired}} certificat(s) expiré(s) et {{expiring}} expirant bientôt",
     "certificatesExpired": "{{count}} certificat(s) expiré(s)",
-    "certificatesExpiringSoon": "{{count}} certificat(s) expirant bientôt"
+    "certificatesExpiringSoon": "{{count}} certificat(s) expirant bientôt",
+    "bindingLeftBehind": "Un renouvellement a laissé {{name}} sur le certificat précédent"
   },
   "password": {
     "changeRequired": "Changement de mot de passe requis",
@@ -3539,7 +3548,12 @@
     "backupKdfAuto": "Automatique (Argon2id si disponible, PBKDF2 en mode FIPS)",
     "backupKdfHelper": "Les archives écrites avec Argon2id ne peuvent pas être restaurées sur une instance en mode FIPS.",
     "ocspResponseValidity": "Validité des réponses OCSP (heures)",
-    "ocspResponseValidityDesc": "Durée de validité des réponses OCSP signées (nextUpdate). 1-168 heures, 24 par défaut."
+    "ocspResponseValidityDesc": "Durée de validité des réponses OCSP signées (nextUpdate). 1-168 heures, 24 par défaut.",
+    "httpsLeftBehind": "Le certificat lié a été renouvelé sans sa clé",
+    "httpsLeftBehindNoKey": "UCM ne détient pas la clé privée du certificat renouvelé : HTTPS sert toujours le certificat précédent, qui va expirer. Importez la clé du certificat renouvelé : HTTPS le suivra alors.",
+    "httpsLeftBehindKeyed": "UCM détient désormais la clé du certificat renouvelé : sélectionnez-le ci-dessous et appliquez-le à HTTPS.",
+    "httpsSelectRenewed": "Sélectionner le certificat renouvelé",
+    "httpsOpenRenewed": "Ouvrir le certificat renouvelé"
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",
@@ -4213,7 +4227,8 @@
       "systemUpdateFailed": "Mise à jour échouée",
       "acmePreflight": "Pré-vérification ACME",
       "acmeOrderRenewalFailed": "Échec du renouvellement ACME",
-      "acmeOrderRevocationFailed": "Échec de la révocation ACME"
+      "acmeOrderRevocationFailed": "Échec de la révocation ACME",
+      "certificateBindingLeftBehind": "Liaison restée sur le certificat précédent"
     },
     "title": "Webhooks",
     "subtitle": "Envoyer des notifications HTTP lors d'événements de certificats",
@@ -6061,7 +6076,9 @@
         "system_backup": "Échec de la sauvegarde",
         "system_restore": "Échec de la restauration",
         "session_revoke": "Session révoquée",
-        "session_revoke_all": "Sessions révoquées"
+        "session_revoke_all": "Sessions révoquées",
+        "deploy_binding_left_behind": "Déploiement resté sur l'ancien certificat",
+        "https_binding_left_behind": "HTTPS resté sur l'ancien certificat"
       }
     }
   },
@@ -6108,7 +6125,9 @@
       "client_renewal_overdue": "Renouvellement client en retard",
       "auto_renewal_blocked": "Renouvellement auto bloqué",
       "renewal_declined": "Renouvellement refusé",
-      "ca_expiring": "CA bientôt expirée"
+      "ca_expiring": "CA bientôt expirée",
+      "deploy_binding_left_behind": "Déploiement resté sur l'ancien certificat",
+      "https_binding_left_behind": "HTTPS resté sur l'ancien certificat"
     },
     "compliance": {
       "rsa_below_3072": "RSA sous 3072 bits",

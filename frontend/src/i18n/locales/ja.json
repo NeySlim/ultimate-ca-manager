@@ -2319,7 +2319,15 @@
     "httpBinding": "HTTP API: ターゲットのボディテンプレートから組み立てたリクエスト",
     "httpBindingHint": "このターゲットはボディテンプレートから組み立てた 1 つのリクエストを送信します。パスやリロードコマンドの設定はありません。以下のチェーンオプションは {{chainVariable}} と {{fullchainVariable}} に適用されます。",
     "httpBindingKeyHint": "このターゲットは秘密鍵の送信が許可されています。",
-    "httpHeadersRemoved": "保存時に、保存済みのヘッダーは削除されます。"
+    "httpHeadersRemoved": "保存時に、保存済みのヘッダーは削除されます。",
+    "leftBehind": "更新に追従していません",
+    "leftBehindHelp": "この証明書は更新されましたが、UCM は更新後の証明書の鍵を保持しておらず、このデプロイは鍵を送信します。期限切れになるこの証明書を引き続きデプロイしています。",
+    "leftBehindNoKey": "更新後の証明書の秘密鍵をインポートするか、鍵の送信をやめてから（鍵のパスを空にするか、HTTP ターゲットのテンプレートから key_pem を削除）、再バインドしてください。",
+    "leftBehindTargetTaken": "このターゲットはすでに更新後の証明書にバインドされています。このデプロイを削除してください。",
+    "openRenewed": "更新後の証明書を開く",
+    "reattach": "更新後の証明書に再バインド",
+    "reattached": "{{name}} は更新後の証明書をデプロイするようになりました",
+    "reattachFailed": "デプロイを再バインドできませんでした"
   },
   "crlDeploy": {
     "title": "CRL デプロイ",
@@ -3391,7 +3399,12 @@
     "backupKdfHelper": "Argon2id で書き込まれたアーカイブは、FIPS モードのインスタンスでは復元できません。",
     "ocspResponseValidity": "OCSP応答の有効期間（時間）",
     "ocspResponseValidityDesc": "署名済みOCSP応答の有効期間（nextUpdate）。1〜168時間、既定は24。",
-    "appearance": {}
+    "appearance": {},
+    "httpsLeftBehind": "バインドされた証明書が鍵なしで更新されました",
+    "httpsLeftBehindNoKey": "UCM は更新後の証明書の秘密鍵を保持していないため、HTTPS は期限切れになる以前の証明書を引き続き提供しています。更新後の証明書の鍵をインポートすると、HTTPS はそれに追従します。",
+    "httpsLeftBehindKeyed": "UCM は更新後の証明書の鍵を保持しました。下で選択して HTTPS に適用してください。",
+    "httpsSelectRenewed": "更新後の証明書を選択",
+    "httpsOpenRenewed": "更新後の証明書を開く"
   },
   "account": {
     "profile": "プロフィール",
@@ -3924,7 +3937,8 @@
     "serverError": "サーバーエラー。再試行してください。",
     "certificatesExpiredAndExpiring": "{{expired}} 件の証明書が期限切れ、{{expiring}} 件がまもなく期限切れ",
     "certificatesExpired": "{{count}} 件の証明書が期限切れ",
-    "certificatesExpiringSoon": "{{count}} 件の証明書がまもなく期限切れ"
+    "certificatesExpiringSoon": "{{count}} 件の証明書がまもなく期限切れ",
+    "bindingLeftBehind": "更新により {{name}} が以前の証明書に残りました"
   },
   "help": {
     "aboutCertificates": "証明書について",
@@ -4213,7 +4227,8 @@
       "systemUpdateFailed": "アップデート失敗",
       "acmePreflight": "ACME 事前チェック",
       "acmeOrderRenewalFailed": "ACME 更新失敗",
-      "acmeOrderRevocationFailed": "ACME 失効失敗"
+      "acmeOrderRevocationFailed": "ACME 失効失敗",
+      "certificateBindingLeftBehind": "以前の証明書に残ったバインディング"
     },
     "title": "Webhooks",
     "subtitle": "証明書イベント発生時にHTTP通知を送信",
@@ -6061,7 +6076,9 @@
         "system_backup": "バックアップの失敗",
         "system_restore": "復元の失敗",
         "session_revoke": "セッションの取り消し",
-        "session_revoke_all": "複数セッションの取り消し"
+        "session_revoke_all": "複数セッションの取り消し",
+        "deploy_binding_left_behind": "旧証明書に残ったデプロイ",
+        "https_binding_left_behind": "旧証明書に残った HTTPS"
       }
     }
   },
@@ -6108,7 +6125,9 @@
       "client_renewal_overdue": "クライアント更新の遅延",
       "auto_renewal_blocked": "自動更新のブロック",
       "renewal_declined": "更新の拒否",
-      "ca_expiring": "CAの期限切れ間近"
+      "ca_expiring": "CAの期限切れ間近",
+      "deploy_binding_left_behind": "旧証明書に残ったデプロイ",
+      "https_binding_left_behind": "旧証明書に残った HTTPS"
     },
     "compliance": {
       "rsa_below_3072": "3072ビット未満のRSA",

@@ -320,6 +320,7 @@ Since v2.214, renewal updates the certificate **in place**:
 - \`renewed_at\` / \`renewed_times\` track the renewal history
 - A revoked certificate cannot be renewed (409): issue a new one instead
 - **Renew** asks for the validity of the new certificate in days, prefilled with the current duration; issuance policies and the CA's expiry still cap it
+- **Renewal through EST, SCEP or WSTEP** stores a new certificate: its deployments and the HTTPS binding move to it. A deployment that sends the private key, and the HTTPS binding, stay on the previous certificate when UCM does not hold the new key: the deployment shows **Not following the renewal**, the bell and the overview list it, and the \`certificate.binding_left_behind\` event is sent. **Reattach to the renewed certificate** once UCM holds its key or the deployment stops sending the key; importing the key of the renewed certificate moves them on its own
 
 **Deleting**: a valid, non-revoked certificate cannot be deleted on its own: **Delete** explains why and offers **Revoke, then delete**, so relying parties see the change. Revocations are persisted independently of the certificate record and survive deletion.
 
@@ -2116,6 +2117,7 @@ Manage the TLS certificate used by the UCM web interface:
 - View the current certificate details
 - Import a new certificate (PEM or PKCS#12)
 - Generate a self-signed certificate
+- When the bound certificate is renewed through a protocol without its key reaching UCM, the page says so: HTTPS keeps serving the previous certificate until the key of the renewed one is imported, which applies it
 
 > ⚠ Changing the HTTPS certificate requires a service restart.
 

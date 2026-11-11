@@ -41,6 +41,10 @@ export const deployService = {
   async deployNow(bindingId) {
     return apiClient.post(`/deploy/bindings/${bindingId}/deploy`)
   },
+  // A binding a renewal left on the previous certificate moves onto the renewed one
+  async reattachBinding(bindingId) {
+    return apiClient.post(`/deploy/bindings/${bindingId}/reattach`)
+  },
 
   // CRL bindings
   async getCRLBindings(params = {}) {

@@ -2319,7 +2319,15 @@
     "httpBinding": "HTTP-API: Anfrage aus der Body-Vorlage des Ziels",
     "httpBindingHint": "Dieses Ziel sendet eine Anfrage, die aus seiner Body-Vorlage erzeugt wird; es sind keine Pfade oder Reload-Befehle festzulegen. Die Ketten-Optionen unten gelten für {{chainVariable}} und {{fullchainVariable}}.",
     "httpBindingKeyHint": "Das Ziel darf den privaten Schlüssel senden.",
-    "httpHeadersRemoved": "Die gespeicherten Header werden beim Speichern entfernt."
+    "httpHeadersRemoved": "Die gespeicherten Header werden beim Speichern entfernt.",
+    "leftBehind": "Folgt der Erneuerung nicht",
+    "leftBehindHelp": "Dieses Zertifikat wurde erneuert, aber UCM besitzt den Schlüssel des erneuerten Zertifikats nicht, und diese Bereitstellung sendet den Schlüssel. Sie stellt weiterhin dieses Zertifikat bereit, das ablaufen wird.",
+    "leftBehindNoKey": "Importieren Sie den privaten Schlüssel des erneuerten Zertifikats oder senden Sie den Schlüssel nicht mehr (Schlüsselpfad leeren oder key_pem aus der Vorlage des HTTP-Ziels entfernen) und binden Sie dann neu.",
+    "leftBehindTargetTaken": "Dieses Ziel ist bereits an das erneuerte Zertifikat gebunden: Entfernen Sie diese Bereitstellung.",
+    "openRenewed": "Erneuertes Zertifikat öffnen",
+    "reattach": "An das erneuerte Zertifikat binden",
+    "reattached": "{{name}} stellt jetzt das erneuerte Zertifikat bereit",
+    "reattachFailed": "Die Bereitstellung konnte nicht neu gebunden werden"
   },
   "crlDeploy": {
     "title": "CRL-Bereitstellung",
@@ -3390,7 +3398,12 @@
     "backupKdfAuto": "Automatisch (Argon2id, sofern verfügbar, PBKDF2 im FIPS-Modus)",
     "backupKdfHelper": "Mit Argon2id geschriebene Archive lassen sich auf einer Instanz im FIPS-Modus nicht wiederherstellen.",
     "ocspResponseValidity": "Gültigkeit der OCSP-Antworten (Stunden)",
-    "ocspResponseValidityDesc": "Wie lange signierte OCSP-Antworten gültig bleiben (nextUpdate). 1-168 Stunden, Standard 24."
+    "ocspResponseValidityDesc": "Wie lange signierte OCSP-Antworten gültig bleiben (nextUpdate). 1-168 Stunden, Standard 24.",
+    "httpsLeftBehind": "Das gebundene Zertifikat wurde ohne seinen Schlüssel erneuert",
+    "httpsLeftBehindNoKey": "UCM besitzt den privaten Schlüssel des erneuerten Zertifikats nicht, daher liefert HTTPS weiterhin das vorherige Zertifikat aus, das ablaufen wird. Importieren Sie den Schlüssel des erneuerten Zertifikats: HTTPS folgt ihm dann.",
+    "httpsLeftBehindKeyed": "UCM besitzt jetzt den Schlüssel des erneuerten Zertifikats: Wählen Sie es unten aus und wenden Sie es auf HTTPS an.",
+    "httpsSelectRenewed": "Erneuertes Zertifikat auswählen",
+    "httpsOpenRenewed": "Erneuertes Zertifikat öffnen"
   },
   "account": {
     "profile": "Profil",
@@ -3921,7 +3934,8 @@
     "serverError": "Serverfehler. Bitte versuchen Sie es erneut.",
     "certificatesExpiredAndExpiring": "{{expired}} Zertifikat(e) abgelaufen und {{expiring}} laufen bald ab",
     "certificatesExpired": "{{count}} Zertifikat(e) abgelaufen",
-    "certificatesExpiringSoon": "{{count}} Zertifikat(e) laufen bald ab"
+    "certificatesExpiringSoon": "{{count}} Zertifikat(e) laufen bald ab",
+    "bindingLeftBehind": "Eine Erneuerung hat {{name}} auf dem vorherigen Zertifikat belassen"
   },
   "help": {
     "aboutCertificates": "Über Zertifikate",
@@ -4210,7 +4224,8 @@
       "systemUpdateFailed": "Update fehlgeschlagen",
       "acmePreflight": "ACME-Vorabprüfung",
       "acmeOrderRenewalFailed": "ACME-Erneuerung fehlgeschlagen",
-      "acmeOrderRevocationFailed": "ACME-Widerruf fehlgeschlagen"
+      "acmeOrderRevocationFailed": "ACME-Widerruf fehlgeschlagen",
+      "certificateBindingLeftBehind": "Bindung auf dem vorherigen Zertifikat verblieben"
     },
     "title": "Webhooks",
     "subtitle": "HTTP-Benachrichtigungen bei Zertifikatsereignissen senden",
@@ -6058,7 +6073,9 @@
         "system_backup": "Sicherung fehlgeschlagen",
         "system_restore": "Wiederherstellung fehlgeschlagen",
         "session_revoke": "Sitzung widerrufen",
-        "session_revoke_all": "Sitzungen widerrufen"
+        "session_revoke_all": "Sitzungen widerrufen",
+        "deploy_binding_left_behind": "Bereitstellung auf altem Zertifikat verblieben",
+        "https_binding_left_behind": "HTTPS auf altem Zertifikat verblieben"
       }
     }
   },
@@ -6105,7 +6122,9 @@
       "client_renewal_overdue": "Client-Erneuerung überfällig",
       "auto_renewal_blocked": "Automatische Erneuerung blockiert",
       "renewal_declined": "Erneuerung abgelehnt",
-      "ca_expiring": "CA läuft ab"
+      "ca_expiring": "CA läuft ab",
+      "deploy_binding_left_behind": "Bereitstellung auf altem Zertifikat verblieben",
+      "https_binding_left_behind": "HTTPS auf altem Zertifikat verblieben"
     },
     "compliance": {
       "rsa_below_3072": "RSA unter 3072 Bit",

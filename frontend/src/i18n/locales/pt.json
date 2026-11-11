@@ -2319,7 +2319,15 @@
     "httpBinding": "API HTTP: requisição construída a partir do modelo de corpo do alvo",
     "httpBindingHint": "Este alvo envia uma única requisição construída a partir do seu modelo de corpo; não há caminhos nem comando de recarga a definir. As opções de cadeia abaixo se aplicam a {{chainVariable}} e {{fullchainVariable}}.",
     "httpBindingKeyHint": "O alvo está autorizado a enviar a chave privada.",
-    "httpHeadersRemoved": "Os cabeçalhos armazenados serão removidos ao guardar."
+    "httpHeadersRemoved": "Os cabeçalhos armazenados serão removidos ao guardar.",
+    "leftBehind": "Não segue a renovação",
+    "leftBehindHelp": "Este certificado foi renovado, mas o UCM não tem a chave do certificado renovado e esta implantação envia a chave. Ela continua a implantar este certificado, que vai expirar.",
+    "leftBehindNoKey": "Importe a chave privada do certificado renovado ou deixe de enviar a chave (limpe o caminho da chave ou remova key_pem do modelo do destino HTTP) e depois vincule novamente.",
+    "leftBehindTargetTaken": "Este destino já está vinculado ao certificado renovado: remova esta implantação.",
+    "openRenewed": "Abrir o certificado renovado",
+    "reattach": "Vincular ao certificado renovado",
+    "reattached": "{{name}} agora implanta o certificado renovado",
+    "reattachFailed": "Não foi possível vincular novamente a implantação"
   },
   "crlDeploy": {
     "title": "Implantação de CRL",
@@ -3390,7 +3398,12 @@
     "backupKdfAuto": "Automática (Argon2id quando disponível, PBKDF2 no modo FIPS)",
     "backupKdfHelper": "Os arquivos gravados com Argon2id não podem ser restaurados numa instância em modo FIPS.",
     "ocspResponseValidity": "Validade das respostas OCSP (horas)",
-    "ocspResponseValidityDesc": "Tempo de validade das respostas OCSP assinadas (nextUpdate). 1-168 horas, padrão 24."
+    "ocspResponseValidityDesc": "Tempo de validade das respostas OCSP assinadas (nextUpdate). 1-168 horas, padrão 24.",
+    "httpsLeftBehind": "O certificado vinculado foi renovado sem a sua chave",
+    "httpsLeftBehindNoKey": "O UCM não tem a chave privada do certificado renovado, por isso o HTTPS ainda serve o certificado anterior, que vai expirar. Importe a chave do certificado renovado: o HTTPS passa então a segui-lo.",
+    "httpsLeftBehindKeyed": "O UCM tem agora a chave do certificado renovado: selecione-o abaixo e aplique-o ao HTTPS.",
+    "httpsSelectRenewed": "Selecionar o certificado renovado",
+    "httpsOpenRenewed": "Abrir o certificado renovado"
   },
   "account": {
     "profile": "Perfil",
@@ -3921,7 +3934,8 @@
     "serverError": "Erro do servidor. Tente novamente.",
     "certificatesExpiredAndExpiring": "{{expired}} certificado(s) expirado(s) e {{expiring}} expirando em breve",
     "certificatesExpired": "{{count}} certificado(s) expirado(s)",
-    "certificatesExpiringSoon": "{{count}} certificado(s) expirando em breve"
+    "certificatesExpiringSoon": "{{count}} certificado(s) expirando em breve",
+    "bindingLeftBehind": "Uma renovação deixou {{name}} no certificado anterior"
   },
   "help": {
     "aboutCertificates": "Sobre certificados",
@@ -4210,7 +4224,8 @@
       "systemUpdateFailed": "Atualização falhou",
       "acmePreflight": "Verificação prévia ACME",
       "acmeOrderRenewalFailed": "Renovação ACME falhou",
-      "acmeOrderRevocationFailed": "Revogação ACME falhou"
+      "acmeOrderRevocationFailed": "Revogação ACME falhou",
+      "certificateBindingLeftBehind": "Vínculo deixado no certificado anterior"
     },
     "title": "Webhooks",
     "subtitle": "Enviar notificações HTTP quando ocorrem eventos de certificados",
@@ -6058,7 +6073,9 @@
         "system_backup": "Backup falhado",
         "system_restore": "Restauração falhada",
         "session_revoke": "Sessão revogada",
-        "session_revoke_all": "Sessões revogadas"
+        "session_revoke_all": "Sessões revogadas",
+        "deploy_binding_left_behind": "Implantação deixada no certificado antigo",
+        "https_binding_left_behind": "HTTPS deixado no certificado antigo"
       }
     }
   },
@@ -6105,7 +6122,9 @@
       "client_renewal_overdue": "Renovação do cliente em atraso",
       "auto_renewal_blocked": "Renovação automática bloqueada",
       "renewal_declined": "Renovação recusada",
-      "ca_expiring": "CA prestes a expirar"
+      "ca_expiring": "CA prestes a expirar",
+      "deploy_binding_left_behind": "Implantação deixada no certificado antigo",
+      "https_binding_left_behind": "HTTPS deixado no certificado antigo"
     },
     "compliance": {
       "rsa_below_3072": "RSA abaixo de 3072 bits",

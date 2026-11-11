@@ -2319,7 +2319,15 @@
     "httpBinding": "API HTTP: richiesta costruita dal template del corpo della destinazione",
     "httpBindingHint": "Questa destinazione invia una richiesta costruita dal proprio template del corpo; non ci sono percorsi né comando di ricarica da impostare. Le opzioni della catena qui sotto si applicano a {{chainVariable}} e {{fullchainVariable}}.",
     "httpBindingKeyHint": "La destinazione è autorizzata a inviare la chiave privata.",
-    "httpHeadersRemoved": "Le intestazioni salvate verranno rimosse al salvataggio."
+    "httpHeadersRemoved": "Le intestazioni salvate verranno rimosse al salvataggio.",
+    "leftBehind": "Non segue il rinnovo",
+    "leftBehindHelp": "Questo certificato è stato rinnovato, ma UCM non possiede la chiave del certificato rinnovato e questa distribuzione invia la chiave. Continua a distribuire questo certificato, che scadrà.",
+    "leftBehindNoKey": "Importa la chiave privata del certificato rinnovato oppure smetti di inviare la chiave (svuota il percorso della chiave o rimuovi key_pem dal modello della destinazione HTTP), poi riassocia.",
+    "leftBehindTargetTaken": "Questa destinazione è già associata al certificato rinnovato: rimuovi questa distribuzione.",
+    "openRenewed": "Apri il certificato rinnovato",
+    "reattach": "Associa al certificato rinnovato",
+    "reattached": "{{name}} ora distribuisce il certificato rinnovato",
+    "reattachFailed": "Impossibile riassociare la distribuzione"
   },
   "crlDeploy": {
     "title": "Distribuzione CRL",
@@ -3390,7 +3398,12 @@
     "backupKdfAuto": "Automatica (Argon2id se disponibile, PBKDF2 in modalità FIPS)",
     "backupKdfHelper": "Gli archivi scritti con Argon2id non possono essere ripristinati su un'istanza in modalità FIPS.",
     "ocspResponseValidity": "Validità delle risposte OCSP (ore)",
-    "ocspResponseValidityDesc": "Durata di validità delle risposte OCSP firmate (nextUpdate). 1-168 ore, predefinito 24."
+    "ocspResponseValidityDesc": "Durata di validità delle risposte OCSP firmate (nextUpdate). 1-168 ore, predefinito 24.",
+    "httpsLeftBehind": "Il certificato associato è stato rinnovato senza la sua chiave",
+    "httpsLeftBehindNoKey": "UCM non possiede la chiave privata del certificato rinnovato, quindi HTTPS serve ancora il certificato precedente, che scadrà. Importa la chiave del certificato rinnovato: HTTPS lo seguirà.",
+    "httpsLeftBehindKeyed": "UCM ora possiede la chiave del certificato rinnovato: selezionalo qui sotto e applicalo a HTTPS.",
+    "httpsSelectRenewed": "Seleziona il certificato rinnovato",
+    "httpsOpenRenewed": "Apri il certificato rinnovato"
   },
   "account": {
     "profile": "Profilo",
@@ -3921,7 +3934,8 @@
     "serverError": "Errore del server. Riprova.",
     "certificatesExpiredAndExpiring": "{{expired}} certificato/i scaduto/i e {{expiring}} in scadenza",
     "certificatesExpired": "{{count}} certificato/i scaduto/i",
-    "certificatesExpiringSoon": "{{count}} certificato/i in scadenza"
+    "certificatesExpiringSoon": "{{count}} certificato/i in scadenza",
+    "bindingLeftBehind": "Un rinnovo ha lasciato {{name}} sul certificato precedente"
   },
   "help": {
     "aboutCertificates": "Informazioni sui certificati",
@@ -4210,7 +4224,8 @@
       "systemUpdateFailed": "Aggiornamento non riuscito",
       "acmePreflight": "Verifica preliminare ACME",
       "acmeOrderRenewalFailed": "Rinnovo ACME non riuscito",
-      "acmeOrderRevocationFailed": "Revoca ACME non riuscita"
+      "acmeOrderRevocationFailed": "Revoca ACME non riuscita",
+      "certificateBindingLeftBehind": "Associazione rimasta sul certificato precedente"
     },
     "title": "Webhook",
     "subtitle": "Invia notifiche HTTP quando si verificano eventi certificato",
@@ -6058,7 +6073,9 @@
         "system_backup": "Backup non riuscito",
         "system_restore": "Ripristino non riuscito",
         "session_revoke": "Sessione revocata",
-        "session_revoke_all": "Sessioni revocate"
+        "session_revoke_all": "Sessioni revocate",
+        "deploy_binding_left_behind": "Distribuzione rimasta sul vecchio certificato",
+        "https_binding_left_behind": "HTTPS rimasto sul vecchio certificato"
       }
     }
   },
@@ -6105,7 +6122,9 @@
       "client_renewal_overdue": "Rinnovo del client in ritardo",
       "auto_renewal_blocked": "Rinnovo automatico bloccato",
       "renewal_declined": "Rinnovo rifiutato",
-      "ca_expiring": "CA in scadenza"
+      "ca_expiring": "CA in scadenza",
+      "deploy_binding_left_behind": "Distribuzione rimasta sul vecchio certificato",
+      "https_binding_left_behind": "HTTPS rimasto sul vecchio certificato"
     },
     "compliance": {
       "rsa_below_3072": "RSA sotto i 3072 bit",

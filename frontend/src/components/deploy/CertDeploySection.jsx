@@ -8,7 +8,7 @@
  */
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CloudArrowUp, Plus, Trash, ArrowsClockwise, PencilSimple } from '@phosphor-icons/react'
+import { CloudArrowUp, Plus, Trash, ArrowsClockwise, PencilSimple, Warning, LinkSimple } from '@phosphor-icons/react'
 import { Badge } from '../Badge'
 import { Button } from '../Button'
 import { CompactSection } from '../DetailCard'
@@ -33,6 +33,7 @@ export function CertDeploySection({ certificate }) {
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
   const [deploying, setDeploying] = useState(null)
+  const [reattaching, setReattaching] = useState(null)
   const [chainVariants, setChainVariants] = useState([])
   const [form, setForm] = useState({
     target_id: '', cert_path: '', key_path: '', fullchain_path: '', include_root: false,
@@ -144,6 +145,19 @@ export function CertDeploySection({ certificate }) {
     }
   }
 
+  const handleReattach = async (binding) => {
+    setReattaching(binding.id)
+    try {
+      await deployService.reattachBinding(binding.id)
+      showSuccess(t('deploy.reattached', { name: binding.target_name }))
+    } catch (err) {
+      showError(err?.message || t('deploy.reattachFailed'))
+    } finally {
+      setReattaching(null)
+      await load()
+    }
+  }
+
   const handleDetach = async (binding) => {
     const confirmed = await showConfirm(t('deploy.detachConfirm', { name: binding.target_name }), {
       title: t('deploy.detachTarget'), variant: 'danger', confirmText: t('common.delete'),
@@ -158,6 +172,8 @@ export function CertDeploySection({ certificate }) {
   }
 
   const field = (key) => (e) => setForm({ ...form, [key]: e.target.value })
+  // The work queue links to a binding with ?binding=<id>; that row is outlined
+  const focusId = Number(new URLSearchParams(window.location.search).get('binding')) || null
   const canWriteDeploy = hasPermission('write:deploy')
   const certificateName = certificate.cn || certificate.common_name || certificate.descr ||
     certificate.name || `${t('common.certificate')} #${certificate.id}`
@@ -170,7 +186,10 @@ export function CertDeploySection({ certificate }) {
             <p className="text-2xs text-text-secondary">{t('deploy.noBindings')}</p>
           )}
           {bindings.map(binding => (
-            <div key={binding.id} className="p-2.5 bg-tertiary-50 border border-border rounded-lg space-y-1">
+            <div key={binding.id} data-binding-id={binding.id}
+                 ref={binding.id === focusId ? (el) => el?.scrollIntoView?.({ block: 'nearest' }) : undefined}
+                 className={`p-2.5 bg-tertiary-50 border rounded-lg space-y-1 ${
+                   binding.id === focusId ? 'border-accent-primary' : 'border-border'}`}>
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
                   <span className="text-xs font-medium text-text-primary truncate">{binding.target_name}</span>
@@ -184,6 +203,9 @@ export function CertDeploySection({ certificate }) {
                     <Badge variant="secondary" size="sm" data-testid="binding-variant">
                       {variantLabel(chainVariants.find(v => v.id === binding.chain_variant) || { id: binding.chain_variant, ca_name: '' }, t)}
                     </Badge>
+                  )}
+                  {binding.needs_attention && (
+                    <Badge variant="danger" size="sm">{t('deploy.leftBehind')}</Badge>
                   )}
                   {binding.last_delivery && (
                     <Badge variant={STATUS_VARIANT[binding.last_delivery.status] || 'secondary'} size="sm"
@@ -221,6 +243,36 @@ export function CertDeploySection({ certificate }) {
                    title={binding.reload_command}>
                   {t('deploy.reloadCommand')}: {binding.reload_command}
                 </p>
+              )}
+              {binding.needs_attention && (
+                <div className="flex items-start gap-1.5 p-2 rounded-md status-danger-bg" data-testid="binding-left-behind">
+                  <Warning size={14} className="status-danger-text shrink-0 mt-0.5" aria-hidden="true" />
+                  <div className="space-y-1 min-w-0">
+                    <p className="text-2xs text-text-primary">{t('deploy.leftBehindHelp')}</p>
+                    {!binding.needs_attention.can_reattach && (
+                      <p className="text-2xs text-text-secondary">
+                        {binding.needs_attention.successor_has_key
+                          ? t('deploy.leftBehindTargetTaken')
+                          : t('deploy.leftBehindNoKey')}
+                      </p>
+                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      {binding.needs_attention.successor_id && (
+                        <a className="text-2xs underline text-accent-primary"
+                           href={`/certificates/${binding.needs_attention.successor_id}`}>
+                          {t('deploy.openRenewed')}
+                        </a>
+                      )}
+                      {canWriteDeploy && binding.needs_attention.can_reattach && (
+                        <Button type="button" size="xs" variant="primary"
+                                onClick={() => handleReattach(binding)}
+                                loading={reattaching === binding.id}>
+                          <LinkSimple size={12} /> {t('deploy.reattach')}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
               {binding.last_delivery?.delivered_at && (
                 <p className="text-2xs text-text-tertiary">

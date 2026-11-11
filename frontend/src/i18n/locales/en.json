@@ -2319,7 +2319,15 @@
     "httpBinding": "HTTP API: request built from the target's body template",
     "httpBindingHint": "This target sends one request built from its body template; there are no paths or reload command to set. The chain options below apply to {{chainVariable}} and {{fullchainVariable}}.",
     "httpBindingKeyHint": "The target is allowed to send the private key.",
-    "httpHeadersRemoved": "The stored headers will be removed when you save."
+    "httpHeadersRemoved": "The stored headers will be removed when you save.",
+    "leftBehind": "Not following the renewal",
+    "leftBehindHelp": "This certificate was renewed, but UCM does not hold the renewed certificate's key and this deployment sends the key. It still deploys this certificate, which will expire.",
+    "leftBehindNoKey": "Import the renewed certificate's private key, or stop sending the key (clear the key path, or remove key_pem from the HTTP target template), then reattach.",
+    "leftBehindTargetTaken": "This target is already bound to the renewed certificate: remove this deployment.",
+    "openRenewed": "Open the renewed certificate",
+    "reattach": "Reattach to the renewed certificate",
+    "reattached": "{{name}} now deploys the renewed certificate",
+    "reattachFailed": "Could not reattach the deployment"
   },
   "crlDeploy": {
     "title": "CRL Deployment",
@@ -3391,7 +3399,12 @@
     "backupKdfAuto": "Automatic (Argon2id when available, PBKDF2 in FIPS mode)",
     "backupKdfHelper": "Archives written with Argon2id cannot be restored on an instance in FIPS mode.",
     "ocspResponseValidity": "OCSP response validity (hours)",
-    "ocspResponseValidityDesc": "How long signed OCSP responses stay valid (nextUpdate). 1-168 hours, default 24."
+    "ocspResponseValidityDesc": "How long signed OCSP responses stay valid (nextUpdate). 1-168 hours, default 24.",
+    "httpsLeftBehind": "The bound certificate was renewed without its key",
+    "httpsLeftBehindNoKey": "UCM does not hold the renewed certificate's private key, so HTTPS still serves the previous certificate, which will expire. Import the key of the renewed certificate: HTTPS then follows it.",
+    "httpsLeftBehindKeyed": "UCM now holds the renewed certificate's key: select it below and apply it to HTTPS.",
+    "httpsSelectRenewed": "Select the renewed certificate",
+    "httpsOpenRenewed": "Open the renewed certificate"
   },
   "account": {
     "profile": "Profile",
@@ -3924,7 +3937,8 @@
     "serverError": "Server error. Please try again.",
     "certificatesExpiredAndExpiring": "{{expired}} certificate(s) expired and {{expiring}} expiring soon",
     "certificatesExpired": "{{count}} certificate(s) expired",
-    "certificatesExpiringSoon": "{{count}} certificate(s) expiring soon"
+    "certificatesExpiringSoon": "{{count}} certificate(s) expiring soon",
+    "bindingLeftBehind": "A renewal left {{name}} on the previous certificate"
   },
   "help": {
     "aboutCertificates": "About Certificates",
@@ -4213,7 +4227,8 @@
       "systemUpdateFailed": "Update Failed",
       "acmePreflight": "ACME Preflight",
       "acmeOrderRenewalFailed": "ACME Renewal Failed",
-      "acmeOrderRevocationFailed": "ACME Revocation Failed"
+      "acmeOrderRevocationFailed": "ACME Revocation Failed",
+      "certificateBindingLeftBehind": "Binding left on the previous certificate"
     },
     "title": "Webhooks",
     "subtitle": "Send HTTP notifications when certificate events occur",
@@ -6061,7 +6076,9 @@
         "system_backup": "Backup failed",
         "system_restore": "Restore failed",
         "session_revoke": "Session revoked",
-        "session_revoke_all": "Sessions revoked"
+        "session_revoke_all": "Sessions revoked",
+        "deploy_binding_left_behind": "Deployment left on the old certificate",
+        "https_binding_left_behind": "HTTPS left on the old certificate"
       }
     }
   },
@@ -6108,7 +6125,9 @@
       "client_renewal_overdue": "Client renewal overdue",
       "auto_renewal_blocked": "Auto-renewal blocked",
       "renewal_declined": "Renewal declined",
-      "ca_expiring": "CA expiring"
+      "ca_expiring": "CA expiring",
+      "deploy_binding_left_behind": "Deployment left on the old certificate",
+      "https_binding_left_behind": "HTTPS left on the old certificate"
     },
     "compliance": {
       "rsa_below_3072": "RSA below 3072 bits",
