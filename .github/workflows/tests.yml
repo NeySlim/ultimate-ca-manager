@@ -463,6 +463,46 @@ jobs:
           cd backend
           pytest --tb=short -m ha tests/ha
 
+  # The pytest tests that call `helm template` are skipped without helm: they run here.
+  test-helm:
+    name: Helm chart
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Helm
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4.3.0
+        with:
+          version: v3.16.3
+
+      - name: Lint and render the chart
+        run: |
+          helm lint charts/ucm
+          helm template t charts/ucm > /dev/null
+          HA="--set ha.enabled=true --set replicaCount=2 --set database.type=postgresql --set database.databaseUrl=postgresql://u:p@db/ucm"
+          helm lint charts/ucm $HA
+          helm template t charts/ucm $HA > /dev/null
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+
+      - name: Run the chart tests
+        run: |
+          cd backend
+          pytest --tb=short -rs tests/test_helm_ha.py tests/test_helm_security_context.py tests/test_helm_initial_admin_password.py tests/test_no_jwt_secret_generated.py tests/test_health_ha.py tests/test_compose_ha.py tests/test_entrypoint_ha_database.py
+
   test-frontend:
     name: Frontend Tests
     runs-on: ubuntu-latest
