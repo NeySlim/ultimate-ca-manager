@@ -11,6 +11,7 @@ import base64
 import html
 from models import db, Certificate, CA, User, AuditLog, SystemConfig
 from services.email_service import EmailService
+from utils.config_cas import config_compare_and_set
 import logging
 from utils.datetime_utils import utc_now, utc_isoformat
 from utils.days_remaining import days_remaining as compute_days_remaining
@@ -559,7 +560,15 @@ def run_scheduled_reports():
         if freq == 'monthly' and current_dom != sched.get('day_of_month', 1):
             continue
         
-        # Time matches — send the report
+        # One send per report and slot, whichever node runs the tick: the marker
+        # moves from its previous value to this slot by compare-and-set
+        marker = f'report_last_sent_{report_key}'
+        slot = f"{now.strftime('%Y-%m-%d')}T{sched_time}"
+        previous = SystemConfig.query.filter_by(key=marker).with_entities(SystemConfig.value).scalar()
+        if previous == slot or not config_compare_and_set(marker, previous, slot):
+            logger.info(f"Scheduled report {report_key} for {slot} already sent")
+            continue
+
         logger.info(f"Running scheduled report: {report_key} ({freq} at {sched_time})")
         try:
             send_report(report_key, recipients, sched.get('format', 'csv'))

@@ -22,6 +22,7 @@ tests/test_protocol_approval_*.py
 tests/test_approval_legacy_hex_serial.py
 tests/test_serial*.py
 tests/test_scheduled_claims_pg.py
+tests/test_scheduled_run_reservations_pg.py
 tests/test_renewal_concurrency_pg.py
 tests/test_renewal_bindings_follow.py
 tests/test_import_ca_serial_unique.py
