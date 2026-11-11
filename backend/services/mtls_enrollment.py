@@ -524,7 +524,7 @@ def revoke_checked(auth_cert, certificate_id, username: str = 'system', upstream
     Obtained over ACME, it is revoked at its CA too: ``(certificate_id, outcome, detail)``
     of :func:`propagate_acme_revocation` is appended to ``upstream`` when given.
     """
-    from models import db
+    from models import Certificate, db
     from services.acme.upstream_revocation import propagate_acme_revocation
     from services.cert_service import CertificateService
     try:
@@ -535,7 +535,10 @@ def revoke_checked(auth_cert, certificate_id, username: str = 'system', upstream
     except Exception as error:
         logger.error('Enrolment %s: revocation refused: %s', auth_cert.id, error)
         db.session.rollback()
-        return REVOCATION_FAILED, 409
+        # A failure after the commit still left it revoked: the row, read again, says so
+        certificate = db.session.get(Certificate, certificate_id)
+        if certificate is None or not certificate.revoked:
+            return REVOCATION_FAILED, 409
     outcome, detail = propagate_acme_revocation(certificate, REMOVAL_REASON)
     if upstream is not None:
         upstream.append((certificate_id, outcome, detail))

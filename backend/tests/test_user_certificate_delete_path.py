@@ -152,3 +152,37 @@ class TestTheCertificateIsRevokedOnTheWayOut:
         assert b'not deleted' in answer.data
         with app.app_context():
             assert db.session.get(AuthCertificate, an_enrolment) is not None
+
+
+class TestARevocationFailingAfterItsCommitOnASingleRemoval:
+    def test_the_enrolment_is_removed_and_the_ca_told(
+            self, app, an_operator, an_enrolment, monkeypatch):
+        from models.auth_certificate import AuthCertificate
+        from services.acme import upstream_revocation
+        from services.ocsp_service import OCSPService
+
+        certificate_id = _certificate_id_of(app, an_enrolment)
+        real = OCSPService.responder_cas_for_certificate
+        calls = []
+
+        def _broken_once(cert_id):
+            if not calls:
+                calls.append(cert_id)
+                raise RuntimeError('responder lookup failed')
+            return real(cert_id)
+        monkeypatch.setattr(OCSPService, 'responder_cas_for_certificate',
+                            staticmethod(_broken_once))
+        told = []
+        real_told = upstream_revocation.propagate_acme_revocation
+
+        def spy(certificate, reason):
+            told.append(certificate.id)
+            return real_told(certificate, reason)
+        monkeypatch.setattr(upstream_revocation, 'propagate_acme_revocation', spy)
+
+        answer = an_operator.delete(f'/api/v2/user-certificates/{an_enrolment}')
+        assert answer.status_code in (200, 204), answer.data[:300]
+        assert b'not deleted' not in answer.data
+        assert told == [certificate_id]
+        with app.app_context():
+            assert db.session.get(AuthCertificate, an_enrolment) is None
