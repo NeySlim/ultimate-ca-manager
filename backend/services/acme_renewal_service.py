@@ -16,7 +16,7 @@ from models import CA, Certificate, DnsProvider, RevokedSerial, SystemConfig, db
 from models.acme_models import AcmeClientOrder
 from models.compromised_key import remember_if_compromised
 from services.acme import dns_providers
-from services.acme.acme_client_service import ACCOUNT_GONE, AcmeClientService
+from services.acme.acme_client_service import AcmeClientService
 from services.acme.compromised_keys import refuse_compromised_csr
 from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challenges
 from services.acme.http01 import wait_for_http01
@@ -86,7 +86,7 @@ def renewal_client(order):
     none (older than per-order accounts) still resolves by environment."""
     client = AcmeClientService.for_existing_order(order)
     if client is None:
-        raise RenewalBlocked(ACCOUNT_GONE)
+        raise RenewalBlocked(AcmeClientService.missing_account_message(order))
     return client
 
 
@@ -359,7 +359,7 @@ def _retry_order_revocations(order, now) -> int:
     for entry in due:
         label = f"certificate serial {entry['serial']}"
         if client is None:
-            error = ACCOUNT_GONE
+            error = AcmeClientService.missing_account_message(order)
         else:
             try:
                 error = send_upstream_revocation(client, entry['certificate'], entry.get('reason'), label)

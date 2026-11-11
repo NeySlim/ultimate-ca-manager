@@ -68,6 +68,11 @@ ACCOUNT_GONE = ('The ACME CA account this order was issued under no longer exist
                 'account could be at another CA. Request a new certificate for these names '
                 'with the account to use, then delete this order.')
 
+# A proxy order recorded before upstream accounts were: its proxy client placed it
+PROXY_ACCOUNT_UNKNOWN = ('This order went through the ACME proxy before UCM recorded the upstream '
+                         'account of its orders, so UCM cannot act for it at the CA. The proxy '
+                         'client that placed it renews or revokes it.')
+
 CERT_KEY_TYPES = {
     'RSA-2048': lambda: key_algorithms.generate('RSA-2048'),
     'RSA-4096': lambda: key_algorithms.generate('RSA-4096'),
@@ -389,6 +394,13 @@ class AcmeClientService:
         if named and cls.order_account(order) is None:
             return None
         return cls.for_order(order)
+
+    @staticmethod
+    def missing_account_message(order: 'AcmeClientOrder') -> str:
+        """Why :meth:`for_existing_order` gave None: an account never recorded, or one deleted."""
+        if order.is_proxy_order and not (order.acme_client_account_id or order.account_url):
+            return PROXY_ACCOUNT_UNKNOWN
+        return ACCOUNT_GONE
 
     def _sync_legacy_eab_to_account(self) -> bool:
         """Copy legacy EAB keys (``acme.client.eab_*``) onto the account row.

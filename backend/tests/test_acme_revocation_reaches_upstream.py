@@ -121,6 +121,8 @@ class TestTheSingleRoute:
         db.session.commit()
         body = _revoke(auth_client, bench, 'keyCompromise')
         assert body['meta']['acme_local_only'] is True
+        assert 'no longer exists' not in body['message']
+        assert 'proxy client' in body['message']
         bench.client.revoke_certificate.assert_not_called()
 
     def test_a_proxy_order_under_an_upstream_account_is_revoked_there(

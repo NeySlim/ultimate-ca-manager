@@ -25,6 +25,8 @@ REVOKED = 'revoked'
 OWED = 'owed'
 #: No upstream account of UCM can speak for it: revoked locally only.
 NO_ACCOUNT = 'no_account'
+#: A proxy order naming no upstream account: its proxy client holds the account.
+PROXY_CLIENT = 'proxy_client'
 #: No ACME order of UCM names it any more: the account that obtained it is unknown.
 NO_ORDER = 'no_order'
 #: A hold (or its removal) is local: ACME has no hold, and a revocation there is final.
@@ -73,6 +75,9 @@ def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
     if order is None:
         return NO_ORDER, None
     if client is None:
+        from services.acme.acme_client_service import PROXY_ACCOUNT_UNKNOWN, AcmeClientService
+        if AcmeClientService.missing_account_message(order) == PROXY_ACCOUNT_UNKNOWN:
+            return PROXY_CLIENT, None
         return NO_ACCOUNT, None
 
     code = reason_code(reason)
@@ -115,6 +120,10 @@ def local_only_message(outcome, detail) -> Optional[str]:
     if outcome == NO_ACCOUNT:
         return ('Certificate revoked in UCM only: the ACME CA account it was issued under '
                 'no longer exists, so the CA was not notified. Revoke it with the CA directly.')
+    if outcome == PROXY_CLIENT:
+        return ('Certificate revoked in UCM only: it was ordered through the ACME proxy under '
+                'an upstream account UCM never recorded, so the CA was not notified. The proxy '
+                'client that ordered it must revoke it with the CA.')
     if outcome == NO_ORDER:
         return ('Certificate revoked in UCM only: UCM no longer has the ACME order it was '
                 'issued under, so it does not know which CA account to revoke it with. '
