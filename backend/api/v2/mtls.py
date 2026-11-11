@@ -684,7 +684,8 @@ def enroll_import_certificate():
             enroll_username = target.username
 
     # Create Certificate record if not exists
-    if not existing_cert:
+    created = existing_cert is None
+    if created:
         # The CA resolved by signature above (never a namesake by DN)
         ca_ref = issuing_ca.refid
 
@@ -730,6 +731,9 @@ def enroll_import_certificate():
         details=f'Imported PEM certificate for user: {enroll_username}',
         success=True,
     )
+    if created:
+        from services.webhook_service import emit_cert_imported
+        emit_cert_imported(existing_cert.to_dict(), ca_refid=existing_cert.caref, actor=user.username)
 
     resp = auth_cert.to_dict()
     resp['cert_id'] = existing_cert.id
