@@ -245,6 +245,8 @@ def write_heartbeat(node_id, leader, started_at) -> None:
     node.started_at = started_at
     node.heartbeat_at, node.is_leader = now, bool(leader)
     node.version, node.pid = Config.APP_VERSION, os.getpid()
+    from security.encryption import key_encryption
+    node.kek_fingerprint = key_encryption.kek_fingerprint()
     if leader:
         ClusterNode.query.filter(ClusterNode.node_id != node_id, ClusterNode.is_leader.is_(True)) \
             .update({'is_leader': False}, synchronize_session=False)
@@ -276,7 +278,7 @@ def cluster_nodes_detail(wake_interval) -> list:
     return [{'node_id': n.node_id, 'leader': bool(n.is_leader),
              'stale': _is_stale(n, wake_interval, now), 'version': n.version,
              'started_at': utc_isoformat(n.started_at), 'heartbeat_at': utc_isoformat(n.heartbeat_at),
-             'command_seen': n.command_seen}
+             'command_seen': n.command_seen, 'kek_fingerprint': n.kek_fingerprint}
             for n in ClusterNode.query.order_by(ClusterNode.node_id).all()]
 
 

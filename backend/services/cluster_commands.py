@@ -24,9 +24,11 @@ RELOAD_RATE_LIMITS = 'reload_rate_limits'
 RELOAD_SYSLOG = 'reload_syslog'
 RELOAD_ADMIN_ALLOWLIST = 'reload_admin_allowlist'
 RESTART = 'restart'
-# No password policy kind (read from the database on every check) and no encryption kind
-# (enabling or rotating encryption is refused in HA until key envelopes ship)
-KINDS = frozenset({RELOAD_RATE_LIMITS, RELOAD_SYSLOG, RELOAD_ADMIN_ALLOWLIST, RESTART})
+# The DEKs changed (enable, disable, rotation): reload them and re-evaluate safe mode
+RELOAD_ENCRYPTION = 'reload_encryption'
+# No password policy kind: read from the database on every check
+KINDS = frozenset({RELOAD_RATE_LIMITS, RELOAD_SYSLOG, RELOAD_ADMIN_ALLOWLIST, RESTART,
+                   RELOAD_ENCRYPTION})
 
 TICK_SECONDS = 2.0
 # A missing id below a newer one is a transaction still committing (or rolled back): wait this long
@@ -203,10 +205,18 @@ def _reload_admin_allowlist(payload):
     admin_allowlist.invalidate_cache()
 
 
+def _reload_encryption(payload):
+    """The payload names a DEK version only, never key material."""
+    from flask import current_app
+    from security.master_key_bootstrap import reload_encryption_state
+    reload_encryption_state(current_app)
+
+
 HANDLERS = {
     RELOAD_RATE_LIMITS: _reload_rate_limits,
     RELOAD_SYSLOG: _reload_syslog,
     RELOAD_ADMIN_ALLOWLIST: _reload_admin_allowlist,
+    RELOAD_ENCRYPTION: _reload_encryption,
 }
 
 

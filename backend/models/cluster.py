@@ -16,6 +16,8 @@ class ClusterNode(db.Model):
     command_seen = db.Column(db.Integer)
     # Last restart command this node claimed: one process of the node acts on it (migration 143)
     restart_seen = db.Column(db.Integer)
+    # Fingerprint of the node's key-encryption key, never the key itself (migration 154)
+    kek_fingerprint = db.Column(db.String(16))
 
 
 class ClusterCommand(db.Model):

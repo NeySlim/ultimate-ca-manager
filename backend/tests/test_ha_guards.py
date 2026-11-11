@@ -8,9 +8,6 @@ from utils.ha import reject_in_ha
 ROUTES = [
     '/api/v2/database/switch',
     '/api/v2/database/migrate',
-    '/api/v2/system/security/enable-encryption',
-    '/api/v2/system/security/disable-encryption',
-    '/api/v2/system/security/encrypt-all-keys',
     '/api/v2/system/security/rotate-secrets',
     '/api/v2/system/updates/install',
     '/api/v2/system/https/regenerate',
