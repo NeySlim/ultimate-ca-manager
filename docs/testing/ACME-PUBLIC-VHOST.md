@@ -16,7 +16,7 @@ See also: [ACME-PROXY-MULTI-CA.md](./ACME-PROXY-MULTI-CA.md), [ACME-DNS-PROPAGAT
 | **ACME settings** | `api/v2/acme/settings.py`, `api/v2/acme_client/settings.py` — `acme_public_base_url`, `acme_proxy_public_base_url` |
 | **Frontend** | `GeneralSection.jsx`, `ConfigTab.jsx`, `LetsEncryptTab.jsx` |
 | **i18n (9 languages)** | `frontend/src/i18n/locales/{en,fr,de,es,it,ja,pt,uk,zh}.json` — labels + wildcard helpers |
-| **Contextual help** | `helpContent.js` / `helpGuides.js` (en) + `help/{de,es,fr,it,ja,pt,uk,zh}/settings.js` |
+| **Contextual help** | `helpContent.js` / `helpGuides.js` (en) + `help/{fr,zh}/settings.js` |
 | **Tests** | `backend/tests/test_acme_public_url.py`, `test_acme.py` extensions |
 
 ### `SystemConfig` keys
@@ -259,12 +259,13 @@ curl -sk -b cookies.txt -X PATCH https://admin.ucm.example.com:8443/api/v2/setti
 
 Expected after PATCH: the URLs above reflect `acme.ucm.example.com:8443`.
 
-### 3. Contextual help (9 UI languages / 8+1 help)
+### 3. Contextual help (9 UI languages / 2+1 help)
 
 | UI language | Panel help file | i18n helpers |
 |-------------|-----------------|--------------|
 | en | `helpContent.js` + `helpGuides.js` | `en.json` |
-| fr, de, es, it, ja, pt, uk, zh | `help/<lang>/settings.js` | `<lang>.json` |
+| fr, zh | `help/<lang>/settings.js` | `<lang>.json` |
+| de, es, it, ja, pt, uk | English `helpContent.js` / `helpGuides.js` with a notice | `<lang>.json` |
 
 1. Open **Settings** → floating help panel
 2. **"Public ACME vhost"** section (or translated equivalent) visible
