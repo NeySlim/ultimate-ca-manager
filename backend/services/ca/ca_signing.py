@@ -271,6 +271,11 @@ class CASigningMixin:
 
         try:
             db.session.flush()
+            # A (RFC 9763) is locked before the renewed row: an in-place renewal of A
+            # locks A, then the rows it unlinks, this one among them
+            if related_a is not None:
+                db.session.query(Certificate.id).filter(
+                    Certificate.id == related_a[0].id).with_for_update().first()
             # The renewed row is archived in the commit that stores its successor,
             # compare-and-set: of two concurrent renewals, only one stores a certificate
             if supersedes is not None and not _claim_superseded(supersedes, renewal_of):
