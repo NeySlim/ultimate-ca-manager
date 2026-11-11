@@ -64,8 +64,10 @@ def _issue(approval, data):
         raise ValueError('The SCEP request could not be issued')
     cert = Certificate.query.filter_by(refid=cert_refid).first()
     try:
-        from services.webhook_service import emit_cert_issued
-        emit_cert_issued(cert.to_dict(), ca_refid=cert.caref)
+        from services.webhook_service import emit_cert_issued, emit_cert_renewed
+        # A RenewalReq is a renewal, as on auto-approval
+        emit = emit_cert_renewed if scep_req.renewal_of else emit_cert_issued
+        emit(cert.to_dict(), ca_refid=cert.caref)
     except Exception as e:
         logger.error(f"Webhook emit (SCEP approval) failed: {e}")
     return {'id': cert.id, 'cn': data.get('cn'), 'protocol': 'scep',

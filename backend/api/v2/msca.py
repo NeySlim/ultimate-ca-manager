@@ -969,15 +969,9 @@ def check_request_status(msca_id, request_id):
                 msca = db.session.get(MicrosoftCA, msca_id)
                 if csr and msca:
                     # A new serial on a row that already held a certificate is a renewal
-                    old_serial = str(csr.serial_number) if csr.crt else None
                     try:
                         _import_signed_cert(csr, req.cert_pem, msca, req.template, request_id)
                         result = req.to_dict()
-                        if old_serial and str(csr.serial_number) != old_serial:
-                            from services.webhook_service import emit_cert_renewed
-                            user = getattr(g, 'current_user', None)
-                            emit_cert_renewed(csr.to_dict(), ca_refid=csr.caref,
-                                              actor=getattr(user, 'username', None))
                     except Exception as imp_err:
                         logger.error(
                             f"MS CA request {request_id} issued but UCM import failed: {imp_err}",
@@ -1008,14 +1002,17 @@ def list_pending_requests():
 
 # --- Helper ---
 
-def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
+def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id, announce=True):
     """Import a signed certificate from MS CA into UCM's certificate store.
 
     Raises on failure. Callers MUST handle the exception so that an MS-CA-issued
     certificate that we couldn't persist is surfaced to the operator instead of
     being silently swallowed (orphan: MS CA has it, UCM doesn't).
+    With *announce*, the commit is followed by certificate.issued, or
+    certificate.renewed when the row held another certificate.
     """
     from models import Certificate
+    from services.import_service import stored_certificate_serial
     import base64
     import uuid
     import json
@@ -1085,6 +1082,7 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
         # This avoids creating a duplicate Certificate row (one CSR + one cert).
         # The CSR's id is reused so existing references (links, audit) stay valid.
         # aki/ski come from the crt listener, in the form CA lookups match
+        old_serial = stored_certificate_serial(csr) if csr is not None else None
         if csr is not None:
             csr.crt = cert_pem_b64
             csr.descr = csr.descr or f"MSCA: {cn} ({template})"
@@ -1150,6 +1148,11 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
             actor = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
             resolve_moot_requests('csr', 'csr_id', csr.id, outcome='approved', username=actor,
                                   certificate_id=cert.id, reason='Signed by the Microsoft CA')
+        if announce:
+            from services.webhook_service import emit_cert_stored
+            actor = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
+            emit_cert_stored(cert.to_dict(), old_serial, cert_obj.serial_number,
+                             ca_refid=cert.caref, actor=actor)
 
     except Exception as e:
         logger.error(f"Failed to import MS CA signed certificate: {e}", exc_info=True)

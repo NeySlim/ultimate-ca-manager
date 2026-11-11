@@ -74,13 +74,18 @@ class MicrosoftCACAControlMixin:
             try:
                 from .inventory import MicrosoftCAInventoryMixin
                 pem = MicrosoftCAInventoryMixin._fetch_cert_pem(msca, rid)
-                if pem and not MicrosoftCACAControlMixin._request_serial_known(msca, rid, pem):
+                own = MicrosoftCACAControlMixin._claim_own_request(msca, rid, pem) if pem else None
+                if own is not None:
+                    result['imported_cert_id'] = own
+                elif pem and not MicrosoftCACAControlMixin._request_serial_known(msca, rid, pem):
                     cert = MicrosoftCAInventoryMixin._import_inventory_cert(
                         msca, rid, None, pem
                     )
                     db.session.commit()
                     result['imported_cert_id'] = cert.id
             except Exception as e:
+                # A claim left uncommitted would mark the request issued with no certificate
+                db.session.rollback()
                 logger.warning(
                     f"MS CA '{msca.name}': approved request {rid} but import failed: {e}"
                 )
@@ -88,6 +93,32 @@ class MicrosoftCACAControlMixin:
 
         logger.info(f"MS CA '{msca.name}' approved pending request {rid}")
         return result
+
+    @staticmethod
+    def _claim_own_request(msca, rid, pem):
+        """Import the certificate of a request UCM submitted into that request's row,
+        with its event; the id of that row, or None for a request UCM did not submit.
+        Claimed by a conditional update: of the approval and a poll, one imports."""
+        from models import Certificate
+        from models.msca import MSCARequest
+        req = (MSCARequest.query
+               .filter(MSCARequest.msca_id == msca.id, MSCARequest.request_id == rid,
+                       MSCARequest.csr_id.isnot(None))
+               .order_by(MSCARequest.id.desc()).first())
+        if req is None:
+            return None
+        claimed = (MSCARequest.query
+                   .filter(MSCARequest.id == req.id, MSCARequest.cert_id.is_(None),
+                           MSCARequest.status != 'issued')
+                   .update({MSCARequest.status: 'issued', MSCARequest.cert_pem: pem},
+                           synchronize_session=False))
+        if claimed != 1:
+            db.session.rollback()
+            return db.session.get(MSCARequest, req.id).cert_id
+        from api.v2.msca import _import_signed_cert
+        row = db.session.get(Certificate, req.csr_id)
+        _import_signed_cert(row, pem, msca, req.template, req.id)
+        return db.session.get(MSCARequest, req.id).cert_id
 
     @staticmethod
     def deny_request(msca_id, request_id):

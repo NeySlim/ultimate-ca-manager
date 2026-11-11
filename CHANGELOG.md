@@ -35,6 +35,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - Import: replacing a certificate through `POST /api/v2/certificates/import` with a new serial now fires the renewal event, so its deploy bindings, webhooks and HTTPS binding follow as after an internal renewal (discussion #440); re-importing the same serial stays silent.
+- Approvals: a certificate issued by approving a request now fires `certificate.issued` like the issue form, so webhooks, notifications and deploy bindings see it.
+- Microsoft AD CS: a certificate AD CS signs for a CSR or a renewal fires `certificate.issued` or `certificate.renewed`; approving a pending request from UCM writes it into the request's own row, where a later status check used to add a second row.
+- ACME client and proxy: a certificate obtained upstream fires `certificate.issued`, or `certificate.renewed` for a renewal stored in a new row; the proxy no longer stores a second row when a client downloads the same certificate again.
+- Import: importing a new certificate, or a certificate that completes a pending CSR, fires `certificate.imported` from the import page as the Smart Import does.
+- Renewal: when EST, SCEP or WSTEP renews a certificate into a new row, its deploy bindings and the HTTPS listener binding move to the new row in the same commit and the renewal is deployed; an approved SCEP renewal fires `certificate.renewed` instead of `certificate.issued`.
 - AD CS: when the status check of a pending request imports a certificate that replaces an existing one, its deploy bindings, webhooks and HTTPS binding now follow as after a renewal.
 - HA preview: two nodes started together on an empty PostgreSQL database could both try to create the session table, and one failed to start; the table is now created under the startup lock.
 - Issuance: a certificate created with `POST /api/v2/certificates` (the certificate form), issued from the form once its approval was granted, enrolled through SCEP or renewed in place, a cross-certificate, and the certificates UCM issues to its own TSA signer, EST key generator and renewed OCSP responder were never counted in their CA's issued certificates; they now are.

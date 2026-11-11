@@ -658,3 +658,62 @@ def test_a_protocol_renewal_of_b_naming_a_and_an_in_place_renewal_of_a_do_not_de
     # A renewed while the protocol side waited: B is refused and stays live
     assert [(name, 'not held by this instance' in error) for name, error in errors] == [('other', True)]
     assert (count, bool(b_archived)) == (3, False)
+
+
+def test_two_protocol_renewals_of_a_bound_row_move_its_bindings_once(app):
+    """The bindings and the HTTPS binding follow the renewal that won, in its commit."""
+    from models import DeployBinding, DeployTarget, SystemConfig
+    from services.ca import CAService
+    from services.https_binding import BOUND_REFID_KEY
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    schema = f'renewal_bind_{uuid.uuid4().hex[:6]}'
+    with _a_schema_of_our_own(schema) as url, _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            ca = _ca_row(*_authority())
+            ca_id = ca.id
+            from services.cert_service import CertificateService
+            row = CertificateService.create_certificate(
+                descr='bound', caref=ca.refid, dn={'CN': 'bound.example.test'},
+                key_type='prime256v1', validity_days=30)
+            target = DeployTarget(name='bound', host='h.example.test', username='u', private_key='k')
+            db.session.add(target)
+            db.session.flush()
+            binding = DeployBinding(target_id=target.id, certificate_id=row.id, cert_path='/srv/c.pem')
+            db.session.add_all([binding, SystemConfig(key=BOUND_REFID_KEY, value=row.refid)])
+            db.session.commit()
+            cert_id, binding_id = row.id, binding.id
+            db.session.remove()
+
+        start, errors, stored = threading.Barrier(2), [], []
+
+        def renew(name):
+            with app.app_context():
+                engine, _pid = _own_session(url)
+                try:
+                    start.wait(10)
+                    _pem, serial = CAService.sign_csr_from_crypto(
+                        db.session.get(CA, ca_id), _csr('bound.example.test'), validity_days=30,
+                        source='est', supersedes=db.session.get(Certificate, cert_id))
+                    stored.append(str(int(serial, 16)))
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(repr(exc))
+                finally:
+                    db.session.remove()
+                    engine.dispose()
+
+        threads = [threading.Thread(target=renew, args=(n,)) for n in ('one', 'two')]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(60)
+
+        with app.app_context():
+            winner = Certificate.query.filter_by(serial_number=stored[0]).one() if stored else None
+            bound_to = db.session.get(DeployBinding, binding_id).certificate_id
+            https = SystemConfig.query.filter_by(key=BOUND_REFID_KEY).one().value
+            result = (winner.id, winner.refid) if winner else (None, None)
+            db.session.remove()
+    assert len(stored) == 1 and len(errors) == 1 and 'AlreadySuperseded' in errors[0], errors
+    assert (bound_to, https) == result

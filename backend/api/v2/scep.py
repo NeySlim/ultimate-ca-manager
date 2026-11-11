@@ -245,10 +245,12 @@ def approve_scep_request(request_id):
     db.session.refresh(scep_req)
     try:
         from models import Certificate as _Certificate
-        from services.webhook_service import emit_cert_issued
+        from services.webhook_service import emit_cert_issued, emit_cert_renewed
         issued = _Certificate.query.filter_by(refid=cert_refid).first()
         if issued is not None:
-            emit_cert_issued(issued.to_dict(), ca_refid=issued.caref)
+            # A RenewalReq is a renewal, as on auto-approval
+            emit = emit_cert_renewed if scep_req.renewal_of else emit_cert_issued
+            emit(issued.to_dict(), ca_refid=issued.caref)
     except Exception as e:
         logger.error(f"Webhook emit (SCEP approval) failed: {e}")
     

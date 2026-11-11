@@ -32,10 +32,11 @@ class AlreadySuperseded(Exception):
     """The certificate being renewed was superseded by a concurrent renewal."""
 
 
-def _claim_superseded(row, presented=None):
+def _claim_superseded(row, presented=None, successor=None):
     """Archive every live row holding *presented*, the certificate the client renews (by
     default *row*'s), same DER under any CA: it is replaced everywhere. False when another
-    renewal got there first. One row at a time in id order, so two claims never cross."""
+    renewal got there first. One row at a time in id order, so two claims never cross.
+    With *successor*, the archived rows' bindings move to it in the same transaction."""
     from sqlalchemy import update
     from sqlalchemy.orm.attributes import set_committed_value
     from services.cert.issued_lookup import _rows_holding
@@ -57,7 +58,33 @@ def _claim_superseded(row, presented=None):
         if result.rowcount != 1:
             return False
     set_committed_value(row, 'archived', True)
+    if successor is not None:
+        _bindings_follow(live, successor)
     return True
+
+
+def _bindings_follow(old_ids, successor):
+    """Deploy bindings and the HTTPS listener binding of the archived rows *old_ids* now
+    name *successor*; a target keeps one binding per certificate (lowest id wins)."""
+    from sqlalchemy import update
+    from models import DeployBinding, SystemConfig
+    from services.https_binding import BOUND_REFID_KEY
+    if successor.id is None:
+        db.session.flush()
+    taken = {t for (t,) in db.session.query(DeployBinding.target_id)
+             .filter(DeployBinding.certificate_id == successor.id)}
+    for binding in (DeployBinding.query.filter(DeployBinding.certificate_id.in_(old_ids))
+                    .order_by(DeployBinding.id)):
+        if binding.target_id not in taken:
+            binding.certificate_id = successor.id
+            taken.add(binding.target_id)
+    refids = [r for (r,) in db.session.query(Certificate.refid).filter(Certificate.id.in_(old_ids))]
+    db.session.execute(
+        update(SystemConfig)
+        .where(SystemConfig.key == BOUND_REFID_KEY, SystemConfig.value.in_(refids))
+        .values(value=successor.refid)
+        .execution_options(synchronize_session=False)
+    )
 
 
 class CASigningMixin:
@@ -278,7 +305,7 @@ class CASigningMixin:
                     Certificate.id == related_a[0].id).with_for_update().first()
             # The renewed row is archived in the commit that stores its successor,
             # compare-and-set: of two concurrent renewals, only one stores a certificate
-            if supersedes is not None and not _claim_superseded(supersedes, renewal_of):
+            if supersedes is not None and not _claim_superseded(supersedes, renewal_of, new_cert):
                 db.session.rollback()
                 raise AlreadySuperseded('the renewed certificate is already superseded')
             link_issued(new_cert, cert_obj, related_a)

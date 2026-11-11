@@ -1782,6 +1782,7 @@ class AcmeClientService:
                 self._record_finalize_failure(order, message)
                 return False, message, None
 
+            already_held = order.certificate_id == cert_id
             order.certificate_id = cert_id
             order.certificate_url = cert_url
             order.status = 'issued'
@@ -1793,6 +1794,8 @@ class AcmeClientService:
             if not_after is not None:
                 order.expires_at = not_after
             db.session.commit()
+            if not already_held:
+                self._announce_import(cert_id, renewal=False)
 
             logger.info(f"Certificate issued for {domains}, ID: {cert_id}, expires_at={order.expires_at}")
             return True, "Certificate issued and imported successfully", cert_id
@@ -1871,8 +1874,21 @@ class AcmeClientService:
 
         if in_place:
             client_certificates.after_renewal_commit(row, cert_pem, key_pem, old_serial)
+        else:
+            self._announce_import(cert_id, renewal=True)
         logger.info(f"Certificate renewed for {renews.domains_list}, ID: {cert_id}")
         return True, "Certificate renewed and imported successfully", cert_id
+
+    @staticmethod
+    def _announce_import(cert_id: int, renewal: bool) -> None:
+        """The event of an order that just stored its certificate: fired once, after the
+        commit that moves the order on, so a resumed import does not fire it twice."""
+        row = db.session.get(Certificate, cert_id)
+        if row is None:
+            return
+        from services.webhook_service import emit_cert_issued, emit_cert_renewed
+        emit = emit_cert_renewed if renewal else emit_cert_issued
+        emit(row.to_dict(), ca_refid=row.caref, actor='system')
 
     @staticmethod
     def _record_finalize_failure(order, message: str) -> None:

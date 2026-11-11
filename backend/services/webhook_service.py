@@ -519,6 +519,17 @@ def emit_cert_renewed(cert: dict, ca_refid: str = None, actor: str = None):
     _emit(WebhookService.CERT_RENEWED, {'certificate': cert}, ca_refid, _meta(actor))
 
 
+def emit_cert_stored(cert: dict, old_serial, new_serial, first_event: str = None,
+                     ca_refid: str = None, actor: str = None):
+    """For a row that now holds a certificate: certificate.renewed when it held another
+    one, *first_event* (default certificate.issued) when it held none readable, nothing
+    when it held this one. Serials are compared as integers."""
+    if old_serial is None:
+        _emit(first_event or WebhookService.CERT_ISSUED, {'certificate': cert}, ca_refid, _meta(actor))
+    elif int(old_serial) != int(new_serial):
+        emit_cert_renewed(cert, ca_refid=ca_refid, actor=actor)
+
+
 def emit_cert_expiring(cert: dict, days_left: int = None, ca_refid: str = None):
     _emit(WebhookService.CERT_EXPIRING, {'certificate': cert, 'days_left': days_left}, ca_refid)
 
