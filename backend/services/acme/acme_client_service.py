@@ -381,9 +381,11 @@ class AcmeClientService:
 
     @classmethod
     def for_existing_order(cls, order: 'AcmeClientOrder') -> Optional['AcmeClientService']:
-        """:meth:`for_order`, or None when the order names a CA account that no longer exists:
-        another account, maybe at another CA, would answer in its place."""
+        """:meth:`for_order`, or None when the order names a CA account that no longer exists,
+        or is a proxy order naming none: another account, maybe at another CA, would answer."""
         named = order.acme_client_account_id or order.account_url
+        if not named and order.is_proxy_order:
+            return None
         if named and cls.order_account(order) is None:
             return None
         return cls.for_order(order)

@@ -38,11 +38,8 @@ def _order_for(cert) -> Optional[AcmeClientOrder]:
 
 
 def _client_for(order):
-    """The service under the upstream account that obtained the order, or None.
-    A proxy order that names no account cannot be revoked with another one."""
+    """The service under the upstream account that obtained the order, or None."""
     from services.acme.acme_client_service import AcmeClientService
-    if order.is_proxy_order and not (order.acme_client_account_id or order.account_url):
-        return None
     return AcmeClientService.for_existing_order(order)
 
 

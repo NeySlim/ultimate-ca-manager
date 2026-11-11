@@ -160,6 +160,23 @@ def test_after_five_attempts_the_ca_is_asked_once_a_day(bench, attempts, hours_a
     assert bench.client.revoke_certificate.called is sent
 
 
+def test_a_proxy_order_whose_upstream_account_is_gone_is_not_retried_under_another(bench):
+    from services.acme.acme_client_service import ACCOUNT_GONE
+    parent = bench.parent()
+    parent.is_proxy_order = True
+    parent.acme_client_account_id = None
+    parent.account_url = None
+    db.session.commit()
+    _owe(bench)
+    with patch('services.acme.acme_client_service.AcmeClientService.for_order', return_value=bench.client), \
+            patch('services.acme.acme_client_service.AcmeClientService.for_issuance',
+                  return_value=bench.client):
+        renew_mod.retry_upstream_revocations()
+    bench.client.revoke_certificate.assert_not_called()
+    owed = _owed(bench)
+    assert owed[0]['error'] == ACCOUNT_GONE and owed[0]['attempts'] == 2
+
+
 def test_an_order_being_renewed_is_left_to_the_next_pass(bench):
     from services.acme.order_lease import OrderLease
     _owe(bench)
