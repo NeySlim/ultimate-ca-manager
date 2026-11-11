@@ -67,3 +67,28 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "ucm.etcPvcName" -}}
 {{- .Values.persistence.etc.existingClaim | default (printf "%s-etc" (include "ucm.fullname" .)) }}
 {{- end }}
+
+{{/* HA render guard: fails the render when the values cannot span nodes. */}}
+{{- define "ucm.haValidate" -}}
+{{- if .Values.ha.enabled -}}
+{{- if ne .Values.database.type "postgresql" -}}
+{{- fail "ha.enabled requires database.type=postgresql (SQLite is single-node)" -}}
+{{- end -}}
+{{- if not (or .Values.database.databaseUrl .Values.database.existingSecret) -}}
+{{- fail "ha.enabled requires database.databaseUrl or database.existingSecret" -}}
+{{- end -}}
+{{- if lt (int .Values.replicaCount) 2 -}}
+{{- fail "ha.enabled requires replicaCount >= 2" -}}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Existing or explicit KEY_ENCRYPTION_KEY ("" when none): kept whatever ha.enabled is,
+so leaving HA never drops the only copy of the key.
+*/}}
+{{- define "ucm.existingKek" -}}
+{{- $existing := (lookup "v1" "Secret" .Release.Namespace (include "ucm.secretName" .)) | default dict -}}
+{{- $data := $existing.data | default dict -}}
+{{- .Values.secrets.keyEncryptionKey | default ((get $data "KEY_ENCRYPTION_KEY") | default "" | b64dec) -}}
+{{- end -}}

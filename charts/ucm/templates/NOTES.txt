@@ -24,6 +24,18 @@ UCM ({{ include "ucm.image" . }}) has been deployed as release "{{ .Release.Name
 {{- end }}
 
 IMPORTANT
+{{- if .Values.ha.enabled }}
+- HA mode: {{ .Values.replicaCount }} nodes on one PostgreSQL. UCM_SECRET_KEY and
+  KEY_ENCRYPTION_KEY live in the "{{ include "ucm.secretName" . }}" Secret: back it up, losing
+  KEY_ENCRYPTION_KEY makes every encrypted private key unrecoverable.
+{{- if not .Values.persistence.data.existingClaim }}
+- WARNING: the data volume is an emptyDir per pod. Local backups are lost when
+  a pod is rescheduled; take backups from the PostgreSQL side.
+{{- end }}
+{{- if not .Values.redis.url }}
+- No redis.url: sessions are per node. Set a cookie affinity on the ingress.
+{{- end }}
+{{- else }}
 - This chart runs a SINGLE instance (replicaCount=1). The bundled scheduler is
   not HA-safe and the default SQLite DB is single-writer. Do not scale up.
 - The "{{ include "ucm.etcPvcName" . }}" PVC holds /etc/ucm/master.key, which
@@ -32,4 +44,5 @@ IMPORTANT
 {{- if eq .Values.database.type "sqlite" }}
 - Using the bundled SQLite database (data PVC). For an external PostgreSQL set
   database.type=postgresql and database.databaseUrl (or database.existingSecret).
+{{- end }}
 {{- end }}

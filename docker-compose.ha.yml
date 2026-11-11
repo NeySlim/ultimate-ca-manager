@@ -1,0 +1,113 @@
+# Two UCM nodes on one PostgreSQL behind a load balancer (see docs/HA.md).
+# Example only. Every secret below is REQUIRED: compose refuses to start
+# without them. Put them in a .env file next to this one, for example:
+#   POSTGRES_PASSWORD=...        long random value
+#   UCM_SECRET_KEY=...           long random value, same on both nodes
+#   KEY_ENCRYPTION_KEY=...       Fernet key (python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+#   HA_LB_CERT=./lb.pem          certificate and private key (PEM) for the load balancer
+#   UCM_FQDN=ucm.example.com
+# Keep KEY_ENCRYPTION_KEY safe: without it the encrypted private keys are lost.
+name: ucm-ha
+
+x-ucm-node: &ucm-node
+  image: neyslim/ultimate-ca-manager:latest
+  restart: unless-stopped
+  depends_on:
+    postgres:
+      condition: service_healthy
+  environment: &ucm-env
+    UCM_HA: "1"
+    # SoftHSM tokens are local to a node: use a network HSM in HA
+    HSM_AUTO_INIT: "false"
+    UCM_FQDN: ${UCM_FQDN:-ucm.example.com}
+    UCM_SECRET_KEY: ${UCM_SECRET_KEY:?set UCM_SECRET_KEY, identical on every node}
+    KEY_ENCRYPTION_KEY: ${KEY_ENCRYPTION_KEY:?set KEY_ENCRYPTION_KEY, identical on every node}
+    DATABASE_URL: postgresql://ucm:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@postgres:5432/ucm
+    UCM_BEHIND_PROXY: "1"
+    # The load balancer reaches the nodes from the compose network
+    UCM_TRUSTED_PROXIES: ${UCM_TRUSTED_PROXIES:-172.16.0.0/12}
+  healthcheck:
+    test: ["CMD", "curl", "-fk", "https://127.0.0.1:8443/health/ready"]
+    interval: 15s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ucm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      POSTGRES_DB: ucm
+    volumes:
+      - ucm-ha-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ucm -d ucm"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  ucm-1:
+    <<: *ucm-node
+    environment:
+      <<: *ucm-env
+      UCM_NODE_ID: ucm-1
+    volumes:
+      - ucm-ha-data-1:/opt/ucm/data
+
+  ucm-2:
+    <<: *ucm-node
+    environment:
+      <<: *ucm-env
+      UCM_NODE_ID: ucm-2
+    volumes:
+      - ucm-ha-data-2:/opt/ucm/data
+
+  # Cookie affinity (the UI session stays on one node) and /health/ready probe.
+  # TLS is terminated here; the nodes keep their own self-signed certificate.
+  lb:
+    image: haproxy:3.0
+    restart: unless-stopped
+    depends_on:
+      - ucm-1
+      - ucm-2
+    ports:
+      - "8443:8443"
+    volumes:
+      - ${HA_LB_CERT:?set HA_LB_CERT to a PEM file with certificate and key}:/certs/lb.pem:ro
+    configs:
+      - source: haproxy_cfg
+        target: /usr/local/etc/haproxy/haproxy.cfg
+
+configs:
+  haproxy_cfg:
+    content: |
+      global
+        log stdout format raw local0
+      defaults
+        mode http
+        option forwardfor
+        timeout connect 5s
+        timeout client 60s
+        timeout server 60s
+        timeout tunnel 1h
+      frontend https
+        bind :8443 ssl crt /certs/lb.pem
+        http-request set-header X-Forwarded-Proto https
+        default_backend ucm
+      backend ucm
+        balance roundrobin
+        cookie UCM_NODE insert indirect nocache secure httponly
+        option httpchk
+        http-check send meth GET uri /health/ready
+        http-check expect status 200
+        default-server check check-ssl ssl verify none inter 5s fall 3 rise 2
+        server ucm-1 ucm-1:8443 cookie ucm-1
+        server ucm-2 ucm-2:8443 cookie ucm-2
+
+volumes:
+  ucm-ha-pgdata:
+  ucm-ha-data-1:
+  ucm-ha-data-2:

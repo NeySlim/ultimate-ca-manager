@@ -11,6 +11,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
+- **HA packaging.** The Helm chart takes `ha.enabled` (rolling update, PodDisruptionBudget, shared `KEY_ENCRYPTION_KEY`), `docker-compose.ha.yml` starts two nodes behind a balancer, the image entrypoint skips SQLite in HA mode, and `docs/HA.md` documents the deployments.
+
 - Inspector: the detail of a certificate, CA, trusted certificate or user certificate opens in a tabbed dock at the bottom or right of the window (full screen on mobile), many objects at a time, instead of floating windows; its position and size follow the user and an invalid value is refused with a 400.
 - Top bar: a theme menu and a notification bell fed by the dashboard queue and the audit log (read marks saved per user); after sign-in you return to the page that asked for it, and a server rate limit is shown on the login page.
 - SSO: an OAuth2/OIDC or SAML sign-in also returns to the page that asked for it; the server keeps that page with the login (never sent to the IdP), uses it once and checks it again (migration 145).
