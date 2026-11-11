@@ -23,6 +23,7 @@ export default {
           { label: 'Servir en HTTP simple', text: 'Désactivé par défaut. Répond aussi au SCEP sur le port du protocole HTTP (8080 par défaut), à http://votre-serveur:8080/scep/pkiclient.exe et aux URL de profil, pour les clients comme sscep qui ne peuvent pas utiliser HTTPS. RFC 8894 §7.10 : les messages SCEP sont déjà protégés, l\'enveloppe CMS garde le mot de passe de défi privé' },
           { label: 'Mot de passe de défi', text: 'Secret partagé que les appareils utilisent pour authentifier l\'inscription. Un renouvellement (RenewalReq) signé par un certificat émis par le même endpoint (profil ou global) est authentifié par ce certificat : son défi n\'est pas vérifié et changer le secret n\'empêche pas les appareils enrôlés de renouveler (RFC 8894 §2.4). Tout autre certificat a toujours besoin du défi de l\'endpoint' },
           { label: 'Clés des appareils (v2.248)', text: 'Un appareil signe sa requête avec une clé RSA, ECDSA, Ed25519 ou ML-DSA ; une signature ML-DSA suit la RFC 9882 (condensat SHA-512). Ed448 est refusé, ML-DSA aussi en mode FIPS' },
+          { label: 'Noms de la requête', text: 'Une requête dont le sujet ou les noms DNS enfreignent la RFC 5280 (un CN de plus de 64 caractères, un nom DNS avec espace, apostrophe ou tiret bas, comme le nom d\'un appareil iOS) est refusée avec sa raison, une fois son défi vérifié et avant sa mise en file, et Intune est informé du refus ; un renouvellement garde les noms que porte son certificat. Construisez un SAN DNS Intune à partir d\'une valeur sûre pour le DNS' },
         ]
       },
       {
@@ -68,7 +69,8 @@ Voir toutes les requêtes d'inscription SCEP :
 Configurer le serveur SCEP :
 - **Activer/Désactiver** : Basculer le service SCEP
 - **CA de signature** : Sélectionner quelle CA signe les certificats inscrits via SCEP. Les appareils chiffrent leur requête pour cette CA, elle doit donc détenir une clé RSA logicielle : les CA EC, adossées à un HSM, sans clé, hors ligne ou révoquées ne sont pas listées (v2.248)
-- **Approbation automatique** : Approuver automatiquement les requêtes avec des mots de passe de défi valides
+- **Approbation automatique** : Approuver automatiquement les requêtes avec des mots de passe de défi valides, ou les renouvellements signés par un certificat émis par le même endpoint
+- **Servir en HTTP simple** : désactivé par défaut. Répond aussi au SCEP sur le port du protocole HTTP (8080 par défaut) pour les clients qui ne peuvent pas utiliser HTTPS, comme sscep. RFC 8894 §7.10 : les messages SCEP sont déjà protégés, TLS n'est donc pas requis ; l'enveloppe CMS garde le mot de passe de défi privé
 
 ### Profils
 Endpoints d'enrôlement nommés, chacun servi sur sa propre URL :
@@ -90,7 +92,9 @@ Pointez chaque flotte d'appareils, profil MDM ou tenant vers sa propre URL de pr
 L'onglet **Défis** affiche les mots de passe de défi. Les appareils doivent inclure un mot de passe de défi valide dans leur requête d'inscription pour s'authentifier.
 
 - **Voir le mot de passe** : Afficher le défi actuel pour une CA
-- **Régénérer** : Créer un nouveau mot de passe de défi (invalide l'ancien)
+- **Régénérer** : Créer un nouveau mot de passe de défi (invalide l'ancien pour les nouvelles inscriptions)
+
+Un renouvellement (RenewalReq) signé par un certificat émis par le même endpoint (profil ou global) est authentifié par ce certificat : son mot de passe de défi n'est pas vérifié, donc un secret régénéré n'empêche pas les appareils enrôlés de renouveler (RFC 8894 §2.4). Un certificat émis ailleurs, par un autre profil, ACME, EST ou l'interface, a toujours besoin du défi de l'endpoint. Un appareil EC envoie quand même un mot de passe, qui sert de clé au chiffrement de sa réponse.
 
 ### Informations
 Affiche l'URL du point de terminaison SCEP et les instructions d'intégration.

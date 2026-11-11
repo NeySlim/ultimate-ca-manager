@@ -28,7 +28,7 @@ export default {
           { label: 'Cache', text: 'Antwort-Cache mit automatischer täglicher Bereinigung abgelaufener Einträge' },
           { label: 'Gesamtabfragen', text: 'Anzahl der seit dem Start des Dienstes beantworteten OCSP-Anfragen und wie viele davon aus dem Cache bedient wurden' },
           { label: 'HTTP-Caching', text: 'Eine Antwort ohne Nonce kann von HTTP-Caches bis zu ihrem nextUpdate gehalten werden, höchstens eine Stunde (RFC 5019 §6.2: Expires, Last-Modified, ETag); eine Antwort mit Nonce wird nicht wiederverwendet' },
-          { label: 'Delegierter Responder', text: 'Antworten mit einem dedizierten OCSPSigning-Zertifikat anstelle des CA-Schlüssels signieren, weisen Sie eines pro CA über das Detailpanel zu' },
+          { label: 'Delegierter Responder', text: 'Antworten mit einem dedizierten OCSPSigning-Zertifikat anstelle des CA-Schlüssels signieren, weisen Sie eines pro CA in deren Bereich auf dieser Seite zu' },
           { label: 'Responder-Auto-Erneuerung', text: 'Eine tägliche Aufgabe stellt das delegierte Responder-Zertifikat vor Ablauf neu aus (gleiches Schlüsselpaar, gleichwertig erneuert) und bindet es neu, standardmäßig aktiviert. Der Schalter und sein Fenster (Tage vor Ablauf, Standard 30) befinden sich unter Einstellungen › Sicherheit' },
         ]
       },
@@ -109,7 +109,7 @@ UCM speichert OCSP-Antworten für die Leistung im Cache. Der Cache wird:
 
 ### Delegierter OCSP-Responder
 
-Standardmäßig werden OCSP-Antworten mit dem CA-Schlüssel selbst signiert. Ein **delegierter Responder** verwendet stattdessen ein dediziertes Zertifikat mit der **OCSPSigning**-EKU: weisen Sie eines pro CA über das Detailpanel der CA zu (nur Zertifikate mit OCSPSigning-EKU und privatem Schlüssel sind wählbar).
+Standardmäßig werden OCSP-Antworten mit dem CA-Schlüssel selbst signiert. Ein **delegierter Responder** verwendet stattdessen ein dediziertes Zertifikat mit der **OCSPSigning**-EKU. Weisen Sie eines pro CA im Bereich **Delegierter Responder** der in der Liste dieser Seite gewählten CA zu (nur Zertifikate mit OCSPSigning-EKU und privatem Schlüssel sind wählbar).
 
 **Automatische Erneuerung**: Eine tägliche Aufgabe stellt das Responder-Zertifikat vor Ablauf neu aus, gleiches Schlüsselpaar und gleiche Erweiterungen, gleichwertig erneuert, und bindet die Responder-Konfiguration der CA an das neue Zertifikat. Kurzlebige OCSP-Signaturzertifikate (z. B. ein 90-Tage-Template) rotieren ohne manuellen Eingriff. Standardmäßig aktiviert; kann deaktiviert und das Erneuerungsfenster unter Einstellungen › Sicherheit angepasst werden.
 
@@ -127,7 +127,7 @@ http://ihr-server:8080/ca/{ca_refid}.cer   (DER-Format)
 http://ihr-server:8080/ca/{ca_refid}.pem   (PEM-Format)
 \`\`\`
 
-Aktivieren Sie CA-Aussteller pro CA im Bereich **AIA CA-Aussteller** des Detailpanels. Die URL wird automatisch mit dem HTTP-Protokollserver und dem konfigurierten FQDN generiert.
+Aktivieren Sie CA-Aussteller pro CA im Bereich **AIA CA-Aussteller** des Panels dieser CA auf dieser Seite. Die URL wird automatisch mit dem HTTP-Protokollserver und dem konfigurierten FQDN generiert.
 
 > ⚠️ **Voraussetzung**: Protokoll-URLs (CDP, OCSP, AIA) erfordern einen gültigen **FQDN** oder eine konfigurierte **Protokoll-Basis-URL** unter Einstellungen → Allgemein. Wenn Sie über \`localhost\` auf UCM zugreifen, schlägt die Aktivierung dieser Funktionen fehl, legen Sie zuerst den FQDN fest.
 

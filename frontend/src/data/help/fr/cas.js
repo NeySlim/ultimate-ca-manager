@@ -303,7 +303,7 @@ C'est la façon standard de protéger une CA racine entre des cérémonies rares
 Le mot de passe suit la politique de complexité standard UCM : longueur minimale, mélange de classes de caractères, pas de séquences triviales. Mêmes règles que les mots de passe utilisateurs.
 
 ### Étape par étape. Mettre hors ligne
-1. Ouvrez le panneau de détails de la CA
+1. Ouvrez la CA dans l'inspecteur
 2. Cliquez sur **Mettre hors ligne**
 3. Lisez l'explication, cliquez sur **Continuer**
 4. Choisissez un mode (*Protégée par mot de passe* ou *Exportée en fichier*)
@@ -311,7 +311,7 @@ Le mot de passe suit la politique de complexité standard UCM : longueur minimal
 6. Confirmez. Pour *Exportée en fichier*, la clé chiffrée est téléchargée immédiatement : stockez-la en sécurité.
 
 ### Étape par étape. Restaurer
-1. Ouvrez le panneau de détails de la CA hors ligne
+1. Ouvrez la CA hors ligne dans l'inspecteur
 2. Cliquez sur **Restaurer**
 3. Saisissez le mot de passe
 4. Pour *Exportée en fichier* : sélectionnez aussi le fichier de clé téléchargé précédemment

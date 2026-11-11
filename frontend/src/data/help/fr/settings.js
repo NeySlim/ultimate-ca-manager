@@ -156,8 +156,10 @@ export default {
           { label: "Sujets dérivés d'AD", text: "Les modèles peuvent choisir de dériver leur sujet/SAN depuis Active Directory (via le connecteur AD) pour l'inscription sans surveillance" },
           { label: 'Templates ML-DSA (v2.248)', text: 'Annoncés par l\'OID de leur algorithme de clé avec le Microsoft Software Key Storage Provider, pas encore testés avec un vrai client Windows, et masqués en mode FIPS. Le renouvellement par certificat ne peut pas utiliser un certificat ML-DSA (XML-DSig n\'a pas de signature ML-DSA) : inscrivez-en un nouveau' },
           { label: "Templates ECDSA (v2.251)", text: "Annoncés en schéma de stratégie 3 avec leur courbe (ECDSA_P256, ECDSA_P384, ECDSA_P521) comme clé de signature et condensat de requête, le plus fort entre le condensat du template et celui de la courbe. Les templates RSA hors mode FIPS restent en schéma 2" },
+          { label: 'Template nommé dans la requête (v2.252)', text: 'Chaque stratégie annonce son extension de template (szOID_CERTIFICATE_TEMPLATE), que Windows copie dans sa requête : le certificat est émis sous le template choisi sur le client, même si un autre a les mêmes EKU. Une requête qui ne nomme aucun template est appariée par ses EKU. Un template dont tous les EKU ne sont jamais émis à un inscrit, comme la signature OCSP, n\'est pas annoncé, et une requête pour lui est refusée' },
           { label: "Template et clé (v2.251)", text: "La clé de la requête doit convenir au template sous lequel elle est émise : même courbe ou même jeu ML-DSA, ou clé RSA au moins aussi longue. Une requête P-384 n'est donc plus émise sous un template P-256 qui partage son EKU. L'enveloppe de requête que Windows signe avec une clé ECDSA est acceptée" },
-          { label: "Renouvellement depuis Windows (v2.248)", text: "certreq ... Renew s'authentifie avec le certificat à renouveler comme certificat client TLS : mTLS doit être activé, avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé" },
+          { label: "Renouvellement depuis Windows (v2.248)", text: "certreq ... Renew s'authentifie avec le certificat à renouveler comme certificat client TLS : mTLS doit être activé, avec l'AC WSTEP, ou l'un de ses ancêtres, en confiance. Un renouvellement conserve le template et les EKU du certificat renouvelé, et son SubjectAltName quand la CSR n'en porte aucun (v2.252)" },
+          { label: 'Type de certificat', text: 'Sans Server Auth, un template avec Email Protection ou EFS émet un certificat S/MIME, un avec Client Auth ou Smartcard Logon un certificat client : une requête utilisateur CN=jdoe sans SAN ne reçoit aucun nom DNS depuis son CN. Une requête sans Key Usage reçoit celui que configure le template, sinon celui du type de template : Digital Signature, Key Encipherment et Non Repudiation pour S/MIME ou EFS, Digital Signature et Key Encipherment pour Smartcard Logon, Digital Signature seul pour Client Auth. Tout autre template, ou aucun, émet un certificat serveur' },
           { label: "Kerberos dans Docker (v2.251)", text: "Les images Docker embarquent le backend Kerberos de pyspnego : la liaison Kerberos fonctionne en conteneur comme dans les installations DEB et RPM" },
         ]
       },
@@ -175,7 +177,7 @@ export default {
 
     ],
     tips: [
-      'Utilisez le widget État du système en haut pour vérifier rapidement la santé des services',
+      'Utilisez la barre d\'état en bas pour vérifier que le service répond',
       'Testez les paramètres SMTP avant de vous fier aux notifications par e-mail',
       'Personnalisez le modèle d\'e-mail avec votre marque à l\'aide de l\'éditeur HTML/Texte intégré',
       'Programmez des sauvegardes automatiques pour les environnements de production',
@@ -255,7 +257,8 @@ Limiter l'interface web et l'API de gestion aux adresses IP et réseaux CIDR lis
 Exiger que tous les utilisateurs activent l'authentification à deux facteurs.
 
 ### Chiffrement des clés privées
-Chiffrez toutes les clés privées stockées en base de données avec AES-256, protégées par un fichier de clé maîtresse. La section affiche l'état du chiffrement et les compteurs de clés **chiffrées / non chiffrées**. Deux variables d'environnement opt-in rendent l'absence de clé fatale au démarrage : \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (chiffrement des secrets d'intégration) et \`UCM_REQUIRE_KEY_ENCRYPTION\` (chiffrement des clés privées).
+Chiffrez toutes les clés privées stockées en base de données avec AES-128 (Fernet, avec HMAC-SHA256), protégées par un fichier de clé maîtresse. La section affiche l'état du chiffrement et les compteurs de clés **chiffrées / non chiffrées**. Deux variables d'environnement opt-in rendent l'absence de clé fatale au démarrage : \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (chiffrement des secrets d'intégration) et \`UCM_REQUIRE_KEY_ENCRYPTION\` (chiffrement des clés privées).
+Une nouvelle installation crée la clé maîtresse à son premier démarrage (dans un conteneur, seulement si \`/etc/ucm\` est un volume à part) ; la section Sécurité des Paramètres affiche l'état du chiffrement, et la Vue d'ensemble affiche une bannière tant qu'aucune clé n'est chargée.
 
 > 💡 Les paramètres sensibles (session, verrouillage, HSTS, URL publique, politique de mot de passe) exigent la permission **admin:settings** : les champs sont verrouillés pour les opérateurs.
 
@@ -478,7 +481,11 @@ L'onglet suit ce qui est configuré par rapport à ce qui manque encore, pour le
 
 Un modèle avec un type de clé **ML-DSA** est annoncé par l'OID de son algorithme de clé, avec le Microsoft Software Key Storage Provider et une spécification de clé réservée à la signature. Il est masqué en mode FIPS, et l'inscription depuis un vrai client Windows n'a pas encore été testée.
 
-Un template **ECDSA** est annoncé en schéma de stratégie 3 avec sa courbe (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) comme clé de signature et condensat de requête, le plus fort entre le condensat du template et celui de la courbe ; les templates RSA hors mode FIPS restent en schéma 2. La clé de la requête doit convenir au template sous lequel elle est émise : même courbe ou même jeu ML-DSA, ou clé RSA au moins aussi longue (v2.251).
+Un template **ECDSA** est annoncé en schéma de stratégie 3 avec sa courbe (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) comme clé de signature et condensat de requête, le plus fort entre le condensat du template et celui de la courbe ; les templates RSA hors mode FIPS restent en schéma 2, qui ne nomme aucun condensat de requête : Windows signe alors sa requête CMC en SHA-1, ce qu'UCM accepte comme l'exigent ces clients ; une PKCS#10 simple signée en SHA-1 reste refusée. La clé de la requête doit convenir au template sous lequel elle est émise : même courbe ou même jeu ML-DSA, ou clé RSA au moins aussi longue (v2.251).
+
+Une requête qui nomme son template, par OID (\`szOID_CERTIFICATE_TEMPLATE\`) ou par nom (\`szOID_ENROLL_CERTTYPE\`), est émise sous ce template ; un template que la CA n'offre pas ou inactif, deux noms pour deux templates, ou des EKU que le template n'émet pas sont refusés. Chaque stratégie annonce l'extension \`szOID_CERTIFICATE_TEMPLATE\` de son template, que Windows CertEnroll copie dans sa requête, ce qui distingue deux templates aux EKU identiques (v2.252). Une requête qui n'en nomme aucun est appariée à un template par ses EKU. Un template dont tous les EKU ne sont jamais émis à un inscrit, comme la signature OCSP, n'est pas annoncé, et une requête pour lui est refusée. Le certificat porte les EKU de son template, pas ceux que la requête demande.
+
+WSTEP ne sert que le type de requête Issue, renouvellements compris, et refuse un message dont le \`wsu:Timestamp\` a expiré depuis plus de 5 minutes. Une PKCS#10 simple ou une requête CMC est reconnue à son contenu quel que soit son ValueType, et chaque réponse porte la CMC Full PKI Response à côté du certificat.
 
 ### Kerberos / SPNEGO
 

@@ -28,7 +28,7 @@ export default {
           { label: '缓存', text: '响应缓存，自动每日清理过期条目' },
           { label: '总查询数', text: '服务启动以来已应答的 OCSP 请求数量，以及其中由缓存提供的数量' },
           { label: 'HTTP 缓存', text: '不带 nonce 的应答可被 HTTP 缓存保留到其 nextUpdate，最长一小时（RFC 5019 §6.2：Expires、Last-Modified、ETag）；带 nonce 的应答不会被重用' },
-          { label: '委托响应器', text: '使用专用的 OCSPSigning 证书而非 CA 密钥签署响应,, 在详情面板中按 CA 分配' },
+          { label: '委托响应者', text: '使用专用的 OCSPSigning 证书而非 CA 密钥签署响应，在本页面中该 CA 的面板里按 CA 分配' },
           { label: '响应器自动续期', text: '每日任务在委托响应器证书到期前重新签发（相同密钥对，按原样续期）并重新绑定,, 默认启用。开关及其窗口（到期前天数，默认 30）位于 设置 › 安全' },
         ]
       },
@@ -109,7 +109,7 @@ UCM 缓存 OCSP 响应以提高性能。缓存：
 
 ### 委托 OCSP 响应器
 
-默认情况下，OCSP 响应由 CA 密钥本身签署。**委托响应器**改用带有 **OCSPSigning** EKU 的专用证书:, 在 CA 的详情面板中按 CA 分配（仅带有 OCSPSigning EKU 和私钥的证书可选）。
+默认情况下，OCSP 响应由 CA 密钥本身签署。**委托响应者**改用带有 **OCSPSigning** EKU 的专用证书。在本页面列表中所选 CA 的**委托响应者**部分按 CA 分配（仅带有 OCSPSigning EKU 和私钥的证书可选）。
 
 **自动续期**：每日任务在响应器证书到期前重新签发:, 相同密钥对和扩展，按原样续期,, 并将 CA 的响应器配置重新绑定到新证书。短期 OCSP 签名证书（例如 90 天模板）无需手动操作即可轮换。默认启用；可在 设置 › 安全 中禁用并调整续期窗口。
 
@@ -127,7 +127,7 @@ http://your-server:8080/ca/{ca_refid}.cer   (DER 格式)
 http://your-server:8080/ca/{ca_refid}.pem   (PEM 格式)
 \`\`\`
 
-在详情面板的 **AIA CA 签发者**部分中按 CA 启用。URL 使用 HTTP 协议服务器和配置的 FQDN 自动生成。
+在本页面该 CA 面板的 **AIA CA 颁发者**部分中按 CA 启用。URL 使用 HTTP 协议服务器和配置的 FQDN 自动生成。
 
 > ⚠️ **前提条件**：协议 URL（CDP、OCSP、AIA）需要有效的 **FQDN** 或在设置 → 通用中配置的**协议基础 URL**。如果您通过 \`localhost\` 访问 UCM，启用这些功能将失败:, 请先设置 FQDN。
 

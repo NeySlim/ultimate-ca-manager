@@ -170,7 +170,7 @@ Certificados revogados são publicados na CRL na próxima regeneração.
 
 Se um certificado foi revogado com o motivo **Suspensão de Certificado**, ele pode ser restaurado para o status válido:
 
-1. Abra os detalhes do certificado revogado
+1. Abra o certificado revogado no inspetor
 2. O botão **Remover Suspensão** aparece na barra de ações (apenas para revogações por Suspensão de Certificado)
 3. Clique em **Remover Suspensão** para restaurar o certificado
 4. O certificado retorna ao status válido, a CRL é regenerada e o cache OCSP é atualizado

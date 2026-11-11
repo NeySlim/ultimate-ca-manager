@@ -156,8 +156,10 @@ export default {
           { label: 'Sujetos derivados de AD', text: 'Las plantillas pueden optar por derivar su sujeto/SAN de Active Directory (mediante el conector de AD) para la inscripción desatendida' },
           { label: 'Plantillas ML-DSA (v2.248)', text: 'Se anuncian por el OID de su algoritmo de clave con el Microsoft Software Key Storage Provider, aún no probadas con un cliente Windows real, y ocultas en modo FIPS. La renovación con certificado no puede usar un certificado ML-DSA (XML-DSig no tiene firma ML-DSA): inscriba uno nuevo' },
           { label: 'Plantillas ECDSA (v2.251)', text: 'Se anuncian en el esquema de directiva 3 con su curva (ECDSA_P256, ECDSA_P384, ECDSA_P521) como clave de firma y un hash de solicitud, el más fuerte entre el resumen de la plantilla y el que corresponde a la curva. Las plantillas RSA fuera del modo FIPS siguen en el esquema 2' },
+          { label: 'Plantilla indicada en la solicitud (v2.252)', text: 'Cada directiva anuncia su extensión de plantilla (szOID_CERTIFICATE_TEMPLATE), que Windows copia en su solicitud, de modo que se emite un certificado con la plantilla elegida en el cliente aunque otra tenga los mismos EKU. Una solicitud que no nombra plantilla se asocia por sus EKU. Una plantilla cuyos EKU nunca se emiten a un solicitante, como OCSP Signing, no se anuncia, y una solicitud para ella se rechaza' },
           { label: 'Plantilla y clave (v2.251)', text: 'La clave de la solicitud debe ajustarse a la plantilla con la que se emite: la misma curva o el mismo conjunto ML-DSA, o una clave RSA al menos igual de larga, de modo que una solicitud P-384 ya no se emite con una plantilla P-256 que comparta su EKU. Se acepta el sobre de solicitud que Windows firma con una clave ECDSA' },
-          { label: 'Renovación desde Windows (v2.248)', text: 'certreq ... Renew se autentica con el certificado que se renueva como certificado de cliente TLS: requiere mTLS activado y la CA de WSTEP, o una de sus ancestras, de confianza. Una renovación conserva la plantilla y los EKU del certificado que renueva' },
+          { label: 'Renovación desde Windows (v2.248)', text: 'certreq ... Renew se autentica con el certificado que se renueva como certificado de cliente TLS: requiere mTLS activado y la CA de WSTEP, o una de sus ancestras, de confianza. Una renovación conserva la plantilla y los EKU del certificado que renueva, y su SubjectAltName cuando el CSR no lleva ninguno (v2.252)' },
+          { label: 'Tipo de certificado', text: 'Sin Server Auth, una plantilla con Email Protection o EFS emite un certificado S/MIME, una con Client Auth o Smartcard Logon uno de cliente: una solicitud de usuario CN=jdoe sin SAN no obtiene nombre DNS a partir de su CN. Una solicitud sin Key Usage recibe el Key Usage que configura la plantilla, o si no el del tipo de plantilla: Digital Signature, Key Encipherment y Non Repudiation para S/MIME o EFS, Digital Signature y Key Encipherment para Smartcard Logon, solo Digital Signature para Client Auth. Cualquier otra plantilla, o ninguna, emite uno de servidor' },
           { label: 'Kerberos en Docker (v2.251)', text: 'Las imágenes Docker incluyen el backend Kerberos de pyspnego, por lo que la vinculación Kerberos funciona en un contenedor igual que en las instalaciones DEB y RPM' },
         ]
       },
@@ -175,7 +177,7 @@ export default {
 
     ],
     tips: [
-      'Use el widget de Estado del Sistema en la parte superior para verificar rápidamente la salud de los servicios',
+      'Use la barra de estado inferior para comprobar que el servicio responde',
       'Pruebe la configuración SMTP antes de depender de las notificaciones por correo electrónico',
       'Personalice la plantilla de correo electrónico con su marca usando el editor HTML/texto integrado',
       'Programe copias de seguridad automáticas para entornos de producción',
@@ -255,7 +257,8 @@ Limita la interfaz web y la API de gestión a las direcciones IP y redes CIDR in
 Requerir que todos los usuarios activen la autenticación de dos factores.
 
 ### Cifrado de claves privadas
-Cifre todas las claves privadas almacenadas en la base de datos con AES-256, protegidas por un archivo de clave maestra. La sección muestra el estado del cifrado y los contadores de claves **cifradas / sin cifrar**. Dos variables de entorno opcionales hacen que la ausencia de claves sea fatal en el arranque: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (cifrado de secretos de integración) y \`UCM_REQUIRE_KEY_ENCRYPTION\` (cifrado de claves privadas).
+Cifre todas las claves privadas almacenadas en la base de datos con AES-128 (Fernet, con HMAC-SHA256), protegidas por un archivo de clave maestra. La sección muestra el estado del cifrado y los contadores de claves **cifradas / sin cifrar**. Dos variables de entorno opcionales hacen que la ausencia de claves sea fatal en el arranque: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (cifrado de secretos de integración) y \`UCM_REQUIRE_KEY_ENCRYPTION\` (cifrado de claves privadas).
+Una instalación nueva crea la clave maestra en su primer arranque (en un contenedor, solo cuando \`/etc/ucm\` es un volumen propio); la sección Seguridad de Configuración muestra el estado del cifrado, y el Resumen muestra un aviso mientras no hay ninguna clave cargada.
 
 > 💡 Las configuraciones sensibles de seguridad (sesión, bloqueo, HSTS, URL pública, política de contraseñas) requieren el permiso **admin:settings**: los campos están bloqueados para los operadores.
 

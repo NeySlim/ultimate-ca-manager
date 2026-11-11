@@ -23,6 +23,7 @@ export default {
           { label: 'Servir en HTTP plano', text: 'Desactivado por defecto. Responde también a SCEP en el puerto del protocolo HTTP (8080 por defecto), en http://su-servidor:8080/scep/pkiclient.exe y las URL de perfil, para clientes como sscep que no pueden usar HTTPS. RFC 8894 §7.10: los mensajes SCEP ya están protegidos, el sobre CMS mantiene privada la contraseña de desafío' },
           { label: 'Contraseña de desafío', text: 'Secreto compartido que los dispositivos usan para autenticar la inscripción. Una renovación (RenewalReq) firmada por un certificado que emitió el mismo endpoint (perfil o global) se autentica con ese certificado, por lo que su desafío no se comprueba y rotar el secreto no impide renovar a los dispositivos inscritos (RFC 8894 §2.4). Cualquier otro certificado sigue necesitando el desafío del endpoint' },
           { label: 'Claves del dispositivo (v2.248)', text: 'Un dispositivo firma su solicitud con una clave RSA, ECDSA, Ed25519 o ML-DSA; una firma ML-DSA sigue la RFC 9882 (resumen SHA-512). Ed448 se rechaza, y ML-DSA también en modo FIPS' },
+          { label: 'Nombres de la solicitud', text: 'Una solicitud cuyo sujeto o nombres DNS incumplen la RFC 5280 (un CN de más de 64 caracteres, un nombre DNS con espacio, apóstrofo o guion bajo, como el nombre de un dispositivo iOS) se rechaza con su motivo, una vez comprobado su desafío y antes de ponerla en cola, y se informa del rechazo a Intune; una renovación conserva los nombres que lleva su certificado. Construya un SAN DNS de Intune a partir de un valor apto para DNS' },
         ]
       },
       {
@@ -82,7 +83,7 @@ Cada perfil está vinculado a:
 - **Su propia CA**: distintas flotas de dispositivos pueden inscribirse contra CAs diferentes
 - **Una plantilla de certificado opcional**: cuando está vinculada, el uso de clave, el uso extendido de clave y la validez de la plantilla gobiernan cada certificado emitido a través del perfil
 - **Propósitos que ningún inscrito puede tener**: una plantilla vinculada a un perfil no puede llevar firma OCSP, sellado de tiempo, cualquier uso ni Smartcard Logon, y una renovación SCEP nunca los traslada; Smartcard Logon se permite cuando el perfil valida contra Intune, que avala la identidad
-- **Una contraseña de desafío por perfil**: almacenada cifrada, con la misma ventana de expiración que el desafío global
+- **Una contraseña de desafío por perfil**: almacenada cifrada, con la misma ventana de expiración que el desafío global (o la validación de Microsoft Intune, véase más abajo)
 - **Una política de aprobación**: aprobación automática o revisión manual por perfil
 
 Apunte cada flota de dispositivos, perfil MDM o tenant a su propia URL de perfil. El endpoint \`/scep/pkiclient.exe\` sin etiqueta sigue sirviendo la configuración global sin cambios.
@@ -91,7 +92,9 @@ Apunte cada flota de dispositivos, perfil MDM o tenant a su propia URL de perfil
 La pestaña **Desafíos** muestra las contraseñas de desafío. Los dispositivos deben incluir una contraseña de desafío válida en su solicitud de inscripción para autenticarse.
 
 - **Ver contraseña**: Mostrar el desafío actual para una CA
-- **Regenerar**: Crear una nueva contraseña de desafío (invalida la anterior)
+- **Regenerar**: Crear una nueva contraseña de desafío (invalida la anterior para las nuevas inscripciones)
+
+Una renovación (RenewalReq) firmada por un certificado que emitió el mismo endpoint (perfil o global) se autentica con ese certificado: no se comprueba su contraseña de desafío, de modo que un secreto regenerado no impide que los dispositivos ya inscritos renueven (RFC 8894 §2.4). Un certificado emitido en otro lugar, por otro perfil, ACME, EST o la interfaz, sigue necesitando el desafío del endpoint. Un dispositivo EC sigue enviando una contraseña, que sirve de clave para cifrar su respuesta.
 
 ### Información
 Muestra la URL del endpoint SCEP e instrucciones de integración.
@@ -131,20 +134,20 @@ Para solicitudes pendientes (aprobación automática desactivada):
 
 Una solicitud que llegó a través de un perfil se emite con la plantilla de ese perfil (validez, usos de clave), exactamente como lo haría la aprobación automática.
 
-> ⚠ Las contraseñas de desafío se transmiten en la solicitud SCEP. Siempre use HTTPS para el endpoint SCEP.
+> La contraseña de desafío va en el CSR, que viaja dentro del sobre CMS cifrado para la CA (RFC 8894 §2.4), por lo que HTTP plano no la expone. Un cliente que la envía como atributo firmado fuera del sobre sí la expone: mantenga esos clientes en HTTPS.
 
 ## Integración de dispositivos
 
 ### Cisco IOS
 \`\`\`
 crypto pki trustpoint UCM
-  enrollment url https://su-servidor:8443/scep
+  enrollment url https://su-servidor:8443/scep/pkiclient.exe
   password <contraseña-de-desafío>
 \`\`\`
 
 ### JAMF
 Configure el perfil SCEP con:
-- URL del servidor: \`https://su-servidor:8443/scep\`
+- URL del servidor: \`https://su-servidor:8443/scep/pkiclient.exe\`, o el \`/scep/<profile>/pkiclient.exe\` de un perfil
 - Desafío: la contraseña de UCM
 
 ### Microsoft Intune
@@ -154,7 +157,7 @@ Intune no admite una contraseña de desafío estática: emite su propio desafío
 2. En **Registros de aplicación de Intune**, añada el registro de aplicación una sola vez (nombre, ID de inquilino, ID de cliente, secreto de cliente) y haga clic en **Probar conexión** para confirmar que UCM puede alcanzar Intune; luego elíjalo en el selector **Registro de aplicación** del perfil. Los perfiles del mismo inquilino lo comparten, así que el secreto se rota en un solo lugar
 3. En Intune, apunte la URL del servidor del perfil SCEP del dispositivo al endpoint \`/scep/<segment>/pkiclient.exe\` de este perfil
 
-Los perfiles con Intune activado deben tener la **aprobación automática** activada: la inscripción de Intune es un ciclo síncrono de validación y emisión, sin cola de aprobación en el lado de Intune para una revisión manual.
+Los perfiles con Intune activado deben tener la **aprobación automática** activada. El flujo de inscripción de Intune es un ciclo síncrono de validación y emisión, sin cola en el lado de Intune para una revisión manual.
 `
   }
 }

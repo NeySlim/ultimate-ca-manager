@@ -155,9 +155,11 @@ export default {
           { label: 'Einrichtungs-Checkliste', text: 'Der Tab zeigt eine Live-Checkliste dessen, was konfiguriert ist bzw. noch fehlt, sowohl für die manuelle als auch die unbeaufsichtigte Registrierung' },
           { label: 'AD-abgeleitete Betreffe', text: 'Vorlagen können sich für die Ableitung ihres Betreffs/SAN aus Active Directory (über den AD-Connector) für die unbeaufsichtigte Registrierung entscheiden' },
           { label: 'ML-DSA-Vorlagen (v2.248)', text: 'Werden über ihre Schlüsselalgorithmus-OID mit dem Microsoft Software Key Storage Provider angekündigt, sind noch nicht mit einem echten Windows-Client getestet und im FIPS-Modus ausgeblendet. Die zertifikatsbasierte Erneuerung kann kein ML-DSA-Zertifikat verwenden (XML-DSig kennt keine ML-DSA-Signatur): ein neues Zertifikat registrieren' },
-          { label: 'ECDSA-Vorlagen (v2.251)', text: 'Werden in Richtlinienschema 3 mit ihrer Kurve (ECDSA_P256, ECDSA_P384, ECDSA_P521) als Signaturschlüssel und Anfrage-Hash angekündigt, dem stärkeren aus Vorlagen-Digest und dem zur Kurve passenden. RSA-Vorlagen außerhalb des FIPS-Modus bleiben bei Schema 2' },
+          { label: 'ECDSA-Vorlagen (v2.251)', text: 'Werden in Richtlinienschema 3 mit ihrer Kurve (ECDSA_P256, ECDSA_P384, ECDSA_P521) als Signaturschlüssel und Anfrage-Hash angekündigt, dem stärkeren aus Vorlagen-Digest und dem zur Kurve passenden. RSA-Vorlagen außerhalb des FIPS-Modus bleiben bei Schema 2, wo Windows seine CMC-Anfrage mit SHA-1 signiert, was UCM akzeptiert (ein reines SHA-1-PKCS#10 wird weiterhin abgelehnt)' },
+          { label: 'In der Anfrage genannte Vorlage (v2.252)', text: 'Jede Richtlinie kündigt ihre Vorlagenerweiterung (szOID_CERTIFICATE_TEMPLATE) an, die Windows in seine Anfrage übernimmt, sodass ein Zertifikat unter der am Client gewählten Vorlage ausgestellt wird, auch wenn eine andere dieselben EKUs hat. Eine Anfrage ohne Vorlagenangabe wird über ihre EKUs zugeordnet. Eine Vorlage, deren EKUs alle nie an einen Teilnehmer ausgestellt werden, etwa OCSP-Signierung, wird nicht angekündigt, und eine Anfrage dafür wird abgelehnt' },
           { label: 'Vorlage und Schlüssel (v2.251)', text: 'Der Anfrageschlüssel muss zur Vorlage passen, unter der ausgestellt wird: dieselbe Kurve oder derselbe ML-DSA-Satz, oder ein mindestens ebenso langer RSA-Schlüssel. Eine P-384-Anfrage wird also nicht mehr unter einer P-256-Vorlage mit gleichem EKU ausgestellt. Der Anfrage-Umschlag, den Windows mit einem ECDSA-Schlüssel signiert, wird akzeptiert' },
-          { label: 'Erneuerung von Windows (v2.248)', text: 'certreq ... Renew authentifiziert sich mit dem zu erneuernden Zertifikat als TLS-Client-Zertifikat: mTLS muss aktiviert und die WSTEP-CA oder eine ihrer übergeordneten CAs vertrauenswürdig sein. Eine Erneuerung behält Vorlage und EKUs des erneuerten Zertifikats' },
+          { label: 'Erneuerung von Windows (v2.248)', text: 'certreq ... Renew authentifiziert sich mit dem zu erneuernden Zertifikat als TLS-Client-Zertifikat: mTLS muss aktiviert und die WSTEP-CA oder eine ihrer übergeordneten CAs vertrauenswürdig sein. Eine Erneuerung behält Vorlage und EKUs des erneuerten Zertifikats sowie dessen SubjectAltName, wenn der CSR keinen trägt (v2.252)' },
+          { label: 'Zertifikatstyp', text: 'Ohne Server Auth stellt eine Vorlage mit E-Mail-Schutz oder EFS ein S/MIME-Zertifikat aus, eine mit Client Auth oder Smartcard-Anmeldung ein Client-Zertifikat: Eine Benutzeranfrage CN=jdoe ohne SAN erhält aus ihrem CN keinen DNS-Namen. Eine Anfrage ohne Key Usage erhält die in der Vorlage konfigurierte Key Usage, sonst die des Vorlagentyps: Digital Signature, Key Encipherment und Non Repudiation für S/MIME oder EFS, Digital Signature und Key Encipherment für Smartcard-Anmeldung, Digital Signature allein für Client Auth. Jede andere oder keine Vorlage stellt ein Server-Zertifikat aus' },
           { label: 'Kerberos in Docker (v2.251)', text: 'Die Docker-Images enthalten das Kerberos-Backend von pyspnego, sodass die Kerberos-Bindung in einem Container wie bei den DEB- und RPM-Installationen funktioniert' },
         ]
       },
@@ -175,7 +177,7 @@ export default {
 
     ],
     tips: [
-      'Verwenden Sie das Systemstatus-Widget oben, um den Dienstzustand schnell zu überprüfen',
+      'Prüfen Sie über die Statusleiste unten, ob der Dienst antwortet',
       'Testen Sie SMTP-Einstellungen, bevor Sie sich auf E-Mail-Benachrichtigungen verlassen',
       'Passen Sie das E-Mail-Template mit Ihrem Branding über den integrierten HTML/Text-Editor an',
       'Planen Sie automatische Sicherungen für Produktionsumgebungen',
@@ -255,7 +257,8 @@ Beschränkt die Weboberfläche und die Management-API auf aufgelistete IP-Adress
 Alle Benutzer zur Aktivierung der Zwei-Faktor-Authentifizierung verpflichten.
 
 ### Verschlüsselung privater Schlüssel
-Alle in der Datenbank gespeicherten privaten Schlüssel mit AES-256 verschlüsseln, geschützt durch eine Master-Key-Datei. Der Bereich zeigt den Verschlüsselungsstatus und die Zähler **verschlüsselt / unverschlüsselt**. Zwei Opt-in-Umgebungsvariablen machen fehlende Schlüssel beim Start fatal: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (Verschlüsselung von Integrationsgeheimnissen) und \`UCM_REQUIRE_KEY_ENCRYPTION\` (Verschlüsselung privater Schlüssel).
+Alle in der Datenbank gespeicherten privaten Schlüssel mit AES-128 (Fernet, mit HMAC-SHA256) verschlüsseln, geschützt durch eine Master-Key-Datei. Der Bereich zeigt den Verschlüsselungsstatus und die Zähler **verschlüsselt / unverschlüsselt**. Zwei Opt-in-Umgebungsvariablen machen fehlende Schlüssel beim Start fatal: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (Verschlüsselung von Integrationsgeheimnissen) und \`UCM_REQUIRE_KEY_ENCRYPTION\` (Verschlüsselung privater Schlüssel).
+Eine neue Installation erzeugt den Master-Key beim ersten Start (in einem Container nur, wenn \`/etc/ucm\` ein eigenes Volume ist); der Bereich Sicherheit der Einstellungen zeigt den Verschlüsselungsstatus, und die Übersicht zeigt ein Banner, solange kein Schlüssel geladen ist.
 
 > 💡 Sicherheitskritische Einstellungen (Sitzung, Sperrung, HSTS, öffentliche URL, Passwortrichtlinie) erfordern die Berechtigung **admin:settings**: die Felder sind für Operatoren gesperrt.
 

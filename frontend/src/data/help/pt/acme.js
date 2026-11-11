@@ -11,6 +11,7 @@ export default {
           { label: "Janela sugerida", text: "Retorna uma janela início/fim centrada antes da expiração, para distribuir as renovações" },
           { label: "Revogação", text: "Um certificado revogado retorna uma janela no passado → clientes conformes renovam imediatamente" },
           { label: "Sem autenticação", text: "renewalInfo é um GET simples, não requer conta nem JWS (RFC 9773)" },
+          { label: "Proxy ACME (v2.252)", text: "Para um certificado emitido através do proxy, a janela da CA upstream é retransmitida com o seu Retry-After, guardada até uma hora. A janela é calculada localmente quando a CA não anuncia renewalInfo ou não dá uma resposta utilizável, ou quando o certificado é revogado no UCM" },
         ]
       },
       {
@@ -85,6 +86,10 @@ export default {
           { label: 'Erros upstream (v2.252)', text: 'Um erro da CA upstream chega ao cliente com o seu tipo (rateLimited, badCSR, rejectedIdentifier, alreadyRevoked...), estado, subproblemas e Retry-After. Os erros sobre a própria conta upstream do proxy continuam serverInternal' },
           { label: 'Perfis e validade (v2.252)', text: 'O diretório lista os perfis da CA upstream. Um perfil, notBefore e notAfter pedidos pelo cliente são passados à CA upstream, um new-order repetido só reutiliza um pedido pendente quando os traz, e um perfil que a CA upstream não oferece é recusado com invalidProfile' },
           { label: 'Registo TXT recusado (v2.252)', text: 'Quando o provedor DNS recusa o registo TXT, o desafio não é submetido upstream: o pedido, as suas autorizações e desafios tornam-se inválidos, nenhum dos seus outros desafios é submetido, e a mensagem do provedor é registada e guardada no pedido. Os registos TXT de um pedido inválido ou desativado são removidos' },
+          { label: 'Submissão de desafio falhada (v2.252)', text: 'Quando a CA upstream recusa a resposta ao desafio (um nonce recusado mais de três vezes, um limite de taxa), ou responde 5xx ou nada e a autorização não mostra o desafio aceite, o pedido torna-se inválido com o erro upstream e continua inválido mesmo que a CA o valide mais tarde. Os seus registos TXT são removidos (dois minutos depois enquanto a CA ainda os pode ler, ou na passagem de manutenção de pedidos de 15 minutos quando um reinício interrompeu esse atraso); o pedido seguinte do cliente para os mesmos nomes é validado de novo, ou fica logo pronto quando a CA já os validou' },
+          { label: 'Verificações do CSR (v2.252)', text: 'Na finalização, o CSR deve nomear exatamente os identificadores do pedido, no CN ou no SAN (RFC 8555 §7.4): caso contrário é recusado com badCSR antes de qualquer coisa chegar à CA upstream' },
+          { label: 'Autorização desativada (v2.252)', text: 'Um pedido cuja autorização o cliente desativou continua inválido e não recebe certificado, mesmo quando o pedido de outra conta sobre o mesmo pedido upstream é emitido (RFC 8555 §7.5.2)' },
+          { label: 'URLs desconhecidos (v2.252)', text: 'Um URL ou método que nenhuma rota serve em /acme ou /acme/proxy recebe um documento de problema malformed com ligação ao diretório, como 405 com Allow quando outro método é servido, por exemplo um GET num recurso só POST (RFC 8555 §6.3)' },
           { label: 'Leituras de desafio (v2.252)', text: 'O proxy lê um desafio pela sua autorização, nunca com um POST-as-GET no desafio, que em algumas CAs inicia a validação antes de o registo TXT existir. A troca de chave (key rollover) não é oferecida pelo diretório do proxy' },
         ]
       },
@@ -387,9 +392,11 @@ certbot certonly \\
 
 > 💡 As credenciais EAB da conta CA upstream são distintas das do cliente: elas autenticam o UCM junto à CA upstream, não seus clientes junto ao UCM. Defina-as nessa conta em **Contas CA externas**.
 
-> ⚠ Pré-requisito: o domínio deve estar em ACME Domains com provedor DNS. O proxy suporta apenas dns-01.
+> ⚠ Pré-requisito: o domínio (ou um domínio pai que cubra os subdomínios) deve estar configurado em ACME Domains com provedor DNS. O proxy suporta apenas dns-01.
 
-> ⚠ Evite solicitações simultâneas para o mesmo FQDN (Certbot + interface UCM).
+> ⚠ Evite solicitações simultâneas para o mesmo FQDN (Certbot + interface UCM): o segundo registro TXT pode sobrescrever o primeiro.
+
+Os erros da CA upstream chegam ao cliente com o seu tipo ACME, estado e Retry-After (um limite de taxa é um 429 \`rateLimited\`, não uma falha do proxy). Um perfil, \`notBefore\` e \`notAfter\` são passados à CA upstream; um perfil que a CA upstream não lista é recusado com \`invalidProfile\`. Quando o provedor DNS recusa o registro TXT, o desafio não é submetido upstream e o pedido torna-se inválido, com a mensagem do provedor nos logs. Quando a CA upstream recusa a resposta ao desafio, ou responde 5xx ou nada e a autorização não mostra o desafio aceito, o pedido também se torna inválido em definitivo com o erro upstream e os seus registros TXT são removidos, de modo que o pedido seguinte do cliente é validado de novo. Um CSR que não nomeia exatamente os identificadores do pedido é recusado com \`badCSR\` antes de chegar à CA upstream (v2.252).
 
 > ℹ️ Em lab / certificado autoassinado, adicione \`--no-verify-ssl\` ao Certbot.
 
@@ -580,6 +587,7 @@ O servidor ACME local anuncia \`renewalInfo\` no seu directory e serve uma **jan
 - Janela centrada antes da expiração → renovações distribuídas
 - Certificado revogado → janela no passado (renovar já)
 - GET não autenticado em \`/acme/renewalInfo/<certID>\`
+- Proxy ACME: a janela da CA upstream é retransmitida com o seu Retry-After para um certificado emitido através do proxy; calculada localmente quando a CA não tem nenhuma ou não responde
 
 `
   }

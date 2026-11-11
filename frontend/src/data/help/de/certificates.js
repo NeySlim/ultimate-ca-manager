@@ -170,7 +170,7 @@ Widerrufene Zertifikate werden bei der nächsten Regenerierung in der CRL veröf
 
 Wenn ein Zertifikat mit dem Grund **Zertifikat gesperrt** widerrufen wurde, kann es auf den gültigen Status zurückgesetzt werden:
 
-1. Öffnen Sie die Details des widerrufenen Zertifikats
+1. Öffnen Sie das widerrufene Zertifikat im Inspektor
 2. Die Schaltfläche **Sperre aufheben** erscheint in der Aktionsleiste (nur für Widerrufe mit Zertifikat gesperrt)
 3. Klicken Sie auf **Sperre aufheben**, um das Zertifikat wiederherzustellen
 4. Das Zertifikat kehrt zum gültigen Status zurück, die CRL wird regeneriert und der OCSP-Cache aktualisiert

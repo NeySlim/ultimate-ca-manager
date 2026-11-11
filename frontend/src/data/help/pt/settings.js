@@ -155,9 +155,11 @@ export default {
           { label: 'Lista de verificação de configuração', text: 'A guia mostra uma lista de verificação em tempo real do que está configurado versus o que ainda falta, tanto para a inscrição manual quanto para a não assistida' },
           { label: 'Assuntos derivados do AD', text: 'Os modelos podem optar por derivar seu assunto/SAN do Active Directory (via conector AD) para a inscrição não assistida' },
           { label: 'Modelos ML-DSA (v2.248)', text: 'Anunciados pelo OID do seu algoritmo de chave com o Microsoft Software Key Storage Provider, ainda não testados com um cliente Windows real, e ocultos em modo FIPS. A renovação por certificado não pode usar um certificado ML-DSA (XML-DSig não tem assinatura ML-DSA): inscreva um novo' },
-          { label: 'Modelos ECDSA (v2.251)', text: 'Anunciados no esquema de diretiva 3 com a sua curva (ECDSA_P256, ECDSA_P384, ECDSA_P521) como chave de assinatura e um hash de pedido, o mais forte entre o digest do modelo e o que corresponde à curva. Os modelos RSA fora do modo FIPS permanecem no esquema 2' },
+          { label: 'Modelos ECDSA (v2.251)', text: 'Anunciados no esquema de diretiva 3 com a sua curva (ECDSA_P256, ECDSA_P384, ECDSA_P521) como chave de assinatura e um hash de pedido, o mais forte entre o digest do modelo e o que corresponde à curva. Os modelos RSA fora do modo FIPS permanecem no esquema 2, em que o Windows assina o seu pedido CMC com SHA-1, o que o UCM aceita (um PKCS#10 SHA-1 simples continua recusado)' },
+          { label: 'Modelo indicado no pedido (v2.252)', text: 'Cada diretiva anuncia a sua extensão de modelo (szOID_CERTIFICATE_TEMPLATE), que o Windows copia para o seu pedido, de modo que um certificado é emitido sob o modelo escolhido no cliente mesmo quando outro tem os mesmos EKUs. Um pedido sem modelo indicado é associado pelos seus EKUs. Um modelo cujos EKUs nunca são emitidos a um inscrito, como OCSP Signing, não é anunciado, e um pedido para ele é recusado' },
           { label: 'Modelo e chave (v2.251)', text: 'A chave do pedido deve caber no modelo sob o qual é emitida: a mesma curva ou o mesmo conjunto ML-DSA, ou uma chave RSA pelo menos igual em tamanho, de modo que um pedido P-384 já não é emitido sob um modelo P-256 com o mesmo EKU. O envelope de pedido que o Windows assina com uma chave ECDSA é aceito' },
-          { label: 'Renovação a partir do Windows (v2.248)', text: 'certreq ... Renew autentica-se com o certificado a renovar como certificado de cliente TLS: requer mTLS ativado com a CA WSTEP, ou uma das suas ancestrais, como confiável. Uma renovação mantém o modelo e os EKUs do certificado que renova' },
+          { label: 'Renovação a partir do Windows (v2.248)', text: 'certreq ... Renew autentica-se com o certificado a renovar como certificado de cliente TLS: requer mTLS ativado com a CA WSTEP, ou uma das suas ancestrais, como confiável. Uma renovação mantém o modelo e os EKUs do certificado que renova, e o seu SubjectAltName quando o CSR não traz nenhum (v2.252)' },
+          { label: 'Tipo de certificado', text: 'Sem Server Auth, um modelo com Email Protection ou EFS emite um certificado S/MIME, um com Client Auth ou Smartcard Logon um de cliente: um pedido de utilizador CN=jdoe sem SAN não recebe nome DNS a partir do CN. Um pedido sem Key Usage recebe o Key Usage que o modelo configura, ou então o do tipo de modelo: Digital Signature, Key Encipherment e Non Repudiation para S/MIME ou EFS, Digital Signature e Key Encipherment para Smartcard Logon, só Digital Signature para Client Auth. Qualquer outro modelo, ou nenhum, emite um de servidor' },
           { label: 'Kerberos no Docker (v2.251)', text: 'As imagens Docker incluem o backend Kerberos do pyspnego, de modo que a vinculação Kerberos funciona num contêiner como nas instalações DEB e RPM' },
         ]
       },
@@ -175,7 +177,7 @@ export default {
 
     ],
     tips: [
-      'Use o widget de Status do Sistema no topo para verificar rapidamente a saúde dos serviços',
+      'Use a barra de status na parte inferior para verificar se o serviço responde',
       'Teste as configurações SMTP antes de depender de notificações por e-mail',
       'Personalize o modelo de e-mail com sua marca usando o editor HTML/Texto integrado',
       'Agende backups automáticos para ambientes de produção',
@@ -255,7 +257,8 @@ Limite a interface web e a API de gestão aos endereços IP e redes CIDR listado
 Exigir que todos os usuários ativem autenticação de dois fatores.
 
 ### Criptografia de Chaves Privadas
-Criptografe todas as chaves privadas armazenadas no banco de dados com AES-256, protegidas por um arquivo de chave mestra. A seção mostra o status da criptografia e os contadores de chaves **criptografadas / não criptografadas**. Duas variáveis de ambiente opcionais tornam a ausência de chave fatal na inicialização: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (criptografia de segredos de integração) e \`UCM_REQUIRE_KEY_ENCRYPTION\` (criptografia de chaves privadas).
+Criptografe todas as chaves privadas armazenadas no banco de dados com AES-128 (Fernet, com HMAC-SHA256), protegidas por um arquivo de chave mestra. A seção mostra o status da criptografia e os contadores de chaves **criptografadas / não criptografadas**. Duas variáveis de ambiente opcionais tornam a ausência de chave fatal na inicialização: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (criptografia de segredos de integração) e \`UCM_REQUIRE_KEY_ENCRYPTION\` (criptografia de chaves privadas).
+Uma nova instalação cria a chave mestra na sua primeira inicialização (em um contêiner, apenas quando \`/etc/ucm\` é um volume próprio); a seção Segurança das Configurações mostra o status da criptografia, e a Visão geral mostra um banner enquanto nenhuma chave estiver carregada.
 
 > 💡 Configurações sensíveis à segurança (sessão, bloqueio, HSTS, URL pública, política de senha) requerem a permissão **admin:settings**: os campos ficam bloqueados para operators.
 
@@ -477,7 +480,11 @@ A guia rastreia o que está configurado versus o que ainda falta, tanto para o c
 
 Um modelo com tipo de chave **ML-DSA** é anunciado pelo OID do seu algoritmo de chave, com o Microsoft Software Key Storage Provider e um key spec só de assinatura. Fica oculto em modo FIPS, e a inscrição a partir de um cliente Windows real ainda não foi testada.
 
-Um modelo **ECDSA** é anunciado no esquema de diretiva 3 com a sua curva (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) como chave de assinatura e um hash de pedido, o mais forte entre o digest do modelo e o que corresponde à curva; os modelos RSA fora do modo FIPS permanecem no esquema 2. A chave do pedido deve caber no modelo sob o qual é emitida: a mesma curva ou o mesmo conjunto ML-DSA, ou uma chave RSA pelo menos igual em tamanho (v2.251).
+Um modelo **ECDSA** é anunciado no esquema de diretiva 3 com a sua curva (\`ECDSA_P256\`, \`ECDSA_P384\`, \`ECDSA_P521\`) como chave de assinatura e um hash de pedido, o mais forte entre o digest do modelo e o que corresponde à curva; os modelos RSA fora do modo FIPS permanecem no esquema 2, que não indica nenhum hash de pedido: o Windows assina então o seu pedido CMC com SHA-1, o que o UCM aceita como esses clientes exigem; um PKCS#10 simples assinado com SHA-1 continua recusado. A chave do pedido deve caber no modelo sob o qual é emitida: a mesma curva ou o mesmo conjunto ML-DSA, ou uma chave RSA pelo menos igual em tamanho (v2.251).
+
+Um pedido que indica o seu modelo, por OID (\`szOID_CERTIFICATE_TEMPLATE\`) ou por nome (\`szOID_ENROLL_CERTTYPE\`), é emitido sob esse modelo; são recusados um modelo que a CA não oferece ou que está inativo, dois nomes para dois modelos, ou EKUs que o modelo não emite. Cada diretiva anuncia a extensão \`szOID_CERTIFICATE_TEMPLATE\` do seu modelo, que o CertEnroll do Windows copia para o seu pedido, de modo que dois modelos com os mesmos EKUs se distinguem (v2.252). Um pedido sem modelo indicado é associado a um modelo pelos seus EKUs. Um modelo cujos EKUs nunca são emitidos a um inscrito, como OCSP Signing, não é anunciado, e um pedido para ele é recusado. O certificado traz os EKUs do seu modelo, não os que o pedido solicita.
+
+O WSTEP serve apenas o tipo de pedido Issue, renovações incluídas, e recusa uma mensagem cujo \`wsu:Timestamp\` expirou há mais de 5 minutos. Um PKCS#10 simples ou um pedido CMC é reconhecido pelo seu conteúdo, qualquer que seja o seu ValueType, e cada resposta traz a CMC Full PKI Response junto do certificado.
 
 ### Kerberos / SPNEGO
 
@@ -485,7 +492,7 @@ Vincula os endpoints XCEP/WSTEP autenticados por Kerberos usados para a autoinsc
 - **Nome da Entidade de Serviço (SPN)**: por exemplo, \`HTTP/ucm.exemplo.com@EXEMPLO.COM\`
 - **Keytab**: Gerado com \`ktpass\` ou \`ktutil\` no controlador de domínio para o SPN acima
 
-> ⚠ Se a biblioteca SPNEGO do lado do servidor não estiver instalada, a autenticação Kerberos não funcionará mesmo se habilitada aqui -- um aviso é exibido na guia.
+> ⚠ O Kerberos requer o **backend \`gssapi\`** do lado do servidor (a biblioteca Python \`gssapi\` mais as bibliotecas Kerberos do sistema): o pacote SPNEGO base não basta. Sem ele, a autenticação Kerberos não funcionará mesmo se habilitada aqui, e a vinculação Kerberos não é anunciada; um aviso é exibido na guia.
 
 As imagens Docker incluem esse backend desde a v2.251.
 

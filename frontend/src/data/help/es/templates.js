@@ -116,7 +116,7 @@ Una plantilla puede añadir extensiones para las que UCM no tiene ningún ajuste
 - Se rechazan las extensiones que UCM define por sí mismo (uso de clave, EKU, nombres, identificadores de clave, punteros CRL y OCSP, políticas, restricciones de nombre, qcStatements...): use sus propios ajustes
 - Un cliente que no reconoce una extensión **crítica** debe rechazar el certificado (RFC 5280, sección 4.2). Déjela no crítica salvo que todas las partes confiantes la entiendan
 
-Los paneles de detalle de certificados y CA enumeran esas extensiones en **Other extensions**, con su OID, nombre si se conoce, criticidad y valor.
+El inspector enumera esas extensiones para certificados y CA en **Otras extensiones**, en la pestaña Extensiones, con su OID, nombre si se conoce, criticidad y valor.
 
 ## Duplicar plantillas
 

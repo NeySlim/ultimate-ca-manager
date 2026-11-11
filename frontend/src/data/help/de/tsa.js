@@ -74,7 +74,7 @@ Der private Schlüssel der signierenden CA wird zum Signieren jedes Zeitstempel-
 
 - Verwenden Sie eine **dedizierte Sub-CA** für Zeitstempel anstelle Ihrer Root-CA
 - RFC 3161 §2.3 verlangt einen Signierer, dessen einzige, kritische EKU **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8) ist, was ein CA-Zertifikat nicht tragen kann, ohne seine anderen Verwendungen zu verlieren. Von dem CA-Zertifikat signierte Token lehnen strenge Prüfprogramme ab: \`openssl ts -verify\` scheitert mit „unsuitable certificate purpose“ und jarsigner mit „Certificate is not valid for timestamping“. Der Tab Einstellungen warnt, solange das CA-Zertifikat signiert: **Erzeugen Sie dort ein dediziertes Signaturzertifikat** für diese Clients
-- Stellen Sie sicher, dass das CA-Zertifikat eine **ausreichende Gültigkeit** hat: Zeitstempel müssen über Jahre hinweg verifizierbar bleiben. Eine CA außerhalb ihrer Gültigkeit signiert nicht: \`/tsa\` antwortet mit 503 und das Dashboard zeigt die TSA als offline
+- Stellen Sie sicher, dass das CA-Zertifikat eine **ausreichende Gültigkeit** hat: Zeitstempel müssen über Jahre hinweg verifizierbar bleiben. Eine CA außerhalb ihrer Gültigkeit signiert nicht: \`/tsa\` antwortet mit 503
 - Aktivieren Sie **Dediziertes Zeitstempelzertifikat erforderlich**, um dies beim Signieren zu erzwingen, statt sich auf Konvention zu verlassen
 
 ### Richtlinien-OID

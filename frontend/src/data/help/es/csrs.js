@@ -11,6 +11,7 @@ export default {
           { label: 'Cargar CSR', text: 'Aceptar archivos CSR codificados en PEM o pegar texto PEM' },
           { label: 'Revisar', text: 'Inspeccionar el sujeto, SAN, tipo de clave y firma antes de firmar' },
           { label: 'Firmar', text: 'Seleccionar una CA, tipo de certificado, establecer el período de validez y emitir el certificado' },
+          { label: 'Comprobaciones de la solicitud', text: 'El sujeto y los nombres de la solicitud se someten a las reglas del formulario de emisión: CN de 64 caracteres como máximo, C de dos letras, nombres DNS con la sintaxis de la RFC 5280 (sin espacio, guion bajo, punto final, dirección IP, última etiqueta solo con dígitos ni comodín más allá de la primera etiqueta). Un CN con sintaxis de nombre DNS da un nombre DNS (una sola etiqueta solo para un certificado de servidor o dispositivo, ninguna para S/MIME); otro no da ninguno, con un aviso cuando el CN de un servidor parece un host. Una sub-CA no recibe ninguno, y un emailAddress válido en el sujeto se añade al SAN. Cada rechazo indica su motivo' },
           { label: 'Añadir nombres', text: 'Al firmar, añada nombres de correo, DNS, IP o URI a los de la solicitud, por ejemplo la dirección de correo de un certificado S/MIME solicitado desde una tarjeta inteligente. Pasan por las restricciones de nombres de la CA, las políticas de emisión y la aprobación como cualquier otro' },
           { label: 'Firmar de nuevo', text: 'En Historial, devuelva una solicitud firmada a Pendientes para firmarla otra vez con otros EKU, nombres o validez, sin generar una clave nueva' },
           { label: 'Descargar', text: 'Descargar el CSR original en formato PEM' },
@@ -103,6 +104,14 @@ En modo Microsoft CA, se elige la plantilla AD CS en lugar del tipo de certifica
 El certificado resultante aparece en la página de Certificados.
 
 > 💡 Una solicitud generada en una tarjeta inteligente suele llevar solo un CN. Para un certificado S/MIME, elija el tipo «Email (S/MIME)» y añada la dirección: pasa a ser el nombre alternativo del sujeto del certificado. Los nombres añadidos pasan por las restricciones de nombres de la CA, las políticas de emisión y la aprobación como cualquier otro, y el aprobador los ve.
+
+Lo que puede llevar una solicitud se comprueba como en el formulario de emisión, y cada rechazo indica su motivo:
+- **Sujeto**: CN, O y OU de 64 caracteres como máximo, L y ST de 128, C un código de país de dos letras como PrintableString (RFC 5280, apéndice A)
+- **Nombres DNS**: letras, dígitos y guiones en etiquetas separadas por puntos (sin guion bajo), un comodín solo como primera etiqueta completa, sin punto final, una última etiqueta que no sea solo dígitos, nunca una dirección IP. Un nombre internacionalizado escrito en el formulario se emite como su A-label (\`xn--\`)
+- **Nombres a partir del CN**: una solicitud sin SAN obtiene un nombre DNS de su CN solo cuando el CN tiene sintaxis de nombre DNS (nunca \`John Doe\`); una sola etiqueta como \`intranet\` cuenta solo para un certificado de servidor o dispositivo, no para cliente, correo o firma de código, y un certificado de correo (S/MIME) no obtiene ninguno, ni siquiera de un CN con puntos como \`john.doe\`; un CN de servidor con aspecto de host que no da ninguno se indica en un aviso, y una sub-CA no obtiene ninguno
+- **Correo en el sujeto**: un emailAddress válido se añade también al SAN como nombre de correo, para todos los tipos de certificado
+- **Key Usage**: una solicitud sin Key Usage recibe el de su tipo, como en el formulario de emisión (cliente, firma de código y correo incluidos)
+- Una CA superior con pathLen 0, o un nombre fuera de las restricciones de nombres de la CA, se rechaza con ese motivo; el CN con puntos de un certificado de correo se comprueba como nombre DNS solo cuando el certificado lleva también Server Auth
 
 ### Firma con Microsoft CA
 

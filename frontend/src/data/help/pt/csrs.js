@@ -11,7 +11,8 @@ export default {
           { label: 'Enviar CSR', text: 'Aceitar arquivos CSR codificados em PEM ou colar texto PEM' },
           { label: 'Revisar', text: 'Inspecionar sujeito, SANs, tipo de chave e assinatura antes de assinar' },
           { label: 'Assinar', text: 'Selecionar uma CA, tipo de certificado, definir período de validade e emitir o certificado' },
-          { label: 'Adicionar nomes', text: 'Ao assinar, adicione nomes de email, DNS, IP ou URI aos do pedido, por exemplo o endereço de email de um certificado S/MIME pedido a partir de um smartcard. Passam pelas restrições de nomes da CA, pelas políticas de emissão e pela aprovação como quaisquer outros' },
+          { label: 'Verificações do pedido', text: 'O sujeito e os nomes do pedido seguem as regras do formulário de emissão: CN com no máximo 64 caracteres, C com duas letras, nomes DNS na sintaxe da RFC 5280 (sem espaço, sublinhado, ponto final, endereço IP, último rótulo todo numérico nem curinga depois do primeiro rótulo). Um CN com sintaxe de nome DNS gera um nome DNS (um único rótulo só para certificado de servidor ou dispositivo, nenhum para S/MIME); caso contrário não gera nenhum, com um aviso quando o CN de um servidor parece um host. Uma sub-CA não recebe nenhum, e um emailAddress válido no sujeito é acrescentado ao SAN. Cada recusa indica o seu motivo' },
+          { label: 'Adicionar nomes',text: 'Ao assinar, adicione nomes de email, DNS, IP ou URI aos do pedido, por exemplo o endereço de email de um certificado S/MIME pedido a partir de um smartcard. Passam pelas restrições de nomes da CA, pelas políticas de emissão e pela aprovação como quaisquer outros' },
           { label: 'Assinar novamente', text: 'No Histórico, volte a colocar um pedido assinado em Pendentes para o assinar de novo com outros EKUs, nomes ou validade, sem gerar uma nova chave' },
           { label: 'Baixar', text: 'Baixar o CSR original em formato PEM' },
           { label: 'Descarregar chave', text: 'Descarregar a chave privada de um CSR gerado no UCM, para a implantar junto de um certificado emitido por uma CA externa (requer a permissão read:private_keys)' },
@@ -103,6 +104,14 @@ No modo Microsoft CA, o modelo AD CS é escolhido no lugar do tipo de certificad
 O certificado resultante aparece na página de Certificados.
 
 > 💡 Um pedido gerado num smartcard traz muitas vezes apenas um CN. Para um certificado S/MIME, escolha o tipo Email e adicione o endereço: passa a ser o nome alternativo do sujeito do certificado. Os nomes adicionados passam pelas restrições de nomes da CA, pelas políticas de emissão e pela aprovação como quaisquer outros, e o aprovador vê-os.
+
+O que um pedido pode conter é verificado como no formulário de emissão, e cada recusa indica o seu motivo:
+- **Sujeito**: CN, O e OU com no máximo 64 caracteres, L e ST 128, C um código de país de duas letras como PrintableString (RFC 5280, apêndice A)
+- **Nomes DNS**: letras, dígitos e hífenes em rótulos separados por pontos (sem sublinhado), um curinga apenas como primeiro rótulo inteiro, sem ponto final, um último rótulo que não seja todo numérico, nunca um endereço IP. Um nome internacionalizado digitado no formulário é emitido como A-label (\`xn--\`)
+- **Nomes a partir do CN**: um pedido sem SAN recebe um nome DNS do seu CN apenas quando o CN tem sintaxe de nome DNS (nunca \`John Doe\`); um rótulo único como \`intranet\` conta apenas para um certificado de servidor ou dispositivo, não para cliente, email ou assinatura de código, e um certificado de email (S/MIME) não recebe nenhum, nem sequer de um CN com pontos como \`john.doe\`; um CN de servidor com aspeto de host que não gera nenhum é indicado num aviso, e uma sub-CA não recebe nenhum
+- **Email no sujeito**: um emailAddress válido é também acrescentado ao SAN como nome de email, para todos os tipos de certificado
+- **Key Usage**: um pedido sem Key Usage recebe o do seu tipo, como no formulário de emissão (cliente, assinatura de código e email incluídos)
+- Uma CA superior com pathLen 0, ou um nome fora das restrições de nomes da CA, é recusado com esse motivo; o CN com pontos de um certificado de email só é verificado como nome DNS quando o certificado também traz Server Auth
 
 ### Assinatura por Microsoft CA
 

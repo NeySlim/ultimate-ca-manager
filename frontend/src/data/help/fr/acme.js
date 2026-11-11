@@ -11,6 +11,7 @@ export default {
           { label: "Fenêtre suggérée", text: "Renvoie une fenêtre début/fin centrée avant l'expiration, pour étaler les renouvellements" },
           { label: "Révocation", text: "Un certificat révoqué renvoie une fenêtre dans le passé → les clients conformes renouvellent immédiatement" },
           { label: "Sans authentification", text: "renewalInfo est un simple GET, ni compte ni JWS requis (RFC 9773)" },
+          { label: "Proxy ACME (v2.252)", text: "Pour un certificat émis via le proxy, la fenêtre de la CA en amont est relayée avec son Retry-After, conservée jusqu'à une heure. La fenêtre est calculée localement quand la CA n'annonce pas de renewalInfo ou ne donne pas de réponse exploitable, ou quand le certificat est révoqué dans UCM" },
         ]
       },
       {
@@ -85,6 +86,10 @@ export default {
           { label: 'Erreurs en amont (v2.252)', text: 'Une erreur de la CA en amont parvient au client avec son type (rateLimited, badCSR, rejectedIdentifier, alreadyRevoked...), son statut, ses sous-problèmes et son Retry-After. Les erreurs sur le compte en amont du proxy restent serverInternal' },
           { label: 'Profils et validité (v2.252)', text: 'Le répertoire liste les profils de la CA en amont. Un profil, notBefore et notAfter demandés par le client sont transmis en amont, un new-order réessayé ne réutilise un order en attente que s\'il les porte, et un profil que la CA en amont n\'offre pas est refusé avec invalidProfile' },
           { label: 'Enregistrement TXT refusé (v2.252)', text: 'Quand le fournisseur DNS refuse l\'enregistrement TXT, le défi n\'est pas soumis en amont : l\'order, ses autorisations et ses défis deviennent invalides, aucun de ses autres défis n\'est soumis, et le message du fournisseur est journalisé et conservé sur l\'order. Les enregistrements TXT d\'un order invalide ou désactivé sont supprimés' },
+          { label: 'Échec de soumission du défi (v2.252)', text: 'Quand la CA en amont refuse la réponse au défi (nonce refusé plus de trois fois, limite de débit), ou répond par une 5xx ou rien sans que l\'autorisation montre le défi pris en compte, l\'order devient invalide avec l\'erreur en amont et le reste même si la CA le valide plus tard. Ses enregistrements TXT sont supprimés (deux minutes plus tard tant que la CA peut encore en lire un, ou lors de la passe d\'entretien des orders toutes les 15 minutes quand un redémarrage a interrompu ce délai) ; le prochain order du client sur les mêmes noms est validé à nouveau, ou est prêt aussitôt quand la CA les a déjà validés' },
+          { label: 'Contrôles de la CSR (v2.252)', text: 'À la finalisation, la CSR doit nommer exactement les identifiants de l\'order, dans son CN ou son SAN (RFC 8555 §7.4) : sinon elle est refusée avec badCSR avant que quoi que ce soit n\'atteigne la CA en amont' },
+          { label: 'Autorisation désactivée (v2.252)', text: 'Un order dont le client a désactivé l\'autorisation reste invalide et ne reçoit aucun certificat, même quand l\'order d\'un autre compte sur le même order en amont est émis (RFC 8555 §7.5.2)' },
+          { label: 'URL inconnues (v2.252)', text: 'Une URL ou une méthode qu\'aucune route ne sert sous /acme ou /acme/proxy reçoit un document de problème malformed avec un lien vers le répertoire, en 405 avec Allow quand une autre méthode est servie, comme un GET sur une ressource en POST seul (RFC 8555 §6.3)' },
           { label: 'Lectures de défi (v2.252)', text: 'Le proxy lit un défi via son autorisation, jamais par un POST-as-GET sur le défi, qui démarre la validation chez certaines CA avant que le TXT n\'existe. Le changement de clé n\'est pas proposé par le répertoire du proxy' },
         ]
       },
@@ -391,6 +396,8 @@ certbot certonly \\
 
 > ⚠ Évitez les demandes simultanées pour le même FQDN (Certbot + interface UCM) : le second enregistrement TXT peut écraser le premier.
 
+Les erreurs de la CA en amont parviennent au client avec leur type ACME, leur statut et leur Retry-After (une limite de débit est un 429 \`rateLimited\`, pas une panne du proxy). Un profil, \`notBefore\` et \`notAfter\` sont transmis en amont ; un profil que la CA en amont ne liste pas est refusé avec \`invalidProfile\`. Quand le fournisseur DNS refuse l'enregistrement TXT, le défi n'est pas soumis en amont et l'order devient invalide, avec le message du fournisseur dans les journaux. Quand la CA en amont refuse la réponse au défi, ou répond par une 5xx ou rien sans que l'autorisation montre le défi pris en compte, l'order devient aussi invalide définitivement avec l'erreur en amont et ses enregistrements TXT sont supprimés : le prochain order du client est validé à nouveau. Une CSR qui ne nomme pas exactement les identifiants de l'order est refusée avec \`badCSR\` avant d'atteindre la CA en amont (v2.252).
+
 > ℹ️ En environnement lab / certificat auto-signé, ajoutez \`--no-verify-ssl\` à Certbot.
 
 ### DNS UPDATE (RFC 2136)
@@ -511,6 +518,8 @@ Les commandes mixtes DNS + IP sont également prises en charge.
 - **HTTP-01** se connecte directement à l'IP (les littéraux IPv6 sont entre crochets, ex. \`http://[2001:db8::1]/...\`).
 - **TLS-ALPN-01** utilise la forme reverse-DNS de l'IP (\`in-addr.arpa\` / \`ip6.arpa\`) comme nom d'hôte SNI.
 
+- **TLS-ALPN-01** exige que le SubjectAltName du certificat de validation contienne exactement le nom ou l'IP validé, rien d'autre.
+
 ### Certificat émis
 Le certificat signé contient une entrée SubjectAltName **iPAddress** pour chaque IP validée.
 
@@ -580,6 +589,7 @@ Le serveur ACME local annonce \`renewalInfo\` dans son directory et sert une **f
 - Fenêtre centrée avant l'expiration → renouvellements étalés dans le temps
 - Certificat révoqué → fenêtre dans le passé (renouveler tout de suite)
 - GET non authentifié sur \`/acme/renewalInfo/<certID>\`
+- Proxy ACME : la fenêtre de la CA en amont est relayée avec son Retry-After pour un certificat émis via le proxy ; calculée localement quand la CA n'en a pas ou ne répond pas
 
 `
   }

@@ -170,7 +170,7 @@ Los certificados revocados se publican en la CRL en la próxima regeneración.
 
 Si un certificado fue revocado con el motivo **Suspensión de certificado**, puede restaurarse al estado válido:
 
-1. Abra los detalles del certificado revocado
+1. Abra el certificado revocado en el inspector
 2. El botón **Levantar suspensión** aparece en la barra de acciones (solo para revocaciones de tipo Suspensión de certificado)
 3. Haga clic en **Levantar suspensión** para restaurar el certificado
 4. El certificado vuelve al estado válido, la CRL se regenera y la caché OCSP se actualiza

@@ -23,74 +23,40 @@ export default {
     ],
   },
   helpGuides: {
-    title: 'Dashboard',
+    title: 'Panoramica',
     content: `
 ## Panoramica
 
-La Dashboard è il tuo hub di monitoraggio centrale. Mostra metriche in tempo reale, grafici e avvisi sull'intera infrastruttura PKI attraverso widget personalizzabili.
+La Panoramica è la pagina iniziale: sei schede indipendenti sui dati in tempo reale della tua PKI. Ogni scheda si carica per conto suo e mostra il proprio stato di caricamento, vuoto, errore o permesso mancante.
 
-## Widget
+## Schede
 
-### Scheda statistiche
-Mostra questi contatori:
-- **Certificati**: tutti i certificati, scaduti e revocati inclusi
-- **CA**: Autorità di certificazione Root e Intermedie
-- **CSR**: Richieste di firma certificato in attesa di firma
-- **ACME**: account ACME registrati
-- **Certificati SSH**: mostrato quando esiste una CA SSH
+### Da gestire
+I sei elementi più urgenti, quelli critici per primi, ciascuno con il link al proprio record. Un livello compresso dà il totale per tipo; i quattro tipi di rinnovo aprono l'elenco dei certificati.
 
-### Attività certificati
-Un grafico ad area dei certificati emessi, revocati e scaduti per giorno nel periodo scelto. Passa il mouse sui punti dati per vedere i conteggi esatti.
+### Stato dell'automazione
+Per protocollo (ACME, SCEP, EST), i successi e i fallimenti giornalieri e l'ultima operazione, più lo stato dello scheduler.
 
-### Distribuzione stati
-Grafico a torta che mostra la ripartizione degli stati dei certificati:
-- **Valido**: Entro il periodo di validità e non revocato
-- **In scadenza**: Scade entro 30 giorni
-- **Scaduto**: Oltre la data "Non dopo"
-- **Revocato**: Esplicitamente revocato
+### Gerarchia
+Le autorità ad albero sotto la loro CA padre, con lo stato di CRL e OCSP, un contrassegno offline o firmata in modo incrociato, e i certificati emessi da ciascuna in 7 giorni. Ogni autorità apre la propria pagina.
 
-### Prossima scadenza
-Elenca i sei certificati validi che scadono per primi, qualunque sia la data. Clicca su un certificato per visualizzarne i dettagli.
+### Orizzonte di scadenza
+I contatori dei certificati in scadenza e scaduti, ciascuno con il proprio elenco, e i cinque certificati che scadono per primi.
 
-### Stato del sistema
-Mostra lo stato dei servizi UCM:
-- Server ACME (abilitato/disabilitato)
-- Server SCEP
-- Protocollo EST (abilitato/disabilitato, CA assegnata)
-- Rigenerazione automatica CRL con conteggio CDP
-- Risponditore OCSP
-- TSA, SMTP e webhook
-- Stato del rinnovo automatico
+### Conformità
+Certificati attivi per algoritmo di chiave e debolezza: RSA sotto i 3072 bit, hash di firma debole, certificati server oltre 398 giorni, catena incompleta, nessuna chiave privata. Ogni contatore apre l'elenco corrispondente.
 
-Il pannello Salute del sistema mostra anche la connessione WebSocket, il database, l'API e l'ora dell'ultimo aggiornamento.
+### Ultime operazioni
+Le cinque operazioni più recenti. Senza **read:audit** vedi solo i tuoi eventi; con il permesso, un link apre l'intero registro nella pagina Registri di audit.
 
-### Attività recente
-Un feed in tempo reale delle ultime operazioni: emissione certificati, revoche, importazioni, accessi utente. Si aggiorna in tempo reale tramite WebSocket.
+## Aprire un elenco filtrato
+Ogni contatore che ha un elenco apre la pagina Certificati filtrata esattamente sui certificati che conta. Il filtro compare come chip sopra la tabella; rimuovilo con la sua x.
 
-### Autorità di certificazione
-Visualizzazione rapida delle ultime CA, ciascuna contrassegnata Root o Sub.
+## Scegliere le schede
+Scegli il preset **Operatore**, **Responsabile** o **Tutte le schede** nell'intestazione della pagina per decidere quali schede mostrare. Il layout è salvato con il tuo account e ti segue tra i browser.
 
-### Scadenza trust store
-Certificati attendibili che scadono per primi.
-
-### Account ACME
-Elenca gli account client ACME registrati e il conteggio dei loro ordini.
-
-## Personalizzazione
-
-### Riorganizzazione dei widget
-Clicca **Modifica layout** nell'intestazione della pagina, poi trascina qualsiasi widget dalla sua intestazione per riposizionarlo. Il layout utilizza una griglia responsiva che si adatta alle dimensioni dello schermo.
-
-### Mostrare/nascondere widget
-Clicca **Personalizza** (icona cursori) nell'intestazione della pagina, poi l'occhio accanto a un widget per attivarne/disattivarne la visibilità. I widget nascosti vengono ricordati tra le sessioni.
-
-### Persistenza del layout
-Il layout è salvato nel browser, non nel tuo account: ogni account che accede dallo stesso profilo del browser lo condivide, e un altro browser parte dal layout predefinito.
-
-## Aggiornamenti in tempo reale
-La dashboard riceve aggiornamenti in tempo reale tramite WebSocket. Non è necessario aggiornare manualmente: nuovi certificati, cambi di stato e voci di attività appaiono automaticamente.
-
-> 💡 Il punto verde nella barra laterale indica una connessione WebSocket attiva e scompare quando cade. I dati verranno aggiornati alla riconnessione.
+## Aggiornamento
+Le schede si caricano all'apertura della pagina; una scheda in errore offre **Riprova**. L'icona di connessione nella barra superiore mostra lo stato del collegamento in tempo reale, e la barra di stato in basso mostra la versione e se il servizio risponde.
 `
   }
 }

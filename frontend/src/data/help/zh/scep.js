@@ -23,6 +23,7 @@ export default {
           { label: '通过纯 HTTP 提供', text: '默认关闭。同时在 HTTP 协议端口（默认 8080）上应答 SCEP，地址为 http://your-server:8080/scep/pkiclient.exe 和各配置文件 URL，供 sscep 等无法使用 HTTPS 的客户端使用。RFC 8894 §7.10：SCEP 消息本身已受保护，CMS 信封使质询密码保持私密' },
           { label: '质询密码', text: '设备用于认证注册的共享密钥。由同一端点（配置文件或全局）签发的证书所签署的续期请求（RenewalReq）由该证书认证，因此不检查其质询，更换密钥也不会阻止已注册的设备续期（RFC 8894 §2.4）。任何其他证书仍需要该端点的质询' },
           { label: '设备密钥 (v2.248)', text: '设备使用 RSA、ECDSA、Ed25519 或 ML-DSA 密钥签署其请求；ML-DSA 签名遵循 RFC 9882（SHA-512 摘要）。Ed448 会被拒绝，FIPS 模式下 ML-DSA 也会被拒绝' },
+          { label: '请求名称', text: '主题或 DNS 名称违反 RFC 5280 的请求（CN 超过 64 个字符，或 DNS 名称含空格、撇号或下划线，例如 iOS 设备名称）会在验证其质询之后、入队之前被拒绝并说明原因，同时通知 Intune 该拒绝；续期会沿用其证书所带的名称。请用符合 DNS 规范的值构建 Intune SAN DNS' },
         ]
       },
       {
@@ -100,12 +101,12 @@ https://your-server:8443/scep/<profile>/pkiclient.exe
 
 ## SCEP 注册流程
 
-1. 管理员在 UCM 中配置 SCEP（CA、质询密码）
-2. 设备使用 SCEP URL 和质询密码配置
-3. 设备生成密钥对和 CSR
-4. 设备将 CSR 和质询密码发送到 UCM
-5. UCM 验证质询密码并签署证书（如果启用自动批准）
-6. 设备接收并安装证书
+1. 设备发送 **GetCACert** 请求以获取 CA 证书
+2. 设备生成密钥对并创建 CSR
+3. 设备将 CSR 与**质询密码**一起封装，并发送 **PKCSReq**
+4. UCM 验证质询密码
+5. 如果启用自动批准，UCM 签署并返回证书
+6. 如果未启用自动批准，由管理员审核并批准或拒绝
 
 ### 设备密钥
 设备使用自己的密钥（RSA、ECDSA、Ed25519 或 ML-DSA）签署 PKCSReq。ML-DSA 签名按 RFC 9882 校验（SHA-512 摘要、密钥自身的算法标识符、无参数）。Ed448 签名会被拒绝，FIPS 模式下 ML-DSA 签名也会被拒绝。请求仍会加密到 RSA 签名 CA。
@@ -126,41 +127,37 @@ GetNextCACert 提供该端点 CA 的后继者，由当前 CA 签署：与其具�
 
 ## 批准/拒绝请求
 
-如果未启用自动批准：
-1. 前往**请求**选项卡
-2. 查看待处理的请求
-3. 检查请求详情（主题、事务 ID、状态、CSR）
-4. 点击**批准**或**拒绝**
+对于待处理的请求（已禁用自动批准）：
+1. 查看请求详情（主题、事务 ID、状态、CSR）
+2. 点击**批准**以签署并签发证书
+3. 或点击**拒绝**并填写原因
 
 通过配置文件提交的请求会以该配置文件的模板（有效期、密钥用法）签发，与自动批准的结果完全一致。
+
+> 质询密码位于 CSR 中，而 CSR 在加密到 CA 的 CMS 信封内传输（RFC 8894 §2.4），因此纯 HTTP 不会暴露它。若客户端把它作为信封之外的已签名属性发送，则会暴露：请让这类客户端使用 HTTPS。
 
 ## 设备集成
 
 ### Cisco IOS
 \`\`\`
-crypto pki trustpoint UCM-CA
-  enrollment url https://your-server:8443/scep
-  subject-name CN=router.example.com,O=MyOrg
-  revocation-check crl
-  password challenge-password-here
-crypto pki enroll UCM-CA
+crypto pki trustpoint UCM
+  enrollment url https://your-server:8443/scep/pkiclient.exe
+  password <challenge-password>
 \`\`\`
 
 ### JAMF
 在 SCEP 配置文件中配置：
-- 服务器 URL：\`https://your-server:8443/scep\`
+- 服务器 URL：\`https://your-server:8443/scep/pkiclient.exe\`，或某个配置文件的 \`/scep/<profile>/pkiclient.exe\`
 - 质询：来自 UCM 的密码
 
 ### Microsoft Intune
-Intune 不支持静态质询密码:, 它会为每台设备签发自己的加密质询，只有 Intune 的 API 才能验证。在 SCEP **配置文件**（而非全局端点）上启用 **Microsoft Intune SCEP 质询验证**，并提供 Entra 应用注册的租户 ID、客户端 ID 和客户端密钥：
+Intune 不支持静态质询密码：它会为每台设备签发自己的加密质询，只有 Intune 的 API 才能验证。在 SCEP **配置文件**（而非全局端点）上启用 **Microsoft Intune SCEP 质询验证**，并提供 Entra 应用注册的租户 ID、客户端 ID 和客户端密钥：
 
 1. 在 Microsoft Entra ID 中注册一个应用，并授予其 **Intune API → SCEP challenge validation**（\`scep_challenge_provider\`）和 **Microsoft Graph → Application.Read.All** 应用程序权限，两者均需管理员同意
 2. 在 **Intune 应用注册** 中添加一次应用注册（名称、租户 ID、客户端 ID、客户端密钥），然后点击**测试连接**，确认 UCM 能够连接到 Intune；随后在配置文件的 **应用注册** 选择器中选择它。同一租户的配置文件共享该应用注册，因此密钥只需在一处轮换
 3. 在 Intune 中，将设备 SCEP 配置文件的服务器 URL 指向此配置文件的 \`/scep/<segment>/pkiclient.exe\` 端点
 
-启用了 Intune 的配置文件必须启用**自动批准**:, Intune 的注册是同步的验证并签发往返过程，Intune 一侧没有供人工审核的队列。
-
-> 💡 SCEP 是传统协议。对于新部署，如果设备支持，建议优先使用 EST。
+启用了 Intune 的配置文件必须启用**自动批准**。Intune 的注册是同步的验证并签发往返过程，Intune 一侧没有供人工审核的队列。
 `
   }
 }

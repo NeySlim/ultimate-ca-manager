@@ -72,8 +72,8 @@ Time Stamp Authority (TSA) implementa la **RFC 3161** per fornire marche tempora
 La chiave privata della CA firmataria viene usata per firmare ogni token timestamp. Buone pratiche:
 
 - Usa una **sotto-CA dedicata** per le marche temporali piuttosto che la CA root
-- Il certificato della CA dovrebbe includere l'Extended Key Usage **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8)
-- Assicurati che il certificato della CA abbia una **validità sufficiente**: le marche temporali devono rimanere verificabili per anni
+- La RFC 3161 §2.3 richiede un firmatario il cui unico EKU, critico, sia **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), che un certificato di CA non può avere senza perdere i suoi altri usi. I token firmati dal certificato della CA sono rifiutati dai verificatori rigorosi: \`openssl ts -verify\` fallisce con "unsuitable certificate purpose" e jarsigner con "Certificate is not valid for timestamping". La scheda Impostazioni avvisa finché firma il certificato della CA: **genera lì un certificato di firma dedicato** per questi client
+- Assicurati che il certificato della CA abbia una **validità sufficiente**: le marche temporali devono rimanere verificabili per anni. Una CA fuori dal periodo di validità non firma: \`/tsa\` risponde 503
 - Abilita **Richiedi un certificato TSA dedicato** per imporlo al momento della firma invece di affidarti alla convenzione
 
 ### Policy OID

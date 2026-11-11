@@ -11,6 +11,7 @@ export default {
           { label: "Vorgeschlagenes Fenster", text: "Liefert ein Start/Ende-Fenster zentriert vor dem Ablauf, um Erneuerungen zeitlich zu verteilen" },
           { label: "Widerruf", text: "Ein widerrufenes Zertifikat liefert ein Fenster in der Vergangenheit → konforme Clients erneuern sofort" },
           { label: "Ohne Authentifizierung", text: "renewalInfo ist ein einfacher GET, weder Konto noch JWS erforderlich (RFC 9773)" },
+          { label: "ACME-Proxy (v2.252)", text: "Für ein über den Proxy ausgestelltes Zertifikat wird das Fenster der Upstream-CA mit ihrem Retry-After weitergereicht und bis zu einer Stunde vorgehalten. Das Fenster wird lokal berechnet, wenn die CA kein renewalInfo ankündigt oder keine brauchbare Antwort gibt oder wenn das Zertifikat in UCM widerrufen ist" },
         ]
       },
       {
@@ -85,6 +86,10 @@ export default {
           { label: 'Upstream-Fehler (v2.252)', text: 'Ein Fehler der Upstream-CA erreicht den Client mit seinem Typ (rateLimited, badCSR, rejectedIdentifier, alreadyRevoked...), Status, Subproblems und Retry-After. Fehler zum eigenen Upstream-Konto des Proxys bleiben serverInternal' },
           { label: 'Profile und Gültigkeit (v2.252)', text: 'Das Directory listet die Profile der Upstream-CA. Ein vom Client angefordertes Profil, notBefore und notAfter werden an den Upstream weitergegeben, ein wiederholtes new-order verwendet eine ausstehende Order nur wieder, wenn es sie trägt, und ein Profil, das die Upstream-CA nicht anbietet, wird mit invalidProfile abgelehnt' },
           { label: 'Abgelehnter TXT-Record (v2.252)', text: 'Lehnt der DNS-Anbieter den TXT-Record ab, wird die Challenge nicht an den Upstream übermittelt: Die Order, ihre Autorisierungen und Challenges werden ungültig, keine ihrer anderen Challenges wird übermittelt, und die Meldung des Anbieters wird protokolliert und an der Order gespeichert. TXT-Records einer ungültigen oder deaktivierten Order werden entfernt' },
+          { label: 'Fehlgeschlagene Challenge-Übermittlung (v2.252)', text: 'Lehnt die Upstream-CA die Challenge-Antwort ab (ein mehr als dreimal abgelehnter Nonce, ein Rate Limit) oder antwortet sie mit 5xx oder gar nicht und die Autorisierung zeigt die Challenge nicht als übernommen, wird die Order mit dem Upstream-Fehler ungültig und bleibt es, auch wenn die CA sie später validiert. Ihre TXT-Records werden entfernt (zwei Minuten später, solange die CA noch einen lesen könnte, oder im 15-Minuten-Durchlauf der Order-Pflege, wenn ein Neustart diese Verzögerung unterbrochen hat); die nächste Order des Clients für dieselben Namen wird erneut validiert oder ist sofort bereit, wenn die CA sie bereits validiert hat' },
+          { label: 'CSR-Prüfungen (v2.252)', text: 'Bei der Finalisierung muss der CSR genau die Bezeichner der Order nennen, in CN oder SAN (RFC 8555 §7.4): Andernfalls wird er mit badCSR abgelehnt, bevor etwas die Upstream-CA erreicht' },
+          { label: 'Deaktivierte Autorisierung (v2.252)', text: 'Eine Order, deren Autorisierung der Client deaktiviert hat, bleibt ungültig und erhält kein Zertifikat, selbst wenn die Order eines anderen Kontos zur selben Upstream-Order ausgestellt wird (RFC 8555 §7.5.2)' },
+          { label: 'Unbekannte URLs (v2.252)', text: 'Eine URL oder Methode, die keine Route unter /acme oder /acme/proxy bedient, erhält ein malformed-Problemdokument mit Verweis auf das Directory, als 405 mit Allow, wenn eine andere Methode bedient wird, etwa ein GET auf eine reine POST-Ressource (RFC 8555 §6.3)' },
           { label: 'Challenge-Lesezugriffe (v2.252)', text: 'Der Proxy liest eine Challenge über ihre Autorisierung, nie mit einem POST-as-GET auf die Challenge, der die Validierung bei manchen CAs startet, bevor der TXT-Record existiert. Key Rollover bietet das Directory des Proxys nicht an' },
         ]
       },
@@ -387,9 +392,11 @@ certbot certonly \\
 
 > 💡 Die EAB-Zugangsdaten des Upstream-CA-Kontos sind von den Client-EAB getrennt: sie authentifizieren UCM gegenüber der Upstream-CA, nicht Ihre Clients gegenüber UCM. Legen Sie sie an diesem Konto unter **Externe CA-Konten** fest.
 
-> ⚠ Voraussetzung: Die Domain muss in ACME Domains mit DNS-Provider konfiguriert sein. Der Proxy unterstützt nur dns-01.
+> ⚠ Voraussetzung: Die Domain (oder eine übergeordnete Domain, die Subdomains abdeckt) muss in ACME Domains mit DNS-Provider konfiguriert sein. Der Proxy unterstützt nur dns-01.
 
-> ⚠ Vermeiden Sie gleichzeitige Anfragen für denselben FQDN (Certbot + UCM-UI).
+> ⚠ Vermeiden Sie gleichzeitige Anfragen für denselben FQDN (Certbot + UCM-UI): Der zweite TXT-Record kann den ersten überschreiben.
+
+Fehler der Upstream-CA erreichen den Client mit ihrem ACME-Typ, Status und Retry-After (ein Rate Limit ist ein 429 \`rateLimited\`, kein Proxy-Fehler). Ein Profil, \`notBefore\` und \`notAfter\` werden an den Upstream weitergegeben; ein Profil, das die Upstream-CA nicht auflistet, wird mit \`invalidProfile\` abgelehnt. Lehnt der DNS-Anbieter den TXT-Record ab, wird die Challenge nicht an den Upstream übermittelt und die Order wird ungültig, mit der Meldung des Anbieters in den Logs. Lehnt die Upstream-CA die Challenge-Antwort ab oder antwortet sie mit 5xx oder gar nicht und die Autorisierung zeigt die Challenge nicht als übernommen, wird die Order mit dem Upstream-Fehler endgültig ungültig und ihre TXT-Records werden entfernt, sodass die nächste Order des Clients erneut validiert wird. Ein CSR, der nicht genau die Bezeichner der Order nennt, wird mit \`badCSR\` abgelehnt, bevor er die Upstream-CA erreicht (v2.252).
 
 > ℹ️ Bei selbstsigniertem UCM-HTTPS-Zertifikat (Lab) \`--no-verify-ssl\` zu Certbot hinzufügen.
 
@@ -488,7 +495,7 @@ Die über ACME ausgestellten Zertifikate durchsuchen:
 Eine Order kann \`notBefore\` und \`notAfter\` tragen (cert-manager mit \`duration\`, lego \`--not-after\`). Das Zertifikat wird mit genau diesen Daten ausgestellt, oder die Anfrage wird als \`malformed\` abgelehnt: ein Fenster, das länger als die Gültigkeit des Profils ist (15 Minuten Uhrenabweichung ausgenommen), außerhalb der Gültigkeit der ausstellenden CA liegt oder bereits vergangen ist. Ein Fenster, das eine Richtlinie verbietet, länger als ihre maximale Gültigkeit oder über einem Schlüsseltyp-Horizont, wird bei finalize als \`badCSR\` abgelehnt. Ohne sie gilt die Gültigkeit des Profils.
 
 ### Widerruf
-Ein Client widerruft mit seinem Konto-Schlüssel oder mit dem eigenen Schlüssel des Zertifikats, und das gesendete Zertifikat muss Byte für Byte mit dem gespeicherten übereinstimmen: eine Seriennummer allein genügt nie. Nur ein RSA- oder EC-P-256-, P-384- oder P-521-Schlüssel kann eine ACME-Anfrage signieren, daher wird ein ML-DSA-, EdDSA- oder Brainpool-Zertifikat mit dem Konto widerrufen, das es bestellt hat; UCM nennt das in der Ablehnung.
+Ein Client widerruft mit seinem Konto-Schlüssel oder mit dem eigenen Schlüssel des Zertifikats, und das gesendete Zertifikat muss Byte für Byte mit dem gespeicherten übereinstimmen: eine Seriennummer allein genügt nie. Ein Konto, das gültige, nicht abgelaufene Autorisierungen für jeden Namen und jede IP-Adresse eines von diesem ACME-Server ausgestellten Zertifikats hält, darf es ebenfalls widerrufen, gleichgültig wer es bestellt hat; per Auto-Genehmigung erteilte Autorisierungen zählen nicht. Nur ein RSA- oder EC-P-256-, P-384- oder P-521-Schlüssel kann eine ACME-Anfrage signieren, daher wird ein ML-DSA-, EdDSA- oder Brainpool-Zertifikat mit dem Konto widerrufen, das es bestellt hat; UCM nennt das in der Ablehnung.
 
 ## Zertifikate für IP-Adressen (RFC 8738)
 
@@ -580,6 +587,7 @@ Der lokale ACME-Server kündigt \`renewalInfo\` in seinem Directory an und liefe
 - Fenster zentriert vor Ablauf → zeitlich verteilte Erneuerungen
 - Widerrufenes Zertifikat → Fenster in der Vergangenheit (jetzt erneuern)
 - Nicht authentifizierter GET auf \`/acme/renewalInfo/<certID>\`
+- ACME-Proxy: Für ein über den Proxy ausgestelltes Zertifikat wird das Fenster der Upstream-CA mit ihrem Retry-After weitergereicht; lokal berechnet, wenn die CA keines hat oder nicht antwortet
 
 `
   }

@@ -301,7 +301,7 @@ Dies ist der Standardweg, eine Root-CA zwischen seltenen Zeremonien zu schützen
 Das Passwort folgt der Standard-UCM-Komplexitätsrichtlinie: Mindestlänge, Mischung der Zeichenklassen, keine trivialen Sequenzen. Dieselben Regeln wie für Benutzerpasswörter.
 
 ### Schritt für Schritt. Offline nehmen
-1. CA-Detailansicht öffnen
+1. Die CA im Inspektor öffnen
 2. Auf **Offline nehmen** klicken
 3. Erklärung lesen, **Weiter** klicken
 4. Modus wählen (*Passwortgeschützt* oder *Datei-exportiert*)
@@ -309,7 +309,7 @@ Das Passwort folgt der Standard-UCM-Komplexitätsrichtlinie: Mindestlänge, Misc
 6. Bestätigen. Bei *Datei-exportiert* wird der verschlüsselte Schlüssel sofort heruntergeladen: sicher aufbewahren.
 
 ### Schritt für Schritt. Wiederherstellen
-1. Detailansicht der offline CA öffnen
+1. Die Offline-CA im Inspektor öffnen
 2. Auf **Wiederherstellen** klicken
 3. Passwort eingeben
 4. Bei *Datei-exportiert*: zusätzlich die zuvor heruntergeladene Schlüsseldatei auswählen

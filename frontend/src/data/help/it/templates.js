@@ -116,7 +116,7 @@ Un modello può aggiungere estensioni per cui UCM non ha un'impostazione. Ognuna
 - Le estensioni che UCM imposta da sé (key usage, EKU, nomi, identificatori di chiave, puntatori CRL e OCSP, policy, name constraints, qcStatements...) vengono rifiutate: usa le loro impostazioni
 - Un client che non riconosce un'estensione **critical** deve rifiutare il certificato (RFC 5280, sezione 4.2). Lasciala non critica a meno che ogni parte che si affida al certificato non la comprenda
 
-I pannelli di dettaglio di certificati e CA elencano tali estensioni sotto **Altre estensioni**, con OID, nome se noto, criticità e valore.
+L'ispettore elenca tali estensioni per certificati e CA sotto **Altre estensioni** nella scheda Estensioni, con OID, nome se noto, criticità e valore.
 
 ## Duplicazione dei modelli
 

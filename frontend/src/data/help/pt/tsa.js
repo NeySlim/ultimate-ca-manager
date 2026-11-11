@@ -72,8 +72,8 @@ Time Stamp Authority (TSA) implementa a **RFC 3161** para fornecer carimbos de t
 A chave privada da CA assinante é usada para assinar cada token de carimbo de tempo. Melhores práticas:
 
 - Use uma **sub-CA dedicada** para carimbos de tempo em vez da sua CA raiz
-- O certificado da CA deve incluir o Extended Key Usage **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8)
-- Garanta que o certificado da CA tenha **validade suficiente**: carimbos de tempo devem permanecer verificáveis por anos
+- A RFC 3161 §2.3 exige um assinante cujo único EKU, crítico, seja **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), o que um certificado de CA não pode portar sem perder os seus outros usos. Tokens assinados pelo certificado da CA são recusados por verificadores estritos: \`openssl ts -verify\` falha com "unsuitable certificate purpose" e o jarsigner com "Certificate is not valid for timestamping". A aba Configurações avisa enquanto o certificado da CA assina: **gere um certificado de assinatura dedicado** ali para esses clientes
+- Garanta que o certificado da CA tenha **validade suficiente**: carimbos de tempo devem permanecer verificáveis por anos. Uma CA fora do seu período de validade não assina: \`/tsa\` responde 503
 - Ative **Exigir um certificado de carimbo de tempo dedicado** para impor isso no momento da assinatura em vez de depender de convenção
 
 ### OID da Política
