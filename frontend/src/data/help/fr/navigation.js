@@ -37,7 +37,7 @@ export default {
       {
         title: 'Notifications',
         items: [
-          { label: 'Cloche', text: 'Le compteur est le nombre d\'éléments non lus du panneau : éléments critiques et approbations de la file de la vue d\'ensemble, et sauvegardes planifiées échouées ou sessions révoquées du journal d\'audit' },
+          { label: 'Cloche', text: 'Le compteur est le nombre d\'éléments non lus du panneau : éléments critiques et approbations de la file de la vue d\'ensemble, et sauvegardes planifiées échouées, restaurations échouées ou sessions révoquées du journal d\'audit' },
           { label: 'Ordre', text: 'Les éléments de la file viennent en premier, puis ceux du journal d\'audit, du plus récent au plus ancien' },
           { label: 'Droits', text: 'Vous ne voyez que les éléments des sources que vous pouvez lire ; une source sur laquelle vous n\'avez aucun droit n\'affiche rien' },
           { label: 'Lu', text: 'Marquez un élément ou tous comme lus ; les marques sont enregistrées avec vos préférences, et un élément résolu quitte le panneau' },

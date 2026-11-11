@@ -14,6 +14,7 @@ export const EventType = {
   // Certificate events
   CERTIFICATE_ISSUED: 'certificate.issued',
   CERTIFICATE_REVOKED: 'certificate.revoked',
+  CERTIFICATE_UNHELD: 'certificate.unheld',
   CERTIFICATE_EXPIRING: 'certificate.expiring',
   CERTIFICATE_RENEWED: 'certificate.renewed',
   CERTIFICATE_DELETED: 'certificate.deleted',
@@ -75,6 +76,7 @@ const WebSocketContext = createContext(null);
 const DATA_CHANGED_TYPE = {
   'certificate.issued': 'certificate',
   'certificate.revoked': 'certificate',
+  'certificate.unheld': 'certificate',
   'certificate.renewed': 'certificate',
   'certificate.deleted': 'certificate',
   'certificate.expiring': 'certificate',

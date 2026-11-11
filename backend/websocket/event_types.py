@@ -11,6 +11,7 @@ class EventType(str, Enum):
     # Certificate events
     CERTIFICATE_ISSUED = 'certificate.issued'
     CERTIFICATE_REVOKED = 'certificate.revoked'
+    CERTIFICATE_UNHELD = 'certificate.unheld'
     CERTIFICATE_EXPIRING = 'certificate.expiring'
     CERTIFICATE_RENEWED = 'certificate.renewed'
     CERTIFICATE_DELETED = 'certificate.deleted'
@@ -70,6 +71,7 @@ class EventType(str, Enum):
 EVENT_DESCRIPTIONS = {
     EventType.CERTIFICATE_ISSUED: "A new certificate has been issued",
     EventType.CERTIFICATE_REVOKED: "A certificate has been revoked",
+    EventType.CERTIFICATE_UNHELD: "A certificate hold has been lifted",
     EventType.CERTIFICATE_EXPIRING: "A certificate is about to expire",
     EventType.CA_CREATED: "A new Certificate Authority has been created",
     EventType.CA_UPDATED: "A Certificate Authority has been updated",

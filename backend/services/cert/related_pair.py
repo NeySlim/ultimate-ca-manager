@@ -317,6 +317,17 @@ def revocation_partner(row):
     return None if partner is not None and partner.archived else partner
 
 
+HOLD_REASONS = ('certificate_hold', 'certificateHold')
+
+
+def unhold_partner(row):
+    """The partner an unhold of *row* lifts with it: the revocation partner, when it is on hold."""
+    partner = revocation_partner(row)
+    if partner is not None and partner.revoked and partner.revoke_reason in HOLD_REASONS:
+        return partner
+    return None
+
+
 def anchor_first(row, partner):
     """``(A, B)``: B is the one whose certificate names the other, else the one carrying the link."""
     cert, other = row_certificate(row), row_certificate(partner)

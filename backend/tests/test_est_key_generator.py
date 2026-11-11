@@ -118,6 +118,28 @@ class TestLifecycle:
             .key_identifier == ca_cert.extensions.get_extension_for_class(
                 x509.SubjectKeyIdentifier).value.digest
 
+    def test_issue_then_reissue_each_tell_the_bus(self, app, client, use, monkeypatch):
+        from services.events import event_bus
+        ca_id, _ = use('lazy')
+        _reset(app, ca_id)
+        seen = []
+        monkeypatch.setattr(event_bus, 'emit', lambda t, p, ref=None, meta=None: seen.append((t, p)))
+        _signer_serial(client, 'evt-1.generator.test')
+        with app.app_context():
+            first_id = _delegate_row(ca_id).id
+            assert [(t, p['certificate']['id']) for t, p in seen
+                    if p['certificate']['id'] == first_id] == [('certificate.issued', first_id)]
+            row = _delegate_row(ca_id)
+            row.valid_to = utc_now() + datetime.timedelta(days=10)
+            db.session.commit()
+        del seen[:]
+        _signer_serial(client, 'evt-2.generator.test')
+        with app.app_context():
+            second_id = _delegate_row(ca_id).id
+        assert second_id != first_id
+        assert [(t, p['certificate']['id']) for t, p in seen
+                if p['certificate']['id'] == second_id] == [('certificate.renewed', second_id)]
+
     def test_reused_across_requests(self, app, client, use):
         ca_id, _ = use('main')
         first = _signer_serial(client, 'reuse-1.generator.test')

@@ -67,6 +67,18 @@ def _binding_value(app, ca_id):
 
 class TestOcspResponderRenewal:
 
+    def test_a_renewal_emits_certificate_renewed(self, app, auth_client, create_ca, monkeypatch):
+        from services.events import event_bus
+        ca = create_ca(cn='OCSP Renewal Event CA')
+        cert_id = _issue_responder_cert(auth_client, ca['id'], 'ocsp-renew-event.test')
+        _bind_responder(app, ca['id'], cert_id)
+        _set_cert_window(app, cert_id, utc_now() - timedelta(days=85), utc_now() + timedelta(days=5))
+        seen = []
+        monkeypatch.setattr(event_bus, 'emit', lambda t, p, ref=None, meta=None: seen.append((t, p)))
+        assert _run(app)['renewed'] == 1
+        renewed = [p for t, p in seen if t == 'certificate.renewed']
+        assert [c['certificate']['id'] for c in renewed] == [int(_binding_value(app, ca['id']))]
+
     def test_renews_expiring_responder_and_rebinds(self, app, auth_client, create_ca):
         ca = create_ca(cn='OCSP Renewal CA')
         cert_id = _issue_responder_cert(auth_client, ca['id'], 'ocsp-renew.test')

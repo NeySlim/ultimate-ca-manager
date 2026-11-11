@@ -84,6 +84,11 @@ class MicrosoftCACAControlMixin:
                     )
                     db.session.commit()
                     result['imported_cert_id'] = cert.id
+                    # One certificate this approval just issued, unlike a bulk inventory import
+                    from flask import g
+                    from services.webhook_service import emit_cert_issued
+                    emit_cert_issued(cert.to_dict(), ca_refid=cert.caref,
+                                     actor=getattr(getattr(g, 'current_user', None), 'username', None))
             except Exception as e:
                 # A claim left uncommitted would mark the request issued with no certificate
                 db.session.rollback()

@@ -282,6 +282,19 @@ class TestApproveDenyService:
         # certutil got the resubmit for the right request id
         assert any('-resubmit 201' in s for s in fake_ca.calls)
 
+    def test_approve_announces_the_certificate_it_imports(self, app, fake_ca, monkeypatch):
+        from services.events import event_bus
+        msca_id = _make_msca(app, 'CAC Approve Event')
+        fake_ca.add_pending(211, 'appr-evt.test.local')
+        fake_ca.issue(211, 'appr-evt.test.local')
+        seen = []
+        monkeypatch.setattr(event_bus, 'emit', lambda t, p, ref=None, meta=None: seen.append((t, p)))
+        with app.app_context():
+            from services.msca_service import MicrosoftCAService
+            result = MicrosoftCAService.approve_request(msca_id, 211)
+        assert [(t, p['certificate']['id']) for t, p in seen] == [
+            ('certificate.issued', result['imported_cert_id'])]
+
     def test_approve_known_serial_no_duplicate(self, app, fake_ca):
         msca_id = _make_msca(app, 'CAC Approve Dup E')
         fake_ca.add_pending(202, 'appr-e.test.local')

@@ -1176,6 +1176,8 @@
     "unholdWarning": "Cela supprimera la suspension du certificat et le restaurera en statut valide. Le certificat sera retiré de la CRL.",
     "unholdCertificate": "Lever la suspension",
     "unheld": "Suspension du certificat levée",
+    "unholdWarningRelated": "Cela supprimera la suspension du certificat et le restaurera en statut valide. Son certificat lié n°{{id}} est levé avec lui s'il est aussi suspendu. Ils seront retirés de la CRL.",
+    "unheldWithRelated": "Suspension du certificat levée, avec son certificat lié n°{{id}}",
     "unholdFailed": "Échec de la levée de suspension",
     "removeHold": "Lever la suspension",
     "certTypes": {
@@ -4191,6 +4193,7 @@
     "eventLabels": {
       "certificateIssued": "Émis",
       "certificateRevoked": "Révoqué",
+      "certificateUnheld": "Suspension levée",
       "certificateRenewed": "Renouvelé",
       "certificateExpiring": "Expire bientôt",
       "certificateExpired": "Expiré",
@@ -6056,6 +6059,7 @@
         "renewal_declined": "Renouvellement refusé",
         "ca_expiring": "CA bientôt expirée",
         "system_backup": "Échec de la sauvegarde",
+        "system_restore": "Échec de la restauration",
         "session_revoke": "Session révoquée",
         "session_revoke_all": "Sessions révoquées"
       }

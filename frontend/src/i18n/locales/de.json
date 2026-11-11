@@ -798,6 +798,8 @@
     "unholdWarning": "Dadurch wird die Zertifikatssperre aufgehoben und es wird wieder als gültig eingestuft. Das Zertifikat wird aus der CRL entfernt.",
     "unholdCertificate": "Sperre aufheben",
     "unheld": "Zertifikatssperre aufgehoben",
+    "unholdWarningRelated": "Dadurch wird die Zertifikatssperre aufgehoben und das Zertifikat wieder als gültig eingestuft. Das verknüpfte Zertifikat #{{id}} wird mit aufgehoben, falls es ebenfalls gesperrt ist. Beide werden aus der CRL entfernt.",
+    "unheldWithRelated": "Zertifikatssperre aufgehoben, zusammen mit dem verknüpften Zertifikat #{{id}}",
     "unholdFailed": "Fehler beim Aufheben der Sperre",
     "removeHold": "Sperre aufheben",
     "certTypes": {
@@ -4188,6 +4190,7 @@
     "eventLabels": {
       "certificateIssued": "Ausgestellt",
       "certificateRevoked": "Gesperrt",
+      "certificateUnheld": "Sperre aufgehoben",
       "certificateRenewed": "Erneuert",
       "certificateExpiring": "Läuft bald ab",
       "certificateExpired": "Abgelaufen",
@@ -6053,6 +6056,7 @@
         "renewal_declined": "Erneuerung abgelehnt",
         "ca_expiring": "CA läuft ab",
         "system_backup": "Sicherung fehlgeschlagen",
+        "system_restore": "Wiederherstellung fehlgeschlagen",
         "session_revoke": "Sitzung widerrufen",
         "session_revoke_all": "Sitzungen widerrufen"
       }

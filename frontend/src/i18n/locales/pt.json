@@ -798,6 +798,8 @@
     "unholdWarning": "Isso removerá a suspensão do certificado e o restaurará para o estado válido. O certificado será removido da CRL.",
     "unholdCertificate": "Remover suspensão",
     "unheld": "Suspensão do certificado removida",
+    "unholdWarningRelated": "Isso removerá a suspensão do certificado e o restaurará para o estado válido. O certificado vinculado n.º {{id}} também é restaurado se estiver suspenso. Ambos serão removidos da CRL.",
+    "unheldWithRelated": "Suspensão do certificado removida, junto com o certificado vinculado n.º {{id}}",
     "unholdFailed": "Falha ao remover a suspensão",
     "removeHold": "Remover suspensão",
     "certTypes": {
@@ -4188,6 +4190,7 @@
     "eventLabels": {
       "certificateIssued": "Emitido",
       "certificateRevoked": "Revogado",
+      "certificateUnheld": "Suspensão removida",
       "certificateRenewed": "Renovado",
       "certificateExpiring": "Expirando",
       "certificateExpired": "Expirado",
@@ -6053,6 +6056,7 @@
         "renewal_declined": "Renovação recusada",
         "ca_expiring": "CA prestes a expirar",
         "system_backup": "Backup falhado",
+        "system_restore": "Restauração falhada",
         "session_revoke": "Sessão revogada",
         "session_revoke_all": "Sessões revogadas"
       }

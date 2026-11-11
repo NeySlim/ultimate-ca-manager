@@ -798,6 +798,8 @@
     "unholdWarning": "这将解除证书暂停并恢复其有效状态。证书将从CRL中移除。",
     "unholdCertificate": "解除暂停",
     "unheld": "证书暂停已解除",
+    "unholdWarningRelated": "这将解除证书暂停并恢复其有效状态。若其关联证书 #{{id}} 同样处于暂停状态，也会一并解除。两者都将从CRL中移除。",
+    "unheldWithRelated": "证书暂停已解除，其关联证书 #{{id}} 一并解除",
     "unholdFailed": "解除暂停失败",
     "removeHold": "解除暂停",
     "certTypes": {
@@ -4188,6 +4190,7 @@
     "eventLabels": {
       "certificateIssued": "已签发",
       "certificateRevoked": "已吊销",
+      "certificateUnheld": "暂停已解除",
       "certificateRenewed": "已续期",
       "certificateExpiring": "即将过期",
       "certificateExpired": "已过期",
@@ -6053,6 +6056,7 @@
         "renewal_declined": "续期被拒绝",
         "ca_expiring": "CA 即将到期",
         "system_backup": "备份失败",
+        "system_restore": "恢复失败",
         "session_revoke": "会话已吊销",
         "session_revoke_all": "多个会话已吊销"
       }

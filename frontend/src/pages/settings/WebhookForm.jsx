@@ -8,6 +8,7 @@ import { changedTargets, secretRequiredForTarget } from '../../lib/secretTarget'
 const WEBHOOK_EVENTS = [
   'certificate.issued',
   'certificate.revoked',
+  'certificate.unheld',
   'certificate.renewed',
   'certificate.expiring',
   'certificate.expired',
@@ -34,6 +35,7 @@ const WEBHOOK_EVENTS = [
 export const WEBHOOK_EVENT_LABEL_KEYS = {
   'certificate.issued': 'webhooks.eventLabels.certificateIssued',
   'certificate.revoked': 'webhooks.eventLabels.certificateRevoked',
+  'certificate.unheld': 'webhooks.eventLabels.certificateUnheld',
   'certificate.renewed': 'webhooks.eventLabels.certificateRenewed',
   'certificate.expiring': 'webhooks.eventLabels.certificateExpiring',
   'certificate.expired': 'webhooks.eventLabels.certificateExpired',

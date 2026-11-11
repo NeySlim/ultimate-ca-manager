@@ -66,6 +66,16 @@ def on_certificate_revoked(cert_id: int, cn: str, reason: str, revoked_by: str):
     }, ROOM_CERTIFICATES)
 
 
+def on_certificate_unheld(cert_id: int, cn: str, unheld_by: str):
+    """Emit event when a certificate hold is lifted."""
+    from websocket.event_types import EventType
+    emit_ws_event(EventType.CERTIFICATE_UNHELD, {
+        'id': cert_id,
+        'cn': cn,
+        'unheld_by': unheld_by
+    }, ROOM_CERTIFICATES)
+
+
 def on_certificate_renewed(cert_id: int, old_cert_id: int, cn: str):
     """Emit event when a certificate is renewed."""
     from websocket.event_types import EventType

@@ -798,6 +798,8 @@
     "unholdWarning": "これにより証明書の一時停止が解除され、有効な状態に復元されます。証明書はCRLから削除されます。",
     "unholdCertificate": "一時停止を解除",
     "unheld": "証明書の一時停止が解除されました",
+    "unholdWarningRelated": "これにより証明書の一時停止が解除され、有効な状態に復元されます。関連する証明書 #{{id}} も一時停止中であれば同時に解除されます。両方ともCRLから削除されます。",
+    "unheldWithRelated": "証明書の一時停止が解除されました（関連証明書 #{{id}} を含む）",
     "unholdFailed": "一時停止の解除に失敗しました",
     "removeHold": "一時停止解除",
     "certTypes": {
@@ -4191,6 +4193,7 @@
     "eventLabels": {
       "certificateIssued": "発行",
       "certificateRevoked": "失効",
+      "certificateUnheld": "一時停止の解除",
       "certificateRenewed": "更新",
       "certificateExpiring": "期限間近",
       "certificateExpired": "期限切れ",
@@ -6056,6 +6059,7 @@
         "renewal_declined": "更新の拒否",
         "ca_expiring": "CAの期限切れ間近",
         "system_backup": "バックアップの失敗",
+        "system_restore": "復元の失敗",
         "session_revoke": "セッションの取り消し",
         "session_revoke_all": "複数セッションの取り消し"
       }

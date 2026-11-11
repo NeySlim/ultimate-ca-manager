@@ -57,6 +57,8 @@ def ws_subscriber(event_type, payload, ca_refid, meta):
     elif event_type == 'certificate.revoked':
         ws.on_certificate_revoked(c.get('id'), c.get('subject') or c.get('descr'),
                                   (meta or {}).get('reason'), actor)
+    elif event_type == 'certificate.unheld':
+        ws.on_certificate_unheld(c.get('id'), c.get('subject') or c.get('descr'), actor)
     elif event_type == 'certificate.renewed':
         ws.on_certificate_renewed(c.get('id'), c.get('id'), c.get('subject') or c.get('descr'))
     elif event_type == 'certificate.deleted':
@@ -70,7 +72,7 @@ def ws_subscriber(event_type, payload, ca_refid, meta):
 
 
 _EMAIL_EVENTS = ('certificate.issued', 'certificate.revoked', 'ca.created')
-_WS_EVENTS = ('certificate.issued', 'certificate.revoked', 'certificate.renewed',
+_WS_EVENTS = ('certificate.issued', 'certificate.revoked', 'certificate.unheld', 'certificate.renewed',
               'certificate.deleted', 'ca.created', 'ca.updated', 'ca.deleted')
 
 

@@ -798,6 +798,8 @@
     "unholdWarning": "Questo rimuoverà la sospensione del certificato e lo ripristinerà in stato valido. Il certificato sarà rimosso dalla CRL.",
     "unholdCertificate": "Rimuovi sospensione",
     "unheld": "Sospensione del certificato rimossa",
+    "unholdWarningRelated": "Questo rimuoverà la sospensione del certificato e lo ripristinerà in stato valido. Anche il certificato collegato #{{id}} viene ripristinato se è sospeso. Entrambi saranno rimossi dalla CRL.",
+    "unheldWithRelated": "Sospensione del certificato rimossa, insieme al certificato collegato #{{id}}",
     "unholdFailed": "Impossibile rimuovere la sospensione",
     "removeHold": "Rimuovi sospensione",
     "certTypes": {
@@ -4188,6 +4190,7 @@
     "eventLabels": {
       "certificateIssued": "Emesso",
       "certificateRevoked": "Revocato",
+      "certificateUnheld": "Sospensione rimossa",
       "certificateRenewed": "Rinnovato",
       "certificateExpiring": "In scadenza",
       "certificateExpired": "Scaduto",
@@ -6053,6 +6056,7 @@
         "renewal_declined": "Rinnovo rifiutato",
         "ca_expiring": "CA in scadenza",
         "system_backup": "Backup non riuscito",
+        "system_restore": "Ripristino non riuscito",
         "session_revoke": "Sessione revocata",
         "session_revoke_all": "Sessioni revocate"
       }
