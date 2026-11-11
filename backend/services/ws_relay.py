@@ -13,6 +13,7 @@ from datetime import timedelta
 from itertools import islice
 
 from sqlalchemy import DateTime, bindparam, text
+from sqlalchemy.exc import DBAPIError
 
 from utils.datetime_utils import utc_now
 
@@ -49,8 +50,14 @@ def _newest_id(conn):
         issued = conn.execute(_SQLITE_SEQ_SQL).scalar()
     elif conn.dialect.name == 'postgresql':
         name = conn.execute(_PG_SEQ_NAME_SQL).scalar()
-        issued = conn.execute(text(f"SELECT CASE WHEN is_called THEN last_value ELSE 0 END FROM {name}")
-                              ).scalar() if name else None
+        issued = None
+        try:
+            # A role without SELECT on the sequence falls back to MAX(id); the savepoint keeps the transaction usable
+            with conn.begin_nested():
+                issued = conn.execute(text(f"SELECT CASE WHEN is_called THEN last_value ELSE 0 END FROM {name}")
+                                      ).scalar() if name else None
+        except DBAPIError:
+            issued = None
     else:
         issued = None
     return max(newest, issued or 0)
