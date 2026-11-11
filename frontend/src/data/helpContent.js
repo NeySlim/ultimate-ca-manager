@@ -1620,6 +1620,7 @@ export const helpContent = {
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Opt-in environment variable: refuse to start without an explicit database encryption key' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: 'Opt-in environment variable: refuse to start unless private-key encryption is enabled' },
           { label: 'Encrypt remaining keys', text: 'Shown while encryption is enabled and some keys or secrets are still stored unencrypted: encrypts them, leaving those already encrypted as they are' },
+          { label: 'Data key rotation', text: 'Keys are encrypted under a data key stored in the database and wrapped by the master key (master.key or KEY_ENCRYPTION_KEY), still the only file to back up. Rotate Data Key re-encrypts every stored key and secret under a new data key without changing the master key; an interrupted rotation keeps both data keys and is finished by running it again. The fingerprint shown names the master key without revealing it' },
         ]
       },
       {

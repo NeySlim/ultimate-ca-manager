@@ -15,7 +15,7 @@ function networksList(value) {
   return networksText(value).split(/[\s,;]+/).filter(Boolean)
 }
 
-export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, encryptionLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
+export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, handleRotateDataKey, encryptionLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
   const { t } = useTranslation()
   // Fields the API writes for admin:settings only are shown, but disabled.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
@@ -41,6 +41,20 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                 </span>
               )}
             </div>
+
+            {encryptionStatus.enabled && encryptionStatus.kek_fingerprint && (
+              <div className="flex items-center gap-3 flex-wrap text-xs text-text-secondary">
+                <span>
+                  {t('settings.kekFingerprint')}: <code className="text-text-primary">{encryptionStatus.kek_fingerprint}</code>
+                </span>
+                <span>
+                  {t('settings.dekVersion')}: <strong className="text-text-primary">{encryptionStatus.dek_version}</strong>
+                </span>
+                {encryptionStatus.rotation_in_progress && (
+                  <Badge variant="warning">{t('settings.dekRotationInProgress')}</Badge>
+                )}
+              </div>
+            )}
             
             {encryptionStatus.total_keys > 0 && (
               <div className="flex gap-4 text-sm">
@@ -94,16 +108,26 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                         {t('settings.encryptRemainingKeys', { count: encryptionStatus.unencrypted_count })}
                       </Button>
                     )}
-                    {/* An environment key would come back after the file is removed */}
-                    {encryptionStatus.key_source === 'file' && (
+                    {handleRotateDataKey && (
                       <Button
-                        onClick={() => setShowDisableEncryptionModal(true)}
+                        onClick={handleRotateDataKey}
                         variant="outline"
+                        disabled={encryptionLoading}
                       >
-                        <Lock size={16} />
-                        {t('settings.disableEncryption')}
+                        <LockKey size={16} />
+                        {encryptionStatus.rotation_in_progress
+                          ? t('settings.resumeDataKeyRotation')
+                          : t('settings.rotateDataKey')}
                       </Button>
                     )}
+                    {/* A key that stays configured (environment, HA) is kept unused */}
+                    <Button
+                      onClick={() => setShowDisableEncryptionModal(true)}
+                      variant="outline"
+                    >
+                      <Lock size={16} />
+                      {t('settings.disableEncryption')}
+                    </Button>
                   </div>
                 )}
               </div>

@@ -953,6 +953,30 @@ export default function SettingsPage() {
     }
   }
 
+  const handleRotateDataKey = async () => {
+    const confirmed = await showConfirm(t('settings.rotateDataKeyConfirm'), {
+      title: t('settings.rotateDataKey'),
+      confirmText: t('settings.rotateDataKey'),
+    })
+    if (!confirmed) return
+    setEncryptionLoading(true)
+    try {
+      const res = await settingsService.rotateDataKey()
+      const data = res.data || res
+      if (data.state === 'done') {
+        showSuccess(t('settings.rotateDataKeyDone', { version: data.version }))
+      } else {
+        showWarning(t('settings.rotateDataKeyPending'))
+      }
+      await loadEncryptionStatus()
+    } catch (error) {
+      showError(error.message || t('common.error'))
+      await loadEncryptionStatus()
+    } finally {
+      setEncryptionLoading(false)
+    }
+  }
+
   // Anomaly detection
   const loadAnomalies = async () => {
     setAnomaliesLoading(true)
@@ -1548,6 +1572,7 @@ export default function SettingsPage() {
             setShowDisableEncryptionModal={setShowDisableEncryptionModal}
             handleDownloadExistingMasterKey={handleDownloadExistingMasterKey}
             handleEncryptRemainingKeys={handleEncryptRemainingKeys}
+            handleRotateDataKey={handleRotateDataKey}
             encryptionLoading={encryptionLoading}
             anomalies={anomalies}
             anomaliesLoading={anomaliesLoading}

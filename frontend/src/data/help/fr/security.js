@@ -14,6 +14,7 @@ export default {
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Variable d\'environnement opt-in : refuser de démarrer sans clé de chiffrement de base de données explicite' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: 'Variable d\'environnement opt-in : refuser de démarrer si le chiffrement des clés privées n\'est pas activé' },
           { label: 'Chiffrer les clés restantes', text: 'Affiché tant que le chiffrement est activé et que certaines clés ou certains secrets restent stockés non chiffrés : les chiffre, en laissant tels quels ceux qui le sont déjà' },
+          { label: 'Rotation de la clé de données', text: 'Les clés sont chiffrées sous une clé de données stockée en base et enveloppée par la clé maîtresse (master.key ou KEY_ENCRYPTION_KEY), qui reste le seul fichier à sauvegarder. Rotation de la clé de données rechiffre chaque clé et secret stocké sous une nouvelle clé de données sans changer la clé maîtresse ; une rotation interrompue garde les deux clés de données et se termine en la relançant. L\'empreinte affichée désigne la clé maîtresse sans la révéler' },
         ]
       },
       {

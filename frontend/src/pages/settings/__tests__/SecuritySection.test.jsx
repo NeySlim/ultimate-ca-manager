@@ -124,9 +124,42 @@ describe('SecuritySection disabling encryption', () => {
     expect(screen.getByText('settings.disableEncryption')).toBeInTheDocument()
   })
 
-  it('is not offered when the key comes from the environment', () => {
+  it('is offered when the key comes from the environment: it stays configured, unused', () => {
     renderSection({ ...status, key_source: 'env' })
-    expect(screen.queryByText('settings.disableEncryption')).not.toBeInTheDocument()
+    expect(screen.getByText('settings.disableEncryption')).toBeInTheDocument()
+  })
+})
+
+describe('SecuritySection data key rotation', () => {
+  const status = {
+    enabled: true,
+    key_source: 'env',
+    kek_fingerprint: '0123456789abcdef',
+    dek_version: 2,
+    rotation_in_progress: false,
+    total_keys: 1,
+    encrypted_count: 1,
+    unencrypted_count: 0,
+    key_files_on_disk: 0,
+  }
+
+  it('shows the fingerprint and version and offers the rotation', () => {
+    const handleRotateDataKey = vi.fn()
+    renderSection(status, { handleRotateDataKey })
+    expect(screen.getByText('0123456789abcdef')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('settings.rotateDataKey'))
+    expect(handleRotateDataKey).toHaveBeenCalledOnce()
+  })
+
+  it('offers to finish a rotation in progress', () => {
+    renderSection({ ...status, rotation_in_progress: true }, { handleRotateDataKey: vi.fn() })
+    expect(screen.getByText('settings.dekRotationInProgress')).toBeInTheDocument()
+    expect(screen.getByText('settings.resumeDataKeyRotation')).toBeInTheDocument()
+  })
+
+  it('is not offered while encryption is off', () => {
+    renderSection({ ...status, enabled: false }, { handleRotateDataKey: vi.fn() })
+    expect(screen.queryByText('settings.rotateDataKey')).not.toBeInTheDocument()
   })
 })
 
