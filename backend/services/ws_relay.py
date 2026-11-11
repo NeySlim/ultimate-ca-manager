@@ -12,7 +12,7 @@ from collections import deque
 from datetime import timedelta
 from itertools import islice
 
-from sqlalchemy import text
+from sqlalchemy import DateTime, bindparam, text
 
 from utils.datetime_utils import utc_now
 
@@ -32,9 +32,28 @@ GAP_GRACE_SECONDS = 4.0
 HOLE_TTL_SECONDS = 120.0
 MAX_HOLES = 32
 
-_INSERT_SQL = text("INSERT INTO websocket_relay (created_at, room, payload) VALUES (:t, :r, :p)")
-_PURGE_SQL = text("DELETE FROM websocket_relay WHERE created_at < :t")
+# Typed binds: a raw datetime goes through the deprecated sqlite3 adapter
+_INSERT_SQL = text("INSERT INTO websocket_relay (created_at, room, payload) VALUES (:t, :r, :p)"
+                   ).bindparams(bindparam('t', type_=DateTime()))
+_PURGE_SQL = text("DELETE FROM websocket_relay WHERE created_at < :t"
+                  ).bindparams(bindparam('t', type_=DateTime()))
 _LAST_SQL = text("SELECT COALESCE(MAX(id), 0) FROM websocket_relay")
+_SQLITE_SEQ_SQL = text("SELECT seq FROM sqlite_sequence WHERE name = 'websocket_relay'")
+_PG_SEQ_NAME_SQL = text("SELECT pg_get_serial_sequence('websocket_relay', 'id')")
+
+
+def _newest_id(conn):
+    """Highest id ever issued: the sequence, which a purge that emptied the table leaves ahead of MAX(id)."""
+    newest = conn.execute(_LAST_SQL).scalar() or 0
+    if conn.dialect.name == 'sqlite':
+        issued = conn.execute(_SQLITE_SEQ_SQL).scalar()
+    elif conn.dialect.name == 'postgresql':
+        name = conn.execute(_PG_SEQ_NAME_SQL).scalar()
+        issued = conn.execute(text(f"SELECT CASE WHEN is_called THEN last_value ELSE 0 END FROM {name}")
+                              ).scalar() if name else None
+    else:
+        issued = None
+    return max(newest, issued or 0)
 
 
 class RelayPublisher:
@@ -185,8 +204,8 @@ class RelayReader:
         try:
             with self.engine.connect() as conn:
                 if self.seen is None:
-                    # Starts at the newest row: what was emitted before this worker is not replayed
-                    self.seen = conn.execute(_LAST_SQL).scalar() or 0
+                    # Starts at the newest id issued: what was emitted before this worker is not replayed
+                    self.seen = _newest_id(conn)
                     rows = []
                 else:
                     rows = self._read(conn)

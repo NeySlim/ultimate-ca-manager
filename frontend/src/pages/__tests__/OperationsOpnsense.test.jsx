@@ -33,7 +33,7 @@ function getIgnoreCertCheckbox() {
 
 function fillConnectionForm() {
   fireEvent.change(screen.getByPlaceholderText('importExport.opnsense.hostPlaceholder'),
-    { target: { value: '192.168.1.254' } })
+    { target: { value: '192.0.2.10' } })
   fireEvent.change(screen.getByPlaceholderText('importExport.opnsense.apiKeyLabel'),
     { target: { value: 'k' } })
   fireEvent.change(screen.getByPlaceholderText('importExport.opnsense.apiSecretLabel'),

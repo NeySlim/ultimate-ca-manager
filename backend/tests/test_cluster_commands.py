@@ -334,3 +334,37 @@ def test_stop_that_times_out_with_a_give_back_pending_says_so(app, caplog):
         applier._thread.join()
     lines = [r for r in caplog.records if r.levelname == 'ERROR' and 'command 41' in r.getMessage()]
     assert len(lines) == 1 and 'possibly not given back' in lines[0].getMessage(), caplog.text
+
+
+def test_stop_survives_the_loop_clearing_the_give_back_while_it_looks(app):
+    applier = cc.CommandApplier(app, 'racing-node')
+    applier._give_back_pending = [None, 42, False]
+
+    class LoopThatFinishesTheGiveBack:
+        def join(self, timeout=None):
+            pass
+
+        def is_alive(self):
+            applier._give_back_pending = None  # the loop gave the claim back just now
+            return True
+
+    applier._thread = LoopThatFinishesTheGiveBack()
+    applier.stop(timeout=0.01)  # no TypeError: the connection is still closed
+    assert applier._engine is None
+
+
+def test_stop_survives_the_loop_giving_back_then_exiting(app):
+    applier = cc.CommandApplier(app, 'racing-node-2')
+    applier._give_back_pending = [None, 43, False]
+
+    class LoopThatEnded:
+        def join(self, timeout=None):
+            pass
+
+        def is_alive(self):
+            applier._give_back_pending = None  # given back, then the loop exited
+            return False
+
+    applier._thread = LoopThatEnded()
+    applier.stop(timeout=0.01)
+    assert applier._engine is None

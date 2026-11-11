@@ -264,7 +264,9 @@ def _resolve_proxy_certificate(cert_obj):
         Certificate.serial_number == canonical_serial(cert_obj.serial_number),
         Certificate.crt.isnot(None),
     ).all()
-    for row in rows:
+    # A copy stored again must not stand in for the row a proxy order names
+    from services.cert import issued_lookup
+    for row in issued_lookup.acme_ordered_first(rows):
         try:
             stored = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
         except (ValueError, TypeError, base64.binascii.Error):

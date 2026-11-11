@@ -598,7 +598,10 @@ export default function OperationsPage() {
       const pairedOutside = new Set((data?.success || [])
         .map(id => partnerBefore.get(id))
         .filter(other => other != null && !selectedIds.has(other) && !notRevoked.includes(other)))
-      const localOnly = bulkAction === 'revoke' ? bulkLocalOnlyRevocationWarning(data, t, bulkRevokeReason) : null
+      // Deleting users revokes their certificates too: the same CA-not-told warning
+      const revokes = bulkAction === 'revoke' || (bulkAction === 'delete' && bulkResourceType === 'users')
+      const localOnly = revokes
+        ? bulkLocalOnlyRevocationWarning(data, t, bulkAction === 'revoke' ? bulkRevokeReason : undefined) : null
       if (localOnly) showWarning(localOnly)
       if (notRevoked.length > 0) {
         showWarning(t('revocation.bulkRelatedRevokeFailed', { count: notRevoked.length, ids: notRevoked.map(id => `#${id}`).join(', ') }))

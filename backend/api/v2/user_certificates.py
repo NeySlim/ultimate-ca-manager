@@ -25,7 +25,8 @@ from services.cert_service import CertificateService
 from services.approval_gate import PairApprovalConflict, approval_payload, queue_revocation
 from services.cert.related_pair import revocation_partner
 from services.mtls_enrollment import remove_enrolment
-from services.acme.upstream_revocation import propagate_acme_revocation, revocation_answer
+from services.acme.upstream_revocation import (
+    propagate_acme_revocation, revocation_answer, with_related_answer)
 from utils.pagination import parse_request_pagination
 from utils.days_remaining import days_remaining as compute_days_remaining
 from utils.export_password import validate_export_password
@@ -546,10 +547,12 @@ def revoke_user_certificate(cert_id):
                                 message='Certificate revocation submitted for approval')
 
     try:
+        related_acme = []
         cert = CertificateService.revoke_certificate(
             cert_id=cert.id,
             reason=reason,
-            username=user.username
+            username=user.username,
+            related_acme=related_acme,
         )
 
         # Disable auth certificate
@@ -570,7 +573,7 @@ def revoke_user_certificate(cert_id):
         owner = db.session.get(User, auth_cert.user_id)
         return success_response(
             data=_build_cert_response(auth_cert, cert, owner),
-            **revocation_answer(acme_outcome, acme_detail))
+            **with_related_answer(revocation_answer(acme_outcome, acme_detail), related_acme))
     except ValueError as e:
         logger.error(f'User certificate revocation validation error: {e}')
         return error_response('Invalid revocation request', 400)

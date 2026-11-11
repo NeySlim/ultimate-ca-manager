@@ -102,6 +102,77 @@ class TestRevokingAUserCertificate:
             _drop_enrolment(enrolment_id)
 
 
+def _pair_with_bench(bench, other_id):
+    """The bench's ACME certificate and another one, related to each other."""
+    from models import Certificate
+    a, b = bench.row(), db.session.get(Certificate, other_id)
+    a.related_certificate_id, b.related_certificate_id = b.id, a.id
+    db.session.commit()
+    return b
+
+
+def _unpair(bench, other_id):
+    from models import Certificate
+    from services.cert_service import CertificateService
+    db.session.rollback()
+    for row in (db.session.get(Certificate, bench.cert_id), db.session.get(Certificate, other_id)):
+        row.related_certificate_id = None
+    db.session.commit()
+    assert CertificateService.delete_certificate(other_id, username='admin')
+
+
+class TestTheRelatedMemberOfARevokedPair:
+    def test_the_user_certificate_route_says_a_related_member_the_ca_was_not_told_of(
+            self, app, auth_client, bench, owner, pair_cert):  # noqa: F811
+        import base64
+        from models import User
+        from models.auth_certificate import AuthCertificate
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        other = pair_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        row = _pair_with_bench(bench, other['id'])
+        enrolment = AuthCertificate(
+            user_id=User.query.filter_by(username=owner[1]).first().id,
+            cert_pem=base64.b64decode(row.crt), cert_serial=row.serial_number,
+            cert_subject=row.subject or '', cert_issuer=row.issuer or '', cert_fingerprint='',
+            name='pair member', enabled=True)
+        db.session.add(enrolment)
+        db.session.commit()
+        enrolment_id = enrolment.id
+        try:
+            answer = auth_client.post(f'/api/v2/user-certificates/{enrolment_id}/revoke',
+                                      data=json.dumps({'reason': 'keyCompromise'}),
+                                      content_type='application/json')
+            assert answer.status_code == 200, answer.data[:300]
+            body = json.loads(answer.data)
+            assert body['meta']['related_acme_local_only'] == bench.cert_id
+            assert f'#{bench.cert_id}' in body['message']
+        finally:
+            _drop_enrolment(enrolment_id)
+            _unpair(bench, other['id'])
+
+    def test_an_approved_revocation_says_it_too(self, app, bench, pair_cert):  # noqa: F811
+        from api.v2.policies import _revoke_approved_certificate
+        from models.policy import ApprovalRequest
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        other = pair_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        row = _pair_with_bench(bench, other['id'])
+        data = {'certificate_id': row.id, 'serial_number': row.serial_number,
+                'reason': 'keyCompromise', 'cn': row.descr}
+        approval = ApprovalRequest(request_type='revocation', request_data=json.dumps(data),
+                                   status='approved')
+        db.session.add(approval)
+        db.session.commit()
+        try:
+            with app.test_request_context():
+                result = _revoke_approved_certificate(approval, data)
+            assert result['acme_local_only'] is True and result['acme_upstream_pending'] is True
+            assert f'#{bench.cert_id}' in result['acme_message']
+        finally:
+            db.session.delete(db.session.get(ApprovalRequest, approval.id))
+            db.session.commit()
+            _unpair(bench, other['id'])
+
+
 def _user_id(username):
     from models import User
     return User.query.filter_by(username=username).first().id
@@ -401,7 +472,7 @@ class TestTheRelatedMemberOfAPair:
             body = json.loads(answer.data)
             if route == 'single':
                 assert body['data']['related_revoked'] == bench.cert_id
-                assert body['meta']['acme_local_only'] is True
+                assert 'acme_local_only' not in body['meta']
                 assert body['meta']['related_acme_local_only'] == bench.cert_id
                 assert f'#{bench.cert_id}' in body['message']
                 assert 'sent again automatically' in body['message']

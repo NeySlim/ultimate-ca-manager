@@ -45,15 +45,26 @@ def find_stored_rows(cert: x509.Certificate) -> list:
 
 
 def acme_ordered_first(rows: list) -> list:
-    """``rows`` with those an ACME order names first, then by id: the order says which CA
-    account to tell, so a copy stored again never stands in for it."""
+    """``rows`` with those an ACME order names first, then by id: a client order names its
+    row, or the one its renewal moved off, and says which CA account to tell; a server order
+    names the row it issued. A copy stored again never stands in for them."""
     from models.acme_models import AcmeClientOrder, AcmeOrder
     ids = [row.id for row in rows]
-    ordered = set()
+    named = set()
     for model in (AcmeClientOrder, AcmeOrder):
-        ordered.update(cid for (cid,) in model.query.with_entities(model.certificate_id)
-                       .filter(model.certificate_id.in_(ids)))
-    return sorted(rows, key=lambda row: (row.id not in ordered, row.id))
+        named.update(cid for (cid,) in model.query.with_entities(model.certificate_id)
+                     .filter(model.certificate_id.in_(ids)))
+    rank = {row.id: 0 if row.id in named else 2 for row in rows}
+    for row in rows:
+        if row.id in named or not row.serial_number:
+            continue
+        for order in AcmeClientOrder.query.filter(
+                AcmeClientOrder.replaced_certificates.contains(row.serial_number, autoescape=True)):
+            if order.names_replaced(row):
+                # The id a renewal recorded tells the row it moved from the copies of the same certificate
+                recorded = any(e.get('certificate_id') == row.id for e in order._replaced_entries())
+                rank[row.id] = min(rank[row.id], 0 if recorded else 1)
+    return sorted(rows, key=lambda row: (rank[row.id], row.id))
 
 
 def _rows_holding(cert: x509.Certificate, *criteria) -> list:

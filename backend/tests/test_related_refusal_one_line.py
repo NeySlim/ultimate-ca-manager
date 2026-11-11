@@ -40,3 +40,23 @@ def test_wstep_answers_with_one_log_line(client, wstep_config, caplog):  # noqa:
         r = client.post(wstep.ISSUE_URL, data=wstep._build_rst(csr), headers=wstep._basic_auth())
     assert r.status_code != 200, r.data
     _one_line(caplog)
+
+
+@pytest.mark.parametrize('route', ['single', 'bulk'])
+def test_csr_signing_logs_the_refusal_once(auth_client, create_ca, monkeypatch, caplog, route):
+    from services.cert_service import CertificateService
+    from tests.test_csr_sign_extra_names import _csr, _upload
+    monkeypatch.setattr(CertificateService, 'sign_csr',
+                        staticmethod(lambda *a, **k: (_ for _ in ()).throw(
+                            related_pair.RelatedCertificateRefused(TEXT))))
+    ca = create_ca(cn='Refusal log CA')
+    csr_id = _upload(auth_client, _csr('refused-csr.example.test'))
+    with caplog.at_level('INFO'):
+        if route == 'single':
+            r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={'ca_id': ca['id'], 'validity_days': 30})
+            assert r.status_code == 400, r.data
+        else:
+            r = auth_client.post('/api/v2/csrs/bulk/sign',
+                                 json={'ids': [csr_id], 'ca_id': ca['id'], 'validity_days': 30})
+            assert r.get_json()['data']['failed'][0]['id'] == csr_id
+    _one_line(caplog)
