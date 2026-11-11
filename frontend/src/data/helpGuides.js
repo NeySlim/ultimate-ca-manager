@@ -2010,7 +2010,7 @@ Require all users to enable two-factor authentication.
 
 ### Private Key Encryption
 Encrypt all private keys stored in the database with AES-128 (Fernet, with HMAC-SHA256), protected by a master key file. The section shows the encryption status and the **encrypted / unencrypted** key counters. Two opt-in environment variables make missing keys fatal at startup: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (integration-secret encryption) and \`UCM_REQUIRE_KEY_ENCRYPTION\` (private-key encryption).
-A new installation creates the master key at its first start (in a container, only when \`/etc/ucm\` is a volume of its own); the Security section of Settings shows the encryption status.
+A new installation creates the master key at its first start (in a container, only when \`/etc/ucm\` is a volume of its own); the Security section of Settings shows the encryption status, and the Overview shows a banner while no key is loaded.
 
 > 💡 Security-sensitive settings (session, lockout, HSTS, public URL, password policy) require the **admin:settings** permission, the fields are locked for operators.
 
