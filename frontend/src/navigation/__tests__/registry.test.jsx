@@ -25,7 +25,6 @@ vi.mock('../../components', async () => {
     ForcePasswordChange: () => null,
     ForceEnroll2FA: () => null,
     SafeModeOverlay: () => null,
-    DetailWindowLayer: () => null,
   }
 })
 

@@ -138,84 +138,6 @@
   
 }
 
-/* ============================================
-   THEME: Light (legacy - most values now in ThemeContext)
-   ============================================ */
-.theme-light {
-  
-  
-  /* Light theme shadow adjustments — stronger, colored */
-  --shadow-color: var(--muted);
-  --shadow-xs: 
-    0 1px 2px color-mix(in srgb, var(--shadow-color) 6%, transparent),
-    0 1px 3px color-mix(in srgb, var(--shadow-color) 8%, transparent);
-  --shadow-sm: 
-    0 1px 2px color-mix(in srgb, var(--shadow-color) 6%, transparent),
-    0 2px 6px color-mix(in srgb, var(--shadow-color) 10%, transparent);
-  --shadow-md: 
-    0 2px 4px color-mix(in srgb, var(--shadow-color) 5%, transparent),
-    0 4px 12px color-mix(in srgb, var(--shadow-color) 8%, transparent),
-    0 8px 24px color-mix(in srgb, var(--shadow-color) 6%, transparent);
-  --shadow-lg: 
-    0 4px 8px color-mix(in srgb, var(--shadow-color) 4%, transparent),
-    0 8px 24px color-mix(in srgb, var(--shadow-color) 8%, transparent),
-    0 16px 48px color-mix(in srgb, var(--shadow-color) 6%, transparent);
-  --shadow-xl: 
-    0 4px 8px color-mix(in srgb, var(--shadow-color) 3%, transparent),
-    0 8px 24px color-mix(in srgb, var(--shadow-color) 6%, transparent),
-    0 24px 64px color-mix(in srgb, var(--shadow-color) 8%, transparent),
-    0 40px 96px color-mix(in srgb, var(--shadow-color) 6%, transparent);
-
-  /* Glow shadows — softer for light */
-  --shadow-glow-primary: 0 0 20px color-mix(in srgb, var(--accent-primary) 20%, transparent);
-  --shadow-glow-success: 0 0 20px color-mix(in srgb, var(--accent-success) 20%, transparent);
-  --shadow-glow-danger: 0 0 20px color-mix(in srgb, var(--accent-danger) 20%, transparent);
-  --shadow-glow-warning: 0 0 20px color-mix(in srgb, var(--accent-warning) 20%, transparent);
-  
-  /* Glass adjustments for light */
-  --glass-bg: color-mix(in srgb, var(--paper) 80%, transparent);
-  --glass-border: color-mix(in srgb, var(--ink) 8%, transparent);
-  --glass-shadow: 0 4px 30px color-mix(in srgb, var(--ink) 6%, transparent);
-  
-  /* Inner highlight for light theme */
-  --shadow-inner-highlight: inset 0 1px 0 0 color-mix(in srgb, var(--paper) 90%, transparent);
-  --shadow-inner-sm: inset 0 1px 3px color-mix(in srgb, var(--shadow-color) 8%, transparent);
-  
-  /* Gradient shine for light */
-  --gradient-shine: linear-gradient(135deg, color-mix(in srgb, var(--paper) 70%, transparent), transparent 50%);
-  --gradient-surface: linear-gradient(180deg, var(--bg-secondary), var(--bg-primary));
-  
-  
-  /* Floating window shadow — stronger for light mode */
-  --floating-window-shadow: 
-    0 4px 16px color-mix(in srgb, var(--ink) 10%, transparent),
-    0 12px 48px color-mix(in srgb, var(--ink) 12%, transparent),
-    0 2px 6px color-mix(in srgb, var(--ink) 6%, transparent);
-}
-
-/* Light mode: stronger section header gradient */
-.theme-light .section-header-gradient {
-  background: linear-gradient(to right, 
-    color-mix(in srgb, var(--accent-primary) 8%, color-mix(in srgb, var(--bg-tertiary) 60%, transparent)), 
-    transparent
-  );
-}
-.theme-light .section-header-gradient:hover {
-  background: linear-gradient(to right, 
-    color-mix(in srgb, var(--accent-primary) 12%, color-mix(in srgb, var(--bg-tertiary) 80%, transparent)), 
-    transparent
-  );
-}
-
-/* Light mode: stronger card borders */
-.theme-light .card-soft {
-  border-color: var(--border);
-  box-shadow: var(--shadow-sm);
-}
-.theme-light .card-soft:hover {
-  box-shadow: var(--shadow-md);
-}
-
 /* Custom scrollbar styling - thin and subtle */
 ::-webkit-scrollbar {
   width: 8px;
@@ -484,28 +406,24 @@ html, body, #root {
 .status-success-bg-solid { background-color: var(--accent-success); }
 .status-success-text { color: var(--accent-success); }
 .status-success-border { border-color: color-mix(in srgb, var(--accent-success) 30%, transparent); }
-.status-success-glow { box-shadow: 0 0 8px color-mix(in srgb, var(--accent-success) 30%, transparent); }
 
 /* Warning (amber/yellow) */
 .status-warning-bg { background-color: color-mix(in srgb, var(--accent-warning) 15%, var(--bg-tertiary)); }
 .status-warning-bg-solid { background-color: var(--accent-warning); }
 .status-warning-text { color: var(--accent-warning); }
 .status-warning-border { border-color: color-mix(in srgb, var(--accent-warning) 30%, transparent); }
-.status-warning-glow { box-shadow: 0 0 8px color-mix(in srgb, var(--accent-warning) 30%, transparent); }
 
 /* Danger (red) */
 .status-danger-bg { background-color: color-mix(in srgb, var(--accent-danger) 15%, var(--bg-tertiary)); }
 .status-danger-bg-solid { background-color: var(--accent-danger); }
 .status-danger-text { color: var(--accent-danger); }
 .status-danger-border { border-color: color-mix(in srgb, var(--accent-danger) 30%, transparent); }
-.status-danger-glow { box-shadow: 0 0 8px color-mix(in srgb, var(--accent-danger) 30%, transparent); }
 
 /* Primary (blue) */
 .status-primary-bg { background-color: color-mix(in srgb, var(--accent-primary) 15%, var(--bg-tertiary)); }
 .status-primary-bg-solid { background-color: var(--accent-primary); }
 .status-primary-text { color: var(--accent-primary); }
 .status-primary-border { border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent); }
-.status-primary-glow { box-shadow: 0 0 8px color-mix(in srgb, var(--accent-primary) 30%, transparent); }
 
 /* Status card styles */
 .stat-card-success {
@@ -554,29 +472,12 @@ html, body, #root {
 
 /* Purple (HSM/special) */
 .status-purple-bg { background-color: color-mix(in srgb, var(--accent-purple) 15%, var(--bg-tertiary)); }
-.status-purple-bg-solid { background-color: var(--accent-purple); }
 .status-purple-text { color: var(--accent-purple); }
 .status-purple-border { border-color: color-mix(in srgb, var(--accent-purple) 30%, transparent); }
 
 /* Orange (expiring soon) */
-.status-orange-bg { background-color: color-mix(in srgb, var(--accent-warning) 20%, transparent); }
-.status-orange-text { color: color-mix(in srgb, var(--accent-warning) 80%, var(--accent-danger)); }
 
 /* Yellow (root CA / pending) */
-.status-yellow-bg { background-color: color-mix(in srgb, var(--accent-warning) 20%, transparent); }
-.status-yellow-text { color: var(--accent-warning); }
-.status-yellow-border { border-color: color-mix(in srgb, var(--accent-warning) 30%, transparent); }
-
-/* Dashboard widget */
-.dashboard-widget {
-  background-color: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 0.75rem;
-  transition: border-color 0.2s, box-shadow 0.2s;
-}
-.dashboard-widget:hover {
-  border-color: color-mix(in srgb, var(--border) 70%, var(--text-tertiary));
-}
 
 /* Border left accent for Card */
 .border-l-accent-success { border-left-color: var(--accent-success); }
@@ -584,12 +485,6 @@ html, body, #root {
 .border-l-accent-danger { border-left-color: var(--accent-danger); }
 .border-l-accent-primary { border-left-color: var(--accent-primary); }
 .border-l-accent-purple { border-left-color: var(--accent-purple); }
-
-/* Combined bg+text utility classes */
-.status-success-badge { @apply status-success-bg status-success-text status-success-border border; }
-.status-warning-badge { @apply status-warning-bg status-warning-text status-warning-border border; }
-.status-danger-badge { @apply status-danger-bg status-danger-text status-danger-border border; }
-.status-primary-badge { @apply status-primary-bg status-primary-text status-primary-border border; }
 
 /* Badge with subtle shadow and hover */
 .badge-enhanced {
@@ -1580,11 +1475,6 @@ input:focus, select:focus, textarea:focus {
   background-color: color-mix(in srgb, var(--accent-primary) 5%, var(--bg-tertiary));
 }
 
-/* Light theme select arrow */
-.theme-light .select-native {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 256 256'%3E%3Cpath fill='%236B7280' d='M213.66 101.66l-80 80a8 8 0 0 1-11.32 0l-80-80a8 8 0 0 1 11.32-11.32L128 164.69l74.34-74.35a8 8 0 0 1 11.32 11.32Z'/%3E%3C/svg%3E");
-}
-
 /* Size variants */
 .select-native-sm {
   padding: 0.25rem 1.75rem 0.25rem 0.5rem;
@@ -1656,62 +1546,6 @@ input:focus, select:focus, textarea:focus {
 .stat-card-enhanced.danger { --card-accent: var(--accent-danger); }
 .stat-card-enhanced.primary { --card-accent: var(--accent-primary); }
 .stat-card-enhanced.pro { --card-accent: var(--accent-pro); }
-
-/* === DASHBOARD GRID LAYOUT === */
-.dashboard-grid .react-grid-item {
-  transition: all 200ms ease;
-}
-
-/* Compact headers/body for dashboard widgets */
-.dashboard-grid .section-header-gradient {
-  padding: 8px 12px 6px;
-}
-.dashboard-grid .px-4.py-3 {
-  padding: 4px 12px 6px;
-}
-
-.dashboard-grid .react-grid-item.react-grid-placeholder {
-  background: var(--accent-primary);
-  opacity: 0.1;
-  border-radius: 12px;
-  border: 2px dashed var(--accent-primary);
-}
-
-.dashboard-grid.edit-mode .react-grid-item {
-  border: 1px dashed color-mix(in srgb, var(--accent-primary) 30%, transparent);
-  border-radius: 12px;
-}
-
-.dashboard-grid.edit-mode .react-grid-item:hover {
-  border-color: var(--accent-primary);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-primary) 20%, transparent);
-}
-
-.dashboard-grid.edit-mode .react-grid-item {
-  pointer-events: auto;
-}
-
-.dashboard-grid.edit-mode .react-grid-item > *:not(.react-resizable-handle):not(.widget-drag-handle) {
-  pointer-events: none;
-}
-
-.dashboard-grid.edit-mode .widget-drag-handle,
-.dashboard-grid.edit-mode .react-resizable-handle {
-  pointer-events: auto;
-}
-
-.dashboard-grid .react-grid-item > .react-resizable-handle::after {
-  border-color: var(--accent-primary);
-  opacity: 0.5;
-}
-
-.dashboard-grid .react-grid-item > .react-resizable-handle {
-  opacity: 0;
-}
-
-.dashboard-grid.edit-mode .react-grid-item:hover > .react-resizable-handle {
-  opacity: 1;
-}
 
 /* === ENHANCED ANIMATIONS === */
 @keyframes fade-in-up {

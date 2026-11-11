@@ -54,32 +54,6 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
-// Mock react-grid-layout (DashboardPage uses it)
-vi.mock('react-grid-layout', () => ({
-  Responsive: ({ children }) => <div data-testid="grid-layout">{children}</div>,
-  WidthProvider: (Component) => Component,
-  verticalCompactor: vi.fn(),
-}))
-vi.mock('react-grid-layout/css/styles.css', () => ({}))
-vi.mock('react-resizable/css/styles.css', () => ({}))
-
-// Mock recharts
-vi.mock('recharts', () => ({
-  ResponsiveContainer: ({ children }) => <div>{children}</div>,
-  AreaChart: ({ children }) => <div>{children}</div>,
-  Area: () => null,
-  XAxis: () => null,
-  YAxis: () => null,
-  CartesianGrid: () => null,
-  Tooltip: () => null,
-  PieChart: ({ children }) => <div>{children}</div>,
-  Pie: () => null,
-  Cell: () => null,
-  Legend: () => null,
-  BarChart: ({ children }) => <div>{children}</div>,
-  Bar: () => null,
-}))
-
 // Mock WebSocket hook
 vi.mock('../../hooks/useWebSocket', () => ({
   useWebSocket: () => ({

@@ -157,10 +157,8 @@ Add the missing rule rather than rounding to a neighbour.
 ### Status tints (theme-aware classes)
 For each of `success`, `warning`, `danger` and `primary` (info):
 `status-X-bg` (soft tint), `status-X-bg-solid`, `status-X-text`,
-`status-X-border`, `status-X-glow`, and the composite `status-X-badge`
-(tint + text + border). `status-purple-*` has only `bg`, `bg-solid`, `text`
-and `border`; `status-orange-*` and `status-yellow-*` are derived from
-`--accent-warning`. `status-badge-{success,warning,danger}` are the
+`status-X-border`. `status-purple-*` has only `bg`, `text` and `border`.
+`status-badge-{success,warning,danger}` are the
 gradient variants used by `badge-enhanced`.
 
 ### Icon background classes (mode-aware, set by tokens.css)

@@ -7,7 +7,6 @@
 
 // Layout
 export { AppShell } from './AppShell'
-export { Sidebar } from './Sidebar'
 export { BottomSheet } from './BottomSheet'
 export { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 
@@ -90,9 +89,6 @@ export { MobileCard, SimpleMobileCard } from './ui/MobileCard'
 export { UnifiedPageHeader } from './ui/UnifiedPageHeader'
 export { RichStatsBar } from './ui/RichStatsBar'
 
-// Dashboard charts
-// Charts are lazy loaded - NOT exported from main bundle
-// Import directly: import { CertificateTrendChart, ... } from './DashboardChart'
 export { UpdateChecker } from './UpdateChecker'
 export { ServiceReconnectOverlay } from './ServiceReconnectOverlay'
 export { SafeModeOverlay } from './SafeModeOverlay'

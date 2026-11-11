@@ -27,6 +27,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - In-app help is now maintained in English, French and Chinese only; the other interface languages show the English help with a notice.
 - Console: the sidebar gives way to the Atelier shell, a horizontal bar with a Modules menu (four groups, keyboard navigable), three pinnable modules kept in your preferences, a status bar fed by `/health` and a module picker on phones; the account menu now carries theme, language and sign out.
+- Console: the code, styles and tests of the pre-Atelier interface (old sidebar, grid dashboard, floating detail windows, light-theme legacy styles) are removed.
 - Dashboard: `GET /api/v2/dashboard/activity` answers 500 on a database error instead of an empty list, so the activity card tells an outage from no activity.
 - Configuration: the new `UCM_CONFIG_DIR` variable (default `/etc/ucm`) moves the directory from which `ucm.env` and `master.key` are read and where the master key is created.
 - Backup: archives are written as format v4, a stream of independently authenticated chunks, so creating one, decrypting it and the checks before the restore plan no longer hold it whole in memory (the plan and the writes still hold every section it carries); `BACKUP_MAX_UPLOAD_MB` now bounds only archives written before 3.0 (v1 to v3), which are still restored, and the new `BACKUP_MAX_ARCHIVE_MB` (0, no limit, by default) can bound v4 archives.
