@@ -160,6 +160,10 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Upgrading to v3.0
+
+- Audit and syslog consumers (SIEM): the text of a restore refused before its archive was read now starts with `Restore request refused: ` followed by the reason; match on that prefix.
+
 ### Upgrading to v2.243
 
 Several fixes change what an existing installation does once upgraded. The CHANGELOG lists them under **Upgrade notes**; before upgrading:
