@@ -27,12 +27,13 @@ import { useNotification, useMobile } from '../contexts'
 import { usePermission, useWebSocket, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { reportSilentFailure } from '../lib/silentFailure'
+import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import UserSecuritySection from './users/UserSecuritySection'
 export default function UsersGroupsPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
   const [searchParams, setSearchParams] = useSearchParams()
-  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
+  const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const { muteToasts } = useWebSocket()
   
@@ -161,8 +162,10 @@ export default function UsersGroupsPage() {
     if (!confirmed) return
     try {
       muteToasts()
-      await usersService.delete(user.id)
-      showSuccess(t('messages.success.delete.user'))
+      // Its enrolled certificates are revoked first: their ACME CA may not have been told
+      const localOnly = localOnlyRevocationWarning(await usersService.delete(user.id), t)
+      if (localOnly) showWarning(localOnly)
+      else showSuccess(t('messages.success.delete.user'))
       if (selectedUser?.id === user.id) setSelectedUser(null)
       loadData()
     } catch (error) {
@@ -467,8 +470,10 @@ export default function UsersGroupsPage() {
     })
     if (!confirmed) return
     try {
-      await usersService.deleteMtlsCertificate(selectedUser.id, certId)
-      showSuccess(t('users.mtls.deleted'))
+      const localOnly = localOnlyRevocationWarning(
+        await usersService.deleteMtlsCertificate(selectedUser.id, certId), t)
+      if (localOnly) showWarning(localOnly)
+      else showSuccess(t('users.mtls.deleted'))
       loadUserMtlsCerts(selectedUser.id)
     } catch (error) {
       showError(error.message || t('users.mtls.deleteFailed'))

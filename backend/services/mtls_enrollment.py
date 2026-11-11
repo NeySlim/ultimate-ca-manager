@@ -559,6 +559,19 @@ def removal_answer(upstream):
     return revocation_answer(*told[0], REMOVED_MESSAGE) if told else None
 
 
+def removal_failure(message, status, upstream):
+    """The error of a removal that failed past the revocation: what the ACME CA was not
+    told is said there too, as the success would have said it."""
+    from services.acme.upstream_revocation import NOT_ACME, local_only_message, revocation_answer
+    from utils.response import error_response
+    told = [(outcome, detail) for _cid, outcome, detail in upstream or () if outcome != NOT_ACME]
+    warning = local_only_message(*told[0]) if told else None
+    if warning is None:
+        return error_response(message, status)
+    meta = revocation_answer(*told[0])['meta']
+    return error_response(f'{message}. {warning}', status, meta=meta)
+
+
 def remove_enrolment(auth_cert, username: str = 'system', actor=None):
     """Revoke the certificate an enrolment names, then delete both.
 
@@ -583,16 +596,16 @@ def remove_enrolment(auth_cert, username: str = 'system', actor=None):
 
     # The enrolment goes first: it is what mTLS authenticates against.
     db.session.delete(auth_cert)
-    committed, failure = safe_commit(
+    committed, _failure = safe_commit(
         logger, 'Failed to delete the certificate enrolment')
     if not committed:
-        return False, failure
+        return False, removal_failure('Failed to delete the certificate enrolment', 500, upstream)
 
     if certificate_id and not CertificateService.delete_certificate(
             certificate_id, username=username):
         # The access is withdrawn either way; saying it all worked would put
         # a success in the ledger for a certificate that is still there.
-        return False, error_response(
+        return False, removal_failure(
             'The enrolment was removed but its certificate could not be '
-            'deleted; it is still listed under Certificates', 500)
+            'deleted; it is still listed under Certificates', 500, upstream)
     return True, removal_answer(upstream)

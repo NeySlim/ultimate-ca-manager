@@ -16,7 +16,7 @@ from utils.export_options import json_boolean
 from services.deletion_blockers import certificate_deletion_blockers, first_blocker
 from services.ocsp_service import OCSPService
 from services.acme.upstream_revocation import (
-    REVOKED_MESSAGE, propagate_acme_revocation, revocation_answer)
+    REVOKED_MESSAGE, propagate_acme_revocation, revocation_answer, with_related_answer)
 from services.audit_service import AuditService
 from services.notification_service import NotificationService
 from websocket.emitters import on_certificate_revoked, on_certificate_deleted
@@ -121,12 +121,14 @@ def revoke_certificate(cert_id):
 
         # Revoke using service — the service emits a single lifecycle event
         # that the bus fans out to webhook + email + WebSocket subscribers.
+        related_acme = []
         cert = CertificateService.revoke_certificate(
             cert_id=cert_id,
             reason=reason,
             username=username,
             invalidity_at=invalidity_at,
             revoke_related=revoke_related,
+            related_acme=related_acme,
         )
 
         # A cert issued through a Microsoft CA connection: try to propagate the
@@ -148,7 +150,8 @@ def revoke_certificate(cert_id):
             cert_dict['related_not_revoked'] = partner_id
             message = (f'Certificate revoked; its related certificate #{partner_id} was not '
                        'revoked, revoke it separately')
-        return success_response(data=cert_dict, **revocation_answer(acme_outcome, acme_detail, message))
+        answer = revocation_answer(acme_outcome, acme_detail, message)
+        return success_response(data=cert_dict, **with_related_answer(answer, related_acme))
     except ValueError as e:
         logger.error(f"Certificate revocation validation error: {e}")
         return error_response('Validation failed', 400)

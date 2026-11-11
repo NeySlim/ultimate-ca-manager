@@ -44,6 +44,18 @@ def find_stored_rows(cert: x509.Certificate) -> list:
     return _rows_holding(cert)
 
 
+def acme_ordered_first(rows: list) -> list:
+    """``rows`` with those an ACME order names first, then by id: the order says which CA
+    account to tell, so a copy stored again never stands in for it."""
+    from models.acme_models import AcmeClientOrder, AcmeOrder
+    ids = [row.id for row in rows]
+    ordered = set()
+    for model in (AcmeClientOrder, AcmeOrder):
+        ordered.update(cid for (cid,) in model.query.with_entities(model.certificate_id)
+                       .filter(model.certificate_id.in_(ids)))
+    return sorted(rows, key=lambda row: (row.id not in ordered, row.id))
+
+
 def _rows_holding(cert: x509.Certificate, *criteria) -> list:
     presented = cert.public_bytes(Encoding.DER)
     candidates = Certificate.query.filter(

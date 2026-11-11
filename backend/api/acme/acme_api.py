@@ -1800,12 +1800,13 @@ def revoke_cert():
         
         # The row must hold this very certificate: a serial is public, and a
         # forged certificate reusing it would otherwise speak for the stored one
-        from services.cert.issued_lookup import find_stored_rows
+        from services.cert import issued_lookup
         serial_hex_lower = format(cert_obj.serial_number, 'x')
-        rows = find_stored_rows(cert_obj)
+        rows = issued_lookup.find_stored_rows(cert_obj)
         if not rows:
             return acme_error('malformed', 'Certificate not found', 404)
-        cert = rows[0]
+        # Stored twice (ACME row and an imported copy): the row an order names is the one revoked
+        cert = issued_lookup.acme_ordered_first(rows)[0]
         
         # A hold may be made final (RFC 5280 §5.2.4); anything else revoked stays as it is
         from utils.revocation_reasons import REASON_BY_CODE, revocable

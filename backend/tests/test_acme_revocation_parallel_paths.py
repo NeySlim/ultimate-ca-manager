@@ -33,9 +33,25 @@ def _enrol(app, bench, username):  # noqa: F811
 
 
 @pytest.fixture
-def owner(create_user):
+def owner(auth_client, create_user):
     name = f'acme_enrolled_{uuid.uuid4().hex[:6]}'
-    return create_user(username=name, role='viewer'), name
+    user = create_user(username=name, role='viewer')
+    yield user, name
+    # Deleted by the test, or left for this teardown: the shared users table ends as it began
+    assert auth_client.delete(f"/api/v2/users/{user['id']}").status_code in (200, 404)
+
+
+@pytest.fixture(scope='module')
+def pair_ca(auth_client, create_ca):
+    """This file's own CA: the session's default one would be left behind by the first user."""
+    ca = create_ca(cn=f'Pair CA {uuid.uuid4().hex[:6]}')
+    yield ca['id']
+    assert auth_client.delete(f"/api/v2/cas/{ca['id']}").status_code in (200, 204)
+
+
+@pytest.fixture
+def pair_cert(create_cert, pair_ca):
+    return lambda **kw: create_cert(ca_id=pair_ca, **kw)
 
 
 def _drop_enrolment(enrolment_id):
@@ -140,6 +156,34 @@ class TestRemovingAnEnrolment:
             _drop_enrolment(enrolment_id)
 
 
+    @pytest.mark.parametrize('failing', ['enrolment commit', 'certificate deletion'])
+    def test_a_failure_after_the_revocation_still_says_the_ca_was_not_told(
+            self, app, auth_client, bench, owner, monkeypatch, failing):  # noqa: F811
+        from services.cert_service import CertificateService
+        from utils import db_transaction
+        from utils.response import error_response
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        if failing == 'enrolment commit':
+            def _fail(_logger, message='failed'):
+                db.session.rollback()
+                return False, error_response(message, 500)
+            monkeypatch.setattr(db_transaction, 'safe_commit', _fail)
+        else:
+            monkeypatch.setattr(CertificateService, 'delete_certificate',
+                                staticmethod(lambda *_a, **_k: False))
+        enrolment_id = _enrol(app, bench, owner[1])
+        try:
+            answer = auth_client.delete(f'/api/v2/user-certificates/{enrolment_id}')
+            assert answer.status_code == 500, answer.data[:300]
+            body = json.loads(answer.data)
+            assert body['meta']['acme_local_only'] is True
+            assert body['meta']['acme_upstream_pending'] is True
+            assert 'sent again automatically' in body['message']
+        finally:
+            monkeypatch.undo()
+            _drop_enrolment(enrolment_id)
+
+
 class TestDeletingAUser:
     def test_the_ca_is_told(self, app, auth_client, bench, owner):  # noqa: F811
         enrolment_id = _enrol(app, bench, owner[1])
@@ -164,6 +208,27 @@ class TestDeletingAUser:
             assert 'sent again automatically' in body['message']
             assert [e['serial'] for e in _owed(bench)] == [bench.old_serial]
         finally:
+            _drop_enrolment(enrolment_id)
+
+    def test_a_failed_deletion_still_says_the_ca_was_not_told(
+            self, app, auth_client, bench, owner, monkeypatch):  # noqa: F811
+        from api.v2.users import crud
+
+        def _fail(_user_id):
+            raise RuntimeError('purge failed')
+        monkeypatch.setattr(crud, '_purge_user_dependencies', _fail)
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        enrolment_id = _enrol(app, bench, owner[1])
+        try:
+            answer = auth_client.delete(f"/api/v2/users/{owner[0]['id']}")
+            assert answer.status_code == 500, answer.data[:300]
+            body = json.loads(answer.data)
+            assert body['meta'] == {'acme_local_only': [bench.cert_id],
+                                    'acme_upstream_pending': [bench.cert_id]}
+            assert f'#{bench.cert_id}' in body['message']
+            assert 'sent again automatically' in body['message']
+        finally:
+            monkeypatch.undo()
             _drop_enrolment(enrolment_id)
 
     def test_the_bulk_deletion_lists_what_the_ca_was_not_told(
@@ -232,14 +297,48 @@ class TestRevokeCertAtUcmsOwnAcmeServer:
         assert _owed(bench) == []
 
 
+    @pytest.mark.parametrize('copy_first', [True, False])
+    def test_a_stored_copy_does_not_hide_the_acme_row(
+            self, app, client, bench, monkeypatch, copy_first):  # noqa: F811
+        """The same certificate imported again: the row its ACME order names is the one revoked."""
+        from models import Certificate
+        from services.cert import issued_lookup
+        row = bench.row()
+        copy = Certificate(refid=str(uuid.uuid4()), descr=f'{bench.name} copy', crt=row.crt,
+                           subject=row.subject, issuer=row.issuer,
+                           serial_number=row.serial_number, source='import',
+                           valid_from=row.valid_from, valid_to=row.valid_to)
+        db.session.add(copy)
+        db.session.commit()
+        copy_id = copy.id
+        found = issued_lookup.find_stored_rows
+
+        def _ordered(cert):
+            rows = sorted(found(cert), key=lambda r: r.id != copy_id)
+            return rows if copy_first else rows[::-1]
+        monkeypatch.setattr(issued_lookup, 'find_stored_rows', _ordered)
+        try:
+            answer = _es256_revocation(client, bench.key, bench.old_pem, 1)
+            assert answer.status_code == 200, answer.data[:300]
+            assert bench.row().revoked is True
+            sent = bench.client.revoke_certificate.call_args
+            assert sent.args[0] == bench.old_pem and sent.kwargs == {'reason': 1}
+        finally:
+            db.session.rollback()
+            from models import RevokedSerial
+            RevokedSerial.query.filter_by(certificate_id=copy_id).delete()
+            db.session.query(Certificate).filter_by(id=copy_id).delete()
+            db.session.commit()
+
+
 class TestTheRelatedMemberOfAPair:
     """RFC 9763: a certificate of UCM's CA may name, as its related one, a certificate
     UCM obtained over ACME; revoking the pair revokes that one at its CA too."""
 
-    def test_the_acme_member_is_revoked_at_its_ca(self, app, auth_client, bench, create_cert):  # noqa: F811
+    def test_the_acme_member_is_revoked_at_its_ca(self, app, auth_client, bench, pair_cert):  # noqa: F811
         from models import Certificate
         from services.cert_service import CertificateService
-        other = create_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        other = pair_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
         a, b = bench.row(), db.session.get(Certificate, other['id'])
         a.related_certificate_id, b.related_certificate_id = b.id, a.id
         db.session.commit()
@@ -259,17 +358,80 @@ class TestTheRelatedMemberOfAPair:
             db.session.commit()
             assert CertificateService.delete_certificate(other['id'], username='admin')
 
-    def test_a_ca_that_does_not_answer_keeps_it_owed(self, app, bench, create_cert):  # noqa: F811
+    def test_a_ca_that_does_not_answer_keeps_it_owed(self, app, bench, pair_cert):  # noqa: F811
         from models import Certificate
         from services.cert_service import CertificateService
         bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
-        other = create_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        other = pair_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
         a, b = bench.row(), db.session.get(Certificate, other['id'])
         a.related_certificate_id, b.related_certificate_id = b.id, a.id
         db.session.commit()
         try:
             CertificateService.revoke_certificate(other['id'], reason='superseded', username='admin')
             assert [(e['serial'], e['reason']) for e in _owed(bench)] == [(bench.old_serial, 4)]
+        finally:
+            db.session.rollback()
+            for row in (db.session.get(Certificate, bench.cert_id),
+                        db.session.get(Certificate, other['id'])):
+                row.related_certificate_id = None
+            db.session.commit()
+            assert CertificateService.delete_certificate(other['id'], username='admin')
+
+    @pytest.mark.parametrize('route', ['single', 'bulk'])
+    def test_a_partner_the_ca_was_not_told_of_is_said(
+            self, app, auth_client, bench, pair_cert, route):  # noqa: F811
+        from models import Certificate
+        from services.cert_service import CertificateService
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        other = pair_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        a, b = bench.row(), db.session.get(Certificate, other['id'])
+        a.related_certificate_id, b.related_certificate_id = b.id, a.id
+        db.session.commit()
+        try:
+            if route == 'single':
+                answer = auth_client.post(f"/api/v2/certificates/{other['id']}/revoke",
+                                          data=json.dumps({'reason': 'keyCompromise'}),
+                                          content_type='application/json')
+            else:
+                answer = auth_client.post('/api/v2/certificates/bulk/revoke',
+                                          data=json.dumps({'ids': [other['id']],
+                                                           'reason': 'keyCompromise'}),
+                                          content_type='application/json')
+            assert answer.status_code == 200, answer.data[:300]
+            body = json.loads(answer.data)
+            if route == 'single':
+                assert body['data']['related_revoked'] == bench.cert_id
+                assert body['meta']['acme_local_only'] is True
+                assert body['meta']['related_acme_local_only'] == bench.cert_id
+                assert f'#{bench.cert_id}' in body['message']
+                assert 'sent again automatically' in body['message']
+            else:
+                assert body['data']['acme_local_only'] == [bench.cert_id]
+        finally:
+            db.session.rollback()
+            for row in (db.session.get(Certificate, bench.cert_id),
+                        db.session.get(Certificate, other['id'])):
+                row.related_certificate_id = None
+            db.session.commit()
+            assert CertificateService.delete_certificate(other['id'], username='admin')
+
+    def test_a_hold_of_the_pair_neither_reaches_the_ca_nor_warns(
+            self, app, bench, pair_cert, caplog):  # noqa: F811
+        import logging
+        from models import Certificate
+        from services.cert_service import CertificateService
+        other = pair_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        a, b = bench.row(), db.session.get(Certificate, other['id'])
+        a.related_certificate_id, b.related_certificate_id = b.id, a.id
+        db.session.commit()
+        try:
+            with caplog.at_level(logging.WARNING, logger='services.cert.mixins.lifecycle'):
+                CertificateService.revoke_certificate(
+                    other['id'], reason='certificateHold', username='admin')
+            assert bench.row().revoked is True
+            bench.client.revoke_certificate.assert_not_called()
+            assert not [r for r in caplog.records if r.name == 'services.cert.mixins.lifecycle'
+                        and r.levelno >= logging.WARNING], caplog.text
         finally:
             db.session.rollback()
             for row in (db.session.get(Certificate, bench.cert_id),

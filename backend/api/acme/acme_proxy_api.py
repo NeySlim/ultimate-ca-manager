@@ -1049,10 +1049,12 @@ def revoke_cert(slug=None):
         local_reason = REASON_BY_CODE[reason]
         if revocable(cert, local_reason):  # a hold may be made final
             try:
+                # RFC 8555 §7.6 revokes the certificate presented, not its related one
                 CertificateService.revoke_certificate(
                     cert_id=cert.id,
                     reason=local_reason,
                     username='acme_proxy',
+                    revoke_related=False,
                 )
             except Exception as exc:
                 logger.error(

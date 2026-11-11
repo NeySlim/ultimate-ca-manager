@@ -512,9 +512,11 @@ def delete_user(user_id):
     upstream = []
     certificate_ids, revoked, refusal = _revoke_enrolled_certificates(
         user_id, g.current_user, upstream)
+    # Revocations already made stand: a failure past them still says what the CA was not told
+    acme_meta, acme_note = _acme_untold(upstream)
     if refusal is not None:
         message, status = refusal
-        return error_response(f'User not deleted: {message}', status)
+        return error_response(f'User not deleted: {message}{acme_note}', status, meta=acme_meta)
     try:
         sessions_deleted = _purge_user_dependencies(user_id)
         db.session.delete(user)
@@ -522,7 +524,9 @@ def delete_user(user_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to delete user {user_id}: {e}", exc_info=True)
-        return error_response('Failed to delete user' + _revoked_note(revoked), 500)
+        return error_response(f'Failed to delete user{_revoked_note(revoked)}.{acme_note}'
+                              if acme_note else 'Failed to delete user' + _revoked_note(revoked),
+                              500, meta=acme_meta)
     kept = _delete_withdrawn_certificates(certificate_ids, g.current_user.username)
 
     if sessions_deleted > 0:
@@ -543,7 +547,6 @@ def delete_user(user_id):
     except Exception:
         pass
 
-    acme_meta, acme_note = _acme_untold(upstream)
     extra = {'meta': acme_meta} if acme_meta else {}
     if kept:
         return success_response(message=(
@@ -591,8 +594,8 @@ def bulk_delete_users():
         certificate_ids, revoked, refusal = _revoke_enrolled_certificates(
             user_id, g.current_user, upstream)
         acme_meta, _note = _acme_untold(upstream)
-        for key, ids in (acme_meta or {}).items():
-            results.setdefault(key, []).extend(ids)
+        for key, certificate_ids_of_key in (acme_meta or {}).items():
+            results.setdefault(key, []).extend(certificate_ids_of_key)
         if refusal is not None:
             results['failed'].append({'id': user_id, 'error': refusal[0]})
             continue

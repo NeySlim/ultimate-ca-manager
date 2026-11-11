@@ -171,6 +171,25 @@ def local_only_message(outcome, detail) -> Optional[str]:
 REVOKED_MESSAGE = 'Certificate revoked successfully'
 
 
+def related_untold(related_acme):
+    """``(partner_id, outcome, detail)`` entries whose ACME CA was not told of a final
+    revocation: a hold is never sent, so it is not one of them."""
+    return [entry for entry in related_acme or () if entry[1] not in (NOT_ACME, REVOKED, HOLD)]
+
+
+def with_related_answer(answer, related_acme) -> dict:
+    """``answer`` of :func:`revocation_answer`, also saying the related member the CA was not told of."""
+    untold = related_untold(related_acme)
+    if not untold:
+        return answer
+    partner_id, outcome, detail = untold[0]
+    meta = dict(answer.get('meta') or {}, acme_local_only=True, related_acme_local_only=partner_id)
+    if outcome == OWED:
+        meta['related_acme_upstream_pending'] = True
+    note = local_only_message(outcome, detail)
+    return {'message': f"{answer['message']} Related certificate #{partner_id}: {note}", 'meta': meta}
+
+
 def revocation_answer(outcome, detail, message=REVOKED_MESSAGE) -> dict:
     """The ``message`` and ``meta`` of a route that revoked a certificate the ACME CA was,
     or was not, told of; ``message`` other than the default is appended, never replaced."""
