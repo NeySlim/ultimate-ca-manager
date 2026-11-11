@@ -611,7 +611,7 @@ def bulk_delete_users():
         total_sessions_invalidated += sessions_deleted
         kept = _delete_withdrawn_certificates(certificate_ids, g.current_user.username)
         if kept:
-            logger.warning(f"User {user_id} deleted, revoked certificate(s) {kept} not deleted")
+            logger.warning(f"User {user_id} deleted, revoked certificate(s) {_numbers(kept)} not deleted")
         results['success'].append(user_id)
 
     AuditService.log_action(
