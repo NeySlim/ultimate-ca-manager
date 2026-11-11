@@ -11,6 +11,18 @@ IMPORT = '/api/v2/certificates/import'
 
 
 _cleanup = pytest.fixture(autouse=True)(delete_leftovers)
+_first = {'binding': 0, 'delivery': 0}
+
+
+@pytest.fixture(autouse=True)
+def _own_bindings_only(app, _cleanup):
+    """Another file's leftover binding or delivery may carry an id this test's rows reuse."""
+    with app.app_context():
+        from models import db, DeployBinding, DeployDelivery
+        _first['binding'] = db.session.query(db.func.max(DeployBinding.id)).scalar() or 0
+        _first['delivery'] = db.session.query(db.func.max(DeployDelivery.id)).scalar() or 0
+    yield
+
 
 def _deliveries(app, cert_id):
     with app.app_context():
@@ -19,6 +31,8 @@ def _deliveries(app, cert_id):
         return [(d.event_type, d.status) for d in DeployDelivery.query
                 .join(DeployBinding, DeployDelivery.binding_id == DeployBinding.id)
                 .filter(DeployBinding.certificate_id == cert_id,
+                        DeployBinding.id > _first['binding'],
+                        DeployDelivery.id > _first['delivery'],
                         DeployDelivery.event_type != 'initial').all()]
 
 

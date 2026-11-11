@@ -6,7 +6,7 @@ import pytest
 from tests.deploy_leftovers import delete_leftovers
 from tests.test_deploy_hooks import _create_target, _create_binding
 from tests.test_import_review import _cert, _gen, _ca_from_fixture, _store_cert, _pem
-from tests.test_import_triggers_deploy import _deliveries
+from tests.test_import_triggers_deploy import _deliveries, _own_bindings_only  # noqa: F401
 
 
 _cleanup = pytest.fixture(autouse=True)(delete_leftovers)
