@@ -44,8 +44,6 @@ export default defineConfig({
             '@radix-ui/react-tooltip',
             '@radix-ui/react-select',
           ],
-          // Charts - only loaded by Dashboard
-          charts: ['recharts'],
         },
       },
     },

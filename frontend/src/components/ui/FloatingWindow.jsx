@@ -3,7 +3,6 @@
  * 
  * Used by:
  * - FloatingHelpPanel (help system)
- * - FloatingDetailWindow (detail panels)
  * 
  * Features:
  * - RAF-based drag/resize via useFloatingWindow hook
