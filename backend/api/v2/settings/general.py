@@ -161,6 +161,7 @@ def update_general_settings():
     data = request.json or {}
     if not isinstance(data, dict):
         return error_response('Request body must be a JSON object', 400)
+    port_restart = False
 
     # Reserved keys are dropped before any validation; a body holding nothing
     # else is refused, so a mixed card still saves its other fields.
@@ -267,6 +268,11 @@ def update_general_settings():
         if port == Config.HTTPS_PORT:
             return error_response("HTTP protocol port cannot be the same as HTTPS port", 400)
         data['http_protocol_port'] = str(port)
+        # Bound when a worker starts: a new value needs a restart, unless the environment pins it
+        import os
+        stored_port = get_config('http_protocol_port', '') or '8080'
+        port_restart = (data['http_protocol_port'] != stored_port
+                        and os.getenv('HTTP_PROTOCOL_PORT') is None)
 
     if 'acme_public_vhost' in data:
         raw_vhost = data.get('acme_public_vhost')
@@ -454,6 +460,11 @@ def update_general_settings():
     if allowlist_change is not None:
         from services.cluster_commands import RELOAD_ADMIN_ALLOWLIST, emit
         emit(RELOAD_ADMIN_ALLOWLIST)  # committed with the list, or not at all
+    from utils.ha import ha_enabled
+    rolling = port_restart and ha_enabled()
+    if rolling:
+        from services.cluster_commands import RESTART, emit
+        emit(RESTART)  # HA: queued with the port, or neither is saved
 
     try:
         db.session.commit()
@@ -493,7 +504,20 @@ def update_general_settings():
         success=True
     )
 
-    return success_response(message='Settings saved successfully')
+    restart_message = None
+    if rolling:
+        from services.cluster_commands import ROLLING_RESTART_MESSAGE
+        restart_message = ROLLING_RESTART_MESSAGE
+    elif port_restart:
+        from config import settings as config_settings
+        if config_settings.is_docker():
+            restart_message = 'Restart the container to apply the HTTP protocol port.'
+        else:
+            restarted, detail = config_settings.restart_ucm_service()
+            restart_message = ('Service restart initiated to apply the HTTP protocol port.'
+                               if restarted else detail)
+    return success_response(data={'needs_restart': port_restart, 'restart_message': restart_message},
+                            message='Settings saved successfully')
 
 
 # --- Certificate Transparency (CT) ---
