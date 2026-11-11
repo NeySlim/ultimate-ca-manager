@@ -499,7 +499,8 @@ class CommandApplier:
         try:
             conn.execute(_RELEASE_SQL, {'prev': previous, 'id': command_id, 'n': self.node_id})
         except Exception as e:
-            if not logged:
+            # Once stop() is called, its own attempt at giving the claim back is the line logged
+            if not logged and not self._stopping:
                 logger.error(f"Rolling restart of node {self.node_id}: claim of command {command_id} "
                              f"not given back, retried on the next pass: {type(e).__name__}: {e}")
                 self._give_back_pending[2] = True

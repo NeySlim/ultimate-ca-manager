@@ -866,6 +866,28 @@ def test_stop_gives_back_a_claim_still_pending(app, ha, monkeypatch, caplog, dat
         assert [r.levelno for r in caplog.records if 'given back' in r.getMessage()] == [logging.ERROR]
 
 
+
+def test_stop_during_a_failed_give_back_logs_it_once(app, ha, monkeypatch, caplog):
+    """The applier thread fails to give the claim back while stop() waits for it: stop()
+    tries once more and that failure is the only line."""
+    import logging
+    from sqlalchemy import text
+    stopper = []
+
+    def action():
+        monkeypatch.setattr(cc, '_RELEASE_SQL', text('SELECT cc_no_such_function()'))
+        stopper.append(threading.Thread(target=solo.stop))
+        stopper[0].start()
+        assert wait_for(lambda: solo._stopping)
+        raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', restart_action=action)
+    caplog.set_level(logging.INFO, logger=cc.logger.name)
+    _emit(app, cc.RESTART)
+    solo.start()
+    assert wait_for(lambda: stopper and not stopper[0].is_alive(), timeout=15)
+    assert [r.levelno for r in caplog.records if 'given back' in r.getMessage()] == [logging.ERROR]
+
 def test_stop_during_a_failed_restart_is_not_undone(app, ha):
     """stop() lands between the failed restart's check of _stopping and its _stop.clear()."""
     clock = _FakeMonotonic()
