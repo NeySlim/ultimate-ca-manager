@@ -73,8 +73,7 @@ def _pushes_key(binding):
         return False
     from services.deploy import http as deploy_http
     try:
-        names = {name for source in (target.url, target.body_template)
-                 for name, _ in deploy_http.template_variables(source or '')}
+        names = deploy_http.template_names(target)
     except ValueError:
         return True  # an unreadable template must not move a binding or abort the renewal
     return 'key_pem' in names
