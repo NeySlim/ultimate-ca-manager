@@ -309,3 +309,13 @@ class TestTwoEnrolmentsOfOneCertificate:
                     db.session.delete(row)
                     db.session.commit()
 
+
+class TestACertificateLeftBehind:
+    def test_is_named_by_number(self, app, auth_client, probe, monkeypatch):
+        from services.cert_service import CertificateService
+        monkeypatch.setattr(CertificateService, 'delete_certificate', lambda *_a, **_k: False)
+        answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+        assert answer.status_code == 200, answer.data[:300]
+        message = json.loads(answer.data)['message']
+        assert f"certificate(s) #{probe['certificate_id']} could not" in message, message
+        assert '[' not in message

@@ -526,7 +526,7 @@ def delete_user(user_id):
 
     if kept:
         return success_response(message=(
-            f'User {username} deleted; its revoked mTLS certificate(s) {kept} '
+            f'User {username} deleted; its revoked mTLS certificate(s) {_numbers(kept)} '
             'could not be deleted and are still listed under Certificates'))
     return success_response(
         message=f'User {username} deleted successfully'
