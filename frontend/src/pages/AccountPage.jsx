@@ -23,13 +23,14 @@ import { formatDate , downloadBlob} from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { reportSilentFailure } from '../lib/silentFailure'
+import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { apiKeyScopePermissions } from '../lib/apiKeyScopes'
 
 export default function AccountPage() {
   const { t } = useTranslation()
   const { user } = useAuth()
   const { isMobile } = useMobile()
-  const { showSuccess, showError, showConfirm, showPrompt } = useNotification()
+  const { showSuccess, showError, showWarning, showConfirm, showPrompt } = useNotification()
   const { copy } = useClipboard()
   const { hasPermission } = usePermission()
 
@@ -370,8 +371,10 @@ export default function AccountPage() {
     if (!confirmed) return
     
     try {
-      await accountService.deleteMTLSCertificate(certId)
-      showSuccess(t('account.certificateDeleted'))
+      // Its certificate is revoked first: the ACME CA that issued it may not have been told
+      const localOnly = localOnlyRevocationWarning(await accountService.deleteMTLSCertificate(certId), t)
+      if (localOnly) showWarning(localOnly)
+      else showSuccess(t('account.certificateDeleted'))
       await loadMTLSCertificates()
     } catch (error) {
       showError(error.message || t('account.deleteCertFailed'))
