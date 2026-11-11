@@ -126,6 +126,24 @@ class TestASessionOpenedBeforeTheUpdate:
         assert old_session.get(PROTECTED).status_code == 401
         assert _login(app, 'proofless_namesake').get(PROTECTED).status_code == 200
 
+    def test_is_refused_by_an_undated_account_that_took_its_id(self, app, auth_client, create_user, cleanup):
+        # An account without a creation time leaves the username as the only binding
+        from auth.session_start import ACCOUNT_KEY
+        cleanup.extend(['proofless_dated', 'proofless_undated'])
+        first = create_user(username='proofless_dated', role='operator')
+        old_session = _login(app, 'proofless_dated')
+        with old_session.session_transaction() as stored:
+            assert stored.pop(ACCOUNT_KEY, None) is not None
+
+        _delete_last(app, auth_client, first['id'])
+        second = create_user(username='proofless_undated', role='admin')
+        _reuses(app, first['id'], second['id'])
+        with app.app_context():
+            db.session.get(User, second['id']).created_at = None
+            db.session.commit()
+
+        assert old_session.get(PROTECTED).status_code == 401
+
     def test_without_a_login_time_is_refused(self, app, create_user, cleanup):
         from auth.session_start import ACCOUNT_KEY
         cleanup.append('proofless_no_time')
