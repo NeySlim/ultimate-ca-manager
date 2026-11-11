@@ -22,6 +22,8 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
   // The API drops these keys without admin:settings; the other fields still save.
   const adminLocked = !(typeof hasPermission === 'function' && hasPermission('admin:settings'))
   const lockedLabel = (key) => <AdminLockLabel text={t(key)} locked={adminLocked} />
+  // HTTP_PROTOCOL_PORT in the service environment sets the port: the value shown is the one bound
+  const portPinned = settings.env_locked?.http_protocol_port_env === true
   // Certificates with a private key, for the ACME public vhost TLS selector
   useEffect(() => {
     let cancelled = false
@@ -107,14 +109,14 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             type="number"
             min={0}
             max={65535}
-            disabled={settings.http_protocol_port_env_locked === true}
+            disabled={portPinned}
             value={settings.http_protocol_port ?? 8080}
             onChange={(e) => {
               const val = parseInt(e.target.value) || 0
               updateSetting('http_protocol_port', Math.min(65535, Math.max(0, val)))
             }}
             placeholder="8080"
-            helperText={settings.http_protocol_port_env_locked === true
+            helperText={portPinned
               ? t('settings.httpProtocolPortEnvLocked')
               : t('settings.httpProtocolPortHelper')}
           />

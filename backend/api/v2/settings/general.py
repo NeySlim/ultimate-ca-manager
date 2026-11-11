@@ -91,6 +91,9 @@ _ADMIN_ONLY_SETTINGS = frozenset([
 @require_auth(['read:settings'])
 def get_general_settings():
     """Get general settings from database"""
+    from protocol_http_server import get_http_protocol_port
+    from utils.public_endpoints import env_locked_fields
+    env_locked = env_locked_fields()
     return success_response(data={
         'system_name': get_config('system_name', ''),
         'timezone': get_config('timezone', 'UTC'),
@@ -109,8 +112,10 @@ def get_general_settings():
         'max_login_attempts': int(get_config('max_login_attempts', '5')),
         'lockout_duration': effective('lockout_duration'),
         'protocol_base_url': get_config('protocol_base_url', ''),
-        'http_protocol_port': int(get_config('http_protocol_port', '8080')),
-        'http_protocol_port_env_locked': os.getenv('HTTP_PROTOCOL_PORT') is not None,
+        # The port really bound: the environment, when it sets one, wins over the stored value
+        'http_protocol_port': (get_http_protocol_port() if env_locked['http_protocol_port_env']
+                               else int(get_config('http_protocol_port', '8080'))),
+        'env_locked': env_locked,
         'base_url': get_config('base_url', ''),
         # ACME public endpoint (local server + proxy directory URLs behind reverse proxy)
         'acme_public_vhost': get_config('acme_public_vhost', ''),
@@ -274,13 +279,15 @@ def update_general_settings():
         # Bound when a worker starts: a new value needs a restart, unless the environment pins it
         stored_port = get_config('http_protocol_port', '') or '8080'
         pinned = os.getenv('HTTP_PROTOCOL_PORT')
-        changed = data['http_protocol_port'] != stored_port
+        if pinned is not None and pinned.strip() == data['http_protocol_port']:
+            del data['http_protocol_port']  # the pinned port GET showed: the stored one stays
+        changed = data.get('http_protocol_port', stored_port) != stored_port
         port_restart = changed and pinned is None
         # The environment wins over the stored port: say so rather than report a save that never binds
         port_pinned_message = (
             f'HTTP_PROTOCOL_PORT={pinned} in the service environment sets this port: '
             'the saved value is not used until it is removed.'
-            if changed and pinned is not None and pinned.strip() != data['http_protocol_port'] else None)
+            if changed and pinned is not None else None)
 
     if 'acme_public_vhost' in data:
         raw_vhost = data.get('acme_public_vhost')

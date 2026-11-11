@@ -39,13 +39,13 @@ const renderWith = (settings) => render(
 
 describe('HTTP protocol port pinned by the environment', () => {
   it('is read-only and says where it is set', () => {
-    renderWith({ http_protocol_port: 8080, http_protocol_port_env_locked: true })
+    renderWith({ http_protocol_port: 9090, env_locked: { http_protocol_port_env: true } })
     expect(screen.getByLabelText('settings.httpProtocolPort')).toBeDisabled()
     expect(screen.getByText('settings.httpProtocolPortEnvLocked')).toBeInTheDocument()
   })
 
   it('stays editable when the environment leaves it alone', () => {
-    renderWith({ http_protocol_port: 8080, http_protocol_port_env_locked: false })
+    renderWith({ http_protocol_port: 8080, env_locked: { http_protocol_port_env: false } })
     expect(screen.getByLabelText('settings.httpProtocolPort')).not.toBeDisabled()
     expect(screen.queryByText('settings.httpProtocolPortEnvLocked')).toBeNull()
   })

@@ -85,13 +85,26 @@ def test_resaving_the_stored_port_under_a_pinned_environment_says_nothing(
     assert r.get_json()['data']['restart_message'] is None
 
 
-def test_get_says_when_the_environment_pins_the_port(app, auth_client, monkeypatch):
-    monkeypatch.delenv('HTTP_PROTOCOL_PORT', raising=False)
-    assert auth_client.get('/api/v2/settings/general').get_json()['data'][
-        'http_protocol_port_env_locked'] is False
-    monkeypatch.setenv('HTTP_PROTOCOL_PORT', '8080')
-    assert auth_client.get('/api/v2/settings/general').get_json()['data'][
-        'http_protocol_port_env_locked'] is True
+def test_get_says_when_the_environment_pins_the_port(app, auth_client, stored_port, monkeypatch):
+    data = auth_client.get('/api/v2/settings/general').get_json()['data']
+    assert data['env_locked']['http_protocol_port_env'] is False
+    assert data['http_protocol_port'] == 8080
+    assert 'http_protocol_port_env_locked' not in data
+    monkeypatch.setenv('HTTP_PROTOCOL_PORT', '9090')
+    data = auth_client.get('/api/v2/settings/general').get_json()['data']
+    assert data['env_locked']['http_protocol_port_env'] is True
+    assert data['http_protocol_port'] == 9090  # the port really bound, not the stored one
+
+
+def test_saving_back_the_pinned_port_keeps_the_stored_one(app, auth_client, stored_port,
+                                                          restarts, monkeypatch):
+    """The card sends every field: the effective port it was shown must not replace the stored one."""
+    monkeypatch.setenv('HTTP_PROTOCOL_PORT', '9090')
+    r = _save(auth_client, 9090)
+    assert r.status_code == 200, r.get_json()
+    assert restarts == [] and r.get_json()['data']['restart_message'] is None
+    with app.app_context():
+        assert SystemConfig.query.filter_by(key='http_protocol_port').first().value == '8080'
 
 
 def test_in_ha_the_rolling_restart_is_committed_with_the_port(app, auth_client, stored_port,
