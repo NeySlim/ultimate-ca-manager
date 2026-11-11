@@ -11,7 +11,8 @@ UNHELD = 'certificate.unheld'
 
 
 def _post(client, url, payload=None):
-    return client.post(url, data=json.dumps(payload or {}), content_type='application/json')
+    return client.post(url, data=json.dumps({} if payload is None else payload),
+                       content_type='application/json')
 
 
 # FK-aware purge: crl_metadata and other children go with their CA.
@@ -126,3 +127,61 @@ def test_unhold_reports_the_partner_it_lifted(app, auth_client, create_ca, creat
                  {'reason': 'certificateHold'}).status_code == 200
     r = _post(auth_client, f"{base}/{a['id']}/unhold")
     assert r.get_json()['data']['related_unheld'] == b['id']
+
+
+def _delta_on(app, *ca_ids):
+    from models import CA
+    with app.app_context():
+        for ca_id in ca_ids:
+            ca = db.session.get(CA, ca_id)
+            ca.delta_crl_enabled = ca.cdp_enabled = True
+        db.session.commit()
+
+
+def _hold_pair(app, auth_client, a, b):
+    _link(app, a['id'], b['id'])
+    r = _post(auth_client, f"/api/v2/certificates/{a['id']}/revoke", {'reason': 'certificateHold'})
+    assert r.status_code == 200, r.data
+
+
+def test_a_pair_on_one_ca_gets_a_single_delta_listing_both(
+        app, auth_client, create_ca, create_cert, monkeypatch):
+    from services.crl_service import CRLService
+    ca = create_ca(cn='Unhold Delta CA')
+    a = create_cert(cn='unhold-delta-a.example.test', ca_id=ca['id'])
+    b = create_cert(cn='unhold-delta-b.example.test', ca_id=ca['id'])
+    _delta_on(app, ca['id'])
+    _hold_pair(app, auth_client, a, b)
+    seen_at_delta = []
+
+    def delta(ca_id, username=None):
+        seen_at_delta.append((ca_id, _state(app, a['id'])[1], _state(app, b['id'])[1]))
+
+    monkeypatch.setattr(CRLService, 'generate_delta_crl', staticmethod(delta))
+    r = _post(auth_client, f"/api/v2/certificates/{a['id']}/unhold")
+    assert r.status_code == 200, r.data
+    assert seen_at_delta == [(ca['id'], 'removeFromCRL', 'removeFromCRL')]
+    assert _state(app, a['id'])[0] is False and _state(app, b['id'])[0] is False
+
+
+def test_a_failed_delta_does_not_stop_the_partner(
+        app, auth_client, create_ca, create_cert, monkeypatch):
+    from services.crl_service import CRLService
+    ca1 = create_ca(cn='Unhold Delta CA 1')
+    ca2 = create_ca(cn='Unhold Delta CA 2')
+    a = create_cert(cn='unhold-fail-a.example.test', ca_id=ca1['id'])
+    b = create_cert(cn='unhold-fail-b.example.test', ca_id=ca2['id'])
+    _delta_on(app, ca1['id'], ca2['id'])
+    _hold_pair(app, auth_client, a, b)
+    calls = []
+
+    def delta(ca_id, username=None):
+        calls.append(ca_id)
+        if len(calls) == 1:
+            raise RuntimeError('delta failed')
+
+    monkeypatch.setattr(CRLService, 'generate_delta_crl', staticmethod(delta))
+    r = _post(auth_client, f"/api/v2/certificates/{a['id']}/unhold")
+    assert r.status_code == 200, r.data
+    assert sorted(calls) == sorted([ca1['id'], ca2['id']])
+    assert _state(app, a['id'])[0] is False and _state(app, b['id'])[0] is False

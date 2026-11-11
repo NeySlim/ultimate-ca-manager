@@ -241,8 +241,9 @@ def unhold_certificate(cert_id):
             'Only certificates with reason "certificateHold" can be unheld', 400
         )
 
+    body = request.get_json(silent=True)
     try:
-        unhold_related = json_boolean(request.get_json(silent=True) or {}, 'unhold_related', True)
+        unhold_related = json_boolean(body or {}, 'unhold_related', True)
     except ValueError as e:
         return error_response(str(e), 400)
 
@@ -257,22 +258,23 @@ def unhold_certificate(cert_id):
         members = [cert] + ([partner] if partner is not None else [])
         cas = {m.id: (CA.query.filter_by(refid=m.caref).first() if m.caref else None)
                for m in members}
-        ca = cas[cert.id]
 
         # Each hold as it stands, before the removeFromCRL staging below
         helds = {m.id: ({field: getattr(m, field)
                          for field in ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at')},
                         m.serial_number, m.caref) for m in members}
 
-        # RFC 5280 §5.3.1 — when delta CRLs are enabled, emit removeFromCRL on
-        # a delta before clearing the hold so relying parties drop the entry.
+        # RFC 5280 §5.3.1: stage removeFromCRL on every member, commit once, then
+        # emit one delta per distinct CA so relying parties drop the entries.
+        staged_cas = {}
         for member in members:
             member_ca = cas[member.id]
             if not (member_ca and member_ca.delta_crl_enabled and member_ca.cdp_enabled):
                 continue
-            member_id = member.id
             member.revoke_reason = 'removeFromCRL'
             member.revoked_at = utc_now()
+            staged_cas[member_ca.id] = member_ca
+        if staged_cas:
             try:
                 db.session.commit()
             except Exception as e:
@@ -280,16 +282,15 @@ def unhold_certificate(cert_id):
                 logger.error(f"Failed to stage removeFromCRL before unhold: {e}")
                 _restore_holds(helds)
                 return error_response('Failed to remove certificate hold', 500)
-            try:
-                from services.crl_service import CRLService
-                CRLService.generate_delta_crl(member_ca.id, username=username)
-            except Exception as e:
-                # Delta emission failed — continue with the unhold anyway; the
-                # full CRL regenerated below no longer lists the certificate.
-                logger.warning(f"Failed to emit removeFromCRL delta before unhold: {e}")
-                members = [db.session.get(Certificate, m.id) for m in members]
-                cert = members[0]
-                break
+            from services.crl_service import CRLService
+            for staged_ca in staged_cas.values():
+                try:
+                    CRLService.generate_delta_crl(staged_ca.id, username=username)
+                except Exception as e:
+                    # The full CRL regenerated below no longer lists the certificates
+                    logger.warning(f"Failed to emit removeFromCRL delta before unhold: {e}")
+            members = [db.session.get(Certificate, m.id) for m in members]
+            cert = members[0]
 
         # The lifted holds and their revocation records go together or not at all
         try:
