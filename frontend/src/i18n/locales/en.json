@@ -3083,6 +3083,7 @@
     "updateReleaseNotes": "What's New in v{{version}}",
     "httpProtocolPort": "HTTP Protocol Port",
     "httpProtocolPortHelper": "Port for the plain HTTP server serving CDP/OCSP endpoints, and SCEP when its plain HTTP option is on. Set to 0 to disable. Requires restart.",
+    "httpProtocolPortEnvLocked": "Set by HTTP_PROTOCOL_PORT in the service environment (ucm.env): remove it there to manage the port here.",
     "ct": "Certificate Transparency",
     "ctDescription": "Submit certificates to public CT logs for transparency and auditability",
     "ctEnabled": "Enable Certificate Transparency",

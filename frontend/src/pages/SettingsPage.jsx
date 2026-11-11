@@ -1115,6 +1115,7 @@ export default function SettingsPage() {
 
   const handleSave = async (section) => {
     setSaving(true)
+    let restartMessage = null
     try {
       if (section === 'email') {
         const targets = smtpSecretTargets(savedEmail, settings)
@@ -1145,9 +1146,11 @@ export default function SettingsPage() {
           smtp_oauth_redirect_uri: settings.smtp_oauth_redirect_uri,
         })
       } else {
-        await settingsService.updateBulk(settings)
+        const response = await settingsService.updateBulk(settings)
+        restartMessage = response?.data?.restart_message
       }
       showSuccess(t('messages.success.update.settings'))
+      if (restartMessage) showWarning(restartMessage)
       if (section === 'email') setOauthDirty(false)
       if (settings.timezone) setAppTimezone(settings.timezone)
       if (settings.date_format) setDateFormat(settings.date_format)

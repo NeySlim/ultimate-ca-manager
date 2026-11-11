@@ -3082,6 +3082,7 @@
     "updateReleaseNotes": "Novedades en v{{version}}",
     "httpProtocolPort": "Puerto HTTP protocolo",
     "httpProtocolPortHelper": "Puerto del servidor HTTP sin cifrar para los endpoints CDP/OCSP. Establecer en 0 para deshabilitar. Requiere reinicio.",
+    "httpProtocolPortEnvLocked": "Set by HTTP_PROTOCOL_PORT in the service environment (ucm.env): remove it there to manage the port here.",
     "ct": "Transparencia de certificados",
     "ctDescription": "Enviar certificados a registros CT públicos para transparencia y auditoría",
     "ctEnabled": "Habilitar transparencia de certificados",

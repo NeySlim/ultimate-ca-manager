@@ -139,6 +139,7 @@ def test_syslog_changed_on_a_reaches_b(app, auth_client, ha):
             'enabled': False, 'host': 'collector.cc.example', 'port': 5514, 'protocol': 'udp'})
         assert r.status_code == 200, r.data
         syslog_forwarder.configure(enabled=False, host=old['host'], port=old['port'])
+        syslog_forwarder._stored = None  # node B never applied the saved rows
         b.start()
         assert wait_for(lambda: syslog_forwarder.config['port'] == 5514
                         and syslog_forwarder.config['host'] == 'collector.cc.example')
@@ -146,6 +147,7 @@ def test_syslog_changed_on_a_reaches_b(app, auth_client, ha):
         auth_client.put('/api/v2/system/audit/syslog', json={
             'enabled': False, 'host': old['host'], 'port': old['port'], 'protocol': old['protocol']})
         syslog_forwarder.configure(enabled=False, host=old['host'], port=old['port'])
+        syslog_forwarder._stored = None
 
 
 def test_admin_allowlist_change_is_emitted_with_its_commit(app, auth_client, ha):

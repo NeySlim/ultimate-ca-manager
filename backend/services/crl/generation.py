@@ -36,6 +36,22 @@ def _refuse_offline_ca(ca) -> None:
         )
 
 
+class CRLSigningKeyMismatch(ValueError):
+    """The CA's signing key is not the key of its certificate: nobody could verify the CRL."""
+
+
+def _signing_key_for(ca, ca_cert):
+    """The CA's signing key, read once, refused when it is not its certificate's key."""
+    from services.hsm.ca_key_loader import get_ca_signing_key
+    from utils.cert_issuer import private_key_matches
+    key = get_ca_signing_key(ca, allow_revoked=True)
+    if not private_key_matches(key, ca_cert):
+        message = f"CA {ca.descr}: its key is not the key of its certificate - no CRL signed"
+        logger.error(message)
+        raise CRLSigningKeyMismatch(message)
+    return key
+
+
 def _authority_key_identifier_for_crl(ca_cert: x509.Certificate) -> x509.AuthorityKeyIdentifier:
     """RFC 5280 §5.2.1 — CRL AKI must identify the signing CA key (its SKI)."""
     return authority_key_identifier_from_issuer(ca_cert)
@@ -221,8 +237,7 @@ class CRLGenerationMixin:
         ca_cert_pem = base64.b64decode(ca.crt).decode('utf-8')
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem.encode(), default_backend())
 
-        from services.hsm.ca_key_loader import get_ca_signing_key
-        ca_private_key = get_ca_signing_key(ca, allow_revoked=True)
+        ca_private_key = _signing_key_for(ca, ca_cert)
 
         _run_housekeeping(ca_id)
 
@@ -355,8 +370,7 @@ class CRLGenerationMixin:
         ca_cert_pem = base64.b64decode(ca.crt).decode('utf-8')
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem.encode(), default_backend())
 
-        from services.hsm.ca_key_loader import get_ca_signing_key
-        ca_private_key = get_ca_signing_key(ca, allow_revoked=True)
+        ca_private_key = _signing_key_for(ca, ca_cert)
 
         # Number, base and list under one lock, released before signing as in generate_crl
         try:

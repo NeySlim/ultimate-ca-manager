@@ -12,6 +12,7 @@ from services.retention_service import RetentionPolicy, RetentionSettingError
 from api.v2.key_recovery import _dual_control_enabled, _dual_control_env
 import json
 import logging
+import os
 
 from . import bp, get_config, set_config
 from services.backup.settings_contract import (
@@ -90,6 +91,9 @@ _ADMIN_ONLY_SETTINGS = frozenset([
 @require_auth(['read:settings'])
 def get_general_settings():
     """Get general settings from database"""
+    from protocol_http_server import get_http_protocol_port
+    from utils.public_endpoints import env_locked_fields
+    env_locked = env_locked_fields()
     return success_response(data={
         'system_name': get_config('system_name', ''),
         'timezone': get_config('timezone', 'UTC'),
@@ -108,7 +112,10 @@ def get_general_settings():
         'max_login_attempts': int(get_config('max_login_attempts', '5')),
         'lockout_duration': effective('lockout_duration'),
         'protocol_base_url': get_config('protocol_base_url', ''),
-        'http_protocol_port': int(get_config('http_protocol_port', '8080')),
+        # The port really bound: the environment, when it sets one, wins over the stored value
+        'http_protocol_port': (get_http_protocol_port() if env_locked['http_protocol_port_env']
+                               else int(get_config('http_protocol_port', '8080'))),
+        'env_locked': env_locked,
         'base_url': get_config('base_url', ''),
         # ACME public endpoint (local server + proxy directory URLs behind reverse proxy)
         'acme_public_vhost': get_config('acme_public_vhost', ''),
@@ -161,6 +168,8 @@ def update_general_settings():
     data = request.json or {}
     if not isinstance(data, dict):
         return error_response('Request body must be a JSON object', 400)
+    port_restart = False
+    port_pinned_message = None
 
     # Reserved keys are dropped before any validation; a body holding nothing
     # else is refused, so a mixed card still saves its other fields.
@@ -261,12 +270,26 @@ def update_general_settings():
             port = int(data['http_protocol_port'])
         except (ValueError, TypeError):
             return error_response("Invalid port number", 400)
-        if port != 0 and (port < 1024 or port > 65535):
-            return error_response("Port must be 0 (disabled) or between 1024-65535", 400)
-        from config.settings import Config
-        if port == Config.HTTPS_PORT:
-            return error_response("HTTP protocol port cannot be the same as HTTPS port", 400)
-        data['http_protocol_port'] = str(port)
+        pinned = os.getenv('HTTP_PROTOCOL_PORT')
+        from protocol_http_server import get_http_protocol_port
+        if pinned is not None and port == get_http_protocol_port():
+            data.pop('http_protocol_port')  # the bound port GET showed: the stored one stays
+        else:
+            if port != 0 and (port < 1024 or port > 65535):
+                return error_response("Port must be 0 (disabled) or between 1024-65535", 400)
+            from config.settings import Config
+            if port == Config.HTTPS_PORT:
+                return error_response("HTTP protocol port cannot be the same as HTTPS port", 400)
+            data['http_protocol_port'] = str(port)
+            # Bound when a worker starts: a new value needs a restart, unless the environment pins it
+            stored_port = get_config('http_protocol_port', '') or '8080'
+            changed = data['http_protocol_port'] != stored_port
+            port_restart = changed and pinned is None
+            # The environment wins over the stored port: say so rather than report a save that never binds
+            port_pinned_message = (
+                f'HTTP_PROTOCOL_PORT={pinned} in the service environment sets this port: '
+                'the saved value is not used until it is removed.'
+                if changed and pinned is not None else None)
 
     if 'acme_public_vhost' in data:
         raw_vhost = data.get('acme_public_vhost')
@@ -454,6 +477,11 @@ def update_general_settings():
     if allowlist_change is not None:
         from services.cluster_commands import RELOAD_ADMIN_ALLOWLIST, emit
         emit(RELOAD_ADMIN_ALLOWLIST)  # committed with the list, or not at all
+    from utils.ha import ha_enabled
+    rolling = port_restart and ha_enabled()
+    if rolling:
+        from services.cluster_commands import RESTART, emit
+        emit(RESTART)  # HA: queued with the port, or neither is saved
 
     try:
         db.session.commit()
@@ -493,7 +521,20 @@ def update_general_settings():
         success=True
     )
 
-    return success_response(message='Settings saved successfully')
+    restart_message = port_pinned_message
+    if rolling:
+        from services.cluster_commands import ROLLING_RESTART_MESSAGE
+        restart_message = ROLLING_RESTART_MESSAGE
+    elif port_restart:
+        from config import settings as config_settings
+        if config_settings.is_docker():
+            restart_message = 'Restart the container to apply the HTTP protocol port.'
+        else:
+            restarted, detail = config_settings.restart_ucm_service()
+            restart_message = ('Service restart initiated to apply the HTTP protocol port.'
+                               if restarted else detail)
+    return success_response(data={'needs_restart': port_restart, 'restart_message': restart_message},
+                            message='Settings saved successfully')
 
 
 # --- Certificate Transparency (CT) ---
