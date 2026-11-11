@@ -60,6 +60,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Security
 
 - Users: deleting a user, alone or in bulk, left the certificates they had enrolled for mTLS valid on the CRL and at the OCSP responder; they are now revoked (cessationOfOperation) and deleted as when an enrolment is removed, and a user whose certificate cannot be revoked is not deleted.
+- mTLS: the self-service routes that list, assign and enrol a user's own certificates relied on the username alone; a certificate recorded before the current account was created is no longer treated as its own, and an administrator can still assign it.
 - ACME client: revoking a certificate obtained from an ACME CA (single, bulk or approved request) only revoked it in UCM while the CA still answered "good"; the CA is now told (RFC 8555 §7.6) with reasons 1, 3, 4, 5 and 9 (privilegeWithdrawn included) and retried by the scheduler until it confirms, and the answer says when the revocation stayed local (`acme_local_only`), a hold included.
 
 ### Upgrade notes
