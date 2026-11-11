@@ -154,6 +154,31 @@ def test_a_failed_export_gives_the_slot_back(app, monkeypatch, tmp_path):
 
 @pytest.mark.postgres
 @pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_an_export_failing_after_a_sql_error_gives_the_slot_back_on_postgresql(
+        app, monkeypatch, tmp_path):
+    from sqlalchemy import text
+
+    def export(*a, **k):
+        # Leaves the PostgreSQL transaction aborted, as a failed export query does
+        try:
+            db.session.execute(text('SELECT * FROM no_such_table_for_this_test'))
+        except Exception:  # noqa: BLE001
+            pass
+        raise RuntimeError('export failed')
+
+    with _pg(app):
+        _backup_schedule(app, monkeypatch, tmp_path, last_run='2026-01-01T00:00:00Z')
+        monkeypatch.setattr(schedule.storage, 'export_archive', export)
+        with app.app_context():
+            with pytest.raises(RuntimeError):
+                schedule.run_scheduled_backup()
+            db.session.remove()
+            assert schedule._get('backup.last_run') == '2026-01-01T00:00:00Z'
+            db.session.remove()
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
 def test_two_backup_runners_write_one_archive_on_postgresql(app, monkeypatch, tmp_path):
     with _pg(app):
         # A previous run on record: the reservation is the conditional update, not the insert

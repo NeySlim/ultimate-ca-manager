@@ -387,6 +387,8 @@ def _claim_run(previous, now: datetime):
 
 def _release_run(previous, claimed: str) -> None:
     """Give a run that wrote no archive back to the next tick, unless moved since."""
+    # The claim is committed; a failed export may have left the transaction aborted
+    db.session.rollback()
     try:
         config_release(_LAST_RUN_KEY, claimed, previous)
     except Exception:
