@@ -110,3 +110,28 @@ class TestASessionOpenedBeforeTheUpdate:
         with old_session.session_transaction() as stored:
             assert ACCOUNT_KEY not in stored
         assert _login(app, 'proofless_second').get(PROTECTED).status_code == 200
+
+    def test_is_refused_by_a_namesake_that_took_its_id(self, app, auth_client, create_user, cleanup):
+        from auth.session_start import ACCOUNT_KEY
+        cleanup.append('proofless_namesake')
+        first = create_user(username='proofless_namesake', role='operator')
+        old_session = _login(app, 'proofless_namesake')
+        with old_session.session_transaction() as stored:
+            assert stored.pop(ACCOUNT_KEY, None) is not None
+
+        _delete_last(app, auth_client, first['id'])
+        second = create_user(username='proofless_namesake', role='admin')
+        _reuses(app, first['id'], second['id'])
+
+        assert old_session.get(PROTECTED).status_code == 401
+        assert _login(app, 'proofless_namesake').get(PROTECTED).status_code == 200
+
+    def test_without_a_login_time_is_refused(self, app, create_user, cleanup):
+        from auth.session_start import ACCOUNT_KEY
+        cleanup.append('proofless_no_time')
+        create_user(username='proofless_no_time', role='operator')
+        client = _login(app, 'proofless_no_time')
+        with client.session_transaction() as stored:
+            assert stored.pop(ACCOUNT_KEY, None) is not None
+            assert stored.pop('login_time', None) is not None
+        assert client.get(PROTECTED).status_code == 401

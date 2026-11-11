@@ -56,13 +56,26 @@ def session_is_current(user) -> bool:
     """False once the account's sessions were closed after this one began, or
     when the session was opened for an earlier account with the same id.
     A session opened before the proof existed gets it on its first request,
-    only if the username it was opened for still names this account."""
+    only if it was opened for this username after this account was created."""
     if session.get('session_version', 0) != (user.session_version or 0):
         return False
     proof = session.get(ACCOUNT_KEY)
     if proof is None:
-        if session.get('username') != user.username:
+        if session.get('username') != user.username or not _opened_after_creation(user):
             return False
         session[ACCOUNT_KEY] = account_proof(user)
         return True
     return proof == account_proof(user)
+
+
+def _opened_after_creation(user) -> bool:
+    """Whether the session's login time (naive UTC) is not before the account's creation."""
+    from datetime import datetime
+    from utils.datetime_utils import to_naive_utc
+    try:
+        opened = to_naive_utc(datetime.fromisoformat(session.get('login_time') or ''))
+    except (TypeError, ValueError):
+        return False
+    created = to_naive_utc(user.created_at)
+    # Every account created since the column exists has a time: NULL is never a recreated one
+    return created is None or opened >= created
