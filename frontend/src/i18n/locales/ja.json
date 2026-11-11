@@ -3404,6 +3404,7 @@
     "httpsLeftBehind": "バインドされた証明書が鍵なしで更新されました",
     "httpsLeftBehindNoKey": "UCM は更新後の証明書の秘密鍵を保持していないため、HTTPS は期限切れになる以前の証明書を引き続き提供しています。更新後の証明書の鍵をインポートすると、HTTPS はそれに追従します。",
     "httpsLeftBehindKeyed": "UCM は更新後の証明書の鍵を保持しました。下で選択して HTTPS に適用してください。",
+    "httpsLeftBehindSuperseded": "The renewed certificate was itself superseded: select the current certificate below and apply it to HTTPS.",
     "httpsSelectRenewed": "更新後の証明書を選択",
     "httpsOpenRenewed": "更新後の証明書を開く"
   },

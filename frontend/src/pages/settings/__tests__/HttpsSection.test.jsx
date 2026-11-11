@@ -86,4 +86,15 @@ describe('HttpsSection bound certificate indicator (#303 follow-up)', () => {
     fireEvent.click(screen.getByText('settings.httpsSelectRenewed'))
     expect(select).toHaveBeenCalledWith(expect.objectContaining({ id: 9 }))
   })
+
+  it('says the renewed certificate was superseded and offers no selection', () => {
+    renderSection({
+      type: 'CA-Signed',
+      bound_certificate: { refid: 'ref-1', exists: true, needs_attention: {
+        reason: 'successor_without_key', successor_id: 9, successor_refid: 'ref-2',
+        successor_descr: 'Web UI cert', successor_has_key: true, successor_archived: true } },
+    })
+    expect(screen.getByText('settings.httpsLeftBehindSuperseded')).toBeInTheDocument()
+    expect(screen.queryByText('settings.httpsSelectRenewed')).not.toBeInTheDocument()
+  })
 })

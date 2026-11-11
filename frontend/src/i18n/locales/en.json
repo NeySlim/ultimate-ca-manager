@@ -3404,6 +3404,7 @@
     "httpsLeftBehind": "The bound certificate was renewed without its key",
     "httpsLeftBehindNoKey": "UCM does not hold the renewed certificate's private key, so HTTPS still serves the previous certificate, which will expire. Import the key of the renewed certificate: HTTPS then follows it.",
     "httpsLeftBehindKeyed": "UCM now holds the renewed certificate's key: select it below and apply it to HTTPS.",
+    "httpsLeftBehindSuperseded": "The renewed certificate was itself superseded: select the current certificate below and apply it to HTTPS.",
     "httpsSelectRenewed": "Select the renewed certificate",
     "httpsOpenRenewed": "Open the renewed certificate"
   },

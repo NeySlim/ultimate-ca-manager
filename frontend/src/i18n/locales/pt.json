@@ -3403,6 +3403,7 @@
     "httpsLeftBehind": "O certificado vinculado foi renovado sem a sua chave",
     "httpsLeftBehindNoKey": "O UCM não tem a chave privada do certificado renovado, por isso o HTTPS ainda serve o certificado anterior, que vai expirar. Importe a chave do certificado renovado: o HTTPS passa então a segui-lo.",
     "httpsLeftBehindKeyed": "O UCM tem agora a chave do certificado renovado: selecione-o abaixo e aplique-o ao HTTPS.",
+    "httpsLeftBehindSuperseded": "The renewed certificate was itself superseded: select the current certificate below and apply it to HTTPS.",
     "httpsSelectRenewed": "Selecionar o certificado renovado",
     "httpsOpenRenewed": "Abrir o certificado renovado"
   },

@@ -922,7 +922,8 @@ private key stays on the previous certificate. Each binding carries `needs_atten
 can_reattach}`. `reattach` (scope `write:deploy`) moves the binding to the renewed certificate, clears the state and
 deploys it; it answers 409 when the renewed certificate was itself superseded, while it has no key and the binding
 sends one, or when the target is already bound to it. A later renewal of the renewed certificate moves the state to
-the newest successor and sends a new `certificate.binding_left_behind` event for the same binding. Uploading or
+the newest successor and sends a new `certificate.binding_left_behind` event when that one has no key either; a
+successor that holds a key takes the binding, clears the state and sends no event. Uploading or
 importing the renewed certificate's key moves such bindings on its own; deleting the binding or the renewed
 certificate clears the state.
 

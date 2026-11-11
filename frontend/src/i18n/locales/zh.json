@@ -3403,6 +3403,7 @@
     "httpsLeftBehind": "已绑定的证书在没有密钥的情况下续期",
     "httpsLeftBehindNoKey": "UCM 没有续期后证书的私钥，因此 HTTPS 仍在提供即将过期的先前证书。导入续期后证书的密钥后，HTTPS 将跟随它。",
     "httpsLeftBehindKeyed": "UCM 现已持有续期后证书的密钥：请在下方选择它并应用到 HTTPS。",
+    "httpsLeftBehindSuperseded": "The renewed certificate was itself superseded: select the current certificate below and apply it to HTTPS.",
     "httpsSelectRenewed": "选择续期后的证书",
     "httpsOpenRenewed": "打开续期后的证书"
   },

@@ -3554,6 +3554,7 @@
     "httpsLeftBehind": "Le certificat lié a été renouvelé sans sa clé",
     "httpsLeftBehindNoKey": "UCM ne détient pas la clé privée du certificat renouvelé : HTTPS sert toujours le certificat précédent, qui va expirer. Importez la clé du certificat renouvelé : HTTPS le suivra alors.",
     "httpsLeftBehindKeyed": "UCM détient désormais la clé du certificat renouvelé : sélectionnez-le ci-dessous et appliquez-le à HTTPS.",
+    "httpsLeftBehindSuperseded": "The renewed certificate was itself superseded: select the current certificate below and apply it to HTTPS.",
     "httpsSelectRenewed": "Sélectionner le certificat renouvelé",
     "httpsOpenRenewed": "Ouvrir le certificat renouvelé"
   },

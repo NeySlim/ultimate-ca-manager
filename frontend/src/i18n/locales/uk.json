@@ -3447,6 +3447,7 @@
     "httpsLeftBehind": "Прив'язаний сертифікат поновлено без його ключа",
     "httpsLeftBehindNoKey": "UCM не має закритого ключа поновленого сертифіката, тому HTTPS і далі обслуговує попередній сертифікат, термін дії якого закінчиться. Імпортуйте ключ поновленого сертифіката: тоді HTTPS перейде на нього.",
     "httpsLeftBehindKeyed": "UCM тепер має ключ поновленого сертифіката: виберіть його нижче й застосуйте до HTTPS.",
+    "httpsLeftBehindSuperseded": "The renewed certificate was itself superseded: select the current certificate below and apply it to HTTPS.",
     "httpsSelectRenewed": "Вибрати поновлений сертифікат",
     "httpsOpenRenewed": "Відкрити поновлений сертифікат"
   },
