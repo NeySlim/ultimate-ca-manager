@@ -108,7 +108,7 @@ def _bindings_follow(old_ids, successor):
     if stayed:
         logger.warning(
             f"Renewed certificate {successor.refid} has no private key in UCM: "
-            f"{', '.join(stayed)} stay on the previous certificate")
+            f"{', '.join(stayed)} {'stays' if len(stayed) == 1 else 'stay'} on the previous certificate")
 
 
 class CASigningMixin:
