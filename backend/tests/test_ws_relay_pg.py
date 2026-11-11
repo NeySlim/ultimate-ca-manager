@@ -153,3 +153,129 @@ def test_the_purge_keeps_recent_rows_on_postgresql(engines):
                                           {'i': old_id})]
         conn.execute(text("DELETE FROM websocket_relay WHERE id >= :i"), {'i': old_id})
     assert old_id not in ids and len(ids) == 1
+
+
+def _payload(node, n):
+    return {'type': 'certificate.renewed', 'data': {'node': node, 'n': n}, 'timestamp': 't'}
+
+
+@pytest.fixture
+def wakeups(app):
+    with app.app_context():
+        url = application_url()
+    made = []
+
+    def make():
+        made.append(ws_relay.PgWakeup(url))
+        return made[-1]
+    yield make
+    for wakeup in made:
+        wakeup.close()
+        wakeup.engine.dispose()
+
+
+@pytest.fixture
+def first_id(engines):
+    with engines[0].connect() as conn:
+        start = ws_relay._newest_id(conn)
+    yield start
+    with engines[0].begin() as conn:
+        conn.execute(text("DELETE FROM websocket_relay WHERE id > :i"), {'i': start})
+
+
+def test_a_notify_wakes_the_reader_long_before_its_tick(engines, wakeups, first_id):
+    got = []
+    reader = ws_relay.RelayReader(engines[0], lambda room, p: got.append(p['data']['n']),
+                                  tick=60.0, wakeup=wakeups())
+    reader.start()
+    try:
+        assert wait_for(lambda: reader.wakeup.backend_pid is not None and reader.seen is not None)
+        time.sleep(0.2)  # the reader is now waiting on LISTEN, not reading
+        publisher = ws_relay.RelayPublisher(engines[1])
+        publisher.publish('r', _payload('a', 1))
+        publisher.stop(timeout=20)
+        assert wait_for(lambda: got == [1], timeout=5.0)
+    finally:
+        reader.stop(timeout=70)
+
+
+def test_a_lost_listen_connection_is_reopened(engines, wakeups, first_id):
+    got = []
+    reader = ws_relay.RelayReader(engines[0], lambda room, p: got.append(p['data']['n']),
+                                  tick=60.0, wakeup=wakeups())
+    reader.start()
+    try:
+        assert wait_for(lambda: reader.wakeup.backend_pid is not None and reader.seen is not None)
+        lost = reader.wakeup.backend_pid
+        with engines[2].connect() as conn:
+            assert conn.execute(text("SELECT pg_terminate_backend(:p)"), {'p': lost}).scalar()
+        assert wait_for(lambda: reader.wakeup.backend_pid not in (None, lost), timeout=10.0)
+        time.sleep(0.2)
+        publisher = ws_relay.RelayPublisher(engines[1])
+        publisher.publish('r', _payload('a', 2))
+        publisher.stop(timeout=20)
+        assert wait_for(lambda: got == [2], timeout=5.0)
+    finally:
+        reader.stop(timeout=70)
+
+
+def test_an_event_of_node_a_reaches_each_node_client_once(app, engines, monkeypatch, first_id):
+    from websocket import emitters, events, socketio
+    a_clients, b_clients = [], []
+    monkeypatch.setattr(socketio, 'emit', lambda name, payload, **kw: a_clients.append(payload))
+    publisher = ws_relay.RelayPublisher(engines[1], origin='node-a-worker')
+    node_a = ws_relay.RelayReader(engines[0], lambda room, p: a_clients.append(p),
+                                  skip_origin=publisher.origin, gap_grace=0.5)
+    node_b = ws_relay.RelayReader(engines[2], lambda room, p: b_clients.append(p), gap_grace=0.5)
+    node_a.run_once()
+    node_b.run_once()
+    monkeypatch.setattr(events, '_queue_in_use', False)
+    events.relay_through(publisher, emit_here=True)
+    try:
+        emitters.on_ca_created(41, 'ha-ca', 'ha-ca', 'system')  # what an API request on A emits
+    finally:
+        events.relay_through(None)
+    assert len(a_clients) == 1  # at once, before any read
+    publisher.stop(timeout=20)
+    for _ in range(3):
+        node_a.run_once()
+        node_b.run_once()
+    assert [p['data']['id'] for p in a_clients] == [41]
+    assert [p['data']['id'] for p in b_clients] == [41]
+    assert ws_relay.ORIGIN_KEY not in b_clients[0]
+
+
+def test_two_nodes_writing_at_once_lose_and_double_nothing(engines, wakeups, first_id):
+    nodes = []
+    for index, name in enumerate(('a', 'b')):
+        got = []
+        publisher = ws_relay.RelayPublisher(engines[2 + index], batch=5, origin=f'origin-{name}')
+        reader = ws_relay.RelayReader(engines[index], lambda room, p, got=got: got.append(p['data']),
+                                      tick=0.5, gap_grace=0.5, skip_origin=publisher.origin,
+                                      wakeup=wakeups())
+        reader.run_once()
+        nodes.append((name, publisher, reader.start(), got))
+
+    def emit(name, publisher):
+        for n in range(PER_EMITTER):
+            publisher.publish('scope:certificates', _payload(name, n))
+            if n % 10 == 0:
+                time.sleep(0.005)
+
+    threads = [threading.Thread(target=emit, args=(name, publisher)) for name, publisher, _, _ in nodes]
+    try:
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        for _, publisher, _, _ in nodes:
+            publisher.stop(timeout=20)
+        assert all(wait_for(lambda got=got: len(got) >= PER_EMITTER) for *_, got in nodes)
+        time.sleep(1.2)  # more passes: nothing arrives twice
+    finally:
+        for _, _, reader, _ in nodes:
+            reader.stop()
+    for name, _, _, got in nodes:
+        other = 'b' if name == 'a' else 'a'
+        assert [d['n'] for d in got if d['node'] == other] == list(range(PER_EMITTER))
+        assert not [d for d in got if d['node'] == name]

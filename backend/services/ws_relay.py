@@ -1,11 +1,15 @@
-"""WebSocket events of the scheduler process, relayed to the web workers without Redis.
+"""WebSocket events relayed between processes and nodes without Redis.
 
 No browser is connected to the scheduler process. Without a message queue it appends each
 event to websocket_relay from one writer thread, in emission order, and every web worker
-emits to its own clients the rows newer than its cursor. With a message queue neither runs.
+emits to its own clients the rows newer than its cursor. In HA the web workers publish too:
+each emits to its own clients at once and skips its own rows when it reads them back.
+On PostgreSQL a NOTIFY wakes the readers; the table stays the source. With a message queue
+none of this runs.
 """
 import json
 import logging
+import secrets
 import threading
 import time
 from collections import deque
@@ -32,6 +36,13 @@ GAP_GRACE_SECONDS = 4.0
 # An id passed over that commits later is still delivered within this window
 HOLE_TTL_SECONDS = 120.0
 MAX_HOLES = 32
+# Payload key naming the publishing process; removed before a browser sees the event
+ORIGIN_KEY = '_origin'
+# NOTIFY only wakes the readers up: one lost is caught up on the next tick. Its payload is
+# the schema, so installations sharing a database do not wake each other
+CHANNEL = 'ucm_ws_relay'
+_NOTIFY_SQL = text(f"SELECT pg_notify('{CHANNEL}', current_schema())")
+STOP_SLICE_SECONDS = 0.5
 
 # Typed binds: a raw datetime goes through the deprecated sqlite3 adapter
 _INSERT_SQL = text("INSERT INTO websocket_relay (created_at, room, payload) VALUES (:t, :r, :p)"
@@ -64,12 +75,13 @@ def _newest_id(conn):
 
 
 class RelayPublisher:
-    """Scheduler side: publish() only queues, one thread writes the rows in order and purges."""
+    """Emitting side: publish() only queues, one thread writes the rows in order and purges."""
 
     def __init__(self, engine, *, clock=utc_now, monotonic=time.monotonic,
                  retry_seconds=TICK_SECONDS, purge_every=PURGE_EVERY_SECONDS,
-                 retention=RETENTION, queue_max=QUEUE_MAX, batch=BATCH):
+                 retention=RETENTION, queue_max=QUEUE_MAX, batch=BATCH, origin=None):
         self.engine = engine
+        self.origin = origin  # set on a process that also reads the relay
         self.clock = clock
         self._monotonic = monotonic
         self.retry_seconds = retry_seconds
@@ -90,6 +102,8 @@ class RelayPublisher:
 
     def publish(self, room, payload):
         """Queue one event for every web worker; never waits on the database, never raises."""
+        if self.origin is not None:
+            payload = dict(payload, **{ORIGIN_KEY: self.origin})
         try:
             item_payload = json.dumps(payload, allow_nan=False)
         except (TypeError, ValueError) as e:
@@ -155,6 +169,8 @@ class RelayPublisher:
             with self.engine.begin() as conn:
                 conn.execute(_INSERT_SQL, [{'t': t, 'r': room, 'p': payload}
                                            for _, room, payload, t in batch])
+                if conn.dialect.name == 'postgresql':
+                    conn.execute(_NOTIFY_SQL)  # sent at commit, with the rows
             with self._lock:
                 while self._queue and self._queue[0][0] <= batch[-1][0]:
                     self._queue.popleft()
@@ -177,9 +193,12 @@ class RelayReader:
     """Worker side: emits each row newer than its cursor once, in id order, from its own thread."""
 
     def __init__(self, engine, deliver, *, tick=TICK_SECONDS, monotonic=time.monotonic,
-                 gap_grace=None, batch=BATCH):
+                 gap_grace=None, batch=BATCH, skip_origin=None, wakeup=None):
         self.engine = engine
         self.deliver = deliver
+        # This process's own rows: its clients got them when they were emitted
+        self.skip_origin = skip_origin
+        self.wakeup = wakeup  # PgWakeup, or None: the tick alone
         self.tick = tick
         self._monotonic = monotonic
         self.gap_grace = GAP_GRACE_SECONDS if gap_grace is None else gap_grace
@@ -200,11 +219,16 @@ class RelayReader:
         self._stop.set()
         if self._thread is not None and self._thread is not threading.current_thread():
             self._thread.join(timeout)
+        if self.wakeup is not None and (self._thread is None or not self._thread.is_alive()):
+            self.wakeup.close()
 
     def _loop(self):
         while not self._stop.is_set():
             self.run_once()
-            self._stop.wait(self.tick)
+            if self.wakeup is not None:
+                self.wakeup.wait(self.tick, self._stop)
+            else:
+                self._stop.wait(self.tick)
 
     def run_once(self):
         """Deliver what is new; a database error is logged once and retried on the next tick."""
@@ -272,9 +296,71 @@ class RelayReader:
             payload = json.loads(row.payload)
             if not isinstance(payload, dict) or not isinstance(row.room, str):
                 raise ValueError('not an event')
+            origin = payload.pop(ORIGIN_KEY, None)
+            if self.skip_origin is not None and origin == self.skip_origin:
+                return
             self.deliver(row.room, payload)
         except Exception as e:
             logger.warning(f"Relayed WebSocket event {row.id} not emitted: {type(e).__name__}: {e}")
+
+
+class PgWakeup:
+    """LISTEN on a connection of its own, outside the pool, reopened when it drops."""
+
+    def __init__(self, url):
+        from services.scheduler_leader import _dedicated_engine
+        self.engine = _dedicated_engine(url)
+        self._raw = None
+        self.backend_pid = None
+        self.schema = None
+        self._error_logged = False
+
+    def _listen(self):
+        raw = self.engine.raw_connection()
+        try:
+            conn = raw.driver_connection
+            conn.autocommit = True
+            conn.execute(f"LISTEN {CHANNEL}")
+            self.schema = conn.execute("SELECT current_schema()").fetchone()[0]
+            self.backend_pid = conn.info.backend_pid
+        except BaseException:
+            raw.close()
+            raise
+        self._raw = raw
+
+    def wait(self, timeout, stop):
+        """Return on a notification, after ``timeout`` or at once after a reconnection."""
+        if self._raw is None:
+            try:
+                self._listen()
+            except Exception as e:
+                if not self._error_logged:
+                    logger.warning(f"WebSocket relay: no LISTEN connection, reading every "
+                                   f"{timeout:g} s: {type(e).__name__}")
+                    self._error_logged = True
+                stop.wait(timeout)
+                return
+            self._error_logged = False
+            return  # notifications sent while it was down are lost: read now
+        deadline = time.monotonic() + timeout
+        try:
+            # In slices: a stop is noticed within one, not after a whole tick
+            while not stop.is_set() and (left := deadline - time.monotonic()) > 0:
+                for notify in self._raw.driver_connection.notifies(timeout=min(left, STOP_SLICE_SECONDS)):
+                    if notify.payload == self.schema:
+                        return
+        except Exception as e:
+            logger.warning(f"WebSocket relay: LISTEN connection lost, reopened: {type(e).__name__}")
+            self.close()
+
+    def close(self):
+        raw, self._raw = self._raw, None
+        self.backend_pid = None
+        if raw is not None:
+            try:
+                raw.close()
+            except Exception:  # noqa: BLE001  # already broken: nothing left to release
+                pass
 
 
 def _engine(app):
@@ -292,15 +378,19 @@ _publisher = None
 _reader = None
 
 
-def start_publisher(app):
-    """Scheduler process: its events go through the table, unless a message queue carries them."""
+def start_publisher(app, *, emit_here=False):
+    """Its events go through the table, unless a message queue carries them.
+
+    ``emit_here``: a web worker, whose clients get its events at once and not from the table.
+    """
     global _publisher
     from websocket import events
     if events.message_queue_in_use():
         return None
     if _publisher is None:
-        _publisher = RelayPublisher(_engine(app))
-        events.relay_through(_publisher)
+        origin = secrets.token_hex(8) if emit_here else None
+        _publisher = RelayPublisher(_engine(app), origin=origin)
+        events.relay_through(_publisher, emit_here=emit_here)
     return _publisher
 
 
@@ -319,13 +409,20 @@ def stop_publisher(timeout=5.0):
 
 
 def start_reader(app):
-    """Web worker: emits the scheduler's events to its clients, unless a message queue does."""
+    """Web worker: emits the relayed events to its clients, unless a message queue does.
+
+    In HA it also publishes its own events, for the other workers and nodes.
+    """
     global _reader
+    from utils.ha import ha_enabled
     from websocket import events
     if events.message_queue_in_use():
         return None
     if _reader is None:
-        _reader = RelayReader(_engine(app), _emit_local).start()
+        engine = _engine(app)
+        skip_origin = start_publisher(app, emit_here=True).origin if ha_enabled() else None
+        wakeup = PgWakeup(engine.url) if engine.dialect.name == 'postgresql' else None
+        _reader = RelayReader(engine, _emit_local, skip_origin=skip_origin, wakeup=wakeup).start()
     return _reader
 
 
@@ -334,3 +431,4 @@ def stop_reader():
     reader, _reader = _reader, None
     if reader is not None:
         reader.stop()
+    stop_publisher()
