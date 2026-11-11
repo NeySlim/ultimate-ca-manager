@@ -437,7 +437,7 @@ def create_csr():
         
         cert_dict = cert.to_dict()
         from services.webhook_service import emit_csr_submitted
-        emit_csr_submitted(cert_dict)
+        emit_csr_submitted(cert_dict, actor=g.current_user.username)
 
         return created_response(
             data=cert_dict,
@@ -564,7 +564,7 @@ def upload_csr():
         # Return CSR-friendly format
         result = new_cert.to_dict()
         from services.webhook_service import emit_csr_submitted
-        emit_csr_submitted(dict(result), actor=getattr(g, 'username', None))
+        emit_csr_submitted(dict(result), actor=g.current_user.username)
         result['status'] = 'Pending'
         result['cn'] = cn
         result['department'] = ou
@@ -691,7 +691,7 @@ def import_csr():
 
         cert_dict = cert.to_dict()
         from services.webhook_service import emit_csr_submitted
-        emit_csr_submitted(cert_dict, actor='import')
+        emit_csr_submitted(cert_dict, actor=g.current_user.username)
 
         return created_response(
             data=cert_dict,
