@@ -331,6 +331,8 @@ Since v2.214, renewal updates the certificate **in place**:
 
 Revoked certificates are published in the CRL on next regeneration.
 
+A certificate obtained over ACME (by the ACME client, or by the proxy under an upstream account UCM holds) is also revoked at that CA, whether it is revoked alone, in bulk or by an approved request. If the CA does not confirm, the revocation is kept owed and sent again by the renewal task until the CA confirms or the certificate expires. If no account of UCM can speak for it, the revocation stays local and a warning says to revoke it with the CA directly. The reason is sent when it is keyCompromise, affiliationChanged, superseded, cessationOfOperation or privilegeWithdrawn.
+
 > ⚠ Revocation is generally permanent: except for **Certificate Hold** which can be removed.
 
 ### Remove Hold (Unhold)
@@ -951,6 +953,7 @@ Manage your ACME client configuration:
 - **Failed renewals** (v2.251): the order list shows the failure count and the last error; after 5 failed scheduled renewals an order is retried once a day. The **Automatic renewal** switch of a selected order stops or resumes its renewal
 - **Orders list** (v2.251): every order is loaded, four pages at a time; a page still missing after its retries leaves a notice that the list is partial
 - **Compromised keys** (v2.251): a key revoked as compromised is refused (409) at the request and before any renewal opens an order
+- **Revocation at the CA**: A certificate obtained over ACME (by the ACME client, or by the proxy under an upstream account UCM holds) is also revoked at that CA, whether it is revoked alone, in bulk or by an approved request. If the CA does not confirm, the revocation is kept owed and sent again by the renewal task until the CA confirms or the certificate expires. If no account of UCM can speak for it, the revocation stays local and a warning says to revoke it with the CA directly. The reason is sent when it is keyCompromise, affiliationChanged, superseded, cessationOfOperation or privilegeWithdrawn.
 
 ### Custom ACME Server
 Use any RFC 8555-compliant CA, not just Let's Encrypt:
@@ -1687,6 +1690,9 @@ Admins can reset any user's password. The user is not asked to change it at the 
 
 ### Security Keys
 In a user's details, administrators see that user's security keys and can disable or remove one, typically a lost key, which otherwise still signs in without a password. Removing the last second factor of an account that requires one asks for a second confirmation; the user then enrols a factor again at the next login.
+
+### Deleting a User
+Deleting a user revokes the certificates they enrolled for mTLS (reason cessationOfOperation), then deletes them. A revocation that fails keeps the user. If the deletion fails after some revocations, the message names the certificates already revoked: they stay revoked.
 
 ### API Keys
 Each user can have multiple API keys for programmatic access. API keys inherit the user's role permissions. See the Account page for managing your own keys.
