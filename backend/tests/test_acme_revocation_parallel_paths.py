@@ -33,9 +33,25 @@ def _enrol(app, bench, username):  # noqa: F811
 
 
 @pytest.fixture
-def owner(create_user):
+def owner(auth_client, create_user):
     name = f'acme_enrolled_{uuid.uuid4().hex[:6]}'
-    return create_user(username=name, role='viewer'), name
+    user = create_user(username=name, role='viewer')
+    yield user, name
+    # Deleted by the test, or left for this teardown: the shared users table ends as it began
+    assert auth_client.delete(f"/api/v2/users/{user['id']}").status_code in (200, 404)
+
+
+@pytest.fixture(scope='module')
+def pair_ca(auth_client, create_ca):
+    """This file's own CA: the session's default one would be left behind by the first user."""
+    ca = create_ca(cn=f'Pair CA {uuid.uuid4().hex[:6]}')
+    yield ca['id']
+    assert auth_client.delete(f"/api/v2/cas/{ca['id']}").status_code in (200, 204)
+
+
+@pytest.fixture
+def pair_cert(create_cert, pair_ca):
+    return lambda **kw: create_cert(ca_id=pair_ca, **kw)
 
 
 def _drop_enrolment(enrolment_id):
@@ -164,6 +180,7 @@ class TestRemovingAnEnrolment:
             assert body['meta']['acme_upstream_pending'] is True
             assert 'sent again automatically' in body['message']
         finally:
+            monkeypatch.undo()
             _drop_enrolment(enrolment_id)
 
 
@@ -211,6 +228,7 @@ class TestDeletingAUser:
             assert f'#{bench.cert_id}' in body['message']
             assert 'sent again automatically' in body['message']
         finally:
+            monkeypatch.undo()
             _drop_enrolment(enrolment_id)
 
     def test_the_bulk_deletion_lists_what_the_ca_was_not_told(
@@ -317,10 +335,10 @@ class TestTheRelatedMemberOfAPair:
     """RFC 9763: a certificate of UCM's CA may name, as its related one, a certificate
     UCM obtained over ACME; revoking the pair revokes that one at its CA too."""
 
-    def test_the_acme_member_is_revoked_at_its_ca(self, app, auth_client, bench, create_cert):  # noqa: F811
+    def test_the_acme_member_is_revoked_at_its_ca(self, app, auth_client, bench, pair_cert):  # noqa: F811
         from models import Certificate
         from services.cert_service import CertificateService
-        other = create_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        other = pair_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
         a, b = bench.row(), db.session.get(Certificate, other['id'])
         a.related_certificate_id, b.related_certificate_id = b.id, a.id
         db.session.commit()
@@ -340,11 +358,11 @@ class TestTheRelatedMemberOfAPair:
             db.session.commit()
             assert CertificateService.delete_certificate(other['id'], username='admin')
 
-    def test_a_ca_that_does_not_answer_keeps_it_owed(self, app, bench, create_cert):  # noqa: F811
+    def test_a_ca_that_does_not_answer_keeps_it_owed(self, app, bench, pair_cert):  # noqa: F811
         from models import Certificate
         from services.cert_service import CertificateService
         bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
-        other = create_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        other = pair_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
         a, b = bench.row(), db.session.get(Certificate, other['id'])
         a.related_certificate_id, b.related_certificate_id = b.id, a.id
         db.session.commit()
@@ -361,11 +379,11 @@ class TestTheRelatedMemberOfAPair:
 
     @pytest.mark.parametrize('route', ['single', 'bulk'])
     def test_a_partner_the_ca_was_not_told_of_is_said(
-            self, app, auth_client, bench, create_cert, route):  # noqa: F811
+            self, app, auth_client, bench, pair_cert, route):  # noqa: F811
         from models import Certificate
         from services.cert_service import CertificateService
         bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
-        other = create_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        other = pair_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
         a, b = bench.row(), db.session.get(Certificate, other['id'])
         a.related_certificate_id, b.related_certificate_id = b.id, a.id
         db.session.commit()
@@ -398,11 +416,11 @@ class TestTheRelatedMemberOfAPair:
             assert CertificateService.delete_certificate(other['id'], username='admin')
 
     def test_a_hold_of_the_pair_neither_reaches_the_ca_nor_warns(
-            self, app, bench, create_cert, caplog):  # noqa: F811
+            self, app, bench, pair_cert, caplog):  # noqa: F811
         import logging
         from models import Certificate
         from services.cert_service import CertificateService
-        other = create_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        other = pair_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
         a, b = bench.row(), db.session.get(Certificate, other['id'])
         a.related_certificate_id, b.related_certificate_id = b.id, a.id
         db.session.commit()
