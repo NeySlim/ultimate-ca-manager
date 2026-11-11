@@ -52,8 +52,9 @@ The render fails with an explicit message when the database is not PostgreSQL or
 
 ### From a single node
 
-Moving an existing single-node release to `ha.enabled=true` needs three steps, because the data volume is no longer mounted and the key comes from the Secret:
+Moving an existing single-node release to `ha.enabled=true` needs these steps, because HA requires PostgreSQL, the data volume is no longer mounted and the key comes from the Secret:
 
+0. If the release uses SQLite (the chart default), move it to PostgreSQL while still single-node: in Settings > Database, test the PostgreSQL URL and run **Migrate data and switch**, then `helm upgrade` with `database.type=postgresql` and that URL, and check the data in the UI. Setting `database.type=postgresql` alone starts on an empty database, and data migration is refused once in HA.
 1. Copy the content of `/etc/ucm/master.key` (the `etc` volume) into `secrets.keyEncryptionKey`. A new key cannot decrypt the existing database.
 2. Back up the data volume. The chart keeps the old claim (`helm.sh/resource-policy: keep`) but HA pods no longer mount it, so SoftHSM tokens, an uploaded HTTPS certificate and local backups stay behind in it.
 3. Run `helm upgrade` with `ha.enabled=true`, then check `/health/ready`.
