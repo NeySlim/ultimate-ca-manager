@@ -163,6 +163,7 @@ Database migrations run automatically at startup.
 ### Upgrading to v3.0
 
 - In-app help is available in English, French and Chinese only; with the interface in German, Spanish, Italian, Japanese, Portuguese or Ukrainian the help panel shows the English text. The interface itself keeps its nine languages.
+- Private-key encryption becomes an envelope: the key in `master.key` or `KEY_ENCRYPTION_KEY` (the KEK) wraps a data key stored in the database. Nothing is re-encrypted at the upgrade and the KEK stays the only secret to back up. A KEK is now changed by hand with the previous one in `master.key.previous` or `KEY_ENCRYPTION_KEY_PREVIOUS` (see the Admin Guide); swapping the key without it puts UCM in safe mode. Disabling encryption with `KEY_ENCRYPTION_KEY` set no longer answers 409: the variable stays configured and unused.
 - Audit and syslog consumers (SIEM): a restore refused before its archive was read is now audited as a failed `system_restore` whose text starts with `Restore request refused: ` followed by the reason; match on that prefix. Version 2.x wrote no audit line for these refusals.
 
 ### Upgrading to v2.243

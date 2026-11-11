@@ -182,6 +182,28 @@ Recommended patterns:
 
 This is an application-level filter: it does not replace a firewall in front of the HTTPS port.
 
+### Private-Key Encryption (KEK and DEK)
+
+Private keys and stored secrets are encrypted with a data-encryption key (DEK). The DEK is stored in the database (`encryption_keys`), wrapped with AES-256-GCM by the key-encryption key (KEK): `master.key` in `UCM_CONFIG_DIR`, or `KEY_ENCRYPTION_KEY`. The KEK is still the only secret to back up: a database copy plus its KEK restores everything; a database copy without its KEK is unreadable. Settings > Security shows the KEK fingerprint (a truncated hash, never the key) and the DEK version.
+
+- **Upgrade.** An installation encrypted before 3.0 keeps its data as it is: its key is DEK version 1, nothing is re-encrypted. The first DEK rotation or KEK change stores the DEK in the database.
+- **Rotating the DEK.** Settings > Security > Rotate data key, or `POST /api/v2/system/security/rotate-encryption-key`, creates a new DEK and re-encrypts every stored value under it in batches, then drops the old DEK. The KEK does not change. If the rotation is interrupted, both DEKs stay in the database and every value stays readable; it finishes at the next start (outside HA) or when you run it again. A value that no DEK opens stops the rotation (409) with the old DEK kept.
+- **HA.** Enabling, disabling and rotating work from any node: the other nodes reload the DEKs within seconds (cluster command `reload_encryption`). A rotation re-encrypts only once every live node has loaded the new DEK; otherwise it answers 202 and you run it again. Every node publishes its KEK fingerprint in `cluster_nodes`; a node whose fingerprint differs from a live peer's refuses to start and names that peer.
+- **Disabling** decrypts every value and drops the DEKs. Outside HA, a `master.key` file is removed; a `KEY_ENCRYPTION_KEY` (or the `master.key` of HA nodes) stays configured but unused until encryption is enabled again.
+
+#### Changing the KEK by hand
+
+The KEK never changes from the interface. To replace it:
+
+1. Back up the database and the current `master.key` (or `KEY_ENCRYPTION_KEY`).
+2. Stop UCM (every node in HA).
+3. Move the current key to `master.key.previous` beside `master.key`, or set it in `KEY_ENCRYPTION_KEY_PREVIOUS`.
+4. Install the new key as `master.key` (0600, owned by the service user) or `KEY_ENCRYPTION_KEY`, identical on every node.
+5. Start UCM (one node first in HA). It rewraps the DEKs under the new KEK, rewrites no stored value, logs and audits `encryption_kek_changed`.
+6. Remove `master.key.previous` or `KEY_ENCRYPTION_KEY_PREVIOUS`, start the other nodes, and back up the new key.
+
+The audit chain is sealed with a key derived from the KEK: after a KEK change, entries sealed before it are reported as under a retired key, attested by `audit-chain.keys`. A DEK rotation leaves every seal verifiable. If the old KEK leaked, also rotate the DEK once the change is done: until then the data stays under the old DEK. A new KEK started without the previous one puts UCM in safe mode, and nothing is written.
+
 ### Authentication Methods
 
 Enable/disable in **Settings** > **Security**:
@@ -428,7 +450,7 @@ With `UCM_HA=1`, every node runs against the same PostgreSQL database and names 
 - **Discovery scans.** Each scan run records the node that runs it. A new leader marks as failed the scans of nodes without a fresh heartbeat and the scheduled scans a live node started before its current scheduler process; the other scans of live nodes are kept (a former leader that only lost its lock connection still runs them). The leader also fails, on every pass, the scans of nodes that have gone stale since and the scheduled scans a live node's former scheduler process left, and a node's web process fails that node's own scans when it starts: under gunicorn the master does it once, before forking its workers (`preload_app = True`); without preload each worker would do it again and fail the scans its siblings already run.
 - **Settings across nodes.** A setting change writes a row in `cluster_commands`, in the same transaction; every node applies the new rows in id order within a few seconds (it polls every 2 s) and records the last one in `cluster_nodes.command_seen`, which `/health` reports for the answering node under `cluster.command_seen`; `GET /api/v2/system/service/status` (authenticated) lists every node with its heartbeat and `command_seen`. A row committed late, behind a newer one, is still applied if it commits within about 10 minutes. Applied without a restart: rate limits (Settings > Security; the changes are stored in the database and each node adds them to its own `RATE_LIMIT_*` environment, also when it starts), syslog forwarding and the admin allowlist. Read from the database on every use, so already shared: the password policy, HSTS, session timeouts. The leader deletes commands older than 24 hours.
 - **Rolling restart.** A restart (Settings > Service, or the one mTLS and WSTEP changes ask for) restarts every node in turn, in `UCM_NODE_ID` order: a node goes once every node before it is back (its heartbeat carries a start time later than the request) or after 120 s per node ahead of it, so a dead node holds the others back no longer than that. A node waiting for its turn keeps applying setting changes, and a second restart requested meanwhile adds no restart of its own: the node still restarts once, after every node before it is back from the later request. A one-node cluster restarts at once, and a node is left alone by a request already committed when it read its settings at start; a request committed later restarts it. When the restart itself fails (for example the signal file cannot be written), the node logs it and tries again after 2 s, then waits twice as long after each new failure, up to 60 s between attempts, also when it went without a node ahead that was not back (the 120 s per node are not waited again); it keeps applying setting changes meanwhile. DEB/RPM nodes restart through their own `ucm-watcher`; a container exits with code 0 and its orchestrator starts it again only under the restart policy `always` or `unless-stopped` (`on-failure` and `no` leave it stopped).
-- **Still refused in HA.** Backend switch and migration (change `DATABASE_URL` by hand, then restart), enabling, disabling or rotating encryption and encrypting all keys (the master key is per node until key envelopes ship), secret rotation (writes `ucm.env`), update install, HTTPS certificate regeneration and apply (files on one node), and backup restore (restored files land on one node).
+- **Still refused in HA.** Backend switch and migration (change `DATABASE_URL` by hand, then restart), secret rotation (writes `ucm.env`), update install, HTTPS certificate regeneration and apply (files on one node), and backup restore (restored files land on one node). Encryption works from any node: see [Private-Key Encryption](#private-key-encryption-kek-and-dek).
 - **Local files.** Tasks that write to the local disk do so on the leader only: local backups, the certificate files mirrored by renewals and session file cleanup stay on that node.
 
 ### Database Tables
