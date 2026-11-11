@@ -24,7 +24,6 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import (
-    ACCOUNT_GONE,
     ORDER_GONE,
     AcmeClientService,
     AUTHZ_INVALID_USER_MSG,
@@ -464,7 +463,7 @@ def verify_challenges(order_id):
     try:
         client = AcmeClientService.for_existing_order(order)
         if client is None:
-            return error_response(ACCOUNT_GONE, 409)
+            return error_response(AcmeClientService.missing_account_message(order), 409)
 
         results = {}
         challenges = order.challenges_dict
@@ -575,7 +574,7 @@ def check_order_status(order_id):
     try:
         client = AcmeClientService.for_existing_order(order)
         if client is None:
-            return error_response(ACCOUNT_GONE, 409)
+            return error_response(AcmeClientService.missing_account_message(order), 409)
         status, data = client.check_order_status(order)
         if status == 'gone':
             status = order.status  # invalid with the reason, or issued as it was
@@ -622,7 +621,7 @@ def finalize_order(order_id):
     try:
         client = AcmeClientService.for_existing_order(order)
         if client is None:
-            return error_response(ACCOUNT_GONE, 409)
+            return error_response(AcmeClientService.missing_account_message(order), 409)
         success, message, cert_id = client.finalize_order(order, lease=lease)
 
         if success:
@@ -994,7 +993,7 @@ def _run_auto_poll_background(order_id: int, environment: str) -> None:
                 client = AcmeClientService.for_existing_order(order)
                 if client is None:
                     order.status = 'pending'
-                    order.error_message = ACCOUNT_GONE
+                    order.error_message = AcmeClientService.missing_account_message(order)
                     db.session.commit()
                     return
                 _auto_poll_and_finalize(client, order)

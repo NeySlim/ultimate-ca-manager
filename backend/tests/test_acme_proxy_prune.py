@@ -214,3 +214,41 @@ class TestSettingsRoundtrip:
             db.session.commit()
         body = auth_client.get(self.URL).get_json()['data']
         assert body['proxy_prune_replaced_certificates'] is False
+
+
+class TestAFailedDeletionKeepsTheOrderLink:
+    """The orders are detached in the deletion's own transaction: a deletion that
+    fails, however it fails, leaves the certificate attached to its orders."""
+
+    def test_a_deletion_that_raises_detaches_nothing(self, app, monkeypatch):
+        from services.ocsp_service import OCSPService
+        with app.app_context():
+            _set_prune(True)
+            old_cert = _make_cert('prune-old')
+            old_order = _make_proxy_order(cert_id=old_cert.id)
+            new_cert = _make_cert('prune-new')
+            new_order = _make_proxy_order(cert_id=new_cert.id)
+
+            def _fails(_cert_id):
+                raise RuntimeError('responder lookup failed')
+            monkeypatch.setattr(OCSPService, 'responder_cas_for_certificate', staticmethod(_fails))
+            assert _make_service()._prune_replaced_certificates(new_order, new_cert.id) == 0
+            db.session.commit()  # the caller's next commit must not carry a half-done prune
+            db.session.expire_all()
+            assert db.session.get(Certificate, old_cert.id) is not None
+            assert db.session.get(AcmeClientOrder, old_order.id).certificate_id == old_cert.id
+
+    def test_a_deletion_the_database_refuses_detaches_nothing(self, app, monkeypatch):
+        from services.cert_service import CertificateService
+        with app.app_context():
+            _set_prune(True)
+            old_cert = _make_cert('prune-old')
+            old_order = _make_proxy_order(cert_id=old_cert.id)
+            new_cert = _make_cert('prune-new')
+            new_order = _make_proxy_order(cert_id=new_cert.id)
+            monkeypatch.setattr(CertificateService, 'delete_certificate',
+                                staticmethod(lambda *a, **k: False))
+            assert _make_service()._prune_replaced_certificates(new_order, new_cert.id) == 0
+            db.session.commit()
+            db.session.expire_all()
+            assert db.session.get(AcmeClientOrder, old_order.id).certificate_id == old_cert.id

@@ -601,19 +601,14 @@ class AcmeProxyService:
             if cert.revoked or cert.source != 'acme_client':
                 # Revoked: keep for CRL/history. Non-proxy origin: never touch.
                 continue
-            # Detach every order still pointing at this certificate (FK safety)
-            for ref in AcmeClientOrder.query.filter_by(certificate_id=cert.id).all():
-                ref.certificate_id = None
+            # The deletion detaches the orders in its own transaction: a failure keeps the link
             try:
-                db.session.flush()
+                deleted = CertificateService.delete_certificate(cert.id, username='acme_proxy')
             except Exception as e:
                 db.session.rollback()
-                logger.error(
-                    f"[ACME Proxy] Prune: failed to detach orders from "
-                    f"certificate {cert.id}: {e}"
-                )
+                logger.error(f"[ACME Proxy] Prune: certificate {cert.id} not deleted: {e}")
                 continue
-            if CertificateService.delete_certificate(cert.id, username='acme_proxy'):
+            if deleted:
                 pruned += 1
             else:
                 logger.error(

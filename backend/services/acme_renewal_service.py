@@ -9,20 +9,21 @@ import random
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-from sqlalchemy import or_
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 
 from models import CA, Certificate, DnsProvider, RevokedSerial, SystemConfig, db
 from models.acme_models import AcmeClientOrder
 from models.compromised_key import remember_if_compromised
 from services.acme import dns_providers
-from services.acme.acme_client_service import ACCOUNT_GONE, AcmeClientService
+from services.acme.acme_client_service import AcmeClientService
 from services.acme.compromised_keys import refuse_compromised_csr
 from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challenges
 from services.acme.http01 import wait_for_http01
 from services.acme import client_certificates
 from services.acme.client_certificates import KEY_MISMATCH
 from services.acme.order_housekeeping import purge_stale_pending_orders
+from services.acme.upstream_revocation import SENT_REASONS
 from services.acme.order_lease import BUSY, LEASE_LOST, OrderLease, RenewalInProgress
 from services.audit.staging import stage_audit_entry
 from services.audit_service import AuditService
@@ -86,7 +87,7 @@ def renewal_client(order):
     none (older than per-order accounts) still resolves by environment."""
     client = AcmeClientService.for_existing_order(order)
     if client is None:
-        raise RenewalBlocked(ACCOUNT_GONE)
+        raise RenewalBlocked(AcmeClientService.missing_account_message(order))
     return client
 
 
@@ -293,8 +294,6 @@ def send_upstream_revocation(acme_client, pem, reason, label):
     return f"HTTP {response.status_code}{': ' + detail if detail else ''}"
 
 
-# Local reasons the CA is told; any other leaves the optional field out (never a hold)
-_UPSTREAM_REASONS = {1, 3, 4, 5}
 
 
 def _upstream_reason(replaced):
@@ -303,16 +302,51 @@ def _upstream_reason(replaced):
     if not replaced.revoked:
         return 4
     code = reason_code(replaced.revoke_reason)
-    return code if code in _UPSTREAM_REASONS else None
+    return code if code in SENT_REASONS else None
+
+
+_OWED_WRITE_ATTEMPTS = 5
+
+
+def update_owed(order_id, change):
+    """Apply ``change`` (a list in, a list out) to an order's owed revocations, uncommitted.
+
+    Compare-and-set on the stored text: a revoke route writes without the order's
+    lease, so no writer may rewrite the list from a copy read before another's write.
+    """
+    table = AcmeClientOrder.__table__
+    column = table.c.upstream_revocations
+    for _attempt in range(_OWED_WRITE_ATTEMPTS):
+        row = db.session.execute(select(column).where(table.c.id == order_id)).first()
+        if row is None:
+            return None
+        current = row[0]
+        entries = AcmeClientOrder.parse_upstream_revocations(current)
+        changed = change(list(entries))
+        unchanged = column.is_(None) if current is None else column == current
+        written = db.session.execute(
+            update(table).where(table.c.id == order_id, unchanged)
+            .values(upstream_revocations=json.dumps(changed) if changed else None)).rowcount
+        if written == 1:
+            order = db.session.identity_map.get(db.session.identity_key(AcmeClientOrder, order_id))
+            if order is not None:
+                db.session.expire(order, ['upstream_revocations'])
+            return changed
+    raise RuntimeError(f'Revocations owed for order {order_id} kept changing: not written')
 
 
 def _owe_upstream_revocation(order, entry, error) -> None:
     """Keep ``entry`` on ``order`` for the next pass, and announce the failure."""
     entry.update(attempts=entry.get('attempts', 0) + 1, error=error,
                  last_attempt_at=utc_now().isoformat())
-    owed = [e for e in order.upstream_revocations_list if e.get('serial') != entry['serial']]
-    order.upstream_revocations_list = owed + [entry]
-    if commit_or_rollback(logger, f"Revocation owed by the CA for order {order.id} not kept"):
+    order_id = order.id
+    try:
+        update_owed(order_id, lambda owed: [e for e in owed if e.get('serial') != entry['serial']] + [entry])
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Revocation owed by the CA for order %s not kept: %s", order_id, exc)
+        return
+    if commit_or_rollback(logger, f"Revocation owed by the CA for order {order_id} not kept"):
         payload = order.to_dict()
         payload.pop('challenges', None)
         emit_acme_revocation_failed(payload, entry['serial'], error, entry['attempts'])
@@ -345,12 +379,13 @@ def retry_upstream_revocations() -> int:
 
 
 def _retry_order_revocations(order, now) -> int:
-    entries = order.upstream_revocations_list
-    alive = [e for e in entries if datetime.fromisoformat(e['not_after']) > now]
-    for gone in [e for e in entries if e not in alive]:
-        logger.info("Certificate %s expired before its CA confirmed the revocation: no longer sent",
-                    gone.get('serial'))
-    order.upstream_revocations_list = alive
+    def _drop_expired(entries):
+        alive = [e for e in entries if datetime.fromisoformat(e['not_after']) > now]
+        for gone in [e for e in entries if e not in alive]:
+            logger.info("Certificate %s expired before its CA confirmed the revocation: no longer sent",
+                        gone.get('serial'))
+        return alive
+    alive = update_owed(order.id, _drop_expired) or []
     commit_or_rollback(logger, f"Revocations owed for order {order.id} not updated")
     due = [e for e in alive if _revocation_due(e, now)]
     if not due:
@@ -359,7 +394,7 @@ def _retry_order_revocations(order, now) -> int:
     for entry in due:
         label = f"certificate serial {entry['serial']}"
         if client is None:
-            error = ACCOUNT_GONE
+            error = AcmeClientService.missing_account_message(order)
         else:
             try:
                 error = send_upstream_revocation(client, entry['certificate'], entry.get('reason'), label)
@@ -367,8 +402,8 @@ def _retry_order_revocations(order, now) -> int:
                 error = str(exc)
         if error is None:
             logger.info("The CA confirmed the revocation of %s", label)
-            order.upstream_revocations_list = [e for e in order.upstream_revocations_list
-                                               if e.get('serial') != entry['serial']]
+            update_owed(order.id, lambda owed, serial=entry['serial']: [
+                e for e in owed if e.get('serial') != serial])
             commit_or_rollback(logger, f"Revocation of {label} done but not recorded")
         else:
             logger.warning("Revocation of %s at the CA failed again: %s", label, error)

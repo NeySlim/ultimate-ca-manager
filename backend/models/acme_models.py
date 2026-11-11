@@ -411,6 +411,8 @@ class AcmeClientOrder(db.Model):
     renewal_claimed_at = db.Column(db.DateTime)
     # JSON list of replaced certificates whose revocation the CA has not confirmed yet
     upstream_revocations = db.Column(db.Text)
+    # JSON list of {certificate_id, serial} a renewal moved off into a new row: still this account's
+    replaced_certificates = db.Column(db.Text)
     # On the order a renewal opens: the order it renews
     renewal_of_order_id = db.Column(
         db.Integer, db.ForeignKey('acme_client_orders.id', ondelete='SET NULL'), nullable=True, index=True)
@@ -464,17 +466,42 @@ class AcmeClientOrder(db.Model):
         else:
             self._pending_key = None
 
-    @property
-    def upstream_revocations_list(self):
+    @staticmethod
+    def parse_upstream_revocations(text):
         try:
-            entries = json.loads(self.upstream_revocations) if self.upstream_revocations else []
+            entries = json.loads(text) if text else []
         except ValueError:
             return []
         return entries if isinstance(entries, list) else []
 
+    @property
+    def upstream_revocations_list(self):
+        return self.parse_upstream_revocations(self.upstream_revocations)
+
     @upstream_revocations_list.setter
     def upstream_revocations_list(self, entries):
         self.upstream_revocations = json.dumps(entries) if entries else None
+
+    def names_replaced(self, certificate) -> bool:
+        """Whether a renewal of this order moved off ``certificate`` (same id and serial)."""
+        try:
+            entries = json.loads(self.replaced_certificates) if self.replaced_certificates else []
+        except ValueError:
+            return False
+        return any(isinstance(e, dict) and e.get('certificate_id') == certificate.id
+                   and e.get('serial') == certificate.serial_number
+                   for e in (entries if isinstance(entries, list) else []))
+
+    def add_replaced(self, certificate) -> None:
+        if certificate is None or self.names_replaced(certificate):
+            return
+        try:
+            entries = json.loads(self.replaced_certificates) if self.replaced_certificates else []
+        except ValueError:
+            entries = []
+        entries = entries if isinstance(entries, list) else []
+        entries.append({'certificate_id': certificate.id, 'serial': certificate.serial_number})
+        self.replaced_certificates = json.dumps(entries)
 
     @property
     def domains_list(self):

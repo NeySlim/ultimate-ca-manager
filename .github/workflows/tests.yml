@@ -329,6 +329,7 @@ jobs:
             tests/test_backup*.py \
             tests/test_restore*.py \
             tests/test_mtls*.py \
+            tests/test_user_delete_revokes_mtls.py \
             tests/test_wstep*.py \
             tests/test_xcep*.py \
             tests/test_certificates*.py \
@@ -355,6 +356,7 @@ jobs:
             tests/test_migration_143*.py \
             tests/test_migration_144*.py \
             tests/test_migration_145*.py \
+            tests/test_migration_146*.py \
             tests/test_postgres_schema_of_its_own.py \
             tests/test_db_error_parameters_hidden.py \
             tests/test_audit_oversized_fields.py \

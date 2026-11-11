@@ -17,6 +17,8 @@ from services.cert.renewal import (
     RenewalError, check_renewable, renew_certificate_in_place, renewal_partner,
 )
 from services.msca.propagation import propagate_revocation, PROPAGATED
+from services.acme.upstream_revocation import (
+    NOT_ACME as ACME_NOT_ACME, REVOKED as ACME_REVOKED, propagate_acme_revocation)
 from services.approval_gate import PairApprovalConflict, queue_revocation
 from services.cert.related_pair import mutual_partner
 from api.v2.certificates.cert_lifecycle import _related_choice_refusal
@@ -62,6 +64,8 @@ def bulk_revoke_certificates():
     # single-certificate route carries it there and this one did not, so a
     # bulk revoke left such a certificate valid to every relying party.
     msca_local_only = []
+    # Same for a certificate obtained over ACME: its CA publishes its status
+    acme_local_only = []
     for cert_id in ids:
         try:
             if cert_id in queued_with_pair:
@@ -113,6 +117,9 @@ def bulk_revoke_certificates():
                 outcome, _detail = propagate_revocation(cert, reason)
                 if outcome != PROPAGATED:
                     msca_local_only.append(cert_id)
+            elif cert is not None and propagate_acme_revocation(cert, reason)[0] not in (
+                    ACME_REVOKED, ACME_NOT_ACME):
+                acme_local_only.append(cert_id)
             results['success'].append(cert_id)
         except Exception as e:
             logger.error(f"Bulk revoke failed for cert {cert_id}: {e}")
@@ -122,6 +129,8 @@ def bulk_revoke_certificates():
         # Reported, not counted as a failure: the certificate *is* revoked in
         # UCM. The operator still has to revoke it on the Windows CA.
         results['msca_local_only'] = msca_local_only
+    if acme_local_only:
+        results['acme_local_only'] = acme_local_only
 
     AuditService.log_action(
         action='certificates_bulk_revoked',

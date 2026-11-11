@@ -46,6 +46,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Backup: a manual backup or a restore that failed left nothing in the audit log; it now records `system_backup` or `system_restore` with `success` false and a reason, as the scheduled backup does.
 - Certificate Transparency: `POST /api/v2/certificates/<id>/submit-ct` always failed with a server error, as it read an attribute the certificate model does not have, and the chain it built stopped at the direct issuer; the submission now sends the leaf with its full issuer chain up to the root, or the chain stored inline with the certificate, one element per certificate (RFC 6962 §4.1). Reported by Chris by e-mail.
 
+### Security
+
+- Users: deleting a user, alone or in bulk, left the certificates they had enrolled for mTLS valid on the CRL and at the OCSP responder; they are now revoked (cessationOfOperation) and deleted as when an enrolment is removed, and a user whose certificate cannot be revoked is not deleted.
+- ACME client: revoking a certificate obtained from an ACME CA (single, bulk or approved request) only revoked it in UCM while the CA still answered "good"; the CA is now told (RFC 8555 §7.6) and retried by the scheduler until it confirms, and the answer says when the revocation stayed local (`acme_local_only`), a hold included.
+
 ### Upgrade notes
 
 - Discovery: on PostgreSQL with a server time zone other than UTC, discovery dates stored before this release are in local time; run a scan of the discovery targets after upgrading to rewrite them.

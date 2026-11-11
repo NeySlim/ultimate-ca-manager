@@ -1,0 +1,126 @@
+"""Carrying a local revocation to the ACME CA that issued the certificate.
+
+A certificate UCM obtained with its ACME client (or through its ACME proxy,
+under an upstream account UCM holds) is published by that CA only: the
+revocation reaches relying parties once the CA is told (RFC 8555 §7.6). The
+revoke routes call this after the local revocation; it never raises.
+"""
+import base64
+import logging
+from datetime import timedelta
+from typing import Optional, Tuple
+
+from models import db
+from models.acme_models import AcmeClientOrder
+from utils.datetime_utils import utc_now
+from utils.revocation_reasons import HOLD_REASONS, reason_code
+
+logger = logging.getLogger(__name__)
+
+#: Not a certificate obtained over ACME: nothing to do.
+NOT_ACME = 'not_acme'
+#: Revoked at the CA.
+REVOKED = 'revoked'
+#: The CA did not confirm: owed on the order, sent again by the scheduler.
+OWED = 'owed'
+#: No upstream account of UCM can speak for it: revoked locally only.
+NO_ACCOUNT = 'no_account'
+#: A proxy order naming no upstream account: its proxy client holds the account.
+PROXY_CLIENT = 'proxy_client'
+#: No ACME order of UCM names it any more: the account that obtained it is unknown.
+NO_ORDER = 'no_order'
+#: A hold (or its removal) is local: ACME has no hold, and a revocation there is final.
+HOLD = 'hold'
+
+# RFC 8555 §7.6 takes an RFC 5280 §5.3.1 code: the final ones of an end-entity certificate.
+# Never unspecified (0, sent absent), cA/aACompromise (2, 10: other issuers), hold (6), removeFromCRL (8)
+SENT_REASONS = frozenset({1, 3, 4, 5, 9})
+
+
+def _order_for(cert) -> Optional[AcmeClientOrder]:
+    """The order that names ``cert``, or whose renewal moved off it into a new row."""
+    order = (AcmeClientOrder.query.filter_by(certificate_id=cert.id)
+             .order_by(AcmeClientOrder.id.desc()).first())
+    if order is not None:
+        return order
+    candidates = (AcmeClientOrder.query
+                  .filter(AcmeClientOrder.replaced_certificates.like(f'%"certificate_id": {int(cert.id)},%'))
+                  .order_by(AcmeClientOrder.id.desc()).all())
+    return next((o for o in candidates if o.names_replaced(cert)), None)
+
+
+def _client_for(order):
+    """The service under the upstream account that obtained the order, or None."""
+    from services.acme.acme_client_service import AcmeClientService
+    return AcmeClientService.for_existing_order(order)
+
+
+def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
+    """Revoke ``cert`` at its ACME CA, the local revocation being done.
+
+    Returns ``(outcome, detail)``: one of the constants above, and the CA's
+    error for :data:`OWED`.
+    """
+    if getattr(cert, 'source', None) != 'acme_client' or not cert.crt:
+        return NOT_ACME, None
+    from services.acme_renewal_service import _owe_upstream_revocation, send_upstream_revocation
+    if reason in HOLD_REASONS or reason == 'removeFromCRL':
+        return HOLD, None
+    try:
+        order = _order_for(cert)
+        client = _client_for(order) if order is not None else None
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Upstream account of certificate %s not resolved: %s", cert.id, exc)
+        return NO_ACCOUNT, None
+    if order is None:
+        return NO_ORDER, None
+    if client is None:
+        from services.acme.acme_client_service import PROXY_ACCOUNT_UNKNOWN, AcmeClientService
+        if AcmeClientService.missing_account_message(order) == PROXY_ACCOUNT_UNKNOWN:
+            return PROXY_CLIENT, None
+        return NO_ACCOUNT, None
+
+    code = reason_code(reason)
+    code = code if code in SENT_REASONS else None
+    pem = base64.b64decode(cert.crt)
+    label = f"certificate {cert.id} (serial {cert.serial_number})"
+    try:
+        error = send_upstream_revocation(client, pem, code, label)
+    except Exception as exc:
+        error = str(exc) or exc.__class__.__name__
+    if error is None:
+        return REVOKED, None
+    logger.warning("Upstream revocation of %s failed: %s", label, error)
+    not_after = cert.valid_to or utc_now() + timedelta(days=90)
+    entry = {'serial': cert.serial_number, 'certificate': pem.decode(), 'reason': code,
+             'not_after': not_after.isoformat()}
+    # Compare-and-set inside: safe without the order's lease, which a renewal may hold
+    try:
+        _owe_upstream_revocation(db.session.get(AcmeClientOrder, order.id), entry, error)
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Revocation owed by the CA for %s not kept: %s", label, exc)
+    return OWED, error
+
+
+def local_only_message(outcome, detail) -> Optional[str]:
+    """What the operator must know when the CA was not told, else None."""
+    if outcome == OWED:
+        return ('Certificate revoked in UCM, but the ACME CA did not confirm the revocation '
+                f'({detail}); it is sent again automatically until the CA does.')
+    if outcome == NO_ACCOUNT:
+        return ('Certificate revoked in UCM only: the ACME CA account it was issued under '
+                'no longer exists, so the CA was not notified. Revoke it with the CA directly.')
+    if outcome == PROXY_CLIENT:
+        return ('Certificate revoked in UCM only: it was ordered through the ACME proxy under '
+                'an upstream account UCM never recorded, so the CA was not notified. The proxy '
+                'client that ordered it must revoke it with the CA.')
+    if outcome == NO_ORDER:
+        return ('Certificate revoked in UCM only: UCM no longer has the ACME order it was '
+                'issued under, so it does not know which CA account to revoke it with. '
+                'Revoke it with the CA directly.')
+    if outcome == HOLD:
+        return ('Certificate put on hold in UCM only: ACME has no hold, so the CA was not '
+                'notified. Revoke it with a final reason to revoke it at the CA.')
+    return None
