@@ -249,6 +249,8 @@ def regenerate_delta_crl(ca_id):
             data['caref'] = ca.refid
         
         return success_response(data=data, message='Delta CRL generated successfully')
+    except CRLSigningKeyMismatch as e:
+        return error_response(str(e), 409)
     except ValueError as e:
         logger.warning(f'Delta CRL generation rejected for CA {ca_id}: {e}')
         msg = str(e)

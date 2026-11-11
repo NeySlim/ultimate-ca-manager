@@ -53,6 +53,15 @@ def test_the_manual_route_says_why_no_crl_was_signed(app, auth_client, mismatche
         assert _count(mismatched) == 0
 
 
+def test_the_manual_delta_route_says_why_no_crl_was_signed(app, auth_client, mismatched):
+    with app.app_context():
+        db.session.get(CA, mismatched).delta_crl_enabled = True
+        db.session.commit()
+    r = auth_client.post(f'/api/v2/crl/{mismatched}/delta/regenerate')
+    assert r.status_code == 409, r.get_json()
+    assert 'not the key of its certificate' in r.get_json()['message']
+
+
 def test_a_matching_key_still_signs(app, create_ca):
     from services.crl_service import CRLService
     created = create_ca(cn='CRL Matching Key')
