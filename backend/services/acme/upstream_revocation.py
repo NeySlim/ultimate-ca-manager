@@ -66,8 +66,10 @@ def _client_for(order):
 def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
     """Revoke ``cert`` at its ACME CA, the local revocation being done.
 
-    Returns ``(outcome, detail)``: one of the constants above, and the CA's
-    error for :data:`OWED`.
+    Returns ``(outcome, detail)``, ``outcome`` one of the constants above. ``detail`` is
+    None except for :data:`OWED`, where it is the CA's error (or why the account did not
+    resolve), and :data:`UNRESOLVED`, where it says why the CA was not told. Either may be
+    shown to the operator: a database error reads 'Database error', its text going to the log.
     """
     if getattr(cert, 'source', None) != 'acme_client' or not cert.crt:
         return NOT_ACME, None
