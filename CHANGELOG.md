@@ -22,6 +22,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Overview: the home page is now six independent cards (work queue, automation health, hierarchy, expiry horizon, compliance, latest operations) with layout presets saved per user; each compliance counter and renewal kind opens the certificate list filtered to exactly what it counts, shown as removable chips. The list accepts the matching filters and refuses an invalid filter value with 400.
 
 - Renewal: a deploy binding or the HTTPS binding that an EST, SCEP or WSTEP renewal leaves on the previous certificate (no key in UCM) is now flagged in the API (`needs_attention`, migration 151), the bell, the overview queue and a `certificate.binding_left_behind` event; it can be reattached once UCM holds the key, and importing that key moves it.
+- HA preview: the HTTPS certificate can be applied or regenerated on any node and a renewal of the bound one follows: every node writes the certificate and key from the database before its TLS socket opens, then the nodes restart one at a time. An uploaded Kerberos keytab is stored in the database and written on every node (migration 152).
 
 ### Changed
 
