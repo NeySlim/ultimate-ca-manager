@@ -15,6 +15,9 @@ from services.cert.related_pair import mutual_partner
 from utils.export_options import json_boolean
 from services.deletion_blockers import certificate_deletion_blockers, first_blocker
 from services.ocsp_service import OCSPService
+from services.acme.upstream_revocation import (
+    OWED as ACME_OWED, REVOKED as ACME_REVOKED, local_only_message as acme_local_only_message,
+    propagate_acme_revocation)
 from services.audit_service import AuditService
 from services.notification_service import NotificationService
 from websocket.emitters import on_certificate_revoked, on_certificate_deleted
@@ -134,6 +137,8 @@ def revoke_certificate(cert_id):
         if cert.source == 'msca':
             return _revoke_msca_on_ca(cert, reason)
 
+        # Obtained over ACME: only the issuing CA's answer reaches relying parties
+        acme_outcome, acme_detail = propagate_acme_revocation(cert, reason)
         cert_dict = cert.to_dict()
         partner = db.session.get(Certificate, partner_id) if revoke_related and partner_id else None
         message = 'Certificate revoked successfully'
@@ -144,13 +149,28 @@ def revoke_certificate(cert_id):
             cert_dict['related_not_revoked'] = partner_id
             message = (f'Certificate revoked; its related certificate #{partner_id} was not '
                        'revoked, revoke it separately')
-        return success_response(data=cert_dict, message=message)
+        return success_response(data=cert_dict, **_acme_answer(acme_outcome, acme_detail, message))
     except ValueError as e:
         logger.error(f"Certificate revocation validation error: {e}")
         return error_response('Validation failed', 400)
     except Exception as e:
         logger.error(f"Failed to revoke certificate: {e}")
         return error_response('Failed to revoke certificate', 500)
+
+
+def _acme_answer(outcome, detail, message):
+    """The message and meta of a revocation the ACME CA was, or was not, told of."""
+    if outcome == ACME_REVOKED:
+        return {'message': 'Certificate revoked in UCM and at the ACME CA', 'meta': {'acme_ca_revoked': True}}
+    warning = acme_local_only_message(outcome, detail)
+    if warning is None:
+        return {'message': message}
+    meta = {'acme_local_only': True}
+    if outcome == ACME_OWED:
+        meta.update(acme_upstream_pending=True, acme_ca_error=str(detail)[:300])
+    if message != 'Certificate revoked successfully':
+        warning = f'{warning} {message}'
+    return {'message': warning, 'meta': meta}
 
 
 def _related_choice_refusal(cert, partner_id, revoke_related):
