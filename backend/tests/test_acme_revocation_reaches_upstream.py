@@ -213,3 +213,16 @@ def test_a_replaced_certificate_is_matched_by_id_and_serial():
     assert not order.names_replaced(SimpleNamespace(id=7, serial_number='13'))
     assert not order.names_replaced(SimpleNamespace(id=17, serial_number='12'))
     assert json.loads(order.replaced_certificates) == [{'certificate_id': 7, 'serial': '12'}]
+
+
+def test_a_revocation_confirmed_by_the_ca_keeps_the_related_certificate_warning():
+    from api.v2.certificates.cert_lifecycle import _acme_answer
+    from services.acme.upstream_revocation import REVOKED
+    kept = ('Certificate revoked; its related certificate #41 was not revoked, '
+            'revoke it separately')
+    answer = _acme_answer(REVOKED, None, kept)
+    assert 'at the ACME CA' in answer['message']
+    assert 'related certificate #41 was not revoked' in answer['message']
+    assert answer['meta'] == {'acme_ca_revoked': True}
+    plain = _acme_answer(REVOKED, None, 'Certificate revoked successfully')
+    assert plain['message'] == 'Certificate revoked in UCM and at the ACME CA'

@@ -141,7 +141,7 @@ def revoke_certificate(cert_id):
         acme_outcome, acme_detail = propagate_acme_revocation(cert, reason)
         cert_dict = cert.to_dict()
         partner = db.session.get(Certificate, partner_id) if revoke_related and partner_id else None
-        message = 'Certificate revoked successfully'
+        message = _REVOKED_MESSAGE
         if partner is not None and not revocable(partner, reason):
             cert_dict['related_revoked'] = partner_id
         elif partner is not None:
@@ -158,19 +158,23 @@ def revoke_certificate(cert_id):
         return error_response('Failed to revoke certificate', 500)
 
 
+_REVOKED_MESSAGE = 'Certificate revoked successfully'
+
+
 def _acme_answer(outcome, detail, message):
     """The message and meta of a revocation the ACME CA was, or was not, told of."""
+    # A message other than the default carries a warning of its own: appended, never replaced
+    extra = '' if message == _REVOKED_MESSAGE else f' {message}'
     if outcome == ACME_REVOKED:
-        return {'message': 'Certificate revoked in UCM and at the ACME CA', 'meta': {'acme_ca_revoked': True}}
+        text = 'Certificate revoked in UCM and at the ACME CA'
+        return {'message': f'{text}.{extra}' if extra else text, 'meta': {'acme_ca_revoked': True}}
     warning = acme_local_only_message(outcome, detail)
     if warning is None:
         return {'message': message}
     meta = {'acme_local_only': True}
     if outcome == ACME_OWED:
         meta.update(acme_upstream_pending=True, acme_ca_error=str(detail)[:300])
-    if message != 'Certificate revoked successfully':
-        warning = f'{warning} {message}'
-    return {'message': warning, 'meta': meta}
+    return {'message': f'{warning}{extra}', 'meta': meta}
 
 
 def _related_choice_refusal(cert, partner_id, revoke_related):
