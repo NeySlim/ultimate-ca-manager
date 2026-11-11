@@ -55,11 +55,14 @@ def keep_own_session(user):
 def session_is_current(user) -> bool:
     """False once the account's sessions were closed after this one began, or
     when the session was opened for an earlier account with the same id.
-    A session opened before the proof existed gets it on its first request."""
+    A session opened before the proof existed gets it on its first request,
+    only if the username it was opened for still names this account."""
     if session.get('session_version', 0) != (user.session_version or 0):
         return False
     proof = session.get(ACCOUNT_KEY)
     if proof is None:
+        if session.get('username') != user.username:
+            return False
         session[ACCOUNT_KEY] = account_proof(user)
         return True
     return proof == account_proof(user)

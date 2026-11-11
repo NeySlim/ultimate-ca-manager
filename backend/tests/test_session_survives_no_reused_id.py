@@ -93,3 +93,20 @@ class TestASessionOpenedBeforeTheUpdate:
         assert client.get(PROTECTED).status_code == 200
         with client.session_transaction() as stored:
             assert stored.get(ACCOUNT_KEY)
+
+    def test_is_refused_by_the_account_that_took_its_id(self, app, auth_client, create_user, cleanup):
+        from auth.session_start import ACCOUNT_KEY
+        cleanup.extend(['proofless_first', 'proofless_second'])
+        first = create_user(username='proofless_first', role='operator')
+        old_session = _login(app, 'proofless_first')
+        with old_session.session_transaction() as stored:
+            assert stored.pop(ACCOUNT_KEY, None) is not None
+
+        _delete_last(app, auth_client, first['id'])
+        second = create_user(username='proofless_second', role='admin')
+        _reuses(app, first['id'], second['id'])
+
+        assert old_session.get(PROTECTED).status_code == 401
+        with old_session.session_transaction() as stored:
+            assert ACCOUNT_KEY not in stored
+        assert _login(app, 'proofless_second').get(PROTECTED).status_code == 200
