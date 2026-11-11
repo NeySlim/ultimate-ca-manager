@@ -288,16 +288,18 @@ def _has_delta_after(ca_id: int, base_number: int) -> bool:
         CRLMetadata.crl_number > base_number).first() is not None
 
 
-def _regenerate_crls() -> Tuple[list, list]:
+def _regenerate_crls() -> Tuple[list, list, list]:
     """A fresh CRL (and delta) for each publishing authority that can sign: the one served
-    may list the revocations of the replaced instance. Returns (regenerated, failed) names."""
+    may list the revocations of the replaced instance. Returns (regenerated, failed, delta_failed)
+    names: delta_failed holds the authorities whose base CRL was signed but not its delta."""
     from models import CA
     from services.crl_service import CRLService
-    regenerated, failed = [], []
+    regenerated, failed, delta_failed = [], [], []
     for ca in CA.query.filter_by(cdp_enabled=True).order_by(CA.id).all():
         if not (ca.has_private_key and ca.crt) or ca.offline:
             continue  # signed elsewhere or not yet issued: the CDP keeps what it has
         name = ca.descr
+        base = None
         try:
             base = CRLService.generate_crl(ca.id, username='system')
             if ca.delta_crl_enabled and not _has_delta_after(ca.id, base.crl_number):
@@ -305,10 +307,10 @@ def _regenerate_crls() -> Tuple[list, list]:
         except Exception as exc:
             db.session.rollback()
             logger.warning("Restore: the CRL of CA %s was not regenerated: %s", name, exc)
-            failed.append(name)
+            (failed if base is None else delta_failed).append(name)
         else:
             regenerated.append(name)
-    return regenerated, failed
+    return regenerated, failed, delta_failed
 
 
 def _request_restart() -> bool:
@@ -361,6 +363,7 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
          'caches_failed': [str],        # caches that refused to drop
          'crls_regenerated': [str],     # CAs whose CRL was signed again
          'crls_failed': [str],          # CAs that could not sign one (HSM absent...)
+         'crls_delta_failed': [str],    # CAs whose base CRL was signed but not its delta
          'crls_not_regenerated': bool,  # the regeneration itself failed, no CA was tried
          'restart_requested': bool}     # the mechanism accepted the request
     """
@@ -389,11 +392,13 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
 
     summary['crls_not_regenerated'] = False
     try:
-        summary['crls_regenerated'], summary['crls_failed'] = _regenerate_crls()
+        (summary['crls_regenerated'], summary['crls_failed'],
+         summary['crls_delta_failed']) = _regenerate_crls()
     except Exception as exc:
         db.session.rollback()
         logger.warning("Restore: the CRLs were not regenerated: %s", exc)
         summary['crls_regenerated'], summary['crls_failed'] = [], []
+        summary['crls_delta_failed'] = []
         summary['crls_not_regenerated'] = True  # no CA was tried: the operator is told so
 
     if request_restart:

@@ -85,7 +85,8 @@ def test_a_delta_that_fails_after_its_base_reports_the_authority(app, create_ca,
             raise RuntimeError('HSM session lost')
         monkeypatch.setattr(CRLGenerationMixin, 'generate_delta_crl', staticmethod(refused))
         result = invalidate_after_restore()
-        assert name in result['crls_failed'] and name not in result['crls_regenerated'], result
+        assert name in result['crls_delta_failed'], result
+        assert name not in result['crls_failed'] and name not in result['crls_regenerated'], result
 
 
 def test_an_authority_that_cannot_sign_is_reported_and_the_others_still_get_theirs(
@@ -151,6 +152,13 @@ def test_the_restore_message_names_the_authorities_left_without_a_crl():
     message = with_restore_warnings('Backup restored successfully.',
                                     {'invalidated': {'crls_failed': ['Issuing HSM CA']}})
     assert 'Issuing HSM CA' in message and 'CRL' in message
+
+
+def test_the_restore_message_says_the_base_was_signed_and_the_delta_was_not():
+    message = with_restore_warnings('Done.', {'invalidated': {'crls_delta_failed': ['Delta CA']}})
+    assert ('The CRL was signed but its delta CRL was not, after the restore, for: Delta CA'
+            in message)
+    assert 'No new CRL could be signed' not in message
 
 
 def test_a_regeneration_that_fails_as_a_whole_is_reported(app, monkeypatch):

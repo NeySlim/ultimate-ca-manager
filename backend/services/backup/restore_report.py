@@ -134,6 +134,10 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
     unsigned = invalidated.get('crls_failed') or []
     if unsigned:
         message += _clause('No new CRL could be signed after the restore for: ' + _listing(unsigned))
+    delta_unsigned = invalidated.get('crls_delta_failed') or []
+    if delta_unsigned:
+        message += _clause('The CRL was signed but its delta CRL was not, after the restore, for: '
+                           + _listing(delta_unsigned))
 
     warnings = (results or {}).get('warnings') or []
     if warnings:
