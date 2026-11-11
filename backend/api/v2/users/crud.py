@@ -43,9 +43,19 @@ def _pending_approvals_count(user_id):
         return 0
 
 
+def _numbers(certificate_ids):
+    return ', '.join(f'#{cid}' for cid in certificate_ids)
+
+
+def _revoked_note(revoked):
+    """What a failure after the revocations must add: they are not undone."""
+    return f'. Already revoked for this deletion: certificate(s) {_numbers(revoked)}' if revoked else ''
+
+
 def _revoke_enrolled_certificates(user_id, actor):
     """Revoke each certificate the user enrolled for mTLS, as removing the
-    enrolment does. Returns ``(certificate_ids, None)`` or ``(None, refusal)``.
+    enrolment does. Returns ``(certificate_ids, revoked_ids, None)`` or
+    ``(None, None, refusal)``.
 
     Every enrolment is checked (policy, revocability) before any certificate is
     revoked, so a refusal revokes nothing; a revocation that fails past the checks
@@ -58,7 +68,7 @@ def _revoke_enrolled_certificates(user_id, actor):
     for enrolment in enrolments:
         certificate_id, needs_revoking, refusal = removal_check(enrolment, actor)
         if refusal is not None:
-            return None, refusal
+            return None, None, refusal
         planned.append((enrolment, certificate_id, needs_revoking))
     certificate_ids, revoked = [], []
     for enrolment, certificate_id, needs_revoking in planned:
@@ -66,14 +76,11 @@ def _revoke_enrolled_certificates(user_id, actor):
             refusal = revoke_checked(enrolment, certificate_id, actor.username)
             if refusal is not None:
                 message, status = refusal
-                if revoked:
-                    message += ('. Already revoked for this deletion: certificate(s) '
-                                + ', '.join(f'#{cid}' for cid in revoked))
-                return None, (message, status)
+                return None, None, (message + _revoked_note(revoked), status)
             revoked.append(certificate_id)
         if certificate_id:
             certificate_ids.append(certificate_id)
-    return certificate_ids, None
+    return certificate_ids, revoked, None
 
 
 def _delete_withdrawn_certificates(certificate_ids, username):
@@ -480,7 +487,7 @@ def delete_user(user_id):
         )
 
     username = user.username
-    certificate_ids, refusal = _revoke_enrolled_certificates(user_id, g.current_user)
+    certificate_ids, revoked, refusal = _revoke_enrolled_certificates(user_id, g.current_user)
     if refusal is not None:
         message, status = refusal
         return error_response(f'User not deleted: {message}', status)
@@ -491,7 +498,7 @@ def delete_user(user_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to delete user {user_id}: {e}", exc_info=True)
-        return error_response('Failed to delete user', 500)
+        return error_response('Failed to delete user' + _revoked_note(revoked), 500)
     kept = _delete_withdrawn_certificates(certificate_ids, g.current_user.username)
 
     if sessions_deleted > 0:
@@ -554,7 +561,7 @@ def bulk_delete_users():
             results['failed'].append({'id': user_id, 'error': 'User has pending approval requests'})
             continue
 
-        certificate_ids, refusal = _revoke_enrolled_certificates(user_id, g.current_user)
+        certificate_ids, revoked, refusal = _revoke_enrolled_certificates(user_id, g.current_user)
         if refusal is not None:
             results['failed'].append({'id': user_id, 'error': refusal[0]})
             continue
@@ -564,11 +571,11 @@ def bulk_delete_users():
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to delete user {user_id}: {e}", exc_info=True)
-            results['failed'].append({'id': user_id, 'error': 'Deletion failed'})
+            results['failed'].append({'id': user_id, 'error': 'Deletion failed' + _revoked_note(revoked)})
             continue
         ok, _err = safe_commit(logger, f"Delete user {user_id}")
         if not ok:
-            results['failed'].append({'id': user_id, 'error': 'Deletion failed'})
+            results['failed'].append({'id': user_id, 'error': 'Deletion failed' + _revoked_note(revoked)})
             continue
         total_sessions_invalidated += sessions_deleted
         kept = _delete_withdrawn_certificates(certificate_ids, g.current_user.username)

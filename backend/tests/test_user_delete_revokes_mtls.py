@@ -228,3 +228,50 @@ class TestAllOrNothingAcrossEnrolments:
         assert self._revoked(app, first) and not self._revoked(app, second)
         with app.app_context():
             assert db.session.get(User, first['user_id']) is not None
+
+
+class TestAFailureAfterTheRevocations:
+    """Revoked certificates stay revoked when the deletion fails: the answer names them."""
+
+    @staticmethod
+    def _purge_fails(monkeypatch):
+        import api.v2.users.crud as crud
+
+        def _broken(_user_id):
+            raise RuntimeError('database is locked')
+        monkeypatch.setattr(crud, '_purge_user_dependencies', _broken)
+
+    def test_unit_delete_names_the_revoked_certificate(self, app, auth_client, probe, monkeypatch):
+        self._purge_fails(monkeypatch)
+        answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+        assert answer.status_code == 500, answer.data[:300]
+        message = json.loads(answer.data)['message']
+        assert f"#{probe['certificate_id']}" in message, message
+        with app.app_context():
+            assert db.session.get(User, probe['user_id']) is not None
+            assert db.session.get(Certificate, probe['certificate_id']).revoked
+
+    def test_bulk_names_the_revoked_certificate(self, app, auth_client, probe, monkeypatch):
+        self._purge_fails(monkeypatch)
+        answer = auth_client.post('/api/v2/users/bulk/delete',
+                                  data=json.dumps({'ids': [probe['user_id']]}),
+                                  content_type='application/json')
+        assert answer.status_code == 200, answer.data[:300]
+        failed = json.loads(answer.data)['data']['failed']
+        assert [f['id'] for f in failed] == [probe['user_id']]
+        assert f"#{probe['certificate_id']}" in failed[0]['error'], failed
+
+    def test_bulk_commit_failure_names_the_revoked_certificate(
+            self, app, auth_client, probe, monkeypatch):
+        import api.v2.users.crud as crud
+
+        def _refused(_logger, _context):
+            db.session.rollback()
+            return False, None
+        monkeypatch.setattr(crud, 'safe_commit', _refused)
+        answer = auth_client.post('/api/v2/users/bulk/delete',
+                                  data=json.dumps({'ids': [probe['user_id']]}),
+                                  content_type='application/json')
+        failed = json.loads(answer.data)['data']['failed']
+        assert f"#{probe['certificate_id']}" in failed[0]['error'], failed
+
