@@ -138,6 +138,31 @@ describe('ApprovalsPage — opening what an approval issued', () => {
       showWarning.mockRestore(); showSuccess.mockRestore()
     })
 
+  it('says of an owed revocation what the single route says', async () => {
+    const showWarning = vi.spyOn(stable.notify, 'showWarning')
+    const said = 'Certificate revoked in UCM, but the ACME CA did not confirm the revocation (HTTP 503); it is sent again automatically until the CA does.'
+    approve.mockResolvedValue({ data: { certificate_issued: true, certificate: {
+      id: 7, revoked: true, reason: 'keyCompromise', acme_local_only: true,
+      acme_upstream_pending: true, acme_message: said } } })
+    renderPage()
+    await clickApproveOrReject('approve')
+    await waitFor(() => expect(showWarning).toHaveBeenCalledWith(said))
+    expect(showWarning).not.toHaveBeenCalledWith('revocation.revokedLocallyOnly')
+    showWarning.mockRestore()
+  })
+
+  it('warns of nothing for an approved hold of an ACME certificate', async () => {
+    const showWarning = vi.spyOn(stable.notify, 'showWarning')
+    approve.mockResolvedValue({ data: { certificate_issued: true, certificate: {
+      id: 7, revoked: true, reason: 'certificateHold', acme_local_only: true,
+      acme_message: 'Certificate put on hold in UCM only' } } })
+    renderPage()
+    await clickApproveOrReject('approve')
+    await waitFor(() => expect(openEntity).toHaveBeenCalled())
+    expect(showWarning).not.toHaveBeenCalled()
+    showWarning.mockRestore()
+  })
+
   it('warns of nothing when the issuing CA was told of an approved revocation', async () => {
     const showWarning = vi.spyOn(stable.notify, 'showWarning')
     approve.mockResolvedValue({ data: { certificate_issued: true, certificate: {
