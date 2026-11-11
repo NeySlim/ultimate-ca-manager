@@ -44,6 +44,7 @@ def test_ha_render_pos():
     assert env['UCM_HA']['value'] == '1'
     assert env['UCM_NODE_ID']['valueFrom']['fieldRef']['fieldPath'] == 'metadata.name'
     assert env['KEY_ENCRYPTION_KEY']['valueFrom']['secretKeyRef']['key'] == 'KEY_ENCRYPTION_KEY'
+    assert env['HSM_AUTO_INIT']['value'] == 'false'
     assert 'REDIS_URL' not in env
     assert 'KEY_ENCRYPTION_KEY' in docs['Secret']['stringData']
     assert docs['PodDisruptionBudget']['spec']['minAvailable'] == 1

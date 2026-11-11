@@ -36,3 +36,8 @@ def test_load_balancer_has_cookie_affinity_and_ready_probe_pos():
 def test_load_balancer_forwards_the_client_address_pos():
     cfg = DOC['configs']['haproxy_cfg']['content']
     assert re.search(r'^\s*option forwardfor\b', cfg, re.M)
+
+
+def test_nodes_do_not_autocreate_a_local_softhsm_token_neg():
+    for n in ('ucm-1', 'ucm-2'):
+        assert DOC['services'][n]['environment']['HSM_AUTO_INIT'] == 'false'

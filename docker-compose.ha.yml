@@ -17,6 +17,8 @@ x-ucm-node: &ucm-node
       condition: service_healthy
   environment: &ucm-env
     UCM_HA: "1"
+    # SoftHSM tokens are local to a node: use a network HSM in HA
+    HSM_AUTO_INIT: "false"
     UCM_FQDN: ${UCM_FQDN:-ucm.example.com}
     UCM_SECRET_KEY: ${UCM_SECRET_KEY:?set UCM_SECRET_KEY, identical on every node}
     KEY_ENCRYPTION_KEY: ${KEY_ENCRYPTION_KEY:?set KEY_ENCRYPTION_KEY, identical on every node}

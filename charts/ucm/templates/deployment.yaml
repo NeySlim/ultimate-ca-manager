@@ -82,6 +82,9 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            # SoftHSM tokens are local to a pod: a fresh token per pod would clobber the shared registration
+            - name: HSM_AUTO_INIT
+              value: "false"
             {{- with .Values.redis.url }}
             - name: REDIS_URL
               value: {{ . | quote }}
