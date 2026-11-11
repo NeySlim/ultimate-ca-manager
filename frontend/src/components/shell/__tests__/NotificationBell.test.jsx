@@ -166,10 +166,24 @@ describe('NotificationBell', () => {
     expect(bell()).toHaveFocus()
   })
 
-  it('asks for failed scheduled backups in their own request, and for nothing else', async () => {
+  it('asks for failed backups and restores in their own request, and for nothing else', async () => {
     setup()
     await waitFor(() => expect(m.getLogs).toHaveBeenCalledWith(
-      expect.objectContaining({ action: ['system_backup'], success: false })))
+      expect.objectContaining({ action: ['system_backup', 'system_restore'], success: false })))
+  })
+
+  it('brings a failed restore back to the bell', async () => {
+    m.extraLogs = [
+      { id: 60, action: 'system_restore', success: false, username: 'root', resource_name: 'b.ucmbkp', timestamp: '2026-11-09T11:00:00Z' },
+      { id: 61, action: 'system_restore', success: true, username: 'root', resource_name: 'b.ucmbkp', timestamp: '2026-11-09T12:00:00Z' },
+    ]
+    setup()
+    const user = userEvent.setup()
+    await waitFor(() => expect(bell()).toHaveAccessibleName(/\|5/))
+    await user.click(bell())
+    const rows = within(screen.getByRole('region', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    expect(rows).toContain('audit:60')
+    expect(rows).not.toContain('audit:61')
   })
 
   it('keeps a failed backup in the bell when 25 newer backups succeeded', async () => {

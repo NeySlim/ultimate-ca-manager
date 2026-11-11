@@ -11,10 +11,10 @@ import { getPreferences, subscribePreferences, persistPreference } from '../../s
 
 export const BELL_KINDS = ['acme_order_failed', 'acme_client_renewal_failed', 'approval_pending', 'crl_due',
   'crl_missing', 'manual_renewal_due', 'auto_renewal_blocked', 'ca_expiring']
-// Journal events worth a notification: a revoked session, a failed scheduled backup.
+// Journal events worth a notification: a revoked session, a failed backup or restore.
 // Failures are asked for on their own so successful runs cannot push them out of the page.
 const SESSION_ACTIONS = ['session_revoke', 'session_revoke_all']
-const FAILURE_ACTIONS = ['system_backup']
+const FAILURE_ACTIONS = ['system_backup', 'system_restore']
 const MAX_MARKS = 200
 const REFRESH_DELAY_MS = 1500
 
