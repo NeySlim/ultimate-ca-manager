@@ -34,6 +34,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Import: replacing a certificate through `POST /api/v2/certificates/import` with a new serial now fires the renewal event, so its deploy bindings, webhooks and HTTPS binding follow as after an internal renewal (discussion #440); re-importing the same serial stays silent.
+- AD CS: when the status check of a pending request imports a certificate that replaces an existing one, its deploy bindings, webhooks and HTTPS binding now follow as after a renewal.
 - HA preview: two nodes started together on an empty PostgreSQL database could both try to create the session table, and one failed to start; the table is now created under the startup lock.
 - Issuance: a certificate created with `POST /api/v2/certificates` (the certificate form), issued from the form once its approval was granted, enrolled through SCEP or renewed in place, a cross-certificate, and the certificates UCM issues to its own TSA signer, EST key generator and renewed OCSP responder were never counted in their CA's issued certificates; they now are.
 - Renewal: an EST, WSTEP or SCEP renewal that waited behind an in-place renewal of the same certificate archived the certificate just renewed; it is now refused, and the OCSP responder renewal task leaves such a certificate as it is.

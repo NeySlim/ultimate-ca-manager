@@ -285,10 +285,11 @@ def import_certificate():
 
             # Update existing certificate
             old_serial = stored_certificate_serial(existing_cert)
+            serial_changed = old_serial is not None and old_serial != cert.serial_number
             first_san = (cert_info.get('san_dns') or [None])[0]
             existing_cert.descr = name or cert_info['cn'] or first_san or existing_cert.descr
             existing_cert.crt = base64.b64encode(cert_pem).decode('utf-8')
-            if old_serial is not None and old_serial != cert.serial_number:
+            if serial_changed:
                 # Revocation is per certificate (RFC 5280): a renewed certificate
                 # is not the revoked one, whose serial stays on the CRL
                 existing_cert.revoked = False
@@ -335,10 +336,19 @@ def import_certificate():
                 success=True
             )
 
+            # A new serial is a renewal: deploy bindings, webhooks and HTTPS
+            # binding follow; the same serial re-imported stays silent.
+            cert_dict = existing_cert.to_dict()
+            if serial_changed:
+                from services.webhook_service import emit_cert_renewed
+                user = getattr(g, 'current_user', None)
+                emit_cert_renewed(cert_dict, ca_refid=existing_cert.caref,
+                                  actor=getattr(user, 'username', None))
+
             message = f'Certificate "{existing_cert.descr}" updated (already existed)'
             if key_dropped:
                 message += '; the stored key did not match the new certificate and was unbound'
-            return success_response(data=existing_cert.to_dict(), message=message)
+            return success_response(data=cert_dict, message=message)
 
         # Regular certificate - find parent CA
         caref = _resolve_caref(ca_id, cert_info)
