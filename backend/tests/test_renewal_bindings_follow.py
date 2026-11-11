@@ -55,6 +55,9 @@ def _bound_row(app, ca_id, cn):
         db.session.flush()
         binding = DeployBinding(target_id=target.id, certificate_id=row.id, cert_path='/srv/c.pem')
         db.session.add(binding)
+        db.session.flush()
+        # Another file's leftover delivery may carry the id this binding reuses
+        DeployDelivery.query.filter_by(binding_id=binding.id).delete()
         db.session.commit()
         set_bound_refid(row.refid)
         return row.id, binding.id
