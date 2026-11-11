@@ -144,6 +144,22 @@ def test_the_first_event_after_a_purge_emptied_the_table_is_not_delayed(relay_db
     assert [p['data']['n'] for _, p in got] == [9]  # on the next tick, no gap grace
 
 
+def test_writing_and_purging_raise_no_datetime_deprecation(relay_db):
+    import warnings
+    _, engine = relay_db
+    times = [utc_now() - ws_relay.RETENTION - timedelta(minutes=1)]
+    publisher = ws_relay.RelayPublisher(engine, clock=lambda: times[0])
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        publisher.publish(ROOM, _payload(0))
+        publisher.stop()
+        times[0] = utc_now()
+        publisher._next_purge = 0.0
+        publisher.run_once()
+    assert [str(w.message) for w in caught if 'datetime adapter' in str(w.message)] == []
+    assert _rows(engine) == []  # written, then purged
+
+
 def test_a_gap_waits_then_a_late_row_is_still_delivered_once(relay_db):
     _, engine = relay_db
     clock = Clock()

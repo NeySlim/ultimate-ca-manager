@@ -12,7 +12,7 @@ from collections import deque
 from datetime import timedelta
 from itertools import islice
 
-from sqlalchemy import text
+from sqlalchemy import DateTime, bindparam, text
 
 from utils.datetime_utils import utc_now
 
@@ -32,8 +32,11 @@ GAP_GRACE_SECONDS = 4.0
 HOLE_TTL_SECONDS = 120.0
 MAX_HOLES = 32
 
-_INSERT_SQL = text("INSERT INTO websocket_relay (created_at, room, payload) VALUES (:t, :r, :p)")
-_PURGE_SQL = text("DELETE FROM websocket_relay WHERE created_at < :t")
+# Typed binds: a raw datetime goes through the deprecated sqlite3 adapter
+_INSERT_SQL = text("INSERT INTO websocket_relay (created_at, room, payload) VALUES (:t, :r, :p)"
+                   ).bindparams(bindparam('t', type_=DateTime()))
+_PURGE_SQL = text("DELETE FROM websocket_relay WHERE created_at < :t"
+                  ).bindparams(bindparam('t', type_=DateTime()))
 _LAST_SQL = text("SELECT COALESCE(MAX(id), 0) FROM websocket_relay")
 _SQLITE_SEQ_SQL = text("SELECT seq FROM sqlite_sequence WHERE name = 'websocket_relay'")
 _PG_SEQ_NAME_SQL = text("SELECT pg_get_serial_sequence('websocket_relay', 'id')")
