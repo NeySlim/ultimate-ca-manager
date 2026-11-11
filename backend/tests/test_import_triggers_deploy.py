@@ -59,3 +59,18 @@ class TestImportReplacementDeploys:
         assert _import(auth_client, IMPORT, new).status_code == 500
         monkeypatch.undo()
         assert _deliveries(app, cert_id) == []
+
+
+    def test_row_without_readable_certificate_is_a_first_issuance(self, app, auth_client, create_ca):
+        ca_cert, ca_key, key, old, cert_id = _setup(app, auth_client, create_ca, 'r7-keyonly.example.com')
+        with app.app_context():
+            from models import db, Certificate
+            db.session.get(Certificate, cert_id).crt = None
+            db.session.commit()
+        new = _cert('r7-keyonly.example.com', key, issuer_cert=ca_cert, signer=ca_key)
+        from unittest.mock import patch
+        with patch('services.webhook_service.emit_cert_renewed') as emitted:
+            r = _import(auth_client, IMPORT, new)
+        assert r.status_code == 200, r.data
+        assert json.loads(r.data)['data']['id'] == cert_id
+        emitted.assert_not_called()

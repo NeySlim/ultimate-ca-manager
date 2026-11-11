@@ -285,11 +285,11 @@ def import_certificate():
 
             # Update existing certificate
             old_serial = stored_certificate_serial(existing_cert)
-            serial_changed = old_serial != cert.serial_number
+            serial_changed = old_serial is not None and old_serial != cert.serial_number
             first_san = (cert_info.get('san_dns') or [None])[0]
             existing_cert.descr = name or cert_info['cn'] or first_san or existing_cert.descr
             existing_cert.crt = base64.b64encode(cert_pem).decode('utf-8')
-            if old_serial is not None and old_serial != cert.serial_number:
+            if serial_changed:
                 # Revocation is per certificate (RFC 5280): a renewed certificate
                 # is not the revoked one, whose serial stays on the CRL
                 existing_cert.revoked = False
