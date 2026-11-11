@@ -255,11 +255,11 @@ def delete_user_mtls_certificate(user_id, cert_id):
         return error_response('Certificate not found', 404)
 
     cert_name = auth_cert.name or f'Certificate #{cert_id}'
-    removed, failure = remove_enrolment(
+    removed, answer = remove_enrolment(
         auth_cert, username=getattr(g.current_user, 'username', 'system'),
         actor=g.current_user)
     if not removed:
-        return failure
+        return answer
 
     AuditService.log_action(
         action='admin_mtls_delete',
@@ -270,4 +270,4 @@ def delete_user_mtls_certificate(user_id, cert_id):
         success=True,
     )
 
-    return no_content_response()
+    return success_response(**answer) if answer else no_content_response()

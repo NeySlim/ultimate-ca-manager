@@ -595,9 +595,9 @@ def delete_user_certificate(cert_id):
 
     # Refused while a policy requires approval to revoke its certificate,
     # whoever holds it (administrators bypass)
-    removed, failure = remove_enrolment(auth_cert, username=user.username, actor=user)
+    removed, answer = remove_enrolment(auth_cert, username=user.username, actor=user)
     if not removed:
-        return failure
+        return answer
 
     AuditService.log_action(
         action='user_certificate_deleted',
@@ -608,4 +608,4 @@ def delete_user_certificate(cert_id):
         success=True
     )
 
-    return no_content_response()
+    return success_response(**answer) if answer else no_content_response()

@@ -507,23 +507,31 @@ REVOCATION_FAILED = ('The certificate could not be revoked, so it was not delete
                      'Check that the issuing CA can sign, then try again')
 
 
-def revoke_checked(auth_cert, certificate_id, username: str = 'system'):
-    """Revoke a certificate :func:`removal_check` cleared; ``(message, status)`` on failure."""
+def revoke_checked(auth_cert, certificate_id, username: str = 'system', upstream=None):
+    """Revoke a certificate :func:`removal_check` cleared; ``(message, status)`` on failure.
+
+    Obtained over ACME, it is revoked at its CA too: ``(certificate_id, outcome, detail)``
+    of :func:`propagate_acme_revocation` is appended to ``upstream`` when given.
+    """
     from models import db
+    from services.acme.upstream_revocation import propagate_acme_revocation
     from services.cert_service import CertificateService
     try:
         # The enrolled certificate only: its pair partner is not part of the enrolment
-        CertificateService.revoke_certificate(
+        certificate = CertificateService.revoke_certificate(
             cert_id=certificate_id, reason=REMOVAL_REASON, username=username,
             revoke_related=False)
     except Exception as error:
         logger.error('Enrolment %s: revocation refused: %s', auth_cert.id, error)
         db.session.rollback()
         return REVOCATION_FAILED, 409
+    outcome, detail = propagate_acme_revocation(certificate, REMOVAL_REASON)
+    if upstream is not None:
+        upstream.append((certificate_id, outcome, detail))
     return None
 
 
-def revoke_for_removal(auth_cert, username: str = 'system', actor=None):
+def revoke_for_removal(auth_cert, username: str = 'system', actor=None, upstream=None):
     """Revoke the certificate an enrolment names, ahead of removing it.
 
     Returns ``(certificate_id, None)``, the id being None when no row of
@@ -534,16 +542,28 @@ def revoke_for_removal(auth_cert, username: str = 'system', actor=None):
     if refusal is not None:
         return None, refusal
     if needs_revoking:
-        refusal = revoke_checked(auth_cert, certificate_id, username)
+        refusal = revoke_checked(auth_cert, certificate_id, username, upstream)
         if refusal is not None:
             return None, refusal
     return certificate_id, None
 
 
+REMOVED_MESSAGE = 'Certificate deleted.'
+
+
+def removal_answer(upstream):
+    """The ``message`` and ``meta`` of a removal whose certificate was obtained over ACME,
+    None when no ACME CA was concerned."""
+    from services.acme.upstream_revocation import NOT_ACME, revocation_answer
+    told = [(outcome, detail) for _cid, outcome, detail in upstream or () if outcome != NOT_ACME]
+    return revocation_answer(*told[0], REMOVED_MESSAGE) if told else None
+
+
 def remove_enrolment(auth_cert, username: str = 'system', actor=None):
     """Revoke the certificate an enrolment names, then delete both.
 
-    Returns ``(True, None)`` or ``(False, response)``. Deleting the
+    Returns ``(True, answer)``, ``answer`` being :func:`removal_answer` (None
+    unless an ACME CA was concerned), or ``(False, response)``. Deleting the
     ``AuthCertificate`` row is what withdraws access to UCM, and that is all
     these routes used to do: the certificate stayed valid for every other
     service trusting the same authority, with nothing on the CRL or at the
@@ -555,7 +575,9 @@ def remove_enrolment(auth_cert, username: str = 'system', actor=None):
     from utils.db_transaction import safe_commit
     from utils.response import error_response
 
-    certificate_id, refusal = revoke_for_removal(auth_cert, username=username, actor=actor)
+    upstream = []
+    certificate_id, refusal = revoke_for_removal(auth_cert, username=username, actor=actor,
+                                                 upstream=upstream)
     if refusal is not None:
         return False, error_response(*refusal)
 
@@ -573,4 +595,4 @@ def remove_enrolment(auth_cert, username: str = 'system', actor=None):
         return False, error_response(
             'The enrolment was removed but its certificate could not be '
             'deleted; it is still listed under Certificates', 500)
-    return True, None
+    return True, removal_answer(upstream)

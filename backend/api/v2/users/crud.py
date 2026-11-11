@@ -52,10 +52,27 @@ def _revoked_note(revoked):
     return f'. Already revoked for this deletion: certificate(s) {_numbers(revoked)}' if revoked else ''
 
 
-def _revoke_enrolled_certificates(user_id, actor):
+def _acme_untold(upstream):
+    """``(meta, note)`` for the certificates of ``upstream`` (``(id, outcome, detail)``)
+    whose ACME CA did not confirm the revocation, or ``(None, '')``."""
+    from services.acme.upstream_revocation import NOT_ACME, OWED, REVOKED, local_only_message
+    untold = [(cid, outcome, detail) for cid, outcome, detail in upstream
+              if outcome not in (REVOKED, NOT_ACME)]
+    if not untold:
+        return None, ''
+    meta = {'acme_local_only': [cid for cid, _o, _d in untold]}
+    owed = [cid for cid, outcome, _d in untold if outcome == OWED]
+    if owed:
+        meta['acme_upstream_pending'] = owed
+    note = ''.join(f' Certificate #{cid}: {local_only_message(outcome, detail)}'
+                   for cid, outcome, detail in untold)
+    return meta, note
+
+
+def _revoke_enrolled_certificates(user_id, actor, upstream=None):
     """Revoke each certificate the user enrolled for mTLS, as removing the
     enrolment does. Returns ``(certificate_ids, revoked_ids, None)`` or
-    ``(None, None, refusal)``.
+    ``(None, None, refusal)``; ``upstream`` collects the ACME outcomes.
 
     Every enrolment is checked (policy, revocability) before any certificate is
     revoked, so a refusal revokes nothing; a revocation that fails past the checks
@@ -78,7 +95,7 @@ def _revoke_enrolled_certificates(user_id, actor):
     certificate_ids, revoked = [], []
     for enrolment, certificate_id, needs_revoking in planned:
         if needs_revoking:
-            refusal = revoke_checked(enrolment, certificate_id, actor.username)
+            refusal = revoke_checked(enrolment, certificate_id, actor.username, upstream)
             if refusal is not None:
                 message, status = refusal
                 return None, None, (message + _revoked_note(revoked), status)
@@ -492,7 +509,9 @@ def delete_user(user_id):
         )
 
     username = user.username
-    certificate_ids, revoked, refusal = _revoke_enrolled_certificates(user_id, g.current_user)
+    upstream = []
+    certificate_ids, revoked, refusal = _revoke_enrolled_certificates(
+        user_id, g.current_user, upstream)
     if refusal is not None:
         message, status = refusal
         return error_response(f'User not deleted: {message}', status)
@@ -524,13 +543,15 @@ def delete_user(user_id):
     except Exception:
         pass
 
+    acme_meta, acme_note = _acme_untold(upstream)
+    extra = {'meta': acme_meta} if acme_meta else {}
     if kept:
         return success_response(message=(
             f'User {username} deleted; its revoked mTLS certificate(s) {_numbers(kept)} '
-            'could not be deleted and are still listed under Certificates'))
+            f'could not be deleted and are still listed under Certificates.{acme_note}'), **extra)
     return success_response(
-        message=f'User {username} deleted successfully'
-    )
+        message=f'User {username} deleted successfully.{acme_note}' if acme_note
+        else f'User {username} deleted successfully', **extra)
 
 
 # ============================================================
@@ -566,7 +587,12 @@ def bulk_delete_users():
             results['failed'].append({'id': user_id, 'error': 'User has pending approval requests'})
             continue
 
-        certificate_ids, revoked, refusal = _revoke_enrolled_certificates(user_id, g.current_user)
+        upstream = []
+        certificate_ids, revoked, refusal = _revoke_enrolled_certificates(
+            user_id, g.current_user, upstream)
+        acme_meta, _note = _acme_untold(upstream)
+        for key, ids in (acme_meta or {}).items():
+            results.setdefault(key, []).extend(ids)
         if refusal is not None:
             results['failed'].append({'id': user_id, 'error': refusal[0]})
             continue
