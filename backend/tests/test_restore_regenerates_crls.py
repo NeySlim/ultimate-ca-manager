@@ -122,6 +122,16 @@ def test_an_authority_without_a_distribution_point_is_left_alone(app, create_ca)
         assert _latest(row.id) == before
 
 
+def test_an_offline_authority_is_neither_regenerated_nor_reported(app, create_ca):
+    """Its CRL is signed next to the key and uploaded: the restore leaves it as it is."""
+    ca_id, name = _publishing(app, create_ca, 'Restore CRL Offline', offline=True)
+    with app.app_context():
+        before = _latest(ca_id)
+        result = invalidate_after_restore()
+        assert name not in result['crls_regenerated'] and name not in result['crls_failed'], result
+        assert _latest(ca_id) == before
+
+
 def test_the_restore_message_names_the_authorities_left_without_a_crl():
     message = with_restore_warnings('Backup restored successfully.',
                                     {'invalidated': {'crls_failed': ['Issuing HSM CA']}})
