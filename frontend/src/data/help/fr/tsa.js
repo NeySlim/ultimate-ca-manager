@@ -73,7 +73,7 @@ La clé privée de la CA de signature est utilisée pour signer chaque jeton d'h
 
 - Utilisez une **sous-CA dédiée** pour l'horodatage plutôt que votre CA racine
 - La RFC 3161 §2.3 exige un signeur dont la seule EKU, critique, est **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), qu'un certificat de CA ne peut pas porter sans perdre ses autres usages. Les jetons signés par le certificat de la CA sont refusés par les vérificateurs stricts : \`openssl ts -verify\` échoue avec « unsuitable certificate purpose » et jarsigner avec « Certificate is not valid for timestamping ». L'onglet Paramètres avertit tant que le certificat de la CA signe : **générez-y un certificat de signature dédié** pour ces clients
-- Assurez-vous que le certificat de la CA a une **validité suffisante** : les horodatages doivent rester vérifiables pendant des années. Une CA hors de sa période de validité ne signe pas : \`/tsa\` répond 503 et le tableau de bord affiche le TSA hors ligne
+- Assurez-vous que le certificat de la CA a une **validité suffisante** : les horodatages doivent rester vérifiables pendant des années. Une CA hors de sa période de validité ne signe pas : \`/tsa\` répond 503
 - Activez **Exiger un certificat dédié** pour l'imposer au moment de la signature plutôt que de s'en remettre à la convention
 
 ### OID de politique

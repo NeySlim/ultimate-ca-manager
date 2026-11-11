@@ -175,7 +175,7 @@ export default {
 
     ],
     tips: [
-      'Use o widget de Status do Sistema no topo para verificar rapidamente a saúde dos serviços',
+      'Use a barra de status na parte inferior para verificar se o serviço responde',
       'Teste as configurações SMTP antes de depender de notificações por e-mail',
       'Personalize o modelo de e-mail com sua marca usando o editor HTML/Texto integrado',
       'Agende backups automáticos para ambientes de produção',
@@ -255,7 +255,8 @@ Limite a interface web e a API de gestão aos endereços IP e redes CIDR listado
 Exigir que todos os usuários ativem autenticação de dois fatores.
 
 ### Criptografia de Chaves Privadas
-Criptografe todas as chaves privadas armazenadas no banco de dados com AES-256, protegidas por um arquivo de chave mestra. A seção mostra o status da criptografia e os contadores de chaves **criptografadas / não criptografadas**. Duas variáveis de ambiente opcionais tornam a ausência de chave fatal na inicialização: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (criptografia de segredos de integração) e \`UCM_REQUIRE_KEY_ENCRYPTION\` (criptografia de chaves privadas).
+Criptografe todas as chaves privadas armazenadas no banco de dados com AES-128 (Fernet, com HMAC-SHA256), protegidas por um arquivo de chave mestra. A seção mostra o status da criptografia e os contadores de chaves **criptografadas / não criptografadas**. Duas variáveis de ambiente opcionais tornam a ausência de chave fatal na inicialização: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (criptografia de segredos de integração) e \`UCM_REQUIRE_KEY_ENCRYPTION\` (criptografia de chaves privadas).
+Uma nova instalação cria a chave mestra na sua primeira inicialização (em um contêiner, apenas quando \`/etc/ucm\` é um volume próprio); a seção Segurança das Configurações mostra o status da criptografia, e a Visão geral mostra um banner enquanto nenhuma chave estiver carregada.
 
 > 💡 Configurações sensíveis à segurança (sessão, bloqueio, HSTS, URL pública, política de senha) requerem a permissão **admin:settings**: os campos ficam bloqueados para operators.
 

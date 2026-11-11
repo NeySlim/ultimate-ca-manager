@@ -28,7 +28,7 @@ export default {
           { label: 'Caché', text: 'Caché de respuestas con limpieza diaria automática de las entradas expiradas' },
           { label: 'Total de consultas', text: 'Número de solicitudes OCSP respondidas desde que arrancó el servicio, y cuántas se sirvieron desde la caché' },
           { label: 'Caché HTTP', text: 'Las cachés HTTP pueden conservar una respuesta sin nonce hasta su nextUpdate, una hora como máximo (RFC 5019 §6.2: Expires, Last-Modified, ETag); una respuesta con nonce no se reutiliza' },
-          { label: 'Respondedor delegado', text: 'Firma las respuestas con un certificado OCSPSigning dedicado en lugar de la clave de la CA, asigne uno por CA desde el panel de detalles' },
+          { label: 'Respondedor delegado', text: 'Firma las respuestas con un certificado OCSPSigning dedicado en lugar de la clave de la CA, asigne uno por CA desde su panel en esta página' },
           { label: 'Auto-renovación del respondedor', text: 'Una tarea diaria reemite el certificado del respondedor delegado antes de que expire (mismo par de claves, renovado a la par) y lo vuelve a vincular, activado por defecto. El interruptor y su ventana (días antes de la expiración, 30 por defecto) están en Ajustes › Seguridad' },
         ]
       },
@@ -109,7 +109,7 @@ UCM almacena en caché las respuestas OCSP para mejorar el rendimiento. La cach�
 
 ### Respondedor OCSP delegado
 
-Por defecto, las respuestas OCSP se firman con la propia clave de la CA. Un **respondedor delegado** utiliza en su lugar un certificado dedicado con el EKU **OCSPSigning**: asigne uno por CA desde el panel de detalles de la CA (solo son elegibles los certificados que llevan el EKU OCSPSigning y una clave privada).
+Por defecto, las respuestas OCSP se firman con la propia clave de la CA. Un **respondedor delegado** utiliza en su lugar un certificado dedicado con el EKU **OCSPSigning**. Asigne uno por CA desde la sección **Respondedor delegado** de la CA seleccionada en la lista de esta página (solo son elegibles los certificados que llevan el EKU OCSPSigning y una clave privada).
 
 **Renovación automática**: una tarea diaria reemite el certificado del respondedor antes de que expire, mismo par de claves y extensiones, renovado a la par, y vuelve a vincular la configuración del respondedor de la CA al nuevo certificado. Los certificados de firma OCSP de corta duración (por ejemplo, una plantilla de 90 días) rotan sin acción manual. Activado por defecto; puede desactivarse y la ventana de renovación ajustarse en Ajustes › Seguridad.
 
@@ -127,7 +127,7 @@ http://su-servidor:8080/ca/{ca_refid}.cer   (formato DER)
 http://su-servidor:8080/ca/{ca_refid}.pem   (formato PEM)
 \`\`\`
 
-Active CA Issuers por CA en la sección **AIA CA Issuers** del panel de detalles. La URL se genera automáticamente usando el servidor de protocolo HTTP y el FQDN configurado.
+Active CA Issuers por CA en la sección **AIA CA Issuers** del panel de esa CA en esta página. La URL se genera automáticamente usando el servidor de protocolo HTTP y el FQDN configurado.
 
 > ⚠️ **Requisito previo**: Las URLs de protocolo (CDP, OCSP, AIA) requieren un **FQDN** válido o una **URL base de protocolo** configurada en Configuración → General. Si accede a UCM mediante \`localhost\`, activar estas funciones fallará, configure el FQDN primero.
 

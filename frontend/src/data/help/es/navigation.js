@@ -37,7 +37,7 @@ export default {
       {
         title: 'Notificaciones',
         items: [
-          { label: 'Campana', text: 'El contador es el número de elementos sin leer del panel: elementos críticos y aprobaciones de la cola del panel de control, y copias de seguridad programadas fallidas o sesiones revocadas del registro de auditoría' },
+          { label: 'Campana', text: 'El contador es el número de elementos sin leer del panel: elementos críticos y aprobaciones de la cola del resumen, y copias de seguridad programadas fallidas o sesiones revocadas del registro de auditoría' },
           { label: 'Orden', text: 'Primero van los elementos de la cola, luego los del registro de auditoría, del más reciente al más antiguo' },
           { label: 'Derechos', text: 'Solo ve los elementos de las fuentes que puede leer; una fuente sobre la que no tiene ningún derecho no muestra nada' },
           { label: 'Leído', text: 'Marque un elemento o todos como leídos; las marcas se guardan con sus preferencias, y un elemento resuelto sale del panel' },

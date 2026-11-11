@@ -175,7 +175,7 @@ export default {
 
     ],
     tips: [
-      'Verwenden Sie das Systemstatus-Widget oben, um den Dienstzustand schnell zu überprüfen',
+      'Prüfen Sie über die Statusleiste unten, ob der Dienst antwortet',
       'Testen Sie SMTP-Einstellungen, bevor Sie sich auf E-Mail-Benachrichtigungen verlassen',
       'Passen Sie das E-Mail-Template mit Ihrem Branding über den integrierten HTML/Text-Editor an',
       'Planen Sie automatische Sicherungen für Produktionsumgebungen',
@@ -255,7 +255,8 @@ Beschränkt die Weboberfläche und die Management-API auf aufgelistete IP-Adress
 Alle Benutzer zur Aktivierung der Zwei-Faktor-Authentifizierung verpflichten.
 
 ### Verschlüsselung privater Schlüssel
-Alle in der Datenbank gespeicherten privaten Schlüssel mit AES-256 verschlüsseln, geschützt durch eine Master-Key-Datei. Der Bereich zeigt den Verschlüsselungsstatus und die Zähler **verschlüsselt / unverschlüsselt**. Zwei Opt-in-Umgebungsvariablen machen fehlende Schlüssel beim Start fatal: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (Verschlüsselung von Integrationsgeheimnissen) und \`UCM_REQUIRE_KEY_ENCRYPTION\` (Verschlüsselung privater Schlüssel).
+Alle in der Datenbank gespeicherten privaten Schlüssel mit AES-128 (Fernet, mit HMAC-SHA256) verschlüsseln, geschützt durch eine Master-Key-Datei. Der Bereich zeigt den Verschlüsselungsstatus und die Zähler **verschlüsselt / unverschlüsselt**. Zwei Opt-in-Umgebungsvariablen machen fehlende Schlüssel beim Start fatal: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (Verschlüsselung von Integrationsgeheimnissen) und \`UCM_REQUIRE_KEY_ENCRYPTION\` (Verschlüsselung privater Schlüssel).
+Eine neue Installation erzeugt den Master-Key beim ersten Start (in einem Container nur, wenn \`/etc/ucm\` ein eigenes Volume ist); der Bereich Sicherheit der Einstellungen zeigt den Verschlüsselungsstatus, und die Übersicht zeigt ein Banner, solange kein Schlüssel geladen ist.
 
 > 💡 Sicherheitskritische Einstellungen (Sitzung, Sperrung, HSTS, öffentliche URL, Passwortrichtlinie) erfordern die Berechtigung **admin:settings**: die Felder sind für Operatoren gesperrt.
 

@@ -116,7 +116,7 @@ Um modelo pode adicionar extensões para as quais o UCM não tem configuração.
 - As extensões que o UCM define por si (key usage, EKU, nomes, identificadores de chave, ponteiros CRL e OCSP, políticas, name constraints, qcStatements...) são recusadas: use as suas próprias configurações
 - Um cliente que não reconhece uma extensão **crítica** deve rejeitar o certificado (RFC 5280, seção 4.2). Deixe-a não crítica, a menos que todas as partes confiantes a entendam
 
-Os painéis de detalhes de certificados e CAs listam essas extensões em **Other extensions**, com o seu OID, nome quando conhecido, criticidade e valor.
+O inspetor lista essas extensões, para certificados e CAs, em **Outras extensões** na aba Extensões, com o seu OID, nome quando conhecido, criticidade e valor.
 
 ## Duplicando Modelos
 

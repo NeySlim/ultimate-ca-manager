@@ -116,7 +116,7 @@ Ein Template kann Erweiterungen hinzufügen, für die UCM keine Einstellung hat.
 - Erweiterungen, die UCM selbst setzt (Key Usage, EKU, Namen, Schlüsselkennungen, CRL- und OCSP-Verweise, Richtlinien, Name Constraints, qcStatements...), werden abgelehnt: Verwenden Sie deren eigene Einstellungen
 - Ein Client, der eine **kritische** Erweiterung nicht erkennt, muss das Zertifikat ablehnen (RFC 5280, Abschnitt 4.2). Lassen Sie sie nicht kritisch, sofern nicht jede vertrauende Partei sie versteht
 
-Die Detailfelder von Zertifikaten und CAs listen solche Erweiterungen unter **Weitere Erweiterungen** auf, mit OID, Name sofern bekannt, Kritikalität und Wert.
+Der Inspektor listet solche Erweiterungen für Zertifikate und CAs unter **Weitere Erweiterungen** auf dem Reiter Erweiterungen auf, mit OID, Name sofern bekannt, Kritikalität und Wert.
 
 ## Templates duplizieren
 

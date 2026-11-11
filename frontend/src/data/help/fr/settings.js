@@ -175,7 +175,7 @@ export default {
 
     ],
     tips: [
-      'Utilisez le widget État du système en haut pour vérifier rapidement la santé des services',
+      'Utilisez la barre d\'état en bas pour vérifier que le service répond',
       'Testez les paramètres SMTP avant de vous fier aux notifications par e-mail',
       'Personnalisez le modèle d\'e-mail avec votre marque à l\'aide de l\'éditeur HTML/Texte intégré',
       'Programmez des sauvegardes automatiques pour les environnements de production',
@@ -255,7 +255,8 @@ Limiter l'interface web et l'API de gestion aux adresses IP et réseaux CIDR lis
 Exiger que tous les utilisateurs activent l'authentification à deux facteurs.
 
 ### Chiffrement des clés privées
-Chiffrez toutes les clés privées stockées en base de données avec AES-256, protégées par un fichier de clé maîtresse. La section affiche l'état du chiffrement et les compteurs de clés **chiffrées / non chiffrées**. Deux variables d'environnement opt-in rendent l'absence de clé fatale au démarrage : \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (chiffrement des secrets d'intégration) et \`UCM_REQUIRE_KEY_ENCRYPTION\` (chiffrement des clés privées).
+Chiffrez toutes les clés privées stockées en base de données avec AES-128 (Fernet, avec HMAC-SHA256), protégées par un fichier de clé maîtresse. La section affiche l'état du chiffrement et les compteurs de clés **chiffrées / non chiffrées**. Deux variables d'environnement opt-in rendent l'absence de clé fatale au démarrage : \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (chiffrement des secrets d'intégration) et \`UCM_REQUIRE_KEY_ENCRYPTION\` (chiffrement des clés privées).
+Une nouvelle installation crée la clé maîtresse à son premier démarrage (dans un conteneur, seulement si \`/etc/ucm\` est un volume à part) ; la section Sécurité des Paramètres affiche l'état du chiffrement, et la Vue d'ensemble affiche une bannière tant qu'aucune clé n'est chargée.
 
 > 💡 Les paramètres sensibles (session, verrouillage, HSTS, URL publique, politique de mot de passe) exigent la permission **admin:settings** : les champs sont verrouillés pour les opérateurs.
 

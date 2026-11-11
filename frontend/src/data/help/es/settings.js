@@ -175,7 +175,7 @@ export default {
 
     ],
     tips: [
-      'Use el widget de Estado del Sistema en la parte superior para verificar rápidamente la salud de los servicios',
+      'Use la barra de estado inferior para comprobar que el servicio responde',
       'Pruebe la configuración SMTP antes de depender de las notificaciones por correo electrónico',
       'Personalice la plantilla de correo electrónico con su marca usando el editor HTML/texto integrado',
       'Programe copias de seguridad automáticas para entornos de producción',
@@ -255,7 +255,8 @@ Limita la interfaz web y la API de gestión a las direcciones IP y redes CIDR in
 Requerir que todos los usuarios activen la autenticación de dos factores.
 
 ### Cifrado de claves privadas
-Cifre todas las claves privadas almacenadas en la base de datos con AES-256, protegidas por un archivo de clave maestra. La sección muestra el estado del cifrado y los contadores de claves **cifradas / sin cifrar**. Dos variables de entorno opcionales hacen que la ausencia de claves sea fatal en el arranque: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (cifrado de secretos de integración) y \`UCM_REQUIRE_KEY_ENCRYPTION\` (cifrado de claves privadas).
+Cifre todas las claves privadas almacenadas en la base de datos con AES-128 (Fernet, con HMAC-SHA256), protegidas por un archivo de clave maestra. La sección muestra el estado del cifrado y los contadores de claves **cifradas / sin cifrar**. Dos variables de entorno opcionales hacen que la ausencia de claves sea fatal en el arranque: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (cifrado de secretos de integración) y \`UCM_REQUIRE_KEY_ENCRYPTION\` (cifrado de claves privadas).
+Una instalación nueva crea la clave maestra en su primer arranque (en un contenedor, solo cuando \`/etc/ucm\` es un volumen propio); la sección Seguridad de Configuración muestra el estado del cifrado, y el Resumen muestra un aviso mientras no hay ninguna clave cargada.
 
 > 💡 Las configuraciones sensibles de seguridad (sesión, bloqueo, HSTS, URL pública, política de contraseñas) requieren el permiso **admin:settings**: los campos están bloqueados para los operadores.
 

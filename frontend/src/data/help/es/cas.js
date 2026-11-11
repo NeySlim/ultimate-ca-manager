@@ -301,7 +301,7 @@ Esta es la forma estándar de proteger una CA raíz entre ceremonias poco frecue
 La contraseña sigue la política de complejidad estándar de UCM: longitud mínima, mezcla de clases de caracteres, sin secuencias triviales. Las mismas reglas que para las contraseñas de usuario.
 
 ### Paso a paso. Poner sin conexión
-1. Abra el panel de detalles de la CA
+1. Abra la CA en el inspector
 2. Haga clic en **Poner sin conexión**
 3. Lea la explicación, haga clic en **Continuar**
 4. Elija un modo (*Protegida con contraseña* o *Exportada a archivo*)
@@ -309,7 +309,7 @@ La contraseña sigue la política de complejidad estándar de UCM: longitud mín
 6. Confirme. Para *Exportada a archivo*, la clave cifrada se descarga inmediatamente: guárdela de forma segura.
 
 ### Paso a paso. Restaurar
-1. Abra el panel de detalles de la CA sin conexión
+1. Abra la CA sin conexión en el inspector
 2. Haga clic en **Restaurar**
 3. Introduzca la contraseña
 4. Para *Exportada a archivo*: seleccione además el archivo de clave previamente descargado

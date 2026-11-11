@@ -301,7 +301,7 @@ Questo è il modo standard per proteggere una CA root tra cerimonie rare, manten
 La password segue la politica di complessità standard UCM: lunghezza minima, mix di classi di caratteri, niente sequenze banali. Le stesse regole delle password utente.
 
 ### Passo per passo. Porta offline
-1. Apri il pannello di dettaglio della CA
+1. Apri la CA nell'ispettore
 2. Clicca su **Porta offline**
 3. Leggi la spiegazione, clicca su **Continua**
 4. Scegli una modalità (*Protetta da password* o *Esportata su file*)
@@ -309,7 +309,7 @@ La password segue la politica di complessità standard UCM: lunghezza minima, mi
 6. Conferma. Per *Esportata su file*, la chiave cifrata viene scaricata immediatamente: conservala in sicurezza.
 
 ### Passo per passo. Ripristina
-1. Apri il pannello di dettaglio della CA offline
+1. Apri la CA offline nell'ispettore
 2. Clicca su **Ripristina**
 3. Inserisci la password
 4. Per *Esportata su file*: seleziona anche il file di chiave scaricato in precedenza

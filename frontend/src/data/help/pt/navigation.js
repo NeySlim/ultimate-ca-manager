@@ -37,7 +37,7 @@ export default {
       {
         title: 'Notificações',
         items: [
-          { label: 'Sino', text: 'O contador é o número de itens não lidos do painel: itens críticos e aprovações da fila do painel, e backups agendados falhados ou sessões revogadas do log de auditoria' },
+          { label: 'Sino', text: 'O contador é o número de itens não lidos do painel: itens críticos e aprovações da fila da visão geral, e backups agendados falhados ou sessões revogadas do log de auditoria' },
           { label: 'Ordem', text: 'Os itens da fila vêm primeiro, depois os do log de auditoria, do mais recente ao mais antigo' },
           { label: 'Direitos', text: 'Você só vê itens das fontes que pode ler; uma fonte sobre a qual você não tem direito não mostra nada' },
           { label: 'Lido', text: 'Marque um item ou todos como lidos; as marcas são salvas com as suas preferências, e um item resolvido sai do painel' },

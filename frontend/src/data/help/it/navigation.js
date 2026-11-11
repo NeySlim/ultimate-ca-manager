@@ -37,7 +37,7 @@ export default {
       {
         title: 'Notifiche',
         items: [
-          { label: 'Campanella', text: 'Il contatore è il numero di elementi non letti nel pannello: elementi critici e approvazioni dalla coda della dashboard, e backup pianificati falliti o sessioni revocate dal registro di audit' },
+          { label: 'Campanella', text: 'Il contatore è il numero di elementi non letti nel pannello: elementi critici e approvazioni dalla coda della panoramica, e backup pianificati falliti o sessioni revocate dal registro di audit' },
           { label: 'Ordine', text: 'Prima gli elementi della coda, poi quelli del registro di audit, dal più recente' },
           { label: 'Diritti', text: 'Vedi solo gli elementi delle fonti che puoi leggere; una fonte su cui non hai diritti non mostra nulla' },
           { label: 'Lette', text: 'Segna come letto un elemento o tutti; i segni sono salvati con le tue preferenze, e un elemento risolto esce dal pannello' },

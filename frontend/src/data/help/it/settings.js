@@ -175,7 +175,7 @@ export default {
 
     ],
     tips: [
-      'Usa il widget Stato del sistema in alto per controllare rapidamente lo stato dei servizi',
+      'Usa la barra di stato in basso per controllare che il servizio risponda',
       'Testa le impostazioni SMTP prima di fare affidamento sulle notifiche email',
       'Personalizza il template email con il tuo branding utilizzando l\'editor HTML/Testo integrato',
       'Pianifica backup automatici per gli ambienti di produzione',
@@ -255,7 +255,8 @@ Limita l'interfaccia web e l'API di gestione agli indirizzi IP e alle reti CIDR 
 Richiedi a tutti gli utenti di abilitare l'autenticazione a due fattori.
 
 ### Cifratura delle chiavi private
-Cifra tutte le chiavi private memorizzate nel database con AES-256, protette da un file di chiave master. La sezione mostra lo stato della cifratura e i contatori delle chiavi **cifrate / non cifrate**. Due variabili d'ambiente opt-in rendono fatale all'avvio l'assenza delle chiavi: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (cifratura dei segreti delle integrazioni) e \`UCM_REQUIRE_KEY_ENCRYPTION\` (cifratura delle chiavi private).
+Cifra tutte le chiavi private memorizzate nel database con AES-128 (Fernet, con HMAC-SHA256), protette da un file di chiave master. La sezione mostra lo stato della cifratura e i contatori delle chiavi **cifrate / non cifrate**. Due variabili d'ambiente opt-in rendono fatale all'avvio l'assenza delle chiavi: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (cifratura dei segreti delle integrazioni) e \`UCM_REQUIRE_KEY_ENCRYPTION\` (cifratura delle chiavi private).
+Una nuova installazione crea la chiave master al primo avvio (in un container, solo quando \`/etc/ucm\` è un volume a sé); la sezione Sicurezza delle Impostazioni mostra lo stato della cifratura, e la Panoramica mostra un banner finché nessuna chiave è caricata.
 
 > 💡 Le impostazioni sensibili alla sicurezza (sessione, blocco, HSTS, URL pubblico, politica password) richiedono il permesso **admin:settings**: i campi sono bloccati per gli operatori.
 

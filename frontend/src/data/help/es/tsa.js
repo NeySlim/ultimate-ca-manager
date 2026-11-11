@@ -72,8 +72,8 @@ Time Stamp Authority (TSA) implementa **RFC 3161** para proporcionar marcas de t
 La clave privada de la CA firmante se usa para firmar cada token de marca de tiempo. Mejores prácticas:
 
 - Use una **sub-CA dedicada** para marcas de tiempo en lugar de su CA raíz
-- El certificado de la CA debe incluir el uso extendido de clave **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8)
-- Asegúrese de que el certificado de la CA tenga **validez suficiente**: las marcas de tiempo deben permanecer verificables durante años
+- La RFC 3161 §2.3 exige un firmante cuyo único EKU, crítico, sea **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), algo que un certificado de CA no puede llevar sin perder sus otros usos. Los verificadores estrictos rechazan los tokens firmados por el certificado de la CA: \`openssl ts -verify\` falla con «unsuitable certificate purpose» y jarsigner con «Certificate is not valid for timestamping». La pestaña Configuración avisa mientras firma el certificado de la CA: **genere allí un certificado de firma dedicado** para estos clientes
+- Asegúrese de que el certificado de la CA tenga **validez suficiente**: las marcas de tiempo deben permanecer verificables durante años. Una CA fuera de su período de validez no firma: \`/tsa\` responde 503
 - Active **Requerir un certificado de marca de tiempo dedicado** para exigirlo en el momento de la firma en lugar de confiar en la convención
 
 ### OID de política

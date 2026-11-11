@@ -301,7 +301,7 @@ Esta é a maneira padrão de proteger uma CA raiz entre cerimônias raras, mante
 A senha segue a política de complexidade padrão do UCM: comprimento mínimo, mistura de classes de caracteres, sem sequências triviais. As mesmas regras das senhas de usuário.
 
 ### Passo a passo. Colocar offline
-1. Abra o painel de detalhes da CA
+1. Abra a CA no inspetor
 2. Clique em **Colocar offline**
 3. Leia a explicação, clique em **Continuar**
 4. Escolha um modo (*Protegida por senha* ou *Exportada para arquivo*)
@@ -309,7 +309,7 @@ A senha segue a política de complexidade padrão do UCM: comprimento mínimo, m
 6. Confirme. Para *Exportada para arquivo*, a chave criptografada é baixada imediatamente: armazene-a com segurança.
 
 ### Passo a passo. Restaurar
-1. Abra o painel de detalhes da CA offline
+1. Abra a CA offline no inspetor
 2. Clique em **Restaurar**
 3. Digite a senha
 4. Para *Exportada para arquivo*: também selecione o arquivo de chave baixado anteriormente
