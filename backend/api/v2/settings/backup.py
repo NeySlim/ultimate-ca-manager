@@ -5,6 +5,7 @@ Settings - Backup management + schedule + history routes
 from flask import request, send_file
 from auth.unified import require_auth
 from utils.ha import reject_in_ha
+from utils.sanitize import client_filename
 from utils.pagination import parse_request_pagination
 from utils.response import success_response, error_response, no_content_response
 from models import db, SystemConfig
@@ -175,10 +176,11 @@ def restore_backup():
     if file.filename == '':
         record_failure('system_restore', 'upload', 'Restore refused: no file selected')
         return error_response('No file selected', 400)
+    audited_name = client_filename(file.filename)  # the client's, never trusted as is
 
     password = request.form.get('password')
     if not password:
-        record_failure('system_restore', file.filename, 'Restore refused: password missing')
+        record_failure('system_restore', audited_name, 'Restore refused: password missing')
         return error_response('Backup password required', 400)
 
     # This route always replaces, as the docstring says. Accepting a `mode`
@@ -187,7 +189,7 @@ def restore_backup():
     # with nothing said either way.
     mode = (request.form.get('mode') or 'replace').strip().lower()
     if mode != 'replace':
-        record_failure('system_restore', file.filename, 'Restore refused: mode not allowed here')
+        record_failure('system_restore', audited_name, 'Restore refused: mode not allowed here')
         return error_response(
             "This endpoint always replaces the instance with the archive. Use "
             "POST /api/v2/system/restore with mode=merge to add an archive's "
@@ -202,13 +204,13 @@ def restore_backup():
             validate_upload_name(file, BACKUP_EXTENSIONS)
         except ValueError as exc:
             logger.warning(f"Backup upload validation error: {exc}")
-            record_failure('system_restore', file.filename, 'Restore refused: invalid file name')
+            record_failure('system_restore', audited_name, 'Restore refused: invalid file name')
             return error_response('Invalid backup file', 400)
         too_large = storage.restore_size_refusal(file.stream)
         if too_large:
             status, message = too_large
             logger.warning('Backup upload refused: %s', message)
-            record_failure('system_restore', file.filename, 'Restore refused: file too large')
+            record_failure('system_restore', audited_name, 'Restore refused: file too large')
             return error_response(message, status)
 
         # Between a backend switch being written and the service restarting
@@ -218,7 +220,7 @@ def restore_backup():
         # whether their restore survived.
         pending = pending_switch_refusal()
         if pending:
-            record_failure('system_restore', file.filename, 'Restore refused: a backend switch is pending')
+            record_failure('system_restore', audited_name, 'Restore refused: a backend switch is pending')
             return error_response(pending, 409)
 
         # A restore rewrites the whole database, which is the largest
@@ -230,12 +232,12 @@ def restore_backup():
                     backup_operation_lock(purpose='the restore'):
                 results = service.restore_backup_from_stream(file.stream, password)
         except MigrationBusyError as busy:
-            record_failure('system_restore', file.filename, 'Restore refused: a backend migration or another restore is running')
+            record_failure('system_restore', audited_name, 'Restore refused: a backend migration or another restore is running')
             return error_response(
                 f"{busy} A backend migration or another restore is still "
                 "running.", 409)
         except BackupBusyError as busy:
-            record_failure('system_restore', file.filename, 'Restore refused: a backup or another restore is running')
+            record_failure('system_restore', audited_name, 'Restore refused: a backup or another restore is running')
             return error_response(f"{busy} Retry once it has finished.", 409)
 
         # Recorded before the archive is judged empty or not, as the system
@@ -250,8 +252,8 @@ def restore_backup():
             record_restore(
                 action='system_restore',
                 resource_type='system',
-                resource_name=file.filename,
-                details=safe_restore_audit_details(file.filename, results),
+                resource_name=audited_name,
+                details=safe_restore_audit_details(audited_name, results),
                 success=True
             )
 
@@ -300,11 +302,11 @@ def restore_backup():
                 'Backup restored, but finishing the restore failed. '
                 'Restart the application before using it.', 500)
     except FipsRestricted:
-        record_failure('system_restore', file.filename, 'Restore refused: not allowed in FIPS mode')
+        record_failure('system_restore', audited_name, 'Restore refused: not allowed in FIPS mode')
         raise  # the app maps it to its problem type, message unchanged
     except BackupDecryptionError:
         logger.warning("Settings restore refused: the backup could not be decrypted")
-        record_failure('system_restore', file.filename, 'Restore refused: wrong password or invalid backup')
+        record_failure('system_restore', audited_name, 'Restore refused: wrong password or invalid backup')
         return error_response(
             'Wrong backup password, or the file is not a valid backup', 400)
     except (ContainerError, BackupSchemaError, RestoreValidationError) as e:
@@ -313,21 +315,21 @@ def restore_backup():
         # failed" on the other, so which endpoint an operator had reached
         # decided what they were told about their own file.
         logger.warning(f"Settings restore refused: {e}")
-        record_failure('system_restore', file.filename, 'Restore refused: the archive failed validation')
+        record_failure('system_restore', audited_name, 'Restore refused: the archive failed validation')
         return error_response(str(e), 400)
     except OverflowError as e:
         logger.warning(f"Settings restore refused: a value is out of range ({e})")
-        record_failure('system_restore', file.filename, 'Restore refused: a value is out of range')
+        record_failure('system_restore', audited_name, 'Restore refused: a value is out of range')
         return error_response(
             'The archive carries a numeric value this database cannot '
             'store; the file is not a valid backup', 400)
     except ValueError as e:
         logger.warning(f"Settings restore validation error: {e}")
-        record_failure('system_restore', file.filename, 'Restore refused: the archive could not be read')
+        record_failure('system_restore', audited_name, 'Restore refused: the archive could not be read')
         return error_response(f'The archive could not be read: {e}', 400)
     except Exception as e:
         logger.error(f"Settings restore failed: {e}")
-        record_failure('system_restore', file.filename, 'Restore failed: unexpected error')
+        record_failure('system_restore', audited_name, 'Restore failed: unexpected error')
         return error_response('Restore failed', 500)
 
 
