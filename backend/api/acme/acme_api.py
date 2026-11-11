@@ -1901,7 +1901,7 @@ def revoke_cert():
         try:
             from services.cert_service import CertificateService
             # RFC 8555 §7.6 revokes the certificate presented, not its related one
-            CertificateService.revoke_certificate(
+            cert = CertificateService.revoke_certificate(
                 cert_id=cert.id,
                 reason=REASON_BY_CODE.get(reason, 'unspecified'),
                 username='acme',
@@ -1922,11 +1922,16 @@ def revoke_cert():
             )
             return acme_error('serverInternal', 'Revocation failed', 500)
 
+        # Obtained by UCM from an ACME CA: only that CA's answer reaches relying parties
+        from services.acme.upstream_revocation import NOT_ACME, propagate_acme_revocation
+        cert_id = cert.id
+        upstream, _detail = propagate_acme_revocation(cert, REASON_BY_CODE.get(reason, 'unspecified'))
         _audit_acme(
             'acme.cert.revoke',
             resource_type='certificate',
-            resource_id=cert.id,
-            details=f"serial={serial_hex_lower} reason={reason} account={request_account_id or '(jwk)'}",
+            resource_id=cert_id,
+            details=(f"serial={serial_hex_lower} reason={reason} account={request_account_id or '(jwk)'}"
+                     + ('' if upstream == NOT_ACME else f' upstream={upstream}')),
         )
 
         # RFC 8555 §7.6: 200 without a body, hence no media type

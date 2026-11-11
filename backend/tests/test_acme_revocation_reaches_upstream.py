@@ -245,6 +245,17 @@ class TestAnApprovedRevocation:
         assert result['acme_local_only'] is True
         assert [e['serial'] for e in _owed(bench)] == [bench.old_serial]
 
+    def test_an_owed_revocation_says_what_the_single_route_says(self, app, auth_client, bench):
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        result = self._approve(app, bench)
+        assert result['acme_upstream_pending'] is True
+        assert 'sent again automatically' in result['acme_message']
+        assert 'HTTP 503' in result['acme_message']
+
+    def test_a_revocation_the_ca_confirmed_has_nothing_to_say(self, app, bench):
+        result = self._approve(app, bench)
+        assert result['acme_upstream_pending'] is False and result['acme_message'] is None
+
 
 def test_an_entry_without_fingerprint_is_matched_by_id_and_serial():
     order = AcmeClientOrder(replaced_certificates='[{"certificate_id": 7, "serial": "12"}]')
@@ -268,8 +279,8 @@ def test_a_replaced_certificate_is_matched_by_serial_and_fingerprint():
 
 
 def test_a_revocation_confirmed_by_the_ca_keeps_the_related_certificate_warning():
-    from api.v2.certificates.cert_lifecycle import _acme_answer
     from services.acme.upstream_revocation import REVOKED
+    from services.acme.upstream_revocation import revocation_answer as _acme_answer
     kept = ('Certificate revoked; its related certificate #41 was not revoked, '
             'revoke it separately')
     answer = _acme_answer(REVOKED, None, kept)
@@ -278,3 +289,56 @@ def test_a_revocation_confirmed_by_the_ca_keeps_the_related_certificate_warning(
     assert answer['meta'] == {'acme_ca_revoked': True}
     plain = _acme_answer(REVOKED, None, 'Certificate revoked successfully')
     assert plain['message'] == 'Certificate revoked in UCM and at the ACME CA'
+
+
+class TestWhatLeavesTheServer:
+    """A database error names its SQL and parameters: the log has them, the answer,
+    the debt kept on the order and its webhook say 'Database error' only."""
+
+    @staticmethod
+    def _db_error():
+        from sqlalchemy.exc import OperationalError
+        return OperationalError('SELECT secret_column FROM acme_client_orders', {'id': 7},
+                                Exception('database is locked'))
+
+    def test_an_account_lookup_failing_in_the_database(self, auth_client, bench, caplog):
+        with patch('services.acme.upstream_revocation._client_for', side_effect=self._db_error()), \
+                patch('services.acme_renewal_service.emit_acme_revocation_failed') as webhook:
+            body = _revoke(auth_client, bench, 'keyCompromise')
+        assert body['meta']['acme_upstream_pending'] is True
+        assert 'secret_column' not in json.dumps(body)
+        assert 'Database error' in body['meta']['acme_ca_error']
+        assert all('secret_column' not in e['error'] for e in _owed(bench))
+        assert 'secret_column' not in repr(webhook.call_args)
+        assert 'secret_column' in caplog.text
+
+    def test_an_order_lookup_failing_in_the_database(self, auth_client, bench, caplog):
+        with patch('services.acme.upstream_revocation._order_for', side_effect=self._db_error()):
+            body = _revoke(auth_client, bench, 'keyCompromise')
+        assert 'secret_column' not in json.dumps(body)
+        assert 'Database error' in body['message']
+        assert 'secret_column' in caplog.text
+
+
+class TestADebtThatCouldNotBeKept:
+    """'Sent again automatically' only once the debt is on the order; else the CA is unaware."""
+
+    @pytest.mark.parametrize('broken', [
+        {'update_owed': MagicMock(side_effect=RuntimeError('kept changing'))},
+        {'commit_or_rollback': MagicMock(side_effect=lambda *_a: db.session.rollback() or False)},
+    ], ids=['write', 'commit'])
+    def test_a_ca_failure_whose_debt_is_lost(self, auth_client, bench, broken):
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        with patch.multiple('services.acme_renewal_service', **broken):
+            body = _revoke(auth_client, bench, 'keyCompromise')
+        assert body['meta'] == {'acme_local_only': True}
+        assert 'CA not notified' in body['message']
+        assert 'sent again automatically' not in body['message']
+        assert _owed(bench) == []
+
+    def test_an_account_not_resolved_whose_debt_is_lost(self, auth_client, bench):
+        with patch('services.acme.upstream_revocation._client_for', side_effect=OSError('locked')), \
+                patch('services.acme_renewal_service.update_owed', side_effect=RuntimeError('x')):
+            body = _revoke(auth_client, bench, 'keyCompromise')
+        assert body['meta'] == {'acme_local_only': True}
+        assert 'CA not notified' in body['message']

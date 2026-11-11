@@ -195,6 +195,27 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
       'revocation.bulkRevokedLocallyOnly:3:#3, #9, #10'))
   })
 
+  it('warns of nothing for ACME certificates put on hold: ACME has no hold', async () => {
+    mocks.selection = [3]
+    mocks.bulkRevoke.mockResolvedValue({ data: { success: [3, 9], failed: [], acme_local_only: [3, 9] } })
+    const dialog = await openBulk('common.revoke')
+    fireEvent.change(within(dialog).getByRole('combobox'), { target: { value: 'certificateHold' } })
+    confirm(dialog)
+    await waitFor(() => expect(mocks.bulkRevoke).toHaveBeenCalledWith([3], 'certificateHold', expect.anything()))
+    expect(mocks.showWarning).not.toHaveBeenCalledWith(expect.stringMatching(/LocallyOnly/))
+  })
+
+  it('still warns of a Microsoft CA not told of a hold', async () => {
+    mocks.selection = [3]
+    mocks.bulkRevoke.mockResolvedValue({ data: {
+      success: [3, 10], failed: [], acme_local_only: [3], msca_local_only: [10] } })
+    const dialog = await openBulk('common.revoke')
+    fireEvent.change(within(dialog).getByRole('combobox'), { target: { value: 'certificateHold' } })
+    confirm(dialog)
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith(
+      'revocation.bulkRevokedLocallyOnly:1:#10'))
+  })
+
   it('warns of nothing when every issuing CA was told', async () => {
     mocks.selection = [3]
     mocks.bulkRevoke.mockResolvedValue({ data: { success: [3], failed: [] } })

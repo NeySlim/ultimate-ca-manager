@@ -10,6 +10,8 @@ import logging
 from datetime import timedelta
 from typing import Optional, Tuple
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from models import db
 from models.acme_models import AcmeClientOrder
 from utils.datetime_utils import utc_now
@@ -64,8 +66,10 @@ def _client_for(order):
 def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
     """Revoke ``cert`` at its ACME CA, the local revocation being done.
 
-    Returns ``(outcome, detail)``: one of the constants above, and the CA's
-    error for :data:`OWED`.
+    Returns ``(outcome, detail)``, ``outcome`` one of the constants above. ``detail`` is
+    None except for :data:`OWED`, where it is the CA's error (or why the account did not
+    resolve), and :data:`UNRESOLVED`, where it says why the CA was not told. Either may be
+    shown to the operator: a database error reads 'Database error', its text going to the log.
     """
     if getattr(cert, 'source', None) != 'acme_client' or not cert.crt:
         return NOT_ACME, None
@@ -80,10 +84,11 @@ def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
         db.session.rollback()
         logger.error("Upstream account of certificate %s not resolved: %s", cert.id, exc)
         if order_id is None:
-            return UNRESOLVED, str(exc) or exc.__class__.__name__
+            return UNRESOLVED, ('the ACME order it was issued under could not be determined: '
+                                f'{_error_text(exc)}')
         # The order is known: owed, so the scheduler sends it once the account resolves
-        error = f"upstream account not resolved: {str(exc) or exc.__class__.__name__}"
-        return OWED, _owe(cert, order_id, reason, error)
+        error = f"upstream account not resolved: {_error_text(exc)}"
+        return _owe(cert, order_id, reason, error)
     if order is None:
         return NO_ORDER, None
     if client is None:
@@ -98,11 +103,19 @@ def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
     try:
         error = send_upstream_revocation(client, pem, _sent_code(reason), label)
     except Exception as exc:
-        error = str(exc) or exc.__class__.__name__
+        logger.error("Upstream revocation of %s raised: %s", label, exc)
+        error = _error_text(exc)
     if error is None:
         return REVOKED, None
     logger.warning("Upstream revocation of %s failed: %s", label, error)
-    return OWED, _owe(cert, order.id, reason, error)
+    return _owe(cert, order.id, reason, error)
+
+
+def _error_text(exc) -> str:
+    """What may leave the server: a database error's text carries its SQL and parameters."""
+    if isinstance(exc, SQLAlchemyError):
+        return 'Database error'
+    return str(exc) or exc.__class__.__name__
 
 
 def _sent_code(reason):
@@ -111,7 +124,8 @@ def _sent_code(reason):
 
 
 def _owe(cert, order_id, reason, error):
-    """Keep the revocation of ``cert`` owed on the order; returns ``error``."""
+    """``(OWED, error)`` once the revocation of ``cert`` is kept owed on the order;
+    ``(UNRESOLVED, why)`` when it is not, nothing then sending it again."""
     from services.acme_renewal_service import _owe_upstream_revocation
     label = f"certificate {cert.id} (serial {cert.serial_number})"
     not_after = cert.valid_to or utc_now() + timedelta(days=90)
@@ -119,11 +133,14 @@ def _owe(cert, order_id, reason, error):
              'reason': _sent_code(reason), 'not_after': not_after.isoformat()}
     # Compare-and-set inside: safe without the order's lease, which a renewal may hold
     try:
-        _owe_upstream_revocation(db.session.get(AcmeClientOrder, order_id), entry, error)
+        kept = _owe_upstream_revocation(db.session.get(AcmeClientOrder, order_id), entry, error)
     except Exception as exc:
         db.session.rollback()
         logger.error("Revocation owed by the CA for %s not kept: %s", label, exc)
-    return error
+        kept = False
+    if kept:
+        return OWED, error
+    return UNRESOLVED, f'{error}; the retry could not be recorded'
 
 
 def local_only_message(outcome, detail) -> Optional[str]:
@@ -143,10 +160,28 @@ def local_only_message(outcome, detail) -> Optional[str]:
                 'issued under, so it does not know which CA account to revoke it with. '
                 'Revoke it with the CA directly.')
     if outcome == UNRESOLVED:
-        return ('Certificate revoked in UCM only: the ACME order it was issued under could not '
-                f'be determined ({detail}), so the CA was not notified. Revoke it with the CA '
-                'directly.')
+        return (f'Certificate revoked in UCM only, ACME CA not notified ({detail}). '
+                'Revoke it with the CA directly.')
     if outcome == HOLD:
         return ('Certificate put on hold in UCM only: ACME has no hold, so the CA was not '
                 'notified. Revoke it with a final reason to revoke it at the CA.')
     return None
+
+
+REVOKED_MESSAGE = 'Certificate revoked successfully'
+
+
+def revocation_answer(outcome, detail, message=REVOKED_MESSAGE) -> dict:
+    """The ``message`` and ``meta`` of a route that revoked a certificate the ACME CA was,
+    or was not, told of; ``message`` other than the default is appended, never replaced."""
+    extra = '' if message == REVOKED_MESSAGE else f' {message}'
+    if outcome == REVOKED:
+        text = 'Certificate revoked in UCM and at the ACME CA'
+        return {'message': f'{text}.{extra}' if extra else text, 'meta': {'acme_ca_revoked': True}}
+    warning = local_only_message(outcome, detail)
+    if warning is None:
+        return {'message': message}
+    meta = {'acme_local_only': True}
+    if outcome == OWED:
+        meta.update(acme_upstream_pending=True, acme_ca_error=str(detail)[:300])
+    return {'message': f'{warning}{extra}', 'meta': meta}

@@ -25,6 +25,7 @@ from services.cert_service import CertificateService
 from services.approval_gate import PairApprovalConflict, approval_payload, queue_revocation
 from services.cert.related_pair import mutual_partner
 from services.mtls_enrollment import remove_enrolment
+from services.acme.upstream_revocation import propagate_acme_revocation, revocation_answer
 from utils.pagination import parse_request_pagination
 from utils.days_remaining import days_remaining as compute_days_remaining
 from utils.export_password import validate_export_password
@@ -564,11 +565,12 @@ def revoke_user_certificate(cert_id):
             success=True
         )
 
+        # After the commit: a failed lookup rolls back, which must not re-enable the enrolment
+        acme_outcome, acme_detail = propagate_acme_revocation(cert, reason)
         owner = db.session.get(User, auth_cert.user_id)
         return success_response(
             data=_build_cert_response(auth_cert, cert, owner),
-            message='Certificate revoked successfully'
-        )
+            **revocation_answer(acme_outcome, acme_detail))
     except ValueError as e:
         logger.error(f'User certificate revocation validation error: {e}')
         return error_response('Invalid revocation request', 400)
@@ -593,9 +595,9 @@ def delete_user_certificate(cert_id):
 
     # Refused while a policy requires approval to revoke its certificate,
     # whoever holds it (administrators bypass)
-    removed, failure = remove_enrolment(auth_cert, username=user.username, actor=user)
+    removed, answer = remove_enrolment(auth_cert, username=user.username, actor=user)
     if not removed:
-        return failure
+        return answer
 
     AuditService.log_action(
         action='user_certificate_deleted',
@@ -606,4 +608,4 @@ def delete_user_certificate(cert_id):
         success=True
     )
 
-    return no_content_response()
+    return success_response(**answer) if answer else no_content_response()

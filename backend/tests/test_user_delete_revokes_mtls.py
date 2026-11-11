@@ -319,3 +319,14 @@ class TestACertificateLeftBehind:
         message = json.loads(answer.data)['message']
         assert f"certificate(s) #{probe['certificate_id']} could not" in message, message
         assert '[' not in message
+
+    def test_is_named_by_number_in_the_bulk_log(self, app, auth_client, probe, monkeypatch, caplog):
+        from services.cert_service import CertificateService
+        monkeypatch.setattr(CertificateService, 'delete_certificate', lambda *_a, **_k: False)
+        answer = auth_client.post('/api/v2/users/bulk/delete',
+                                  data=json.dumps({'ids': [probe['user_id']]}),
+                                  content_type='application/json')
+        assert answer.status_code == 200, answer.data[:300]
+        logged = [r.getMessage() for r in caplog.records if 'not deleted' in r.getMessage()]
+        assert logged and f"#{probe['certificate_id']}" in logged[0], logged
+        assert '[' not in logged[0]

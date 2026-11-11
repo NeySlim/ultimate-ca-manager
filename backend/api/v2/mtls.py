@@ -336,10 +336,10 @@ def delete_mtls_certificate(cert_id):
 
     serial = auth_cert.cert_serial
     cert_name = auth_cert.name or serial
-    removed, failure = remove_enrolment(
+    removed, answer = remove_enrolment(
         auth_cert, username=getattr(user, 'username', 'system'), actor=user)
     if not removed:
-        return failure
+        return answer
 
     AuditService.log_action(
         action='mtls_cert_delete',
@@ -350,7 +350,7 @@ def delete_mtls_certificate(cert_id):
         success=True,
     )
 
-    return success_response(message='Certificate deleted')
+    return success_response(**(answer or {'message': 'Certificate deleted'}))
 
 
 @bp.route('/certificates/<int:cert_id>/download', methods=['GET', 'POST'])

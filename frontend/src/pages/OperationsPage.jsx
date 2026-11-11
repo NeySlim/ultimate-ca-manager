@@ -598,7 +598,7 @@ export default function OperationsPage() {
       const pairedOutside = new Set((data?.success || [])
         .map(id => partnerBefore.get(id))
         .filter(other => other != null && !selectedIds.has(other) && !notRevoked.includes(other)))
-      const localOnly = bulkAction === 'revoke' ? bulkLocalOnlyRevocationWarning(data, t) : null
+      const localOnly = bulkAction === 'revoke' ? bulkLocalOnlyRevocationWarning(data, t, bulkRevokeReason) : null
       if (localOnly) showWarning(localOnly)
       if (notRevoked.length > 0) {
         showWarning(t('revocation.bulkRelatedRevokeFailed', { count: notRevoked.length, ids: notRevoked.map(id => `#${id}`).join(', ') }))
