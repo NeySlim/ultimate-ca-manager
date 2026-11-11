@@ -105,7 +105,7 @@ def test_opnsense_route_skips_a_second_row_with_the_same_ca_serial(app, auth_cli
                         lambda verify_ssl=True: _Session(ca_rows, cert_rows))
     try:
         r = auth_client.post('/api/v2/import/opnsense/import', json={
-            'host': '192.168.1.254', 'port': 443, 'api_key': 'k', 'api_secret': 's',
+            'host': '192.0.2.10', 'port': 443, 'api_key': 'k', 'api_secret': 's',
             'verify_ssl': False, 'items': []})
         assert r.status_code == 200, r.data
         body = json.loads(r.data)['data']
