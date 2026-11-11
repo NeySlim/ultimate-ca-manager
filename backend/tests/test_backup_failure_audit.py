@@ -249,7 +249,9 @@ def test_the_audited_file_name_is_its_base_name_on_one_line(auth_client, audit, 
 
 @pytest.mark.parametrize('raw, audited', [
     ('../../x\r\nforged', 'xforged'), ('C:\\dir\\b.ucmbkp', 'b.ucmbkp'),
-    ('a\x00\x1b\x7f\x85\u2028b', 'ab'), ('n' * 300, 'n' * 255), ('../\r\n', 'upload')])
+    ('a\x00\x1b\x7f\x85\u2028b', 'ab'), ('n' * 300, 'n' * 255), ('../\r\n', 'upload'),
+    ('evil\u202egpj.exe', 'evilgpj.exe'), ('a\u200bb\ufeff', 'ab'), ('  ', 'upload'),
+    (' . x.ucmbkp. ', 'x.ucmbkp')])
 def test_client_filename(raw, audited):
     from utils.sanitize import client_filename
     assert client_filename(raw) == audited

@@ -24,12 +24,12 @@ def sanitize_filename(name):
 
 def client_filename(name, limit=255):
     """A client-supplied file name as one audit line: its base name (either separator),
-    without control or line-separator characters, at most *limit* characters."""
+    without control, format (bidi marks) or line-separator characters, at most *limit* characters."""
     import unicodedata
     base = re.split(r'[/\\]', name or '')[-1]
-    base = ''.join(c for c in base if unicodedata.category(c) not in ('Cc', 'Zl', 'Zp'))
-    base = base[:limit]
-    return base if base.strip('.') else 'upload'
+    base = ''.join(c for c in base if unicodedata.category(c) not in ('Cc', 'Cf', 'Zl', 'Zp'))
+    base = base[:limit].strip('. ')
+    return base or 'upload'
 
 
 def ca_url_slug(name):
