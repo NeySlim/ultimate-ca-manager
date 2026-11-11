@@ -64,3 +64,33 @@ def test_signing_a_request_as_a_ca_announces_the_new_ca(auth_client, create_ca, 
     assert r.status_code == 200, r.get_json()
     sent = [e for e in _of(seen, 'ca.created') if e[1]['ca'].get('id') != ca['id']]
     assert len(sent) == 1
+
+
+def test_a_request_brought_by_the_smart_import_is_announced(auth_client, seen, monkeypatch):
+    import json
+    from models import db
+
+    order = []
+    real_emit, real_commit = event_bus.emit, db.session.commit
+
+    def emit(event_type, payload, ca_refid=None, meta=None):
+        if event_type == 'csr.submitted':
+            order.append('emit')
+        return real_emit(event_type, payload, ca_refid, meta)
+
+    def commit():
+        order.append('commit')
+        return real_commit()
+
+    monkeypatch.setattr(event_bus, 'emit', emit)
+    monkeypatch.setattr(db.session, 'commit', commit)
+    r = auth_client.post('/api/v2/import/execute', data=json.dumps({
+        'content': _pem('smart-evt.example.test'), 'options': {'import_csrs': True}}),
+        content_type='application/json')
+    assert r.status_code in (200, 201), r.data
+    ids = r.get_json()['data']['imported_ids']['csrs']
+    sent = _of(seen, 'csr.submitted')
+    assert len(ids) == 1 and [e[1]['csr']['id'] for e in sent] == ids
+    assert sent[0][2].get('actor') == 'admin'
+    # Announced after the import's commit, never before it
+    assert 'commit' in order[:order.index('emit')]

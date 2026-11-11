@@ -306,6 +306,9 @@ class SmartImporter:
                 self._import_csrs(objects, matching, result, desc_prefix, username)
 
             self._stage_audit()
+            # Snapshotted before the commit expires the rows, announced once it holds
+            submitted = [db.session.get(Certificate, cid).to_dict()
+                         for cid in result.imported_ids.get('csrs', [])]
             db.session.commit()
             from services.ca import cross_certs
             for target, row in self._attached_cross:
@@ -313,7 +316,7 @@ class SmartImporter:
 
             # ca.created for each imported CA, certificate.imported for each certificate
             try:
-                from services.webhook_service import emit_ca_created, emit_cert_imported
+                from services.webhook_service import emit_ca_created, emit_cert_imported, emit_csr_submitted
                 for ca_id in result.imported_ids.get('cas', []):
                     ca_obj = db.session.get(CA, ca_id)
                     if ca_obj:
@@ -322,6 +325,8 @@ class SmartImporter:
                     obj = db.session.get(Certificate, cid)
                     if obj:
                         emit_cert_imported(obj.to_dict(), ca_refid=obj.caref)
+                for csr in submitted:
+                    emit_csr_submitted(csr, actor=username)
             except Exception as e:
                 logger.error(f"Webhook emit (import) failed: {e}")
 
