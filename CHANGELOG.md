@@ -34,6 +34,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- WebSocket: without Redis, events born in the scheduler process (automatic renewal, scheduled CRL, expiry, discovery) now reach the browsers, relayed to the web workers through the database (migration 149).
 - Import: replacing a certificate through `POST /api/v2/certificates/import` with a new serial now fires the renewal event, so its deploy bindings, webhooks and HTTPS binding follow as after an internal renewal (discussion #440); re-importing the same serial stays silent.
 - Approvals: a certificate issued by approving a request now fires `certificate.issued` like the issue form, so webhooks, notifications and deploy bindings see it.
 - Microsoft AD CS: a certificate AD CS signs for a CSR or a renewal fires `certificate.issued` or `certificate.renewed`; approving a pending request from UCM writes it into the request's own row, where a later status check used to add a second row.
