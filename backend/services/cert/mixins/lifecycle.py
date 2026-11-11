@@ -516,8 +516,8 @@ class LifecycleMixin:
         notify_rejected(rejected_snapshots, reason='Certificate revoked', actor=username)
 
         if revoke_related:
-            from services.cert.related_pair import mutual_partner
-            partner = mutual_partner(db.session.get(Certificate, cert_id))
+            from services.cert.related_pair import revocation_partner
+            partner = revocation_partner(db.session.get(Certificate, cert_id))
             if partner is not None and revocable(partner, reason):
                 partner_id = partner.id
                 try:

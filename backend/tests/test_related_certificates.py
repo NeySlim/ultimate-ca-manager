@@ -350,6 +350,52 @@ def test_a_never_returns_to_a_b_that_is_no_longer_current(app, auth_client, cert
         assert (row.related_certificate_id, row.hybrid_role) == (None, None)
 
 
+def _names_a(row_id):
+    db.session.expire_all()
+    cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(Certificate, row_id).crt))
+    try:
+        cert.extensions.get_extension_for_oid(related_cert.RELATED_CERT_EXTENSION_OID)
+    except x509.ExtensionNotFound:
+        return False
+    return True
+
+
+def test_b_renewed_alone_names_no_a_that_was_archived(app, auth_client, cert_a):
+    """RFC 9763 makes the extension optional: a replaced A is not hashed into the renewed B."""
+    row_id = cert_a[0]
+    b = _sign_b(app, auth_client, row_id)
+    with app.app_context():
+        assert _names_a(b)
+        db.session.get(Certificate, row_id).archived = True
+        db.session.commit()
+    r = auth_client.post(f'/api/v2/certificates/{b}/renew', json={})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert not _names_a(b)
+        assert db.session.get(Certificate, b).related_certificate_id is None
+
+
+@pytest.mark.parametrize('how', ['single', 'bulk'])
+def test_revoking_b_leaves_a_superseded_a_alone(app, auth_client, cert_a, how):
+    """An archived member is a replaced certificate: a pair revocation does not follow it."""
+    row_id = cert_a[0]
+    b = _sign_b(app, auth_client, row_id)
+    with app.app_context():
+        db.session.get(Certificate, row_id).archived = True
+        db.session.commit()
+    if how == 'bulk':
+        r = auth_client.post('/api/v2/certificates/bulk/revoke', json={'ids': [b], 'reason': 'superseded'})
+        assert r.status_code == 200, r.data
+        assert json.loads(r.data)['data']['failed'] == [], r.data
+    else:
+        r = auth_client.post(f'/api/v2/certificates/{b}/revoke', json={'reason': 'superseded'})
+        assert r.status_code == 200, r.data
+        assert 'related_revoked' not in json.loads(r.data)['data'], r.data
+    with app.app_context():
+        assert db.session.get(Certificate, b).revoked
+        assert not db.session.get(Certificate, row_id).revoked
+
+
 def test_revoking_a_alone_moves_no_link(app, auth_client, cert_a):
     row_id = cert_a[0]
     b1, b2 = _sign_b(app, auth_client, row_id), _sign_b(app, auth_client, row_id)

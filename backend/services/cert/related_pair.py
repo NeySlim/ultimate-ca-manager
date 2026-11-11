@@ -311,6 +311,12 @@ def mutual_partner(row):
     return partner
 
 
+def revocation_partner(row):
+    """The mutual partner a revocation follows: a superseded (archived) one is left alone."""
+    partner = mutual_partner(row)
+    return None if partner is not None and partner.archived else partner
+
+
 def anchor_first(row, partner):
     """``(A, B)``: B is the one whose certificate names the other, else the one carrying the link."""
     cert, other = row_certificate(row), row_certificate(partner)
