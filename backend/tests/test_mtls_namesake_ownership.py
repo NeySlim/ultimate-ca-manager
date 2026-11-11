@@ -141,3 +141,40 @@ class TestTheAccountsOwnCertificatesStillWork:
                 db.session.delete(enrolment)
             db.session.delete(db.session.get(Certificate, mine['id']))
             db.session.commit()
+
+
+class TestAnUndatedRecordProvesNothing:
+    @pytest.mark.parametrize('undated', ['certificate', 'account'])
+    def test_it_is_not_made_for_the_account(self, app, undated):
+        from datetime import datetime
+        from types import SimpleNamespace
+        from services.mtls_enrollment import made_for_account
+        when = datetime(2026, 1, 1)
+        certificate = SimpleNamespace(created_by=NAME, created_at=None if undated == 'certificate' else when)
+        account = SimpleNamespace(username=NAME, created_at=None if undated == 'account' else when)
+        assert made_for_account(certificate, account) is False
+
+    def test_a_dated_record_of_the_account_is(self, app):
+        from datetime import datetime
+        from types import SimpleNamespace
+        from services.mtls_enrollment import made_for_account
+        account = SimpleNamespace(username=NAME, created_at=datetime(2026, 1, 1))
+        assert made_for_account(SimpleNamespace(created_by=NAME, created_at=datetime(2026, 1, 1)), account)
+
+    def test_an_undated_certificate_is_neither_offered_nor_assignable(
+            self, app, left_behind, create_cert):
+        undated = create_cert(cn='namesake-undated.example')
+        _own(app, undated['id'], NAME)
+        with app.app_context():
+            db.session.get(Certificate, undated['id']).created_at = None
+            db.session.commit()
+        client = left_behind['client']
+        offered = [c['id'] for c in json.loads(
+            client.get('/api/v2/mtls/available-certificates').data)['data']]
+        assert undated['id'] not in offered
+        answer = client.post('/api/v2/mtls/assign', data=json.dumps({'cert_id': undated['id']}),
+                             content_type='application/json')
+        assert answer.status_code == 403, answer.data[:300]
+        with app.app_context():
+            db.session.delete(db.session.get(Certificate, undated['id']))
+            db.session.commit()

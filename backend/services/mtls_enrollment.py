@@ -463,12 +463,13 @@ def certificate_row_for(auth_cert) -> Optional[Certificate]:
 
 def made_for_account(certificate, user) -> bool:
     """Whether ``created_by`` names this very account: a record older than the
-    account was made for an earlier holder of the name, never its own."""
+    account was made for an earlier holder of the name, and an undated one
+    proves nothing; an administrator still assigns either."""
     from utils.datetime_utils import to_naive_utc
     if certificate.created_by != user.username:
         return False
     made, opened = to_naive_utc(certificate.created_at), to_naive_utc(user.created_at)
-    return made is None or opened is None or made >= opened
+    return made is not None and opened is not None and made >= opened
 
 
 # Withdrawing a certificate from service, RFC 5280 §5.3.1.
