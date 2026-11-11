@@ -86,6 +86,7 @@ configs:
         log stdout format raw local0
       defaults
         mode http
+        option forwardfor
         timeout connect 5s
         timeout client 60s
         timeout server 60s

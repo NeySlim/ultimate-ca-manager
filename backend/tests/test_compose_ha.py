@@ -31,3 +31,8 @@ def test_nodes_share_secrets_and_database_pos():
 def test_load_balancer_has_cookie_affinity_and_ready_probe_pos():
     cfg = DOC['configs']['haproxy_cfg']['content']
     assert 'cookie UCM_NODE insert' in cfg and '/health/ready' in cfg
+
+
+def test_load_balancer_forwards_the_client_address_pos():
+    cfg = DOC['configs']['haproxy_cfg']['content']
+    assert re.search(r'^\s*option forwardfor\b', cfg, re.M)
