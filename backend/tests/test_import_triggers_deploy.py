@@ -64,8 +64,6 @@ class TestImportReplacementDeploys:
         assert _import(auth_client, IMPORT, new).status_code == 500
         monkeypatch.undo()
         assert _deliveries(app, cert_id) == []
-        monkeypatch.undo()
-        assert _deliveries(app, cert_id) == []
 
     def test_row_without_readable_certificate_is_not_a_renewal(self, app, auth_client, create_ca):
         ca_cert, ca_key, key, old, cert_id = _setup(app, auth_client, create_ca, 'r7-keyonly.example.com')

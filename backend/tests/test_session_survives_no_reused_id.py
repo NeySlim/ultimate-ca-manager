@@ -24,7 +24,7 @@ def _login(app, username):
 
 
 def _delete_last(app, auth_client, user_id):
-    """Delete the account, then make sure it was the last row so its id comes back."""
+    """Delete the account through the API and check its row is gone."""
     assert auth_client.delete(f'/api/v2/users/{user_id}').status_code == 200
     with app.app_context():
         assert db.session.get(User, user_id) is None
