@@ -3,6 +3,7 @@
 They were optional sections no route asked for, so a restore lost the renewal
 schedule, the pending approvals and the recovery requests without a word.
 """
+import base64
 from datetime import timedelta
 
 import pytest
@@ -552,3 +553,43 @@ def test_an_unreadable_pending_key_reaches_the_backup_result(target):
     service.create_backup(PASSWORD)
 
     assert any(f'order {order.id}' in w for w in service.last_export_warnings)
+
+
+# -- a certificate a renewal moved off --------------------------------------
+
+def test_a_replaced_certificate_restored_elsewhere_is_still_revoked_at_its_ca(target):
+    """The order names it by serial and fingerprint, which a new row number does not change."""
+    from unittest.mock import MagicMock, patch
+    from models import Certificate
+    from services.acme import upstream_revocation
+
+    _user('orders-admin')
+    issuer = _authority_row('orders-replaced-ca')
+    old = _certificate_row('orders-replaced-old', issuer)
+    current = _certificate_row('orders-replaced-new', issuer)
+    old.source = current.source = 'acme_client'
+    order = _order(order_url='https://ca.example.test/order/r', status='issued',
+                   certificate_id=current.id)
+    order.add_replaced(old)
+    blob = _snapshot()
+
+    db.session.delete(order)
+    db.session.flush()
+    db.session.delete(old)
+    db.session.delete(current)
+    db.session.flush()
+    # Rows of this installation hold the archived numbers when the restore writes
+    for refid in ('orders-replaced-here-1', 'orders-replaced-here-2'):
+        _certificate_row(refid, issuer)
+    db.session.commit()
+
+    _restore(blob, mode='merge')
+
+    restored = Certificate.query.filter_by(refid='orders-replaced-old').one()
+    assert restored.id != old.id
+    with patch.object(upstream_revocation, '_client_for', return_value=MagicMock()), \
+            patch('services.acme_renewal_service.send_upstream_revocation',
+                  return_value=None) as sent:
+        outcome, _detail = upstream_revocation.propagate_acme_revocation(restored, 'keyCompromise')
+    assert outcome == upstream_revocation.REVOKED
+    assert sent.call_args.args[1] == base64.b64decode(restored.crt)

@@ -24,6 +24,7 @@ import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, extractCN, cn , downloadBlob} from '../lib/utils'
 import { soleImported } from '../lib/importResult'
+import { bulkLocalOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../lib/caSelection'
 import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { useOpenEntity } from '../hooks/useOpenEntity'
@@ -597,6 +598,8 @@ export default function OperationsPage() {
       const pairedOutside = new Set((data?.success || [])
         .map(id => partnerBefore.get(id))
         .filter(other => other != null && !selectedIds.has(other) && !notRevoked.includes(other)))
+      const localOnly = bulkAction === 'revoke' ? bulkLocalOnlyRevocationWarning(data, t) : null
+      if (localOnly) showWarning(localOnly)
       if (notRevoked.length > 0) {
         showWarning(t('revocation.bulkRelatedRevokeFailed', { count: notRevoked.length, ids: notRevoked.map(id => `#${id}`).join(', ') }))
       }

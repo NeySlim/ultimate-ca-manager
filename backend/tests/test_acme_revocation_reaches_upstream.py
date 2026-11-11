@@ -96,6 +96,27 @@ class TestTheSingleRoute:
         bench.client.revoke_certificate.assert_not_called()
         assert _owed(bench) == []
 
+    def test_an_account_not_resolved_for_now_is_owed_not_said_gone(self, auth_client, bench):
+        with patch('services.acme.upstream_revocation._client_for',
+                   side_effect=OSError('database is locked')):
+            body = _revoke(auth_client, bench, 'keyCompromise')
+        assert body['meta']['acme_local_only'] is True
+        assert body['meta']['acme_upstream_pending'] is True
+        assert 'no longer exists' not in body['message']
+        owed = _owed(bench)
+        assert [e['serial'] for e in owed] == [bench.old_serial]
+        assert owed[0]['certificate'] == bench.old_pem.decode() and owed[0]['reason'] == 1
+        bench.client.revoke_certificate.assert_not_called()
+
+    def test_an_order_not_found_for_now_says_so(self, auth_client, bench):
+        with patch('services.acme.upstream_revocation._order_for',
+                   side_effect=OSError('database is locked')):
+            body = _revoke(auth_client, bench, 'keyCompromise')
+        assert body['meta']['acme_local_only'] is True
+        assert 'no longer exists' not in body['message']
+        assert 'could not be determined' in body['message']
+        assert _owed(bench) == []
+
     def test_a_certificate_whose_order_was_deleted_says_the_account_is_unknown(
             self, auth_client, bench):
         from services.acme.order_housekeeping import delete_order
@@ -225,15 +246,25 @@ class TestAnApprovedRevocation:
         assert [e['serial'] for e in _owed(bench)] == [bench.old_serial]
 
 
-def test_a_replaced_certificate_is_matched_by_id_and_serial():
-    order = AcmeClientOrder()
-    order.add_replaced(SimpleNamespace(id=7, serial_number='12'))
-    order.add_replaced(SimpleNamespace(id=7, serial_number='12'))
+def test_an_entry_without_fingerprint_is_matched_by_id_and_serial():
+    order = AcmeClientOrder(replaced_certificates='[{"certificate_id": 7, "serial": "12"}]')
     assert order.names_replaced(SimpleNamespace(id=7, serial_number='12'))
     # An id the database handed out again names another certificate
     assert not order.names_replaced(SimpleNamespace(id=7, serial_number='13'))
     assert not order.names_replaced(SimpleNamespace(id=17, serial_number='12'))
-    assert json.loads(order.replaced_certificates) == [{'certificate_id': 7, 'serial': '12'}]
+
+
+def test_a_replaced_certificate_is_matched_by_serial_and_fingerprint():
+    order = AcmeClientOrder()
+    old = SimpleNamespace(id=7, serial_number='12', thumbprint_sha256='AB:CD')
+    order.add_replaced(old)
+    order.add_replaced(old)
+    assert json.loads(order.replaced_certificates) == [
+        {'certificate_id': 7, 'serial': '12', 'fingerprint': 'abcd'}]
+    # Renumbered by a restore elsewhere: still the same certificate
+    assert order.names_replaced(SimpleNamespace(id=70, serial_number='12', thumbprint_sha256='AB:CD'))
+    assert not order.names_replaced(SimpleNamespace(id=7, serial_number='12', thumbprint_sha256='EF'))
+    assert not order.names_replaced(SimpleNamespace(id=7, serial_number='13', thumbprint_sha256='AB:CD'))
 
 
 def test_a_revocation_confirmed_by_the_ca_keeps_the_related_certificate_warning():

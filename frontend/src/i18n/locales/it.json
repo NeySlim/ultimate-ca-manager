@@ -3998,7 +3998,8 @@
     "revokeRelatedBulk": "Revoca anche i certificati collegati",
     "revokeRelatedBulkHint": "I membri selezionati di una coppia ibrida trascinano con sé l'altro membro. Deseleziona per mantenere validi gli altri membri.",
     "bulkRelatedRevoked": "{{count}} certificati collegati revocati con la selezione",
-    "bulkRelatedRevokeFailed": "Non è stato possibile revocare {{count}} certificati collegati con la selezione ({{ids}}): revocali separatamente"
+    "bulkRelatedRevokeFailed": "Non è stato possibile revocare {{count}} certificati collegati con la selezione ({{ids}}): revocali separatamente",
+    "bulkRevokedLocallyOnly": "{{count}} certificates revoked in UCM only ({{ids}}): the issuing CA did not confirm. A revocation an ACME CA did not confirm is sent again automatically; otherwise revoke them with the CA directly."
   },
   "details": {
     "pemCertificate": "Certificato PEM",

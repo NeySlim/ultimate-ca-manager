@@ -228,3 +228,94 @@ class TestAllOrNothingAcrossEnrolments:
         assert self._revoked(app, first) and not self._revoked(app, second)
         with app.app_context():
             assert db.session.get(User, first['user_id']) is not None
+
+
+class TestAFailureAfterTheRevocations:
+    """Revoked certificates stay revoked when the deletion fails: the answer names them."""
+
+    @staticmethod
+    def _purge_fails(monkeypatch):
+        import api.v2.users.crud as crud
+
+        def _broken(_user_id):
+            raise RuntimeError('database is locked')
+        monkeypatch.setattr(crud, '_purge_user_dependencies', _broken)
+
+    def test_unit_delete_names_the_revoked_certificate(self, app, auth_client, probe, monkeypatch):
+        self._purge_fails(monkeypatch)
+        answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+        assert answer.status_code == 500, answer.data[:300]
+        message = json.loads(answer.data)['message']
+        assert f"#{probe['certificate_id']}" in message, message
+        with app.app_context():
+            assert db.session.get(User, probe['user_id']) is not None
+            assert db.session.get(Certificate, probe['certificate_id']).revoked
+
+    def test_bulk_names_the_revoked_certificate(self, app, auth_client, probe, monkeypatch):
+        self._purge_fails(monkeypatch)
+        answer = auth_client.post('/api/v2/users/bulk/delete',
+                                  data=json.dumps({'ids': [probe['user_id']]}),
+                                  content_type='application/json')
+        assert answer.status_code == 200, answer.data[:300]
+        failed = json.loads(answer.data)['data']['failed']
+        assert [f['id'] for f in failed] == [probe['user_id']]
+        assert f"#{probe['certificate_id']}" in failed[0]['error'], failed
+
+    def test_bulk_commit_failure_names_the_revoked_certificate(
+            self, app, auth_client, probe, monkeypatch):
+        import api.v2.users.crud as crud
+
+        def _refused(_logger, _context):
+            db.session.rollback()
+            return False, None
+        monkeypatch.setattr(crud, 'safe_commit', _refused)
+        answer = auth_client.post('/api/v2/users/bulk/delete',
+                                  data=json.dumps({'ids': [probe['user_id']]}),
+                                  content_type='application/json')
+        failed = json.loads(answer.data)['data']['failed']
+        assert f"#{probe['certificate_id']}" in failed[0]['error'], failed
+
+
+class TestTwoEnrolmentsOfOneCertificate:
+    def test_revoke_it_once(self, app, auth_client, probe, monkeypatch):
+        from services.cert_service import CertificateService
+        with app.app_context():
+            first = db.session.get(AuthCertificate, probe['enrolment_id'])
+            certificate = db.session.get(Certificate, probe['certificate_id'])
+            # Another spelling of the issuer: the unique index lets it in, the PEM binds it
+            twin = AuthCertificate(user_id=probe['user_id'], cert_serial=first.cert_serial,
+                                   cert_subject=first.cert_subject, cert_issuer='CN=twin spelling',
+                                   cert_pem=base64.b64decode(certificate.crt), cert_fingerprint='',
+                                   name='twin', enabled=True)
+            db.session.add(twin)
+            db.session.commit()
+            twin_id = twin.id
+        calls = []
+        original = CertificateService.revoke_certificate
+
+        def _counted(**kwargs):
+            calls.append(kwargs['cert_id'])
+            return original(**kwargs)
+        monkeypatch.setattr(CertificateService, 'revoke_certificate', _counted)
+        try:
+            answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+            assert answer.status_code == 200, answer.data[:300]
+            assert calls == [probe['certificate_id']]
+            assert b'could not be deleted' not in answer.data
+        finally:
+            with app.app_context():
+                row = db.session.get(AuthCertificate, twin_id)
+                if row is not None:
+                    db.session.delete(row)
+                    db.session.commit()
+
+
+class TestACertificateLeftBehind:
+    def test_is_named_by_number(self, app, auth_client, probe, monkeypatch):
+        from services.cert_service import CertificateService
+        monkeypatch.setattr(CertificateService, 'delete_certificate', lambda *_a, **_k: False)
+        answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+        assert answer.status_code == 200, answer.data[:300]
+        message = json.loads(answer.data)['message']
+        assert f"certificate(s) #{probe['certificate_id']} could not" in message, message
+        assert '[' not in message

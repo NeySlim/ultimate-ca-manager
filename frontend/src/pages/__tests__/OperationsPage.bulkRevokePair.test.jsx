@@ -185,6 +185,25 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
     await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('revocation.bulkRelatedRevoked:1'))
   })
 
+  it('warns once for the certificates whose issuing CA was not told', async () => {
+    mocks.selection = [3]
+    mocks.bulkRevoke.mockResolvedValue({ data: {
+      success: [3, 9, 10], failed: [], acme_local_only: [3, 9], msca_local_only: [10, 3] } })
+    const dialog = await openBulk('common.revoke')
+    confirm(dialog)
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith(
+      'revocation.bulkRevokedLocallyOnly:3:#3, #9, #10'))
+  })
+
+  it('warns of nothing when every issuing CA was told', async () => {
+    mocks.selection = [3]
+    mocks.bulkRevoke.mockResolvedValue({ data: { success: [3], failed: [] } })
+    const dialog = await openBulk('common.revoke')
+    confirm(dialog)
+    await waitFor(() => expect(mocks.bulkRevoke).toHaveBeenCalled())
+    expect(mocks.showWarning).not.toHaveBeenCalledWith(expect.stringMatching(/LocallyOnly/))
+  })
+
   it('reports the other members renewed outside the selection', async () => {
     mocks.bulkRenew.mockResolvedValue({ data: { success: [1], failed: [] } })
     const dialog = await openBulk('common.renew')

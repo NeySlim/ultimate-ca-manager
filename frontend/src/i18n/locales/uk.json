@@ -4052,7 +4052,8 @@
     "relatedRevokeFailed": "Сертифікат відкликано, але пов'язаний сертифікат #{{id}} відкликати не вдалося: відкличте його окремо.",
     "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
     "bulkRelatedRevoked": "Разом із вибраними відкликано пов'язаних сертифікатів: {{count}}",
-    "bulkRelatedRevokeFailed": "Разом із вибраними не вдалося відкликати пов'язані сертифікати: {{count}} ({{ids}}): відкличте їх окремо"
+    "bulkRelatedRevokeFailed": "Разом із вибраними не вдалося відкликати пов'язані сертифікати: {{count}} ({{ids}}): відкличте їх окремо",
+    "bulkRevokedLocallyOnly": "{{count}} certificates revoked in UCM only ({{ids}}): the issuing CA did not confirm. A revocation an ACME CA did not confirm is sent again automatically; otherwise revoke them with the CA directly."
   },
   "details": {
     "pemCertificate": "PEM Сертифікат",
