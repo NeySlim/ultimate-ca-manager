@@ -547,8 +547,6 @@ def bulk_delete_users():
             continue
 
         unrevoked = _withdraw_enrolments(user_id, g.current_user)
-        if unrevoked:
-            results['unrevoked'].append({'user_id': user_id, 'certificates': unrevoked})
         try:
             user = db.session.get(User, user_id)
             sessions_deleted = _purge_user_dependencies(user_id)
@@ -564,6 +562,9 @@ def bulk_delete_users():
             continue
         total_sessions_invalidated += sessions_deleted
         results['success'].append(user_id)
+        # Named only once the user is gone: a failed deletion reports nothing as deleted
+        if unrevoked:
+            results['unrevoked'].append({'user_id': user_id, 'certificates': unrevoked})
 
     details = f'Bulk deleted {len(results["success"])} users ({total_sessions_invalidated} sessions invalidated)'
     left_valid = [c for entry in results['unrevoked'] for c in entry['certificates']]

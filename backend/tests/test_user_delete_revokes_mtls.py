@@ -197,6 +197,33 @@ class TestAFailureLeavesAConsistentState:
         _assert_published_as_revoked(app, probe)
 
 
+    def test_bulk_does_not_name_a_user_it_failed_to_delete(
+            self, app, auth_client, create_user, probe, monkeypatch):
+        from api.v2.users import crud
+        plain = create_user(username='mtls_del_bulk_survivor', role='viewer')
+        real_purge = crud._purge_user_dependencies
+
+        def _broken_for_probe(user_id):
+            if user_id == probe['user_id']:
+                raise RuntimeError('database went away')
+            return real_purge(user_id)
+        monkeypatch.setattr(crud, '_purge_user_dependencies', _broken_for_probe)
+        _refuse_revocation(monkeypatch)
+        answer = auth_client.post(
+            '/api/v2/users/bulk/delete',
+            data=json.dumps({'ids': [probe['user_id'], plain['id']]}),
+            content_type='application/json')
+        assert answer.status_code == 200, answer.data[:300]
+        body = json.loads(answer.data)
+        assert body['data']['success'] == [plain['id']]
+        assert [f['id'] for f in body['data']['failed']] == [probe['user_id']]
+        assert body['data']['unrevoked'] == []
+        assert f"#{probe['certificate_id']}" not in body['message']
+        assert f"#{probe['certificate_id']}" not in _last_audit(app, 'users_bulk_deleted')
+        with app.app_context():
+            assert db.session.get(User, probe['user_id']) is not None
+
+
 class TestNothingToRevoke:
     def test_a_user_without_enrolment(self, app, auth_client, create_user, monkeypatch):
         from services.cert_service import CertificateService
