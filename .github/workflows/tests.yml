@@ -329,6 +329,7 @@ jobs:
             tests/test_backup*.py \
             tests/test_restore*.py \
             tests/test_mtls*.py \
+            tests/test_user_delete_revokes_mtls.py \
             tests/test_wstep*.py \
             tests/test_xcep*.py \
             tests/test_certificates*.py \
