@@ -66,6 +66,34 @@ def test_a_port_set_by_the_environment_is_not_restarted_for(app, auth_client, st
     assert restarts == []
 
 
+def test_a_port_pinned_by_the_environment_says_the_saved_one_is_not_used(
+        app, auth_client, stored_port, restarts, monkeypatch):
+    """DEB/RPM write HTTP_PROTOCOL_PORT into the service environment: a new value never binds."""
+    monkeypatch.setenv('HTTP_PROTOCOL_PORT', '8080')
+    r = _save(auth_client, 8084)
+    assert r.status_code == 200, r.get_json()
+    data = r.get_json()['data']
+    assert restarts == [] and data['needs_restart'] is False
+    assert 'HTTP_PROTOCOL_PORT' in (data['restart_message'] or '')
+
+
+def test_resaving_the_stored_port_under_a_pinned_environment_says_nothing(
+        app, auth_client, stored_port, restarts, monkeypatch):
+    monkeypatch.setenv('HTTP_PROTOCOL_PORT', '9090')
+    r = _save(auth_client, 8080)
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()['data']['restart_message'] is None
+
+
+def test_get_says_when_the_environment_pins_the_port(app, auth_client, monkeypatch):
+    monkeypatch.delenv('HTTP_PROTOCOL_PORT', raising=False)
+    assert auth_client.get('/api/v2/settings/general').get_json()['data'][
+        'http_protocol_port_env_locked'] is False
+    monkeypatch.setenv('HTTP_PROTOCOL_PORT', '8080')
+    assert auth_client.get('/api/v2/settings/general').get_json()['data'][
+        'http_protocol_port_env_locked'] is True
+
+
 def test_in_ha_the_rolling_restart_is_committed_with_the_port(app, auth_client, stored_port,
                                                                restarts, monkeypatch):
     monkeypatch.setattr('utils.ha.ha_enabled', lambda: True)

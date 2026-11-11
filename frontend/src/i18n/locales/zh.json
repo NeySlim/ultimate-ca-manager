@@ -3082,6 +3082,7 @@
     "updateReleaseNotes": "v{{version}} 新功能",
     "httpProtocolPort": "HTTP协议端口",
     "httpProtocolPortHelper": "用于CDP/OCSP端点的HTTP明文服务器端口。设为0禁用。需要重启。",
+    "httpProtocolPortEnvLocked": "Set by HTTP_PROTOCOL_PORT in the service environment (ucm.env): remove it there to manage the port here.",
     "ct": "证书透明度",
     "ctDescription": "将证书提交到公共CT日志以提高透明度和可审计性",
     "ctEnabled": "启用证书透明度",

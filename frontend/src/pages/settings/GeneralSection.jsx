@@ -107,13 +107,16 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             type="number"
             min={0}
             max={65535}
+            disabled={settings.http_protocol_port_env_locked === true}
             value={settings.http_protocol_port ?? 8080}
             onChange={(e) => {
               const val = parseInt(e.target.value) || 0
               updateSetting('http_protocol_port', Math.min(65535, Math.max(0, val)))
             }}
             placeholder="8080"
-            helperText={t('settings.httpProtocolPortHelper')}
+            helperText={settings.http_protocol_port_env_locked === true
+              ? t('settings.httpProtocolPortEnvLocked')
+              : t('settings.httpProtocolPortHelper')}
           />
           <Input
             label={lockedLabel('settings.acmePublicVhost')}

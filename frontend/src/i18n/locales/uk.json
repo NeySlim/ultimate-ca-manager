@@ -3120,6 +3120,7 @@
     "updateReleaseNotes": "Що нового у v{{version}}",
     "httpProtocolPort": "HTTP порт протоколу",
     "httpProtocolPortHelper": "Порт HTTP-сервера без шифрування для CDP/OCSP. Встановіть 0 для вимкнення. Потрібен перезапуск.",
+    "httpProtocolPortEnvLocked": "Set by HTTP_PROTOCOL_PORT in the service environment (ucm.env): remove it there to manage the port here.",
     "ct": "Прозорість сертифікатів",
     "ctDescription": "Надсилати сертифікати до публічних журналів CT для прозорості та можливості аудиту",
     "ctEnabled": "Увімкнути прозорість сертифікатів",

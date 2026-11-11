@@ -12,6 +12,7 @@ from services.retention_service import RetentionPolicy, RetentionSettingError
 from api.v2.key_recovery import _dual_control_enabled, _dual_control_env
 import json
 import logging
+import os
 
 from . import bp, get_config, set_config
 from services.backup.settings_contract import (
@@ -109,6 +110,7 @@ def get_general_settings():
         'lockout_duration': effective('lockout_duration'),
         'protocol_base_url': get_config('protocol_base_url', ''),
         'http_protocol_port': int(get_config('http_protocol_port', '8080')),
+        'http_protocol_port_env_locked': os.getenv('HTTP_PROTOCOL_PORT') is not None,
         'base_url': get_config('base_url', ''),
         # ACME public endpoint (local server + proxy directory URLs behind reverse proxy)
         'acme_public_vhost': get_config('acme_public_vhost', ''),
@@ -162,6 +164,7 @@ def update_general_settings():
     if not isinstance(data, dict):
         return error_response('Request body must be a JSON object', 400)
     port_restart = False
+    port_pinned_message = None
 
     # Reserved keys are dropped before any validation; a body holding nothing
     # else is refused, so a mixed card still saves its other fields.
@@ -269,10 +272,15 @@ def update_general_settings():
             return error_response("HTTP protocol port cannot be the same as HTTPS port", 400)
         data['http_protocol_port'] = str(port)
         # Bound when a worker starts: a new value needs a restart, unless the environment pins it
-        import os
         stored_port = get_config('http_protocol_port', '') or '8080'
-        port_restart = (data['http_protocol_port'] != stored_port
-                        and os.getenv('HTTP_PROTOCOL_PORT') is None)
+        pinned = os.getenv('HTTP_PROTOCOL_PORT')
+        changed = data['http_protocol_port'] != stored_port
+        port_restart = changed and pinned is None
+        # The environment wins over the stored port: say so rather than report a save that never binds
+        port_pinned_message = (
+            f'HTTP_PROTOCOL_PORT={pinned} in the service environment sets this port: '
+            'the saved value is not used until it is removed.'
+            if changed and pinned is not None and pinned.strip() != data['http_protocol_port'] else None)
 
     if 'acme_public_vhost' in data:
         raw_vhost = data.get('acme_public_vhost')
@@ -504,7 +512,7 @@ def update_general_settings():
         success=True
     )
 
-    restart_message = None
+    restart_message = port_pinned_message
     if rolling:
         from services.cluster_commands import ROLLING_RESTART_MESSAGE
         restart_message = ROLLING_RESTART_MESSAGE
