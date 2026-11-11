@@ -35,13 +35,24 @@ def _setup(app, auth_client, create_ca, cn, bound=True):
 
 
 class TestImportReplacementDeploys:
-    def test_replacement_queues_one_delivery_per_binding(self, app, auth_client, create_ca):
-        ca_cert, ca_key, key, old, cert_id = _setup(app, auth_client, create_ca, 'r7-replace.example.com')
+    def test_replacement_queues_one_delivery_per_active_binding(self, app, auth_client, create_ca):
+        ca_cert, ca_key, key, old, cert_id = _setup(
+            app, auth_client, create_ca, 'r7-replace.example.com', bound=False)
+        for _ in range(2):
+            _create_binding(auth_client, _create_target(auth_client)['id'], cert_id)
+        off_binding = _create_binding(auth_client, _create_target(auth_client)['id'], cert_id)
+        off_target = _create_target(auth_client)
+        _create_binding(auth_client, off_target['id'], cert_id)
+        with app.app_context():
+            from models import db, DeployBinding, DeployTarget
+            db.session.get(DeployBinding, off_binding['id']).enabled = False
+            db.session.get(DeployTarget, off_target['id']).enabled = False
+            db.session.commit()
         new = _cert('r7-replace.example.com', key, issuer_cert=ca_cert, signer=ca_key)
         r = _import(auth_client, IMPORT, new)
         assert r.status_code == 200, r.data
         assert json.loads(r.data)['data']['id'] == cert_id
-        assert _deliveries(app, cert_id) == [('certificate.renewed', 'pending')]
+        assert _deliveries(app, cert_id) == [('certificate.renewed', 'pending')] * 2
 
     def test_same_serial_reimport_queues_nothing(self, app, auth_client, create_ca):
         *_, old, cert_id = _setup(app, auth_client, create_ca, 'r7-same.example.com')
@@ -49,10 +60,13 @@ class TestImportReplacementDeploys:
         assert r.status_code == 200, r.data
         assert _deliveries(app, cert_id) == []
 
-    def test_replacement_without_binding_is_silent(self, app, auth_client, create_ca):
+    def test_replacement_without_binding_fires_the_event_and_queues_nothing(self, app, auth_client, create_ca):
         ca_cert, ca_key, key, old, cert_id = _setup(app, auth_client, create_ca, 'r7-nobind.example.com', bound=False)
         new = _cert('r7-nobind.example.com', key, issuer_cert=ca_cert, signer=ca_key)
-        assert _import(auth_client, IMPORT, new).status_code == 200
+        from unittest.mock import patch
+        with patch('services.webhook_service.emit_cert_renewed') as emitted:
+            assert _import(auth_client, IMPORT, new).status_code == 200
+        emitted.assert_called_once()
         assert _deliveries(app, cert_id) == []
 
     def test_failed_commit_emits_nothing(self, app, auth_client, create_ca, monkeypatch):
