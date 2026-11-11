@@ -1,5 +1,6 @@
-"""A protocol renewal that archives the old row moves its deploy bindings and the HTTPS
-listener binding onto the new row, and its renewal event deploys the new certificate."""
+"""A protocol renewal that archives the old row moves its deploy bindings onto the new
+row, and its renewal event deploys the new certificate. The new row holds no key: a
+binding that pushes the key and the HTTPS listener binding stay on the old row."""
 import base64
 import uuid
 
@@ -41,7 +42,8 @@ def https(app, monkeypatch, tmp_path):
 
 
 def _bound_row(app, ca_id, cn):
-    """An issued row, a deploy binding on it, and the HTTPS listener bound to it."""
+    """An issued row, a deploy binding on it, one pushing its key, and the HTTPS listener
+    bound to it. Returns (row id, binding id, key binding id)."""
     from services.cert_service import CertificateService
     from services.https_binding import set_bound_refid
     with app.app_context():
@@ -53,11 +55,17 @@ def _bound_row(app, ca_id, cn):
                               username='u', private_key='k')
         db.session.add(target)
         db.session.flush()
+        keyed_target = DeployTarget(name=f'follow-key-{uuid.uuid4().hex[:8]}', host='h.example.test',
+                                    username='u', private_key='k')
+        db.session.add(keyed_target)
+        db.session.flush()
         binding = DeployBinding(target_id=target.id, certificate_id=row.id, cert_path='/srv/c.pem')
-        db.session.add(binding)
+        keyed = DeployBinding(target_id=keyed_target.id, certificate_id=row.id,
+                              cert_path='/srv/c.pem', key_path='/srv/k.pem')
+        db.session.add_all([binding, keyed])
         db.session.commit()
         set_bound_refid(row.refid)
-        return row.id, binding.id
+        return row.id, binding.id, keyed.id
 
 
 def _csr(cn):
@@ -67,7 +75,7 @@ def _csr(cn):
             .sign(key, hashes.SHA256()))
 
 
-def _assert_followed(app, old_id, binding_id, written):
+def _assert_followed(app, old_id, binding_id, keyed_id, written, caplog):
     from services.https_binding import get_bound_refid
     with app.app_context():
         old = db.session.get(Certificate, old_id)
@@ -75,11 +83,18 @@ def _assert_followed(app, old_id, binding_id, written):
         new = db.session.get(Certificate, binding.certificate_id)
         assert old.archived is True
         assert new.id != old_id and not new.archived
-        assert get_bound_refid() == new.refid
         queued = [d.event_type for d in DeployDelivery.query.filter_by(binding_id=binding_id)]
         assert queued == ['certificate.renewed']
-        # The client holds the key: the listener stays bound to the live row, no file is written
+        # The client holds the key: what needs it stays on the old row, no file is written
         assert not new.prv and written == []
+        assert db.session.get(DeployBinding, keyed_id).certificate_id == old_id
+        assert DeployDelivery.query.filter_by(binding_id=keyed_id).count() == 0
+        assert get_bound_refid() == old.refid
+    warnings = [r for r in caplog.records
+                if r.levelname == 'WARNING' and 'has no private key in UCM' in r.getMessage()]
+    assert len(warnings) == 1
+    assert f'deploy binding {keyed_id}' in warnings[0].getMessage()
+    assert 'HTTPS listener binding' in warnings[0].getMessage()
 
 
 def _protocol_renewal(app, old_id, source):
@@ -97,17 +112,17 @@ def _protocol_renewal(app, old_id, source):
 
 
 @pytest.mark.parametrize('source', ['est', 'wstep-renewal'])
-def test_est_and_wstep_renewal_moves_the_bindings(app, create_ca, https, source):
+def test_est_and_wstep_renewal_moves_the_bindings(app, create_ca, https, caplog, source):
     ca = create_ca(cn=f'follow {source} CA')
-    old_id, binding_id = _bound_row(app, ca['id'], f'follow-{source}.example.test')
+    old_id, binding_id, keyed_id = _bound_row(app, ca['id'], f'follow-{source}.example.test')
     _protocol_renewal(app, old_id, source)
-    _assert_followed(app, old_id, binding_id, https)
+    _assert_followed(app, old_id, binding_id, keyed_id, https, caplog)
 
 
 @pytest.mark.parametrize('queue', ['scep', 'approvals'])
-def test_scep_approved_renewal_moves_the_bindings(app, auth_client, create_ca, https, queue):
+def test_scep_approved_renewal_moves_the_bindings(app, auth_client, create_ca, https, caplog, queue):
     ca = create_ca(cn=f'follow scep {queue} CA')
-    old_id, binding_id = _bound_row(app, ca['id'], f'follow-scep-{queue}.example.test')
+    old_id, binding_id, keyed_id = _bound_row(app, ca['id'], f'follow-scep-{queue}.example.test')
     with app.app_context():
         old = db.session.get(Certificate, old_id)
         req = SCEPRequest(transaction_id=f'txn-follow-{uuid.uuid4().hex[:8]}', ca_refid=old.caref,
@@ -125,7 +140,7 @@ def test_scep_approved_renewal_moves_the_bindings(app, auth_client, create_ca, h
             from services.scep import approval
             with app.app_context():
                 approval._issue(SimpleNamespace(get_approvals=lambda: []), {'scep_request_id': req_id})
-        _assert_followed(app, old_id, binding_id, https)
+        _assert_followed(app, old_id, binding_id, keyed_id, https, caplog)
     finally:
         with app.app_context():
             SCEPRequest.query.filter_by(id=req_id).delete()
@@ -135,7 +150,7 @@ def test_scep_approved_renewal_moves_the_bindings(app, auth_client, create_ca, h
 def test_a_target_already_bound_to_the_new_row_keeps_one_binding(app, create_ca, https):
     """Two archived twins bound to the same target: the new row gets one binding for it."""
     ca = create_ca(cn='follow twin CA')
-    old_id, binding_id = _bound_row(app, ca['id'], 'follow-twin.example.test')
+    old_id, binding_id, _ = _bound_row(app, ca['id'], 'follow-twin.example.test')
     with app.app_context():
         old = db.session.get(Certificate, old_id)
         columns = {c.name: getattr(old, c.name) for c in Certificate.__table__.columns
@@ -152,3 +167,24 @@ def test_a_target_already_bound_to_the_new_row_keeps_one_binding(app, create_ca,
         new_id = db.session.get(DeployBinding, binding_id).certificate_id
         assert db.session.get(Certificate, twin_id).archived is True
         assert DeployBinding.query.filter_by(certificate_id=new_id, target_id=target_id).count() == 1
+
+
+def test_a_successor_holding_a_key_takes_every_binding(app, create_ca, https, caplog):
+    """The rule's other side: with a key in UCM, the key binding and the HTTPS binding follow."""
+    from services.ca.ca_signing import _bindings_follow
+    from services.cert_service import CertificateService
+    from services.https_binding import get_bound_refid
+    ca = create_ca(cn='follow keyed CA')
+    old_id, binding_id, keyed_id = _bound_row(app, ca['id'], 'follow-keyed.example.test')
+    with app.app_context():
+        successor = CertificateService.create_certificate(
+            descr='follow-keyed.example.test', caref=db.session.get(CA, ca['id']).refid,
+            dn={'CN': 'follow-keyed.example.test'}, cert_type='server_cert',
+            key_type='prime256v1', validity_days=30, username='admin')
+        assert successor.has_private_key
+        _bindings_follow([old_id], successor)
+        db.session.commit()
+        assert db.session.get(DeployBinding, binding_id).certificate_id == successor.id
+        assert db.session.get(DeployBinding, keyed_id).certificate_id == successor.id
+        assert get_bound_refid() == successor.refid
+    assert not [r for r in caplog.records if 'has no private key in UCM' in r.getMessage()]

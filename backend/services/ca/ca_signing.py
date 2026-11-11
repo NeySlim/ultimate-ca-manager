@@ -65,26 +65,34 @@ def _claim_superseded(row, presented=None, successor=None):
 
 def _bindings_follow(old_ids, successor):
     """Deploy bindings and the HTTPS listener binding of the archived rows *old_ids* now
-    name *successor*; a target keeps one binding per certificate (lowest id wins)."""
-    from sqlalchemy import update
+    name *successor*; a target keeps one binding per certificate (lowest id wins).
+    A binding that pushes the key, and the HTTPS binding, follow only a successor holding one."""
     from models import DeployBinding, SystemConfig
     from services.https_binding import BOUND_REFID_KEY
     if successor.id is None:
         db.session.flush()
+    keyed = successor.has_private_key
     taken = {t for (t,) in db.session.query(DeployBinding.target_id)
              .filter(DeployBinding.certificate_id == successor.id)}
+    stayed = []
     for binding in (DeployBinding.query.filter(DeployBinding.certificate_id.in_(old_ids))
                     .order_by(DeployBinding.id)):
-        if binding.target_id not in taken:
+        if binding.key_path and not keyed:
+            stayed.append(f'deploy binding {binding.id}')
+        elif binding.target_id not in taken:
             binding.certificate_id = successor.id
             taken.add(binding.target_id)
     refids = [r for (r,) in db.session.query(Certificate.refid).filter(Certificate.id.in_(old_ids))]
-    db.session.execute(
-        update(SystemConfig)
-        .where(SystemConfig.key == BOUND_REFID_KEY, SystemConfig.value.in_(refids))
-        .values(value=successor.refid)
-        .execution_options(synchronize_session=False)
-    )
+    https = SystemConfig.query.filter(SystemConfig.key == BOUND_REFID_KEY,
+                                      SystemConfig.value.in_(refids)).first()
+    if https is not None and keyed:
+        https.value = successor.refid
+    elif https is not None:
+        stayed.append('the HTTPS listener binding')
+    if stayed:
+        logger.warning(
+            f"Renewed certificate {successor.refid} has no private key in UCM: "
+            f"{', '.join(stayed)} stay on the previous certificate")
 
 
 class CASigningMixin:
