@@ -4191,6 +4191,7 @@
     "eventLabels": {
       "certificateIssued": "Issued",
       "certificateRevoked": "Revoked",
+      "certificateUnheld": "Hold lifted",
       "certificateRenewed": "Renewed",
       "certificateExpiring": "Expiring",
       "certificateExpired": "Expired",

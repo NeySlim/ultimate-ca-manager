@@ -4191,6 +4191,7 @@
     "eventLabels": {
       "certificateIssued": "発行",
       "certificateRevoked": "失効",
+      "certificateUnheld": "Hold lifted",
       "certificateRenewed": "更新",
       "certificateExpiring": "期限間近",
       "certificateExpired": "期限切れ",

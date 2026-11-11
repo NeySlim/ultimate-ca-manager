@@ -4250,6 +4250,7 @@
     "eventLabels": {
       "certificateIssued": "Видано",
       "certificateRevoked": "Відкликано",
+      "certificateUnheld": "Hold lifted",
       "certificateRenewed": "Поновлено",
       "certificateExpiring": "Скоро спливає",
       "certificateExpired": "Прострочено",

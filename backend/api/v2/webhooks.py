@@ -546,6 +546,7 @@ def list_events():
         'descriptions': {
             'certificate.issued': 'When a new certificate is issued',
             'certificate.revoked': 'When a certificate is revoked',
+            'certificate.unheld': 'When a certificate hold is lifted',
             'certificate.renewed': 'When a certificate is auto-renewed',
             'certificate.expiring': 'When a certificate is about to expire',
             'ca.created': 'When a new CA is created',

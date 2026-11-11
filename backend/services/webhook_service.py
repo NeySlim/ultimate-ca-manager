@@ -244,6 +244,7 @@ class WebhookService:
     # Event types — certificate lifecycle
     CERT_ISSUED = 'certificate.issued'
     CERT_REVOKED = 'certificate.revoked'
+    CERT_UNHELD = 'certificate.unheld'
     CERT_RENEWED = 'certificate.renewed'
     CERT_EXPIRING = 'certificate.expiring'
     CERT_EXPIRED = 'certificate.expired'
@@ -273,7 +274,7 @@ class WebhookService:
     UPDATE_FAILED = 'system.update_failed'
 
     ALL_EVENTS = [
-        CERT_ISSUED, CERT_REVOKED, CERT_RENEWED, CERT_EXPIRING,
+        CERT_ISSUED, CERT_REVOKED, CERT_UNHELD, CERT_RENEWED, CERT_EXPIRING,
         CERT_EXPIRED, CERT_IMPORTED, CERT_DELETED,
         CA_CREATED, CA_UPDATED, CA_DELETED,
         CSR_SUBMITTED, CSR_APPROVED, CSR_REJECTED,
@@ -513,6 +514,10 @@ def emit_cert_issued(cert: dict, ca_refid: str = None, actor: str = None):
 
 def emit_cert_revoked(cert: dict, reason: str = None, ca_refid: str = None, actor: str = None):
     _emit(WebhookService.CERT_REVOKED, {'certificate': cert, 'reason': reason}, ca_refid, _meta(actor, reason=reason))
+
+
+def emit_cert_unheld(cert: dict, ca_refid: str = None, actor: str = None):
+    _emit(WebhookService.CERT_UNHELD, {'certificate': cert}, ca_refid, _meta(actor))
 
 
 def emit_cert_renewed(cert: dict, ca_refid: str = None, actor: str = None):

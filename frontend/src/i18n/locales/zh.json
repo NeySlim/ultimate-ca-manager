@@ -4188,6 +4188,7 @@
     "eventLabels": {
       "certificateIssued": "已签发",
       "certificateRevoked": "已吊销",
+      "certificateUnheld": "Hold lifted",
       "certificateRenewed": "已续期",
       "certificateExpiring": "即将过期",
       "certificateExpired": "已过期",
