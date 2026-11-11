@@ -1,0 +1,13 @@
+{{- if .Values.ha.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "ucm.fullname" . }}
+  labels:
+    {{- include "ucm.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.ha.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "ucm.selectorLabels" . | nindent 6 }}
+{{- end }}

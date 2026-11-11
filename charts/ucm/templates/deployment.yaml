@@ -5,11 +5,20 @@ metadata:
   labels:
     {{- include "ucm.labels" . | nindent 4 }}
 spec:
+  {{- include "ucm.haValidate" . }}
   # Single instance: SQLite + the per-pod scheduler are not HA-safe, and the
   # RWO volumes cannot be mounted by two pods at once.
   replicas: {{ .Values.replicaCount }}
+  {{- if .Values.ha.enabled }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  {{- else }}
   strategy:
     type: Recreate
+  {{- end }}
   selector:
     matchLabels:
       {{- include "ucm.selectorLabels" . | nindent 6 }}
@@ -66,6 +75,23 @@ spec:
                 secretKeyRef:
                   name: {{ include "ucm.secretName" . }}
                   key: UCM_SECRET_KEY
+            {{- if .Values.ha.enabled }}
+            - name: UCM_HA
+              value: "1"
+            - name: UCM_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: KEY_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "ucm.secretName" . }}
+                  key: KEY_ENCRYPTION_KEY
+            {{- with .Values.redis.url }}
+            - name: REDIS_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
             {{- if .Values.initialAdminPassword }}
             - name: UCM_INITIAL_ADMIN_PASSWORD
               valueFrom:
@@ -138,20 +164,23 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /opt/ucm/data
+            {{- if not .Values.ha.enabled }}
             - name: etc
               mountPath: /etc/ucm
+            {{- end }}
             {{- if .Values.fips.enabled }}
             - name: fips-run
               mountPath: /run/ucm
             {{- end }}
       volumes:
         - name: data
-          {{- if .Values.persistence.enabled }}
+          {{- if and .Values.persistence.enabled (or (not .Values.ha.enabled) .Values.persistence.data.existingClaim) }}
           persistentVolumeClaim:
             claimName: {{ include "ucm.dataPvcName" . }}
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- if not .Values.ha.enabled }}
         - name: etc
           {{- if .Values.persistence.enabled }}
           persistentVolumeClaim:
@@ -159,6 +188,7 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- end }}
         {{- if .Values.fips.enabled }}
         - name: fips-run
           emptyDir:
@@ -169,9 +199,19 @@ spec:
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.affinity }}
+      {{- if .Values.affinity }}
       affinity:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .Values.affinity | nindent 8 }}
+      {{- else if .Values.ha.enabled }}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "ucm.selectorLabels" . | nindent 20 }}
       {{- end }}
       {{- with .Values.tolerations }}
       tolerations:

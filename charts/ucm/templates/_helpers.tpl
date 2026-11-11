@@ -67,3 +67,18 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- define "ucm.etcPvcName" -}}
 {{- .Values.persistence.etc.existingClaim | default (printf "%s-etc" (include "ucm.fullname" .)) }}
 {{- end }}
+
+{{/* HA render guard: fails the render when the values cannot span nodes. */}}
+{{- define "ucm.haValidate" -}}
+{{- if .Values.ha.enabled -}}
+{{- if ne .Values.database.type "postgresql" -}}
+{{- fail "ha.enabled requires database.type=postgresql (SQLite is single-node)" -}}
+{{- end -}}
+{{- if not (or .Values.database.databaseUrl .Values.database.existingSecret) -}}
+{{- fail "ha.enabled requires database.databaseUrl or database.existingSecret" -}}
+{{- end -}}
+{{- if lt (int .Values.replicaCount) 2 -}}
+{{- fail "ha.enabled requires replicaCount >= 2" -}}
+{{- end -}}
+{{- end -}}
+{{- end }}

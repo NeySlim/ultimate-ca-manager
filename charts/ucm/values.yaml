@@ -1,8 +1,7 @@
 # Default values for the UCM Helm chart.
 # UCM defaults to a single instance on a local SQLite database: keep replicaCount
-# at 1. UCM_HA=1 (extraEnv) is an HA preview: the node requires PostgreSQL,
-# SECRET_KEY and KEY_ENCRYPTION_KEY, refuses host-local operations and reports
-# ha, node_id and leader in its probes. Full HA arrives in later releases.
+# at 1. For several nodes set ha.enabled=true (see docs/HA.md): it needs
+# PostgreSQL and replicaCount >= 2.
 
 image:
   repository: neyslim/ultimate-ca-manager
@@ -14,8 +13,24 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
-## Single instance only — SQLite + per-pod scheduler are not HA-safe.
+## Single instance unless ha.enabled (then 2 or more).
 replicaCount: 1
+
+## High availability (UCM_HA=1): several nodes on one PostgreSQL. The render
+## fails unless database.type=postgresql and replicaCount >= 2. Each pod gets
+## UCM_NODE_ID = pod name; UCM_SECRET_KEY and KEY_ENCRYPTION_KEY come from the
+## one shared Secret (generated once, kept across upgrades). There is no etc
+## PVC. The data volume is an emptyDir per pod (local backups are lost with the
+## pod), or the persistence.data.existingClaim you name (ReadWriteMany).
+## Without a Redis URL, sessions stay per node: set an ingress cookie affinity.
+ha:
+  enabled: false
+  podDisruptionBudget:
+    minAvailable: 1
+
+## Optional Redis shared by the nodes (sets REDIS_URL in HA mode).
+redis:
+  url: ""
 
 ## Fully qualified domain name UCM serves on. Used for the self-signed UI
 ## certificate and as the default base URL for issued AIA/CRL/OCSP URLs.
@@ -29,6 +44,7 @@ initialAdminPassword: ""
 ## and PERSISTS them across upgrades (via lookup) so sessions survive restarts.
 secrets:
   secretKey: ""   # UCM_SECRET_KEY (Flask)
+  keyEncryptionKey: ""   # KEY_ENCRYPTION_KEY (Fernet key), used when ha.enabled
 
 ## Database backend.
 ##  - sqlite (default): file in the data PVC, single instance.
@@ -138,6 +154,9 @@ ingress:
   className: ""
   annotations: {}
     # nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    # Session affinity for HA without Redis (ingress-nginx):
+    # nginx.ingress.kubernetes.io/affinity: "cookie"
+    # nginx.ingress.kubernetes.io/session-cookie-name: "ucm-node"
   host: ucm.local
   tls: []
     # - secretName: ucm-tls
