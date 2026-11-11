@@ -206,6 +206,19 @@ class TestARestoreIsAReplacement:
             db.session.expire_all()
             assert User.query.filter_by(username='replace_untouched_user').first()
 
+    def test_an_account_removed_by_the_restore_leaves_its_id_unused(self, app, create_user):
+        from models import User
+        create_user(username='replace_id_in_archive', role='viewer')
+        with app.app_context():
+            blob = _service().create_backup(PASSWORD, include=_only('users'))
+        removed = create_user(username='replace_id_removed', role='viewer')
+        with app.app_context():
+            _service().restore_backup(blob, PASSWORD)
+            db.session.expire_all()
+            assert db.session.get(User, removed['id']) is None
+        following = create_user(username='replace_id_following', role='viewer')
+        assert following['id'] > removed['id']
+
     def test_an_unknown_mode_is_refused_before_anything_happens(self, app):
         from services.backup.errors import BackupSchemaError
         with app.app_context():
