@@ -11,8 +11,10 @@ def _certificate_count(app):
         return Certificate.query.count()
 
 
-def test_it_has_a_database_of_its_own(app, create_cert):
-    cert = create_cert(cn='session-side.example.com')
+def test_it_has_a_database_of_its_own(app, create_ca, create_cert):
+    # Its own CA: the session's default one stays, other tests' certificates sit under it
+    ca = create_ca(cn='Fresh App Own CA')
+    cert = create_cert(cn='session-side.example.com', ca_id=ca['id'])
     try:
         with fresh_app() as other:
             assert other is not app
@@ -22,8 +24,7 @@ def test_it_has_a_database_of_its_own(app, create_cert):
         from models import CA, Certificate, db
         with app.app_context():
             Certificate.query.filter_by(id=cert['id']).delete()
-            # The CA the factory made for it too, or the shared tables keep one more
-            CA.query.filter_by(refid=cert['caref']).delete()
+            CA.query.filter_by(id=ca['id']).delete()
             db.session.commit()
 
 
