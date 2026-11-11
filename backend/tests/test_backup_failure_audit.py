@@ -5,6 +5,7 @@ import json
 import pytest
 
 from services.audit_service import AuditService
+from services.backup.restore_completion import REQUEST_REFUSED
 
 CREATE = ('/api/v2/system/backup', '/api/v2/settings/backup/create')
 RESTORE = ('/api/v2/system/restore', '/api/v2/settings/backup/restore')
@@ -75,6 +76,7 @@ def test_failed_restore_is_audited(auth_client, audit, monkeypatch, route, error
 
     assert response.status_code in (400, 409, 500)
     _assert_failure(audit, 'system_restore')
+    assert audit[0]['details'].startswith(REQUEST_REFUSED) is (error == 'pending')
 
 
 def _post_create(client, route, body):
@@ -149,6 +151,7 @@ def test_a_restore_refused_before_it_starts_is_audited(auth_client, audit, monke
 
     assert response.status_code in (400, 413)
     _single_refusal(audit, 'system_restore')
+    assert audit[0]['details'].startswith(REQUEST_REFUSED)
 
 
 @pytest.mark.parametrize('route', RESTORE)
@@ -161,6 +164,7 @@ def test_a_fips_refused_restore_is_audited(auth_client, audit, monkeypatch, rout
     monkeypatch.setattr(BackupService, 'restore_backup_from_stream', refuse)
     _restore(auth_client, route, _form())
     _single_refusal(audit, 'system_restore')
+    assert not audit[0]['details'].startswith(REQUEST_REFUSED)
 
 
 @pytest.mark.parametrize('route', RESTORE)
@@ -254,3 +258,24 @@ def test_the_audited_file_name_is_its_base_name_on_one_line(auth_client, audit, 
 def test_client_filename(raw, audited):
     from utils.sanitize import client_filename
     assert client_filename(raw) == audited
+
+
+@pytest.mark.parametrize('route', RESTORE)
+@pytest.mark.parametrize('lock', ['migration', 'backup'])
+def test_a_restore_refused_while_busy_carries_the_request_marker(auth_client, audit, monkeypatch, route, lock):
+    import contextlib
+    import importlib
+    from services.backup.locking import BackupBusyError
+    from services.database_admin.lock import MigrationBusyError
+    module = importlib.import_module('api.v2.system.backup' if route == RESTORE[0] else 'api.v2.settings.backup')
+    exc = MigrationBusyError(LEAKY) if lock == 'migration' else BackupBusyError(LEAKY)
+
+    @contextlib.contextmanager
+    def busy(*a, **k):
+        raise exc
+        yield
+    monkeypatch.setattr(module, 'database_migration_lock', busy)
+    response = _restore(auth_client, route, _form())
+    assert response.status_code == 409
+    _single_refusal(audit, 'system_restore')
+    assert audit[0]['details'].startswith(REQUEST_REFUSED)

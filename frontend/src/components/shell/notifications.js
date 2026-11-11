@@ -30,13 +30,16 @@ export function queueItems(data) {
     }))
 }
 
-// A restore the form refused before reading the archive is not a failed restore.
-const FORM_REFUSAL = /^Restore refused: (no file|password missing|unknown mode|invalid file name|file too large|a backend (switch|migration)|a backup or)/
+// A restore refused before the archive was read is not a failed restore: the backend
+// marks it (services/backup/restore_completion.py); older rows carry their fixed phrase.
+export const REQUEST_REFUSED = 'Restore request refused: '
+const LEGACY_REFUSAL = /^Restore refused: (no file|password missing|unknown mode|invalid file name|file too large|a backend (switch|migration)|a backup or)/
+const requestRefused = (details = '') => details.startsWith(REQUEST_REFUSED) || LEGACY_REFUSAL.test(details)
 
 export function auditItems(rows) {
   return (Array.isArray(rows) ? rows : [])
     .filter(e => e && (e.action.startsWith('session_') || e.success === false)
-      && !(e.action === 'system_restore' && FORM_REFUSAL.test(e.details || '')))
+      && !(e.action === 'system_restore' && requestRefused(e.details || '')))
     .map(e => ({
       key: keyOf('audit', e.id), source: 'audit', kind: e.action, tier: e.success === false ? 'critical' : 'warning',
       title: e.resource_name || e.username || '', at: e.timestamp || null,

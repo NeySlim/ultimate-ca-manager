@@ -46,6 +46,7 @@ logger = logging.getLogger(__name__)
 # depending on which page had asked for it.
 from services.backup.restore_completion import (
     record_failure as _audit_failure,
+    record_request_refusal,
     record_restore as _safe_audit_log,
     request_restart as _request_restart_after_restore,
     restore_message,
@@ -414,22 +415,22 @@ def restore_backup():
     # The archive's version decides the rest, once the upload is spooled.
     request.max_content_length = storage.restore_body_limit()
     if 'file' not in request.files:
-        _audit_failure('system_restore', 'upload', 'Restore refused: no file provided')
+        record_request_refusal('upload', 'no file provided')
         return error_response('No backup file provided', 400)
     file = request.files['file']
     if not file.filename:
-        _audit_failure('system_restore', 'upload', 'Restore refused: no file selected')
+        record_request_refusal('upload', 'no file selected')
         return error_response('No file selected', 400)
     audited_name = client_filename(file.filename)  # the client's, never trusted as is
 
     password = request.form.get('password')
     if not password:
-        _audit_failure('system_restore', audited_name, 'Restore refused: password missing')
+        record_request_refusal(audited_name, 'password missing')
         return error_response('Backup password required', 400)
 
     mode = (request.form.get('mode') or 'replace').strip().lower()
     if mode not in ('replace', 'merge'):
-        _audit_failure('system_restore', audited_name, 'Restore refused: unknown mode')
+        record_request_refusal(audited_name, 'unknown mode')
         return error_response("mode must be 'replace' or 'merge'", 400)
 
     try:
@@ -437,19 +438,19 @@ def restore_backup():
             validate_upload_name(file, BACKUP_EXTENSIONS)
         except ValueError as exc:
             logger.warning('Backup upload refused: %s', exc)
-            _audit_failure('system_restore', audited_name, 'Restore refused: invalid file name')
+            record_request_refusal(audited_name, 'invalid file name')
             return error_response('Invalid backup file', 400)
         too_large = storage.restore_size_refusal(file.stream)
         if too_large:
             status, message = too_large
             logger.warning('Backup upload refused: %s', message)
-            _audit_failure('system_restore', audited_name, 'Restore refused: file too large')
+            record_request_refusal(audited_name, 'file too large')
             return error_response(message, status)
 
         # A restore landing before a pending backend switch is lost at restart.
         pending = pending_switch_refusal()
         if pending:
-            _audit_failure('system_restore', audited_name, 'Restore refused: a backend switch is pending')
+            record_request_refusal(audited_name, 'a backend switch is pending')
             return error_response(pending, 409)
 
         try:
@@ -459,12 +460,12 @@ def restore_backup():
                 results = BackupService().restore_backup_from_stream(
                     file.stream, password, mode=mode)
         except MigrationBusyError as busy:
-            _audit_failure('system_restore', audited_name, 'Restore refused: a backend migration or another restore is running')
+            record_request_refusal(audited_name, 'a backend migration or another restore is running')
             return error_response(
                 f'{busy} A backend migration or another restore is still '
                 'running.', 409)
         except BackupBusyError as busy:
-            _audit_failure('system_restore', audited_name, 'Restore refused: a backup or another restore is running')
+            record_request_refusal(audited_name, 'a backup or another restore is running')
             return error_response(f'{busy} Retry once it has finished.', 409)
 
         try:

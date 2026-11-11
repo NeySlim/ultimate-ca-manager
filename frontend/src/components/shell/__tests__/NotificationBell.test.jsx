@@ -27,7 +27,11 @@ vi.mock('../../../stores/userPreferencesStore', () => ({
   },
 }))
 
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { NotificationBell } from '../NotificationBell'
+import { REQUEST_REFUSED } from '../notifications'
 
 const QUEUE = { data: { counts: {}, items: [
   { kind: 'acme_order_failed', tier: 'critical', id: 7, label: 'web.example', due_at: '2026-11-09T10:00:00Z', href_hint: '/acme?tab=orders&order=7' },
@@ -187,10 +191,11 @@ describe('NotificationBell', () => {
   })
 
   it('ignores a restore the form refused before it started', async () => {
-    const refused = ['no file provided', 'no file selected', 'password missing', 'invalid file name']
+    const refused = ['Restore request refused: no file provided', 'Restore request refused: mode not allowed here',
+      'Restore request refused: a future refusal', 'Restore refused: password missing']
     m.extraLogs = [
-      ...refused.map((why, i) => ({ id: 70 + i, action: 'system_restore', success: false, username: 'root',
-        resource_name: 'upload', details: `Restore refused: ${why}`, timestamp: '2026-11-09T11:00:00Z' })),
+      ...refused.map((details, i) => ({ id: 70 + i, action: 'system_restore', success: false, username: 'root',
+        resource_name: 'upload', details, timestamp: '2026-11-09T11:00:00Z' })),
       { id: 80, action: 'system_restore', success: false, username: 'root', resource_name: 'b.ucmbkp',
         details: 'Restore failed: unexpected error', timestamp: '2026-11-09T11:30:00Z' },
     ]
@@ -215,5 +220,12 @@ describe('NotificationBell', () => {
     const rows = within(screen.getByRole('region', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
     expect(rows).toContain('audit:41')
     expect(rows).not.toContain('audit:100')
+  })
+
+  it('keys on the marker the backend writes for a refused restore request', () => {
+    const here = dirname(fileURLToPath(import.meta.url))
+    const source = readFileSync(join(here, '..', '..', '..', '..', '..', 'backend', 'services', 'backup', 'restore_completion.py'), 'utf8')
+    expect(source).toMatch(/^REQUEST_REFUSED = '([^']+)'$/m)
+    expect(source.match(/^REQUEST_REFUSED = '([^']+)'$/m)[1]).toBe(REQUEST_REFUSED)
   })
 })
