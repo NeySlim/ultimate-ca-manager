@@ -142,12 +142,34 @@ class DeployBinding(db.Model):
     # target can therefore serve different daemons with different reloads.
     reload_command = db.Column(db.String(512))
     enabled = db.Column(db.Boolean, nullable=False, default=True)
+    # Set when a renewal left this binding on the previous certificate (migration 151);
+    # cleared by reattachment, or when the successor receives its key
+    attention_reason = db.Column(db.String(40))
+    attention_successor_id = db.Column(db.Integer, index=True)
 
     created_at = db.Column(db.DateTime, default=utc_now)
     created_by = db.Column(db.String(80))
 
     target = db.relationship('DeployTarget', backref=db.backref('bindings', lazy='dynamic'))
     certificate = db.relationship('Certificate', backref=db.backref('deploy_bindings', lazy='dynamic'))
+    # No foreign key: deleting the successor clears the state (services.binding_attention)
+    attention_successor = db.relationship(
+        'Certificate', primaryjoin='foreign(DeployBinding.attention_successor_id) == Certificate.id',
+        viewonly=True)
+
+    def attention(self):
+        """The left-behind state as the API shows it, or None."""
+        if not self.attention_reason:
+            return None
+        from services.binding_attention import can_reattach
+        successor = self.attention_successor
+        return {
+            'reason': self.attention_reason,
+            'successor_id': self.attention_successor_id,
+            'successor_refid': successor.refid if successor else None,
+            'successor_has_key': bool(successor and successor.has_private_key),
+            'can_reattach': can_reattach(self),
+        }
 
     def to_dict(self, include_target=True):
         data = {
@@ -163,6 +185,7 @@ class DeployBinding(db.Model):
             'enabled': self.enabled,
             'created_at': utc_isoformat(self.created_at),
             'created_by': self.created_by,
+            'needs_attention': self.attention(),
         }
         if include_target and self.target:
             data['target_name'] = self.target.name

@@ -11,7 +11,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy import (DateTime, String, and_, case, cast, false, func, literal, literal_column,
                         or_, select, true, type_coerce, union_all)
 
-from models import CA, Certificate, SystemConfig
+from models import CA, Certificate, DeployBinding, DeployTarget, SystemConfig
 from models.acme_models import AcmeClientOrder, AcmeOrder
 from models.audit_log import AuditLog
 from models.certificate_template import CertificateTemplate
@@ -26,7 +26,8 @@ from utils.datetime_utils import utc_isoformat, utc_now
 QUEUE_KINDS = ('acme_order_failed', 'acme_client_renewal_failed', 'approval_pending',
                'scep_request_pending', 'key_recovery_pending', 'crl_due', 'crl_missing',
                'manual_renewal_due', 'client_renewal_overdue', 'auto_renewal_blocked',
-               'renewal_declined', 'ca_expiring')
+               'renewal_declined', 'ca_expiring', 'deploy_binding_left_behind',
+               'https_binding_left_behind')
 ACME_FAILURE_LOOKBACK_DAYS = 7
 CRITICAL_WITHIN = timedelta(hours=24)
 DEFAULT_CRL_VALIDITY_DAYS = 7
@@ -54,6 +55,8 @@ _HREF = {
     'auto_renewal_blocked': '/certificates/{id}',
     'renewal_declined': '/certificates/{id}',
     'ca_expiring': '/cas/{id}',
+    'deploy_binding_left_behind': '/certificates/{certificate_id}?binding={id}',
+    'https_binding_left_behind': '/settings?tab=https',
 }
 
 
@@ -187,6 +190,30 @@ def _queue_union(now, dialect):
         CA.id.label('id'), text_label(CA.descr).label('label'), due(CA.valid_to).label('due_at'),
     ).where(_active_ca(now), CA.valid_to.isnot(None),
             CA.valid_to < now + timedelta(days=CA_EXPIRY_WARNING_DAYS)))
+
+    # Bindings a renewal left on the previous certificate: due when that one expires
+    held = aliased(Certificate)
+    parts.append(select(
+        _const('deploy_binding_left_behind').label('kind'), _CRITICAL.label('rank'),
+        DeployBinding.id.label('id'), text_label(DeployTarget.name).label('label'),
+        due(held.valid_to).label('due_at'),
+    ).select_from(DeployBinding)
+     .join(DeployTarget, DeployTarget.id == DeployBinding.target_id)
+     .join(held, held.id == DeployBinding.certificate_id)
+     .where(DeployBinding.attention_reason.isnot(None)))
+
+    from services.binding_attention import HTTPS_LEFT_BEHIND_KEY
+    from services.https_binding import BOUND_REFID_KEY
+    bound = aliased(SystemConfig)
+    parts.append(select(
+        _const('https_binding_left_behind').label('kind'), _CRITICAL.label('rank'),
+        SystemConfig.id.label('id'), text_label(held.descr).label('label'),
+        due(held.valid_to).label('due_at'),
+    ).select_from(SystemConfig)
+     .join(bound, bound.key == BOUND_REFID_KEY)
+     .join(held, held.refid == bound.value, isouter=True)
+     .where(SystemConfig.key == HTTPS_LEFT_BEHIND_KEY, SystemConfig.value.isnot(None),
+            SystemConfig.value != ''))
 
     return union_all(*parts).subquery('queue')
 
@@ -339,10 +366,15 @@ def work_queue(session, limit, now=None, kinds=None):
         listing = listing.where(queue.c.kind.in_(list(kinds)))
     rows = session.execute(
         listing.order_by(queue.c.rank, queue.c.due_at, queue.c.kind, queue.c.id).limit(limit))
+    rows = rows.all()
+    # A binding's link names the certificate holding it: one lookup for the page shown
+    binding_ids = [r.id for r in rows if r.kind == 'deploy_binding_left_behind']
+    held_by = dict(session.execute(select(DeployBinding.id, DeployBinding.certificate_id)
+                                   .where(DeployBinding.id.in_(binding_ids))).all()) if binding_ids else {}
     items = [{
         'kind': r.kind, 'tier': 'critical' if r.rank == 0 else 'warning', 'id': r.id,
         'label': _short_label(r.kind, r.label), 'due_at': utc_isoformat(r.due_at),
-        'href_hint': _HREF[r.kind].format(id=r.id),
+        'href_hint': _HREF[r.kind].format(id=r.id, certificate_id=held_by.get(r.id, '')),
     } for r in rows]
     return {'items': items, 'counts': counts, 'total': sum(counts.values()),
             'filter_hints': {kind: {'renewal': kind} for kind in RENEWAL_KINDS}}

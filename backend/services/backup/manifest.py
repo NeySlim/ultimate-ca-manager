@@ -437,7 +437,8 @@ SECTIONS: Dict[str, Section] = {
         model='models.deploy:DeployBinding',
         identity=('target_id', 'certificate_id'),
         exclude={**_SURROGATE},
-        references={'target_id': 'deploy_targets', 'certificate_id': 'certificates'},
+        references={'target_id': 'deploy_targets', 'certificate_id': 'certificates',
+                    'attention_successor_id': 'certificates'},
     ),
     'crl_deploy_bindings': Section(
         model='models.deploy:CRLDeployBinding',
@@ -556,8 +557,9 @@ class SettingReference:
 # (`settings_refs` in the configuration section) and renumbered on restore.
 # A refid reads the same everywhere and is not one of them: est_ca_refid,
 # tsa_ca_refid, tsa_signer_cert_refid, wstep_ca_refid, xcep_ca_refid,
-# mtls_trusted_ca_id, https_bound_certificate_refid, est_labels. The number in
-# `ca_url_alias_<n>` is the one published URLs carry, and stays the source's.
+# mtls_trusted_ca_id, https_bound_certificate_refid, https_binding_left_behind_for,
+# est_labels. The number in `ca_url_alias_<n>` is the one published URLs carry,
+# and stays the source's.
 SETTING_REFERENCES: Tuple[SettingReference, ...] = (
     SettingReference(r'scep_ca_id', value='certificate_authorities'),
     SettingReference(r'acme\.issuing_ca_id', value='certificate_authorities'),

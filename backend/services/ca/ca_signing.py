@@ -84,6 +84,7 @@ def _bindings_follow(old_ids, successor):
     name *successor*; a target keeps one binding per certificate (lowest id wins).
     A binding that pushes the key, and the HTTPS binding, follow only a successor holding one."""
     from models import DeployBinding, SystemConfig
+    from services import binding_attention
     from services.https_binding import BOUND_REFID_KEY
     if successor.id is None:
         db.session.flush()
@@ -95,6 +96,7 @@ def _bindings_follow(old_ids, successor):
                     .order_by(DeployBinding.id)):
         if not keyed and _pushes_key(binding):
             stayed.append(f'deploy binding {binding.id}')
+            binding_attention.mark_deploy(binding, successor)
         elif binding.target_id not in taken:
             binding.certificate_id = successor.id
             taken.add(binding.target_id)
@@ -105,6 +107,7 @@ def _bindings_follow(old_ids, successor):
         https.value = successor.refid
     elif https is not None:
         stayed.append('the HTTPS listener binding')
+        binding_attention.mark_https(successor)
     if stayed:
         logger.warning(
             f"Renewed certificate {successor.refid} has no private key in UCM: "
@@ -357,5 +360,7 @@ class CASigningMixin:
             emit_cert_renewed(new_cert.to_dict(), ca_refid=ca.refid)
         else:
             emit_cert_issued(new_cert.to_dict(), ca_refid=ca.refid)
+        from services.binding_attention import emit_pending
+        emit_pending()
 
         return cert_pem_str, serial

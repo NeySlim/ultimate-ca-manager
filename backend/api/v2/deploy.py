@@ -367,6 +367,47 @@ def update_binding(binding_id):
     return success_response(data=binding.to_dict(), message=message)
 
 
+@bp.route('/api/v2/deploy/bindings/<int:binding_id>/reattach', methods=['POST'])
+@require_auth(['write:deploy'])
+def reattach_binding(binding_id):
+    """Move a binding a renewal left behind onto the renewed certificate and deploy it."""
+    from services.binding_attention import can_reattach, clear
+    binding = db.session.get(DeployBinding, binding_id)
+    if not binding:
+        return error_response('Deploy binding not found', 404)
+    if not binding.attention_reason:
+        return error_response('This binding is not waiting for a renewed certificate', 409)
+    successor = binding.attention_successor
+    if successor is None:
+        return error_response('The renewed certificate no longer exists', 409)
+    if not can_reattach(binding):
+        if DeployBinding.query.filter_by(target_id=binding.target_id,
+                                         certificate_id=successor.id).count():
+            return error_response('The renewed certificate is already bound to this target', 409)
+        return error_response(
+            'The renewed certificate has no private key in UCM and this binding sends the key: '
+            'import the key of the renewed certificate, or stop sending the key', 409)
+    previous_id = binding.certificate_id
+    binding.certificate_id = successor.id
+    clear(binding)
+    delivery = DeployService.deploy_binding_update_now(
+        binding, DeployDelivery.BINDING_CERTIFICATE, actor=_actor())
+    ok, err = safe_commit(logger, 'Failed to reattach deploy binding')
+    if not ok:
+        return err
+    AuditService.log_action(
+        action='deploy_binding_update', resource_type='deploy_target',
+        resource_id=str(binding.target_id),
+        resource_name=binding.target.name if binding.target else '?',
+        details=(f"Reattached deploy binding {binding.id} from certificate {previous_id} "
+                 f"to the renewed certificate {successor.id}"),
+        success=True)
+    message = ('Deploy binding reattached and deployed'
+               if delivery and delivery.status == DeployDelivery.STATUS_DELIVERED
+               else 'Deploy binding reattached')
+    return success_response(data=binding.to_dict(), message=message)
+
+
 @bp.route('/api/v2/deploy/bindings/<int:binding_id>', methods=['DELETE'])
 @require_auth(['delete:deploy'])
 def delete_binding(binding_id):

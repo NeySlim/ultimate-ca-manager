@@ -86,6 +86,16 @@ def on_certificate_renewed(cert_id: int, old_cert_id: int, cn: str):
     }, ROOM_CERTIFICATES)
 
 
+def on_certificate_binding_left_behind(cert_id: int, previous_id, binding: dict):
+    """Emit event when a renewal leaves a binding on the previous certificate."""
+    from websocket.event_types import EventType
+    emit_ws_event(EventType.CERTIFICATE_BINDING_LEFT_BEHIND, {
+        'id': cert_id,
+        'previous_id': previous_id,
+        'binding': binding,
+    }, ROOM_CERTIFICATES)
+
+
 def on_certificate_deleted(cert_id: int, cn: str, deleted_by: str):
     """Emit event when a certificate is deleted."""
     from websocket.event_types import EventType

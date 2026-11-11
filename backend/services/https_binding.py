@@ -96,6 +96,9 @@ def set_bound_refid(refid):
                            description='Certificate bound to the HTTPS listener')
         db.session.add(row)
     row.value = refid or ''
+    # Any rebinding settles a renewal the binding could not follow
+    from services.binding_attention import clear_https
+    clear_https()
     try:
         db.session.commit()
     except Exception:
@@ -212,6 +215,11 @@ def on_certificate_renewed(event_type, payload, ca_refid, meta):
         restart_service()
     except Exception as exc:  # never break the renewal itself
         logger.error(f"HTTPS re-materialization after renewal failed: {exc}")
+
+
+def apply_bound_now(refid):
+    """Re-materialize *refid* now that the binding names it (same path as a renewal)."""
+    on_certificate_renewed('certificate.renewed', {'certificate': {'refid': refid}}, None, {})
 
 
 def register_https_binding_subscriber(app):
