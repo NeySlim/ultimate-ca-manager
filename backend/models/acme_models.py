@@ -466,13 +466,17 @@ class AcmeClientOrder(db.Model):
         else:
             self._pending_key = None
 
-    @property
-    def upstream_revocations_list(self):
+    @staticmethod
+    def parse_upstream_revocations(text):
         try:
-            entries = json.loads(self.upstream_revocations) if self.upstream_revocations else []
+            entries = json.loads(text) if text else []
         except ValueError:
             return []
         return entries if isinstance(entries, list) else []
+
+    @property
+    def upstream_revocations_list(self):
+        return self.parse_upstream_revocations(self.upstream_revocations)
 
     @upstream_revocations_list.setter
     def upstream_revocations_list(self, entries):

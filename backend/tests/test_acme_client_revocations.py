@@ -1,6 +1,7 @@
 """ACME client revocations: the CA is told the local reason, and is asked again until it answers;
 a key revoked as compromised stays known once its certificate is deleted (migration 128)."""
 import json
+import os
 import uuid
 from datetime import timedelta
 from types import SimpleNamespace
@@ -9,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from models import CA, RevokedSerial, WebhookDelivery, db
+from models.acme_models import AcmeClientOrder
 from services import acme_renewal_service as renew_mod
 from services.acme import compromised_keys
 from services.cert_service import CertificateService
@@ -186,6 +188,54 @@ def test_an_order_being_renewed_is_left_to_the_next_pass(bench):
     with patch('services.acme.acme_client_service.AcmeClientService.for_order', return_value=bench.client):
         renew_mod.retry_upstream_revocations()
     bench.client.revoke_certificate.assert_not_called()
+
+
+def _entry(serial):
+    return {'serial': serial, 'certificate': 'PEM', 'reason': 1,
+            'not_after': (utc_now() + timedelta(days=30)).isoformat()}
+
+
+def test_a_debt_written_meanwhile_survives_a_writer_holding_an_older_copy(bench):
+    """A revoke route writes without the order's lease while a renewal holds it:
+    the renewal's own debt, written from the row it loaded earlier, keeps the route's."""
+    order = bench.parent()
+    assert order.upstream_revocations_list == []  # the renewal's copy, loaded now
+    # The revoke route's write, which the loaded copy does not see
+    AcmeClientOrder.query.filter_by(id=order.id).update(
+        {'upstream_revocations': json.dumps([_entry('AA')])}, synchronize_session=False)
+    renew_mod._owe_upstream_revocation(order, _entry('BB'), 'HTTP 503')
+    assert sorted(e['serial'] for e in _owed(bench)) == ['AA', 'BB']
+
+
+def test_a_write_between_the_read_and_the_update_is_kept(bench):
+    """Compare-and-set: a list changed after it was read is read again, not overwritten."""
+    order_id = bench.parent_id
+    calls = []
+
+    def _add(entries):
+        if not calls:  # another writer commits its entry between this read and the write
+            AcmeClientOrder.query.filter_by(id=order_id).update(
+                {'upstream_revocations': json.dumps([_entry('AA')])}, synchronize_session=False)
+        calls.append(len(entries))
+        return entries + [_entry('BB')]
+    renew_mod.update_owed(order_id, _add)
+    db.session.commit()
+    assert calls == [0, 1]
+    assert sorted(e['serial'] for e in _owed(bench)) == ['AA', 'BB']
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not os.getenv('UCM_TEST_APP_PG_URL'), reason='UCM_TEST_APP_PG_URL not set')
+def test_two_transactions_on_postgresql_keep_both_debts(bench):
+    """Another connection commits its debt while this transaction holds an older copy."""
+    from sqlalchemy import text
+    order = bench.parent()
+    assert order.upstream_revocations_list == []
+    with db.engine.begin() as other:
+        other.execute(text('UPDATE acme_client_orders SET upstream_revocations = :v WHERE id = :i'),
+                      {'v': json.dumps([_entry('AA')]), 'i': order.id})
+    renew_mod._owe_upstream_revocation(order, _entry('BB'), 'HTTP 503')
+    assert sorted(e['serial'] for e in _owed(bench)) == ['AA', 'BB']
 
 
 def test_the_event_can_be_subscribed_to():

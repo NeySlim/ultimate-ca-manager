@@ -9,7 +9,7 @@ import random
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-from sqlalchemy import or_
+from sqlalchemy import or_, select, update
 from sqlalchemy.exc import SQLAlchemyError
 
 from models import CA, Certificate, DnsProvider, RevokedSerial, SystemConfig, db
@@ -306,13 +306,48 @@ def _upstream_reason(replaced):
     return code if code in _UPSTREAM_REASONS else None
 
 
+_OWED_WRITE_ATTEMPTS = 5
+
+
+def update_owed(order_id, change):
+    """Apply ``change`` (a list in, a list out) to an order's owed revocations, uncommitted.
+
+    Compare-and-set on the stored text: a revoke route writes without the order's
+    lease, so no writer may rewrite the list from a copy read before another's write.
+    """
+    table = AcmeClientOrder.__table__
+    column = table.c.upstream_revocations
+    for _attempt in range(_OWED_WRITE_ATTEMPTS):
+        row = db.session.execute(select(column).where(table.c.id == order_id)).first()
+        if row is None:
+            return None
+        current = row[0]
+        entries = AcmeClientOrder.parse_upstream_revocations(current)
+        changed = change(list(entries))
+        unchanged = column.is_(None) if current is None else column == current
+        written = db.session.execute(
+            update(table).where(table.c.id == order_id, unchanged)
+            .values(upstream_revocations=json.dumps(changed) if changed else None)).rowcount
+        if written == 1:
+            order = db.session.identity_map.get(db.session.identity_key(AcmeClientOrder, order_id))
+            if order is not None:
+                db.session.expire(order, ['upstream_revocations'])
+            return changed
+    raise RuntimeError(f'Revocations owed for order {order_id} kept changing: not written')
+
+
 def _owe_upstream_revocation(order, entry, error) -> None:
     """Keep ``entry`` on ``order`` for the next pass, and announce the failure."""
     entry.update(attempts=entry.get('attempts', 0) + 1, error=error,
                  last_attempt_at=utc_now().isoformat())
-    owed = [e for e in order.upstream_revocations_list if e.get('serial') != entry['serial']]
-    order.upstream_revocations_list = owed + [entry]
-    if commit_or_rollback(logger, f"Revocation owed by the CA for order {order.id} not kept"):
+    order_id = order.id
+    try:
+        update_owed(order_id, lambda owed: [e for e in owed if e.get('serial') != entry['serial']] + [entry])
+    except Exception as exc:
+        db.session.rollback()
+        logger.error("Revocation owed by the CA for order %s not kept: %s", order_id, exc)
+        return
+    if commit_or_rollback(logger, f"Revocation owed by the CA for order {order_id} not kept"):
         payload = order.to_dict()
         payload.pop('challenges', None)
         emit_acme_revocation_failed(payload, entry['serial'], error, entry['attempts'])
@@ -345,12 +380,13 @@ def retry_upstream_revocations() -> int:
 
 
 def _retry_order_revocations(order, now) -> int:
-    entries = order.upstream_revocations_list
-    alive = [e for e in entries if datetime.fromisoformat(e['not_after']) > now]
-    for gone in [e for e in entries if e not in alive]:
-        logger.info("Certificate %s expired before its CA confirmed the revocation: no longer sent",
-                    gone.get('serial'))
-    order.upstream_revocations_list = alive
+    def _drop_expired(entries):
+        alive = [e for e in entries if datetime.fromisoformat(e['not_after']) > now]
+        for gone in [e for e in entries if e not in alive]:
+            logger.info("Certificate %s expired before its CA confirmed the revocation: no longer sent",
+                        gone.get('serial'))
+        return alive
+    alive = update_owed(order.id, _drop_expired) or []
     commit_or_rollback(logger, f"Revocations owed for order {order.id} not updated")
     due = [e for e in alive if _revocation_due(e, now)]
     if not due:
@@ -367,8 +403,8 @@ def _retry_order_revocations(order, now) -> int:
                 error = str(exc)
         if error is None:
             logger.info("The CA confirmed the revocation of %s", label)
-            order.upstream_revocations_list = [e for e in order.upstream_revocations_list
-                                               if e.get('serial') != entry['serial']]
+            update_owed(order.id, lambda owed, serial=entry['serial']: [
+                e for e in owed if e.get('serial') != serial])
             commit_or_rollback(logger, f"Revocation of {label} done but not recorded")
         else:
             logger.warning("Revocation of %s at the CA failed again: %s", label, error)

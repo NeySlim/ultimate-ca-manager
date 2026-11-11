@@ -94,21 +94,12 @@ def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
     not_after = cert.valid_to or utc_now() + timedelta(days=90)
     entry = {'serial': cert.serial_number, 'certificate': pem.decode(), 'reason': code,
              'not_after': not_after.isoformat()}
-    # The retry pass rewrites the list under the order's lease: the debt is added under it too
-    from services.acme.order_lease import OrderLease
-    lease = None
+    # Compare-and-set inside: safe without the order's lease, which a renewal may hold
     try:
-        lease = OrderLease.take(order.id)
-        if lease is None:
-            logger.warning("Order %s is being renewed: revocation of %s owed without its lease",
-                           order.id, label)
         _owe_upstream_revocation(db.session.get(AcmeClientOrder, order.id), entry, error)
     except Exception as exc:
         db.session.rollback()
         logger.error("Revocation owed by the CA for %s not kept: %s", label, exc)
-    finally:
-        if lease is not None:
-            lease.release()
     return OWED, error
 
 
