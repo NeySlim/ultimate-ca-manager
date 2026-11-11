@@ -8,6 +8,7 @@ from uuid import uuid4
 import pytest
 from flask import Flask
 
+from auth.session_start import ACCOUNT_KEY, account_proof
 from auth.twofa_enforcement import ENROLL_SESSION_KEY
 from models import User, db
 from models.group import Group, GroupMember
@@ -76,7 +77,11 @@ def _session_client(app, user_id=None, **extra):
     with client.session_transaction() as sess:
         now = utc_now().isoformat()
         if user_id is not None:
-            sess['user_id'] = user_id
+            # A real login also records the username and the account proof.
+            with app.app_context():
+                user = db.session.get(User, user_id)
+                sess.update(user_id=user_id, username=user.username,
+                            **{ACCOUNT_KEY: account_proof(user)})
         sess['login_time'] = now
         sess['last_activity'] = now
         sess.update(extra)
