@@ -34,6 +34,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Certificates: lifting a hold now emits a `certificate.unheld` event (webhooks, WebSocket) and lifts the hold of the related-certificate partner with it, as a revocation takes it.
+- Events: uploaded and imported CSRs emit `csr.submitted`, a CA signed from a CSR emits `ca.created`, an OCSP responder or EST key generator renewal emits its issued or renewed event, and approving a pending Microsoft CA request announces the certificate it imports.
+- Notification bell: a failed restore shows again, as a failed backup does.
 - ACME: a certificate obtained over ACME is also revoked at its CA when it is revoked as a user certificate, with its mTLS enrolment or user, as the related member of a pair or by its key at UCM's own ACME server. A revocation is announced as sent again only once that retry is recorded, a database error no longer leaks its SQL into the answer, and a bulk or approved hold no longer warns to revoke at the CA.
 - WebSocket: without Redis, certificate and CA events born in the scheduler process, such as automatic renewals, now reach the browsers, relayed to the web workers through the database (migration 149).
 - Import: replacing a certificate through `POST /api/v2/certificates/import` with a new serial now fires the renewal event, so its deploy bindings, webhooks and HTTPS binding follow as after an internal renewal (discussion #440); re-importing the same serial stays silent.
