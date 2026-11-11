@@ -37,6 +37,12 @@ socketio = SocketIO()
 # Worker-local socket state; counts and rooms are per worker by design.
 connected_clients: Dict[str, Dict[str, Any]] = {}
 
+# True once init_websocket gave SocketIO a message queue: it carries every process's events
+_queue_in_use = False
+# Scheduler process without a message queue: its events go to the web workers through the
+# database (services.ws_relay) instead of a SocketIO server no browser is connected to
+_relay_publisher = None
+
 _QUEUE_SCHEMES = ("redis", "rediss", "unix")
 _KEEPALIVE_OPTIONS = {
     opt: value
@@ -174,8 +180,10 @@ def _checked_origins(app) -> list:
 # ================== Initialization ==================
 def init_websocket(app):
     """Initialize WebSocket with Flask app; refuses to start without explicit origins."""
+    global _queue_in_use
     origins = _checked_origins(app)
     message_queue = _message_queue(app)
+    _queue_in_use = message_queue is not None
     socketio.init_app(
         app,
         cors_allowed_origins=origins,
@@ -188,6 +196,16 @@ def init_websocket(app):
         engineio_logger=_flag(_setting(app, 'WEBSOCKET_ENGINEIO_LOGGER', False)))
     logger.info("WebSocket initialized (message queue: %s)", bool(message_queue))
     return socketio
+
+
+def message_queue_in_use() -> bool:
+    return _queue_in_use
+
+
+def relay_through(publisher):
+    """Route this process's events to ``publisher`` (None: emit them here again)."""
+    global _relay_publisher
+    _relay_publisher = publisher
 
 
 # ================== Identity and rooms ==================
@@ -442,6 +460,10 @@ def emit_event(event_type, data, room=None, include_self=True):
     type_name = _event_name(event_type)
     _check_payload(data)
     payload = {'type': type_name, 'data': data, 'timestamp': _timestamp()}
+    publisher = _relay_publisher
+    if publisher is not None:
+        publisher.publish(room, payload)  # queues only, never raises
+        return
     options = {'to': room}
     if not include_self and _calling_sid():
         options['skip_sid'] = _calling_sid()

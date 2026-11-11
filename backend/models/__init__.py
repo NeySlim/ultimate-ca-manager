@@ -43,6 +43,7 @@ from models.compromised_key import CompromisedKeyRecord
 from models.est_signer_cert import EstSignerCert
 from models.deploy import DeployTarget, DeployBinding, CRLDeployBinding, DeployDelivery
 from models.cluster import ClusterCommand, ClusterNode, SchedulerRequest
+from models.websocket_relay import WebsocketRelayEvent
 
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -66,5 +67,5 @@ __all__ = [
     "KeyRecoveryRequest",
     "ADConnectorConfig", "RevokedSerial", "CompromisedKeyRecord", "EstSignerCert",
     "DeployTarget", "DeployBinding", "CRLDeployBinding", "DeployDelivery",
-    "ClusterCommand", "ClusterNode", "SchedulerRequest",
+    "ClusterCommand", "ClusterNode", "SchedulerRequest", "WebsocketRelayEvent",
 ]

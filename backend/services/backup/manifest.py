@@ -537,6 +537,7 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'cluster_nodes': 'heartbeats of the running HA nodes: runtime state of one cluster, never restored',
     'scheduler_requests': 'pending run-now requests of one cluster: runtime state, never restored',
     'cluster_commands': 'HA reload and restart queue of one cluster: runtime state, never restored',
+    'websocket_relay': 'WebSocket events waiting minutes for the web workers: runtime state, never restored',
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',
 }

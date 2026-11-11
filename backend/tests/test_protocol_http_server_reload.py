@@ -157,6 +157,7 @@ def gunicorn_conf(app, monkeypatch):
     # post_worker_init replaces the handle_error of the hub: use a stand-in hub
     monkeypatch.setattr(gevent, 'get_hub', lambda: types.SimpleNamespace(handle_error=None))
     calls = []
+    monkeypatch.setattr('services.ws_relay.start_reader', lambda a: None)
     monkeypatch.setattr(phs, 'start_http_protocol_server',
                         lambda a, **kw: calls.append((a, kw)))
     return module, calls

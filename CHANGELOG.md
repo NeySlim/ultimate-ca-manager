@@ -35,6 +35,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - ACME: a certificate obtained over ACME is also revoked at its CA when it is revoked as a user certificate, with its mTLS enrolment or user, as the related member of a pair or by its key at UCM's own ACME server. A revocation is announced as sent again only once that retry is recorded, a database error no longer leaks its SQL into the answer, and a bulk or approved hold no longer warns to revoke at the CA.
+- WebSocket: without Redis, certificate and CA events born in the scheduler process, such as automatic renewals, now reach the browsers, relayed to the web workers through the database (migration 149).
 - Import: replacing a certificate through `POST /api/v2/certificates/import` with a new serial now fires the renewal event, so its deploy bindings, webhooks and HTTPS binding follow as after an internal renewal (discussion #440); re-importing the same serial stays silent.
 - Approvals: a certificate issued by approving a request now fires `certificate.issued` like the issue form, so webhooks, notifications and deploy bindings see it.
 - AD CS: a certificate AD CS signs for a CSR or a renewal fires `certificate.issued` or `certificate.renewed`; approving a pending request from UCM writes it into the request's own row, where a later status check used to add a second row.

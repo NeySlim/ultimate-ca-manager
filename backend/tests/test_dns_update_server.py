@@ -1133,6 +1133,7 @@ def gunicorn_conf(app, monkeypatch):
                         lambda a, **kw: calls.append(('http', a, kw)))
     monkeypatch.setattr(srv_mod, 'start_dns_update_server',
                         lambda a, **kw: calls.append(('dns', a, kw)))
+    monkeypatch.setattr('services.ws_relay.start_reader', lambda a: None)
     return module, calls
 
 

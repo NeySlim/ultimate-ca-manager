@@ -109,12 +109,13 @@ def test_post_worker_init_forgets_the_inherited_pool_first(app, monkeypatch, tmp
                         lambda a, **kw: order.append(('http', a)))
     monkeypatch.setattr('services.syslog_service.syslog_forwarder.forget_inherited_socket',
                         lambda: order.append(('syslog',)))
+    monkeypatch.setattr('services.ws_relay.start_reader', lambda a: order.append(('relay', a)))
     module.post_worker_init(_worker())
 
     with app.app_context():
         assert order[0] == ('forget', list(db.engines.values()))
         assert bind in order[0][1] and db.engine in order[0][1]
-    assert ('http', app) in order
+    assert ('http', app) in order and ('relay', app) in order
     assert order.index(('syslog',)) < order.index(('http', app))  # before anything can log
 
 
