@@ -52,12 +52,6 @@ def _revoked_note(revoked):
     return f'. Already revoked for this deletion: certificate(s) {_numbers(revoked)}' if revoked else ''
 
 
-def _sentence(message):
-    """``message`` ended by a full stop, so that a note can follow it."""
-    message = str(message).rstrip()
-    return message if message.endswith(('.', '!', '?')) else f'{message}.'
-
-
 def _acme_untold(upstream):
     """``(meta, note)`` for the certificates of ``upstream`` (``(id, outcome, detail)``)
     whose ACME CA did not confirm the revocation, or ``(None, '')``."""
@@ -75,44 +69,62 @@ def _acme_untold(upstream):
     return meta, note
 
 
-def _revoke_enrolled_certificates(user_id, actor, upstream=None):
-    """Revoke each certificate the user enrolled for mTLS, as removing the
-    enrolment does. Returns ``(certificate_ids, revoked_ids, None)`` or
-    ``(None, None, refusal)``; ``upstream`` collects the ACME outcomes.
+def _unrevoked_entry(certificate_id):
+    from models import Certificate
+    row = db.session.get(Certificate, certificate_id)
+    return {'id': certificate_id, 'serial_number': row.serial_number if row else None,
+            'name': (row.descr or row.subject_cn if row else None) or f'Certificate #{certificate_id}'}
 
-    Every enrolment is checked (policy, revocability) before any certificate is
-    revoked, so a refusal revokes nothing; a revocation that fails past the checks
-    cannot undo the committed ones, and its refusal names them.
+
+def _unrevoked_text(unrevoked):
+    return ', '.join(f"#{c['id']} (serial {c['serial_number']})" for c in unrevoked)
+
+
+def _withdraw_enrolled_certificates(user_id, actor, upstream=None):
+    """Revoke each certificate the user enrolled for mTLS, then delete it with its
+    enrolments, as removing the enrolment does. Returns ``(revoked, unrevoked, kept,
+    None)`` or ``(None, None, None, refusal)``; ``upstream`` collects the ACME outcomes.
+
+    A policy refusal is found before anything is revoked and blocks the deletion; a
+    certificate the CA cannot revoke never does: it stays, with its enrolment, in
+    ``unrevoked``. Withdrawn enrolments are committed before the user is touched.
     """
     from models import AuthCertificate
     from services.mtls_enrollment import removal_check, revoke_checked
     enrolments = AuthCertificate.query.filter_by(user_id=user_id).order_by(AuthCertificate.id).all()
-    planned, seen = [], set()
+    planned, bound, seen = [], [], set()
     for enrolment in enrolments:
         certificate_id, needs_revoking, refusal = removal_check(enrolment, actor)
         if refusal is not None:
-            return None, None, refusal
+            return None, None, None, refusal
+        bound.append((enrolment.id, certificate_id))
         # Two enrolments of one certificate: revoked and deleted once
         if certificate_id is not None:
             if certificate_id in seen:
                 continue
             seen.add(certificate_id)
         planned.append((enrolment, certificate_id, needs_revoking))
-    certificate_ids, revoked = [], []
+    withdrawn, revoked, unrevoked = [], [], []
     for enrolment, certificate_id, needs_revoking in planned:
         if needs_revoking:
             refusal = revoke_checked(enrolment, certificate_id, actor.username, upstream)
             if refusal is not None:
-                message, status = refusal
-                return None, None, (message + _revoked_note(revoked), status)
+                unrevoked.append(_unrevoked_entry(certificate_id))
+                continue
             revoked.append(certificate_id)
         if certificate_id:
-            certificate_ids.append(certificate_id)
-    return certificate_ids, revoked, None
+            withdrawn.append(certificate_id)
+    left_valid = {c['id'] for c in unrevoked}
+    for enrolment_id, certificate_id in bound:
+        if certificate_id is None or certificate_id not in left_valid:
+            AuthCertificate.query.filter_by(id=enrolment_id).delete()
+    if not safe_commit(logger, f'Withdraw the mTLS enrolments of user {user_id}')[0]:
+        return revoked, unrevoked, withdrawn, None
+    return revoked, unrevoked, _delete_withdrawn_certificates(withdrawn, actor.username), None
 
 
 def _delete_withdrawn_certificates(certificate_ids, username):
-    """Delete the revoked certificate rows once the user is gone; ids left behind."""
+    """Delete the withdrawn certificate rows; ids left behind."""
     from services.cert_service import CertificateService
     return [cid for cid in certificate_ids
             if not CertificateService.delete_certificate(cid, username=username)]
@@ -516,15 +528,16 @@ def delete_user(user_id):
 
     username = user.username
     upstream = []
-    certificate_ids, revoked, refusal = _revoke_enrolled_certificates(
+    revoked, unrevoked, kept, refusal = _withdraw_enrolled_certificates(
         user_id, g.current_user, upstream)
+    if refusal is not None:
+        # Found before any revocation: nothing was withdrawn
+        message, status = refusal
+        return error_response(f'User not deleted: {message}', status)
     # Revocations already made stand: a failure past them still says what the CA was not told
     acme_meta, acme_note = _acme_untold(upstream)
-    if refusal is not None:
-        message, status = refusal
-        text = _sentence(message) if acme_note else message
-        return error_response(f'User not deleted: {text}{acme_note}', status, meta=acme_meta)
     try:
+        user = db.session.get(User, user_id)
         sessions_deleted = _purge_user_dependencies(user_id)
         db.session.delete(user)
         db.session.commit()
@@ -534,17 +547,19 @@ def delete_user(user_id):
         return error_response(f'Failed to delete user{_revoked_note(revoked)}.{acme_note}'
                               if acme_note else 'Failed to delete user' + _revoked_note(revoked),
                               500, meta=acme_meta)
-    kept = _delete_withdrawn_certificates(certificate_ids, g.current_user.username)
 
     if sessions_deleted > 0:
         logger.info(f"Invalidated {sessions_deleted} sessions for deleted user {username}")
 
+    details = f'Deleted user: {username} ({sessions_deleted} sessions invalidated)'
+    if unrevoked:
+        details += f'; mTLS certificates not revoked: {_unrevoked_text(unrevoked)}'
     AuditService.log_action(
         action='user_delete',
         resource_type='user',
         resource_id=str(user_id),
         resource_name=username,
-        details=f'Deleted user: {username} ({sessions_deleted} sessions invalidated)',
+        details=details,
         success=True
     )
 
@@ -555,13 +570,20 @@ def delete_user(user_id):
         pass
 
     extra = {'meta': acme_meta} if acme_meta else {}
+    if unrevoked:
+        extra['data'] = {'unrevoked_certificates': unrevoked}
+    if not (kept or unrevoked):
+        return success_response(
+            message=f'User {username} deleted successfully.{acme_note}' if acme_note
+            else f'User {username} deleted successfully', **extra)
+    message = f'User {username} deleted'
+    if unrevoked:
+        message += (f'; its mTLS certificate(s) {_unrevoked_text(unrevoked)} could not be revoked '
+                    'and remain valid: revoke them under Certificates')
     if kept:
-        return success_response(message=(
-            f'User {username} deleted; its revoked mTLS certificate(s) {_numbers(kept)} '
-            f'could not be deleted and are still listed under Certificates.{acme_note}'), **extra)
-    return success_response(
-        message=f'User {username} deleted successfully.{acme_note}' if acme_note
-        else f'User {username} deleted successfully', **extra)
+        message += (f'; its revoked mTLS certificate(s) {_numbers(kept)} '
+                    'could not be deleted and are still listed under Certificates')
+    return success_response(message=f'{message}.{acme_note}', **extra)
 
 
 # ============================================================
@@ -579,7 +601,7 @@ def bulk_delete_users():
     if ids_error:
         return ids_error
 
-    results = {'success': [], 'failed': []}
+    results = {'success': [], 'failed': [], 'unrevoked': []}
     total_sessions_invalidated = 0
 
     for user_id in ids:
@@ -598,7 +620,7 @@ def bulk_delete_users():
             continue
 
         upstream = []
-        certificate_ids, revoked, refusal = _revoke_enrolled_certificates(
+        revoked, unrevoked, kept, refusal = _withdraw_enrolled_certificates(
             user_id, g.current_user, upstream)
         acme_meta, _note = _acme_untold(upstream)
         for key, certificate_ids_of_key in (acme_meta or {}).items():
@@ -607,6 +629,7 @@ def bulk_delete_users():
             results['failed'].append({'id': user_id, 'error': refusal[0]})
             continue
         try:
+            user = db.session.get(User, user_id)
             sessions_deleted = _purge_user_dependencies(user_id)
             db.session.delete(user)
         except Exception as e:
@@ -619,18 +642,28 @@ def bulk_delete_users():
             results['failed'].append({'id': user_id, 'error': 'Deletion failed' + _revoked_note(revoked)})
             continue
         total_sessions_invalidated += sessions_deleted
-        kept = _delete_withdrawn_certificates(certificate_ids, g.current_user.username)
         if kept:
             logger.warning(f"User {user_id} deleted, revoked certificate(s) {_numbers(kept)} not deleted")
         results['success'].append(user_id)
+        # Named only once the user is gone: a failed deletion reports nothing as deleted
+        if unrevoked:
+            results['unrevoked'].append({'user_id': user_id, 'certificates': unrevoked})
 
+    details = f'Bulk deleted {len(results["success"])} users ({total_sessions_invalidated} sessions invalidated)'
+    left_valid = [c for entry in results['unrevoked'] for c in entry['certificates']]
+    if left_valid:
+        details += f'; mTLS certificates not revoked: {_unrevoked_text(left_valid)}'
     AuditService.log_action(
         action='users_bulk_deleted',
         resource_type='user',
         resource_id=','.join(str(i) for i in results['success']),
         resource_name=f'{len(results["success"])} users',
-        details=f'Bulk deleted {len(results["success"])} users ({total_sessions_invalidated} sessions invalidated)',
+        details=details,
         success=True
     )
 
-    return success_response(data=results, message=f'{len(results["success"])} users deleted')
+    message = f'{len(results["success"])} users deleted'
+    if left_valid:
+        message += (f'; mTLS certificate(s) {_unrevoked_text(left_valid)} could not be revoked '
+                    'and remain valid: revoke them under Certificates')
+    return success_response(data=results, message=message)
