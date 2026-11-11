@@ -58,12 +58,14 @@ def clear(binding):
 
 
 def can_reattach(binding):
-    """The successor exists, holds the key or the binding sends none, and the target
-    has no binding on it yet."""
+    """The successor exists and is live, holds the key or the binding sends none, and
+    the target has no binding on it yet."""
     from models import DeployBinding
     from services.ca.ca_signing import _pushes_key
     successor = binding.attention_successor
-    if successor is None or (not successor.has_private_key and _pushes_key(binding)):
+    if successor is None or successor.archived:
+        return False
+    if not successor.has_private_key and _pushes_key(binding):
         return False
     return not DeployBinding.query.filter_by(
         target_id=binding.target_id, certificate_id=successor.id).count()

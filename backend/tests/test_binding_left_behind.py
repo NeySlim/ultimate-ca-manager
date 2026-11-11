@@ -365,3 +365,19 @@ def test_a_keyed_successor_of_the_awaited_row_takes_what_was_left_behind(app, cr
         assert get_bound_refid() == nxt.refid
         assert https_left_behind_for() == ''
 
+
+def test_reattaching_refuses_an_archived_successor(app, auth_client, create_ca, https, seen):
+    ca = create_ca(cn='left behind archived CA')
+    old_id, _, keyed_id = _bound_row(app, ca['id'], 'left-archived.example.test')
+    _protocol_renewal(app, old_id, 'est')
+    r = auth_client.patch(f'/api/v2/deploy/bindings/{keyed_id}', data=json.dumps({'key_path': None}),
+                          content_type='application/json')
+    assert r.status_code == 200, r.get_json()
+    with app.app_context():
+        successor = db.session.get(Certificate, db.session.get(DeployBinding, keyed_id).attention_successor_id)
+        successor.archived = True
+        db.session.commit()
+    url = f'/api/v2/deploy/bindings/{keyed_id}/reattach'
+    assert auth_client.post(url, data='{}', content_type='application/json').status_code == 409
+    with app.app_context():
+        assert db.session.get(DeployBinding, keyed_id).certificate_id == old_id
