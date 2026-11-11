@@ -467,3 +467,20 @@ def test_a_key_arriving_during_a_renewal_of_its_row_leaves_the_renewal_s_marks(
         keyed = db.session.get(DeployBinding, keyed_id)
         assert (keyed.certificate_id, keyed.attention_reason, keyed.attention_successor_id) == (
             old_id, REASON, second_id)
+
+
+def test_marks_left_twice_by_a_retried_savepoint_announce_once(app, create_ca, https, seen):
+    """A serial-collision retry rolls back its savepoint, not session.info: the same mark
+    may be there twice, and still yields one event, in the order the marks were made."""
+    from services.binding_attention import _PENDING, emit_pending
+    ca = create_ca(cn='left behind retried CA')
+    old_id, _, keyed_id = _bound_row(app, ca['id'], 'left-retried.example.test')
+    _protocol_renewal(app, old_id, 'est')
+    with app.app_context():
+        new_id = db.session.get(DeployBinding, keyed_id).attention_successor_id
+    del seen[:]
+    with app.app_context():
+        db.session.info[_PENDING] = [('deploy', keyed_id, new_id), ('https', None, new_id),
+                                     ('deploy', keyed_id, new_id), ('https', None, new_id)]
+        emit_pending()
+    assert [p['binding']['type'] for p, _ in seen] == ['deploy', 'https']

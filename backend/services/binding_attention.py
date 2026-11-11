@@ -156,7 +156,8 @@ def emit_pending():
     if not marks:
         return
     from services.webhook_service import _emit
-    for kind, binding_id, successor_id in marks:
+    # A savepoint retried after a serial collision leaves its marks behind: same mark, one event
+    for kind, binding_id, successor_id in dict.fromkeys(marks):
         try:
             payload = _snapshot(kind, binding_id, successor_id)
         except Exception as e:  # never break the renewal that already committed
