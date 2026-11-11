@@ -318,3 +318,19 @@ def test_any_other_snapshot_error_is_still_reported(master_on_sqlite, tmp_path, 
     master_on_sqlite.write_bytes(b'not a database' * 100)
     assert cc.snapshot_committed_restarts(str(tmp_path)) == frozenset()
     assert 'restarts not read before the settings' in capsys.readouterr().err
+
+
+def test_stop_that_times_out_with_a_give_back_pending_says_so(app, caplog):
+    release = threading.Event()
+    applier = cc.CommandApplier(app, 'stuck-node')
+    applier._give_back_pending = [None, 41, False]
+    applier._thread = threading.Thread(target=release.wait, daemon=True)
+    applier._thread.start()
+    try:
+        with caplog.at_level('INFO'):
+            applier.stop(timeout=0.05)
+    finally:
+        release.set()
+        applier._thread.join()
+    lines = [r for r in caplog.records if r.levelname == 'ERROR' and 'command 41' in r.getMessage()]
+    assert len(lines) == 1 and 'possibly not given back' in lines[0].getMessage(), caplog.text
