@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { helpContent } from '../../data/helpContent'
 import { helpGuides } from '../../data/helpGuides'
+import { HELP_TRANSLATED_LANGUAGES } from '../../data/helpLanguages'
 
 const dir = dirname(fileURLToPath(import.meta.url))
 const LOCALE_CODES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'uk', 'zh']
@@ -65,7 +66,7 @@ describe('acme.dnsUpdate i18n keys (9 locales)', () => {
   })
 
   it('every translated help file carries the section and the guide, without em dashes', async () => {
-    for (const code of LOCALE_CODES.filter((c) => c !== 'en')) {
+    for (const code of HELP_TRANSLATED_LANGUAGES) {
       const text = readFileSync(helpFile(code), 'utf8')
       const added = text.slice(text.indexOf('DNS UPDATE'))
       expect(text, code).toContain('DNS UPDATE (RFC 2136)')

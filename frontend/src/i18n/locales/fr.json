@@ -2232,6 +2232,7 @@
     "memberCount": "{{count}} membres"
   },
   "help": {
+    "englishOnlyNotice": "L'aide est disponible en anglais, en français et en chinois.",
     "aboutCertificates": "À propos des certificats",
     "statusLegend": "Légende des statuts",
     "exportFormats": "Formats d'export",

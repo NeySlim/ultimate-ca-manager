@@ -7,8 +7,12 @@ import { describe, it, expect } from 'vitest'
 const pages = import.meta.glob('../*/*.js')
 
 describe('translated help pages', () => {
+  it('finds only the fr and zh pages', () => {
+    expect(Object.keys(pages).every((p) => /^\.\.\/(fr|zh)\//.test(p))).toBe(true)
+  })
+
   it('finds the pages', () => {
-    expect(Object.keys(pages).length).toBeGreaterThan(200)
+    expect(Object.keys(pages).length).toBeGreaterThan(60)
   })
 
   it.each(Object.keys(pages))('%s loads', async (path) => {

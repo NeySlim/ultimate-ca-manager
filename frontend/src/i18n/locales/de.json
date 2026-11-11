@@ -3939,6 +3939,7 @@
     "bindingLeftBehind": "Eine Erneuerung hat {{name}} auf dem vorherigen Zertifikat belassen"
   },
   "help": {
+    "englishOnlyNotice": "Die Hilfe ist auf Englisch, Französisch und Chinesisch verfügbar.",
     "aboutCertificates": "Über Zertifikate",
     "statusLegend": "Statuslegende",
     "exportFormats": "Exportformate",

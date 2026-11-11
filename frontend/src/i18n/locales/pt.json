@@ -3939,6 +3939,7 @@
     "bindingLeftBehind": "Uma renovação deixou {{name}} no certificado anterior"
   },
   "help": {
+    "englishOnlyNotice": "A ajuda está disponível em inglês, francês e chinês.",
     "aboutCertificates": "Sobre certificados",
     "statusLegend": "Legenda de estados",
     "exportFormats": "Formatos de exportação",

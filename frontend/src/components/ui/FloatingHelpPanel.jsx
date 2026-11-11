@@ -18,6 +18,8 @@ import { useTranslation } from 'react-i18next'
 import { helpContent as defaultHelpData } from '../../data/helpContent'
 import { helpGuides as defaultHelpGuides } from '../../data/helpGuides'
 import { FloatingWindow } from './FloatingWindow'
+import { HELP_TRANSLATED_LANGUAGES } from '../../data/helpLanguages'
+import { loadHelpPage } from '../../data/helpLoader'
 
 const STORAGE_KEY = 'ucm-help-panel'
 const READER_KEY = 'ucm-help-reader'
@@ -80,7 +82,7 @@ function useHelpTranslation(lang, pageKey) {
   const langKey = lang?.substring(0, 2)
 
   useEffect(() => {
-    if (!langKey || langKey === 'en' || !pageKey) {
+    if (!pageKey || !HELP_TRANSLATED_LANGUAGES.includes(langKey)) {
       setTranslation(null)
       return
     }
@@ -89,12 +91,15 @@ function useHelpTranslation(lang, pageKey) {
       setTranslation(sectionCache[cacheKey])
       return
     }
-    import(`../../data/help/${langKey}/${pageKey}.js`)
+    // A superseded load must not overwrite the current language's state.
+    let live = true
+    loadHelpPage(langKey, pageKey)
       .then(mod => {
         sectionCache[cacheKey] = mod.default
-        setTranslation(mod.default)
+        if (live) setTranslation(mod.default)
       })
-      .catch(() => setTranslation(null))
+      .catch(() => { if (live) setTranslation(null) })
+    return () => { live = false }
   }, [langKey, pageKey])
 
   return translation
@@ -103,7 +108,9 @@ function useHelpTranslation(lang, pageKey) {
 export function FloatingHelpPanel({ isOpen, onClose, pageKey }) {
   const { t, i18n } = useTranslation()
   const { isMobile } = useMobile()
-  const translation = useHelpTranslation(i18n.language, pageKey)
+  const translation = useHelpTranslation(i18n.resolvedLanguage, pageKey)
+  const langKey = i18n.resolvedLanguage?.substring(0, 2)
+  const englishNotice = !!langKey && langKey !== 'en' && !HELP_TRANSLATED_LANGUAGES.includes(langKey)
 
   const quickContent = useMemo(() => {
     const en = pageKey ? defaultHelpData[pageKey] : null
@@ -122,15 +129,15 @@ export function FloatingHelpPanel({ isOpen, onClose, pageKey }) {
   if (!isOpen || (!quickContent && !guideContent)) return null
 
   return isMobile
-    ? <MobileSheet quickContent={quickContent} guideContent={guideContent} onClose={onClose} t={t} />
-    : <DesktopPanel quickContent={quickContent} guideContent={guideContent} onClose={onClose} t={t} />
+    ? <MobileSheet quickContent={quickContent} guideContent={guideContent} onClose={onClose} t={t} englishNotice={englishNotice} />
+    : <DesktopPanel quickContent={quickContent} guideContent={guideContent} onClose={onClose} t={t} englishNotice={englishNotice} />
 }
 
 // =============================================================================
 // DESKTOP — Using shared FloatingWindow component
 // =============================================================================
 
-function DesktopPanel({ quickContent, guideContent, onClose, t }) {
+function DesktopPanel({ quickContent, guideContent, onClose, t, englishNotice }) {
   const title = quickContent?.title || guideContent?.title || t('common.help')
   const subtitle = quickContent?.subtitle || ''
 
@@ -152,7 +159,7 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
       zIndex={50}
       onClose={onClose}
     >
-      <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} isMobileView={false} panelWidth={640} />
+      <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} englishNotice={englishNotice} isMobileView={false} panelWidth={640} />
     </FloatingWindow>
   )
 }
@@ -161,7 +168,7 @@ function DesktopPanel({ quickContent, guideContent, onClose, t }) {
 // HELP BODY — Tab switching Quick / Guide
 // =============================================================================
 
-function HelpBody({ quickContent, guideContent, t, isMobileView, panelWidth }) {
+function HelpBody({ quickContent, guideContent, t, englishNotice, isMobileView, panelWidth }) {
   const hasQuick = !!quickContent
   const hasGuide = !!guideContent
   const defaultTab = hasGuide ? 'guide' : 'quick'
@@ -172,6 +179,11 @@ function HelpBody({ quickContent, guideContent, t, isMobileView, panelWidth }) {
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
+      {englishNotice && (
+        <p className="shrink-0 px-4 py-1.5 text-2xs text-text-tertiary border-b border-border">
+          {t('help.englishOnlyNotice')}
+        </p>
+      )}
       {showTabs && (
         <div className="shrink-0 flex border-b border-border bg-secondary-op30">
           <button
@@ -965,7 +977,7 @@ function formatInline(text) {
 // MOBILE — Bottom sheet
 // =============================================================================
 
-function MobileSheet({ quickContent, guideContent, onClose, t }) {
+function MobileSheet({ quickContent, guideContent, onClose, t, englishNotice }) {
   const [translateY, setTranslateY] = useState(0)
   const [isDragging, setIsDragging] = useState(false)
   const startYRef = useRef(0)
@@ -1025,7 +1037,7 @@ function MobileSheet({ quickContent, guideContent, onClose, t }) {
           </div>
         </div>
 
-        <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} isMobileView={true} />
+        <HelpBody quickContent={quickContent} guideContent={guideContent} t={t} englishNotice={englishNotice} isMobileView={true} />
       </div>
     </div>
   )

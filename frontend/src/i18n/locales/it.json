@@ -3939,6 +3939,7 @@
     "bindingLeftBehind": "Un rinnovo ha lasciato {{name}} sul certificato precedente"
   },
   "help": {
+    "englishOnlyNotice": "La guida è disponibile in inglese, francese e cinese.",
     "aboutCertificates": "Informazioni sui certificati",
     "statusLegend": "Legenda stati",
     "exportFormats": "Formati di esportazione",
