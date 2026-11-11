@@ -1194,6 +1194,7 @@ def sign_csr(csr_id):
     except FipsRestricted:
         raise
     except PolicyViolation as e:
+        logger.warning(f"CSR {csr_id} not signed, refused: {e}")
         return error_response(f'Policy violation: {e}', 400)
     except (TemplateConfigError, RequestRejected) as e:
         return error_response(str(e), 400)
@@ -1309,6 +1310,7 @@ def bulk_sign_csrs():
             results['success'].append(csr_id)
             signed_notices += [f'CSR {csr_id}: {n}' for n in item_notices if n]
         except PolicyViolation as e:
+            logger.warning(f"Bulk sign: CSR {csr_id} not signed, refused: {e}")
             results['failed'].append({'id': csr_id, 'error': f'Policy violation: {e}'})
         except (FipsRestricted, TemplateConfigError, RequestRejected) as e:
             results['failed'].append({'id': csr_id, 'error': str(e)})
