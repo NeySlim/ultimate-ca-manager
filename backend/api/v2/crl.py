@@ -12,6 +12,7 @@ from utils.trusted_proxy import client_ip
 from models import db, CA, AuditLog
 from models.crl import CRLMetadata
 from services.crl_service import CRLService
+from services.crl import CRLSigningKeyMismatch
 from services.audit_service import AuditService
 from datetime import timedelta
 import logging
@@ -152,6 +153,8 @@ def regenerate_crl(ca_id):
         )
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except CRLSigningKeyMismatch as e:
+        return error_response(str(e), 409)
     except Exception as e:
         logger.error(f'Failed to regenerate CRL: {e}')
         return error_response("Failed to regenerate CRL", 500)

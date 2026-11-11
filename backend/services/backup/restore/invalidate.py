@@ -277,16 +277,6 @@ CACHE_PURGES: Tuple[Tuple[str, Callable[[], None]], ...] = (
 )
 
 
-def _signing_key_matches(ca) -> bool:
-    """Whether the key the CRL would be signed with is the CA certificate's key."""
-    import base64
-    from cryptography import x509
-    from services.hsm.ca_key_loader import get_ca_signing_key
-    from utils.cert_issuer import private_key_matches
-    cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
-    return private_key_matches(get_ca_signing_key(ca, allow_revoked=True), cert)
-
-
 def _has_delta_after(ca_id: int, base_number: int) -> bool:
     """Whether a delta CRL newer than base `base_number` was stored (generate_crl only logs its failure)."""
     from models.crl import CRLMetadata
@@ -306,8 +296,6 @@ def _regenerate_crls() -> Tuple[list, list]:
             continue  # signed elsewhere or not yet issued: the CDP keeps what it has
         name = ca.descr
         try:
-            if not _signing_key_matches(ca):
-                raise ValueError("its key is not the key of its certificate")
             base = CRLService.generate_crl(ca.id, username='system')
             if ca.delta_crl_enabled and not _has_delta_after(ca.id, base.crl_number):
                 raise ValueError("its delta CRL is older than the new base")
