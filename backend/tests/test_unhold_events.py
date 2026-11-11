@@ -197,3 +197,30 @@ def test_a_body_that_is_not_an_object_is_refused(app, auth_client, create_ca, cr
     assert _post(auth_client, f'{base}/revoke', {'reason': 'certificateHold'}).status_code == 200
     r = _post(auth_client, f'{base}/unhold', body)
     assert r.status_code == 400, r.data
+
+
+@pytest.mark.parametrize('data,content_type', [
+    ('{"unhold_related": false', 'application/json'),
+    ('unhold_related=false', 'application/x-www-form-urlencoded'),
+])
+def test_an_unreadable_body_is_refused_and_the_partner_stays_held(
+        app, auth_client, create_ca, create_cert, data, content_type):
+    ca = create_ca(cn='Unhold Strict CA')
+    a = create_cert(cn='unhold-strict-a.example.test', ca_id=ca['id'])
+    b = create_cert(cn='unhold-strict-b.example.test', ca_id=ca['id'])
+    _hold_pair(app, auth_client, a, b)
+    r = auth_client.post(f"/api/v2/certificates/{a['id']}/unhold", data=data,
+                         content_type=content_type)
+    assert r.status_code in (400, 415), r.data
+    assert _state(app, a['id']) == (True, 'certificateHold')
+    assert _state(app, b['id']) == (True, 'certificateHold')
+
+
+def test_an_empty_body_lifts_the_pair(app, auth_client, create_ca, create_cert):
+    ca = create_ca(cn='Unhold Empty CA')
+    a = create_cert(cn='unhold-empty-a.example.test', ca_id=ca['id'])
+    b = create_cert(cn='unhold-empty-b.example.test', ca_id=ca['id'])
+    _hold_pair(app, auth_client, a, b)
+    r = auth_client.post(f"/api/v2/certificates/{a['id']}/unhold")
+    assert r.status_code == 200, r.data
+    assert _state(app, a['id'])[0] is False and _state(app, b['id'])[0] is False

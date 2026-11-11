@@ -243,7 +243,8 @@ def unhold_certificate(cert_id):
             'Only certificates with reason "certificateHold" can be unheld', 400
         )
 
-    body = request.get_json(silent=True)
+    # A body that is present is read strictly (400/415): an unreadable refusal must not lift the pair
+    body = request.get_json() if request.get_data(cache=True) else None
     if body is not None and not isinstance(body, dict):
         return error_response('Request body must be a JSON object', 400)
     try:
