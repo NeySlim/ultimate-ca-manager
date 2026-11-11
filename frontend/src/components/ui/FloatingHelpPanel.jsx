@@ -91,7 +91,8 @@ function useHelpTranslation(lang, pageKey) {
       setTranslation(sectionCache[cacheKey])
       return
     }
-    // A superseded load must not overwrite the current language's state.
+    // Drop the previous language's text while loading; a superseded load must not overwrite the state.
+    setTranslation(null)
     let live = true
     loadHelpPage(langKey, pageKey)
       .then(mod => {
