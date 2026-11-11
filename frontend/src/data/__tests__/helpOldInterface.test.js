@@ -6,8 +6,12 @@ import { describe, it, expect } from 'vitest'
 import { helpGuides } from '../helpGuides'
 import { helpContent } from '../helpContent'
 
-// Sidebar tab layout still exists on the Operations and ACME pages; the e-mail template editor is still a floating window
-const ALLOWED = [/Sidebar Tabs/g, /"Let's Encrypt orders" sidebar tab/g, /in a floating window/g]
+// Per-entry exceptions: the Operations and ACME pages keep a sidebar tab layout; the e-mail template editor is still a floating window
+const ALLOWED = {
+  'guide settings': [/in a floating window/g],
+  'content operations': [/Sidebar Tabs/g],
+  'content acme': [/"Let's Encrypt orders" sidebar tab/g],
+}
 const RETIRED = [
   /widget/i, /edit layout/i, /\bcustomize\b.*sliders/i, /sidebar/i, /floating window/i,
   /green dot/i, /System Health panel/i, /certificate and CA detail panels/i,
@@ -34,7 +38,7 @@ const INSPECTOR_ONLY = /CA'?s? detail panels?/i
 describe('English help vs the 3.0 interface', () => {
   it.each(entries)('%s has no retired interface term', (_name, entry) => {
     let text = strings(entry).join('\n')
-    ALLOWED.forEach((re) => { text = text.replace(re, '') })
+    ;(ALLOWED[_name] || []).forEach((re) => { text = text.replace(re, '') })
     const hits = RETIRED.filter((re) => re.test(text)).map(String)
     if (!/(sshCas|crlocsp)$/.test(_name) && INSPECTOR_ONLY.test(text)) hits.push(String(INSPECTOR_ONLY))
     expect(hits).toEqual([])
