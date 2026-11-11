@@ -25,6 +25,8 @@ REVOKED = 'revoked'
 OWED = 'owed'
 #: No upstream account of UCM can speak for it: revoked locally only.
 NO_ACCOUNT = 'no_account'
+#: No ACME order of UCM names it any more: the account that obtained it is unknown.
+NO_ORDER = 'no_order'
 #: A hold (or its removal) is local: ACME has no hold, and a revocation there is final.
 HOLD = 'hold'
 
@@ -60,7 +62,9 @@ def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
     except Exception as exc:
         db.session.rollback()
         logger.error("Upstream account of certificate %s not resolved: %s", cert.id, exc)
-        order, client = None, None
+        return NO_ACCOUNT, None
+    if order is None:
+        return NO_ORDER, None
     if client is None:
         return NO_ACCOUNT, None
 
@@ -104,6 +108,10 @@ def local_only_message(outcome, detail) -> Optional[str]:
     if outcome == NO_ACCOUNT:
         return ('Certificate revoked in UCM only: the ACME CA account it was issued under '
                 'no longer exists, so the CA was not notified. Revoke it with the CA directly.')
+    if outcome == NO_ORDER:
+        return ('Certificate revoked in UCM only: UCM no longer has the ACME order it was '
+                'issued under, so it does not know which CA account to revoke it with. '
+                'Revoke it with the CA directly.')
     if outcome == HOLD:
         return ('Certificate put on hold in UCM only: ACME has no hold, so the CA was not '
                 'notified. Revoke it with a final reason to revoke it at the CA.')

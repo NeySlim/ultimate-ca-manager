@@ -90,6 +90,17 @@ class TestTheSingleRoute:
         bench.client.revoke_certificate.assert_not_called()
         assert _owed(bench) == []
 
+    def test_a_certificate_whose_order_was_deleted_says_the_account_is_unknown(
+            self, auth_client, bench):
+        from services.acme.order_housekeeping import delete_order
+        delete_order(bench.parent())
+        db.session.commit()
+        body = _revoke(auth_client, bench, 'keyCompromise')
+        assert body['meta']['acme_local_only'] is True
+        assert 'no longer exists' not in body['message']
+        assert 'no longer has the ACME order' in body['message']
+        bench.client.revoke_certificate.assert_not_called()
+
     def test_a_proxy_order_naming_no_upstream_account_is_not_revoked_with_another(
             self, auth_client, bench):
         order = bench.parent()
