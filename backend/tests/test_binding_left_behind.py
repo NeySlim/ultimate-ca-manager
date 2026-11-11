@@ -386,3 +386,84 @@ def test_reattaching_refuses_an_archived_successor(app, auth_client, create_ca, 
     assert (attention['successor_archived'], attention['can_reattach']) == (True, False)
     with app.app_context():
         assert db.session.get(DeployBinding, keyed_id).certificate_id == old_id
+
+
+def _keyed_successor_awaited(app, auth_client, create_ca, cn):
+    """O renewed to S1 without a key, then S1's key stored and committed, its bindings
+    not followed yet. Returns (O id, keyed binding id, S1 id)."""
+    from utils.key_codec import store_pem_bytes
+    ca = create_ca(cn=f'{cn} CA')
+    old_id, _, keyed_id = _bound_row(app, ca['id'], f'{cn}.example.test')
+    first_id, key_pem = _renew_with_known_key(app, old_id)
+    with app.app_context():
+        db.session.get(Certificate, first_id).prv = store_pem_bytes(key_pem.encode())
+        db.session.commit()
+    return old_id, keyed_id, first_id
+
+
+def test_a_key_reaching_an_archived_row_moves_nothing(app, auth_client, create_ca, https, seen):
+    from services.binding_attention import follow_key
+    old_id, keyed_id, first_id = _keyed_successor_awaited(app, auth_client, create_ca, 'left-key-archived')
+    with app.app_context():
+        first = db.session.get(Certificate, first_id)
+        first.archived = True
+        db.session.commit()
+        assert follow_key(first) is False
+        db.session.commit()
+        keyed = db.session.get(DeployBinding, keyed_id)
+        assert (keyed.certificate_id, keyed.attention_successor_id) == (old_id, first_id)
+
+
+def test_a_key_arriving_during_a_renewal_of_its_row_leaves_the_renewal_s_marks(
+        app, auth_client, create_ca, https, seen):
+    """PostgreSQL: a renewal archives S1 and retargets B to S2 while S1's key arrives. The
+    key's transaction waits for the renewal, then sees S1 archived and leaves B on S2."""
+    import threading
+    import time
+    from services.binding_attention import follow_key
+    with app.app_context():
+        if db.engine.dialect.name != 'postgresql':
+            pytest.skip('row locks need PostgreSQL (UCM_TEST_APP_PG_URL)')
+    old_id, keyed_id, first_id = _keyed_successor_awaited(app, auth_client, create_ca, 'left-key-race')
+    second_id = first_id + 1_000_000  # attention_successor_id has no foreign key
+    outcome = {}
+
+    def key_arrives():
+        with app.app_context():
+            try:
+                outcome['moved'] = follow_key(db.session.get(Certificate, first_id))
+                db.session.commit()
+            except Exception as e:  # surfaced by the assertion below
+                outcome['error'] = repr(e)
+            finally:
+                db.session.remove()
+
+    with app.app_context():
+        renewal = db.engine.connect()
+        watcher = db.engine.connect()
+        try:
+            renewal.execute(text('UPDATE certificates SET archived = true WHERE id = :i'), {'i': first_id})
+            renewal.execute(text('UPDATE deploy_bindings SET attention_successor_id = :s WHERE id = :b'),
+                            {'s': second_id, 'b': keyed_id})
+            thread = threading.Thread(target=key_arrives)
+            thread.start()
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline and thread.is_alive():
+                waiting = watcher.execute(text(
+                    "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' "
+                    "AND application_name = current_setting('application_name') "
+                    "AND pid <> pg_backend_pid()")).scalar()
+                watcher.rollback()
+                if waiting:
+                    break
+                time.sleep(0.05)
+            renewal.commit()
+            thread.join(30)
+        finally:
+            renewal.close()
+            watcher.close()
+        assert not thread.is_alive() and 'error' not in outcome, outcome
+        db.session.expire_all()
+        keyed = db.session.get(DeployBinding, keyed_id)
+        assert (keyed.certificate_id, keyed.attention_reason, keyed.attention_successor_id) == (
+            old_id, REASON, second_id)

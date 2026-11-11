@@ -84,15 +84,22 @@ def follow_key(cert, actor='system', queue=True):
     """*cert* now holds its key: the bindings left behind for it follow it, as they would
     have at renewal. Deliveries are queued unless *queue* is False (a renewal event
     deploys them). Returns True when the HTTPS binding moved. The caller commits."""
-    from models import DeployBinding, DeployDelivery
+    from sqlalchemy import select
+    from models import Certificate, DeployBinding, DeployDelivery, SystemConfig
     from services.deploy import DeployService
     from services.https_binding import BOUND_REFID_KEY
     if not cert.has_private_key:
         return False
+    # The row lock orders us with a renewal of *cert* (its claim archives the row): an
+    # archived row's bindings already wait for, or moved to, its successor.
+    archived = db.session.execute(select(Certificate.archived).where(Certificate.id == cert.id)
+                                  .with_for_update()).scalar()
+    if archived:
+        return False
     taken = {t for (t,) in db.session.query(DeployBinding.target_id)
              .filter(DeployBinding.certificate_id == cert.id)}
     for binding in (DeployBinding.query.filter_by(attention_successor_id=cert.id)
-                    .order_by(DeployBinding.id)):
+                    .order_by(DeployBinding.id).with_for_update().populate_existing()):
         clear(binding)
         if binding.target_id in taken:
             continue  # that target already receives the successor
@@ -101,11 +108,11 @@ def follow_key(cert, actor='system', queue=True):
         if queue:
             DeployService.enqueue_binding_update(
                 binding, DeployDelivery.BINDING_CERTIFICATE, actor=actor)
-    if not cert.refid or https_left_behind_for() != cert.refid:
+    awaited = SystemConfig.query.filter_by(key=HTTPS_LEFT_BEHIND_KEY).with_for_update().first()
+    if not cert.refid or awaited is None or (awaited.value or '').strip() != cert.refid:
         return False
-    from models import SystemConfig
     clear_https()
-    bound = SystemConfig.query.filter_by(key=BOUND_REFID_KEY).first()
+    bound = SystemConfig.query.filter_by(key=BOUND_REFID_KEY).with_for_update().first()
     if bound is None:
         return False
     bound.value = cert.refid
