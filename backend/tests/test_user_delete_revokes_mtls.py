@@ -240,6 +240,42 @@ class TestAFailureLeavesAConsistentState:
             assert db.session.get(AuthCertificate, probe['enrolment_id']) is None
         _assert_published_as_revoked(app, probe)
 
+    @staticmethod
+    def _break_the_purge(monkeypatch):
+        from api.v2.users import crud
+
+        def _broken(_user_id):
+            raise RuntimeError('database went away')
+        monkeypatch.setattr(crud, '_purge_user_dependencies', _broken)
+
+    def test_a_failed_purge_says_the_certificate_rows_are_deleted(
+            self, app, auth_client, probe, monkeypatch):
+        self._break_the_purge(monkeypatch)
+        answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+        assert answer.status_code == 500, answer.data[:300]
+        message = json.loads(answer.data)['message']
+        assert f"row(s) of #{probe['certificate_id']} are already deleted" in message
+
+    def test_a_failed_purge_names_the_rows_that_could_not_be_deleted(
+            self, app, auth_client, probe, monkeypatch):
+        from services.cert_service import CertificateService
+        self._break_the_purge(monkeypatch)
+        monkeypatch.setattr(CertificateService, 'delete_certificate', staticmethod(lambda *a, **k: False))
+        answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+        assert answer.status_code == 500, answer.data[:300]
+        message = json.loads(answer.data)['message']
+        assert f"certificate(s) #{probe['certificate_id']} could not be deleted and are still listed" in message
+        assert 'already deleted' not in message
+
+    def test_bulk_failed_purge_says_the_certificate_rows_are_deleted(
+            self, app, auth_client, probe, monkeypatch):
+        self._break_the_purge(monkeypatch)
+        answer = auth_client.post('/api/v2/users/bulk/delete',
+                                  data=json.dumps({'ids': [probe['user_id']]}),
+                                  content_type='application/json')
+        failed = json.loads(answer.data)['data']['failed']
+        assert f"row(s) of #{probe['certificate_id']} are already deleted" in failed[0]['error']
+
     def test_bulk_does_not_name_a_user_it_failed_to_delete(
             self, app, auth_client, create_user, probe, monkeypatch):
         from api.v2.users import crud

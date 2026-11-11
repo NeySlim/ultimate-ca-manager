@@ -47,9 +47,19 @@ def _numbers(certificate_ids):
     return ', '.join(f'#{cid}' for cid in certificate_ids)
 
 
-def _revoked_note(revoked):
-    """What a failure after the revocations must add: they are not undone."""
-    return f'. Already revoked for this deletion: certificate(s) {_numbers(revoked)}' if revoked else ''
+def _revoked_note(revoked, kept=()):
+    """What a failure after the revocations must add: they are not undone, and the rows of
+    the revoked certificates are already deleted, but for the ``kept`` ones."""
+    deleted = [cid for cid in revoked if cid not in kept]
+    parts = []
+    if revoked:
+        parts.append(f'Already revoked for this deletion: certificate(s) {_numbers(revoked)}')
+    if deleted:
+        parts.append(f'the row(s) of {_numbers(deleted)} are already deleted')
+    if kept:
+        parts.append(f'certificate(s) {_numbers(kept)} could not be deleted '
+                     'and are still listed under Certificates')
+    return '. ' + '; '.join(parts) if parts else ''
 
 
 def _acme_untold(upstream):
@@ -560,8 +570,8 @@ def delete_user(user_id):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to delete user {user_id}: {e}", exc_info=True)
-        return error_response(f'Failed to delete user{_revoked_note(revoked)}.{acme_note}'
-                              if acme_note else 'Failed to delete user' + _revoked_note(revoked),
+        return error_response(f'Failed to delete user{_revoked_note(revoked, kept)}.{acme_note}'
+                              if acme_note else 'Failed to delete user' + _revoked_note(revoked, kept),
                               500, meta=acme_meta)
 
     if sessions_deleted > 0:
@@ -609,7 +619,7 @@ def delete_user(user_id):
 @bp.route('/api/v2/users/bulk/delete', methods=['POST'])
 @require_auth(['delete:users'])
 def bulk_delete_users():
-    """Bulk deactivate users (soft delete)"""
+    """Delete users, each with the mTLS certificates it enrolled (a real deletion, not a deactivation)."""
     if g.current_user.role != 'admin':
         return error_response('Insufficient permissions', 403)
 
@@ -651,11 +661,11 @@ def bulk_delete_users():
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to delete user {user_id}: {e}", exc_info=True)
-            results['failed'].append({'id': user_id, 'error': 'Deletion failed' + _revoked_note(revoked)})
+            results['failed'].append({'id': user_id, 'error': 'Deletion failed' + _revoked_note(revoked, kept)})
             continue
         ok, _err = safe_commit(logger, f"Delete user {user_id}")
         if not ok:
-            results['failed'].append({'id': user_id, 'error': 'Deletion failed' + _revoked_note(revoked)})
+            results['failed'].append({'id': user_id, 'error': 'Deletion failed' + _revoked_note(revoked, kept)})
             continue
         total_sessions_invalidated += sessions_deleted
         if kept:
