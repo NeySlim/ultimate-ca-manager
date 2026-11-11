@@ -72,6 +72,16 @@ REVOKED_THEN_DELETED = ('Certificate {id} was revoked, then deleted: automatic r
                         'Turn it back on to obtain a new certificate for these names.')
 
 
+def _propagate_to_acme_ca(partner, reason):
+    """The related member obtained over ACME is revoked at its CA too; the caller
+    answers for the member it named, so this one's outcome is logged."""
+    from services.acme.upstream_revocation import (
+        NOT_ACME, REVOKED, local_only_message, propagate_acme_revocation)
+    outcome, detail = propagate_acme_revocation(partner, reason)
+    if outcome not in (NOT_ACME, REVOKED):
+        logger.warning("Related certificate %s: %s", partner.id, local_only_message(outcome, detail))
+
+
 class LifecycleMixin:
 
     @staticmethod
@@ -511,12 +521,15 @@ class LifecycleMixin:
             if partner is not None and revocable(partner, reason):
                 partner_id = partner.id
                 try:
-                    LifecycleMixin.revoke_certificate(partner_id, reason=reason, username=username,
-                                                      invalidity_at=invalidity_at, revoke_related=False)
+                    partner = LifecycleMixin.revoke_certificate(
+                        partner_id, reason=reason, username=username,
+                        invalidity_at=invalidity_at, revoke_related=False)
                 except Exception:
                     # The member asked for stays revoked; the other one is said, not hidden
                     logger.error("Certificate %s revoked, its related certificate %s was not",
                                  cert_id, partner_id, exc_info=True)
+                else:
+                    _propagate_to_acme_ca(partner, reason)
         else:
             from services.cert.related_pair import hand_over_link
             try:

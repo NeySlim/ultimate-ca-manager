@@ -230,3 +230,50 @@ class TestRevokeCertAtUcmsOwnAcmeServer:
         assert answer.status_code == 200, answer.data[:300]
         bench.client.revoke_certificate.assert_not_called()
         assert _owed(bench) == []
+
+
+class TestTheRelatedMemberOfAPair:
+    """RFC 9763: a certificate of UCM's CA may name, as its related one, a certificate
+    UCM obtained over ACME; revoking the pair revokes that one at its CA too."""
+
+    def test_the_acme_member_is_revoked_at_its_ca(self, app, auth_client, bench, create_cert):  # noqa: F811
+        from models import Certificate
+        from services.cert_service import CertificateService
+        other = create_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        a, b = bench.row(), db.session.get(Certificate, other['id'])
+        a.related_certificate_id, b.related_certificate_id = b.id, a.id
+        db.session.commit()
+        try:
+            answer = auth_client.post(f"/api/v2/certificates/{other['id']}/revoke",
+                                      data=json.dumps({'reason': 'keyCompromise'}),
+                                      content_type='application/json')
+            assert answer.status_code == 200, answer.data[:300]
+            assert bench.row().revoked is True
+            sent = bench.client.revoke_certificate.call_args
+            assert sent.args[0] == bench.old_pem and sent.kwargs == {'reason': 1}
+        finally:
+            db.session.rollback()
+            for row in (db.session.get(Certificate, bench.cert_id),
+                        db.session.get(Certificate, other['id'])):
+                row.related_certificate_id = None
+            db.session.commit()
+            assert CertificateService.delete_certificate(other['id'], username='admin')
+
+    def test_a_ca_that_does_not_answer_keeps_it_owed(self, app, bench, create_cert):  # noqa: F811
+        from models import Certificate
+        from services.cert_service import CertificateService
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        other = create_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        a, b = bench.row(), db.session.get(Certificate, other['id'])
+        a.related_certificate_id, b.related_certificate_id = b.id, a.id
+        db.session.commit()
+        try:
+            CertificateService.revoke_certificate(other['id'], reason='superseded', username='admin')
+            assert [(e['serial'], e['reason']) for e in _owed(bench)] == [(bench.old_serial, 4)]
+        finally:
+            db.session.rollback()
+            for row in (db.session.get(Certificate, bench.cert_id),
+                        db.session.get(Certificate, other['id'])):
+                row.related_certificate_id = None
+            db.session.commit()
+            assert CertificateService.delete_certificate(other['id'], username='admin')
