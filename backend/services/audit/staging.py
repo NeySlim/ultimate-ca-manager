@@ -68,10 +68,11 @@ def syslog_copy(entry):
     return SimpleNamespace(**{name: getattr(entry, name, None) for name in _SYSLOG_FIELDS})
 
 
-def forward_to_syslog(entry):
+def forward_to_syslog(entry, reload=True):
     try:
         from services.syslog_service import syslog_forwarder
-        syslog_forwarder.reload_if_changed()
+        if reload:
+            syslog_forwarder.reload_if_changed()
         if syslog_forwarder.is_enabled:
             syslog_forwarder.send(entry)
     except Exception as e:
@@ -86,7 +87,7 @@ def _syslog_after_commit(session):
     if session.in_nested_transaction():
         return
     for _tx, entry in session.info.pop(_PENDING_SYSLOG, ()):
-        forward_to_syslog(entry)
+        forward_to_syslog(entry, reload=False)  # reloaded at staging: no SQL in this hook
 
 
 def _within(tx, ended):

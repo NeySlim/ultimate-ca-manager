@@ -343,11 +343,13 @@ class SyslogForwarder:
             return {'success': False, 'error': str(e)}
 
     def _read_stored(self) -> dict:
-        """The stored settings, in a session of its own: callable from an after_commit hook."""
-        from sqlalchemy.orm import Session
+        """The stored settings, read without flushing what the caller has pending.
+
+        Not from an after_commit hook: the session refuses SQL there.
+        """
         from models import db, SystemConfig
-        with Session(db.engine) as session:
-            rows = session.query(SystemConfig.key, SystemConfig.value) \
+        with db.session.no_autoflush:
+            rows = db.session.query(SystemConfig.key, SystemConfig.value) \
                 .filter(SystemConfig.key.in_(self.SETTING_KEYS)).all()
         return {key: value for key, value in rows}
 

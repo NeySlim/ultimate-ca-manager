@@ -162,3 +162,28 @@ def test_the_collector_being_turned_off_still_hears_of_it(app, auth_client, coll
         syslog_forwarder._socket = None
     packets = [p for p in _received(collector) if 'syslog_config_updated' in p]
     assert len(packets) == 1 and 'disabled' in packets[0], packets
+
+
+def test_a_reload_at_staging_keeps_the_callers_transaction(app):
+    """The settings are read in the caller's session: nothing it has pending is lost or flushed."""
+    from services.audit.staging import stage_audit_entry
+    from services.syslog_service import syslog_forwarder
+    saved = dict(syslog_forwarder.__dict__)
+    key = f'xp_probe_{uuid.uuid4().hex[:8]}'
+    try:
+        with app.app_context():
+            db.session.add(SystemConfig(key=key, value='kept'))
+            db.session.flush()
+            syslog_forwarder._checked_at = float('-inf')  # a reload is due
+            assert stage_audit_entry(action='xp_probe', resource_type='system',
+                                     resource_name=key, username='tester') is not None
+            db.session.commit()
+            assert SystemConfig.query.filter_by(key=key).first() is not None
+            from models import AuditLog
+            assert AuditLog.query.filter_by(resource_name=key).count() == 1
+    finally:
+        syslog_forwarder.__dict__.clear()
+        syslog_forwarder.__dict__.update(saved)
+        with app.app_context():
+            SystemConfig.query.filter_by(key=key).delete()
+            db.session.commit()
