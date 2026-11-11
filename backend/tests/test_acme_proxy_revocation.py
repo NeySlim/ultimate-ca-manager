@@ -185,6 +185,7 @@ def test_proxy_revoke_relays_upstream_status_and_revokes_local(
         cert_id=proxy_revocation_rows['certificate_id'],
         reason='superseded',
         username='acme_proxy',
+        revoke_related=False,
     )
 
 
@@ -223,7 +224,8 @@ def test_proxy_revoke_makes_a_local_hold_final_only(
     assert response.status_code == 200
     if local:
         local_revoke.assert_called_once_with(
-            cert_id=proxy_revocation_rows['certificate_id'], reason=local, username='acme_proxy')
+            cert_id=proxy_revocation_rows['certificate_id'], reason=local, username='acme_proxy',
+            revoke_related=False)
     else:
         local_revoke.assert_not_called()
 
@@ -286,3 +288,64 @@ def test_proxy_revoke_relays_upstream_failure_status(
     problem = response.get_json()
     assert problem['type'] == 'urn:ietf:params:acme:error:serverInternal'
     assert 'HTTP 403' in problem['detail']
+
+
+def test_proxy_revoke_leaves_the_related_member_alone(
+    app, client, proxy_revocation_rows, monkeypatch,
+):
+    """RFC 8555 §7.6: the key holder revokes the certificate presented, not its pair partner."""
+    from api.acme import acme_proxy_api
+    from services.acme import upstream_revocation
+
+    with app.app_context():
+        a = db.session.get(Certificate, proxy_revocation_rows['certificate_id'])
+        b = Certificate(
+            refid=str(uuid4()), descr='proxy-partner.example', crt=a.crt,
+            subject='CN=proxy-partner.example', issuer='CN=External CA',
+            serial_number=format(uuid4().int >> 64, 'x'), source='acme_client',
+            valid_from=datetime.utcnow() - timedelta(days=1),
+            valid_to=datetime.utcnow() + timedelta(days=90),
+            related_certificate_id=a.id)
+        db.session.add(b)
+        db.session.flush()
+        a.related_certificate_id = b.id
+        db.session.commit()
+        partner_id = b.id
+    sent = []
+    monkeypatch.setattr(upstream_revocation, 'propagate_acme_revocation',
+                        lambda cert, reason: sent.append(cert.id) or ('revoked', None))
+    payload = {'certificate': _b64url(proxy_revocation_rows['certificate_der']), 'reason': 1}
+    service = MagicMock()
+    service.account.id = proxy_revocation_rows['account_id']
+    service.revoke_certificate.return_value.status_code = 200
+    monkeypatch.setattr(acme_proxy_api, 'verify_proxy_jws', lambda: (True, payload, None, None))
+    monkeypatch.setattr(
+        acme_proxy_api, '_request_protected_header',
+        lambda: {'kid': 'https://ucm.example/acme/proxy/acct/internal-acme-account'})
+    monkeypatch.setattr(acme_proxy_api, 'get_proxy_service', lambda slug=None: service)
+    try:
+        response = client.post(
+            '/acme/proxy/revoke-cert',
+            data=json.dumps({'protected': 'stub', 'payload': 'stub', 'signature': 'stub'}),
+            content_type='application/jose+json')
+
+        assert response.status_code == 200
+        with app.app_context():
+            db.session.expire_all()
+            assert db.session.get(Certificate, proxy_revocation_rows['certificate_id']).revoked
+            assert db.session.get(Certificate, partner_id).revoked is not True
+        assert partner_id not in sent
+        service.revoke_certificate.assert_called_once()
+    finally:
+        with app.app_context():
+            from models import RevokedSerial
+            for cid in (proxy_revocation_rows['certificate_id'], partner_id):
+                row = db.session.get(Certificate, cid)
+                if row is not None:
+                    row.related_certificate_id = None
+            RevokedSerial.query.filter(
+                RevokedSerial.certificate_id.in_(
+                    [proxy_revocation_rows['certificate_id'], partner_id])).delete(
+                synchronize_session=False)
+            db.session.query(Certificate).filter_by(id=partner_id).delete()
+            db.session.commit()
