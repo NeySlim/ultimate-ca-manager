@@ -169,7 +169,6 @@ class TestTheScheduleReportsWhatHappened:
             SystemConfig.query.filter_by(key='backup_password').delete()
             SystemConfig.query.filter_by(key='backup.last_run').delete()
             db.session.commit()
-            schedule._LAST_ATTEMPT['at'] = None
             try:
                 with pytest.raises(Exception):
                     schedule.run_scheduled_backup()
@@ -178,4 +177,3 @@ class TestTheScheduleReportsWhatHappened:
                 assert 'password' in (status['last_outcome_reason'] or '')
             finally:
                 _set('auto_backup_enabled', 'false')
-                schedule._LAST_ATTEMPT['at'] = None

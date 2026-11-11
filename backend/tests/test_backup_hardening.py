@@ -307,11 +307,8 @@ class TestPublicationDecidesTheRetryGuard:
         _set('backup_password', 'Correct-Horse-Battery-9')
         SystemConfig.query.filter_by(key='backup.last_run').delete()
         db.session.commit()
-        schedule._LAST_ATTEMPT['at'] = None
 
     def _disable(self):
-        from services.backup import schedule
-        schedule._LAST_ATTEMPT['at'] = None
         _set('auto_backup_enabled', 'false')
         SystemConfig.query.filter_by(key='backup_password').delete()
         SystemConfig.query.filter_by(key='backup.last_run').delete()
@@ -357,7 +354,7 @@ class TestPublicationDecidesTheRetryGuard:
                     lambda path: (3, 'deadbeef'))  # as if the file were short
                 with pytest.raises(BackupValidationError):
                     schedule.run_scheduled_backup()
-                assert schedule._LAST_ATTEMPT['at'] is None, \
+                assert schedule._get('backup.last_run') is None, \
                     'a run that produced no provable archive must be retried'
                 assert not list(tmp_path.glob('ucm_backup_*.ucmbkp')), \
                     'a failed validation must not leave a listed archive'
@@ -629,8 +626,8 @@ class TestRedactionCoversEveryPasswordShape:
 
 
 class TestFailedTimestampStopsTheLoop:
-    """An archive written but never recorded must not be written again a
-    minute later, which is what filled the disk."""
+    """An archive written must not be written again a minute later, whatever
+    fails after it: that is what filled the disk."""
 
     def test_the_run_does_not_come_due_again_on_the_next_tick(
             self, app, tmp_path, monkeypatch):
@@ -643,18 +640,16 @@ class TestFailedTimestampStopsTheLoop:
             _set('backup_password', 'Correct-Horse-Battery-9')
             SystemConfig.query.filter_by(key='backup.last_run').delete()
             db.session.commit()
-            schedule._LAST_ATTEMPT['at'] = None
 
             monkeypatch.setattr(
                 'services.backup.schedule.BackupService.iter_backup',
                 lambda self, pw, **k: b'archive-bytes')
             monkeypatch.setattr(
-                'services.backup.schedule._record_last_run',
-                lambda ts: (_ for _ in ()).throw(
-                    schedule.ScheduledBackupError('cannot write')))
+                'services.backup.schedule._apply_retention',
+                lambda days: (_ for _ in ()).throw(RuntimeError('retention failed')))
 
             try:
-                with pytest.raises(schedule.ScheduledBackupError):
+                with pytest.raises(RuntimeError):
                     schedule.run_scheduled_backup()
                 written = list(tmp_path.glob('ucm_backup_*.ucmbkp'))
                 assert len(written) == 1
@@ -664,9 +659,9 @@ class TestFailedTimestampStopsTheLoop:
                     'status': 'skipped', 'reason': 'not_due'}
                 assert len(list(tmp_path.glob('ucm_backup_*.ucmbkp'))) == 1
             finally:
-                schedule._LAST_ATTEMPT['at'] = None
                 _set('auto_backup_enabled', 'false')
                 SystemConfig.query.filter_by(key='backup_password').delete()
+                SystemConfig.query.filter_by(key='backup.last_run').delete()
                 db.session.commit()
 
 

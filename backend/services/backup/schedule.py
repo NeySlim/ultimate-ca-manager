@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 import fips_mode
 from models import db, SystemConfig
 from config.settings import Config
+from utils.config_cas import config_compare_and_set, config_release
 from utils.datetime_utils import utc_now, utc_isoformat
 
 from . import storage
@@ -371,44 +372,30 @@ def run_backup_retention(wait: float = 0) -> int:
         return 0
 
 
-# Last archive this process published, whether or not its timestamp could be
-# stored. `backup.last_run` is the source of truth across restarts; this guard
-# only covers the case where writing that row fails, which used to leave the
-# task due again 60 seconds later, once per minute, until the disk filled. It
-# is set after publication, never before, so a failed attempt is retried.
-_LAST_ATTEMPT: dict = {'at': None}
-
-
-def _record_last_run(ts: datetime) -> None:
-    """Persist the run timestamp, or raise.
-
-    The scheduler asks every 60 seconds whether a backup is due, and the
-    answer is read from this row: a silent rollback left the task due again on
-    the next tick, writing one archive per minute until the disk filled.
-    """
-    # Leader-only task: one writer, so last_run needs no compare-and-set
-    cfg = SystemConfig.query.filter_by(key=_LAST_RUN_KEY).first()
-    if cfg:
-        cfg.value = utc_isoformat(ts)
-    else:
-        db.session.add(SystemConfig(key=_LAST_RUN_KEY, value=utc_isoformat(ts)))
+def _claim_run(previous, now: datetime):
+    """Move ``backup.last_run`` from what the due check read to this run, before any
+    archive is written: of two nodes finding the run due, one writes. The claimed
+    value, or None when another node moved it first."""
+    claimed = utc_isoformat(now)
     try:
-        db.session.commit()
+        moved = config_compare_and_set(_LAST_RUN_KEY, previous, claimed)
     except Exception as exc:
         db.session.rollback()
-        raise ScheduledBackupError(
-            f'Backup created, but its schedule timestamp could not be saved: {exc}'
-        ) from exc
+        raise ScheduledBackupError(f'The backup schedule could not be reserved: {exc}') from exc
+    return claimed if moved else None
+
+
+def _release_run(previous, claimed: str) -> None:
+    """Give a run that wrote no archive back to the next tick, unless moved since."""
+    try:
+        config_release(_LAST_RUN_KEY, claimed, previous)
+    except Exception:
+        db.session.rollback()
+        logger.warning("Could not release the backup schedule; next run in one period")
 
 
 def _is_due(sched: dict, now: datetime) -> bool:
     period = _PERIOD_SECONDS.get(sched.get('frequency', 'daily'), 86400)
-    attempted = _LAST_ATTEMPT.get('at')
-    if attempted is not None:
-        elapsed = (_naive_utc(now) - _naive_utc(attempted)).total_seconds()
-        if elapsed < period - 300:
-            return False
-
     last_run = sched.get('last_run')
     if not last_run:
         return True  # never run → run now
@@ -476,16 +463,19 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
             # A setting carried over from a standard instance must not stop every run.
             logger.warning("Scheduled backup KDF is Argon2id, refused in FIPS mode: using PBKDF2")
             kdf = None
+        claimed = _claim_run(sched.get('last_run'), now)
+        if claimed is None:
+            logger.info("Scheduled backup already taken by another node")
+            return {'status': 'skipped', 'reason': 'claimed by another node'}
         service = BackupService()
-        # The same export and naming as every other archive, under the lock already held
-        size, _path, filename = storage.export_archive(service, password, kdf=kdf)
-
-        # Only now: the archive exists, it reads back as written, and it is
-        # recorded. An export or write that failed before this point leaves
-        # the run due again on the next tick, which is what should happen;
-        # past it, a timestamp that cannot be stored must not produce a second
-        # archive a minute later.
-        _LAST_ATTEMPT['at'] = now
+        try:
+            # The same export and naming as every other archive, under the lock already held
+            size, _path, filename = storage.export_archive(service, password, kdf=kdf)
+        except Exception:
+            # No archive: the next tick retries. Past this point the claim stays,
+            # so nothing after the write can bring a second archive a minute later.
+            _release_run(sched.get('last_run'), claimed)
+            raise
 
         logger.info(f"Scheduled backup created: {filename} ({size} bytes)")
         for left_out in service.last_export_warnings:
@@ -494,7 +484,6 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
                                 success=True)
 
         removed = _apply_retention(sched.get('retention_days', 30))
-        _record_last_run(now)
         _record_outcome('ok', filename)
         return {
             'status': 'ok',

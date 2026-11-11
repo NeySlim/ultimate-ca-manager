@@ -141,7 +141,6 @@ class TestAFullDiskPublishesNothing:
                     db.session.add(SystemConfig(key=key, value=value))
             SystemConfig.query.filter_by(key='backup.last_run').delete()
             db.session.commit()
-            schedule._LAST_ATTEMPT['at'] = None
 
             real_fsync = os_module.fsync
             archive_dir = str(backup_dir)
@@ -168,10 +167,9 @@ class TestAFullDiskPublishesNothing:
                 status = schedule.get_schedule()
                 assert status['last_outcome'] == 'failed'
                 assert status['last_outcome_reason']
-                assert schedule._LAST_ATTEMPT['at'] is None, \
+                assert schedule._get('backup.last_run') is None, \
                     'a run that wrote nothing must be tried again'
             finally:
-                schedule._LAST_ATTEMPT['at'] = None
                 row = SystemConfig.query.filter_by(key='auto_backup_enabled').first()
                 if row:
                     row.value = 'false'
