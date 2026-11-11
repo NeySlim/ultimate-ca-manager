@@ -263,12 +263,13 @@ class CommandApplier:
         self._stop.set()
         if self._thread is not None and self._thread is not threading.current_thread():
             self._thread.join(timeout)
-        if self._give_back_pending is not None:
+        pending = self._give_back_pending  # read once: the loop can clear it meanwhile
+        if pending is not None:
             if (self._thread is not None and self._thread.is_alive()
                     and self._thread is not threading.current_thread()):
                 # the loop still owns the connection: the give-back is left undone
                 logger.error(f"Rolling restart of node {self.node_id}: claim of command "
-                             f"{self._give_back_pending[1]} possibly not given back at stop, "
+                             f"{pending[1]} possibly not given back at stop, "
                              f"the loop did not end within {timeout}s")
             else:
                 self._give_back_at_stop()
