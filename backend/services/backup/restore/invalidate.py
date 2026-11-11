@@ -287,6 +287,14 @@ def _signing_key_matches(ca) -> bool:
     return private_key_matches(get_ca_signing_key(ca, allow_revoked=True), cert)
 
 
+def _has_delta_after(ca_id: int, base_number: int) -> bool:
+    """Whether a delta CRL newer than base `base_number` was stored (generate_crl only logs its failure)."""
+    from models.crl import CRLMetadata
+    return db.session.query(CRLMetadata.id).filter(
+        CRLMetadata.ca_id == ca_id, CRLMetadata.is_delta.is_(True),
+        CRLMetadata.crl_number > base_number).first() is not None
+
+
 def _regenerate_crls() -> Tuple[list, list]:
     """A fresh CRL (and delta) for each publishing authority that can sign: the one served
     may list the revocations of the replaced instance. Returns (regenerated, failed) names."""
@@ -300,7 +308,9 @@ def _regenerate_crls() -> Tuple[list, list]:
         try:
             if not _signing_key_matches(ca):
                 raise ValueError("its key is not the key of its certificate")
-            CRLService.generate_crl(ca.id, username='system')
+            base = CRLService.generate_crl(ca.id, username='system')
+            if ca.delta_crl_enabled and not _has_delta_after(ca.id, base.crl_number):
+                raise ValueError("its delta CRL is older than the new base")
         except Exception as exc:
             db.session.rollback()
             logger.warning("Restore: the CRL of CA %s was not regenerated: %s", name, exc)

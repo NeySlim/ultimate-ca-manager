@@ -73,6 +73,21 @@ def test_a_publishing_authority_gets_a_new_crl_and_its_delta(app, create_ca, mon
                for kind, payload in events), events
 
 
+def test_a_delta_that_fails_after_its_base_reports_the_authority(app, create_ca, monkeypatch):
+    """The served delta would be older than the new base: the authority is not fully re-signed."""
+    from services.crl.generation import CRLGenerationMixin
+    from services.crl_service import CRLService
+    ca_id, name = _publishing(app, create_ca, 'Restore CRL Delta Fails', delta_crl_enabled=True)
+    with app.app_context():
+        CRLService.generate_crl(ca_id)  # an earlier base and delta exist
+
+        def refused(*a, **kw):
+            raise RuntimeError('HSM session lost')
+        monkeypatch.setattr(CRLGenerationMixin, 'generate_delta_crl', staticmethod(refused))
+        result = invalidate_after_restore()
+        assert name in result['crls_failed'] and name not in result['crls_regenerated'], result
+
+
 def test_an_authority_that_cannot_sign_is_reported_and_the_others_still_get_theirs(
         app, create_ca, monkeypatch):
     good_id, good = _publishing(app, create_ca, 'Restore CRL Good')
