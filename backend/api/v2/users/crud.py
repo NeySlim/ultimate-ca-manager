@@ -80,6 +80,21 @@ def _unrevoked_text(unrevoked):
     return ', '.join(f"#{c['id']} (serial {c['serial_number']})" for c in unrevoked)
 
 
+def _revoked_despite_refusal(certificate_id, upstream):
+    """A refusal raised after the revocation committed: the row, read again, says so, and the
+    ACME CA is told as it would have been."""
+    from models import Certificate
+    from services.acme.upstream_revocation import propagate_acme_revocation
+    from services.mtls_enrollment import REMOVAL_REASON
+    row = db.session.get(Certificate, certificate_id)
+    if row is None or not row.revoked:
+        return False
+    outcome, detail = propagate_acme_revocation(row, REMOVAL_REASON)
+    if upstream is not None:
+        upstream.append((certificate_id, outcome, detail))
+    return True
+
+
 def _withdraw_enrolled_certificates(user_id, actor, upstream=None):
     """Revoke each certificate the user enrolled for mTLS, then delete it with its
     enrolments, as removing the enrolment does. Returns ``(revoked, unrevoked, kept,
@@ -109,8 +124,9 @@ def _withdraw_enrolled_certificates(user_id, actor, upstream=None):
         if needs_revoking:
             refusal = revoke_checked(enrolment, certificate_id, actor.username, upstream)
             if refusal is not None:
-                unrevoked.append(_unrevoked_entry(certificate_id))
-                continue
+                if not _revoked_despite_refusal(certificate_id, upstream):
+                    unrevoked.append(_unrevoked_entry(certificate_id))
+                    continue
             revoked.append(certificate_id)
         if certificate_id:
             withdrawn.append(certificate_id)

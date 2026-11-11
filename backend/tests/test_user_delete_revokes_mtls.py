@@ -169,6 +169,62 @@ class TestACertificateThatCannotBeRevokedNeverBlocksTheDeletion:
         assert f"#{probe['certificate_id']}" in _last_audit(app, 'users_bulk_deleted')
 
 
+class TestARevocationFailingAfterItsCommitIsStillARevocation:
+    @staticmethod
+    def _fail_after_the_commit(monkeypatch):
+        from services.ocsp_service import OCSPService
+
+        real = OCSPService.responder_cas_for_certificate
+        calls = []
+
+        def _broken_once(cert_id):
+            # The revocation's own lookup; the deletion that follows reads it normally
+            if not calls:
+                calls.append(cert_id)
+                raise RuntimeError('responder lookup failed')
+            return real(cert_id)
+        monkeypatch.setattr(OCSPService, 'responder_cas_for_certificate', staticmethod(_broken_once))
+
+    @staticmethod
+    def _spy_on_the_acme_propagation(monkeypatch):
+        from services.acme import upstream_revocation
+        told = []
+        real = upstream_revocation.propagate_acme_revocation
+
+        def spy(certificate, reason):
+            told.append(certificate.id)
+            return real(certificate, reason)
+        monkeypatch.setattr(upstream_revocation, 'propagate_acme_revocation', spy)
+        return told
+
+    def test_unit_delete_does_not_call_it_valid(self, app, auth_client, probe, monkeypatch):
+        self._fail_after_the_commit(monkeypatch)
+        told = self._spy_on_the_acme_propagation(monkeypatch)
+        answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+        assert answer.status_code == 200, answer.data[:300]
+        body = json.loads(answer.data)
+        assert not (body.get('data') or {}).get('unrevoked_certificates')
+        assert 'could not be revoked' not in body['message']
+        assert told == [probe['certificate_id']]
+        with app.app_context():
+            assert db.session.get(User, probe['user_id']) is None
+            assert db.session.get(Certificate, probe['certificate_id']) is None
+        assert 'could not be revoked' not in _last_audit(app, 'user_delete')
+
+    def test_bulk_delete_does_not_call_it_valid(self, app, auth_client, probe, monkeypatch):
+        self._fail_after_the_commit(monkeypatch)
+        told = self._spy_on_the_acme_propagation(monkeypatch)
+        answer = auth_client.post('/api/v2/users/bulk/delete',
+                                  data=json.dumps({'ids': [probe['user_id']]}),
+                                  content_type='application/json')
+        assert answer.status_code == 200, answer.data[:300]
+        data = json.loads(answer.data)['data']
+        assert data['success'] == [probe['user_id']] and not data.get('unrevoked')
+        assert told == [probe['certificate_id']]
+        with app.app_context():
+            assert db.session.get(Certificate, probe['certificate_id']) is None
+
+
 class TestAFailureLeavesAConsistentState:
     def test_the_user_stays_when_its_own_deletion_fails(self, app, auth_client, probe, monkeypatch):
         from api.v2.users import crud
