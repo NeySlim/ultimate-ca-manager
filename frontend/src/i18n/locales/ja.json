@@ -4001,7 +4001,8 @@
     "revokeRelatedBulk": "リンクされた証明書も失効させる",
     "revokeRelatedBulkHint": "選択したハイブリッドペアのメンバーは、もう一方も一緒に失効します。チェックを外すと、他のメンバーは有効なまま残ります。",
     "bulkRelatedRevoked": "選択した証明書と共に、リンクされた証明書 {{count}} 件を失効させました",
-    "bulkRelatedRevokeFailed": "選択した証明書と共に、リンクされた証明書 {{count}} 件を失効できませんでした（{{ids}}）：個別に失効させてください"
+    "bulkRelatedRevokeFailed": "選択した証明書と共に、リンクされた証明書 {{count}} 件を失効できませんでした（{{ids}}）：個別に失効させてください",
+    "bulkRevokedLocallyOnly": "{{count}} certificates revoked in UCM only ({{ids}}): the issuing CA did not confirm. A revocation an ACME CA did not confirm is sent again automatically; otherwise revoke them with the CA directly."
   },
   "details": {
     "pemCertificate": "PEM証明書",

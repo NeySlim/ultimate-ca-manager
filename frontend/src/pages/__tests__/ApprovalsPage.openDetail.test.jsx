@@ -125,6 +125,31 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     showError.mockRestore(); showSuccess.mockRestore()
   })
 
+  it.each([['acme_local_only'], ['msca_local_only']])(
+    'warns when an approved revocation stayed local (%s)', async (flag) => {
+      const showWarning = vi.spyOn(stable.notify, 'showWarning')
+      const showSuccess = vi.spyOn(stable.notify, 'showSuccess')
+      approve.mockResolvedValue({ data: { certificate_issued: true,
+        certificate: { id: 7, revoked: true, [flag]: true } } })
+      renderPage()
+      await clickApproveOrReject('approve')
+      await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('approvals.revocationPerformed'))
+      expect(showWarning).toHaveBeenCalledWith('revocation.revokedLocallyOnly')
+      showWarning.mockRestore(); showSuccess.mockRestore()
+    })
+
+  it('warns of nothing when the issuing CA was told of an approved revocation', async () => {
+    const showWarning = vi.spyOn(stable.notify, 'showWarning')
+    approve.mockResolvedValue({ data: { certificate_issued: true, certificate: {
+      id: 7, revoked: true, acme_local_only: false, msca_local_only: false } } })
+    renderPage()
+    await clickApproveOrReject('approve')
+    await waitFor(() => expect(approve).toHaveBeenCalled())
+    await waitFor(() => expect(openEntity).toHaveBeenCalled())
+    expect(showWarning).not.toHaveBeenCalled()
+    showWarning.mockRestore()
+  })
+
   it('opens nothing on reject', async () => {
     reject.mockResolvedValue({ data: {} })
     renderPage()

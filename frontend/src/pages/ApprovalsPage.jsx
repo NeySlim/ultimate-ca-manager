@@ -19,6 +19,7 @@ import { usePermission } from '../hooks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { formatDate, cn } from '../lib/utils'
 import { showNotices } from '../lib/notices'
+import { approvedLocalOnlyRevocationWarning } from '../lib/revocationOutcome'
 
 // What a request asks for: labels resolved via t() inside component
 const REQUEST_TYPES = {
@@ -245,6 +246,8 @@ export default function ApprovalsPage() {
         result = await approvalsService.approve(req.id, comment || undefined)
         if (result?.data?.certificate_issued && result.data.certificate?.revoked) {
           showSuccess(t('approvals.revocationPerformed'))
+          const localOnly = approvedLocalOnlyRevocationWarning(result.data.certificate, t)
+          if (localOnly) showWarning(localOnly)
         } else if (result?.data?.certificate_issued) {
           showSuccess(t('approvals.certificateIssued'))
           showNotices(result, showWarning)

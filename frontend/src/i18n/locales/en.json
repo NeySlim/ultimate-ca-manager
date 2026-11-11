@@ -4001,7 +4001,8 @@
     "revokeRelatedBulk": "Also revoke the linked certificates",
     "revokeRelatedBulkHint": "Selected members of a hybrid pair take the other member with them. Untick to keep the other members valid.",
     "bulkRelatedRevoked": "{{count}} linked certificates revoked with the selection",
-    "bulkRelatedRevokeFailed": "{{count}} linked certificates could not be revoked with the selection ({{ids}}): revoke them separately"
+    "bulkRelatedRevokeFailed": "{{count}} linked certificates could not be revoked with the selection ({{ids}}): revoke them separately",
+    "bulkRevokedLocallyOnly": "{{count}} certificates revoked in UCM only ({{ids}}): the issuing CA did not confirm. A revocation an ACME CA did not confirm is sent again automatically; otherwise revoke them with the CA directly."
   },
   "details": {
     "pemCertificate": "PEM Certificate",

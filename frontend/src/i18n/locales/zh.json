@@ -3998,7 +3998,8 @@
     "relatedRevokeFailed": "证书已吊销，但其关联证书 #{{id}} 无法吊销：请单独吊销。",
     "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
     "bulkRelatedRevoked": "已随所选项一并吊销 {{count}} 张关联证书",
-    "bulkRelatedRevokeFailed": "有 {{count}} 张关联证书无法随所选项一并吊销（{{ids}}）：请单独吊销"
+    "bulkRelatedRevokeFailed": "有 {{count}} 张关联证书无法随所选项一并吊销（{{ids}}）：请单独吊销",
+    "bulkRevokedLocallyOnly": "{{count}} certificates revoked in UCM only ({{ids}}): the issuing CA did not confirm. A revocation an ACME CA did not confirm is sent again automatically; otherwise revoke them with the CA directly."
   },
   "details": {
     "pemCertificate": "PEM 证书",
