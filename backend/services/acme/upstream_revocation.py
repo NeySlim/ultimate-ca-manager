@@ -10,6 +10,8 @@ import logging
 from datetime import timedelta
 from typing import Optional, Tuple
 
+from sqlalchemy.exc import SQLAlchemyError
+
 from models import db
 from models.acme_models import AcmeClientOrder
 from utils.datetime_utils import utc_now
@@ -80,9 +82,9 @@ def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
         db.session.rollback()
         logger.error("Upstream account of certificate %s not resolved: %s", cert.id, exc)
         if order_id is None:
-            return UNRESOLVED, str(exc) or exc.__class__.__name__
+            return UNRESOLVED, _error_text(exc)
         # The order is known: owed, so the scheduler sends it once the account resolves
-        error = f"upstream account not resolved: {str(exc) or exc.__class__.__name__}"
+        error = f"upstream account not resolved: {_error_text(exc)}"
         return OWED, _owe(cert, order_id, reason, error)
     if order is None:
         return NO_ORDER, None
@@ -98,11 +100,19 @@ def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
     try:
         error = send_upstream_revocation(client, pem, _sent_code(reason), label)
     except Exception as exc:
-        error = str(exc) or exc.__class__.__name__
+        logger.error("Upstream revocation of %s raised: %s", label, exc)
+        error = _error_text(exc)
     if error is None:
         return REVOKED, None
     logger.warning("Upstream revocation of %s failed: %s", label, error)
     return OWED, _owe(cert, order.id, reason, error)
+
+
+def _error_text(exc) -> str:
+    """What may leave the server: a database error's text carries its SQL and parameters."""
+    if isinstance(exc, SQLAlchemyError):
+        return 'Database error'
+    return str(exc) or exc.__class__.__name__
 
 
 def _sent_code(reason):

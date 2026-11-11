@@ -278,3 +278,32 @@ def test_a_revocation_confirmed_by_the_ca_keeps_the_related_certificate_warning(
     assert answer['meta'] == {'acme_ca_revoked': True}
     plain = _acme_answer(REVOKED, None, 'Certificate revoked successfully')
     assert plain['message'] == 'Certificate revoked in UCM and at the ACME CA'
+
+
+class TestWhatLeavesTheServer:
+    """A database error names its SQL and parameters: the log has them, the answer,
+    the debt kept on the order and its webhook say 'Database error' only."""
+
+    @staticmethod
+    def _db_error():
+        from sqlalchemy.exc import OperationalError
+        return OperationalError('SELECT secret_column FROM acme_client_orders', {'id': 7},
+                                Exception('database is locked'))
+
+    def test_an_account_lookup_failing_in_the_database(self, auth_client, bench, caplog):
+        with patch('services.acme.upstream_revocation._client_for', side_effect=self._db_error()), \
+                patch('services.acme_renewal_service.emit_acme_revocation_failed') as webhook:
+            body = _revoke(auth_client, bench, 'keyCompromise')
+        assert body['meta']['acme_upstream_pending'] is True
+        assert 'secret_column' not in json.dumps(body)
+        assert 'Database error' in body['meta']['acme_ca_error']
+        assert all('secret_column' not in e['error'] for e in _owed(bench))
+        assert 'secret_column' not in repr(webhook.call_args)
+        assert 'secret_column' in caplog.text
+
+    def test_an_order_lookup_failing_in_the_database(self, auth_client, bench, caplog):
+        with patch('services.acme.upstream_revocation._order_for', side_effect=self._db_error()):
+            body = _revoke(auth_client, bench, 'keyCompromise')
+        assert 'secret_column' not in json.dumps(body)
+        assert 'Database error' in body['message']
+        assert 'secret_column' in caplog.text
