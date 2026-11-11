@@ -205,10 +205,16 @@ def test_narrowing_the_categories_reaches_the_collector(app, auth_client, create
     assert 'system' in packets[0] and 'user' in packets[0], packets[0]
 
     user = create_user(username=f'sl-{uuid.uuid4().hex[:8]}')
-    r = auth_client.put(f"/api/v2/users/{user['id']}", content_type='application/json',
-                        data=json.dumps({'role': 'admin'}))
-    assert r.status_code == 200, r.get_json()
-    assert any('user_update' in p for p in _received(collector))
+    try:
+        r = auth_client.put(f"/api/v2/users/{user['id']}", content_type='application/json',
+                            data=json.dumps({'role': 'admin'}))
+        assert r.status_code == 200, r.get_json()
+        assert any('user_update' in p for p in _received(collector))
+    finally:
+        from models import db, User
+        with app.app_context():
+            User.query.filter_by(id=user['id']).delete(synchronize_session=False)
+            db.session.commit()
 
 
 def test_disabling_forwarding_is_the_last_packet_sent(app, auth_client, collector, forwarding,

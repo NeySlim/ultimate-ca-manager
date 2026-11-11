@@ -15,6 +15,29 @@ def session_store(app, tmp_path, monkeypatch):
     monkeypatch.setitem(app.config, 'SESSION_FILE_DIR', str(store))
 
 
+@pytest.fixture
+def create_ca(app, create_ca):
+    """The authorities a test creates, removed with their CRLs and certificates (PostgreSQL order)."""
+    created = []
+
+    def create(**kwargs):
+        ca = create_ca(**kwargs)
+        created.append(ca['id'])
+        return ca
+    yield create
+    from models import Certificate
+    with app.app_context():
+        db.session.rollback()
+        for ca_id in created:
+            row = db.session.get(CA, ca_id)
+            CRLMetadata.query.filter_by(ca_id=ca_id).delete(synchronize_session=False)
+            if row is not None:
+                Certificate.query.filter_by(caref=row.refid).delete(synchronize_session=False)
+        db.session.flush()
+        CA.query.filter(CA.id.in_(created)).delete(synchronize_session=False)
+        db.session.commit()
+
+
 def _publishing(app, create_ca, cn, **columns):
     ca = create_ca(cn=cn)
     with app.app_context():
