@@ -256,7 +256,7 @@ class TestLifecycle:
             assert (db.session.get(CA, ca_id, populate_existing=True).serial or 0) == counted + 1
 
 
-def test_a_delegate_renewed_in_place_meanwhile_is_not_archived(app, use):
+def test_a_delegate_renewed_in_place_meanwhile_is_not_archived(app, use, caplog):
     """The replaced delegate is archived only if it still holds the serial read: a row
     renewed in place meanwhile is left live, and this replacement goes with its savepoint."""
     ca_id, ca_cert = use('main')
@@ -278,10 +278,13 @@ def test_a_delegate_renewed_in_place_meanwhile_is_not_archived(app, use):
                          .values(serial_number=renewed))
         return original(*args)
 
-    with app.app_context():
+    with app.app_context(), caplog.at_level('INFO', logger='services.est_key_generator'):
         with patch.object(est_key_generator, '_certificate_row', side_effect=renewed_in_place_meanwhile):
-            with pytest.raises(RuntimeError):
+            with pytest.raises(est_key_generator.DelegateRenewedMeanwhile):
                 est_key_generator.key_generator(db.session.get(CA, ca_id), ca_cert)
+        assert [r.getMessage() for r in caplog.records if r.name == 'services.est_key_generator'] == [
+            f'EST key generator certificate {old_id} of CA {ca_id} was renewed meanwhile; '
+            'it is not replaced']
         db.session.rollback()
         db.session.expire_all()
         row = db.session.get(Certificate, old_id)
@@ -291,6 +294,34 @@ def test_a_delegate_renewed_in_place_meanwhile_is_not_archived(app, use):
         assert (db.session.get(CA, ca_id).serial or 0) == counted
     _reset(app, ca_id)
 
+
+def test_serverkeygen_answers_409_when_its_delegate_was_renewed_meanwhile(app, client, use):
+    ca_id, ca_cert = use('main')
+    with app.app_context():
+        est_key_generator.key_generator(db.session.get(CA, ca_id), ca_cert)
+        row = _delegate_row(ca_id)
+        row.valid_to = utc_now() + datetime.timedelta(days=10)
+        db.session.commit()
+        old_id = row.id
+    transport, _, client_pem = _enrol_transport(client, 'transport-renewed.generator.test')
+    csr, _ = _make_csr(common_name='renewed.generator.test',
+                       extra_attributes=((ASYMMETRIC_ID, _ski(transport)),))
+    original = est_key_generator._certificate_row
+
+    def renewed_in_place_meanwhile(*args):
+        from sqlalchemy import update
+        with db.engine.begin() as conn:
+            conn.execute(update(Certificate.__table__).where(Certificate.__table__.c.id == old_id)
+                         .values(serial_number=str(x509.random_serial_number())))
+        return original(*args)
+
+    with patch.object(est_key_generator, '_certificate_row', side_effect=renewed_in_place_meanwhile):
+        r = _post_csr(client, 'serverkeygen', csr, client_cert_pem=client_pem)
+    assert r.status_code == 409, r.data
+    assert b'renewed meanwhile' in r.data
+    with app.app_context():
+        assert Certificate.query.filter_by(subject_cn='renewed.generator.test').count() == 0
+    _reset(app, ca_id)
 
 def _ca_like(key, *, hsm_key_id=None, name=None, days=3650, extensions=()):
     from utils.key_codec import store_pem_bytes

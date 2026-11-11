@@ -153,8 +153,9 @@ def _load(row):
     return key, x509.load_pem_x509_certificate(base64.b64decode(row.crt))
 
 
-class _RenewedMeanwhile(Exception):
-    """The delegate being replaced no longer holds the serial read: this replacement loses."""
+class DelegateRenewedMeanwhile(RuntimeError):
+    """The delegate being replaced was renewed in place since it was read: this replacement
+    loses, and the request is answered 409 (a retry replaces the renewed row)."""
 
 
 def _archive(previous, serial) -> bool:
@@ -204,7 +205,7 @@ def key_generator(ca, ca_cert):
                 link.created_at = utc_now()
             if previous is not None and previous.caref == ca.refid and not previous.revoked \
                     and not _archive(previous, previous_serial):
-                raise _RenewedMeanwhile()
+                raise DelegateRenewedMeanwhile(previous_id)
             db.session.flush()  # a concurrent pointer fails here, before the audit entry is staged
             # The delegate is an issuance of the CA; a lost race rolls the count back with it
             from utils.ca_serial_counter import next_ca_serial
@@ -216,7 +217,11 @@ def key_generator(ca, ca_cert):
                          f'issued, valid to {not_after}'
                          + (f', replacing certificate {previous_id}' if previous_id else '')))
         db.session.commit()
-    except (IntegrityError, _RenewedMeanwhile):  # the savepoint goes, the caller's transaction stays
+    except DelegateRenewedMeanwhile:  # the savepoint goes, the caller's transaction stays
+        logger.info('EST key generator certificate %s of CA %s was renewed meanwhile; '
+                    'it is not replaced', previous_id, ca.id)
+        raise
+    except IntegrityError:  # the savepoint goes, the caller's transaction stays
         winner = EstSignerCert.query.filter_by(ca_id=ca.id).first()
         logger.info('EST key generator of CA %s made by a concurrent request', ca.id)
         usable = _usable(winner, ca, fingerprint, ca_cert)

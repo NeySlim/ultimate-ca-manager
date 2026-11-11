@@ -6,6 +6,7 @@ from flask import Blueprint, request, Response
 from models import db, CA
 from services.ca_service import CAService
 from services.ca.ca_signing import AlreadySuperseded
+from services.est_key_generator import DelegateRenewedMeanwhile
 from services.policy_service import PolicyViolation
 from utils.request_names import RequestRejected
 from services.audit_service import AuditService
@@ -1217,6 +1218,10 @@ def server_keygen(label=None):
                     key, signer_key, signer_cert, recipient_cert, chain=(ca_cert,),
                     key_encryption=key_encryption,
                 )
+            except DelegateRenewedMeanwhile:
+                _release_claim(approved)
+                return Response('The EST key generator certificate was renewed meanwhile; '
+                                'retry the request', status=409)
             except Exception as e:
                 logger.error(f"EST serverkeygen: the key package could not be signed: {e}")
                 _release_claim(approved)

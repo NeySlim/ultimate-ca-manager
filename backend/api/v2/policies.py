@@ -1368,10 +1368,14 @@ def approve_approval_request(request_id, comment=None):
             if issued_cert:
                 logger.info(f"Certificate issued for approval #{approval.id}")
         except Exception as e:
-            logger.error(f"Failed to issue certificate for approval #{approval.id}: {e}",
-                         exc_info=True)
             from services.policy_service import PolicyViolation
             from services.cert.renewal import RenewalError
+            if isinstance(e, RenewalError) and e.status < 500:
+                # A refusal the approver is told about, not a failure
+                logger.warning(f"Certificate for approval #{approval.id} refused: {e}")
+            else:
+                logger.error(f"Failed to issue certificate for approval #{approval.id}: {e}",
+                             exc_info=True)
             from services.protocol_approval import GENERIC_ISSUE_ERROR, is_key_material_error
             from utils.custom_extensions import TemplateConfigError
             if isinstance(e, PolicyViolation):
