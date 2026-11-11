@@ -1834,6 +1834,8 @@ class AcmeClientService:
                 self._record_finalize_failure(order, message)
                 return False, message, None
 
+        if row is not None and row.id != cert_id:
+            renews.add_replaced(row)  # still revocable at the CA under this order's account
         renews.certificate_id = cert_id
         renews.order_url = order.order_url
         renews.certificate_url = cert_url

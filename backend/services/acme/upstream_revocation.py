@@ -35,8 +35,15 @@ _SENT_REASONS = {1, 2, 3, 4, 5, 9, 10}
 
 
 def _order_for(cert) -> Optional[AcmeClientOrder]:
-    return (AcmeClientOrder.query.filter_by(certificate_id=cert.id)
-            .order_by(AcmeClientOrder.id.desc()).first())
+    """The order that names ``cert``, or whose renewal moved off it into a new row."""
+    order = (AcmeClientOrder.query.filter_by(certificate_id=cert.id)
+             .order_by(AcmeClientOrder.id.desc()).first())
+    if order is not None:
+        return order
+    candidates = (AcmeClientOrder.query
+                  .filter(AcmeClientOrder.replaced_certificates.like(f'%"certificate_id": {int(cert.id)},%'))
+                  .order_by(AcmeClientOrder.id.desc()).all())
+    return next((o for o in candidates if o.names_replaced(cert)), None)
 
 
 def _client_for(order):

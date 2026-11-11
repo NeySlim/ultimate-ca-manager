@@ -101,6 +101,19 @@ class TestTheSingleRoute:
         assert 'no longer has the ACME order' in body['message']
         bench.client.revoke_certificate.assert_not_called()
 
+    def test_a_held_certificate_renewed_into_a_new_row_is_still_revoked_at_the_ca(
+            self, auth_client, bench):
+        _revoke(auth_client, bench, 'certificateHold')
+        ok, message = bench.renew()
+        assert ok, message
+        db.session.expire_all()
+        assert bench.parent().certificate_id != bench.cert_id
+        bench.client.revoke_certificate.reset_mock()
+        body = _revoke(auth_client, bench, 'keyCompromise')
+        sent = bench.client.revoke_certificate.call_args
+        assert sent.args[0] == bench.old_pem and sent.kwargs == {'reason': 1}
+        assert body['meta'] == {'acme_ca_revoked': True}
+
     def test_a_proxy_order_naming_no_upstream_account_is_not_revoked_with_another(
             self, auth_client, bench):
         order = bench.parent()
@@ -189,3 +202,14 @@ class TestAnApprovedRevocation:
         result = self._approve(app, bench)
         assert result['acme_local_only'] is True
         assert [e['serial'] for e in _owed(bench)] == [bench.old_serial]
+
+
+def test_a_replaced_certificate_is_matched_by_id_and_serial():
+    order = AcmeClientOrder()
+    order.add_replaced(SimpleNamespace(id=7, serial_number='12'))
+    order.add_replaced(SimpleNamespace(id=7, serial_number='12'))
+    assert order.names_replaced(SimpleNamespace(id=7, serial_number='12'))
+    # An id the database handed out again names another certificate
+    assert not order.names_replaced(SimpleNamespace(id=7, serial_number='13'))
+    assert not order.names_replaced(SimpleNamespace(id=17, serial_number='12'))
+    assert json.loads(order.replaced_certificates) == [{'certificate_id': 7, 'serial': '12'}]
