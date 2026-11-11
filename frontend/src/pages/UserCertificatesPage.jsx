@@ -23,6 +23,7 @@ import { formatDate, extractCN, isOnHold } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { isExportFormatAllowed } from '../lib/keyAlgorithms'
+import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 
 export default function UserCertificatesPage() {
   const { t } = useTranslation()
@@ -173,8 +174,11 @@ export default function UserCertificatesPage() {
     setRevoking(true)
     try {
       const res = await userCertificatesService.revoke(revokingCert.id, reason)
+      const localOnly = localOnlyRevocationWarning(res, t)
       if (res?.data?.approval_required) {
         showWarning(t('certificates.revocationApprovalRequired', { policy: res.data.policy_name }))
+      } else if (localOnly) {
+        showWarning(localOnly)
       } else {
         showSuccess(t('userCertificates.revokeSuccess'))
       }
@@ -198,14 +202,16 @@ export default function UserCertificatesPage() {
     )
     if (!confirmed) return
     try {
-      await userCertificatesService.delete(id)
-      showSuccess(t('userCertificates.deleteSuccess'))
+      // Its certificate is revoked first: the issuing CA may not have been told
+      const localOnly = localOnlyRevocationWarning(await userCertificatesService.delete(id), t)
+      if (localOnly) showWarning(localOnly)
+      else showSuccess(t('userCertificates.deleteSuccess'))
       setSelectedCert(null)
       loadData()
     } catch (error) {
       showError(error.message || t('userCertificates.deleteFailed'))
     }
-  }, [certificates, showConfirm, showSuccess, showError, loadData, t])
+  }, [certificates, showConfirm, showSuccess, showWarning, showError, loadData, t])
 
   // Table columns — follows ResponsiveDataTable pattern: { key, header, priority, sortable, render(val, row) }
   const columns = useMemo(() => [
