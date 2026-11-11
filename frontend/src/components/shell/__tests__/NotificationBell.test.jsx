@@ -59,7 +59,7 @@ beforeEach(() => {
     data: [...LOGS.data, ...(m.extraLogs || [])]
       .filter(e => params.action.includes(e.action) && (params.success === undefined || e.success === params.success))
       .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-      .slice(0, params.per_page ?? 50),
+      .slice(((params.page ?? 1) - 1) * (params.per_page ?? 50), (params.page ?? 1) * (params.per_page ?? 50)),
   }))
   m.persistPreference.mockReset()
   m.prefs = {}
@@ -227,5 +227,23 @@ describe('NotificationBell', () => {
     const source = readFileSync(join(here, '..', '..', '..', '..', '..', 'backend', 'services', 'backup', 'restore_completion.py'), 'utf8')
     expect(source).toMatch(/^REQUEST_REFUSED = '([^']+)'$/m)
     expect(source.match(/^REQUEST_REFUSED = '([^']+)'$/m)[1]).toBe(REQUEST_REFUSED)
+  })
+
+  it('reads past a page of refused restore requests to reach a real failure', async () => {
+    m.extraLogs = [
+      { id: 300, action: 'system_restore', success: false, username: 'root', resource_name: 'b.ucmbkp',
+        details: 'Restore failed: unexpected error', timestamp: '2026-11-09T12:00:00Z' },
+      ...Array.from({ length: 60 }, (_, i) => ({
+        id: 200 + i, action: 'system_restore', success: false, username: 'root', resource_name: 'upload',
+        details: 'Restore request refused: password missing', timestamp: `2026-11-10T${String(i % 24).padStart(2, '0')}:${String(i).padStart(2, '0')}:00Z`,
+      })),
+    ]
+    setup()
+    const user = userEvent.setup()
+    await waitFor(() => expect(bell()).toHaveAccessibleName(/\|5/))
+    await user.click(bell())
+    const rows = within(screen.getByRole('region', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    expect(rows).toContain('audit:300')
+    expect(rows.some(r => r.startsWith('audit:2'))).toBe(false)
   })
 })

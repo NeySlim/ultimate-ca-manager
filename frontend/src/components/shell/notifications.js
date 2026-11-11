@@ -16,6 +16,9 @@ export const BELL_KINDS = ['acme_order_failed', 'acme_client_renewal_failed', 'a
 export const SESSION_ACTIONS = ['session_revoke', 'session_revoke_all']
 export const FAILURE_ACTIONS = ['system_backup', 'system_restore']
 const MAX_MARKS = 200
+const FAILURES_SHOWN = 20
+const FAILURE_PAGE = 50
+const MAX_FAILURE_PAGES = 5
 const REFRESH_DELAY_MS = 1500
 
 const keyOf = (prefix, id) => `${prefix}:${id}`.replace(/[^A-Za-z0-9_.:-]/g, '_').slice(0, 120)
@@ -47,6 +50,18 @@ export function auditItems(rows) {
     }))
 }
 
+// Refused requests are dropped after the query, so pages are read until enough real failures remain
+async function failedRuns() {
+  const kept = []
+  for (let page = 1; page <= MAX_FAILURE_PAGES && kept.length < FAILURES_SHOWN; page++) {
+    const res = await auditService.getLogs({ action: FAILURE_ACTIONS, success: false, per_page: FAILURE_PAGE, page })
+    const rows = res?.data ?? res
+    kept.push(...auditItems(rows))
+    if (!Array.isArray(rows) || rows.length < FAILURE_PAGE) break
+  }
+  return kept.slice(0, FAILURES_SHOWN)
+}
+
 function useReadMarks() {
   const [marks, setMarks] = useState(() => getPreferences().notifications_read || [])
   useEffect(() => subscribePreferences(p => setMarks(Array.isArray(p.notifications_read) ? p.notifications_read : [])), [])
@@ -65,7 +80,7 @@ export function useNotifications(can) {
     const [q, a, f] = await Promise.allSettled([
       canQueue ? dashboardService.getQueue(BELL_KINDS) : Promise.resolve(null),
       canAudit ? auditService.getLogs({ action: SESSION_ACTIONS, per_page: 20 }) : Promise.resolve(null),
-      canAudit ? auditService.getLogs({ action: FAILURE_ACTIONS, success: false, per_page: 20 }) : Promise.resolve(null),
+      canAudit ? failedRuns() : Promise.resolve(null),
     ])
     if (!alive.current) return
     // A transient failure keeps what was shown; a refused call (rights changed) empties the source
@@ -77,7 +92,7 @@ export function useNotifications(can) {
     setParts(p => ({
       queue: next(q, p.queue, v => queueItems(v.data ?? v)),
       audit: next(a, p.audit, v => auditItems(v.data ?? v)),
-      failures: next(f, p.failures, v => auditItems(v.data ?? v)),
+      failures: next(f, p.failures, v => v),
     }))
   }, [canQueue, canAudit])
 
