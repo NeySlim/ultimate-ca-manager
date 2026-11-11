@@ -242,10 +242,15 @@ def unhold_certificate(cert_id):
         )
 
     try:
+        unhold_related = json_boolean(request.get_json(silent=True) or {}, 'unhold_related', True)
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+    try:
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
 
-        # The other member of a related pair comes off hold with it, mirroring the revoke
-        partner = revocation_partner(cert)
+        # The other member of a related pair comes off hold with it unless the request says otherwise
+        partner = revocation_partner(cert) if unhold_related else None
         if partner is not None and not (
                 partner.revoked and partner.revoke_reason in hold_reasons):
             partner = None
@@ -360,14 +365,14 @@ def unhold_certificate(cert_id):
                         success=True,
                     )
                     return success_response(
-                        data=cert.to_dict(),
+                        data=_unhold_data(cert, partner),
                         message='Certificate hold removed in UCM and on the Microsoft CA',
                         meta={'msca_ca_unrevoked': True}
                     )
                 except MSCAAdminChannelError as e:
                     logger.error(f"MS CA admin-channel unrevoke failed for cert {cert.id}: {e}")
                     return success_response(
-                        data=cert.to_dict(),
+                        data=_unhold_data(cert, partner),
                         message=(
                             'Certificate hold removed in UCM, but lifting it on the '
                             f'Windows CA failed: {e}. Unrevoke it on the CA manually.'
@@ -376,12 +381,19 @@ def unhold_certificate(cert_id):
                     )
 
         return success_response(
-            data=cert.to_dict(),
+            data=_unhold_data(cert, partner),
             message='Certificate hold removed successfully'
         )
     except Exception as e:
         logger.error(f"Failed to unhold certificate: {e}")
         return error_response('Failed to remove certificate hold', 500)
+
+
+def _unhold_data(cert, partner):
+    data = cert.to_dict()
+    if partner is not None:
+        data['related_unheld'] = partner.id
+    return data
 
 
 def _restore_holds(helds):

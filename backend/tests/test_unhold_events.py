@@ -110,3 +110,31 @@ def test_a_partner_revoked_for_cause_stays_revoked(app, auth_client, create_ca, 
     assert _post(auth_client, f"{base}/{a['id']}/unhold").status_code == 200
     assert _state(app, b['id']) == (True, 'keyCompromise')
     assert [e[1]['certificate']['id'] for e in _unheld(seen)] == [a['id']]
+
+
+def test_unhold_related_false_keeps_the_partner_on_hold(app, auth_client, create_ca, create_cert, seen):
+    ca = create_ca(cn='Unhold Opt CA')
+    a = create_cert(cn='unhold-opt-a.example.test', ca_id=ca['id'])
+    b = create_cert(cn='unhold-opt-b.example.test', ca_id=ca['id'])
+    _link(app, a['id'], b['id'])
+    base = '/api/v2/certificates'
+    for c in (a, b):
+        assert _post(auth_client, f"{base}/{c['id']}/revoke",
+                     {'reason': 'certificateHold', 'revoke_related': False}).status_code == 200
+    r = _post(auth_client, f"{base}/{a['id']}/unhold", {'unhold_related': False})
+    assert r.status_code == 200, r.data
+    assert _state(app, a['id'])[0] is False
+    assert _state(app, b['id']) == (True, 'certificateHold')
+    assert 'related_unheld' not in r.get_json()['data']
+
+
+def test_unhold_reports_the_partner_it_lifted(app, auth_client, create_ca, create_cert, seen):
+    ca = create_ca(cn='Unhold Rep CA')
+    a = create_cert(cn='unhold-rep-a.example.test', ca_id=ca['id'])
+    b = create_cert(cn='unhold-rep-b.example.test', ca_id=ca['id'])
+    _link(app, a['id'], b['id'])
+    base = '/api/v2/certificates'
+    assert _post(auth_client, f"{base}/{a['id']}/revoke",
+                 {'reason': 'certificateHold'}).status_code == 200
+    r = _post(auth_client, f"{base}/{a['id']}/unhold")
+    assert r.get_json()['data']['related_unheld'] == b['id']
