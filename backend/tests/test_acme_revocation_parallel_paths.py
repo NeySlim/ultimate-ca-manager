@@ -140,6 +140,33 @@ class TestRemovingAnEnrolment:
             _drop_enrolment(enrolment_id)
 
 
+    @pytest.mark.parametrize('failing', ['enrolment commit', 'certificate deletion'])
+    def test_a_failure_after_the_revocation_still_says_the_ca_was_not_told(
+            self, app, auth_client, bench, owner, monkeypatch, failing):  # noqa: F811
+        from services.cert_service import CertificateService
+        from utils import db_transaction
+        from utils.response import error_response
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        if failing == 'enrolment commit':
+            def _fail(_logger, message='failed'):
+                db.session.rollback()
+                return False, error_response(message, 500)
+            monkeypatch.setattr(db_transaction, 'safe_commit', _fail)
+        else:
+            monkeypatch.setattr(CertificateService, 'delete_certificate',
+                                staticmethod(lambda *_a, **_k: False))
+        enrolment_id = _enrol(app, bench, owner[1])
+        try:
+            answer = auth_client.delete(f'/api/v2/user-certificates/{enrolment_id}')
+            assert answer.status_code == 500, answer.data[:300]
+            body = json.loads(answer.data)
+            assert body['meta']['acme_local_only'] is True
+            assert body['meta']['acme_upstream_pending'] is True
+            assert 'sent again automatically' in body['message']
+        finally:
+            _drop_enrolment(enrolment_id)
+
+
 class TestDeletingAUser:
     def test_the_ca_is_told(self, app, auth_client, bench, owner):  # noqa: F811
         enrolment_id = _enrol(app, bench, owner[1])
@@ -163,6 +190,26 @@ class TestDeletingAUser:
             assert f'#{bench.cert_id}' in body['message']
             assert 'sent again automatically' in body['message']
             assert [e['serial'] for e in _owed(bench)] == [bench.old_serial]
+        finally:
+            _drop_enrolment(enrolment_id)
+
+    def test_a_failed_deletion_still_says_the_ca_was_not_told(
+            self, app, auth_client, bench, owner, monkeypatch):  # noqa: F811
+        from api.v2.users import crud
+
+        def _fail(_user_id):
+            raise RuntimeError('purge failed')
+        monkeypatch.setattr(crud, '_purge_user_dependencies', _fail)
+        bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
+        enrolment_id = _enrol(app, bench, owner[1])
+        try:
+            answer = auth_client.delete(f"/api/v2/users/{owner[0]['id']}")
+            assert answer.status_code == 500, answer.data[:300]
+            body = json.loads(answer.data)
+            assert body['meta'] == {'acme_local_only': [bench.cert_id],
+                                    'acme_upstream_pending': [bench.cert_id]}
+            assert f'#{bench.cert_id}' in body['message']
+            assert 'sent again automatically' in body['message']
         finally:
             _drop_enrolment(enrolment_id)
 

@@ -95,7 +95,7 @@ def build_problem(message, code=400, details=None, problem_type=None, title=None
     return body
 
 
-def error_response(message, code=400, details=None, problem_type=None, title=None):
+def error_response(message, code=400, details=None, problem_type=None, title=None, meta=None):
     """
     Standard error response. RFC 7807 problem details plus the legacy keys.
 
@@ -105,6 +105,7 @@ def error_response(message, code=400, details=None, problem_type=None, title=Non
         details: Optional error details
         problem_type: Optional RFC 7807 type URI
         title: Optional RFC 7807 title (defaults to the status phrase)
+        meta: Optional metadata, the RFC 7807 extension member a success would carry
 
     Returns:
         Flask response with application/problem+json
@@ -112,7 +113,10 @@ def error_response(message, code=400, details=None, problem_type=None, title=Non
     Example:
         return error_response('Invalid input', 400, {'field': 'name'})
     """
-    response = jsonify(build_problem(message, code, details, problem_type, title))
+    body = build_problem(message, code, details, problem_type, title)
+    if meta:
+        body['meta'] = meta
+    response = jsonify(body)
     response.mimetype = PROBLEM_CONTENT_TYPE
     return response, code
 
