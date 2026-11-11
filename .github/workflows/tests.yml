@@ -405,7 +405,7 @@ jobs:
           cache: 'pip'
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev libpq-dev postgresql-client
+        run: scripts/ci/apt-install.sh libkrb5-dev libpq-dev postgresql-client
 
       - name: Install dependencies
         run: |
