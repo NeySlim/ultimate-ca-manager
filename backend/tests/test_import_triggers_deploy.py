@@ -1,11 +1,16 @@
 """An import that replaces a certificate queues its deploy bindings (discussion #440)."""
 import json
 
+import pytest
+
+from tests.deploy_leftovers import delete_leftovers
 from tests.test_deploy_hooks import _create_target, _create_binding
 from tests.test_import_review import _cert, _gen, _ca_from_fixture, _store_cert, _import
 
 IMPORT = '/api/v2/certificates/import'
 
+
+_cleanup = pytest.fixture(autouse=True)(delete_leftovers)
 
 def _deliveries(app, cert_id):
     with app.app_context():
