@@ -1,4 +1,5 @@
 """GET /api/v2/cas costs the same number of statements whatever the number of CAs."""
+import threading
 import uuid
 
 import pytest
@@ -9,9 +10,12 @@ from models import CA, db, Certificate
 
 def _count_statements(app, client):
     seen = []
+    mine = threading.get_ident()
 
     def hook(conn, cursor, statement, *rest):
-        seen.append(statement)
+        # The request runs on this thread: another thread's queries on the engine are not its cost
+        if threading.get_ident() == mine:
+            seen.append(statement)
 
     from utils.admin_allowlist import invalidate_cache
     with app.app_context():
