@@ -146,13 +146,9 @@ def _renew_msca_certificate(cert):
     except Exception:
         pass
 
-    cert_dict = cert.to_dict()
-    cert_caref = cert.caref
-    from services.webhook_service import emit_cert_renewed
-    emit_cert_renewed(cert_dict, ca_refid=cert_caref, actor=username)
-
+    # certificate.renewed was fired by the import, after its commit
     return success_response(
-        data=cert_dict,
+        data=cert.to_dict(),
         message='Certificate renewed by Microsoft CA',
         meta={'msca_status': 'issued'}
     )

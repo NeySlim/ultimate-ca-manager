@@ -354,7 +354,7 @@ class MicrosoftCAInventoryMixin:
         db.session.flush()
         # csr=None → the importer creates a fresh Certificate row and links it
         # to this MSCARequest.
-        _import_signed_cert(None, pem, msca, template or 'unknown', req.id)
+        _import_signed_cert(None, pem, msca, template or 'unknown', req.id, announce=False)
         return db.session.get(Certificate, req.cert_id)
 
 
