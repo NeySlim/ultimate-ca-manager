@@ -319,3 +319,104 @@ def test_the_newest_id_falls_back_to_the_table_when_the_sequence_cannot_be_read(
     conn = Conn()
     assert ws_relay._newest_id(conn) == 41
     assert conn.savepoints == 1
+
+
+# ---- HA: web workers publish too, and never deliver their own rows twice ----
+
+@pytest.fixture
+def ha_worker(app, monkeypatch, relay_db):
+    """A web worker of an HA node without Redis: its reader and its publisher on relay_db."""
+    from config.settings import Config
+    _, engine = relay_db
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr(events, '_queue_in_use', False)
+    monkeypatch.setattr(ws_relay, '_engine', lambda _app: engine)
+    seen = []
+    monkeypatch.setattr(socketio, 'emit', lambda *a, **kw: seen.append((a, kw)))
+    monkeypatch.setattr(ws_relay.RelayReader, 'start', lambda self: self)  # driven by the test
+    reader = ws_relay.start_reader(app)
+    try:
+        yield reader, ws_relay._publisher, seen, engine
+    finally:
+        ws_relay.stop_reader()
+
+
+def test_a_reader_skips_the_rows_of_its_own_origin_only(relay_db):
+    _, engine = relay_db
+    mine = ws_relay.RelayPublisher(engine, origin='worker-a')
+    other = ws_relay.RelayPublisher(engine, origin='worker-b')
+    reader, got = _reader(engine)
+    reader.skip_origin = mine.origin
+    reader.run_once()
+    mine.publish(ROOM, _payload(1))
+    mine.stop()
+    other.publish(ROOM, _payload(2))
+    other.stop()
+    reader.run_once()
+    reader.run_once()
+    assert [p['data']['n'] for _, p in got] == [2]
+    assert all(ws_relay.ORIGIN_KEY not in p for _, p in got)  # the origin never reaches a browser
+    assert reader.seen == _rows(engine)[-1].id  # its own row moved the cursor all the same
+
+
+def test_in_ha_a_web_worker_emits_at_once_and_publishes_once(ha_worker):
+    reader, publisher, seen, engine = ha_worker
+    assert reader is not None and publisher is not None
+    assert reader.skip_origin == publisher.origin
+    reader.run_once()
+    emitters.on_ca_created(5, 'ha-ca', 'ha-ca', 'system')
+    assert len(seen) == 1  # its own clients: immediately, not on the next tick
+    publisher.stop()
+    (row,) = _rows(engine)
+    assert row.room == emitters.ROOM_CAS and json.loads(row.payload)['data']['id'] == 5
+    reader.run_once()
+    reader.run_once()
+    assert len(seen) == 1  # its own row read back: not emitted a second time
+
+
+def test_in_ha_include_self_false_still_skips_the_caller_on_its_worker(ha_worker, monkeypatch):
+    _, publisher, seen, engine = ha_worker
+    monkeypatch.setattr(events, '_calling_sid', lambda: 'sid-1')
+    events.emit_event('ca.created', {'id': 1}, room=emitters.ROOM_CAS, include_self=False)
+    publisher.stop()
+    assert seen[0][1] == {'to': emitters.ROOM_CAS, 'skip_sid': 'sid-1'}
+    assert len(_rows(engine)) == 1  # the caller's socket lives on this worker only
+
+
+def test_outside_ha_a_web_worker_does_not_publish(app, monkeypatch, relay_db):
+    from config.settings import Config
+    _, engine = relay_db
+    monkeypatch.setattr(Config, 'HA_MODE', False)
+    monkeypatch.setattr(events, '_queue_in_use', False)
+    monkeypatch.setattr(ws_relay, '_engine', lambda _app: engine)
+    monkeypatch.setattr(ws_relay.RelayReader, 'start', lambda self: self)
+    seen = []
+    monkeypatch.setattr(socketio, 'emit', lambda *a, **kw: seen.append((a, kw)))
+    try:
+        reader = ws_relay.start_reader(app)
+        assert reader is not None and reader.skip_origin is None and ws_relay._publisher is None
+        emitters.on_ca_created(5, 'single-ca', 'single-ca', 'system')
+    finally:
+        ws_relay.stop_reader()
+    assert len(seen) == 1 and _rows(engine) == []
+
+
+def test_in_ha_with_a_message_queue_the_relay_stays_off(app, monkeypatch, relay_db):
+    from config.settings import Config
+    _, engine = relay_db
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr(events, '_queue_in_use', True)
+    monkeypatch.setattr(ws_relay, '_engine', lambda _app: engine)
+    seen = []
+    monkeypatch.setattr(socketio, 'emit', lambda *a, **kw: seen.append((a, kw)))
+    assert ws_relay.start_reader(app) is None
+    assert ws_relay._publisher is None and events._relay_publisher is None
+    emitters.on_ca_created(5, 'queued-ca', 'queued-ca', 'system')
+    assert len(seen) == 1 and _rows(engine) == []
+
+
+def test_stopping_the_reader_stops_the_worker_publisher(ha_worker):
+    _, publisher, _, _ = ha_worker
+    ws_relay.stop_reader()
+    assert ws_relay._publisher is None and events._relay_publisher is None
+    assert publisher._stop.is_set()
