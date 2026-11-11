@@ -798,6 +798,8 @@
     "unholdWarning": "Questo rimuoverà la sospensione del certificato e lo ripristinerà in stato valido. Il certificato sarà rimosso dalla CRL.",
     "unholdCertificate": "Rimuovi sospensione",
     "unheld": "Sospensione del certificato rimossa",
+    "unholdWarningRelated": "Questo rimuoverà la sospensione del certificato e lo ripristinerà in stato valido. Anche il certificato collegato #{{id}} viene ripristinato se è sospeso. Entrambi saranno rimossi dalla CRL.",
+    "unheldWithRelated": "Sospensione del certificato rimossa, insieme al certificato collegato #{{id}}",
     "unholdFailed": "Impossibile rimuovere la sospensione",
     "removeHold": "Rimuovi sospensione",
     "certTypes": {

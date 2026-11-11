@@ -1176,6 +1176,8 @@
     "unholdWarning": "Cela supprimera la suspension du certificat et le restaurera en statut valide. Le certificat sera retiré de la CRL.",
     "unholdCertificate": "Lever la suspension",
     "unheld": "Suspension du certificat levée",
+    "unholdWarningRelated": "Cela supprimera la suspension du certificat et le restaurera en statut valide. Son certificat lié n°{{id}} est levé avec lui s'il est aussi suspendu. Ils seront retirés de la CRL.",
+    "unheldWithRelated": "Suspension du certificat levée, avec son certificat lié n°{{id}}",
     "unholdFailed": "Échec de la levée de suspension",
     "removeHold": "Lever la suspension",
     "certTypes": {

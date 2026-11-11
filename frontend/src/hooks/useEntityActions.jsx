@@ -170,8 +170,11 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
   }
 
   const handleUnhold = async () => {
+    const relatedId = data?.related_certificate_id ?? null
     const confirmed = await showConfirm(
-      t('certificates.unholdWarning', 'This will remove the certificate hold and restore it to valid status. The certificate will be removed from the CRL.'),
+      relatedId != null
+        ? t('certificates.unholdWarningRelated', { id: relatedId })
+        : t('certificates.unholdWarning', 'This will remove the certificate hold and restore it to valid status. The certificate will be removed from the CRL.'),
       {
         title: t('certificates.unholdCertificate', 'Remove Certificate Hold'),
         confirmText: t('certificates.unholdCertificate', 'Remove Hold'),
@@ -181,8 +184,11 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
     if (!confirmed) return
     try {
       onMutate?.()
-      await certificatesService.unhold(id)
-      showSuccess(t('certificates.unheld', 'Certificate hold removed'))
+      const res = await certificatesService.unhold(id)
+      const relatedUnheld = res?.data?.related_unheld
+      showSuccess(relatedUnheld != null
+        ? t('certificates.unheldWithRelated', { id: relatedUnheld })
+        : t('certificates.unheld', 'Certificate hold removed'))
       refresh()
       await settle()
     } catch (err) {

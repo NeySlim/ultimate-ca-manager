@@ -206,6 +206,28 @@ describe('what a surface does after an action', () => {
     expect(onChanged).toHaveBeenCalled()
   })
 
+  it('names the linked certificate when removing a hold lifts it too', async () => {
+    notify.showConfirm.mockResolvedValue(true)
+    svc.certs.unhold.mockResolvedValue({ data: { related_unheld: 8 } })
+    svc.certs.getById.mockResolvedValue({ data: { ...CERT, revoked: false } })
+    const held = { ...CERT, revoked: true, revoke_reason: 'certificateHold', status: 'revoked', related_certificate_id: 8 }
+    const r = run('certificate', held, rights(['write:certificates']), { onClose: vi.fn() })
+    await act(async () => { await r.handler('unhold')() })
+    expect(notify.showConfirm.mock.calls.at(-1)[0]).toBe('certificates.unholdWarningRelated')
+    expect(notify.showSuccess).toHaveBeenLastCalledWith('certificates.unheldWithRelated')
+  })
+
+  it('keeps the single-certificate wording without a linked certificate', async () => {
+    notify.showConfirm.mockResolvedValue(true)
+    svc.certs.unhold.mockResolvedValue({ data: {} })
+    svc.certs.getById.mockResolvedValue({ data: { ...CERT, revoked: false } })
+    const held = { ...CERT, revoked: true, revoke_reason: 'certificateHold', status: 'revoked' }
+    const r = run('certificate', held, rights(['write:certificates']), { onClose: vi.fn() })
+    await act(async () => { await r.handler('unhold')() })
+    expect(notify.showConfirm.mock.calls.at(-1)[0]).toBe('certificates.unholdWarning')
+    expect(notify.showSuccess).toHaveBeenLastCalledWith('certificates.unheld')
+  })
+
   it('closes after a delete even on a slide-over: the entity is gone', async () => {
     notify.showConfirm.mockResolvedValueOnce(true)
     svc.certs.delete.mockResolvedValue({})

@@ -798,6 +798,8 @@
     "unholdWarning": "This will remove the certificate hold and restore it to valid status. The certificate will be removed from the CRL.",
     "unholdCertificate": "Remove Certificate Hold",
     "unheld": "Certificate hold removed",
+    "unholdWarningRelated": "This will remove the certificate hold and restore it to valid status. Its linked certificate #{{id}} comes off hold with it if it is also on hold. They will be removed from the CRL.",
+    "unheldWithRelated": "Certificate hold removed, with its linked certificate #{{id}}",
     "unholdFailed": "Failed to remove certificate hold",
     "removeHold": "Remove Hold",
     "certTypes": {
