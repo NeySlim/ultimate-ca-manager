@@ -45,16 +45,32 @@ def _pending_approvals_count(user_id):
 
 def _revoke_enrolled_certificates(user_id, actor):
     """Revoke each certificate the user enrolled for mTLS, as removing the
-    enrolment does. Returns ``(certificate_ids, None)`` or ``(None, refusal)``:
-    on a refusal the user and every enrolment stay in place."""
+    enrolment does. Returns ``(certificate_ids, None)`` or ``(None, refusal)``.
+
+    Every enrolment is checked (policy, revocability) before any certificate is
+    revoked, so a refusal revokes nothing; a revocation that fails past the checks
+    cannot undo the committed ones, and its refusal names them.
+    """
     from models import AuthCertificate
-    from services.mtls_enrollment import revoke_for_removal
-    certificate_ids = []
-    for enrolment in AuthCertificate.query.filter_by(user_id=user_id).order_by(AuthCertificate.id).all():
-        certificate_id, refusal = revoke_for_removal(
-            enrolment, username=actor.username, actor=actor)
+    from services.mtls_enrollment import removal_check, revoke_checked
+    enrolments = AuthCertificate.query.filter_by(user_id=user_id).order_by(AuthCertificate.id).all()
+    planned = []
+    for enrolment in enrolments:
+        certificate_id, needs_revoking, refusal = removal_check(enrolment, actor)
         if refusal is not None:
             return None, refusal
+        planned.append((enrolment, certificate_id, needs_revoking))
+    certificate_ids, revoked = [], []
+    for enrolment, certificate_id, needs_revoking in planned:
+        if needs_revoking:
+            refusal = revoke_checked(enrolment, certificate_id, actor.username)
+            if refusal is not None:
+                message, status = refusal
+                if revoked:
+                    message += ('. Already revoked for this deletion: certificate(s) '
+                                + ', '.join(f'#{cid}' for cid in revoked))
+                return None, (message, status)
+            revoked.append(certificate_id)
         if certificate_id:
             certificate_ids.append(certificate_id)
     return certificate_ids, None

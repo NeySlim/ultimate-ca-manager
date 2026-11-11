@@ -471,20 +471,16 @@ def _revocation_held(actor) -> bool:
     return actor is not None and getattr(actor, 'role', None) != 'admin'
 
 
-def revoke_for_removal(auth_cert, username: str = 'system', actor=None):
-    """Revoke the certificate an enrolment names, ahead of removing it.
+def removal_check(auth_cert, actor=None):
+    """Whether an enrolment's certificate may be revoked for its removal, without revoking it.
 
-    Returns ``(certificate_id, None)``, the id being None when no row of
-    this server backs the enrolment, or ``(None, (message, status))`` when the
-    enrolment must stay: a revocation that fails or needs approval.
+    Returns ``(certificate_id, needs_revoking, None)``, the id being None when
+    no row of this server backs the enrolment, or ``(None, False, (message, status))``.
     """
-    from models import db
-    from services.cert_service import CertificateService
     from utils.datetime_utils import utc_now
 
     certificate = certificate_row_for(auth_cert)
     certificate_id = certificate.id if certificate else None
-
     needs_revoking = bool(
         certificate is not None
         and certificate.crt
@@ -497,27 +493,50 @@ def revoke_for_removal(auth_cert, username: str = 'system', actor=None):
             policy = revocation_policy_for(certificate)
         except Exception as error:
             logger.error('Enrolment %s: policy evaluation failed: %s', auth_cert.id, error)
-            return None, ('Policy evaluation failed; the enrolment was not removed', 500)
+            return None, False, ('Policy evaluation failed; the enrolment was not removed', 500)
         if policy is not None:
-            return None, (
+            return None, False, (
                 f'Revoking this certificate requires approval per policy "{policy.name}": '
                 'request its revocation, then remove the enrolment once it is revoked', 409)
+    return certificate_id, needs_revoking, None
+
+
+# Said when a revocation fails: the certificate would otherwise vanish while still valid
+REVOCATION_FAILED = ('The certificate could not be revoked, so it was not deleted: '
+                     'it would stay valid for anything else trusting its authority. '
+                     'Check that the issuing CA can sign, then try again')
+
+
+def revoke_checked(auth_cert, certificate_id, username: str = 'system'):
+    """Revoke a certificate :func:`removal_check` cleared; ``(message, status)`` on failure."""
+    from models import db
+    from services.cert_service import CertificateService
+    try:
+        # The enrolled certificate only: its pair partner is not part of the enrolment
+        CertificateService.revoke_certificate(
+            cert_id=certificate_id, reason=REMOVAL_REASON, username=username,
+            revoke_related=False)
+    except Exception as error:
+        logger.error('Enrolment %s: revocation refused: %s', auth_cert.id, error)
+        db.session.rollback()
+        return REVOCATION_FAILED, 409
+    return None
+
+
+def revoke_for_removal(auth_cert, username: str = 'system', actor=None):
+    """Revoke the certificate an enrolment names, ahead of removing it.
+
+    Returns ``(certificate_id, None)``, the id being None when no row of
+    this server backs the enrolment, or ``(None, (message, status))`` when the
+    enrolment must stay: a revocation that fails or needs approval.
+    """
+    certificate_id, needs_revoking, refusal = removal_check(auth_cert, actor)
+    if refusal is not None:
+        return None, refusal
     if needs_revoking:
-        try:
-            # The enrolled certificate only: its pair partner is not part of the enrolment
-            CertificateService.revoke_certificate(
-                cert_id=certificate_id, reason=REMOVAL_REASON, username=username,
-                revoke_related=False)
-        except Exception as error:
-            # An authority that cannot sign right now is not a reason to make
-            # the certificate disappear without a trace; say so instead.
-            logger.error('Enrolment %s: revocation refused: %s',
-                         auth_cert.id, error)
-            db.session.rollback()
-            return None, (
-                'The certificate could not be revoked, so it was not deleted: '
-                'it would stay valid for anything else trusting its authority. '
-                'Check that the issuing CA can sign, then try again', 409)
+        refusal = revoke_checked(auth_cert, certificate_id, username)
+        if refusal is not None:
+            return None, refusal
     return certificate_id, None
 
 

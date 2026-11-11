@@ -142,3 +142,65 @@ class TestAUserWithoutEnrolment:
         assert calls == []
         with app.app_context():
             assert db.session.get(User, user['id']) is None
+
+
+class TestAllOrNothingAcrossEnrolments:
+    """Every enrolment is checked before any is revoked: a refusal on the
+    second must not leave the first revoked under a user that stays."""
+
+    @pytest.fixture
+    def two(self, app, create_user, create_cert):
+        first = _enrolled_user(app, create_user, create_cert, 'mtls_del_two')
+        enrolment_id, _ = _enrolment_for(app, create_cert, 'mtls_del_two', 'mtls-del-two-b')
+        with app.app_context():
+            from services.mtls_enrollment import certificate_row_for
+            second_id = certificate_row_for(db.session.get(AuthCertificate, enrolment_id)).id
+        second = dict(first, enrolment_id=enrolment_id, certificate_id=second_id)
+        yield first, second
+        with app.app_context():
+            row = db.session.get(AuthCertificate, second['enrolment_id'])
+            if row is not None:
+                db.session.delete(row)
+                db.session.commit()
+        _cleanup(app, first)
+        _cleanup(app, second)
+
+    @staticmethod
+    def _revoked(app, probe):
+        with app.app_context():
+            return bool(db.session.get(Certificate, probe['certificate_id']).revoked)
+
+    def test_a_policy_on_the_second_revokes_nothing(self, app, auth_client, two, monkeypatch):
+        from types import SimpleNamespace
+        import services.approval_gate as gate
+        import services.mtls_enrollment as enrollment
+        first, second = two
+        monkeypatch.setattr(enrollment, '_revocation_held', lambda actor: True)
+        monkeypatch.setattr(gate, 'revocation_policy_for', lambda cert: (
+            SimpleNamespace(name='dual control') if cert.id == second['certificate_id'] else None))
+        answer = auth_client.delete(f"/api/v2/users/{first['user_id']}")
+        assert answer.status_code == 409, answer.data[:300]
+        assert b'dual control' in answer.data
+        assert not self._revoked(app, first), 'the first certificate was revoked anyway'
+        assert not self._revoked(app, second)
+        with app.app_context():
+            assert db.session.get(User, first['user_id']) is not None
+
+    def test_a_revocation_failing_after_another_names_the_revoked_one(
+            self, app, auth_client, two, monkeypatch):
+        from services.cert_service import CertificateService
+        first, second = two
+        original = CertificateService.revoke_certificate
+
+        def _second_fails(**kwargs):
+            if kwargs['cert_id'] == second['certificate_id']:
+                raise RuntimeError('unable to persist revocation record')
+            return original(**kwargs)
+        monkeypatch.setattr(CertificateService, 'revoke_certificate', _second_fails)
+        answer = auth_client.delete(f"/api/v2/users/{first['user_id']}")
+        assert answer.status_code == 409, answer.data[:300]
+        message = json.loads(answer.data)['message']
+        assert f"#{first['certificate_id']}" in message, message
+        assert self._revoked(app, first) and not self._revoked(app, second)
+        with app.app_context():
+            assert db.session.get(User, first['user_id']) is not None
