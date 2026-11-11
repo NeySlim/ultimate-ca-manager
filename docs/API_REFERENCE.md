@@ -918,11 +918,13 @@ POST /api/v2/deploy/bindings/{binding_id}/reattach
 ```
 When EST, SCEP or WSTEP renews a certificate into a new row whose key UCM does not hold, a binding that sends the
 private key stays on the previous certificate. Each binding carries `needs_attention`, `null` or
-`{reason: "successor_without_key", successor_id, successor_refid, successor_has_key, can_reattach}`. `reattach`
-(scope `write:deploy`) moves the binding to the renewed certificate, clears the state and deploys it; it answers
-409 while the renewed certificate has no key and the binding sends one, or when the target is already bound to it.
-Uploading or importing the renewed certificate's key moves such bindings on its own; deleting the binding or the
-renewed certificate clears the state.
+`{reason: "successor_without_key", successor_id, successor_refid, successor_has_key, successor_archived,
+can_reattach}`. `reattach` (scope `write:deploy`) moves the binding to the renewed certificate, clears the state and
+deploys it; it answers 409 when the renewed certificate was itself superseded, while it has no key and the binding
+sends one, or when the target is already bound to it. A later renewal of the renewed certificate moves the state to
+the newest successor and sends a new `certificate.binding_left_behind` event for the same binding. Uploading or
+importing the renewed certificate's key moves such bindings on its own; deleting the binding or the renewed
+certificate clears the state.
 
 ### Delete Certificate
 ```http
