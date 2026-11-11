@@ -64,7 +64,10 @@ class TestImportReplacementDeploys:
         ca_cert, ca_key, key, old, cert_id = _setup(app, auth_client, create_ca, 'r7-nobind.example.com', bound=False)
         new = _cert('r7-nobind.example.com', key, issuer_cert=ca_cert, signer=ca_key)
         from unittest.mock import patch
-        with patch('services.webhook_service.emit_cert_renewed') as emitted:
+        from services import webhook_service
+        # Wrapped, not replaced: the real bus and its deploy subscriber run
+        with patch('services.webhook_service.emit_cert_renewed',
+                   wraps=webhook_service.emit_cert_renewed) as emitted:
             assert _import(auth_client, IMPORT, new).status_code == 200
         emitted.assert_called_once()
         assert _deliveries(app, cert_id) == []
