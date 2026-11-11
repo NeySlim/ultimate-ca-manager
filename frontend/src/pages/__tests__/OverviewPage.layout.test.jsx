@@ -8,6 +8,7 @@ vi.mock('../../components/overview', () => {
   return { QueueCard: card('queue'), HealthCard: card('health'), ComplianceCard: card('compliance'),
     HierarchyCard: card('hierarchy'), HorizonCard: card('horizon'), ActivityCard: card('activity') }
 })
+vi.mock('../../components/overview/KeyEncryptionBanner', () => ({ KeyEncryptionBanner: () => <div data-testid="key-banner" /> }))
 const store = vi.hoisted(() => ({ prefs: {}, persist: vi.fn(), listeners: new Set() }))
 vi.mock('../../stores/userPreferencesStore', () => ({
   getPreferences: () => store.prefs,
@@ -23,6 +24,11 @@ describe('OverviewPage', () => {
   it('shows the six cards by default', () => {
     render(<OverviewPage />)
     expect(screen.getAllByTestId(/^card-/)).toHaveLength(6)
+  })
+
+  it('carries the master key banner', () => {
+    render(<OverviewPage />)
+    expect(screen.getByTestId('key-banner')).toBeTruthy()
   })
 
   it('a preset hides the other cards and is saved under the dashboard key', () => {

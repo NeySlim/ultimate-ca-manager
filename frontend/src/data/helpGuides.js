@@ -9,74 +9,40 @@ export const helpGuides = {
 
   // ===================================================================
   dashboard: {
-    title: 'Dashboard',
+    title: 'Overview',
     content: `
 ## Overview
 
-The Dashboard is your central monitoring hub. It displays real-time metrics, charts, and alerts about your entire PKI infrastructure through customizable widgets.
+The Overview is the home page: six independent cards over the live data of your PKI. Each card loads on its own and shows its own loading, empty, error or missing-permission state.
 
-## Widgets
+## Cards
 
-### Statistics Card
-Displays these counters:
-- **Certificates**: every certificate, expired and revoked included
-- **CAs**: Root and Intermediate Certificate Authorities
-- **CSRs**: Certificate Signing Requests awaiting signature
-- **ACME**: registered ACME accounts
-- **SSH Certificates**: shown when an SSH CA exists
+### To handle
+The six most urgent items, critical first, each linking to its record. A folded tier gives the total per kind; the four renewal kinds open the certificate list.
 
-### Certificate Activity
-An area chart of the certificates issued, revoked and expired per day over the chosen period. Hover over data points to see exact counts.
+### Automation health
+Per protocol (ACME, SCEP, EST), the daily successes and failures and the last operation, plus the scheduler state.
 
-### Status Distribution
-Pie chart showing the breakdown of certificate states:
-- **Valid**: Within validity period and not revoked
-- **Expiring**: Expires within 30 days
-- **Expired**: Past the "Not After" date
-- **Revoked**: Explicitly revoked
+### Hierarchy
+The authorities as a tree under their parent, with CRL and OCSP state, an offline or cross-signed mark, and the certificates each issued over 7 days. Each authority opens its page.
 
-### Next Expiry
-Lists the six valid certificates that expire soonest, whatever their date. Click any certificate to navigate to its details.
+### Expiry horizon
+The expiring and expired counters, each opening its list, and the five certificates that expire next.
 
-### System Status
-Shows the health of UCM services:
-- ACME server (enabled/disabled)
-- SCEP server
-- EST protocol (enabled/disabled, assigned CA)
-- CRL auto-regeneration with CDP count
-- OCSP responder
-- TSA, SMTP and webhooks
-- Auto-renewal status
+### Compliance
+Live certificates by key algorithm and weakness: RSA below 3072 bits, weak signature hash, server certificates over 398 days, incomplete chain, no private key. Each counter opens the matching list.
 
-The System Health panel also shows the WebSocket connection, the database, the API and the time of the last refresh.
+### Latest operations
+The five most recent operations. Without **read:audit** you only see your own events; with it, a link opens the whole trail on the Audit Logs page.
 
-### Recent Activity
-A live feed of the latest operations: certificate issuance, revocations, imports, user logins. Updates in real-time via WebSocket. The whole feed needs **read:audit**, as the Audit Logs page does; without it you see your own events only.
+## Opening a filtered list
+Every counter that has a list opens the Certificates page filtered to exactly the certificates it counts. The filter appears as a chip above the table; remove it with its x.
 
-### Certificate Authorities
-Quick view of the latest CAs, each marked Root or Sub.
+## Choosing the cards
+Pick the **Operator**, **Manager** or **All cards** preset in the page header to choose which cards are shown. The layout is saved with your account and follows you across browsers.
 
-### Trust Store Expiry
-Trusted certificates that expire soonest.
-
-### ACME Accounts
-Lists registered ACME client accounts and their order counts.
-
-## Customization
-
-### Rearranging Widgets
-Click **Edit layout** in the page header, then drag any widget by its header to reposition it. The layout uses a responsive grid that adapts to your screen size.
-
-### Showing/Hiding Widgets
-Click **Customize** (sliders icon) in the page header, then the eye next to a widget to toggle its visibility. Hidden widgets are remembered across sessions.
-
-### Layout Persistence
-Your layout is saved in the browser, not in your account: every account that signs in from the same browser profile shares it, and another browser starts from the default layout.
-
-## Real-Time Updates
-The dashboard receives live updates via WebSocket. No manual refresh is needed: new certificates, status changes, and activity entries appear automatically.
-
-> 💡 The green dot in the sidebar shows a live WebSocket connection and disappears when it drops. Data will refresh on reconnection.
+## Refreshing
+Cards load when the page opens; a card in error offers **Retry**. The connection icon in the top bar shows the state of the live link, and the status bar at the bottom shows the version and whether the service answers.
 `
   },
 
@@ -275,7 +241,7 @@ This is the standard way to protect a Root CA between rare ceremonies, while kee
 The password follows the standard UCM password complexity policy: minimum length, mix of character classes, no trivial sequences. The same rules as user passwords.
 
 ### Step by step. Take offline
-1. Open the CA detail panel
+1. Open the CA in the inspector
 2. Click **Take offline**
 3. Read the explanation, click **Continue**
 4. Pick a mode (*Password protected* or *File exported*)
@@ -283,7 +249,7 @@ The password follows the standard UCM password complexity policy: minimum length
 6. Confirm. For *File exported*, the encrypted key downloads immediately: store it safely.
 
 ### Step by step. Restore
-1. Open the offline CA's detail panel
+1. Open the offline CA in the inspector
 2. Click **Restore**
 3. Enter the password
 4. For *File exported*: also select the previously downloaded key file
@@ -371,7 +337,7 @@ Revoked certificates are published in the CRL on next regeneration.
 
 If a certificate was revoked with the **Certificate Hold** reason, it can be restored to valid status:
 
-1. Open the revoked certificate details
+1. Open the revoked certificate in the inspector
 2. The **Remove Hold** button appears in the action bar (only for Certificate Hold revocations)
 3. Click **Remove Hold** to restore the certificate
 4. The certificate returns to valid status, the CRL is regenerated, and the OCSP cache is updated
@@ -706,7 +672,7 @@ A template can add extensions UCM has no setting for. Each one is an **OID**, a 
 - Extensions UCM sets itself (key usage, EKU, names, key identifiers, CRL and OCSP pointers, policies, name constraints, qcStatements...) are refused: use their own settings
 - A client that does not recognise a **critical** extension must reject the certificate (RFC 5280, section 4.2). Leave it non-critical unless every relying party understands it
 
-The certificate and CA detail panels list such extensions under **Other extensions**, with their OID, name when known, criticality and value.
+The inspector lists such extensions for certificates and CAs under **Other extensions** on the Extensions tab, with their OID, name when known, criticality and value.
 
 ## Duplicating Templates
 
@@ -814,7 +780,7 @@ UCM caches OCSP responses for performance. The cache is:
 
 ### Delegated OCSP Responder
 
-By default, OCSP responses are signed with the CA key itself. A **delegated responder** uses a dedicated certificate with the **OCSPSigning** EKU instead: assign one per CA from the CA's detail panel (only certificates carrying the OCSPSigning EKU and a private key are eligible).
+By default, OCSP responses are signed with the CA key itself. A **delegated responder** uses a dedicated certificate with the **OCSPSigning** EKU instead. Assign one per CA from the **Delegated Responder** section of the CA selected in the list on this page (only certificates carrying the OCSPSigning EKU and a private key are eligible).
 
 **Automatic renewal**: a daily task re-issues the responder certificate before it expires, same key pair and extensions, renewed at par, and rebinds the CA's responder configuration to the new certificate. Short-lived OCSP signing certificates (e.g. a 90-day template) rotate without manual action. Enabled by default; it can be disabled and the renewal window tuned in Settings › Security.
 
@@ -832,7 +798,7 @@ http://your-server:8080/ca/{ca_refid}.cer   (DER format)
 http://your-server:8080/ca/{ca_refid}.pem   (PEM format)
 \`\`\`
 
-Enable CA Issuers per CA in the **AIA CA Issuers** section of the detail panel. The URL is automatically generated using the HTTP protocol server and the configured FQDN.
+Enable CA Issuers per CA in the **AIA CA Issuers** section of that CA's panel on this page. The URL is automatically generated using the HTTP protocol server and the configured FQDN.
 
 > ⚠️ **Prerequisite**: Protocol URLs (CDP, OCSP, AIA) require a valid **FQDN** or a configured **Protocol Base URL** in Settings → General. If you access UCM via \`localhost\`, enabling these features will fail, set the FQDN first.
 
@@ -1544,7 +1510,7 @@ The signing CA's private key is used to sign every timestamp token. Best practic
 
 - Use a **dedicated sub-CA** for timestamping rather than your root CA
 - RFC 3161 §2.3 requires a signer whose only, critical EKU is **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8), which a CA certificate cannot carry without losing its other uses. Tokens signed by the CA certificate are refused by strict verifiers: \`openssl ts -verify\` fails with "unsuitable certificate purpose" and jarsigner with "Certificate is not valid for timestamping". The Settings tab warns while the CA certificate signs: **generate a dedicated signing certificate** there for these clients
-- Ensure the CA certificate has **sufficient validity**: timestamps must remain verifiable for years. A CA outside its validity period does not sign: \`/tsa\` answers 503 and the dashboard shows the TSA offline
+- Ensure the CA certificate has **sufficient validity**: timestamps must remain verifiable for years. A CA outside its validity period does not sign: \`/tsa\` answers 503
 - Enable **Require a dedicated timestamping certificate** to enforce this at signing time instead of relying on convention
 
 ### Policy OID
@@ -2044,7 +2010,7 @@ Require all users to enable two-factor authentication.
 
 ### Private Key Encryption
 Encrypt all private keys stored in the database with AES-128 (Fernet, with HMAC-SHA256), protected by a master key file. The section shows the encryption status and the **encrypted / unencrypted** key counters. Two opt-in environment variables make missing keys fatal at startup: \`UCM_REQUIRE_DB_ENCRYPTION_KEY\` (integration-secret encryption) and \`UCM_REQUIRE_KEY_ENCRYPTION\` (private-key encryption).
-A new installation creates the master key at its first start (in a container, only when \`/etc/ucm\` is a volume of its own); the Dashboard shows a banner while no key is loaded.
+A new installation creates the master key at its first start (in a container, only when \`/etc/ucm\` is a volume of its own); the Security section of Settings shows the encryption status, and the Overview shows a banner while no key is loaded.
 
 > 💡 Security-sensitive settings (session, lockout, HSTS, public URL, password policy) require the **admin:settings** permission, the fields are locked for operators.
 

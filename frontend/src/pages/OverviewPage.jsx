@@ -8,6 +8,7 @@ import { Button } from '../components'
 import {
   ActivityCard, ComplianceCard, HealthCard, HierarchyCard, HorizonCard, QueueCard,
 } from '../components/overview'
+import { KeyEncryptionBanner } from '../components/overview/KeyEncryptionBanner'
 import { getPreferences, persistPreference, subscribePreferences } from '../stores/userPreferencesStore'
 import { PRESETS, normalizeLayout, presetLayout, visibleCards } from '../lib/overviewLayout'
 
@@ -37,6 +38,7 @@ export default function OverviewPage() {
           ))}
         </div>
       </header>
+      <KeyEncryptionBanner />
       {shown.length === 0 && <p className="text-sm text-text-secondary">{t('overview.allHidden')}</p>}
       <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
         {shown.map((id) => {

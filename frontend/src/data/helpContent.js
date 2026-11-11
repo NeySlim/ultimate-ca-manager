@@ -86,7 +86,7 @@ export const helpContent = {
         title: 'Notifications',
         icon: Stack,
         items: [
-          { label: 'Bell', text: 'The count is the number of unread items in the panel: critical items and approvals from the dashboard queue, and failed scheduled backups or revoked sessions from the audit log' },
+          { label: 'Bell', text: 'The count is the number of unread items in the panel: critical items and approvals from the overview queue, and failed scheduled backups or revoked sessions from the audit log' },
           { label: 'Order', text: 'The queue items come first, then the audit log items, newest first' },
           { label: 'Rights', text: 'You only see items from sources you may read; a source you have no right on shows nothing' },
           { label: 'Read', text: 'Mark an item or all of them read; the marks are saved with your preferences, and an item that resolves leaves the panel' },
@@ -98,7 +98,7 @@ export const helpContent = {
       'Your pins follow you to every browser and device you sign in from',
       'A pinned page you lose the right to open is hidden, and returns if the right is restored before you change your pins',
     ],
-    related: ['Dashboard', 'Certificates', 'Settings']
+    related: ['Overview', 'Certificates', 'Settings']
   },
 
   // ===== CERTIFICATE AUTHORITIES =====
@@ -511,7 +511,7 @@ export const helpContent = {
           { label: 'Cache', text: 'Response cache with automatic daily cleanup of expired entries' },
           { label: 'Total Queries', text: 'Number of OCSP requests answered since the service started, and how many were served from the cache' },
           { label: 'HTTP caching', text: 'An answer without a nonce can be kept by HTTP caches until its nextUpdate, an hour at most (RFC 5019 §6.2: Expires, Last-Modified, ETag); an answer with a nonce is not reused' },
-          { label: 'Delegated Responder', text: 'Sign responses with a dedicated OCSPSigning certificate instead of the CA key, assign one per CA from the detail panel' },
+          { label: 'Delegated Responder', text: 'Sign responses with a dedicated OCSPSigning certificate instead of the CA key, assign one per CA from its panel on this page' },
           { label: 'Responder Auto-Renewal', text: 'A daily task re-issues the delegated responder certificate before expiry (same key pair, renewed at par) and rebinds it, enabled by default. The switch and its window (days before expiry, default 30) are in Settings › Security' },
         ]
       },
@@ -1267,7 +1267,7 @@ export const helpContent = {
       },
     ],
     tips: [
-      'Use the System Status widget at the top to quickly check service health',
+      'Use the status bar at the bottom to check that the service answers',
       'Test SMTP settings before relying on email notifications',
       'Customize the email template with your branding using the built-in HTML/Text editor',
       'Schedule automatic backups for production environments',
