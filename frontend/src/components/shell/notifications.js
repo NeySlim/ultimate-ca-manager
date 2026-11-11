@@ -30,9 +30,13 @@ export function queueItems(data) {
     }))
 }
 
+// A restore the form refused before reading the archive is not a failed restore.
+const FORM_REFUSAL = /^Restore refused: (no file|password missing|unknown mode|invalid file name|file too large|a backend (switch|migration)|a backup or)/
+
 export function auditItems(rows) {
   return (Array.isArray(rows) ? rows : [])
-    .filter(e => e && (e.action.startsWith('session_') || e.success === false))
+    .filter(e => e && (e.action.startsWith('session_') || e.success === false)
+      && !(e.action === 'system_restore' && FORM_REFUSAL.test(e.details || '')))
     .map(e => ({
       key: keyOf('audit', e.id), source: 'audit', kind: e.action, tier: e.success === false ? 'critical' : 'warning',
       title: e.resource_name || e.username || '', at: e.timestamp || null,

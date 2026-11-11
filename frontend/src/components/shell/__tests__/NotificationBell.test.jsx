@@ -186,6 +186,23 @@ describe('NotificationBell', () => {
     expect(rows).not.toContain('audit:61')
   })
 
+  it('ignores a restore the form refused before it started', async () => {
+    const refused = ['no file provided', 'no file selected', 'password missing', 'invalid file name']
+    m.extraLogs = [
+      ...refused.map((why, i) => ({ id: 70 + i, action: 'system_restore', success: false, username: 'root',
+        resource_name: 'upload', details: `Restore refused: ${why}`, timestamp: '2026-11-09T11:00:00Z' })),
+      { id: 80, action: 'system_restore', success: false, username: 'root', resource_name: 'b.ucmbkp',
+        details: 'Restore failed: unexpected error', timestamp: '2026-11-09T11:30:00Z' },
+    ]
+    setup()
+    const user = userEvent.setup()
+    await waitFor(() => expect(bell()).toHaveAccessibleName(/\|5/))
+    await user.click(bell())
+    const rows = within(screen.getByRole('region', { name: 'shell.bell.title' })).getAllByRole('listitem').map(li => li.getAttribute('data-notification'))
+    expect(rows).toContain('audit:80')
+    for (let i = 0; i < refused.length; i++) expect(rows).not.toContain(`audit:${70 + i}`)
+  })
+
   it('keeps a failed backup in the bell when 25 newer backups succeeded', async () => {
     m.extraLogs = Array.from({ length: 25 }, (_, i) => ({
       id: 100 + i, action: 'system_backup', success: true, username: 'root', resource_name: null,
