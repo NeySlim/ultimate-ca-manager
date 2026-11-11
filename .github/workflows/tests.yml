@@ -97,10 +97,15 @@ jobs:
           sarif_file: 'trivy-results.sarif'
         continue-on-error: true
   
+  # Two halves of the file list (scripts/ci/shard-tests.sh), four workers each.
   test-backend:
-    name: Backend Tests
+    name: Backend Tests (${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     
     steps:
       - name: Checkout code
@@ -132,7 +137,7 @@ jobs:
           UCM_DEV_MODE: 'true'
         run: |
           cd backend
-          pytest -v --tb=short -n 4 --dist loadfile
+          pytest -v --tb=short -n 4 --dist loadfile $(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 2)
 
   # One database for the whole suite, as a user runs it: the integration judge.
   # Release branches, the nightly run of dev, and on demand. Not on dev pushes.
@@ -283,7 +288,7 @@ jobs:
           # No DATABASE_URL here on purpose: these tests keep their own SQLite
           # instance and reach PostgreSQL through the two variables below, each
           # building its own engine. The application on PostgreSQL is the next
-          # step, through UCM_TEST_APP_PG_URL.
+          # job, through UCM_TEST_APP_PG_URL.
           UCM_TEST_POSTGRES_URL: postgresql://ucm:ucm_ci_password@localhost:5432/ucm_test
           UCM_TEST_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
         run: |
@@ -307,11 +312,77 @@ jobs:
             tests/test_migration_runner_pg.py \
             tests/test_scep_intune_ca_lock_pg.py
 
+  # The application suite on PostgreSQL, in three shards of scripts/ci/pg-app-tests.txt,
+  # each with a PostgreSQL service of its own.
+  test-backend-postgres-app:
+    name: Backend Tests (PostgreSQL app ${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    if: github.event_name != 'schedule'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ucm
+          POSTGRES_PASSWORD: ucm_ci_password
+          POSTGRES_DB: ucm_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.13'
+          cache: 'pip'
+
+      - name: Install system dependencies
+        run: scripts/ci/apt-install.sh libkrb5-dev libpq-dev postgresql-client
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r backend/requirements-dev.txt
+          pip install --no-deps pyjks==20.0.0
+
+      - name: Wait for PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            pg_isready -h localhost -p 5432 -U ucm && break
+            sleep 1
+          done
+
+      # The role the service creates is a superuser, and a superuser can
+      # disable foreign keys during a migration. Every installation that runs
+      # a managed PostgreSQL cannot, and the fallback that handles it went
+      # unexercised for thirty releases. These tests get a role that is
+      # deliberately ordinary, with a database of its own to reset.
+      - name: Create the unprivileged role the migration tests need
+        env:
+          PGPASSWORD: ucm_ci_password
+        run: |
+          psql -h localhost -U ucm -d ucm_test -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE ucm_migtest LOGIN PASSWORD 'ucm_migtest_ci' NOSUPERUSER;
+          CREATE DATABASE ucm_migtest OWNER ucm_migtest;
+          SQL
+
       # The application itself on PostgreSQL: the session `app` fixture builds
       # it in a schema of its own (docs/testing/postgres-harness.md), so the
       # routes and services run on this backend and not only the migrations.
-      # The unprivileged role, as on a managed PostgreSQL; its `public` schema,
-      # emptied by the step above, is never touched here.
+      # The unprivileged role, as on a managed PostgreSQL; its `public` schema
+      # is never touched here.
       - name: Run the application tests on PostgreSQL
         timeout-minutes: 30
         env:
@@ -324,56 +395,7 @@ jobs:
           UCM_TEST_APP_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
         run: |
           cd backend
-          pytest --tb=short \
-            tests/test_acme*.py \
-            tests/test_backup*.py \
-            tests/test_restore*.py \
-            tests/test_mtls*.py \
-            tests/test_user_delete_revokes_mtls.py \
-            tests/test_wstep*.py \
-            tests/test_xcep*.py \
-            tests/test_certificates*.py \
-            tests/test_revocation*.py \
-            tests/test_scheduler*.py \
-            tests/test_cluster_nodes_pg.py \
-            tests/test_cluster_commands_pg.py \
-            tests/test_boot_lock_pg.py \
-            tests/test_discovery_recovery_ha.py \
-            tests/test_discovery_timestamps.py \
-            tests/test_health_ha.py \
-            tests/test_sessions_store.py \
-            tests/test_dashboard*.py \
-            tests/test_protocol_approval_*.py \
-            tests/test_approval_legacy_hex_serial.py \
-            tests/test_serial*.py \
-            tests/test_scheduled_claims_pg.py \
-            tests/test_renewal_concurrency_pg.py \
-            tests/test_renewal_bindings_follow.py \
-            tests/test_import_ca_serial_unique.py \
-            tests/test_migration_138*.py \
-            tests/test_migration_139*.py \
-            tests/test_migration_141*.py \
-            tests/test_migration_142*.py \
-            tests/test_migration_143*.py \
-            tests/test_migration_144*.py \
-            tests/test_migration_145*.py \
-            tests/test_migration_146*.py \
-            tests/test_migration_148*.py \
-            tests/test_migration_149*.py \
-            tests/test_migration_150*.py \
-            tests/test_migration_151*.py \
-            tests/test_binding_left_behind.py \
-            tests/test_renewal_bindings_follow.py \
-            tests/test_user_id_never_reused.py \
-            tests/test_ws_relay*.py \
-            tests/test_postgres_schema_of_its_own.py \
-            tests/test_db_error_parameters_hidden.py \
-            tests/test_audit_oversized_fields.py \
-            tests/test_sso_login_identity.py \
-            tests/test_sso_return_path.py \
-            tests/test_cas_list_query_count.py \
-            tests/test_fresh_app.py \
-            tests/test_policy_algorithms_397.py
+          pytest --tb=short $(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 3 ../scripts/ci/pg-app-tests.txt)
   
   # Two real UCM nodes in HA mode on one PostgreSQL (docs/testing/ha-bench.md).
   # Manual only: run the workflow by hand with the `ha` input ticked.
