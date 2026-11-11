@@ -366,7 +366,7 @@ class TestMootRequestsAreResolved:
             _drop_policy(app, pid)
             _drop_rows(app, cert_id)
 
-    @pytest.mark.parametrize('refusal', ['renewed'])
+    @pytest.mark.parametrize('refusal', ['renewed', 'related'])
     def test_an_expected_refusal_is_a_warning_without_a_trace(self, app, auth_client, create_ca,
                                                               create_user, monkeypatch, caplog, refusal):
         from services.cert import renewal

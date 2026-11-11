@@ -597,7 +597,14 @@ def test_a_failed_signature_does_not_use_the_request(app, cert_a, monkeypatch):
         assert len(_bindings(request, cert)) == 1
 
 
-def test_two_concurrent_keys_meet_the_unique_binding(app, cert_a, monkeypatch):
+def _a_refusal_is_one_warning(caplog, text):
+    """An expected refusal: one WARNING naming it, no ERROR and no trace."""
+    lines = [(r.levelname, r.exc_info) for r in caplog.records
+             if r.levelname in ('WARNING', 'ERROR') and text in r.getMessage()]
+    assert lines == [('WARNING', None)], caplog.text
+
+
+def test_two_concurrent_keys_meet_the_unique_binding(app, cert_a, monkeypatch, caplog):
     """Both requests passed the check before either committed: the second insert loses."""
     from models.related_cert_request import RelatedCertRequestUse
     from services.cert import related_pair
@@ -620,8 +627,10 @@ def test_two_concurrent_keys_meet_the_unique_binding(app, cert_a, monkeypatch):
         monkeypatch.setattr(related_pair, 'check_request_key', lambda *a: None)
         monkeypatch.setattr(related_pair, '_bound_key', unseen_once)
         before = Certificate.query.count()
-        with pytest.raises(RelatedCertificateRefused, match='already used with another key'):
+        with caplog.at_level('INFO'), \
+                pytest.raises(RelatedCertificateRefused, match='already used with another key'):
             _est_sign(ca, _csr_with(cert, ec.generate_private_key(ec.SECP256R1()), request))
+        _a_refusal_is_one_warning(caplog, 'already used with another key')
         assert len(calls) == 2
         assert Certificate.query.count() == before
         assert db.session.get(Certificate, row_id).related_certificate_id == link
@@ -751,7 +760,8 @@ def test_b_is_stored_and_linked_when_a_changes_after_signing(app, auth_client, c
 
 
 @pytest.mark.parametrize('path', ['est', 'sign_route'])
-def test_no_link_is_written_onto_an_a_renewed_after_signing(app, auth_client, cert_a, monkeypatch, path):
+def test_no_link_is_written_onto_an_a_renewed_after_signing(app, auth_client, cert_a, monkeypatch,
+                                                             caplog, path):
     """B's extension hashes the A it was signed against: an A renewed in place meanwhile
     holds another certificate, so the linked issuance is refused rather than linked wrong."""
     row_id, cert, key = cert_a
@@ -770,9 +780,10 @@ def test_no_link_is_written_onto_an_a_renewed_after_signing(app, auth_client, ce
     monkeypatch.setattr(TrustStoreService, 'sign_csr', staticmethod(sign_then_renew_a))
     try:
         if path == 'est':
-            with app.app_context():
+            with app.app_context(), caplog.at_level('INFO'):
                 with pytest.raises(RelatedCertificateRefused, match='not held by this instance'):
                     _est_sign(_signing_ca(row_id)[0], x509.load_pem_x509_csr(_csr_b(cert, key)))
+            _a_refusal_is_one_warning(caplog, 'not held by this instance')
         else:
             with app.app_context():
                 ca_id = _signing_ca(row_id)[0].id

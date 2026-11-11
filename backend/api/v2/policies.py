@@ -1370,7 +1370,9 @@ def approve_approval_request(request_id, comment=None):
         except Exception as e:
             from services.policy_service import PolicyViolation
             from services.cert.renewal import RenewalError
-            if isinstance(e, RenewalError) and e.status < 500:
+            from services.cert.related_pair import RelatedCertificateRefused
+            if isinstance(e, RelatedCertificateRefused) or (
+                    isinstance(e, RenewalError) and e.status < 500):
                 # A refusal the approver is told about, not a failure
                 logger.warning(f"Certificate for approval #{approval.id} refused: {e}")
             else:
