@@ -487,3 +487,47 @@ class TestACertificateLeftBehind:
         logged = [r.getMessage() for r in caplog.records if 'not deleted' in r.getMessage()]
         assert logged and f"#{probe['certificate_id']}" in logged[0], logged
         assert '[' not in logged[0]
+
+
+class TestARevocationFailingAfterARowChange:
+    """revoke_checked reads the row again when revoke_certificate raises: only its own
+    revocation, committed before a later step failed, lets the removal go on."""
+
+    def _raising_after(self, monkeypatch, reason):
+        from services.cert_service import CertificateService
+        from utils.datetime_utils import utc_now
+
+        def _revoked_then_fails(**kwargs):
+            certificate = db.session.get(Certificate, kwargs['cert_id'])
+            certificate.revoked, certificate.revoke_reason = True, reason
+            certificate.revoked_at = utc_now()
+            db.session.commit()
+            raise ValueError('a step after the commit failed')
+        monkeypatch.setattr(CertificateService, 'revoke_certificate', _revoked_then_fails)
+
+    def _revoke(self, app, probe, monkeypatch):
+        from services import mtls_enrollment
+        sent = []
+        monkeypatch.setattr('services.acme.upstream_revocation.propagate_acme_revocation',
+                            lambda certificate, reason: sent.append(certificate.id) or ('local', None))
+        with app.app_context():
+            enrolment = db.session.get(AuthCertificate, probe['enrolment_id'])
+            return mtls_enrollment.revoke_checked(enrolment, probe['certificate_id']), sent
+
+    def test_a_concurrent_suspension_is_refused(self, app, probe, monkeypatch):
+        from services.mtls_enrollment import REVOCATION_FAILED
+        self._raising_after(monkeypatch, 'certificateHold')
+        refusal, sent = self._revoke(app, probe, monkeypatch)
+        assert refusal == (REVOCATION_FAILED, 409)
+        assert sent == []
+
+    def test_its_own_revocation_goes_on_and_is_not_logged_as_refused(
+            self, app, probe, monkeypatch, caplog):
+        import logging
+        self._raising_after(monkeypatch, 'cessationOfOperation')
+        with caplog.at_level(logging.WARNING, logger='services.mtls_enrollment'):
+            refusal, sent = self._revoke(app, probe, monkeypatch)
+        assert refusal is None and sent == [probe['certificate_id']]
+        logged = [(r.levelno, r.getMessage()) for r in caplog.records if r.name == 'services.mtls_enrollment']
+        assert not [m for _, m in logged if 'refused' in m], logged
+        assert [level for level, m in logged if 'a step after the commit failed' in m] == [logging.WARNING]

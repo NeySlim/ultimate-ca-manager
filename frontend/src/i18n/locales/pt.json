@@ -2324,6 +2324,7 @@
     "leftBehindHelp": "Este certificado foi renovado, mas o UCM não tem a chave do certificado renovado e esta implantação envia a chave. Ela continua a implantar este certificado, que vai expirar.",
     "leftBehindNoKey": "Importe a chave privada do certificado renovado ou deixe de enviar a chave (limpe o caminho da chave ou remova key_pem do modelo do destino HTTP) e depois vincule novamente.",
     "leftBehindTargetTaken": "Este destino já está vinculado ao certificado renovado: remova esta implantação.",
+    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
     "openRenewed": "Abrir o certificado renovado",
     "reattach": "Vincular ao certificado renovado",
     "reattached": "{{name}} agora implanta o certificado renovado",

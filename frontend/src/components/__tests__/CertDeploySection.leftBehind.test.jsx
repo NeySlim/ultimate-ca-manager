@@ -59,6 +59,18 @@ describe('CertDeploySection left-behind state', () => {
     expect(screen.queryByText('deploy.reattach')).not.toBeInTheDocument()
   })
 
+  it('says the renewed certificate was superseded rather than blaming the key or the target', async () => {
+    mocks.getBindings.mockResolvedValue({ data: [binding({
+      reason: 'successor_without_key', successor_id: 43, successor_refid: 'abc',
+      successor_has_key: true, successor_archived: true, can_reattach: false,
+    })] })
+    render(<CertDeploySection certificate={certificate} />)
+    expect(await screen.findByText('deploy.leftBehindSuperseded')).toBeInTheDocument()
+    expect(screen.queryByText('deploy.leftBehindTargetTaken')).not.toBeInTheDocument()
+    expect(screen.queryByText('deploy.leftBehindNoKey')).not.toBeInTheDocument()
+    expect(screen.queryByText('deploy.reattach')).not.toBeInTheDocument()
+  })
+
   it('reattaches to the renewed certificate when it can', async () => {
     mocks.getBindings.mockResolvedValue({ data: [binding({
       reason: 'successor_without_key', successor_id: 43, successor_refid: 'abc',

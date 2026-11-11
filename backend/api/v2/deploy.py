@@ -380,6 +380,8 @@ def reattach_binding(binding_id):
     successor = binding.attention_successor
     if successor is None:
         return error_response('The renewed certificate no longer exists', 409)
+    if successor.archived:
+        return error_response('The renewed certificate was itself superseded', 409)
     if not can_reattach(binding):
         if DeployBinding.query.filter_by(target_id=binding.target_id,
                                          certificate_id=successor.id).count():
