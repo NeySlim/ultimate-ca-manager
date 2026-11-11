@@ -230,9 +230,11 @@ def test_the_scheduler_process_prepares_then_runs_then_hands_over(monkeypatch):
     monkeypatch.setattr(app_module, 'create_app', create_app)
     monkeypatch.setattr(app_module, 'run_startup_housekeeping', lambda a: calls.append(('housekeeping', a)))
     monkeypatch.setattr(scheduler_service, 'get_scheduler', lambda: Scheduler())
+    monkeypatch.setattr('services.ws_relay.start_publisher', lambda a: calls.append(('relay', a)))
+    monkeypatch.setattr('services.ws_relay.stop_publisher', lambda **kw: calls.append('relay stop'))
     assert scheduler_main.main() == 0
-    assert calls == [('create_app', '1'), ('housekeeping', 'the-app'), 'rearm', ('start', 'the-app'),
-                     'relinquish', ('join', 7.0)]
+    assert calls == [('create_app', '1'), ('relay', 'the-app'), ('housekeeping', 'the-app'), 'rearm',
+                     ('start', 'the-app'), 'relinquish', ('join', 7.0), 'relay stop']
 
 
 def test_under_gunicorn_the_master_skips_the_startup_housekeeping(monkeypatch):
@@ -290,6 +292,8 @@ def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch):
     monkeypatch.setattr(app_module, 'create_app', lambda: 'the-app')
     monkeypatch.setattr(app_module, 'run_startup_housekeeping', lambda a: None)
     monkeypatch.setattr(scheduler_service, 'get_scheduler', lambda: Scheduler())
+    monkeypatch.setattr('services.ws_relay.start_publisher', lambda a: None)
+    monkeypatch.setattr('services.ws_relay.stop_publisher', lambda **kw: exits.append('relay stop'))
     with pytest.raises(Exit):
         scheduler_main.main()
-    assert exits == [0]
+    assert exits == ['relay stop', 0]

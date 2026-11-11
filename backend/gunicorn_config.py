@@ -269,6 +269,8 @@ def worker_exit(server, worker):
     # A worker leaving with a restart claim not given back would keep its successor from restarting
     from services.cluster_commands import stop_applier
     stop_applier()
+    from services.ws_relay import stop_reader
+    stop_reader()
 
 def post_worker_init(worker):
     """Post-worker initialization:
@@ -336,3 +338,12 @@ def post_worker_init(worker):
     except Exception as e:
         import logging
         logging.getLogger('ucm.cluster').error("Cluster command applier not started: %s", e)
+
+    # Without Redis: this worker emits the scheduler process's events to its clients
+    try:
+        from services.ws_relay import start_reader
+        from wsgi import app as flask_app
+        start_reader(flask_app)
+    except Exception as e:
+        import logging
+        logging.getLogger('ucm.websocket').error("WebSocket relay reader not started: %s", e)

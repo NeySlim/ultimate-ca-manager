@@ -24,6 +24,12 @@ def main() -> int:
 
     from app import create_app, run_startup_housekeeping
     app = create_app()
+    # No browser is connected here: without Redis the events reach the workers through the database
+    from services.ws_relay import start_publisher, stop_publisher
+    try:
+        start_publisher(app)
+    except Exception as e:
+        logger.error("WebSocket relay not started, scheduler events reach no browser: %s", e)
     run_startup_housekeeping(app)
     scheduler = get_scheduler()
     scheduler.rearm_grace()
@@ -47,8 +53,10 @@ def main() -> int:
         if thread.is_alive():
             # A stop that was asked for: 0, or the arbiter logs "Worker exited with code 1"
             logger.warning("A scheduled task outlasted %ss: the scheduler process exits anyway", grace)
+            stop_publisher(timeout=2)
             logging.shutdown()
             os._exit(0)
+    stop_publisher()
     logger.info("Scheduler process %s stopped", os.getpid())
     return 0
 
