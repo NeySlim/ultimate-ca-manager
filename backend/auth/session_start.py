@@ -12,6 +12,17 @@ def _new_identifier():
         regenerate(session)
 
 
+# The account's creation time: an id handed out again (SQLite reuses the last
+# one deleted) names another account, which this tells apart.
+ACCOUNT_KEY = 'account_created'
+
+
+def account_proof(user) -> str:
+    from utils.datetime_utils import to_naive_utc
+    created = to_naive_utc(user.created_at)
+    return created.isoformat() if created else ''
+
+
 def begin_session(user):
     """Empty session under a new identifier, bound to ``user``'s session version.
 
@@ -20,6 +31,7 @@ def begin_session(user):
     """
     session.clear()
     session['session_version'] = user.session_version or 0
+    session[ACCOUNT_KEY] = account_proof(user)
     _new_identifier()
 
 
@@ -41,5 +53,13 @@ def keep_own_session(user):
 
 
 def session_is_current(user) -> bool:
-    """False once the account's sessions were closed after this one began."""
-    return session.get('session_version', 0) == (user.session_version or 0)
+    """False once the account's sessions were closed after this one began, or
+    when the session was opened for an earlier account with the same id.
+    A session opened before the proof existed gets it on its first request."""
+    if session.get('session_version', 0) != (user.session_version or 0):
+        return False
+    proof = session.get(ACCOUNT_KEY)
+    if proof is None:
+        session[ACCOUNT_KEY] = account_proof(user)
+        return True
+    return proof == account_proof(user)
