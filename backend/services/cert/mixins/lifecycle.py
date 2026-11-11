@@ -76,9 +76,10 @@ def _propagate_to_acme_ca(partner, reason):
     """The related member obtained over ACME is revoked at its CA too; ``(outcome, detail)``
     of :func:`propagate_acme_revocation`, logged when the CA was not told."""
     from services.acme.upstream_revocation import (
-        NOT_ACME, REVOKED, local_only_message, propagate_acme_revocation)
+        HOLD, NOT_ACME, REVOKED, local_only_message, propagate_acme_revocation)
     outcome, detail = propagate_acme_revocation(partner, reason)
-    if outcome not in (NOT_ACME, REVOKED):
+    # A hold is never sent: nothing to warn about
+    if outcome not in (NOT_ACME, REVOKED, HOLD):
         logger.warning("Related certificate %s: %s", partner.id, local_only_message(outcome, detail))
     return outcome, detail
 

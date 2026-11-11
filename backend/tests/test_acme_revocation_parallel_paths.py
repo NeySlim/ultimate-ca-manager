@@ -362,3 +362,28 @@ class TestTheRelatedMemberOfAPair:
                 row.related_certificate_id = None
             db.session.commit()
             assert CertificateService.delete_certificate(other['id'], username='admin')
+
+    def test_a_hold_of_the_pair_neither_reaches_the_ca_nor_warns(
+            self, app, bench, create_cert, caplog):  # noqa: F811
+        import logging
+        from models import Certificate
+        from services.cert_service import CertificateService
+        other = create_cert(cn=f'pair-{uuid.uuid4().hex[:6]}.example')
+        a, b = bench.row(), db.session.get(Certificate, other['id'])
+        a.related_certificate_id, b.related_certificate_id = b.id, a.id
+        db.session.commit()
+        try:
+            with caplog.at_level(logging.WARNING, logger='services.cert.mixins.lifecycle'):
+                CertificateService.revoke_certificate(
+                    other['id'], reason='certificateHold', username='admin')
+            assert bench.row().revoked is True
+            bench.client.revoke_certificate.assert_not_called()
+            assert not [r for r in caplog.records if r.name == 'services.cert.mixins.lifecycle'
+                        and r.levelno >= logging.WARNING], caplog.text
+        finally:
+            db.session.rollback()
+            for row in (db.session.get(Certificate, bench.cert_id),
+                        db.session.get(Certificate, other['id'])):
+                row.related_certificate_id = None
+            db.session.commit()
+            assert CertificateService.delete_certificate(other['id'], username='admin')
