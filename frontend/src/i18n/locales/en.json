@@ -3941,6 +3941,7 @@
     "bindingLeftBehind": "A renewal left {{name}} on the previous certificate"
   },
   "help": {
+    "englishOnlyNotice": "Help is available in English, French and Chinese.",
     "aboutCertificates": "About Certificates",
     "statusLegend": "Status Legend",
     "exportFormats": "Export Formats",

@@ -3938,6 +3938,7 @@
     "bindingLeftBehind": "续期后 {{name}} 仍留在先前的证书上"
   },
   "help": {
+    "englishOnlyNotice": "帮助提供英语、法语和中文版本。",
     "aboutCertificates": "关于证书",
     "statusLegend": "状态图例",
     "exportFormats": "导出格式",

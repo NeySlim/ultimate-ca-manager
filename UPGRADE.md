@@ -162,6 +162,7 @@ Database migrations run automatically at startup.
 
 ### Upgrading to v3.0
 
+- In-app help is available in English, French and Chinese only; with the interface in German, Spanish, Italian, Japanese, Portuguese or Ukrainian the help panel shows the English text. The interface itself keeps its nine languages.
 - Audit and syslog consumers (SIEM): the text of a restore refused before its archive was read now starts with `Restore request refused: ` followed by the reason; match on that prefix.
 
 ### Upgrading to v2.243

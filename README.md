@@ -230,7 +230,7 @@ Docker: data at `/opt/ucm/data/` (mount as volume), config via environment varia
 - [x] **Certificate Practice Statement (CPS)**: Per-CA CPS URI and Policy OID in CertificatePolicies extension *(v2.109)*
 - [x] **Multiple CDP/OCSP/AIA URLs**: Multiple distribution points and access descriptions per CA *(v2.109)*
 - [x] **RFC 3161 Timestamp Authority (TSA)**: Time stamping server with a configurable policy OID *(v2.109)*
-- [x] **In-App Help Translations**: 208 help files across 8 languages for all 26 sections *(v2.109)*
+- [x] **In-App Help Translations**: in-app help for all 26 sections in English, French and Chinese; other interface languages show the English help *(v2.109)*
 - [x] **ACME Auto-Supersede**: Automatically revoke old certificates on ACME renewal *(v2.110)*
 - [x] **Universal Format Detection**: DER/PEM detection by content across all file uploads *(v2.110)*
 - [x] **PKCS7/PKCS12 Decode**: Certificate decoder supports P7B bundles and PKCS12 files *(v2.111)*

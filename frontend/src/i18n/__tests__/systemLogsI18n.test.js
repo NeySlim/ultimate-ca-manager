@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { helpContent } from '../../data/helpContent'
 import { helpGuides } from '../../data/helpGuides'
+import { HELP_TRANSLATED_LANGUAGES } from '../../data/helpLanguages'
 
 const dir = dirname(fileURLToPath(import.meta.url))
 const localesDir = join(dir, '..', 'locales')
@@ -11,7 +12,7 @@ const LOCALE_CODES = ['de', 'en', 'es', 'fr', 'it', 'ja', 'pt', 'uk', 'zh']
 const LOG_KEYS = ['subtitle', 'level', 'lines', 'searchPlaceholder', 'empty',
   'unavailable', 'showing', 'scanCap', 'linesOpt', 'filters', 'exclude', 'readingFrom', 'source', 'sourceApp', 'sourceAccess',
   'sourceError', 'sourceJournal', 'component', 'allComponents', 'follow', 'time', 'message', 'levelShort', 'from', 'to', 'serverTime', 'errors', 'warnings', 'components', 'copyAll', 'copySelected']
-const HELP_FILES = LOCALE_CODES.filter((c) => c !== 'en')
+const HELP_FILES = HELP_TRANSLATED_LANGUAGES
   .map((c) => join(dir, '..', '..', 'data', 'help', c, 'systemLogs.js'))
 
 function loadLocale(code) {
