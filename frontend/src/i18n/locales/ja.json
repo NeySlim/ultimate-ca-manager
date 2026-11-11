@@ -2324,6 +2324,7 @@
     "leftBehindHelp": "この証明書は更新されましたが、UCM は更新後の証明書の鍵を保持しておらず、このデプロイは鍵を送信します。期限切れになるこの証明書を引き続きデプロイしています。",
     "leftBehindNoKey": "更新後の証明書の秘密鍵をインポートするか、鍵の送信をやめてから（鍵のパスを空にするか、HTTP ターゲットのテンプレートから key_pem を削除）、再バインドしてください。",
     "leftBehindTargetTaken": "このターゲットはすでに更新後の証明書にバインドされています。このデプロイを削除してください。",
+    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
     "openRenewed": "更新後の証明書を開く",
     "reattach": "更新後の証明書に再バインド",
     "reattached": "{{name}} は更新後の証明書をデプロイするようになりました",

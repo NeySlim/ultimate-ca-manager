@@ -1911,6 +1911,7 @@
     "leftBehindHelp": "Ce certificat a été renouvelé, mais UCM ne détient pas la clé du certificat renouvelé et ce déploiement envoie la clé. Il déploie toujours ce certificat, qui va expirer.",
     "leftBehindNoKey": "Importez la clé privée du certificat renouvelé, ou cessez d'envoyer la clé (videz le chemin de la clé, ou retirez key_pem du modèle de la cible HTTP), puis rattachez.",
     "leftBehindTargetTaken": "Cette cible est déjà liée au certificat renouvelé : supprimez ce déploiement.",
+    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
     "openRenewed": "Ouvrir le certificat renouvelé",
     "reattach": "Rattacher au certificat renouvelé",
     "reattached": "{{name}} déploie désormais le certificat renouvelé",

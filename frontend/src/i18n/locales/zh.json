@@ -2324,6 +2324,7 @@
     "leftBehindHelp": "此证书已续期，但 UCM 没有续期后证书的密钥，而此部署会发送密钥。它仍在部署此证书，而此证书即将过期。",
     "leftBehindNoKey": "请导入续期后证书的私钥，或停止发送密钥（清空密钥路径，或从 HTTP 目标模板中删除 key_pem），然后重新绑定。",
     "leftBehindTargetTaken": "此目标已绑定到续期后的证书：请删除此部署。",
+    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
     "openRenewed": "打开续期后的证书",
     "reattach": "重新绑定到续期后的证书",
     "reattached": "{{name}} 现在部署续期后的证书",

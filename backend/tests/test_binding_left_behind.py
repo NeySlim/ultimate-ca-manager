@@ -87,7 +87,7 @@ def _assert_flagged(app, auth_client, old_id, binding_id, keyed_id, seen):
         f'/api/v2/deploy/bindings?certificate_id={old_id}').get_json()['data']}
     assert listed[keyed_id]['needs_attention'] == {
         'reason': REASON, 'successor_id': new_id, 'successor_refid': new_refid,
-        'successor_has_key': False, 'can_reattach': False}
+        'successor_has_key': False, 'successor_archived': False, 'can_reattach': False}
     _write_listener_cert(app, old_id)
     bound = auth_client.get('/api/v2/system/https/cert-info').get_json()['data']['bound_certificate']
     assert bound['needs_attention']['successor_refid'] == new_refid
@@ -378,6 +378,11 @@ def test_reattaching_refuses_an_archived_successor(app, auth_client, create_ca, 
         successor.archived = True
         db.session.commit()
     url = f'/api/v2/deploy/bindings/{keyed_id}/reattach'
-    assert auth_client.post(url, data='{}', content_type='application/json').status_code == 409
+    r = auth_client.post(url, data='{}', content_type='application/json')
+    assert r.status_code == 409
+    assert r.get_json()['message'] == 'The renewed certificate was itself superseded'
+    listed = auth_client.get(f'/api/v2/deploy/bindings?certificate_id={old_id}').get_json()['data']
+    attention = next(b for b in listed if b['id'] == keyed_id)['needs_attention']
+    assert (attention['successor_archived'], attention['can_reattach']) == (True, False)
     with app.app_context():
         assert db.session.get(DeployBinding, keyed_id).certificate_id == old_id

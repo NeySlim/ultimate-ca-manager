@@ -2324,6 +2324,7 @@
     "leftBehindHelp": "Questo certificato è stato rinnovato, ma UCM non possiede la chiave del certificato rinnovato e questa distribuzione invia la chiave. Continua a distribuire questo certificato, che scadrà.",
     "leftBehindNoKey": "Importa la chiave privata del certificato rinnovato oppure smetti di inviare la chiave (svuota il percorso della chiave o rimuovi key_pem dal modello della destinazione HTTP), poi riassocia.",
     "leftBehindTargetTaken": "Questa destinazione è già associata al certificato rinnovato: rimuovi questa distribuzione.",
+    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
     "openRenewed": "Apri il certificato rinnovato",
     "reattach": "Associa al certificato rinnovato",
     "reattached": "{{name}} ora distribuisce il certificato rinnovato",

@@ -251,9 +251,11 @@ export function CertDeploySection({ certificate }) {
                     <p className="text-2xs text-text-primary">{t('deploy.leftBehindHelp')}</p>
                     {!binding.needs_attention.can_reattach && (
                       <p className="text-2xs text-text-secondary">
-                        {binding.needs_attention.successor_has_key
-                          ? t('deploy.leftBehindTargetTaken')
-                          : t('deploy.leftBehindNoKey')}
+                        {binding.needs_attention.successor_archived
+                          ? t('deploy.leftBehindSuperseded')
+                          : binding.needs_attention.successor_has_key
+                            ? t('deploy.leftBehindTargetTaken')
+                            : t('deploy.leftBehindNoKey')}
                       </p>
                     )}
                     <div className="flex flex-wrap items-center gap-2">

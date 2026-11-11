@@ -168,6 +168,7 @@ class DeployBinding(db.Model):
             'successor_id': self.attention_successor_id,
             'successor_refid': successor.refid if successor else None,
             'successor_has_key': bool(successor and successor.has_private_key),
+            'successor_archived': bool(successor and successor.archived),
             'can_reattach': can_reattach(self),
         }
 

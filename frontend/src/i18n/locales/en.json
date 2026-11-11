@@ -2324,6 +2324,7 @@
     "leftBehindHelp": "This certificate was renewed, but UCM does not hold the renewed certificate's key and this deployment sends the key. It still deploys this certificate, which will expire.",
     "leftBehindNoKey": "Import the renewed certificate's private key, or stop sending the key (clear the key path, or remove key_pem from the HTTP target template), then reattach.",
     "leftBehindTargetTaken": "This target is already bound to the renewed certificate: remove this deployment.",
+    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
     "openRenewed": "Open the renewed certificate",
     "reattach": "Reattach to the renewed certificate",
     "reattached": "{{name}} now deploys the renewed certificate",

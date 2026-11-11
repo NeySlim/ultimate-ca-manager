@@ -2324,6 +2324,7 @@
     "leftBehindHelp": "Dieses Zertifikat wurde erneuert, aber UCM besitzt den Schlüssel des erneuerten Zertifikats nicht, und diese Bereitstellung sendet den Schlüssel. Sie stellt weiterhin dieses Zertifikat bereit, das ablaufen wird.",
     "leftBehindNoKey": "Importieren Sie den privaten Schlüssel des erneuerten Zertifikats oder senden Sie den Schlüssel nicht mehr (Schlüsselpfad leeren oder key_pem aus der Vorlage des HTTP-Ziels entfernen) und binden Sie dann neu.",
     "leftBehindTargetTaken": "Dieses Ziel ist bereits an das erneuerte Zertifikat gebunden: Entfernen Sie diese Bereitstellung.",
+    "leftBehindSuperseded": "The renewed certificate was itself superseded: bind this target to the current certificate, or remove this deployment.",
     "openRenewed": "Erneuertes Zertifikat öffnen",
     "reattach": "An das erneuerte Zertifikat binden",
     "reattached": "{{name}} stellt jetzt das erneuerte Zertifikat bereit",
