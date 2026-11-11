@@ -307,3 +307,61 @@ def test_a_renewal_rolled_back_announces_nothing(app, create_ca, https, seen):
         sign_est_csr(CA.query.filter_by(refid=old.caref).one(), _csr(old.descr),
                      renewal_of=held, supersedes=old)
     assert [p['binding']['id'] for p, _ in seen if p['binding']['type'] == 'deploy'] == [ok_keyed]
+
+
+def test_a_second_keyless_renewal_retargets_what_was_left_behind(app, auth_client, create_ca, https, seen):
+    """O renewed to S1 without a key, then S1 to S2: the flags name S2, never the superseded S1."""
+    from services.binding_attention import https_left_behind_for
+    from services.https_binding import get_bound_refid
+    ca = create_ca(cn='left behind twice CA')
+    old_id, _, keyed_id = _bound_row(app, ca['id'], 'left-twice.example.test')
+    _protocol_renewal(app, old_id, 'est')
+    with app.app_context():
+        first_id = db.session.get(DeployBinding, keyed_id).attention_successor_id
+    del seen[:]
+    second_id, key_pem = _renew_with_known_key(app, first_id)
+    with app.app_context():
+        keyed = db.session.get(DeployBinding, keyed_id)
+        assert keyed.certificate_id == old_id
+        assert (keyed.attention_reason, keyed.attention_successor_id) == (REASON, second_id)
+        second_refid = db.session.get(Certificate, second_id).refid
+        assert https_left_behind_for() == second_refid
+        assert get_bound_refid() == db.session.get(Certificate, old_id).refid
+    assert [(p['binding']['id'], s) for p, s in seen if p['binding']['type'] == 'deploy'] == [
+        (keyed_id, second_id)]
+    assert [s for p, s in seen if p['binding']['type'] == 'https'] == [second_refid]
+    r = auth_client.post(f'/api/v2/certificates/{second_id}/key', data=json.dumps({'key': key_pem}),
+                         content_type='application/json')
+    assert r.status_code == 200, r.get_json()
+    with app.app_context():
+        keyed = db.session.get(DeployBinding, keyed_id)
+        assert keyed.certificate_id == second_id
+        assert (keyed.attention_reason, keyed.attention_successor_id) == (None, None)
+        assert get_bound_refid() == second_refid
+        assert https_left_behind_for() == ''
+
+
+def test_a_keyed_successor_of_the_awaited_row_takes_what_was_left_behind(app, create_ca, https, seen):
+    from services.binding_attention import https_left_behind_for
+    from services.ca.ca_signing import _bindings_follow
+    from services.cert_service import CertificateService
+    from services.https_binding import get_bound_refid
+    ca = create_ca(cn='left behind keyed next CA')
+    old_id, _, keyed_id = _bound_row(app, ca['id'], 'left-keyed-next.example.test')
+    _protocol_renewal(app, old_id, 'est')
+    with app.app_context():
+        first_id = db.session.get(DeployBinding, keyed_id).attention_successor_id
+        ca_row = db.session.get(CA, ca['id'])
+        nxt = CertificateService.create_certificate(
+            descr='left-keyed-next.example.test', caref=ca_row.refid,
+            dn={'CN': 'left-keyed-next.example.test'}, cert_type='server_cert',
+            key_type='prime256v1', validity_days=30, username='admin')
+        assert nxt.has_private_key
+        _bindings_follow([first_id], nxt)
+        db.session.commit()
+        keyed = db.session.get(DeployBinding, keyed_id)
+        assert keyed.certificate_id == nxt.id
+        assert (keyed.attention_reason, keyed.attention_successor_id) == (None, None)
+        assert get_bound_refid() == nxt.refid
+        assert https_left_behind_for() == ''
+

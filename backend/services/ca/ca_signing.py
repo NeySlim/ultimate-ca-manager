@@ -80,9 +80,11 @@ def _pushes_key(binding):
 
 
 def _bindings_follow(old_ids, successor):
-    """Deploy bindings and the HTTPS listener binding of the archived rows *old_ids* now
-    name *successor*; a target keeps one binding per certificate (lowest id wins).
-    A binding that pushes the key, and the HTTPS binding, follow only a successor holding one."""
+    """Deploy bindings and the HTTPS listener binding of the archived rows *old_ids*, and
+    those left behind waiting for one of them, now name *successor*; a target keeps one
+    binding per certificate (lowest id wins). A binding that pushes the key, and the
+    HTTPS binding, follow only a successor holding one, and otherwise wait for it."""
+    from sqlalchemy import or_
     from models import DeployBinding, SystemConfig
     from services import binding_attention
     from services.https_binding import BOUND_REFID_KEY
@@ -92,19 +94,27 @@ def _bindings_follow(old_ids, successor):
     taken = {t for (t,) in db.session.query(DeployBinding.target_id)
              .filter(DeployBinding.certificate_id == successor.id)}
     stayed = []
-    for binding in (DeployBinding.query.filter(DeployBinding.certificate_id.in_(old_ids))
-                    .order_by(DeployBinding.id)):
+    for binding in (DeployBinding.query.filter(or_(
+            DeployBinding.certificate_id.in_(old_ids),
+            DeployBinding.attention_successor_id.in_(old_ids)))
+            .order_by(DeployBinding.id)):
         if not keyed and _pushes_key(binding):
             stayed.append(f'deploy binding {binding.id}')
             binding_attention.mark_deploy(binding, successor)
-        elif binding.target_id not in taken:
+            continue
+        binding_attention.clear(binding)
+        if binding.target_id not in taken:
             binding.certificate_id = successor.id
             taken.add(binding.target_id)
     refids = [r for (r,) in db.session.query(Certificate.refid).filter(Certificate.id.in_(old_ids))]
-    https = SystemConfig.query.filter(SystemConfig.key == BOUND_REFID_KEY,
-                                      SystemConfig.value.in_(refids)).first()
+    https = SystemConfig.query.filter(SystemConfig.key == BOUND_REFID_KEY).first()
+    awaited = binding_attention.https_left_behind_for() in refids
+    if https is None or not (https.value in refids or awaited):
+        https = None
     if https is not None and keyed:
         https.value = successor.refid
+        if awaited:
+            binding_attention.clear_https()
     elif https is not None:
         stayed.append('the HTTPS listener binding')
         binding_attention.mark_https(successor)
