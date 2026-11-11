@@ -4193,7 +4193,7 @@
     "eventLabels": {
       "certificateIssued": "発行",
       "certificateRevoked": "失効",
-      "certificateUnheld": "Hold lifted",
+      "certificateUnheld": "一時停止の解除",
       "certificateRenewed": "更新",
       "certificateExpiring": "期限間近",
       "certificateExpired": "期限切れ",
@@ -6059,7 +6059,7 @@
         "renewal_declined": "更新の拒否",
         "ca_expiring": "CAの期限切れ間近",
         "system_backup": "バックアップの失敗",
-        "system_restore": "Restore failed",
+        "system_restore": "復元の失敗",
         "session_revoke": "セッションの取り消し",
         "session_revoke_all": "複数セッションの取り消し"
       }

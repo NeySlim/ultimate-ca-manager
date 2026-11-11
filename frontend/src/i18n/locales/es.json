@@ -4190,7 +4190,7 @@
     "eventLabels": {
       "certificateIssued": "Emitido",
       "certificateRevoked": "Revocado",
-      "certificateUnheld": "Hold lifted",
+      "certificateUnheld": "Suspensión levantada",
       "certificateRenewed": "Renovado",
       "certificateExpiring": "Por expirar",
       "certificateExpired": "Expirado",
@@ -6056,7 +6056,7 @@
         "renewal_declined": "Renovación rechazada",
         "ca_expiring": "CA por expirar",
         "system_backup": "Copia de seguridad fallida",
-        "system_restore": "Restore failed",
+        "system_restore": "Restauración fallida",
         "session_revoke": "Sesión revocada",
         "session_revoke_all": "Sesiones revocadas"
       }

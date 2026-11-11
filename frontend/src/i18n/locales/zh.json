@@ -4190,7 +4190,7 @@
     "eventLabels": {
       "certificateIssued": "已签发",
       "certificateRevoked": "已吊销",
-      "certificateUnheld": "Hold lifted",
+      "certificateUnheld": "暂停已解除",
       "certificateRenewed": "已续期",
       "certificateExpiring": "即将过期",
       "certificateExpired": "已过期",
@@ -6056,7 +6056,7 @@
         "renewal_declined": "续期被拒绝",
         "ca_expiring": "CA 即将到期",
         "system_backup": "备份失败",
-        "system_restore": "Restore failed",
+        "system_restore": "恢复失败",
         "session_revoke": "会话已吊销",
         "session_revoke_all": "多个会话已吊销"
       }
