@@ -81,6 +81,39 @@ def test_two_workers_each_get_every_event_once_in_emitter_order(engines):
             assert [p['data']['n'] for p in got if p['data']['e'] == index] == list(range(PER_EMITTER))
 
 
+def test_an_id_committed_out_of_order_is_waited_for_then_delivered_once(engines):
+    from utils.datetime_utils import utc_now
+    insert = text("INSERT INTO websocket_relay (created_at, room, payload) VALUES (:t, 'r', :p) RETURNING id")
+
+    def payload(n):
+        return {'t': utc_now(), 'p': json.dumps({'type': 'x', 'data': {'n': n}})}
+
+    now = [1000.0]
+    got = []
+    reader = ws_relay.RelayReader(engines[0], lambda room, p: got.append(p['data']['n']),
+                                  monotonic=lambda: now[0], gap_grace=30.0)
+    reader.run_once()
+    slow = engines[1].connect()
+    try:
+        tx = slow.begin()
+        low = slow.execute(insert, payload(1)).scalar()  # takes the lower id, commits last
+        with engines[2].begin() as conn:
+            high = conn.execute(insert, payload(2)).scalar()  # takes the higher id, commits first
+        assert high > low
+        reader.run_once()
+        now[0] += 1
+        reader.run_once()
+        assert got == []  # the lower id may still commit: the higher one waits
+        tx.commit()
+        reader.run_once()
+        reader.run_once()
+        assert got == [1, 2]  # each once, in id order
+    finally:
+        slow.close()
+        with engines[3].begin() as conn:
+            conn.execute(text("DELETE FROM websocket_relay WHERE id >= :i"), {'i': low})
+
+
 def test_the_purge_keeps_recent_rows_on_postgresql(engines):
     from datetime import timedelta
     from utils.datetime_utils import utc_now
