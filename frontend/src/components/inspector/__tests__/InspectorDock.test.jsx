@@ -116,7 +116,7 @@ describe('InspectorDock', () => {
     await screen.findByText('one.example.com:overview')
     fireEvent.click(screen.getByText('open-2'))
     await screen.findByText('two.example.com:overview')
-    expect(screen.getByRole('tab', { name: 'two.example.com' })).toHaveAttribute('aria-selected', 'true')
+    expect(await screen.findByRole('tab', { name: 'two.example.com' })).toHaveAttribute('aria-selected', 'true')
     fireEvent.keyDown(screen.getByRole('tab', { name: 'two.example.com' }), { key: 'Escape' })
     await screen.findByText('one.example.com:overview')
     expect(screen.queryByRole('tab', { name: 'two.example.com' })).toBeNull()
