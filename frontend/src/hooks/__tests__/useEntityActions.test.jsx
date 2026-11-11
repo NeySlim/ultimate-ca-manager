@@ -210,11 +210,22 @@ describe('what a surface does after an action', () => {
     notify.showConfirm.mockResolvedValue(true)
     svc.certs.unhold.mockResolvedValue({ data: { related_unheld: 8 } })
     svc.certs.getById.mockResolvedValue({ data: { ...CERT, revoked: false } })
-    const held = { ...CERT, revoked: true, revoke_reason: 'certificateHold', status: 'revoked', related_certificate_id: 8 }
+    const held = { ...CERT, revoked: true, revoke_reason: 'certificateHold', status: 'revoked', related_certificate_id: 8, related_on_hold_id: 8 }
     const r = run('certificate', held, rights(['write:certificates']), { onClose: vi.fn() })
     await act(async () => { await r.handler('unhold')() })
     expect(notify.showConfirm.mock.calls.at(-1)[0]).toBe('certificates.unholdWarningRelated')
     expect(notify.showSuccess).toHaveBeenLastCalledWith('certificates.unheldWithRelated')
+  })
+
+  it('does not announce the linked certificate when the unhold will leave it alone', async () => {
+    notify.showConfirm.mockResolvedValue(true)
+    svc.certs.unhold.mockResolvedValue({ data: {} })
+    svc.certs.getById.mockResolvedValue({ data: { ...CERT, revoked: false } })
+    // Linked, but archived, not mutual or not on hold: the server reports no partner to lift
+    const held = { ...CERT, revoked: true, revoke_reason: 'certificateHold', status: 'revoked', related_certificate_id: 8, related_on_hold_id: null }
+    const r = run('certificate', held, rights(['write:certificates']), { onClose: vi.fn() })
+    await act(async () => { await r.handler('unhold')() })
+    expect(notify.showConfirm.mock.calls.at(-1)[0]).toBe('certificates.unholdWarning')
   })
 
   it('keeps the single-certificate wording without a linked certificate', async () => {

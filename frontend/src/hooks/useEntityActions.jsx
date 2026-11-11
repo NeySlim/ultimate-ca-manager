@@ -170,7 +170,8 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
   }
 
   const handleUnhold = async () => {
-    const relatedId = data?.related_certificate_id ?? null
+    // Named only when the server says the unhold lifts it (live, mutual partner on hold)
+    const relatedId = data?.related_on_hold_id ?? null
     const confirmed = await showConfirm(
       relatedId != null
         ? t('certificates.unholdWarningRelated', { id: relatedId })

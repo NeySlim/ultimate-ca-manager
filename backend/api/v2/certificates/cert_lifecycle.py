@@ -11,7 +11,7 @@ from utils.revocation_reasons import normalize_revocation_reason, invalid_reason
 from services.cert_service import CertificateService
 from services.approval_gate import (PairApprovalConflict, approval_payload, queue_revocation,
                                     revocation_policy_for)
-from services.cert.related_pair import revocation_partner
+from services.cert.related_pair import HOLD_REASONS, revocation_partner, unhold_partner
 from utils.export_options import json_boolean
 from services.deletion_blockers import certificate_deletion_blockers, first_blocker
 from services.ocsp_service import OCSPService
@@ -237,8 +237,7 @@ def unhold_certificate(cert_id):
         return error_response('Certificate is not revoked', 400)
 
     # Only certificateHold can be unheld
-    hold_reasons = ('certificate_hold', 'certificateHold')
-    if cert.revoke_reason not in hold_reasons:
+    if cert.revoke_reason not in HOLD_REASONS:
         return error_response(
             'Only certificates with reason "certificateHold" can be unheld', 400
         )
@@ -256,10 +255,7 @@ def unhold_certificate(cert_id):
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
 
         # The other member of a related pair comes off hold with it unless the request says otherwise
-        partner = revocation_partner(cert) if unhold_related else None
-        if partner is not None and not (
-                partner.revoked and partner.revoke_reason in hold_reasons):
-            partner = None
+        partner = unhold_partner(cert) if unhold_related else None
         members = [cert] + ([partner] if partner is not None else [])
         cas = {m.id: (CA.query.filter_by(refid=m.caref).first() if m.caref else None)
                for m in members}

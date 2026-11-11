@@ -895,7 +895,9 @@ Requires reason `certificateHold` / `certificate_hold`. When the issuing CA has 
 **`unhold_related`** (JSON boolean, default `true`): lifting the hold on a member of a related pair also lifts
 the other member when it is on hold for `certificateHold`; a partner revoked for another reason stays revoked.
 The response carries `related_unheld` (the partner's id) when it was lifted, and each lifted certificate emits
-a `certificate.unheld` event. A request body that is not a JSON object is refused with 400.
+a `certificate.unheld` event. A request body that is not a JSON object is refused with 400 (415 for a
+non-JSON media type). `GET /api/v2/certificates/{cert_id}` reports in `related_on_hold_id` the partner an
+unhold would lift, or `null`.
 
 ### Import Certificate
 ```http

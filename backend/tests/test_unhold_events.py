@@ -224,3 +224,29 @@ def test_an_empty_body_lifts_the_pair(app, auth_client, create_ca, create_cert):
     r = auth_client.post(f"/api/v2/certificates/{a['id']}/unhold")
     assert r.status_code == 200, r.data
     assert _state(app, a['id'])[0] is False and _state(app, b['id'])[0] is False
+
+
+def _detail(auth_client, cert_id):
+    r = auth_client.get(f'/api/v2/certificates/{cert_id}')
+    assert r.status_code == 200, r.data
+    return r.get_json()['data']
+
+
+@pytest.mark.parametrize('case', ['lifted', 'archived', 'not_mutual', 'not_held'])
+def test_the_detail_names_the_partner_an_unhold_would_lift(app, auth_client, create_ca, create_cert, case):
+    tag = case.replace('_', '-')
+    ca = create_ca(cn=f'Unhold Detail CA {tag}')
+    a = create_cert(cn=f'unhold-detail-a-{tag}.example.test', ca_id=ca['id'])
+    b = create_cert(cn=f'unhold-detail-b-{tag}.example.test', ca_id=ca['id'])
+    _link(app, a['id'], b['id'])
+    held = {'reason': 'certificateHold', 'revoke_related': case != 'not_held'}
+    assert _post(auth_client, f"/api/v2/certificates/{a['id']}/revoke", held).status_code == 200
+    with app.app_context():
+        row = db.session.get(Certificate, b['id'])
+        if case == 'archived':
+            row.archived = True
+        if case == 'not_mutual':
+            row.related_certificate_id = None
+        db.session.commit()
+    expected = b['id'] if case == 'lifted' else None
+    assert _detail(auth_client, a['id'])['related_on_hold_id'] == expected
