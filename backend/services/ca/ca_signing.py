@@ -63,6 +63,23 @@ def _claim_superseded(row, presented=None, successor=None):
     return True
 
 
+def _pushes_key(binding):
+    """An SSH binding with a key_path, or an HTTP binding whose target template names
+    key_pem (same predicate as DeployService.validate_http_binding)."""
+    if binding.key_path:
+        return True
+    target = binding.target
+    if target is None or not target.is_http:
+        return False
+    from services.deploy import http as deploy_http
+    try:
+        names = {name for source in (target.url, target.body_template)
+                 for name, _ in deploy_http.template_variables(source or '')}
+    except ValueError:
+        return True  # an unreadable template must not move a binding or abort the renewal
+    return 'key_pem' in names
+
+
 def _bindings_follow(old_ids, successor):
     """Deploy bindings and the HTTPS listener binding of the archived rows *old_ids* now
     name *successor*; a target keeps one binding per certificate (lowest id wins).
@@ -77,7 +94,7 @@ def _bindings_follow(old_ids, successor):
     stayed = []
     for binding in (DeployBinding.query.filter(DeployBinding.certificate_id.in_(old_ids))
                     .order_by(DeployBinding.id)):
-        if binding.key_path and not keyed:
+        if not keyed and _pushes_key(binding):
             stayed.append(f'deploy binding {binding.id}')
         elif binding.target_id not in taken:
             binding.certificate_id = successor.id

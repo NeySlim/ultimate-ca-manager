@@ -188,3 +188,27 @@ def test_a_successor_holding_a_key_takes_every_binding(app, create_ca, https, ca
         assert db.session.get(DeployBinding, keyed_id).certificate_id == successor.id
         assert get_bound_refid() == successor.refid
     assert not [r for r in caplog.records if 'has no private key in UCM' in r.getMessage()]
+
+
+def test_an_http_binding_sending_the_key_stays_on_a_keyless_renewal(app, create_ca, https, caplog):
+    """An HTTP target whose template names key_pem pushes the key without a key_path."""
+    ca = create_ca(cn='follow http key CA')
+    old_id, binding_id, keyed_id = _bound_row(app, ca['id'], 'follow-http-key.example.test')
+    with app.app_context():
+        target = DeployTarget(name=f'follow-http-{uuid.uuid4().hex[:8]}', kind=DeployTarget.KIND_HTTP,
+                              host='api.example.test', port=443, username='', private_key='',
+                              url='https://api.example.test/certs', http_method='POST',
+                              body_template='{"key": "{{key_pem|json}}"}', allow_private_key=True)
+        db.session.add(target)
+        db.session.flush()
+        http_binding = DeployBinding(target_id=target.id, certificate_id=old_id)
+        db.session.add(http_binding)
+        db.session.commit()
+        http_id = http_binding.id
+    _protocol_renewal(app, old_id, 'est')
+    _assert_followed(app, old_id, binding_id, keyed_id, https, caplog)
+    with app.app_context():
+        assert db.session.get(DeployBinding, http_id).certificate_id == old_id
+        assert DeployDelivery.query.filter_by(binding_id=http_id).count() == 0
+    warning = next(r.getMessage() for r in caplog.records if 'has no private key in UCM' in r.getMessage())
+    assert f'deploy binding {http_id}' in warning
