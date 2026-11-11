@@ -544,7 +544,7 @@ def upload_csr():
             san_email=json.dumps(san_email) if san_email else None,
             san_uri=json.dumps(san_uri) if san_uri else None,
             source='upload',
-            created_by=getattr(g, 'username', 'system')
+            created_by=g.current_user.username
         )
         
         db.session.add(new_cert)
@@ -670,7 +670,7 @@ def import_csr():
             san_ip=json.dumps(san_ip) if san_ip else None,
             san_email=json.dumps(san_email) if san_email else None,
             san_uri=json.dumps(san_uri) if san_uri else None,
-            created_by='import',
+            created_by=g.current_user.username,
             created_at=utc_now()
         )
         

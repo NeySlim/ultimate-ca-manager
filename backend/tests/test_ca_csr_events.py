@@ -44,6 +44,7 @@ def test_an_uploaded_request_is_announced(auth_client, seen):
     sent = _of(seen, 'csr.submitted')
     assert len(sent) == 1 and sent[0][1]['csr']['id'] == r.get_json()['data']['id']
     assert sent[0][2].get('actor') == 'admin'
+    assert sent[0][1]['csr']['created_by'] == 'admin'
 
 
 def test_an_imported_request_is_announced(auth_client, seen):
@@ -53,6 +54,7 @@ def test_an_imported_request_is_announced(auth_client, seen):
     sent = _of(seen, 'csr.submitted')
     assert len(sent) == 1 and sent[0][1]['csr']['id'] == r.get_json()['data']['id']
     assert sent[0][2].get('actor') == 'admin'
+    assert sent[0][1]['csr']['created_by'] == 'admin'
 
 
 def test_signing_a_request_as_a_ca_announces_the_new_ca(auth_client, create_ca, seen):
