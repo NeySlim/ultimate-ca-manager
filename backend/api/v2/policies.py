@@ -353,9 +353,10 @@ def _revoke_approved_certificate(approval, data):
         return {'id': cert.id, 'cn': data.get('cn'), 'serial_number': cert.serial_number,
                 'revoked': True, 'already_revoked': True}
     duplicate_ids = _close_duplicate_requests(approval, 'certificate_id', cert.id)
+    related_acme = []
     cert = CertificateService.revoke_certificate(
         cert_id=cert.id, reason=reason, username=_requester_name(approval, data),
-        invalidity_at=invalidity_at)
+        invalidity_at=invalidity_at, related_acme=related_acme)
     cert_id, serial, msca = cert.id, cert.serial_number, cert.source == 'msca'
     msca_local_only, acme_local_only, enrolment = False, False, None
     acme_pending, acme_message = False, None
@@ -364,11 +365,18 @@ def _revoke_approved_certificate(approval, data):
         msca_local_only = propagate_revocation(cert, reason)[0] != PROPAGATED
     else:
         from services.acme.upstream_revocation import (
-            NOT_ACME, OWED, REVOKED, local_only_message, propagate_acme_revocation)
+            NOT_ACME, OWED, REVOKED, REVOKED_MESSAGE, local_only_message, propagate_acme_revocation,
+            related_untold, with_related_answer)
         acme_outcome, acme_detail = propagate_acme_revocation(cert, reason)
         acme_local_only = acme_outcome not in (NOT_ACME, REVOKED)
         # The single route's warning, owed or local only, for the approver to read
         acme_pending, acme_message = acme_outcome == OWED, local_only_message(acme_outcome, acme_detail)
+        if related_untold(related_acme):
+            # The other member of the pair, which the CA was not told of
+            acme_local_only = True
+            acme_pending = acme_pending or any(e[1] == OWED for e in related_untold(related_acme))
+            acme_message = with_related_answer(
+                {'message': acme_message or REVOKED_MESSAGE}, related_acme)['message']
     if data.get('auth_certificate_id'):
         # Revoked from the user certificates page: the enrolment is disabled too
         from models import AuthCertificate
