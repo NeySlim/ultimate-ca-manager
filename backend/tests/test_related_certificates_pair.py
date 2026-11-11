@@ -658,14 +658,37 @@ def test_the_partner_policy_holds_a_user_certificate_revocation(
             db.session.commit()
 
 
+def _drop_made(app, cert_ids, ca_ids, user_ids):
+    """The rows a test made: its certificates, then their CAs, then its users."""
+    from models import User
+    from services.ca_service import CAService
+    from services.cert_service import CertificateService
+    with app.app_context():
+        for cert_id in cert_ids:
+            if db.session.get(Certificate, cert_id) is not None:
+                CertificateService.delete_certificate(cert_id, username='test')
+        for ca_id in ca_ids:
+            if db.session.get(CA, ca_id) is not None:
+                CAService.delete_ca(ca_id, username='test')
+        for user_id in user_ids:
+            user = db.session.get(User, user_id)
+            if user is not None:
+                db.session.delete(user)
+        db.session.commit()
+
+
 def test_a_superseded_partner_does_not_bring_its_policy_to_a_user_certificate_revocation(
         app, auth_client, create_ca, create_user):
     """The user-certificate route follows ``revocation_partner``: an archived partner is left alone."""
     from models import AuthCertificate
     a, b = _pair(auth_client, create_ca, 'pair-archived-user.example.com')
-    pid = _approval_policy(app, _move_to_new_ca(app, create_ca, b['id'], 'Pair CA2 archived'), ['revocation'])
+    ca_ids = [_ca_id_of(app, a['id'])]
+    ca_ids.append(_move_to_new_ca(app, create_ca, b['id'], 'Pair CA2 archived'))
+    pid = _approval_policy(app, ca_ids[1], ['revocation'])
+    user_ids = []
     try:
-        user = create_user()
+        user = create_user(username='pair_archived_holder')
+        user_ids.append(user['id'])
         with app.app_context():
             db.session.get(Certificate, b['id']).archived = True
             cert = _x509(a)
@@ -675,8 +698,12 @@ def test_a_superseded_partner_does_not_bring_its_policy_to_a_user_certificate_re
             db.session.add(enrolment)
             db.session.commit()
             enrolment_id = enrolment.id
-        operator = _login(app, create_user)
-        r = operator.post(f'/api/v2/user-certificates/{enrolment_id}/revoke', json={'reason': 'keyCompromise'})
+        operator = create_user(username='pair_archived_operator', role='operator')
+        user_ids.append(operator['id'])
+        client = app.test_client()
+        r = client.post('/api/v2/auth/login', json={'username': operator['username'], 'password': 'TestPass123!'})
+        assert r.status_code == 200, r.data
+        r = client.post(f'/api/v2/user-certificates/{enrolment_id}/revoke', json={'reason': 'keyCompromise'})
         assert r.status_code == 200, r.data
         assert not json.loads(r.data)['data'].get('approval_required'), r.data
         assert _revoked(app, a['id'], b['id']) == [True, False]
@@ -685,6 +712,7 @@ def test_a_superseded_partner_does_not_bring_its_policy_to_a_user_certificate_re
         with app.app_context():
             AuthCertificate.query.filter_by(cert_serial=str(_x509(a).serial_number)).delete()
             db.session.commit()
+        _drop_made(app, [a['id'], b['id']], ca_ids, user_ids)
 
 
 @pytest.mark.parametrize('route', ['single', 'bulk', 'user'])
