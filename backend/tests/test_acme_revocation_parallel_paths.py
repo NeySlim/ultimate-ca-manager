@@ -167,7 +167,9 @@ class TestTheRelatedMemberOfARevokedPair:
                 result = _revoke_approved_certificate(approval, data)
             assert result['acme_local_only'] is False
             assert result['related_acme_local_only'] == bench.cert_id
-            assert result['acme_upstream_pending'] is True
+            # The partner's owed revocation is its own flag, as on the single route
+            assert result['acme_upstream_pending'] is False
+            assert result['related_acme_upstream_pending'] is True
             assert f'#{bench.cert_id}' in result['acme_message']
         finally:
             db.session.delete(db.session.get(ApprovalRequest, approval.id))
