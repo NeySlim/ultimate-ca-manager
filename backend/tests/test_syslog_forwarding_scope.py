@@ -37,6 +37,7 @@ def forwarding(collector):
         syslog_forwarder.configure(enabled=True, host='127.0.0.1', port=collector.getsockname()[1],
                                    protocol='udp', categories=categories)
     configure()
+    syslog_forwarder._checked_at = float('inf')  # the stored rows never override this target
     yield configure
     syslog_forwarder._close()
     syslog_forwarder.__dict__.clear()

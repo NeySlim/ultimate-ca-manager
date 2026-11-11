@@ -129,6 +129,7 @@ def update_syslog_config():
         # Logged as settings (never filtered) and before reconfiguring, so the
         # collector that is being narrowed or turned off still hears of it
         old = syslog_forwarder.config
+        syslog_forwarder.postpone_reload()
         entry = AuditService.log_action(
             action='syslog_config_updated',
             resource_type='settings',
@@ -140,11 +141,7 @@ def update_syslog_config():
                      f"categories {','.join(old['categories'])})"),
         )
 
-        syslog_forwarder.configure(
-            enabled=enabled, host=host, port=port,
-            protocol=protocol, tls=tls, tls_verify=tls_verify,
-            framing=framing, categories=categories
-        )
+        syslog_forwarder.load_from_db()
         # A collector that was not the one being told also receives its own setup
         new = syslog_forwarder.config
         if entry is not None and enabled and any(

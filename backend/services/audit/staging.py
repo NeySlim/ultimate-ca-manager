@@ -71,6 +71,7 @@ def syslog_copy(entry):
 def forward_to_syslog(entry):
     try:
         from services.syslog_service import syslog_forwarder
+        syslog_forwarder.reload_if_changed()
         if syslog_forwarder.is_enabled:
             syslog_forwarder.send(entry)
     except Exception as e:
@@ -119,6 +120,7 @@ def _staged_copy(entry):
     copy = syslog_copy(entry)
     try:
         from services.syslog_service import syslog_forwarder
+        syslog_forwarder.reload_if_changed()
         if syslog_forwarder.is_enabled:
             copy.syslog_hostname = syslog_forwarder._resolve_hostname()
     except Exception:
