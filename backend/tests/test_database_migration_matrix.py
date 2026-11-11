@@ -237,6 +237,58 @@ class TestTheMatrix:
         assert copied['certificate_authorities'] >= 1
 
 
+def _deleted_last_user(app, auth_client, create_user):
+    """The id of an account created and then deleted: the highest ever handed out."""
+    made = create_user(username='switch_high_water', role='viewer')
+    assert auth_client.delete(f"/api/v2/users/{made['id']}").status_code == 200
+    return made['id']
+
+
+def _next_user_id(url):
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            return conn.execute(text(
+                "INSERT INTO users (username, email, password_hash, role, auth_source) "
+                "VALUES ('after_switch', 'after@switch', 'x', 'viewer', 'local') RETURNING id")).scalar()
+    finally:
+        engine.dispose()
+
+
+class TestAUserIdCrossesTheSwitchUnused:
+    """The target hands out ids above every one the source ever handed out."""
+
+    def test_migration_to_sqlite(self, app, auth_client, create_user, sqlite_target):
+        gone = _deleted_last_user(app, auth_client, create_user)
+        with app.app_context():
+            ok, message, _ = migration.migrate_data(sqlite_target)
+        assert ok is True, message
+        assert _next_user_id(sqlite_target) > gone
+
+    def test_bootstrap_to_sqlite(self, app, auth_client, create_user, sqlite_target):
+        gone = _deleted_last_user(app, auth_client, create_user)
+        with app.app_context():
+            ok, message, _ = migration.bootstrap_auth_to_target(sqlite_target)
+        assert ok is True, message
+        assert _next_user_id(sqlite_target) > gone
+
+    @_needs_pg
+    def test_migration_to_postgresql(self, app, auth_client, create_user, pg_target):
+        gone = _deleted_last_user(app, auth_client, create_user)
+        with app.app_context():
+            ok, message, _ = migration.migrate_data(pg_target)
+        assert ok is True, message
+        assert _next_user_id(pg_target) > gone
+
+    @_needs_pg
+    def test_bootstrap_to_postgresql(self, app, auth_client, create_user, pg_target):
+        gone = _deleted_last_user(app, auth_client, create_user)
+        with app.app_context():
+            ok, message, _ = migration.bootstrap_auth_to_target(pg_target)
+        assert ok is True, message
+        assert _next_user_id(pg_target) > gone
+
+
 class TestTheSourceKeepsBeingWrittenTo:
     def test_a_row_written_during_the_copy_is_wholly_in_or_wholly_out(
             self, app, create_ca, create_cert, sqlite_target, monkeypatch):

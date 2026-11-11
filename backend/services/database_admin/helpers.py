@@ -483,6 +483,50 @@ def _reset_pg_sequences(engine):
     logger.info("Reset %d PostgreSQL sequence(s), %d failed", done, failed)
 
 
+# Tables whose ids are never handed out again: a backend switch carries their counter
+NEVER_REUSED_IDS = ('users',)
+_PG_LAST_VALUE_SQL = text(
+    "SELECT pg_sequence_last_value(CAST(pg_get_serial_sequence(:t, 'id') AS regclass))")
+
+
+def read_id_high_water(conn, is_pg) -> dict:
+    """{table: the highest id it ever handed out, deleted rows included}."""
+    high = {}
+    has_sqlite_sequence = not is_pg and conn.execute(text(
+        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'sqlite_sequence'")).first()
+    for table in NEVER_REUSED_IDS:
+        values = [conn.execute(select(func.max(sa_column('id'))).select_from(sa_table(table))).scalar()]
+        if is_pg:
+            values.append(conn.execute(_PG_LAST_VALUE_SQL, {'t': table}).scalar())
+        elif has_sqlite_sequence:
+            values.append(conn.execute(text("SELECT seq FROM sqlite_sequence WHERE name = :t"),
+                                       {'t': table}).scalar())
+        high[table] = max((int(v) for v in values if v is not None), default=0)
+    return high
+
+
+def carry_id_high_water(engine, high_water, is_pg) -> None:
+    """Move each counter of the target up to the source's high-water mark, never down."""
+    with engine.begin() as conn:
+        for table, highest in high_water.items():
+            if highest <= 0:
+                continue
+            if is_pg:
+                current = conn.execute(_PG_LAST_VALUE_SQL, {'t': table}).scalar() or 0
+                if current < highest:
+                    conn.execute(text("SELECT setval(CAST(pg_get_serial_sequence(:t, 'id') AS regclass), "
+                                      ":n, true)"), {'t': table, 'n': highest})
+                continue
+            current = conn.execute(text("SELECT seq FROM sqlite_sequence WHERE name = :t"),
+                                   {'t': table}).scalar()
+            if current is None:
+                conn.execute(text("INSERT INTO sqlite_sequence (name, seq) VALUES (:t, :n)"),
+                             {'t': table, 'n': highest})
+            elif current < highest:
+                conn.execute(text("UPDATE sqlite_sequence SET seq = :n WHERE name = :t"),
+                             {'t': table, 'n': highest})
+
+
 def _type_name(col_type) -> str:
     name = getattr(col_type, "__visit_name__", None) or type(col_type).__name__
     return str(name).split("(", 1)[0].strip().upper()

@@ -35,6 +35,8 @@ from .copy import (
 from .helpers import (
     _force_register_all_models,
     _reset_pg_sequences,
+    carry_id_high_water,
+    read_id_high_water,
     _short_err,
     _topo_sort_tables,
 )
@@ -364,9 +366,11 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
             result = copy_tables(
                 src, target_engine, plan,
                 source_is_pg=source_is_pg, target_is_pg=target_is_pg)
+            high_water = read_id_high_water(src, source_is_pg)
 
         if target_is_pg:
             _reset_pg_sequences(target_engine)
+        carry_id_high_water(target_engine, high_water, target_is_pg)
 
         stats["tables"] = dict(result.tables)
         stats["tables_bootstrapped"] = len(result.tables)
@@ -484,6 +488,7 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
             result = copy_tables(
                 src, target_engine, plan,
                 source_is_pg=source_is_pg, target_is_pg=target_is_pg)
+            high_water = read_id_high_water(src, source_is_pg)
 
         stats["source_view"] = source_view
         stats["tables"] = dict(result.tables)
@@ -495,6 +500,8 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
         # after the switch, and the check below is what makes it blocking.
         if target_is_pg:
             _reset_pg_sequences(target_engine)
+        # A deleted account's id stays unused on the target too
+        carry_id_high_water(target_engine, high_water, target_is_pg)
 
         # 6. What landed is checked before the caller is told it can switch.
         stats["validation"] = verify_migration(
