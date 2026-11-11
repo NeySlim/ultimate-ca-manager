@@ -527,6 +527,8 @@ class CSRMixin:
                 mirror_private_key(
                     ca_key_path(new_ca), key_data, context=f"CA {new_ca.id}"
                 )
+            from services.webhook_service import emit_ca_created
+            emit_ca_created(new_ca.to_dict(), actor=username)
             return new_ca
         else:
             AuditService.log_certificate('csr_signed', certificate, f'Signed CSR: {certificate.descr}')

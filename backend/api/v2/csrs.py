@@ -563,6 +563,8 @@ def upload_csr():
 
         # Return CSR-friendly format
         result = new_cert.to_dict()
+        from services.webhook_service import emit_csr_submitted
+        emit_csr_submitted(dict(result), actor=getattr(g, 'username', None))
         result['status'] = 'Pending'
         result['cn'] = cn
         result['department'] = ou
@@ -687,8 +689,12 @@ def import_csr():
             success=True
         )
 
+        cert_dict = cert.to_dict()
+        from services.webhook_service import emit_csr_submitted
+        emit_csr_submitted(cert_dict, actor='import')
+
         return created_response(
-            data=cert.to_dict(),
+            data=cert_dict,
             message=f'CSR "{cert.descr}" imported successfully'
         )
 
