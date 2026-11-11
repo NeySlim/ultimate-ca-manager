@@ -96,6 +96,27 @@ class TestTheSingleRoute:
         bench.client.revoke_certificate.assert_not_called()
         assert _owed(bench) == []
 
+    def test_an_account_not_resolved_for_now_is_owed_not_said_gone(self, auth_client, bench):
+        with patch('services.acme.upstream_revocation._client_for',
+                   side_effect=OSError('database is locked')):
+            body = _revoke(auth_client, bench, 'keyCompromise')
+        assert body['meta']['acme_local_only'] is True
+        assert body['meta']['acme_upstream_pending'] is True
+        assert 'no longer exists' not in body['message']
+        owed = _owed(bench)
+        assert [e['serial'] for e in owed] == [bench.old_serial]
+        assert owed[0]['certificate'] == bench.old_pem.decode() and owed[0]['reason'] == 1
+        bench.client.revoke_certificate.assert_not_called()
+
+    def test_an_order_not_found_for_now_says_so(self, auth_client, bench):
+        with patch('services.acme.upstream_revocation._order_for',
+                   side_effect=OSError('database is locked')):
+            body = _revoke(auth_client, bench, 'keyCompromise')
+        assert body['meta']['acme_local_only'] is True
+        assert 'no longer exists' not in body['message']
+        assert 'could not be determined' in body['message']
+        assert _owed(bench) == []
+
     def test_a_certificate_whose_order_was_deleted_says_the_account_is_unknown(
             self, auth_client, bench):
         from services.acme.order_housekeeping import delete_order
