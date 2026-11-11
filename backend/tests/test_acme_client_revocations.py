@@ -320,8 +320,10 @@ def test_a_backup_carries_the_key_digest(app, bench, create_ca):
 
 @pytest.mark.parametrize('local, sent', [('keyCompromise', 1), ('affiliationChanged', 3),
                                          ('cessationOfOperation', 5), ('certificateHold', None),
-                                         ('unspecified', None), ('privilegeWithdrawn', None)])
+                                         ('unspecified', None), ('privilegeWithdrawn', 9),
+                                         ('aACompromise', None)])
 def test_only_a_reason_a_replaced_certificate_may_carry_reaches_the_ca(bench, local, sent):
+    # The set a revoke route sends too (RFC 5280 §5.3.1 end-entity final reasons)
     row = bench.row()
     row.revoked, row.revoke_reason = True, local
     db.session.commit()

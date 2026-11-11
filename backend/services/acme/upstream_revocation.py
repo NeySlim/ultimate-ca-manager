@@ -32,8 +32,9 @@ NO_ORDER = 'no_order'
 #: A hold (or its removal) is local: ACME has no hold, and a revocation there is final.
 HOLD = 'hold'
 
-# RFC 5280 §5.3.1 codes RFC 8555 §7.6 lets a client send; a hold (6) or removeFromCRL (8) never
-_SENT_REASONS = {1, 2, 3, 4, 5, 9, 10}
+# RFC 8555 §7.6 takes an RFC 5280 §5.3.1 code: the final ones of an end-entity certificate.
+# Never unspecified (0, sent absent), cA/aACompromise (2, 10: other issuers), hold (6), removeFromCRL (8)
+SENT_REASONS = frozenset({1, 3, 4, 5, 9})
 
 
 def _order_for(cert) -> Optional[AcmeClientOrder]:
@@ -81,7 +82,7 @@ def propagate_acme_revocation(cert, reason) -> Tuple[str, Optional[str]]:
         return NO_ACCOUNT, None
 
     code = reason_code(reason)
-    code = code if code in _SENT_REASONS else None
+    code = code if code in SENT_REASONS else None
     pem = base64.b64decode(cert.crt)
     label = f"certificate {cert.id} (serial {cert.serial_number})"
     try:

@@ -23,6 +23,7 @@ from services.acme.http01 import wait_for_http01
 from services.acme import client_certificates
 from services.acme.client_certificates import KEY_MISMATCH
 from services.acme.order_housekeeping import purge_stale_pending_orders
+from services.acme.upstream_revocation import SENT_REASONS
 from services.acme.order_lease import BUSY, LEASE_LOST, OrderLease, RenewalInProgress
 from services.audit.staging import stage_audit_entry
 from services.audit_service import AuditService
@@ -293,8 +294,6 @@ def send_upstream_revocation(acme_client, pem, reason, label):
     return f"HTTP {response.status_code}{': ' + detail if detail else ''}"
 
 
-# Local reasons the CA is told; any other leaves the optional field out (never a hold)
-_UPSTREAM_REASONS = {1, 3, 4, 5}
 
 
 def _upstream_reason(replaced):
@@ -303,7 +302,7 @@ def _upstream_reason(replaced):
     if not replaced.revoked:
         return 4
     code = reason_code(replaced.revoke_reason)
-    return code if code in _UPSTREAM_REASONS else None
+    return code if code in SENT_REASONS else None
 
 
 _OWED_WRITE_ATTEMPTS = 5

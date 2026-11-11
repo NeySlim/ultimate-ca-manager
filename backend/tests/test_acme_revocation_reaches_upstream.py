@@ -63,6 +63,12 @@ class TestTheSingleRoute:
         _revoke(auth_client, bench, 'unspecified')
         assert bench.client.revoke_certificate.call_args.kwargs == {'reason': None}
 
+    @pytest.mark.parametrize('reason, sent', [('privilegeWithdrawn', 9), ('aACompromise', None),
+                                              ('cACompromise', None)])
+    def test_only_the_end_entity_reasons_are_sent(self, auth_client, bench, reason, sent):
+        _revoke(auth_client, bench, reason)
+        assert bench.client.revoke_certificate.call_args.kwargs == {'reason': sent}
+
     def test_a_ca_that_does_not_answer_is_owed_and_retried(self, auth_client, bench):
         bench.client.revoke_certificate = MagicMock(return_value=_answer(503))
         body = _revoke(auth_client, bench, 'cessationOfOperation')
