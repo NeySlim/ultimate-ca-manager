@@ -818,6 +818,25 @@ def test_a_restart_gone_past_a_dead_node_is_retried_after_its_backoff_not_the_gu
     assert attempts[1] - attempts[0] == cc.RESTART_RETRY_FIRST
 
 
+
+def test_a_restart_gone_past_a_dead_node_says_so_once(app, ha, caplog):
+    """One "restarts anyway" line per restart decided past the guard, not one per retry."""
+    import logging
+    clock, attempts = _FakeMonotonic(), []
+
+    def action():
+        attempts.append(clock.t)
+        raise OSError('signal file not writable')
+    _node_row(app, 'a')  # fresh heartbeat, but nothing runs there any more
+    _node_row(app, 'b')
+    b = ha('b', monotonic=clock, restart_action=action, guard=10)
+    caplog.set_level(logging.INFO, logger=cc.logger.name)
+    _emit(app, cc.RESTART)
+    b.run_once()
+    _fail_until(b, clock, attempts, 4)
+    assert len([r for r in caplog.records if r.name == cc.logger.name
+                and 'restarts anyway' in r.getMessage()]) == 1
+
 @pytest.mark.parametrize('database', ['back', 'still-lost'])
 def test_stop_gives_back_a_claim_still_pending(app, ha, monkeypatch, caplog, database):
     """A worker started after this one can claim the restart; a failure is logged, not raised."""
@@ -846,6 +865,28 @@ def test_stop_gives_back_a_claim_still_pending(app, ha, monkeypatch, caplog, dat
         assert _restart_seen(app, 'solo') == restart_id
         assert [r.levelno for r in caplog.records if 'given back' in r.getMessage()] == [logging.ERROR]
 
+
+
+def test_stop_during_a_failed_give_back_logs_it_once(app, ha, monkeypatch, caplog):
+    """The applier thread fails to give the claim back while stop() waits for it: stop()
+    tries once more and that failure is the only line."""
+    import logging
+    from sqlalchemy import text
+    stopper = []
+
+    def action():
+        monkeypatch.setattr(cc, '_RELEASE_SQL', text('SELECT cc_no_such_function()'))
+        stopper.append(threading.Thread(target=solo.stop))
+        stopper[0].start()
+        assert wait_for(lambda: solo._stopping)
+        raise OSError('signal file not writable')
+    _node_row(app, 'solo')
+    solo = ha('solo', restart_action=action)
+    caplog.set_level(logging.INFO, logger=cc.logger.name)
+    _emit(app, cc.RESTART)
+    solo.start()
+    assert wait_for(lambda: stopper and not stopper[0].is_alive(), timeout=15)
+    assert [r.levelno for r in caplog.records if 'given back' in r.getMessage()] == [logging.ERROR]
 
 def test_stop_during_a_failed_restart_is_not_undone(app, ha):
     """stop() lands between the failed restart's check of _stopping and its _stop.clear()."""

@@ -240,6 +240,7 @@ class CommandApplier:
         self._gap = None  # (first missing id, monotonic time it was noticed)
         self._restart_wait = None  # (command id, monotonic first sight, nodes ahead then)
         self._held = None  # the restart waiting for this node's turn; later reloads still apply
+        self._anyway_said = None  # the restart last said to go on without the nodes ahead
         self._retry_delay = None  # seconds before the next attempt of a restart that failed
         self._retry_at = 0.0  # monotonic instant of that attempt
         self._give_back_pending = None  # [restart_seen to restore, command id, error logged]
@@ -459,7 +460,9 @@ class CommandApplier:
             return
         # The wait stays spent until the restart runs: a failed attempt follows the backoff
         self._held = None
-        if pending:
+        if pending and self._anyway_said != row.id:
+            # Once per restart: a failed attempt retried later is not decided again
+            self._anyway_said = row.id
             logger.warning(f"Rolling restart: {', '.join(pending)} not back after "
                            f"{self.guard * ahead:.0f}s, node {self.node_id} restarts anyway")
         # Claimed before acting: a sibling process of this node that lost the claim leaves it alone
@@ -496,7 +499,8 @@ class CommandApplier:
         try:
             conn.execute(_RELEASE_SQL, {'prev': previous, 'id': command_id, 'n': self.node_id})
         except Exception as e:
-            if not logged:
+            # Once stop() is called, its own attempt at giving the claim back is the line logged
+            if not logged and not self._stopping:
                 logger.error(f"Rolling restart of node {self.node_id}: claim of command {command_id} "
                              f"not given back, retried on the next pass: {type(e).__name__}: {e}")
                 self._give_back_pending[2] = True

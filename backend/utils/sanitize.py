@@ -22,6 +22,16 @@ def sanitize_filename(name):
     return name or 'download'
 
 
+def client_filename(name, limit=255):
+    """A client-supplied file name as one audit line: its base name (either separator),
+    without control or line-separator characters, at most *limit* characters."""
+    import unicodedata
+    base = re.split(r'[/\\]', name or '')[-1]
+    base = ''.join(c for c in base if unicodedata.category(c) not in ('Cc', 'Zl', 'Zp'))
+    base = base[:limit]
+    return base if base.strip('.') else 'upload'
+
+
 def ca_url_slug(name):
     """URL-safe slug from a CA name for named protocol URLs (#207)."""
     return re.sub(r'[^a-z0-9]+', '-', (name or '').lower()).strip('-')[:48]

@@ -621,3 +621,40 @@ def test_an_in_place_renewal_waiting_on_a_protocol_renewal_is_refused(app, monke
         [('in-place', True)]
     # Created, then renewed by the protocol once; the in-place side stored nothing
     assert (count, archived, live) == (2, True, 1)
+
+
+def test_a_protocol_renewal_of_b_naming_a_and_an_in_place_renewal_of_a_do_not_deadlock(
+        app, monkeypatch):
+    """A renewed alone unlinks its device-held B; the protocol renewal of B naming A locks A
+    before archiving B, so both take A then B and the second one waits."""
+    from services.ca import CAService
+    from tests.test_backup_cross_installation import _bound_to
+    from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
+
+    with _a_schema_of_our_own(f'related_superseded_{uuid.uuid4().hex[:6]}') as url, \
+            _bound_to(app, url, is_postgresql=True):
+        with app.app_context():
+            ca = _ca_row(*_authority())
+            ca_id = ca.id
+            a_id, cert_a, key_a = _a_with_its_key(ca, 'paired-a')
+            b_id = _a_with_its_key(ca, 'paired-b')[0]
+            a_row, b_row = db.session.get(Certificate, a_id), db.session.get(Certificate, b_id)
+            a_row.related_certificate_id, b_row.related_certificate_id = b_id, a_id
+            b_row.prv = None  # enrolled by a device: A renews alone
+            db.session.commit()
+            db.session.remove()
+        csr = _csr_naming_a(cert_a, key_a)
+
+        blocked, errors = _race_with_an_in_place_renewal(
+            app, url, monkeypatch, a_id, ca_id, lambda: CAService.sign_csr_from_crypto(
+                db.session.get(CA, ca_id), csr, validity_days=30, source='est-renewal',
+                supersedes=db.session.get(Certificate, b_id)))
+
+        with app.app_context():
+            count = db.session.get(CA, ca_id).serial
+            b_archived = db.session.get(Certificate, b_id).archived
+            db.session.remove()
+    assert blocked, errors
+    # A renewed while the protocol side waited: B is refused and stays live
+    assert [(name, 'not held by this instance' in error) for name, error in errors] == [('other', True)]
+    assert (count, bool(b_archived)) == (3, False)

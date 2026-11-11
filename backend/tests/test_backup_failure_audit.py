@@ -208,3 +208,48 @@ def test_a_committed_restore_is_audited_even_when_its_details_cannot_be_built(au
 
     assert [(c['action'], c['success']) for c in audit] == [('system_restore', True)]
     assert LEAKY not in str(audit)
+
+
+
+def _raw_restore(client, route, filename, **fields):
+    """A multipart restore whose file name travels as RFC 2231 filename*, CR and LF included."""
+    from urllib.parse import quote
+    parts = [f'--B\r\nContent-Disposition: form-data; name="{k}"\r\n\r\n{v}\r\n'
+             for k, v in {'password': SECRET + 'xx', **fields}.items()]
+    parts.append("--B\r\nContent-Disposition: form-data; name=\"file\"; "
+                 f"filename*=UTF-8''{quote(filename, safe='')}\r\n"
+                 "Content-Type: application/octet-stream\r\n\r\nx\r\n--B--\r\n")
+    return client.post(route, data=''.join(parts).encode(),
+                       content_type='multipart/form-data; boundary=B')
+
+
+@pytest.mark.parametrize('route', RESTORE)
+@pytest.mark.parametrize('outcome', ['restored', 'refused'])
+def test_the_audited_file_name_is_its_base_name_on_one_line(auth_client, audit, monkeypatch,
+                                                           route, outcome):
+    import importlib
+    from services.backup.restore import invalidate
+    from services.backup_service import BackupService
+    module = importlib.import_module('api.v2.system.backup' if route == RESTORE[0] else 'api.v2.settings.backup')
+    if outcome == 'restored':
+        monkeypatch.setattr(BackupService, 'restore_backup_from_stream',
+                            lambda self, *a, **k: {'sections_carried': ['users']})
+        monkeypatch.setattr(invalidate, 'invalidate_after_restore', lambda: 0)
+        monkeypatch.setattr(module, '_request_restart_after_restore' if route == RESTORE[0]
+                            else 'request_restart', lambda: (False, 'no'))
+        _raw_restore(auth_client, route, '../../x\r\nforged.ucmbkp')
+        audited = 'xforged.ucmbkp'
+    else:
+        _raw_restore(auth_client, route, '../../x\r\nforged', mode=LEAKY)
+        audited = 'xforged'
+    assert [(c['action'], c['success'], c['resource_name']) for c in audit] == [
+        ('system_restore', outcome == 'restored', audited)]
+    assert not any(ch in audit[0]['details'] for ch in '\r\n/') and '..' not in audit[0]['details']
+
+
+@pytest.mark.parametrize('raw, audited', [
+    ('../../x\r\nforged', 'xforged'), ('C:\\dir\\b.ucmbkp', 'b.ucmbkp'),
+    ('a\x00\x1b\x7f\x85\u2028b', 'ab'), ('n' * 300, 'n' * 255), ('../\r\n', 'upload')])
+def test_client_filename(raw, audited):
+    from utils.sanitize import client_filename
+    assert client_filename(raw) == audited
