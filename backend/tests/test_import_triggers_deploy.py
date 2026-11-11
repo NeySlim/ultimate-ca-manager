@@ -12,6 +12,17 @@ IMPORT = '/api/v2/certificates/import'
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
+# Certificate ids are reused on SQLite: a binding or delivery older than the setup belongs to another test.
+_SINCE = {}
+
+
+def _last_ids(app):
+    with app.app_context():
+        from models import db, DeployDelivery, DeployBinding
+        return (db.session.query(db.func.max(DeployDelivery.id)).scalar() or 0,
+                db.session.query(db.func.max(DeployBinding.id)).scalar() or 0)
+
+
 def _deliveries(app, cert_id):
     with app.app_context():
         from models import DeployDelivery, DeployBinding
@@ -19,15 +30,19 @@ def _deliveries(app, cert_id):
         return [(d.event_type, d.status) for d in DeployDelivery.query
                 .join(DeployBinding, DeployDelivery.binding_id == DeployBinding.id)
                 .filter(DeployBinding.certificate_id == cert_id,
+                        DeployDelivery.id > _SINCE.get(cert_id, (0, 0))[0],
+                        DeployBinding.id > _SINCE.get(cert_id, (0, 0))[1],
                         DeployDelivery.event_type != 'initial').all()]
 
 
 def _setup(app, auth_client, create_ca, cn, bound=True):
+    since = _last_ids(app)
     ca = create_ca(cn=f'{cn} CA')
     ca_cert, ca_key, caref, _ = _ca_from_fixture(app, ca)
     key = _gen()
     old = _cert(cn, key, issuer_cert=ca_cert, signer=ca_key)
     cert_id = _store_cert(app, old, key, caref=caref)
+    _SINCE[cert_id] = since
     if bound:
         target = _create_target(auth_client)
         _create_binding(auth_client, target['id'], cert_id)
