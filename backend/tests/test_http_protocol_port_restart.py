@@ -126,3 +126,24 @@ def test_in_ha_the_rolling_restart_is_committed_with_the_port(app, auth_client, 
             ClusterCommand.query.filter(ClusterCommand.id > last).delete()
             db.session.commit()
 
+
+
+@pytest.mark.parametrize('pinned', ['80', 'abc', '09090'])
+def test_the_card_round_trip_under_any_pinned_value_saves(app, auth_client, stored_port,
+                                                          restarts, monkeypatch, pinned):
+    """GET shows the bound port (80, 0 for junk, 9090): sending it back never trips the range check."""
+    monkeypatch.setenv('HTTP_PROTOCOL_PORT', pinned)
+    shown = auth_client.get('/api/v2/settings/general').get_json()['data']['http_protocol_port']
+    r = _save(auth_client, shown)
+    assert r.status_code == 200, r.get_json()
+    assert restarts == [] and r.get_json()['data']['restart_message'] is None
+    with app.app_context():
+        assert SystemConfig.query.filter_by(key='http_protocol_port').first().value == '8080'
+
+
+def test_a_different_port_under_a_low_pin_still_warns(app, auth_client, stored_port,
+                                                      restarts, monkeypatch):
+    monkeypatch.setenv('HTTP_PROTOCOL_PORT', '80')
+    r = _save(auth_client, 8085)
+    assert r.status_code == 200, r.get_json()
+    assert 'HTTP_PROTOCOL_PORT' in (r.get_json()['data']['restart_message'] or '')

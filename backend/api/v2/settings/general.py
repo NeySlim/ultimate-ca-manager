@@ -270,24 +270,26 @@ def update_general_settings():
             port = int(data['http_protocol_port'])
         except (ValueError, TypeError):
             return error_response("Invalid port number", 400)
-        if port != 0 and (port < 1024 or port > 65535):
-            return error_response("Port must be 0 (disabled) or between 1024-65535", 400)
-        from config.settings import Config
-        if port == Config.HTTPS_PORT:
-            return error_response("HTTP protocol port cannot be the same as HTTPS port", 400)
-        data['http_protocol_port'] = str(port)
-        # Bound when a worker starts: a new value needs a restart, unless the environment pins it
-        stored_port = get_config('http_protocol_port', '') or '8080'
         pinned = os.getenv('HTTP_PROTOCOL_PORT')
-        if pinned is not None and pinned.strip() == data['http_protocol_port']:
-            del data['http_protocol_port']  # the pinned port GET showed: the stored one stays
-        changed = data.get('http_protocol_port', stored_port) != stored_port
-        port_restart = changed and pinned is None
-        # The environment wins over the stored port: say so rather than report a save that never binds
-        port_pinned_message = (
-            f'HTTP_PROTOCOL_PORT={pinned} in the service environment sets this port: '
-            'the saved value is not used until it is removed.'
-            if changed and pinned is not None else None)
+        from protocol_http_server import get_http_protocol_port
+        if pinned is not None and port == get_http_protocol_port():
+            data.pop('http_protocol_port')  # the bound port GET showed: the stored one stays
+        else:
+            if port != 0 and (port < 1024 or port > 65535):
+                return error_response("Port must be 0 (disabled) or between 1024-65535", 400)
+            from config.settings import Config
+            if port == Config.HTTPS_PORT:
+                return error_response("HTTP protocol port cannot be the same as HTTPS port", 400)
+            data['http_protocol_port'] = str(port)
+            # Bound when a worker starts: a new value needs a restart, unless the environment pins it
+            stored_port = get_config('http_protocol_port', '') or '8080'
+            changed = data['http_protocol_port'] != stored_port
+            port_restart = changed and pinned is None
+            # The environment wins over the stored port: say so rather than report a save that never binds
+            port_pinned_message = (
+                f'HTTP_PROTOCOL_PORT={pinned} in the service environment sets this port: '
+                'the saved value is not used until it is removed.'
+                if changed and pinned is not None else None)
 
     if 'acme_public_vhost' in data:
         raw_vhost = data.get('acme_public_vhost')
