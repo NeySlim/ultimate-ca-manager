@@ -185,3 +185,15 @@ def test_a_failed_delta_does_not_stop_the_partner(
     assert r.status_code == 200, r.data
     assert sorted(calls) == sorted([ca1['id'], ca2['id']])
     assert _state(app, a['id'])[0] is False and _state(app, b['id'])[0] is False
+
+
+@pytest.mark.parametrize('body', [[], 'yes', 3])
+def test_a_body_that_is_not_an_object_is_refused(app, auth_client, create_ca, create_cert, body):
+    ca = create_ca(cn='Unhold Body CA')
+    cert = create_cert(cn='unhold-body.example.test', ca_id=ca['id'])
+    base = f"/api/v2/certificates/{cert['id']}"
+    r = _post(auth_client, f'{base}/revoke', body)
+    assert r.status_code == 400, r.data
+    assert _post(auth_client, f'{base}/revoke', {'reason': 'certificateHold'}).status_code == 200
+    r = _post(auth_client, f'{base}/unhold', body)
+    assert r.status_code == 400, r.data

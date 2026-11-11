@@ -60,6 +60,8 @@ def revoke_certificate(cert_id):
     """Revoke certificate"""
 
     data = request.json
+    if data is not None and not isinstance(data, dict):
+        return error_response('Request body must be a JSON object', 400)
     reason = data.get('reason', 'unspecified') if data else 'unspecified'
     # RFC 5280 reason names only, stored in canonical spelling (#334)
     canonical = normalize_revocation_reason(reason)
@@ -242,6 +244,8 @@ def unhold_certificate(cert_id):
         )
 
     body = request.get_json(silent=True)
+    if body is not None and not isinstance(body, dict):
+        return error_response('Request body must be a JSON object', 400)
     try:
         unhold_related = json_boolean(body or {}, 'unhold_related', True)
     except ValueError as e:
