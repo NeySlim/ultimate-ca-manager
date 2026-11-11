@@ -82,15 +82,17 @@ spec:
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.name
+            {{- with .Values.redis.url }}
+            - name: REDIS_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if or .Values.ha.enabled (include "ucm.existingKek" .) }}
             - name: KEY_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ include "ucm.secretName" . }}
                   key: KEY_ENCRYPTION_KEY
-            {{- with .Values.redis.url }}
-            - name: REDIS_URL
-              value: {{ . | quote }}
-            {{- end }}
             {{- end }}
             {{- if .Values.initialAdminPassword }}
             - name: UCM_INITIAL_ADMIN_PASSWORD

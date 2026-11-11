@@ -94,3 +94,16 @@ def test_without_ha_nothing_ha_is_rendered_neg():
     assert 'PodDisruptionBudget' not in docs
     assert docs['Deployment']['spec']['strategy'] == {'type': 'Recreate'}
     assert 'KEY_ENCRYPTION_KEY' not in docs['Secret']['stringData']
+
+
+def test_leaving_ha_keeps_the_encryption_key_pos():
+    docs = _docs('--set', 'secrets.keyEncryptionKey=KEEPME')
+    assert docs['Secret']['stringData']['KEY_ENCRYPTION_KEY'] == 'KEEPME'
+    env = {e['name'] for e in docs['Deployment']['spec']['template']['spec']['containers'][0]['env']}
+    assert 'KEY_ENCRYPTION_KEY' in env
+
+
+def test_secret_with_a_key_is_kept_on_uninstall_pos():
+    for args in (HA, ['--set', 'secrets.keyEncryptionKey=K']):
+        ann = _docs(*args)['Secret']['metadata'].get('annotations', {})
+        assert ann.get('helm.sh/resource-policy') == 'keep'

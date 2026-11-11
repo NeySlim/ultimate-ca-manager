@@ -44,7 +44,7 @@ ingress:
 The render fails with an explicit message when the database is not PostgreSQL or `replicaCount` is below 2. In HA mode the chart:
 
 - sets `UCM_HA=1` and `UCM_NODE_ID` to the pod name;
-- puts `UCM_SECRET_KEY` and `KEY_ENCRYPTION_KEY` in one Secret, generated once and kept across upgrades (override with `secrets.secretKey` and `secrets.keyEncryptionKey`); back this Secret up;
+- puts `UCM_SECRET_KEY` and `KEY_ENCRYPTION_KEY` in one Secret, generated once and kept across upgrades, including when `ha.enabled` is later set to false (override with `secrets.secretKey` and `secrets.keyEncryptionKey`). The Secret carries `helm.sh/resource-policy: keep`, so `helm uninstall` leaves it; back it up. With `helm template` or GitOps (ArgoCD) there is no lookup: set `secrets.keyEncryptionKey` explicitly, or each render generates a new key;
 - creates no `etc` volume or claim: the key comes from the Secret;
 - updates with `RollingUpdate` (`maxUnavailable: 0`), adds a PodDisruptionBudget (`ha.podDisruptionBudget.minAvailable`, default 1) and a preferred pod anti-affinity that spreads the pods over hosts (your own `affinity` value replaces it);
 - passes `redis.url` as `REDIS_URL` when set;

@@ -82,3 +82,13 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 {{- end -}}
 {{- end }}
+
+{{/*
+Existing or explicit KEY_ENCRYPTION_KEY ("" when none): kept whatever ha.enabled is,
+so leaving HA never drops the only copy of the key.
+*/}}
+{{- define "ucm.existingKek" -}}
+{{- $existing := (lookup "v1" "Secret" .Release.Namespace (include "ucm.secretName" .)) | default dict -}}
+{{- $data := $existing.data | default dict -}}
+{{- .Values.secrets.keyEncryptionKey | default ((get $data "KEY_ENCRYPTION_KEY") | default "" | b64dec) -}}
+{{- end -}}

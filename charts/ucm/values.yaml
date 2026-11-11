@@ -44,7 +44,7 @@ initialAdminPassword: ""
 ## and PERSISTS them across upgrades (via lookup) so sessions survive restarts.
 secrets:
   secretKey: ""   # UCM_SECRET_KEY (Flask)
-  keyEncryptionKey: ""   # KEY_ENCRYPTION_KEY (Fernet key), used when ha.enabled
+  keyEncryptionKey: ""   # KEY_ENCRYPTION_KEY (Fernet key). Required with helm template or GitOps: without a cluster lookup a new key is generated at each render.
 
 ## Database backend.
 ##  - sqlite (default): file in the data PVC, single instance.
