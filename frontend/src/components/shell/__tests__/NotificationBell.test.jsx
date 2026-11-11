@@ -80,6 +80,23 @@ describe('NotificationBell', () => {
     expect(m.getQueue).toHaveBeenCalledWith(expect.arrayContaining(['acme_order_failed', 'approval_pending']))
   })
 
+  it('asks for the bindings a renewal left behind and links each to its binding', async () => {
+    m.getQueue.mockResolvedValue({ data: { counts: {}, items: [
+      { kind: 'deploy_binding_left_behind', tier: 'critical', id: 5, label: 'web01', due_at: null,
+        href_hint: '/certificates/12?binding=5' },
+      { kind: 'https_binding_left_behind', tier: 'critical', id: 2, label: 'ucm.example', due_at: null,
+        href_hint: '/settings?tab=https' },
+    ] } })
+    const user = setup()
+    await waitFor(() => expect(m.getQueue).toHaveBeenCalled())
+    expect(m.getQueue.mock.calls[0][0]).toEqual(
+      expect.arrayContaining(['deploy_binding_left_behind', 'https_binding_left_behind']))
+    await user.click(bell())
+    const panel = screen.getByRole('region', { name: 'shell.bell.title' })
+    const links = within(panel).getAllByRole('link').map(a => a.getAttribute('href'))
+    expect(links).toEqual(expect.arrayContaining(['/certificates/12?binding=5', '/settings?tab=https']))
+  })
+
   it('shows a count equal to the unread items of the panel', async () => {
     const user = setup()
     await waitFor(() => expect(bell()).toHaveAccessibleName(/\|4/))

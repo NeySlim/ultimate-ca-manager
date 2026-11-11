@@ -549,6 +549,8 @@ def list_events():
             'certificate.unheld': 'When a certificate hold is lifted',
             'certificate.renewed': 'When a certificate is auto-renewed',
             'certificate.expiring': 'When a certificate is about to expire',
+            'certificate.binding_left_behind': 'When a renewal leaves a deployment or the HTTPS '
+                                               'binding on the previous certificate (no key in UCM)',
             'ca.created': 'When a new CA is created',
             'ca.updated': 'When a CA is updated',
             'csr.submitted': 'When a CSR is submitted',

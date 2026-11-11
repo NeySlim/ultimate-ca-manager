@@ -2319,7 +2319,15 @@
     "httpBinding": "API HTTP: solicitud construida a partir de la plantilla del cuerpo del destino",
     "httpBindingHint": "Este destino envía una solicitud construida a partir de su plantilla de cuerpo; no hay rutas ni comando de recarga que definir. Las opciones de cadena de abajo se aplican a {{chainVariable}} y {{fullchainVariable}}.",
     "httpBindingKeyHint": "El destino tiene permitido enviar la clave privada.",
-    "httpHeadersRemoved": "Las cabeceras almacenadas se eliminarán al guardar."
+    "httpHeadersRemoved": "Las cabeceras almacenadas se eliminarán al guardar.",
+    "leftBehind": "No sigue la renovación",
+    "leftBehindHelp": "Este certificado se renovó, pero UCM no tiene la clave del certificado renovado y este despliegue envía la clave. Sigue desplegando este certificado, que caducará.",
+    "leftBehindNoKey": "Importe la clave privada del certificado renovado o deje de enviar la clave (vacíe la ruta de la clave o quite key_pem de la plantilla del destino HTTP) y vuelva a vincular.",
+    "leftBehindTargetTaken": "Este destino ya está vinculado al certificado renovado: elimine este despliegue.",
+    "openRenewed": "Abrir el certificado renovado",
+    "reattach": "Vincular al certificado renovado",
+    "reattached": "{{name}} despliega ahora el certificado renovado",
+    "reattachFailed": "No se pudo volver a vincular el despliegue"
   },
   "crlDeploy": {
     "title": "Despliegue de CRL",
@@ -3390,7 +3398,12 @@
     "backupKdfAuto": "Automática (Argon2id si está disponible, PBKDF2 en modo FIPS)",
     "backupKdfHelper": "Los archivos escritos con Argon2id no se pueden restaurar en una instancia en modo FIPS.",
     "ocspResponseValidity": "Validez de respuestas OCSP (horas)",
-    "ocspResponseValidityDesc": "Tiempo de validez de las respuestas OCSP firmadas (nextUpdate). 1-168 horas, 24 por defecto."
+    "ocspResponseValidityDesc": "Tiempo de validez de las respuestas OCSP firmadas (nextUpdate). 1-168 horas, 24 por defecto.",
+    "httpsLeftBehind": "El certificado vinculado se renovó sin su clave",
+    "httpsLeftBehindNoKey": "UCM no tiene la clave privada del certificado renovado, por lo que HTTPS sigue sirviendo el certificado anterior, que caducará. Importe la clave del certificado renovado: HTTPS lo seguirá entonces.",
+    "httpsLeftBehindKeyed": "UCM tiene ahora la clave del certificado renovado: selecciónelo abajo y aplíquelo a HTTPS.",
+    "httpsSelectRenewed": "Seleccionar el certificado renovado",
+    "httpsOpenRenewed": "Abrir el certificado renovado"
   },
   "account": {
     "profile": "Perfil",
@@ -3921,7 +3934,8 @@
     "serverError": "Error del servidor. Intente de nuevo.",
     "certificatesExpiredAndExpiring": "{{expired}} certificado(s) expirado(s) y {{expiring}} por expirar",
     "certificatesExpired": "{{count}} certificado(s) expirado(s)",
-    "certificatesExpiringSoon": "{{count}} certificado(s) por expirar"
+    "certificatesExpiringSoon": "{{count}} certificado(s) por expirar",
+    "bindingLeftBehind": "Una renovación dejó {{name}} en el certificado anterior"
   },
   "help": {
     "aboutCertificates": "Acerca de certificados",
@@ -4210,7 +4224,8 @@
       "systemUpdateFailed": "Actualización fallida",
       "acmePreflight": "Comprobación previa ACME",
       "acmeOrderRenewalFailed": "Renovación ACME fallida",
-      "acmeOrderRevocationFailed": "Revocación ACME fallida"
+      "acmeOrderRevocationFailed": "Revocación ACME fallida",
+      "certificateBindingLeftBehind": "Vínculo que quedó en el certificado anterior"
     },
     "title": "Webhooks",
     "subtitle": "Enviar notificaciones HTTP cuando ocurran eventos de certificados",
@@ -6058,7 +6073,9 @@
         "system_backup": "Copia de seguridad fallida",
         "system_restore": "Restauración fallida",
         "session_revoke": "Sesión revocada",
-        "session_revoke_all": "Sesiones revocadas"
+        "session_revoke_all": "Sesiones revocadas",
+        "deploy_binding_left_behind": "Despliegue en el certificado anterior",
+        "https_binding_left_behind": "HTTPS en el certificado anterior"
       }
     }
   },
@@ -6105,7 +6122,9 @@
       "client_renewal_overdue": "Renovación del cliente atrasada",
       "auto_renewal_blocked": "Renovación automática bloqueada",
       "renewal_declined": "Renovación rechazada",
-      "ca_expiring": "CA por expirar"
+      "ca_expiring": "CA por expirar",
+      "deploy_binding_left_behind": "Despliegue en el certificado anterior",
+      "https_binding_left_behind": "HTTPS en el certificado anterior"
     },
     "compliance": {
       "rsa_below_3072": "RSA por debajo de 3072 bits",

@@ -911,6 +911,19 @@ Content-Type: application/json
 }
 ```
 
+### Deploy Bindings Left Behind by a Renewal
+```http
+GET  /api/v2/deploy/bindings?certificate_id={id}
+POST /api/v2/deploy/bindings/{binding_id}/reattach
+```
+When EST, SCEP or WSTEP renews a certificate into a new row whose key UCM does not hold, a binding that sends the
+private key stays on the previous certificate. Each binding carries `needs_attention`, `null` or
+`{reason: "successor_without_key", successor_id, successor_refid, successor_has_key, can_reattach}`. `reattach`
+(scope `write:deploy`) moves the binding to the renewed certificate, clears the state and deploys it; it answers
+409 while the renewed certificate has no key and the binding sends one, or when the target is already bound to it.
+Uploading or importing the renewed certificate's key moves such bindings on its own; deleting the binding or the
+renewed certificate clears the state.
+
 ### Delete Certificate
 ```http
 DELETE /api/v2/certificates/{cert_id}
@@ -1978,6 +1991,8 @@ Scope `read:dashboard`. A `days` outside its range is refused with 400.
 | `auto_renewal_blocked` | due for auto-renewal (within `auto_renewal_days` of expiry and in the last third of its lifetime), its CA offline, revoked, expired or keyless | |
 | `renewal_declined` | | renewal rejected by an approver during the current lifetime, expires within 30 days, not superseded by a live certificate |
 | `ca_expiring` | expires within 90 days | expires within a year |
+| `deploy_binding_left_behind` | deploy binding a renewal left on the previous certificate; `href_hint` is `/certificates/{certificate_id}?binding={id}` | |
+| `https_binding_left_behind` | HTTPS binding a renewal left on the previous certificate | |
 
 Certificates counted are issued, not revoked, not archived and not expired. A certificate appears under one kind only, by precedence `auto_renewal_blocked` > `renewal_declined` > `manual_renewal_due` > `client_renewal_overdue`. `manual_renewal_due` leaves out what auto-renewal, the enrolling client (ACME, SCEP, EST, WSTEP without a stored key), UCM's ACME client or the delegated OCSP responder task renews, a declined renewal, and a certificate superseded by a live one beyond the 30 days with the same subject, DNS and IP SANs from the same CA.
 
@@ -2303,6 +2318,9 @@ Content-Type: application/json
 ```
 
 ### HTTPS Certificate
+`cert-info` returns `bound_certificate.needs_attention` (`reason`, `successor_id`, `successor_refid`, `successor_descr`,
+`successor_has_key`) when a renewal left the HTTPS binding on the previous certificate, else `null`; applying a
+certificate or unbinding clears it, and importing the renewed certificate's key moves the binding to it.
 ```http
 # Get current certificate info
 GET /api/v2/system/https/cert-info
@@ -3712,6 +3730,11 @@ POST /api/v2/webhooks/{endpoint_id}/regenerate-secret
 ```http
 GET /api/v2/webhooks/events
 ```
+
+`certificate.binding_left_behind` is sent once per binding when an EST, SCEP or WSTEP renewal leaves a deploy
+binding or the HTTPS binding on the previous certificate, after the renewal's commit: `certificate` is the renewed
+certificate, `previous_certificate` `{id, refid, descr}`, `binding` `{type: "deploy", id, target_id, target_name}`
+or `{type: "https"}`, and `reason` `successor_without_key`. It also reaches the WebSocket `certificates` room.
 
 ---
 

@@ -54,6 +54,8 @@ describe('DUP-FE-006 — getEventNotification() uses the existing notifications.
     [EventType.CRL_REGENERATED, { ca_name: 'Root CA' }, 'showInfo', 'CRL régénérée pour Root CA'],
     [EventType.USER_LOGIN, { username: 'alice' }, 'showInfo', 'Utilisateur connecté : alice'],
     [EventType.USER_LOGOUT, { username: 'alice' }, 'showInfo', 'Utilisateur déconnecté : alice'],
+    [EventType.CERTIFICATE_BINDING_LEFT_BEHIND, { binding: { type: 'deploy', target_name: 'web01' } }, 'showWarning',
+      'Un renouvellement a laissé web01 sur le certificat précédent'],
   ]
 
   it.each(cases)('%s is translated', (type, data, method, expected) => {

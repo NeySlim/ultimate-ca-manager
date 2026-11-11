@@ -2319,7 +2319,15 @@
     "httpBinding": "HTTP API：由目标的正文模板构建请求",
     "httpBindingHint": "此目标发送一个由其正文模板构建的请求；无需设置路径或重载命令。下方的链选项适用于 {{chainVariable}} 和 {{fullchainVariable}}。",
     "httpBindingKeyHint": "该目标被允许发送私钥。",
-    "httpHeadersRemoved": "保存时将移除已存储的请求头。"
+    "httpHeadersRemoved": "保存时将移除已存储的请求头。",
+    "leftBehind": "未跟随续期",
+    "leftBehindHelp": "此证书已续期，但 UCM 没有续期后证书的密钥，而此部署会发送密钥。它仍在部署此证书，而此证书即将过期。",
+    "leftBehindNoKey": "请导入续期后证书的私钥，或停止发送密钥（清空密钥路径，或从 HTTP 目标模板中删除 key_pem），然后重新绑定。",
+    "leftBehindTargetTaken": "此目标已绑定到续期后的证书：请删除此部署。",
+    "openRenewed": "打开续期后的证书",
+    "reattach": "重新绑定到续期后的证书",
+    "reattached": "{{name}} 现在部署续期后的证书",
+    "reattachFailed": "无法重新绑定部署"
   },
   "crlDeploy": {
     "title": "CRL 部署",
@@ -3390,7 +3398,12 @@
     "backupKdfAuto": "自动（可用时使用 Argon2id，FIPS 模式下使用 PBKDF2）",
     "backupKdfHelper": "使用 Argon2id 写入的归档无法在 FIPS 模式的实例上恢复。",
     "ocspResponseValidity": "OCSP 响应有效期（小时）",
-    "ocspResponseValidityDesc": "已签名 OCSP 响应的有效时长（nextUpdate）。1-168 小时，默认 24。"
+    "ocspResponseValidityDesc": "已签名 OCSP 响应的有效时长（nextUpdate）。1-168 小时，默认 24。",
+    "httpsLeftBehind": "已绑定的证书在没有密钥的情况下续期",
+    "httpsLeftBehindNoKey": "UCM 没有续期后证书的私钥，因此 HTTPS 仍在提供即将过期的先前证书。导入续期后证书的密钥后，HTTPS 将跟随它。",
+    "httpsLeftBehindKeyed": "UCM 现已持有续期后证书的密钥：请在下方选择它并应用到 HTTPS。",
+    "httpsSelectRenewed": "选择续期后的证书",
+    "httpsOpenRenewed": "打开续期后的证书"
   },
   "account": {
     "profile": "个人资料",
@@ -3921,7 +3934,8 @@
     "serverError": "服务器错误，请重试。",
     "certificatesExpiredAndExpiring": "{{expired}} 个证书已过期，{{expiring}} 个即将过期",
     "certificatesExpired": "{{count}} 个证书已过期",
-    "certificatesExpiringSoon": "{{count}} 个证书即将过期"
+    "certificatesExpiringSoon": "{{count}} 个证书即将过期",
+    "bindingLeftBehind": "续期后 {{name}} 仍留在先前的证书上"
   },
   "help": {
     "aboutCertificates": "关于证书",
@@ -4210,7 +4224,8 @@
       "systemUpdateFailed": "更新失败",
       "acmePreflight": "ACME 预检",
       "acmeOrderRenewalFailed": "ACME 续订失败",
-      "acmeOrderRevocationFailed": "ACME 吊销失败"
+      "acmeOrderRevocationFailed": "ACME 吊销失败",
+      "certificateBindingLeftBehind": "绑定仍留在先前的证书上"
     },
     "title": "Webhooks",
     "subtitle": "证书事件触发时发送 HTTP 通知",
@@ -6058,7 +6073,9 @@
         "system_backup": "备份失败",
         "system_restore": "恢复失败",
         "session_revoke": "会话已吊销",
-        "session_revoke_all": "多个会话已吊销"
+        "session_revoke_all": "多个会话已吊销",
+        "deploy_binding_left_behind": "部署仍在旧证书上",
+        "https_binding_left_behind": "HTTPS 仍在旧证书上"
       }
     }
   },
@@ -6105,7 +6122,9 @@
       "client_renewal_overdue": "客户端续期逾期",
       "auto_renewal_blocked": "自动续期被阻止",
       "renewal_declined": "续期被拒绝",
-      "ca_expiring": "CA 即将到期"
+      "ca_expiring": "CA 即将到期",
+      "deploy_binding_left_behind": "部署仍在旧证书上",
+      "https_binding_left_behind": "HTTPS 仍在旧证书上"
     },
     "compliance": {
       "rsa_below_3072": "RSA 低于 3072 位",

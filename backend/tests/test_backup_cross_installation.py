@@ -638,7 +638,8 @@ def _seed_source():
     db.session.flush()
 
     add('deploy_bindings', target_id=deploy_targets[1].id,
-        certificate_id=leaves[1].id, chain_variant=f'cross:{cross.id}')
+        certificate_id=leaves[1].id, chain_variant=f'cross:{cross.id}',
+        attention_reason='successor_without_key', attention_successor_id=leaves[0].id)
     add('crl_deploy_bindings', target_id=deploy_targets[1].id,
         ca_id=authorities[1].id, crl_path='/etc/ucm/xinst.crl',
         format='pem', include_parent_crls=True,

@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Lock, Certificate, MagnifyingGlass, ShieldCheck, ArrowsClockwise, Key, UploadSimple } from '@phosphor-icons/react'
+import { Lock, Certificate, MagnifyingGlass, ShieldCheck, ArrowsClockwise, Key, UploadSimple, Warning } from '@phosphor-icons/react'
 import { Button, Badge, DetailHeader, DetailSection, DetailGrid, DetailField, DetailContent } from '../../components'
 import { formatDate, certificateLabel } from '../../lib/utils'
 
@@ -62,6 +62,35 @@ export default function HttpsSection({ httpsInfo, selectedHttpsCert, setSelected
             <p className="text-xs text-text-secondary">{t('settings.httpsNotBound')}</p>
           </div>
         )}
+        {httpsInfo?.bound_certificate?.needs_attention && (() => {
+          const attention = httpsInfo.bound_certificate.needs_attention
+          return (
+            <div className="mt-3 p-3 rounded-lg status-danger-bg flex items-start gap-2" data-testid="https-left-behind">
+              <Warning size={16} className="status-danger-text shrink-0 mt-0.5" aria-hidden="true" />
+              <div className="min-w-0 space-y-1">
+                <p className="text-sm font-medium text-text-primary">{t('settings.httpsLeftBehind')}</p>
+                <p className="text-xs text-text-secondary">
+                  {attention.successor_has_key ? t('settings.httpsLeftBehindKeyed') : t('settings.httpsLeftBehindNoKey')}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {attention.successor_id && (
+                    <a className="text-xs underline text-accent-primary" href={`/certificates/${attention.successor_id}`}>
+                      {t('settings.httpsOpenRenewed')}
+                    </a>
+                  )}
+                  {attention.successor_has_key && attention.successor_id && (
+                    <Button type="button" variant="secondary" size="sm"
+                      onClick={() => setSelectedHttpsCert({
+                        id: attention.successor_id, common_name: attention.successor_descr || attention.successor_refid,
+                      })}>
+                      {t('settings.httpsSelectRenewed')}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )
+        })()}
       </DetailSection>
 
       <DetailSection title={t('settings.useUCMCert')} icon={Certificate} iconClass="icon-bg-violet">

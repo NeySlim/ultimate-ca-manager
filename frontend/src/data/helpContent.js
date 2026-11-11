@@ -313,6 +313,7 @@ export const helpContent = {
           { label: 'Automatic', text: 'On issuance and renewal, the bound files are pushed again and that deployment\'s optional reload command runs; deliveries are queued with retries' },
           { label: 'Files', text: 'Written atomically at the exact configured paths (parent directory must exist): key 0600, certificate/chain 0644' },
           { label: 'Deploy now', text: 'Manual push from the detail view, with the delivery status and last error shown per target' },
+          { label: 'Renewal without the key', text: 'An EST, SCEP or WSTEP renewal moves deployments to the new certificate, except one that sends the private key when UCM does not hold the new key: it shows Not following the renewal, appears in the bell and the overview, and offers Reattach to the renewed certificate once UCM holds the key or the deployment stops sending it. Importing the key moves it on its own' },
         ]
       },
     ],
@@ -1189,7 +1190,7 @@ export const helpContent = {
           { label: 'Audit', text: 'Log retention, syslog forwarding, integrity verification' },
           { label: 'Database', text: 'Active backend (SQLite or native PostgreSQL), size, table count, bidirectional migration UI with safety checks' },
           { label: 'PostgreSQL schema (v2.251)', text: 'A PostgreSQL URL whose search_path names a schema other than public is supported: the integrity check counts the tables of that schema, and a migration to it realigns its sequences' },
-          { label: 'HTTPS', text: 'TLS certificate for the UCM web interface. The applied certificate is remembered and re-applied when it is renewed (v2.217); the bound certificate is shown with an unbind button to stop following renewals (v2.218)' },
+          { label: 'HTTPS', text: 'TLS certificate for the UCM web interface. The applied certificate is remembered and re-applied when it is renewed (v2.217); the bound certificate is shown with an unbind button to stop following renewals (v2.218). A protocol renewal whose key UCM does not hold leaves HTTPS on the previous certificate and says so, until the key of the renewed certificate is imported' },
           { label: 'Updates', text: 'Check for new versions, view changelog, scheduled daily check with opt-in unattended install (DEB/RPM)' },
           { label: 'Webhooks', text: 'HTTP webhooks for certificate events (issue, revoke, expire): internal LAN URLs allowed; cloud-metadata IPs blocked. Optional outbound auth: Bearer, Basic, API key, or custom header' },
           { label: 'Unique webhook names (v2.251)', text: 'A webhook name already in use is refused (409), on creation and on rename. The upgrade renamed earlier duplicates "name (2)", "name (3)", oldest first' },

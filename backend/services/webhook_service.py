@@ -250,6 +250,8 @@ class WebhookService:
     CERT_EXPIRED = 'certificate.expired'
     CERT_IMPORTED = 'certificate.imported'
     CERT_DELETED = 'certificate.deleted'
+    # A renewal left a binding on the previous certificate (services.binding_attention)
+    CERT_BINDING_LEFT_BEHIND = 'certificate.binding_left_behind'
     # CA lifecycle
     CA_CREATED = 'ca.created'
     CA_UPDATED = 'ca.updated'
@@ -275,7 +277,7 @@ class WebhookService:
 
     ALL_EVENTS = [
         CERT_ISSUED, CERT_REVOKED, CERT_UNHELD, CERT_RENEWED, CERT_EXPIRING,
-        CERT_EXPIRED, CERT_IMPORTED, CERT_DELETED,
+        CERT_EXPIRED, CERT_IMPORTED, CERT_DELETED, CERT_BINDING_LEFT_BEHIND,
         CA_CREATED, CA_UPDATED, CA_DELETED,
         CSR_SUBMITTED, CSR_APPROVED, CSR_REJECTED,
         TEMPLATE_CREATED, TEMPLATE_UPDATED,

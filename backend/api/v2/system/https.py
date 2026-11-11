@@ -28,6 +28,22 @@ from utils.key_codec import private_key_to_pem
 logger = logging.getLogger(__name__)
 
 
+def _https_attention():
+    """The renewed certificate the HTTPS binding could not follow (no key in UCM), or None."""
+    from services.binding_attention import REASON_SUCCESSOR_WITHOUT_KEY, https_left_behind_for
+    refid = https_left_behind_for()
+    if not refid:
+        return None
+    successor = Certificate.query.filter_by(refid=refid).first()
+    return {
+        'reason': REASON_SUCCESSOR_WITHOUT_KEY,
+        'successor_id': successor.id if successor else None,
+        'successor_refid': refid,
+        'successor_descr': successor.descr if successor else None,
+        'successor_has_key': bool(successor and successor.has_private_key),
+    }
+
+
 @bp.route('/api/v2/system/https/cert-info', methods=['GET'])
 @require_auth(['read:settings'])
 def get_https_cert_info():
@@ -84,6 +100,7 @@ def get_https_cert_info():
                     'descr': row.descr if row else None,
                     'common_name': row.common_name if row else None,
                     'exists': bool(row and row.crt and row.prv),
+                    'needs_attention': _https_attention(),
                 }
         except Exception as e:
             logger.warning(f"Could not resolve HTTPS binding: {e}")

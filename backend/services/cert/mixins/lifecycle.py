@@ -595,6 +595,8 @@ class LifecycleMixin:
             from models.est_signer_cert import EstSignerCert
             EstSignerCert.query.filter_by(certificate_id=cert_id).delete(synchronize_session='fetch')
 
+            from services.binding_attention import forget_successor
+            forget_successor(certificate)
             binding_ids = [row.id for row in DeployBinding.query.filter_by(certificate_id=cert_id)]
             if binding_ids:
                 DeployDelivery.query.filter(

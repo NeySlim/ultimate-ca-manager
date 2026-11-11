@@ -107,13 +107,19 @@ def upload_private_key(cert_id):
         # Encrypt with our key encryption if configured
         key_encoded = base64.b64encode(unencrypted_key).decode('utf-8')
         cert.prv = encrypt_private_key(key_encoded)
+        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+        # The bindings a keyless renewal left behind for this certificate follow it now
+        from services.binding_attention import follow_key
+        https_moved = follow_key(cert, actor=username)
 
         ok, _err = safe_commit(logger, "Failed to upload private key")
         if not ok:
             return _err
+        if https_moved:
+            from services.https_binding import apply_bound_now
+            apply_bound_now(cert.refid)
 
         # Audit log
-        username = g.current_user.username if hasattr(g, 'current_user') else 'system'
         AuditService.log_action(
             action='certificate_key_uploaded',
             resource_type='certificate',

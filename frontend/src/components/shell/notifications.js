@@ -10,7 +10,8 @@ import { useWebSocket } from '../../hooks/useWebSocket'
 import { getPreferences, subscribePreferences, persistPreference } from '../../stores/userPreferencesStore'
 
 export const BELL_KINDS = ['acme_order_failed', 'acme_client_renewal_failed', 'approval_pending', 'crl_due',
-  'crl_missing', 'manual_renewal_due', 'auto_renewal_blocked', 'ca_expiring']
+  'crl_missing', 'manual_renewal_due', 'auto_renewal_blocked', 'ca_expiring', 'deploy_binding_left_behind',
+  'https_binding_left_behind']
 // Journal events worth a notification: a revoked session, a failed backup or restore.
 // Failures are asked for on their own so successful runs cannot push them out of the page.
 export const SESSION_ACTIONS = ['session_revoke', 'session_revoke_all']

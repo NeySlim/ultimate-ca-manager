@@ -210,6 +210,7 @@ DEPENDENT_TABLES: Dict[str, str] = {
 # SQLite hands a removed row's id to the next row inserted.
 SOFT_LINKS = (
     ('certificates', 'related_certificate_id', 'certificates', 'id'),
+    ('deploy_bindings', 'attention_successor_id', 'certificates', 'id'),
     ('scep_profiles', 'template_id', 'certificate_templates', 'id'),
     ('scep_requests', 'profile_id', 'scep_profiles', 'id'),
     ('acme_eab_credentials', 'created_by_user_id', 'users', 'id'),

@@ -328,9 +328,20 @@ def import_certificate():
             else:
                 existing_cert.caref = _resolve_caref(None, cert_info) or existing_cert.caref
 
+            # A key reaching a renewed certificate takes the bindings left behind for it;
+            # a new serial deploys them through its renewal event
+            https_moved = False
+            if key_pem:
+                from services.binding_attention import follow_key
+                user = getattr(g, 'current_user', None)
+                https_moved = follow_key(existing_cert, actor=getattr(user, 'username', None) or 'system',
+                                         queue=not serial_changed)
             ok, err = safe_commit(logger, "Failed to update certificate")
             if not ok:
                 return err
+            if https_moved and not serial_changed:
+                from services.https_binding import apply_bound_now
+                apply_bound_now(existing_cert.refid)
             AuditService.log_action(
                 action='certificate_updated',
                 resource_type='certificate',

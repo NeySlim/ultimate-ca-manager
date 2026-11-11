@@ -760,6 +760,8 @@ class SCEPService:
                             emit_cert_issued(cert.to_dict(), ca_refid=cert.caref)
                 except Exception as e:
                     logger.error(f"Webhook emit (SCEP issuance) failed: {e}")
+                from services.binding_attention import emit_pending
+                emit_pending()
                 logger.debug("SCEP: Returning SUCCESS response")
                 return self._create_cert_rep_success(
                     cert_obj,
@@ -991,6 +993,8 @@ class SCEPService:
             db.session.rollback()
             logger.error(f"SCEP approve_request: DB commit failed: {e}")
             return None
+        from services.binding_attention import emit_pending
+        emit_pending()
 
         return cert_refid
 
