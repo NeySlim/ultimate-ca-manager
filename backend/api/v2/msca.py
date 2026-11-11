@@ -968,7 +968,6 @@ def check_request_status(msca_id, request_id):
                 csr = db.session.get(Certificate, req.csr_id)
                 msca = db.session.get(MicrosoftCA, msca_id)
                 if csr and msca:
-                    # A new serial on a row that already held a certificate is a renewal
                     try:
                         _import_signed_cert(csr, req.cert_pem, msca, req.template, request_id)
                         result = req.to_dict()
