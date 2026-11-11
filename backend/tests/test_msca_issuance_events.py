@@ -94,3 +94,28 @@ def test_approval_from_ucm_renews_the_requests_row_once(app, auth_client, monkey
         assert db.session.get(MSCARequest, req_id).cert_id == cert_id
     assert [e for e, _ in events if e.startswith('certificate.')] == ['certificate.renewed']
     assert cert_events(events, cert_id) == [('certificate.renewed', cert_id)]
+
+
+def test_approval_after_a_lost_claim_never_falls_back_to_the_inventory(app, monkeypatch, events):
+    """A poll claimed the request (issued, PEM set, no row yet): the approval imports nothing."""
+    from models import Certificate, MSCARequest, db
+    from services.msca.admin_channel import MicrosoftCAAdminChannelMixin
+    from services.msca.inventory import MicrosoftCAInventoryMixin
+    from services.msca_service import MicrosoftCAService
+    cert_id, msca_id, _ = _create_msca_cert(app, 'ev-lost-claim.test.local')
+    _, _, new_pem = _make_key_csr_cert('ev-lost-claim.test.local', days=730)
+    with app.app_context():
+        req = MSCARequest(msca_id=msca_id, csr_id=cert_id, template='WebServer',
+                          status='issued', cert_pem=new_pem, request_id=92)
+        db.session.add(req)
+        db.session.commit()
+    monkeypatch.setattr(MicrosoftCAAdminChannelMixin, '_run_ps', staticmethod(lambda *a, **k: ''))
+    monkeypatch.setattr(MicrosoftCAInventoryMixin, '_fetch_cert_pem', staticmethod(lambda *a, **k: new_pem))
+    with app.app_context():
+        result = MicrosoftCAService.approve_request(msca_id, 92)
+        assert result['imported_cert_id'] is None
+        assert 'import_error' not in result
+        assert MSCARequest.query.filter_by(msca_id=msca_id, request_id=92).count() == 1
+        rows = Certificate.query.filter_by(subject_cn='ev-lost-claim.test.local').all()
+        assert [row.id for row in rows] == [cert_id]
+    assert [e for e, _ in events if e.startswith('certificate.')] == []
