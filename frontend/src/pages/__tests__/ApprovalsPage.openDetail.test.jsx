@@ -125,12 +125,12 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     showError.mockRestore(); showSuccess.mockRestore()
   })
 
-  it.each([['acme_local_only'], ['msca_local_only']])(
-    'warns when an approved revocation stayed local (%s)', async (flag) => {
+  it.each([['acme_local_only', true], ['related_acme_local_only', 7], ['msca_local_only', true]])(
+    'warns when an approved revocation stayed local (%s)', async (flag, value) => {
       const showWarning = vi.spyOn(stable.notify, 'showWarning')
       const showSuccess = vi.spyOn(stable.notify, 'showSuccess')
       approve.mockResolvedValue({ data: { certificate_issued: true,
-        certificate: { id: 7, revoked: true, [flag]: true } } })
+        certificate: { id: 7, revoked: true, [flag]: value } } })
       renderPage()
       await clickApproveOrReject('approve')
       await waitFor(() => expect(showSuccess).toHaveBeenCalledWith('approvals.revocationPerformed'))
