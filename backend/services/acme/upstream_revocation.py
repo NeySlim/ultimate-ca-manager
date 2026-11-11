@@ -150,3 +150,22 @@ def local_only_message(outcome, detail) -> Optional[str]:
         return ('Certificate put on hold in UCM only: ACME has no hold, so the CA was not '
                 'notified. Revoke it with a final reason to revoke it at the CA.')
     return None
+
+
+REVOKED_MESSAGE = 'Certificate revoked successfully'
+
+
+def revocation_answer(outcome, detail, message=REVOKED_MESSAGE) -> dict:
+    """The ``message`` and ``meta`` of a route that revoked a certificate the ACME CA was,
+    or was not, told of; ``message`` other than the default is appended, never replaced."""
+    extra = '' if message == REVOKED_MESSAGE else f' {message}'
+    if outcome == REVOKED:
+        text = 'Certificate revoked in UCM and at the ACME CA'
+        return {'message': f'{text}.{extra}' if extra else text, 'meta': {'acme_ca_revoked': True}}
+    warning = local_only_message(outcome, detail)
+    if warning is None:
+        return {'message': message}
+    meta = {'acme_local_only': True}
+    if outcome == OWED:
+        meta.update(acme_upstream_pending=True, acme_ca_error=str(detail)[:300])
+    return {'message': f'{warning}{extra}', 'meta': meta}

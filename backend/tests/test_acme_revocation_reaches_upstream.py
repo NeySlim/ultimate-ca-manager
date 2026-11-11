@@ -268,8 +268,8 @@ def test_a_replaced_certificate_is_matched_by_serial_and_fingerprint():
 
 
 def test_a_revocation_confirmed_by_the_ca_keeps_the_related_certificate_warning():
-    from api.v2.certificates.cert_lifecycle import _acme_answer
     from services.acme.upstream_revocation import REVOKED
+    from services.acme.upstream_revocation import revocation_answer as _acme_answer
     kept = ('Certificate revoked; its related certificate #41 was not revoked, '
             'revoke it separately')
     answer = _acme_answer(REVOKED, None, kept)
