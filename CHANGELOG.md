@@ -34,6 +34,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Syslog: a change or a deactivation of the remote syslog target now reaches the scheduled tasks within seconds; their audit entries kept going to the previous target until the service restarted.
+- Backup: a restore now signs a fresh CRL (and delta CRL) for every CA that publishes one and can sign, instead of serving the previous one until its renewal threshold; a CA that cannot sign (HSM missing) is named in the restore result.
+- Settings: changing the HTTP protocol port now asks for the service restart it needs (a rolling restart in HA) and says so, instead of being saved without taking effect.
 - HA preview: two nodes started together on an empty PostgreSQL database could both try to create the session table, and one failed to start; the table is now created under the startup lock.
 - Issuance: a certificate created with `POST /api/v2/certificates` (the certificate form), issued from the form once its approval was granted, or enrolled through SCEP was never counted in its CA's issued certificates; it now is.
 - Issue form: the preselected key now comes from the server default for the chosen CA and template (new `default_key_type` in `GET /api/v2/policies/effective`) instead of a fixed RSA-2048, and a key you picked yourself is kept.
