@@ -126,6 +126,24 @@ def test_the_reader_skips_what_was_there_and_delivers_each_row_once_in_order(rel
     assert {room for room, _ in got} == {ROOM}
 
 
+def test_the_first_event_after_a_purge_emptied_the_table_is_not_delayed(relay_db):
+    _, engine = relay_db
+    old = ws_relay.RelayPublisher(engine)
+    for n in range(3):
+        old.publish(ROOM, _payload(n))
+    old.stop()
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM websocket_relay"))  # what a quiet retention period leaves
+    clock = Clock()
+    reader, got = _reader(engine, clock)
+    reader.run_once()
+    publisher = ws_relay.RelayPublisher(engine)
+    publisher.publish(ROOM, _payload(9))
+    publisher.stop()
+    reader.run_once()
+    assert [p['data']['n'] for _, p in got] == [9]  # on the next tick, no gap grace
+
+
 def test_a_gap_waits_then_a_late_row_is_still_delivered_once(relay_db):
     _, engine = relay_db
     clock = Clock()
