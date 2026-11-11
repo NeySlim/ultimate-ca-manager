@@ -228,5 +228,8 @@ def key_generator(ca, ca_cert):
         if usable is None:
             raise RuntimeError('the concurrent EST key generator is not usable')
         return usable
+    from services.webhook_service import emit_cert_issued, emit_cert_renewed
+    announce = emit_cert_renewed if previous_id is not None else emit_cert_issued
+    announce(row.to_dict(), ca_refid=ca.refid, actor='system:est-key-generator')
     logger.info('EST key generator of CA %s issued, valid until %s', ca.id, not_after)
     return key, cert

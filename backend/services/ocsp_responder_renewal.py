@@ -274,6 +274,8 @@ def run_ocsp_responder_renewal():
                 ),
             )
             db.session.commit()
+            from services.webhook_service import emit_cert_renewed
+            emit_cert_renewed(new_row.to_dict(), ca_refid=ca.refid, actor='system:ocsp-renewal')
             # The CA's cached answers embed the old responder certificate
             try:
                 from services.ocsp_service import OCSPService
