@@ -17,6 +17,9 @@ from models.auth_certificate import AuthCertificate
 from models.revoked_serial import RevokedSerial
 from tests.test_user_certificate_key_export_guard import _enrolment_for
 
+# The CAs and certificates made here (the default test CA included) go with the module.
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _enrolled_user(app, create_user, create_cert, username):
     create_user(username=username, role='viewer')

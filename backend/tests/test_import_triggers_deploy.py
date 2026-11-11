@@ -1,10 +1,15 @@
 """An import that replaces a certificate queues its deploy bindings (discussion #440)."""
 import json
 
+import pytest
+
 from tests.test_deploy_hooks import _create_target, _create_binding
 from tests.test_import_review import _cert, _gen, _ca_from_fixture, _store_cert, _import
 
 IMPORT = '/api/v2/certificates/import'
+
+# The CAs and certificates made here (the default test CA included) go with the module.
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _deliveries(app, cert_id):

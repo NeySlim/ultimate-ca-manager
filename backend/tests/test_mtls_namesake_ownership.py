@@ -16,6 +16,9 @@ from tests.test_user_certificate_key_export_guard import _enrolment_for
 
 NAME = 'mtls_namesake_probe'
 
+# The CAs and certificates made here (the default test CA included) go with the module.
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _login(app, username):
     client = app.test_client()
