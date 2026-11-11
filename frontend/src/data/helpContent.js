@@ -935,7 +935,7 @@ export const helpContent = {
           { label: 'Roles', text: 'Assign system or custom roles to control permissions' },
           { label: 'Status', text: 'Enable or disable user accounts' },
           { label: 'Password Reset', text: 'Reset a user\'s password (admin action). The user\'s open sessions are signed out, as they are by a 2FA reset' },
-          { label: 'Delete User', text: 'Deleting a user revokes the certificates they enrolled for mTLS (cessationOfOperation), then deletes them. A revocation that fails keeps the user; a failure after some revocations names the certificates already revoked. Removing a user or one of its mTLS certificates warns when the ACME CA that issued a certificate was not told of its revocation' },
+          { label: 'Delete User', text: 'Deleting a user revokes the certificates they enrolled for mTLS (cessationOfOperation), then deletes them. A certificate the CA cannot revoke does not block the deletion: it stays valid, is named in the warning and the audit log, and must be revoked under Certificates. A failure after some revocations keeps the user and names the certificates already revoked. Removing a user or one of its mTLS certificates warns when the ACME CA that issued a certificate was not told of its revocation' },
           { label: 'API Keys', text: 'In a user\'s details, list their API keys and revoke a leaked or unused one: it stops working at once, and a revoked or expired key can then be deleted. Owners create their keys on their Account page' },
           { label: 'Source', text: 'Shows where each user comes from: Local (managed in UCM) or LDAP / OAuth2 / SAML (provisioned by an SSO provider). The badge displays the originating provider name.' },
         ]
