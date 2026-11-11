@@ -351,3 +351,20 @@ def test_stop_survives_the_loop_clearing_the_give_back_while_it_looks(app):
     applier._thread = LoopThatFinishesTheGiveBack()
     applier.stop(timeout=0.01)  # no TypeError: the connection is still closed
     assert applier._engine is None
+
+
+def test_stop_survives_the_loop_giving_back_then_exiting(app):
+    applier = cc.CommandApplier(app, 'racing-node-2')
+    applier._give_back_pending = [None, 43, False]
+
+    class LoopThatEnded:
+        def join(self, timeout=None):
+            pass
+
+        def is_alive(self):
+            applier._give_back_pending = None  # given back, then the loop exited
+            return False
+
+    applier._thread = LoopThatEnded()
+    applier.stop(timeout=0.01)
+    assert applier._engine is None

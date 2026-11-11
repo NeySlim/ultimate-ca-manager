@@ -280,8 +280,11 @@ class CommandApplier:
 
     def _give_back_at_stop(self):
         """Once, so that the process started after this one can claim the restart."""
-        command_id = self._give_back_pending[1]
-        self._give_back_pending[2] = True  # the line below is the one logged
+        pending = self._give_back_pending
+        if pending is None:  # the loop already gave the claim back
+            return
+        command_id = pending[1]
+        pending[2] = True  # the line below is the one logged
         try:
             self._give_back(self._connection())
         except Exception as e:
