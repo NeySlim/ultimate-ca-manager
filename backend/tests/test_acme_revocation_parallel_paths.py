@@ -279,6 +279,40 @@ class TestRevokeCertAtUcmsOwnAcmeServer:
         assert _owed(bench) == []
 
 
+    @pytest.mark.parametrize('copy_first', [True, False])
+    def test_a_stored_copy_does_not_hide_the_acme_row(
+            self, app, client, bench, monkeypatch, copy_first):  # noqa: F811
+        """The same certificate imported again: the row its ACME order names is the one revoked."""
+        from models import Certificate
+        from services.cert import issued_lookup
+        row = bench.row()
+        copy = Certificate(refid=str(uuid.uuid4()), descr=f'{bench.name} copy', crt=row.crt,
+                           subject=row.subject, issuer=row.issuer,
+                           serial_number=row.serial_number, source='import',
+                           valid_from=row.valid_from, valid_to=row.valid_to)
+        db.session.add(copy)
+        db.session.commit()
+        copy_id = copy.id
+        found = issued_lookup.find_stored_rows
+
+        def _ordered(cert):
+            rows = sorted(found(cert), key=lambda r: r.id != copy_id)
+            return rows if copy_first else rows[::-1]
+        monkeypatch.setattr(issued_lookup, 'find_stored_rows', _ordered)
+        try:
+            answer = _es256_revocation(client, bench.key, bench.old_pem, 1)
+            assert answer.status_code == 200, answer.data[:300]
+            assert bench.row().revoked is True
+            sent = bench.client.revoke_certificate.call_args
+            assert sent.args[0] == bench.old_pem and sent.kwargs == {'reason': 1}
+        finally:
+            db.session.rollback()
+            from models import RevokedSerial
+            RevokedSerial.query.filter_by(certificate_id=copy_id).delete()
+            db.session.query(Certificate).filter_by(id=copy_id).delete()
+            db.session.commit()
+
+
 class TestTheRelatedMemberOfAPair:
     """RFC 9763: a certificate of UCM's CA may name, as its related one, a certificate
     UCM obtained over ACME; revoking the pair revokes that one at its CA too."""
