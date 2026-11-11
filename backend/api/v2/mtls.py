@@ -30,7 +30,7 @@ from utils import trusted_proxy
 from utils.key_codec import load_pem_bytes
 from utils.validity import MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS
 from services.mtls_enrollment import (
-    certificate_row_for, enrolments_of, issuing_ca_for, normalized_fingerprint,
+    certificate_row_for, enrolments_of, issuing_ca_for, made_for_account, normalized_fingerprint,
     parse_validity_days, remove_enrolment,
 )
 from utils.response import success_response, error_response, created_response
@@ -651,7 +651,7 @@ def enroll_import_certificate():
                 'This certificate is not recorded on this server; ask an administrator to enroll it',
                 403,
             )
-        if existing_cert.created_by != user.username or existing_cert.cert_type != 'usr_cert':
+        if not made_for_account(existing_cert, user) or existing_cert.cert_type != 'usr_cert':
             return error_response(
                 'This certificate belongs to another record; ask an administrator to assign it',
                 403,
@@ -750,8 +750,9 @@ def list_available_certificates():
         query = query.filter(Certificate.created_by == user.username)
 
     certs = [c for c in query.order_by(Certificate.id.desc()).all()
-             if serial_to_int(c.serial_number) is None
-             or not enrolments_of(serial_to_int(c.serial_number), c.issuer, pool=pool)]
+             if (user.role == 'admin' or made_for_account(c, user))
+             and (serial_to_int(c.serial_number) is None
+                  or not enrolments_of(serial_to_int(c.serial_number), c.issuer, pool=pool))]
 
     results = []
     for c in certs:
@@ -804,7 +805,7 @@ def assign_certificate():
         enroll_user_id = target.id
         enroll_username = target.username
     elif user.role != 'admin':
-        if certificate.created_by != user.username:
+        if not made_for_account(certificate, user):
             return error_response('Not authorized to assign this certificate', 403)
 
     # Check duplicate enrollment
