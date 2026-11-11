@@ -11,6 +11,7 @@ export default {
           { label: 'Carica CSR', text: 'Accetta file CSR codificati in PEM o incolla il testo PEM' },
           { label: 'Esamina', text: 'Ispeziona soggetto, SAN, tipo di chiave e firma prima della firma' },
           { label: 'Firma', text: 'Seleziona una CA, il tipo di certificato, imposta il periodo di validità ed emetti il certificato' },
+          { label: 'Controlli della richiesta', text: 'Soggetto e nomi della richiesta rispettano le regole del modulo di emissione: CN al massimo 64 caratteri, C due lettere, nomi DNS con sintassi RFC 5280 (niente spazio, trattino basso, punto finale, indirizzo IP, ultima etichetta solo numerica, né wildcard oltre la prima etichetta). Un CN con sintassi di nome DNS produce un nome DNS (una sola etichetta solo per un certificato server o dispositivo, nessuna per S/MIME); un altro non ne produce, con un avviso quando un CN server sembra un host. Una sub-CA non ne ottiene, e un emailAddress valido nel soggetto viene aggiunto al SAN. Ogni rifiuto indica il suo motivo' },
           { label: 'Aggiungi nomi', text: 'In firma, aggiungi nomi email, DNS, IP o URI a quelli della richiesta, ad esempio l\'indirizzo email di un certificato S/MIME richiesto da una smartcard. Rispettano i vincoli di nome della CA, le policy di emissione e l\'approvazione come tutti gli altri' },
           { label: 'Firma di nuovo', text: 'In Cronologia, rimetti in attesa una richiesta firmata per firmarla ancora con altri EKU, nomi o validità, senza generare una nuova chiave' },
           { label: 'Scarica',text: 'Scarica il CSR originale in formato PEM' },
@@ -103,6 +104,14 @@ In modalità Microsoft CA, al posto del tipo di certificato si sceglie il templa
 Il certificato risultante appare nella pagina Certificati.
 
 > 💡 Una richiesta generata su una smartcard spesso contiene solo un CN. Per un certificato S/MIME, scegli il tipo Email e aggiungi l'indirizzo: diventa il Subject Alternative Name del certificato. I nomi aggiunti rispettano i vincoli di nome della CA, le policy di emissione e l'approvazione come tutti gli altri, e l'approvatore li vede.
+
+Ciò che una richiesta può contenere viene controllato come nel modulo di emissione, e un rifiuto ne indica il motivo:
+- **Soggetto**: CN, O e OU al massimo 64 caratteri, L e ST 128, C un codice paese di due lettere come PrintableString (RFC 5280 appendice A)
+- **Nomi DNS**: lettere, cifre e trattini in etichette separate da punti (niente trattino basso), un wildcard solo come intera prima etichetta, nessun punto finale, un'ultima etichetta non interamente numerica, mai un indirizzo IP. Un nome internazionalizzato digitato nel modulo viene emesso come A-label (\`xn--\`)
+- **Nomi dal CN**: una richiesta senza SAN ottiene un nome DNS dal suo CN solo quando il CN ha sintassi di nome DNS (mai \`John Doe\`); un'etichetta singola come \`intranet\` vale solo per un certificato server o dispositivo, non per client, email o firma codice, e un certificato email (S/MIME) non ne ottiene nessuno, nemmeno da un CN con punti come \`john.doe\`; un CN server simile a un host che non produce nomi viene segnalato in un avviso, e una sub-CA non ne ottiene
+- **Email nel soggetto**: un emailAddress valido viene aggiunto anche al SAN come nome email, per ogni tipo di certificato
+- **Key Usage**: una richiesta senza Key Usage ottiene quello del suo tipo, come nel modulo di emissione (client, firma codice ed email inclusi)
+- Una CA padre con pathLen 0, o un nome fuori dai vincoli di nome della CA, viene rifiutato con quel motivo; il CN con punti di un certificato email viene controllato come nome DNS solo quando il certificato porta anche Server Auth
 
 ### Firma con Microsoft CA
 

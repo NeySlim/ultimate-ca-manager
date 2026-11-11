@@ -156,8 +156,10 @@ export default {
           { label: 'AD 派生主题', text: '模板可以选择通过 AD 连接器从 Active Directory 派生其主题/SAN，用于无人值守注册' },
           { label: 'ML-DSA 模板 (v2.248)', text: '通过其密钥算法 OID 配合 Microsoft Software Key Storage Provider 公布，尚未使用真实 Windows 客户端测试，FIPS 模式下隐藏。基于证书的续订无法使用 ML-DSA 证书（XML-DSig 没有 ML-DSA 签名）：请注册新证书' },
           { label: 'ECDSA 模板 (v2.251)', text: '在策略模式 3 中公布，以其曲线（ECDSA_P256、ECDSA_P384、ECDSA_P521）作为签名密钥和请求哈希，取模板摘要与曲线对应摘要中较强者。FIPS 模式之外的 RSA 模板仍为模式 2' },
+          { label: '请求中指定的模板 (v2.252)', text: '每个策略都会公布其模板扩展（szOID_CERTIFICATE_TEMPLATE），Windows 会将其复制到请求中，因此即使另一个模板具有相同的 EKU，证书也会按客户端所选的模板签发。未指定模板的请求按其 EKU 匹配。所有 EKU 都不会签发给注册者的模板（例如 OCSP 签名）不会被公布，对它的请求会被拒绝' },
           { label: '模板与密钥 (v2.251)', text: '请求密钥必须与其所签发的模板相符：相同的曲线或 ML-DSA 参数集，或不更短的 RSA 密钥，因此 P-384 请求不再在共用同一 EKU 的 P-256 模板下签发。Windows 使用 ECDSA 密钥签名的请求信封可被接受' },
-          { label: 'Windows 续期 (v2.248)', text: 'certreq ... Renew 使用待续期的证书作为 TLS 客户端证书进行身份验证：需要启用 mTLS，且 WSTEP CA 或其某个上级 CA 受信任。续期会保留被续期证书的模板和 EKU' },
+          { label: 'Windows 续期 (v2.248)', text: 'certreq ... Renew 使用待续期的证书作为 TLS 客户端证书进行身份验证：需要启用 mTLS，且 WSTEP CA 或其某个上级 CA 受信任。续期会保留被续期证书的模板和 EKU，当 CSR 不含 SubjectAltName 时也保留其 SubjectAltName (v2.252)' },
+          { label: '证书类型', text: '没有服务器身份验证时，带有电子邮件保护或 EFS 的模板签发 S/MIME 证书，带有客户端身份验证或智能卡登录的模板签发客户端证书：没有 SAN 的用户请求 CN=jdoe 不会从其 CN 得到 DNS 名称。没有密钥用法的请求会获得模板配置的密钥用法，否则获得该模板类型的默认值：S/MIME 或 EFS 为数字签名、密钥加密和不可否认性，智能卡登录为数字签名和密钥加密，客户端身份验证仅为数字签名。任何其他模板或无模板则签发服务器证书' },
           { label: 'Docker 中的 Kerberos (v2.251)', text: 'Docker 镜像包含 pyspnego 的 Kerberos 后端，因此 Kerberos 绑定在容器中的工作方式与 DEB 和 RPM 安装相同' },
         ]
       },
@@ -478,7 +480,11 @@ UCM 自身与 Active Directory 的 LDAP 连接，独立于在 SSO 下配置的�
 
 密钥类型为 **ML-DSA** 的模板通过其密钥算法 OID 公布，配合 Microsoft Software Key Storage Provider 和仅签名的密钥规格。它在 FIPS 模式下隐藏，尚未使用真实 Windows 客户端测试注册。
 
-**ECDSA** 模板在策略模式 3 中公布，以其曲线（\`ECDSA_P256\`、\`ECDSA_P384\`、\`ECDSA_P521\`）作为签名密钥和请求哈希，取模板摘要与曲线对应摘要中较强者；FIPS 模式之外的 RSA 模板仍为模式 2。请求密钥必须与其所签发的模板相符：相同的曲线或 ML-DSA 参数集，或不更短的 RSA 密钥 (v2.251)。
+**ECDSA** 模板在策略模式 3 中公布，以其曲线（\`ECDSA_P256\`、\`ECDSA_P384\`、\`ECDSA_P521\`）作为签名密钥和请求哈希，取模板摘要与曲线对应摘要中较强者；FIPS 模式之外的 RSA 模板仍为模式 2，该模式不指定请求哈希：Windows 此时用 SHA-1 签署其 CMC 请求，UCM 按这些客户端的要求予以接受；用 SHA-1 签名的普通 PKCS#10 仍会被拒绝。请求密钥必须与其所签发的模板相符：相同的曲线或 ML-DSA 参数集，或不更短的 RSA 密钥 (v2.251)。
+
+指明其模板的请求，无论是通过 OID（\`szOID_CERTIFICATE_TEMPLATE\`）还是名称（\`szOID_ENROLL_CERTTYPE\`），都会按该模板签发；CA 未提供或未启用的模板、两个名称对应两个模板，或模板不签发的 EKU，都会被拒绝。每个策略都会公布其模板的 \`szOID_CERTIFICATE_TEMPLATE\` 扩展，Windows CertEnroll 会将其复制到请求中，因此 EKU 相同的两个模板可以区分 (v2.252)。未指明模板的请求按其 EKU 匹配模板。所有 EKU 都不会签发给注册者的模板（例如 OCSP 签名）不会被公布，对它的请求会被拒绝。证书带有其模板的 EKU，而不是请求所要求的 EKU。
+
+WSTEP 仅提供 Issue 请求类型（续期也包括在内），并拒绝 \`wsu:Timestamp\` 已过期超过 5 分钟的消息。普通 PKCS#10 或 CMC 请求按其内容识别，与其 ValueType 无关，每个应答在证书之外还附带 CMC Full PKI Response。
 
 ### Kerberos / SPNEGO
 
@@ -486,7 +492,7 @@ UCM 自身与 Active Directory 的 LDAP 连接，独立于在 SSO 下配置的�
 - **服务主体名称 (SPN)**: 例如 \`HTTP/ucm.example.com@EXAMPLE.COM\`
 - **Keytab**: 在域控制器上使用 \`ktpass\` 或 \`ktutil\` 为上述 SPN 生成
 
-> ⚠ 如果未安装服务器端 SPNEGO 库，即使在此处启用，Kerberos 身份验证也无法工作:, 该标签页会显示警告。
+> ⚠ Kerberos 需要服务器端的 **\`gssapi\` 后端**（Python 的 \`gssapi\` 库加系统 Kerberos 库）：仅有基础 SPNEGO 包是不够的。没有它，即使在此处启用，Kerberos 身份验证也无法工作，且不会公布 Kerberos 绑定；该标签页会显示警告。
 
 Docker 镜像自 v2.251 起包含此后端。
 
@@ -501,15 +507,15 @@ Docker 镜像自 v2.251 起包含此后端。
 
 XML-DSig 没有 ML-DSA 签名方法，因此 **ML-DSA** 证书无法通过此方式续订：UCM 会在拒绝信息中指明该密钥，客户端需改为注册新证书。
 
-Windows 也可以使用 \`certreq ... Renew\` 续期，以待续期的证书作为 TLS 客户端证书进行身份验证：请启用 mTLS，且 WSTEP CA 或其某个上级 CA 受信任。续期会保留被续期证书的模板和 EKU (v2.248)。
+Windows 也可以使用 \`certreq ... Renew\` 续期，以待续期的证书作为 TLS 客户端证书进行身份验证：请启用 mTLS，且 WSTEP CA 或其某个上级 CA 受信任。续期会保留被续期证书的模板和 EKU (v2.248)；当 CSR 不含 SubjectAltName 时，也保留其 SubjectAltName (v2.252)。
 
 ### SID 安全扩展 (KB5014754)
 
-在**经 Kerberos 身份验证的签发**中，UCM 会在签发证书的 Microsoft SID 安全扩展（\`szOID_NTDS_CA_SECURITY_EXT\`）中嵌入请求者的 AD SID。域控制器将其用于**强证书映射**（KB5014754）:, 自 AD 对基于证书的身份验证（智能卡登录、PKINIT）强制执行强映射以来，这是必需项。
+在**经 Kerberos 身份验证的签发**中，UCM 会在签发证书的 Microsoft SID 安全扩展（\`szOID_NTDS_CA_SECURITY_EXT\`）中嵌入请求者的 AD SID。域控制器将其用于**强证书映射**（KB5014754）:, 自 AD 对基于证书的身份验证（智能卡登录、PKINIT）强制执行强映射以来，这是必需项。启用 AD 连接器时，SID 无法解析的请求会被拒绝而不是在没有它的情况下签发，其中也包括来自连接器域之外的领域的主体。
 
 ### AD 派生主题
 
-证书模板可以选择**从 Active Directory 构建主题**（模板 → 注册）：对于无人值守的 GPO 自动注册，主题和 SAN 通过 AD 连接器从请求者的 AD 对象派生，而不要求客户端提供:, 与真实 ADCS 模板配置自动注册的方式一致。与此独立，**允许自动注册** 会在证书注册策略中将模板公布为 \`autoEnroll=true\`，使经 GPO/Kerberos 身份验证的客户端在登录时自动请求它。
+证书模板可以选择**从 Active Directory 构建主题**（模板 → 注册）：对于无人值守的 GPO 自动注册，主题和 SAN 通过 AD 连接器从请求者的 AD 对象派生，而不要求客户端提供:, 与真实 ADCS 模板配置自动注册的方式一致。与此独立，**允许自动注册** 会在证书注册策略中将模板公布为 \`autoEnroll=true\`，使经 GPO/Kerberos 身份验证的客户端在登录时自动请求它。在 Kerberos 端点上，此类模板以及每个机器模板（Web 服务器、VPN、OCSP 签名类型）的主题始终来自 Active Directory，无论请求写了什么：机器模板取计算机的 DNS 名称，用户账户不能使用它，而“从 Active Directory 构建主题”的模板不能给计算机使用。两者都不是的模板，只要配置了其 EKU，就沿用客户端提供的主题，用户名/密码端点上的每个模板也是如此，因为它们没有可用来构建主题的目录身份。在 Kerberos 端点上，未匹配任何模板的请求也从 Active Directory 获取主题：计算机用其 DNS 名称，用户仅在有模板选择启用时才可以，否则会被拒绝。
 
 ## 关于
 

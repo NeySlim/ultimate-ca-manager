@@ -19,10 +19,11 @@ export default {
         title: 'Configuração',
         items: [
           { label: 'CA Assinante', text: 'Selecione qual CA assina os certificados inscritos via SCEP. Os dispositivos cifram a solicitação para esta CA, que deve portanto ter uma chave RSA em software: CAs EC, com HSM, sem chave, offline e revogadas não são listadas (v2.248)' },
-          { label: 'Auto-Aprovação', text: 'Aprovar automaticamente solicitações com senhas de desafio válidas' },
+          { label: 'Auto-Aprovação', text: 'Aprovar automaticamente solicitações com senhas de desafio válidas, ou renovações assinadas por um certificado emitido pelo mesmo ponto de acesso' },
           { label: 'Servir em HTTP simples', text: 'Desativado por padrão. Responde também ao SCEP na porta do protocolo HTTP (8080 por padrão), em http://seu-servidor:8080/scep/pkiclient.exe e nas URLs de perfil, para clientes como o sscep que não podem usar HTTPS. RFC 8894 §7.10: as mensagens SCEP já são protegidas, o envelope CMS mantém a senha de desafio privada' },
-          { label: 'Senha de Desafio', text: 'Segredo compartilhado que dispositivos usam para autenticar a inscrição' },
+          { label: 'Senha de Desafio', text: 'Segredo compartilhado que dispositivos usam para autenticar a inscrição. Uma renovação (RenewalReq) assinada por um certificado que o mesmo ponto de acesso (perfil ou global) emitiu é autenticada por esse certificado, portanto o seu desafio não é verificado e rotacionar o segredo não impede os dispositivos já inscritos de renovar (RFC 8894 §2.4). Qualquer outro certificado continua a precisar do desafio do ponto de acesso' },
           { label: 'Chaves do dispositivo (v2.248)', text: 'Um dispositivo assina o seu pedido com uma chave RSA, ECDSA, Ed25519 ou ML-DSA; uma assinatura ML-DSA segue a RFC 9882 (resumo SHA-512). Ed448 é recusado, e ML-DSA também em modo FIPS' },
+          { label: 'Nomes do pedido', text: 'Um pedido cujo sujeito ou nomes DNS violem a RFC 5280 (um CN com mais de 64 caracteres, um nome DNS com espaço, apóstrofo ou sublinhado, como o nome de um dispositivo iOS) é recusado com o seu motivo, depois de verificado o desafio e antes de entrar na fila, e o Intune é informado da recusa; uma renovação mantém os nomes que o seu certificado já tem. Construa o SAN DNS do Intune a partir de um valor seguro para DNS' },
         ]
       },
       {
@@ -68,7 +69,8 @@ Visualize todas as solicitações de inscrição SCEP:
 Configure o servidor SCEP:
 - **Ativar/Desativar**: Alternar o serviço SCEP
 - **CA Assinante**: Selecione qual CA assina os certificados inscritos via SCEP. Os dispositivos cifram a solicitação para esta CA, que deve portanto ter uma chave RSA em software: CAs EC, com HSM, sem chave, offline e revogadas não são listadas (v2.248)
-- **Auto-Aprovação**: Aprovar automaticamente solicitações com senhas de desafio válidas
+- **Auto-Aprovação**: Aprovar automaticamente solicitações com senhas de desafio válidas, ou renovações assinadas por um certificado que o mesmo ponto de acesso emitiu
+- **Servir em HTTP simples**: desativado por padrão. Responde também ao SCEP na porta do protocolo HTTP (8080 por padrão) para clientes que não podem usar HTTPS, como o sscep. RFC 8894 §7.10: as mensagens SCEP já são protegidas, portanto o TLS não é obrigatório; o envelope CMS mantém a senha de desafio privada
 
 ### Perfis
 Endpoints de inscrição nomeados, cada um servido em sua própria URL:
@@ -81,7 +83,7 @@ Cada perfil está vinculado a:
 - **Sua própria CA**: frotas de dispositivos diferentes podem se inscrever em CAs diferentes
 - **Um modelo de certificado opcional**: quando vinculado, o key usage, extended key usage e validade do modelo governam cada certificado emitido pelo perfil
 - **Finalidades que nenhum inscrito pode ter**: um modelo vinculado a um perfil não pode conter assinatura OCSP, carimbo de tempo, qualquer finalidade ou Smartcard Logon, e uma renovação SCEP nunca os transfere; Smartcard Logon é permitido quando o perfil valida contra o Intune, que atesta a identidade
-- **Uma senha de desafio por perfil**: armazenada criptografada, com a mesma janela de expiração do desafio global
+- **Uma senha de desafio por perfil**: armazenada criptografada, com a mesma janela de expiração do desafio global (ou validação do Microsoft Intune, veja abaixo)
 - **Uma política de aprovação**: auto-aprovação ou revisão manual por perfil
 
 Aponte cada frota de dispositivos, perfil MDM ou tenant para sua própria URL de perfil. O endpoint \`/scep/pkiclient.exe\` sem segmento continua servindo a configuração global inalterada.
@@ -90,7 +92,9 @@ Aponte cada frota de dispositivos, perfil MDM ou tenant para sua própria URL de
 A aba **Desafios** mostra as senhas de desafio. Os dispositivos devem incluir uma senha de desafio válida em sua solicitação de inscrição para autenticação.
 
 - **Ver senha**: Mostrar o desafio atual para uma CA
-- **Regenerar**: Criar uma nova senha de desafio (invalida a anterior)
+- **Regenerar**: Criar uma nova senha de desafio (invalida a anterior para novas inscrições)
+
+Uma renovação (RenewalReq) assinada por um certificado que o mesmo ponto de acesso (perfil ou global) emitiu é autenticada por esse certificado: a sua senha de desafio não é verificada, portanto um segredo regenerado não impede os dispositivos já inscritos de renovar (RFC 8894 §2.4).
 
 ### Informações
 Exibe a URL do endpoint SCEP e instruções de integração.
@@ -110,11 +114,13 @@ O dispositivo assina o seu PKCSReq com a sua própria chave: RSA, ECDSA, Ed25519
 ## URLs SCEP
 
 \`\`\`
-https://seu-servidor:8443/scep                          (endpoint global)
+https://seu-servidor:8443/scep/pkiclient.exe            (CA configurada)
 https://seu-servidor:8443/scep/<perfil>/pkiclient.exe   (endpoint por perfil)
+https://seu-servidor:8443/cgi-bin/pkiclient.exe         (CA configurada, caminho legado)
+http://seu-servidor:8080/scep/pkiclient.exe             (com Servir em HTTP simples)
 \`\`\`
 
-Os dispositivos precisam da URL para se inscrever. Use uma URL de perfil para direcionar a CA, o modelo e a senha de desafio daquele perfil.
+Os dispositivos precisam da URL para se inscrever; \`/scep\` sozinho é a interface web, não um endpoint SCEP. Use uma URL de perfil para direcionar a CA, o modelo e a senha de desafio daquele perfil.
 
 ### Troca de CA (GetNextCACert)
 O GetNextCACert serve a sucessora da CA do endpoint, assinada pela CA atual: outra CA com o mesmo pai e o mesmo DN de sujeito, não revogada, não offline, com chave RSA em software e que expira mais tarde. Uma CA que apenas compartilha o nome de exibição nunca é servida; sem sucessora, a resposta é 404.
@@ -135,13 +141,13 @@ Uma solicitação que chegou por um perfil é emitida com o modelo desse perfil 
 ### Cisco IOS
 \`\`\`
 crypto pki trustpoint UCM
-  enrollment url https://seu-servidor:8443/scep
+  enrollment url https://seu-servidor:8443/scep/pkiclient.exe
   password <senha-de-desafio>
 \`\`\`
 
 ### JAMF
 Configure o perfil SCEP com:
-- URL do servidor: \`https://seu-servidor:8443/scep\`
+- URL do servidor: \`https://seu-servidor:8443/scep/pkiclient.exe\`, ou o \`/scep/<perfil>/pkiclient.exe\` de um perfil
 - Desafio: a senha do UCM
 
 ### Microsoft Intune

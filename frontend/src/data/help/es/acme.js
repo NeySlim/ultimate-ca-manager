@@ -5,12 +5,13 @@ export default {
     overview: 'UCM soporta dos modos ACME: cliente ACME para certificados públicos de cualquier CA compatible con RFC 8555 (Let\'s Encrypt, ZeroSSL, HARICA, etc.), y servidor ACME local para automatización PKI interna con mapeo de dominios multi-CA.',
     sections: [
       {
-        title: "Renewal Information (ARI, RFC 9773)",
+        title: "Información de renovación (ARI, RFC 9773)",
         content: "El servidor ACME local publica un recurso renewalInfo para que los clientes conozcan el momento ideal para renovar cada certificado.",
         items: [
           { label: "Ventana sugerida", text: "Devuelve una ventana inicio/fin centrada antes de la expiración, para distribuir las renovaciones" },
           { label: "Revocación", text: "Un certificado revocado devuelve una ventana en el pasado → los clientes conformes renuevan de inmediato" },
           { label: "Sin autenticación", text: "renewalInfo es un simple GET, no requiere cuenta ni JWS (RFC 9773)" },
+          { label: "Proxy ACME (v2.252)", text: "Para un certificado emitido a través del proxy, se retransmite la ventana de la CA upstream con su Retry-After, conservada hasta una hora. La ventana se calcula localmente cuando la CA no anuncia renewalInfo o no da una respuesta utilizable, o cuando el certificado está revocado en UCM" },
         ]
       },
       {
@@ -85,6 +86,10 @@ export default {
           { label: 'Errores upstream (v2.252)', text: 'Un error de la CA upstream llega al cliente con su tipo (rateLimited, badCSR, rejectedIdentifier, alreadyRevoked...), estado, subproblems y Retry-After. Los errores sobre la propia cuenta upstream del proxy siguen siendo serverInternal' },
           { label: 'Perfiles y validez (v2.252)', text: 'El directorio lista los perfiles de la CA upstream. Un perfil, notBefore y notAfter pedidos por el cliente se pasan upstream, un new-order reintentado reutiliza un pedido pendiente solo si los lleva, y un perfil que la CA upstream no ofrece se rechaza con invalidProfile' },
           { label: 'Registro TXT rechazado (v2.252)', text: 'Cuando el proveedor DNS rechaza el registro TXT, el desafío no se envía upstream: el pedido, sus autorizaciones y desafíos pasan a inválidos, ninguno de sus otros desafíos se envía, y el mensaje del proveedor se registra y se conserva en el pedido. Los registros TXT de un pedido inválido o desactivado se eliminan' },
+          { label: 'Envío de desafío fallido (v2.252)', text: 'Cuando la CA upstream rechaza la respuesta al desafío (un nonce rechazado más de tres veces, un límite de tasa), o responde un 5xx o nada y la autorización no muestra el desafío aceptado, el pedido pasa a inválido con el error upstream y sigue inválido aunque la CA lo valide más tarde. Sus registros TXT se eliminan (dos minutos después mientras la CA aún pueda leer uno, o en la pasada de mantenimiento de pedidos de 15 minutos cuando un reinicio interrumpió ese plazo); el siguiente pedido del cliente sobre los mismos nombres se valida de nuevo, o queda listo de inmediato cuando la CA ya los validó' },
+          { label: 'Comprobaciones del CSR (v2.252)', text: 'En la finalización, el CSR debe nombrar exactamente los identificadores del pedido, en su CN o SAN (RFC 8555 §7.4): de lo contrario se rechaza con badCSR antes de que nada llegue a la CA upstream' },
+          { label: 'Autorización desactivada (v2.252)', text: 'Un pedido cuya autorización desactivó el cliente sigue inválido y no recibe certificado, incluso cuando se emite el pedido de otra cuenta sobre el mismo pedido upstream (RFC 8555 §7.5.2)' },
+          { label: 'URL desconocidas (v2.252)', text: 'Una URL o método que ninguna ruta sirve bajo /acme o /acme/proxy recibe un documento de problema malformed con enlace al directorio, como 405 con Allow cuando se sirve otro método, por ejemplo un GET sobre un recurso solo POST (RFC 8555 §6.3)' },
           { label: 'Lecturas de desafíos (v2.252)', text: 'El proxy lee un desafío a través de su autorización, nunca con un POST-as-GET sobre el desafío, que en algunas CA inicia la validación antes de que exista el registro TXT. El directorio del proxy no ofrece key rollover' },
         ]
       },
@@ -373,7 +378,7 @@ https://su-servidor-ucm:8443/acme/proxy/<slug>/directory
 https://su-servidor-ucm:8443/acme/proxy/directory
 \`\`\`
 
-Ejemplo con certbot (reemplace \`<slug>\`):
+Ejemplo con certbot (reemplace \`<slug>\` por el slug de su CA):
 \`\`\`
 certbot certonly \\
   --server https://su-servidor-ucm:8443/acme/proxy/<slug>/directory \\
@@ -387,9 +392,11 @@ certbot certonly \\
 
 > 💡 Las credenciales EAB de la cuenta CA upstream son distintas de las del cliente: autentican UCM ante la CA upstream, no sus clientes ante UCM. Defínalas en esa cuenta en **Cuentas CA externas**.
 
-> ⚠ Requisito: el dominio debe estar en ACME Domains con proveedor DNS. El proxy solo admite dns-01.
+> ⚠ Requisito: el dominio (o un dominio superior que cubra los subdominios) debe estar configurado en Dominios ACME con un proveedor DNS. El proxy solo admite dns-01.
 
-> ⚠ Evite solicitudes simultáneas para el mismo FQDN (Certbot + interfaz UCM).
+> ⚠ Evite solicitudes simultáneas para el mismo FQDN (Certbot + interfaz UCM): el segundo registro TXT podría sobrescribir el primero.
+
+Los errores de la CA upstream llegan al cliente con su tipo ACME, estado y Retry-After (un límite de tasa es un 429 \`rateLimited\`, no un fallo del proxy). Un perfil, \`notBefore\` y \`notAfter\` se pasan upstream; un perfil que la CA upstream no lista se rechaza con \`invalidProfile\`. Cuando el proveedor DNS rechaza el registro TXT, el desafío no se envía upstream y el pedido pasa a inválido, con el mensaje del proveedor en los registros. Cuando la CA upstream rechaza la respuesta al desafío, o responde un 5xx o nada y la autorización no muestra el desafío aceptado, el pedido también pasa a inválido de forma definitiva con el error upstream y sus registros TXT se eliminan, de modo que el siguiente pedido del cliente se valida de nuevo. Un CSR que no nombra exactamente los identificadores del pedido se rechaza con \`badCSR\` antes de llegar a la CA upstream (v2.252).
 
 > ℹ️ En lab / certificado autofirmado, añada \`--no-verify-ssl\` a Certbot.
 
@@ -488,7 +495,7 @@ Consulta los certificados emitidos mediante ACME:
 Un pedido puede llevar \`notBefore\` y \`notAfter\` (cert-manager con una \`duration\`, lego \`--not-after\`). El certificado se emite con exactamente esas fechas, o la solicitud se rechaza como \`malformed\`: una ventana más larga que la validez del perfil (salvo 15 minutos de desfase de reloj), fuera de la validez de la CA emisora, o ya pasada. Una ventana que una política prohíbe, más larga que su validez máxima o más allá del horizonte de un tipo de clave, se rechaza en finalize como \`badCSR\`. Sin ellas se aplica la validez del perfil.
 
 ### Revocación
-Un cliente revoca con la clave de su cuenta o con la propia clave del certificado, y el certificado que envía debe coincidir byte a byte con el almacenado: un número de serie solo nunca basta. Solo una clave RSA o EC P-256, P-384 o P-521 puede firmar una solicitud ACME, por lo que un certificado ML-DSA, EdDSA o Brainpool se revoca con la cuenta que lo pidió; UCM lo indica en el rechazo.
+Un cliente revoca con la clave de su cuenta o con la propia clave del certificado, y el certificado que envía debe coincidir byte a byte con el almacenado: un número de serie solo nunca basta. Una cuenta con autorizaciones válidas y no expiradas para cada nombre y dirección IP de un certificado emitido por este servidor ACME también puede revocarlo, quienquiera que lo pidiera; las autorizaciones concedidas por aprobación automática no cuentan. Solo una clave RSA o EC P-256, P-384 o P-521 puede firmar una solicitud ACME, por lo que un certificado ML-DSA, EdDSA o Brainpool se revoca con la cuenta que lo pidió; UCM lo indica en el rechazo.
 
 ## Certificados de dirección IP (RFC 8738)
 
@@ -511,8 +518,10 @@ También se admiten pedidos mixtos DNS + IP.
 - **HTTP-01** se conecta directamente a la IP (los literales IPv6 van entre corchetes, ej. \`http://[2001:db8::1]/...\`).
 - **TLS-ALPN-01** usa la forma reverse-DNS de la IP (\`in-addr.arpa\` / \`ip6.arpa\`) como nombre de host SNI.
 
+- **TLS-ALPN-01** exige que el SubjectAltName del certificado de validación contenga exactamente el nombre o la IP validados, nada más.
+
 ### Certificado emitido
-El certificado firmado contiene una entrada SubjectAltName **iPAddress** por cada IP validada.
+El certificado firmado contiene una entrada SubjectAltName **iPAddress** por cada IP validada. El CSR puede poner también una de las direcciones IP del pedido en su common name.
 
 > 💡 Las direcciones internas (RFC1918, loopback) se validan de forma nativa: el modelo de despliegue principal de UCM. Las IP de metadatos cloud siguen bloqueadas.
 
@@ -573,13 +582,14 @@ acme.sh --issue \\
 
 > ⚠ Para ACME interno, los clientes deben confiar en la CA de UCM. Instala el certificado de la CA raíz en el almacén de confianza del cliente.
 
-## Renewal Information (ARI, RFC 9773)
+## Información de renovación (ARI, RFC 9773)
 
 El servidor ACME local anuncia \`renewalInfo\` en su directory y sirve una **ventana de renovación sugerida** por certificado.
 
 - Ventana centrada antes de la expiración → renovaciones distribuidas
 - Certificado revocado → ventana en el pasado (renovar ya)
 - GET sin autenticación en \`/acme/renewalInfo/<certID>\`
+- Proxy ACME: la ventana de la CA upstream se retransmite con su Retry-After para un certificado emitido a través del proxy; se calcula localmente cuando la CA no tiene ninguna o no responde
 
 `
   }

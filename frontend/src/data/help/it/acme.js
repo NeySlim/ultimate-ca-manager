@@ -11,6 +11,7 @@ export default {
           { label: "Finestra suggerita", text: "Restituisce una finestra inizio/fine centrata prima della scadenza, per distribuire i rinnovi" },
           { label: "Revoca", text: "Un certificato revocato restituisce una finestra nel passato → i client conformi rinnovano subito" },
           { label: "Senza autenticazione", text: "renewalInfo è una semplice GET, nessun account o JWS richiesto (RFC 9773)" },
+          { label: "Proxy ACME (v2.252)", text: "Per un certificato emesso tramite il proxy, la finestra della CA a monte viene inoltrata con il suo Retry-After, conservata fino a un'ora. La finestra è calcolata localmente quando la CA non annuncia renewalInfo o non dà una risposta utilizzabile, oppure quando il certificato è revocato in UCM" },
         ]
       },
       {
@@ -85,6 +86,10 @@ export default {
                   { label: 'Errori a monte (v2.252)', text: 'Un errore della CA a monte raggiunge il client con il suo tipo (rateLimited, badCSR, rejectedIdentifier, alreadyRevoked...), stato, sottoproblemi e Retry-After. Gli errori sull\'account a monte del proxy stessi restano serverInternal' },
                   { label: 'Profili e validità (v2.252)', text: 'La directory elenca i profili della CA a monte. Un profilo, notBefore e notAfter richiesti dal client sono passati a monte, un new-order ripetuto riutilizza un ordine in attesa solo se li riporta, e un profilo che la CA a monte non offre viene rifiutato con invalidProfile' },
                   { label: 'Record TXT rifiutato (v2.252)', text: 'Quando il provider DNS rifiuta il record TXT, la sfida non viene inviata a monte: l\'ordine, le sue autorizzazioni e sfide diventano non validi, nessuna delle sue altre sfide viene inviata, e il messaggio del provider viene registrato e conservato nell\'ordine. I record TXT di un ordine non valido o disattivato vengono rimossi' },
+                  { label: 'Invio della sfida non riuscito (v2.252)', text: 'Quando la CA a monte rifiuta la risposta alla sfida (un nonce rifiutato più di tre volte, un limite di frequenza), o risponde con un 5xx o non risponde e l\'autorizzazione non mostra la sfida presa in carico, l\'ordine diventa non valido con l\'errore a monte e resta tale anche se la CA lo convalida più tardi. I suoi record TXT vengono rimossi (due minuti dopo se la CA può ancora leggerne uno, oppure al passaggio di pulizia degli ordini ogni 15 minuti quando un riavvio ha interrotto quell\'attesa); il nuovo ordine del client sugli stessi nomi viene convalidato di nuovo, oppure è subito pronto quando la CA li ha già convalidati' },
+                  { label: 'Controlli del CSR (v2.252)', text: 'Alla finalizzazione il CSR deve nominare esattamente gli identificatori dell\'ordine, nel CN o nel SAN (RFC 8555 §7.4): altrimenti viene rifiutato con badCSR prima che qualcosa raggiunga la CA a monte' },
+                  { label: 'Autorizzazione disattivata (v2.252)', text: 'Un ordine la cui autorizzazione è stata disattivata dal client resta non valido e non ottiene alcun certificato, anche quando viene emesso l\'ordine di un altro account sullo stesso ordine a monte (RFC 8555 §7.5.2)' },
+                  { label: 'URL sconosciuti (v2.252)', text: 'Un URL o un metodo che nessuna route serve sotto /acme o /acme/proxy riceve un documento di problema malformed con il link alla directory, come 405 con Allow quando è servito un altro metodo, ad esempio una GET su una risorsa solo POST (RFC 8555 §6.3)' },
                   { label: 'Letture delle sfide (v2.252)', text: 'Il proxy legge una sfida tramite la sua autorizzazione, mai con un POST-as-GET sulla sfida, che su alcune CA avvia la validazione prima che il record TXT esista. Il key rollover non è offerto dalla directory del proxy' },
         ]
       },
@@ -391,6 +396,8 @@ certbot certonly \\
 
 > ⚠ Evitare richieste simultanee per lo stesso FQDN (Certbot + interfaccia UCM).
 
+Gli errori della CA a monte raggiungono il client con il loro tipo ACME, lo stato e il Retry-After (un limite di frequenza è un 429 \`rateLimited\`, non un guasto del proxy). Un profilo, \`notBefore\` e \`notAfter\` sono passati a monte; un profilo che la CA a monte non elenca viene rifiutato con \`invalidProfile\`. Quando il provider DNS rifiuta il record TXT, la sfida non viene inviata a monte e l'ordine diventa non valido, con il messaggio del provider nei log. Quando la CA a monte rifiuta la risposta alla sfida, o risponde con un 5xx o non risponde e l'autorizzazione non mostra la sfida presa in carico, l'ordine diventa anch'esso non valido in modo definitivo con l'errore a monte e i suoi record TXT vengono rimossi: il nuovo ordine del client viene quindi convalidato di nuovo. Un CSR che non nomina esattamente gli identificatori dell'ordine viene rifiutato con \`badCSR\` prima di raggiungere la CA a monte (v2.252).
+
 > ℹ️ In lab / certificato autofirmato, aggiungere \`--no-verify-ssl\` a Certbot.
 
 ### DNS UPDATE (RFC 2136)
@@ -511,6 +518,8 @@ Sono supportati anche ordini misti DNS + IP.
 - **HTTP-01** si connette direttamente all'IP (i letterali IPv6 sono tra parentesi quadre, es. \`http://[2001:db8::1]/...\`).
 - **TLS-ALPN-01** usa la forma reverse-DNS dell'IP (\`in-addr.arpa\` / \`ip6.arpa\`) come hostname SNI.
 
+- **TLS-ALPN-01** richiede che il SubjectAltName del certificato di validazione contenga esattamente il nome o l'IP validato, nient'altro.
+
 ### Certificato emesso
 Il certificato firmato contiene una voce SubjectAltName **iPAddress** per ogni IP validato.
 
@@ -580,6 +589,7 @@ Il server ACME locale annuncia \`renewalInfo\` nel suo directory e serve una **f
 - Finestra centrata prima della scadenza → rinnovi distribuiti nel tempo
 - Certificato revocato → finestra nel passato (rinnova subito)
 - GET non autenticata su \`/acme/renewalInfo/<certID>\`
+- Proxy ACME: per un certificato emesso tramite il proxy, la finestra della CA a monte viene inoltrata con il suo Retry-After; calcolata localmente quando la CA non ne ha o non risponde
 
 `
   }

@@ -10,7 +10,8 @@ export default {
         items: [
           { label: "建议窗口", text: "返回一个以到期前为中心的开始/结束窗口，使续期错峰分布" },
           { label: "吊销", text: "已吊销证书返回过去的窗口 → 合规客户端立即续期" },
-          { label: "无需认证", text: "renewalInfo 是普通 GET,, 无需账户或 JWS（RFC 9773）" },
+          { label: "无需认证", text: "renewalInfo 是普通 GET，无需账户或 JWS（RFC 9773）" },
+          { label: "ACME 代理 (v2.252)", text: "对于通过代理签发的证书，会转发上游 CA 的窗口及其 Retry-After，最长缓存一小时。当 CA 未公布 renewalInfo、未给出可用的答复，或证书已在 UCM 中吊销时，窗口由本地计算" },
         ]
       },
       {
@@ -85,6 +86,10 @@ export default {
           { label: '上游错误 (v2.252)', text: '上游 CA 的错误会连同其类型（rateLimited、badCSR、rejectedIdentifier、alreadyRevoked 等）、状态、子问题和 Retry-After 一并传给客户端。与代理自身上游账户有关的错误仍为 serverInternal' },
           { label: '配置文件与有效期 (v2.252)', text: '目录列出上游 CA 的配置文件。客户端请求的配置文件、notBefore 和 notAfter 会传给上游；重试的 new-order 仅在携带它们时才重用待处理订单；上游 CA 不提供的配置文件会以 invalidProfile 拒绝' },
           { label: 'TXT 记录被拒绝 (v2.252)', text: 'DNS 提供商拒绝 TXT 记录时，挑战不会提交到上游：订单、其授权和挑战都会变为 invalid，其其他挑战均不提交，提供商的消息会被记录并保存在订单上。无效或已停用订单的 TXT 记录会被移除' },
+          { label: '挑战提交失败 (v2.252)', text: '当上游 CA 拒绝挑战响应（nonce 被拒超过三次、速率限制），或返回 5xx 或无响应且授权未显示挑战已被接收时，订单会连同上游错误变为 invalid，即使 CA 之后完成验证也保持 invalid。其 TXT 记录会被删除（若 CA 可能仍在读取则延迟两分钟，若重启打断了该延迟则在 15 分钟一次的订单清理中删除）；客户端对相同名称的下一个订单会重新验证，若 CA 已验证过这些名称则立即就绪' },
+          { label: 'CSR 检查 (v2.252)', text: '在 finalize 时，CSR 必须在其 CN 或 SAN 中恰好列出订单的标识符（RFC 8555 §7.4）：否则在任何内容到达上游 CA 之前，以 badCSR 拒绝' },
+          { label: '已停用的授权 (v2.252)', text: '客户端停用了其授权的订单保持 invalid 且不会获得证书，即使同一上游订单上另一个账户的订单已签发（RFC 8555 §7.5.2）' },
+          { label: '未知 URL (v2.252)', text: '/acme 或 /acme/proxy 下没有路由处理的 URL 或方法，会得到指向目录的 malformed 问题文档；若该 URL 支持其他方法，则返回带 Allow 的 405，例如对仅支持 POST 的资源发起 GET（RFC 8555 §6.3）' },
           { label: '挑战读取 (v2.252)', text: '代理通过其授权读取挑战，绝不对挑战使用 POST-as-GET，因为在某些 CA 上这会在 TXT 记录存在之前就启动验证。代理目录不提供密钥轮换' },
         ]
       },
@@ -580,6 +585,7 @@ acme.sh --issue \\
 - 窗口以到期前为中心 → 续期随时间错峰
 - 已吊销证书 → 过去的窗口（立即续期）
 - 对 \`/acme/renewalInfo/<certID>\` 的无认证 GET
+- ACME 代理：对于通过代理签发的证书，会转发上游 CA 的窗口及其 Retry-After；当 CA 没有或未作答时，由本地计算
 
 `
   }

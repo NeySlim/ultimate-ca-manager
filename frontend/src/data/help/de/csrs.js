@@ -11,6 +11,7 @@ export default {
           { label: 'CSR hochladen', text: 'PEM-kodierte CSR-Dateien akzeptieren oder PEM-Text einfügen' },
           { label: 'Prüfen', text: 'Betreff, SANs, Schlüsseltyp und Signatur vor dem Signieren überprüfen' },
           { label: 'Signieren', text: 'Eine CA auswählen, Zertifikatstyp festlegen, Gültigkeitsdauer einstellen und Zertifikat ausstellen' },
+          { label: 'Anfrageprüfungen', text: 'Betreff und Namen der Anfrage unterliegen den Regeln des Ausstellungsformulars: CN höchstens 64 Zeichen, C zwei Buchstaben, DNS-Namen in der Syntax von RFC 5280 (kein Leerzeichen, kein Unterstrich, kein abschließender Punkt, keine IP-Adresse, kein rein numerisches letztes Label, kein Platzhalter hinter dem ersten Label). Ein CN in DNS-Namen-Syntax ergibt einen DNS-Namen (nur ein einzelnes Label bei einem Server- oder Gerätezertifikat, keiner bei S/MIME); andernfalls entsteht keiner, mit einem Hinweis, wenn ein Server-CN wie ein Host aussieht. Eine Sub-CA erhält keinen, und eine gültige emailAddress im Betreff wird in die SAN übernommen. Jede Ablehnung nennt ihren Grund' },
           { label: 'Namen hinzufügen', text: 'Beim Signieren E-Mail-, DNS-, IP- oder URI-Namen zu denen der Anfrage hinzufügen, zum Beispiel die E-Mail-Adresse eines S/MIME-Zertifikats, das von einer Smartcard angefordert wurde. Sie durchlaufen die Namenseinschränkungen der CA, die Ausstellungsrichtlinien und die Genehmigung wie alle anderen' },
           { label: 'Erneut signieren', text: 'Im Verlauf eine signierte Anfrage zurück nach Ausstehend setzen, um sie mit anderen EKUs, Namen oder einer anderen Gültigkeit noch einmal zu signieren, ohne einen neuen Schlüssel zu erzeugen' },
           { label: 'Herunterladen',text: 'Den Original-CSR im PEM-Format herunterladen' },
@@ -103,6 +104,14 @@ Im Microsoft-CA-Modus wird statt des Zertifikatstyps das AD-CS-Template gewählt
 Das resultierende Zertifikat erscheint auf der Zertifikatsseite.
 
 > 💡 Eine auf einer Smartcard erzeugte Anfrage enthält oft nur einen CN. Wählen Sie für ein S/MIME-Zertifikat den Typ E-Mail und fügen Sie die Adresse hinzu: Sie wird zum Subject Alternative Name des Zertifikats. Hinzugefügte Namen durchlaufen die Namenseinschränkungen der CA, die Ausstellungsrichtlinien und die Genehmigung wie alle anderen, und der Genehmiger sieht sie.
+
+Was eine Anfrage enthalten darf, wird wie im Ausstellungsformular geprüft, und jede Ablehnung nennt ihren Grund:
+- **Betreff**: CN, O und OU höchstens 64 Zeichen, L und ST 128, C ein zweibuchstabiger Ländercode als PrintableString (RFC 5280 Anhang A)
+- **DNS-Namen**: Buchstaben, Ziffern und Bindestriche in durch Punkte getrennten Labels (kein Unterstrich), ein Platzhalter nur als gesamtes erstes Label, kein abschließender Punkt, ein letztes Label nicht ausschließlich aus Ziffern, nie eine IP-Adresse. Ein im Formular eingegebener internationalisierter Name wird als sein A-Label (\`xn--\`) ausgestellt
+- **Namen aus dem CN**: Eine Anfrage ohne SAN erhält einen DNS-Namen aus ihrem CN nur, wenn der CN in DNS-Namen-Syntax vorliegt (nie \`John Doe\`); ein einzelnes Label wie \`intranet\` zählt nur für ein Server- oder Gerätezertifikat, nicht für Client, E-Mail oder Code-Signierung, und ein E-Mail-Zertifikat (S/MIME) erhält keinen, auch nicht aus einem CN mit Punkt wie \`john.doe\`; ein hostähnlicher Server-CN, der keinen ergibt, wird in einem Hinweis genannt, und eine Sub-CA erhält keinen
+- **E-Mail im Betreff**: Eine gültige emailAddress wird für jeden Zertifikatstyp zusätzlich als E-Mail-Name in die SAN übernommen
+- **Key Usage**: Eine Anfrage ohne Key Usage erhält die ihres Typs, wie im Ausstellungsformular (Client, Code-Signierung und E-Mail eingeschlossen)
+- Eine übergeordnete CA mit pathLen 0 oder ein Name außerhalb der Namenseinschränkungen der CA wird mit diesem Grund abgelehnt; der CN mit Punkt eines E-Mail-Zertifikats wird nur dann als DNS-Name geprüft, wenn das Zertifikat auch Server Auth trägt
 
 ### Microsoft CA-Signierung
 

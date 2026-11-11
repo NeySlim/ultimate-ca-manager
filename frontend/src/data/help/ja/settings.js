@@ -155,9 +155,11 @@ export default {
           { label: 'セットアップチェックリスト', text: '手動登録と無人登録の両方について、構成済みの項目と未構成の項目をリアルタイムのチェックリストで表示します' },
           { label: 'AD 由来のサブジェクト', text: 'テンプレートは、無人登録のために Active Directory (AD コネクタ経由) からサブジェクト/SAN を導出するよう選択できます' },
           { label: 'ML-DSA テンプレート (v2.248)', text: '鍵アルゴリズム OID と Microsoft Software Key Storage Provider で通知されます。実際の Windows クライアントではまだ未検証で、FIPS モードでは非表示になります。証明書による更新には ML-DSA 証明書を使えません（XML-DSig に ML-DSA 署名がないため）：新しい証明書を登録してください' },
-          { label: 'ECDSA テンプレート (v2.251)', text: 'ポリシースキーマ 3 で、曲線（ECDSA_P256、ECDSA_P384、ECDSA_P521）を署名鍵およびリクエストハッシュとして通知します。ハッシュは、テンプレートのダイジェストと曲線に対応するダイジェストのうち強い方です。FIPS モード外の RSA テンプレートはスキーマ 2 のままです' },
+          { label: 'ECDSA テンプレート (v2.251)', text: 'ポリシースキーマ 3 で、曲線（ECDSA_P256、ECDSA_P384、ECDSA_P521）を署名鍵およびリクエストハッシュとして通知します。ハッシュは、テンプレートのダイジェストと曲線に対応するダイジェストのうち強い方です。FIPS モード外の RSA テンプレートはスキーマ 2 のままです。このスキーマでは Windows が CMC リクエストを SHA-1 で署名し、UCM はこれを受け付けます（単独の SHA-1 PKCS#10 は引き続き拒否されます）' },
+          { label: 'リクエストで指定されたテンプレート (v2.252)', text: '各ポリシーはテンプレート拡張（szOID_CERTIFICATE_TEMPLATE）を通知し、Windows はこれをリクエストにコピーします。そのため、EKU が同じ別のテンプレートがあっても、クライアントで選択したテンプレートで証明書が発行されます。テンプレートを指定しないリクエストは EKU で照合されます。OCSP Signing のように、すべての EKU が登録者に発行されることのないテンプレートは通知されず、そのリクエストは拒否されます' },
           { label: 'テンプレートと鍵 (v2.251)', text: 'リクエストの鍵は、発行先のテンプレートに適合している必要があります。同じ曲線または ML-DSA セット、もしくは同等以上の長さの RSA 鍵です。そのため、EKU を共有する P-256 テンプレートで P-384 のリクエストが発行されることはなくなりました。Windows が ECDSA 鍵で署名するリクエストエンベロープも受け付けます' },
-          { label: 'Windows からの更新 (v2.248)', text: 'certreq ... Renew は、更新対象の証明書を TLS クライアント証明書として認証します。mTLS を有効にし、WSTEP の CA またはその上位 CA を信頼する必要があります。更新では、更新対象の証明書のテンプレートと EKU が維持されます' },
+          { label: 'Windows からの更新 (v2.248)', text: 'certreq ... Renew は、更新対象の証明書を TLS クライアント証明書として認証します。mTLS を有効にし、WSTEP の CA またはその上位 CA を信頼する必要があります。更新では、更新対象の証明書のテンプレートと EKU が維持され、CSR に SubjectAltName がない場合はその SAN も維持されます (v2.252)' },
+          { label: '証明書の種類', text: 'Server Auth がない場合、Email Protection または EFS のテンプレートは S/MIME 証明書を、Client Auth または Smartcard Logon のテンプレートはクライアント証明書を発行します。SAN のないユーザーリクエスト CN=jdoe では、CN から DNS 名は付与されません。Key Usage のないリクエストには、テンプレートに設定された Key Usage、なければテンプレート種別の Key Usage が付与されます。S/MIME と EFS は Digital Signature、Key Encipherment、Non Repudiation、Smartcard Logon は Digital Signature と Key Encipherment、Client Auth は Digital Signature のみです。それ以外のテンプレート、またはテンプレートなしの場合は、サーバー証明書を発行します' },
           { label: 'Docker での Kerberos (v2.251)', text: 'Docker イメージには pyspnego の Kerberos バックエンドが含まれるため、DEB や RPM のインストールと同様に、コンテナーでも Kerberos バインディングが動作します' },
         ]
       },
