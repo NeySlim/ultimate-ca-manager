@@ -3997,6 +3997,7 @@
     "revokedWithRelated": "証明書を失効させました（リンクされた証明書 #{{id}} も失効）",
     "relatedNotRevoked": "リンクされた証明書は失効しませんでした：この証明書をペアとして指していないか、すでに失効済みです。",
     "relatedRevokeFailed": "証明書を失効させましたが、リンクされた証明書 #{{id}} を失効できませんでした：個別に失効させてください。",
+    "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
     "revokeRelatedBulk": "リンクされた証明書も失効させる",
     "revokeRelatedBulkHint": "選択したハイブリッドペアのメンバーは、もう一方も一緒に失効します。チェックを外すと、他のメンバーは有効なまま残ります。",
     "bulkRelatedRevoked": "選択した証明書と共に、リンクされた証明書 {{count}} 件を失効させました",

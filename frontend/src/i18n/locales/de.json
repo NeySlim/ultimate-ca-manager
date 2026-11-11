@@ -3994,6 +3994,7 @@
     "revokedWithRelated": "Zertifikat widerrufen, zusammen mit seinem verknüpften Zertifikat #{{id}}",
     "relatedNotRevoked": "Das verknüpfte Zertifikat wurde nicht widerrufen: Es nennt dieses Zertifikat nicht als sein Paar oder wurde bereits widerrufen.",
     "relatedRevokeFailed": "Zertifikat widerrufen, aber das verknüpfte Zertifikat #{{id}} konnte nicht widerrufen werden: Widerrufen Sie es separat.",
+    "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
     "revokeRelatedBulk": "Auch die verknüpften Zertifikate widerrufen",
     "revokeRelatedBulkHint": "Ausgewählte Mitglieder eines hybriden Paars ziehen das andere Mitglied mit. Deaktivieren, damit die anderen Mitglieder gültig bleiben.",
     "bulkRelatedRevoked": "{{count}} verknüpfte Zertifikate zusammen mit der Auswahl widerrufen",

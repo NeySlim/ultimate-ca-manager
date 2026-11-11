@@ -2107,6 +2107,7 @@
     "revokedWithRelated": "Certificat révoqué, avec son certificat lié n°{{id}}",
     "relatedNotRevoked": "Le certificat lié n'a pas été révoqué : il ne désigne pas ce certificat comme son pair, ou il était déjà révoqué.",
     "relatedRevokeFailed": "Certificat révoqué, mais son certificat lié n°{{id}} n'a pas pu être révoqué : révoquez-le séparément.",
+    "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
     "revokeRelatedBulk": "Révoquer aussi les certificats liés",
     "revokeRelatedBulkHint": "Les membres sélectionnés d'une paire hybride entraînent l'autre membre. Décochez pour conserver valides les autres membres.",
     "bulkRelatedRevoked": "{{count}} certificats liés révoqués avec la sélection",

@@ -3997,6 +3997,7 @@
     "revokedWithRelated": "Certificate revoked, with its linked certificate #{{id}}",
     "relatedNotRevoked": "The linked certificate was not revoked: it does not name this certificate as its pair, or it was already revoked.",
     "relatedRevokeFailed": "Certificate revoked, but its linked certificate #{{id}} could not be revoked: revoke it separately.",
+    "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
     "revokeRelatedBulk": "Also revoke the linked certificates",
     "revokeRelatedBulkHint": "Selected members of a hybrid pair take the other member with them. Untick to keep the other members valid.",
     "bulkRelatedRevoked": "{{count}} linked certificates revoked with the selection",

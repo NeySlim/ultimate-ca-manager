@@ -20,6 +20,7 @@ import { ExportModal } from '../components/ExportModal'
 import { RevokeCertificateModal } from '../components/RevokeCertificateModal'
 import { SmartImportModal } from '../components/SmartImport'
 import { showNotices } from '../lib/notices'
+import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { certificatesService, casService, truststoreService } from '../services'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
@@ -336,7 +337,9 @@ export default function CertificatesPage() {
       }
       const alsoDelete = deleteAfterRevoke ? revokingCert.id : null
       const relatedRevoked = res?.data?.related_revoked
-      showSuccess(relatedRevoked != null
+      const localOnly = localOnlyRevocationWarning(res, t)
+      if (localOnly) showWarning(localOnly)
+      else showSuccess(relatedRevoked != null
         ? t('revocation.revokedWithRelated', { id: relatedRevoked })
         : t('messages.success.other.revoked'))
       if (res?.data?.related_not_revoked != null) {

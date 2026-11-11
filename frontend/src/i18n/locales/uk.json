@@ -4050,6 +4050,7 @@
     "revokeRelatedBulk": "Також відкликати пов'язані сертифікати",
     "revokeRelatedBulkHint": "Вибрані учасники гібридної пари забирають із собою другого учасника. Зніміть позначку, щоб інші учасники залишилися чинними.",
     "relatedRevokeFailed": "Сертифікат відкликано, але пов'язаний сертифікат #{{id}} відкликати не вдалося: відкличте його окремо.",
+    "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
     "bulkRelatedRevoked": "Разом із вибраними відкликано пов'язаних сертифікатів: {{count}}",
     "bulkRelatedRevokeFailed": "Разом із вибраними не вдалося відкликати пов'язані сертифікати: {{count}} ({{ids}}): відкличте їх окремо"
   },

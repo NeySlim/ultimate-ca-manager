@@ -28,6 +28,7 @@ import { ENTITY_RESOURCE, entityService, entityTitle } from '../lib/entityDetail
 import { isOnHold, downloadBlob } from '../lib/utils'
 import { holdsNoKey } from '../lib/caSelection'
 import { canExportPrivateKey } from '../lib/exportPermissions'
+import { localOnlyRevocationWarning } from '../lib/revocationOutcome'
 import { downloadExport } from '../lib/exportDownload'
 import { askRenewal } from '../lib/renewalPrompt'
 import { renameCertificate } from '../lib/certificateRename'
@@ -134,7 +135,9 @@ export function useEntityActions({ type, entity, entityId, onChanged, onClose, o
         const relatedRevoked = res?.data?.related_revoked
         if (res?.data?.approval_required) queued = t('certificates.revocationApprovalRequired', { policy: res.data.policy_name })
         else {
-          showSuccess(relatedRevoked != null
+          const localOnly = localOnlyRevocationWarning(res, t)
+          if (localOnly) showWarning(localOnly)
+          else showSuccess(relatedRevoked != null
             ? t('revocation.revokedWithRelated', { id: relatedRevoked })
             : t('messages.success.other.revoked'))
           if (res?.data?.related_not_revoked != null) {

@@ -174,6 +174,15 @@ describe('what a surface does after an action', () => {
     expect(onChanged).toHaveBeenCalledWith(expect.objectContaining({ id: 9, revoked: true }))
   })
 
+  it('warns with the server message when the issuing CA was not told of the revocation', async () => {
+    const message = 'Certificate revoked in UCM only: the ACME CA was not notified'
+    svc.certs.revoke.mockResolvedValue({ data: { ...CERT, revoked: true }, message, meta: { acme_local_only: true } })
+    svc.certs.getById.mockResolvedValue({ data: { ...CERT, revoked: true } })
+    await confirmRevoke('certificate', CERT)
+    expect(notify.showWarning).toHaveBeenCalledWith(message)
+    expect(notify.showSuccess).not.toHaveBeenCalledWith('messages.success.other.revoked')
+  })
+
   it('closes the detail window after revoking a CA, as it always did', async () => {
     svc.cas.revoke.mockResolvedValue({ data: caRevoked })
     const { onClose } = await confirmRevoke('ca', CA)

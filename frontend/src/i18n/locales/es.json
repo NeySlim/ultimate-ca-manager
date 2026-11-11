@@ -3994,6 +3994,7 @@
     "revokedWithRelated": "Certificado revocado, junto con su certificado vinculado n.º {{id}}",
     "relatedNotRevoked": "El certificado vinculado no se revocó: no nombra a este certificado como su pareja, o ya estaba revocado.",
     "relatedRevokeFailed": "Certificado revocado, pero no se pudo revocar su certificado vinculado n.º {{id}}: revóquelo por separado.",
+    "revokedLocallyOnly": "Certificate revoked in UCM only: the issuing CA was not notified.",
     "revokeRelatedBulk": "Revocar también los certificados vinculados",
     "revokeRelatedBulkHint": "Los miembros seleccionados de un par híbrido arrastran al otro miembro. Desmarque para mantener válidos los demás miembros.",
     "bulkRelatedRevoked": "{{count}} certificados vinculados revocados con la selección",
