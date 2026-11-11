@@ -1185,8 +1185,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             template_id=getattr(matched_template, 'id', None),
             cert_type=cert_type, template_key_usage=template_ku, on_stored=on_stored,
         )
-    except PolicyViolation as e:
-        logger.warning('WSTEP issue refused by policy: %s', e)
+    except PolicyViolation as e:  # the route logs the refusal it answers
         return None, f'Policy violation: {e}'
     except RequestRejected as e:
         logger.warning('WSTEP issue refused: %s', e)
@@ -1410,8 +1409,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
         )
     except AlreadySuperseded:
         return None, 'Signing certificate has been superseded by a newer one'
-    except PolicyViolation as e:
-        logger.warning('WSTEP renew refused by policy: %s', e)
+    except PolicyViolation as e:  # the route logs the refusal it answers
         return None, f'Policy violation: {e}'
     except RequestRejected as e:
         logger.warning('WSTEP renew refused: %s', e)

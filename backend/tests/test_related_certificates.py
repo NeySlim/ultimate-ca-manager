@@ -597,11 +597,11 @@ def test_a_failed_signature_does_not_use_the_request(app, cert_a, monkeypatch):
         assert len(_bindings(request, cert)) == 1
 
 
-def _a_refusal_is_one_warning(caplog, text):
-    """An expected refusal: one WARNING naming it, no ERROR and no trace."""
+def _a_refusal_is_not_an_error(caplog, text):
+    """An expected refusal: no ERROR and no trace; the route that answers it reports it."""
     lines = [(r.levelname, r.exc_info) for r in caplog.records
-             if r.levelname in ('WARNING', 'ERROR') and text in r.getMessage()]
-    assert lines == [('WARNING', None)], caplog.text
+             if r.levelno >= 30 and text in r.getMessage()]
+    assert lines == [], caplog.text
 
 
 def test_two_concurrent_keys_meet_the_unique_binding(app, cert_a, monkeypatch, caplog):
@@ -630,7 +630,7 @@ def test_two_concurrent_keys_meet_the_unique_binding(app, cert_a, monkeypatch, c
         with caplog.at_level('INFO'), \
                 pytest.raises(RelatedCertificateRefused, match='already used with another key'):
             _est_sign(ca, _csr_with(cert, ec.generate_private_key(ec.SECP256R1()), request))
-        _a_refusal_is_one_warning(caplog, 'already used with another key')
+        _a_refusal_is_not_an_error(caplog, 'already used with another key')
         assert len(calls) == 2
         assert Certificate.query.count() == before
         assert db.session.get(Certificate, row_id).related_certificate_id == link
@@ -783,7 +783,7 @@ def test_no_link_is_written_onto_an_a_renewed_after_signing(app, auth_client, ce
             with app.app_context(), caplog.at_level('INFO'):
                 with pytest.raises(RelatedCertificateRefused, match='not held by this instance'):
                     _est_sign(_signing_ca(row_id)[0], x509.load_pem_x509_csr(_csr_b(cert, key)))
-            _a_refusal_is_one_warning(caplog, 'not held by this instance')
+            _a_refusal_is_not_an_error(caplog, 'not held by this instance')
         else:
             with app.app_context():
                 ca_id = _signing_ca(row_id)[0].id
