@@ -594,8 +594,8 @@ def bulk_delete_users():
         certificate_ids, revoked, refusal = _revoke_enrolled_certificates(
             user_id, g.current_user, upstream)
         acme_meta, _note = _acme_untold(upstream)
-        for key, ids in (acme_meta or {}).items():
-            results.setdefault(key, []).extend(ids)
+        for key, certificate_ids_of_key in (acme_meta or {}).items():
+            results.setdefault(key, []).extend(certificate_ids_of_key)
         if refusal is not None:
             results['failed'].append({'id': user_id, 'error': refusal[0]})
             continue
