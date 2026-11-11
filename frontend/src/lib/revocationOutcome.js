@@ -6,7 +6,7 @@ const isHoldReason = (reason) => HOLD_REASONS.has(reason)
 // the server says so in `meta`, and its message is the warning to show.
 export function localOnlyRevocationWarning(res, t) {
   const meta = res?.meta || {}
-  if (!meta.acme_local_only && !meta.msca_local_only) return null
+  if (!meta.acme_local_only && !meta.related_acme_local_only && !meta.msca_local_only) return null
   return res?.message || t('revocation.revokedLocallyOnly')
 }
 

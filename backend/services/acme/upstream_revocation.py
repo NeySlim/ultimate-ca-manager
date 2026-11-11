@@ -183,11 +183,13 @@ def with_related_answer(answer, related_acme) -> dict:
     if not untold:
         return answer
     partner_id, outcome, detail = untold[0]
-    meta = dict(answer.get('meta') or {}, acme_local_only=True, related_acme_local_only=partner_id)
+    meta = dict(answer.get('meta') or {}, related_acme_local_only=partner_id)
     if outcome == OWED:
         meta['related_acme_upstream_pending'] = True
     note = local_only_message(outcome, detail)
-    return {'message': f"{answer['message']} Related certificate #{partner_id}: {note}", 'meta': meta}
+    message = answer['message'].rstrip()
+    sep = ' ' if message.endswith('.') else '. '
+    return {'message': f"{message}{sep}Related certificate #{partner_id}: {note}", 'meta': meta}
 
 
 def revocation_answer(outcome, detail, message=REVOKED_MESSAGE) -> dict:

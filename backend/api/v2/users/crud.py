@@ -52,6 +52,12 @@ def _revoked_note(revoked):
     return f'. Already revoked for this deletion: certificate(s) {_numbers(revoked)}' if revoked else ''
 
 
+def _sentence(message):
+    """``message`` ended by a full stop, so that a note can follow it."""
+    message = str(message).rstrip()
+    return message if message.endswith(('.', '!', '?')) else f'{message}.'
+
+
 def _acme_untold(upstream):
     """``(meta, note)`` for the certificates of ``upstream`` (``(id, outcome, detail)``)
     whose ACME CA did not confirm the revocation, or ``(None, '')``."""
@@ -516,7 +522,8 @@ def delete_user(user_id):
     acme_meta, acme_note = _acme_untold(upstream)
     if refusal is not None:
         message, status = refusal
-        return error_response(f'User not deleted: {message}{acme_note}', status, meta=acme_meta)
+        text = _sentence(message) if acme_note else message
+        return error_response(f'User not deleted: {text}{acme_note}', status, meta=acme_meta)
     try:
         sessions_deleted = _purge_user_dependencies(user_id)
         db.session.delete(user)

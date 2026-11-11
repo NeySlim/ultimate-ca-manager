@@ -21,7 +21,7 @@ vi.mock('react-i18next', () => ({
 // 1 and 2 form a pair, 3 stands alone, 4 names 1 one way, 5 names the revoked 6,
 // 7 names 8, which is not listed and is read on demand
 const mocks = vi.hoisted(() => ({
-  bulkRevoke: vi.fn(), bulkRenew: vi.fn(), showWarning: vi.fn(), showInfo: vi.fn(), getById: vi.fn(),
+  bulkRevoke: vi.fn(), bulkRenew: vi.fn(), bulkDeleteUsers: vi.fn(), showWarning: vi.fn(), showInfo: vi.fn(), getById: vi.fn(),
   selection: [1],
   certs: [
     { id: 1, cn: 'pair.example.com', related_certificate_id: 2 },
@@ -69,7 +69,7 @@ vi.mock('../../services', () => ({
   },
   csrsService: { getAll: vi.fn().mockResolvedValue({ data: [], meta: { total: 0 } }), bulkSign: vi.fn() },
   templatesService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
-  usersService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
+  usersService: { getAll: vi.fn().mockResolvedValue({ data: [] }), bulkDelete: (...args) => mocks.bulkDeleteUsers(...args) },
 }))
 
 vi.mock('../../components/SmartImport', () => ({ SmartImportWidget: () => null }))
@@ -226,6 +226,15 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
     confirm(dialog)
     await waitFor(() => expect(mocks.bulkRevoke).toHaveBeenCalled())
     expect(mocks.showWarning).not.toHaveBeenCalledWith(expect.stringMatching(/LocallyOnly/))
+  })
+
+  it('warns of the users\' certificates whose ACME CA was not told when they are deleted', async () => {
+    localStorage.setItem('ucm-ops-resource-type', 'users')
+    mocks.bulkDeleteUsers.mockResolvedValue({ data: { success: [1], failed: [], acme_local_only: [3, 9] } })
+    const dialog = await openBulk('common.delete')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'common.delete' }))
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith(
+      'revocation.bulkRevokedLocallyOnly:2:#3, #9'))
   })
 
   it('reports the other members renewed outside the selection', async () => {

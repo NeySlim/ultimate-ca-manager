@@ -401,7 +401,7 @@ class TestTheRelatedMemberOfAPair:
             body = json.loads(answer.data)
             if route == 'single':
                 assert body['data']['related_revoked'] == bench.cert_id
-                assert body['meta']['acme_local_only'] is True
+                assert 'acme_local_only' not in body['meta']
                 assert body['meta']['related_acme_local_only'] == bench.cert_id
                 assert f'#{bench.cert_id}' in body['message']
                 assert 'sent again automatically' in body['message']
