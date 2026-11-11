@@ -34,6 +34,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Certificates: removing a hold also lifts the hold on the other member of a related pair (unless `unhold_related` is `false`) and reports it as `related_unheld`; a request body that is not a JSON object is refused with 400, and a pair on one CA gets a single delta CRL.
+- Import: an imported CA now announces `ca.created` and `ca.updated`, and a submitted CSR carries the acting user in `csr.submitted`.
 - Certificates: lifting a hold now emits a `certificate.unheld` event (webhooks, WebSocket) and lifts the hold of the related-certificate partner with it, as a revocation takes it.
 - Events: uploaded and imported CSRs emit `csr.submitted`, a CA signed from a CSR emits `ca.created`, an OCSP responder or EST key generator renewal emits its issued or renewed event, and approving a pending Microsoft CA request announces the certificate it imports.
 - Notification bell: a failed restore shows again, as a failed backup does.
