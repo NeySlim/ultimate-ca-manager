@@ -305,8 +305,11 @@ class TestRevalidation:
         second = make_user(role_perms=PRIVILEGED)
         client = _session_client(app, first)
         with _socket(app, client) as ws:
-            with client.session_transaction() as sess:
-                sess['user_id'] = second
+            # A session fully valid for the other account: only the identity check can cut
+            with client.session_transaction() as sess, app.app_context():
+                other = db.session.get(User, second)
+                sess.update(user_id=second, username=other.username,
+                            **{ACCOUNT_KEY: account_proof(other)})
             ws.emit('ping')
             assert not ws.is_connected()
 
