@@ -969,11 +969,12 @@ def check_request_status(msca_id, request_id):
                 msca = db.session.get(MicrosoftCA, msca_id)
                 if csr and msca:
                     # A new serial on a row that already held a certificate is a renewal
-                    old_serial = str(csr.serial_number) if csr.crt else None
+                    from services.import_service import stored_certificate_serial
+                    old_serial = stored_certificate_serial(csr)
                     try:
                         _import_signed_cert(csr, req.cert_pem, msca, req.template, request_id)
                         result = req.to_dict()
-                        if old_serial and str(csr.serial_number) != old_serial:
+                        if old_serial is not None and stored_certificate_serial(csr) != old_serial:
                             from services.webhook_service import emit_cert_renewed
                             user = getattr(g, 'current_user', None)
                             emit_cert_renewed(csr.to_dict(), ca_refid=csr.caref,

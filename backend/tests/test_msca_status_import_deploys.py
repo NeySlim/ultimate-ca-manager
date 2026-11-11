@@ -66,3 +66,20 @@ def test_first_issuance_of_a_csr_stays_silent(app, auth_client, create_ca):
         r = _poll(app, auth_client, new, _pending(app, cert_id))
     assert r.status_code == 200, r.data
     emitted.assert_not_called()
+
+
+def test_row_without_readable_certificate_is_a_first_issuance(app, auth_client, create_ca):
+    ca_cert, ca_key, key, cert_id = _setup(app, auth_client, create_ca, 'r7-unreadable.example.com',
+                                           bound=False)
+    with app.app_context():
+        from models import db, Certificate
+        from sqlalchemy import update
+        # Unreadable certificate and no serial column, as an interrupted import leaves it
+        db.session.execute(update(Certificate).where(Certificate.id == cert_id)
+                           .values(crt='bm90IGEgY2VydGlmaWNhdGU=', serial_number=None))
+        db.session.commit()
+    new = _cert('r7-unreadable.example.com', key, issuer_cert=ca_cert, signer=ca_key)
+    with patch('services.webhook_service.emit_cert_renewed') as emitted:
+        r = _poll(app, auth_client, new, _pending(app, cert_id))
+    assert r.status_code == 200, r.data
+    emitted.assert_not_called()
