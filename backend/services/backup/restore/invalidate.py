@@ -360,6 +360,7 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
          'caches_failed': [str],        # caches that refused to drop
          'crls_regenerated': [str],     # CAs whose CRL was signed again
          'crls_failed': [str],          # CAs that could not sign one (HSM absent...)
+         'crls_not_regenerated': bool,  # the regeneration itself failed, no CA was tried
          'restart_requested': bool}     # the mechanism accepted the request
     """
     revoked = _revoke_database_sessions()
@@ -385,12 +386,14 @@ def invalidate_after_restore(*, request_restart: bool = False) -> Dict[str, Any]
         else:
             summary['caches_cleared'].append(name)
 
+    summary['crls_not_regenerated'] = False
     try:
         summary['crls_regenerated'], summary['crls_failed'] = _regenerate_crls()
     except Exception as exc:
         db.session.rollback()
         logger.warning("Restore: the CRLs were not regenerated: %s", exc)
         summary['crls_regenerated'], summary['crls_failed'] = [], []
+        summary['crls_not_regenerated'] = True  # no CA was tried: the operator is told so
 
     if request_restart:
         summary['restart_requested'] = _request_restart()

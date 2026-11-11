@@ -127,7 +127,11 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
         message += _clause('Rows the archive does not carry lost their link to a removed row: '
                            + _listing([f'{name} ({count})' for name, count in sorted(unlinked.items())]))
 
-    unsigned = ((results or {}).get('invalidated') or {}).get('crls_failed') or []
+    invalidated = (results or {}).get('invalidated') or {}
+    if invalidated.get('crls_not_regenerated'):
+        message += _clause('The CRLs were not regenerated after the restore: '
+                           'the ones served may list the revocations of the replaced instance')
+    unsigned = invalidated.get('crls_failed') or []
     if unsigned:
         message += _clause('No new CRL could be signed after the restore for: ' + _listing(unsigned))
 

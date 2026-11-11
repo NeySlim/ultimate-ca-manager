@@ -138,6 +138,27 @@ def test_the_restore_message_names_the_authorities_left_without_a_crl():
     assert 'Issuing HSM CA' in message and 'CRL' in message
 
 
+def test_a_regeneration_that_fails_as_a_whole_is_reported(app, monkeypatch):
+    import services.backup.restore.invalidate as invalidate
+
+    def unreachable():
+        raise RuntimeError('database unreachable')
+    monkeypatch.setattr(invalidate, '_regenerate_crls', unreachable)
+    with app.app_context():
+        result = invalidate_after_restore()
+    assert result['crls_regenerated'] == [] and result['crls_failed'] == []
+    assert result['crls_not_regenerated'] is True
+    message = with_restore_warnings('Backup restored successfully.', {'invalidated': result})
+    assert 'CRLs were not regenerated' in message, message
+
+
+def test_a_clean_regeneration_adds_no_warning(app):
+    with app.app_context():
+        result = invalidate_after_restore()
+    assert result['crls_not_regenerated'] is False
+    assert with_restore_warnings('Done.', {'invalidated': {**result, 'crls_failed': []}}) == 'Done.'
+
+
 @pytest.mark.parametrize('route', ('/api/v2/system/restore', '/api/v2/settings/backup/restore'))
 def test_both_restore_routes_name_an_authority_left_without_a_crl(app, auth_client, monkeypatch,
                                                                     route):
