@@ -64,11 +64,16 @@ def _revoke_enrolled_certificates(user_id, actor):
     from models import AuthCertificate
     from services.mtls_enrollment import removal_check, revoke_checked
     enrolments = AuthCertificate.query.filter_by(user_id=user_id).order_by(AuthCertificate.id).all()
-    planned = []
+    planned, seen = [], set()
     for enrolment in enrolments:
         certificate_id, needs_revoking, refusal = removal_check(enrolment, actor)
         if refusal is not None:
             return None, None, refusal
+        # Two enrolments of one certificate: revoked and deleted once
+        if certificate_id is not None:
+            if certificate_id in seen:
+                continue
+            seen.add(certificate_id)
         planned.append((enrolment, certificate_id, needs_revoking))
     certificate_ids, revoked = [], []
     for enrolment, certificate_id, needs_revoking in planned:
