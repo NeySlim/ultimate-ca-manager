@@ -277,6 +277,16 @@ CACHE_PURGES: Tuple[Tuple[str, Callable[[], None]], ...] = (
 )
 
 
+def _signing_key_matches(ca) -> bool:
+    """Whether the key the CRL would be signed with is the CA certificate's key."""
+    import base64
+    from cryptography import x509
+    from services.hsm.ca_key_loader import get_ca_signing_key
+    from utils.cert_issuer import private_key_matches
+    cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+    return private_key_matches(get_ca_signing_key(ca, allow_revoked=True), cert)
+
+
 def _regenerate_crls() -> Tuple[list, list]:
     """A fresh CRL (and delta) for each publishing authority that can sign: the one served
     may list the revocations of the replaced instance. Returns (regenerated, failed) names."""
@@ -288,6 +298,8 @@ def _regenerate_crls() -> Tuple[list, list]:
             continue  # signed elsewhere or not yet issued: the CDP keeps what it has
         name = ca.descr
         try:
+            if not _signing_key_matches(ca):
+                raise ValueError("its key is not the key of its certificate")
             CRLService.generate_crl(ca.id, username='system')
         except Exception as exc:
             db.session.rollback()

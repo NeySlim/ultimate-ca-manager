@@ -69,6 +69,24 @@ def test_an_authority_that_cannot_sign_is_reported_and_the_others_still_get_thei
         assert _latest(good_id) is not None
 
 
+def test_an_authority_whose_key_is_not_its_certificate_s_signs_no_crl(app, create_ca):
+    """A CRL nobody can verify is never published: the authority is reported instead."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from utils.key_codec import store_pem_bytes
+    ca_id, name = _publishing(app, create_ca, 'Restore CRL Mismatched')
+    stranger = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption())
+    with app.app_context():
+        db.session.get(CA, ca_id).prv = store_pem_bytes(stranger)
+        db.session.commit()
+        before = _latest(ca_id)
+        result = invalidate_after_restore()
+        assert name in result['crls_failed'] and name not in result['crls_regenerated'], result
+        assert _latest(ca_id) == before
+
+
 def test_an_authority_without_a_distribution_point_is_left_alone(app, create_ca):
     ca = create_ca(cn='Restore CRL No CDP')
     with app.app_context():
