@@ -199,6 +199,19 @@ def test_a_body_that_is_not_an_object_is_refused(app, auth_client, create_ca, cr
     assert r.status_code == 400, r.data
 
 
+def test_a_null_body_is_refused_like_any_other_non_object(app, auth_client, create_ca, create_cert):
+    ca = create_ca(cn='Unhold Null CA')
+    cert = create_cert(cn='unhold-null.example.test', ca_id=ca['id'])
+    base = f"/api/v2/certificates/{cert['id']}"
+    r = auth_client.post(f'{base}/revoke', data='null', content_type='application/json')
+    assert r.status_code == 400, r.data
+    assert _state(app, cert['id'])[0] is False
+    assert _post(auth_client, f'{base}/revoke', {'reason': 'certificateHold'}).status_code == 200
+    r = auth_client.post(f'{base}/unhold', data='null', content_type='application/json')
+    assert r.status_code == 400, r.data
+    assert _state(app, cert['id']) == (True, 'certificateHold')
+
+
 @pytest.mark.parametrize('data,content_type', [
     ('{"unhold_related": false', 'application/json'),
     ('unhold_related=false', 'application/x-www-form-urlencoded'),
