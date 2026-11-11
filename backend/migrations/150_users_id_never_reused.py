@@ -185,11 +185,10 @@ def _upgrade_pg(conn):
 
     seed = _highest_named(lambda q: conn.execute(text(q)).scalar(),
                           lambda q: conn.execute(text(q)).fetchall(), has_column)
-    if seed > 0:
-        conn.execute(text(
-            "SELECT setval(CAST(:s AS regclass), GREATEST(:n, "
-            "(SELECT CASE WHEN is_called THEN last_value ELSE last_value - 1 END "
-            f"FROM {sequence})), true)"), {'s': sequence, 'n': seed})
+    current = conn.execute(text("SELECT pg_sequence_last_value(CAST(:s AS regclass))"),
+                           {'s': sequence}).scalar() or 0
+    if seed > current:
+        conn.execute(text("SELECT setval(CAST(:s AS regclass), :n, true)"), {'s': sequence, 'n': seed})
     logger.info("[150] users ids never reused (PostgreSQL)")
 
 
