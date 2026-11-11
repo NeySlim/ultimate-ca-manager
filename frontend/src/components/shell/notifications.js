@@ -13,8 +13,8 @@ export const BELL_KINDS = ['acme_order_failed', 'acme_client_renewal_failed', 'a
   'crl_missing', 'manual_renewal_due', 'auto_renewal_blocked', 'ca_expiring']
 // Journal events worth a notification: a revoked session, a failed backup or restore.
 // Failures are asked for on their own so successful runs cannot push them out of the page.
-const SESSION_ACTIONS = ['session_revoke', 'session_revoke_all']
-const FAILURE_ACTIONS = ['system_backup', 'system_restore']
+export const SESSION_ACTIONS = ['session_revoke', 'session_revoke_all']
+export const FAILURE_ACTIONS = ['system_backup', 'system_restore']
 const MAX_MARKS = 200
 const REFRESH_DELAY_MS = 1500
 

@@ -37,7 +37,7 @@ export default {
       {
         title: 'Benachrichtigungen',
         items: [
-          { label: 'Glocke', text: 'Die Zahl entspricht den ungelesenen Einträgen im Panel: kritische Einträge und Genehmigungen aus der Warteschlange der Übersicht sowie fehlgeschlagene geplante Sicherungen oder widerrufene Sitzungen aus dem Audit-Protokoll' },
+          { label: 'Glocke', text: 'Die Zahl entspricht den ungelesenen Einträgen im Panel: kritische Einträge und Genehmigungen aus der Warteschlange der Übersicht sowie fehlgeschlagene geplante Sicherungen, fehlgeschlagene Wiederherstellungen oder widerrufene Sitzungen aus dem Audit-Protokoll' },
           { label: 'Reihenfolge', text: 'Zuerst die Einträge der Warteschlange, dann die des Audit-Protokolls, jeweils die neuesten zuerst' },
           { label: 'Berechtigungen', text: 'Sie sehen nur Einträge aus Quellen, die Sie lesen dürfen; eine Quelle ohne Berechtigung zeigt nichts an' },
           { label: 'Gelesen', text: 'Markieren Sie einen Eintrag oder alle als gelesen; die Markierungen werden mit Ihren Einstellungen gespeichert, und ein erledigter Eintrag verlässt das Panel' },

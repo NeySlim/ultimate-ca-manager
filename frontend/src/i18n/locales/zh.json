@@ -6054,6 +6054,7 @@
         "renewal_declined": "续期被拒绝",
         "ca_expiring": "CA 即将到期",
         "system_backup": "备份失败",
+        "system_restore": "Restore failed",
         "session_revoke": "会话已吊销",
         "session_revoke_all": "多个会话已吊销"
       }

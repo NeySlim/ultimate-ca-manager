@@ -6054,6 +6054,7 @@
         "renewal_declined": "Erneuerung abgelehnt",
         "ca_expiring": "CA läuft ab",
         "system_backup": "Sicherung fehlgeschlagen",
+        "system_restore": "Restore failed",
         "session_revoke": "Sitzung widerrufen",
         "session_revoke_all": "Sitzungen widerrufen"
       }

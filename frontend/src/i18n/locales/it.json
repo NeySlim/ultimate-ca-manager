@@ -6054,6 +6054,7 @@
         "renewal_declined": "Rinnovo rifiutato",
         "ca_expiring": "CA in scadenza",
         "system_backup": "Backup non riuscito",
+        "system_restore": "Restore failed",
         "session_revoke": "Sessione revocata",
         "session_revoke_all": "Sessioni revocate"
       }

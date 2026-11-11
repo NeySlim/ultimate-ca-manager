@@ -6057,6 +6057,7 @@
         "renewal_declined": "更新の拒否",
         "ca_expiring": "CAの期限切れ間近",
         "system_backup": "バックアップの失敗",
+        "system_restore": "Restore failed",
         "session_revoke": "セッションの取り消し",
         "session_revoke_all": "複数セッションの取り消し"
       }
