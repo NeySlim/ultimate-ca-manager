@@ -285,13 +285,15 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
 
 def _renewal_members(cert):
     """``[cert]``, or both members of its related pair with A first. A partner whose key
-    the server does not hold (enrolled by a device) renews through its own protocol, never here."""
+    the server does not hold (enrolled by a device) renews through its own protocol, never
+    here; an archived one (superseded) is not renewed at all."""
     from services.cert.related_pair import anchor_first, mutual_partner
     try:
         partner = mutual_partner(cert)
     except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
         return [cert]
-    if partner is None or partner.revoked or not cert.crt or not partner.crt or not partner.prv:
+    if (partner is None or partner.revoked or partner.archived or not cert.crt
+            or not partner.crt or not partner.prv):
         return [cert]
     return list(anchor_first(cert, partner))
 

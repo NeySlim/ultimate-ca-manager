@@ -701,6 +701,27 @@ def test_a_form_pair_renews_a_alone_once_a_device_enrols_a_newer_b(app, auth_cli
         assert _links(a_id, form_id, b2_id) == [(None, None)] * 3
 
 
+@pytest.mark.parametrize('archived', ['related', 'certificate'])
+def test_an_archived_partner_is_not_renewed_with_the_live_member(app, auth_client, create_ca, archived):
+    ca = create_ca(cn=f'Archived partner CA {archived}')
+    r = auth_client.post('/api/v2/certificates', json={
+        'cn': f'archived-{archived}.example.com', 'ca_id': ca['id'], 'validity_days': 90,
+        'hybrid': {'classical': next(l for l in key_algorithms.labels('EC') if l.endswith('P256')),
+                   'pq': PQ_LABEL}})
+    assert r.status_code == 201, r.data
+    a_id, b_id = (json.loads(r.data)['data'][k]['id'] for k in ('certificate', 'related'))
+    gone, live = (b_id, a_id) if archived == 'related' else (a_id, b_id)
+    with app.app_context():
+        row = db.session.get(Certificate, gone)
+        row.archived, gone_serial = True, row.serial_number
+        db.session.commit()
+    _renew(auth_client, live, 'single')
+    with app.app_context():
+        row = db.session.get(Certificate, gone)
+        assert (db.session.get(Certificate, live).renewed_times, row.renewed_times or 0,
+                row.serial_number) == (1, 0, gone_serial)
+
+
 @pytest.mark.parametrize('path', ['est', 'sign_route'])
 def test_b_is_stored_and_linked_when_a_changes_after_signing(app, auth_client, cert_a, monkeypatch, path):
     """A is found before signing: a lookup after it could lose a signed certificate."""
