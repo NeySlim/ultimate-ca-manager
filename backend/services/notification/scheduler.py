@@ -13,8 +13,8 @@ from ._constants import CERT_EXPIRING, CRL_EXPIRING
 
 logger = logging.getLogger(__name__)
 
-# HA: one node at a time runs the expiry pass. The webhook mark is the cluster instant of
-# the last emission: the next pass announces what expired since, whichever node runs it.
+# HA: one node at a time runs the expiry pass. The webhook mark (kept on every install) is the
+# cluster instant of the last emission: the next pass announces what expired since, on any node.
 EXPIRY_LEASE_KEY = 'expiry_alerts.lease'
 EXPIRY_WEBHOOKS_MARK_KEY = 'expiry_alerts.webhooks_mark'
 EXPIRY_LEASE = timedelta(minutes=10)
@@ -41,6 +41,11 @@ def _parse_mark(value):
         return None
 
 
+def _later(last, now):
+    """The mark never moves back: a cluster clock stepping back would announce expiries again."""
+    return last if last is not None and last > now else now
+
+
 def _emit_webhooks_in_ha():
     """HA: 'expired' covers (last mark, now], 'expiring' reminders go out once per cluster
     day; a pass cut short before the mark is emitted again once the lease is over."""
@@ -55,7 +60,7 @@ def _emit_webhooks_in_ha():
         expired_after=last if last is not None else now - timedelta(days=1),
         now=now,
     )
-    config_compare_and_set(EXPIRY_WEBHOOKS_MARK_KEY, previous, now.isoformat())
+    config_compare_and_set(EXPIRY_WEBHOOKS_MARK_KEY, previous, _later(last, now).isoformat())
 
 
 def _emit_webhooks_single_node():
@@ -69,7 +74,7 @@ def _emit_webhooks_single_node():
         if row is None:
             db.session.add(SystemConfig(key=EXPIRY_WEBHOOKS_MARK_KEY, value=now.isoformat()))
         else:
-            row.value = now.isoformat()
+            row.value = _later(_parse_mark(row.value), now).isoformat()
         db.session.commit()
     except Exception:
         db.session.rollback()

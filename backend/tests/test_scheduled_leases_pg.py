@@ -417,3 +417,17 @@ def test_a_certificate_revoked_elsewhere_meanwhile_is_not_announced_again(
 
 
 from tests.test_msca_crl_sync import fake_adcs, patched_network  # noqa: E402,F401  (fixtures)
+
+
+@pytest.mark.parametrize('in_ha', [True, False])
+def test_the_webhook_mark_never_moves_back_with_the_clock(app, monkeypatch, in_ha):
+    # A cluster clock stepping back (NTP, PostgreSQL failover) would announce the same expiries again
+    _record_webhook_passes(monkeypatch)
+    monkeypatch.setattr('utils.ha.ha_enabled', lambda: in_ha)
+    later = datetime(2031, 3, 4, 12, 0)
+    monkeypatch.setattr(notification_scheduler, '_cluster_now', lambda: later - timedelta(minutes=5))
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_LEASE_KEY, None)
+        _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, later.isoformat())
+        NotificationService.run_scheduled_checks()
+        assert _value(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY) == later.isoformat()
