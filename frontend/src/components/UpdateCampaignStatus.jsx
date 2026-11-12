@@ -12,7 +12,7 @@ export function UpdateCampaignStatus({ campaign, onResume, resuming = false }) {
   if (!campaign) return null
   const done = campaign.done || []
   const families = Object.entries(campaign.families || {})
-    .map(([node, family]) => `${node}: ${family || 'unknown'}`).join(', ')
+    .map(([node, family]) => `${node}: ${family || t('common.unknown')}`).join(', ')
   const pending = (campaign.order || []).filter(
     (node) => !done.includes(node) && node !== campaign.current?.node && node !== campaign.failed?.node
   )

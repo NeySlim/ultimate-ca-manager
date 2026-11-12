@@ -84,6 +84,13 @@ describe('rolling update on the update screen', () => {
     expect(screen.getByText('n1: deb, n2: rpm-el9, n3: rpm-fedora')).toBeInTheDocument()
   })
 
+  it('names a node of no reported family in the interface language', async () => {
+    mocks.get.mockResolvedValue(checkAnswer({ ...running, families: { n1: 'deb', n2: null } }))
+    render(<UpdateChecker />)
+    await tick(0)
+    expect(screen.getByText('n1: deb, n2: common.unknown')).toBeInTheDocument()
+  })
+
   it('names the failed node and its reason, and resumes on request', async () => {
     const stopped = { ...running, status: 'stopped', current: null,
       failed: { node: 'n2', reason: 'not back within 900s' } }
