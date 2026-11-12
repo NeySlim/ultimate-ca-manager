@@ -150,7 +150,7 @@ _LEAF_CA_ONLY_EXTENSION_OIDS = frozenset({
 # The only extensions a leaf CSR may contribute to the issued certificate.
 # Everything else on a leaf is the issuer's to set: CRL Distribution Points,
 # AIA and Certificate Policies come from the CA configuration below, the
-# Microsoft template and SID security extensions only from the WSTEP kwargs,
+# Microsoft template and SID security extensions only from the caller's kwargs,
 # SKI/AKI from the keys. Copying unknown extensions verbatim let an enrollee
 # that reached this trunk through ACME, EST or WSTEP choose the revocation
 # endpoints of its own certificate, or carry a szOID_NTDS_CA_SECURITY_EXT of
