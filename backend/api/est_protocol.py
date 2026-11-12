@@ -629,6 +629,10 @@ def _validate_est_csr(csr):
     return True, None
 
 
+# Seconds a client is asked to wait before sending a refused-for-now request again
+EST_RETRY_AFTER_DEFAULT = 300
+
+
 @_labelled_route('/cacerts', methods=['GET'], endpoint='get_ca_certs')
 def get_ca_certs(label=None):
     """
@@ -867,7 +871,8 @@ def simple_reenroll(label=None):
         logger.warning('EST reenroll: client certificate superseded by a concurrent renewal')
         return Response('Client certificate has been superseded by a newer one', status=403)
     except renewal_identity.RenewalIdentityUnresolved as e:
-        return Response(str(e), status=500)
+        # A passing outage (RFC 9110 §15.6.4): the client may send the same request later
+        return Response(str(e), status=503, headers={'Retry-After': str(EST_RETRY_AFTER_DEFAULT)})
     except PolicyViolation as e:
         logger.warning(f"EST simplereenroll refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)

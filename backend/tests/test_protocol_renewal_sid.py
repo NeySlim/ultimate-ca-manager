@@ -154,13 +154,16 @@ class TestEstReenrolment:
         assert b'The requester was not found in the directory' in r.data
         assert _count(app) == before
 
-    def test_unreachable_directory_is_a_server_fault(self, client, app, est_config, monkeypatch):
+    def test_unreachable_directory_asks_to_retry_later(self, client, app, est_config, monkeypatch):
+        """RFC 9110 §15.6.4: a passing outage is a 503 that may name when to come back."""
+        from api.est_protocol import EST_RETRY_AFTER_DEFAULT
         old, key = _issue(app, est_config['id'], 'est-sid-down.example.test')
         _configure_ad_connector(app)
         monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.UNREACHABLE)
         before = _count(app)
         r = _est_reenrol(client, old, key)
-        assert r.status_code == 500
+        assert r.status_code == 503
+        assert r.headers['Retry-After'] == str(EST_RETRY_AFTER_DEFAULT)
         assert _count(app) == before
 
 
