@@ -1001,7 +1001,8 @@ def simple_reenroll(label=None):
         logger.warning('EST reenroll: client certificate superseded by a concurrent renewal')
         return Response('Client certificate has been superseded by a newer one', status=403)
     except renewal_identity.RenewalIdentityUnresolved as e:
-        return Response(str(e), status=500)
+        # A passing outage (RFC 9110 §15.6.4): the client may send the same request later
+        return Response(str(e), status=503, headers={'Retry-After': str(_retry_after_seconds())})
     except PolicyViolation as e:
         logger.warning(f"EST simplereenroll refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
