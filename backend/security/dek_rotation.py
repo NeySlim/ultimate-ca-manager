@@ -538,7 +538,8 @@ def begin_disable():
     key_encryption = _encryption.key_encryption
     lock_key_state()
     key_encryption.refresh()
-    if not key_encryption.is_enabled:
+    # A disable done is not resumed: its markers and its grace stay as they are
+    if not key_encryption.is_enabled or disable_done():
         db.session.rollback()
         raise RotationError('Encryption is not enabled', 400)
     grace = retiring()

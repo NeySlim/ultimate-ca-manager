@@ -2119,6 +2119,12 @@ def test_a_kek_changed_by_hand_rewraps_the_retained_keys_too(set_env, app, value
     assert app.config['SAFE_MODE'] is False and _read(app, values) == CLEAR
 
 
+def _grace_row(app):
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key=GRACE_KEY).first()
+        return row.value if row else None
+
+
 def test_a_rotation_after_a_disable_done_says_encryption_is_off(app, auth_client, values,
                                                                 retention):
     """Not 'left half-way': the disable went to its end, its DEKs only kept for reading."""
@@ -2135,3 +2141,21 @@ def test_a_rotation_after_a_disable_done_says_encryption_is_off(app, auth_client
     assert 'half-way' not in r.get_json()['message']
     assert _rows(app) == rows
 
+
+@pytest.mark.parametrize('after_grace', [False, True])
+def test_a_second_disable_after_a_disable_done_changes_nothing(app, auth_client, values,
+                                                               retention, after_grace):
+    """A second disable within the retention neither rewrites the markers nor restarts a
+    grace that would hold the next enable again."""
+    from security import dek_rotation
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    if after_grace:
+        retention(601)
+        with app.app_context():
+            dek_rotation.retire_if_due()
+    rows, kept, grace_row = _rows(app), _retain_after(app), _grace_row(app)
+    assert (grace_row is None) == after_grace
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert r.status_code == 400, r.data
+    assert r.get_json()['message'] == 'Encryption is not enabled'
+    assert _rows(app) == rows and _retain_after(app) == kept and _grace_row(app) == grace_row
