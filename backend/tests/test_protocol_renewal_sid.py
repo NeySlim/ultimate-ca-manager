@@ -377,3 +377,24 @@ def test_an_unresolved_sid_logs_the_connector_fault(app, create_ca, monkeypatch,
     logged = [r.getMessage() for r in caplog.records if r.name == renewal_identity.__name__]
     expected = f'TEST: the AD Connector cannot resolve SID {SID} of a renewed certificate'
     assert logged == [f'{expected}: {fault}' if fault else expected]
+
+
+def test_a_scep_request_decided_before_it_is_closed_answers_400_and_keeps_its_decision(app):
+    import uuid
+    from api.v2 import scep
+    from models import SCEPRequest
+    with app.app_context():
+        row = SCEPRequest(transaction_id=f'decided-{uuid.uuid4().hex}', csr='x', status='approved',
+                          approved_by='alice')
+        db.session.add(row)
+        db.session.commit()
+        try:
+            with app.test_request_context():
+                response, status = scep._close_refused(row.id, 'admin', 'gone')
+            assert (status, response.get_json()['message']) == (400, 'SCEP request is no longer pending')
+            db.session.expire_all()
+            kept = db.session.get(SCEPRequest, row.id)
+            assert (kept.status, kept.approved_by, kept.rejection_reason) == ('approved', 'alice', None)
+        finally:
+            db.session.delete(db.session.get(SCEPRequest, row.id))
+            db.session.commit()
