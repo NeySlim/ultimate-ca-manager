@@ -462,11 +462,21 @@ class TestOcsp:
         assert SERIAL_A in _entries(_full_crl(ca))
         assert _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.REVOKED
 
-    def test_a_live_valid_certificate_wins_over_a_record(self, app, backend):
+    def test_a_live_valid_certificate_does_not_hide_a_record(self, app, backend):
+        """RFC 6960 §2.2: the serial is revoked for this issuer, as its CRL says."""
         ca, ca_key, ca_cert = _make_ca()
         leaf = _issue(ca_key, ca_cert, SERIAL_A)
         _store(ca, leaf, str(SERIAL_A))
         _persist(ca, format(SERIAL_A, 'x'))
+        assert SERIAL_A in _entries(_full_crl(ca))
+        assert _ocsp(app, ca_cert, leaf) == (ocsp.OCSPCertStatus.REVOKED, x509.ReasonFlags.key_compromise)
+
+    def test_a_record_of_the_live_row_itself_was_lifted(self, app, backend):
+        ca, ca_key, ca_cert = _make_ca()
+        leaf = _issue(ca_key, ca_cert, SERIAL_A)
+        row = _store(ca, leaf, str(SERIAL_A))
+        _persist(ca, str(SERIAL_A), certificate_id=row.id)
+        assert SERIAL_A not in _entries(_full_crl(ca))
         assert _ocsp(app, ca_cert, leaf) == (ocsp.OCSPCertStatus.GOOD, None)
 
     @pytest.mark.parametrize('stored,expected', [

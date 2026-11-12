@@ -350,3 +350,42 @@ class TestAnUnverifiableIssuerKeyIsNeverASignature:
         leaf, _ = _leaf('unverifiable-auto.example.test', ca_cert, ca_key)
         assert _import(auth_client, leaf).status_code in (200, 201)
         assert [caref for _, caref in _rows(app, leaf)] == [None]
+
+
+class TestALiveRowNeverHidesAPersistentRevocation:
+    """RFC 6960 §2.2: a serial this CA revoked answers ``revoked``, as on its CRL,
+    whatever non-revoked row holds that serial now."""
+
+    @staticmethod
+    def _answers(app, ca_id, serial):
+        from services.crl_service import CRLService
+        from services.ocsp_service import OCSPService
+        with app.app_context():
+            ca = db.session.get(CA, ca_id)
+            ocsp = OCSPService._status_for_serial(ca, serial)[1]
+            crl = x509.load_pem_x509_crl(CRLService.generate_crl(ca_id).crl_pem.encode())
+            return ocsp, crl.get_revoked_certificate_by_serial_number(serial) is not None
+
+    def test_a_forged_row_of_a_revoked_serial(self, app, issuer):
+        from models import RevokedSerial
+        ca_id, refid, ca_cert, _ = issuer
+        forged, _ = _leaf('forged-ocsp.example.test', ca_cert, _gen())
+        _store(app, forged, refid)
+        with app.app_context():
+            db.session.add(RevokedSerial(caref=refid, serial_number=str(forged.serial_number),
+                                         valid_to=forged.not_valid_after_utc.replace(tzinfo=None)))
+            db.session.commit()
+        assert self._answers(app, ca_id, forged.serial_number) == ('revoked', True)
+
+    def test_a_revoked_certificate_deleted_then_imported_again(self, app, auth_client, issuer):
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('revoked-reimported.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid)
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'keyCompromise'})
+        assert r.status_code == 200, r.data
+        assert auth_client.delete(f'/api/v2/certificates/{row_id}').status_code in (200, 204)
+        r = _import(auth_client, real, key)
+        assert r.status_code in (200, 201), r.data
+        [(_, caref)] = _rows(app, real)
+        assert caref == refid
+        assert self._answers(app, ca_id, real.serial_number) == ('revoked', True)
