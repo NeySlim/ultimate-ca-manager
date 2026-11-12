@@ -200,8 +200,10 @@ class KeyEncryption:
     def _load_data_keys(self, rows=_UNREAD) -> None:
         """The DEKs the database holds under this KEK; outside an app context, the KEK alone.
 
-        No row: the KEK is DEK version 1. A row this KEK did not wrap leaves encryption off
-        (dek_error), so nothing is written under a key the database does not know.
+        No row: the KEK is DEK version 1, unless a disabled marker is left, under this KEK or
+        another (a KEK replaced after a disable never turns encryption back on). A row this
+        KEK did not wrap leaves encryption off (dek_error), so nothing is written under a key
+        the database does not know.
         """
         from security import envelope
         rows = _read_rows() if rows is _UNREAD else rows
@@ -212,10 +214,10 @@ class KeyEncryption:
             self._rows, self._read_at = rows, time.monotonic()
         mine = envelope.kek_id(self._key_bytes)
         keys = [r for r in rows or () if r[1] in (envelope.ACTIVE, envelope.PREVIOUS)]
-        disabled = any(r[1] == envelope.DISABLED and r[2] == mine for r in rows or ())
+        disabled = any(r[1] == envelope.DISABLED for r in rows or ())
         if not keys:
             if disabled:
-                return  # turned off from the UI while this KEK was configured
+                return  # turned off from the UI, under this KEK or the one it replaced
             self._set_deks({1: Fernet(base64.urlsafe_b64encode(self._key_bytes))}, 1)
             return
         deks, active = {}, None

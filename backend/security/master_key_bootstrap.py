@@ -134,8 +134,15 @@ def activate_new_master_key(exclusive: bool) -> dict:
     The key file is removed only when it failed to load: once a value is
     encrypted under it, removing it would lose that value.
     """
+    from models import db, EncryptionKey
+    from security import envelope
+    from security.dek_rotation import lock_key_state
     KeyEncryption = _encryption.KeyEncryption
     key_encryption = _encryption.key_encryption
+    # A disabled marker keeps any KEK off: enabling is what lifts it
+    lock_key_state()
+    EncryptionKey.query.filter_by(state=envelope.DISABLED).delete(synchronize_session=False)
+    db.session.commit()
     KeyEncryption.write_key_file(KeyEncryption.generate_key(), exclusive=exclusive)
     key_encryption.reload()
     if not key_encryption.is_enabled:

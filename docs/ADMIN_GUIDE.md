@@ -202,7 +202,7 @@ The KEK never changes from the interface. To replace it:
 5. Start UCM (one node first in HA). It rewraps the DEKs under the new KEK, rewrites no stored value, logs and audits `encryption_kek_changed`.
 6. Remove `master.key.previous` or `KEY_ENCRYPTION_KEY_PREVIOUS`, start the other nodes, and back up the new key.
 
-The audit chain is sealed with a key derived from the KEK: after a KEK change, entries sealed before it are reported as under a retired key, attested by `audit-chain.keys`. A DEK rotation leaves every seal verifiable. If the old KEK leaked, also rotate the DEK once the change is done: until then the data stays under the old DEK. A new KEK started without the previous one puts UCM in safe mode, and nothing is written.
+The audit chain is sealed with a key derived from the KEK: after a KEK change, entries sealed before it are reported as under a retired key, attested by `audit-chain.keys`. A DEK rotation leaves every seal verifiable. If the old KEK leaked, also rotate the DEK once the change is done: until then the data stays under the old DEK. A new KEK started without the previous one puts UCM in safe mode while values are encrypted, and nothing is written. With encryption disabled, outside HA UCM stays disabled under the new KEK until you enable it again; in HA the node stays in safe mode until it has the cluster's KEK.
 
 ### Authentication Methods
 

@@ -1352,9 +1352,9 @@ def test_in_ha_a_start_under_a_kek_another_disabled_does_not_encrypt(app, values
                                      wrapped=None, created_at=utc_now()))
         db.session.commit()
     try:
-        # Outside HA it is a file disable followed by a new master.key: encryption runs
+        # Outside HA it is a disable followed by a new KEK: off until enabled again
         _start(app)
-        assert key_encryption.is_encrypting
+        assert not key_encryption.is_encrypting
         _ha(monkeypatch)
         _start(app)
         assert app.config['SAFE_MODE'] is True
@@ -1585,3 +1585,30 @@ def test_a_key_the_end_of_grace_sweep_decrypts_gets_its_mirror(app, auth_client,
         assert dek_rotation.retire_if_due() == 0
         assert db.session.get(CA, ca_id).prv == plain
     assert path.read_bytes() == base64.b64decode(plain)
+
+
+def test_outside_ha_a_kek_replaced_without_the_previous_one_after_a_disable_stays_off(
+        app, auth_client, values, set_env, encryption_enabled):
+    """The marker names the old KEK: the new one never turns encryption back on by itself."""
+    key_encryption = encryption_enabled.key_encryption
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    rows = _rows(app)
+    assert [(v, s) for v, s, _, _ in rows] == [(0, 'disabled')]
+    set_env('KEY_ENCRYPTION_KEY', Fernet.generate_key().decode())
+    try:
+        _start(app)
+        assert app.config['SAFE_MODE'] is False
+        with app.app_context():
+            assert not key_encryption.is_enabled and key_encryption.kek_loaded
+            assert key_encryption.encrypt_string('x') == 'x'
+        assert _rows(app) == rows and _stored(app, values)['target'] == PEM
+        # Enabling is the operator's choice: under the new KEK
+        r = auth_client.post('/api/v2/system/security/enable-encryption')
+        assert r.status_code == 200, r.data
+        assert key_encryption.is_encrypted(_stored(app, values)['target'])
+        assert _read(app, values) == CLEAR
+    finally:
+        app.config['SAFE_MODE'] = False
+        with app.app_context():
+            # Back in the clear while the new KEK is loaded: the teardown holds the old one
+            encryption_enabled.decrypt_all_keys(dry_run=False)
