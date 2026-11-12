@@ -2470,7 +2470,7 @@ With encryption enabled (always in HA) the key is stored in the database and eve
   "data": {
     "rotated": true,
     "mode": "database",
-    "previous_accepted_until": "2026-11-13T10:00:00"
+    "previous_accepted_until": "2026-11-13T10:00:00Z"
   }
 }
 ```
@@ -2487,7 +2487,7 @@ GET /api/v2/system/security/secrets-status
     "session_secret": {
       "configured": true,
       "source": "database",
-      "previous_accepted_until": "2026-11-13T10:00:00",
+      "previous_accepted_until": "2026-11-13T10:00:00Z",
       "rotation": "database"
     },
     "encryption_key": {"configured": true}

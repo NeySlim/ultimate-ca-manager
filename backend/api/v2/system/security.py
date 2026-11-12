@@ -729,12 +729,12 @@ def _rotate_stored_secret(session_key):
         db.session.rollback()
         current_app.logger.error(f"Failed to rotate the session key: {type(e).__name__}")
         return error_response("Failed to rotate secrets", 500)
-    end = until.isoformat(timespec='seconds')
+    end = session_key.stamp(until)
     AuditService.log_action(
         action='secrets_rotated',
         resource_type='security',
         details=f'Session secret key rotated in the database; the previous key is accepted '
-                f'until {end} UTC',
+                f'until {end}',
         success=True
     )
     return success_response(

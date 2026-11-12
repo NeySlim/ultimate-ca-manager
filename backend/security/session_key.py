@@ -180,6 +180,11 @@ def verification_keys(app) -> list:
     return keys
 
 
+def stamp(moment):
+    """A naive UTC instant as the API gives it: ISO 8601 with ``Z``."""
+    return moment.isoformat(timespec='seconds') + 'Z' if moment else None
+
+
 def status(app) -> dict:
     state = _state(app)
     until = state.get('previous_until') if app.config.get('SECRET_KEY_FALLBACKS') else None
@@ -188,7 +193,7 @@ def status(app) -> dict:
         until = None
     return {
         'source': state.get('source', 'environment'),
-        'previous_accepted_until': until.isoformat(timespec='seconds') if until else None,
+        'previous_accepted_until': stamp(until),
     }
 
 

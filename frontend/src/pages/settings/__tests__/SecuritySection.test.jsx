@@ -311,7 +311,7 @@ describe('SecuritySection session key', () => {
   it('says the stored key rotates without a restart and names the grace end', () => {
     const rotate = vi.fn()
     renderSection(null, {
-      secretsStatus: { session_secret: { source: 'database', rotation: 'database', previous_accepted_until: '2026-11-13T10:00:00' } },
+      secretsStatus: { session_secret: { source: 'database', rotation: 'database', previous_accepted_until: '2026-11-13T10:00:00Z' } },
       handleRotateSessionKey: rotate,
     })
     expect(screen.getByText('settings.sessionKeyFromDatabase')).toBeTruthy()

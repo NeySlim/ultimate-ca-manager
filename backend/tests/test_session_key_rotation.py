@@ -394,3 +394,15 @@ def test_the_status_drops_the_grace_once_it_is_over_and_a_rotation_goes_through(
     data = auth_client.get(STATUS).get_json()['data']['session_secret']
     assert data['previous_accepted_until'] is None
     assert auth_client.post(ROTATE, json={}).status_code == 200
+
+
+def test_the_end_of_the_grace_is_given_in_utc(app, auth_client, stored, encryption_enabled):
+    from datetime import datetime, timezone
+    r = auth_client.post(ROTATE, json={})
+    assert r.status_code == 200, r.data
+    status = auth_client.get(STATUS).get_json()['data']['session_secret']
+    for end in (r.get_json()['data']['previous_accepted_until'],
+                status['previous_accepted_until']):
+        assert end.endswith('Z'), end
+        parsed = datetime.fromisoformat(end.replace('Z', '+00:00'))
+        assert parsed.tzinfo == timezone.utc and parsed > datetime.now(timezone.utc)
