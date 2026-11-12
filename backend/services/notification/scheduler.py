@@ -55,12 +55,16 @@ def _emit_webhooks_in_ha():
     now = _cluster_now()
     previous = db.session.query(SystemConfig.value).filter_by(key=EXPIRY_WEBHOOKS_MARK_KEY).scalar()
     last = _parse_mark(previous)
-    expiry_alert_service._emit_expiry_webhooks(
-        expiring=last is None or last.date() != now.date(),
-        expired_after=last if last is not None else now - timedelta(days=1),
-        now=now,
-    )
-    config_compare_and_set(EXPIRY_WEBHOOKS_MARK_KEY, previous, _later(last, now).isoformat())
+    if not expiry_alert_service._emit_expiry_webhooks(
+            expiring=last is None or last.date() != now.date(),
+            expired_after=last if last is not None else now - timedelta(days=1),
+            now=now):
+        return
+    try:
+        config_compare_and_set(EXPIRY_WEBHOOKS_MARK_KEY, previous, _later(last, now).isoformat())
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Expiry webhooks sent, their mark not stored: {e}")
 
 
 def _emit_webhooks_single_node():
@@ -68,7 +72,8 @@ def _emit_webhooks_single_node():
     from models import SystemConfig, db
     from services import expiry_alert_service
     now = _cluster_now()
-    expiry_alert_service._emit_expiry_webhooks(now=now)
+    if not expiry_alert_service._emit_expiry_webhooks(now=now):
+        return
     try:
         row = SystemConfig.query.filter_by(key=EXPIRY_WEBHOOKS_MARK_KEY).first()
         if row is None:
@@ -76,9 +81,9 @@ def _emit_webhooks_single_node():
         else:
             row.value = _later(_parse_mark(row.value), now).isoformat()
         db.session.commit()
-    except Exception:
+    except Exception as e:
         db.session.rollback()
-        raise
+        logger.error(f"Expiry webhooks sent, their mark not stored: {e}")
 
 
 class NotificationSchedulerMixin:

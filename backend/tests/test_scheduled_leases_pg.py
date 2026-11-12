@@ -98,7 +98,7 @@ def _record_sends(monkeypatch):
 
 def _record_webhook_passes(monkeypatch):
     passes = []
-    monkeypatch.setattr(expiry_alert_service, '_emit_expiry_webhooks', lambda **_: passes.append(1))
+    monkeypatch.setattr(expiry_alert_service, '_emit_expiry_webhooks', lambda **_: passes.append(1) or True)
     return passes
 
 
@@ -149,7 +149,7 @@ def test_a_pass_whose_lease_was_taken_over_stops_sending(
 def test_expiring_reminders_fire_once_per_day_in_ha(app, ha, monkeypatch):
     passes = []
     monkeypatch.setattr(expiry_alert_service, '_emit_expiry_webhooks',
-                        lambda expiring=True, **_: passes.append(expiring))
+                        lambda expiring=True, **_: passes.append(expiring) or True)
     first = datetime(2026, 11, 11, 1, 0)
     instants = iter([first, first + timedelta(hours=20), first + timedelta(hours=24)])
     monkeypatch.setattr(notification_scheduler, '_cluster_now', lambda: next(instants))
@@ -431,3 +431,38 @@ def test_the_webhook_mark_never_moves_back_with_the_clock(app, monkeypatch, in_h
         _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, later.isoformat())
         NotificationService.run_scheduled_checks()
         assert _value(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY) == later.isoformat()
+
+
+@pytest.mark.parametrize('in_ha', [True, False])
+def test_a_failed_webhook_pass_leaves_the_mark_for_the_next_one(app, monkeypatch, in_ha):
+    # The expiries of the failed pass are announced by the next one, not lost
+    def fail(**_):
+        raise RuntimeError('webhook store down')
+    monkeypatch.setattr('services.ca.cross_certs.expiring_alerts', fail)
+    monkeypatch.setattr('utils.ha.ha_enabled', lambda: in_ha)
+    before = datetime(2031, 3, 4, 0, 30)
+    monkeypatch.setattr(notification_scheduler, '_cluster_now', lambda: before + timedelta(days=1))
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_LEASE_KEY, None)
+        _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, before.isoformat())
+        NotificationService.run_scheduled_checks()
+        assert _value(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY) == before.isoformat()
+
+
+def test_a_mark_not_stored_is_not_logged_as_a_failed_pass(app, ha, monkeypatch, caplog):
+    _record_webhook_passes(monkeypatch)
+
+    real = config_cas.config_compare_and_set
+
+    def fail(key, *a, **k):
+        if key == notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY:
+            raise RuntimeError('database down')
+        return real(key, *a, **k)
+    monkeypatch.setattr(config_cas, 'config_compare_and_set', fail)
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_LEASE_KEY, None)
+        with caplog.at_level('WARNING'):
+            NotificationService.run_scheduled_checks()
+    messages = [r.getMessage() for r in caplog.records]
+    assert not any('webhook pass failed' in m for m in messages), messages
+    assert any('mark not stored' in m for m in messages), messages
