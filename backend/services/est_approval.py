@@ -28,8 +28,13 @@ def _issue(approval, data):
         if status != OK:
             raise ProtocolRequestGone(f'The certificate being renewed can no longer be renewed ({status})',
                                       refusal=protocol_approval.ISSUANCE_REFUSAL)
-    pem, _serial = sign_est_csr(ca, csr, renewal_of=renewal_of, supersedes=supersedes,
-                                on_stored=protocol_approval.linker(approval))
+    from services.ad_connector.renewal_identity import RenewalAccountGone
+    try:
+        pem, _serial = sign_est_csr(ca, csr, renewal_of=renewal_of, supersedes=supersedes,
+                                    on_stored=protocol_approval.linker(approval))
+    except RenewalAccountGone as e:
+        raise ProtocolRequestGone(f'The EST request can no longer be issued: {e}',
+                                  refusal=protocol_approval.ISSUANCE_REFUSAL) from e
     serial = x509.load_pem_x509_certificate(pem.encode()).serial_number
     row = Certificate.query.filter_by(serial_number=str(serial), caref=ca.refid).first()
     return {'id': row.id if row is not None else None, 'cn': data.get('cn'), 'protocol': 'est',
