@@ -99,17 +99,22 @@ def _enable_with_configured_kek():
         return error_response("Failed to initialize encryption with the configured key", 500)
     _wait_for_nodes(command)
     encrypted, skipped, errors = do_encrypt(dry_run=False)
+    # As with a new master.key: the plaintext .key mirrors a disable wrote go (#320)
+    from security.master_key_bootstrap import purge_plaintext_key_files
+    purge = purge_plaintext_key_files()
     AuditService.log_action(
         action='encryption_enabled',
         resource_type='system',
         resource_name='Private Key Encryption',
         details=(f"Encryption enabled with the configured key-encryption key "
                  f"({key_encryption.kek_fingerprint()}). Encrypted {encrypted} keys, "
-                 f"{skipped} already encrypted."),
+                 f"{skipped} already encrypted. Removed {purge['removed']} key files; "
+                 f"kept {purge['kept_no_db_key']} without a database key."),
         success=not errors)
     return success_response(
         message=f"Encryption enabled. {encrypted} keys encrypted.",
         data={'enabled': True, 'encrypted': encrypted, 'skipped': skipped, 'errors': errors,
+              'key_files_removed': purge['removed'], 'key_files_kept': purge['kept_no_db_key'],
               'master_key': None, 'backup_required': False})
 
 

@@ -143,14 +143,19 @@ def activate_new_master_key(exclusive: bool) -> dict:
         raise KeyActivationError('Failed to initialize encryption after key generation')
 
     encrypted, skipped, errors = _encryption.encrypt_all_keys(dry_run=False)
+    return {'encrypted': encrypted, 'skipped': skipped, 'errors': errors,
+            'purge': purge_plaintext_key_files()}
+
+
+def purge_plaintext_key_files() -> dict:
+    """The plaintext .key mirrors removed once the database is encrypted; never raises."""
     from services.file_regen_service import purge_private_key_files
     try:
-        purge = purge_private_key_files()
+        return purge_private_key_files()
     except Exception as e:
         # The key now encrypts the database: a failed cleanup must not hide it
         logger.error("🔓 Could not remove the plaintext key copies: %s", e)
-        purge = {'removed': 0, 'kept_no_db_key': 0, 'errors': 1}
-    return {'encrypted': encrypted, 'skipped': skipped, 'errors': errors, 'purge': purge}
+        return {'removed': 0, 'kept_no_db_key': 0, 'errors': 1}
 
 
 def _log_remaining(errors: list) -> None:

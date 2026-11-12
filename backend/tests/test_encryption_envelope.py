@@ -548,3 +548,19 @@ def test_enabling_never_drops_dek_rows_the_kek_cannot_open(set_env, app, auth_cl
     r = auth_client.post('/api/v2/system/security/enable-encryption')
     assert r.status_code == 409, r.data
     assert _rows(app) == rows
+
+
+def test_enabling_with_the_configured_kek_purges_the_plaintext_key_files(app, auth_client, values,
+                                                                       encryption_enabled):
+    """Disabling writes the .key mirrors in the clear: enabling again removes them (#320)."""
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert r.status_code == 200, r.data
+    mirror = Config.PRIVATE_DIR / f"envtest-{values['tag']}.key"
+    mirror.write_text(PEM)
+    try:
+        r = auth_client.post('/api/v2/system/security/enable-encryption')
+        assert r.status_code == 200, r.data
+        assert not mirror.exists()
+        assert r.get_json()['data']['key_files_removed'] >= 1
+    finally:
+        mirror.unlink(missing_ok=True)
