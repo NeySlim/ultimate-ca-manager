@@ -8,13 +8,13 @@ export default {
         title: '私钥加密',
         items: [
           { label: '状态与计数器', text: '显示是否已启用加密，以及已存储私钥中加密与未加密的数量' },
-          { label: '启用 / 禁用', text: '在主密钥文件下使用 AES-128（Fernet，带 HMAC-SHA256）加密所有 CA 和证书私钥。启用时同时删除明文密钥副本，禁用时重新创建' },
+          { label: '启用 / 禁用', text: '在主密钥文件下使用 AES-128（Fernet，带 HMAC-SHA256）加密所有 CA 和证书私钥。启用时同时删除明文密钥副本，禁用时立即重新创建。在所有值解密完成之前中断的禁用会显示为未完成：再次运行即可完成。禁用后，数据密钥在十分钟内仍可打开禁用期间写入的值，之后被删除；再次启用需等待这段时间' },
           { label: '首次启动', text: '没有主密钥时，UCM 会在启动时创建 /etc/ucm/master.key（0600）并加密已存储的密钥。容器仅在 /etc/ucm 是命名卷或主机目录时才这样做。设置了 KEY_ENCRYPTION_KEY、数据库中已有加密密钥或带密钥的审计链、已在此处禁用加密，或设置了 UCM_AUTO_MASTER_KEY=false 时跳过。每次启动时，已加载的密钥还会加密仍以未加密方式存储的值，无法解密它们的密钥会使 UCM 进入安全模式。请备份密钥文件' },
           { label: '磁盘上的密钥文件', text: '显示仍保留的明文密钥副本数量；其他服务需要密钥文件时请使用部署钩子' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: '可选启用的环境变量：没有显式的数据库加密密钥时拒绝启动' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: '可选启用的环境变量：未启用私钥加密时拒绝启动' },
           { label: '加密剩余密钥', text: '启用加密后，若仍有密钥或机密以未加密方式存储，则会显示：加密这些内容，已加密的保持不变' },
-          { label: 'Data key rotation', text: 'Keys are encrypted under a data key stored in the database and wrapped by the master key (master.key or KEY_ENCRYPTION_KEY), still the only file to back up. Rotate Data Key re-encrypts every stored key and secret under a new data key without changing the master key; an interrupted rotation keeps both data keys and is finished by running it again. Once every value is rewritten, the previous data key is kept for reading for ten minutes, then dropped; the next rotation waits for that. The fingerprint shown names the master key without revealing it' },
+          { label: '数据密钥轮换', text: '密钥在存储于数据库中的数据密钥下加密，该数据密钥由主密钥（master.key 或 KEY_ENCRYPTION_KEY）封装，主密钥仍是唯一需要备份的文件。轮换数据密钥会在新的数据密钥下重新加密所有已存储的密钥和机密，而不更改主密钥；中断的轮换会保留两个数据密钥，再次运行即可完成。所有值重写完成后，旧数据密钥在十分钟内仍可读取，之后被删除；下一次轮换需等待这段时间。显示的指纹标识主密钥而不泄露它' },
         ]
       },
       {
