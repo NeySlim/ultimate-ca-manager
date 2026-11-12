@@ -114,7 +114,7 @@ sudo systemctl enable --now ucm
 
 ### RHEL/Rocky/Fedora
 
-Download the `.rpm` package from the [latest release](https://github.com/NeySlim/ultimate-ca-manager/releases/latest): `ucm-VERSION-1.fc43.noarch.rpm` for Fedora, `ucm-el9-VERSION-1.el9.noarch.rpm` for RHEL, Rocky Linux and AlmaLinux 9.
+Download the `.rpm` package from the [latest release](https://github.com/NeySlim/ultimate-ca-manager/releases/latest): `ucm-VERSION-1.fc43.noarch.rpm` for Fedora, `ucm-el9-VERSION-1.el9.noarch.rpm` for RHEL, Rocky Linux and AlmaLinux 9, `ucm-el10-VERSION-1.el10.noarch.rpm` for the same distributions at 10.
 
 ```bash
 sudo dnf install ./ucm-VERSION-1.fc43.noarch.rpm

@@ -88,10 +88,11 @@ sudo systemctl status ucm
 
 **Native installation for Fedora, Red Hat Enterprise Linux, Rocky Linux, AlmaLinux, and derivatives.**
 
-Each release has two RPMs: `ucm-VERSION-1.fc43.noarch.rpm` for Fedora, and `ucm-el9-VERSION-1.el9.noarch.rpm` for RHEL, Rocky Linux and AlmaLinux 9, which runs on the `python3.12` package of the distribution (its `python3` is 3.9).
+Each release has three RPMs: `ucm-VERSION-1.fc43.noarch.rpm` for Fedora, `ucm-el9-VERSION-1.el9.noarch.rpm` for RHEL, Rocky Linux and AlmaLinux 9, which runs on the `python3.12` package of the distribution (its `python3` is 3.9), and `ucm-el10-VERSION-1.el10.noarch.rpm` for the same distributions at 10, which runs on the system `python3` (3.12). FIPS builds of the packages are supported on EL9 and Ubuntu 24.04 only.
 
 ```bash
-# Download latest package (replace VERSION with actual version, e.g. 2.241)
+# Download latest package (replace VERSION with the actual version, e.g. 2.241,
+# and el9 with el10 on RHEL, Rocky Linux or AlmaLinux 10)
 wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-el9-VERSION-1.el9.noarch.rpm
 
 # Install

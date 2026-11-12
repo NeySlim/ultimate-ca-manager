@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
+- RPM for RHEL, AlmaLinux and Rocky Linux 10 (`ucm-el10-VERSION-1.el10.noarch.rpm`); the updater picks it on an EL10 host, and an EL host with no matching build is still offered the Fedora RPM, which needs a system `python3` of 3.12 or later.
 - **HA packaging.** The Helm chart takes `ha.enabled` (rolling update, PodDisruptionBudget, shared `KEY_ENCRYPTION_KEY`), `docker-compose.ha.yml` starts two nodes behind a balancer, the image entrypoint skips SQLite in HA mode, and `docs/HA.md` documents the deployments.
 
 - Inspector: the detail of a certificate, CA, trusted certificate or user certificate opens in a tabbed dock at the bottom or right of the window (full screen on mobile), many objects at a time, instead of floating windows; its position and size follow the user and an invalid value is refused with a 400.
@@ -48,6 +49,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - HA preview: certificate and CRL expiry e-mails, the expiry webhooks, the scheduled CRL of a CA and the revocations a Microsoft CA CRL sync announces now go out once when two nodes run them during a leader change; a node that dies mid-run hands over after a lease of 10 to 15 minutes.
+- DEB and RPM: installing the DEB no longer fails on a host without `sudo`, and the sudoers file earlier packages wrote for the `ucm` user (unused, the service restarts through the watcher) is removed on install and update.
 - HA preview: a scheduled report or scheduled backup run twice during a leader change is sent or written once, and two nodes serving orders that share one upstream ACME proxy challenge start its dns-01 automation once. `GET /api/v2/settings/backup/schedule` reports `in_progress` while a scheduled backup is still being written, and a restore keeps the target's own schedule state.
 - Certificates: lifting a hold now emits `certificate.unheld` (webhooks, WebSocket) and lifts the hold of the other member of a related pair too, unless `unhold_related` is `false`, reporting it as `related_unheld`; a body that is not a JSON object is refused (400 or 415), and a pair on one CA gets a single delta CRL.
 - Import: an imported CA now announces `ca.created` and `ca.updated`, and a submitted CSR carries the acting user in `csr.submitted`.

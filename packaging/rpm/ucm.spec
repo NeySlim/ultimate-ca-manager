@@ -10,8 +10,9 @@ Source0:        %{name}-%{version}.tar.gz
 BuildArch:      noarch
 # Disable auto-detection of requires (we manage deps via venv)
 AutoReqProv:    no
-# EL9's python3 is 3.9: the el9 build runs on the parallel-installable python3.12
-%if 0%{?rhel}
+# EL9's python3 is 3.9: the el9 build runs on the parallel-installable python3.12.
+# EL10's python3 is 3.12: it takes the system python3 like Fedora
+%if 0%{?rhel} && 0%{?rhel} < 10
 Requires:       python3.12
 %global ucm_python python3.12
 %else
@@ -81,16 +82,10 @@ getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s /sbi
 %post
 %systemd_post %{name}.service
 
-# Install sudoers for service management (watcher handles restart/update)
-cat > /etc/sudoers.d/ucm << 'SUDOERSEOF'
-# UCM service management - allows ucm user to restart service without password
-# This is required for HTTPS certificate application and other system operations
-ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm
-ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload ucm
-ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop ucm
-ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl start ucm
-SUDOERSEOF
-chmod 440 /etc/sudoers.d/ucm
+# sudoers-cleanup: no sudo grant any more (the watcher restarts the service);
+# drop the files earlier versions wrote. Absent file or directory is fine.
+rm -f /etc/sudoers.d/ucm-service /etc/sudoers.d/ucm
+# end sudoers-cleanup
 
 # Enable ucm-watcher path unit for restart/update handling
 systemctl daemon-reload

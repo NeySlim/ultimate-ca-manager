@@ -697,8 +697,17 @@ def test_updaters_before_2_241_still_take_the_fedora_rpm(tag):
     assert first['name'].endswith('.fc43.noarch.rpm'), first['name']
 
 
+def test_the_release_downloads_every_rpm_artifact_it_builds():
+    yaml = pytest.importorskip('yaml')
+    jobs = yaml.safe_load(WORKFLOW.read_text())['jobs']
+    built = {b['artifact'] for b in jobs['build-rpm']['strategy']['matrix']['include']}
+    fetched = {s['with']['name'] for s in jobs['release']['steps']
+               if str(s.get('uses', '')).startswith('actions/download-artifact')}
+    assert built <= fetched, built - fetched
+
+
 class TestRpmAssetPerDistribution:
-    """A release carries a Fedora RPM and an EL9 one (python3.12): each host takes its own."""
+    """A release carries a Fedora RPM, an EL9 one (python3.12) and an EL10 one: each host takes its own."""
 
     def _check(self, monkeypatch, el, assets):
         import time as _time
@@ -715,9 +724,20 @@ class TestRpmAssetPerDistribution:
         assert result['package_name'] == 'ucm-el9-99.0-1.el9.noarch.rpm'
         assert result['checksum_url'] == 'http://x/ucm-el9-99.0-1.el9.noarch.rpm.sha256'
 
-    @pytest.mark.parametrize('el', [None, '10'])
-    def test_other_hosts_never_take_the_el9_build(self, monkeypatch, el):
+    @pytest.mark.parametrize('el', [None, '8'])
+    def test_other_hosts_never_take_an_el_build(self, monkeypatch, el):
         result = self._check(monkeypatch, el, _release_assets('99.0'))
+        assert result['package_name'] == 'ucm-99.0-1.fc43.noarch.rpm'
+
+    @pytest.mark.parametrize('order', [1, -1])
+    def test_el10_host_takes_the_el10_build(self, monkeypatch, order):
+        result = self._check(monkeypatch, '10', _release_assets('99.0')[::order])
+        assert result['package_name'] == 'ucm-el10-99.0-1.el10.noarch.rpm'
+        assert result['checksum_url'] == 'http://x/ucm-el10-99.0-1.el10.noarch.rpm.sha256'
+
+    def test_el10_host_falls_back_on_a_release_without_el10_build(self, monkeypatch):
+        assets = [a for a in _release_assets('99.0') if '.el10.' not in a['name']]
+        result = self._check(monkeypatch, '10', assets)
         assert result['package_name'] == 'ucm-99.0-1.fc43.noarch.rpm'
 
     def test_el9_host_falls_back_on_a_release_without_el9_build(self, monkeypatch):

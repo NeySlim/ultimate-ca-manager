@@ -42,7 +42,7 @@ done
 # 4. RPM download URLs
 for f in Home.md Quick-Start.md Installation-Guide.md; do
     [ -f "$f" ] || continue
-    for rpm in ucm-:fc43 ucm-el9-:el9; do
+    for rpm in ucm-:fc43 ucm-el9-:el9 ucm-el10-:el10; do
         name=${rpm%%:*}; dist=${rpm#*:}
         sed -i "s|/releases/download/v[0-9.]*/${name}[0-9.]*-1\.$dist\.noarch\.rpm|/releases/download/v${NEW_VERSION}/$name${NEW_VERSION}-1.$dist.noarch.rpm|g" "$f"
         sed -i "s|dnf install \./${name}[0-9.]*-1\.$dist\.noarch\.rpm|dnf install ./$name${NEW_VERSION}-1.$dist.noarch.rpm|g" "$f"
