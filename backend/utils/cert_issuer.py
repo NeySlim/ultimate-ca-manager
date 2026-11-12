@@ -194,17 +194,29 @@ def find_ca_by_ski(ski, exclude_id=None):
     return found[0] if found else None
 
 
+def ca_signature_verdict(ca, cert: x509.Certificate):
+    """True when the stored CA record's key verifies *cert*'s signature, False
+    when it does not, None when that cannot be checked (no CA certificate, an
+    unreadable one, or a key type this cannot verify)."""
+    if ca is None or not ca.crt:
+        return None
+    try:
+        ca_cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+    except Exception:
+        return None
+    try:
+        return certificate_signed_by(cert, ca_cert)
+    except UnsupportedIssuerKey:
+        return None
+    except Exception:
+        return False
+
+
 def ca_signed(ca, cert: x509.Certificate) -> bool:
     """Whether the stored CA record's key verifies *cert*'s signature.
 
     An unreadable record or a key type this cannot check is never a yes."""
-    if ca is None or not ca.crt:
-        return False
-    try:
-        ca_cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
-        return certificate_signed_by(cert, ca_cert)
-    except Exception:
-        return False
+    return ca_signature_verdict(ca, cert) is True
 
 
 def signing_ca_for(cert: x509.Certificate):
