@@ -84,7 +84,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Certificates: an imported certificate is now linked to a CA only when that CA's signature on it verifies, and renewal, re-enrolment and status checks only treat as issued by a CA a stored certificate it signed.
 - OCSP: a serial the CA revoked answers `revoked`, as on its CRL, even when a non-revoked record of that serial is stored again.
 - Certificates: a certificate imported again after its revocation and deletion comes back revoked, and a certificate its CA's revocation record names is no longer renewed in place.
-- Revocation: a serial its CA recorded as revoked is reported revoked on every surface, whichever record now holds it, and lifting a hold removes its record under every spelling and every record of the CA key.
+- Revocation: a certificate its CA recorded as revoked is now shown and treated as revoked everywhere, and an hourly pass marks such certificates revoked, with an audit entry.
+- Revocation: lifting a hold is refused (409) when a final revocation is recorded for the certificate; otherwise it removes the hold's record under every record of the CA key.
+- mTLS: an administrator importing a certificate for a user can no longer enrol a revoked certificate.
 - Renewal: a certificate whose signature no longer verifies with its CA's current key (CA re-keyed or replaced under the same name) is refused with a message asking for a new certificate.
 - Users: deleting a user, alone or in bulk, left the certificates they had enrolled for mTLS valid on the CRL and at the OCSP responder; they are now revoked (cessationOfOperation) and deleted as when an enrolment is removed; a certificate that cannot be revoked does not block the deletion but is named in the answer (`unrevoked_certificates`, or `unrevoked` per user in bulk), the warning and the audit log.
 - mTLS: the self-service routes that list, assign and enrol a user's own certificates relied on the username alone; a certificate recorded before the current account was created is no longer treated as its own, and an administrator can still assign it.
