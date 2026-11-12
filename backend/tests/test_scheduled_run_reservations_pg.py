@@ -433,6 +433,18 @@ def test_two_backup_runners_write_one_archive_on_postgresql(app, monkeypatch, tm
     assert sorted(r['status'] for r in results) == ['ok', 'skipped']
 
 
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_two_first_backup_runners_write_one_archive_on_postgresql(app, monkeypatch, tmp_path):
+    with _pg(app):
+        # No run on record: the reservation is the insert the unique key lets through once
+        exported = _backup_schedule(app, monkeypatch, tmp_path, last_run=None)
+        results = _twice_at_once(app, schedule.run_scheduled_backup,
+                                 schedule, 'config_compare_and_set')
+    assert len(exported) == 1, results
+    assert sorted(r['status'] for r in results) == ['ok', 'skipped']
+
+
 # ------------------------------------------------------------------ ACME proxy
 
 def _sibling_orders(app):
