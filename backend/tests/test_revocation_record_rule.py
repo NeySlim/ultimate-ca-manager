@@ -1,0 +1,388 @@
+"""One rule for the revocation record of a serial: a ``RevokedSerial`` of the CA's key
+(or a record of the same key) for the serial, in any spelling, says revoked; lifting a
+suspension deletes it. Every surface reads it through ``persisted_revocation``."""
+import base64
+import uuid
+from datetime import datetime, timedelta, timezone
+
+import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+
+from models import CA, Certificate, RevokedSerial, db
+from tests.test_import_issuer_signature import _import, _leaf, _pem, _store
+
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
+EARLY = datetime(2026, 1, 2, 3, 4, 5)
+LATER = datetime(2026, 2, 3, 4, 5, 6)
+
+
+@pytest.fixture(scope='module')
+def issuer(app, create_ca):
+    data = create_ca(cn=f'Record Rule CA {uuid.uuid4().hex[:6]}',
+                     keyUsage=['digitalSignature', 'keyCertSign', 'cRLSign'])
+    with app.app_context():
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        row = db.session.get(CA, data['id'])
+        cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+        return row.id, row.refid, cert, get_ca_signing_key(row)
+
+
+@pytest.fixture
+def twin(app, issuer):
+    """A second record of the issuer's subject and key (a re-signed root), dropped afterwards."""
+    ca_id, _, ca_cert, ca_key = issuer
+    now = datetime.now(timezone.utc)
+    again = (x509.CertificateBuilder().subject_name(ca_cert.subject).issuer_name(ca_cert.subject)
+             .public_key(ca_key.public_key()).serial_number(x509.random_serial_number())
+             .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=365))
+             .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+             .add_extension(x509.SubjectKeyIdentifier.from_public_key(ca_key.public_key()), critical=False)
+             .sign(ca_key, hashes.SHA256()))
+    with app.app_context():
+        original = db.session.get(CA, ca_id)
+        row = CA(refid=str(uuid.uuid4()), descr='twin record', serial=0, prv=original.prv,
+                 crt=base64.b64encode(again.public_bytes(serialization.Encoding.PEM)).decode(),
+                 subject=original.subject, issuer=original.issuer)
+        db.session.add(row)
+        db.session.commit()
+        refid = row.id, row.refid
+    yield refid
+    from services.ca_service import CAService
+    from services.cert_service import CertificateService
+    with app.app_context():
+        for row_id in [r.id for r in Certificate.query.filter_by(caref=refid[1])]:
+            CertificateService.delete_certificate(row_id)
+        CAService.delete_ca(refid[0])
+
+
+def _record(app, caref, cert, *, reason='keyCompromise', at=EARLY, column=None, certificate_id=None):
+    with app.app_context():
+        record = RevokedSerial(caref=caref, serial_number=column or str(cert.serial_number),
+                               revoked_at=at, revoke_reason=reason, certificate_id=certificate_id,
+                               valid_to=cert.not_valid_after_utc.replace(tzinfo=None))
+        db.session.add(record)
+        db.session.commit()
+        return record.id
+
+
+def _row(app, row_id):
+    with app.app_context():
+        db.session.expire_all()
+        row = db.session.get(Certificate, row_id)
+        return bool(row.revoked), row.revoke_reason, row.revoked_at
+
+
+def _surfaces(app, ca_id, cert):
+    """(OCSP status, OCSP reason, CRL entry reason or None, issued status)."""
+    from services.cert.issued_lookup import issued_certificate_status
+    from services.crl_service import CRLService
+    from services.ocsp_service import OCSPService
+    with app.app_context():
+        db.session.expire_all()
+        ca = db.session.get(CA, ca_id)
+        _, ocsp_status, _, ocsp_reason = OCSPService._status_for_serial(ca, cert.serial_number)
+        crl = x509.load_pem_x509_crl(CRLService.generate_crl(ca_id).crl_pem.encode())
+        entry = crl.get_revoked_certificate_by_serial_number(cert.serial_number)
+        crl_reason = None
+        if entry is not None:
+            try:
+                crl_reason = entry.extensions.get_extension_for_class(x509.CRLReason).value.reason
+            except x509.ExtensionNotFound:
+                crl_reason = x509.ReasonFlags.unspecified
+        return ocsp_status, ocsp_reason, crl_reason, issued_certificate_status(ca, cert)[1]
+
+
+KEY_COMPROMISED = ('revoked', x509.ReasonFlags.key_compromise, x509.ReasonFlags.key_compromise, 'revoked')
+
+
+def _renewal_refused(app, row_id):
+    from services.cert.renewal import RenewalError, check_renewable
+    with app.app_context():
+        with pytest.raises(RenewalError) as e:
+            check_renewable(db.session.get(Certificate, row_id))
+        return e.value.status
+
+
+class TestAHomonymImportNeverLiftsARevocation:
+    """A revoked row updated by a namesake, then by the revoked certificate again."""
+
+    def _revoked_then_replaced(self, app, auth_client, issuer, cn):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf(cn, ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        assert auth_client.post(f'/api/v2/certificates/{row_id}/revoke',
+                                json={'reason': 'keyCompromise'}).status_code == 200
+        with app.app_context():
+            revoked_at = db.session.get(Certificate, row_id).revoked_at
+        namesake, _ = _leaf(cn, ca_cert, ca_key)
+        r = _import(auth_client, namesake)
+        assert r.status_code == 200, r.data
+        assert r.get_json()['data']['id'] == row_id
+        return real, key, row_id, revoked_at
+
+    def test_the_record_of_the_replaced_serial_is_unlinked_and_kept(self, app, auth_client, issuer):
+        _, refid, _, _ = issuer
+        real, _, row_id, revoked_at = self._revoked_then_replaced(
+            app, auth_client, issuer, 'homonym-unlinked.example.test')
+        with app.app_context():
+            record = RevokedSerial.query.filter_by(caref=refid, serial_number=str(real.serial_number)).one()
+            assert (record.certificate_id, record.revoke_reason, record.revoked_at) == (
+                None, 'keyCompromise', revoked_at)
+
+    def test_the_revoked_certificate_imported_again_answers_revoked_everywhere(
+            self, app, auth_client, issuer):
+        ca_id, _, _, _ = issuer
+        real, key, row_id, revoked_at = self._revoked_then_replaced(
+            app, auth_client, issuer, 'homonym-everywhere.example.test')
+        r = _import(auth_client, real, key)
+        assert r.status_code == 200, r.data
+        assert r.get_json()['data']['id'] == row_id
+        assert _row(app, row_id) == (True, 'keyCompromise', revoked_at)
+        assert _surfaces(app, ca_id, real) == KEY_COMPROMISED
+        assert _renewal_refused(app, row_id) == 409
+        assert auth_client.post(f'/api/v2/certificates/{row_id}/renew', json={}).status_code == 409
+        assert _row(app, row_id) == (True, 'keyCompromise', revoked_at)
+
+
+class TestARecordLinkedToTheLiveRowStillRevokes:
+    """A record linked to a row that is not revoked is not a lifted revocation."""
+
+    def test_every_surface_answers_revoked(self, app, issuer):
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('linked-live.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _record(app, refid, real, certificate_id=row_id)
+        assert _surfaces(app, ca_id, real) == KEY_COMPROMISED
+        assert _renewal_refused(app, row_id) == 409
+
+    def test_the_import_applies_it(self, app, auth_client, issuer):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('linked-import.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _record(app, refid, real, certificate_id=row_id)
+        assert _import(auth_client, real, key).status_code == 200
+        assert _row(app, row_id) == (True, 'keyCompromise', EARLY)
+
+
+class TestTheGravestRecordWins:
+
+    def test_a_compromise_outranks_an_earlier_hold_of_a_twin(self, app, auth_client, issuer, twin):
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('gravest.example.test', ca_cert, ca_key)
+        _record(app, twin[1], real, reason='certificateHold', at=EARLY)
+        _record(app, refid, real, reason='keyCompromise', at=LATER)
+        from services.cert.issued_lookup import persisted_revocation
+        with app.app_context():
+            record = persisted_revocation(db.session.get(CA, ca_id), real.serial_number)
+            assert (record.revoke_reason, record.revoked_at) == ('keyCompromise', LATER)
+        assert _surfaces(app, ca_id, real) == KEY_COMPROMISED
+        assert _import(auth_client, real, key).status_code in (200, 201)
+        with app.app_context():
+            row_id = Certificate.query.filter_by(serial_number=str(real.serial_number)).one().id
+        assert _row(app, row_id) == (True, 'keyCompromise', LATER)
+
+    def test_between_equal_reasons_the_earliest_date(self, app, issuer, twin):
+        """Non-regression: the earliest record already won before the fix."""
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, _ = _leaf('earliest.example.test', ca_cert, ca_key)
+        _record(app, refid, real, reason='unspecified', at=LATER)
+        _record(app, twin[1], real, reason='unspecified', at=EARLY)
+        from services.cert.issued_lookup import persisted_revocation
+        with app.app_context():
+            assert persisted_revocation(db.session.get(CA, ca_id), real.serial_number).revoked_at == EARLY
+
+
+class TestLiftingAHoldDeletesEveryRecordOfTheSerial:
+
+    def test_a_record_under_a_twin_goes_with_the_hold(self, app, auth_client, issuer, twin):
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('unhold-twin.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, twin[1], key=key)
+        _record(app, refid, real, reason='certificateHold')
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            row.revoked, row.revoke_reason, row.revoked_at = True, 'certificateHold', EARLY
+            db.session.commit()
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            assert RevokedSerial.query.filter(
+                RevokedSerial.caref.in_([refid, twin[1]]),
+                RevokedSerial.serial_number == str(real.serial_number)).count() == 0
+        assert _surfaces(app, ca_id, real) == ('good', None, None, 'ok')
+
+    def test_a_record_in_another_spelling_goes_with_the_hold(self, app, auth_client, issuer):
+        """Issued with a hexadecimal serial column, deleted, imported again in decimal."""
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('unhold-hex.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _record(app, refid, real, reason='certificateHold', column=format(real.serial_number, 'x'))
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            row.revoked, row.revoke_reason, row.revoked_at = True, 'certificateHold', EARLY
+            db.session.commit()
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            assert RevokedSerial.query.filter_by(caref=refid).filter(RevokedSerial.serial_number.in_(
+                [str(real.serial_number), format(real.serial_number, 'x')])).count() == 0
+        assert _surfaces(app, ca_id, real) == ('good', None, None, 'ok')
+
+    def test_a_hold_is_not_lifted_over_a_compromise(self, app, auth_client, issuer, twin):
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('unhold-compromised.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, twin[1], key=key)
+        _record(app, twin[1], real, reason='certificateHold', certificate_id=row_id)
+        _record(app, refid, real, reason='keyCompromise', at=LATER)
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            row.revoked, row.revoke_reason, row.revoked_at = True, 'certificateHold', EARLY
+            db.session.commit()
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 409, r.data
+        assert _row(app, row_id) == (True, 'certificateHold', EARLY)
+        with app.app_context():
+            assert RevokedSerial.query.filter_by(caref=refid, serial_number=str(real.serial_number)).count() == 1
+        surfaces = _surfaces(app, ca_id, real)
+        assert (surfaces[0], surfaces[2] is not None, surfaces[3]) == ('revoked', True, 'revoked')
+
+
+class TestASupersededRecordNeverReplacesAGraverOne:
+
+    def test_a_compromise_keeps_its_reason_and_date(self, app, issuer, leaf_row):
+        from services.cert.renewal import _record_superseded
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, row_id = leaf_row
+        _record(app, refid, real, reason='keyCompromise', at=EARLY)
+        with app.app_context():
+            _record_superseded(row_id, db.session.get(CA, ca_id), str(real.serial_number),
+                               datetime(2030, 1, 1), LATER)
+            db.session.commit()
+            [record] = RevokedSerial.query.filter_by(caref=refid, serial_number=str(real.serial_number)).all()
+            assert (record.revoke_reason, record.revoked_at) == ('keyCompromise', EARLY)
+
+    def test_a_record_for_the_serial_is_updated_not_duplicated(self, app, issuer, leaf_row):
+        """Non-regression: passes before the fix, called on the record alone."""
+        from services.cert.renewal import _record_superseded
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, row_id = leaf_row
+        _record(app, refid, real, reason='superseded', at=EARLY)
+        with app.app_context():
+            _record_superseded(row_id, db.session.get(CA, ca_id), str(real.serial_number),
+                               datetime(2030, 1, 1), LATER)
+            db.session.commit()
+            [record] = RevokedSerial.query.filter_by(caref=refid, serial_number=str(real.serial_number)).all()
+            assert (record.certificate_id, record.valid_to) == (row_id, datetime(2030, 1, 1))
+
+
+@pytest.fixture
+def leaf_row(app, issuer):
+    _, refid, ca_cert, ca_key = issuer
+    real, key = _leaf(f'superseded-{uuid.uuid4().hex[:6]}.example.test', ca_cert, ca_key)
+    return real, _store(app, real, refid, key=key)
+
+
+class TestAnAttachedRowTakesTheRecord:
+
+    def test_the_backfill_that_links_an_orphan_applies_it(self, app, issuer):
+        from services.ski_aki_backfill import backfill_ski_aki
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('orphan-linked.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, None, key=key)
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            row.aki = real.extensions.get_extension_for_class(
+                x509.AuthorityKeyIdentifier).value.key_identifier.hex(':').upper()
+            db.session.commit()
+        _record(app, refid, real)
+        with app.app_context():
+            backfill_ski_aki()
+            db.session.expire_all()
+            assert db.session.get(Certificate, row_id).caref == refid
+        assert _row(app, row_id) == (True, 'keyCompromise', EARLY)
+
+    def test_the_hourly_repair_marks_a_linked_row_left_unrevoked(self, app, issuer):
+        from services.ski_aki_backfill import backfill_ski_aki
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('legacy-unrevoked.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _record(app, refid, real)
+        with app.app_context():
+            backfill_ski_aki()
+        assert _row(app, row_id) == (True, 'keyCompromise', EARLY)
+
+
+class TestAnUpdateThatComesBackRevokedIsNoRenewal:
+
+    def test_no_renewal_event(self, app, auth_client, issuer, monkeypatch):
+        from services import webhook_service
+        _, refid, ca_cert, ca_key = issuer
+        current, key = _leaf('revoked-update.example.test', ca_cert, ca_key)
+        row_id = _store(app, current, refid, key=key)
+        revoked, _ = _leaf('revoked-update.example.test', ca_cert, ca_key, key=key)
+        _record(app, refid, revoked)
+        renewed = []
+        monkeypatch.setattr(webhook_service, 'emit_cert_renewed', lambda *a, **k: renewed.append(a))
+        r = _import(auth_client, revoked, key)
+        assert r.status_code == 200, r.data
+        assert _row(app, row_id) == (True, 'keyCompromise', EARLY)
+        assert renewed == []
+
+
+class TestTheSchedulerMarksARecordedRevocation:
+
+    def test_the_row_is_marked_revoked_instead_of_failing_each_pass(self, app, issuer, monkeypatch):
+        from models import AuditLog
+        from services.auto_renewal_service import AutoRenewalService
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('scheduled-revoked.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _record(app, refid, real)
+        monkeypatch.setattr(AutoRenewalService, 'get_renewal_config', staticmethod(lambda: {'enabled': True}))
+        monkeypatch.setattr(AutoRenewalService, '_held_for_approval',
+                            staticmethod(lambda cert, already_queued: None))
+        monkeypatch.setattr(AutoRenewalService, 'waiting_certificates', staticmethod(lambda config: {}))
+        monkeypatch.setattr(AutoRenewalService, '_publish_crls', staticmethod(lambda carefs: None))
+        with app.app_context():
+            monkeypatch.setattr(AutoRenewalService, 'get_certificates_for_renewal',
+                                staticmethod(lambda: [db.session.get(Certificate, row_id)]))
+            floor = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+            stats = AutoRenewalService.run_auto_renewal()
+            assert (stats['failed'], stats['skipped']) == (0, 1), stats
+            assert AuditLog.query.filter(AuditLog.id > floor,
+                                         AuditLog.action == 'certificate.auto_renewal_failed').count() == 0
+        assert _row(app, row_id) == (True, 'keyCompromise', EARLY)
+
+
+class TestAPairPartnerRevokedOnlyByItsRecord:
+
+    def test_it_is_left_out_like_a_revoked_partner(self, app, issuer, monkeypatch):
+        from services.cert import related_pair
+        from services.cert.renewal import _renewal_members
+        _, refid, ca_cert, ca_key = issuer
+        first, key_a = _leaf('pair-a.example.test', ca_cert, ca_key)
+        second, key_b = _leaf('pair-b.example.test', ca_cert, ca_key)
+        a_id, b_id = _store(app, first, refid, key=key_a), _store(app, second, refid, key=key_b)
+        _record(app, refid, second)
+        with app.app_context():
+            a, b = db.session.get(Certificate, a_id), db.session.get(Certificate, b_id)
+            monkeypatch.setattr(related_pair, 'mutual_partner', lambda cert: b if cert is a else a)
+            assert _renewal_members(a) == [a]
+
+
+class TestAnAcmeReplacementNeverSupersedesAGraverRecord:
+
+    def test_a_compromise_keeps_its_reason_and_date(self, app, issuer, leaf_row):
+        from types import SimpleNamespace
+        from services.acme_renewal_service import _record_replaced_serial
+        _, refid, _, _ = issuer
+        real, row_id = leaf_row
+        _record(app, refid, real, reason='keyCompromise', at=EARLY)
+        with app.app_context():
+            _record_replaced_serial(SimpleNamespace(
+                id=row_id, caref=refid, serial=str(real.serial_number), valid_to=datetime(2030, 1, 1),
+                pem=real.public_bytes(serialization.Encoding.PEM)))
+            [record] = RevokedSerial.query.filter_by(caref=refid, serial_number=str(real.serial_number)).all()
+            assert (record.revoke_reason, record.revoked_at) == ('keyCompromise', EARLY)

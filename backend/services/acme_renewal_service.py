@@ -191,11 +191,15 @@ def _record_replaced_serial(replaced):
         return  # an external CA publishes its own revocations
     now = utc_now()
     row = RevokedSerial.query.filter_by(caref=ca.refid, serial_number=replaced.serial).first()
-    if row is None:
+    fresh = row is None
+    if fresh:
         row = RevokedSerial(caref=ca.refid, serial_number=replaced.serial)
         db.session.add(row)
-    row.revoked_at = now
-    row.revoke_reason = 'superseded'
+    from utils.revocation_reasons import HOLD_REASONS
+    # A final revocation already recorded keeps its reason and date
+    if fresh or row.revoke_reason in HOLD_REASONS:
+        row.revoked_at = now
+        row.revoke_reason = 'superseded'
     row.valid_to = replaced.valid_to or now + timedelta(days=365)
     row.certificate_id = replaced.id
     # The row now holds the new key: the digest comes from the replaced certificate

@@ -11,7 +11,8 @@ from utils.db_transaction import safe_commit
 from utils.key_codec import MalformedKey
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
-from models import Certificate, CA, db
+from models import Certificate, CA, RevokedSerial, db
+from utils.serial_format import serial_variants
 from services.audit_service import AuditService
 from utils.cert_issuer import ca_signature_verdict, ca_signed, private_key_matches, signing_ca_for, stored_private_key_matches
 from services.import_service import (
@@ -336,7 +337,13 @@ def import_certificate():
                 kept = CA.query.filter_by(refid=existing_cert.caref).first()
                 caref = existing_cert.caref if ca_signed(kept, cert) else None
             existing_cert.caref = caref
-            apply_persisted_revocation(existing_cert)
+            if serial_changed:
+                # The row now holds another certificate: the old serial's record stays, unlinked
+                RevokedSerial.query.filter(
+                    RevokedSerial.certificate_id == existing_cert.id,
+                    RevokedSerial.serial_number.in_(serial_variants(old_serial)),
+                ).update({RevokedSerial.certificate_id: None}, synchronize_session='fetch')
+            came_back_revoked = apply_persisted_revocation(existing_cert)
 
             ok, err = safe_commit(logger, "Failed to update certificate")
             if not ok:
@@ -352,7 +359,8 @@ def import_certificate():
 
             # A new serial is a renewal, so deploy bindings push it; the same serial stays silent
             cert_dict = existing_cert.to_dict()
-            if serial_changed:
+            # A certificate its CA revoked is no renewal of the one it replaces
+            if serial_changed and not came_back_revoked:
                 from services.webhook_service import emit_cert_renewed
                 actor = getattr(getattr(g, 'current_user', None), 'username', None)
                 emit_cert_renewed(cert_dict, ca_refid=cert_dict.get('caref'), actor=actor)

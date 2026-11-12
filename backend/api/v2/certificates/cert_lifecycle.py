@@ -239,11 +239,19 @@ def unhold_certificate(cert_id):
         ca = None
         if cert.caref:
             ca = CA.query.filter_by(refid=cert.caref).first()
+        # Only a suspension lifts: a final revocation recorded for the serial stays
+        from services.cert.issued_lookup import persisted_revocation
+        from services.cert.serial_resolution import resolve_record_serial
+        serial_int = resolve_record_serial(cert)
+        record = persisted_revocation(ca, serial_int) if ca is not None and serial_int is not None else None
+        if record is not None and record.revoke_reason not in hold_reasons:
+            return error_response(
+                f'Certificate "{cert.descr or cert.refid}" is revoked for good '
+                f'({record.revoke_reason or "unspecified"}): its hold cannot be lifted', 409)
 
         # The hold as it stands, before the removeFromCRL staging below
         held = {field: getattr(cert, field)
                 for field in ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at')}
-        serial, caref = cert.serial_number, cert.caref
 
         # RFC 5280 §5.3.1 — when delta CRLs are enabled, emit removeFromCRL on
         # a delta before clearing the hold so relying parties drop the entry.
@@ -272,10 +280,10 @@ def unhold_certificate(cert_id):
 
         # The lifted hold and its revocation record go together or not at all
         try:
-            if caref and serial:
-                from models import RevokedSerial
-                RevokedSerial.query.filter_by(caref=caref, serial_number=serial).delete(
-                    synchronize_session='fetch')
+            # Every spelling, under every record of the CA's key
+            if ca is not None and serial_int is not None:
+                from services.cert.issued_lookup import lift_persisted_revocation
+                lift_persisted_revocation(ca, serial_int)
             db.session.commit()
         except Exception as e:
             db.session.rollback()

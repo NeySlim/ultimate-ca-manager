@@ -16,6 +16,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.x509.oid import ExtensionOID
 from utils.cert_issuer import ca_signed, cas_by_ski
+from services.cert.issued_lookup import apply_persisted_revocation, apply_persisted_revocations
 
 logger = logging.getLogger(__name__)
 
@@ -275,10 +276,14 @@ def backfill_ski_aki():
             if parent:
                 old_caref = cert.caref
                 cert.caref = parent.refid
+                apply_persisted_revocation(cert)  # the CA's record of the serial comes with the link
                 stats['rechained_certs'] += 1
                 logger.info(f"SKI/AKI backfill: re-chained cert '{cert.descr}' (caref={old_caref}) -> CA '{parent.descr}'")
         except Exception:
             pass
+
+    # Rows an earlier release left unrevoked beside their CA's record of the serial
+    stats['revoked_from_records'] = apply_persisted_revocations()
 
     # --- Phase 4: Deduplicate CAs with same SKI ---
     # Only records holding the same certificate are one CA: a cross-certificate
@@ -301,7 +306,7 @@ def backfill_ski_aki():
             if len(group) > 1:
                 _merge_ca_group(db, group, stats)
 
-    if stats['rechained_cas'] or stats['rechained_certs'] or stats['deduplicated']:
+    if stats['rechained_cas'] or stats['rechained_certs'] or stats['deduplicated'] or stats['revoked_from_records']:
         try:
             db.session.commit()
         except Exception as _commit_err:
