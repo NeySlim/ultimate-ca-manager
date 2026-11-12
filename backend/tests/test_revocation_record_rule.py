@@ -964,6 +964,54 @@ class TestTheCrlReadsTheRecordsOnce:
         assert [listed.get(s) for s in serials] == ['keyCompromise'] * len(made)
 
 
+class TestAPageReadsTheRecordsOnce:
+
+    def test_one_record_query_and_two_per_ca_of_the_covered_rows(self, app, issuer, create_ca):
+        import threading
+        from sqlalchemy import event
+        from services.cert.issued_lookup import persisted_revocations_of
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        other = create_ca(cn=f'Record Rule page CA {uuid.uuid4().hex[:6]}',
+                          keyUsage=['digitalSignature', 'keyCertSign', 'cRLSign'])
+        with app.app_context():
+            row = db.session.get(CA, other['id'])
+            second = (row.refid, x509.load_pem_x509_certificate(base64.b64decode(row.crt)),
+                      get_ca_signing_key(row))
+        authorities = [(issuer[1], issuer[2], issuer[3]), second]
+        made = []
+
+        def recorded_rows(count):
+            for refid, ca_cert, ca_key in authorities:
+                for _ in range(count):
+                    real, key = _leaf(f'page-{uuid.uuid4().hex[:8]}.example.test', ca_cert, ca_key)
+                    made.append(_store(app, real, refid, key=key))
+                    _record(app, refid, real, certificate_id=made[-1])
+
+        def queries():
+            seen, mine = [], threading.get_ident()
+
+            def count(_conn, _cursor, statement, *_rest):
+                if threading.get_ident() == mine:
+                    seen.append(statement)
+            with app.app_context():
+                db.session.expire_all()
+                rows = Certificate.query.filter(Certificate.id.in_(made)).all()
+                event.listen(db.engine, 'before_cursor_execute', count)
+                try:
+                    found = persisted_revocations_of(rows)
+                finally:
+                    event.remove(db.engine, 'before_cursor_execute', count)
+                return seen, found
+
+        recorded_rows(1)
+        few, _ = queries()
+        recorded_rows(3)
+        many, found = queries()
+        # The records' query, then the CA and its same-key records for each CA of the page
+        assert len(few) == len(many) == 1 + 2 * len(authorities), many
+        assert set(found) == set(made)
+
+
 @pytest.mark.parametrize('column, serial', [
     ('171', 171), ('ab', 171), ('AB', 171), ('10', 10), ('0x10', None), ('007', None), ('', None),
     ('not a serial', None), ('-10', -10)])
