@@ -59,3 +59,7 @@ tests/test_fresh_app.py
 tests/test_policy_algorithms_397.py
 tests/test_startup_backend_guards.py
 tests/test_initial_admin_password.py
+tests/test_est_fortios*.py
+tests/test_scep_get_pkioperation.py
+tests/test_scep_limited_client.py
+tests/test_scep_intune_fake_service.py
