@@ -39,6 +39,7 @@ Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `U
 | `UCM_HA` | `UCM_HA` | (unset) | `1` enables HA mode in preview: settings and restarts propagate to every node, operations that only change the local host are refused; full high availability arrives in later releases. Requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, identical on every node (the native packages generate a random key per node); the node exits at startup when one is missing (the Docker image also refuses to generate `UCM_SECRET_KEY`) |
 | `INITIAL_ADMIN_PASSWORD_FILE` | `UCM_INITIAL_ADMIN_PASSWORD_FILE` (or `INITIAL_ADMIN_PASSWORD_FILE`) | (unset) | File holding the first administrator's password (a secret), read at the first start only. See [Initial administrator password](#initial-administrator-password) |
 | `INITIAL_ADMIN_PASSWORD` | `UCM_INITIAL_ADMIN_PASSWORD` (or `INITIAL_ADMIN_PASSWORD`) | (unset: generated) | The first administrator's password, read at the first start only. No default |
+| `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE` | `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE` | (unset) | `1`: the provided password was drawn by a deployment tool, nobody chose it; it must be changed at first login. The Helm chart sets it for the value it generates |
 | `INITIAL_ADMIN_USERNAME` / `INITIAL_ADMIN_EMAIL` | `UCM_INITIAL_ADMIN_USERNAME` / `UCM_INITIAL_ADMIN_EMAIL` | `admin` / `admin@localhost` | Identity of the first administrator |
 | `UCM_NODE_ID` | `UCM_NODE_ID` | hostname | Node name reported as `node_id` by `/health` and `/health/ready` |
 | `BACKUP_MAX_UPLOAD_MB` | `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive written before 3.0 (format v1 to v3) a restore accepts and reads, in MB; its decompressed content may be four times that. Archives written since 3.0 (v4) are read in chunks and not bound by it. Every other request keeps the 50 MB limit |
@@ -817,6 +818,7 @@ UCM has no default password. When the database holds no user, the start creates 
 |--------|--------|---------------|--------------|
 | `INITIAL_ADMIN_PASSWORD_FILE` | path of a file holding the password (Docker, Compose or Kubernetes secret); one trailing line ending is dropped | no | no |
 | `INITIAL_ADMIN_PASSWORD` | the value itself | no | no |
+| either one, with `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE=1` | a deployment tool that drew the value (the Helm chart, for the one it generates) | yes, at first login | no |
 | generated | neither is set | yes, at first login | `DATA_DIR/initial-admin-password` |
 
 - **Priority.** None: both set refuses the start (`INITIAL_ADMIN_PASSWORD and INITIAL_ADMIN_PASSWORD_FILE are both set: keep only one`), since which one was meant cannot be guessed. A `_FILE` that cannot be read or is empty refuses the start too, naming the path; UCM never falls back to generating a password the operator did not expect.

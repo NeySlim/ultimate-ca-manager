@@ -154,6 +154,18 @@ def test_a_provided_variable_is_used_without_file_or_forced_change(database, tmp
     assert 'Operator-Chosen-1!' not in logs
 
 
+def test_a_password_a_deployment_tool_generated_is_forced_without_a_file(database, tmp_path):
+    """The Helm chart's own random value: the operator never chose it."""
+    data = tmp_path / 'node'
+    result, logs = _boot(database, data, {'INITIAL_ADMIN_PASSWORD': 'Chart-Generated-Value-1',
+                                          'INITIAL_ADMIN_PASSWORD_FORCE_CHANGE': '1',
+                                          'CHILD_LOGIN': 'Chart-Generated-Value-1'})
+    assert result['login'] == 200 and result['forced'] is True
+    assert result['users'] == [['admin', True]]
+    assert not (data / PASSWORD_FILE).exists()
+    assert 'Chart-Generated-Value-1' not in logs
+
+
 def test_a_provided_file_is_used_without_generation_or_forced_change(database, tmp_path):
     data = tmp_path / 'node'
     secret = tmp_path / 'secret'
@@ -370,3 +382,11 @@ def test_a_weak_provided_password_is_kept_and_said_without_its_value(app, caplog
     assert got.value == 'changeme123' and not got.generated
     assert 'does not meet the password policy' in caplog.text
     assert 'changeme123' not in caplog.text
+
+
+@pytest.mark.parametrize('flag, forced', [('1', True), ('true', True), ('', False), ('0', False)])
+def test_the_force_change_flag_marks_a_provided_password(flag, forced):
+    from auth import initial_admin
+    got = initial_admin.resolve({'INITIAL_ADMIN_PASSWORD': 'Some-Value-1!',
+                                 'INITIAL_ADMIN_PASSWORD_FORCE_CHANGE': flag})
+    assert got.force_change is forced and not got.generated

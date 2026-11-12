@@ -137,3 +137,22 @@ def test_helm_notes_point_to_the_secret_on_install_only(tmp_path):
     upgraded = _notes(tmp_path / 'u', '--is-upgrade')
     assert 'UCM_INITIAL_ADMIN_PASSWORD' not in upgraded
     assert 'keeps its password' in upgraded
+
+
+@pytest.mark.skipif(shutil.which('helm') is None, reason='helm not installed')
+@pytest.mark.parametrize('args, forced', [
+    ((), True),
+    (('--set', 'initialAdminPassword=Operator-Chosen-1!'), False),
+    (('--set', 'extraEnv[0].name=INITIAL_ADMIN_PASSWORD_FILE', '--set', 'extraEnv[0].value=/s'), False),
+], ids=['generated', 'provided', 'file'])
+def test_helm_a_password_it_generated_is_changed_at_first_login(args, forced):
+    env = {i['name']: i.get('value') for i in _deploy_env(_render(*args))}
+    assert (env.get('INITIAL_ADMIN_PASSWORD_FORCE_CHANGE') == '1') is forced
+
+
+@pytest.mark.skipif(shutil.which('helm') is None, reason='helm not installed')
+def test_helm_generated_password_has_no_character_to_misread():
+    for _ in range(5):
+        secret = next(d for d in _render() if d['kind'] == 'Secret')
+        value = secret['stringData']['UCM_INITIAL_ADMIN_PASSWORD']
+        assert len(value) == 24 and value.isalnum() and not set(value) & set('0Oo1lI')

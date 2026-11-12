@@ -279,6 +279,8 @@ class Config:
     # No default: unset, auth.initial_admin generates one into the data directory
     INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD") or None
     INITIAL_ADMIN_PASSWORD_FILE = os.getenv("INITIAL_ADMIN_PASSWORD_FILE") or None
+    # Set by the Helm chart for the value it generated: changed at first login like ours
+    INITIAL_ADMIN_PASSWORD_FORCE_CHANGE = os.getenv("INITIAL_ADMIN_PASSWORD_FORCE_CHANGE") or None
     INITIAL_ADMIN_EMAIL = os.getenv("INITIAL_ADMIN_EMAIL", "admin@localhost")
     
     # Rate Limiting

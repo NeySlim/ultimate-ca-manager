@@ -160,6 +160,8 @@ spec:
                 secretKeyRef:
                   name: t-ucm-secrets
                   key: UCM_INITIAL_ADMIN_PASSWORD
+            - name: INITIAL_ADMIN_PASSWORD_FORCE_CHANGE
+              value: "1"
           livenessProbe:
             httpGet:
               path: /health/live

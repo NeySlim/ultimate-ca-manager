@@ -38,6 +38,8 @@ class InitialPassword:
     value: str = field(repr=False)
     generated: bool
     source: str  # 'INITIAL_ADMIN_PASSWORD', 'INITIAL_ADMIN_PASSWORD_FILE' or 'generated'
+    # Provided, but drawn by a deployment tool (the Helm chart): nobody chose it
+    force_change: bool = False
 
 
 def password_file(config) -> Path:
@@ -55,6 +57,7 @@ def read_command(path) -> str:
 def resolve(config) -> InitialPassword:
     """Both sources set is refused: which one the operator meant cannot be guessed."""
     value = config.get('INITIAL_ADMIN_PASSWORD') or ''
+    force = str(config.get('INITIAL_ADMIN_PASSWORD_FORCE_CHANGE') or '').lower() in ('1', 'true', 'yes')
     path = config.get('INITIAL_ADMIN_PASSWORD_FILE') or ''
     if value and path:
         raise InitialPasswordError(
@@ -70,9 +73,9 @@ def resolve(config) -> InitialPassword:
         value = value.rstrip('\r\n')
         if not value:
             raise InitialPasswordError(f'INITIAL_ADMIN_PASSWORD_FILE {path} is empty')
-        return InitialPassword(value, False, 'INITIAL_ADMIN_PASSWORD_FILE')
+        return InitialPassword(value, False, 'INITIAL_ADMIN_PASSWORD_FILE', force)
     if value:
-        return InitialPassword(value, False, 'INITIAL_ADMIN_PASSWORD')
+        return InitialPassword(value, False, 'INITIAL_ADMIN_PASSWORD', force)
     return InitialPassword(''.join(secrets.choice(ALPHABET) for _ in range(LENGTH)), True, 'generated')
 
 
@@ -160,7 +163,7 @@ def seed_admin(config, prepared=None):
         email=config.get('INITIAL_ADMIN_EMAIL') or 'admin@localhost',
         role='admin',
         active=True,
-        force_password_change=prepared.generated,
+        force_password_change=prepared.generated or prepared.force_change,
         # Forced 2FA enrolment (#141) never locks this account out
         totp_exempt=True,
     )

@@ -102,3 +102,11 @@ variable is then not passed, both sources set refuse the start.
 {{- if has .name (list "INITIAL_ADMIN_PASSWORD_FILE" "UCM_INITIAL_ADMIN_PASSWORD_FILE") }}true{{ end -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+"true" when the initial admin password is the chart's own random value: the
+application then forces its change at first login, as for one it generates.
+*/}}
+{{- define "ucm.adminPasswordGenerated" -}}
+{{- if not (or .Values.initialAdminPassword (include "ucm.adminPasswordFromFile" .)) }}true{{ end -}}
+{{- end -}}

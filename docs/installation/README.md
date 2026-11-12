@@ -243,7 +243,7 @@ The chart always provides the password: `initialAdminPassword` when set, otherwi
 kubectl -n ucm get secret ucm-secrets -o jsonpath='{.data.UCM_INITIAL_ADMIN_PASSWORD}' | base64 -d; echo
 ```
 
-(`<fullname>-secrets` for another release name.) As a provided password, it is not forced to change: change it in Account > Password after the first login. No file is written in the pod. `helm template` and GitOps tools cannot look the Secret up and render a new value each time: set `initialAdminPassword` there.
+(`<fullname>-secrets` for another release name.) The value the chart generated must be changed at the first login, as a generated password (the chart sets `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE=1`); a value you set in `initialAdminPassword` is yours and no change is forced. No file is written in the pod. `helm template` and GitOps tools cannot look the Secret up and render a new value each time: set `initialAdminPassword` there.
 
 ### HA (several nodes on one PostgreSQL)
 
