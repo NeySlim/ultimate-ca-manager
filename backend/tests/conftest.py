@@ -229,6 +229,15 @@ def _deterministic_dns(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _kek_refusal_ends_with_its_test():
+    """A KEK refused by a test's start is the process's until it restarts: not the next test's."""
+    yield
+    from security.encryption import key_encryption
+    if key_encryption.kek_refused:
+        key_encryption.start_over()
+
+
+@pytest.fixture(autouse=True)
 def _reset_acme_proxy_caches():
     """The ACME proxy caches are process-wide: no test may see another's."""
     from services.acme.acme_proxy_service import reset_proxy_caches
@@ -300,12 +309,27 @@ def encryption_enabled(monkeypatch, tmp_path, app):
         patch.setattr(enc_mod, 'MASTER_KEY_PATH', tmp_path / 'master.key')
         patch.setenv('KEY_ENCRYPTION_KEY', Fernet.generate_key().decode('ascii'))
         patch.delenv('KEY_ENCRYPTION_KEY_FILE', raising=False)
-        enc_mod.key_encryption.reload()
+        enc_mod.key_encryption.start_over()
         assert enc_mod.key_encryption.is_enabled
         yield enc_mod
 
-    enc_mod.key_encryption.reload()
+    # A KEK a test's start refused is evaluated again, as by a restart
+    enc_mod.key_encryption.start_over()
     _drop_unreadable_key_material(app)
+
+
+@pytest.fixture
+def dek_refresh_now(monkeypatch):
+    """Every key use re-reads the DEK rows, so a rotation or a disable waits for no process."""
+    from security import encryption as enc_mod
+    monkeypatch.setattr(enc_mod, 'REFRESH_SECONDS', 0.0)
+
+
+@pytest.fixture
+def dek_retire_at_once(monkeypatch):
+    """A rotation drops the previous DEK at its end, with no grace period."""
+    from security import dek_rotation
+    monkeypatch.setattr(dek_rotation, 'GRACE_SECONDS', 0.0)
 
 
 _SESSION_APP = []

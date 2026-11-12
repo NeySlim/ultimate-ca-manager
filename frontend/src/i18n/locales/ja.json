@@ -2854,6 +2854,21 @@
     "encryptRemainingKeys": "残りのキーを暗号化 ({{count}})",
     "encryptRemainingKeysConfirm": "暗号化されずに保存されている {{count}} 個のキーとシークレットを暗号化しますか？既に暗号化されているものはそのままです。",
     "encryptRemainingKeysDone": "{{count}} 個のキーとシークレットを暗号化しました",
+    "kekFingerprint": "Key-encryption key fingerprint",
+    "dekVersion": "Data key version",
+    "dekRotationInProgress": "Data key rotation in progress",
+    "rotateDataKey": "Rotate Data Key",
+    "resumeDataKeyRotation": "Finish Data Key Rotation",
+    "previousDekKeptUntil": "Previous data key kept until {{date}}",
+    "previousDekKeptUntilNodesReload": "Previous data key kept until every node has reloaded the new one, then for two minutes",
+    "disabledKeysKeptUntil": "The data keys still open values written during the disable until {{date}}; encryption can be enabled again after that.",
+    "disabledKeysKeptUntilNodesReload": "The data keys still open values written during the disable until every node has reloaded, then for two minutes; encryption can be enabled again after that.",
+    "encryptionDisabling": "Disable left half-way",
+    "encryptionDisablingHint": "A disable of encryption stopped before every value was decrypted. Every value still opens and nothing new is encrypted: run the disable again to finish it.",
+    "runDisableAgain": "Run Disable Again",
+    "rotateDataKeyConfirm": "Create a new data key and re-encrypt every stored private key and secret under it? The master key does not change.",
+    "rotateDataKeyDone": "Data key rotated to version {{version}}",
+    "rotateDataKeyPending": "Rotation started: some nodes have not loaded the new key yet. Run it again to finish.",
     "backupMasterKey": "マスターキーをバックアップ",
     "masterKeyBackupTitle": "マスターキーをバックアップしてください",
     "masterKeyBackupCritical": "重要: 今すぐこのキーをバックアップしてください",
@@ -3386,7 +3401,7 @@
           "remedy": "DATABASE_URL から gssencmode を、環境変数から PGGSSENCMODE を削除するか、disable に設定してください。接続は TLS で保護されます。"
         },
         "keys_no_master_key": {
-          "title": "マスターキーが設定されていません。CA と証明書の秘密鍵は暗号化されずにデータベースに保存されます",
+          "title": "Private keys are stored unencrypted (no master key, or encryption disabled)",
           "remedy": "設定 > セキュリティで秘密鍵の暗号化を有効にするか、/etc/ucm/master.key または KEY_ENCRYPTION_KEY を指定してください。UCM_REQUIRE_KEY_ENCRYPTION=true の場合、マスターキーがないと UCM は起動しません。"
         },
         "https_unapproved_key": {
@@ -4350,6 +4365,8 @@
     "step1Title": "マスターキーファイルを配置してください：",
     "mismatchDescription": "設定されたマスターキーでは保存済みの秘密鍵を復号できません。暗号化に使われたキーではありません。以前のマスターキーを復元するまで秘密鍵にはアクセスできません。",
     "mismatchStep1Title": "以前のマスターキーファイルを次の場所に戻してください：",
+    "foreignKekDescription": "Encryption was disabled for this cluster under another key-encryption key: this node's key is not the cluster's. Nothing is encrypted, and this node writes nothing until its key matches.",
+    "foreignKekStep1Title": "Configure the cluster's key-encryption key on this node, in KEY_ENCRYPTION_KEY or at:",
     "step2Title": "その後サービスを再起動してください：",
     "lostKeyHint": "マスターキーを紛失した場合は、バックアップから復元してください。",
     "polling": "確認中..."

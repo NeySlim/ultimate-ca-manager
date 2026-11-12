@@ -15,7 +15,7 @@ function networksList(value) {
   return networksText(value).split(/[\s,;]+/).filter(Boolean)
 }
 
-export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, encryptionLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
+export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, handleRotateDataKey, encryptionLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
   const { t } = useTranslation()
   // Fields the API writes for admin:settings only are shown, but disabled.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
@@ -32,15 +32,40 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
         {encryptionStatus ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <Badge variant={encryptionStatus.enabled ? 'success' : 'warning'}>
-                {encryptionStatus.enabled ? t('common.enabled') : t('common.disabled')}
-              </Badge>
+              {encryptionStatus.disabling ? (
+                <Badge variant="warning">{t('settings.encryptionDisabling')}</Badge>
+              ) : (
+                <Badge variant={encryptionStatus.enabled ? 'success' : 'warning'}>
+                  {encryptionStatus.enabled ? t('common.enabled') : t('common.disabled')}
+                </Badge>
+              )}
               {encryptionStatus.enabled && encryptionStatus.key_source && (
                 <span className="text-xs text-text-tertiary">
                   {t('settings.keySource')}: {encryptionStatus.key_file_path}
                 </span>
               )}
             </div>
+
+            {encryptionStatus.enabled && encryptionStatus.kek_fingerprint && (
+              <div className="flex items-center gap-3 flex-wrap text-xs text-text-secondary">
+                <span>
+                  {t('settings.kekFingerprint')}: <code className="text-text-primary">{encryptionStatus.kek_fingerprint}</code>
+                </span>
+                <span>
+                  {t('settings.dekVersion')}: <strong className="text-text-primary">{encryptionStatus.dek_version}</strong>
+                </span>
+                {encryptionStatus.rotation_in_progress && (
+                  <Badge variant="warning">{t('settings.dekRotationInProgress')}</Badge>
+                )}
+                {encryptionStatus.previous_dek_retire_after ? (
+                  <Badge variant="secondary">
+                    {t('settings.previousDekKeptUntil', { date: formatDate(encryptionStatus.previous_dek_retire_after, { hour: '2-digit', minute: '2-digit' }) })}
+                  </Badge>
+                ) : encryptionStatus.previous_dek_waits_for_nodes && (
+                  <Badge variant="secondary">{t('settings.previousDekKeptUntilNodesReload')}</Badge>
+                )}
+              </div>
+            )}
             
             {encryptionStatus.total_keys > 0 && (
               <div className="flex gap-4 text-sm">
@@ -63,12 +88,25 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
 
             <p className="text-xs text-text-secondary">{t('settings.encryptionDesc')}</p>
 
+            {encryptionStatus.disabling && (
+              <p className="text-sm text-status-warning">{t('settings.encryptionDisablingHint')}</p>
+            )}
+
+            {encryptionStatus.disabled_keys_kept_until ? (
+              <p className="text-sm text-text-secondary">
+                {t('settings.disabledKeysKeptUntil', { date: formatDate(encryptionStatus.disabled_keys_kept_until, { hour: '2-digit', minute: '2-digit' }) })}
+              </p>
+            ) : encryptionStatus.disabled_keys_wait_for_nodes && (
+              <p className="text-sm text-text-secondary">{t('settings.disabledKeysKeptUntilNodesReload')}</p>
+            )}
+
             {hasPermission('admin:system') && (
               <div>
                 {!encryptionStatus.enabled ? (
-                  <Button 
+                  <Button
                     onClick={() => setShowEnableEncryptionModal(true)}
                     variant="primary"
+                    disabled={!!encryptionStatus.disabled_keys_kept_until || !!encryptionStatus.disabled_keys_wait_for_nodes}
                   >
                     <LockKey size={16} />
                     {t('settings.enableEncryption')}
@@ -84,7 +122,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                         {t('settings.backupMasterKey')}
                       </Button>
                     )}
-                    {encryptionStatus.unencrypted_count > 0 && handleEncryptRemainingKeys && (
+                    {!encryptionStatus.disabling && encryptionStatus.unencrypted_count > 0 && handleEncryptRemainingKeys && (
                       <Button
                         onClick={handleEncryptRemainingKeys}
                         variant="primary"
@@ -94,16 +132,26 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                         {t('settings.encryptRemainingKeys', { count: encryptionStatus.unencrypted_count })}
                       </Button>
                     )}
-                    {/* An environment key would come back after the file is removed */}
-                    {encryptionStatus.key_source === 'file' && (
+                    {!encryptionStatus.disabling && handleRotateDataKey && (
                       <Button
-                        onClick={() => setShowDisableEncryptionModal(true)}
+                        onClick={handleRotateDataKey}
                         variant="outline"
+                        disabled={encryptionLoading || !!encryptionStatus.previous_dek_retire_after || !!encryptionStatus.previous_dek_waits_for_nodes}
                       >
-                        <Lock size={16} />
-                        {t('settings.disableEncryption')}
+                        <LockKey size={16} />
+                        {encryptionStatus.rotation_in_progress
+                          ? t('settings.resumeDataKeyRotation')
+                          : t('settings.rotateDataKey')}
                       </Button>
                     )}
+                    {/* A key that stays configured (environment, HA) is kept unused */}
+                    <Button
+                      onClick={() => setShowDisableEncryptionModal(true)}
+                      variant="outline"
+                    >
+                      <Lock size={16} />
+                      {encryptionStatus.disabling ? t('settings.runDisableAgain') : t('settings.disableEncryption')}
+                    </Button>
                   </div>
                 )}
               </div>

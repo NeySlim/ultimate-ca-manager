@@ -22,11 +22,11 @@ PREVIOUS = b'-----BEGIN PRIVATE KEY-----\nprevious\n-----END PRIVATE KEY-----\n'
 
 @pytest.fixture
 def mirrors_enabled(monkeypatch):
-    """Mirroring only happens when database encryption is off."""
+    """Mirroring only happens while new values are stored in the clear."""
     from security import encryption
 
     monkeypatch.setattr(
-        type(encryption.key_encryption), 'is_enabled',
+        type(encryption.key_encryption), 'is_encrypting',
         property(lambda self: False))
 
 
@@ -102,7 +102,7 @@ class TestAStaleMirrorGoesWhenEncryptionIsOn:
         from security import encryption
 
         monkeypatch.setattr(
-            type(encryption.key_encryption), 'is_enabled',
+            type(encryption.key_encryption), 'is_encrypting',
             property(lambda self: True))
         destination = tmp_path / 'ca-1.key'
         destination.write_bytes(PREVIOUS)

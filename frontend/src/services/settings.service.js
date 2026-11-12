@@ -106,6 +106,11 @@ export const settingsService = {
     return apiClient.post('/system/security/disable-encryption')
   },
 
+  // New data key, every stored value re-encrypted under it; 202 while nodes lag (run again)
+  async rotateDataKey() {
+    return apiClient.post('/system/security/rotate-encryption-key')
+  },
+
   // Encrypts only the keys still stored in the clear; encrypted ones are skipped
   async encryptAllKeys() {
     return apiClient.post('/system/security/encrypt-all-keys', { dry_run: false })

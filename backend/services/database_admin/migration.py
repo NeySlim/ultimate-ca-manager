@@ -102,6 +102,8 @@ def _safe_ident(name: str) -> str:
 # the very case the fallback exists for, a switch from an installation using
 # custom roles or SSO died on a foreign key violation.
 BOOTSTRAP_AUTH_TABLES = (
+    # The DEKs: pro_sso_providers and system_config carry values encrypted under them
+    "encryption_keys",
     "users",
     "groups",
     "group_members",

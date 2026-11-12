@@ -83,12 +83,15 @@ Compose refuses to start while one of these variables is missing. The balancer l
 - **Certificate files** mirrored by renewals and session file cleanup, which run on the leader only.
 - **The self-signed HTTPS certificate** of each node, as long as none was applied or regenerated from the web interface. Once one is, every node writes it from the database before it starts (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md), HA mode).
 
+## Shared encryption key
+
+Every node holds the same key-encryption key (KEK): `KEY_ENCRYPTION_KEY`, or the same `master.key` on every node. The data-encryption keys it wraps live in the database (`encryption_keys`), so enabling, disabling, encrypting all keys and rotating the data key work from any node; the others reload the keys within seconds (`reload_encryption`). Each node publishes the fingerprint of its KEK (a truncated hash, never the key) in `cluster_nodes`, and a node whose fingerprint differs from a live peer's refuses to start and names that peer. Back up the KEK: the database without it is unreadable. See [Private-Key Encryption](ADMIN_GUIDE.md#private-key-encryption-kek-and-dek).
+
 ## Refused in HA mode today
 
 These operations answer `409` with code `ha_mode`, because they only change the host that receives the request:
 
 - backend switch and data migration between databases (`database.py`): change `DATABASE_URL` by hand, then restart;
-- enabling and disabling encryption, and encrypting all keys: the key is shared through `KEY_ENCRYPTION_KEY`;
 - secret rotation (it writes `ucm.env`);
 - backup restore, both from System and from Settings (restored files land on one node).
 

@@ -34,10 +34,10 @@ def no_key(monkeypatch, tmp_path, app):
             patch.delenv(var, raising=False)
         patch.setattr(boot, 'in_container', lambda: False)
         patch.setitem(app.config, 'AUTO_MASTER_KEY', True)
-        enc.key_encryption.reload()
+        enc.key_encryption.start_over()
         assert not enc.key_encryption.is_enabled
         yield enc
-    enc.key_encryption.reload()
+    enc.key_encryption.start_over()
     _drop_unreadable_key_material(app)
 
 
@@ -258,6 +258,8 @@ def test_exclusive_write_never_replaces_a_key(no_key):
     assert [p.name for p in path.parent.iterdir()] == ['master.key']
 
 
+# A restart after the grace (master.key and DEKs gone): the disable ends it at once
+@pytest.mark.usefixtures('dek_retire_at_once')
 def test_disabled_encryption_stays_disabled_after_restart(app, auth_client, create_ca, no_key):
     """Disabling from the UI leaves nothing encrypted: the next start must not take it for a new installation."""
     from security.master_key_bootstrap import bootstrap_master_key, check_master_key_at_start

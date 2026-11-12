@@ -2855,6 +2855,21 @@
     "encryptRemainingKeys": "Encrypt remaining keys ({{count}})",
     "encryptRemainingKeysConfirm": "Encrypt the {{count}} keys and secrets still stored unencrypted? Those already encrypted are left as they are.",
     "encryptRemainingKeysDone": "Encrypted {{count}} keys and secrets",
+    "kekFingerprint": "Key-encryption key fingerprint",
+    "dekVersion": "Data key version",
+    "dekRotationInProgress": "Data key rotation in progress",
+    "rotateDataKey": "Rotate Data Key",
+    "resumeDataKeyRotation": "Finish Data Key Rotation",
+    "previousDekKeptUntil": "Previous data key kept until {{date}}",
+    "previousDekKeptUntilNodesReload": "Previous data key kept until every node has reloaded the new one, then for two minutes",
+    "disabledKeysKeptUntil": "The data keys still open values written during the disable until {{date}}; encryption can be enabled again after that.",
+    "disabledKeysKeptUntilNodesReload": "The data keys still open values written during the disable until every node has reloaded, then for two minutes; encryption can be enabled again after that.",
+    "encryptionDisabling": "Disable left half-way",
+    "encryptionDisablingHint": "A disable of encryption stopped before every value was decrypted. Every value still opens and nothing new is encrypted: run the disable again to finish it.",
+    "runDisableAgain": "Run Disable Again",
+    "rotateDataKeyConfirm": "Create a new data key and re-encrypt every stored private key and secret under it? The master key does not change.",
+    "rotateDataKeyDone": "Data key rotated to version {{version}}",
+    "rotateDataKeyPending": "Rotation started: some nodes have not loaded the new key yet. Run it again to finish.",
     "backupMasterKey": "Back Up Master Key",
     "masterKeyBackupTitle": "Back Up Your Master Key",
     "masterKeyBackupCritical": "Critical: back up this key NOW",
@@ -3387,7 +3402,7 @@
           "remedy": "Remove gssencmode from DATABASE_URL and PGGSSENCMODE from the environment, or set them to disable: TLS then protects the connection."
         },
         "keys_no_master_key": {
-          "title": "No master key is configured: CA and certificate private keys are stored unencrypted in the database",
+          "title": "Private keys are stored unencrypted (no master key, or encryption disabled)",
           "remedy": "Enable private key encryption in Settings > Security, or provide /etc/ucm/master.key or KEY_ENCRYPTION_KEY; with UCM_REQUIRE_KEY_ENCRYPTION=true, UCM then refuses to start without one."
         },
         "https_unapproved_key": {
@@ -4350,6 +4365,8 @@
     "step1Title": "Place your master key file at:",
     "mismatchDescription": "The configured master key does not decrypt the stored private keys: it is not the key they were encrypted with. Private keys cannot be accessed until the previous master key is restored.",
     "mismatchStep1Title": "Put the previous master key file back at:",
+    "foreignKekDescription": "Encryption was disabled for this cluster under another key-encryption key: this node's key is not the cluster's. Nothing is encrypted, and this node writes nothing until its key matches.",
+    "foreignKekStep1Title": "Configure the cluster's key-encryption key on this node, in KEY_ENCRYPTION_KEY or at:",
     "step2Title": "Then restart the service:",
     "lostKeyHint": "If you lost the master key, restore from a backup to recover your private keys.",
     "polling": "Checking for resolution..."

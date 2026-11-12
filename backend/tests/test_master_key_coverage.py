@@ -194,24 +194,39 @@ def test_decrypting_is_all_or_nothing(app, secrets, only_these):
         assert key_encryption.is_encrypted(db.session.get(*secrets['target']).private_key)
 
 
-def test_disabling_is_refused_while_the_key_comes_from_the_environment(
+def _drop_disabled_marker(app):
+    from models import EncryptionKey
+    with app.app_context():
+        EncryptionKey.query.delete()
+        db.session.commit()
+
+
+# Asserts the state once the grace is over (no DEK left): the disable ends it at once
+@pytest.mark.usefixtures('dek_retire_at_once')
+def test_disabling_keeps_a_key_from_the_environment_unused(
         app, auth_client, secrets, only_these):
+    """The variable cannot be removed from here: it stays, marked unused, and a reload keeps
+    encryption off instead of taking it back (it used to be refused with 409)."""
     from security.encryption import encrypt_text, key_encryption
 
     assert key_encryption.key_source == 'env'
     with app.app_context():
         db.session.get(*secrets['target']).private_key = encrypt_text(PEM)
         db.session.commit()
+    try:
+        response = auth_client.post('/api/v2/system/security/disable-encryption')
+        assert response.status_code == 200, response.data
+        with app.app_context():
+            key_encryption.reload()
+            assert not key_encryption.is_enabled and key_encryption.kek_loaded
+            assert db.session.get(*secrets['target']).private_key == PEM
+    finally:
+        _drop_disabled_marker(app)
 
-    response = auth_client.post('/api/v2/system/security/disable-encryption')
-    # The key would be reloaded from the environment: nothing to disable
-    assert response.status_code == 409, response.data
-    assert key_encryption.is_enabled
-    with app.app_context():
-        assert key_encryption.is_encrypted(db.session.get(*secrets['target']).private_key)
 
-
-def test_disabling_is_refused_while_the_environment_would_supply_a_key(
+# Asserts the state once the grace is over (master.key removed): the disable ends it at once
+@pytest.mark.usefixtures('dek_retire_at_once')
+def test_disabling_a_key_file_does_not_fall_back_to_the_environment(
         app, auth_client, secrets, only_these):
     from security import encryption
     from security.encryption import KeyEncryption, encrypt_text, key_encryption
@@ -223,9 +238,13 @@ def test_disabling_is_refused_while_the_environment_would_supply_a_key(
     with app.app_context():
         db.session.get(*secrets['target']).private_key = encrypt_text(PEM)
         db.session.commit()
-
-    response = auth_client.post('/api/v2/system/security/disable-encryption')
-    assert response.status_code == 409, response.data
-    assert encryption.MASTER_KEY_PATH.exists()
-    with app.app_context():
-        assert key_encryption.is_encrypted(db.session.get(*secrets['target']).private_key)
+    try:
+        response = auth_client.post('/api/v2/system/security/disable-encryption')
+        assert response.status_code == 200, response.data
+        assert not encryption.MASTER_KEY_PATH.exists()
+        with app.app_context():
+            key_encryption.reload()
+            assert key_encryption.key_source == 'env' and not key_encryption.is_enabled
+            assert db.session.get(*secrets['target']).private_key == PEM
+    finally:
+        _drop_disabled_marker(app)

@@ -2961,6 +2961,21 @@
     "encryptRemainingKeys": "Chiffrer les clés restantes ({{count}})",
     "encryptRemainingKeysConfirm": "Chiffrer les {{count}} clés et secrets encore stockés en clair ? Ceux déjà chiffrés restent inchangés.",
     "encryptRemainingKeysDone": "{{count}} clés et secrets chiffrés",
+    "kekFingerprint": "Empreinte de la clé maître",
+    "dekVersion": "Version de la clé de données",
+    "dekRotationInProgress": "Rotation de la clé de données en cours",
+    "rotateDataKey": "Rotation de la clé de données",
+    "resumeDataKeyRotation": "Terminer la rotation de la clé de données",
+    "previousDekKeptUntil": "Clé de données précédente conservée jusqu'au {{date}}",
+    "previousDekKeptUntilNodesReload": "Clé de données précédente conservée jusqu'à ce que tous les nœuds aient chargé la nouvelle, puis pendant deux minutes",
+    "disabledKeysKeptUntil": "Les clés de données ouvrent encore jusqu'au {{date}} les valeurs écrites pendant la désactivation ; le chiffrement pourra être réactivé ensuite.",
+    "disabledKeysKeptUntilNodesReload": "Les clés de données ouvrent encore les valeurs écrites pendant la désactivation jusqu'à ce que tous les nœuds l'aient prise en compte, puis pendant deux minutes ; le chiffrement pourra être réactivé ensuite.",
+    "encryptionDisabling": "Désactivation interrompue",
+    "encryptionDisablingHint": "Une désactivation du chiffrement s'est arrêtée avant que toutes les valeurs soient déchiffrées. Toutes les valeurs s'ouvrent encore et rien de nouveau n'est chiffré : relancez la désactivation pour la terminer.",
+    "runDisableAgain": "Relancer la désactivation",
+    "rotateDataKeyConfirm": "Créer une nouvelle clé de données et rechiffrer sous elle chaque clé privée et secret stocké ? La clé maître ne change pas.",
+    "rotateDataKeyDone": "Clé de données passée à la version {{version}}",
+    "rotateDataKeyPending": "Rotation commencée : certains nœuds n'ont pas encore chargé la nouvelle clé. Relancez-la pour la terminer.",
     "backupMasterKey": "Sauvegarder la clé maître",
     "masterKeyBackupTitle": "Sauvegardez votre clé maître",
     "masterKeyBackupCritical": "Critique : sauvegardez cette clé MAINTENANT",
@@ -3537,7 +3552,7 @@
           "remedy": "Retirez gssencmode de DATABASE_URL et PGGSSENCMODE de l'environnement, ou définissez-les sur disable : TLS protège alors la connexion."
         },
         "keys_no_master_key": {
-          "title": "Aucune clé maître n'est configurée : les clés privées des CA et des certificats sont stockées non chiffrées dans la base de données",
+          "title": "Les clés privées sont stockées non chiffrées (aucune clé maître, ou chiffrement désactivé)",
           "remedy": "Activez le chiffrement des clés privées dans Paramètres > Sécurité, ou fournissez /etc/ucm/master.key ou KEY_ENCRYPTION_KEY ; avec UCM_REQUIRE_KEY_ENCRYPTION=true, UCM refuse alors de démarrer sans clé."
         },
         "https_unapproved_key": {
@@ -4350,6 +4365,8 @@
     "step1Title": "Placez votre fichier de clé maître dans :",
     "mismatchDescription": "La clé maître configurée ne déchiffre pas les clés privées stockées : ce n'est pas celle qui les a chiffrées. Les clés privées restent inaccessibles tant que la clé maître précédente n'est pas restaurée.",
     "mismatchStep1Title": "Remettez le fichier de la clé maître précédente dans :",
+    "foreignKekDescription": "Le chiffrement de ce cluster a été désactivé sous une autre clé maître : la clé de ce nœud n'est pas celle du cluster. Rien n'est chiffré, et ce nœud n'écrit rien tant que sa clé ne correspond pas.",
+    "foreignKekStep1Title": "Configurez la clé maître du cluster sur ce nœud, dans KEY_ENCRYPTION_KEY ou dans :",
     "step2Title": "Puis redémarrez le service :",
     "lostKeyHint": "Si vous avez perdu la clé maître, restaurez à partir d'une sauvegarde pour récupérer vos clés privées.",
     "polling": "Vérification en cours..."

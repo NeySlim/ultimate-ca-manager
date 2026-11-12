@@ -97,14 +97,16 @@ def test_a_failed_restore_writes_no_file_for_the_rows_it_did_not_keep(target):
     assert not cert.exists() and not key.exists()
 
 
-@pytest.mark.parametrize('encrypted', [False, True])
-def test_a_key_mirror_waits_for_the_publication(tmp_path, monkeypatch, encrypted):
+# (DEKs loaded, new values encrypted): (False, False) off, (True, False) a disable's grace
+@pytest.mark.parametrize('enabled,encrypted', [(False, False), (True, False), (True, True)])
+def test_a_key_mirror_waits_for_the_publication(tmp_path, monkeypatch, enabled, encrypted):
     """Written at once, a mirror outlived the rollback; removed at once, it was lost by one."""
     from security.encryption import key_encryption
     from services.backup.restore.files import StagedFiles
     from services.backup.restore_core import _stage_key_mirror
 
-    monkeypatch.setattr(type(key_encryption), 'is_enabled', property(lambda self: encrypted))
+    monkeypatch.setattr(type(key_encryption), 'is_enabled', property(lambda self: enabled))
+    monkeypatch.setattr(type(key_encryption), 'is_encrypting', property(lambda self: encrypted))
     mirror = tmp_path / 'private' / 'ca_x.key'
     mirror.parent.mkdir()
     mirror.write_bytes(b'before')

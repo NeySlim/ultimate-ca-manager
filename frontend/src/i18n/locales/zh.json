@@ -2854,6 +2854,21 @@
     "encryptRemainingKeys": "加密剩余密钥（{{count}}）",
     "encryptRemainingKeysConfirm": "加密仍以未加密形式存储的 {{count}} 个密钥和凭据？已加密的保持不变。",
     "encryptRemainingKeysDone": "已加密 {{count}} 个密钥和凭据",
+    "kekFingerprint": "Key-encryption key fingerprint",
+    "dekVersion": "Data key version",
+    "dekRotationInProgress": "Data key rotation in progress",
+    "rotateDataKey": "Rotate Data Key",
+    "resumeDataKeyRotation": "Finish Data Key Rotation",
+    "previousDekKeptUntil": "Previous data key kept until {{date}}",
+    "previousDekKeptUntilNodesReload": "Previous data key kept until every node has reloaded the new one, then for two minutes",
+    "disabledKeysKeptUntil": "The data keys still open values written during the disable until {{date}}; encryption can be enabled again after that.",
+    "disabledKeysKeptUntilNodesReload": "The data keys still open values written during the disable until every node has reloaded, then for two minutes; encryption can be enabled again after that.",
+    "encryptionDisabling": "Disable left half-way",
+    "encryptionDisablingHint": "A disable of encryption stopped before every value was decrypted. Every value still opens and nothing new is encrypted: run the disable again to finish it.",
+    "runDisableAgain": "Run Disable Again",
+    "rotateDataKeyConfirm": "Create a new data key and re-encrypt every stored private key and secret under it? The master key does not change.",
+    "rotateDataKeyDone": "Data key rotated to version {{version}}",
+    "rotateDataKeyPending": "Rotation started: some nodes have not loaded the new key yet. Run it again to finish.",
     "backupMasterKey": "备份主密钥",
     "masterKeyBackupTitle": "备份您的主密钥",
     "masterKeyBackupCritical": "重要：立即备份此密钥",
@@ -3386,7 +3401,7 @@
           "remedy": "请从 DATABASE_URL 中移除 gssencmode，并从环境变量中移除 PGGSSENCMODE，或将它们设置为 disable：此后由 TLS 保护连接。"
         },
         "keys_no_master_key": {
-          "title": "未配置主密钥：CA 和证书的私钥以未加密形式存储在数据库中",
+          "title": "Private keys are stored unencrypted (no master key, or encryption disabled)",
           "remedy": "请在 设置 > 安全 中启用私钥加密，或提供 /etc/ucm/master.key 或 KEY_ENCRYPTION_KEY；若设置 UCM_REQUIRE_KEY_ENCRYPTION=true，则没有主密钥时 UCM 将拒绝启动。"
         },
         "https_unapproved_key": {
@@ -4347,6 +4362,8 @@
     "step1Title": "将主密钥文件放置在：",
     "mismatchDescription": "配置的主密钥无法解密已存储的私钥：它不是加密这些私钥时使用的密钥。在恢复之前的主密钥之前，无法访问私钥。",
     "mismatchStep1Title": "将之前的主密钥文件放回：",
+    "foreignKekDescription": "Encryption was disabled for this cluster under another key-encryption key: this node's key is not the cluster's. Nothing is encrypted, and this node writes nothing until its key matches.",
+    "foreignKekStep1Title": "Configure the cluster's key-encryption key on this node, in KEY_ENCRYPTION_KEY or at:",
     "step2Title": "然后重启服务：",
     "lostKeyHint": "如果丢失了主密钥，请从备份中恢复。",
     "polling": "正在检查..."

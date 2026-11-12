@@ -485,13 +485,14 @@ def _database_gssenc():
 
 
 @detector('keys.no_master_key', WARNING,
-          'No master key is configured: CA and certificate private keys are stored unencrypted '
-          'in the database',
+          'Private keys are stored unencrypted (no master key, or encryption disabled)',
           'Enable private key encryption in Settings > Security, or provide '
           '/etc/ucm/master.key or KEY_ENCRYPTION_KEY; with UCM_REQUIRE_KEY_ENCRYPTION=true, '
           'UCM then refuses to start without one.')
 def _no_master_key():
-    if encryption.key_encryption.is_enabled:
+    from security.dek_rotation import shown_as_enabled
+    # As the encryption status: a disable in its grace keeps its DEKs but encrypts nothing
+    if shown_as_enabled():
         return []
     return [f'{encryption.MASTER_KEY_PATH}, KEY_ENCRYPTION_KEY']
 

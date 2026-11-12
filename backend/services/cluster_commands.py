@@ -24,15 +24,15 @@ RELOAD_RATE_LIMITS = 'reload_rate_limits'
 RELOAD_SYSLOG = 'reload_syslog'
 RELOAD_ADMIN_ALLOWLIST = 'reload_admin_allowlist'
 RESTART = 'restart'
+# The DEKs changed (enable, disable, rotation): reload them and re-evaluate safe mode
+RELOAD_ENCRYPTION = 'reload_encryption'
 RELOAD_KEYTAB = 'reload_keytab'
 # One node's turn in a rolling update (services.update_campaign), always targeted
 UPDATE = 'update'
-# No password policy kind (read from the database on every check) and no encryption kind
-# (enabling or rotating encryption is refused in HA until key envelopes ship).
-# No HTTPS kind: each node writes the HTTPS pair from the database as it starts, so a
-# rolling restart (RESTART) is what serves a new certificate.
+# No password policy kind: read from the database on every check. No HTTPS kind: each
+# node writes the HTTPS pair from the database as it starts, so RESTART serves a new one.
 KINDS = frozenset({RELOAD_RATE_LIMITS, RELOAD_SYSLOG, RELOAD_ADMIN_ALLOWLIST, RESTART,
-                   RELOAD_KEYTAB, UPDATE})
+                   RELOAD_ENCRYPTION, RELOAD_KEYTAB, UPDATE})
 
 TICK_SECONDS = 2.0
 # A missing id below a newer one is a transaction still committing (or rolled back): wait this long
@@ -209,6 +209,13 @@ def _reload_admin_allowlist(payload):
     admin_allowlist.invalidate_cache()
 
 
+def _reload_encryption(payload):
+    """The payload names a DEK version only, never key material."""
+    from flask import current_app
+    from security.master_key_bootstrap import reload_encryption_state
+    reload_encryption_state(current_app)
+
+
 def _reload_keytab(payload):
     from services.kerberos.negotiate_auth import write_stored_keytab
     done = write_stored_keytab()
@@ -225,6 +232,7 @@ HANDLERS = {
     RELOAD_RATE_LIMITS: _reload_rate_limits,
     RELOAD_SYSLOG: _reload_syslog,
     RELOAD_ADMIN_ALLOWLIST: _reload_admin_allowlist,
+    RELOAD_ENCRYPTION: _reload_encryption,
     RELOAD_KEYTAB: _reload_keytab,
     UPDATE: _update,
 }

@@ -42,6 +42,8 @@ tests/test_migration_149*.py
 tests/test_migration_150*.py
 tests/test_migration_151*.py
 tests/test_migration_152*.py
+tests/test_migration_153*.py
+tests/test_encryption_envelope*.py
 tests/test_binding_left_behind.py
 tests/test_user_id_never_reused.py
 tests/test_ws_relay*.py

@@ -2854,6 +2854,21 @@
     "encryptRemainingKeys": "Crittografa chiavi rimanenti ({{count}})",
     "encryptRemainingKeysConfirm": "Crittografare le {{count}} chiavi e i segreti ancora memorizzati in chiaro? Quelli già crittografati restano invariati.",
     "encryptRemainingKeysDone": "{{count}} chiavi e segreti crittografati",
+    "kekFingerprint": "Key-encryption key fingerprint",
+    "dekVersion": "Data key version",
+    "dekRotationInProgress": "Data key rotation in progress",
+    "rotateDataKey": "Rotate Data Key",
+    "resumeDataKeyRotation": "Finish Data Key Rotation",
+    "previousDekKeptUntil": "Previous data key kept until {{date}}",
+    "previousDekKeptUntilNodesReload": "Previous data key kept until every node has reloaded the new one, then for two minutes",
+    "disabledKeysKeptUntil": "The data keys still open values written during the disable until {{date}}; encryption can be enabled again after that.",
+    "disabledKeysKeptUntilNodesReload": "The data keys still open values written during the disable until every node has reloaded, then for two minutes; encryption can be enabled again after that.",
+    "encryptionDisabling": "Disable left half-way",
+    "encryptionDisablingHint": "A disable of encryption stopped before every value was decrypted. Every value still opens and nothing new is encrypted: run the disable again to finish it.",
+    "runDisableAgain": "Run Disable Again",
+    "rotateDataKeyConfirm": "Create a new data key and re-encrypt every stored private key and secret under it? The master key does not change.",
+    "rotateDataKeyDone": "Data key rotated to version {{version}}",
+    "rotateDataKeyPending": "Rotation started: some nodes have not loaded the new key yet. Run it again to finish.",
     "backupMasterKey": "Backup chiave principale",
     "masterKeyBackupTitle": "Esegui il backup della tua chiave principale",
     "masterKeyBackupCritical": "Critico: esegui ORA il backup di questa chiave",
@@ -3386,7 +3401,7 @@
           "remedy": "Rimuovi gssencmode da DATABASE_URL e PGGSSENCMODE dall'ambiente, oppure impostali su disable: la connessione sarà protetta da TLS."
         },
         "keys_no_master_key": {
-          "title": "Nessuna chiave master configurata: le chiavi private delle CA e dei certificati sono memorizzate non cifrate nel database",
+          "title": "Private keys are stored unencrypted (no master key, or encryption disabled)",
           "remedy": "Abilita la cifratura delle chiavi private in Impostazioni > Sicurezza, oppure fornisci /etc/ucm/master.key o KEY_ENCRYPTION_KEY; con UCM_REQUIRE_KEY_ENCRYPTION=true, UCM rifiuta di avviarsi senza una chiave."
         },
         "https_unapproved_key": {
@@ -4347,6 +4362,8 @@
     "step1Title": "Posiziona il file chiave master in:",
     "mismatchDescription": "La chiave master configurata non decifra le chiavi private archiviate: non è quella con cui sono state cifrate. Le chiavi private restano inaccessibili finché non viene ripristinata la chiave master precedente.",
     "mismatchStep1Title": "Rimetti il file della chiave master precedente in:",
+    "foreignKekDescription": "Encryption was disabled for this cluster under another key-encryption key: this node's key is not the cluster's. Nothing is encrypted, and this node writes nothing until its key matches.",
+    "foreignKekStep1Title": "Configure the cluster's key-encryption key on this node, in KEY_ENCRYPTION_KEY or at:",
     "step2Title": "Poi riavvia il servizio:",
     "lostKeyHint": "Se hai perso la chiave master, ripristina da un backup.",
     "polling": "Verifica in corso..."

@@ -2854,6 +2854,21 @@
     "encryptRemainingKeys": "Verbleibende Schlüssel verschlüsseln ({{count}})",
     "encryptRemainingKeysConfirm": "Die {{count}} noch unverschlüsselt gespeicherten Schlüssel und Geheimnisse verschlüsseln? Bereits verschlüsselte bleiben unverändert.",
     "encryptRemainingKeysDone": "{{count}} Schlüssel und Geheimnisse verschlüsselt",
+    "kekFingerprint": "Key-encryption key fingerprint",
+    "dekVersion": "Data key version",
+    "dekRotationInProgress": "Data key rotation in progress",
+    "rotateDataKey": "Rotate Data Key",
+    "resumeDataKeyRotation": "Finish Data Key Rotation",
+    "previousDekKeptUntil": "Previous data key kept until {{date}}",
+    "previousDekKeptUntilNodesReload": "Previous data key kept until every node has reloaded the new one, then for two minutes",
+    "disabledKeysKeptUntil": "The data keys still open values written during the disable until {{date}}; encryption can be enabled again after that.",
+    "disabledKeysKeptUntilNodesReload": "The data keys still open values written during the disable until every node has reloaded, then for two minutes; encryption can be enabled again after that.",
+    "encryptionDisabling": "Disable left half-way",
+    "encryptionDisablingHint": "A disable of encryption stopped before every value was decrypted. Every value still opens and nothing new is encrypted: run the disable again to finish it.",
+    "runDisableAgain": "Run Disable Again",
+    "rotateDataKeyConfirm": "Create a new data key and re-encrypt every stored private key and secret under it? The master key does not change.",
+    "rotateDataKeyDone": "Data key rotated to version {{version}}",
+    "rotateDataKeyPending": "Rotation started: some nodes have not loaded the new key yet. Run it again to finish.",
     "backupMasterKey": "Hauptschlüssel sichern",
     "masterKeyBackupTitle": "Sichern Sie Ihren Hauptschlüssel",
     "masterKeyBackupCritical": "Kritisch: sichern Sie diesen Schlüssel JETZT",
@@ -3386,7 +3401,7 @@
           "remedy": "gssencmode aus DATABASE_URL und PGGSSENCMODE aus der Umgebung entfernen oder auf disable setzen: TLS schützt die Verbindung dann."
         },
         "keys_no_master_key": {
-          "title": "Es ist kein Master-Schlüssel konfiguriert: Private Schlüssel von CAs und Zertifikaten werden unverschlüsselt in der Datenbank gespeichert",
+          "title": "Private keys are stored unencrypted (no master key, or encryption disabled)",
           "remedy": "Die Verschlüsselung privater Schlüssel unter Einstellungen > Sicherheit aktivieren oder /etc/ucm/master.key bzw. KEY_ENCRYPTION_KEY bereitstellen; mit UCM_REQUIRE_KEY_ENCRYPTION=true startet UCM ohne einen solchen Schlüssel nicht."
         },
         "https_unapproved_key": {
@@ -4347,6 +4362,8 @@
     "step1Title": "Platzieren Sie Ihre Hauptschlüsseldatei unter:",
     "mismatchDescription": "Der konfigurierte Hauptschlüssel entschlüsselt die gespeicherten privaten Schlüssel nicht: Sie wurden mit einem anderen Schlüssel verschlüsselt. Die privaten Schlüssel bleiben unzugänglich, bis der vorherige Hauptschlüssel wiederhergestellt ist.",
     "mismatchStep1Title": "Legen Sie die vorherige Hauptschlüsseldatei wieder ab unter:",
+    "foreignKekDescription": "Encryption was disabled for this cluster under another key-encryption key: this node's key is not the cluster's. Nothing is encrypted, and this node writes nothing until its key matches.",
+    "foreignKekStep1Title": "Configure the cluster's key-encryption key on this node, in KEY_ENCRYPTION_KEY or at:",
     "step2Title": "Dann starten Sie den Dienst neu:",
     "lostKeyHint": "Wenn Sie den Hauptschlüssel verloren haben, stellen Sie aus einem Backup wieder her.",
     "polling": "Überprüfung läuft..."

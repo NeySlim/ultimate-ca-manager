@@ -1,19 +1,21 @@
 """
 Private Key Encryption Module
-Encrypts private keys at rest using Fernet (AES-128-CBC with HMAC-SHA256)
+Encrypts private keys at rest using Fernet (AES-128-CBC with HMAC-SHA256) under a
+data-encryption key (DEK) that the key-encryption key (KEK) wraps: see security.envelope.
 
-Key sources (in order of priority):
+KEK sources (in order of priority):
 1. master.key in the configuration directory (UCM_CONFIG_DIR, default /etc/ucm)
 2. KEY_ENCRYPTION_KEY environment variable (backward compat)
 """
 
 import os
+import time
 import base64
 import tempfile
 import logging
 from pathlib import Path
 from typing import Optional, Tuple
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken, MultiFernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -25,6 +27,9 @@ from utils.randomness import csp_bytes
 logger = logging.getLogger(__name__)
 
 ENCRYPTED_MARKER = b'ENC:'
+# A process re-reads the DEK rows before using a key once its last read is this old: a
+# change committed elsewhere (rotation, disable) reaches every process within that bound
+REFRESH_SECONDS = 2.0
 MASTER_KEY_PATH = master_key_file()
 
 
@@ -50,6 +55,32 @@ def log_encryption_disabled() -> None:
     )
 
 
+def _table_missing(error) -> bool:
+    """The DEK table does not exist yet (SQLite, PostgreSQL 42P01); any other error is not that."""
+    orig = getattr(error, 'orig', error)
+    if getattr(orig, 'sqlstate', None) == '42P01' or getattr(orig, 'pgcode', None) == '42P01':
+        return True
+    message = str(orig).lower()
+    return 'no such table' in message and 'encryption_keys' in message
+
+
+_UNREAD = object()
+
+
+def _read_rows():
+    """The DEK rows, [] before migration 153, None outside an application context."""
+    from security import envelope
+    try:
+        return envelope.stored_rows()
+    except Exception as e:
+        if not _table_missing(e):
+            raise
+        from models import db
+        db.session.rollback()
+        logger.debug(f"DEK table not read: {type(e).__name__}")
+        return []
+
+
 class KeyEncryption:
     """
     Handles encryption/decryption of private keys stored in database.
@@ -57,10 +88,21 @@ class KeyEncryption:
     """
     
     _instance = None
-    _fernet = None
-    _key_bytes = None
+    _fernet = None  # the active DEK: every new value is encrypted with it
+    _decryptor = None  # every DEK this process holds, the active one first
+    _key_bytes = None  # the KEK
+    _versions = ()
+    _active_version = None
+    _rows_loaded = False
+    _rows = None  # the DEK rows last read
+    _read_at = 0.0  # time.monotonic() of that read
     _enabled = False
     _key_source = None  # 'file', 'env', or None
+    dek_error = None  # why stored DEKs were not loaded ('kek_mismatch'), or None
+    # Why this process runs without its KEK until it restarts (refuse_kek), or None; the
+    # refused KEK's fingerprint is still published to the peers
+    kek_refused = None
+    _refused_kek_id = None
     
     def __new__(cls):
         if cls._instance is None:
@@ -120,10 +162,8 @@ class KeyEncryption:
         
         try:
             key_bytes = key.encode('utf-8')
-            self._fernet = Fernet(key_bytes)
-            self._key_bytes = base64.urlsafe_b64decode(key_bytes)
-            self._enabled = True
-            logger.info("✅ Private key encryption enabled")
+            Fernet(key_bytes)
+            kek = base64.urlsafe_b64decode(key_bytes)
         except Exception as e:
             logger.error(f"❌ Invalid encryption key: {e}")
             # A key that EXISTS but does not parse must not bypass the
@@ -138,41 +178,208 @@ class KeyEncryption:
                     'with plaintext key storage.'
                 )
             self._enabled = False
+            return
+        self._key_bytes = kek
+        # A database error propagates: reload() then keeps the keys it had
+        self._load_data_keys()
+        if self._enabled:
+            logger.info("✅ Private key encryption enabled")
     
+    def _set_deks(self, deks: dict, active) -> None:
+        self._versions = tuple(sorted(deks))
+        self._active_version = active
+        if active is None:
+            self._fernet = self._decryptor = None
+            self._enabled = False
+            return
+        self._fernet = deks[active]
+        self._decryptor = MultiFernet([deks[active]] + [f for v, f in sorted(deks.items())
+                                                        if v != active])
+        self._enabled = True
+
+    def _load_data_keys(self, rows=_UNREAD) -> None:
+        """The DEKs the database holds under this KEK; outside an app context, the KEK alone.
+
+        No row: the KEK is DEK version 1, unless a disabled marker is left, under this KEK or
+        another (a KEK replaced after a disable never turns encryption back on). A row this
+        KEK did not wrap leaves encryption off (dek_error), so nothing is written under a key
+        the database does not know.
+        """
+        from security import envelope
+        rows = _read_rows() if rows is _UNREAD else rows
+        self.dek_error = None
+        self._set_deks({}, None)
+        self._rows_loaded = rows is not None
+        if rows is not None:
+            self._rows, self._read_at = rows, time.monotonic()
+        mine = envelope.kek_id(self._key_bytes)
+        keys = [r for r in rows or () if r[1] in (envelope.ACTIVE, envelope.PREVIOUS)]
+        disabled = any(r[1] == envelope.DISABLED for r in rows or ())
+        if not keys:
+            if disabled:
+                return  # turned off from the UI, under this KEK or the one it replaced
+            self._set_deks({1: Fernet(base64.urlsafe_b64encode(self._key_bytes))}, 1)
+            return
+        deks, active = {}, None
+        for version, state, wrapping_kek, wrapped in keys:
+            try:
+                if wrapping_kek != mine:
+                    raise ValueError(f'DEK version {version} is wrapped by another key')
+                dek = envelope.material(self._key_bytes, version, wrapped)
+            except ValueError as e:
+                self.dek_error = 'kek_mismatch'
+                logger.error(f"❌ {e}: the configured key-encryption key is not this database's")
+                return
+            deks[version] = Fernet(base64.urlsafe_b64encode(dek))
+            if state == envelope.ACTIVE:
+                active = max(active or 0, version)
+        self._set_deks(deks, active if active is not None else max(deks))
+        if disabled:
+            # Being disabled: every value still opens, nothing new is encrypted
+            self._fernet = None
+
+    _FIELDS = ('_fernet', '_decryptor', '_key_bytes', '_versions', '_active_version',
+               '_rows_loaded', '_rows', '_read_at', '_enabled', '_key_source', 'dek_error')
+
+    def _swap_in(self, build) -> None:
+        """Build the new state on a scratch object, then publish it in one dict update.
+
+        A request (or greenlet) running while the DEKs reload sees the old keys or the
+        new ones, never encryption off: a write in that gap would land in plaintext.
+        """
+        fresh = object.__new__(type(self))
+        for name in self._FIELDS:
+            setattr(fresh, name, getattr(type(self), name))
+        build(fresh)
+        self.__dict__.update({name: getattr(fresh, name) for name in self._FIELDS})
+
+    def _ensure_loaded(self) -> None:
+        """The DEK rows, read before a use when never read or older than REFRESH_SECONDS.
+
+        A read that fails raises: the use fails rather than run on keys that may be stale.
+        """
+        if self._key_bytes is None:
+            return
+        if self._rows_loaded and time.monotonic() - self._read_at < REFRESH_SECONDS:
+            return
+        from flask import has_app_context
+        if not has_app_context():
+            return
+        rows = _read_rows()
+        if self._rows_loaded and rows == self._rows:
+            self._read_at = time.monotonic()
+            return
+        kek, source = self._key_bytes, self._key_source
+
+        def build(fresh):
+            fresh._key_bytes, fresh._key_source = kek, source
+            fresh._load_data_keys(rows)
+        self._swap_in(build)
+
+    def load_rows(self, rows) -> None:
+        """Without an application context (the gunicorn master): the DEK rows the caller read."""
+        if self.kek_refused:
+            return
+        kek, source = self._key_bytes, self._key_source
+
+        def build(fresh):
+            fresh._key_bytes, fresh._key_source = kek, source
+            fresh._load_data_keys(rows)
+        self._swap_in(build)
+
     def reload(self):
-        """Reload encryption key (after enable/disable)"""
-        self._fernet = None
-        self._key_bytes = None
-        self._enabled = False
-        self._key_source = None
-        self._initialize()
+        """Reload the KEK and the DEKs (after enable, disable, rotation or a cluster command);
+        a KEK refused by this process stays unloaded until it restarts."""
+        if self.kek_refused:
+            return
+        self._swap_in(lambda fresh: fresh._initialize())
+
+    def refuse_kek(self, reason: str) -> None:
+        """The KEK is not the database's: run without it until the process restarts."""
+        kept = self.kek_fingerprint() or self._refused_kek_id
+        self.unload()
+        self.kek_refused, self._refused_kek_id = reason, kept
+
+    def start_over(self) -> None:
+        """A start evaluates the configured KEK again (check_master_key_at_start)."""
+        self.kek_refused = self._refused_kek_id = None
+        self.reload()
+
+    def configured_kek_fingerprint(self) -> Optional[str]:
+        """The fingerprint the peers compare: the configured KEK's, refused or not."""
+        return self.kek_fingerprint() or self._refused_kek_id
     
     def unload(self):
         """Run as without a key, e.g. when the configured one is not the database's."""
-        self._fernet = None
+        self._fernet = self._decryptor = None
         self._key_bytes = None
         self._enabled = False
+        self._versions = ()
+        self._active_version = None
+
+    @property
+    def dek_rows(self) -> tuple:
+        """The DEK rows last read, (version, state, kek_id, wrapped); never key material in clear."""
+        return tuple(self._rows or ())
+
+    @property
+    def kek_loaded(self) -> bool:
+        return self._key_bytes is not None
+
+    @property
+    def active_version(self):
+        return self._active_version
+
+    @property
+    def dek_versions(self) -> tuple:
+        return self._versions
+
+    def kek_fingerprint(self) -> Optional[str]:
+        """The KEK's public fingerprint (security.envelope.kek_id), None without a KEK."""
+        if self._key_bytes is None:
+            return None
+        from security.envelope import kek_id
+        return kek_id(self._key_bytes)
+
+    def kek_bytes_for_envelope(self) -> Optional[bytes]:
+        """For security.envelope and the rotation only: never logged, never returned by the API."""
+        return self._key_bytes
+
+    def _decrypt_token(self, token: bytes) -> bytes:
+        """Any DEK this process holds: during a rotation a value is under the old or the new one."""
+        return self._decryptor.decrypt(token)
+
+    def refresh(self) -> None:
+        """Re-read the DEK rows now: under the key-state lock, the state the database holds."""
+        self._read_at = float('-inf')
+        self._ensure_loaded()
 
     @property
     def is_enabled(self) -> bool:
+        self._ensure_loaded()
         return self._enabled
+
+    @property
+    def is_encrypting(self) -> bool:
+        """Enabled and not being disabled: new values are encrypted."""
+        return self.is_enabled and self._fernet is not None
     
     @property
     def key_source(self) -> Optional[str]:
         return self._key_source
 
     def derive_key(self, label: bytes, length: int = 32) -> Optional[bytes]:
-        """A key of its own for ``label``, derived from the master key (HKDF-SHA256).
+        """A key of its own for ``label``, derived from the KEK (HKDF-SHA256).
 
-        None without a master key. The master key itself never leaves this object.
+        None without a KEK. Bound to the KEK, not the DEK: a DEK rotation changes no derived key.
         """
-        if not self._enabled or not self._key_bytes:
+        if not self._key_bytes:
             return None
         return HKDF(algorithm=hashes.SHA256(), length=length, salt=None,
                     info=label).derive(self._key_bytes)
     
     def encrypt(self, data: str) -> str:
-        if not self._enabled or not data:
+        if not self.is_encrypting or not data:
             return data
         
         try:
@@ -209,14 +416,14 @@ class KeyEncryption:
         if not decoded.startswith(ENCRYPTED_MARKER):
             return data
         
-        if not self._enabled:
+        if not self.is_enabled:
             logger.error("Cannot decrypt: encryption key not available")
             raise ValueError("Encryption key not configured")
         
         # Step 2: actual decryption — only failures here are real errors.
         try:
             encrypted_data = decoded[len(ENCRYPTED_MARKER):]
-            decrypted = self._fernet.decrypt(encrypted_data)
+            decrypted = self._decrypt_token(encrypted_data)
             return base64.b64encode(decrypted).decode('utf-8')
         except InvalidToken:
             logger.error("Decryption failed: Invalid token (wrong key?)")
@@ -295,7 +502,7 @@ class KeyEncryption:
 
     def encrypt_string(self, plaintext: str) -> str:
         """Encrypt a plaintext string (e.g., LDAP bind password). Returns prefixed base64."""
-        if not self._enabled or not plaintext:
+        if not self.is_encrypting or not plaintext:
             return plaintext
         try:
             encrypted = self._fernet.encrypt(plaintext.encode('utf-8'))
@@ -313,11 +520,11 @@ class KeyEncryption:
             decoded = base64.b64decode(data)
             if not decoded.startswith(ENCRYPTED_MARKER):
                 return data
-            if not self._enabled:
+            if not self.is_enabled:
                 logger.error("Cannot decrypt: encryption key not available")
                 return data
             encrypted_data = decoded[len(ENCRYPTED_MARKER):]
-            return self._fernet.decrypt(encrypted_data).decode('utf-8')
+            return self._decrypt_token(encrypted_data).decode('utf-8')
         except Exception:
             return data
 
@@ -443,7 +650,7 @@ def decrypt_master_key_value(value: str, fmt: str) -> str:
         raise ValueError("Encryption key not configured")
     token = base64.b64decode(value)[len(ENCRYPTED_MARKER):]
     try:
-        return key_encryption._fernet.decrypt(token).decode('utf-8')
+        return key_encryption._decrypt_token(token).decode('utf-8')
     except InvalidToken:
         raise ValueError("Failed to decrypt - wrong encryption key")
 
@@ -530,7 +737,7 @@ def encrypt_all_keys(dry_run: bool = True) -> tuple:
     Encrypt every value still stored unencrypted under the master key.
     Returns: (encrypted_count, skipped_count, errors)
     """
-    if not key_encryption.is_enabled:
+    if not key_encryption.is_encrypting:
         return 0, 0, ["Encryption not enabled"]
 
     from models import db

@@ -43,14 +43,15 @@ def test_missing_key_encryption_key_refused(ha_cfg, monkeypatch, tmp_path):
         ha.validate_ha_config(Config)
 
 
-def test_master_key_file_accepted_with_warning(ha_cfg, monkeypatch, tmp_path, caplog):
+def test_master_key_file_accepted_identity_checked_at_start(ha_cfg, monkeypatch, tmp_path, caplog):
+    """The KEK fingerprint check at start replaces the old 'not verified' warning."""
     monkeypatch.delenv('KEY_ENCRYPTION_KEY')
     mk = tmp_path / 'master.key'
     mk.write_text('x')
     monkeypatch.setattr('security.encryption.MASTER_KEY_PATH', mk)
     with caplog.at_level(logging.WARNING):
         ha.validate_ha_config(Config)
-    assert 'master.key identity between nodes is not verified' in caplog.text
+    assert 'not verified' not in caplog.text
 
 
 def test_valid_ha_config_starts(ha_cfg, caplog):
@@ -110,7 +111,6 @@ def test_env_key_with_master_key_file_warns_file_wins(ha_cfg, monkeypatch, tmp_p
     monkeypatch.setattr('security.encryption.MASTER_KEY_PATH', mk)
     with caplog.at_level(logging.WARNING):
         ha.validate_ha_config(Config)
-    assert 'master.key identity between nodes is not verified' in caplog.text
     assert 'overrides KEY_ENCRYPTION_KEY' in caplog.text
 
 

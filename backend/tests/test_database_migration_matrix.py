@@ -289,6 +289,40 @@ class TestAUserIdCrossesTheSwitchUnused:
         assert _next_user_id(pg_target) > gone
 
 
+class TestTheDataKeysCrossTheSwitch:
+    """A switch without data carries values under the DEK: it carries the DEK rows too."""
+
+    def _bootstrap(self, app, target):
+        from models import EncryptionKey
+        from utils.datetime_utils import utc_now
+        with app.app_context():
+            EncryptionKey.query.delete()
+            db.session.add(EncryptionKey(version=7, state='active', kek_id='0' * 16,
+                                         wrapped='1:dGVzdA==', created_at=utc_now()))
+            db.session.commit()
+            try:
+                ok, message, _ = migration.bootstrap_auth_to_target(target)
+            finally:
+                EncryptionKey.query.delete()
+                db.session.commit()
+        assert ok is True, message
+        engine = create_engine(target)
+        try:
+            with engine.connect() as conn:
+                rows = conn.execute(text(
+                    'SELECT version, state, wrapped FROM encryption_keys')).fetchall()
+        finally:
+            engine.dispose()
+        assert [tuple(r) for r in rows] == [(7, 'active', '1:dGVzdA==')]
+
+    def test_bootstrap_to_sqlite(self, app, sqlite_target):
+        self._bootstrap(app, sqlite_target)
+
+    @_needs_pg
+    def test_bootstrap_to_postgresql(self, app, pg_target):
+        self._bootstrap(app, pg_target)
+
+
 class TestTheSourceKeepsBeingWrittenTo:
     def test_a_row_written_during_the_copy_is_wholly_in_or_wholly_out(
             self, app, create_ca, create_cert, sqlite_target, monkeypatch):

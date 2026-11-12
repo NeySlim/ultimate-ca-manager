@@ -134,8 +134,15 @@ def activate_new_master_key(exclusive: bool) -> dict:
     The key file is removed only when it failed to load: once a value is
     encrypted under it, removing it would lose that value.
     """
+    from models import db, EncryptionKey
+    from security import envelope
+    from security.dek_rotation import lock_key_state
     KeyEncryption = _encryption.KeyEncryption
     key_encryption = _encryption.key_encryption
+    # A disabled marker keeps any KEK off: enabling is what lifts it
+    lock_key_state()
+    EncryptionKey.query.filter_by(state=envelope.DISABLED).delete(synchronize_session=False)
+    db.session.commit()
     KeyEncryption.write_key_file(KeyEncryption.generate_key(), exclusive=exclusive)
     key_encryption.reload()
     if not key_encryption.is_enabled:
@@ -143,14 +150,19 @@ def activate_new_master_key(exclusive: bool) -> dict:
         raise KeyActivationError('Failed to initialize encryption after key generation')
 
     encrypted, skipped, errors = _encryption.encrypt_all_keys(dry_run=False)
+    return {'encrypted': encrypted, 'skipped': skipped, 'errors': errors,
+            'purge': purge_plaintext_key_files()}
+
+
+def purge_plaintext_key_files() -> dict:
+    """The plaintext .key mirrors removed once the database is encrypted; never raises."""
     from services.file_regen_service import purge_private_key_files
     try:
-        purge = purge_private_key_files()
+        return purge_private_key_files()
     except Exception as e:
         # The key now encrypts the database: a failed cleanup must not hide it
         logger.error("🔓 Could not remove the plaintext key copies: %s", e)
-        purge = {'removed': 0, 'kept_no_db_key': 0, 'errors': 1}
-    return {'encrypted': encrypted, 'skipped': skipped, 'errors': errors, 'purge': purge}
+        return {'removed': 0, 'kept_no_db_key': 0, 'errors': 1}
 
 
 def _log_remaining(errors: list) -> None:
@@ -192,12 +204,23 @@ def bootstrap_master_key(app) -> str:
     """Create the master key when the installation never had one; returns what was done."""
     key_encryption = _encryption.key_encryption
     path = _encryption.MASTER_KEY_PATH
+    if key_encryption.dek_error:
+        # The stored DEKs are wrapped by another KEK: nothing is written under this one
+        key_encryption.refuse_kek('wrong_key')
+        return 'wrong_key'
+    if _marker_is_foreign_in_ha(key_encryption):
+        # Disabled under another KEK: an enable from here, or a peer's (no marker left, the KEK
+        # read as DEK version 1), would encrypt under a KEK the other nodes do not hold, so this
+        # process writes nothing until it restarts with the cluster's KEK
+        key_encryption.refuse_kek('foreign_disable')
+        return 'foreign_disable'
     if key_encryption.is_enabled:
         if not _loaded_key_reads_the_database():
             # Running on would write new values under the wrong key: keep them as without one
-            key_encryption.unload()
+            key_encryption.refuse_kek('wrong_key')
             return 'wrong_key'
-        if auto_master_key_allowed(app):
+        # A disable in progress encrypts nothing: there is nothing to resume
+        if key_encryption.is_encrypting and auto_master_key_allowed(app):
             _resume_encryption()
         return 'present'
     if not auto_master_key_allowed(app):
@@ -245,22 +268,250 @@ def bootstrap_master_key(app) -> str:
     return 'generated'
 
 
+PREVIOUS_KEK_ENV = 'KEY_ENCRYPTION_KEY_PREVIOUS'
+
+
+def previous_kek_path():
+    return _encryption.MASTER_KEY_PATH.with_name('master.key.previous')
+
+
+def _previous_kek():
+    """The KEK being replaced by hand (file beside master.key, or variable), as raw bytes."""
+    import base64
+    from cryptography.fernet import Fernet
+    path = previous_kek_path()
+    value = path.read_text().strip() if path.exists() else os.getenv(PREVIOUS_KEK_ENV, '').strip()
+    if not value:
+        return None
+    Fernet(value.encode())  # same format as the KEK; raises when it is not one
+    return base64.urlsafe_b64decode(value.encode())
+
+
+def _reads_with(kek: bytes) -> bool:
+    """Whether the first encrypted value decrypts with ``kek`` taken as DEK version 1."""
+    import base64
+    from cryptography.fernet import Fernet, InvalidToken
+    fernet = Fernet(base64.urlsafe_b64encode(kek))
+    for _, row, attribute, _ in _encryption.master_key_values():
+        value = getattr(row, attribute)
+        if _encryption.key_encryption.is_encrypted(value):
+            try:
+                fernet.decrypt(base64.b64decode(value)[len(_encryption.ENCRYPTED_MARKER):])
+            except InvalidToken:
+                return False
+            return True
+    return False
+
+
+def rewrap_under_new_kek() -> str:
+    """Manual KEK change: the DEKs the previous KEK wrapped are wrapped by the configured one,
+    and its disabled markers name the configured one.
+
+    Writes encryption_keys and the audit entry encryption_kek_changed, never a stored value;
+    returns what was done.
+    """
+    from models import db, EncryptionKey
+    from security import envelope
+    from security.dek_rotation import lock_key_state
+    from utils.datetime_utils import utc_now
+    try:
+        previous = _previous_kek()
+    except Exception as e:
+        logger.error("🔑 The previous key-encryption key is unreadable, nothing rewrapped: %s",
+                     type(e).__name__)
+        return 'unreadable'
+    current = _encryption.key_encryption.kek_bytes_for_envelope()
+    if previous is None:
+        return 'none'
+    if current is None or previous == current:
+        logger.warning("🔑 A previous key-encryption key is configured but no new one: nothing "
+                       "rewrapped")
+        return 'same'
+    lock_key_state()
+    old_id, new_id = envelope.kek_id(previous), envelope.kek_id(current)
+    rows = EncryptionKey.query.order_by(EncryptionKey.version).all()
+    changed = 0
+    # Disabled markers move too, even with no DEK row: left under the old KEK, a disabled
+    # cluster would read as disabled under another one (safe mode in HA)
+    for row in rows:
+        if row.kek_id != old_id:
+            continue
+        if row.state != envelope.DISABLED:
+            dek = envelope.material(previous, row.version, row.wrapped)
+            row.wrapped = envelope.wrap(current, row.version, dek)
+        row.kek_id = new_id
+        changed += 1
+    if not any(r.state in (envelope.ACTIVE, envelope.PREVIOUS) for r in rows) \
+            and _reads_with(previous):
+        # DEK version 1 was the previous KEK's material: from now on it is stored, wrapped
+        db.session.add(EncryptionKey(version=1, state=envelope.ACTIVE, kek_id=new_id,
+                                     wrapped=envelope.wrap(current, 1, previous),
+                                     created_at=utc_now()))
+        changed += 1
+    if not changed:
+        db.session.rollback()
+        return 'nothing'
+    db.session.commit()
+    from services.audit_service import AuditService
+    AuditService.log_action(
+        action='encryption_kek_changed', resource_type='system',
+        resource_name='Key Encryption Key',
+        details=(f"{changed} encryption key row(s) (data-encryption keys, disabled markers) "
+                 f"moved from KEK {old_id} to KEK {new_id}"),
+        success=True)
+    logger.warning("🔑 %d encryption key row(s) moved under the new key-encryption key "
+                   "(%s). Remove %s (or %s) once every node runs with the new key.",
+                   changed, new_id, previous_kek_path(), PREVIOUS_KEK_ENV)
+    return 'rewrapped'
+
+
+def live_peers_with_another_kek() -> list:
+    """HA: (node_id, fingerprint) of each live peer that publishes another KEK than this node's."""
+    from utils.ha import ha_enabled
+    if not ha_enabled():
+        return []
+    from config.settings import Config
+    from models import ClusterNode
+    from services.scheduler_leader import STALE_PASSES, cluster_utc_now
+    from services.scheduler_service import WAKE_INTERVAL_SECONDS
+    mine = _encryption.key_encryption.configured_kek_fingerprint()
+    now = cluster_utc_now()
+    return [(peer.node_id, peer.kek_fingerprint)
+            for peer in ClusterNode.query.filter(ClusterNode.node_id != Config.NODE_ID)
+            .order_by(ClusterNode.node_id).all()
+            if (now - peer.heartbeat_at).total_seconds() <= STALE_PASSES * WAKE_INTERVAL_SECONDS
+            and peer.kek_fingerprint and peer.kek_fingerprint != mine]
+
+
+def _database_names_kek(fingerprint) -> bool:
+    """An encryption_keys row (DEK or disabled marker) was made under this KEK."""
+    from models import EncryptionKey
+    return bool(fingerprint) and EncryptionKey.query.filter_by(kek_id=fingerprint).first() is not None
+
+
+def refuse_kek_mismatch_with_peers() -> None:
+    """HA: a node whose KEK fingerprint differs from a live peer's does not start, unless the
+    database names this node's KEK and not the peer's (that peer is the stranger)."""
+    from config.settings import Config
+    mine = _encryption.key_encryption.configured_kek_fingerprint()
+    for node_id, theirs in live_peers_with_another_kek():
+        if _database_names_kek(mine) and not _database_names_kek(theirs):
+            logger.error("🔒 HA: live peer %s holds another key-encryption key (fingerprint %s) "
+                         "than the cluster's; it writes nothing until it has the cluster's",
+                         node_id, theirs)
+            continue
+        raise SystemExit(
+            f"HA: the key-encryption key of node {Config.NODE_ID} (fingerprint {mine or 'none'}) "
+            f"differs from that of live peer {node_id} (fingerprint "
+            f"{theirs}). Configure the same KEY_ENCRYPTION_KEY or master.key "
+            "on every node.")
+
+
+def _apply_safe_mode(app, outcome=None) -> bool:
+    key_encryption = _encryption.key_encryption
+    has_enc = _encryption.has_encrypted_keys_in_db()
+    mismatch = outcome in ('wrong_key', 'foreign_disable', 'foreign_kek')
+    app.config['SAFE_MODE'] = not key_encryption.is_enabled and (has_enc or mismatch)
+    if outcome in ('foreign_disable', 'foreign_kek') and not has_enc:
+        # Nothing is encrypted: the KEK is not the cluster's, no key is undecryptable
+        reason = 'encryption_kek_not_the_clusters'
+    else:
+        reason = 'encryption_key_mismatch' if mismatch else 'encryption_key_missing'
+    app.config['SAFE_MODE_REASON'] = reason
+    return has_enc
+
+
+def _marker_is_foreign(key_encryption) -> bool:
+    """No DEK row, and a disable marker that is not this KEK's."""
+    from security import envelope
+    rows = key_encryption.dek_rows
+    if not key_encryption.kek_loaded or any(
+            r[1] in (envelope.ACTIVE, envelope.PREVIOUS) for r in rows):
+        return False
+    markers = {r[2] for r in rows if r[1] == envelope.DISABLED}
+    return bool(markers) and key_encryption.kek_fingerprint() not in markers
+
+
+def _marker_is_foreign_in_ha(key_encryption) -> bool:
+    """HA: the cluster was disabled under another KEK. Outside HA a file disable followed by
+    a new master.key leaves that marker legitimately."""
+    from utils.ha import ha_enabled
+    return ha_enabled() and _marker_is_foreign(key_encryption)
+
+
+def _kek_is_foreign(key_encryption) -> bool:
+    """No DEK row: the database was written under another KEK when a peer's disable marker
+    is not this KEK's, or when a value does not open with this KEK (the start path's check)."""
+    from security import envelope
+    if any(r[1] in (envelope.ACTIVE, envelope.PREVIOUS) for r in key_encryption.dek_rows):
+        return False
+    if _marker_is_foreign(key_encryption):
+        return True
+    return key_encryption.is_enabled and not _loaded_key_reads_the_database()
+
+
+def reload_encryption_state(app) -> None:
+    """Cluster command reload_encryption: the DEKs from the database, safe mode re-evaluated."""
+    key_encryption = _encryption.key_encryption
+    # A KEK this process refused stays refused, whatever the database now holds
+    outcome = key_encryption.kek_refused
+    key_encryption.reload()
+    if outcome:
+        pass
+    elif not key_encryption.dek_error and _marker_is_foreign(key_encryption):
+        outcome = 'foreign_disable'
+    elif key_encryption.dek_error or (key_encryption.kek_loaded
+                                      and _kek_is_foreign(key_encryption)):
+        outcome = 'wrong_key'
+    elif key_encryption.kek_loaded and live_peers_with_another_kek() and not _database_names_kek(
+            key_encryption.kek_fingerprint()):
+        # No row names this KEK and a live peer holds another one: it is not the cluster's
+        outcome = 'foreign_kek'
+    if outcome:
+        key_encryption.refuse_kek(outcome)
+    if outcome is None and key_encryption.is_enabled:
+        # Enabled with the database's KEK: no safe mode, and no scan of every stored value
+        app.config['SAFE_MODE'] = False
+    else:
+        _apply_safe_mode(app, outcome)
+    logger.info("🔐 Encryption reloaded: enabled=%s, DEK version=%s, safe mode=%s",
+                key_encryption.is_enabled, key_encryption.active_version,
+                app.config['SAFE_MODE'])
+
+
 def check_master_key_at_start(app) -> None:
     """Load the master key, create it on a new installation, and enter safe mode
     when encrypted keys are found without it. Runs inside an app context."""
     key_encryption = _encryption.key_encryption
-    key_encryption.reload()
+    key_encryption.start_over()
+    refuse_kek_mismatch_with_peers()
+    # Before anything reads the DEKs: a KEK changed by hand leaves them wrapped by the previous one
+    if rewrap_under_new_kek() == 'rewrapped':
+        key_encryption.reload()
     outcome = bootstrap_master_key(app)
-    has_enc = _encryption.has_encrypted_keys_in_db()
+    if outcome == 'present':
+        from security.dek_rotation import resume_at_start
+        resume_at_start()
+    has_enc = _apply_safe_mode(app, outcome)
     app.logger.info(
         f"🔐 Encryption check: enabled={key_encryption.is_enabled}, has_encrypted_keys={has_enc}, "
-        f"key_source={key_encryption.key_source}, first_start={outcome}")
-    app.config['SAFE_MODE'] = not key_encryption.is_enabled and has_enc
-    app.config['SAFE_MODE_REASON'] = ('encryption_key_mismatch' if outcome == 'wrong_key'
-                                      else 'encryption_key_missing')
+        f"key_source={key_encryption.key_source}, DEK version={key_encryption.active_version}, "
+        f"first_start={outcome}")
     if not key_encryption.is_enabled and not has_enc and outcome in ('disabled', 'configured'):
-        _encryption.log_encryption_disabled()
-    if app.config['SAFE_MODE'] and outcome == 'wrong_key':
+        if key_encryption.kek_loaded:
+            app.logger.warning("🔓 Private-key encryption is turned off; a key-encryption key "
+                               "is configured but holds no data-encryption key")
+        else:
+            _encryption.log_encryption_disabled()
+    reason = app.config['SAFE_MODE_REASON']
+    if app.config['SAFE_MODE'] and reason == 'encryption_kek_not_the_clusters':
+        app.logger.error(
+            "🔒 SAFE MODE: encryption was disabled for this cluster under another key-encryption "
+            "key; this node's is not the cluster's. Nothing is encrypted and nothing is written. "
+            "Configure the cluster's KEY_ENCRYPTION_KEY (or master.key) on this node, or, after "
+            f"a key change by hand, the cluster's previous key in {PREVIOUS_KEK_ENV}, and "
+            "restart UCM.")
+    elif app.config['SAFE_MODE'] and reason == 'encryption_key_mismatch':
         app.logger.error(
             "🔒 SAFE MODE: the configured master key does not decrypt the stored private keys. "
             f"Restore the previous {_encryption.MASTER_KEY_PATH} (or KEY_ENCRYPTION_KEY) "

@@ -55,15 +55,21 @@ def _encrypted(data: bytes) -> str:
 @pytest.fixture
 def master_key(monkeypatch):
     """This node has the master key the rows were encrypted with."""
+    from cryptography.fernet import MultiFernet
     from security.encryption import key_encryption
+    # No KEK held, so no DEK row is re-read: the rows' key is the only DEK
+    monkeypatch.setattr(key_encryption, '_key_bytes', None)
     monkeypatch.setattr(key_encryption, '_fernet', Fernet(FERNET_KEY))
+    monkeypatch.setattr(key_encryption, '_decryptor', MultiFernet([Fernet(FERNET_KEY)]))
     monkeypatch.setattr(key_encryption, '_enabled', True)
 
 
 @pytest.fixture
 def no_master_key(monkeypatch):
     from security.encryption import key_encryption
+    monkeypatch.setattr(key_encryption, '_key_bytes', None)
     monkeypatch.setattr(key_encryption, '_fernet', None)
+    monkeypatch.setattr(key_encryption, '_decryptor', None)
     monkeypatch.setattr(key_encryption, '_enabled', False)
 
 
@@ -99,6 +105,7 @@ def install(tmp_path, monkeypatch):
         _seed(lambda sql, params=(): connection.execute(sql, params), '?', **rows)
         connection.commit()
         connection.close()
+    seed.path = str(tmp_path / 'ucm.db')
     return str(tmp_path), tls / 'https_cert.pem', tls / 'https_key.pem', seed
 
 
@@ -210,6 +217,57 @@ boot_config.mtls_client_ca = lambda data_path: None
 import gunicorn_config
 print(gunicorn_config.certfile)
 '''
+
+
+ENVELOPE_TABLE = ("CREATE TABLE encryption_keys (version INTEGER PRIMARY KEY, state VARCHAR(16) "
+                  "NOT NULL, kek_id VARCHAR(16) NOT NULL, wrapped TEXT, created_at TIMESTAMP)")
+
+
+@pytest.fixture
+def rotated(monkeypatch):
+    """The master at start holds the KEK alone; the database holds DEK 2, the values under it."""
+    from security import envelope
+    from security.encryption import key_encryption
+    kek = base64.urlsafe_b64decode(FERNET_KEY)
+    monkeypatch.setattr(key_encryption, '_key_bytes', kek)
+    monkeypatch.setattr(key_encryption, '_rows_loaded', False)
+    key_encryption._swap_in(lambda fresh: (setattr(fresh, '_key_bytes', kek),
+                                           fresh._load_data_keys(None)))
+    dek = envelope.new_dek()
+    dek_fernet = Fernet(base64.urlsafe_b64encode(dek))
+    row = (2, 'active', envelope.kek_id(kek), envelope.wrap(kek, 2, dek))
+
+    def encrypted(data):
+        return base64.b64encode(b'ENC:' + dek_fernet.encrypt(data)).decode()
+    yield row, encrypted
+    key_encryption.reload()
+
+
+def _seed_rotated(seed, row, **rows):
+    seed(tables=SCHEMA + (ENVELOPE_TABLE,), **rows)
+    connection = sqlite3.connect(seed.path)
+    connection.execute("INSERT INTO encryption_keys (version, state, kek_id, wrapped) "
+                       "VALUES (?, ?, ?, ?)", row)
+    connection.commit()
+    connection.close()
+
+
+def test_after_a_rotation_the_bound_pair_is_written_under_the_new_dek(install, rotated):
+    data_path, cert_path, key_path, seed = install
+    row, encrypted = rotated
+    _seed_rotated(seed, row, settings=[('https_bound_certificate_refid', REFID)], certificates=[
+        (REFID, base64.b64encode(LEAF.encode()).decode(), encrypted(KEY.encode()))])
+    assert materialize_https(data_path, cert_path, key_path).endswith('written from the database')
+    assert (cert_path.read_text(), key_path.read_text()) == (LEAF, KEY)
+
+
+def test_after_a_rotation_the_regenerated_pair_is_written_under_the_new_dek(install, rotated):
+    data_path, cert_path, key_path, seed = install
+    row, encrypted = rotated
+    pair = json.dumps({'crt': ISSUER, 'key': KEY}).encode()
+    _seed_rotated(seed, row, shared=[('https.generated', encrypted(pair))])
+    materialize_https(data_path, cert_path, key_path)
+    assert (cert_path.read_text(), key_path.read_text()) == (ISSUER, KEY)
 
 
 def test_the_gunicorn_master_writes_the_pair_before_the_application(install):

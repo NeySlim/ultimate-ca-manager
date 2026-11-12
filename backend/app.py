@@ -662,6 +662,14 @@ def create_app(config_name=None):
         except ImportError:
             pass
 
+        from security.dek_rotation import scheduled_retire
+        scheduler.register_task(
+            name="dek_retire",
+            func=scheduled_retire,
+            interval=60,
+            description="Drop the previous data-encryption key once its grace period is over"
+        )
+
         from utils.ha import ha_enabled
         if ha_enabled():
             from services.cluster_commands import purge_old_commands

@@ -2892,6 +2892,21 @@
     "encryptRemainingKeys": "Зашифрувати решту ключів ({{count}})",
     "encryptRemainingKeysConfirm": "Зашифрувати {{count}} ключів і секретів, що досі зберігаються незашифрованими? Уже зашифровані дані не змінюються.",
     "encryptRemainingKeysDone": "Зашифровано ключів і секретів: {{count}}",
+    "kekFingerprint": "Key-encryption key fingerprint",
+    "dekVersion": "Data key version",
+    "dekRotationInProgress": "Data key rotation in progress",
+    "rotateDataKey": "Rotate Data Key",
+    "resumeDataKeyRotation": "Finish Data Key Rotation",
+    "previousDekKeptUntil": "Previous data key kept until {{date}}",
+    "previousDekKeptUntilNodesReload": "Previous data key kept until every node has reloaded the new one, then for two minutes",
+    "disabledKeysKeptUntil": "The data keys still open values written during the disable until {{date}}; encryption can be enabled again after that.",
+    "disabledKeysKeptUntilNodesReload": "The data keys still open values written during the disable until every node has reloaded, then for two minutes; encryption can be enabled again after that.",
+    "encryptionDisabling": "Disable left half-way",
+    "encryptionDisablingHint": "A disable of encryption stopped before every value was decrypted. Every value still opens and nothing new is encrypted: run the disable again to finish it.",
+    "runDisableAgain": "Run Disable Again",
+    "rotateDataKeyConfirm": "Create a new data key and re-encrypt every stored private key and secret under it? The master key does not change.",
+    "rotateDataKeyDone": "Data key rotated to version {{version}}",
+    "rotateDataKeyPending": "Rotation started: some nodes have not loaded the new key yet. Run it again to finish.",
     "backupMasterKey": "Резервна копія головного ключа",
     "masterKeyBackupTitle": "Створіть резервну копію головного ключа",
     "masterKeyBackupCritical": "Критично: створіть резервну копію цього ключа ЗАРАЗ",
@@ -3430,7 +3445,7 @@
           "remedy": "Приберіть gssencmode з DATABASE_URL і PGGSSENCMODE із середовища або встановіть для них значення disable: тоді з'єднання захищатиме TLS."
         },
         "keys_no_master_key": {
-          "title": "Головний ключ не налаштовано: приватні ключі CA та сертифікатів зберігаються в базі даних у незашифрованому вигляді",
+          "title": "Private keys are stored unencrypted (no master key, or encryption disabled)",
           "remedy": "Увімкніть шифрування приватних ключів у Налаштування > Безпека або надайте /etc/ucm/master.key чи KEY_ENCRYPTION_KEY; якщо задано UCM_REQUIRE_KEY_ENCRYPTION=true, UCM відмовляється запускатися без нього."
         },
         "https_unapproved_key": {
@@ -4409,6 +4424,8 @@
     "step1Title": "Розмістіть файл майстер-ключа в:",
     "mismatchDescription": "Налаштований майстер-ключ не розшифровує збережені приватні ключі: їх зашифровано іншим ключем. Приватні ключі недоступні, доки не буде відновлено попередній майстер-ключ.",
     "mismatchStep1Title": "Поверніть файл попереднього майстер-ключа в:",
+    "foreignKekDescription": "Encryption was disabled for this cluster under another key-encryption key: this node's key is not the cluster's. Nothing is encrypted, and this node writes nothing until its key matches.",
+    "foreignKekStep1Title": "Configure the cluster's key-encryption key on this node, in KEY_ENCRYPTION_KEY or at:",
     "step2Title": "Потім перезапустіть сервіс:",
     "lostKeyHint": "Якщо ви втратили майстер-ключ, відновіть із резервної копії.",
     "polling": "Перевірка..."

@@ -33,8 +33,7 @@ def test_without_ha_no_thread_and_no_row(app, auth_client, monkeypatch):
 
 
 @pytest.mark.parametrize('kind', ['reload_everything',
-                                  'invalidate_password_policy',  # read from the database on every check
-                                  'reload_encryption'])          # refused in HA until key envelopes
+                                  'invalidate_password_policy'])  # read from the database on every check
 def test_unknown_kind_is_refused(app, kind):
     with app.app_context(), pytest.raises(ValueError):
         cc.emit(kind)

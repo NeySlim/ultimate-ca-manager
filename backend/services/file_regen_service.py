@@ -42,9 +42,9 @@ def insert_file_writes_enabled() -> bool:
 
 
 def mirror_private_key(path: Path, key_pem: bytes, *, context: str) -> bool:
-    """Mirror a plaintext key only when database encryption is disabled.
-
-    When encryption is enabled, any stale mirror at ``path`` is removed.
+    """Mirror a plaintext key only while values are stored in the clear (encryption off,
+    or being disabled and in its grace period). While new values are encrypted, any stale
+    mirror at ``path`` is removed.
 
     The write is atomic: the content goes to a temporary file in the same
     directory, is fsynced and chmoded there, and only then replaces the
@@ -62,7 +62,7 @@ def mirror_private_key(path: Path, key_pem: bytes, *, context: str) -> bool:
 
     temp_path = None
     try:
-        if key_encryption.is_enabled:
+        if key_encryption.is_encrypting:
             path.unlink(missing_ok=True)
             logger.debug("Skipped plaintext key mirror for %s", context)
             return False
@@ -99,7 +99,7 @@ def mirror_private_key(path: Path, key_pem: bytes, *, context: str) -> bool:
 def write_cert_files(cert) -> None:
     """Write certificate, key, and CSR files for a Certificate object.
 
-    With key encryption enabled the key is neither decrypted nor mirrored."""
+    While new values are encrypted the key is neither decrypted nor mirrored."""
     from security.encryption import key_encryption
     from utils.key_codec import load_pem_bytes
 
@@ -113,7 +113,7 @@ def write_cert_files(cert) -> None:
         except Exception as e:
             logger.warning(f"Could not write cert file for {cert.descr}: {e}")
 
-    if cert.prv and not key_encryption.is_enabled:
+    if cert.prv and not key_encryption.is_encrypting:
         try:
             key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
             mirror_private_key(
@@ -139,7 +139,7 @@ def write_cert_files(cert) -> None:
 def write_ca_files(ca) -> None:
     """Write certificate and key files for a CA object.
 
-    With key encryption enabled the key is neither decrypted nor mirrored."""
+    While new values are encrypted the key is neither decrypted nor mirrored."""
     from security.encryption import key_encryption
     from utils.key_codec import load_pem_bytes
 
@@ -153,7 +153,7 @@ def write_ca_files(ca) -> None:
         except Exception as e:
             logger.warning(f"Could not write CA cert file for {ca.descr}: {e}")
 
-    if ca.prv and not key_encryption.is_enabled:
+    if ca.prv and not key_encryption.is_encrypting:
         try:
             key_pem = load_pem_bytes(ca.prv, context=f"CA {ca.id}")
             mirror_private_key(ca_key_path(ca), key_pem, context=f"CA {ca.id}")
@@ -162,12 +162,12 @@ def write_ca_files(ca) -> None:
 
 
 def purge_private_key_files() -> dict:
-    """Remove plaintext key mirrors while database encryption is enabled."""
+    """Remove plaintext key mirrors while new values are encrypted (not during a disable's grace)."""
     from models import CA, Certificate
     from security.encryption import key_encryption
 
     stats = {'removed': 0, 'kept_no_db_key': 0, 'errors': 0}
-    if not key_encryption.is_enabled:
+    if not key_encryption.is_encrypting:
         return stats
 
     known_keys = {}
@@ -231,7 +231,8 @@ def regenerate_all_files():
     from models import CA, Certificate
     from security.encryption import key_encryption
 
-    encryption_enabled = key_encryption.is_enabled
+    # A disable's grace keeps the DEKs loaded, but values are stored in the clear: mirrored
+    encryption_enabled = key_encryption.is_encrypting
     purge_stats = purge_private_key_files() if encryption_enabled else None
     for directory in [Config.CA_DIR, Config.CERT_DIR, Config.PRIVATE_DIR, Config.CRL_DIR]:
         directory.mkdir(parents=True, exist_ok=True)

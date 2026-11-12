@@ -84,9 +84,9 @@ def _row_file_paths() -> set:
 
 
 def _stage_key_mirror(staged, path, key_pem: bytes) -> None:
-    """A plaintext key mirror, only while database encryption is off (as mirror_private_key)."""
+    """A plaintext key mirror, only while values are stored in the clear (as mirror_private_key)."""
     from security.encryption import key_encryption
-    if key_encryption.is_enabled:
+    if key_encryption.is_encrypting:
         staged.stage_removal(path)
     else:
         staged.stage(path, key_pem, mode=0o600)
