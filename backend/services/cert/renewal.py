@@ -400,7 +400,8 @@ def _signing_ca(cert, ca):
     from utils.cert_issuer import ca_signed
     if not ca_signed(ca, x509.load_pem_x509_certificate(b64decode(cert.crt))):
         raise RenewalError(
-            f'This certificate was not signed by CA "{ca.descr}" and cannot be renewed under it', 400)
+            f'This certificate\'s signature does not verify with the current key of CA "{ca.descr}" '
+            '(re-keyed or replaced): it cannot be renewed under it, issue a new certificate instead', 400)
 
     from services.hsm.ca_key_loader import get_ca_signing_key
     try:

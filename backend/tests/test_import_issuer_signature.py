@@ -309,9 +309,35 @@ class TestStoredRowsAreIssuedOnlyWhenTheCaSignedThem:
         row_id = _store(app, forged, refid, key=key)
         r = auth_client.post(f'/api/v2/certificates/{row_id}/renew', json={})
         assert r.status_code == 400, r.data
-        assert 'not signed' in r.get_json()['message']
+        assert 'does not verify with the current key' in r.get_json()['message']
         with app.app_context():
             assert db.session.get(Certificate, row_id).serial_number == str(forged.serial_number)
+
+    def test_a_ca_re_keyed_in_place_asks_for_a_new_certificate(self, app, auth_client, create_ca):
+        """Same DN, new key: leaves of the old key no longer renew, and the message says why."""
+        data = create_ca(cn=f'Re-keyed CA {uuid.uuid4().hex[:6]}',
+                         keyUsage=['digitalSignature', 'keyCertSign', 'cRLSign'])
+        with app.app_context():
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca = db.session.get(CA, data['id'])
+            old_cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+            leaf, key = _leaf('re-keyed.example.test', old_cert, get_ca_signing_key(ca))
+            new_key, now = _gen(), datetime.now(timezone.utc)
+            ca.crt = base64.b64encode(_pem(
+                x509.CertificateBuilder().subject_name(old_cert.subject).issuer_name(old_cert.subject)
+                .public_key(new_key.public_key()).serial_number(x509.random_serial_number())
+                .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=365))
+                .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                .add_extension(x509.SubjectKeyIdentifier.from_public_key(new_key.public_key()), critical=False)
+                .sign(new_key, hashes.SHA256())).encode()).decode()
+            db.session.commit()
+            refid = ca.refid
+        row_id = _store(app, leaf, refid, key=key)
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/renew', json={})
+        assert r.status_code == 400, r.data
+        message = r.get_json()['message']
+        assert 'not signed' not in message
+        assert 'does not verify with the current key' in message and 'issue a new certificate' in message
 
     def test_est_reenrolment_refuses_it(self, app, client, est_config):
         from tests.test_protocol_renewal_identity import _reenrol
