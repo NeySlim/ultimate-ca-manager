@@ -28,6 +28,26 @@ def _set(key, value):
     db.session.commit()
 
 
+_TOUCHED = ('auto_backup_enabled', 'backup_frequency', 'backup_password', 'backup.last_run',
+            'backup.last_outcome', 'backup.last_reason', 'backup.last_outcome_at',
+            'backup.concluded_run', 'report_schedule_ca_hierarchy',
+            'report_last_sent_ca_hierarchy')
+
+
+@pytest.fixture(autouse=True)
+def _settings_put_back(app):
+    """The shared database gets back the values these tests overwrite or remove."""
+    with app.app_context():
+        saved = {key: SystemConfig.query.filter_by(key=key).with_entities(
+            SystemConfig.value).scalar() for key in _TOUCHED}
+        db.session.remove()
+    yield
+    with app.app_context():
+        for key, value in saved.items():
+            _set(key, value)
+        db.session.remove()
+
+
 # ------------------------------------------------------------------ reports
 
 def _report_schedule(app, monkeypatch):
