@@ -43,34 +43,43 @@ def get_encryption_status():
         )
 
         from security.dek_rotation import (
-            disable_grace, grace_end, retiring, rotation_in_progress, shown_as_enabled,
+            disable_done, disable_grace, grace_end, retained, retiring, rotation_in_progress,
+            shown_as_enabled, removes_key_file,
         )
 
+        def stamp(moment):
+            return moment.isoformat(timespec='seconds') + 'Z' if moment else None
+
         encrypted, unencrypted = count_master_key_values()
-        # A disable done: its DEKs still open values written late, until the grace ends
+        # The short grace of a change: enable (after a disable) or rotate waits for its end,
+        # known once every live node applied the change (None until then)
         disabled_grace = disable_grace()
         grace = None if disabled_grace else retiring()
-        # The end is known once every live node applied the change (None until then)
         disabled_end = grace_end(disabled_grace) if disabled_grace else None
         grace_until = grace_end(grace) if grace else None
+        done = disable_done()
+        kept = retained()
 
         return success_response(data={
             'enabled': shown_as_enabled(),
             # A disable left half-way: values still open, none is encrypted any more
             'disabling': (key_encryption.is_enabled and not key_encryption.is_encrypting
-                          and not disabled_grace),
-            'disabled_keys_kept_until': (disabled_end.isoformat(timespec='seconds') + 'Z'
-                                         if disabled_end else None),
-            'disabled_keys_wait_for_nodes': bool(disabled_grace) and disabled_end is None,
+                          and not done),
+            'enable_available_after': stamp(disabled_end),
+            'enable_waits_for_nodes': bool(disabled_grace) and disabled_end is None,
+            # Old DEKs kept for reading only, each dropped after its date and a clean sweep
+            'retained_keys': [{'version': r.version, 'retire_after': stamp(r.retire_after)}
+                              for r in kept],
+            # Outside HA master.key goes with the last DEK a disable kept
+            'key_file_kept_for_retained_keys': bool(done and kept and removes_key_file()),
             'key_source': key_encryption.key_source,
             # Fingerprint and version only: neither key ever leaves the server here
             'kek_fingerprint': key_encryption.kek_fingerprint(),
             'dek_version': key_encryption.active_version,
-            # The values are all rewritten once the previous DEK is only kept for its grace
-            'rotation_in_progress': rotation_in_progress() and grace is None,
-            'previous_dek_retire_after': (grace_until.isoformat(timespec='seconds') + 'Z'
-                                          if grace_until else None),
-            'previous_dek_waits_for_nodes': bool(grace) and grace_until is None,
+            'rotation_in_progress': rotation_in_progress(),
+            'rotation_available': key_encryption.is_encrypting and grace is None,
+            'rotation_available_after': stamp(grace_until),
+            'rotation_waits_for_nodes': bool(grace) and grace_until is None,
             'key_file_path': str(MASTER_KEY_PATH),
             'key_file_exists': key_encryption.key_file_exists(),
             'encrypted_count': encrypted,
@@ -112,15 +121,27 @@ def _enable_with_configured_kek():
             f"Encryption not enabled: live node(s) {names} hold another key-encryption key than "
             f"this node's ({key_encryption.kek_fingerprint()}). Configure the same "
             "KEY_ENCRYPTION_KEY on every node, or stop those nodes, then enable again.", 409)
-    # Only the disabled marker goes: a stored DEK here means this KEK cannot open it
-    if key_encryption.dek_error or EncryptionKey.query.filter(
-            EncryptionKey.state.in_((envelope.ACTIVE, envelope.PREVIOUS))).first():
+    # Only the disabled marker goes. The DEKs a disable kept for its retention go on opening
+    # late values under a new active DEK; any other stored DEK means this KEK cannot open it
+    mine = key_encryption.kek_fingerprint()
+    keys = EncryptionKey.query.filter(
+        EncryptionKey.state.in_((envelope.ACTIVE, envelope.PREVIOUS))).all()
+    if key_encryption.dek_error or any(r.retire_after is None or r.kek_id != mine for r in keys):
         db.session.rollback()
         return error_response("The stored data-encryption keys do not open with the configured "
                               "key-encryption key; nothing was changed.", 409)
-    EncryptionKey.query.delete()
+    EncryptionKey.query.filter_by(state=envelope.DISABLED).delete(synchronize_session=False)
+    version = 1
+    if keys:
+        for row in keys:
+            row.state = envelope.PREVIOUS
+        version = max(r.version for r in keys) + 1
+        kek = key_encryption.kek_bytes_for_envelope()
+        db.session.add(EncryptionKey(version=version, state=envelope.ACTIVE, kek_id=mine,
+                                     wrapped=envelope.wrap(kek, version, envelope.new_dek()),
+                                     created_at=utc_now()))
     record_operator_choice(auto=True)
-    command = emit(RELOAD_ENCRYPTION, {'version': 1})
+    command = emit(RELOAD_ENCRYPTION, {'version': version})
     db.session.commit()
     key_encryption.reload()
     if not key_encryption.is_enabled:
@@ -173,10 +194,19 @@ def enable_encryption():
             grace = retiring()
             if grace is not None:
                 return error_response(grace_refusal(grace), 409)
-        if key_encryption.is_enabled:
+        from security.dek_rotation import shown_as_enabled
+        # Keys a disable kept for reading leave is_enabled on: the disable still stands
+        if shown_as_enabled():
             return error_response("Encryption is already enabled", 400)
         if key_encryption.kek_loaded:
             return _enable_with_configured_kek()
+        from security.dek_rotation import retained
+        if retained():
+            # A new master.key could not open them: a value still under them would be lost
+            return error_response(
+                "Data-encryption keys kept from the last disable are wrapped by a key-encryption "
+                "key that is not configured: restore that master.key (or KEY_ENCRYPTION_KEY) "
+                "and enable again.", 409)
         if ha_enabled():
             return error_response(
                 "No key-encryption key is configured: set the same KEY_ENCRYPTION_KEY on "
@@ -332,8 +362,9 @@ def _env_kek_fingerprint():
 def disable_encryption():
     """
     Disable private key encryption.
-    Decrypts all keys in database; the DEKs are dropped after a grace period, with a master.key
-    file outside HA. A KEK that stays configured (variable, HA) is kept, unused.
+    Decrypts all keys in database; the DEKs are kept for reading through their retention, then
+    dropped with a master.key file outside HA. A KEK that stays configured (variable, HA) is
+    kept, unused.
     """
     try:
         from security.encryption import (
@@ -359,13 +390,15 @@ def disable_encryption():
             )
 
         from security.dek_rotation import (
-            RotationError, begin_disable, finish_disable, grace_end, retire_if_due, retiring,
-            settle,
+            RotationError, begin_disable, finish_disable, grace_end, retained, retire_if_due,
+            retiring, settle,
         )
         from utils.ha import ha_enabled
 
         # Phase 1, under the lock: nothing new is encrypted, every DEK still opens what it did
         try:
+            if retiring() is not None:
+                retire_if_due()  # a grace that is over no longer holds the disable
             command = begin_disable()
         except RotationError as e:
             return error_response(str(e), e.status)
@@ -384,9 +417,9 @@ def disable_encryption():
         # (this one, or the variable the next reload falls back to) is marked unused
         remove_file = key_encryption.key_source == 'file' and not ha_enabled()
         kept_kek = key_encryption.kek_fingerprint() if not remove_file else _env_kek_fingerprint()
-        # Phase 2: only if no value is encrypted any more; the DEKs stay for their grace period
+        # Phase 2: only if no value is encrypted any more; the DEKs stay for their retention
         try:
-            finish_disable(kept_kek, remove_file)
+            finish_disable(kept_kek)
         except RotationError as e:
             return error_response(str(e), e.status)
         try:
@@ -398,7 +431,8 @@ def disable_encryption():
         # Reload singleton
         key_encryption.reload()
         grace = retiring()
-        kept_until = grace_end(grace) if grace else None
+        enable_after = grace_end(grace) if grace else None
+        kept_until = max((r.retire_after for r in retained()), default=None)
 
         from services.file_regen_service import regenerate_all_files
         regeneration_stats = regenerate_all_files()
@@ -426,6 +460,8 @@ def disable_encryption():
                 'key_files_written': key_files_written,
                 'keys_kept_until': (None if dropped or not kept_until
                                     else kept_until.isoformat(timespec='seconds') + 'Z'),
+                'enable_available_after': (enable_after.isoformat(timespec='seconds') + 'Z'
+                                           if enable_after else None),
             }
         )
 

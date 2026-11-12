@@ -90,6 +90,7 @@ class KeyEncryption:
     _instance = None
     _fernet = None  # the active DEK: every new value is encrypted with it
     _decryptor = None  # every DEK this process holds, the active one first
+    _deks = None  # {version: Fernet} of those DEKs
     _key_bytes = None  # the KEK
     _versions = ()
     _active_version = None
@@ -187,6 +188,7 @@ class KeyEncryption:
     
     def _set_deks(self, deks: dict, active) -> None:
         self._versions = tuple(sorted(deks))
+        self._deks = dict(deks)
         self._active_version = active
         if active is None:
             self._fernet = self._decryptor = None
@@ -238,7 +240,7 @@ class KeyEncryption:
             # Being disabled: every value still opens, nothing new is encrypted
             self._fernet = None
 
-    _FIELDS = ('_fernet', '_decryptor', '_key_bytes', '_versions', '_active_version',
+    _FIELDS = ('_fernet', '_decryptor', '_deks', '_key_bytes', '_versions', '_active_version',
                '_rows_loaded', '_rows', '_read_at', '_enabled', '_key_source', 'dek_error')
 
     def _swap_in(self, build) -> None:
@@ -312,6 +314,7 @@ class KeyEncryption:
     def unload(self):
         """Run as without a key, e.g. when the configured one is not the database's."""
         self._fernet = self._decryptor = None
+        self._deks = None
         self._key_bytes = None
         self._enabled = False
         self._versions = ()
@@ -344,6 +347,20 @@ class KeyEncryption:
     def kek_bytes_for_envelope(self) -> Optional[bytes]:
         """For security.envelope and the rotation only: never logged, never returned by the API."""
         return self._key_bytes
+
+    def dek_version_of(self, data: str):
+        """The version of the DEK held here that opens ``data`` (a stored value), or None."""
+        try:
+            token = base64.b64decode(data)[len(ENCRYPTED_MARKER):]
+        except Exception:
+            return None
+        for version, fernet in (self._deks or {}).items():
+            try:
+                fernet.decrypt(token)
+                return version
+            except InvalidToken:
+                continue
+        return None
 
     def _decrypt_token(self, token: bytes) -> bytes:
         """Any DEK this process holds: during a rotation a value is under the old or the new one."""

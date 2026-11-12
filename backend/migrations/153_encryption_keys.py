@@ -2,6 +2,7 @@
 
 One row per DEK version: state 'active' (encrypts), 'previous' (decrypts until a
 rotation ends) or 'disabled' (no key: encryption turned off while a KEK stays configured).
+retire_after: set once a DEK only decrypts (after a rotation or a disable), when it may be dropped.
 No row: the KEK material is itself DEK version 1, as before the envelope.
 """
 import logging
@@ -12,7 +13,8 @@ pg_compatible = True
 
 DDL = ("CREATE TABLE IF NOT EXISTS encryption_keys ("
        "version INTEGER NOT NULL PRIMARY KEY, state VARCHAR(16) NOT NULL, "
-       "kek_id VARCHAR(16) NOT NULL, wrapped TEXT, created_at TIMESTAMP NOT NULL)")
+       "kek_id VARCHAR(16) NOT NULL, wrapped TEXT, created_at TIMESTAMP NOT NULL, "
+       "retire_after TIMESTAMP)")
 
 
 def upgrade(conn):

@@ -440,6 +440,9 @@ def test_on_postgresql_node_b_writes_the_keytab_a_rotated(app, auth_client, valu
 
 # --- grace period of the previous DEK -------------------------------------
 
+DAY = 86400
+WEEK = 7 * DAY
+
 
 @pytest.fixture
 def grace(monkeypatch):
@@ -474,7 +477,8 @@ def test_a_write_under_the_old_dek_after_the_final_sweep_stays_readable(app, val
     with app.app_context():
         old = encryption_enabled.key_encryption._fernet
         result = dek_rotation.rotate()
-    assert result['state'] == 'done' and result['dropped'] == 0 and result['retire_after']
+    assert result['state'] == 'done' and result['dropped'] == 0
+    assert result['rotation_available_after']
     assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
     _late_write(app, values, old)
     assert _read(app, values) == CLEAR
@@ -482,13 +486,13 @@ def test_a_write_under_the_old_dek_after_the_final_sweep_stays_readable(app, val
         assert dek_rotation.retire_if_due() == 0  # not due
     grace(601)
     with app.app_context():
-        # The end-of-grace sweep finds the late value: rewritten, the old DEK kept once more
+        # The end-of-grace sweep finds the late value: rewritten, the old DEK kept a day
         assert dek_rotation.retire_if_due() == 0
     with pytest.raises(InvalidToken):
         old.decrypt(_token(_stored(app, values)['target']))
     assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
     assert _read(app, values) == CLEAR
-    grace(601)
+    grace(DAY + 1)
     with app.app_context():
         dek_rotation.scheduled_retire()
         assert dek_rotation.retiring() is None
@@ -512,7 +516,7 @@ def test_a_restart_during_the_grace_period_keeps_the_previous_dek(app, values, g
     assert _read(app, values) == CLEAR
     grace(601)
     _start(app)  # the late value rewritten, then a second period
-    grace(601)
+    grace(DAY + 1)
     _start(app)
     assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'active')]
     assert _read(app, values) == CLEAR
@@ -523,11 +527,11 @@ def test_during_the_grace_period_rotate_and_disable_name_its_end(app, auth_clien
     with app.app_context():
         dek_rotation.rotate()
     status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
-    assert status['rotation_in_progress'] is False and status['previous_dek_retire_after']
+    assert status['rotation_in_progress'] is False and status['rotation_available_after']
     for route in ('rotate-encryption-key', 'disable-encryption'):
         r = auth_client.post(f'/api/v2/system/security/{route}')
         assert r.status_code == 409, r.data
-        assert 'kept until' in r.get_json()['message']
+        assert 'waits until' in r.get_json()['message']
     grace(601)
     r = auth_client.post('/api/v2/system/security/rotate-encryption-key')
     assert r.status_code == 200, r.data
@@ -585,7 +589,7 @@ def test_on_postgresql_a_transaction_open_across_the_rotation_stays_readable(
             assert encryption.decrypt_master_key_value(stored, 'text') == PEM
             with pytest.raises(InvalidToken):
                 old.decrypt(_token(stored))
-        grace(601)
+        grace(DAY + 1)
         with app.app_context():
             assert dek_rotation.retire_if_due() == 1
             db.session.expire_all()
@@ -1153,16 +1157,16 @@ def test_a_value_encrypted_before_the_disable_was_seen_stays_readable(app, auth_
     assert _late_value_opens(app, values)
     status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
     assert status['enabled'] is False and status['disabling'] is False
-    assert status['disabled_keys_kept_until'] and not status['previous_dek_retire_after']
+    assert status['enable_available_after'] and not status['rotation_available_after']
     with app.app_context():
         assert dek_rotation.retire_if_due() == 0  # not due
     grace(601)
     with app.app_context():
-        # The sweep finds the late value: decrypted in place, the DEKs kept once more
+        # The sweep finds the late value: decrypted in place, the DEKs kept a day
         assert dek_rotation.retire_if_due() == 0
     assert _stored(app, values)['target'] == PEM
     assert (2, 'active') in [(v, s) for v, s, _, _ in _rows(app)]
-    grace(601)
+    grace(DAY + 1)
     with app.app_context():
         dek_rotation.scheduled_retire()
         assert dek_rotation.retiring() is None
@@ -1187,7 +1191,7 @@ def test_a_restart_during_the_grace_of_a_disable_keeps_the_deks(app, auth_client
     grace(601)
     _start(app)  # the late value decrypted, then a second period
     assert _stored(app, values)['target'] == PEM
-    grace(601)
+    grace(DAY + 1)
     _start(app)
     assert [(v, s) for v, s, _, _ in _rows(app)] == [(0, 'disabled')]
     assert app.config['SAFE_MODE'] is False and not key_encryption.is_enabled
@@ -1245,7 +1249,7 @@ def test_enable_and_rotate_during_the_grace_of_a_disable_name_its_end(app, auth_
         r = auth_client.post(f'/api/v2/system/security/{route}')
         assert r.status_code == 409, r.data
         # A rotation is refused (400) after the grace too: the way on is to enable
-        assert 'kept until' in r.get_json()['message']
+        assert 'waits until' in r.get_json()['message']
         assert 'Try again' not in r.get_json()['message']
         assert 'enable it again after that' in r.get_json()['message']
     grace(601)
@@ -1301,7 +1305,7 @@ def test_on_postgresql_a_transaction_open_across_the_disable_stays_readable(
             assert dek_rotation.retire_if_due() == 0
             db.session.expire_all()
             assert SystemConfig.query.filter_by(key=key).one().value == PEM
-        grace(601)
+        grace(DAY + 1)
         with app.app_context():
             assert dek_rotation.retire_if_due() == 1
     finally:
@@ -1631,11 +1635,11 @@ def test_the_previous_dek_goes_a_margin_after_every_node_acknowledged(app, auth_
     with app.app_context():
         before = cluster_utc_now()
         result = dek_rotation.rotate()
-    end = datetime.fromisoformat(result['retire_after'])
+    end = datetime.fromisoformat(result['rotation_available_after'])
     assert -1 <= (end - before).total_seconds() - _margin() < 30
     status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
-    assert status['previous_dek_retire_after'] == result['retire_after'] + 'Z'
-    assert status['previous_dek_waits_for_nodes'] is False
+    assert status['rotation_available_after'] == result['rotation_available_after'] + 'Z'
+    assert status['rotation_waits_for_nodes'] is False
     grace(_margin() - 5)
     with app.app_context():
         assert dek_rotation.retire_if_due() == 0
@@ -1679,9 +1683,9 @@ def test_in_ha_the_grace_waits_for_a_lagging_node_then_a_margin(app, auth_client
     from services.scheduler_leader import cluster_utc_now
     data = _lagging_disable(app, auth_client, monkeypatch)
     # No time is announced before every live node has reloaded
-    assert data['keys_kept_until'] is None
+    assert data['enable_available_after'] is None
     status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
-    assert status['disabled_keys_kept_until'] is None and status['disabled_keys_wait_for_nodes']
+    assert status['enable_available_after'] is None and status['enable_waits_for_nodes']
     r = auth_client.post('/api/v2/system/security/enable-encryption')
     assert r.status_code == 409 and 'every node' in r.get_json()['message']
     grace(300)
@@ -1693,8 +1697,8 @@ def test_in_ha_the_grace_waits_for_a_lagging_node_then_a_margin(app, auth_client
         end = dek_rotation.grace_end(dek_rotation.retiring())
         assert abs((end - cluster_utc_now()).total_seconds() - _margin()) < 30
     status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
-    assert status['disabled_keys_kept_until'] == end.isoformat(timespec='seconds') + 'Z'
-    assert status['disabled_keys_wait_for_nodes'] is False
+    assert status['enable_available_after'] == end.isoformat(timespec='seconds') + 'Z'
+    assert status['enable_waits_for_nodes'] is False
     grace(_margin() + 1)
     with app.app_context():
         _node_acknowledges(app)
@@ -1740,11 +1744,11 @@ def test_a_value_written_under_the_old_dek_during_the_margin_is_swept(app, value
     _late_write(app, values, old)
     grace(_margin())
     with app.app_context():
-        assert dek_rotation.retire_if_due() == 0  # rewritten, kept for one more margin
+        assert dek_rotation.retire_if_due() == 0  # rewritten, kept until the next sweep
     with pytest.raises(InvalidToken):
         old.decrypt(_token(_stored(app, values)['target']))
     assert _read(app, values) == CLEAR
-    grace(_margin() + 1)
+    grace(DAY + 1)
     with app.app_context():
         assert dek_rotation.retire_if_due() == 1
     assert _read(app, values) == CLEAR
@@ -1778,11 +1782,338 @@ def test_the_disable_announces_the_end_of_its_grace(app, auth_client, values, gr
     r = auth_client.post('/api/v2/system/security/disable-encryption')
     with app.app_context():
         end = dek_rotation.grace_end(dek_rotation.retiring())
-    assert r.get_json()['data']['keys_kept_until'] == end.isoformat(timespec='seconds') + 'Z'
+    assert r.get_json()['data']['enable_available_after'] == end.isoformat(timespec='seconds') + 'Z'
     assert abs((end - cluster_utc_now()).total_seconds() - _margin()) < 30
     status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
-    assert status['disabled_keys_kept_until'] == r.get_json()['data']['keys_kept_until']
-    assert status['disabled_keys_wait_for_nodes'] is False
+    assert status['enable_available_after'] == r.get_json()['data']['enable_available_after']
+    assert status['enable_waits_for_nodes'] is False
     grace(_margin() + 1)
     r = auth_client.post('/api/v2/system/security/enable-encryption')
     assert r.status_code == 200, r.data
+
+
+# --- retention: old DEKs kept for reading, dropped after a clean sweep ---------
+
+
+
+@pytest.fixture
+def retention(monkeypatch, grace):
+    """The default week of retention after the ten-minute grace; returns ``later``."""
+    from security import dek_rotation
+    monkeypatch.setattr(dek_rotation, 'RETENTION_SECONDS', float(WEEK))
+    monkeypatch.setattr(dek_rotation, 'SWEEP_SECONDS', float(DAY))
+    return grace
+
+
+def _retain_after(app):
+    from models import EncryptionKey
+    with app.app_context():
+        return {r.version: r.retire_after for r in EncryptionKey.query.all()}
+
+
+def _write_under(app, model, row_id, attribute, fernet, plain):
+    from security import encryption
+    with app.app_context():
+        setattr(db.session.get(model, row_id), attribute, base64.b64encode(
+            encryption.ENCRYPTED_MARKER + fernet.encrypt(plain)).decode())
+        db.session.commit()
+
+
+def test_a_value_committed_under_the_old_dek_days_after_the_grace_is_read_then_swept(
+        app, values, retention, encryption_enabled):
+    """A long transaction encrypted under DEK 1 and commits three days after the rotation."""
+    from security import dek_rotation
+    with app.app_context():
+        old = encryption_enabled.key_encryption._fernet
+        dek_rotation.rotate()
+    retention(601)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 0
+        assert dek_rotation.retiring() is None  # the next rotation is possible
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
+    retention(3 * DAY)
+    _late_write(app, values, old)
+    assert _read(app, values) == CLEAR
+    with app.app_context():
+        dek_rotation.scheduled_sweep()
+    with pytest.raises(InvalidToken):
+        old.decrypt(_token(_stored(app, values)['target']))
+    assert _read(app, values) == CLEAR
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
+    retention(WEEK)
+    with app.app_context():
+        dek_rotation.scheduled_retire()
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'active')]
+    assert _read(app, values) == CLEAR
+
+
+def test_two_rotations_within_the_retention_leave_three_keys_readable(
+        app, auth_client, values, retention, encryption_enabled):
+    from models.deploy import DeployTarget
+    from models.ssh import SSHCertificateAuthority
+    from security import dek_rotation
+    key_encryption = encryption_enabled.key_encryption
+    with app.app_context():
+        first = key_encryption._fernet
+        dek_rotation.rotate()
+        second = key_encryption._fernet
+    retention(601)
+    r = auth_client.post('/api/v2/system/security/rotate-encryption-key')
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['version'] == 3
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'previous'),
+                                                     (3, 'active')]
+    _write_under(app, DeployTarget, values['ids'][DeployTarget], 'private_key', first,
+                 PEM.encode())
+    _write_under(app, SSHCertificateAuthority, values['ids'][SSHCertificateAuthority],
+                 'private_key', second, base64.b64decode(SSH_KEY))
+    with app.app_context():
+        key_encryption.reload()
+        assert key_encryption.dek_versions == (1, 2, 3)
+    assert _read(app, values) == CLEAR
+    retained = _retain_after(app)
+    assert retained[3] is None and retained[2] > retained[1]
+
+
+def test_a_retained_key_a_sweep_still_finds_a_value_under_is_kept(app, values, retention,
+                                                                  encryption_enabled):
+    from security import dek_rotation
+    with app.app_context():
+        old = encryption_enabled.key_encryption._fernet
+        dek_rotation.rotate()
+    retention(601)
+    with app.app_context():
+        dek_rotation.retire_if_due()
+    retention(WEEK)
+    _late_write(app, values, old)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 0
+    # Rewritten under the current DEK, the old one kept until the next sweep finds none
+    with pytest.raises(InvalidToken):
+        old.decrypt(_token(_stored(app, values)['target']))
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
+    retention(DAY + 1)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 1
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'active')]
+    assert _read(app, values) == CLEAR
+
+
+def test_a_retained_key_is_kept_while_a_value_opens_with_no_key(app, values, retention,
+                                                                encryption_enabled):
+    from security import dek_rotation
+    with app.app_context():
+        dek_rotation.rotate()
+    retention(601)
+    with app.app_context():
+        dek_rotation.retire_if_due()
+    retention(WEEK)
+    _late_write(app, values, Fernet(Fernet.generate_key()))
+    try:
+        with app.app_context(), pytest.raises(dek_rotation.RotationError):
+            dek_rotation.retire_if_due()
+        assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
+    finally:
+        _late_write(app, values, Fernet(_kek(encryption_enabled)))  # readable for teardown
+
+
+def test_the_status_says_rotation_possible_once_the_short_grace_ends(app, auth_client, values,
+                                                                    retention):
+    from security import dek_rotation
+    with app.app_context():
+        dek_rotation.rotate()
+    status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
+    assert status['rotation_available'] is False and status['rotation_available_after']
+    retention(601)
+    with app.app_context():
+        dek_rotation.retire_if_due()
+    status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
+    assert status['rotation_available'] is True and status['rotation_available_after'] is None
+    assert status['rotation_in_progress'] is False
+    kept = status['retained_keys']
+    assert [k['version'] for k in kept] == [1]
+    assert kept[0]['retire_after'] == (_retain_after(app)[1].isoformat(timespec='seconds')
+                                       + 'Z')
+
+
+def test_a_grace_replaced_by_another_node_is_not_ended_here(app, values, grace, monkeypatch):
+    """Between the acknowledgement check and its record, a peer set a grace of its own."""
+    from security import dek_rotation
+    with app.app_context():
+        dek_rotation.rotate()
+        # As in HA while a node lags: no acknowledgement recorded yet
+        current = dek_rotation.retiring()
+        dek_rotation._set_grace(current['version'], current['command'], until=current['until'])
+        db.session.commit()
+    grace(601)
+    real = dek_rotation.wait_for_nodes
+
+    def peer_replaces_the_grace(command, timeout=None):
+        dek_rotation._set_grace(99, None)
+        db.session.commit()
+        return real(command, timeout)
+    monkeypatch.setattr(dek_rotation, 'wait_for_nodes', peer_replaces_the_grace)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 0
+        assert dek_rotation.retiring()['version'] == 99
+
+
+def test_a_disable_keeps_its_keys_for_the_retention_and_its_late_values_are_decrypted(
+        app, auth_client, values, retention, monkeypatch, encryption_enabled):
+    from security import dek_rotation
+    key_encryption = encryption_enabled.key_encryption
+    with app.app_context():
+        _rotate_at_once(monkeypatch)
+        stale = key_encryption._fernet
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert r.status_code == 200, r.data
+    retention(601)
+    with app.app_context():
+        dek_rotation.retire_if_due()
+    status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
+    assert status['enabled'] is False and status['disabling'] is False
+    assert status['enable_available_after'] is None
+    # Version 1 from the rotation before, version 2 from the disable
+    assert [k['version'] for k in status['retained_keys']] == [1, 2]
+    retention(2 * DAY)
+    _late_write(app, values, stale)
+    assert _late_value_opens(app, values)
+    with app.app_context():
+        dek_rotation.scheduled_sweep()
+    assert _stored(app, values)['target'] == PEM
+    retention(WEEK)
+    with app.app_context():
+        dek_rotation.scheduled_retire()
+        key_encryption.reload()
+        assert not key_encryption.is_enabled and key_encryption.kek_loaded
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(0, 'disabled')]
+
+
+def _file_kek(app, set_env, encryption_enabled):
+    """master.key holds the KEK, no variable: the case a disable removes the file for."""
+    key_encryption = encryption_enabled.key_encryption
+    path = encryption_enabled.MASTER_KEY_PATH
+    path.write_text(Fernet.generate_key().decode())
+    set_env('KEY_ENCRYPTION_KEY', None)
+    with app.app_context():
+        key_encryption.reload()
+        assert key_encryption.key_source == 'file'
+    return path
+
+
+def test_a_file_disable_removes_the_master_key_with_the_last_retained_key(
+        app, auth_client, envelope_keys, set_env, retention, encryption_enabled):
+    """The file's KEK wraps the retained DEKs: it goes in the step that drops the last one."""
+    from security import dek_rotation
+    key_encryption = encryption_enabled.key_encryption
+    path = _file_kek(app, set_env, encryption_enabled)
+    with app.app_context():
+        dek_rotation.rotate()  # DEK 1 retained a week from now
+    retention(DAY)
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
+    assert status['key_file_kept_for_retained_keys'] is True
+    retention(601)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 0
+    assert path.exists()
+    retention(WEEK - DAY)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 1  # DEK 1; DEK 2 a day more
+    assert path.exists()
+    retention(DAY)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 1
+        assert not key_encryption.is_enabled
+    assert not path.exists()
+    assert [s for _, s, _, _ in _rows(app)] == ['disabled']
+
+
+def test_enabling_with_a_new_master_key_is_refused_while_keys_are_retained(
+        app, auth_client, envelope_keys, set_env, retention, encryption_enabled):
+    """master.key was removed by hand during the retention: a new one could not open them."""
+    key_encryption = encryption_enabled.key_encryption
+    path = _file_kek(app, set_env, encryption_enabled)
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    retention(601)
+    rows = _rows(app)
+    path.unlink()
+    with app.app_context():
+        key_encryption.reload()
+        assert not key_encryption.kek_loaded
+    r = auth_client.post('/api/v2/system/security/enable-encryption')
+    assert r.status_code == 409, r.data
+    assert not path.exists() and _rows(app) == rows
+
+
+def test_a_retention_sweep_never_runs_while_a_rotation_waits_for_its_nodes(
+        app, values, retention, encryption_enabled):
+    """A new DEK may not be loaded everywhere yet: nothing is written under it before then."""
+    from security import dek_rotation
+    with app.app_context():
+        dek_rotation.rotate()
+    retention(601)
+    with app.app_context():
+        dek_rotation.retire_if_due()
+        dek_rotation.start()  # DEK 2 being rewritten, DEK 3 active, nothing rewritten yet
+    retention(WEEK)
+    with app.app_context():
+        assert dek_rotation.retire_if_due(sweep=True) == 0
+        assert not dek_rotation._under_active(_stored(app, values)['target'])
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'previous'),
+                                                     (3, 'active')]
+
+
+def test_enabling_during_the_retention_of_a_disable_keeps_its_keys_readable(
+        app, auth_client, values, retention, monkeypatch, encryption_enabled):
+    from security import dek_rotation
+    key_encryption = encryption_enabled.key_encryption
+    with app.app_context():
+        _rotate_at_once(monkeypatch)
+        stale = key_encryption._fernet
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    retention(601)
+    r = auth_client.post('/api/v2/system/security/enable-encryption')
+    assert r.status_code == 200, r.data
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'previous'),
+                                                     (3, 'active')]
+    assert _read(app, values) == CLEAR
+    _late_write(app, values, stale)
+    assert _read(app, values) == CLEAR
+    with app.app_context():
+        assert key_encryption.is_encrypting and key_encryption.active_version == 3
+        dek_rotation.scheduled_sweep()
+    with pytest.raises(InvalidToken):
+        stale.decrypt(_token(_stored(app, values)['target']))
+    retention(WEEK)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 2
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(3, 'active')]
+    assert _read(app, values) == CLEAR
+
+
+def test_a_kek_changed_by_hand_rewraps_the_retained_keys_too(set_env, app, values, retention,
+                                                             encryption_enabled):
+    from security import dek_rotation
+    old = _kek(encryption_enabled).decode()
+    with app.app_context():
+        dek_rotation.rotate()
+    retention(601)
+    with app.app_context():
+        dek_rotation.rotate()
+    kept = _retain_after(app)
+    new = Fernet.generate_key().decode()
+    set_env('KEY_ENCRYPTION_KEY', new)
+    set_env('KEY_ENCRYPTION_KEY_PREVIOUS', old)
+    _start(app)
+    assert app.config['SAFE_MODE'] is False
+    rows = _rows(app)
+    assert [(v, s) for v, s, _, _ in rows] == [(1, 'previous'), (2, 'previous'), (3, 'active')]
+    assert {k for _, _, k, _ in rows} == {encryption_enabled.key_encryption.kek_fingerprint()}
+    assert _retain_after(app) == kept
+    with app.app_context():
+        encryption_enabled.key_encryption.reload()
+        assert encryption_enabled.key_encryption.dek_versions == (1, 2, 3)
+    set_env('KEY_ENCRYPTION_KEY_PREVIOUS', None)
+    _start(app)
+    assert app.config['SAFE_MODE'] is False and _read(app, values) == CLEAR
