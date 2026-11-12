@@ -293,14 +293,14 @@ def _mark_while_recorded(row: Certificate, record) -> bool:
 
 
 def interrupted_lift(row: Certificate) -> bool:
-    """A row in removeFromCRL is an unhold stopped between its two commits only while a hold
-    record of its serial is still stored (the second commit deletes it) and no final one is."""
+    """A row in removeFromCRL is an unhold stopped between its two commits unless a record
+    of its serial says otherwise: a hold record or none is a lift to finish, a final one is not."""
     from utils.revocation_reasons import HOLD_REASONS
     from services.cert.serial_resolution import resolve_record_serial
     ca = CA.query.filter_by(refid=row.caref).first() if row.caref else None
     serial = resolve_record_serial(row)
     records = revocation_records(ca, serial) if ca is not None and serial is not None else []
-    return bool(records) and all(r.revoke_reason in HOLD_REASONS for r in records)
+    return all(r.revoke_reason in HOLD_REASONS for r in records)
 
 
 def lock_serial_records(ca: CA, serial: int) -> list:

@@ -1026,14 +1026,12 @@ class TestARecordedHoldIsShownAndLifted:
         with app.app_context():
             assert db.session.get(RevokedSerial, record_id) is not None
 
-    @pytest.mark.parametrize('record', ['removeFromCRL', None])
-    def test_remove_from_crl_with_no_hold_record_is_no_interrupted_lift(self, app, auth_client, issuer,
-                                                                       record):
-        """An ACME revocation with reason 8 (row and record) or a row alone proves no lift."""
+    def test_remove_from_crl_with_its_own_record_is_no_interrupted_lift(self, app, auth_client, issuer):
+        """A row and a record both in removeFromCRL (an old ACME reason 8) prove no lift."""
         _, refid, ca_cert, ca_key = issuer
-        real, key = _leaf(f'remove-from-crl-{record}.example.test', ca_cert, ca_key)
+        real, key = _leaf('remove-from-crl-recorded.example.test', ca_cert, ca_key)
         row_id = _store(app, real, refid, key=key)
-        record_id = _record(app, refid, real, reason=record, certificate_id=row_id) if record else None
+        record_id = _record(app, refid, real, reason='removeFromCRL', certificate_id=row_id)
         with app.app_context():
             row = db.session.get(Certificate, row_id)
             row.revoked, row.revoke_reason, row.revoked_at = True, 'removeFromCRL', LATER
@@ -1042,9 +1040,21 @@ class TestARecordedHoldIsShownAndLifted:
         assert r.status_code == 409, r.data
         assert 'not on hold' in r.get_json()['message']
         assert _row(app, row_id) == (True, 'removeFromCRL', LATER)
-        if record_id:
-            with app.app_context():
-                assert db.session.get(RevokedSerial, record_id).revoke_reason == 'removeFromCRL'
+        with app.app_context():
+            assert db.session.get(RevokedSerial, record_id).revoke_reason == 'removeFromCRL'
+
+    def test_a_lift_of_a_row_only_hold_left_half_done_completes(self, app, auth_client, issuer):
+        """The hold was on the row alone: stopped mid-lift, no record is left and it still completes."""
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('remove-from-crl-row-only.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            row.revoked, row.revoke_reason, row.revoked_at = True, 'removeFromCRL', LATER
+            db.session.commit()
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 200, r.data
+        assert _row(app, row_id) == (False, None, None)
 
     def test_a_lift_left_half_done_in_remove_from_crl_completes(self, app, auth_client, issuer):
         """removeFromCRL on a row is an unhold stopped between its two commits, not a final reason."""
@@ -1202,6 +1212,7 @@ def _wait_for_a_lock_waiter(conn, seconds=5.0):
     from sqlalchemy import text
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
+        conn.execute(text('SELECT pg_stat_clear_snapshot()'))  # the view is cached per transaction
         if conn.execute(text("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' "
                              "AND datname = current_database() AND pid <> pg_backend_pid()")).scalar():
             return True
