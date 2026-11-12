@@ -427,10 +427,12 @@ def _named_template(ca, csr):
 
 
 def _policy_oid_cas(ca):
-    """The CAs whose policy OIDs a request may name: *ca*, and the XCEP CA when set apart."""
-    from models import CA, SystemConfig
-    row = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
-    xcep_ca = CA.query.filter_by(refid=row.value).first() if row and row.value != ca.refid else None
+    """The CAs whose policy OIDs a request may name: *ca*, and the profile's policy CA when set apart."""
+    from models import CA
+    from services.windows_profiles import serving_profile
+    profile = serving_profile()
+    refid = profile.policy_ca_refid if profile is not None else None
+    xcep_ca = CA.query.filter_by(refid=refid).first() if refid and refid != ca.refid else None
     return [ca, xcep_ca] if xcep_ca is not None else [ca]
 
 

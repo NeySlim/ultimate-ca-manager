@@ -122,18 +122,17 @@ def test_an_unreadable_template_name_is_refused(app, subject_ca):
 @pytest.fixture
 def split_xcep(app, subject_ca, create_ca):
     """A WSTEP CA offering TWINS while XCEP is set to another CA: (WSTEP CA id, XCEP OID of VPNUser)."""
-    from models import SystemConfig
+    from tests.windows_profile_support import restore, set_config, snapshot
     ca_id = subject_ca('Named split WSTEP CA', TWINS)
     xcep_ca = create_ca(cn='Named split XCEP CA')
     with app.app_context():
         template = CertificateTemplate.query.filter_by(name='Named split WSTEP CA VPNUser').one()
         oid = _policy_oid_for_template(db.session.get(CA, xcep_ca['id']), template)
-        db.session.add(SystemConfig(key='xcep_ca_refid', value=xcep_ca['refid']))
-        db.session.commit()
+        saved = snapshot(('xcep_ca_refid',))
+        set_config('xcep_ca_refid', xcep_ca['refid'])
     yield ca_id, oid
     with app.app_context():
-        SystemConfig.query.filter_by(key='xcep_ca_refid').delete()
-        db.session.commit()
+        restore(saved)
 
 
 def test_an_oid_announced_by_a_separate_xcep_ca_is_issued(app, split_xcep):
@@ -176,8 +175,8 @@ def test_only_an_oid_of_the_template_is_stamped(app, split_xcep):
 
 
 def ca_id_of_xcep(oid):
-    from models import SystemConfig
-    return CA.query.filter_by(refid=SystemConfig.query.filter_by(key='xcep_ca_refid').one().value).one().id
+    from tests.windows_profile_support import get_config
+    return CA.query.filter_by(refid=get_config('xcep_ca_refid')).one().id
 
 
 @pytest.mark.parametrize('how', ['name', 'eku'])
@@ -202,7 +201,6 @@ def test_a_request_not_naming_the_oid_carries_the_one_xcep_announced(app, split_
 def test_a_certificate_renews_after_the_xcep_ca_changes(app, split_xcep, create_ca, change, path):
     """The renewed certificate was issued by this CA: its template OID, stamped under the XCEP
     CA of the time, still names its template once that setting is cleared or moved."""
-    from models import SystemConfig
     ca_id, oid = split_xcep
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     csr = (x509.CertificateSigningRequestBuilder()
@@ -214,9 +212,8 @@ def test_a_certificate_renews_after_the_xcep_ca_changes(app, split_xcep, create_
     assert err is None, err
     other = create_ca(cn=f'Named split other XCEP CA {change} {path}') if change == 'moved' else None
     with app.app_context():
-        row = SystemConfig.query.filter_by(key='xcep_ca_refid').one()
-        row.value = other['refid'] if other else ''
-        db.session.commit()
+        from tests.windows_profile_support import set_config
+        set_config('xcep_ca_refid', other['refid'] if other else '')
     cert, err = _renew(app, ca_id, path, old_cert, key, _eku_csr(old_cert, key, CLIENT_AUTH))
     assert err is None, err
     with app.app_context():

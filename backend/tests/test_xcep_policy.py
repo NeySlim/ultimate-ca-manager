@@ -9,6 +9,7 @@ from models import CA, CATemplatePin, CertificateTemplate, db
 from models.system_config import SystemConfig
 from tests.fixtures.templates import delete_templates
 from services.wstep.soap_envelope import SOAP_NS
+from tests.windows_profile_support import get_config, restore, set_config, snapshot
 
 
 XCEP_URL = '/ADPolicyProvider_CEP_UsernamePassword/service.svc'
@@ -18,12 +19,7 @@ XCEP_NS = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollmentpolicy'
 
 
 def _set_config(key, value):
-    row = SystemConfig.query.filter_by(key=key).first()
-    if row is None:
-        db.session.add(SystemConfig(key=key, value=value))
-    else:
-        row.value = value
-    db.session.commit()
+    set_config(key, value)
 
 
 @pytest.fixture(scope='module')
@@ -31,11 +27,7 @@ def xcep_config(app, create_ca):
     ca_data = create_ca(cn='XCEP Policy CA')
     keys = ('xcep_enabled', 'xcep_ca_refid', 'xcep_username', 'xcep_password')
     with app.app_context():
-        previous = {
-            key: (SystemConfig.query.filter_by(key=key).first().value
-                  if SystemConfig.query.filter_by(key=key).first() else None)
-            for key in keys
-        }
+        previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
         _set_config('xcep_enabled', 'true')
         _set_config('xcep_ca_refid', ca.refid)
@@ -68,16 +60,7 @@ def xcep_config(app, create_ca):
     with app.app_context():
         delete_templates([template_id])
         db.session.commit()
-        for key, value in previous.items():
-            row = SystemConfig.query.filter_by(key=key).first()
-            if value is None:
-                if row is not None:
-                    db.session.delete(row)
-            elif row is None:
-                db.session.add(SystemConfig(key=key, value=value))
-            else:
-                row.value = value
-        db.session.commit()
+        restore(previous)
 
 
 def _basic_auth():
@@ -87,8 +70,7 @@ def _basic_auth():
 
 def test_get_policies_disabled_returns_503(client, app):
     with app.app_context():
-        row = SystemConfig.query.filter_by(key='xcep_enabled').first()
-        previous = row.value if row else None
+        previous = get_config('xcep_enabled')
         _set_config('xcep_enabled', 'false')
     try:
         r = client.post(XCEP_URL, data=b'<GetPolicies/>', headers=_basic_auth())
@@ -315,8 +297,7 @@ def test_get_policies_falls_back_to_active_templates_when_unpinned(client, app, 
     ca_data = create_ca(cn='XCEP Fallback CA')
     with app.app_context():
         ca = db.session.get(CA, ca_data['id'])
-        previous_refid = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
-        previous_value = previous_refid.value if previous_refid else None
+        previous_value = get_config('xcep_ca_refid')
         _set_config('xcep_ca_refid', ca.refid)
 
         template = CertificateTemplate(
@@ -343,13 +324,7 @@ def test_get_policies_falls_back_to_active_templates_when_unpinned(client, app, 
         with app.app_context():
             delete_templates([template_id])
             db.session.commit()
-            if previous_value is None:
-                row = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
-                if row:
-                    db.session.delete(row)
-                db.session.commit()
-            else:
-                _set_config('xcep_ca_refid', previous_value)
+            restore({'xcep_ca_refid': previous_value})
 
 
 def test_get_policies_autoenroll_reflects_per_template_flag(client, app, create_ca):
@@ -361,8 +336,7 @@ def test_get_policies_autoenroll_reflects_per_template_flag(client, app, create_
     ca_data = create_ca(cn='XCEP Autoenroll CA')
     with app.app_context():
         ca = db.session.get(CA, ca_data['id'])
-        previous_refid = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
-        previous_value = previous_refid.value if previous_refid else None
+        previous_value = get_config('xcep_ca_refid')
         _set_config('xcep_ca_refid', ca.refid)
 
         auto_template = CertificateTemplate(
@@ -401,13 +375,7 @@ def test_get_policies_autoenroll_reflects_per_template_flag(client, app, create_
         with app.app_context():
             delete_templates([auto_id, manual_id])
             db.session.commit()
-            if previous_value is None:
-                row = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
-                if row:
-                    db.session.delete(row)
-                db.session.commit()
-            else:
-                _set_config('xcep_ca_refid', previous_value)
+            restore({'xcep_ca_refid': previous_value})
 
 
 def test_get_policies_template_oid_arcs_fit_uint32(client, app, create_ca):
@@ -427,8 +395,7 @@ def test_get_policies_template_oid_arcs_fit_uint32(client, app, create_ca):
     ca_data = create_ca(cn='XCEP OID Arc CA')
     with app.app_context():
         ca = db.session.get(CA, ca_data['id'])
-        previous_refid = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
-        previous_value = previous_refid.value if previous_refid else None
+        previous_value = get_config('xcep_ca_refid')
         _set_config('xcep_ca_refid', ca.refid)
         _set_config('xcep_enabled', 'true')
 
@@ -476,13 +443,7 @@ def test_get_policies_template_oid_arcs_fit_uint32(client, app, create_ca):
                     db.session.delete(pin_row)
             delete_templates(template_ids)
             db.session.commit()
-            if previous_value is None:
-                row = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
-                if row:
-                    db.session.delete(row)
-                db.session.commit()
-            else:
-                _set_config('xcep_ca_refid', previous_value)
+            restore({'xcep_ca_refid': previous_value})
 
 
 def _fault_code(data):

@@ -10,6 +10,7 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, SystemConfig, CA
 from services.audit_service import AuditService
+from services import windows_profiles
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,11 +34,17 @@ def set_config(key, value):
         db.session.add(config)
 
 
+def _actor():
+    from flask import g
+    return getattr(getattr(g, 'current_user', None), 'username', None)
+
+
 @bp.route('/api/v2/wstep/config', methods=['GET'])
 @require_auth(['read:wstep'])
 def get_wstep_config():
-    """Get WSTEP configuration from database"""
-    ca_refid = get_config('wstep_ca_refid', '')
+    """WSTEP configuration: the switch, and the default profile's issuing CA, account and validity"""
+    profile = windows_profiles.default_profile()
+    ca_refid = (profile.issuing_ca_refid if profile is not None else None) or ''
     ca_id = None
     ca_name = None
     if ca_refid:
@@ -51,16 +58,16 @@ def get_wstep_config():
         'ca_refid': ca_refid,
         'ca_id': ca_id,
         'ca_name': ca_name,
-        'username': get_config('wstep_username', ''),
-        'password_set': bool(get_config('wstep_password', '')),
-        'validity_days': int(get_config('wstep_validity_days', '365') or 365),
+        'username': (profile.wstep_username if profile is not None else None) or '',
+        'password_set': bool(profile is not None and profile.wstep_password),
+        'validity_days': (profile.validity_days if profile is not None else None) or 365,
     })
 
 
 @bp.route('/api/v2/wstep/config', methods=['PATCH'])
 @require_auth(['write:wstep'])
 def update_wstep_config():
-    """Update WSTEP configuration in database"""
+    """Update the WSTEP switch and the default profile's issuing CA, account and validity"""
     data = request.json or {}
 
     # gunicorn_config.py reads wstep_enabled once at worker startup to
@@ -74,42 +81,51 @@ def update_wstep_config():
 
     if 'enabled' in data:
         set_config('wstep_enabled', 'true' if data['enabled'] else 'false')
+    profile = (windows_profiles.default_for_write(_actor())
+               if {'ca_refid', 'ca_id', 'username', 'password', 'validity_days'} & set(data) else None)
+    current = (profile.issuing_ca_refid if profile is not None else None) or ''
     if 'ca_refid' in data:
         if data['ca_refid']:
             ca = CA.query.filter_by(refid=str(data['ca_refid'])).first()
             if not ca:
+                db.session.rollback()
                 return error_response('CA not found', 404)
             # WSTEP issues: the CA must be able to sign when it is chosen
-            if ca.refid != get_config('wstep_ca_refid', '') and signing_ca_problem(ca):
+            if ca.refid != current and signing_ca_problem(ca):
+                db.session.rollback()
                 return error_response(signing_ca_problem(ca), 400)
-        set_config('wstep_ca_refid', data['ca_refid'] or '')
+        profile.issuing_ca_refid = str(data['ca_refid']) if data['ca_refid'] else None
     if 'ca_id' in data:
         if data['ca_id']:
             ca = db.session.get(CA, data['ca_id'])
             if not ca:
+                db.session.rollback()
                 return error_response('CA not found', 404)
-            if ca.refid != get_config('wstep_ca_refid', '') and signing_ca_problem(ca):
+            if ca.refid != current and signing_ca_problem(ca):
+                db.session.rollback()
                 return error_response(signing_ca_problem(ca), 400)
-            set_config('wstep_ca_refid', ca.refid)
+            profile.issuing_ca_refid = ca.refid
         else:
-            set_config('wstep_ca_refid', '')
+            profile.issuing_ca_refid = None
     if 'username' in data:
-        set_config('wstep_username', data['username'])
+        profile.wstep_username = data['username'] or None
     if 'password' in data and data['password']:
         from utils.password_hash import hash_password
-        set_config('wstep_password', hash_password(data['password']))
+        profile.wstep_password = hash_password(data['password'])
     if 'validity_days' in data:
         # Bound to PKI-internal cap (10 years), same as EST.
         from utils.validity import (MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS,
                                     coerce_validity_days, validity_days_in_range)
         vd = coerce_validity_days(data['validity_days'])
         if vd is None:
+            db.session.rollback()
             return error_response('validity_days must be an integer', 400)
         if not validity_days_in_range(vd):
+            db.session.rollback()
             return error_response(
                 f'validity_days must be between {MIN_VALIDITY_DAYS} and {MAX_VALIDITY_DAYS}',
                 400)
-        set_config('wstep_validity_days', str(vd))
+        profile.validity_days = vd
 
     # HA: the restart is queued with the setting, or neither is saved
     from utils.ha import ha_enabled

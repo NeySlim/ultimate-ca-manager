@@ -81,6 +81,11 @@ def update_kerberos_config():
         _set_config('kerberos_enabled', 'true' if data['enabled'] else 'false')
     if 'spn' in data:
         _set_config('kerberos_spn', data['spn'] or '')
+        from services import windows_profiles
+        profile = windows_profiles.default_profile()
+        if profile is not None:
+            db.session.flush()
+            windows_profiles.fill_realm(profile)
 
     ok, _err = safe_commit(logger, "Failed to update Kerberos configuration")
     if not ok:
@@ -143,11 +148,14 @@ def upload_kerberos_keytab():
             f"Keytab is not a valid krb5 keytab: {inspection['error']}", 400
         )
 
-    # The database holds the keytab every node writes; reload_keytab reaches the others (HA)
-    from services import cluster_commands, shared_files
+    # The default profile holds the keytab; the file every node writes is rebuilt from it
+    # and reload_keytab reaches the other nodes (HA)
+    from services import cluster_commands, windows_profiles
     user = getattr(g, 'current_user', None)
-    shared_files.store_file(shared_files.KERBEROS_KEYTAB, file_content,
-                     actor=getattr(user, 'username', None))
+    profile = windows_profiles.default_for_write(getattr(user, 'username', None))
+    profile.set_keytab(file_content)
+    windows_profiles.fill_realm(profile)
+    windows_profiles.publish_keytab(actor=getattr(user, 'username', None))
     cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
     ok, _err = safe_commit(logger, "Failed to store Kerberos keytab")
     if not ok:

@@ -17,7 +17,6 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from lxml import etree
 
 from models import CA, CATemplatePin, Certificate, CertificateTemplate, db
-from models.system_config import SystemConfig
 from tests.conftest import get_json
 from tests.fixtures.templates import templates_created_here_removed
 
@@ -135,15 +134,11 @@ def test_issuance_from_a_legacy_spelled_template_works(app, auth_client, create_
 # ---------------------------------------------------------------- XCEP
 
 def _set_config(key, value):
-    row = SystemConfig.query.filter_by(key=key).first()
+    from tests.windows_profile_support import delete_config, set_config
     if value is None:
-        if row is not None:
-            db.session.delete(row)
-    elif row is None:
-        db.session.add(SystemConfig(key=key, value=value))
+        delete_config(key)
     else:
-        row.value = value
-    db.session.commit()
+        set_config(key, value)
 
 
 @pytest.fixture
@@ -153,8 +148,8 @@ def xcep_ca(app, create_ca):
     keys = ('xcep_enabled', 'xcep_ca_refid', 'xcep_username', 'xcep_password')
     pinned = []
     with app.app_context():
-        previous = {k: getattr(SystemConfig.query.filter_by(key=k).first(), 'value', None)
-                    for k in keys}
+        from tests.windows_profile_support import snapshot
+        previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
         for key, value in zip(keys, ('true', ca.refid, XCEP_USER, XCEP_PASSWORD)):
             _set_config(key, value)

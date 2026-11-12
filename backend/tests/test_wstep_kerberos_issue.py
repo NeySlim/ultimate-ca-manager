@@ -24,6 +24,7 @@ from services.ad_connector import lookup as ad_lookup
 from services.kerberos import negotiate_auth
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WST_NS, WSSE_NS
 from utils.upn_san import extract_upns_from_san_list
+from tests.windows_profile_support import restore, set_config, snapshot
 
 ISSUE_URL = '/ADCertificateService_CES_Kerberos/service.svc'
 KERBEROS_PRINCIPAL = 'HOST$@HAGLAND.DOMAIN'
@@ -36,12 +37,7 @@ def _templates_stay_in_this_module(app):
 
 
 def _set_config(key, value):
-    row = SystemConfig.query.filter_by(key=key).first()
-    if row is None:
-        db.session.add(SystemConfig(key=key, value=value))
-    else:
-        row.value = value
-    db.session.commit()
+    set_config(key, value)
 
 
 @pytest.fixture(scope='module')
@@ -49,11 +45,7 @@ def wstep_kerberos_config(app, create_ca):
     ca_data = create_ca(cn='WSTEP Kerberos CA')
     keys = ('wstep_enabled', 'wstep_ca_refid', 'wstep_validity_days')
     with app.app_context():
-        previous = {
-            key: (SystemConfig.query.filter_by(key=key).first().value
-                  if SystemConfig.query.filter_by(key=key).first() else None)
-            for key in keys
-        }
+        previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
         _set_config('wstep_enabled', 'true')
         _set_config('wstep_ca_refid', ca.refid)
@@ -62,16 +54,7 @@ def wstep_kerberos_config(app, create_ca):
     yield ca_data
 
     with app.app_context():
-        for key, value in previous.items():
-            row = SystemConfig.query.filter_by(key=key).first()
-            if value is None:
-                if row is not None:
-                    db.session.delete(row)
-            elif row is None:
-                db.session.add(SystemConfig(key=key, value=value))
-            else:
-                row.value = value
-        db.session.commit()
+        restore(previous)
 
 
 def _make_csr(common_name='machine.hagland.domain'):

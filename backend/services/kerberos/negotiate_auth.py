@@ -159,7 +159,12 @@ def is_configured():
     modes ("nobody configured Kerberos" vs "Kerberos is configured but the
     optional dependency isn't installed") stay distinguishable in logs.
     """
-    return bool(is_enabled() and get_spn() and KEYTAB_PATH.exists())
+    if not (is_enabled() and get_spn() and KEYTAB_PATH.exists()):
+        return False
+    # A profile without a realm, or disabled, serves no Kerberos client (A1)
+    from services.windows_profiles import serving_profile
+    profile = serving_profile()
+    return bool(profile is not None and profile.realm)
 
 
 def sync_keytab_file(raw_bytes):
@@ -210,27 +215,35 @@ def write_stored_keytab():
 
 
 def restore_keytab_at_start(app):
-    """Startup: the stored keytab is written to disk; a single node's file from before
-    the keytab was stored is stored once. Never raises."""
+    """Startup: the default profile takes a keytab it does not hold yet (a single node's file
+    from 2.x, or the one stored before profiles), then the stored keytab is written to disk.
+    Never raises."""
     from models import SharedFile, db
-    from services import shared_files
+    from services import shared_files, windows_profiles
     from utils.ha import ha_enabled
     with app.app_context():
         try:
+            profile = windows_profiles.default_profile()
+            if profile is None or not profile.keytab:
+                data = None
+                if db.session.get(SharedFile, shared_files.KERBEROS_KEYTAB) is not None:
+                    data = shared_files.read_file(shared_files.KERBEROS_KEYTAB)
+                elif KEYTAB_PATH.exists() and ha_enabled():
+                    # Two nodes may hold different files: the operator uploads the right one
+                    logger.warning("Kerberos keytab found on this node only: upload it again "
+                                   "to serve it from every node")
+                elif KEYTAB_PATH.exists():
+                    data = KEYTAB_PATH.read_bytes()
+                if data:
+                    profile = profile or windows_profiles.default_for_write('system')
+                    profile.set_keytab(data)
+                    windows_profiles.fill_realm(profile)
+                    windows_profiles.publish_keytab()
+                    db.session.commit()
+                    logger.info("Kerberos keytab stored in the default Windows enrollment profile")
             if db.session.get(SharedFile, shared_files.KERBEROS_KEYTAB) is not None:
                 if write_stored_keytab() == 'written':
                     logger.info("Kerberos keytab written from the database")
-                return
-            if not KEYTAB_PATH.exists():
-                return
-            if ha_enabled():
-                # Two nodes may hold different files: the operator uploads the right one
-                logger.warning("Kerberos keytab found on this node only: upload it again "
-                               "to serve it from every node")
-                return
-            shared_files.store_file(shared_files.KERBEROS_KEYTAB, KEYTAB_PATH.read_bytes(), actor='system')
-            db.session.commit()
-            logger.info("Kerberos keytab stored in the database")
         except Exception as e:
             db.session.rollback()
             logger.error(f"Kerberos keytab not restored from the database: {type(e).__name__}: {e}")

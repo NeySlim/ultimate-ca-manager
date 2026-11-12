@@ -149,9 +149,14 @@ def _users_backup_codes_scrypt():
           'EST, WSTEP or XCEP passwords stored as scrypt hashes: clients are refused in FIPS mode',
           'Enter the password again in the protocol settings: it is then stored as a PBKDF2 hash.')
 def _protocol_secrets_scrypt():
-    keys = {'est_password': 'EST', 'wstep_password': 'WSTEP', 'xcep_password': 'XCEP'}
-    rows = SystemConfig.query.filter(SystemConfig.key.in_(list(keys))).all()
-    return sorted(keys[r.key] for r in rows if (r.value or '').startswith('scrypt:'))
+    from models import WindowsEnrollmentProfile
+    row = SystemConfig.query.filter_by(key='est_password').first()
+    found = {'EST'} if row is not None and (row.value or '').startswith('scrypt:') else set()
+    for profile in WindowsEnrollmentProfile.query.all():
+        for label, value in (('WSTEP', profile.wstep_password), ('XCEP', profile.xcep_password)):
+            if (value or '').startswith('scrypt:'):
+                found.add(label)
+    return sorted(found)
 
 
 def _ca_keys():

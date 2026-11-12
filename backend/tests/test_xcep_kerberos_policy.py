@@ -19,6 +19,7 @@ from models.system_config import SystemConfig
 from tests.fixtures.templates import delete_templates
 from services.kerberos import negotiate_auth
 from services.wstep.soap_envelope import SOAP_NS
+from tests.windows_profile_support import restore, set_config, snapshot
 
 XCEP_KRB_URL = '/ADPolicyProvider_CEP_Kerberos/service.svc'
 XCEP_USERPASS_URL = '/ADPolicyProvider_CEP_UsernamePassword/service.svc'
@@ -28,12 +29,7 @@ XCEP_PASSWORD = 'xcep-krb-password'
 
 
 def _set_config(key, value):
-    row = SystemConfig.query.filter_by(key=key).first()
-    if row is None:
-        db.session.add(SystemConfig(key=key, value=value))
-    else:
-        row.value = value
-    db.session.commit()
+    set_config(key, value)
 
 
 @pytest.fixture(scope='module')
@@ -41,11 +37,7 @@ def xcep_kerberos_config(app, create_ca):
     ca_data = create_ca(cn='XCEP Kerberos CA')
     keys = ('xcep_enabled', 'xcep_ca_refid', 'xcep_username', 'xcep_password')
     with app.app_context():
-        previous = {
-            key: (SystemConfig.query.filter_by(key=key).first().value
-                  if SystemConfig.query.filter_by(key=key).first() else None)
-            for key in keys
-        }
+        previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
         _set_config('xcep_enabled', 'true')
         _set_config('xcep_ca_refid', ca.refid)
@@ -77,16 +69,7 @@ def xcep_kerberos_config(app, create_ca):
     with app.app_context():
         delete_templates([template_id])
         db.session.commit()
-        for key, value in previous.items():
-            row = SystemConfig.query.filter_by(key=key).first()
-            if value is None:
-                if row is not None:
-                    db.session.delete(row)
-            elif row is None:
-                db.session.add(SystemConfig(key=key, value=value))
-            else:
-                row.value = value
-        db.session.commit()
+        restore(previous)
 
 
 def _cauri_auth_values(response_bytes):
