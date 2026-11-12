@@ -59,3 +59,4 @@ tests/test_fresh_app.py
 tests/test_policy_algorithms_397.py
 tests/test_startup_backend_guards.py
 tests/test_initial_admin_password.py
+tests/test_est_fortios*.py
