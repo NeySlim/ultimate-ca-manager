@@ -249,8 +249,9 @@ class TestInPlace:
         before = _state(app, cid)
         with app.app_context():
             refid = db.session.get(CA, ca['id']).refid
+            # Linked to the live row, so lifted: an unlinked record would refuse the renewal
             db.session.add(RevokedSerial(caref=refid, serial_number=before['serial'],
-                                         revoke_reason='unspecified', certificate_id=None,
+                                         revoke_reason='unspecified', certificate_id=cid,
                                          valid_to=datetime(2001, 1, 1)))
             db.session.commit()
         _renew(app, cid)

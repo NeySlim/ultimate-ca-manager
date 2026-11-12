@@ -1,5 +1,5 @@
 """A certificate its CA revoked comes back revoked when imported again, on every
-import path.
+import path, and the persistent record alone is enough to refuse its renewal.
 
 The revocation record outlives the certificate row: OCSP and the CRL keep
 answering "revoked" for the serial, and the row an import creates must agree.
@@ -208,3 +208,50 @@ class TestAnImportWithoutAPersistedRevocationIsUnchanged:
         assert _import(auth_client, elsewhere).status_code in (200, 201)
         assert _states(app, elsewhere) == [(None, False, None, None)]
 
+
+class TestARenewalRefusesAPersistedRevocation:
+    """A row left unrevoked beside the record of its serial (stored by an earlier release)."""
+
+    def test_the_renewability_check_refuses_it(self, app, issuer):
+        from services.cert.renewal import RenewalError, check_renewable
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('unrevoked-row-check.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _record(app, refid, real)
+        with app.app_context():
+            with pytest.raises(RenewalError) as e:
+                check_renewable(db.session.get(Certificate, row_id))
+            assert e.value.status == 409 and 'revoked' in e.value.message
+
+    def test_the_renew_route_refuses_it(self, app, auth_client, issuer):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('unrevoked-row-route.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _record(app, refid, real)
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/renew', json={})
+        assert r.status_code == 409, r.data
+        with app.app_context():
+            assert db.session.get(Certificate, row_id).serial_number == str(real.serial_number)
+
+    def test_a_row_without_a_ca_link_is_refused_under_the_ca_that_signed_it(self, app, issuer):
+        from services.cert.renewal import RenewalError, renew_certificate_in_place
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('unrevoked-row-unlinked.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, None, key=key)
+        _record(app, refid, real)
+        with app.app_context():
+            with pytest.raises(RenewalError) as e:
+                renew_certificate_in_place(db.session.get(Certificate, row_id))
+            assert e.value.status == 409 and 'revoked' in e.value.message
+            db.session.expire_all()
+            assert db.session.get(Certificate, row_id).serial_number == str(real.serial_number)
+
+    def test_protocol_renewals_already_answer_revoked(self, app, issuer):
+        """Non-regression: issued_certificate_status read the record before this fix."""
+        from services.cert.issued_lookup import REVOKED, issued_certificate_status
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('unrevoked-row-protocol.example.test', ca_cert, ca_key)
+        _store(app, real, refid, key=key)
+        _record(app, refid, real)
+        with app.app_context():
+            assert issued_certificate_status(db.session.get(CA, ca_id), real)[1] == REVOKED
