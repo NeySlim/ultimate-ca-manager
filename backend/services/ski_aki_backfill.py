@@ -15,7 +15,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.x509.oid import ExtensionOID
-from utils.cert_issuer import find_ca_by_ski
+from utils.cert_issuer import ca_signed, cas_by_ski, find_ca_by_ski
 
 logger = logging.getLogger(__name__)
 
@@ -266,7 +266,9 @@ def backfill_ski_aki():
         if cert.caref and cert.caref in ca_refids:
             continue
         try:
-            parent = find_ca_by_ski(cert.aki)
+            # The AKI only names a key: the CA must also verify the signature
+            leaf = x509.load_pem_x509_certificate(base64.b64decode(cert.crt)) if cert.crt else None
+            parent = next((ca for ca in cas_by_ski(cert.aki) if leaf is not None and ca_signed(ca, leaf)), None)
             if parent:
                 old_caref = cert.caref
                 cert.caref = parent.refid

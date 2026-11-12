@@ -13,6 +13,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Packages: the DEB installation no longer fails on a host without sudo; the unused sudoers file is no longer written and is removed from both the DEB and the RPM.
 
+### Security
+
+- Certificates: an imported certificate is now linked to a CA only when that CA's signature on it verifies, and renewal, re-enrolment and status checks only treat as issued by a CA a stored certificate it signed.
+
 ## [2.253] - 2026-11-11
 
 ### Fixed

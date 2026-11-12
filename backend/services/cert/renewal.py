@@ -396,6 +396,11 @@ def _signing_ca(cert, ca):
         raise RenewalError('CA is offline; restore it before renewing', 400)
     if ca.revoked_in_chain:
         raise RenewalError('CA is revoked and can no longer renew certificates', 400)
+    # The row's caref is not proof of issuance: only a certificate this CA signed renews under it
+    from utils.cert_issuer import ca_signed
+    if not ca_signed(ca, x509.load_pem_x509_certificate(b64decode(cert.crt))):
+        raise RenewalError(
+            f'This certificate was not signed by CA "{ca.descr}" and cannot be renewed under it', 400)
 
     from services.hsm.ca_key_loader import get_ca_signing_key
     try:

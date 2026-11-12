@@ -106,6 +106,15 @@ def _is_self_signed(encoded_crt):
         return False
 
 
+def _ca_signed_entry(ca, encoded_crt):
+    """Whether *ca* signed the appliance entry's certificate: the entry's caref is only a claim."""
+    from utils.cert_issuer import ca_signed
+    try:
+        return ca_signed(ca, x509.load_pem_x509_certificate(base64.b64decode(encoded_crt)))
+    except Exception:
+        return False
+
+
 def _parse_cert(encoded_crt):
     info = {
         'subject': '',
@@ -683,7 +692,7 @@ def import_items():
                 cert_info = _parse_cert(crt)
                 caref = cert_data.get('caref') or None
                 caref = attached_refids.get(caref, caref)
-                if caref and not CA.query.filter_by(refid=caref).first():
+                if caref and not _ca_signed_entry(CA.query.filter_by(refid=caref).first(), crt):
                     caref = None
                  
                 # Create certificate

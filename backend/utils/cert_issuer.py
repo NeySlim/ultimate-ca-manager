@@ -194,6 +194,30 @@ def find_ca_by_ski(ski, exclude_id=None):
     return found[0] if found else None
 
 
+def ca_signed(ca, cert: x509.Certificate) -> bool:
+    """Whether the stored CA record's key verifies *cert*'s signature.
+
+    An unreadable record or a key type this cannot check is never a yes."""
+    if ca is None or not ca.crt:
+        return False
+    try:
+        ca_cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+        return certificate_signed_by(cert, ca_cert)
+    except Exception:
+        return False
+
+
+def signing_ca_for(cert: x509.Certificate):
+    """The stored CA whose key signed *cert*: the AKI's candidates first, then
+    the CAs bearing its issuer DN; None when no stored CA verifies it."""
+    from models import CA
+    aki = authority_key_identifier_hex(cert)
+    candidates = cas_by_ski(aki) if aki else []
+    named = CA.query.filter(CA.subject == cert.issuer.rfc4514_string()).order_by(CA.id).all()
+    candidates += [ca for ca in self_signed_first(named) if ca not in candidates]
+    return next((ca for ca in candidates if ca_signed(ca, cert)), None)
+
+
 def _is_self_signed_record(ca):
     if ca.subject != ca.issuer:
         return False
