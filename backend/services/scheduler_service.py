@@ -66,7 +66,8 @@ class ScheduledTask:
         func: Callable,
         interval: int,  # in seconds
         description: str = "",
-        enabled: bool = True
+        enabled: bool = True,
+        per_node: bool = False
     ):
         """
         Initialize a scheduled task
@@ -77,13 +78,14 @@ class ScheduledTask:
             interval: Interval in seconds between executions
             description: Human-readable description
             enabled: Whether task is enabled
-            initial_delay: Seconds to wait before first execution (0 = run immediately)
+            per_node: HA: run on every node, leader or not (work on the node's own disk)
         """
         self.name = name
         self.func = func
         self.interval = interval
         self.description = description
         self.enabled = enabled
+        self.per_node = per_node
         self.last_run: Optional[datetime] = None
         self.next_run: Optional[datetime] = None
         self.run_count = 0
@@ -120,6 +122,7 @@ class ScheduledTask:
             "description": self.description,
             "interval": self.interval,
             "enabled": self.enabled,
+            "per_node": self.per_node,
             "last_run": (self.last_run.isoformat() + 'Z') if self.last_run else None,
             "next_run": (self.next_run.isoformat() + 'Z') if self.next_run else None,
             "run_count": self.run_count,
@@ -186,7 +189,8 @@ class SchedulerService:
         func: Callable,
         interval: int,
         description: str = "",
-        enabled: bool = True
+        enabled: bool = True,
+        per_node: bool = False
     ) -> None:
         """
         Register a new scheduled task
@@ -197,6 +201,8 @@ class SchedulerService:
             interval: Interval in seconds
             description: Human-readable description
             enabled: Whether task starts enabled
+            per_node: HA: runs on every node outside the leader election, for what lives on
+                each host (its local backups, its update result); single node: no difference
         """
         with self.tasks_lock:
             if name in self.tasks:
@@ -207,7 +213,8 @@ class SchedulerService:
                 func=func,
                 interval=interval,
                 description=description,
-                enabled=enabled
+                enabled=enabled,
+                per_node=per_node
             )
             self.tasks[name] = task
             logger.info(
@@ -597,6 +604,8 @@ class SchedulerService:
                     self._publish_state()
                 self._heartbeat(force=lost)
                 if not self._owns_lock:
+                    if _ha():
+                        self._run_node_tasks()
                     self._wake.wait(LOCK_RETRY_SECONDS)
                     continue
                 try:
@@ -631,6 +640,18 @@ class SchedulerService:
             # The next process waiting for the lock takes over from here
             self._release_lock()
             self._heartbeat(force=True)
+
+    def _run_node_tasks(self) -> None:
+        """HA follower: the per-node tasks due on this node; the leader runs them with the rest."""
+        with self.tasks_lock:
+            due = [task for task in self.tasks.values() if task.per_node and task.should_run()]
+        for task in due:
+            if not self._running:
+                break
+            try:
+                self._run_task(task)
+            except Exception as e:
+                logger.error(f"Unexpected error running task '{task.name}': {e}", exc_info=True)
 
     def on_leadership(self, hook: Callable[[], Any]) -> None:
         """HA: run ``hook`` in the app context each time this process becomes the leader."""

@@ -254,3 +254,70 @@ def test_the_api_reports_a_stale_state_and_a_queued_run(app, auth_client, monkey
     resp = auth_client.post(f'/api/v2/system/scheduler/{name}/run').get_json()
     assert resp['data']['queued'] is True and 'started' in resp['message']
     assert audits[-1]['success'] is True and 'still running' in audits[-1]['details']
+
+
+def test_a_per_node_task_follows_the_host_lock_outside_ha(sched):
+    # Single node: the process holding the host lock runs it, a waiting one does not
+    holder, waiting = sched(), sched()
+    runs = {'holder': 0, 'waiting': 0}
+    for s, name in ((holder, 'holder'), (waiting, 'waiting')):
+        s.register_task('local', lambda name=name: runs.__setitem__(name, runs[name] + 1),
+                        interval=3600, per_node=True)
+        s.tasks['local']._created_at -= timedelta(seconds=60)
+    holder.start()
+    assert _wait(lambda: runs['holder'] == 1)
+    waiting.start()
+    time.sleep(0.3)
+    assert runs == {'holder': 1, 'waiting': 0}
+
+
+def test_a_task_says_whether_it_runs_on_every_node(sched):
+    s = sched()
+    s.register_task('local', lambda: None, interval=60, per_node=True)
+    s.register_task('cluster', lambda: None, interval=60)
+    assert s.tasks['local'].to_dict()['per_node'] is True
+    assert s.tasks['cluster'].to_dict()['per_node'] is False
+
+
+class _OneOwnerLock:
+    """The leader lock of two nodes, without PostgreSQL: the first to ask holds it."""
+    owner = None
+
+    def __init__(self, scheduler):
+        self.scheduler = scheduler
+
+    def acquire(self):
+        if _OneOwnerLock.owner in (None, self.scheduler):
+            _OneOwnerLock.owner = self.scheduler
+            return True
+        return False
+
+    def still_held(self):
+        return _OneOwnerLock.owner is self.scheduler
+
+    def release(self):
+        if _OneOwnerLock.owner is self.scheduler:
+            _OneOwnerLock.owner = None
+
+
+def test_in_ha_a_per_node_task_runs_on_every_node_and_a_leader_task_on_one(sched, monkeypatch):
+    monkeypatch.setattr(scheduler_service, '_ha', lambda: True)
+    monkeypatch.setattr(_OneOwnerLock, 'owner', None)
+    for name in ('_heartbeat', '_publish_state', '_took_leadership'):
+        monkeypatch.setattr(SchedulerService, name, lambda self, *a, **k: None)
+    monkeypatch.setattr(SchedulerService, '_take_requests', lambda self: [])
+    monkeypatch.setattr(SchedulerService, '_has_requests', lambda self: False)
+    monkeypatch.setattr(SchedulerService, '_singleton_lock', lambda self: _OneOwnerLock(self))
+    runs = {}
+    nodes = [sched(), sched()]
+    for node, s in enumerate(nodes):
+        s.wake_interval = 0.05
+        for name, per_node in (('local', True), ('cluster', False)):
+            s.register_task(name, lambda key=(node, name): runs.__setitem__(key, runs.get(key, 0) + 1),
+                            interval=3600, per_node=per_node)
+            s.tasks[name]._created_at -= timedelta(seconds=60)
+        s.start()
+    assert _wait(lambda: runs.get((0, 'local')) and runs.get((1, 'local')))
+    time.sleep(0.3)
+    assert runs[(0, 'local')] == 1 and runs[(1, 'local')] == 1
+    assert runs.get((0, 'cluster'), 0) + runs.get((1, 'cluster'), 0) == 1
