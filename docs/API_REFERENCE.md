@@ -2569,12 +2569,14 @@ POST /api/v2/system/alerts/expiry/check
 # Check for updates
 GET /api/v2/system/updates/check
 
-# Install update (HA mode: starts a rolling update of every node, 409 when one runs
-# or the release publishes no SHA-256; Docker/Kubernetes: 400, the orchestrator updates)
+# Install update (HA mode: starts a rolling update of every node, 409 when one runs, a node
+# has no package family (Docker, unknown) or the release lacks a present family's package or
+# SHA-256; Docker/Kubernetes: 400, the orchestrator updates)
 POST /api/v2/system/updates/install
 
 # HA rolling update state: {ha, campaign: {status (running|stopped|done), target, order,
-# done, skipped, current: {node, since, state}, failed: {node, reason, at}} or null}
+# done, skipped, current: {node, since, state}, failed: {node, reason, at},
+# packages: {family: {download_url, package_name, sha256}}, families: {node: family}} or null}
 GET /api/v2/system/updates/campaign
 
 # Resume a stopped rolling update from the node where it stopped (HA only; 409 otherwise)
@@ -2619,6 +2621,10 @@ GET /api/v2/system/service/status
   "provider": {"name": "OpenSSL FIPS Provider", "version": "3.1.2", "buildinfo": "3.1.2"},
   "module_settings": {"security-checks": 1, "tls1-prf-ems-check": 1, "drbg-no-trunc-md": 1}
 }
+
+# "cluster.nodes" in the response (HA mode): every registered node with node_id, leader,
+# stale, version, started_at, heartbeat_at, command_seen and package_family (deb, rpm-elN,
+# rpm-fedora, container or unknown: the package a rolling update gives the node)
 
 # Restart service
 POST /api/v2/system/service/restart
