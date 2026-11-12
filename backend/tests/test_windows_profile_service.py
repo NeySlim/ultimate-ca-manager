@@ -85,6 +85,7 @@ def clean_slate(app):
         SystemConfig.query.filter(SystemConfig.key.in_(MIGRATED_KEYS)).delete(synchronize_session=False)
         connector = ADConnectorConfig.get_singleton()
         connector_state = (connector.enabled, connector.base_dn) if connector is not None else None
+        connectors = {c.id for c in ADConnectorConfig.query.all()}
         db.session.commit()
     yield
     with app.app_context():
@@ -105,6 +106,11 @@ def clean_slate(app):
                 SystemConfig.query.filter_by(key=key).delete()
             else:
                 _set(key, value)
+        # A connector left enabled serves its realm to the next file's Kerberos tests
+        added = [c.id for c in ADConnectorConfig.query.all() if c.id not in connectors]
+        WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.connector_id.in_(added)).update(
+            {'connector_id': None}, synchronize_session=False)
+        ADConnectorConfig.query.filter(ADConnectorConfig.id.in_(added)).delete(synchronize_session=False)
         connector = ADConnectorConfig.get_singleton()
         if connector is not None and connector_state is not None:
             connector.enabled, connector.base_dn = connector_state
