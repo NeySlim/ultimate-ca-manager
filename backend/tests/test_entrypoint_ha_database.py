@@ -71,3 +71,13 @@ def test_the_first_run_notice_never_shows_a_password(tmp_path, provided, expect)
     r = _run('ucm_sqlite_check_and_backup', env, tmp_path)
     assert r.returncode == 0 and expect in r.stdout, r.stdout
     assert 'changeme123' not in r.stdout and 'Op-Chosen-1!' not in r.stdout
+
+
+def test_the_first_run_notice_says_both_sources_refuse_the_start(tmp_path):
+    env = {'UCM_DATABASE_PATH': str(tmp_path / 'absent.db'), 'UCM_INITIAL_ADMIN_USERNAME': 'operator',
+           'UCM_INITIAL_ADMIN_PASSWORD': 'Op-Chosen-1!', 'UCM_INITIAL_ADMIN_PASSWORD_FILE': '/run/secrets/a'}
+    r = _run('ucm_initial_admin_notice', env, tmp_path)
+    assert r.returncode == 0, r.stderr
+    assert 'Username: operator' in r.stdout
+    assert 'both set' in r.stdout and 'refused' in r.stdout
+    assert 'the one you provided' not in r.stdout and 'Op-Chosen-1!' not in r.stdout

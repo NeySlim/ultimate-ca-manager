@@ -497,7 +497,7 @@ cmd_fips_build_ok() {
 
 # Post-install banner; IPv6 addresses are bracketed in the URLs.
 cmd_banner() {
-    local envfile=$1 pkg=$2 host port ips ip pwfile data
+    local envfile=$1 pkg=$2 host port ips ip pwfile data user
     # Cosmetic: a failed lookup (no hostname binary) must not cut it short
     set +e
     pwfile=$(env_value "$envfile" INITIAL_ADMIN_PASSWORD_FILE)
@@ -519,8 +519,13 @@ cmd_banner() {
     done
     echo ""
     # Never the value: where it comes from, or where the first start writes it
-    echo " Admin:    admin"
-    if [ -n "$pwfile" ]; then
+    user=$(env_value "$envfile" INITIAL_ADMIN_USERNAME)
+    echo " Admin:    ${user:-admin}"
+    if [ -n "$pwfile" ] && env_has "$envfile" INITIAL_ADMIN_PASSWORD; then
+        # The application refuses to start then: which one was meant cannot be guessed
+        echo " Password: INITIAL_ADMIN_PASSWORD and INITIAL_ADMIN_PASSWORD_FILE are both set"
+        echo "           in $envfile: the start is refused, keep only one"
+    elif [ -n "$pwfile" ]; then
         echo " Password: the one you provided (INITIAL_ADMIN_PASSWORD_FILE=$pwfile)"
     elif env_has "$envfile" INITIAL_ADMIN_PASSWORD; then
         echo " Password: the one you provided (INITIAL_ADMIN_PASSWORD in $envfile)"

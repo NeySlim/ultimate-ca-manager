@@ -1216,3 +1216,36 @@ def test_a_failed_write_leaves_no_copy_of_the_secret(tmp_path):
     result = _run(['env', str(envfile), '/d'], _env(tmp_path, extra={'PATH': str(bin_dir)}))
     assert result.returncode != 0
     assert [p.name for p in conf.iterdir()] == ['ucm.env'] and envfile.read_text() == 'SECRET_KEY=\n'
+
+
+def _sourced_banner(tmp_path, env_text):
+    """cmd_banner and the helpers it calls, sourced alone: the script itself never runs."""
+    import re as _re
+    body = SCRIPT.read_text(encoding='utf-8')
+    def function(name):
+        one_line = _re.search(rf'^{name}\(\) \{{ .*\}}$', body, _re.M)
+        return (one_line or _re.search(rf'^{name}\(\) \{{\n.*?^\}}$', body, _re.M | _re.S)).group(0)
+    funcs = '\n'.join(function(name) for name in ('env_value', 'env_has', 'cmd_banner'))
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    for tool, script in (('hostname', 'echo ucm.example.test'), ('dpkg-query', 'exit 1'), ('rpm', 'exit 1')):
+        (bin_dir / tool).write_text(f'#!/bin/sh\n{script}\n')
+        (bin_dir / tool).chmod(0o755)
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text(env_text)
+    return subprocess.run([BASH, '-c', funcs + f'\ncmd_banner {envfile} deb'],
+                          env={'PATH': f'{bin_dir}:/usr/bin:/bin'}, capture_output=True, text=True)
+
+
+def test_the_banner_says_both_sources_refuse_the_start(tmp_path):
+    result = _sourced_banner(tmp_path, 'INITIAL_ADMIN_PASSWORD=Op-Chosen-1!\n'
+                                       'INITIAL_ADMIN_PASSWORD_FILE=/root/admin.pw\n')
+    assert result.returncode == 0, result.stderr
+    assert 'both set' in result.stdout and 'refused' in result.stdout
+    assert 'the one you provided' not in result.stdout and 'Op-Chosen-1!' not in result.stdout
+
+
+def test_the_banner_names_the_configured_administrator(tmp_path):
+    result = _sourced_banner(tmp_path, 'INITIAL_ADMIN_USERNAME=operator\n')
+    assert result.returncode == 0, result.stderr
+    assert ' Admin:    operator' in result.stdout

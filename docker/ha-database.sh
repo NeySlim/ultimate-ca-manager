@@ -32,7 +32,11 @@ ucm_initial_admin_notice() {
     [ -n "${UCM_INITIAL_ADMIN_PASSWORD:-}" ] && source=INITIAL_ADMIN_PASSWORD
     [ -n "${UCM_INITIAL_ADMIN_PASSWORD_FILE:-}" ] && source=INITIAL_ADMIN_PASSWORD_FILE
     echo "   • Username: ${UCM_INITIAL_ADMIN_USERNAME:-admin}"
-    if [ -n "$source" ]; then
+    if [ -n "${UCM_INITIAL_ADMIN_PASSWORD:-}" ] && [ -n "${UCM_INITIAL_ADMIN_PASSWORD_FILE:-}" ]; then
+        # The application refuses to start then: which one was meant cannot be guessed
+        echo "   • Password: INITIAL_ADMIN_PASSWORD and INITIAL_ADMIN_PASSWORD_FILE are both set:"
+        echo "     the start will be refused, keep only one"
+    elif [ -n "$source" ]; then
         echo "   • Password: the one you provided (${source})"
     else
         echo "   • Password: generated at first start, read it with:"
