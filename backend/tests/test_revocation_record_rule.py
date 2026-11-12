@@ -1075,3 +1075,85 @@ class TestAnImportOverARenewedRowUnlinksOnlyItsOwnSerial:
             assert db.session.get(Certificate, row_id).serial_number == str(namesake.serial_number)
             record = RevokedSerial.query.filter_by(caref=refid, serial_number=str(first.serial_number)).one()
             assert record.certificate_id == row_id
+
+
+class TestARecordedHoldIsShownAndLifted:
+    """A hold its record alone carries (a row not yet aligned) lifts, and the detail and the
+    list show the revocation the record makes, as OCSP and the CRL answer it."""
+
+    def _recorded(self, app, issuer, cn, reason='certificateHold'):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf(cn, ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        return real, row_id, _record(app, refid, real, reason=reason, certificate_id=row_id)
+
+    def test_a_hold_carried_by_its_record_only_lifts(self, app, auth_client, issuer):
+        ca_id = issuer[0]
+        real, row_id, record_id = self._recorded(app, issuer, 'recorded-hold-lifts.example.test')
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            assert db.session.get(RevokedSerial, record_id) is None
+        assert _row(app, row_id) == (False, None, None)
+        assert _surfaces(app, ca_id, real) == ('good', None, None, 'ok')
+
+    def test_a_final_record_is_still_refused(self, app, auth_client, issuer):
+        real, row_id, record_id = self._recorded(app, issuer, 'recorded-final-kept.example.test',
+                                                 reason='keyCompromise')
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 409, r.data
+        with app.app_context():
+            assert db.session.get(RevokedSerial, record_id) is not None
+
+    def test_a_certificate_nothing_revokes_is_not_revoked(self, app, auth_client, issuer):
+        """Non-regression: passes before and after the change."""
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('nothing-revokes.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        assert auth_client.post(f'/api/v2/certificates/{row_id}/unhold').status_code == 400
+
+    def test_the_detail_shows_the_recorded_revocation(self, app, auth_client, issuer):
+        _, row_id, _ = self._recorded(app, issuer, 'recorded-detail.example.test')
+        data = auth_client.get(f'/api/v2/certificates/{row_id}').get_json()['data']
+        assert (data['revoked'], data['revoke_reason'], data['status']) == (True, 'certificateHold', 'revoked')
+        assert data['revoked_at'].startswith('2026-01-02T03:04:05')
+
+    def test_the_list_shows_it_with_one_record_query_for_the_page(self, app, auth_client, issuer, twin):
+        from sqlalchemy import event
+        tag = uuid.uuid4().hex[:8]
+        _, refid, ca_cert, ca_key = issuer
+        recorded, plain = [], []
+
+        def rows(count):
+            for _ in range(count):
+                cn = f'list-{tag}-{uuid.uuid4().hex[:6]}.example.test'
+                real, key = _leaf(cn, ca_cert, ca_key)
+                recorded.append(_store(app, real, refid, key=key))
+                _record(app, twin[1], real, reason='certificateHold', certificate_id=recorded[-1])
+                real, key = _leaf(f'plain-{cn}', ca_cert, ca_key)
+                plain.append(_store(app, real, refid, key=key))
+                # Another CA's record of the same serial names another certificate
+                _record(app, f'other-ca-{tag}', real, certificate_id=plain[-1])
+
+        def listed():
+            seen = []
+
+            def count(*_args):
+                seen.append(1)
+            with app.app_context():
+                event.listen(db.engine, 'before_cursor_execute', count)
+            try:
+                r = auth_client.get(f'/api/v2/certificates?search={tag}&per_page=100')
+            finally:
+                with app.app_context():
+                    event.remove(db.engine, 'before_cursor_execute', count)
+            return len(seen), {d['id']: (d['revoked'], d['revoke_reason'], d['status'])
+                               for d in r.get_json()['data']}
+
+        rows(2)
+        few, _ = listed()
+        rows(6)
+        many, shown = listed()
+        assert many == few
+        assert {i: shown[i] for i in recorded} == {i: (True, 'certificateHold', 'revoked') for i in recorded}
+        assert all(shown[i][0] is False for i in plain)

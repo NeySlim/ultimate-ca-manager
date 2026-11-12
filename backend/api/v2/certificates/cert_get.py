@@ -25,7 +25,9 @@ def get_certificate(cert_id):
     if not cert:
         return error_response('Certificate not found', 404)
 
-    data = cert.to_dict()
+    # The revocation a record of its CA makes counts as OCSP and the CRL answer it
+    from services.cert.issued_lookup import row_persisted_revocation, show_effective_revocation
+    data = show_effective_revocation(cert.to_dict(), cert, row_persisted_revocation(cert))
 
     # Parse X.509 extensions from PEM
     from utils.cert_extensions import parse_certificate_extensions

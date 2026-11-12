@@ -208,9 +208,12 @@ def list_certificates():
     # Paginate
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
+    # The records of the page in one query: a revocation they make shows as OCSP answers it
+    from services.cert.issued_lookup import persisted_revocations_of, show_effective_revocation
+    recorded = persisted_revocations_of(pagination.items)
     certs = []
     for cert in pagination.items:
-        d = cert.to_dict()
+        d = show_effective_revocation(cert.to_dict(), cert, recorded.get(cert.id))
         compliance = calculate_compliance_score(d)
         d['compliance_score'] = compliance['score']
         d['compliance_grade'] = compliance['grade']

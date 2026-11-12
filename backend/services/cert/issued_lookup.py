@@ -21,7 +21,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import Encoding
 
 from models import CA, Certificate, RevokedSerial, db
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import utc_isoformat, utc_now
 from utils.serial_format import serial_named_by, serial_to_int, serial_variants, unambiguous_serial_spellings
 
 OK = 'ok'
@@ -184,6 +184,42 @@ def row_revoked(row: Certificate) -> bool:
 def effective_revocation(row: Certificate):
     """What revokes ``row``: the graver of its own revocation and its serial's record, or None."""
     return gravest_revocation(row if row.revoked else None, row_persisted_revocation(row))
+
+
+def persisted_revocations_of(rows) -> dict:
+    """``{row id: record}`` as ``row_persisted_revocation`` answers each of ``rows``, from one
+    query of their serials' records (and one per CA a record names): a page, not a row each."""
+    from utils.cert_issuer import same_key_refids
+    serials = {row.id: serial for row in rows if row.caref and row.crt
+               and (serial := _row_serial(row)) is not None}
+    if not serials:
+        return {}
+    by_serial = {}
+    for record in RevokedSerial.query.filter(RevokedSerial.serial_number.in_(
+            {form for s in serials.values() for form in unambiguous_serial_spellings(s)})):
+        by_serial.setdefault(serial_named_by(record.serial_number), []).append(record)
+    refids, found = {}, {}
+    for row in rows:
+        records = by_serial.get(serials[row.id]) if row.id in serials else None
+        if not records:
+            continue
+        if row.caref not in refids:
+            ca = CA.query.filter_by(refid=row.caref).first()
+            refids[row.caref] = set(same_key_refids(ca)) if ca is not None else set()
+        mine = [r for r in records if r.caref in refids[row.caref]]
+        if mine:
+            found[row.id] = min(mine, key=revocation_order)
+    return found
+
+
+def show_effective_revocation(data: dict, row: Certificate, record) -> dict:
+    """``data`` (``row.to_dict()``) with the revocation ``record`` makes when it is graver
+    than the row's own, as OCSP and the CRL answer it."""
+    holder = gravest_revocation(row if row.revoked else None, record)
+    if holder is not None and holder is not row:
+        data.update(revoked=True, status='revoked', revoke_reason=holder.revoke_reason,
+                    revoked_at=utc_isoformat(holder.revoked_at), invalidity_at=utc_isoformat(holder.invalidity_at))
+    return data
 
 
 def apply_persisted_revocation(row: Certificate, record=None) -> bool:
