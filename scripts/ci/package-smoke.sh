@@ -25,11 +25,13 @@ case "$PKG" in
     WANT=$(dpkg-deb -f "$PKG" Version 2>/dev/null)
     UNSUDO='dpkg --purge --force-depends sudo'
     INSTALL='apt-get update -qq && apt-get install -y -qq "$PKG"'
+    GET_SU=:
     ;;
   *.rpm)
     WANT=$(rpm -qp --qf '%{VERSION}' "$PKG" 2>/dev/null)
     UNSUDO='rpm -e --nodeps sudo'
     INSTALL='dnf install -y -q "$PKG"'
+    GET_SU='dnf install -y -q util-linux'
     ;;
   *) echo "FAIL: unsupported package type: $PKG"; exit 2 ;;
 esac
@@ -39,6 +41,10 @@ if command -v sudo >/dev/null 2>&1; then
   hash -r 2>/dev/null
   command -v sudo >/dev/null 2>&1 && { echo "FAIL: precondition: sudo cannot be removed from this image"; exit 2; }
 fi
+# Checks run as ucm through su: without it they would blame the package. Container images
+# of Fedora ship util-linux-core, which lacks su; util-linux does not bring sudo.
+command -v su >/dev/null 2>&1 || eval "$GET_SU" >/dev/null 2>&1
+command -v su >/dev/null 2>&1 || { echo "FAIL: precondition: su is missing in this image"; exit 2; }
 if ! eval "$INSTALL" >/tmp/ucm-install.log 2>&1; then
   tail -n 30 /tmp/ucm-install.log
   echo "FAIL: package installation exited non-zero"

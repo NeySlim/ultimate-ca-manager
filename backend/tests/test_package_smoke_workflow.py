@@ -124,8 +124,8 @@ def test_script_passes_shellcheck():
     assert subprocess.run(['shellcheck', '-s', 'sh', str(SCRIPT)]).returncode == 0
 
 
-def _stubbed_run(tmp_path, kind, sudo_present):
-    """Run the script against stub commands; returns the ordered command log."""
+def _stubbed_run(tmp_path, kind, sudo_present, su_present=True):
+    """Run the script against stub commands; returns (ordered command log, completed process)."""
     bin_dir = tmp_path / 'bin'
     bin_dir.mkdir()
     log = tmp_path / 'log'
@@ -143,18 +143,33 @@ def _stubbed_run(tmp_path, kind, sudo_present):
     stub('dpkg', f'echo "dpkg $*" >> {log}; rm -f {bin_dir}/sudo')
     if sudo_present:
         stub('sudo', 'exit 0')
+    if su_present:
+        stub('su', 'exit 1')
     pkg = tmp_path / f'ucm.{kind}'
     pkg.write_text('x')
-    subprocess.run(['/bin/sh', str(SCRIPT), str(pkg)], env={'PATH': f'{bin_dir}'},
-                   capture_output=True, text=True, cwd=tmp_path)
-    return log.read_text().splitlines() if log.exists() else []
+    proc = subprocess.run(['/bin/sh', str(SCRIPT), str(pkg)], env={'PATH': f'{bin_dir}'},
+                          capture_output=True, text=True, cwd=tmp_path)
+    return (log.read_text().splitlines() if log.exists() else []), proc
 
 
 def test_a_preinstalled_sudo_is_removed_before_the_install(tmp_path):
-    calls = _stubbed_run(tmp_path, 'deb', sudo_present=True)
+    calls, _ = _stubbed_run(tmp_path, 'deb', sudo_present=True)
     assert calls[0].startswith('dpkg --purge') and calls[1].startswith('apt-get')
 
 
 def test_no_sudo_removal_when_the_image_has_none(tmp_path):
-    calls = _stubbed_run(tmp_path, 'deb', sudo_present=False)
+    calls, _ = _stubbed_run(tmp_path, 'deb', sudo_present=False)
     assert calls and calls[0].startswith('apt-get')
+
+
+def test_a_missing_su_stops_before_the_package_install(tmp_path):
+    calls, proc = _stubbed_run(tmp_path, 'deb', sudo_present=False, su_present=False)
+    assert proc.returncode == 2
+    assert 'FAIL: precondition: su is missing in this image' in proc.stdout
+    assert not any(c.startswith('apt-get') for c in calls)
+
+
+def test_an_rpm_image_without_su_gets_util_linux_first(tmp_path):
+    calls, proc = _stubbed_run(tmp_path, 'rpm', sudo_present=False, su_present=False)
+    assert calls == ['dnf install -y -q util-linux']
+    assert proc.returncode == 2 and 'su is missing' in proc.stdout
