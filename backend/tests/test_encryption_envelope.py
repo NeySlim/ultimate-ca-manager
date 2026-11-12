@@ -12,7 +12,9 @@ import pytest
 from cryptography.fernet import Fernet, InvalidToken
 
 from config.settings import Config
-from models import db, SystemConfig
+from models import db, SharedFile, SystemConfig
+from services import shared_files
+from tests import pg_app_harness
 
 @pytest.fixture(autouse=True)
 def _dek_refresh(dek_refresh_now):
@@ -41,6 +43,7 @@ def _bystander_stays_plaintext(app):
 
 
 PEM = '-----BEGIN PRIVATE KEY-----\nenvelope\n-----END PRIVATE KEY-----\n'
+KEYTAB = b'\x05\x02envelope-keytab'
 SSH_KEY = base64.b64encode(b'-----BEGIN OPENSSH PRIVATE KEY-----\nenv\n-----END OPENSSH PRIVATE KEY-----\n').decode()
 
 
@@ -117,10 +120,13 @@ def values(app, encryption_enabled, envelope_keys):
         config = SystemConfig(key=f'acme.account.env{tag}.private_key', value=encrypt_text(PEM))
         rows = [ssh, target, provider, config]
         db.session.add_all(rows)
+        # A shared file (Kerberos keytab, HTTPS pair) is keyed by its name
+        shared = f'envtest-{tag}.keytab'
+        shared_files.store_file(shared, KEYTAB)
         db.session.commit()
         ids = {type(r): r.id for r in rows}
 
-    yield {'ids': ids, 'tag': tag}
+    yield {'ids': ids, 'tag': tag, 'shared': shared}
     with app.app_context():
         # An enable encrypts every key of the session database under this throwaway KEK:
         # back in the clear while the KEK is still loaded (a no-op when it cannot open them)
@@ -131,6 +137,7 @@ def values(app, encryption_enabled, envelope_keys):
             row = db.session.get(model, row_id)
             if row is not None:
                 db.session.delete(row)
+        shared_files.drop_file(shared)
         db.session.commit()
 
 
@@ -147,6 +154,7 @@ def _stored(app, values):
             'target': db.session.get(DeployTarget, ids[DeployTarget]).private_key,
             'bind': db.session.get(SSOProvider, ids[SSOProvider])._ldap_bind_password,
             'config': db.session.get(SystemConfig, ids[SystemConfig]).value,
+            'shared': db.session.get(SharedFile, values['shared']).content,
         }
 
 
@@ -168,10 +176,11 @@ def _read(app, values):
                 db.session.get(SSOProvider, ids[SSOProvider]).ldap_bind_password, 'text'),
             'config': decrypt_master_key_value(
                 db.session.get(SystemConfig, ids[SystemConfig]).value, 'text'),
+            'shared': shared_files.read_file(values['shared']),
         }
 
 
-CLEAR = {'ssh': SSH_KEY, 'target': PEM, 'bind': 'bind-secret', 'config': PEM}
+CLEAR = {'ssh': SSH_KEY, 'target': PEM, 'bind': 'bind-secret', 'config': PEM, 'shared': KEYTAB}
 
 
 def _kek(enc):
@@ -347,6 +356,85 @@ def test_rotation_keeps_the_previous_key_while_a_value_opens_with_none(app, valu
     assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'active')]
 
 
+def test_encrypt_all_encrypts_a_shared_file_left_in_the_clear(app, auth_client, values,
+                                                             encryption_enabled):
+    with app.app_context():
+        db.session.get(SharedFile, values['shared']).content = base64.b64encode(KEYTAB).decode()
+        db.session.commit()
+    r = auth_client.post('/api/v2/system/security/encrypt-all-keys', json={'dry_run': False})
+    assert r.status_code == 200, r.data
+    assert encryption_enabled.key_encryption.is_encrypted(_stored(app, values)['shared'])
+    assert _read(app, values) == CLEAR
+
+
+def test_a_keytab_rotated_on_another_node_is_written_by_reload_and_at_start(
+        app, values, monkeypatch, tmp_path, encryption_enabled):
+    """This process held only the first DEK when another node rotated: it re-reads the rows."""
+    from security import dek_rotation, encryption
+    from services import cluster_commands as cc
+    from services.kerberos import negotiate_auth
+    key_encryption = encryption_enabled.key_encryption
+    path = tmp_path / 'kerberos.keytab'
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', path)
+    monkeypatch.setattr(encryption, 'REFRESH_SECONDS', 2.0)
+    monkeypatch.setattr(dek_rotation.time, 'sleep', lambda seconds: None)
+    try:
+        with app.app_context():
+            shared_files.store_file(shared_files.KERBEROS_KEYTAB, KEYTAB)
+            db.session.commit()
+            key_encryption.is_enabled
+            stale = {name: getattr(key_encryption, name) for name in key_encryption._FIELDS}
+            dek_rotation.rotate()
+            assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'active')]
+            key_encryption.__dict__.update(stale)
+            key_encryption._read_at -= 2 * encryption.REFRESH_SECONDS
+            cc.HANDLERS[cc.RELOAD_KEYTAB]({})
+            assert path.read_bytes() == KEYTAB and key_encryption.active_version == 2
+            path.unlink()
+        negotiate_auth.restore_keytab_at_start(app)
+        assert path.read_bytes() == KEYTAB
+    finally:
+        with app.app_context():
+            shared_files.drop_file(shared_files.KERBEROS_KEYTAB)
+            db.session.commit()
+
+
+@pytest.mark.skipif(not pg_app_harness.ENABLED,
+                    reason='needs UCM_TEST_APP_PG_URL (HA runs on PostgreSQL)')
+def test_on_postgresql_node_b_writes_the_keytab_a_rotated(app, auth_client, values, monkeypatch,
+                                                          tmp_path, encryption_enabled):
+    """Node B is a second applier on its own connection; A rotates, B reads under the new DEK."""
+    import time
+    from datetime import timedelta
+    from services import cluster_commands as cc
+    from services.kerberos import negotiate_auth
+    from utils.datetime_utils import utc_now
+    _ha(monkeypatch)
+    monkeypatch.setattr(cc, 'GAP_GRACE_SECONDS', 0.3)
+    on_b = tmp_path / 'b.keytab'
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', on_b)
+    with app.app_context():
+        shared_files.store_file(shared_files.KERBEROS_KEYTAB, KEYTAB)
+        db.session.commit()
+    node_b = cc.CommandApplier(app, 'envtest-b', tick=0.05, restart_action=lambda: None,
+                               started_at=utc_now() - timedelta(seconds=30)).start()
+    try:
+        r = auth_client.post('/api/v2/system/security/rotate-encryption-key')
+        assert r.status_code == 200, r.data
+        assert r.get_json()['data']['state'] == 'done'
+        with app.app_context():
+            assert cc.emit_committed(cc.RELOAD_KEYTAB)
+        deadline = time.monotonic() + 8
+        while time.monotonic() < deadline and not on_b.exists():
+            time.sleep(0.02)
+        assert on_b.read_bytes() == KEYTAB
+    finally:
+        node_b.stop()
+        with app.app_context():
+            shared_files.drop_file(shared_files.KERBEROS_KEYTAB)
+            db.session.commit()
+
+
 def test_rotation_refused_without_encryption(auth_client, envelope_keys):
     r = auth_client.post('/api/v2/system/security/rotate-encryption-key')
     assert r.status_code == 400
@@ -474,13 +562,14 @@ def test_in_ha_disable_then_enable_keep_the_kek_and_tell_every_node(app, auth_cl
         assert not key_encryption.is_enabled and key_encryption.kek_loaded
     stored = _stored(app, values)
     assert (stored['ssh'], stored['target'], stored['config']) == (SSH_KEY, PEM, PEM)
+    assert stored['shared'] == base64.b64encode(KEYTAB).decode()
     assert [(v, s) for v, s, _, _ in _rows(app)] == [(0, 'disabled')]
     r = auth_client.post('/api/v2/system/security/enable-encryption')
     assert r.status_code == 200, r.data
     assert r.get_json()['data']['master_key'] is None
     assert _rows(app) == []
     stored = _stored(app, values)
-    assert all(key_encryption.is_encrypted(stored[k]) for k in ('ssh', 'target', 'config'))
+    assert all(key_encryption.is_encrypted(stored[k]) for k in ('ssh', 'target', 'config', 'shared'))
     assert _read(app, values) == CLEAR
     # Disable: decrypt-only, then the DEKs dropped; enable
     assert [k for k, _ in _commands(app)] == ['reload_encryption'] * 3
