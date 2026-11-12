@@ -493,3 +493,50 @@ def test_the_manual_check_counts_what_a_pass_taken_over_sent(app, auth_client, m
     response = auth_client.post('/api/v2/system/alerts/expiry/check')
     assert response.status_code == 200, response.data
     assert '2 alerts sent' in response.get_json()['message']
+
+
+def test_a_crl_sync_revokes_in_id_order(app, fake_adcs, patched_network, monkeypatch):
+    # Two syncs locking the same rows in one order cannot deadlock on PostgreSQL
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+    from sqlalchemy import event
+    from models import Certificate
+    from models.msca import MicrosoftCA, MSCARequest
+    from services.msca.crl_sync import MicrosoftCACRLSyncMixin
+    from tests.test_msca_crl_sync import _add_connection_with_certs
+    msca_id, ids = _add_connection_with_certs(app, f'CRL order {uuid.uuid4().hex[:8]}', fake_adcs)
+    now = utc_now()
+    builder = (x509.CertificateRevocationListBuilder().issuer_name(fake_adcs['crl'].issuer)
+               .last_update(now - timedelta(minutes=10)).next_update(now + timedelta(days=7)))
+    for cert in (fake_adcs['revoked_cert'], fake_adcs['valid_cert']):
+        builder = builder.add_revoked_certificate(
+            x509.RevokedCertificateBuilder().serial_number(cert.serial_number)
+            .revocation_date(now - timedelta(minutes=30)).build())
+    crl = builder.sign(fake_adcs['ca_key'], hashes.SHA256())
+    monkeypatch.setattr(MicrosoftCACRLSyncMixin, '_fetch_crl', staticmethod(lambda msca, url: crl))
+    real = MicrosoftCACRLSyncMixin._connection_certificates
+    monkeypatch.setattr(MicrosoftCACRLSyncMixin, '_connection_certificates',
+                        staticmethod(lambda msca: sorted(real(msca), key=lambda c: -c.id)))
+    updated = []
+
+    def witness(conn, cursor, statement, params, context, executemany):
+        if statement.lstrip().upper().startswith('UPDATE CERTIFICATES'):
+            updated.append((statement, params))
+    try:
+        with app.app_context():
+            event.listen(db.engine, 'before_cursor_execute', witness)
+            try:
+                summary = MicrosoftCACRLSyncMixin.sync_crl(msca_id, username='scheduler')
+            finally:
+                event.remove(db.engine, 'before_cursor_execute', witness)
+        assert summary['revoked'] == 2
+        # The row id is the WHERE clause's parameter: last positional, or the named id_1
+        order = [next(v for k, v in p.items() if k.startswith('id')) if isinstance(p, dict) else p[-1]
+                 for _, p in updated]
+        assert order == sorted(ids.values()), updated
+    finally:
+        with app.app_context():
+            MSCARequest.query.filter_by(msca_id=msca_id).delete()
+            Certificate.query.filter(Certificate.id.in_(list(ids.values()))).delete(synchronize_session=False)
+            MicrosoftCA.query.filter_by(id=msca_id).delete()
+            db.session.commit()

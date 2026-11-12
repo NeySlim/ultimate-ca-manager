@@ -62,7 +62,8 @@ class MicrosoftCACRLSyncMixin:
                     reason,
                 )
 
-            candidates = MicrosoftCACRLSyncMixin._connection_certificates(msca)
+            # In id order: two syncs lock the rows they revoke in one order, never crosswise
+            candidates = sorted(MicrosoftCACRLSyncMixin._connection_certificates(msca), key=lambda c: c.id)
             newly_revoked = []
             for cert in candidates:
                 try:
