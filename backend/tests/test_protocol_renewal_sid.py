@@ -341,3 +341,9 @@ def test_an_issuer_key_that_cannot_be_checked_carries_no_sid(app, create_ca, mon
             raise cert_issuer.UnsupportedIssuerKey('test')
         monkeypatch.setattr(cert_issuer, 'certificate_signed_by', unverifiable)
         assert renewal_identity.renewal_requester_sid(old, ca_cert, 'TEST') is None
+
+
+def test_a_scep_request_gone_before_it_is_closed_answers_404(app):
+    from api.v2 import scep
+    with app.test_request_context():
+        assert scep._close_refused(987654321, 'admin', 'gone')[1] == 404
