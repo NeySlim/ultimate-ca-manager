@@ -1468,8 +1468,10 @@ def init_database(app):
         conn.close()
     
     try:
-        add_missing_columns()
-        create_missing_tables()
+        # These helpers speak raw sqlite3 to DATABASE_PATH: meaningless on other backends.
+        if db.engine.dialect.name == 'sqlite':
+            add_missing_columns()
+            create_missing_tables()
     except Exception as e:
         app.logger.warning(f"Schema migration check failed (may be normal): {e}")
     
@@ -1491,11 +1493,11 @@ def init_database(app):
             admin.totp_exempt = True
             db.session.add(admin)
 
-            # Add initial system config
-            configs = [
-                SystemConfig(key="app.version", value=app.config["APP_VERSION"],
-                            description="Application version"),
-            ]
+            # Add initial system config; an existing app.version is never rewritten here
+            configs = []
+            if not SystemConfig.query.filter_by(key="app.version").first():
+                configs.append(SystemConfig(key="app.version", value=app.config["APP_VERSION"],
+                                            description="Application version"))
             
             for config in configs:
                 db.session.add(config)
