@@ -186,6 +186,8 @@ class SchedulerService:
         self._node_thread: Optional[threading.Thread] = None
         # Asked to run while another thread ran them: served at a later pass, never awaited
         self._deferred: list = []
+        # HA: per-node run-now asked in this process while its own loop runs here
+        self._local_requests: list = []
         logger.info(f"SchedulerService initialized (wake interval: {wake_interval}s)")
     
     def register_task(
@@ -262,14 +264,21 @@ class SchedulerService:
                 return True
             return False
     
-    def _delegated(self) -> bool:
+    def _delegated(self, task: Optional[ScheduledTask] = None) -> bool:
         """Whether the loop runs in the scheduler process rather than here.
 
-        In HA mode any process but the leader's loop asks the leader, through the database.
+        In HA mode any process but the leader's loop asks the leader, through the database;
+        a per-node task is asked of this node's own loop instead.
         """
-        if _ha():
+        if _ha() and not (task is not None and task.per_node):
             return not (self._running and self._owns_lock)
+        if _ha() and self._running:
+            return not self._owns_lock
         return supervised() and not self._running
+
+    def _node_state_elsewhere(self) -> bool:
+        """HA: this node's per-node state lives in its scheduler process, published to the local file."""
+        return _ha() and supervised() and not self._running
 
     def run_task_now(self, name: str) -> Optional[Dict[str, Any]]:
         """Run a task at once and return its status after the run.
@@ -281,17 +290,22 @@ class SchedulerService:
             task = self.tasks.get(name)
         if not task:
             return None
-        if self._delegated():
-            return self._run_in_scheduler_process(name)
+        if self._delegated(task):
+            return self._run_in_scheduler_process(task)
         self._run_task(task)
         with self.tasks_lock:
             return task.to_dict()
 
-    def _run_in_scheduler_process(self, name: str) -> Dict[str, Any]:
+    def _run_in_scheduler_process(self, task: ScheduledTask) -> Dict[str, Any]:
         def marker(status):
             return status.get('run_count'), status.get('last_run')
+        name = task.name
         before = marker(self.get_task_status(name) or {})
-        if _ha():
+        if _ha() and task.per_node and self._running:
+            with self.tasks_lock:
+                if name not in self._local_requests:
+                    self._local_requests.append(name)
+        elif _ha() and not task.per_node:
             from models import SchedulerRequest, db
             db.session.add(SchedulerRequest(task_name=name, requested_at=utc_now(),
                                             requested_by=self.node_id))
@@ -321,20 +335,31 @@ class SchedulerService:
                 name: task.to_dict()
                 for name, task in self.tasks.items()
             }
+            per_node = {name for name, task in self.tasks.items() if task.per_node} if _ha() else set()
         if self._delegated():
-            state = self._published_state()
-            published = state.get('tasks', {})
-            statuses.update({name: published[name] for name in statuses if name in published})
-            if self.state_is_stale(state):
-                for status in statuses.values():
-                    status['stale'] = True
+            # HA: a per-node task shows this node's runs, never the leader's
+            self._merge_state(statuses, self._published_state(), set(statuses) - per_node)
+        if per_node and self._node_state_elsewhere():
+            self._merge_state(statuses, _read_state(), per_node)
         return statuses
+
+    def _merge_state(self, statuses: dict, state: dict, names: set) -> None:
+        published = state.get('tasks', {})
+        stale = self._stale(state)
+        for name in names:
+            if name in published:
+                statuses[name] = published[name]
+            if stale:
+                statuses[name]['stale'] = True
 
     def state_is_stale(self, state=None) -> bool:
         """Whether the scheduler process stopped publishing (two passes missed)."""
         if not self._delegated():
             return False
         state = self._published_state() if state is None else state
+        return self._stale(state)
+
+    def _stale(self, state: dict) -> bool:
         published_at = state.get('published_at')
         if not isinstance(published_at, (int, float)):
             return True
@@ -372,7 +397,7 @@ class SchedulerService:
         state = {'pid': os.getpid(), 'published_at': time.time(), 'tasks': tasks}
         if supervised():
             path = _data_path(STATE_FILE)
-            temp = f'{path}.{os.getpid()}.tmp'
+            temp = f'{path}.{os.getpid()}.{threading.get_ident()}.tmp'  # the node thread publishes too
             try:
                 with open(temp, 'w') as handle:
                     json.dump(state, handle)
@@ -392,22 +417,31 @@ class SchedulerService:
         """The tasks a web worker asked to run now, each request consumed once."""
         if _ha():
             try:
-                return self._in_app(self._claim_db_requests)
+                taken = self._in_app(self._claim_db_requests)
             except Exception as e:
                 self._in_app(_rollback)
                 logger.error(f"Scheduler requests not read: {type(e).__name__}: {e}")
-                return []
+                taken = []
+            return taken + [task for task in self._take_local_requests() if task not in taken]
+        return self._take_local_requests()
+
+    def _take_local_requests(self) -> list:
+        """Run-now asked on this node: the request files, plus HA per-node ones asked in this process."""
+        with self.tasks_lock:
+            names, self._local_requests = self._local_requests, []
         directory = _data_path(REQUESTS_DIR)
         try:
-            names = os.listdir(directory)
+            listed = os.listdir(directory)
         except OSError:
-            return []
-        taken = []
-        for name in names:
+            listed = []
+        for name in listed:
             try:
                 os.unlink(os.path.join(directory, name))
             except OSError:
                 continue
+            names.append(name)
+        taken = []
+        for name in names:
             with self.tasks_lock:
                 task = self.tasks.get(name)
             if task is not None and task not in taken:
@@ -449,11 +483,13 @@ class SchedulerService:
 
     def _has_requests(self) -> bool:
         if _ha():
+            if self._local_requests:
+                return True
             try:
-                return self._in_app(_db_requests_pending)
+                if self._in_app(_db_requests_pending):
+                    return True
             except Exception:
                 self._in_app(_rollback)
-                return False
         try:
             return bool(os.listdir(_data_path(REQUESTS_DIR)))
         except OSError:
@@ -654,6 +690,7 @@ class SchedulerService:
                 if not self._owns_lock:
                     if _ha():
                         self._start_node_tasks()
+                        self._publish_state()  # this node's per-node runs, for its web workers
                     self._wake.wait(LOCK_RETRY_SECONDS)
                     continue
                 try:
@@ -698,6 +735,8 @@ class SchedulerService:
         if self._node_thread is not None and self._node_thread.is_alive():
             return
         requested = self._take_deferred(per_node_only=True)
+        requested += [task for task in self._take_local_requests()
+                      if task.per_node and task not in requested]
         with self.tasks_lock:
             if not requested and not any(task.per_node and task.should_run()
                                          for task in self.tasks.values()):
@@ -719,7 +758,8 @@ class SchedulerService:
                         self._defer(left)  # the leader loop or the next node pass serves it
                 break
             try:
-                self._try_run(task, requested=task in requested, on_follower=True)
+                if self._try_run(task, requested=task in requested, on_follower=True):
+                    self._publish_state()
             except Exception as e:
                 logger.error(f"Unexpected error running task '{task.name}': {e}", exc_info=True)
 

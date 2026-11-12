@@ -538,3 +538,53 @@ def test_a_follower_that_became_leader_stops_between_two_per_node_tasks(sched, m
     time.sleep(0.2)
     assert [r for r in runs if r[0] == 'second'] == [('second', 'SchedulerService')]
     assert [r for r in runs if r[0] == 'first'] == [('first', 'SchedulerNodeTasks')]
+
+
+def test_in_ha_a_run_now_of_a_per_node_task_runs_on_the_node_asked(sched, monkeypatch):
+    _ha_pair(monkeypatch)
+    monkeypatch.setattr(SchedulerService, '_take_requests', lambda self: self._take_local_requests())
+    leader, follower = sched(), sched()
+    ran = []
+    for who, s in (('leader', leader), ('follower', follower)):
+        s.wake_interval = 0.05
+        # Not due before the grace period: only the run-now starts it
+        s.register_task('local', lambda who=who: ran.append((who, threading.current_thread().name)),
+                        interval=3600, per_node=True)
+    leader.start()
+    assert _wait(lambda: _OneOwnerLock.owner is leader)
+    follower.start()
+    status = follower.run_task_now('local')
+    assert ran == [('follower', 'SchedulerNodeTasks')]
+    assert status['run_count'] == 1 and not status.get('queued')
+    assert leader.get_task_status('local')['run_count'] == 0
+
+
+def test_in_ha_a_worker_shows_its_own_node_for_a_per_node_task(sched, monkeypatch, data_dir):
+    monkeypatch.setattr(scheduler_service, '_ha', lambda: True)
+    monkeypatch.setenv(scheduler_service.SUPERVISED_ENV, '1')
+    monkeypatch.setattr(scheduler_service, 'RUN_NOW_WAIT_SECONDS', 0.3)
+    node, worker = sched(), sched()
+    for s in (node, worker):
+        s.register_task('local', lambda: None, interval=3600, per_node=True)
+        s.register_task('cluster', lambda: None, interval=3600)
+    leader_state = {'published_at': time.time(), 'tasks': {
+        name: dict(worker.tasks[name].to_dict(), run_count=7) for name in ('local', 'cluster')}}
+    monkeypatch.setattr(SchedulerService, '_published_state', lambda self: leader_state)
+    # This node's scheduler process, a follower, publishes its own copy
+    node.tasks['local'].run_count = 2
+    node._publish_state()
+    statuses = worker.get_all_tasks_status()
+    assert statuses['local']['run_count'] == 2 and statuses['cluster']['run_count'] == 7
+    assert 'stale' not in statuses['local']
+    # The run-now is asked of this node's scheduler process, not of the leader
+    assert worker.run_task_now('local')['queued'] is True
+    assert os.listdir(scheduler_service._data_path(scheduler_service.REQUESTS_DIR)) == ['local']
+    assert node._take_local_requests() == [node.tasks['local']]
+
+
+def test_in_ha_a_per_node_run_now_without_a_loop_on_this_node_runs_here(sched, monkeypatch):
+    monkeypatch.setattr(scheduler_service, '_ha', lambda: True)
+    monkeypatch.setattr(scheduler_service, 'RUN_NOW_WAIT_SECONDS', 0.3)
+    s = sched()
+    s.register_task('local', lambda: None, interval=3600, per_node=True)
+    assert s.run_task_now('local')['run_count'] == 1

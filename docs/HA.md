@@ -82,6 +82,7 @@ The network uses the fixed subnet `172.28.0.0/24`, trusted as the proxy. When `u
 
 - **Backups.** Scheduled and manual backups are written under the node's data directory by the leader. They are not replicated: copy them off the host, and also back PostgreSQL up with its own tools. Retention runs on every node, so a former leader prunes its own archives.
 - **Update result.** The outcome of an update is read on the node that installed it, leader or not.
+- **Per-node task status.** The scheduler view shows the backup retention and update result runs of the node that answers, and Run now runs them on that node.
 - **SoftHSM tokens.** A token lives on the node's own disk, so the chart and the compose example set `HSM_AUTO_INIT=false`. Software CA keys stored in PostgreSQL under the shared `KEY_ENCRYPTION_KEY` work on every node; keys kept in an HSM must use a network HSM (PKCS#11 over the network, OpenBao, Azure Key Vault, AWS CloudHSM, Google KMS).
 - **Certificate files** mirrored by renewals and session file cleanup, which run on the leader only.
 - **The self-signed HTTPS certificate** of each node, as long as none was applied or regenerated from the web interface. Once one is, every node writes it from the database before it starts (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md), HA mode).
