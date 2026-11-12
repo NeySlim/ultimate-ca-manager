@@ -19,6 +19,27 @@ def _dek_refresh(dek_refresh_now):
     """No process here lags: rotations and disables wait for none."""
 
 
+@pytest.fixture(autouse=True)
+def _bystander_stays_plaintext(app):
+    """A plaintext key of the session database outside this file's rows (the default CA's,
+    say) is still plaintext once every fixture of a test has torn down."""
+    from models.deploy import DeployTarget
+    with app.app_context():
+        row = DeployTarget(name=f'bystander {uuid.uuid4().hex[:8]}', host='h.example',
+                           username='u', private_key=PEM)
+        db.session.add(row)
+        db.session.commit()
+        row_id = row.id
+    yield
+    with app.app_context():
+        db.session.rollback()
+        row = db.session.get(DeployTarget, row_id)
+        stored = row.private_key
+        db.session.delete(row)
+        db.session.commit()
+    assert stored == PEM, 'a plaintext key outside this test was left encrypted or dropped'
+
+
 PEM = '-----BEGIN PRIVATE KEY-----\nenvelope\n-----END PRIVATE KEY-----\n'
 SSH_KEY = base64.b64encode(b'-----BEGIN OPENSSH PRIVATE KEY-----\nenv\n-----END OPENSSH PRIVATE KEY-----\n').decode()
 
@@ -78,7 +99,10 @@ def values(app, encryption_enabled, envelope_keys):
     from models.deploy import DeployTarget
     from models.ssh import SSHCertificateAuthority
     from models.sso import SSOProvider
-    from security.encryption import encrypt_private_key, encrypt_text
+    # Imported before a test patches them
+    from security.encryption import (
+        decrypt_all_keys, encrypt_private_key, encrypt_text, key_encryption,
+    )
 
     tag = uuid.uuid4().hex[:8]
     with app.app_context():
@@ -98,6 +122,11 @@ def values(app, encryption_enabled, envelope_keys):
 
     yield {'ids': ids, 'tag': tag}
     with app.app_context():
+        # An enable encrypts every key of the session database under this throwaway KEK:
+        # back in the clear while the KEK is still loaded (a no-op when it cannot open them)
+        db.session.rollback()
+        key_encryption.reload()
+        decrypt_all_keys(dry_run=False)
         for model, row_id in ids.items():
             row = db.session.get(model, row_id)
             if row is not None:
