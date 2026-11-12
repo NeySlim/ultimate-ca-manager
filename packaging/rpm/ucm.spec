@@ -81,16 +81,10 @@ getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s /sbi
 %post
 %systemd_post %{name}.service
 
-# Install sudoers for service management (watcher handles restart/update)
-cat > /etc/sudoers.d/ucm << 'SUDOERSEOF'
-# UCM service management - allows ucm user to restart service without password
-# This is required for HTTPS certificate application and other system operations
-ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm
-ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl reload ucm
-ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop ucm
-ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl start ucm
-SUDOERSEOF
-chmod 440 /etc/sudoers.d/ucm
+# BEGIN legacy-sudoers: the app no longer uses sudo; drop the file older packages wrote
+_sd="${UCM_SUDOERS_DIR:-/etc/sudoers.d}"
+rm -f "$_sd/ucm"
+# END legacy-sudoers
 
 # Enable ucm-watcher path unit for restart/update handling
 systemctl daemon-reload
