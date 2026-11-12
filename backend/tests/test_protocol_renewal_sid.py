@@ -206,3 +206,17 @@ class TestScepRenewal:
         assert _count(app) == before
         with app.app_context():
             assert db.session.get(SCEPRequest, req_id).status == 'pending'
+
+    def test_approved_renewal_says_why_when_the_directory_does_not_answer(
+            self, app, auth_client, scep_ca, monkeypatch):
+        from models import SCEPRequest
+        from services.ad_connector.renewal_identity import UNRESOLVED_MESSAGE
+        _material, ca_id = scep_ca
+        req_id = self._held(app, ca_id, 'scep-sid-held-down.example.test')
+        _configure_ad_connector(app)
+        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.UNREACHABLE)
+        r = self._approve(auth_client, req_id)
+        assert UNRESOLVED_MESSAGE in r.get_json()['message']
+        with app.app_context():
+            row = db.session.get(SCEPRequest, req_id)
+            assert row.status == 'pending' and row.cert_refid is None
