@@ -90,7 +90,6 @@ These operations answer `409` with code `ha_mode`, because they only change the 
 - backend switch and data migration between databases (`database.py`): change `DATABASE_URL` by hand, then restart;
 - enabling and disabling encryption, and encrypting all keys: the key is shared through `KEY_ENCRYPTION_KEY`;
 - secret rotation (it writes `ucm.env`);
-- installing an update from the web interface;
 - backup restore, both from System and from Settings (restored files land on one node).
 
 ## Upgrading
@@ -99,6 +98,16 @@ Upgrade the nodes one at a time. Migrations run under a PostgreSQL advisory lock
 
 - **Helm:** `helm upgrade` rolls the pods with no unavailable pod; the PodDisruptionBudget protects them from node drains.
 - **Compose:** `docker compose -f docker-compose.ha.yml pull`, then `up -d ucm-1`, wait until it is healthy, then `up -d ucm-2`.
-- **DEB/RPM:** upgrade and restart one host, wait for `/health/ready`, then the next.
+- **DEB/RPM:** upgrade and restart one host, wait for `/health/ready`, then the next. Or install the update from the web interface (System > Updates), or let the scheduled automatic install do it: in HA mode either starts a rolling update.
+
+### Rolling update from the web interface (DEB/RPM)
+
+One campaign runs at a time. The scheduler leader gives the turn to one node at a time, in `UCM_NODE_ID` order, among the nodes with a fresh heartbeat when it starts. That node downloads the package itself and checks it against the release's published SHA-256 (a release without one is refused), then asks its own update watcher to install it. The next node starts only once the previous one has a fresh heartbeat on the target version in `cluster_nodes`. A node already on the target is counted done without an install.
+
+The campaign stops, and leaves the remaining nodes alone, when a node fails to download or verify the package, comes back on another version, or is not back on the target within 15 minutes (download, install, migrations under the startup lock and the first heartbeat). Every step is audited and pushed to the browsers. System > Updates shows the target, the nodes done, the node in progress and the node where it stopped with the reason; fix that node, then **Resume** continues from it. Nodes without a fresh heartbeat at the start are listed as skipped and not updated.
+
+While the campaign runs, the updated nodes and the others share the database. The first updated node applies the target's migrations: a migration that the older version cannot run against leaves the nodes not yet updated failing until their turn. Read the release notes before updating a cluster.
+
+In Docker and Kubernetes the route and the scheduled install refuse with a message: the orchestrator updates the image (`docker compose pull`, `helm upgrade`).
 
 During a roll from a version without the scheduled backup's conclusion marker, a scheduled backup run by an older leader is not marked as concluded: a newer leader then writes one extra archive two hours later, once.
