@@ -65,12 +65,16 @@ def get_expiring_certificates(days: int = 30, include_revoked: bool = False,
 
 
 def count_expired_between(after, until) -> int:
-    """Unrevoked certificates and cross-certificates whose expiry falls in (after, until]."""
+    """Unrevoked certificates and cross-certificates whose expiry falls in (after, until].
+
+    Same rows as the 'expired' announcements: a cross-certificate counts only with its CA, as in expiring_alerts.
+    """
+    from models import CA
     from models.ca_cross_certificate import CACrossCertificate
     certs = Certificate.query.filter(
         Certificate.valid_to <= until, Certificate.valid_to > after,
         Certificate.revoked.isnot(True)).count()
-    cross = CACrossCertificate.query.filter(
+    cross = CACrossCertificate.query.join(CA, CA.id == CACrossCertificate.ca_id).filter(
         CACrossCertificate.valid_to <= until, CACrossCertificate.valid_to > after,
         CACrossCertificate.revoked.is_(False)).count()
     return certs + cross
