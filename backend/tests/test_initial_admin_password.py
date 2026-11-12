@@ -205,6 +205,22 @@ def test_an_unwritable_data_directory_creates_no_administrator(database, tmp_pat
     blocker.mkdir()  # os.replace cannot put a file over a directory, whoever runs this
     _, logs = _boot(database, data, ok=False)
     assert PASSWORD_FILE in logs
+    assert _user_rows(database) == 0, 'an account was committed with a password nobody can read'
+
+
+def _user_rows(database):
+    """Accounts in the installation's database, read after its boot exited."""
+    import sqlalchemy as sa
+    from models.user import User
+    from utils.db_url import sqlalchemy_url
+    engine = sa.create_engine(sqlalchemy_url(database['CHILD_DB_URI']))
+    try:
+        with engine.connect() as conn:
+            if not sa.inspect(conn).has_table(User.__tablename__):
+                return 0
+            return conn.execute(sa.text(f'SELECT COUNT(*) FROM {User.__tablename__}')).scalar()
+    finally:
+        engine.dispose()
 
 
 def test_an_existing_installation_reads_no_password_source_again(database, tmp_path):
