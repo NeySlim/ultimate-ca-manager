@@ -81,7 +81,7 @@ getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s /sbi
 %post
 %systemd_post %{name}.service
 
-# BEGIN legacy-sudoers: the app no longer uses sudo; drop the file older packages wrote
+# BEGIN legacy-sudoers: the app no longer uses sudo; drop the files older packages wrote
 rm -f /etc/sudoers.d/ucm-service /etc/sudoers.d/ucm
 # END legacy-sudoers
 

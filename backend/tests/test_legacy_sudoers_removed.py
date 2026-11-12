@@ -18,10 +18,14 @@ def _fragment(path):
 
 def _sandboxed(fragment, root):
     """Redirect the hard-coded directory to root; refuse any script still naming a path outside it."""
-    script = fragment.replace('/etc/sudoers.d', str(root))
+    assert '/etc/sudoers.d/' in fragment, 'fragment names no sudoers path to redirect'
+    script = fragment.replace('/etc/sudoers.d/', f'{root}/')
     assert '/etc/' not in script, 'fragment still names /etc'
-    for p in re.findall(r'(?<![\w$])/[\w./-]*', script):
-        assert p.startswith(str(root)), f'path outside the sandbox: {p}'
+    # Nothing that expands or moves at run time: the suite runs as root on a real host
+    code = '\n'.join(line for line in script.splitlines() if not line.lstrip().startswith('#'))
+    assert not re.search(r'[$~`\\]|\.\.|\bcd\b', code), 'fragment expands or moves at run time'
+    for p in re.findall(r'(?<!\w)/[\w./-]*', code):
+        assert p.startswith(f'{root}/'), f'path outside the sandbox: {p}'
     return script
 
 
@@ -49,10 +53,13 @@ def test_succeeds_without_sudoers_dir_and_creates_nothing(tmp_path, kind):
     assert list(tmp_path.iterdir()) == []
 
 
-@pytest.mark.parametrize('spelling', ['/etc//sudoers.d/ucm', '/etc/./sudoers.d/ucm', '/usr/etc/x', '/var/tmp/x'])
+@pytest.mark.parametrize('spelling', [
+    '/etc//sudoers.d/ucm', '/etc/./sudoers.d/ucm', '/usr/etc/x', '/var/tmp/x',
+    '"$UCM_CONFIG/sudoers"', '$HOME/x', '~root/x', '/etc/sudoers.d/../../root/x', '/etc/sudoers.dX/ucm',
+    '$(printf x)', '`printf x`', 'x; cd'])
 def test_sandbox_refuses_a_fragment_with_another_spelling(tmp_path, spelling):
     with pytest.raises(AssertionError):
-        _sandboxed(f'rm -f {spelling}\n', tmp_path)
+        _sandboxed(f'rm -f /etc/sudoers.d/ucm {spelling}\n', tmp_path)
 
 
 def test_text_guard_scripts_do_not_ship_sudoers():
@@ -65,9 +72,9 @@ def test_text_guard_scripts_do_not_ship_sudoers():
 
 def test_text_guard_deb_daemon_reload_never_fails_the_install():
     """Text guard: every bare systemctl daemon-reload in the DEB script must be tolerated under set -e."""
-    for line in (PKG / 'debian' / 'postinst').read_text().splitlines():
-        if re.match(r'\s*systemctl daemon-reload', line):
-            assert '|| true' in line, line
+    lines = [line for line in (PKG / 'debian' / 'postinst').read_text().splitlines()
+             if re.match(r'\s*systemctl daemon-reload', line)]
+    assert lines and all('|| true' in line for line in lines), lines
 
 
 def test_text_guard_workflows_install_both_python_build_deps():
