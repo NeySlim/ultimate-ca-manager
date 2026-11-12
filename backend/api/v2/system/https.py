@@ -153,6 +153,23 @@ def unbind_https_cert():
     return success_response(message='HTTPS certificate binding cleared')
 
 
+def _unrecorded_message():
+    """The 500 of a pair written to disk whose binding was not stored (outside HA).
+
+    The next start rewrites the files only when the database names a pair (materialize_https).
+    """
+    base = "Certificate written but not recorded: the service was not restarted"
+    try:
+        from services import shared_files
+        from services.https_binding import get_bound_refid
+        db.session.rollback()
+        named = bool(get_bound_refid()) or shared_files.read_file(shared_files.HTTPS_GENERATED) is not None
+    except Exception:
+        db.session.rollback()
+        return base
+    return f"{base}, and its next start serves {'the previous' if named else 'this'} certificate"
+
+
 @bp.route('/api/v2/system/https/regenerate', methods=['POST'])
 @require_auth(['admin:system'])
 def regenerate_https_cert():
@@ -216,14 +233,12 @@ def regenerate_https_cert():
         except Exception as e:
             db.session.rollback()
             current_app.logger.error(f"Could not store the regenerated HTTPS certificate: {e}")
-            # Not restarted: the next start writes the pair the database still names
+            # Not restarted: the next start writes the pair the database still names, if any
             if ha_enabled():
                 return error_response(
                     "Certificate regenerated on this node only: it could not be stored "
                     "for the other nodes", 500)
-            return error_response(
-                "Certificate written but not recorded: the service was not restarted, "
-                "and its next start serves the previous certificate", 500)
+            return error_response(_unrecorded_message(), 500)
 
         AuditService.log_action(
             action='https_regenerate',
@@ -296,13 +311,11 @@ def apply_https_cert():
             set_bound_refid(cert.refid, chain=full_cert)
         except Exception as e:
             current_app.logger.warning(f"Could not persist HTTPS binding: {e}")
-            # Not restarted: the next start writes the certificate the database still names
+            # Not restarted: the next start writes the certificate the database still names, if any
             if ha_enabled():
                 return error_response(
                     "Certificate applied on this node only: the binding could not be stored", 500)
-            return error_response(
-                "Certificate written but not recorded: the service was not restarted, "
-                "and its next start serves the previous certificate", 500)
+            return error_response(_unrecorded_message(), 500)
 
         AuditService.log_action(
             action='https_apply',
