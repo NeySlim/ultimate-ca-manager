@@ -401,7 +401,11 @@ def reload_encryption_state(app) -> None:
     if key_encryption.dek_error or (key_encryption.kek_loaded and _kek_is_foreign(key_encryption)):
         key_encryption.unload()
         outcome = 'wrong_key'
-    _apply_safe_mode(app, outcome)
+    if outcome is None and key_encryption.is_enabled:
+        # Enabled with the database's KEK: no safe mode, and no scan of every stored value
+        app.config['SAFE_MODE'] = False
+    else:
+        _apply_safe_mode(app, outcome)
     logger.info("🔐 Encryption reloaded: enabled=%s, DEK version=%s, safe mode=%s",
                 key_encryption.is_enabled, key_encryption.active_version,
                 app.config['SAFE_MODE'])

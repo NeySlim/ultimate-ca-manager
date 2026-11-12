@@ -809,6 +809,28 @@ def test_a_reload_with_the_database_kek_and_no_dek_row_leaves_safe_mode(app, val
             app.config['SAFE_MODE'] = False
 
 
+def test_a_reload_scans_the_stored_values_only_when_encryption_is_off(app, values, monkeypatch,
+                                                                    encryption_enabled):
+    """Each node and process runs it on every enable, disable and rotation."""
+    from security import dek_rotation, encryption
+    from security.master_key_bootstrap import reload_encryption_state
+    real = encryption.has_encrypted_keys_in_db
+    scans = []
+    monkeypatch.setattr(encryption, 'has_encrypted_keys_in_db',
+                        lambda: scans.append(1) or real())
+    with app.app_context():
+        dek_rotation.rotate()
+        reload_encryption_state(app)
+        assert scans == [] and app.config['SAFE_MODE'] is False
+        encryption_enabled.key_encryption.unload()
+        monkeypatch.setattr(encryption_enabled.key_encryption, 'reload', lambda: None)
+        try:
+            reload_encryption_state(app)
+            assert scans == [1] and app.config['SAFE_MODE'] is True
+        finally:
+            app.config['SAFE_MODE'] = False
+
+
 def test_a_node_whose_kek_differs_from_a_live_peer_does_not_start(app, values, monkeypatch,
                                                                   encryption_enabled):
     from models import ClusterNode
