@@ -97,8 +97,9 @@ def grace_refusal(grace) -> str:
     """Why an enable, rotation or disable waits for the end of ``grace``."""
     until = grace['until'].isoformat(timespec='seconds')
     if grace.get('disable'):
+        # A rotation is refused afterwards as well (nothing to rotate): only enabling goes on
         return (f"Encryption was disabled: its data-encryption keys are kept until {until} UTC "
-                f"for values written during the disable. Try again after that.")
+                f"for values written during the disable; enable it again after that.")
     return f"The previous data-encryption key is kept until {until} UTC: rotate again after that"
 
 
@@ -321,8 +322,9 @@ def retire_if_due() -> int:
     late = rewrite(commit=False, decrypt=disable)
     if late['unreadable']:
         db.session.commit()
+        kept = 'the keys of the disable are kept' if disable else 'the previous key is kept'
         raise RotationError(f"{len(late['unreadable'])} value(s) decrypt with no data-encryption "
-                            f"key, the previous key is kept: {', '.join(late['unreadable'][:5])}")
+                            f"key, {kept}: {', '.join(late['unreadable'][:5])}")
     extra = {k: grace[k] for k in ('disable', 'remove_file') if k in grace}
     if late['rewritten']:
         # Something still wrote under the DEK: it stays for another grace period

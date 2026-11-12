@@ -1244,8 +1244,12 @@ def test_enable_and_rotate_during_the_grace_of_a_disable_name_its_end(app, auth_
     for route in ('enable-encryption', 'rotate-encryption-key'):
         r = auth_client.post(f'/api/v2/system/security/{route}')
         assert r.status_code == 409, r.data
+        # A rotation is refused (400) after the grace too: the way on is to enable
         assert 'kept until' in r.get_json()['message']
+        assert 'Try again' not in r.get_json()['message']
+        assert 'enable it again after that' in r.get_json()['message']
     grace(601)
+    assert auth_client.post('/api/v2/system/security/rotate-encryption-key').status_code == 400
     r = auth_client.post('/api/v2/system/security/enable-encryption')
     assert r.status_code == 200, r.data
     assert _rows(app) == []
@@ -1376,6 +1380,22 @@ def test_the_scheduled_retire_says_once_that_the_key_is_kept(app, values, grace,
     assert len(lines) == 1 and 'decrypt with no data-encryption key' in lines[0]
     assert lines[0].count('kept') == 1
     assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
+    _late_write(app, values, Fernet(_kek(encryption_enabled)))  # readable again for teardown
+
+
+def test_the_retire_after_a_disable_names_the_disable(app, auth_client, values, grace, caplog,
+                                                     encryption_enabled):
+    import logging
+    from security import dek_rotation
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    _late_write(app, values, Fernet(Fernet.generate_key()))
+    grace(601)
+    with caplog.at_level(logging.ERROR, logger='security.dek_rotation'), app.app_context():
+        dek_rotation.scheduled_retire()
+    lines = [r.getMessage() for r in caplog.records
+             if r.name == 'security.dek_rotation' and r.levelno >= logging.ERROR]
+    assert len(lines) == 1 and 'previous key' not in lines[0]
+    assert 'keys of the disable are kept' in lines[0]
     _late_write(app, values, Fernet(_kek(encryption_enabled)))  # readable again for teardown
 
 
