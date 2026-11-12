@@ -326,6 +326,26 @@ def test_a_disable_that_fails_keeps_the_stored_key_active(
     assert app.config['SECRET_KEY'] == key
 
 
+def test_a_rotation_after_a_failed_disable_is_refused_until_the_disable_is_done(
+        app, auth_client, stored, encryption_enabled, dek_refresh_now, monkeypatch):
+    """The stored key would sign again at the next start: the file rotation changes nothing."""
+    assert auth_client.post(ROTATE, json={}).status_code == 200
+    monkeypatch.setattr('security.encryption.decrypt_all_keys',
+                        lambda dry_run=False: (0, 0, ['CA 1: unreadable']))
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 500
+    key, rows, file_path = app.config['SECRET_KEY'], _rows(app), []
+    # The environment-file path rewrites the host's file and restarts: never run here
+    monkeypatch.setattr('api.v2.system.security._rotate_secret_in_env_file',
+                        lambda: file_path.append(1) or ('', 200))
+    r = auth_client.post(ROTATE, json={})
+    assert r.status_code == 409, r.data
+    assert 'disable' in r.get_json()['message']
+    assert not file_path
+    assert _rows(app) == rows and app.config['SECRET_KEY'] == key
+    status = auth_client.get('/api/v2/system/security/secrets-status').get_json()['data']
+    assert status['session_secret']['rotation'] == 'blocked'
+
+
 def test_the_stored_key_never_travels_in_a_backup():
     from security import session_key
     from services.backup import installation

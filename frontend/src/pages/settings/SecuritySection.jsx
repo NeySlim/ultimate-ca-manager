@@ -199,6 +199,8 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
             <p className="text-sm text-text-secondary">
               {secretsStatus.session_secret.rotation === 'database'
                 ? t('settings.sessionKeyRotateStoredDesc')
+                : secretsStatus.session_secret.rotation === 'blocked'
+                  ? t('settings.sessionKeyRotateBlocked')
                 : secretsStatus.session_secret.ha
                   ? t('settings.sessionKeyRotateHaRefused')
                   : t('settings.sessionKeyRotateFileDesc')}
@@ -208,6 +210,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                 onClick={handleRotateSessionKey}
                 variant="outline"
                 disabled={sessionKeyLoading || !!secretsStatus.session_secret.previous_accepted_until
+                  || secretsStatus.session_secret.rotation === 'blocked'
                   || (secretsStatus.session_secret.ha && secretsStatus.session_secret.rotation !== 'database')}
               >
                 <ArrowsClockwise size={16} />

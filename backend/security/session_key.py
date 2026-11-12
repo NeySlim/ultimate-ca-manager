@@ -2,8 +2,8 @@
 
 Three system_config rows: the active key and the previous one, each encrypted as a whole
 like the other master-key values (a DEK rotation rewrites them), and the instant until
-which the previous one is still accepted. No row, or at start one that does not open: the
-environment's SECRET_KEY signs, as before. A key is never stored in the clear.
+which the previous one is still accepted. No row, or at start an active key that does not
+open: the environment's SECRET_KEY signs, as before. A key is never stored in the clear.
 """
 import logging
 import secrets as py_secrets
@@ -67,6 +67,12 @@ def stored_mode() -> bool:
     return key_encryption.is_encrypting
 
 
+def kept_by_unfinished_disable() -> bool:
+    """A stored key while encryption no longer encrypts: a disable that did not finish.
+    That key signs again at the next start, so an environment-file rotation changes nothing."""
+    return not stored_mode() and ACTIVE_KEY in _read_rows()
+
+
 def _read_rows():
     from models import SystemConfig
     return {r.key: r.value for r in
@@ -101,8 +107,8 @@ def _until(rows):
 
 def load(app, at_start=False) -> str:
     """Sets this process's signing key and the previous key it still accepts, from the
-    database; the environment's key when nothing is stored. A row that cannot be read or
-    opened falls back to the environment at start only, a reload keeps the keys in memory;
+    database; the environment's key when nothing is stored. Rows that cannot be read, or an
+    active key that does not open, fall back to the environment at start only, a reload keeps the keys in memory;
     either way reload_if_pending() tries again until it succeeds. Returns the source."""
     from models import db
     state = _state(app)
@@ -140,7 +146,8 @@ def load(app, at_start=False) -> str:
         state.pop('retry', None)
     if failed and not at_start:
         logger.warning("Session key reload incomplete: this node keeps the keys it had "
-                       "and tries again")
+                       "and tries again (at most every %d s, until it succeeds)",
+                       RETRY_MAX_SECONDS)
         return state.get('source', 'environment')
     if failed and source == 'environment':
         logger.warning("The environment's SECRET_KEY signs on this node; rotate the session "
@@ -188,8 +195,8 @@ def stamp(moment):
 def status(app) -> dict:
     state = _state(app)
     until = state.get('previous_until') if app.config.get('SECRET_KEY_FALLBACKS') else None
-    # Over is over even if nothing reloaded since: the next rotation is accepted then
-    if until is not None and _local_now() >= until:
+    # Over is over even if nothing reloaded since; the clock the rotation route compares with
+    if until is not None and _now() >= until:
         until = None
     return {
         'source': state.get('source', 'environment'),

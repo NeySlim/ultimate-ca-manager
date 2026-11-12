@@ -348,6 +348,18 @@ describe('SecuritySection session key', () => {
     expect(rotate).not.toHaveBeenCalled()
   })
 
+  it('blocks the rotation while a disable is unfinished and says why', () => {
+    const rotate = vi.fn()
+    renderSection(null, {
+      secretsStatus: { session_secret: { source: 'database', rotation: 'blocked', ha: false, previous_accepted_until: null } },
+      handleRotateSessionKey: rotate,
+    })
+    expect(screen.getByText('settings.sessionKeyRotateBlocked')).toBeTruthy()
+    expect(screen.queryByText('settings.sessionKeyRotateFileDesc')).toBeNull()
+    fireEvent.click(screen.getByText('settings.rotateSessionKey'))
+    expect(rotate).not.toHaveBeenCalled()
+  })
+
   it('keeps the stored rotation available in HA', () => {
     const rotate = vi.fn()
     renderSection(null, {

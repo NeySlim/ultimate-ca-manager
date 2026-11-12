@@ -708,6 +708,9 @@ def rotate_secrets():
     from utils.ha import ha_enabled, ha_refusal, LOCAL_ONLY
     if session_key.stored_mode():
         return _rotate_stored_secret(session_key)
+    if session_key.kept_by_unfinished_disable():
+        return error_response("A disable of encryption is unfinished and the stored session "
+                              "key still signs: run the disable again, then rotate", 409)
     if ha_enabled():
         return ha_refusal(LOCAL_ONLY)
     return _rotate_secret_in_env_file()
@@ -878,7 +881,9 @@ def secrets_status():
             # Where the key that signs comes from, and how the next rotation applies
             'source': stored['source'],
             'previous_accepted_until': stored['previous_accepted_until'],
-            'rotation': 'database' if session_key.stored_mode() else 'environment_file',
+            'rotation': ('database' if session_key.stored_mode() else
+                         'blocked' if session_key.kept_by_unfinished_disable() else
+                         'environment_file'),
             # In HA the environment-file rotation is refused: the screen says so
             'ha': ha_enabled(),
         },
