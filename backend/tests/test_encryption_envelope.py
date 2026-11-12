@@ -2251,3 +2251,29 @@ def test_enabling_refuses_a_kept_dek_another_node_rewrapped_since_the_last_read(
     assert r.status_code == 409, r.data
     assert 'do not open with the configured' in r.get_json()['message']
     assert _rows(app) == rows
+
+
+def test_a_key_file_not_written_keeps_the_disabled_markers(app, monkeypatch):
+    # Without them a KEK configured later would turn encryption on by itself
+    from models import EncryptionKey
+    from security import encryption, envelope
+    from security.master_key_bootstrap import activate_new_master_key
+    from utils.datetime_utils import utc_now
+
+    def refuse(*a, **k):
+        raise PermissionError('read-only config directory')
+    monkeypatch.setattr(encryption.KeyEncryption, 'write_key_file', staticmethod(refuse))
+    with app.app_context():
+        db.session.add(EncryptionKey(version=0, state=envelope.DISABLED, kek_id='e' * 16,
+                                     wrapped=None, created_at=utc_now()))
+        db.session.commit()
+        try:
+            with pytest.raises(PermissionError):
+                activate_new_master_key(exclusive=False)
+            db.session.rollback()
+            assert [(r.state, r.kek_id) for r in EncryptionKey.query.filter_by(version=0)] == [
+                (envelope.DISABLED, 'e' * 16)]
+        finally:
+            db.session.rollback()
+            EncryptionKey.query.filter_by(version=0).delete()
+            db.session.commit()

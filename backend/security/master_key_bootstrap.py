@@ -139,15 +139,31 @@ def activate_new_master_key(exclusive: bool) -> dict:
     from security.dek_rotation import lock_key_state
     KeyEncryption = _encryption.KeyEncryption
     key_encryption = _encryption.key_encryption
-    # A disabled marker keeps any KEK off: enabling is what lifts it
+    # A disabled marker keeps any KEK off: enabling is what lifts it, and puts it back on failure
     lock_key_state()
+    columns = ('version', 'state', 'kek_id', 'wrapped', 'created_at', 'retire_after')
+    markers = [{c: getattr(r, c) for c in columns}
+               for r in EncryptionKey.query.filter_by(state=envelope.DISABLED)]
     EncryptionKey.query.filter_by(state=envelope.DISABLED).delete(synchronize_session=False)
     db.session.commit()
-    KeyEncryption.write_key_file(KeyEncryption.generate_key(), exclusive=exclusive)
-    key_encryption.reload()
-    if not key_encryption.is_enabled:
-        KeyEncryption.remove_key_file()
-        raise KeyActivationError('Failed to initialize encryption after key generation')
+    try:
+        KeyEncryption.write_key_file(KeyEncryption.generate_key(), exclusive=exclusive)
+        key_encryption.reload()
+        if not key_encryption.is_enabled:
+            KeyEncryption.remove_key_file()
+            raise KeyActivationError('Failed to initialize encryption after key generation')
+    except BaseException:
+        db.session.rollback()
+        try:
+            lock_key_state()
+            for marker in markers:
+                if db.session.get(EncryptionKey, marker['version']) is None:
+                    db.session.add(EncryptionKey(**marker))
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error("🔓 Disabled-encryption markers not put back: %s", e)
+        raise
 
     encrypted, skipped, errors = _encryption.encrypt_all_keys(dry_run=False)
     return {'encrypted': encrypted, 'skipped': skipped, 'errors': errors,
