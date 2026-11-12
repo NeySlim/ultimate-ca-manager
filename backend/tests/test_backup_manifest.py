@@ -11,6 +11,7 @@ import pytest
 
 from models import db
 from services.backup import manifest
+from services.notification.scheduler import EXPIRY_WEBHOOKS_MARK_KEY
 
 
 def _model_of(section):
@@ -300,7 +301,8 @@ class TestClusterStateStaysLocal:
             db.session.commit()
             assert SystemConfig.query.filter_by(key=STATE_KEY).first() is None
 
-    @pytest.mark.parametrize('key', ['backup.last_run', 'backup.concluded_run'])
+    @pytest.mark.parametrize('key', ['backup.last_run', 'backup.concluded_run',
+                                     EXPIRY_WEBHOOKS_MARK_KEY])
     def test_the_backup_schedule_state_is_neither_exported_nor_restored(self, app, key):
         """An archive carries its own reservation, not yet concluded: restored, the
         schedule would report a run in progress that does not exist."""

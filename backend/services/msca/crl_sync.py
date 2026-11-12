@@ -76,9 +76,14 @@ class MicrosoftCACRLSyncMixin:
                 # syncs revocations, so skip rather than revoke.
                 if reason == 'removeFromCRL':
                     continue
-                cert.revoked = True
-                cert.revoked_at = revoked_at
-                cert.revoke_reason = reason
+                # Conditional: of two syncs reading the certificate unrevoked, one revokes and announces it
+                moved = Certificate.query.filter(
+                    Certificate.id == cert.id, Certificate.revoked.isnot(True),
+                ).update({Certificate.revoked: True, Certificate.revoked_at: revoked_at,
+                          Certificate.revoke_reason: reason}, synchronize_session=False)
+                db.session.expire(cert, ['revoked', 'revoked_at', 'revoke_reason'])
+                if moved != 1:
+                    continue
                 remember_if_compromised(cert)
                 newly_revoked.append(cert)
 
@@ -289,7 +294,6 @@ class MicrosoftCACRLSyncMixin:
 
 def scheduled_msca_crl_sync():
     """Scheduler entry point: sync every enabled connection that opted in."""
-    # Leader-only: one scheduler runs it, so the sync needs no claim of its own
     connections = MicrosoftCA.query.filter_by(enabled=True, crl_sync_enabled=True).all()
     if not connections:
         return

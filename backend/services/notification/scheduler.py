@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import List, Dict
 from models import CA, Certificate
 from models.email_notification import NotificationLog
@@ -12,6 +12,68 @@ from .sender import NotificationSenderMixin
 from ._constants import CERT_EXPIRING, CRL_EXPIRING
 
 logger = logging.getLogger(__name__)
+
+# HA: one node at a time runs the expiry pass. The webhook mark is the cluster instant of
+# the last emission: the next pass announces what expired since, whichever node runs it.
+EXPIRY_LEASE_KEY = 'expiry_alerts.lease'
+EXPIRY_WEBHOOKS_MARK_KEY = 'expiry_alerts.webhooks_mark'
+EXPIRY_LEASE = timedelta(minutes=10)
+
+
+class _NoLease:
+    """Outside HA one scheduler runs the pass: nothing to reserve."""
+    def renew(self):
+        return True
+
+    def end(self):
+        pass
+
+
+def _cluster_now():
+    from services.scheduler_leader import cluster_utc_now
+    return cluster_utc_now()
+
+
+def _parse_mark(value):
+    try:
+        return datetime.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
+def _emit_webhooks_in_ha():
+    """HA: 'expired' covers (last mark, now], 'expiring' reminders go out once per cluster
+    day; a pass cut short before the mark is emitted again once the lease is over."""
+    from models import SystemConfig, db
+    from utils.config_cas import config_compare_and_set
+    from services import expiry_alert_service
+    now = _cluster_now()
+    previous = db.session.query(SystemConfig.value).filter_by(key=EXPIRY_WEBHOOKS_MARK_KEY).scalar()
+    last = _parse_mark(previous)
+    expiry_alert_service._emit_expiry_webhooks(
+        expiring=last is None or last.date() != now.date(),
+        expired_after=last if last is not None else now - timedelta(days=1),
+        now=now,
+    )
+    config_compare_and_set(EXPIRY_WEBHOOKS_MARK_KEY, previous, now.isoformat())
+
+
+def _emit_webhooks_single_node():
+    """The last 24h, then the mark moves too: HA turned back on resumes from this pass."""
+    from models import SystemConfig, db
+    from services import expiry_alert_service
+    now = _cluster_now()
+    expiry_alert_service._emit_expiry_webhooks(now=now)
+    try:
+        row = SystemConfig.query.filter_by(key=EXPIRY_WEBHOOKS_MARK_KEY).first()
+        if row is None:
+            db.session.add(SystemConfig(key=EXPIRY_WEBHOOKS_MARK_KEY, value=now.isoformat()))
+        else:
+            row.value = now.isoformat()
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
 
 
 class NotificationSchedulerMixin:
@@ -93,6 +155,22 @@ class NotificationSchedulerMixin:
 
     @staticmethod
     def run_scheduled_checks():
+        from utils.ha import ha_enabled
+        if not ha_enabled():
+            return NotificationSchedulerMixin._run_checks(_NoLease())
+        from utils.config_cas import ConfigLease
+        lease = ConfigLease(EXPIRY_LEASE_KEY, EXPIRY_LEASE)
+        if not lease.take():
+            logger.info("Expiry checks skipped: another node is running them")
+            return {'status': 'skipped', 'reason': 'another node is running the expiry checks'}
+        try:
+            return NotificationSchedulerMixin._run_checks(lease)
+        finally:
+            lease.end()
+
+    @staticmethod
+    def _run_checks(lease):
+        """Every send is preceded by a renewal: a node whose lease was taken over stops."""
         logger.info("Running scheduled notification checks...")
         results = {
             'cert_expiring': {'checked': 0, 'notified': 0, 'failed': 0},
@@ -112,6 +190,8 @@ class NotificationSchedulerMixin:
             results['cert_expiring']['checked'] = len(expiring_certs)
 
             for item in expiring_certs:
+                if not lease.renew():
+                    return NotificationSchedulerMixin._taken_over(results)
                 cert = item['cert']
                 days = item['days_remaining']
 
@@ -131,6 +211,8 @@ class NotificationSchedulerMixin:
             results['crl_expiring']['checked'] = len(expiring_crls)
 
             for item in expiring_crls:
+                if not lease.renew():
+                    return NotificationSchedulerMixin._taken_over(results)
                 crl = item['crl']
                 days = item['days_remaining']
 
@@ -147,10 +229,19 @@ class NotificationSchedulerMixin:
         # of email notification config — webhooks must work even when email
         # alerts are disabled or have no recipients.
         try:
-            from services.expiry_alert_service import _emit_expiry_webhooks
-            _emit_expiry_webhooks()
+            if isinstance(lease, _NoLease):
+                _emit_webhooks_single_node()
+            elif lease.renew():
+                _emit_webhooks_in_ha()
+            else:
+                return NotificationSchedulerMixin._taken_over(results)
         except Exception as e:
             logger.error(f"Expiry webhook pass failed: {e}")
 
         logger.info(f"Notification check completed: {results}")
+        return results
+
+    @staticmethod
+    def _taken_over(results):
+        logger.warning(f"Expiry checks stopped: another node took the run over ({results})")
         return results
