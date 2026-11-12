@@ -87,8 +87,7 @@ case "$1" in
         # ============================================================
         
         # BEGIN legacy-sudoers: the app no longer uses sudo; drop files older packages wrote
-        _sd="${UCM_SUDOERS_DIR:-/etc/sudoers.d}"
-        rm -f "$_sd/ucm-service" "$_sd/ucm"
+        rm -f /etc/sudoers.d/ucm-service /etc/sudoers.d/ucm
         # END legacy-sudoers
 
         # Enable ucm-watcher for restart/update handling
@@ -218,7 +217,7 @@ ENVEOF
         fi
         
         # Enable and start/restart service
-        systemctl daemon-reload
+        systemctl daemon-reload 2>/dev/null || true
         systemctl enable ucm
         if systemctl is-active --quiet ucm; then
             systemctl restart ucm || true

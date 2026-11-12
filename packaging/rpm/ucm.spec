@@ -82,8 +82,7 @@ getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s /sbi
 %systemd_post %{name}.service
 
 # BEGIN legacy-sudoers: the app no longer uses sudo; drop the file older packages wrote
-_sd="${UCM_SUDOERS_DIR:-/etc/sudoers.d}"
-rm -f "$_sd/ucm"
+rm -f /etc/sudoers.d/ucm-service /etc/sudoers.d/ucm
 # END legacy-sudoers
 
 # Enable ucm-watcher path unit for restart/update handling

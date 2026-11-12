@@ -11,8 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- Packages: the DEB installation no longer fails on a host without sudo, and the sudoers file the DEB and RPM wrote (unused since restarts go through a signal file) is no longer created; an existing one is removed on install and upgrade.
-- DEB: `python3-pip` is installed with the other build dependencies in the release workflow; `systemctl daemon-reload` no longer aborts the installation where systemd is not running.
+- Packages: the DEB installation no longer fails on a host without sudo; the unused sudoers file is no longer written and is removed from both the DEB and the RPM.
 
 ## [2.253] - 2026-11-11
 
