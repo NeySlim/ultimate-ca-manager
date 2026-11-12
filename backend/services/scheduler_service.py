@@ -482,13 +482,20 @@ class SchedulerService:
     def _try_run(self, task: ScheduledTask, requested: bool = False, on_follower: bool = False) -> bool:
         """Run ``task`` unless another thread holds its run lock; True when it ran.
 
-        A run asked for while the lock is busy is deferred to a later pass, never awaited.
+        Checked with the lock held: a follower that became leader leaves the task to its loop,
+        and a due run the other thread has just made is not made again.
         """
         if not task._run_lock.acquire(blocking=False):
             if requested:
                 self._defer(task)
             return False
         try:
+            if on_follower and (self._owns_lock or not self._running):
+                if requested:
+                    self._defer(task)
+                return False
+            if not requested and not task.should_run():
+                return False
             self._run_task_once(task)
             return True
         finally:

@@ -433,6 +433,35 @@ class _HookLock:
         self.release()
 
 
+def test_the_loop_does_not_rerun_a_task_run_just_before_it_took_the_run_lock(sched):
+    s = sched()
+    runs = []
+    s.register_task('t', lambda: runs.append(1), interval=3600)
+    task = s.tasks['t']
+    task._created_at -= timedelta(seconds=60)
+    # The node thread ran it between the loop's look at the tasks and its taking the run lock
+    task._run_lock = _HookLock(lambda: setattr(task, 'last_run', scheduler_service.utc_now()))
+    s.start()
+    assert _wait(lambda: task._run_lock._hook is None)
+    time.sleep(0.2)
+    assert runs == []
+
+
+def test_a_follower_that_became_leader_leaves_a_per_node_task_to_the_loop(sched):
+    s = sched()
+    runs = []
+    s.register_task('local', lambda: runs.append(1), interval=3600, per_node=True)
+    task = s.tasks['local']
+    task._created_at -= timedelta(seconds=60)
+    s._running = True
+    task._run_lock = _HookLock(lambda: setattr(s, '_owns_lock', True))
+    try:
+        s._run_node_tasks()
+    finally:
+        s._running, s._owns_lock = False, False
+    assert runs == []
+
+
 def test_a_run_now_on_a_task_the_node_thread_still_runs_never_blocks_the_new_leader(sched, monkeypatch):
     beats = []
     _ha_pair(monkeypatch, beats)
@@ -471,3 +500,41 @@ def test_a_run_now_on_a_task_the_node_thread_still_runs_never_blocks_the_new_lea
     time.sleep(0.3)
     assert runs == ['SchedulerNodeTasks', 'SchedulerService']
 
+
+def test_a_follower_that_became_leader_stops_between_two_per_node_tasks(sched, monkeypatch):
+    _ha_pair(monkeypatch)
+    monkeypatch.setattr(SchedulerService, '_take_requests', lambda self: [])
+    leader, follower = sched(), sched()
+    first_go, cluster_go, first_started = threading.Event(), threading.Event(), threading.Event()
+    runs = []
+
+    def first():
+        runs.append(('first', threading.current_thread().name))
+        first_started.set()
+        first_go.wait(2)
+
+    def cluster():
+        runs.append(('cluster', threading.current_thread().name))
+        cluster_go.wait(2)
+    leader.wake_interval = follower.wake_interval = 0.05
+    leader.start()
+    assert _wait(lambda: _OneOwnerLock.owner is leader)
+    for name, func, per_node in (('first', first, True), ('cluster', cluster, False),
+                                 ('second', lambda: runs.append(('second', threading.current_thread().name)), True)):
+        follower.register_task(name, func, interval=3600, per_node=per_node)
+        follower.tasks[name]._created_at -= timedelta(seconds=60)
+    follower.start()
+    try:
+        assert first_started.wait(2)
+        leader.stop(timeout=5)
+        # The new leader's loop is busy with its own task while the node thread ends the first one
+        assert _wait(lambda: ('cluster', 'SchedulerService') in runs, timeout=1.0)
+        first_go.set()
+        assert _wait(lambda: not follower._node_thread.is_alive(), timeout=1.0)
+    finally:
+        first_go.set()
+        cluster_go.set()
+    assert _wait(lambda: any(r[0] == 'second' for r in runs), timeout=2)
+    time.sleep(0.2)
+    assert [r for r in runs if r[0] == 'second'] == [('second', 'SchedulerService')]
+    assert [r for r in runs if r[0] == 'first'] == [('first', 'SchedulerNodeTasks')]
