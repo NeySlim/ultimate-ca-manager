@@ -697,3 +697,6 @@ class RestoreExtendedMixin:
             staged.stage(Config.HTTPS_KEY_PATH,
                          https_data['key_pem'].encode(), mode=0o600)
             results['https_server'] += 1
+        # A regenerated pair stored on the target would replace the restored one at start
+        from services import shared_files
+        shared_files.drop_file(shared_files.HTTPS_GENERATED)
