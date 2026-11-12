@@ -2458,7 +2458,20 @@ POST /api/v2/system/security/rotate-secrets
 Content-Type: application/json
 
 {
-  "new_key": "optional-new-key"
+  "new_secret": "optional, at least 32 characters"
+}
+```
+
+With encryption enabled (always in HA) the key is stored in the database and every node reloads it without a restart; the previous key stays accepted until `previous_accepted_until`, and a second rotation before then answers 409. Without encryption `SECRET_KEY` is written to `ucm.env` and the service restarts (`auto_apply: false` returns the key with manual steps instead); in HA that mode answers 409 `ha_mode`.
+
+**Response (encryption enabled):**
+```json
+{
+  "data": {
+    "rotated": true,
+    "mode": "database",
+    "previous_accepted_until": "2026-11-13T10:00:00"
+  }
 }
 ```
 
@@ -2471,8 +2484,13 @@ GET /api/v2/system/security/secrets-status
 ```json
 {
   "data": {
-    "rotated_at": "2026-01-28T00:00:00",
-    "next_rotation": "2026-04-28T00:00:00"
+    "session_secret": {
+      "configured": true,
+      "source": "database",
+      "previous_accepted_until": "2026-11-13T10:00:00",
+      "rotation": "database"
+    },
+    "encryption_key": {"configured": true}
   }
 }
 ```

@@ -5,7 +5,7 @@ UCM can run on two or more nodes that share one PostgreSQL database. This page c
 ## Prerequisites
 
 - **PostgreSQL 13 or later**, reachable by every node (`DATABASE_URL`). SQLite is refused at startup.
-- **The same `SECRET_KEY` on every node** (`UCM_SECRET_KEY` in the Docker image). Sessions and signed tokens depend on it.
+- **The same `SECRET_KEY` on every node** (`UCM_SECRET_KEY` in the Docker image). It signs the CSRF tokens until the session key is rotated from the web interface, which stores the new key in the database for every node; it then stays the fallback (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md#session-key-rotation)).
 - **The same `KEY_ENCRYPTION_KEY` on every node**, a Fernet key. It decrypts every private key in the database: losing it makes them unrecoverable. Do not keep a different `master.key` file on a node: a local file overrides the variable.
 - **A distinct `UCM_NODE_ID` per node** (default: the host name).
 - **`UCM_HA=1`** on every node.
@@ -92,7 +92,7 @@ Every node holds the same key-encryption key (KEK): `KEY_ENCRYPTION_KEY`, or the
 These operations answer `409` with code `ha_mode`, because they only change the host that receives the request:
 
 - backend switch and data migration between databases (`database.py`): change `DATABASE_URL` by hand, then restart;
-- secret rotation (it writes `ucm.env`);
+- session key rotation without encryption (it would write `ucm.env`); with the KEK every HA node holds, it is stored in the database and works from any node, see [Session key rotation](ADMIN_GUIDE.md#session-key-rotation);
 - backup restore, both from System and from Settings (restored files land on one node).
 
 ## Upgrading
