@@ -210,8 +210,9 @@ def effective_revocation(row: Certificate):
 
 
 def persisted_revocations_of(rows) -> dict:
-    """``{row id: record}`` as ``row_persisted_revocation`` answers each of ``rows``, from one
-    query of their serials' records (and one per CA a record names): a page, not a row each."""
+    """``{row id: record}`` as ``row_persisted_revocation`` answers each of ``rows``: one query
+    of their serials' records, then two per distinct CA of the rows that have one (the CA and
+    its same-key records), so a page costs at most ``1 + 2 * per_page`` and never one per row."""
     from utils.cert_issuer import same_key_refids
     serials = {row.id: serial for row in rows if row.caref and row.crt
                and (serial := _row_serial(row)) is not None}
