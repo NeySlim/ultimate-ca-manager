@@ -236,7 +236,8 @@ def unhold_certificate(cert_id):
 
     # Only a suspension lifts: a final reason, on the row or on a record, is one 409 refusal
     hold_reasons = ('certificate_hold', 'certificateHold')
-    if cert.revoked and cert.revoke_reason not in hold_reasons:
+    # removeFromCRL on the row is an earlier unhold stopped between its commits: it completes
+    if cert.revoked and cert.revoke_reason not in hold_reasons + ('removeFromCRL',):
         return _revoked_for_good(cert, cert.revoke_reason)
 
     try:
