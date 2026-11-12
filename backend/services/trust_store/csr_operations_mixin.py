@@ -684,10 +684,10 @@ class CSROperationsMixin:
         passes here directly.
         ``requester_sid``: the authenticated requester's AD SID (
         ``"S-1-5-21-..."`` string form), embedded as the SID security
-        extension (KB5014754 strong certificate mapping) — only WSTEP's
-        Kerberos binding passes this, independent of ``override_subject``
-        (applies to naked and normal CSRs alike, since it identifies who
-        authenticated, not what subject was requested).
+        extension (KB5014754 strong certificate mapping). WSTEP passes it at
+        Kerberos issuance and at renewal (the renewed certificate's own SID,
+        never the CSR's), independent of ``override_subject``: it identifies
+        who authenticated, not what subject was requested.
         ``extra_san``: names the operator adds to the request's own (admin
         Sign CSR only); with a request that names none, they join those its
         CN implies, a CN that is not a hostname giving no DNS name.
@@ -1261,8 +1261,8 @@ class CSROperationsMixin:
 
         # Microsoft SID security extension (szOID_NTDS_CA_SECURITY_EXT,
         # 1.3.6.1.4.1.311.25.2) for KB5014754 strong certificate mapping —
-        # only WSTEP's Kerberos binding passes this, with the requester's
-        # own AD SID once resolved via the AD Connector. Non-critical,
+        # WSTEP passes it at Kerberos issuance (SID resolved by the AD Connector)
+        # and at renewal (the renewed certificate's SID). Non-critical,
         # matching real ADCS's own issuance (confirmed against a captured
         # real cert — see _ad_security_extension's docstring).
         if requester_sid:
