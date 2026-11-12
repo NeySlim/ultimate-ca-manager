@@ -218,15 +218,15 @@ LIFTABLE_ROW_REASONS = ('certificateHold', 'certificate_hold', 'removeFromCRL')
 
 
 def _interrupted_lift(cert):
-    """A row in removeFromCRL is an unhold stopped between its two commits only while a hold
-    record of its serial is still stored (the second commit deletes it) and no final one is."""
+    """A row in removeFromCRL is an unhold stopped between its two commits unless a record
+    of its serial says otherwise: a hold record or none is a lift to finish, a final one is not."""
     from services.cert.issued_lookup import revocation_records
     from services.cert.serial_resolution import resolve_record_serial
     from utils.revocation_reasons import HOLD_REASONS
     ca = CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
     serial = resolve_record_serial(cert)
     records = revocation_records(ca, serial) if ca is not None and serial is not None else []
-    return bool(records) and all(r.revoke_reason in HOLD_REASONS for r in records)
+    return all(r.revoke_reason in HOLD_REASONS for r in records)
 
 
 def _liftable_row(cert_id):
