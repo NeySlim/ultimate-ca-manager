@@ -33,7 +33,7 @@ describe('SafeModeOverlay: safe mode reason', () => {
   it('says the key is not the cluster\'s when the cluster was disabled under another one', async () => {
     health({ safe_mode: true, safe_mode_reason: 'encryption_kek_not_the_clusters' })
     render(<SafeModeOverlay />)
-    expect(await screen.findByText('safeMode.foreignKekDescription')).toBeInTheDocument()
+    expect(await screen.findByText('safeMode.kekNotTheClustersDescription')).toBeInTheDocument()
     expect(screen.getByText('safeMode.foreignKekStep1Title')).toBeInTheDocument()
     expect(screen.queryByText('safeMode.mismatchDescription')).toBeNull()
     expect(screen.queryByText('safeMode.lostKeyHint')).toBeNull()

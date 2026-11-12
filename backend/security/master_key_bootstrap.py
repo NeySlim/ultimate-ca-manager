@@ -506,8 +506,8 @@ def check_master_key_at_start(app) -> None:
     reason = app.config['SAFE_MODE_REASON']
     if app.config['SAFE_MODE'] and reason == 'encryption_kek_not_the_clusters':
         app.logger.error(
-            "🔒 SAFE MODE: encryption was disabled for this cluster under another key-encryption "
-            "key; this node's is not the cluster's. Nothing is encrypted and nothing is written. "
+            "🔒 SAFE MODE: this node's key-encryption key is not the cluster's (the cluster was "
+            "disabled under another key, or a live node holds another one); nothing is written. "
             "Configure the cluster's KEY_ENCRYPTION_KEY (or master.key) on this node, or, after "
             f"a key change by hand, the cluster's previous key in {PREVIOUS_KEK_ENV}, and "
             "restart UCM.")

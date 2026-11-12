@@ -45,7 +45,7 @@ export function SafeModeOverlay() {
   }
 
   if (checking || !safeMode) return null
-  // Disabled under another KEK: nothing is encrypted, so no key is lost or undecryptable
+  // This KEK is not the cluster's (a disable marker or a live peer says so), nothing is undecryptable
   const foreign = reason === 'encryption_kek_not_the_clusters'
   const mismatch = reason === 'encryption_key_mismatch'
 
@@ -61,7 +61,7 @@ export function SafeModeOverlay() {
         </h2>
         
         <p className="text-sm text-text-secondary mb-4">
-          {t(foreign ? 'safeMode.foreignKekDescription'
+          {t(foreign ? 'safeMode.kekNotTheClustersDescription'
             : mismatch ? 'safeMode.mismatchDescription' : 'safeMode.description')}
         </p>
 
