@@ -581,8 +581,9 @@ def lookup_account_by_sid(sid):
     """The ``sAMAccountName`` of the one directory object whose ``objectSid`` is ``sid``.
 
     None when the connector is off; the falsy ``NO_ACCOUNT`` when ``sid`` is malformed or
-    names no account (no object, or one without ``sAMAccountName``) under the base DN; the falsy ``UNREACHABLE`` when the directory cannot
-    answer or several objects match. Never raises.
+    names no account (no object, one without ``sAMAccountName``, or one whose returned
+    ``objectSid`` is not ``sid``) under the base DN; the falsy ``UNREACHABLE`` when the
+    directory cannot answer or several objects match. Never raises.
     """
     from ldap3.utils.conv import escape_bytes
 
