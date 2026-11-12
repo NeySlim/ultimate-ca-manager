@@ -18,7 +18,7 @@ from models.policy import ApprovalRequest, CertificatePolicy
 from services.policy_service import PolicyEvaluationService, PolicyViolation
 from tests.conftest import get_json
 from utils import key_algorithms
-from tests.fixtures.templates import templates_created_here_removed
+from tests.fixtures.templates import delete_templates, templates_created_here_removed
 
 
 @pytest.fixture(autouse=True, scope='module')
@@ -47,10 +47,14 @@ def _policy(auth_client, name, rules, ca_id=None):
 
 def _drop(app, model, *ids):
     with app.app_context():
-        for row_id in ids:
-            row = db.session.get(model, row_id)
-            if row is not None:
-                db.session.delete(row)
+        if model is CertificateTemplate:
+            # What points to a template lets go first: SQLite hands the id to the next one
+            delete_templates(ids)
+        else:
+            for row_id in ids:
+                row = db.session.get(model, row_id)
+                if row is not None:
+                    db.session.delete(row)
         db.session.commit()
 
 
