@@ -259,10 +259,14 @@ def _2x_archive(app, settings, base_dn='DC=c01,DC=example', connector_enabled=Tr
             row.pop('windows_profile_id_ref', None)
         payload.pop('windows_enrollment_profiles', None)
         payload.pop('windows_profile_templates', None)
-        # What 2.x announced: the counts of its own sections, no digests of these
+        # What 2.x announced: the counts of its own sections, no digests of these, and
+        # none of the sections it did not know among those it left out
         payload['metadata'].pop('section_digests', None)
         payload['metadata']['sections'] = {name: len(rows) for name, rows in payload.items()
                                            if name in manifest.SECTIONS and isinstance(rows, (list, dict))}
+        payload['metadata']['excluded_sections'] = [
+            name for name in payload['metadata'].get('excluded_sections') or []
+            if name not in ('windows_enrollment_profiles', 'windows_profile_templates')]
     return as_v3(blob, BACKUP_PASSWORD, edit=as_2x), connector_row
 
 
@@ -643,3 +647,58 @@ def test_the_node_that_loses_the_race_writes_its_keytab_file(app, clean_slate, n
     assert path.read_bytes() == TARGET_KEYTAB
     with app.app_context():
         assert _default().keytab_bytes() == TARGET_KEYTAB
+
+
+def _restore(app, archive, mode='merge'):
+    from services.backup_service import BackupService
+    try:
+        with app.app_context():
+            return BackupService().restore_backup(archive, BACKUP_PASSWORD, mode=mode)
+    finally:
+        with app.app_context():
+            Certificate.query.filter_by(refid='c01-wstep-cert').delete()
+            db.session.commit()
+
+
+def test_a_2x_archive_with_only_kerberos_gets_the_profile_the_migration_makes(app, clean_slate):
+    """One criterion on both sides: an SPN alone was a Windows configuration to carry."""
+    settings = {'kerberos_enabled': 'true', 'kerberos_spn': 'HTTP/ucm.c01.example@C01.EXAMPLE'}
+    archive, _connector = _2x_archive(app, settings)
+    _restore(app, archive)
+    with app.app_context():
+        restored = _default()
+        assert restored is not None
+        restored = _columns(restored)
+        WindowsEnrollmentProfile.query.filter_by(is_default=True).delete()
+        for key, value in settings.items():
+            _set(key, value)
+        db.session.commit()
+        _migrate_app_db()
+        assert _columns(_default()) == restored
+    assert restored['realm'] == 'C01.EXAMPLE' and restored['enabled']
+
+
+def test_a_30_archive_without_the_profiles_section_creates_none(app, clean_slate):
+    from services.backup_service import BackupService
+    with app.app_context():
+        _set('kerberos_spn', 'HTTP/ucm.c01.example@C01.EXAMPLE')
+        db.session.commit()
+        include = {name: name == 'configuration' for name in manifest.SECTIONS}
+        blob = BackupService().create_backup(BACKUP_PASSWORD, include=include)
+    _restore(app, blob)
+    with app.app_context():
+        assert _default() is None
+
+
+def test_a_converted_realm_the_keytab_here_lacks_is_reported(app, clean_slate, two_cas):
+    from tests.test_windows_profile_migration import ONE_REALM
+    issuing, policy, _template = two_cas
+    with app.app_context():
+        # This installation's keytab, kept by the profile that the restore converts again
+        profile = WindowsEnrollmentProfile(name='default', is_default=True)
+        profile.set_keytab(ONE_REALM)
+        db.session.add(profile)
+        db.session.commit()
+    archive, _connector = _2x_archive(app, _settings_2x(issuing, policy))
+    results = _restore(app, archive)
+    assert any('C01.EXAMPLE' in w and 'EXAMPLE.TEST' in w for w in results['warnings']), results['warnings']

@@ -9,7 +9,8 @@ import base64
 import logging
 from typing import Any, Dict, Optional
 
-from services.windows_profiles.legacy import MIGRATED_KEYS, connector_names, profile_from_2x, switches_from_2x
+from services.windows_profiles.legacy import (MIGRATED_KEYS, connector_names, keytab_realms, profile_from_2x,
+                                              switches_from_2x)
 
 from ..export_generic import REFERENCE_SUFFIX
 
@@ -43,8 +44,18 @@ def _name_connectors(backup_data) -> list:
     return sorted(rows, key=lambda r: r['id'] if isinstance(r.get('id'), int) else 0)
 
 
-def upgrade_archived_windows_profiles(backup_data) -> Optional[Dict[str, Any]]:
-    """Convert a 2.x archive in place; returns the profile row written, None for a 3.0 archive."""
+def _from_30(backup_data) -> bool:
+    """A 3.0 archive carries the profiles' section, or names it among those it left out."""
+    if PROFILES in backup_data:
+        return True
+    metadata = backup_data.get('metadata') if 'metadata' in backup_data else None
+    excluded = metadata.get('excluded_sections') if isinstance(metadata, dict) else None
+    return isinstance(excluded, list) and PROFILES in excluded
+
+
+def upgrade_archived_windows_profiles(backup_data, warnings=None) -> Optional[Dict[str, Any]]:
+    """Convert a 2.x archive in place; returns the profile row written, None for a 3.0 archive.
+    What the operator must know is appended to *warnings*."""
     connectors = _name_connectors(backup_data)
     configuration = backup_data.get('configuration') if 'configuration' in backup_data else None
     settings = configuration.get('settings') if isinstance(configuration, dict) else None
@@ -54,7 +65,7 @@ def upgrade_archived_windows_profiles(backup_data) -> Optional[Dict[str, Any]]:
     if isinstance(configuration.get('encrypted_settings'), list):
         configuration['encrypted_settings'] = [k for k in configuration['encrypted_settings']
                                                if k not in MIGRATED_KEYS]
-    if not migrated or PROFILES in backup_data:
+    if _from_30(backup_data):
         return None
     first = connectors[0] if connectors else None
     connector = ({'id': first.get('id'), 'enabled': bool(first.get('enabled')),
@@ -64,6 +75,13 @@ def upgrade_archived_windows_profiles(backup_data) -> Optional[Dict[str, Any]]:
     profile = profile_from_2x({**settings, **migrated}, connector, keytab)
     if profile is None:
         return None
+    realms = keytab_realms(keytab) if keytab else None
+    if keytab and profile['realm'] and profile['realm'] not in (realms or ()):
+        message = (f"windows_enrollment_profiles: the realm {profile['realm']} of the default profile "
+                   f"is not in this installation's keytab ({', '.join(sorted(realms or ())) or 'unreadable'}): "
+                   "Kerberos clients of that realm fail until a keytab for it is uploaded")
+        if warnings is not None:
+            warnings.append(message)
     row = dict(profile, keytab=base64.b64encode(keytab).decode('ascii') if keytab else None)
     row[f'connector_id{REFERENCE_SUFFIX}'] = {'name': first['name']} if first else None
     backup_data[PROFILES] = [row]

@@ -330,7 +330,8 @@ class RestoreCoreMixin:
         self._check_payload_schema(backup_data)
         self._check_serial_duplicates(backup_data)
         upgrade_archived_permissions(backup_data)
-        upgrade_archived_windows_profiles(backup_data)
+        windows_warnings: List[str] = []
+        upgrade_archived_windows_profiles(backup_data, windows_warnings)
         if mode not in ('replace', 'merge'):
             raise BackupSchemaError(
                 f"Unknown restore mode {mode!r}: use 'replace' (the archive "
@@ -412,7 +413,7 @@ class RestoreCoreMixin:
         # Orders this installation moved on with: kept in a merge, named in a replacement
         order_warnings = keep_newer_orders(backup_data, mode)
         plan = RestorePlan.build(backup_data, pruned=pruned)
-        plan.warnings.extend(order_warnings)
+        plan.warnings.extend(order_warnings + windows_warnings)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
         built_with = len(plan.warnings)
