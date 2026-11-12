@@ -39,9 +39,10 @@ connected_clients: Dict[str, Dict[str, Any]] = {}
 
 # True once init_websocket gave SocketIO a message queue: it carries every process's events
 _queue_in_use = False
-# Scheduler process without a message queue: its events go to the web workers through the
-# database (services.ws_relay) instead of a SocketIO server no browser is connected to
+# Without a message queue: events go to the other processes through the database
+# (services.ws_relay); the scheduler process emits nowhere else, an HA web worker also here
 _relay_publisher = None
+_relay_emits_here = False
 
 _QUEUE_SCHEMES = ("redis", "rediss", "unix")
 _KEEPALIVE_OPTIONS = {
@@ -202,10 +203,11 @@ def message_queue_in_use() -> bool:
     return _queue_in_use
 
 
-def relay_through(publisher):
-    """Route this process's events to ``publisher`` (None: emit them here again)."""
-    global _relay_publisher
+def relay_through(publisher, emit_here=False):
+    """Route this process's events to ``publisher`` (None: emit them here again only)."""
+    global _relay_publisher, _relay_emits_here
     _relay_publisher = publisher
+    _relay_emits_here = bool(emit_here) and publisher is not None
 
 
 # ================== Identity and rooms ==================
@@ -463,7 +465,9 @@ def emit_event(event_type, data, room=None, include_self=True):
     publisher = _relay_publisher
     if publisher is not None:
         publisher.publish(room, payload)  # queues only, never raises
-        return
+        if not _relay_emits_here:
+            return
+    # The skipped sid, if any, is a socket of this process: the relayed copies need no option
     options = {'to': room}
     if not include_self and _calling_sid():
         options['skip_sid'] = _calling_sid()

@@ -550,6 +550,7 @@ MASTER_KEY_COLUMNS = (
     ('models.scep', 'ScepProfile', 'challenge_password', 'text'),
     ('models.sso', 'SSOProvider', 'ldap_bind_password', 'text'),
     ('models.acme_models', 'AcmeClientOrder', '_pending_key', 'b64'),
+    ('models.shared_file', 'SharedFile', 'content', 'b64'),
 )
 # SystemConfig values stored under the master key, as fnmatch patterns
 MASTER_KEY_CONFIG_KEYS = (
@@ -577,7 +578,8 @@ def master_key_values():
             query = query.filter(column.isnot(None), column != '')
         for row in query.all():
             if getattr(row, attribute):
-                label = getattr(row, 'refid', None) or row.id
+                # SharedFile is keyed by its name, with no id column
+                label = getattr(row, 'refid', None) or getattr(row, 'id', None) or row.name
                 yield f"{name} {label}", row, attribute, fmt
 
     for row in SystemConfig.query.filter(SystemConfig.key.like('acme.%')).all():

@@ -11,12 +11,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
+- **HA packaging.** The Helm chart takes `ha.enabled` (rolling update, PodDisruptionBudget, shared `KEY_ENCRYPTION_KEY`), `docker-compose.ha.yml` starts two nodes behind a balancer, the image entrypoint skips SQLite in HA mode, and `docs/HA.md` documents the deployments.
+
 - Inspector: the detail of a certificate, CA, trusted certificate or user certificate opens in a tabbed dock at the bottom or right of the window (full screen on mobile), many objects at a time, instead of floating windows; its position and size follow the user and an invalid value is refused with a 400.
 - Top bar: a theme menu and a notification bell fed by the dashboard queue and the audit log (read marks saved per user); after sign-in you return to the page that asked for it, and a server rate limit is shown on the login page.
 - SSO: an OAuth2/OIDC or SAML sign-in also returns to the page that asked for it; the server keeps that page with the login (never sent to the IdP), uses it once and checks it again (migration 145).
 - Sessions: on PostgreSQL without Redis, server-side sessions are stored in the database (migration 138) so a session opened on one node is valid on the others; expired rows are purged by the scheduler and every row is deleted after a restore.
 - HA preview: `UCM_HA=1` enables an HA preview: the node requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, refuses operations that only change the local host, and reports `ha`, `node_id` and `leader` in `/health`. Full high availability arrives in later releases. The Helm chart now probes readiness on `/health/ready` (503 in safe mode only with `UCM_HA=1`) and liveness on `/health/live`.
 - HA preview: one node runs the scheduled tasks, elected by a PostgreSQL advisory lock and replaced within seconds when its connection drops, or about a minute after its host vanishes; nodes heartbeat in `cluster_nodes` (reported under `cluster` in `/health`), "run now" works from any node, and startup migrations run on one node at a time (migration 141).
+- HA preview: without Redis, a real-time event raised on any node now reaches the browsers connected to every node, once each; on PostgreSQL a `LISTEN`/`NOTIFY` wake-up delivers it within a second instead of up to 2 s.
 - HA preview: rate limits, syslog forwarding and the admin allowlist changed on one node take effect on every node within seconds, without a restart, and a service restart (including the one mTLS and WSTEP changes ask for) restarts the nodes one at a time, containers included (migration 143). `/health` reports the answering node's `command_seen`; `GET /api/v2/system/service/status` lists every node.
 - Dashboard: `GET /api/v2/dashboard/queue`, `/health`, `/compliance` and `/issuance` (scope `read:dashboard`, now held by every built-in role and grantable to groups) return the work queue, per-protocol health, compliance counters and issuances and in-place renewals per CA, computed in SQL without parsing certificates. A repeated `kind` parameter restricts the queue items to those kinds. Certificates gain `key_bits` and `sig_hash` columns, backfilled by migration 139.
 - Overview: the home page is now six independent cards (work queue, automation health, hierarchy, expiry horizon, compliance, latest operations) with layout presets saved per user; each compliance counter and renewal kind opens the certificate list filtered to exactly what it counts, shown as removable chips. The list accepts the matching filters and refuses an invalid filter value with 400.
@@ -24,11 +27,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - HA preview: enabling, disabling and rotating encryption work from any node and reach the others within seconds; a node whose key-encryption key fingerprint differs from a live peer's refuses to start (migration 154).
 
 - Renewal: a deploy binding or the HTTPS binding that an EST, SCEP or WSTEP renewal leaves on the previous certificate (no key in UCM) is now flagged in the API (`needs_attention`, migration 151), the bell, the overview queue and a `certificate.binding_left_behind` event; it can be reattached once UCM holds the key, and importing that key moves it.
+- HA preview: the HTTPS certificate can be applied or regenerated on any node and a renewal of the bound one follows: every node writes the certificate and key from the database before its TLS socket opens, then the nodes restart one at a time. An uploaded Kerberos keytab is stored in the database and written on every node (migration 152).
 
 ### Changed
 
 - In-app help is now maintained in English, French and Chinese only; the other interface languages show the English help with a notice.
 - Console: the sidebar gives way to the Atelier shell, a horizontal bar with a Modules menu (four groups, keyboard navigable), three pinnable modules kept in your preferences, a status bar fed by `/health` and a module picker on phones; the account menu now carries theme, language and sign out.
+- Console: the code, styles and tests of the pre-Atelier interface (old sidebar, grid dashboard, floating detail windows, light-theme legacy styles) are removed.
 - Dashboard: `GET /api/v2/dashboard/activity` answers 500 on a database error instead of an empty list, so the activity card tells an outage from no activity.
 - Encryption: disabling it while `KEY_ENCRYPTION_KEY` is set now succeeds and leaves the variable configured but unused, where it answered 409.
 - Configuration: the new `UCM_CONFIG_DIR` variable (default `/etc/ucm`) moves the directory from which `ucm.env` and `master.key` are read and where the master key is created.
@@ -40,6 +45,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- HA preview: a scheduled report or scheduled backup run twice during a leader change is sent or written once, and two nodes serving orders that share one upstream ACME proxy challenge start its dns-01 automation once. `GET /api/v2/settings/backup/schedule` reports `in_progress` while a scheduled backup is still being written.
 - Certificates: lifting a hold now emits `certificate.unheld` (webhooks, WebSocket) and lifts the hold of the other member of a related pair too, unless `unhold_related` is `false`, reporting it as `related_unheld`; a body that is not a JSON object is refused (400 or 415), and a pair on one CA gets a single delta CRL.
 - Import: an imported CA now announces `ca.created` and `ca.updated`, and a submitted CSR carries the acting user in `csr.submitted`.
 - Events: uploaded and imported CSRs emit `csr.submitted`, a CA signed from a CSR emits `ca.created`, an OCSP responder or EST key generator renewal emits its issued or renewed event, and approving a pending Microsoft CA request announces the certificate it imports.

@@ -7,13 +7,13 @@ test.describe('Dashboard', () => {
   })
 
   test('page loads without error', async ({ page }) => {
-    // Dashboard uses react-grid-layout with widget cards, no h1
-    await expect(page.locator('.react-grid-layout, [class*="grid"], [class*="dashboard"]').first()).toBeVisible({ timeout: 10000 })
+    // The overview is the landing page: the shell and its main area render
+    await expect(page.locator('.shell-main').first()).toBeVisible({ timeout: 10000 })
   })
 
   test('has widget cards', async ({ page }) => {
-    // Widget cards are present in the grid layout
-    const widgets = page.locator('.react-grid-item, [class*="widget"], [class*="card"]')
+    // Overview cards are present
+    const widgets = page.locator('[class*="card"]')
     await expect(widgets.first()).toBeVisible({ timeout: 10000 })
     expect(await widgets.count()).toBeGreaterThan(0)
   })
@@ -25,7 +25,6 @@ test.describe('Dashboard', () => {
   })
 
   test('has quick-create buttons', async ({ page }) => {
-    // Dashboard has quick action buttons
     const buttons = page.locator('button')
     expect(await buttons.count()).toBeGreaterThan(2)
   })

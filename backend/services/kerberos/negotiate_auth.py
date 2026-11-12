@@ -187,6 +187,57 @@ def sync_keytab_file(raw_bytes):
         raise
 
 
+def write_stored_keytab():
+    """``KEYTAB_PATH`` holds the keytab stored in the database, or is removed when none is.
+
+    Returns 'written', 'unchanged', 'removed' or None (nothing stored, no file).
+    Raises ValueError when the stored keytab cannot be decrypted on this node.
+    """
+    from services import shared_files
+    data = shared_files.read_file(shared_files.KERBEROS_KEYTAB)
+    if data is None:
+        if KEYTAB_PATH.exists():
+            KEYTAB_PATH.unlink()
+            return 'removed'
+        return None
+    try:
+        if KEYTAB_PATH.read_bytes() == data:
+            return 'unchanged'
+    except FileNotFoundError:
+        pass
+    sync_keytab_file(data)
+    return 'written'
+
+
+def restore_keytab_at_start(app):
+    """Startup: the stored keytab is written to disk; a single node's file from before
+    the keytab was stored is stored once. Never raises."""
+    from models import SharedFile, db
+    from services import shared_files
+    from utils.ha import ha_enabled
+    with app.app_context():
+        try:
+            if db.session.get(SharedFile, shared_files.KERBEROS_KEYTAB) is not None:
+                if write_stored_keytab() == 'written':
+                    logger.info("Kerberos keytab written from the database")
+                return
+            if not KEYTAB_PATH.exists():
+                return
+            if ha_enabled():
+                # Two nodes may hold different files: the operator uploads the right one
+                logger.warning("Kerberos keytab found on this node only: upload it again "
+                               "to serve it from every node")
+                return
+            shared_files.store_file(shared_files.KERBEROS_KEYTAB, KEYTAB_PATH.read_bytes(), actor='system')
+            db.session.commit()
+            logger.info("Kerberos keytab stored in the database")
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Kerberos keytab not restored from the database: {type(e).__name__}: {e}")
+        finally:
+            db.session.remove()
+
+
 def inspect_keytab(path=None):
     """Parse the keytab at ``path`` (default ``KEYTAB_PATH``) via GSSAPI's
     own keytab-loading code, the same mechanism the real acceptor uses at

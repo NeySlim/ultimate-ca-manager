@@ -54,6 +54,7 @@ validate_fqdn() {
 # DNS UPDATE (RFC 2136) listener port check
 . "$(dirname "${BASH_SOURCE[0]}")/dns-update-port.sh"
 . "$(dirname "${BASH_SOURCE[0]}")/ha-secret.sh"
+. "$(dirname "${BASH_SOURCE[0]}")/ha-database.sh"
 
 # =============================================================================
 # FIPS MODE (UCM_FIPS=1): module configuration written at every start
@@ -172,7 +173,7 @@ check_ha_secret || exit 1
 : "${UCM_SECRET_KEY:=$(generate_secret)}"
 
 # Database
-: "${UCM_DATABASE_PATH:="/opt/ucm/data/ucm.db"}"
+: "${UCM_DATABASE_PATH:="/opt/ucm/data/ucm.db"}"  # unused and not exported in HA mode
 # Copy of the SQLite database taken by this script before each start
 : "${UCM_BACKUP_ENABLED:=true}"
 : "${UCM_BACKUP_RETENTION_DAYS:=30}"
@@ -324,7 +325,7 @@ LOG_LEVEL=${UCM_LOG_LEVEL}
 SECRET_KEY=${UCM_SECRET_KEY}
 
 # Database
-DATABASE_PATH=${UCM_DATABASE_PATH}
+$(ucm_env_database_line)
 
 # Initial Admin User (used on first run)
 INITIAL_ADMIN_USERNAME=${UCM_INITIAL_ADMIN_USERNAME}
@@ -426,28 +427,7 @@ fi
 
 echo -e "${BLUE}💾 Checking database...${NC}"
 
-if [ ! -f "$UCM_DATABASE_PATH" ]; then
-    echo -e "${YELLOW}   First run detected - database will be auto-created${NC}"
-    echo -e "${CYAN}   Default credentials:${NC}"
-    echo "   • Username: admin"
-    echo "   • Password: changeme123"
-    echo -e "   ${RED}⚠️  CHANGE THIS PASSWORD IMMEDIATELY!${NC}"
-else
-    echo -e "${GREEN}✅ Database exists${NC}"
-    
-    # Database backup if enabled
-    if [ "$UCM_BACKUP_ENABLED" = "true" ]; then
-        BACKUP_DIR="/opt/ucm/data/backups"
-        BACKUP_FILE="$BACKUP_DIR/ucm-backup-$(date +%Y%m%d-%H%M%S).db"
-        
-        # Create backup
-        cp "$UCM_DATABASE_PATH" "$BACKUP_FILE"
-        echo -e "${GREEN}✅ Database backup created${NC}"
-        
-        # Clean old backups
-        find "$BACKUP_DIR" -name "ucm-backup-*.db" -mtime "+$UCM_BACKUP_RETENTION_DAYS" -delete 2>/dev/null || true
-    fi
-fi
+ucm_sqlite_check_and_backup
 
 # =============================================================================
 # DISPLAY CONFIGURATION SUMMARY
@@ -464,7 +444,7 @@ echo "   • HTTPS Port:  ${UCM_HTTPS_PORT}"
 echo "   • HTTP Port:   ${UCM_HTTP_PORT}"
 echo ""
 echo -e "${GREEN}💾 Storage:${NC}"
-echo "   • Database:    ${UCM_DATABASE_PATH}"
+echo "   • Database:    $(ucm_database_label)"
 echo "   • Data Dir:    /opt/ucm/data"
 echo "   • Backup:      ${UCM_BACKUP_ENABLED}"
 echo ""
@@ -489,7 +469,7 @@ export HTTP_PORT="${UCM_HTTP_PORT}"
 export DEBUG="${UCM_DEBUG}"
 export LOG_LEVEL="${UCM_LOG_LEVEL}"
 export SECRET_KEY="${UCM_SECRET_KEY}"
-export DATABASE_PATH="${UCM_DATABASE_PATH}"
+ucm_export_database_path
 export INITIAL_ADMIN_USERNAME="${UCM_INITIAL_ADMIN_USERNAME}"
 export INITIAL_ADMIN_EMAIL="${UCM_INITIAL_ADMIN_EMAIL}"
 export INITIAL_ADMIN_PASSWORD="${UCM_INITIAL_ADMIN_PASSWORD}"

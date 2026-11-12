@@ -1,4 +1,4 @@
-{{- if .Values.persistence.enabled }}
+{{- if and .Values.persistence.enabled (not .Values.ha.enabled) }}
 {{- if not .Values.persistence.data.existingClaim }}
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -6,6 +6,9 @@ metadata:
   name: {{ include "ucm.dataPvcName" . }}
   labels:
     {{- include "ucm.labels" . | nindent 4 }}
+  annotations:
+    # Switching to ha.enabled stops rendering this claim; keep it (SoftHSM tokens, uploads, backups).
+    "helm.sh/resource-policy": keep
 spec:
   accessModes:
     - {{ .Values.persistence.data.accessMode }}

@@ -1,0 +1,195 @@
+---
+# Source: ucm/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: t-ucm
+  labels:
+    helm.sh/chart: @CHART@
+    app.kubernetes.io/name: ucm
+    app.kubernetes.io/instance: t
+    app.kubernetes.io/version: "@APP@"
+    app.kubernetes.io/managed-by: Helm
+---
+# Source: ucm/templates/secret.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: t-ucm-secrets
+  labels:
+    helm.sh/chart: @CHART@
+    app.kubernetes.io/name: ucm
+    app.kubernetes.io/instance: t
+    app.kubernetes.io/version: "@APP@"
+    app.kubernetes.io/managed-by: Helm
+type: Opaque
+stringData:
+  UCM_SECRET_KEY: "k"
+---
+# Source: ucm/templates/pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: t-ucm-data
+  labels:
+    helm.sh/chart: @CHART@
+    app.kubernetes.io/name: ucm
+    app.kubernetes.io/instance: t
+    app.kubernetes.io/version: "@APP@"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    # Switching to ha.enabled stops rendering this claim; keep it (SoftHSM tokens, uploads, backups).
+    "helm.sh/resource-policy": keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: "5Gi"
+---
+# Source: ucm/templates/pvc.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: t-ucm-etc
+  labels:
+    helm.sh/chart: @CHART@
+    app.kubernetes.io/name: ucm
+    app.kubernetes.io/instance: t
+    app.kubernetes.io/version: "@APP@"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    # /etc/ucm holds master.key — deleting this PVC makes every encrypted
+    # private key in the database unrecoverable. Keep it.
+    "helm.sh/resource-policy": keep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: "64Mi"
+---
+# Source: ucm/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: t-ucm
+  labels:
+    helm.sh/chart: @CHART@
+    app.kubernetes.io/name: ucm
+    app.kubernetes.io/instance: t
+    app.kubernetes.io/version: "@APP@"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - name: https
+      port: 8443
+      targetPort: https
+      protocol: TCP
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: ucm
+    app.kubernetes.io/instance: t
+---
+# Source: ucm/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: t-ucm
+  labels:
+    helm.sh/chart: @CHART@
+    app.kubernetes.io/name: ucm
+    app.kubernetes.io/instance: t
+    app.kubernetes.io/version: "@APP@"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  # Single instance: SQLite + the per-pod scheduler are not HA-safe, and the
+  # RWO volumes cannot be mounted by two pods at once.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: ucm
+      app.kubernetes.io/instance: t
+  template:
+    metadata:
+      annotations:
+        checksum/secret: @SUM@
+      labels:
+        app.kubernetes.io/name: ucm
+        app.kubernetes.io/instance: t
+    spec:
+      serviceAccountName: t-ucm
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ucm
+          image: "neyslim/ultimate-ca-manager:@APP@"
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+          ports:
+            - name: https
+              containerPort: 8443
+              protocol: TCP
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: UCM_FQDN
+              value: "ucm.local"
+            - name: UCM_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: t-ucm-secrets
+                  key: UCM_SECRET_KEY
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 40
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: https
+              scheme: HTTPS
+            initialDelaySeconds: 20
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+          resources:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: 100m
+              memory: 512Mi
+          volumeMounts:
+            - name: data
+              mountPath: /opt/ucm/data
+            - name: etc
+              mountPath: /etc/ucm
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: t-ucm-data
+        - name: etc
+          persistentVolumeClaim:
+            claimName: t-ucm-etc

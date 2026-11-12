@@ -30,10 +30,6 @@ vi.mock('../../contexts', () => ({
     openEntity: vi.fn(),closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
   }),
-  useWindowManager: () => ({
-    openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
-    prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
-  }),
 }))
 
 vi.mock('../../hooks', () => ({

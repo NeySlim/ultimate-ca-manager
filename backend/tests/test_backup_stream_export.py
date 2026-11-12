@@ -73,10 +73,9 @@ def test_the_scheduled_backup_streams_too(app, small_chunks, monkeypatch):
     monkeypatch.setattr(storage, 'export_archive',
                         lambda service, password, **kwargs: calls.append(kwargs)
                         or (7, small_chunks / 'x.ucmbkp', 'x.ucmbkp'))
-    # The run marks itself attempted: put the mark back for the files after this one
-    monkeypatch.setitem(schedule._LAST_ATTEMPT, 'at', schedule._LAST_ATTEMPT.get('at'))
+    # The run reserves its slot in backup.last_run: left untouched for the files after this one
+    monkeypatch.setattr(schedule, '_claim_run', lambda previous, now: 'claimed')
     monkeypatch.setattr(schedule, '_apply_retention', lambda days: 0)
-    monkeypatch.setattr(schedule, '_record_last_run', lambda now: None)
     monkeypatch.setattr(schedule, '_record_outcome', lambda *args: None)
     monkeypatch.setattr(schedule, '_audit_scheduled_backup', lambda *args, **kwargs: None)
     with app.app_context():

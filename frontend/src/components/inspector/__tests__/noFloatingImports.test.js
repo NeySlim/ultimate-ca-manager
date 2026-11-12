@@ -1,10 +1,9 @@
 /**
- * The detail-window modules are no longer imported by the application: the
- * inspector replaced them. Their files stay until A-08 deletes them.
- * ui/FloatingWindow and useFloatingWindow are not in that set: the help panel
- * and the email template editor still use them.
+ * The pre-Atelier interface is gone: its files must not exist and nothing may
+ * import them. ui/FloatingWindow and useFloatingWindow are not in that set:
+ * the help panel and the email template editor still use them.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -13,6 +12,9 @@ const LEGACY = {
   'components/FloatingDetailWindow.jsx': /\bFloatingDetailWindow\b/,
   'components/DetailWindowLayer.jsx': /\bDetailWindowLayer\b/,
   'contexts/WindowManagerContext.jsx': /\bWindowManagerContext\b|\buseWindowManager\b|\bWindowManagerProvider\b/,
+  'components/Sidebar.jsx': /\/Sidebar['"]/,
+  'components/DashboardChart.jsx': /\bDashboardChart\b/,
+  'pages/DashboardPage.jsx': /\bDashboardPage\b/,
 }
 
 function sources(dir, out = []) {
@@ -75,32 +77,28 @@ describe('live module walk', () => {
   })
 })
 
-describe('legacy detail windows', () => {
+describe('legacy interface', () => {
   const files = sources(SRC).map((p) => [relative(SRC, p), readFileSync(p, 'utf8')])
 
-  it.each(Object.entries(LEGACY))('%s is imported by no live module', (legacy, pattern) => {
+  it.each(Object.keys(LEGACY))('%s no longer exists', (legacy) => {
+    expect(existsSync(join(SRC, legacy))).toBe(false)
+  })
+
+  it.each(Object.entries(LEGACY))('%s is imported by nothing', (legacy, pattern) => {
     const users = files
-      .filter(([rel]) => !Object.keys(LEGACY).includes(rel))
       .filter(([, text]) => importStatements(text).some((st) => pattern.test(st)))
       .map(([rel]) => rel)
     expect(users).toEqual([])
   })
 
-  // Live = reached from the entry point through relative imports (barrels included),
-  // never through a legacy module
-  const live = liveModules(files, Object.keys(LEGACY))
+  const live = liveModules(files, [])
   const importersOf = (target) => {
     const name = target.split('/').pop().replace(/\.jsx?$/, '')
     return files
-      .filter(([rel]) => !Object.keys(LEGACY).includes(rel) && rel !== target)
+      .filter(([rel]) => rel !== target)
       .filter(([, text]) => importStatements(text).some((st) => new RegExp(`/${name}['"]`).test(st)))
       .map(([rel]) => rel)
   }
-
-  it('tells a live module from one only a dead module imports', () => {
-    expect(live.has('main.jsx')).toBe(true)
-    expect(live.has('components/DetailWindowLayer.jsx')).toBe(false)
-  })
 
   it.each(['ui/FloatingWindow.jsx', 'hooks/useFloatingWindow.js'])(
     'keeps %s out of the legacy set while a live module imports it', (shared) => {

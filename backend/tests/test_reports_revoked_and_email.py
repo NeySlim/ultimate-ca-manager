@@ -103,6 +103,7 @@ def schedules(app):
     with app.app_context():
         for key in keys:
             SystemConfig.query.filter_by(key=f'report_schedule_{key}').delete()
+            SystemConfig.query.filter_by(key=f'report_last_sent_{key}').delete()
         db.session.commit()
 
 

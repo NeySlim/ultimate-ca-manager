@@ -234,7 +234,6 @@ class TestScheduledBackupKdf:
         from services.backup import schedule
         from utils.encryption import encrypt_if_needed
         monkeypatch.setattr(Config, 'BACKUP_DIR', tmp_path, raising=False)
-        monkeypatch.setattr(schedule, '_LAST_ATTEMPT', {'at': None})
         with app.app_context():
             try:
                 _set('auto_backup_enabled', 'true')
@@ -252,7 +251,6 @@ class TestScheduledBackupKdf:
         from services.backup import schedule
         from utils.encryption import encrypt_if_needed
         monkeypatch.setattr(Config, 'BACKUP_DIR', tmp_path, raising=False)
-        monkeypatch.setattr(schedule, '_LAST_ATTEMPT', {'at': None})
         monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
         with app.app_context():
             try:

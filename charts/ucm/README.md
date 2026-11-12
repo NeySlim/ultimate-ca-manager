@@ -41,7 +41,10 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `image.repository` | `neyslim/ultimate-ca-manager` | Image repo |
 | `image.tag` | `""` (→ chart `appVersion`) | Image tag |
 | `replicaCount` | `1` | Keep at 1 (see above) |
-| `extraEnv` `UCM_HA` / `UCM_NODE_ID` | unset | `UCM_HA=1`: HA mode in preview: refuses host-local operations; full high availability arrives in later releases. Needs `database.type=postgresql` and `KEY_ENCRYPTION_KEY`; the secret key must be identical across replicas, which the chart guarantees (one generated Secret shared by the pods). `UCM_NODE_ID` defaults to the pod name |
+| `ha.enabled` | `false` | Several nodes on one PostgreSQL (`UCM_HA=1`). Needs `database.type=postgresql` and `replicaCount` >= 2, or the render fails. Adds a PodDisruptionBudget, a preferred pod anti-affinity, a rolling update, `UCM_NODE_ID` (pod name) and a shared `KEY_ENCRYPTION_KEY`; no etc PVC. See `docs/HA.md` |
+| `ha.podDisruptionBudget.minAvailable` | `1` | Pods kept available during voluntary disruptions |
+| `redis.url` | `""` | Redis shared by the nodes (`REDIS_URL`, HA only) |
+| `secrets.keyEncryptionKey` | `""` | `KEY_ENCRYPTION_KEY`; generated once and kept when empty (HA only) |
 | `fqdn` | `ucm.local` | FQDN for the self-signed UI cert / default AIA-CRL-OCSP base URL |
 | `initialAdminPassword` | `""` (→ image default `changeme123`) | First-boot admin password |
 | `secrets.secretKey` | `""` (auto-generated + persisted) | Flask session secret |

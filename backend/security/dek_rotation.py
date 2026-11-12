@@ -169,7 +169,8 @@ def rewrite(batch=None, commit=True) -> dict:
     unreadable = []
     for model, column, fmt, unwrap, wrap in _columns():
         table = model.__table__
-        pk, stored_column = table.c.id, column.property.columns[0]
+        # SharedFile is keyed by its name: the primary key, not an id column
+        pk, stored_column = list(table.primary_key.columns)[0], column.property.columns[0]
         config = model is SystemConfig
         last = None
         while True:

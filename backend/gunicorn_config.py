@@ -120,7 +120,8 @@ def ssl_context(conf, default_ssl_context_factory):
     return ctx
 
 
-from boot_config import anchor_client_verification, mtls_client_ca, wstep_enabled
+from boot_config import (HttpsMaterialError, anchor_client_verification, materialize_https,
+                         mtls_client_ca, wstep_enabled)
 
 # Drives the TLS 1.2 cap in ssl_context().
 WSTEP_TLS12_CAP_NEEDED = wstep_enabled(data_path)
@@ -205,6 +206,22 @@ def _load_mtls_config():
         _reuse_last_known_mtls()
 
 
+def _materialize_https():
+    """Before the TLS socket opens: the HTTPS pair the database names, on every node."""
+    try:
+        done = materialize_https(data_path, certfile, keyfile)
+    except HttpsMaterialError as e:
+        print(f"HTTPS: {e}; the certificate files on disk are left as they are", file=sys.stderr)
+        return
+    except Exception as e:
+        print(f"HTTPS: certificate not read from the database ({type(e).__name__}: {e}); "
+              "the certificate files on disk are left as they are", file=sys.stderr)
+        return
+    if done:
+        print(f"HTTPS: {done}", file=sys.stderr)
+
+
+_materialize_https()
 _load_mtls_config()
 
 # Logging: stdout in Docker, files in native installs

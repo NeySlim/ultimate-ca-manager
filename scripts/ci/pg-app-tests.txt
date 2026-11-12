@@ -12,6 +12,7 @@ tests/test_revocation*.py
 tests/test_scheduler*.py
 tests/test_cluster_nodes_pg.py
 tests/test_cluster_commands_pg.py
+tests/test_shared_files_pg.py
 tests/test_boot_lock_pg.py
 tests/test_discovery_recovery_ha.py
 tests/test_discovery_timestamps.py
@@ -22,6 +23,7 @@ tests/test_protocol_approval_*.py
 tests/test_approval_legacy_hex_serial.py
 tests/test_serial*.py
 tests/test_scheduled_claims_pg.py
+tests/test_scheduled_run_reservations_pg.py
 tests/test_renewal_concurrency_pg.py
 tests/test_renewal_bindings_follow.py
 tests/test_import_ca_serial_unique.py
@@ -37,6 +39,7 @@ tests/test_migration_148*.py
 tests/test_migration_149*.py
 tests/test_migration_150*.py
 tests/test_migration_151*.py
+tests/test_migration_152*.py
 tests/test_migration_153*.py
 tests/test_encryption_envelope*.py
 tests/test_binding_left_behind.py
