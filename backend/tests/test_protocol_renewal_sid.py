@@ -318,23 +318,30 @@ def test_a_scep_request_gone_before_it_is_closed_answers_404(app):
         assert scep._close_refused(987654321, 'admin', 'gone')[1] == 404
 
 
-@pytest.mark.parametrize('fault', ['no directory server is configured', None])
-def test_an_unresolved_sid_logs_the_connector_fault(app, create_ca, monkeypatch, caplog, fault):
-    """A misconfigured connector says why in the log; a directory that does not answer says no more."""
+@pytest.mark.parametrize('server', ['', 'dc1.hagland.domain'])
+def test_an_unresolved_sid_logs_the_connector_fault(app, create_ca, monkeypatch, caplog, server):
+    """A connector without a server says so in the log; a directory that does not answer says no more."""
     import logging
+    from models import ADConnectorConfig
     from services.ad_connector import renewal_identity
     ca_data = create_ca(cn='SID fault log CA')
     old, _key_ = _issue(app, ca_data['id'], 'sid-fault-log.example.test')
-    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.UNREACHABLE)
-    monkeypatch.setattr(ad_lookup, 'connector_config_fault', lambda: fault)
-    with app.app_context():
-        ca_cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(CA, ca_data['id']).crt))
-        with caplog.at_level(logging.WARNING, logger=renewal_identity.__name__):
-            with pytest.raises(renewal_identity.RenewalIdentityUnresolved):
-                renewal_identity.renewal_requester_sid(old, ca_cert, 'TEST')
+    _configure_ad_connector(app)
+    try:
+        with app.app_context():
+            ADConnectorConfig.get_singleton().server = server
+            db.session.commit()
+            if server:
+                monkeypatch.setattr(ad_lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))
+            ca_cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(CA, ca_data['id']).crt))
+            with caplog.at_level(logging.WARNING, logger=renewal_identity.__name__):
+                with pytest.raises(renewal_identity.RenewalIdentityUnresolved):
+                    renewal_identity.renewal_requester_sid(old, ca_cert, 'TEST')
+    finally:
+        _clear_ad_connector(app)
     logged = [r.getMessage() for r in caplog.records if r.name == renewal_identity.__name__]
     expected = f'TEST: the AD Connector cannot resolve SID {SID} of a renewed certificate'
-    assert logged == [f'{expected}: {fault}' if fault else expected]
+    assert logged == [expected if server else f'{expected}: no server is configured']
 
 
 def test_a_scep_request_decided_before_it_is_closed_answers_400_and_keeps_its_decision(app):
