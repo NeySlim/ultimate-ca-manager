@@ -25,6 +25,7 @@ metadata:
 type: Opaque
 stringData:
   UCM_SECRET_KEY: "k"
+  UCM_INITIAL_ADMIN_PASSWORD: "GENERATED"
 ---
 # Source: ucm/templates/pvc.yaml
 apiVersion: v1
@@ -154,6 +155,11 @@ spec:
                 secretKeyRef:
                   name: t-ucm-secrets
                   key: UCM_SECRET_KEY
+            - name: UCM_INITIAL_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: t-ucm-secrets
+                  key: UCM_INITIAL_ADMIN_PASSWORD
           livenessProbe:
             httpGet:
               path: /health/live

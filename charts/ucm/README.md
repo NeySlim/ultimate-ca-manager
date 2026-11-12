@@ -46,7 +46,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `redis.url` | `""` | Redis shared by the nodes (`REDIS_URL`, HA only) |
 | `secrets.keyEncryptionKey` | `""` | `KEY_ENCRYPTION_KEY`, passed to the pods whenever set or already in the Secret; generated once when empty only with `ha.enabled` |
 | `fqdn` | `ucm.local` | FQDN for the self-signed UI cert / default AIA-CRL-OCSP base URL |
-| `initialAdminPassword` | `""` (→ image default `changeme123`) | First-boot admin password |
+| `initialAdminPassword` | `""` (generated into the Secret, kept across upgrades) | First-boot admin password; read the generated one with `kubectl get secret <fullname>-secrets -o jsonpath='{.data.UCM_INITIAL_ADMIN_PASSWORD}' \| base64 -d` |
 | `secrets.secretKey` | `""` (auto-generated + persisted) | Flask session secret |
 | `database.type` | `sqlite` | `sqlite` or `postgresql` |
 | `database.databaseUrl` | `""` | `postgresql://…` when `type=postgresql` |

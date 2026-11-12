@@ -88,6 +88,7 @@ jobs:
           python3 scripts/smoke_release.py \
             --version "${{ steps.ver.outputs.version }}" \
             ${{ steps.rc.outputs.flag }} \
+            --admin-password changeme123 \
             --target "Docker SQLite=https://localhost:8443"
 
       - name: Container logs on failure
@@ -230,6 +231,7 @@ jobs:
           python3 scripts/smoke_release.py \
             --version "${{ steps.ver.outputs.version }}" \
             ${{ steps.rc.outputs.flag }} \
+            --admin-password changeme123 \
             --target "Docker PostgreSQL=https://localhost:8443"
 
       - name: Container logs on failure
@@ -298,6 +300,7 @@ jobs:
           python3 scripts/smoke_release.py \
             --version "${{ steps.ver.outputs.version }}" \
             ${{ steps.rc.outputs.flag }} \
+            --admin-password changeme123 \
             --target "Docker SQLite FIPS=https://localhost:8443"
 
       - name: Container logs on failure

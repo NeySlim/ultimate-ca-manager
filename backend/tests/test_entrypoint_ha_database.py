@@ -59,3 +59,15 @@ def test_ha_summary_names_postgresql_pos(tmp_path):
 
 def test_dockerfile_ships_the_helper_pos():
     assert 'docker/ha-database.sh /ha-database.sh' in (ROOT / 'Dockerfile').read_text()
+
+
+@pytest.mark.parametrize('provided,expect', [
+    ({}, 'docker exec <container> cat /opt/ucm/data/initial-admin-password'),
+    ({'UCM_INITIAL_ADMIN_PASSWORD': 'Op-Chosen-1!'}, 'the one you provided (INITIAL_ADMIN_PASSWORD)'),
+    ({'UCM_INITIAL_ADMIN_PASSWORD_FILE': '/run/secrets/a'}, 'the one you provided (INITIAL_ADMIN_PASSWORD_FILE)'),
+])
+def test_the_first_run_notice_never_shows_a_password(tmp_path, provided, expect):
+    env = {'UCM_DATABASE_PATH': str(tmp_path / 'absent.db'), 'UCM_INITIAL_ADMIN_USERNAME': 'admin', **provided}
+    r = _run('ucm_sqlite_check_and_backup', env, tmp_path)
+    assert r.returncode == 0 and expect in r.stdout, r.stdout
+    assert 'changeme123' not in r.stdout and 'Op-Chosen-1!' not in r.stdout

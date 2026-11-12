@@ -72,6 +72,8 @@ done
 [ -f "$ENV_FILE" ] || fail "$ENV_FILE missing"
 # shellcheck disable=SC1090
 PORT=$( . "$ENV_FILE" 2>/dev/null; echo "${HTTPS_PORT:-8443}")
+# shellcheck disable=SC1090
+DATA_DIR=${UCM_SMOKE_DATA_DIR:-$( . "$ENV_FILE" 2>/dev/null; echo "${DATA_DIR:-/opt/ucm/data}")}
 
 # Same user, directory, environment file and command as the systemd unit
 chown ucm "$RUN_DIR"
@@ -108,6 +110,40 @@ else
   fi
   SAFE=$(echo "$BODY" | "$HOME_DIR/venv/bin/python" -c "import json,sys; print(bool(json.load(sys.stdin).get('safe_mode')))" 2>/dev/null)
   [ "$SAFE" = True ] && fail "health reports safe_mode: the application started degraded"
+  # No password is installed: the first start generated one, readable by root and ucm only,
+  # absent from every log, forced to change at first login, its file removed by that change
+  grep -Eq '^[[:space:]]*(export[[:space:]]+)?INITIAL_ADMIN_PASSWORD=.' "$ENV_FILE" \
+    && fail "$ENV_FILE carries an initial password"
+  FIRST=$(PWFILE="$DATA_DIR/initial-admin-password" LOGS="$INSTALL_LOG $RUN_DIR/app.log" PORT="$PORT" \
+    "$HOME_DIR/venv/bin/python" -c "
+# initial-admin-password first login
+import json, os, pwd, ssl, stat, urllib.request
+path = os.environ['PWFILE']
+st = os.stat(path)
+if stat.S_IMODE(st.st_mode) != 0o600 or pwd.getpwuid(st.st_uid).pw_name != 'ucm':
+    raise SystemExit('mode or owner of ' + path)
+value = open(path).read().rstrip('\n')
+if any(value in open(f, errors='replace').read() for f in os.environ['LOGS'].split()):
+    raise SystemExit('the generated password is in a log')
+c = ssl._create_unverified_context()
+o = urllib.request.build_opener(urllib.request.HTTPSHandler(context=c), urllib.request.HTTPCookieProcessor())
+base = 'https://127.0.0.1:' + os.environ['PORT'] + '/api/v2'
+def post(p, body, csrf=None):
+    r = urllib.request.Request(base + p, json.dumps(body).encode(), {'Content-Type': 'application/json', **({'X-CSRF-Token': csrf} if csrf else {})})
+    return json.load(o.open(r, timeout=10))
+data = post('/auth/login', {'username': 'admin', 'password': value})['data']
+if not data.get('force_password_change'):
+    raise SystemExit('no forced change')
+post('/account/password', {'new_password': 'Smoke-Changed-Pass-1!'}, data.get('csrf_token'))
+if os.path.exists(path):
+    raise SystemExit('file still there after the change')
+print('first-login-ok')
+" 2>&1)
+  if [ "$FIRST" = first-login-ok ]; then
+    ok "generated password: file, forced change, removal"
+  else
+    fail "first login with the generated password: $(echo "$FIRST" | tail -n 1)"
+  fi
 fi
 
 # Clean stop: TERM the process, it must exit within 35s

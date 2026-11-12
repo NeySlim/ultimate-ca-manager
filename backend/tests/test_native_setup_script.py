@@ -83,9 +83,28 @@ def test_a_file_written_before_the_install_gets_secrets_and_defaults(tmp_path):
     assert values['DATABASE_PATH'] == ['/opt/ucm/data/ucm.db']
     assert values['DATA_DIR'] == ['/opt/ucm/data']
     assert values['HTTPS_PORT'] == ['8443'] and values['HTTP_PROTOCOL_PORT'] == ['8080']
-    assert values['INITIAL_ADMIN_PASSWORD'] == ['changeme123']
+    # No default password: the first start generates one into the data directory
+    assert 'INITIAL_ADMIN_PASSWORD' not in values
     assert values['UCM_FIPS_BUILD'] == ['1']
     assert stat.S_IMODE(envfile.stat().st_mode) == 0o600
+
+
+@pytest.mark.parametrize('line', ['INITIAL_ADMIN_PASSWORD=changeme123', 'export INITIAL_ADMIN_PASSWORD="changeme123"'])
+def test_the_password_older_packages_wrote_is_dropped(tmp_path, line):
+    """An existing account is untouched; a later database reset generates instead."""
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text(f'SECRET_KEY=keep-me\n{line}\nLOG_LEVEL=INFO\n')
+    envfile.chmod(0o600)
+    assert _run(['env', str(envfile), '/d'], _env(tmp_path)).returncode == 0
+    assert envfile.read_text() == 'SECRET_KEY=keep-me\nLOG_LEVEL=INFO\n'
+    assert stat.S_IMODE(envfile.stat().st_mode) == 0o600
+
+
+def test_a_password_the_operator_chose_stays_in_the_file(tmp_path):
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('SECRET_KEY=keep-me\nINITIAL_ADMIN_PASSWORD=changeme1234\n')
+    assert _run(['env', str(envfile), '/d'], _env(tmp_path)).returncode == 0
+    assert _values(envfile)['INITIAL_ADMIN_PASSWORD'] == ['changeme1234']
 
 
 def test_a_file_without_final_newline_keeps_its_last_line(tmp_path):
@@ -1114,7 +1133,8 @@ def test_a_generated_secret_never_appears_in_a_command_line(tmp_path):
 # ----------------------------------------------------------------- banner
 
 def _banner(tmp_path, pkg, softhsm=False,
-            hostname='[ "$1" = -I ] && echo "192.0.2.10 2001:db8::10 " || echo ucm.example.test'):
+            hostname='[ "$1" = -I ] && echo "192.0.2.10 2001:db8::10 " || echo ucm.example.test',
+            env_text='HTTPS_PORT=9443\nINITIAL_ADMIN_PASSWORD=s3cret\n'):
     bin_dir = tmp_path / 'bin'
     _stub(bin_dir / 'hostname', hostname)
     status = 'install ok installed' if softhsm is True else softhsm
@@ -1122,7 +1142,7 @@ def _banner(tmp_path, pkg, softhsm=False,
     _stub(bin_dir / 'dpkg', 'exit 1')
     _stub(bin_dir / 'rpm', '[ "$*" = "-q softhsm" ]' if softhsm else 'exit 1')
     envfile = tmp_path / 'ucm.env'
-    envfile.write_text('HTTPS_PORT=9443\nINITIAL_ADMIN_PASSWORD=s3cret\n')
+    envfile.write_text(env_text)
     path = f"{bin_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}"
     return envfile, _run(['banner', str(envfile), pkg], _env(tmp_path, extra={'PATH': path}))
 
@@ -1132,8 +1152,25 @@ def test_the_banner_brackets_ipv6_addresses(tmp_path):
     assert result.returncode == 0, result.stderr
     urls = [line.split()[-1] for line in result.stdout.splitlines() if 'https://' in line]
     assert urls == ['https://ucm.example.test:9443', 'https://192.0.2.10:9443', 'https://[2001:db8::10]:9443']
-    assert ' Admin:    admin / s3cret' in result.stdout
+    assert f' Password: the one you provided (INITIAL_ADMIN_PASSWORD in {envfile})' in result.stdout
+    assert 's3cret' not in result.stdout
     assert f' Config:   {envfile}' in result.stdout
+
+
+@pytest.mark.parametrize('env_text, path', [
+    ('HTTPS_PORT=9443\nDATA_DIR=/srv/ucm\n', '/srv/ucm/initial-admin-password'),
+    ('HTTPS_PORT=9443\nINITIAL_ADMIN_PASSWORD=\n', '/opt/ucm/data/initial-admin-password'),
+])
+def test_the_banner_says_where_the_generated_password_will_be(tmp_path, env_text, path):
+    _, result = _banner(tmp_path, 'deb', env_text=env_text)
+    assert result.returncode == 0, result.stderr
+    assert f'sudo cat {path}' in result.stdout
+    assert 'changeme123' not in result.stdout
+
+
+def test_the_banner_names_a_password_file(tmp_path):
+    _, result = _banner(tmp_path, 'rpm', env_text='INITIAL_ADMIN_PASSWORD_FILE=/root/admin.pw\n')
+    assert ' Password: the one you provided (INITIAL_ADMIN_PASSWORD_FILE=/root/admin.pw)' in result.stdout
 
 
 @pytest.mark.parametrize('pkg, softhsm, line', [
@@ -1159,7 +1196,7 @@ def test_the_banner_names_the_hsm_package_of_the_distribution(tmp_path, pkg, sof
 def test_a_failed_host_lookup_does_not_cut_the_banner_short(tmp_path):
     _, result = _banner(tmp_path, 'rpm', hostname='exit 127')
     assert result.returncode == 0, result.stderr
-    assert ' Admin:    admin / s3cret' in result.stdout
+    assert ' Admin:    admin' in result.stdout
     assert result.stdout.rstrip().endswith('============================================')
 
 
