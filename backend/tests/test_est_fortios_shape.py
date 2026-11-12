@@ -24,17 +24,33 @@ pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 NAMES = ('fgt-test.example.test',)
 
 
+def _saved(*keys):
+    rows = {r.key: r.value for r in SystemConfig.query.filter(SystemConfig.key.in_(keys))}
+    return {k: rows.get(k) for k in keys}
+
+
+def _put_back(saved):
+    for key, value in saved.items():
+        row = SystemConfig.query.filter_by(key=key).first()
+        if value is None:
+            if row:
+                db.session.delete(row)
+        elif row is None:
+            db.session.add(SystemConfig(key=key, value=value))
+        else:
+            row.value = value
+    db.session.commit()
+
+
 @pytest.fixture(autouse=True)
 def _est_on(app, est_config):  # noqa: F811
     with app.app_context():
+        before = _saved('est_enabled', 'est_allow_empty_username')
         _set_config('est_enabled', 'true')
         _set_config('est_allow_empty_username', 'true')
     yield
     with app.app_context():
-        row = SystemConfig.query.filter_by(key='est_allow_empty_username').first()
-        if row:
-            db.session.delete(row)
-            db.session.commit()
+        _put_back(before)
 
 
 @pytest.fixture
@@ -42,13 +58,11 @@ def labelled(app, create_ca, est_config):  # noqa: F811
     ca_data = create_ca(cn='EST FortiOS Labelled CA')
     with app.app_context():
         refid = db.session.get(CA, ca_data['id']).refid
+        before = _saved('est_labels')
         _set_config('est_labels', json.dumps({'branch': refid}))
     yield 'branch'
     with app.app_context():
-        row = SystemConfig.query.filter_by(key='est_labels').first()
-        if row:
-            db.session.delete(row)
-            db.session.commit()
+        _put_back(before)
 
 
 def _strict_body(response):
@@ -72,7 +86,7 @@ def _strict_pkcs7_certs(response):
     return certs
 
 
-def _folded_csr(csr, challenge=None):
+def _folded_csr(csr):
     """Base64 folded at 64 characters, as a libest-based client sends it."""
     text = base64.b64encode(csr.public_bytes(serialization.Encoding.DER)).decode()
     return '\n'.join(text[i:i + 64] for i in range(0, len(text), 64)) + '\n'

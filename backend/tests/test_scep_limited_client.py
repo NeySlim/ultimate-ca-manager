@@ -39,7 +39,7 @@ def _verify_rsa_v15(public_key, signature, data, digest_name, label):
 
 
 def decode_certrep(response, ca_cert, client_key, client_cert):
-    """The CertRep read as a limited client would; returns (attributes, issued certificate)."""
+    """The CertRep read as a limited client would: (attributes, issued certificate, algorithms seen)."""
     signed = asn1crypto.cms.ContentInfo.load(response)['content']
     for algorithm in signed['digest_algorithms']:
         _only(algorithm['algorithm'].native, DIGESTS, 'digest')
@@ -79,7 +79,8 @@ def decode_certrep(response, ca_cert, client_key, client_cert):
     _verify_rsa_v15(ca_cert.public_key(), cert['signature_value'].native, cert['tbs_certificate'].dump(),
                     'sha1' if tbs_label.startswith('sha1') else 'sha256', tbs_label)
     assert cert['tbs_certificate']['subject_public_key_info']['algorithm']['algorithm'].native == 'rsa'
-    return _response_attributes(response), x509.load_der_x509_certificate(cert.dump())
+    seen = {'digest': digest, 'cipher': cipher, 'certificate': tbs_label}
+    return _response_attributes(response), x509.load_der_x509_certificate(cert.dump()), seen
 
 
 def test_sha1_3des_pkcs1v15_client_gets_a_certrep_it_can_read(client, scep_http):
@@ -94,8 +95,10 @@ def test_sha1_3des_pkcs1v15_client_gets_a_certrep_it_can_read(client, scep_http)
     r = client.post(PATHS[0] + '?operation=PKIOperation', data=request,
                     content_type='application/x-pki-message')
     assert r.status_code == 200, r.data
-    attrs, issued = decode_certrep(r.data, ca_cert, identity[1], identity[0])
+    attrs, issued, seen = decode_certrep(r.data, ca_cert, identity[1], identity[0])
     assert attrs[PKI_STATUS_OID] == '0'
+    # RFC 8894 section 3.5.2: AES-128 and SHA-256 are mandatory, so the reply never falls back to 3DES or SHA-1
+    assert seen == {'digest': 'sha256', 'cipher': 'aes128_cbc', 'certificate': 'sha256_rsa'}
     sent = {a['type'].native: a['values'][0].native for a in request_info['signed_attrs']}
     assert attrs[TRANSACTION_ID_OID] == sent[TRANSACTION_ID_OID]
     assert attrs[RECIPIENT_NONCE_OID] == sent[SENDER_NONCE_OID]
