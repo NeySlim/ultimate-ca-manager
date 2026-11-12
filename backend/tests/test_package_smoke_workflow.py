@@ -151,6 +151,9 @@ def _assert_sandboxed(env, tmp_path):
         assert value, f'{var} is not set: the script would use the real default path'
         assert pathlib.Path(value).resolve().is_relative_to(tmp_path.resolve()), \
             f'{var}={value} is outside {tmp_path}'
+    # The stub directory is the real barrier: no host command may be on the PATH
+    assert pathlib.Path(env.get('PATH', '/')).resolve().is_relative_to(tmp_path.resolve()), \
+        'PATH leaves the sandbox'
 
 
 def _stubbed_run(tmp_path, kind, sudo_present, su_present=True, install_ok=False, env_extra=None,
@@ -235,8 +238,17 @@ def test_the_guard_refuses_a_path_outside_tmp_path(tmp_path):
     for var in SMOKE_VARS:
         (tmp_path / var).mkdir()
         with pytest.raises(AssertionError, match=var):
-            _stubbed_run(tmp_path / var, 'deb', sudo_present=False, env_extra={var: '/opt/ucm'})
+            # A sibling of the sandbox, never a real host path: a broken guard must stay harmless
+            _stubbed_run(tmp_path / var, 'deb', sudo_present=False,
+                         env_extra={var: str(tmp_path / 'outside')})
         assert not (tmp_path / var / 'log').exists()
+
+
+def test_the_guard_refuses_a_path_with_host_commands(tmp_path):
+    env = {var: str(tmp_path) for var in SMOKE_VARS}
+    with pytest.raises(AssertionError, match='PATH'):
+        _assert_sandboxed({**env, 'PATH': '/usr/bin'}, tmp_path)
+    _assert_sandboxed({**env, 'PATH': str(tmp_path / 'bin')}, tmp_path)
 
 
 def test_the_guard_refuses_an_unset_path_variable(tmp_path):
@@ -261,6 +273,8 @@ def test_a_safe_mode_health_answer_fails(tmp_path):
 
 
 def test_the_health_wait_is_bounded_by_the_announced_delay(tmp_path):
+    # Proves an upper bound only: the stub probe answers at once, so a loop counting
+    # attempts instead of seconds passes too. The real delay is checked in containers.
     import time
     t0 = time.time()
     _, proc = _stubbed_run(tmp_path, 'deb', sudo_present=False, install_ok=True, health_down=True)

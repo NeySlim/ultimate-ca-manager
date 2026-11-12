@@ -91,6 +91,8 @@ c = ssl._create_unverified_context()
 print(urllib.request.urlopen('https://127.0.0.1:$PORT/api/v2/health', timeout=$LEFT, context=c).read().decode())
 " 2>/dev/null) && break
   BODY=
+  ELAPSED=$(($(date +%s) - START))
+  [ $((ELAPSED + 1)) -ge "$WAIT" ] && break
   sleep 1
   ELAPSED=$(($(date +%s) - START))
 done
