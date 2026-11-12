@@ -212,7 +212,8 @@ def bootstrap_master_key(app) -> str:
             # Running on would write new values under the wrong key: keep them as without one
             key_encryption.refuse_kek('wrong_key')
             return 'wrong_key'
-        if auto_master_key_allowed(app):
+        # A disable in progress encrypts nothing: there is nothing to resume
+        if key_encryption.is_encrypting and auto_master_key_allowed(app):
             _resume_encryption()
         return 'present'
     if not auto_master_key_allowed(app):

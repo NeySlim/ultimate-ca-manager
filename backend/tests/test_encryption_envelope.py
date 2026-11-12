@@ -1540,3 +1540,20 @@ def test_in_ha_a_start_is_not_refused_by_a_peer_whose_kek_the_database_does_not_
         db.session.commit()
         encryption_enabled.key_encryption.reload()
         refuse_kek_mismatch_with_peers()
+
+
+def test_a_start_during_a_disable_left_half_way_logs_no_encryption_resumed(
+        app, values, caplog, monkeypatch, encryption_enabled):
+    """Nothing is encrypted while disabling: no "now encrypted" nor "still unencrypted" line."""
+    import logging
+    from security import dek_rotation
+    from security.encryption import decrypt_all_keys
+    from security import master_key_bootstrap
+    monkeypatch.setattr(master_key_bootstrap, 'auto_master_key_allowed', lambda app: True)
+    with app.app_context():
+        dek_rotation.begin_disable()
+        decrypt_all_keys(dry_run=False)
+    with caplog.at_level(logging.WARNING, logger='security.master_key_bootstrap'):
+        _start(app)
+    lines = [r.getMessage() for r in caplog.records if r.name == 'security.master_key_bootstrap']
+    assert not any('now encrypted' in line or 'still stored unencrypted' in line for line in lines)
