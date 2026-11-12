@@ -270,6 +270,15 @@ class KeyEncryption:
             fresh._load_data_keys(rows)
         self._swap_in(build)
 
+    def load_rows(self, rows) -> None:
+        """Without an application context (the gunicorn master): the DEK rows the caller read."""
+        kek, source = self._key_bytes, self._key_source
+
+        def build(fresh):
+            fresh._key_bytes, fresh._key_source = kek, source
+            fresh._load_data_keys(rows)
+        self._swap_in(build)
+
     def reload(self):
         """Reload the KEK and the DEKs (after enable, disable, rotation or a cluster command)"""
         self._swap_in(lambda fresh: fresh._initialize())

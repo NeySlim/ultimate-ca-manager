@@ -204,6 +204,25 @@ def _first_certificate(pem):
     return ''.join(pem[start:end + len(PEM_FOOTER)].split())
 
 
+def _load_deks(database):
+    """The DEK rows, so a value a rotation rewrote opens; called after the last other read
+    (on PostgreSQL a missing table aborts the transaction). Before migration 153: the KEK alone."""
+    from security.encryption import key_encryption
+    if not key_encryption.kek_loaded:
+        return
+    try:
+        rows = database.rows(
+            "SELECT version, state, kek_id, wrapped FROM encryption_keys ORDER BY version")
+    except Exception as e:
+        if _missing_table(e):
+            return
+        raise
+    key_encryption.load_rows([tuple(row) for row in rows])
+    if key_encryption.dek_error:
+        raise HttpsMaterialError("the configured master key (master.key or KEY_ENCRYPTION_KEY) "
+                                 "does not open this database's data-encryption keys")
+
+
 def _stored_bytes(stored, context):
     """A column under the master key (``utils.key_codec`` format) as raw bytes."""
     from security.encryption import key_encryption
@@ -240,6 +259,7 @@ def https_material(database):
         leaf = _certificate_text(row[0])
         if _first_certificate(leaf) is None:
             raise HttpsMaterialError(f"{label}: the stored certificate is not PEM")
+        _load_deks(database)
         key = _key_text(row[1], label)
         chain = config.get(HTTPS_CHAIN_KEY) or ''
         if chain and _first_certificate(chain) == _first_certificate(leaf):
@@ -255,6 +275,7 @@ def https_material(database):
         return None
     import json
     label = "regenerated self-signed certificate"
+    _load_deks(database)
     pair = json.loads(_stored_bytes(row[0], label))
     return pair['crt'], pair['key'], label, True
 
