@@ -15,7 +15,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.x509.oid import ExtensionOID
-from utils.cert_issuer import ca_signed, cas_by_ski, find_ca_by_ski
+from utils.cert_issuer import ca_signed, cas_by_ski
 
 logger = logging.getLogger(__name__)
 
@@ -245,7 +245,10 @@ def backfill_ski_aki():
             if aki == ca.ski:
                 continue
 
-            parent = find_ca_by_ski(aki, exclude_id=ca.id)
+            # The AKI only names a key: the parent is the CA whose key verifies the signature
+            from services.import_service import relink_parent_caref
+            parent_refid = relink_parent_caref(cert_obj, None, exclude_ca_id=ca.id)
+            parent = CA.query.filter_by(refid=parent_refid).first() if parent_refid else None
             if parent:
                 ca.caref = parent.refid
                 stats['rechained_cas'] += 1
