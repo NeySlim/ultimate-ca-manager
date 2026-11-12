@@ -23,7 +23,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Revocation: lifting a hold is refused with one code (409) and one message when the certificate or its CA's record holds a final revocation; otherwise it removes the hold's record in each unambiguous spelling of its serial and under every record of the CA key.
 - Revocation: revoking or suspending a certificate its CA already recorded as revoked for good answers that it is already revoked; a recorded hold can still be made final.
 - Revocation: the upgrade deletes once the suspension records that lifting a hold used to leave behind.
-- Revocation: a hold its CA recorded but the certificate does not show yet can be lifted, and the certificate details and list show the revocation the CA recorded; a list page that shows one marks it revoked, so the status filters and counts agree.
+- Revocation: a hold its CA recorded but the certificate does not show yet can be lifted, and the certificate details and list show the revocation the CA recorded.
 - Backup: restored certificates take the revocation their CA recorded at once, with an audit entry, and an archive from a release before 2.254 no longer brings back as holds the records a lifted hold left behind (the restore result counts them).
 - mTLS: an administrator importing a certificate for a user can no longer enrol a revoked certificate.
 - Renewal: a certificate whose signature no longer verifies with its CA's current key (CA re-keyed or replaced under the same name) is refused with a message asking for a new certificate.
