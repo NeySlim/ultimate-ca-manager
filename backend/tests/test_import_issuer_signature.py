@@ -532,3 +532,34 @@ class TestAnOpnsenseEntryNamingTheWrongCaFindsItsSigner:
         with app.app_context():
             assert importer.ImportMixin().import_certificates(entries)['imported'] == 1
         assert [caref for _, caref in _rows(app, real)] == [refid]
+
+
+class TestTheChainOfAnUnlinkedRowNamesOnlyTheSigningCa:
+
+    @staticmethod
+    def _chain(app, auth_client, cert, ca_cert, *, aki):
+        row_id = _store(app, cert, None)
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            row.aki = ca_cert.extensions.get_extension_for_class(
+                x509.SubjectKeyIdentifier).value.digest.hex(':').upper() if aki else None
+            db.session.commit()
+        r = auth_client.get(f'/api/v2/certificates/{row_id}')
+        assert r.status_code == 200, r.data
+        return r.get_json()['data']['chain_status']
+
+    @pytest.mark.parametrize('aki', [True, False], ids=['by-aki', 'by-issuer-dn'])
+    def test_a_forged_row_is_not_shown_under_the_ca(self, app, auth_client, issuer, aki):
+        _, _, ca_cert, _ = issuer
+        forged, _ = _leaf(f'forged-chain-{aki}.example.test', ca_cert, _gen())
+        chain = self._chain(app, auth_client, forged, ca_cert, aki=aki)
+        assert chain['status'] == 'incomplete'
+        assert [link['type'] for link in chain['chain']] == []
+
+    @pytest.mark.parametrize('aki', [True, False], ids=['by-aki', 'by-issuer-dn'])
+    def test_a_row_the_ca_signed_is(self, app, auth_client, issuer, aki):
+        _, _, ca_cert, ca_key = issuer
+        real, _ = _leaf(f'real-chain-{aki}.example.test', ca_cert, ca_key)
+        chain = self._chain(app, auth_client, real, ca_cert, aki=aki)
+        assert chain['status'] == 'partial'
+        assert [link['type'] for link in chain['chain']] == ['managed_ca']
