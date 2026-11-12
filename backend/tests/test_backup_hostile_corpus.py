@@ -210,6 +210,15 @@ def v3_archive(app, archive):
 
 
 @pytest.fixture(autouse=True)
+def installation_identified(app):
+    """The first archive gives the installation its identifier: written before any census."""
+    from services.backup.installation import installation_id
+    with app.app_context():
+        installation_id(create=True)
+        db.session.commit()
+
+
+@pytest.fixture(autouse=True)
 def no_forged_rows_left(app):
     """Whatever a case wrote, the next file must not find it."""
     yield
