@@ -12,7 +12,6 @@ from utils.key_codec import MalformedKey
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from models import Certificate, CA, RevokedSerial, db
-from utils.serial_format import serial_variants
 from services.audit_service import AuditService
 from utils.cert_issuer import ca_signature_verdict, ca_signed, private_key_matches, signing_ca_for, stored_private_key_matches
 from services.import_service import (
@@ -23,7 +22,7 @@ from services.import_service import (
     serialize_cert_to_pem, serialize_key_to_pem
 )
 from services.cert_service import CertificateService
-from services.cert.issued_lookup import apply_persisted_revocation
+from services.cert.issued_lookup import apply_persisted_revocation, record_serial_clause
 from services.ca_service import CAService
 from security.encryption import encrypt_private_key
 from . import bp
@@ -341,7 +340,7 @@ def import_certificate():
                 # The row now holds another certificate: the old serial's record stays, unlinked
                 RevokedSerial.query.filter(
                     RevokedSerial.certificate_id == existing_cert.id,
-                    RevokedSerial.serial_number.in_(serial_variants(old_serial)),
+                    record_serial_clause(old_serial),
                 ).update({RevokedSerial.certificate_id: None}, synchronize_session='fetch')
             came_back_revoked = apply_persisted_revocation(existing_cert)
 

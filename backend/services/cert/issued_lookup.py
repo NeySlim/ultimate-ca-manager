@@ -22,7 +22,7 @@ from cryptography.hazmat.primitives.serialization import Encoding
 
 from models import CA, Certificate, RevokedSerial
 from utils.datetime_utils import utc_now
-from utils.serial_format import serial_variants
+from utils.serial_format import serial_to_int, serial_variants, unambiguous_serial_spellings
 
 OK = 'ok'
 UNKNOWN = 'unknown'
@@ -82,13 +82,18 @@ def revocation_order(record):
     return rank, record.revoked_at or datetime.max, record.id or 0
 
 
+def record_serial_clause(serial):
+    """The records of ``serial``, in each spelling that cannot be another serial's."""
+    return RevokedSerial.serial_number.in_(unambiguous_serial_spellings(serial))
+
+
 def revocation_records(ca: CA, serial: int) -> list:
     """Every record of ``ca``'s key (or a record of the same subject and key) for
-    ``serial`` in any spelling, gravest first."""
+    ``serial`` (``record_serial_clause``), gravest first."""
     from utils.cert_issuer import same_key_refids
     return sorted(RevokedSerial.query.filter(
         RevokedSerial.caref.in_(same_key_refids(ca)),
-        RevokedSerial.serial_number.in_(serial_variants(serial)),
+        record_serial_clause(serial),
     ).all(), key=revocation_order)
 
 
@@ -100,11 +105,11 @@ def persisted_revocation(ca: CA, serial: int):
 
 
 def lift_persisted_revocation(ca: CA, serial: int) -> int:
-    """Delete every record of ``serial`` under ``ca``'s key, in any spelling. No commit."""
+    """Delete every record of ``serial`` under ``ca``'s key (``record_serial_clause``). No commit."""
     from utils.cert_issuer import same_key_refids
     return RevokedSerial.query.filter(
         RevokedSerial.caref.in_(same_key_refids(ca)),
-        RevokedSerial.serial_number.in_(serial_variants(serial)),
+        record_serial_clause(serial),
     ).delete(synchronize_session='fetch')
 
 
@@ -150,18 +155,15 @@ def apply_persisted_revocations() -> int:
     """Mark revoked every linked, unrevoked row holding a serial its CA recorded as revoked
     (rows stored by an earlier release). No commit; returns how many."""
     from sqlalchemy import or_
-    spellings = set()
-    for (column,) in RevokedSerial.query.with_entities(RevokedSerial.serial_number).distinct():
-        for base in (10, 16):  # an all-digit column may be either
-            try:
-                spellings |= serial_variants(int(str(column), base))
-            except (TypeError, ValueError):
-                continue
-    spellings = sorted(spellings)
+    # A record column reads as its own serial only (an all-digit one in decimal), as a row's does
+    serials = {serial_to_int(column) for (column,) in RevokedSerial.query.with_entities(
+        RevokedSerial.serial_number).distinct()}
+    columns = sorted({form for serial in serials if serial is not None
+                      for form in unambiguous_serial_spellings(serial)})
     applied = 0
-    for start in range(0, len(spellings), 500):
+    for start in range(0, len(columns), 500):
         for row in Certificate.query.filter(
-                Certificate.serial_number.in_(spellings[start:start + 500]),
+                Certificate.serial_number.in_(columns[start:start + 500]),
                 Certificate.caref.isnot(None), Certificate.crt.isnot(None),
                 or_(Certificate.revoked.is_(False), Certificate.revoked.is_(None))).all():
             applied += apply_persisted_revocation(row)
