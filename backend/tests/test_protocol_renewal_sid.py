@@ -58,6 +58,45 @@ def _issue(app, ca_id, cn, sid=SID):
     return x509.load_pem_x509_certificate(pem.encode()), key
 
 
+def forged_import(app, auth_client, ca_id, cn, sid=SID, with_key=False):
+    """A certificate naming the CA as issuer (DN and AKI) and carrying ``sid``, signed by
+    another key, on a row linked to that CA as an earlier release's import left it."""
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import ExtendedKeyUsageOID
+    from utils.datetime_utils import utc_now
+    from datetime import timedelta
+    with app.app_context():
+        ca_cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(CA, ca_id).crt))
+    key, forger = _key(), ec.generate_private_key(ec.SECP256R1())
+    now = utc_now()
+    cert = (x509.CertificateBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
+            .issuer_name(ca_cert.subject).public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(minutes=5)).not_valid_after(now + timedelta(days=30))
+            .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+            .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False)
+            .add_extension(x509.AuthorityKeyIdentifier.from_issuer_subject_key_identifier(
+                ca_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value), critical=False)
+            .add_extension(_ad_security_extension(sid), critical=False)
+            .sign(forger, hashes.SHA256()))
+    pem = cert.public_bytes(serialization.Encoding.PEM)
+    if with_key:
+        pem += key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                 serialization.NoEncryption())
+    # The import refuses to link it: the link is the one an earlier release stored
+    r = auth_client.post('/api/v2/certificates/import',
+                         data={'pem_content': pem.decode(), 'name': cn},
+                         content_type='multipart/form-data')
+    assert r.status_code in (200, 201), r.get_json()
+    with app.app_context():
+        row = db.session.get(Certificate, r.get_json()['data']['id'])
+        assert row.caref is None
+        row.caref = db.session.get(CA, ca_id).refid
+        db.session.commit()
+        return row.id, cert, key
+
+
 def _sid_ext(cert):
     try:
         return cert.extensions.get_extension_for_oid(_SID_SECURITY_EXT_OID).value.value
@@ -89,6 +128,15 @@ class TestEstReenrolment:
         old, key = _issue(app, est_config['id'], 'est-sid-keep.example.test')
         renewed = _est_leaf(_est_reenrol(client, old, key, csr_sid=OTHER_SID))
         assert _sid_ext(renewed) == _sid_ext(old) == _ad_security_extension(SID).value
+
+    def test_a_certificate_the_ca_did_not_sign_is_refused(self, client, app, auth_client,
+                                                         est_config, monkeypatch):
+        _row_id, forged, key = forged_import(app, auth_client, est_config['id'], 'est-sid-forged.example.test')
+        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: pytest.fail('unsigned SID'))
+        _configure_ad_connector(app)
+        before = _count(app)
+        assert _est_reenrol(client, forged, key).status_code == 403
+        assert _count(app) == before
 
     def test_without_the_extension_renews_without_it(self, client, app, est_config, monkeypatch):
         old, key = _issue(app, est_config['id'], 'est-sid-none.example.test', sid=None)
@@ -141,6 +189,15 @@ class TestScepRenewal:
         assert attrs[PKI_STATUS_OID] == '0', attrs.get(FAIL_INFO_OID)
         renewed = pkcs7.load_der_pkcs7_certificates(_decrypt_response(response, old_key, old))[0]
         assert _sid_ext(renewed) == _sid_ext(old) == _ad_security_extension(SID).value
+
+    def test_a_certificate_the_ca_did_not_sign_is_refused(self, app, auth_client, scep_ca):
+        """SCEP checks the signer's signature with the CA key before any lookup by bytes."""
+        (ca, ca_cert), ca_id = scep_ca
+        _row_id, forged, key = forged_import(app, auth_client, ca_id, 'scep-sid-forged.example.test')
+        before = _count(app)
+        attrs, _response = _scep_renew(ca, ca_cert, forged, key)
+        assert attrs[PKI_STATUS_OID] == '2'
+        assert _count(app) == before
 
     @pytest.mark.parametrize('answer', ['NO_ACCOUNT', 'UNREACHABLE'])
     def test_connector_without_the_account_refuses(self, app, scep_ca, monkeypatch, answer):
@@ -220,3 +277,29 @@ class TestScepRenewal:
         with app.app_context():
             row = db.session.get(SCEPRequest, req_id)
             assert row.status == 'pending' and row.cert_refid is None
+
+
+def test_a_certificate_the_ca_did_not_sign_carries_no_sid(app, auth_client, create_ca):
+    """The row's link to the CA is not proof: only the signature is."""
+    from services.ad_connector import renewal_identity
+    ca_data = create_ca(cn='SID forged issuer CA')
+    _row_id, forged, _key_ = forged_import(app, auth_client, ca_data['id'], 'sid-forged-unit.example.test')
+    with app.app_context():
+        ca_cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(CA, ca_data['id']).crt))
+        assert renewal_identity.renewal_requester_sid(forged, ca_cert, 'TEST') is None
+
+
+def test_an_issuer_key_that_cannot_be_checked_carries_no_sid(app, create_ca, monkeypatch):
+    """Unverifiable is never read as signed by the CA."""
+    from services.ad_connector import renewal_identity
+    from utils import cert_issuer
+    ca_data = create_ca(cn='SID unverifiable issuer CA')
+    old, _key_ = _issue(app, ca_data['id'], 'sid-unverifiable.example.test')
+    with app.app_context():
+        ca_cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(CA, ca_data['id']).crt))
+        assert renewal_identity.renewal_requester_sid(old, ca_cert, 'TEST') == SID
+
+        def unverifiable(cert, issuer):
+            raise cert_issuer.UnsupportedIssuerKey('test')
+        monkeypatch.setattr(cert_issuer, 'certificate_signed_by', unverifiable)
+        assert renewal_identity.renewal_requester_sid(old, ca_cert, 'TEST') is None

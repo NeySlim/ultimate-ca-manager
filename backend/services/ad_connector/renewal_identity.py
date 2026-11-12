@@ -22,17 +22,27 @@ class RenewalIdentityUnresolved(ValueError):
     A ValueError so an approval shows the approver this message, the request left pending."""
 
 
-def renewal_requester_sid(renewed_cert, protocol):
-    """The SID ``renewed_cert``'s extension carries, None without a readable one.
+def renewal_requester_sid(renewed_cert, ca_cert, protocol):
+    """The SID ``renewed_cert``'s extension carries, None without a readable one or
+    when ``ca_cert`` did not sign it (an import sets the issuer without checking).
 
     An enabled AD Connector must still find that account, as issuance refuses an
     unresolved requester; with the connector off the SID is carried over as is.
     """
     from services.ad_connector import lookup
     from services.trust_store.csr_operations_mixin import ad_security_extension_sid
+    from utils.cert_issuer import UnsupportedIssuerKey, certificate_signed_by
 
     sid = ad_security_extension_sid(renewed_cert)
     if sid is None:
+        return None
+    try:
+        signed = certificate_signed_by(renewed_cert, ca_cert)
+    except UnsupportedIssuerKey:
+        signed = False  # unverifiable is never verified
+    if not signed:
+        logger.warning("%s: renewed certificate serial %x was not signed by this CA, its SID is not carried over",
+                       protocol, renewed_cert.serial_number)
         return None
     account = lookup.lookup_account_by_sid(sid)
     if account is None or account:

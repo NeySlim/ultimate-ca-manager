@@ -840,7 +840,8 @@ def simple_reenroll(label=None):
         days = int(validity_days.value) if validity_days else 365
         
         # A re-enrolment keeps the renewed certificate's SID extension, never the CSR's
-        requester_sid = renewal_identity.renewal_requester_sid(client_cert_obj, 'EST')
+        requester_sid = renewal_identity.renewal_requester_sid(
+            client_cert_obj, x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend()), 'EST')
         cert_pem, serial = CAService.sign_csr_from_crypto(
             ca=ca, csr=csr, validity_days=days, source='est',
             renewal_of=client_cert_obj, cert_type='device_cert',

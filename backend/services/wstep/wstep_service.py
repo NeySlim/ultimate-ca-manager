@@ -1330,7 +1330,8 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
 
     from services.ad_connector import renewal_identity
     try:
-        requester_sid = renewal_identity.renewal_requester_sid(signing_cert, 'WSTEP')
+        requester_sid = renewal_identity.renewal_requester_sid(
+            signing_cert, x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), 'WSTEP')
     except renewal_identity.RenewalIdentityUnresolved as e:
         return None, ServerError(str(e))
     except renewal_identity.RenewalAccountGone as e:
