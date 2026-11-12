@@ -13,6 +13,7 @@ import time
 import requests
 
 from config.settings import Config, DATA_DIR
+from utils.config_cas import config_compare_and_set
 
 logger = logging.getLogger('ucm.updates')
 
@@ -666,11 +667,21 @@ def get_update_settings():
 
 
 def _notify_update_available(result):
-    """Emit the bus event once per newly seen version. Returns True when the
-    deduplication marker was durably persisted (review R-05)."""
+    """Emit the bus event once per newly seen version. Returns True when the version
+    is notified, by this call or another executor (review R-05)."""
+    from models import db
     latest = result['latest_version']
-    if _cfg_get(_NOTIFIED_VERSION_KEY) == latest:
+    previous = _cfg_get(_NOTIFIED_VERSION_KEY)
+    if previous == latest:
         return True
+    # Reserved before emitting: of two executors reading the same marker, one emits
+    try:
+        if not config_compare_and_set(_NOTIFIED_VERSION_KEY, previous, latest):
+            return True
+    except Exception as e:
+        db.session.rollback()
+        logger.warning(f"Update {latest} not notified, its marker could not be stored: {e}")
+        return False
     from services.webhook_service import emit_update_available
     emit_update_available({
         'current_version': result['current_version'],
@@ -678,12 +689,6 @@ def _notify_update_available(result):
         'html_url': result.get('html_url'),
         'prerelease': result.get('prerelease', False),
     })
-    if not _cfg_set(_NOTIFIED_VERSION_KEY, latest):
-        logger.warning(
-            "Update notification emitted but the deduplication marker could "
-            "not be persisted, the next check may notify again"
-        )
-        return False
     logger.info(
         f"Update available: {result['current_version']} -> {latest}"
     )

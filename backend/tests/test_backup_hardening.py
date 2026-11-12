@@ -161,7 +161,7 @@ class TestScheduledRunReportsOutcome:
             _set('auto_backup_enabled', 'true')
             _set('backup_frequency', 'daily')
             _set('backup_password', 'Correct-Horse-Battery-9')
-            SystemConfig.query.filter_by(key='backup.last_run').delete()
+            SystemConfig.query.filter(SystemConfig.key.in_(('backup.last_run', 'backup.concluded_run'))).delete()
             db.session.commit()
             monkeypatch.setattr(
                 'services.backup.schedule.BackupService.iter_backup',
@@ -173,7 +173,8 @@ class TestScheduledRunReportsOutcome:
                 assert SystemConfig.query.filter_by(key='backup.last_run').first() is None
             finally:
                 _set('auto_backup_enabled', 'false')
-                SystemConfig.query.filter_by(key='backup_password').delete()
+                SystemConfig.query.filter(SystemConfig.key.in_(
+                    ('backup_password', 'backup.last_run', 'backup.concluded_run'))).delete()
                 db.session.commit()
 
     def test_scheduler_separates_failed_skipped_and_done(self):
@@ -309,13 +310,13 @@ class TestPublicationDecidesTheRetryGuard:
         _set('auto_backup_enabled', 'true')
         _set('backup_frequency', 'daily')
         _set('backup_password', 'Correct-Horse-Battery-9')
-        SystemConfig.query.filter_by(key='backup.last_run').delete()
+        SystemConfig.query.filter(SystemConfig.key.in_(('backup.last_run', 'backup.concluded_run'))).delete()
         db.session.commit()
 
     def _disable(self):
         _set('auto_backup_enabled', 'false')
         SystemConfig.query.filter_by(key='backup_password').delete()
-        SystemConfig.query.filter_by(key='backup.last_run').delete()
+        SystemConfig.query.filter(SystemConfig.key.in_(('backup.last_run', 'backup.concluded_run'))).delete()
         db.session.commit()
 
     def test_a_failed_export_is_retried_on_the_next_tick(
@@ -642,7 +643,7 @@ class TestFailedTimestampStopsTheLoop:
             _set('auto_backup_enabled', 'true')
             _set('backup_frequency', 'daily')
             _set('backup_password', 'Correct-Horse-Battery-9')
-            SystemConfig.query.filter_by(key='backup.last_run').delete()
+            SystemConfig.query.filter(SystemConfig.key.in_(('backup.last_run', 'backup.concluded_run'))).delete()
             db.session.commit()
 
             monkeypatch.setattr(
@@ -665,7 +666,7 @@ class TestFailedTimestampStopsTheLoop:
             finally:
                 _set('auto_backup_enabled', 'false')
                 SystemConfig.query.filter_by(key='backup_password').delete()
-                SystemConfig.query.filter_by(key='backup.last_run').delete()
+                SystemConfig.query.filter(SystemConfig.key.in_(('backup.last_run', 'backup.concluded_run'))).delete()
                 db.session.commit()
 
 

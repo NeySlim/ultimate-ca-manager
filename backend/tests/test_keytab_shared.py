@@ -175,3 +175,29 @@ def test_an_unencrypted_stored_keytab_is_reported(app, keytab_on, encryption_ena
             c for c in enc.MASTER_KEY_COLUMNS if c[1] == 'SharedFile'))
         monkeypatch.setattr(enc, '_is_master_key_config', lambda key: False)
         assert enc.has_unencrypted_master_key_values()
+
+
+def test_a_keytab_unreadable_without_the_master_key_says_so(app, keytab_on, encryption_enabled, monkeypatch):
+    from models import db
+    with app.app_context():
+        shared_files.store_file(shared_files.KERBEROS_KEYTAB, KEYTAB)
+        db.session.commit()
+        with monkeypatch.context() as patch:
+            patch.setattr(encryption_enabled.key_encryption, '_enabled', False)
+            with pytest.raises(ValueError) as missing:
+                shared_files.read_file(shared_files.KERBEROS_KEYTAB)
+        assert 'private key' not in str(missing.value)
+        assert 'master key' in str(missing.value) and 'kerberos.keytab' in str(missing.value)
+
+
+def test_a_keytab_under_another_master_key_says_so(app, keytab_on, encryption_enabled):
+    import base64
+    from models import SharedFile, db
+    with app.app_context():
+        db.session.add(SharedFile(name=shared_files.KERBEROS_KEYTAB,
+                                  content=base64.b64encode(b'ENC:not-a-fernet-token').decode()))
+        db.session.commit()
+        with pytest.raises(ValueError) as wrong:
+            shared_files.read_file(shared_files.KERBEROS_KEYTAB)
+    assert 'private key' not in str(wrong.value)
+    assert 'different KEY_ENCRYPTION_KEY' in str(wrong.value)

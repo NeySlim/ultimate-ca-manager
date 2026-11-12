@@ -317,11 +317,28 @@ def _prepare(path, text, mode):
     return tmp_path
 
 
+def _keep_aside(path):
+    """A copy of ``path`` beside it, or None when it does not exist."""
+    import shutil
+    import tempfile
+    if not os.path.exists(path):
+        return None
+    fd, aside = tempfile.mkstemp(prefix='.ucm-https-', suffix='.old', dir=os.path.dirname(path) or '.')
+    os.close(fd)
+    try:
+        shutil.copy2(path, aside)
+    except BaseException:
+        os.unlink(aside)
+        raise
+    return aside
+
+
 def write_https_pair(cert_path, key_path, cert_pem, key_pem, backup_suffix=None):
     """Both files hold exactly these texts afterwards; False when they already did.
 
     Each is replaced by the rename of a complete temporary file, prepared both before
     either rename. The key is 0600; the certificate keeps the mode of the one it replaces.
+    Raises on failure, leaving both files as they were.
     """
     cert_path, key_path = str(cert_path), str(key_path)
     if _same_file(cert_path, cert_pem) and _same_file(key_path, key_pem):
@@ -341,8 +358,19 @@ def write_https_pair(cert_path, key_path, cert_pem, key_pem, backup_suffix=None)
     try:
         prepared.append(_prepare(cert_path, cert_pem, cert_mode))
         prepared.append(_prepare(key_path, key_pem, 0o600))
+        old_key = _keep_aside(key_path)
+        if old_key:
+            prepared.append(old_key)
         os.replace(prepared[1], key_path)
-        os.replace(prepared[0], cert_path)
+        try:
+            os.replace(prepared[0], cert_path)
+        except BaseException:
+            # The new key never stays beside the old certificate
+            if old_key:
+                os.replace(old_key, key_path)
+            else:
+                os.unlink(key_path)
+            raise
     finally:
         for tmp_path in prepared:
             if os.path.exists(tmp_path):

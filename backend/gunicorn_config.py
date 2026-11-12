@@ -356,7 +356,8 @@ def post_worker_init(worker):
         import logging
         logging.getLogger('ucm.cluster').error("Cluster command applier not started: %s", e)
 
-    # Without Redis: this worker emits the scheduler process's events to its clients
+    # Without Redis: this worker emits to its clients the events of the scheduler process,
+    # and in HA those of the other workers and nodes, to which it also publishes its own
     try:
         from services.ws_relay import start_reader
         from wsgi import app as flask_app

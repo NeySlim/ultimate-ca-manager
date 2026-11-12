@@ -171,19 +171,29 @@ def https_files(app, monkeypatch, tmp_path):
     monkeypatch.setenv('HTTPS_CERT_PATH', str(tmp_path / 'https_cert.pem'))
     monkeypatch.setenv('HTTPS_KEY_PATH', str(tmp_path / 'https_key.pem'))
     monkeypatch.setattr(Config, 'HA_MODE', True)
-    yield tmp_path
     from models import ClusterCommand, db
+    with app.app_context():
+        floor = db.session.query(db.func.max(ClusterCommand.id)).scalar() or 0
+    yield tmp_path, floor
     from services import shared_files
     from services.https_binding import set_bound_refid
     with app.app_context():
         shared_files.drop_file(shared_files.HTTPS_GENERATED)
         set_bound_refid('')
-        ClusterCommand.query.delete()
+        ClusterCommand.query.filter(ClusterCommand.id > floor).delete()
         db.session.commit()
 
 
+def _commands_after(floor):
+    """The commands this test queued: other files of the worker may leave theirs."""
+    from models import ClusterCommand
+    return [c.kind for c in ClusterCommand.query.filter(ClusterCommand.id > floor)
+            .order_by(ClusterCommand.id)]
+
+
 def test_https_apply_in_ha_stores_what_every_node_serves(app, auth_client, https_files, create_cert):
-    from models import ClusterCommand, SystemConfig
+    from models import SystemConfig
+    https_files, floor = https_files
     from services.https_binding import CHAIN_KEY, get_bound_refid
     cert = create_cert(cn='ha-apply.example.test')
     r = auth_client.post('/api/v2/system/https/apply', json={'cert_id': cert['id']})
@@ -192,12 +202,12 @@ def test_https_apply_in_ha_stores_what_every_node_serves(app, auth_client, https
         assert get_bound_refid() == cert['refid']
         chain = SystemConfig.query.filter_by(key=CHAIN_KEY).one().value
         assert chain == (https_files / 'https_cert.pem').read_text()
-        assert [c.kind for c in ClusterCommand.query.all()] == ['restart']
+        assert _commands_after(floor) == ['restart']
 
 
 def test_https_regenerate_in_ha_stores_the_pair_for_every_node(app, auth_client, https_files):
     import json
-    from models import ClusterCommand
+    https_files, floor = https_files
     from services import shared_files
     from services.https_binding import get_bound_refid
     r = auth_client.post('/api/v2/system/https/regenerate', json={'common_name': 'ucm-ha.test'})
@@ -207,4 +217,4 @@ def test_https_regenerate_in_ha_stores_the_pair_for_every_node(app, auth_client,
         assert pair == {'crt': (https_files / 'https_cert.pem').read_text(),
                         'key': (https_files / 'https_key.pem').read_text()}
         assert get_bound_refid() == ''
-        assert [c.kind for c in ClusterCommand.query.all()] == ['restart']
+        assert _commands_after(floor) == ['restart']

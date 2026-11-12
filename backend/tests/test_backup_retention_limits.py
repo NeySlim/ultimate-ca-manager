@@ -167,7 +167,7 @@ class TestTheScheduleReportsWhatHappened:
             _set('auto_backup_enabled', 'true')
             _set('backup_frequency', 'daily')
             SystemConfig.query.filter_by(key='backup_password').delete()
-            SystemConfig.query.filter_by(key='backup.last_run').delete()
+            SystemConfig.query.filter(SystemConfig.key.in_(('backup.last_run', 'backup.concluded_run'))).delete()
             db.session.commit()
             try:
                 with pytest.raises(Exception):

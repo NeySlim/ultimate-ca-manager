@@ -542,8 +542,8 @@ EXCLUDED_TABLES: Dict[str, str] = {
                         'the archive carries the values in the clear and the target encrypts them '
                         'under its own key'),
     'websocket_relay': 'WebSocket events waiting minutes for the web workers: runtime state, never restored',
-    'shared_files': ('the Kerberos keytab and the HTTPS pair each node writes to disk: '
-                     'node files, which archives never carried'),
+    'shared_files': ('the Kerberos keytab, which archives never carried, and the HTTPS pair '
+                     'each node writes to disk, carried as the https_server files instead'),
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',
 }

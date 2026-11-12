@@ -84,6 +84,52 @@ class TestDueLogic:
                             'concluded_run': three_hours}, utc_now()) is False
 
 
+class TestConclusionMarker:
+    def test_an_existing_marker_is_not_inserted_again(self, app):
+        """The INSERT of a compare-and-set fails on the unique key: a PostgreSQL log ERROR."""
+        from sqlalchemy import event
+        from services.backup.schedule import _CONCLUDED_KEY, _start_marking_conclusions
+        with app.app_context():
+            saved = SystemConfig.query.filter_by(key=_CONCLUDED_KEY).first()
+            saved = saved.value if saved else None
+            _set(_CONCLUDED_KEY, 'an earlier run')
+            statements = []
+
+            def record(conn, cursor, statement, *args):
+                statements.append(statement)
+            engine = db.engine
+            event.listen(engine, 'before_cursor_execute', record)
+            try:
+                _start_marking_conclusions('an earlier run')
+            finally:
+                event.remove(engine, 'before_cursor_execute', record)
+            try:
+                assert not [s for s in statements if s.lstrip().upper().startswith('INSERT')]
+                assert SystemConfig.query.filter_by(key=_CONCLUDED_KEY).one().value == 'an earlier run'
+            finally:
+                if saved is None:
+                    SystemConfig.query.filter_by(key=_CONCLUDED_KEY).delete()
+                    db.session.commit()
+                else:
+                    _set(_CONCLUDED_KEY, saved)
+
+    def test_a_missing_marker_is_created(self, app):
+        from services.backup.schedule import _CONCLUDED_KEY, _start_marking_conclusions
+        with app.app_context():
+            saved = SystemConfig.query.filter_by(key=_CONCLUDED_KEY).first()
+            saved = saved.value if saved else None
+            SystemConfig.query.filter_by(key=_CONCLUDED_KEY).delete()
+            db.session.commit()
+            try:
+                _start_marking_conclusions('prev')
+                assert SystemConfig.query.filter_by(key=_CONCLUDED_KEY).one().value == 'prev'
+            finally:
+                SystemConfig.query.filter_by(key=_CONCLUDED_KEY).delete()
+                db.session.commit()
+                if saved is not None:
+                    _set(_CONCLUDED_KEY, saved)
+
+
 class TestScheduledTaskGating:
     def test_disabled_is_noop(self, app, monkeypatch):
         with app.app_context():
