@@ -370,3 +370,85 @@ class TestAnAcmeReplacementNeverSupersedesAGraverRecord:
                 pem=real.public_bytes(serialization.Encoding.PEM)))
             [record] = RevokedSerial.query.filter_by(caref=refid, serial_number=str(real.serial_number)).all()
             assert (record.revoke_reason, record.revoked_at) == ('keyCompromise', EARLY)
+
+
+def _homonyms():
+    """(d, h): ``h``'s hexadecimal is all digits and spells ``d`` in decimal (16 and "10")."""
+    import secrets
+    d = int(''.join(secrets.choice('0123456789') for _ in range(11)).lstrip('0') or '7') + 10 ** 11
+    return d, int(str(d), 16)
+
+
+def _held(app, row_id, at=EARLY):
+    with app.app_context():
+        row = db.session.get(Certificate, row_id)
+        row.revoked, row.revoke_reason, row.revoked_at = True, 'certificateHold', at
+        db.session.commit()
+
+
+def _renewable(app, row_id):
+    from services.cert.renewal import check_renewable
+    with app.app_context():
+        check_renewable(db.session.get(Certificate, row_id))
+
+
+class TestAnotherSerialsHexSpellingNamesNothing:
+    """A serial whose hex is all digits is the decimal spelling of another one."""
+
+    def test_revoking_the_decimal_one_leaves_the_other_good_everywhere(self, app, auth_client, issuer):
+        from services.ski_aki_backfill import backfill_ski_aki
+        ca_id, refid, ca_cert, ca_key = issuer
+        d, h = _homonyms()
+        cert_d, key_d = _leaf('homonym-d.example.test', ca_cert, ca_key, serial=d)
+        cert_h, key_h = _leaf('homonym-h.example.test', ca_cert, ca_key, serial=h)
+        d_id, h_id = _store(app, cert_d, refid, key=key_d), _store(app, cert_h, refid, key=key_h)
+        assert auth_client.post(f'/api/v2/certificates/{d_id}/revoke',
+                                json={'reason': 'keyCompromise'}).status_code == 200
+        assert _surfaces(app, ca_id, cert_h) == ('good', None, None, 'ok')
+        with app.app_context():
+            backfill_ski_aki()
+        assert _row(app, h_id) == (False, None, None)
+        assert _surfaces(app, ca_id, cert_h) == ('good', None, None, 'ok')
+        _renewable(app, h_id)
+        assert _import(auth_client, cert_h, key_h).status_code == 200
+        assert _row(app, h_id) == (False, None, None)
+        assert _surfaces(app, ca_id, cert_d)[0] == 'revoked'
+
+    def test_lifting_a_hold_keeps_the_other_serials_record(self, app, auth_client, issuer):
+        _, refid, ca_cert, ca_key = issuer
+        d, h = _homonyms()
+        cert_d, _ = _leaf('unhold-d.example.test', ca_cert, ca_key, serial=d)
+        cert_h, key_h = _leaf('unhold-h.example.test', ca_cert, ca_key, serial=h)
+        h_id = _store(app, cert_h, refid, key=key_h)
+        _held(app, h_id)
+        _record(app, refid, cert_h, reason='certificateHold', certificate_id=h_id)
+        other = _record(app, refid, cert_d, reason='certificateHold')
+        r = auth_client.post(f'/api/v2/certificates/{h_id}/unhold')
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            assert db.session.get(RevokedSerial, other) is not None
+
+    def test_another_serials_compromise_does_not_block_a_lift(self, app, auth_client, issuer):
+        ca_id, refid, ca_cert, ca_key = issuer
+        d, h = _homonyms()
+        cert_d, _ = _leaf('unhold-409-d.example.test', ca_cert, ca_key, serial=d)
+        cert_h, key_h = _leaf('unhold-409-h.example.test', ca_cert, ca_key, serial=h)
+        h_id = _store(app, cert_h, refid, key=key_h)
+        _held(app, h_id)
+        _record(app, refid, cert_h, reason='certificateHold', certificate_id=h_id)
+        _record(app, refid, cert_d, reason='keyCompromise')
+        r = auth_client.post(f'/api/v2/certificates/{h_id}/unhold')
+        assert r.status_code == 200, r.data
+        assert _surfaces(app, ca_id, cert_h) == ('good', None, None, 'ok')
+
+    def test_the_hourly_task_never_marks_the_other_row(self, app, issuer):
+        from services.ski_aki_backfill import backfill_ski_aki
+        _, refid, ca_cert, ca_key = issuer
+        d, h = _homonyms()
+        cert_d, _ = _leaf('hourly-d.example.test', ca_cert, ca_key, serial=d)
+        cert_h, key_h = _leaf('hourly-h.example.test', ca_cert, ca_key, serial=h)
+        h_id = _store(app, cert_h, refid, key=key_h)
+        _record(app, refid, cert_d)
+        with app.app_context():
+            backfill_ski_aki()
+        assert _row(app, h_id) == (False, None, None)

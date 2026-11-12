@@ -26,7 +26,7 @@ def _gen():
     return ec.generate_private_key(ec.SECP256R1())
 
 
-def _leaf(cn, ca_cert, signer, *, key=None, aki_from=None, days=30):
+def _leaf(cn, ca_cert, signer, *, key=None, aki_from=None, days=30, serial=None):
     """A leaf naming ``ca_cert`` as issuer (DN and AKI), signed by ``signer``."""
     key = key or _gen()
     now = datetime.now(timezone.utc)
@@ -34,7 +34,7 @@ def _leaf(cn, ca_cert, signer, *, key=None, aki_from=None, days=30):
     cert = (x509.CertificateBuilder()
             .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
             .issuer_name(ca_cert.subject)
-            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .public_key(key.public_key()).serial_number(serial or x509.random_serial_number())
             .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=days))
             .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
             .add_extension(x509.SubjectAlternativeName([x509.DNSName(cn)]), critical=False)
