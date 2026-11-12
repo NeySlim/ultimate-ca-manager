@@ -42,17 +42,17 @@ def get_encryption_status():
             key_encryption, MASTER_KEY_PATH, count_master_key_values,
         )
 
-        from security.dek_rotation import retiring, rotation_in_progress
+        from security.dek_rotation import (
+            disable_grace, retiring, rotation_in_progress, shown_as_enabled,
+        )
 
         encrypted, unencrypted = count_master_key_values()
-        grace = retiring()
         # A disable done: its DEKs still open values written late, until the grace ends
-        disabled_grace = grace if grace and grace.get('disable') else None
-        if disabled_grace:
-            grace = None
+        disabled_grace = disable_grace()
+        grace = None if disabled_grace else retiring()
 
         return success_response(data={
-            'enabled': key_encryption.is_enabled and not disabled_grace,
+            'enabled': shown_as_enabled(),
             # A disable left half-way: values still open, none is encrypted any more
             'disabling': (key_encryption.is_enabled and not key_encryption.is_encrypting
                           and not disabled_grace),

@@ -60,6 +60,19 @@ def retiring():
     return grace
 
 
+def disable_grace():
+    """The grace period of a disable done (its DEKs kept for reading only), or None."""
+    grace = retiring()
+    return grace if grace and grace.get('disable') else None
+
+
+def shown_as_enabled() -> bool:
+    """Encryption as the status, the dashboard and the preflight report it: on while new values
+    are encrypted or a disable is left half-way, off once a disable is done (grace included)."""
+    key_encryption = _encryption.key_encryption
+    return key_encryption.is_encrypting or (key_encryption.is_enabled and disable_grace() is None)
+
+
 def _set_grace(version, command_id, **extra) -> datetime:
     from models import db, SystemConfig
     from services.scheduler_leader import cluster_utc_now

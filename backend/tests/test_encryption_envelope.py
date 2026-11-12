@@ -1252,6 +1252,24 @@ def test_enable_and_rotate_during_the_grace_of_a_disable_name_its_end(app, auth_
     assert _read(app, values) == CLEAR
 
 
+def test_the_dashboard_and_the_preflight_read_a_disable_in_its_grace_as_the_status_does(
+        app, auth_client, values, grace):
+    """The DEKs are still loaded, but nothing is encrypted: every reader says off."""
+    from services import fips_preflight
+
+    def readers():
+        status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
+        board = auth_client.get('/api/v2/dashboard/system-status').get_json()['data']
+        with app.app_context():
+            findings = {f['id'] for f in fips_preflight.run()['findings']}
+        return (status['enabled'], board['key_encryption']['status'],
+                'keys.no_master_key' in findings)
+
+    assert readers() == (True, 'online', False)
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    assert readers() == (False, 'warning', True)
+
+
 @pytest.mark.skipif(not pg_app_harness.ENABLED, reason='needs UCM_TEST_APP_PG_URL')
 def test_on_postgresql_a_transaction_open_across_the_disable_stays_readable(
         app, auth_client, values, grace, monkeypatch, encryption_enabled):

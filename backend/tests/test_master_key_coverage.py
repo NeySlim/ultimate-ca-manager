@@ -201,7 +201,8 @@ def _drop_disabled_marker(app):
         db.session.commit()
 
 
-@pytest.mark.usefixtures('dek_retire_at_once')  # the disable drops its DEKs at once
+# Asserts the state once the grace is over (no DEK left): the disable ends it at once
+@pytest.mark.usefixtures('dek_retire_at_once')
 def test_disabling_keeps_a_key_from_the_environment_unused(
         app, auth_client, secrets, only_these):
     """The variable cannot be removed from here: it stays, marked unused, and a reload keeps
@@ -223,7 +224,8 @@ def test_disabling_keeps_a_key_from_the_environment_unused(
         _drop_disabled_marker(app)
 
 
-@pytest.mark.usefixtures('dek_retire_at_once')  # the disable drops its DEKs at once
+# Asserts the state once the grace is over (master.key removed): the disable ends it at once
+@pytest.mark.usefixtures('dek_retire_at_once')
 def test_disabling_a_key_file_does_not_fall_back_to_the_environment(
         app, auth_client, secrets, only_these):
     from security import encryption

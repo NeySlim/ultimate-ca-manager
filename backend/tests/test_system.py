@@ -409,7 +409,6 @@ class TestEnableEncryption:
                         content_type='application/json')
         assert r.status_code == 401, r.data
 
-    @pytest.mark.usefixtures('dek_retire_at_once')  # the disable drops its DEKs at once
     def test_enable_purges_plaintext_key_files(
         self, auth_client, monkeypatch, tmp_path
     ):
@@ -449,7 +448,6 @@ class TestDisableEncryption:
                         content_type='application/json')
         assert r.status_code == 401, r.data
 
-    @pytest.mark.usefixtures('dek_retire_at_once')  # the disable drops its DEKs at once
     def test_disable_recreates_plaintext_key_files(
         self, app, auth_client, monkeypatch, tmp_path
     ):
@@ -490,18 +488,27 @@ class TestDisableEncryption:
                 db.session.commit()
                 cert_id = cert.id
 
-            response = auth_client.post(
-                '/api/v2/system/security/disable-encryption', json={}
-            )
-            data = assert_success(response)
-            assert data['key_files_written'] >= 1
+            try:
+                response = auth_client.post(
+                    '/api/v2/system/security/disable-encryption', json={}
+                )
+                data = assert_success(response)
+                # The default grace: the DEKs stay loaded, the mirrors are written all the same
+                assert data['keys_kept_until']
+                assert data['key_files_written'] >= 1
 
-            with app.app_context():
-                cert = db.session.get(Certificate, cert_id)
-                assert cert_key_path(cert).read_bytes() == b'private-key-data'
-                cert_key_path(cert).unlink()
-                db.session.delete(cert)
-                db.session.commit()
+                with app.app_context():
+                    cert = db.session.get(Certificate, cert_id)
+                    assert cert_key_path(cert).read_bytes() == b'private-key-data'
+                    cert_key_path(cert).unlink()
+            finally:
+                with app.app_context():
+                    from models import EncryptionKey, SystemConfig
+                    from security.dek_rotation import GRACE_KEY
+                    EncryptionKey.query.delete()
+                    SystemConfig.query.filter_by(key=GRACE_KEY).delete()
+                    db.session.delete(db.session.get(Certificate, cert_id))
+                    db.session.commit()
 
         enc.key_encryption.reload()
 

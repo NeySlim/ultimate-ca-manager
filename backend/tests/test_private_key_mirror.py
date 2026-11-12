@@ -377,3 +377,45 @@ def test_api_creation_keeps_key_mirrors_when_encryption_disabled(
             assert cert_key_path(cert).exists()
     finally:
         _cleanup_models(app, cert_id, ca_data['id'])
+
+
+def test_mirrors_follow_the_values_while_a_disable_keeps_its_deks(
+    app, encryption_enabled, monkeypatch, tmp_path
+):
+    """A disable's DEKs stay loaded for its grace, but values are stored in the clear: mirrored."""
+    import base64
+
+    import pytest
+
+    from config.settings import Config
+    from models import EncryptionKey
+    from security import dek_rotation
+    from services.ca import helpers
+    from services.file_regen_service import write_ca_files, write_cert_files
+
+    key_encryption = encryption_enabled.key_encryption
+    for name in ('PRIVATE_DIR', 'CERT_DIR', 'CA_DIR'):
+        monkeypatch.setattr(Config, name, tmp_path / name.lower())
+    prv = base64.b64encode(KEY_PEM).decode()
+    with app.app_context():
+        dek_rotation.begin_disable()
+        try:
+            assert key_encryption.is_enabled and not key_encryption.is_encrypting
+            orphan = Config.PRIVATE_DIR / 'cert_orphan.key'
+            assert mirror_private_key(orphan, KEY_PEM, context='grace') is True
+            assert purge_private_key_files()['removed'] == 0 and orphan.exists()
+
+            cert = Certificate(refid=str(uuid.uuid4()), descr='Grace mirror cert', prv=prv)
+            write_cert_files(cert)
+            assert cert_key_path(cert).read_bytes() == KEY_PEM
+            ca = CA(refid=str(uuid.uuid4()), descr='Grace mirror CA', prv=prv)
+            write_ca_files(ca)
+            assert ca_key_path(ca).read_bytes() == KEY_PEM
+
+            # A mirror that fails to write is an error, not "skipped because encrypted"
+            monkeypatch.setattr(helpers, 'mirror_private_key', lambda *a, **k: False)
+            with pytest.raises(OSError):
+                helpers.save_ca_key_file(ca, KEY_PEM)
+        finally:
+            EncryptionKey.query.delete()
+            db.session.commit()
