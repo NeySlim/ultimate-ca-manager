@@ -8,7 +8,7 @@ import json
 import os
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -150,6 +150,73 @@ def test_a_failed_export_gives_the_slot_back(app, monkeypatch, tmp_path):
             assert schedule._get('backup.last_run') == '2026-01-01T00:00:00Z'
     finally:
         _drop_backup(app)
+
+
+class _Killed(BaseException):
+    """What os._exit, an OOM kill or a SIGTERM past the grace period look like to the
+    code after the claim: nothing below the export runs."""
+
+
+def _interrupted_then_retried(app, monkeypatch, tmp_path):
+    """Claim a run, die inside the export, then tick within and past the lease."""
+    exported = _backup_schedule(app, monkeypatch, tmp_path, last_run='2026-01-01T00:00:00Z')
+    real_export = schedule.storage.export_archive
+
+    def die(*a, **k):
+        raise _Killed()
+
+    clock = {'now': _NOW}
+    monkeypatch.setattr(schedule, 'utc_now', lambda: clock['now'])
+    with app.app_context():
+        _set('backup.last_outcome', 'ok')
+        _set('backup.last_outcome_at', '2026-01-01T00:05:00Z')
+        monkeypatch.setattr(schedule.storage, 'export_archive', die)
+        with pytest.raises(_Killed):
+            schedule.run_scheduled_backup()
+        db.session.remove()
+        monkeypatch.setattr(schedule.storage, 'export_archive', real_export)
+
+        clock['now'] = _NOW + timedelta(minutes=10)
+        within = schedule.run_scheduled_backup()
+        clock['now'] = _NOW + timedelta(seconds=schedule._CLAIM_LEASE_SECONDS + 60)
+        after = schedule.run_scheduled_backup()
+        db.session.remove()
+    return within, after, exported
+
+
+def test_a_run_killed_during_the_export_is_retried_after_the_lease(app, monkeypatch, tmp_path):
+    try:
+        within, after, exported = _interrupted_then_retried(app, monkeypatch, tmp_path)
+        # Still in flight on another node for all this one knows; then abandoned
+        assert within == {'status': 'skipped', 'reason': 'not_due'}
+        assert after['status'] == 'ok'
+        assert len(exported) == 1
+    finally:
+        _drop_backup(app)
+
+
+def test_a_concluded_run_is_not_retried_after_the_lease(app, monkeypatch, tmp_path):
+    exported = _backup_schedule(app, monkeypatch, tmp_path, last_run='2026-01-01T00:00:00Z')
+    clock = {'now': _NOW}
+    monkeypatch.setattr(schedule, 'utc_now', lambda: clock['now'])
+    try:
+        with app.app_context():
+            assert schedule.run_scheduled_backup()['status'] == 'ok'
+            clock['now'] = _NOW + timedelta(seconds=schedule._CLAIM_LEASE_SECONDS + 60)
+            assert schedule.run_scheduled_backup() == {'status': 'skipped', 'reason': 'not_due'}
+        assert len(exported) == 1
+    finally:
+        _drop_backup(app)
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_a_run_killed_during_the_export_is_retried_on_postgresql(app, monkeypatch, tmp_path):
+    with _pg(app):
+        within, after, exported = _interrupted_then_retried(app, monkeypatch, tmp_path)
+    assert within == {'status': 'skipped', 'reason': 'not_due'}
+    assert after['status'] == 'ok'
+    assert len(exported) == 1
 
 
 @pytest.mark.postgres

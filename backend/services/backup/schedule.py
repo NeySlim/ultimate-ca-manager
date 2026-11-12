@@ -35,6 +35,9 @@ _BACKUP_GLOB = 'ucm_backup_*.ucmbkp'
 _LAST_RUN_KEY = 'backup.last_run'
 _VALID_FREQUENCIES = ('daily', 'weekly', 'monthly')
 _PERIOD_SECONDS = {'daily': 86400, 'weekly': 604800, 'monthly': 2592000}
+# A claimed run with no outcome recorded after it is in flight for this long, then
+# abandoned (killed, OOM, os._exit on shutdown): the slot becomes due again.
+_CLAIM_LEASE_SECONDS = 2 * 3600
 
 # Archives with no validation record are kept in this number, newest first:
 # nothing can be proven about them either way, so prudence decides.
@@ -396,17 +399,27 @@ def _release_run(previous, claimed: str) -> None:
         logger.warning("Could not release the backup schedule; next run in one period")
 
 
+def _parse(value):
+    try:
+        return _naive_utc(datetime.fromisoformat(value.replace('Z', '+00:00')))
+    except (ValueError, AttributeError):
+        return None
+
+
 def _is_due(sched: dict, now: datetime) -> bool:
     period = _PERIOD_SECONDS.get(sched.get('frequency', 'daily'), 86400)
     last_run = sched.get('last_run')
     if not last_run:
         return True  # never run → run now
-    try:
-        prev = datetime.fromisoformat(last_run.replace('Z', '+00:00'))
-    except (ValueError, AttributeError):
+    prev = _parse(last_run)
+    if prev is None:
         return True
+    elapsed = (_naive_utc(now) - prev).total_seconds()
+    concluded = _parse(sched.get('last_outcome_at'))
+    if (concluded is None or concluded < prev) and elapsed >= _CLAIM_LEASE_SECONDS:
+        return True  # claimed, never concluded, lease expired
     # small slack so a ~daily timer doesn't drift a day each run
-    return (_naive_utc(now) - _naive_utc(prev)).total_seconds() >= period - 300
+    return elapsed >= period - 300
 
 
 def _naive_utc(value: datetime) -> datetime:
