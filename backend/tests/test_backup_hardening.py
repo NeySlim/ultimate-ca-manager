@@ -15,6 +15,8 @@ import pytest
 
 from models import db, SystemConfig
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 
 def _service():
     from services.backup_service import BackupService
@@ -31,16 +33,18 @@ def _set(key, value):
 
 
 @pytest.fixture(scope='module')
-def operator_client(app, create_user):
+def operator_client(app, auth_client, create_user):
     """A logged-in operator: holds read/write:settings, never admin:system."""
-    create_user(username='op_backup_review', role='operator')
+    user = create_user(username='op_backup_review', role='operator')
     c = app.test_client()
     r = c.post('/api/v2/auth/login',
                data=json.dumps({'username': 'op_backup_review',
                                 'password': 'TestPass123!'}),
                content_type='application/json')
     assert r.status_code == 200, r.data
-    return c
+    yield c
+    r = auth_client.delete(f"/api/v2/users/{user['id']}")
+    assert r.status_code in (200, 204), r.data
 
 
 class TestArchivesAreAdminOnly:
