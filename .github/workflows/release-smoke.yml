@@ -28,7 +28,7 @@ jobs:
   smoke-sqlite:
     name: Smoke (SQLite)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v')) }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -98,10 +98,62 @@ jobs:
         if: always()
         run: docker rm -f ucm-smoke || true
 
+  # Installs each published package in the container of its distribution. Debian 12 is
+  # not covered: the packages need python3 >= 3.12.
+  smoke-packages:
+    name: Package ${{ matrix.image }} (${{ matrix.label }})
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v')) }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {image: 'debian:13', label: DEB, pattern: 'ucm_*_all.deb'}
+          - {image: 'ubuntu:24.04', label: DEB, pattern: 'ucm_*_all.deb'}
+          - {image: 'ubuntu:26.04', label: DEB, pattern: 'ucm_*_all.deb'}
+          - {image: 'almalinux:9', label: RPM el9, pattern: 'ucm-el9-*.el9.noarch.rpm'}
+          - {image: 'almalinux:10', label: RPM el10, pattern: 'ucm-el10-*.el10.noarch.rpm'}
+          - {image: 'fedora:43', label: RPM Fedora, pattern: 'ucm-[0-9]*.fc43.noarch.rpm'}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Resolve version
+        id: ver
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then VER="$INPUT_VERSION"; else VER="${HEAD_BRANCH#v}"; fi
+          [[ "$VER" =~ ^[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]] || { echo "Invalid version: $VER"; exit 1; }
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+
+      - name: Download the published asset and verify its checksum
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.ver.outputs.version }}
+          PATTERN: ${{ matrix.pattern }}
+        run: |
+          mkdir pkg
+          gh release download "v$VERSION" --repo "$GITHUB_REPOSITORY" --dir pkg \
+            --pattern "$PATTERN" --pattern "$PATTERN.sha256"
+          test "$(ls pkg/*.sha256 | wc -l)" -eq 1
+          (cd pkg && sha256sum -c ./*.sha256)
+
+      - name: Install and run in the distribution container
+        env:
+          IMAGE: ${{ matrix.image }}
+        run: |
+          docker run --rm -v "$PWD/pkg:/pkg:ro" -v "$PWD/scripts/ci/package-smoke.sh:/smoke.sh:ro" \
+            "$IMAGE" sh -c 'sh /smoke.sh $(ls /pkg/*.deb /pkg/*.rpm 2>/dev/null | head -n 1)'
+
   smoke-postgres:
     name: Smoke (PostgreSQL)
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v')) }}
 
     services:
       postgres:
@@ -193,7 +245,7 @@ jobs:
     runs-on: ubuntu-latest
     # The -fips image is best effort: its absence must not fail the standard smokes
     continue-on-error: true
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'v')) }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
