@@ -568,15 +568,9 @@ def begin_disable():
                                      kek_id=mine, wrapped=None, created_at=now))
     else:
         marker.kek_id = mine
-    # No session key stays stored once nothing is encrypted: the environment's signs again
-    from security import session_key
-    dropped_session_key = session_key.drop_stored()
     command = _emit_reload(None)
     db.session.commit()
     key_encryption.reload()
-    if dropped_session_key:
-        from flask import current_app
-        session_key.load(current_app._get_current_object())
     return command
 
 
@@ -613,10 +607,17 @@ def finish_disable(kept_kek) -> None:
     # Nothing is encrypted any more: without this the next start would create a key
     from security.master_key_bootstrap import record_operator_choice
     record_operator_choice(auto=False)
+    # Here, not in phase 1: a disable that fails keeps the session key it had. The sweep of
+    # phase 1 skips these rows, so none was ever written in the clear
+    from security import session_key
+    dropped_session_key = session_key.drop_stored()
     command = _emit_reload(None)
     db.session.flush()  # the command's id, which every live node acknowledges
     _set_grace(max(kept, default=None), getattr(command, 'id', None), disable=True)
     db.session.commit()
+    if dropped_session_key:
+        from flask import current_app
+        session_key.load(current_app._get_current_object())
 
 
 def resume_at_start() -> None:

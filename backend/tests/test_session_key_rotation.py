@@ -300,10 +300,30 @@ def test_disabling_encryption_drops_the_stored_key(
         app, auth_client, stored, encryption_enabled, dek_refresh_now):
     from security import dek_rotation
     assert auth_client.post(ROTATE, json={}).status_code == 200
+    key = app.config['SECRET_KEY']
     with app.app_context():
         dek_rotation.begin_disable()
+    # Phase 1 alone: the stored key stays, still readable under the DEKs kept for reading
+    assert stored.ACTIVE_KEY in _rows(app) and app.config['SECRET_KEY'] == key
+    with app.app_context():
+        dek_rotation.finish_disable(None)
     assert _rows(app) == {}
     assert app.config['SECRET_KEY'] == stored.environment_key(app)
+
+
+def test_a_disable_that_fails_keeps_the_stored_key_active(
+        app, auth_client, stored, encryption_enabled, dek_refresh_now, monkeypatch):
+    assert auth_client.post(ROTATE, json={}).status_code == 200
+    key, rows = app.config['SECRET_KEY'], _rows(app)
+    monkeypatch.setattr('security.encryption.decrypt_all_keys',
+                        lambda dry_run=False: (0, 0, ['CA 1: unreadable']))
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert r.status_code == 500, r.data
+    assert _rows(app) == rows
+    assert app.config['SECRET_KEY'] == key
+    with app.app_context():
+        stored.load(app)
+    assert app.config['SECRET_KEY'] == key
 
 
 def test_the_stored_key_never_travels_in_a_backup():
