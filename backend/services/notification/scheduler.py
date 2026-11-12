@@ -254,4 +254,4 @@ class NotificationSchedulerMixin:
     @staticmethod
     def _taken_over(results):
         logger.warning(f"Expiry checks stopped: another node took the run over ({results})")
-        return results
+        return {**results, 'status': 'warning', 'reason': 'another node took the run over'}

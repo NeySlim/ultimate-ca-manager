@@ -141,9 +141,13 @@ def test_a_pass_whose_lease_was_taken_over_stops_sending(
         return True, 'sent'
     monkeypatch.setattr(NotificationSenderMixin, 'send_cert_expiring_notification', staticmethod(send))
     with app.app_context():
-        NotificationService.run_scheduled_checks()
+        result = NotificationService.run_scheduled_checks()
     assert len(sent) == 1
     assert passes == []
+    # Recorded as a run with something to see, not as a complete one
+    from services.scheduler_service import SchedulerService
+    assert SchedulerService._outcome_of(result)[0] == 'warning'
+    assert result['cert_expiring']['notified'] == 1
 
 
 def test_expiring_reminders_fire_once_per_day_in_ha(app, ha, monkeypatch):
@@ -466,3 +470,13 @@ def test_a_mark_not_stored_is_not_logged_as_a_failed_pass(app, ha, monkeypatch, 
     messages = [r.getMessage() for r in caplog.records]
     assert not any('webhook pass failed' in m for m in messages), messages
     assert any('mark not stored' in m for m in messages), messages
+
+
+def test_the_manual_check_counts_what_a_pass_taken_over_sent(app, auth_client, monkeypatch):
+    counts = {'cert_expiring': {'checked': 2, 'notified': 2, 'failed': 0},
+              'crl_expiring': {'checked': 0, 'notified': 0, 'failed': 0}}
+    monkeypatch.setattr(NotificationService, 'run_scheduled_checks',
+                        staticmethod(lambda: notification_scheduler.NotificationSchedulerMixin._taken_over(counts)))
+    response = auth_client.post('/api/v2/system/alerts/expiry/check')
+    assert response.status_code == 200, response.data
+    assert '2 alerts sent' in response.get_json()['message']
