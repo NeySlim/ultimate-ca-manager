@@ -1000,3 +1000,55 @@ class TestANegativeSerialNamesItsOwnRecordOnly:
                 for record in made:
                     db.session.delete(record)
                 db.session.commit()
+
+
+class TestCaAndCrossRecordsReadUnambiguousSpellings:
+    """A CA's or a cross-certificate's record lookup: another serial's all-digit hex is no match."""
+
+    def test_a_child_ca(self, app, issuer):
+        ca_id, refid, ca_cert, ca_key = issuer
+        d, h = _homonyms()
+        now = datetime.now(timezone.utc)
+        child_key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, f'homonym child {uuid.uuid4().hex[:6]}')])
+        child = (x509.CertificateBuilder().subject_name(name).issuer_name(ca_cert.subject)
+                 .public_key(child_key.public_key()).serial_number(h)
+                 .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
+                 .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                 .sign(ca_key, hashes.SHA256()))
+        with app.app_context():
+            row = CA(refid=str(uuid.uuid4()), descr='homonym child', caref=refid, serial=0,
+                     crt=base64.b64encode(child.public_bytes(serialization.Encoding.PEM)).decode(),
+                     subject=name.rfc4514_string(), issuer=ca_cert.subject.rfc4514_string(),
+                     serial_number=str(h))
+            db.session.add(row)
+            db.session.commit()
+            child_id = row.id
+        other = _record(app, refid, ca_cert, column=str(d))
+        try:
+            with app.app_context():
+                assert db.session.get(CA, child_id).persisted_revocation() is None
+            own = _record(app, refid, ca_cert, column=str(h))
+            with app.app_context():
+                assert db.session.get(CA, child_id).persisted_revocation().id == own
+        finally:
+            with app.app_context():
+                RevokedSerial.query.filter(RevokedSerial.id.in_([other])).delete(synchronize_session=False)
+                RevokedSerial.query.filter_by(caref=refid, serial_number=str(h)).delete()
+                db.session.delete(db.session.get(CA, child_id))
+                db.session.commit()
+
+    def test_a_cross_certificate(self, app, issuer):
+        from types import SimpleNamespace
+        from services.ca.cross_certs import published_record
+        ca_id, refid, ca_cert, _ = issuer
+        d, h = _homonyms()
+        other = _record(app, refid, ca_cert, column=str(d))
+        try:
+            with app.app_context():
+                assert published_record(SimpleNamespace(serial_number=str(h)), db.session.get(CA, ca_id)) is None
+                assert published_record(SimpleNamespace(serial_number=str(d)), db.session.get(CA, ca_id)).id == other
+        finally:
+            with app.app_context():
+                db.session.delete(db.session.get(RevokedSerial, other))
+                db.session.commit()
