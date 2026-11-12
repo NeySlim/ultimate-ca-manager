@@ -261,6 +261,8 @@ SECRET_VALUES = {
     ('scep_profiles', 'challenge_password'): 'xinst-scep-challenge',
     ('intune_apps', 'client_secret'): 'xinst-intune-secret',
     ('ad_connector', 'bind_password'): 'xinst-ad-bind-password',
+    # Base64 of the keytab bytes, as the profile keeps it under the master key
+    ('windows_enrollment_profiles', 'keytab'): 'eGluc3Qta2V5dGFi',
     ('webhook_endpoints', 'secret'): 'xinst-webhook-secret',
     ('webhook_endpoints', 'auth_token'): 'xinst-webhook-auth-token',
     ('deploy_targets', 'private_key'): 'xinst-deploy-private-key',
@@ -285,6 +287,7 @@ SECRET_ROW = {
     'intune_apps': {'name': 'xinst-intune'},
     'scep_profiles': {'name': 'xinst-scep'},
     'ad_connector': {},
+    'windows_enrollment_profiles': {'name': 'xinst-windows'},
     'webhook_endpoints': {'name': 'xinst-webhook'},
     'deploy_targets': {'name': 'xinst-deploy-b'},
     'acme_client_orders': {'order_url': 'https://acme-b.example.test/order/1'},
@@ -323,6 +326,7 @@ WRAPPED_WITH_THE_MASTER_KEY = {
     ('acme_client_accounts', 'account_key'),
     ('acme_client_accounts', 'eab_hmac_key'),
     ('deploy_targets', 'http_headers'),
+    ('windows_enrollment_profiles', 'keytab'),
 }
 
 
@@ -668,6 +672,13 @@ def _seed_source():
     connector = add('ad_connector', enabled=False, server='ad.example.test',
                     bind_dn='CN=ucm', base_dn='DC=example,DC=test')
     secret(connector, 'ad_connector', 'bind_password')
+    db.session.flush()
+    windows = add('windows_enrollment_profiles', name='xinst-windows', realm='XINST.TEST',
+                  is_default=True, connector_id=connector.id, issuing_ca_refid='xinst-ca-b')
+    secret(windows, 'windows_enrollment_profiles', 'keytab')
+    db.session.flush()
+    add('windows_profile_templates', profile_id=windows.id, template_id=templates[1].id)
+    leaves[1].windows_profile_id = windows.id
 
     endpoint = add('webhook_endpoints', name='xinst-webhook',
                    url='https://hook.example.test/xinst', auth_type='bearer')
@@ -752,6 +763,7 @@ RESTORABLE_SECTIONS = tuple(
         'scep_profiles', 'scep_requests', 'deploy_targets', 'scan_profiles', 'scan_runs',
         'intune_apps',
         'discovered_certificates', 'smtp_config', 'ad_connector',
+        'windows_enrollment_profiles', 'windows_profile_templates',
         'webhook_endpoints',
         # These six used to abort the restore outright: their references
         # point at rows the same restore creates, and the plan was indexed
@@ -1347,6 +1359,7 @@ AT_REST_AFTER_A_RESTORE = {
     ('acme_dns_update_keys', 'secret'): 'database key',
     ('ad_connector', 'bind_password'): 'database key',
     ('dns_providers', 'credentials'): 'database key',
+    ('windows_enrollment_profiles', 'keytab'): 'key-encryption key',
     ('microsoft_cas', 'password'): 'database key',
 
     # Put back under the target's database key now that their restorers go

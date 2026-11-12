@@ -79,6 +79,12 @@ def _scep_challenge(secret):
     return ScepProfile, row, ScepProfile.name == f'{MARK}-challenge'
 
 
+def _windows_profile(secret):
+    from models import WindowsEnrollmentProfile
+    row = WindowsEnrollmentProfile(name=f'{MARK}-windows', is_default=False, keytab=_master(secret))
+    return WindowsEnrollmentProfile, row, WindowsEnrollmentProfile.name == f'{MARK}-windows'
+
+
 def _intune_app(secret):
     from models.scep import IntuneApp
     row = IntuneApp(name=f'{MARK}-intune', tenant_id=f'{MARK}-tenant',
@@ -138,6 +144,7 @@ CASES = [
     ('deploy_targets', 'private_key', _deploy_target, _read_master),
     ('deploy_targets', 'http_headers', _http_target, _read_master_headers),
     ('hsm_providers', 'config', _hsm_provider, _read_hsm_token),
+    ('windows_enrollment_profiles', 'keytab', _windows_profile, _read_master),
 ]
 
 

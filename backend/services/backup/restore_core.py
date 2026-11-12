@@ -34,6 +34,7 @@ from .restore.replace import plan_replacement, remove_after_writes, remove_befor
 from .restore.setting_refs import deferred_keys, prune_doomed_settings, restore_setting_references
 from .restore.settings import restore_encrypted_settings
 from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
+from .restore.windows_profiles import upgrade_archived_windows_profiles
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +120,8 @@ GENERIC_SECTIONS = (
     'crl_deploy_bindings',
     'intune_apps',
     'scep_profiles',
+    'windows_enrollment_profiles',
+    'windows_profile_templates',
     'ca_template_pins',
     'acme_client_accounts',
     # After its proxy account, EAB credential and creator (users and
@@ -327,6 +330,7 @@ class RestoreCoreMixin:
         self._check_payload_schema(backup_data)
         self._check_serial_duplicates(backup_data)
         upgrade_archived_permissions(backup_data)
+        upgrade_archived_windows_profiles(backup_data)
         if mode not in ('replace', 'merge'):
             raise BackupSchemaError(
                 f"Unknown restore mode {mode!r}: use 'replace' (the archive "
