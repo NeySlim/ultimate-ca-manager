@@ -114,6 +114,7 @@ class TestImportLinksOnlyTheSigningCa:
         assert [caref for _, caref in _rows(app, forged)] == [None]
 
     def test_a_certificate_the_ca_signed_is_linked_and_renews(self, app, auth_client, issuer):
+        """Non-regression: passes with or without the signature check, not a proof of it."""
         ca_id, refid, ca_cert, ca_key = issuer
         real, key = _leaf('really-issued.example.test', ca_cert, ca_key)
         r = _import(auth_client, real, key, ca_id=str(ca_id))
@@ -124,12 +125,14 @@ class TestImportLinksOnlyTheSigningCa:
         assert r.status_code in (200, 201), r.data
 
     def test_without_ca_id_a_certificate_the_ca_signed_is_linked(self, app, auth_client, issuer):
+        """Non-regression: passes with or without the signature check, not a proof of it."""
         _, refid, ca_cert, ca_key = issuer
         real, _ = _leaf('really-issued-auto.example.test', ca_cert, ca_key)
         assert _import(auth_client, real).status_code in (200, 201)
         assert [caref for _, caref in _rows(app, real)] == [refid]
 
     def test_a_third_party_certificate_imports_as_before(self, app, auth_client):
+        """Non-regression: passes with or without the signature check, not a proof of it."""
         other_key = _gen()
         now = datetime.now(timezone.utc)
         other = (x509.CertificateBuilder()
@@ -169,7 +172,9 @@ class TestImportLinksOnlyTheSigningCa:
             assert row.serial_number == str(real.serial_number) and row.caref == refid
 
     def test_a_record_of_the_same_key_stays_linkable(self, app, auth_client, issuer):
-        """A CA re-signed under its own key (a second record, same subject and key)."""
+        """A CA re-signed under its own key (a second record, same subject and key).
+
+        Non-regression: passes with or without the signature check, not a proof of it."""
         _, refid, ca_cert, ca_key = issuer
         now = datetime.now(timezone.utc)
         resigned = (x509.CertificateBuilder().subject_name(ca_cert.subject).issuer_name(ca_cert.subject)
@@ -292,6 +297,7 @@ class TestStoredRowsAreIssuedOnlyWhenTheCaSignedThem:
             assert row is None and error == 'Signing certificate is not recognized'
 
     def test_a_revoked_forged_row_stays_revoked(self, app, issuer):
+        """Non-regression: passes with or without the signature check, not a proof of it."""
         from models import RevokedSerial
         from services.cert.issued_lookup import REVOKED, issued_certificate_status
         from utils.serial_format import canonical_serial
@@ -558,6 +564,7 @@ class TestTheChainOfAnUnlinkedRowNamesOnlyTheSigningCa:
 
     @pytest.mark.parametrize('aki', [True, False], ids=['by-aki', 'by-issuer-dn'])
     def test_a_row_the_ca_signed_is(self, app, auth_client, issuer, aki):
+        """Non-regression: passes with or without the signature check, not a proof of it."""
         _, _, ca_cert, ca_key = issuer
         real, _ = _leaf(f'real-chain-{aki}.example.test', ca_cert, ca_key)
         chain = self._chain(app, auth_client, real, ca_cert, aki=aki)
