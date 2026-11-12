@@ -238,6 +238,8 @@ export default function SettingsPage() {
 
   // Encryption states
   const [encryptionStatus, setEncryptionStatus] = useState(null)
+  const [secretsStatus, setSecretsStatus] = useState(null)
+  const [sessionKeyLoading, setSessionKeyLoading] = useState(false)
   const [showEnableEncryptionModal, setShowEnableEncryptionModal] = useState(false)
   const [showDisableEncryptionModal, setShowDisableEncryptionModal] = useState(false)
   const [encryptionLoading, setEncryptionLoading] = useState(false)
@@ -846,6 +848,8 @@ export default function SettingsPage() {
       const response = await settingsService.getEncryptionStatus()
       setEncryptionStatus(response.data)
     } catch (error) { reportSilentFailure('loadEncryptionStatus', error) }
+    // Enabling or disabling encryption changes how the session key rotates
+    loadSecretsStatus()
   }
 
   const handleEnableEncryption = async () => {
@@ -950,6 +954,35 @@ export default function SettingsPage() {
       showError(error.message || t('common.error'))
     } finally {
       setEncryptionLoading(false)
+    }
+  }
+
+  const loadSecretsStatus = async () => {
+    try {
+      const response = await settingsService.getSecretsStatus()
+      setSecretsStatus(response.data)
+    } catch (error) { reportSilentFailure('loadSecretsStatus', error) }
+  }
+
+  const handleRotateSessionKey = async () => {
+    const stored = secretsStatus?.session_secret?.rotation === 'database'
+    const confirmed = await showConfirm(
+      t(stored ? 'settings.rotateSessionKeyConfirmStored' : 'settings.rotateSessionKeyConfirmFile'), {
+        title: t('settings.rotateSessionKey'),
+        confirmText: t('settings.rotateSessionKey'),
+      })
+    if (!confirmed) return
+    setSessionKeyLoading(true)
+    try {
+      const res = await settingsService.rotateSessionKey()
+      const data = res.data || res
+      showSuccess(t(data.mode === 'database' ? 'settings.rotateSessionKeyDoneStored' : 'settings.rotateSessionKeyDoneFile'))
+      await loadSecretsStatus()
+    } catch (error) {
+      showError(error.message || t('common.error'))
+      await loadSecretsStatus()
+    } finally {
+      setSessionKeyLoading(false)
     }
   }
 
@@ -1574,6 +1607,9 @@ export default function SettingsPage() {
             handleEncryptRemainingKeys={handleEncryptRemainingKeys}
             handleRotateDataKey={handleRotateDataKey}
             encryptionLoading={encryptionLoading}
+            secretsStatus={secretsStatus}
+            handleRotateSessionKey={handleRotateSessionKey}
+            sessionKeyLoading={sessionKeyLoading}
             anomalies={anomalies}
             anomaliesLoading={anomaliesLoading}
             loadAnomalies={loadAnomalies}

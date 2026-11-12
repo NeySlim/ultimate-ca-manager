@@ -306,3 +306,33 @@ describe('SecuritySection admin access allowlist', () => {
     expect(screen.queryByText('settings.adminAllowlistActive')).not.toBeInTheDocument()
   })
 })
+
+describe('SecuritySection session key', () => {
+  it('says the stored key rotates without a restart and names the grace end', () => {
+    const rotate = vi.fn()
+    renderSection(null, {
+      secretsStatus: { session_secret: { source: 'database', rotation: 'database', previous_accepted_until: '2026-11-13T10:00:00' } },
+      handleRotateSessionKey: rotate,
+    })
+    expect(screen.getByText('settings.sessionKeyFromDatabase')).toBeTruthy()
+    expect(screen.getByText('settings.sessionKeyRotateStoredDesc')).toBeTruthy()
+    expect(screen.getByText('settings.sessionKeyPreviousUntil')).toBeTruthy()
+    expect(screen.queryByText('settings.sessionKeyRotateFileDesc')).toBeNull()
+    // The next rotation waits for the end of the grace
+    fireEvent.click(screen.getByText('settings.rotateSessionKey'))
+    expect(rotate).not.toHaveBeenCalled()
+  })
+
+  it('says the file rotation restarts the service without encryption', () => {
+    const rotate = vi.fn()
+    renderSection(null, {
+      secretsStatus: { session_secret: { source: 'environment', rotation: 'environment_file', previous_accepted_until: null } },
+      handleRotateSessionKey: rotate,
+    })
+    expect(screen.getByText('settings.sessionKeyFromEnvironment')).toBeTruthy()
+    expect(screen.getByText('settings.sessionKeyRotateFileDesc')).toBeTruthy()
+    expect(screen.queryByText('settings.sessionKeyRotateStoredDesc')).toBeNull()
+    fireEvent.click(screen.getByText('settings.rotateSessionKey'))
+    expect(rotate).toHaveBeenCalled()
+  })
+})
