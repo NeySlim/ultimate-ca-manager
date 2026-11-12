@@ -2860,6 +2860,7 @@
     "dekRotationInProgress": "Data key rotation in progress",
     "rotateDataKey": "Rotate Data Key",
     "resumeDataKeyRotation": "Finish Data Key Rotation",
+    "previousDekKeptUntil": "Previous data key kept until {{date}}",
     "rotateDataKeyConfirm": "Create a new data key and re-encrypt every stored private key and secret under it? The master key does not change.",
     "rotateDataKeyDone": "Data key rotated to version {{version}}",
     "rotateDataKeyPending": "Rotation started: some nodes have not loaded the new key yet. Run it again to finish.",

@@ -23,7 +23,7 @@ pytestmark = pytest.mark.skipif(not pg_app_harness.ENABLED,
 
 
 @pytest.fixture(autouse=True)
-def _dek_refresh(dek_refresh_now):
+def _dek_refresh(dek_refresh_now, dek_retire_at_once):
     """No process here lags: rotations and disables wait for none."""
 
 
@@ -50,6 +50,7 @@ def ha(app, monkeypatch, encryption_enabled):
         with app.app_context():
             ClusterCommand.query.delete()
             EncryptionKey.query.delete()
+            SystemConfig.query.filter_by(key='encryption.dek_retire_after').delete()
             ClusterNode.query.filter(ClusterNode.node_id.like(PREFIX + '%')).delete(
                 synchronize_session=False)
             SystemConfig.query.filter(SystemConfig.key.like(f'acme.account.{PREFIX}%')).delete(

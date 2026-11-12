@@ -4,8 +4,10 @@ Until the end both DEKs stay in encryption_keys (old 'previous', new 'active'), 
 interruption at any point leaves every value readable; running it again resumes.
 """
 import importlib
+import json
 import logging
 import time
+from datetime import datetime, timedelta
 
 from sqlalchemy import text
 
@@ -19,6 +21,10 @@ BATCH = 200
 ACK_TIMEOUT_SECONDS = 30.0
 _LOCK = 0x75636D64656B  # PostgreSQL advisory lock id for DEK state changes
 DISABLED_MARKER_VERSION = 0
+# The previous DEK opens values for this long after the last sweep: a write encrypted under
+# it before its process re-read the rows (REFRESH_SECONDS) commits within it and stays readable
+GRACE_SECONDS = 600.0
+GRACE_KEY = 'encryption.dek_retire_after'  # system_config: {"version", "until", "command"}
 
 
 class RotationError(RuntimeError):
@@ -36,8 +42,39 @@ def lock_key_state(session=None) -> None:
 
 
 def rotation_in_progress() -> bool:
+    """A previous DEK is still in the database: being rewritten, or in its grace period."""
     from models import EncryptionKey
     return EncryptionKey.query.filter_by(state=envelope.PREVIOUS).first() is not None
+
+
+def retiring():
+    """The grace period of the previous DEK, {'version', 'until', 'command'}, or None."""
+    from models import SystemConfig
+    row = SystemConfig.query.filter_by(key=GRACE_KEY).first()
+    if row is None or not row.value:
+        return None
+    grace = json.loads(row.value)
+    grace['until'] = datetime.fromisoformat(grace['until'])
+    return grace
+
+
+def _set_grace(version, command_id) -> datetime:
+    from models import db, SystemConfig
+    from services.scheduler_leader import cluster_utc_now
+    until = cluster_utc_now() + timedelta(seconds=GRACE_SECONDS)
+    value = json.dumps({'version': version, 'until': until.isoformat(), 'command': command_id})
+    row = SystemConfig.query.filter_by(key=GRACE_KEY).first()
+    if row is None:
+        db.session.add(SystemConfig(key=GRACE_KEY, value=value,
+                                    description='Previous data-encryption key kept until'))
+    else:
+        row.value = value
+    return until
+
+
+def _clear_grace() -> None:
+    from models import SystemConfig
+    SystemConfig.query.filter_by(key=GRACE_KEY).delete(synchronize_session=False)
 
 
 def _emit_reload(version):
@@ -108,7 +145,7 @@ def wait_for_nodes(command, timeout=None) -> list:
     if command is None or command.id is None:
         return []
     from config.settings import Config
-    from models import db
+    from models import db, ClusterNode
     from services.scheduler_leader import STALE_PASSES, cluster_utc_now
     from services.scheduler_service import WAKE_INTERVAL_SECONDS
     deadline = time.monotonic() + (ACK_TIMEOUT_SECONDS if timeout is None else timeout)
@@ -116,9 +153,9 @@ def wait_for_nodes(command, timeout=None) -> list:
     while True:
         db.session.commit()  # a fresh snapshot on every poll
         now = cluster_utc_now()
-        rows = db.session.execute(text(
-            "SELECT node_id, heartbeat_at, command_seen FROM cluster_nodes WHERE node_id <> :me"),
-            {'me': Config.NODE_ID}).fetchall()
+        rows = db.session.query(ClusterNode.node_id, ClusterNode.heartbeat_at,
+                                ClusterNode.command_seen).filter(
+            ClusterNode.node_id != Config.NODE_ID).all()
         pending = sorted(r.node_id for r in rows
                          if (now - r.heartbeat_at).total_seconds() <= stale
                          and (r.command_seen or 0) < command.id)
@@ -206,29 +243,96 @@ def rewrite(batch=None, commit=True) -> dict:
     return {'rewritten': rewritten, 'skipped': skipped, 'unreadable': unreadable}
 
 
-def finish() -> int:
-    """Last pass, then the previous DEKs are dropped; returns how many were."""
-    from models import db, EncryptionKey
-    rewrite()
-    lock_key_state()
-    # The final sweep and the drop share one transaction: the window for a late write is its length
+def _final_sweep() -> None:
+    """Under the lock, in the caller's transaction; raises while a value opens with no DEK."""
+    from models import db
     unreadable = rewrite(commit=False)['unreadable']
     if unreadable:
         # Dropping a DEK could lose what only it opens: the rotation stays resumable
         db.session.commit()
         raise RotationError(f"{len(unreadable)} value(s) decrypt with no data-encryption key, "
                             f"the previous key is kept: {', '.join(unreadable[:5])}")
+
+
+def finish(command=None):
+    """Last pass, then the previous DEKs enter their grace period; returns its end."""
+    from models import db
+    rewrite()
+    lock_key_state()
+    _final_sweep()
+    until = _set_grace(_encryption.key_encryption.active_version,
+                       getattr(command, 'id', None))
+    db.session.commit()
+    return until
+
+
+def retire_if_due() -> int:
+    """Drop the previous DEKs once their grace is over, every live node has loaded the active
+    one and a sweep finds no value left under them; returns how many were dropped."""
+    from types import SimpleNamespace
+    from models import db, EncryptionKey
+    from services.scheduler_leader import cluster_utc_now
+    grace = retiring()
+    if grace is None or cluster_utc_now() < grace['until']:
+        return 0
+    lagging = wait_for_nodes(SimpleNamespace(id=grace['command']), timeout=0)
+    if lagging:
+        logger.warning("Previous DEK kept: node(s) %s have not loaded DEK version %s",
+                       ', '.join(lagging), grace['version'])
+        return 0
+    lock_key_state()
+    _encryption.key_encryption.refresh()
+    late = rewrite(commit=False)
+    if late['unreadable']:
+        db.session.commit()
+        raise RotationError(f"{len(late['unreadable'])} value(s) decrypt with no data-encryption "
+                            f"key, the previous key is kept: {', '.join(late['unreadable'][:5])}")
+    if late['rewritten']:
+        # Something still wrote under the previous DEK: it stays for another grace period
+        _set_grace(grace['version'], grace['command'])
+        db.session.commit()
+        logger.warning("Previous DEK kept: %d value(s) were written under it since the "
+                       "rotation", late['rewritten'])
+        return 0
     previous = EncryptionKey.query.filter_by(state=envelope.PREVIOUS).all()
     for row in previous:
         db.session.delete(row)
+    _clear_grace()
     _emit_reload(_encryption.key_encryption.active_version)
     db.session.commit()
     _encryption.key_encryption.reload()
     return len(previous)
 
 
+def scheduled_retire() -> None:
+    """Scheduler task (the leader in HA): ends a grace period that is over."""
+    from models import db
+    if retiring() is None:
+        return
+    try:
+        dropped = retire_if_due()
+    except RotationError as e:
+        logger.error("🔑 Previous DEK kept: %s", e)
+        return
+    except Exception:
+        db.session.rollback()
+        raise
+    if dropped:
+        logger.info("🔑 Previous data-encryption key dropped after its grace period")
+
+
 def rotate(wait_timeout=None) -> dict:
-    """Start (or resume) a rotation and carry it to the end; 'in_progress' when nodes lag."""
+    """Start (or resume) a rotation and carry it to the end; 'in_progress' when nodes lag.
+
+    A rotation still in its grace period is retired first when it is due, else refused.
+    """
+    if retiring() is not None:
+        retire_if_due()
+        grace = retiring()
+        if grace is not None:
+            raise RotationError(f"The previous data-encryption key is kept until "
+                                f"{grace['until'].isoformat(timespec='seconds')} UTC: rotate "
+                                f"again after that")
     version, command = start()
     # No value is rewritten under the new DEK before every process can open it
     settle()
@@ -238,11 +342,13 @@ def rotate(wait_timeout=None) -> dict:
                        "again to resume", version, ', '.join(lagging))
         return {'state': 'in_progress', 'version': version, 'waiting_for': lagging}
     stats = rewrite()
-    dropped = finish()
+    until = finish(command)
+    dropped = retire_if_due()
     logger.info("🔑 DEK rotated to version %s: %d values rewritten, %d previous key(s) dropped",
                 version, stats['rewritten'], dropped)
     return {'state': 'done', 'version': version, 'rewritten': stats['rewritten'],
-            'dropped': dropped}
+            'dropped': dropped,
+            'retire_after': None if dropped else until.isoformat(timespec='seconds')}
 
 
 def begin_disable():
@@ -259,7 +365,12 @@ def begin_disable():
         db.session.rollback()
         raise RotationError('Encryption is not enabled', 400)
     if rotation_in_progress():
+        grace = retiring()
         db.session.rollback()
+        if grace is not None:
+            raise RotationError(f"The previous data-encryption key of the last rotation is kept "
+                                f"until {grace['until'].isoformat(timespec='seconds')} UTC: "
+                                f"disable after that.")
         raise RotationError('A data-encryption key rotation is in progress: finish it first.')
     mine = envelope.kek_id(key_encryption.kek_bytes_for_envelope())
     rows = EncryptionKey.query.all()
@@ -313,6 +424,9 @@ def resume_at_start() -> None:
     if ha_enabled() or not _encryption.key_encryption.is_enabled:
         return
     try:
+        if retiring() is not None:
+            retire_if_due()  # restarted during the grace period: the scheduler ends it otherwise
+            return
         if not rotation_in_progress():
             return
         result = rotate()

@@ -34,7 +34,8 @@ def _add_authority(refid):
     return key
 
 
-def test_an_archive_under_a_rotated_dek_restores_under_the_target_kek(app, tmp_path):
+def test_an_archive_under_a_rotated_dek_restores_under_the_target_kek(app, tmp_path,
+                                                                     dek_retire_at_once):
     from models import CA, EncryptionKey
     from security import dek_rotation
     from security.encryption import ENCRYPTED_MARKER, key_encryption

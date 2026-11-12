@@ -315,6 +315,13 @@ def dek_refresh_now(monkeypatch):
     monkeypatch.setattr(enc_mod, 'REFRESH_SECONDS', 0.0)
 
 
+@pytest.fixture
+def dek_retire_at_once(monkeypatch):
+    """A rotation drops the previous DEK at its end, with no grace period."""
+    from security import dek_rotation
+    monkeypatch.setattr(dek_rotation, 'GRACE_SECONDS', 0.0)
+
+
 _SESSION_APP = []
 
 

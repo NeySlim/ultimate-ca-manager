@@ -157,6 +157,13 @@ describe('SecuritySection data key rotation', () => {
     expect(screen.getByText('settings.resumeDataKeyRotation')).toBeInTheDocument()
   })
 
+  it('names the end of the previous key grace period and holds the next rotation', () => {
+    renderSection({ ...status, previous_dek_retire_after: '2026-11-12T10:00:00Z' },
+      { handleRotateDataKey: vi.fn() })
+    expect(screen.getByText('settings.previousDekKeptUntil')).toBeInTheDocument()
+    expect(screen.getByText('settings.rotateDataKey').closest('button')).toBeDisabled()
+  })
+
   it('is not offered while encryption is off', () => {
     renderSection({ ...status, enabled: false }, { handleRotateDataKey: vi.fn() })
     expect(screen.queryByText('settings.rotateDataKey')).not.toBeInTheDocument()

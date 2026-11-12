@@ -53,6 +53,11 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                 {encryptionStatus.rotation_in_progress && (
                   <Badge variant="warning">{t('settings.dekRotationInProgress')}</Badge>
                 )}
+                {encryptionStatus.previous_dek_retire_after && (
+                  <Badge variant="secondary">
+                    {t('settings.previousDekKeptUntil', { date: formatDate(encryptionStatus.previous_dek_retire_after, { hour: '2-digit', minute: '2-digit' }) })}
+                  </Badge>
+                )}
               </div>
             )}
             
@@ -112,7 +117,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                       <Button
                         onClick={handleRotateDataKey}
                         variant="outline"
-                        disabled={encryptionLoading}
+                        disabled={encryptionLoading || !!encryptionStatus.previous_dek_retire_after}
                       >
                         <LockKey size={16} />
                         {encryptionStatus.rotation_in_progress

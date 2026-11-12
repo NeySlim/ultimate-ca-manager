@@ -14,7 +14,7 @@ export default {
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: '可选启用的环境变量：没有显式的数据库加密密钥时拒绝启动' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: '可选启用的环境变量：未启用私钥加密时拒绝启动' },
           { label: '加密剩余密钥', text: '启用加密后，若仍有密钥或机密以未加密方式存储，则会显示：加密这些内容，已加密的保持不变' },
-          { label: 'Data key rotation', text: 'Keys are encrypted under a data key stored in the database and wrapped by the master key (master.key or KEY_ENCRYPTION_KEY), still the only file to back up. Rotate Data Key re-encrypts every stored key and secret under a new data key without changing the master key; an interrupted rotation keeps both data keys and is finished by running it again. The fingerprint shown names the master key without revealing it' },
+          { label: 'Data key rotation', text: 'Keys are encrypted under a data key stored in the database and wrapped by the master key (master.key or KEY_ENCRYPTION_KEY), still the only file to back up. Rotate Data Key re-encrypts every stored key and secret under a new data key without changing the master key; an interrupted rotation keeps both data keys and is finished by running it again. Once every value is rewritten, the previous data key is kept for reading for ten minutes, then dropped; the next rotation waits for that. The fingerprint shown names the master key without revealing it' },
         ]
       },
       {

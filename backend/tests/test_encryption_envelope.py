@@ -14,11 +14,13 @@ from cryptography.fernet import Fernet, InvalidToken
 from config.settings import Config
 from models import db, SharedFile, SystemConfig
 from services import shared_files
+from security.dek_rotation import GRACE_KEY
 from tests import pg_app_harness
 
 @pytest.fixture(autouse=True)
-def _dek_refresh(dek_refresh_now):
-    """No process here lags: rotations and disables wait for none."""
+def _dek_refresh(dek_refresh_now, dek_retire_at_once):
+    """No process here lags: rotations and disables wait for none, and the previous DEK
+    goes at the end (the grace tests set a period of their own)."""
 
 
 @pytest.fixture(autouse=True)
@@ -63,6 +65,7 @@ def envelope_keys(app):
     def clean():
         with app.app_context():
             EncryptionKey.query.delete()
+            SystemConfig.query.filter_by(key=GRACE_KEY).delete()
             ClusterCommand.query.delete()
             ClusterNode.query.filter(ClusterNode.node_id.like('envtest-%')).delete(
                 synchronize_session=False)
@@ -432,6 +435,166 @@ def test_on_postgresql_node_b_writes_the_keytab_a_rotated(app, auth_client, valu
         node_b.stop()
         with app.app_context():
             shared_files.drop_file(shared_files.KERBEROS_KEYTAB)
+            db.session.commit()
+
+
+# --- grace period of the previous DEK -------------------------------------
+
+
+@pytest.fixture
+def grace(monkeypatch):
+    """A grace period of ten minutes; ``later(seconds)`` moves the cluster clock on."""
+    from datetime import timedelta
+    from security import dek_rotation
+    from services import scheduler_leader
+    monkeypatch.setattr(dek_rotation, 'GRACE_SECONDS', 600.0)
+    real = scheduler_leader.cluster_utc_now
+    offset = [timedelta(0)]
+    monkeypatch.setattr(scheduler_leader, 'cluster_utc_now',
+                        lambda executor=None: real(executor) + offset[0])
+
+    def later(seconds):
+        offset[0] += timedelta(seconds=seconds)
+    return later
+
+
+def _late_write(app, values, fernet):
+    """A process that encrypted under ``fernet`` before it re-read the rows commits now."""
+    from models.deploy import DeployTarget
+    from security import encryption
+    with app.app_context():
+        db.session.get(DeployTarget, values['ids'][DeployTarget]).private_key = base64.b64encode(
+            encryption.ENCRYPTED_MARKER + fernet.encrypt(PEM.encode())).decode()
+        db.session.commit()
+
+
+def test_a_write_under_the_old_dek_after_the_final_sweep_stays_readable(app, values, grace,
+                                                                       encryption_enabled):
+    from security import dek_rotation
+    with app.app_context():
+        old = encryption_enabled.key_encryption._fernet
+        result = dek_rotation.rotate()
+    assert result['state'] == 'done' and result['dropped'] == 0 and result['retire_after']
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
+    _late_write(app, values, old)
+    assert _read(app, values) == CLEAR
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 0  # not due
+    grace(601)
+    with app.app_context():
+        # The end-of-grace sweep finds the late value: rewritten, the old DEK kept once more
+        assert dek_rotation.retire_if_due() == 0
+    with pytest.raises(InvalidToken):
+        old.decrypt(_token(_stored(app, values)['target']))
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
+    assert _read(app, values) == CLEAR
+    grace(601)
+    with app.app_context():
+        dek_rotation.scheduled_retire()
+        assert dek_rotation.retiring() is None
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'active')]
+    assert _read(app, values) == CLEAR
+
+
+def test_a_restart_during_the_grace_period_keeps_the_previous_dek(app, values, grace,
+                                                                  encryption_enabled):
+    from security import dek_rotation
+    with app.app_context():
+        old = encryption_enabled.key_encryption._fernet
+        dek_rotation.rotate()
+    _late_write(app, values, old)
+    _start(app)
+    assert app.config['SAFE_MODE'] is False
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
+    with app.app_context():
+        encryption_enabled.key_encryption.reload()
+        assert encryption_enabled.key_encryption.dek_versions == (1, 2)
+    assert _read(app, values) == CLEAR
+    grace(601)
+    _start(app)  # the late value rewritten, then a second period
+    grace(601)
+    _start(app)
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'active')]
+    assert _read(app, values) == CLEAR
+
+
+def test_during_the_grace_period_rotate_and_disable_name_its_end(app, auth_client, values, grace):
+    from security import dek_rotation
+    with app.app_context():
+        dek_rotation.rotate()
+    status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
+    assert status['rotation_in_progress'] is False and status['previous_dek_retire_after']
+    for route in ('rotate-encryption-key', 'disable-encryption'):
+        r = auth_client.post(f'/api/v2/system/security/{route}')
+        assert r.status_code == 409, r.data
+        assert 'kept until' in r.get_json()['message']
+    grace(601)
+    r = auth_client.post('/api/v2/system/security/rotate-encryption-key')
+    assert r.status_code == 200, r.data
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'previous'), (3, 'active')]
+
+
+def test_in_ha_the_previous_dek_waits_for_every_live_node(app, values, grace, monkeypatch):
+    from models import ClusterNode
+    from security import dek_rotation
+    from services.scheduler_leader import cluster_utc_now
+    _ha(monkeypatch)
+    with app.app_context():
+        dek_rotation.rotate()
+        command = dek_rotation.retiring()['command']
+        assert command
+    grace(601)
+    with app.app_context():
+        now = cluster_utc_now()
+        db.session.add(ClusterNode(node_id='envtest-lag', started_at=now, heartbeat_at=now,
+                                   is_leader=False, command_seen=command - 1))
+        db.session.commit()
+        assert dek_rotation.retire_if_due() == 0
+        db.session.get(ClusterNode, 'envtest-lag').command_seen = command
+        db.session.commit()
+        assert dek_rotation.retire_if_due() == 1
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'active')]
+
+
+@pytest.mark.skipif(not pg_app_harness.ENABLED, reason='needs UCM_TEST_APP_PG_URL')
+def test_on_postgresql_a_transaction_open_across_the_rotation_stays_readable(
+        app, values, grace, encryption_enabled):
+    """A second connection encrypts under the old DEK, the rotation ends, then it commits."""
+    from sqlalchemy import text
+    from security import dek_rotation, encryption
+    key = f"acme.account.late{values['tag']}.private_key"
+    with app.app_context():
+        old = encryption_enabled.key_encryption._fernet
+        late = base64.b64encode(encryption.ENCRYPTED_MARKER + old.encrypt(PEM.encode())).decode()
+        other = db.engine.connect()
+        transaction = other.begin()
+        other.execute(text("INSERT INTO system_config (key, value) VALUES (:k, :v)"),
+                      {'k': key, 'v': late})
+    try:
+        with app.app_context():
+            assert dek_rotation.rotate()['dropped'] == 0
+        transaction.commit()
+        with app.app_context():
+            stored = SystemConfig.query.filter_by(key=key).one().value
+            assert encryption.decrypt_master_key_value(stored, 'text') == PEM
+        grace(601)
+        with app.app_context():
+            assert dek_rotation.retire_if_due() == 0
+            db.session.expire_all()
+            stored = SystemConfig.query.filter_by(key=key).one().value
+            assert encryption.decrypt_master_key_value(stored, 'text') == PEM
+            with pytest.raises(InvalidToken):
+                old.decrypt(_token(stored))
+        grace(601)
+        with app.app_context():
+            assert dek_rotation.retire_if_due() == 1
+            db.session.expire_all()
+            stored = SystemConfig.query.filter_by(key=key).one().value
+            assert encryption.decrypt_master_key_value(stored, 'text') == PEM
+    finally:
+        other.close()
+        with app.app_context():
+            SystemConfig.query.filter_by(key=key).delete()
             db.session.commit()
 
 

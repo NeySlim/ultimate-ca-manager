@@ -42,9 +42,10 @@ def get_encryption_status():
             key_encryption, MASTER_KEY_PATH, count_master_key_values,
         )
 
-        from security.dek_rotation import rotation_in_progress
+        from security.dek_rotation import retiring, rotation_in_progress
 
         encrypted, unencrypted = count_master_key_values()
+        grace = retiring()
 
         return success_response(data={
             'enabled': key_encryption.is_enabled,
@@ -54,7 +55,10 @@ def get_encryption_status():
             # Fingerprint and version only: neither key ever leaves the server here
             'kek_fingerprint': key_encryption.kek_fingerprint(),
             'dek_version': key_encryption.active_version,
-            'rotation_in_progress': rotation_in_progress(),
+            # The values are all rewritten once the previous DEK is only kept for its grace
+            'rotation_in_progress': rotation_in_progress() and grace is None,
+            'previous_dek_retire_after': (grace['until'].isoformat(timespec='seconds') + 'Z'
+                                          if grace else None),
             'key_file_path': str(MASTER_KEY_PATH),
             'key_file_exists': key_encryption.key_file_exists(),
             'encrypted_count': encrypted,
