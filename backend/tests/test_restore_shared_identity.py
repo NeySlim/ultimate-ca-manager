@@ -59,9 +59,14 @@ def seeded(app, create_ca, create_cert):
     with app.app_context():
         floor = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
     authority = create_ca(cn='zzcontract-shared-identity-ca.test')
-    create_cert(cn='zzcontract-shared-identity-leaf.test', ca_id=authority['id'])
+    leaf = create_cert(cn='zzcontract-shared-identity-leaf.test', ca_id=authority['id'])
     with app.app_context():
         rows, _failures, order, _secrets = _seed_all()
+        # A request on a certificate here: one naming none is cancelled by the restore
+        from models import Certificate
+        here = db.session.get(Certificate, leaf['id'])
+        rows['key_recovery_requests'].cert_id, rows['key_recovery_requests'].cert_refid = here.id, here.refid
+        db.session.commit()
         seeded = {name: row.id for name, row in rows.items() if hasattr(row, 'id')}
         extra = _seed_by_hand(authority['id'])
         seeded.update({name: row.id for name, row in extra.items()})
