@@ -39,6 +39,7 @@ import EmailTemplateWindow from '../components/EmailTemplateWindow'
 import DatabaseBackendSection from './settings/DatabaseBackendSection'
 import ServiceStatusWidget from './settings/ServiceStatusWidget'
 import AboutSection from './settings/AboutSection'
+import { expiryCheckOutcome } from './settings/expiryCheck'
 import { addCtLogUrl, removeCtLogUrl } from './settings/ctLogUrls'
 import AppearanceSettings from './settings/AppearanceSettings'
 import CopyableUrl from './settings/CopyableUrl'
@@ -386,10 +387,9 @@ export default function SettingsPage() {
   const triggerExpiryCheck = async () => {
     try {
       const res = await settingsService.checkExpiryAlerts()
-      const data = res.data || res
-      // The check reports per type: {cert_expiring: {notified}, crl_expiring: {notified}}
-      const count = (data.cert_expiring?.notified || 0) + (data.crl_expiring?.notified || 0) + (data.alerts_sent || 0)
-      showSuccess(t('settings.expiryCheckResult', { count }))
+      const outcome = expiryCheckOutcome(res.data || res)
+      if (outcome.skipped) showInfo(t('settings.expiryCheckSkipped'))
+      else showSuccess(t('settings.expiryCheckResult', { count: outcome.count }))
     } catch (e) {
       showError(e.message || t('common.error'))
     }

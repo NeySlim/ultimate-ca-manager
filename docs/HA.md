@@ -69,6 +69,8 @@ docker compose -f docker-compose.ha.yml up -d
 
 Compose refuses to start while one of these variables is missing. The balancer listens on port 8443. The image entrypoint writes no SQLite path and takes no SQLite backup copy when `UCM_HA=1`. Keep the restart policy `unless-stopped` or `always`: a rolling restart exits each container in turn.
 
+The network uses the fixed subnet `172.28.0.0/24`, trusted as the proxy. When `up` fails with "Pool overlaps", another Docker network already holds that range: set `UCM_HA_SUBNET` in `.env` to a free one.
+
 ## Deployment 3: DEB or RPM on two hosts
 
 1. Install the package on both hosts.
@@ -85,7 +87,7 @@ Compose refuses to start while one of these variables is missing. The balancer l
 
 ## Shared encryption key
 
-Every node holds the same key-encryption key (KEK): `KEY_ENCRYPTION_KEY`, or the same `master.key` on every node. The data-encryption keys it wraps live in the database (`encryption_keys`), so enabling, disabling, encrypting all keys and rotating the data key work from any node; the others reload the keys within seconds (`reload_encryption`). Each node publishes the fingerprint of its KEK (a truncated hash, never the key) in `cluster_nodes`, and a node whose fingerprint differs from a live peer's refuses to start and names that peer. Back up the KEK: the database without it is unreadable. See [Private-Key Encryption](ADMIN_GUIDE.md#private-key-encryption-kek-and-dek).
+Every node holds the same key-encryption key (KEK): `KEY_ENCRYPTION_KEY`, or the same `master.key` on every node. The data-encryption keys it wraps live in the database (`encryption_keys`), so enabling, disabling, encrypting all keys and rotating the data key work from any node; the others reload the keys within seconds (`reload_encryption`). Each node publishes the fingerprint of its KEK (a truncated hash, never the key) in `cluster_nodes`, and a node whose fingerprint differs from a live peer's refuses to start and names that peer, unless the database names its KEK and not the peer's. Enabling encryption is refused (409, naming the node) while a live node holds another KEK. Back up the KEK: the database without it is unreadable. See [Private-Key Encryption](ADMIN_GUIDE.md#private-key-encryption-kek-and-dek).
 
 ## Refused in HA mode today
 

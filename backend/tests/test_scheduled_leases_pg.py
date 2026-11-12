@@ -51,6 +51,31 @@ def ha(monkeypatch):
     monkeypatch.setattr('utils.ha.ha_enabled', lambda: True)
 
 
+@pytest.fixture(autouse=True, scope='module')
+def _rows_of_this_file_removed(app):
+    """The CAs, certificates and Microsoft CA connections this file creates, deleted after it."""
+    from models import CA
+    from models.msca import MicrosoftCA, MSCARequest
+    from tests import seeded_rows
+
+    def _top(model):
+        return db.session.query(db.func.max(model.id)).scalar() or 0
+    with app.app_context():
+        tops = {model: _top(model) for model in (CA, Certificate, MicrosoftCA)}
+        db.session.remove()
+    yield
+    with app.app_context():
+        msca_ids = [row.id for row in MicrosoftCA.query.filter(MicrosoftCA.id > tops[MicrosoftCA])]
+        MSCARequest.query.filter(MSCARequest.msca_id.in_(msca_ids)).delete(synchronize_session=False)
+        MicrosoftCA.query.filter(MicrosoftCA.id.in_(msca_ids)).delete(synchronize_session=False)
+        seeded_rows.delete_cas(CA.query.filter(CA.id > tops[CA]))
+        db.session.commit()
+        for (cert_id,) in db.session.query(Certificate.id).filter(Certificate.id > tops[Certificate]):
+            seeded_rows._SEEDED.append((app, 'certificates', 'id', cert_id))
+        db.session.remove()
+    seeded_rows.remove_seeded()
+
+
 @pytest.fixture(autouse=True)
 def _expiry_keys_put_back(app):
     with app.app_context():
@@ -84,6 +109,19 @@ def test_a_fresh_lease_is_refused_and_an_old_one_taken_over(app):
             _set(key, None)
 
 
+
+def test_a_lease_stamped_far_in_the_future_does_not_hold_forever(app):
+    # A clock stepped back, or a stamp from elsewhere: live for one duration at most
+    key = f'lease-test-{uuid.uuid4().hex[:8]}'
+    with app.app_context():
+        try:
+            _set(key, f"{(utc_now() + timedelta(hours=1)).isoformat()}|other-node")
+            assert config_cas.ConfigLease(key, timedelta(minutes=10)).take()
+            _set(key, f"{(utc_now() + timedelta(minutes=1)).isoformat()}|other-node")
+            assert not config_cas.ConfigLease(key, timedelta(minutes=10)).take()
+        finally:
+            _set(key, None)
+
 # ------------------------------------------------------------------ expiry e-mails and webhooks
 
 def _record_sends(monkeypatch):
@@ -98,7 +136,7 @@ def _record_sends(monkeypatch):
 
 def _record_webhook_passes(monkeypatch):
     passes = []
-    monkeypatch.setattr(expiry_alert_service, '_emit_expiry_webhooks', lambda **_: passes.append(1))
+    monkeypatch.setattr(expiry_alert_service, '_emit_expiry_webhooks', lambda **_: passes.append(1) or True)
     return passes
 
 
@@ -141,15 +179,19 @@ def test_a_pass_whose_lease_was_taken_over_stops_sending(
         return True, 'sent'
     monkeypatch.setattr(NotificationSenderMixin, 'send_cert_expiring_notification', staticmethod(send))
     with app.app_context():
-        NotificationService.run_scheduled_checks()
+        result = NotificationService.run_scheduled_checks()
     assert len(sent) == 1
     assert passes == []
+    # Recorded as a run with something to see, not as a complete one
+    from services.scheduler_service import SchedulerService
+    assert SchedulerService._outcome_of(result)[0] == 'warning'
+    assert result['cert_expiring']['notified'] == 1
 
 
 def test_expiring_reminders_fire_once_per_day_in_ha(app, ha, monkeypatch):
     passes = []
     monkeypatch.setattr(expiry_alert_service, '_emit_expiry_webhooks',
-                        lambda expiring=True, **_: passes.append(expiring))
+                        lambda expiring=True, **_: passes.append(expiring) or True)
     first = datetime(2026, 11, 11, 1, 0)
     instants = iter([first, first + timedelta(hours=20), first + timedelta(hours=24)])
     monkeypatch.setattr(notification_scheduler, '_cluster_now', lambda: next(instants))
@@ -417,3 +459,109 @@ def test_a_certificate_revoked_elsewhere_meanwhile_is_not_announced_again(
 
 
 from tests.test_msca_crl_sync import fake_adcs, patched_network  # noqa: E402,F401  (fixtures)
+
+
+@pytest.mark.parametrize('in_ha', [True, False])
+def test_the_webhook_mark_never_moves_back_with_the_clock(app, monkeypatch, in_ha):
+    # A cluster clock stepping back (NTP, PostgreSQL failover) would announce the same expiries again
+    _record_webhook_passes(monkeypatch)
+    monkeypatch.setattr('utils.ha.ha_enabled', lambda: in_ha)
+    later = datetime(2031, 3, 4, 12, 0)
+    monkeypatch.setattr(notification_scheduler, '_cluster_now', lambda: later - timedelta(minutes=5))
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_LEASE_KEY, None)
+        _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, later.isoformat())
+        NotificationService.run_scheduled_checks()
+        assert _value(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY) == later.isoformat()
+
+
+@pytest.mark.parametrize('in_ha', [True, False])
+def test_a_failed_webhook_pass_leaves_the_mark_for_the_next_one(app, monkeypatch, in_ha):
+    # The expiries of the failed pass are announced by the next one, not lost
+    def fail(**_):
+        raise RuntimeError('webhook store down')
+    monkeypatch.setattr('services.ca.cross_certs.expiring_alerts', fail)
+    monkeypatch.setattr('utils.ha.ha_enabled', lambda: in_ha)
+    before = datetime(2031, 3, 4, 0, 30)
+    monkeypatch.setattr(notification_scheduler, '_cluster_now', lambda: before + timedelta(days=1))
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_LEASE_KEY, None)
+        _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, before.isoformat())
+        NotificationService.run_scheduled_checks()
+        assert _value(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY) == before.isoformat()
+
+
+def test_a_mark_not_stored_is_not_logged_as_a_failed_pass(app, ha, monkeypatch, caplog):
+    _record_webhook_passes(monkeypatch)
+
+    real = config_cas.config_compare_and_set
+
+    def fail(key, *a, **k):
+        if key == notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY:
+            raise RuntimeError('database down')
+        return real(key, *a, **k)
+    monkeypatch.setattr(config_cas, 'config_compare_and_set', fail)
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_LEASE_KEY, None)
+        with caplog.at_level('WARNING'):
+            NotificationService.run_scheduled_checks()
+    messages = [r.getMessage() for r in caplog.records]
+    assert not any('webhook pass failed' in m for m in messages), messages
+    assert any('mark not stored' in m for m in messages), messages
+
+
+def test_the_manual_check_counts_what_a_pass_taken_over_sent(app, auth_client, monkeypatch):
+    counts = {'cert_expiring': {'checked': 2, 'notified': 2, 'failed': 0},
+              'crl_expiring': {'checked': 0, 'notified': 0, 'failed': 0}}
+    monkeypatch.setattr(NotificationService, 'run_scheduled_checks',
+                        staticmethod(lambda: notification_scheduler.NotificationSchedulerMixin._taken_over(counts)))
+    response = auth_client.post('/api/v2/system/alerts/expiry/check')
+    assert response.status_code == 200, response.data
+    assert '2 alerts sent' in response.get_json()['message']
+
+
+def test_a_crl_sync_revokes_in_id_order(app, fake_adcs, patched_network, monkeypatch):
+    # Two syncs locking the same rows in one order cannot deadlock on PostgreSQL
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+    from sqlalchemy import event
+    from models import Certificate
+    from models.msca import MicrosoftCA, MSCARequest
+    from services.msca.crl_sync import MicrosoftCACRLSyncMixin
+    from tests.test_msca_crl_sync import _add_connection_with_certs
+    msca_id, ids = _add_connection_with_certs(app, f'CRL order {uuid.uuid4().hex[:8]}', fake_adcs)
+    now = utc_now()
+    builder = (x509.CertificateRevocationListBuilder().issuer_name(fake_adcs['crl'].issuer)
+               .last_update(now - timedelta(minutes=10)).next_update(now + timedelta(days=7)))
+    for cert in (fake_adcs['revoked_cert'], fake_adcs['valid_cert']):
+        builder = builder.add_revoked_certificate(
+            x509.RevokedCertificateBuilder().serial_number(cert.serial_number)
+            .revocation_date(now - timedelta(minutes=30)).build())
+    crl = builder.sign(fake_adcs['ca_key'], hashes.SHA256())
+    monkeypatch.setattr(MicrosoftCACRLSyncMixin, '_fetch_crl', staticmethod(lambda msca, url: crl))
+    real = MicrosoftCACRLSyncMixin._connection_certificates
+    monkeypatch.setattr(MicrosoftCACRLSyncMixin, '_connection_certificates',
+                        staticmethod(lambda msca: sorted(real(msca), key=lambda c: -c.id)))
+    updated = []
+
+    def witness(conn, cursor, statement, params, context, executemany):
+        if statement.lstrip().upper().startswith('UPDATE CERTIFICATES'):
+            updated.append((statement, params))
+    try:
+        with app.app_context():
+            event.listen(db.engine, 'before_cursor_execute', witness)
+            try:
+                summary = MicrosoftCACRLSyncMixin.sync_crl(msca_id, username='scheduler')
+            finally:
+                event.remove(db.engine, 'before_cursor_execute', witness)
+        assert summary['revoked'] == 2
+        # The row id is the WHERE clause's parameter: last positional, or the named id_1
+        order = [next(v for k, v in p.items() if k.startswith('id')) if isinstance(p, dict) else p[-1]
+                 for _, p in updated]
+        assert order == sorted(ids.values()), updated
+    finally:
+        with app.app_context():
+            MSCARequest.query.filter_by(msca_id=msca_id).delete()
+            Certificate.query.filter(Certificate.id.in_(list(ids.values()))).delete(synchronize_session=False)
+            MicrosoftCA.query.filter_by(id=msca_id).delete()
+            db.session.commit()

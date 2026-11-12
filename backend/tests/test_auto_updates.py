@@ -327,7 +327,7 @@ class TestNotifyMarker:
     RESULT = {'current_version': '2.0', 'latest_version': '99.0',
               'html_url': 'http://x', 'prerelease': False}
 
-    def test_marker_failure_is_visible(self, app, clean_update_config, monkeypatch):
+    def test_marker_failure_is_visible(self, app, clean_update_config, monkeypatch, caplog):
         """R-05: a marker that cannot be reserved emits nothing and says so; the next check retries."""
         import services.webhook_service as wh
         events = []
@@ -337,10 +337,11 @@ class TestNotifyMarker:
         def fail(*a, **k):
             raise RuntimeError('database down')
         monkeypatch.setattr(updates, 'config_compare_and_set', fail)
-        with app.app_context():
+        with caplog.at_level('WARNING', logger='ucm.updates'), app.app_context():
             ok = updates._notify_update_available(dict(self.RESULT))
         assert ok is False
         assert events == []
+        assert any('Update 99.0 not notified' in r.getMessage() for r in caplog.records)
 
     def test_two_executors_reading_the_same_marker_notify_once(self, app, clean_update_config, monkeypatch):
         """Two nodes during a leader change both read the old marker: one reserves it, one emits."""

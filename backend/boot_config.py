@@ -318,7 +318,7 @@ def _prepare(path, text, mode):
 
 
 def _keep_aside(path):
-    """A copy of ``path`` beside it, or None when it does not exist."""
+    """A copy of ``path`` beside it with its mode and owner, or None when it does not exist."""
     import shutil
     import tempfile
     if not os.path.exists(path):
@@ -327,6 +327,11 @@ def _keep_aside(path):
     os.close(fd)
     try:
         shutil.copy2(path, aside)
+        st = os.stat(path)
+        try:
+            os.chown(aside, st.st_uid, st.st_gid)
+        except PermissionError:
+            pass  # not root: only root can give a file away, the copy stays ours
     except BaseException:
         os.unlink(aside)
         raise

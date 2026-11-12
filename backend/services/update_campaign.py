@@ -94,7 +94,7 @@ def plan_step(campaign, nodes, now, *, stale_seconds, guard):
 
     Pure: ``nodes`` maps node_id to NodeView, ``now`` is on the cluster clock.
     """
-    from services.updates import versions_match
+    from services.updates import CONTAINER_FAMILY, CONTAINER_HA_REFUSAL, versions_match
     if campaign is None or campaign.get('status') != RUNNING:
         return None, None
     c = deepcopy(campaign)
@@ -117,10 +117,18 @@ def plan_step(campaign, nodes, now, *, stale_seconds, guard):
             return _stopped(c, node, f"node {node} not back on version {target} "
                                      f"within {guard:.0f}s", now)
         return None, None
-    # A node that joined after the start takes a turn too, if the campaign has its package
+    # A node that joined after the start takes a turn too, if the campaign has its package;
+    # one already on the target has nothing to install, whatever its family
     late = sorted(n for n, v in nodes.items() if n not in c['order']
                   and n not in c.get('skipped', []) and _fresh(v, now, stale_seconds))
     for n in late:
+        if versions_match(nodes[n].version, target):
+            c['order'].append(n)
+            c['done'].append(n)
+            c.setdefault('families', {})[n] = nodes[n].family
+            continue
+        if nodes[n].family == CONTAINER_FAMILY:
+            return _stopped(c, n, f"node {n} joined after the start: {CONTAINER_HA_REFUSAL}", now)
         if nodes[n].family not in packages:
             return _stopped(c, n, f"node {n} joined after the start and the campaign has no "
                                   f"package of its family {nodes[n].family or 'unknown'}", now)
@@ -206,6 +214,8 @@ def _catalog(assets, families):
         if family in packages:
             continue
         label = family or updates.UNKNOWN_FAMILY
+        if family == updates.CONTAINER_FAMILY:
+            return None, f"node {node} ({label}): {updates.CONTAINER_HA_REFUSAL}"
         found = updates.family_package(assets, family)
         if found is None:
             return None, (f"node {node} ({label}): no package in this release for its family, "
@@ -223,6 +233,17 @@ def _catalog(assets, families):
         packages[family] = {'download_url': found['download_url'],
                             'package_name': found['package_name'], 'sha256': sha256.lower()}
     return packages, None
+
+
+def families_without_package(assets):
+    """Package families (deb, rpm-*) of the nodes beating now that ``assets`` has no package for:
+    a release still uploading them. Container and unknown families never get one."""
+    from services import updates
+    from services.scheduler_leader import cluster_utc_now
+    now, stale = cluster_utc_now(), _stale_seconds()
+    present = {v.family for v in _nodes().values() if _fresh(v, now, stale)}
+    return sorted(f for f in present if f and (f == 'deb' or f.startswith('rpm-'))
+                  and updates.family_package(assets or [], f) is None)
 
 
 def start_campaign(target, assets, initiated_by):
@@ -300,22 +321,37 @@ def _discard(path):
         logger.warning(f"Rolling update: dropped package not removed: {type(e).__name__}: {e}")
 
 
+def _handed_to_the_watcher(data_dir):
+    """Package names the install watcher was handed or is installing: .update_pending, and the
+    manifest it claims (.update_manifest.processing) as it deletes .update_pending."""
+    names = set()
+    try:
+        with open(os.path.join(data_dir, '.update_pending')) as f:
+            names.add(os.path.basename(f.read().strip()))
+    except OSError:
+        pass
+    for manifest in ('.update_manifest.json', '.update_manifest.processing'):
+        try:
+            with open(os.path.join(data_dir, manifest)) as f:
+                names.add(os.path.basename(str(json.load(f).get('package_path') or '')))
+        except (OSError, ValueError, AttributeError):
+            pass
+    names.discard('')
+    return names
+
+
 def _purge_earlier_turns():
-    """Drop the packages earlier turns left in updates/; never the one the install watcher
-    was handed (.update_pending), nor a file no turn named."""
+    """Drop the packages earlier turns left in updates/; never one the install watcher
+    was handed or is installing, nor a file no turn named."""
     from services import updates
     folder = os.path.join(str(updates.DATA_DIR), 'updates')
-    try:
-        with open(os.path.join(str(updates.DATA_DIR), '.update_pending')) as f:
-            pending = os.path.basename(f.read().strip())
-    except OSError:
-        pending = None
+    kept = _handed_to_the_watcher(str(updates.DATA_DIR))
     try:
         names = os.listdir(folder)
     except OSError:
         return
     for name in names:
-        if _TURN_FILE.match(name) and name != pending:
+        if _TURN_FILE.match(name) and name not in kept:
             _discard(os.path.join(folder, name))
 
 

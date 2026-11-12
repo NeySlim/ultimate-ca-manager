@@ -59,7 +59,7 @@ class ExportCoreMixin:
         # Get all system config entries
         system_configs = SystemConfig.query.all()
         for sc in system_configs:
-            if sc.key in installation.LOCAL_SETTINGS:
+            if installation.is_local_setting(sc.key):
                 continue    # the installation's own; its id is carried in the metadata
             val = sc.value
             # A setting is secret either because the row says so or because

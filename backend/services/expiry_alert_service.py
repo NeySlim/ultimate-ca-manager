@@ -70,6 +70,7 @@ def _emit_expiry_webhooks(expiring=True, expired_after=None, now=None):
     Independent of SMTP config (webhooks must work even when email is off).
     'expiring' is a recurring reminder for the active window; 'expired' covers
     certificates whose expiry falls in (expired_after, now], the last 24h by default.
+    Returns False when the pass failed: its window is not covered and the mark must stay.
     """
     try:
         from services.webhook_service import emit_cert_expiring, emit_cert_expired
@@ -100,3 +101,5 @@ def _emit_expiry_webhooks(expiring=True, expired_after=None, now=None):
             emit_cert_expired(payload, ca_refid=ca_refid)
     except Exception as e:
         logger.error(f"Expiry webhook pass failed: {e}")
+        return False
+    return True

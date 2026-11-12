@@ -2144,23 +2144,26 @@ def test_a_rotation_after_a_disable_done_says_encryption_is_off(app, auth_client
     assert _rows(app) == rows
 
 
-@pytest.mark.parametrize('after_grace', [False, True])
+@pytest.mark.parametrize('after_grace', [False, True, 'expired_stored'])
 def test_a_second_disable_after_a_disable_done_changes_nothing(app, auth_client, values,
                                                                retention, after_grace):
     """A second disable within the retention neither rewrites the markers nor restarts a
-    grace that would hold the next enable again."""
+    grace that would hold the next enable again. A grace over but still stored is ended by
+    the route itself (retire_if_due) before it answers."""
     from security import dek_rotation
     assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
     if after_grace:
         retention(601)
+    if after_grace is True:
         with app.app_context():
             dek_rotation.retire_if_due()
     rows, kept, grace_row = _rows(app), _retain_after(app), _grace_row(app)
-    assert (grace_row is None) == after_grace
+    assert (grace_row is None) == (after_grace is True)
     r = auth_client.post('/api/v2/system/security/disable-encryption')
     assert r.status_code == 400, r.data
     assert r.get_json()['message'] == 'Encryption is not enabled'
-    assert _rows(app) == rows and _retain_after(app) == kept and _grace_row(app) == grace_row
+    assert _rows(app) == rows and _retain_after(app) == kept
+    assert _grace_row(app) == (None if after_grace else grace_row)
 
 
 def test_a_restart_resumes_an_interrupted_rotation_before_an_old_key_past_its_retention(
@@ -2251,3 +2254,29 @@ def test_enabling_refuses_a_kept_dek_another_node_rewrapped_since_the_last_read(
     assert r.status_code == 409, r.data
     assert 'do not open with the configured' in r.get_json()['message']
     assert _rows(app) == rows
+
+
+def test_a_key_file_not_written_keeps_the_disabled_markers(app, monkeypatch):
+    # Without them a KEK configured later would turn encryption on by itself
+    from models import EncryptionKey
+    from security import encryption, envelope
+    from security.master_key_bootstrap import activate_new_master_key
+    from utils.datetime_utils import utc_now
+
+    def refuse(*a, **k):
+        raise PermissionError('read-only config directory')
+    monkeypatch.setattr(encryption.KeyEncryption, 'write_key_file', staticmethod(refuse))
+    with app.app_context():
+        db.session.add(EncryptionKey(version=0, state=envelope.DISABLED, kek_id='e' * 16,
+                                     wrapped=None, created_at=utc_now()))
+        db.session.commit()
+        try:
+            with pytest.raises(PermissionError):
+                activate_new_master_key(exclusive=False)
+            db.session.rollback()
+            assert [(r.state, r.kek_id) for r in EncryptionKey.query.filter_by(version=0)] == [
+                (envelope.DISABLED, 'e' * 16)]
+        finally:
+            db.session.rollback()
+            EncryptionKey.query.filter_by(version=0).delete()
+            db.session.commit()

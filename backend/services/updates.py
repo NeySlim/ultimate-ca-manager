@@ -733,6 +733,13 @@ def _auto_install(result):
     in_ha = ha_enabled()
     if not in_ha and not result.get('download_url'):
         return
+    if in_ha:
+        from services import update_campaign
+        missing = update_campaign.families_without_package(result.get('assets'))
+        if missing:
+            # Before the marker: the next check tries again once the release has them
+            logger.info(f"Auto-update to {latest} waits: no package yet for {', '.join(missing)}")
+            return
     if _cfg_get(_ATTEMPTED_VERSION_KEY) == latest:
         return  # one attempt per version — no overnight crash loops
 

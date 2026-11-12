@@ -13,8 +13,8 @@ from ._constants import CERT_EXPIRING, CRL_EXPIRING
 
 logger = logging.getLogger(__name__)
 
-# HA: one node at a time runs the expiry pass. The webhook mark is the cluster instant of
-# the last emission: the next pass announces what expired since, whichever node runs it.
+# HA: one node at a time runs the expiry pass. The webhook mark (kept on every install) is the
+# cluster instant of the last emission: the next pass announces what expired since, on any node.
 EXPIRY_LEASE_KEY = 'expiry_alerts.lease'
 EXPIRY_WEBHOOKS_MARK_KEY = 'expiry_alerts.webhooks_mark'
 EXPIRY_LEASE = timedelta(minutes=10)
@@ -41,6 +41,11 @@ def _parse_mark(value):
         return None
 
 
+def _later(last, now):
+    """The mark never moves back: a cluster clock stepping back would announce expiries again."""
+    return last if last is not None and last > now else now
+
+
 def _emit_webhooks_in_ha():
     """HA: 'expired' covers (last mark, now], 'expiring' reminders go out once per cluster
     day; a pass cut short before the mark is emitted again once the lease is over."""
@@ -50,12 +55,16 @@ def _emit_webhooks_in_ha():
     now = _cluster_now()
     previous = db.session.query(SystemConfig.value).filter_by(key=EXPIRY_WEBHOOKS_MARK_KEY).scalar()
     last = _parse_mark(previous)
-    expiry_alert_service._emit_expiry_webhooks(
-        expiring=last is None or last.date() != now.date(),
-        expired_after=last if last is not None else now - timedelta(days=1),
-        now=now,
-    )
-    config_compare_and_set(EXPIRY_WEBHOOKS_MARK_KEY, previous, now.isoformat())
+    if not expiry_alert_service._emit_expiry_webhooks(
+            expiring=last is None or last.date() != now.date(),
+            expired_after=last if last is not None else now - timedelta(days=1),
+            now=now):
+        return
+    try:
+        config_compare_and_set(EXPIRY_WEBHOOKS_MARK_KEY, previous, _later(last, now).isoformat())
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Expiry webhooks sent, their mark not stored: {e}")
 
 
 def _emit_webhooks_single_node():
@@ -63,17 +72,18 @@ def _emit_webhooks_single_node():
     from models import SystemConfig, db
     from services import expiry_alert_service
     now = _cluster_now()
-    expiry_alert_service._emit_expiry_webhooks(now=now)
+    if not expiry_alert_service._emit_expiry_webhooks(now=now):
+        return
     try:
         row = SystemConfig.query.filter_by(key=EXPIRY_WEBHOOKS_MARK_KEY).first()
         if row is None:
             db.session.add(SystemConfig(key=EXPIRY_WEBHOOKS_MARK_KEY, value=now.isoformat()))
         else:
-            row.value = now.isoformat()
+            row.value = _later(_parse_mark(row.value), now).isoformat()
         db.session.commit()
-    except Exception:
+    except Exception as e:
         db.session.rollback()
-        raise
+        logger.error(f"Expiry webhooks sent, their mark not stored: {e}")
 
 
 class NotificationSchedulerMixin:
@@ -244,4 +254,4 @@ class NotificationSchedulerMixin:
     @staticmethod
     def _taken_over(results):
         logger.warning(f"Expiry checks stopped: another node took the run over ({results})")
-        return results
+        return {**results, 'status': 'warning', 'reason': 'another node took the run over'}

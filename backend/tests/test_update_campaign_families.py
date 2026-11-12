@@ -190,7 +190,12 @@ def test_a_node_whose_family_has_no_package_refuses_the_start(app, ha, family):
     _rows(app, a='deb', b=family)
     ok, message, _ = _start(app)
     assert not ok
-    assert PREFIX + 'b' in message and 'no package' in message
+    assert PREFIX + 'b' in message
+    # A container node is updated by its orchestrator, not by a missing package
+    if family == 'container':
+        assert updates.CONTAINER_HA_REFUSAL in message and 'no package' not in message
+    else:
+        assert 'no package' in message
     assert _state(app) is None
 
 
@@ -271,17 +276,33 @@ def test_the_download_is_verified_against_the_campaign_digest(app, ha, monkeypat
     assert calls[0][2] == SHAS[DEB]
 
 
-def test_a_node_joining_after_the_start_without_its_package_stops_the_campaign(app, ha, monkeypatch):
+@pytest.mark.parametrize('family', ['rpm-el9', 'container'])
+def test_a_node_joining_after_the_start_without_its_package_stops_the_campaign(app, ha, monkeypatch, family):
     _rows(app, a='deb')
     assert _start(app)[0]
-    _rows(app, z='rpm-el9')
+    _rows(app, z=family)
     with app.app_context():
         event = uc.campaign_tick()
     assert event[0] == 'stopped' and event[1] == PREFIX + 'z'
-    state = _state(app)
-    assert 'rpm-el9' in state['failed']['reason'] and 'after the start' in state['failed']['reason']
+    reason = _state(app)['failed']['reason']
+    assert 'after the start' in reason
+    assert (updates.CONTAINER_HA_REFUSAL if family == 'container' else 'rpm-el9') in reason
     assert _commands(app) == []
 
+
+
+def test_a_node_joining_already_on_the_target_counts_as_done(app, ha, monkeypatch):
+    # Its family has no package (a container), but it has nothing to install
+    calls = []
+    _witnesses(monkeypatch, calls)
+    _rows(app, a='deb')
+    assert _start(app)[0]
+    _rows(app, z='container')
+    _back(app, 'z')
+    with app.app_context():
+        assert uc.campaign_tick() == ('dispatch', PREFIX + 'a', None)
+    state = _state(app)
+    assert state['status'] == uc.RUNNING and PREFIX + 'z' in state['done']
 
 def test_a_node_joining_after_the_start_with_its_package_gets_its_turn(app, ha, monkeypatch):
     calls = []
@@ -346,6 +367,28 @@ def test_a_new_turn_purges_the_packages_of_earlier_turns_only(app, ha, monkeypat
     assert '0123456789ab-old.deb' not in left
     assert len([n for n in left if n.endswith('-' + DEB)]) == 1  # this turn's own package stays
 
+
+
+def test_the_package_the_watcher_is_installing_is_not_purged(app, ha, monkeypatch):
+    # The watcher deletes .update_pending before dpkg or dnf runs; its claimed manifest names the package
+    import json
+    calls = []
+    _witnesses(monkeypatch, calls)
+    folder = os.path.join(str(updates.DATA_DIR), 'updates')
+    os.makedirs(folder)
+    installing = os.path.join(folder, 'abcdef012345-installing.rpm')
+    for path in (installing, os.path.join(folder, '0123456789ab-old.deb')):
+        with open(path, 'wb') as f:
+            f.write(b'x')
+    with open(os.path.join(str(updates.DATA_DIR), '.update_manifest.processing'), 'w') as f:
+        json.dump({'package_path': installing, 'to_version': '3.0'}, f)
+    _rows(app, a='deb')
+    assert _start(app)[0]
+    with app.app_context():
+        uc.campaign_tick()
+    _turn(app, monkeypatch, 'a', 'deb')
+    left = sorted(os.listdir(folder))
+    assert 'abcdef012345-installing.rpm' in left and '0123456789ab-old.deb' not in left
 
 def test_the_end_message_names_the_nodes_left_out(app, ha, monkeypatch):
     from models import ClusterNode, db
@@ -413,6 +456,24 @@ def test_scheduled_auto_install_in_ha_gives_each_family_its_package(app, ha, mon
     assert {f: p['sha256'] for f, p in state['packages'].items()} == {'deb': SHAS[DEB], 'rpm-el9': SHAS[EL9]}
     assert [c[0] for c in _commands(app)] == [PREFIX + 'a']
 
+
+
+@pytest.mark.parametrize('assets', [[], [_asset(DEB), _asset(DEB + '.sha256')]])
+def test_scheduled_auto_install_in_ha_waits_for_the_package_of_each_family(app, ha, monkeypatch, assets):
+    # A release still uploading its assets is tried again at the next check, not marked as attempted
+    from models import SystemConfig, db
+    monkeypatch.delenv('UCM_DOCKER', raising=False)
+    _rows(app, a='deb', b='rpm-el9')
+    with app.app_context():
+        SystemConfig.query.filter_by(key=updates._ATTEMPTED_VERSION_KEY).delete()
+        db.session.commit()
+        try:
+            updates._auto_install({'latest_version': '3.1', 'current_version': '3.0', 'assets': assets})
+            assert updates._cfg_get(updates._ATTEMPTED_VERSION_KEY) in (None, '')
+        finally:
+            SystemConfig.query.filter_by(key=updates._ATTEMPTED_VERSION_KEY).delete()
+            db.session.commit()
+    assert _state(app) is None
 
 def test_scheduled_auto_install_in_ha_refuses_a_cluster_with_a_family_without_checksum(app, ha, monkeypatch):
     from models import SystemConfig, db

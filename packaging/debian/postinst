@@ -219,7 +219,7 @@ ENVEOF
         
         # Enable and start/restart service
         systemctl daemon-reload 2>/dev/null || true
-        systemctl enable ucm
+        systemctl enable ucm || true
         if systemctl is-active --quiet ucm; then
             systemctl restart ucm || true
         else
