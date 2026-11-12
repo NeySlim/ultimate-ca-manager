@@ -194,17 +194,21 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                 </Badge>
               )}
             </div>
-            {/* What a rotation really does depends on whether the key can be stored encrypted */}
+            {/* What a rotation really does depends on whether the key can be stored encrypted;
+                in HA the environment-file rotation is refused (409 ha_mode) */}
             <p className="text-sm text-text-secondary">
               {secretsStatus.session_secret.rotation === 'database'
                 ? t('settings.sessionKeyRotateStoredDesc')
-                : t('settings.sessionKeyRotateFileDesc')}
+                : secretsStatus.session_secret.ha
+                  ? t('settings.sessionKeyRotateHaRefused')
+                  : t('settings.sessionKeyRotateFileDesc')}
             </p>
             {hasPermission('admin:system') && handleRotateSessionKey && (
               <Button
                 onClick={handleRotateSessionKey}
                 variant="outline"
-                disabled={sessionKeyLoading || !!secretsStatus.session_secret.previous_accepted_until}
+                disabled={sessionKeyLoading || !!secretsStatus.session_secret.previous_accepted_until
+                  || (secretsStatus.session_secret.ha && secretsStatus.session_secret.rotation !== 'database')}
               >
                 <ArrowsClockwise size={16} />
                 {t('settings.rotateSessionKey')}

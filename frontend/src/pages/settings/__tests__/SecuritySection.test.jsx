@@ -335,4 +335,26 @@ describe('SecuritySection session key', () => {
     fireEvent.click(screen.getByText('settings.rotateSessionKey'))
     expect(rotate).toHaveBeenCalled()
   })
+
+  it('disables the file rotation in HA and says why', () => {
+    const rotate = vi.fn()
+    renderSection(null, {
+      secretsStatus: { session_secret: { source: 'environment', rotation: 'environment_file', ha: true, previous_accepted_until: null } },
+      handleRotateSessionKey: rotate,
+    })
+    expect(screen.getByText('settings.sessionKeyRotateHaRefused')).toBeTruthy()
+    expect(screen.queryByText('settings.sessionKeyRotateFileDesc')).toBeNull()
+    fireEvent.click(screen.getByText('settings.rotateSessionKey'))
+    expect(rotate).not.toHaveBeenCalled()
+  })
+
+  it('keeps the stored rotation available in HA', () => {
+    const rotate = vi.fn()
+    renderSection(null, {
+      secretsStatus: { session_secret: { source: 'database', rotation: 'database', ha: true, previous_accepted_until: null } },
+      handleRotateSessionKey: rotate,
+    })
+    fireEvent.click(screen.getByText('settings.rotateSessionKey'))
+    expect(rotate).toHaveBeenCalled()
+  })
 })

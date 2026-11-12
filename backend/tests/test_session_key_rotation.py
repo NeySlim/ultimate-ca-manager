@@ -270,6 +270,8 @@ def test_ha_without_encryption_is_refused(app, auth_client, stored, monkeypatch)
     monkeypatch.setattr(Config, 'HA_MODE', True)
     r = auth_client.post(ROTATE, json={})
     assert r.status_code == 409 and r.get_json()['code'] == 'ha_mode'
+    data = auth_client.get(STATUS).get_json()['data']['session_secret']
+    assert data['ha'] is True and data['rotation'] == 'environment_file'
 
 
 def test_ha_with_encryption_rotates_in_the_database(

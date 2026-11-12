@@ -699,10 +699,10 @@ def rotate_secrets():
     """
     Rotate the session secret key (SECRET_KEY).
 
-    Encryption on (always the case in HA): the new key is stored in the database under the
-    data-encryption key, every node reloads it without a restart, and tokens signed with
-    the previous key stay valid for its grace period. Encryption off (single node only):
-    the environment file is rewritten and the service restarts, as before.
+    Encryption on (in HA, the KEK every node holds): the new key is stored in the database
+    under the data-encryption key, every node reloads it without a restart, and tokens signed
+    with the previous key stay valid for its grace period. Encryption off: on a single node
+    the environment file is rewritten and the service restarts, as before; refused in HA.
     """
     from security import session_key
     from utils.ha import ha_enabled, ha_refusal, LOCAL_ONLY
@@ -858,6 +858,7 @@ def secrets_status():
     """Get status of secret keys (without revealing them)"""
     from config.settings import Config
     from security import session_key
+    from utils.ha import ha_enabled
 
     session_configured = bool(os.getenv('SECRET_KEY')) and Config.SECRET_KEY != "INSTALL_TIME_PLACEHOLDER"
     encryption_configured = bool(os.getenv('KEY_ENCRYPTION_KEY')) or _key_file_exists()
@@ -870,6 +871,8 @@ def secrets_status():
             'source': stored['source'],
             'previous_accepted_until': stored['previous_accepted_until'],
             'rotation': 'database' if session_key.stored_mode() else 'environment_file',
+            # In HA the environment-file rotation is refused: the screen says so
+            'ha': ha_enabled(),
         },
         'encryption_key': {
             'configured': encryption_configured
