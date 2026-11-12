@@ -432,6 +432,12 @@ class LifecycleMixin:
         now = utc_now()
         rejected_renewals = []
         try:
+            # The record is locked before the row is written, the order unholds and the hourly
+            # pass follow (PostgreSQL), so none of them deadlocks. A row migration 144 left
+            # pending keeps its spelling; records never do
+            record = RevokedSerial.query.filter_by(
+                caref=certificate.caref, serial_number=canonical_serial(certificate.serial_number)
+            ).with_for_update().first() if ca is not None else None
             certificate.revoked = True
             certificate.revoked_at = now
             certificate.revoke_reason = reason
@@ -443,9 +449,6 @@ class LifecycleMixin:
             # A Microsoft certificate has no caref: nothing for a UCM CRL to publish
             if ca is not None:
                 valid_to = to_naive_utc(certificate.valid_to) or now + timedelta(days=365)
-                # A row migration 144 left pending keeps its spelling; records never do
-                record = RevokedSerial.query.filter_by(
-                    caref=certificate.caref, serial_number=canonical_serial(certificate.serial_number)).first()
                 fresh = record is None
                 if fresh:
                     record = RevokedSerial(caref=certificate.caref,
