@@ -220,6 +220,7 @@ def apply_persisted_revocations() -> list:
                       for form in unambiguous_serial_spellings(serial)})
     marked = []
     for start in range(0, len(columns), 500):
+        # A pre-filter only: row_persisted_revocation below is the guard
         for row in Certificate.query.filter(
                 Certificate.serial_number.in_(columns[start:start + 500]),
                 Certificate.caref.isnot(None), Certificate.crt.isnot(None),

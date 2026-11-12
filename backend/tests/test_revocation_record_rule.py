@@ -1052,3 +1052,26 @@ class TestCaAndCrossRecordsReadUnambiguousSpellings:
             with app.app_context():
                 db.session.delete(db.session.get(RevokedSerial, other))
                 db.session.commit()
+
+
+class TestAnImportOverARenewedRowUnlinksOnlyItsOwnSerial:
+
+    def test_the_record_of_the_serial_renewed_away_stays_linked(self, app, auth_client, issuer):
+        _, refid, ca_cert, ca_key = issuer
+        cn = 'renewed-then-imported.example.test'
+        first, key = _leaf(cn, ca_cert, ca_key)
+        row_id = _store(app, first, refid, key=key)
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/renew', json={})
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            renewed = db.session.get(Certificate, row_id).serial_number
+            assert renewed != str(first.serial_number)
+            [record] = RevokedSerial.query.filter_by(caref=refid, serial_number=str(first.serial_number)).all()
+            assert record.certificate_id == row_id
+        namesake, _ = _leaf(cn, ca_cert, ca_key)
+        r = _import(auth_client, namesake)
+        assert r.status_code == 200 and r.get_json()['data']['id'] == row_id, r.data
+        with app.app_context():
+            assert db.session.get(Certificate, row_id).serial_number == str(namesake.serial_number)
+            record = RevokedSerial.query.filter_by(caref=refid, serial_number=str(first.serial_number)).one()
+            assert record.certificate_id == row_id
