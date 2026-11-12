@@ -263,3 +263,43 @@ def test_the_detail_names_the_partner_an_unhold_would_lift(app, auth_client, cre
         db.session.commit()
     expected = b['id'] if case == 'lifted' else None
     assert _detail(auth_client, a['id'])['related_on_hold_id'] == expected
+
+
+def test_a_partner_held_by_its_record_alone_is_named_and_lifted(app, auth_client, create_ca, create_cert, seen):
+    ca = create_ca(cn='Unhold Record Partner CA')
+    a = create_cert(cn='unhold-record-a.example.test', ca_id=ca['id'])
+    b = create_cert(cn='unhold-record-b.example.test', ca_id=ca['id'])
+    _link(app, a['id'], b['id'])
+    assert _post(auth_client, f"/api/v2/certificates/{a['id']}/revoke",
+                 {'reason': 'certificateHold'}).status_code == 200
+    with app.app_context():
+        # The row not aligned yet: only the CA's record holds the partner
+        row = db.session.get(Certificate, b['id'])
+        row.revoked, row.revoke_reason, row.revoked_at = False, None, None
+        db.session.commit()
+    assert _detail(auth_client, a['id'])['related_on_hold_id'] == b['id']
+    r = _post(auth_client, f"/api/v2/certificates/{a['id']}/unhold")
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['related_unheld'] == b['id']
+    with app.app_context():
+        assert RevokedSerial.query.filter(
+            RevokedSerial.certificate_id.in_([a['id'], b['id']])).count() == 0
+    assert _state(app, b['id']) == (False, None)
+
+
+def test_a_held_partner_its_record_revokes_for_good_refuses_the_pair(app, auth_client, create_ca, create_cert,
+                                                                     seen):
+    ca = create_ca(cn='Unhold Final Record Partner CA')
+    a = create_cert(cn='unhold-final-record-a.example.test', ca_id=ca['id'])
+    b = create_cert(cn='unhold-final-record-b.example.test', ca_id=ca['id'])
+    _link(app, a['id'], b['id'])
+    assert _post(auth_client, f"/api/v2/certificates/{a['id']}/revoke",
+                 {'reason': 'certificateHold'}).status_code == 200
+    with app.app_context():
+        record = RevokedSerial.query.filter_by(certificate_id=b['id']).one()
+        record.revoke_reason = 'keyCompromise'
+        db.session.commit()
+    r = _post(auth_client, f"/api/v2/certificates/{a['id']}/unhold")
+    assert r.status_code == 409, r.data
+    assert _state(app, a['id']) == (True, 'certificateHold')
+    assert _unheld(seen) == []
