@@ -602,3 +602,44 @@ def test_startup_rebuilds_a_shared_keytab_the_profile_does_not_hold(app, clean_s
     with app.app_context():
         assert shared_files.read_file(shared_files.KERBEROS_KEYTAB) == ARCHIVED_KEYTAB
     assert path.read_bytes() == ARCHIVED_KEYTAB
+
+
+def _another_node_created_the_default(monkeypatch, misses):
+    """The default profile, committed by a concurrent writer after the first *misses* reads here."""
+    from services import windows_profiles
+    real = windows_profiles.default_profile
+    calls = []
+
+    def racing():
+        calls.append(1)
+        return None if len(calls) <= misses else real()
+    monkeypatch.setattr(windows_profiles, 'default_profile', racing)
+
+
+def test_a_concurrent_default_profile_is_the_one_written(app, auth_client, clean_slate, monkeypatch):
+    with app.app_context():
+        db.session.add(WindowsEnrollmentProfile(name='default', is_default=True, xcep_username='first'))
+        db.session.commit()
+    _another_node_created_the_default(monkeypatch, misses=1)
+    r = auth_client.patch('/api/v2/xcep/config', json={'username': 'second'})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert [p.xcep_username for p in WindowsEnrollmentProfile.query.filter_by(is_default=True)] == ['second']
+
+
+def test_the_node_that_loses_the_race_writes_its_keytab_file(app, clean_slate, no_shared_keytab,
+                                                              monkeypatch, tmp_path):
+    from config.settings import Config
+    from services import shared_files
+    monkeypatch.setattr(Config, 'HA_MODE', False)
+    path = tmp_path / 'kerberos.keytab'
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', path)
+    with app.app_context():
+        db.session.add(WindowsEnrollmentProfile(name='default', is_default=True))
+        shared_files.store_file(shared_files.KERBEROS_KEYTAB, TARGET_KEYTAB)
+        db.session.commit()
+    _another_node_created_the_default(monkeypatch, misses=2)
+    negotiate_auth.restore_keytab_at_start(app)
+    assert path.read_bytes() == TARGET_KEYTAB
+    with app.app_context():
+        assert _default().keytab_bytes() == TARGET_KEYTAB

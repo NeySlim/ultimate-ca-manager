@@ -5,6 +5,8 @@ while it is enabled: a disabled profile serves nothing.
 """
 import logging
 
+from sqlalchemy.exc import IntegrityError
+
 from models import CA, ADConnectorConfig, WindowsEnrollmentProfile, db
 
 from .legacy import DEFAULT_NAME, NO_REALM, resolve_realm
@@ -73,11 +75,15 @@ def default_for_write(actor=None):
     profile = default_profile()
     if profile is None:
         connector = ADConnectorConfig.get_singleton()
-        profile = WindowsEnrollmentProfile(name=DEFAULT_NAME, is_default=True, enabled=True,
-                                           connector_id=connector.id if connector else None,
-                                           created_by=actor)
-        db.session.add(profile)
-        db.session.flush()
+        try:
+            # A concurrent writer may create it first: its row is the default then
+            with db.session.begin_nested():
+                profile = WindowsEnrollmentProfile(name=DEFAULT_NAME, is_default=True, enabled=True,
+                                                   connector_id=connector.id if connector else None,
+                                                   created_by=actor)
+                db.session.add(profile)
+        except IntegrityError:
+            profile = WindowsEnrollmentProfile.query.filter_by(is_default=True).one()
     profile.updated_by = actor
     fill_realm(profile)
     return profile
