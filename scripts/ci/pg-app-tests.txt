@@ -1,0 +1,15 @@
+# Test files of the CI job "Backend Tests (PostgreSQL app)", one glob per line.
+# Every file gated on UCM_TEST_APP_PG_URL belongs here (tests/test_workflow_pg_app_tests.py checks it).
+tests/test_acme*.py
+tests/test_backup*.py
+tests/test_restore*.py
+tests/test_mtls*.py
+tests/test_wstep*.py
+tests/test_xcep*.py
+tests/test_certificates*.py
+tests/test_revocation*.py
+tests/test_scheduler*.py
+tests/test_postgres_schema_of_its_own.py
+tests/test_db_error_parameters_hidden.py
+tests/test_audit_oversized_fields.py
+tests/test_sso_login_identity.py
