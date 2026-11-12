@@ -18,6 +18,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Certificates: an imported certificate is now linked to a CA only when that CA's signature on it verifies, and renewal, re-enrolment and status checks only treat as issued by a CA a stored certificate it signed.
 - OCSP: a serial the CA revoked answers `revoked`, as on its CRL, even when a non-revoked record of that serial is stored again.
 - Certificates: a certificate imported again after its revocation and deletion comes back revoked, and a certificate its CA's revocation record names is no longer renewed in place.
+- Revocation: a serial its CA recorded as revoked is reported revoked on every surface, whichever record now holds it, and lifting a hold removes its record under every spelling and every record of the CA key.
 - Renewal: a certificate whose signature no longer verifies with its CA's current key (CA re-keyed or replaced under the same name) is refused with a message asking for a new certificate.
 
 ## [2.253] - 2026-11-11
