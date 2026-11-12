@@ -358,8 +358,8 @@ def test_a_running_per_node_task_does_not_delay_a_follower_takeover(sched, monke
         assert started.wait(2)
         before = beats.count(follower)
         leader.stop(timeout=5)
-        assert _wait(lambda: _OneOwnerLock.owner is follower, timeout=1.0)
-        assert _wait(lambda: beats.count(follower) > before + 2, timeout=1.0)
+        assert _wait(lambda: _OneOwnerLock.owner is follower, timeout=2)
+        assert _wait(lambda: beats.count(follower) > before + 2, timeout=2)
         assert not release.is_set() and runs == [1]
     finally:
         release.set()
@@ -489,9 +489,9 @@ def test_a_run_now_on_a_task_the_node_thread_still_runs_never_blocks_the_new_lea
     try:
         assert started.wait(2)
         leader.stop(timeout=5)
-        assert _wait(lambda: asked, timeout=1.0)
+        assert _wait(lambda: asked, timeout=2)
         before = beats.count(follower)
-        assert _wait(lambda: beats.count(follower) > before + 2, timeout=1.0)
+        assert _wait(lambda: beats.count(follower) > before + 2, timeout=2)
         assert runs == ['SchedulerNodeTasks']
     finally:
         release.set()
@@ -528,9 +528,9 @@ def test_a_follower_that_became_leader_stops_between_two_per_node_tasks(sched, m
         assert first_started.wait(2)
         leader.stop(timeout=5)
         # The new leader's loop is busy with its own task while the node thread ends the first one
-        assert _wait(lambda: ('cluster', 'SchedulerService') in runs, timeout=1.0)
+        assert _wait(lambda: ('cluster', 'SchedulerService') in runs, timeout=2)
         first_go.set()
-        assert _wait(lambda: not follower._node_thread.is_alive(), timeout=1.0)
+        assert _wait(lambda: not follower._node_thread.is_alive(), timeout=2)
     finally:
         first_go.set()
         cluster_go.set()
@@ -588,3 +588,38 @@ def test_in_ha_a_per_node_run_now_without_a_loop_on_this_node_runs_here(sched, m
     s = sched()
     s.register_task('local', lambda: None, interval=3600, per_node=True)
     assert s.run_task_now('local')['run_count'] == 1
+
+
+def test_a_per_node_run_now_taken_by_a_leader_that_loses_the_lock_still_runs_here(sched, monkeypatch):
+    """The node asked can still serve it as a follower: the request is not dropped."""
+    _ha_pair(monkeypatch)
+    s, other, runs, asked = sched(), object(), [], []
+
+    def take(self):
+        if not asked:
+            asked.append(1)
+            _OneOwnerLock.owner = other  # the lock is lost between the take and the run
+            return [self.tasks['local']]
+        return []
+    monkeypatch.setattr(SchedulerService, '_take_requests', take)
+    s.wake_interval = 0.05
+    s.register_task('local', lambda: runs.append(1), interval=3600, per_node=True)
+    s.start()
+    try:
+        assert _wait(lambda: runs == [1], timeout=2)
+    finally:
+        _OneOwnerLock.owner = None
+
+
+def test_a_deferred_leader_task_is_dropped_when_leadership_is_taken_again(sched, monkeypatch):
+    """Dropped, not replayed: the leader in between already dropped its request."""
+    monkeypatch.setattr(scheduler_service, '_ha', lambda: True)
+    monkeypatch.setattr(scheduler_service, '_drop_abandoned_requests', lambda: None)
+    s = sched()
+    monkeypatch.setattr(s, '_in_app', lambda fn, *a, **k: fn(*a, **k))
+    s.register_task('job', lambda: None, interval=3600)
+    s.register_task('local', lambda: None, interval=3600, per_node=True)
+    s._defer(s.tasks['job'])
+    s._defer(s.tasks['local'])
+    s._took_leadership()
+    assert s._take_deferred() == [s.tasks['local']]

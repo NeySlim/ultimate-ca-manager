@@ -704,8 +704,12 @@ class SchedulerService:
                         ]
 
                     # Execute tasks outside of lock
-                    for task in tasks_to_run:
+                    for done, task in enumerate(tasks_to_run):
                         if not self._running or not self._still_leader(lock):
+                            # This node can still serve the per-node requests it took
+                            for left in tasks_to_run[done:]:
+                                if left in requested and left.per_node:
+                                    self._defer(left)
                             break
                         ran = False
                         try:
@@ -772,6 +776,9 @@ class SchedulerService:
         if not _ha():
             return
         self._claimed.clear()
+        # A leader task deferred before the lock was lost: its request is gone with it
+        with self.tasks_lock:
+            self._deferred = [t for t in self._deferred if t.per_node]
         for hook in [_drop_abandoned_requests] + self._leadership_hooks:
             try:
                 self._in_app(hook)
