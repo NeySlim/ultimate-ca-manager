@@ -119,7 +119,7 @@ jobs:
       
       - name: Install build dependencies
         run: |
-          scripts/ci/apt-install.sh build-essential debhelper fakeroot devscripts dh-python python3-all python3-pip
+          scripts/ci/apt-install.sh build-essential debhelper fakeroot devscripts dh-python python3-all python3-pip python3-setuptools
       
       - name: Update changelog version
         run: |

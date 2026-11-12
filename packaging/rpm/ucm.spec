@@ -83,8 +83,8 @@ getent passwd %{name} >/dev/null || useradd -r -g %{name} -d %{ucm_home} -s /sbi
 %systemd_post %{name}.service
 
 # sudoers-cleanup: no sudo grant any more (the watcher restarts the service);
-# drop the file earlier versions wrote. Absent file or directory is fine.
-rm -f /etc/sudoers.d/ucm
+# drop the files earlier versions wrote. Absent file or directory is fine.
+rm -f /etc/sudoers.d/ucm-service /etc/sudoers.d/ucm
 # end sudoers-cleanup
 
 # Enable ucm-watcher path unit for restart/update handling
