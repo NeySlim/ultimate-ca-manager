@@ -197,7 +197,7 @@ def bootstrap_master_key(app) -> str:
     """Create the master key when the installation never had one; returns what was done."""
     key_encryption = _encryption.key_encryption
     path = _encryption.MASTER_KEY_PATH
-    if key_encryption.dek_error:
+    if key_encryption.dek_error or _marker_is_foreign_in_ha(key_encryption):
         # The stored DEKs are wrapped by another KEK: nothing is written under this one
         key_encryption.unload()
         return 'wrong_key'
@@ -381,15 +381,31 @@ def _apply_safe_mode(app, outcome=None) -> bool:
     return has_enc
 
 
+def _marker_is_foreign(key_encryption) -> bool:
+    """No DEK row, and a disable marker that is not this KEK's."""
+    from security import envelope
+    rows = key_encryption.dek_rows
+    if not key_encryption.kek_loaded or any(
+            r[1] in (envelope.ACTIVE, envelope.PREVIOUS) for r in rows):
+        return False
+    markers = {r[2] for r in rows if r[1] == envelope.DISABLED}
+    return bool(markers) and key_encryption.kek_fingerprint() not in markers
+
+
+def _marker_is_foreign_in_ha(key_encryption) -> bool:
+    """HA: the cluster was disabled under another KEK. Outside HA a file disable followed by
+    a new master.key leaves that marker legitimately."""
+    from utils.ha import ha_enabled
+    return ha_enabled() and _marker_is_foreign(key_encryption)
+
+
 def _kek_is_foreign(key_encryption) -> bool:
     """No DEK row: the database was written under another KEK when a peer's disable marker
     is not this KEK's, or when a value does not open with this KEK (the start path's check)."""
     from security import envelope
-    rows = key_encryption.dek_rows
-    if any(r[1] in (envelope.ACTIVE, envelope.PREVIOUS) for r in rows):
+    if any(r[1] in (envelope.ACTIVE, envelope.PREVIOUS) for r in key_encryption.dek_rows):
         return False
-    markers = {r[2] for r in rows if r[1] == envelope.DISABLED}
-    if markers and key_encryption.kek_fingerprint() not in markers:
+    if _marker_is_foreign(key_encryption):
         return True
     return key_encryption.is_enabled and not _loaded_key_reads_the_database()
 

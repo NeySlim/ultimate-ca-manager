@@ -1316,3 +1316,27 @@ def test_a_grace_retired_and_a_rotation_started_before_the_lock_is_not_retired_a
     with app.app_context():
         # Nothing was rewritten under v3 before the peers could have loaded it
         assert not dek_rotation._under_active(stored['target'])
+
+
+def test_in_ha_a_start_under_a_kek_another_disabled_does_not_encrypt(app, values, monkeypatch,
+                                                                    encryption_enabled):
+    """The cluster was disabled under another KEK, and no peer is live to compare with."""
+    from models import EncryptionKey
+    from security import envelope
+    from utils.datetime_utils import utc_now
+    key_encryption = encryption_enabled.key_encryption
+    with app.app_context():
+        db.session.add(EncryptionKey(version=0, state=envelope.DISABLED, kek_id='f' * 16,
+                                     wrapped=None, created_at=utc_now()))
+        db.session.commit()
+    try:
+        # Outside HA it is a file disable followed by a new master.key: encryption runs
+        _start(app)
+        assert key_encryption.is_encrypting
+        _ha(monkeypatch)
+        _start(app)
+        assert app.config['SAFE_MODE'] is True
+        assert app.config['SAFE_MODE_REASON'] == 'encryption_key_mismatch'
+        assert key_encryption.encrypt_string('x') == 'x'
+    finally:
+        app.config['SAFE_MODE'] = False
