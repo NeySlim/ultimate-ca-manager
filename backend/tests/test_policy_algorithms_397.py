@@ -22,6 +22,7 @@ from models.policy import CertificatePolicy
 from services.policy_service import (PolicyEvaluationService, PolicyViolation,
                                      key_label_for_public_key)
 from tests.conftest import get_json
+from tests.fixtures.templates import delete_templates
 
 CONTENT_JSON = 'application/json'
 
@@ -39,10 +40,14 @@ def _policy(app, name, ca_id=None, rules=None, template_id=None):
 
 def _drop(app, model, *ids):
     with app.app_context():
-        for row_id in ids:
-            row = db.session.get(model, row_id)
-            if row is not None:
-                db.session.delete(row)
+        if model is CertificateTemplate:
+            # What points to a template lets go first: SQLite hands the id to the next one
+            delete_templates(ids)
+        else:
+            for row_id in ids:
+                row = db.session.get(model, row_id)
+                if row is not None:
+                    db.session.delete(row)
         db.session.commit()
 
 
