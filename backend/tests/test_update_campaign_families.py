@@ -347,6 +347,28 @@ def test_a_new_turn_purges_the_packages_of_earlier_turns_only(app, ha, monkeypat
     assert len([n for n in left if n.endswith('-' + DEB)]) == 1  # this turn's own package stays
 
 
+
+def test_the_package_the_watcher_is_installing_is_not_purged(app, ha, monkeypatch):
+    # The watcher deletes .update_pending before dpkg or dnf runs; its claimed manifest names the package
+    import json
+    calls = []
+    _witnesses(monkeypatch, calls)
+    folder = os.path.join(str(updates.DATA_DIR), 'updates')
+    os.makedirs(folder)
+    installing = os.path.join(folder, 'abcdef012345-installing.rpm')
+    for path in (installing, os.path.join(folder, '0123456789ab-old.deb')):
+        with open(path, 'wb') as f:
+            f.write(b'x')
+    with open(os.path.join(str(updates.DATA_DIR), '.update_manifest.processing'), 'w') as f:
+        json.dump({'package_path': installing, 'to_version': '3.0'}, f)
+    _rows(app, a='deb')
+    assert _start(app)[0]
+    with app.app_context():
+        uc.campaign_tick()
+    _turn(app, monkeypatch, 'a', 'deb')
+    left = sorted(os.listdir(folder))
+    assert 'abcdef012345-installing.rpm' in left and '0123456789ab-old.deb' not in left
+
 def test_the_end_message_names_the_nodes_left_out(app, ha, monkeypatch):
     from models import ClusterNode, db
     from utils.datetime_utils import utc_now

@@ -300,22 +300,37 @@ def _discard(path):
         logger.warning(f"Rolling update: dropped package not removed: {type(e).__name__}: {e}")
 
 
+def _handed_to_the_watcher(data_dir):
+    """Package names the install watcher was handed or is installing: .update_pending, and the
+    manifest it claims (.update_manifest.processing) as it deletes .update_pending."""
+    names = set()
+    try:
+        with open(os.path.join(data_dir, '.update_pending')) as f:
+            names.add(os.path.basename(f.read().strip()))
+    except OSError:
+        pass
+    for manifest in ('.update_manifest.json', '.update_manifest.processing'):
+        try:
+            with open(os.path.join(data_dir, manifest)) as f:
+                names.add(os.path.basename(str(json.load(f).get('package_path') or '')))
+        except (OSError, ValueError, AttributeError):
+            pass
+    names.discard('')
+    return names
+
+
 def _purge_earlier_turns():
-    """Drop the packages earlier turns left in updates/; never the one the install watcher
-    was handed (.update_pending), nor a file no turn named."""
+    """Drop the packages earlier turns left in updates/; never one the install watcher
+    was handed or is installing, nor a file no turn named."""
     from services import updates
     folder = os.path.join(str(updates.DATA_DIR), 'updates')
-    try:
-        with open(os.path.join(str(updates.DATA_DIR), '.update_pending')) as f:
-            pending = os.path.basename(f.read().strip())
-    except OSError:
-        pending = None
+    kept = _handed_to_the_watcher(str(updates.DATA_DIR))
     try:
         names = os.listdir(folder)
     except OSError:
         return
     for name in names:
-        if _TURN_FILE.match(name) and name != pending:
+        if _TURN_FILE.match(name) and name not in kept:
             _discard(os.path.join(folder, name))
 
 
