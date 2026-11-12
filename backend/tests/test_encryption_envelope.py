@@ -1012,6 +1012,20 @@ def test_a_value_encrypted_during_the_disable_keeps_the_deks(app, auth_client, v
         assert encryption.decrypt_master_key_value(_stored(app, values)['target'], 'text') == PEM
 
 
+def test_a_disable_left_half_way_is_reported_and_named_by_the_rotation(app, auth_client, values):
+    from security import dek_rotation
+    with app.app_context():
+        dek_rotation.begin_disable()  # decrypt errors stopped the disable after its first phase
+    status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
+    assert status['enabled'] is True and status['disabling'] is True
+    r = auth_client.post('/api/v2/system/security/rotate-encryption-key')
+    assert r.status_code == 409, r.data
+    assert 'disable' in r.get_json()['message'].lower()
+    assert 'not enabled' not in r.get_json()['message']
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert r.status_code == 200, r.data
+
+
 def test_a_rotation_never_undoes_a_disable_committed_meanwhile(app, values, monkeypatch,
                                                               encryption_enabled):
     """The process's state may be stale before the lock; the database's under it decides."""

@@ -95,6 +95,9 @@ def start():
     key_encryption.refresh()
     if not key_encryption.is_encrypting:
         db.session.rollback()
+        if key_encryption.is_enabled:
+            raise RotationError('A disable of encryption was left half-way: run Disable '
+                                'Encryption again to finish it.')
         raise RotationError('Encryption is not enabled', 400)
     rows = EncryptionKey.query.order_by(EncryptionKey.version).all()
     keys = [r for r in rows if r.state in (envelope.ACTIVE, envelope.PREVIOUS)]

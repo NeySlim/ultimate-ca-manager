@@ -32,9 +32,13 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
         {encryptionStatus ? (
           <div className="space-y-4">
             <div className="flex items-center gap-3">
-              <Badge variant={encryptionStatus.enabled ? 'success' : 'warning'}>
-                {encryptionStatus.enabled ? t('common.enabled') : t('common.disabled')}
-              </Badge>
+              {encryptionStatus.disabling ? (
+                <Badge variant="warning">{t('settings.encryptionDisabling')}</Badge>
+              ) : (
+                <Badge variant={encryptionStatus.enabled ? 'success' : 'warning'}>
+                  {encryptionStatus.enabled ? t('common.enabled') : t('common.disabled')}
+                </Badge>
+              )}
               {encryptionStatus.enabled && encryptionStatus.key_source && (
                 <span className="text-xs text-text-tertiary">
                   {t('settings.keySource')}: {encryptionStatus.key_file_path}
@@ -82,6 +86,10 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
 
             <p className="text-xs text-text-secondary">{t('settings.encryptionDesc')}</p>
 
+            {encryptionStatus.disabling && (
+              <p className="text-sm text-status-warning">{t('settings.encryptionDisablingHint')}</p>
+            )}
+
             {hasPermission('admin:system') && (
               <div>
                 {!encryptionStatus.enabled ? (
@@ -103,7 +111,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                         {t('settings.backupMasterKey')}
                       </Button>
                     )}
-                    {encryptionStatus.unencrypted_count > 0 && handleEncryptRemainingKeys && (
+                    {!encryptionStatus.disabling && encryptionStatus.unencrypted_count > 0 && handleEncryptRemainingKeys && (
                       <Button
                         onClick={handleEncryptRemainingKeys}
                         variant="primary"
@@ -113,7 +121,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                         {t('settings.encryptRemainingKeys', { count: encryptionStatus.unencrypted_count })}
                       </Button>
                     )}
-                    {handleRotateDataKey && (
+                    {!encryptionStatus.disabling && handleRotateDataKey && (
                       <Button
                         onClick={handleRotateDataKey}
                         variant="outline"
@@ -131,7 +139,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                       variant="outline"
                     >
                       <Lock size={16} />
-                      {t('settings.disableEncryption')}
+                      {encryptionStatus.disabling ? t('settings.runDisableAgain') : t('settings.disableEncryption')}
                     </Button>
                   </div>
                 )}

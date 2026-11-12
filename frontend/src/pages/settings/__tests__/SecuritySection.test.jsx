@@ -128,6 +128,18 @@ describe('SecuritySection disabling encryption', () => {
     renderSection({ ...status, key_source: 'env' })
     expect(screen.getByText('settings.disableEncryption')).toBeInTheDocument()
   })
+
+  it('shows a disable left half-way and offers to run it again, not to rotate', () => {
+    const setShow = vi.fn()
+    renderSection({ ...status, key_source: 'env', disabling: true },
+      { setShowDisableEncryptionModal: setShow, handleRotateDataKey: vi.fn() })
+    expect(screen.getByText('settings.encryptionDisabling')).toBeInTheDocument()
+    expect(screen.getByText('settings.encryptionDisablingHint')).toBeInTheDocument()
+    expect(screen.queryByText('common.enabled')).not.toBeInTheDocument()
+    expect(screen.queryByText('settings.rotateDataKey')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('settings.runDisableAgain'))
+    expect(setShow).toHaveBeenCalledWith(true)
+  })
 })
 
 describe('SecuritySection data key rotation', () => {
