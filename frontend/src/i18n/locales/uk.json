@@ -3464,7 +3464,26 @@
     "httpsLeftBehindKeyed": "UCM тепер має ключ поновленого сертифіката: виберіть його нижче й застосуйте до HTTPS.",
     "httpsLeftBehindSuperseded": "Поновлений сертифікат сам було замінено: виберіть нижче поточний сертифікат і застосуйте його до HTTPS.",
     "httpsSelectRenewed": "Вибрати поновлений сертифікат",
-    "httpsOpenRenewed": "Відкрити поновлений сертифікат"
+    "httpsOpenRenewed": "Відкрити поновлений сертифікат",
+    "updateCampaign": {
+      "title": "Rolling update to v{{version}}",
+      "status": {
+        "running": "In progress",
+        "stopped": "Stopped",
+        "done": "Finished"
+      },
+      "nodesDone": "Nodes updated",
+      "currentNode": "Node updating",
+      "pending": "Waiting",
+      "none": "None",
+      "failed": "Stopped at node {{node}}: {{reason}}",
+      "packages": "Package per node",
+      "resume": "Resume",
+      "resumed": "Rolling update resumed",
+      "resumeFailed": "Failed to resume the rolling update",
+      "started": "Rolling update to v{{version}} started: the nodes update one at a time",
+      "haNote": "HA mode: the nodes update one at a time, the next one only once the previous one is back on the new version."
+    }
   },
   "account": {
     "profile": "Профіль",

@@ -3571,7 +3571,26 @@
     "httpsLeftBehindKeyed": "UCM détient désormais la clé du certificat renouvelé : sélectionnez-le ci-dessous et appliquez-le à HTTPS.",
     "httpsLeftBehindSuperseded": "Le certificat renouvelé a lui-même été remplacé : sélectionnez le certificat actuel ci-dessous et appliquez-le à HTTPS.",
     "httpsSelectRenewed": "Sélectionner le certificat renouvelé",
-    "httpsOpenRenewed": "Ouvrir le certificat renouvelé"
+    "httpsOpenRenewed": "Ouvrir le certificat renouvelé",
+    "updateCampaign": {
+      "title": "Rolling update to v{{version}}",
+      "status": {
+        "running": "In progress",
+        "stopped": "Stopped",
+        "done": "Finished"
+      },
+      "nodesDone": "Nodes updated",
+      "currentNode": "Node updating",
+      "pending": "Waiting",
+      "none": "None",
+      "failed": "Stopped at node {{node}}: {{reason}}",
+      "packages": "Paquet par nœud",
+      "resume": "Resume",
+      "resumed": "Rolling update resumed",
+      "resumeFailed": "Failed to resume the rolling update",
+      "started": "Rolling update to v{{version}} started: the nodes update one at a time",
+      "haNote": "HA mode: the nodes update one at a time, the next one only once the previous one is back on the new version."
+    }
   },
   "sso": {
     "subtitle": "Configurez des fournisseurs LDAP, OAuth2 ou SAML pour une authentification centralisée",

@@ -3420,7 +3420,26 @@
     "httpsLeftBehindKeyed": "UCM besitzt jetzt den Schlüssel des erneuerten Zertifikats: Wählen Sie es unten aus und wenden Sie es auf HTTPS an.",
     "httpsLeftBehindSuperseded": "Das erneuerte Zertifikat wurde selbst ersetzt: Wählen Sie unten das aktuelle Zertifikat aus und wenden Sie es auf HTTPS an.",
     "httpsSelectRenewed": "Erneuertes Zertifikat auswählen",
-    "httpsOpenRenewed": "Erneuertes Zertifikat öffnen"
+    "httpsOpenRenewed": "Erneuertes Zertifikat öffnen",
+    "updateCampaign": {
+      "title": "Rolling update to v{{version}}",
+      "status": {
+        "running": "In progress",
+        "stopped": "Stopped",
+        "done": "Finished"
+      },
+      "nodesDone": "Nodes updated",
+      "currentNode": "Node updating",
+      "pending": "Waiting",
+      "none": "None",
+      "failed": "Stopped at node {{node}}: {{reason}}",
+      "packages": "Package per node",
+      "resume": "Resume",
+      "resumed": "Rolling update resumed",
+      "resumeFailed": "Failed to resume the rolling update",
+      "started": "Rolling update to v{{version}} started: the nodes update one at a time",
+      "haNote": "HA mode: the nodes update one at a time, the next one only once the previous one is back on the new version."
+    }
   },
   "account": {
     "profile": "Profil",

@@ -93,7 +93,6 @@ These operations answer `409` with code `ha_mode`, because they only change the 
 
 - backend switch and data migration between databases (`database.py`): change `DATABASE_URL` by hand, then restart;
 - secret rotation (it writes `ucm.env`);
-- installing an update from the web interface;
 - backup restore, both from System and from Settings (restored files land on one node).
 
 ## Upgrading
@@ -102,6 +101,16 @@ Upgrade the nodes one at a time. Migrations run under a PostgreSQL advisory lock
 
 - **Helm:** `helm upgrade` rolls the pods with no unavailable pod; the PodDisruptionBudget protects them from node drains.
 - **Compose:** `docker compose -f docker-compose.ha.yml pull`, then `up -d ucm-1`, wait until it is healthy, then `up -d ucm-2`.
-- **DEB/RPM:** upgrade and restart one host, wait for `/health/ready`, then the next.
+- **DEB/RPM:** upgrade and restart one host, wait for `/health/ready`, then the next. Or install the update from the web interface (System > Updates), or let the scheduled automatic install do it: in HA mode either starts a rolling update.
+
+### Rolling update from the web interface (DEB/RPM)
+
+One campaign runs at a time. The scheduler leader gives the turn to one node at a time, in `UCM_NODE_ID` order, among the nodes with a fresh heartbeat when it starts. Each node installs the package of its own family, reported in `cluster_nodes.package_family` at every heartbeat: `deb`, `rpm-el9` (any `rpm-elN`) or `rpm-fedora` (an RPM host of no EL release). At the start the campaign records one package per family present among the nodes beating, with its SHA-256 from the release; it refuses to start, naming the node and the reason, when a node runs Docker or Kubernetes (`container`) or an unknown packaging, or when the release lacks the package of a present family or its SHA-256. On its turn, a node takes the entry of the family it detects itself, checks that the command carries the SHA-256 frozen at the start for that family, downloads and verifies the package, then asks its own update watcher to install it. The next node starts only once the previous one has a fresh heartbeat on the target version in `cluster_nodes`. A node already on the target is counted done without an install.
+
+The campaign stops, and leaves the remaining nodes alone, when a node fails to download or verify the package, has a family the campaign holds no package for (a node that joined after the start; one that joins with a family present takes a turn), comes back on another version, or is not back on the target within 15 minutes (download, install, migrations under the startup lock and the first heartbeat). Every step is audited and pushed to the browsers. System > Updates shows the target, the nodes done, the node in progress and the node where it stopped with the reason; fix that node, then **Resume** continues from it. Nodes without a fresh heartbeat at the start are listed as skipped and not updated; the end message names them.
+
+While the campaign runs, the updated nodes and the others share the database. The first updated node applies the target's migrations: a migration that the older version cannot run against leaves the nodes not yet updated failing until their turn. Read the release notes before updating a cluster.
+
+In Docker and Kubernetes the route and the scheduled install refuse with a message: the orchestrator updates the image (`docker compose pull`, `helm upgrade`).
 
 During a roll from a version without the scheduled backup's conclusion marker, a scheduled backup run by an older leader is not marked as concluded: a newer leader then writes one extra archive two hours later, once.

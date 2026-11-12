@@ -406,17 +406,20 @@ def _alert_scope(row):
     return row.ca.refid
 
 
-def expiring_alerts(days: int = 30, expired_within_hours: int = 24):
+def expiring_alerts(days: int = 30, expired_within_hours: int = 24, now=None, expired_after=None):
     """``(expiring, just_expired)`` payloads, each ``(scope_refid, dict)``, for unrevoked cross-certificates.
 
-    The scope is the issuing CA while it is held, else the certified CA; ``ca_refid`` in the payload is the certified CA."""
+    The scope is the issuing CA while it is held, else the certified CA; ``ca_refid`` in the payload is the certified CA.
+    Just expired: in (expired_after, now], the last *expired_within_hours* by default."""
     from datetime import timedelta
-    now = utc_now()
+    now = now or utc_now()
+    if expired_after is None:
+        expired_after = now - timedelta(hours=expired_within_hours)
     base = CACrossCertificate.query.join(CA, CA.id == CACrossCertificate.ca_id).filter(
         CACrossCertificate.revoked.is_(False))
     soon = base.filter(CACrossCertificate.valid_to > now,
                        CACrossCertificate.valid_to <= now + timedelta(days=days)).all()
     gone = base.filter(CACrossCertificate.valid_to <= now,
-                       CACrossCertificate.valid_to > now - timedelta(hours=expired_within_hours)).all()
+                       CACrossCertificate.valid_to > expired_after).all()
     return ([(_alert_scope(row), _alert_payload(row, now)) for row in soon],
             [(_alert_scope(row), _alert_payload(row, now)) for row in gone])

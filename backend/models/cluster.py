@@ -12,6 +12,8 @@ class ClusterNode(db.Model):
     is_leader = db.Column(db.Boolean, nullable=False, default=False)
     version = db.Column(db.String(32))
     pid = db.Column(db.Integer)
+    # deb, rpm-el9, rpm-fedora, container or unknown: the package a rolling update gives this node
+    package_family = db.Column(db.String(32))
     # Last cluster_commands.id this node's applier handled (migration 143)
     command_seen = db.Column(db.Integer)
     # Last restart command this node claimed: one process of the node acts on it (migration 143)

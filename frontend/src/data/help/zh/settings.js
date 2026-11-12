@@ -75,6 +75,7 @@ export default {
           { label: '自动安装', text: '默认关闭。启用后，UCM 会在选定的时间下载、验证并安装更新，然后重启,, 仅限 DEB/RPM 安装' },
           { label: '校验和', text: '无人值守安装要求发布版提供已公布的 SHA256 用于验证；手动安装在有校验和公布时也会进行验证' },
           { label: 'Docker', text: '容器无法自行更新,, 检查和通知仍然有效；请拉取新镜像来完成更新' },
+          { label: 'HA mode', text: 'In HA mode on DEB/RPM, Install Update and the auto-install update the nodes one at a time; the next node starts once the previous one is back on the new version. The screen shows the nodes done, the node in progress and the node where it stopped with the reason; Resume continues from it. Docker and Kubernetes leave it to the orchestrator' },
           { label: '更新后弹窗', text: '可选（v2.217）：更新安装后按用户显示一次版本说明。默认关闭' },
         ]
       },
@@ -369,6 +370,7 @@ UCM 支持两种数据库后端：
 - 查看可用更新的变更日志
 - 当前版本和构建信息
 - **自动更新**：在支持的安装（DEB/RPM）上，点击**安装更新**自动下载和安装最新版本
+- **HA mode**: on DEB/RPM, **Install Update** and the auto-install update the nodes one at a time, and the screen follows the rolling update (nodes done, node in progress, package of each node, node where it stopped and why, **Resume**)
 - **更新通道**：稳定版、预发布版（候选发布版本）或 dev
 
 ## Webhook

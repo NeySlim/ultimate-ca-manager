@@ -34,6 +34,25 @@ if not _ca_bundle:
 # GitHub repo
 REPO = "NeySlim/ultimate-ca-manager"
 
+# The image sets UCM_DOCKER=1; the Helm chart runs the same image, so Kubernetes is covered
+CONTAINER_HA_REFUSAL = ("In HA mode on Docker or Kubernetes the orchestrator updates the nodes: "
+                        "roll the new image (docker compose pull, helm upgrade)")
+
+
+def is_container_install():
+    return os.getenv('UCM_DOCKER') == '1'
+
+
+def versions_match(detected, target):
+    """Same version once the packaging transforms are undone: DEB/RPM ship 2.215-rc1 as
+    2.215~rc1, and a package revision ('-1') may be appended."""
+    d = (detected or '').replace('~', '-').strip()
+    t = (target or '').replace('~', '-').strip()
+    if not d or not t:
+        return False
+    base = re.sub(r'-\d+$', '', d)
+    return d == t or base == t
+
 # Simple cache to avoid GitHub rate limits (5 min TTL)
 _releases_cache = {'data': None, 'ts': 0, 'ttl': 300}
 
@@ -61,6 +80,38 @@ def _pick_rpm(assets, el):
         if el and tag and tag.group(1) == el:
             return asset
     return next((a for a in rpms if not _EL_TAG.search(a['name'])), None)
+
+
+CONTAINER_FAMILY, UNKNOWN_FAMILY = 'container', 'unknown'
+
+
+def package_family():
+    """The package this host installs: deb, rpm-elN, rpm-fedora (an RPM host of no EL
+    release), container (the orchestrator updates it) or unknown. dpkg wins over rpm."""
+    if is_container_install():
+        return CONTAINER_FAMILY
+    if os.path.exists('/usr/bin/dpkg'):
+        return 'deb'
+    if os.path.exists('/usr/bin/rpm'):
+        el = _el_release()
+        return f'rpm-el{el}' if el else 'rpm-fedora'
+    return UNKNOWN_FAMILY
+
+
+def family_package(assets, family):
+    """{download_url, package_name, checksum_url} of ``family`` in a release's assets, or None.
+    checksum_url is None when the release publishes no .sha256 asset for that package."""
+    if family == 'deb':
+        chosen = next((a for a in assets if a['name'].endswith('.deb')), None)
+    elif family and family.startswith('rpm-'):
+        chosen = _pick_rpm(assets, family[len('rpm-el'):] if family.startswith('rpm-el') else None)
+    else:
+        return None
+    if chosen is None:
+        return None
+    checksum = next((a for a in assets if a['name'] == chosen['name'] + '.sha256'), None)
+    return {'download_url': chosen['browser_download_url'], 'package_name': chosen['name'],
+            'checksum_url': checksum['browser_download_url'] if checksum else None}
 
 
 def get_github_repo():
@@ -260,37 +311,19 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
         # Find appropriate download asset
         download_url = None
         package_name = None
-        
-        # Detect package type (deb takes priority over rpm if both exist)
-        is_docker = os.getenv('UCM_DOCKER') == '1'
-        is_deb = os.path.exists('/usr/bin/dpkg')
-        is_rpm = os.path.exists('/usr/bin/rpm') and not is_deb
-        
-        # Collect all matching assets, then pick the best one
-        deb_asset = None
-        checksum_assets = {}
         checksum_url = None
-
-        for asset in latest_release.get('assets', []):
-            name = asset['name']
-            if is_docker:
+        assets = [{'name': a['name'], 'browser_download_url': a['browser_download_url']}
+                  for a in latest_release.get('assets', [])]
+        family = package_family()
+        if family == CONTAINER_FAMILY:
+            if assets:
                 download_url = f"ghcr.io/neyslim/ultimate-ca-manager:{latest_version}"
-                package_name = name
-                break
-            elif name.endswith('.sha256'):
-                checksum_assets[name[:-len('.sha256')]] = asset
-            elif name.endswith('.deb') and not deb_asset:
-                deb_asset = asset
-
-        if not is_docker:
-            rpm_asset = _pick_rpm(latest_release.get('assets', []), _el_release()) if is_rpm else None
-            chosen = deb_asset if is_deb and deb_asset else (rpm_asset if is_rpm and rpm_asset else None)
+                package_name = assets[0]['name']
+        else:
+            chosen = family_package(assets, family)
             if chosen:
-                download_url = chosen['browser_download_url']
-                package_name = chosen['name']
-                checksum_asset = checksum_assets.get(package_name)
-                if checksum_asset:
-                    checksum_url = checksum_asset['browser_download_url']
+                download_url, package_name, checksum_url = (
+                    chosen['download_url'], chosen['package_name'], chosen['checksum_url'])
         
         update_available = compare_versions(latest_version, current) > 0
         
@@ -304,6 +337,8 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
             'download_url': download_url,
             'package_name': package_name,
             'checksum_url': checksum_url,
+            # Every family's package: an HA rolling update gives each node its own
+            'assets': assets,
             'published_at': latest_release.get('published_at'),
             'html_url': latest_release.get('html_url'),
             'prerelease': latest_release.get('prerelease', False),
@@ -522,24 +557,13 @@ def consume_update_result():
     }
     actor = data.get('initiated_by') or 'system'
 
-    def _version_matches(detected, target):
-        # Tolerate the packaging transforms (review S-01): the prerelease
-        # separator '-' becomes '~' in DEB/RPM versions (2.215-rc1 ships as
-        # 2.215~rc1), and a package revision ('-1') may be appended.
-        d = (detected or '').replace('~', '-').strip()
-        t = (target or '').replace('~', '-').strip()
-        if not d or not t:
-            return False
-        base = re.sub(r'-\d+$', '', d)
-        return d == t or base == t
-
     # Independent backend check on top of the watcher's own verification:
     # 'installed' additionally requires the recorded installed_version to
     # match the target — a watcher result claiming success without a
     # matching version is downgraded to a failure.
     verified = (
         data.get('status') == 'installed'
-        and _version_matches(data.get('installed_version'), data.get('to_version'))
+        and versions_match(data.get('installed_version'), data.get('to_version'))
     )
     if data.get('status') == 'installed' and not verified:
         data['status'] = 'failed'
@@ -701,11 +725,13 @@ def _auto_install(result):
     from services.audit_service import AuditService
 
     latest = result['latest_version']
-    if os.getenv('UCM_DOCKER') == '1' or not result.get('download_url'):
+    if is_container_install():
+        logger.info(f"Auto-update to {latest} not installed: in Docker or Kubernetes "
+                    f"the orchestrator updates the image")
         return
     from utils.ha import ha_enabled
-    if ha_enabled():
-        logger.info("Auto-update skipped: not available in HA mode")
+    in_ha = ha_enabled()
+    if not in_ha and not result.get('download_url'):
         return
     if _cfg_get(_ATTEMPTED_VERSION_KEY) == latest:
         return  # one attempt per version — no overnight crash loops
@@ -724,6 +750,16 @@ def _auto_install(result):
     # install without its anti-repeat marker could loop every night.
     if not _cfg_set(_ATTEMPTED_VERSION_KEY, latest):
         return refuse('could not persist the attempted-version marker')
+
+    if in_ha:
+        # One verified package per node family, frozen at the start; each node fetches its own
+        from services import update_campaign
+        started, message, _ = update_campaign.start_campaign(
+            latest, result.get('assets') or [], 'scheduler')
+        if not started:
+            return refuse(message)
+        update_campaign.campaign_tick()
+        return
 
     if not result.get('checksum_url'):
         return refuse('release publishes no SHA256 checksum')
