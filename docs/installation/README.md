@@ -279,7 +279,7 @@ With a generated password, UCM asks for a new one right after login. Until it is
 
 After installation:
 
-1. **Change default password** — Settings → Users & Groups
+1. **Log in and set your password**: see [First Access](#first-access); there is no default password
 2. **Configure HTTPS certificate** — Upload a trusted certificate or use the auto-generated one
 3. **Create your first CA** — Dashboard → Create Certificate Authority
 4. **Configure email notifications** (optional) — Settings → SMTP
