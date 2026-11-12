@@ -137,7 +137,10 @@ jobs:
           UCM_DEV_MODE: 'true'
         run: |
           cd backend
-          pytest -v --tb=short -n 4 --dist loadfile $(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 2)
+          # A failed or empty list stops the step: pytest without files runs the whole suite
+          files=$(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 2)
+          [ -n "$files" ]
+          pytest -v --tb=short -n 4 --dist loadfile $files
 
   # One database for the whole suite, as a user runs it: the integration judge.
   # Release branches, the nightly run of dev, and on demand. Not on dev pushes.
@@ -395,7 +398,9 @@ jobs:
           UCM_TEST_APP_PG_URL: postgresql://ucm_migtest:ucm_migtest_ci@localhost:5432/ucm_migtest
         run: |
           cd backend
-          pytest --tb=short $(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 3 ../scripts/ci/pg-app-tests.txt)
+          files=$(../scripts/ci/shard-tests.sh ${{ matrix.shard }} 3 ../scripts/ci/pg-app-tests.txt)
+          [ -n "$files" ]
+          pytest --tb=short $files
   
   # Two real UCM nodes in HA mode on one PostgreSQL (docs/testing/ha-bench.md).
   # Manual only: run the workflow by hand with the `ha` input ticked.

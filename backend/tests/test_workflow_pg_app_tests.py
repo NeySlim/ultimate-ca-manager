@@ -56,8 +56,50 @@ def test_a_listed_pattern_matching_no_file_fails_the_shard(tmp_path):
     assert run.returncode != 0 and 'no_such_file' in run.stderr
 
 
+def _sharded_jobs():
+    import yaml
+    jobs = yaml.safe_load((ROOT / '.github' / 'workflows' / 'tests.yml').read_text())['jobs']
+    found = {}
+    for name, job in jobs.items():
+        runs = [step['run'] for step in job.get('steps', []) if 'shard-tests.sh' in step.get('run', '')]
+        if runs:
+            found[name] = (job, runs)
+    return found
+
+
 def test_the_workflow_runs_every_shard_it_cuts():
-    text = (ROOT / '.github' / 'workflows' / 'tests.yml').read_text()
-    assert 'shard-tests.sh ${{ matrix.shard }} 2)' in text and 'shard: [1, 2]\n' in text
-    assert 'shard-tests.sh ${{ matrix.shard }} 3 ../scripts/ci/pg-app-tests.txt)' in text
-    assert 'shard: [1, 2, 3]\n' in text
+    jobs = _sharded_jobs()
+    assert {'test-backend', 'test-backend-postgres-app'} <= set(jobs), sorted(jobs)
+    for name, (job, runs) in jobs.items():
+        matrix = job['strategy']['matrix']
+        assert set(matrix) == {'shard'}, (name, matrix)  # no include or exclude
+        n = len(matrix['shard'])
+        assert matrix['shard'] == list(range(1, n + 1)), (name, matrix)
+        assert len(runs) == 1 and f'shard-tests.sh ${{{{ matrix.shard }}}} {n}' in runs[0], (name, runs)
+
+
+@pytest.mark.parametrize('job', ['test-backend', 'test-backend-postgres-app'])
+@pytest.mark.parametrize('shard_out, shard_rc, runs_pytest', [
+    ('tests/test_a.py\ntests/test_b.py\n', 0, True),
+    ('', 1, False),   # the script failed
+    ('', 0, False),   # it printed nothing: pytest would run the whole suite
+])
+def test_a_failed_or_empty_shard_list_stops_the_step(tmp_path, job, shard_out, shard_rc, runs_pytest):
+    # The step as GitHub runs it (bash -e), with stand-ins for the script and pytest
+    run = _sharded_jobs()[job][1][0].replace('${{ matrix.shard }}', '1')
+    (tmp_path / 'backend').mkdir()
+    (tmp_path / 'scripts' / 'ci').mkdir(parents=True)
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    called = tmp_path / 'pytest-args'
+    for path, body in ((tmp_path / 'scripts' / 'ci' / 'shard-tests.sh',
+                        f'printf %s "{shard_out}"\nexit {shard_rc}\n'),
+                       (bin_dir / 'pytest', f'printf "%s\\n" "$@" > {called}\n')):
+        path.write_text('#!/bin/sh\n' + body)
+        path.chmod(0o755)
+    result = subprocess.run(['bash', '-e', '-c', run], cwd=tmp_path, capture_output=True, text=True,
+                            env={'PATH': f'{bin_dir}:/usr/bin:/bin'})
+    assert (result.returncode == 0) is runs_pytest, result.stderr
+    assert called.exists() is runs_pytest
+    if runs_pytest:
+        assert called.read_text().split()[-2:] == ['tests/test_a.py', 'tests/test_b.py']
