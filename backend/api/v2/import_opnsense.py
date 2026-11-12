@@ -106,13 +106,19 @@ def _is_self_signed(encoded_crt):
         return False
 
 
-def _ca_signed_entry(ca, encoded_crt):
-    """Whether *ca* signed the appliance entry's certificate: the entry's caref is only a claim."""
-    from utils.cert_issuer import ca_signed
+def _entry_issuer_refid(ca, encoded_crt):
+    """The refid of the stored CA that signed the appliance entry's certificate:
+    *ca*, the one the entry names, when its key verifies it, else whichever stored
+    CA does; None when none does (the entry's caref is only a claim)."""
+    from utils.cert_issuer import ca_signed, signing_ca_for
     try:
-        return ca_signed(ca, x509.load_pem_x509_certificate(base64.b64decode(encoded_crt)))
+        cert = x509.load_pem_x509_certificate(base64.b64decode(encoded_crt))
     except Exception:
-        return False
+        return None
+    if ca_signed(ca, cert):
+        return ca.refid
+    signer = signing_ca_for(cert)
+    return signer.refid if signer else None
 
 
 def _parse_cert(encoded_crt):
@@ -694,8 +700,8 @@ def import_items():
                 cert_info = _parse_cert(crt)
                 caref = cert_data.get('caref') or None
                 caref = attached_refids.get(caref, caref)
-                if caref and not _ca_signed_entry(CA.query.filter_by(refid=caref).first(), crt):
-                    caref = None
+                if caref:
+                    caref = _entry_issuer_refid(CA.query.filter_by(refid=caref).first(), crt)
                 # uix_certificates_ca_serial: a config may hold the same certificate twice
                 if Certificate.stored_under(caref, cert_info['serial_number']):
                     stats['certs_skipped'] += 1
