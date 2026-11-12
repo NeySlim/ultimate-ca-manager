@@ -64,7 +64,7 @@ _SETTINGS_KEYS = (
     'auto_backup_enabled', 'backup_frequency', 'backup_password',
     'backup_retention_days', 'backup_min_keep', 'backup_max_total_mb',
     'backup.last_run', 'backup.last_outcome', 'backup.last_reason',
-    'backup.last_outcome_at',
+    'backup.last_outcome_at', 'backup.concluded_run',
 )
 _OUTCOME_KEYS = ('backup.last_outcome', 'backup.last_reason',
                  'backup.last_outcome_at')

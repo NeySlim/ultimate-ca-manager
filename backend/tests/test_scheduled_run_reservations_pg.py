@@ -118,7 +118,8 @@ def _backup_schedule(app, monkeypatch, tmp_path, last_run=None):
 def _drop_backup(app):
     with app.app_context():
         for key in ('auto_backup_enabled', 'backup_password', 'backup.last_run',
-                    'backup.last_outcome', 'backup.last_reason', 'backup.last_outcome_at'):
+                    'backup.last_outcome', 'backup.last_reason', 'backup.last_outcome_at',
+                    'backup.concluded_run'):
             _set(key, None)
         db.session.remove()
 

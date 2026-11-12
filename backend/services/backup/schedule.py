@@ -33,10 +33,13 @@ logger = logging.getLogger(__name__)
 
 _BACKUP_GLOB = 'ucm_backup_*.ucmbkp'
 _LAST_RUN_KEY = 'backup.last_run'
+# The reservation (a last_run value) whose archive was written: a reservation that
+# differs from it is in flight, or abandoned once the lease is over.
+_CONCLUDED_KEY = 'backup.concluded_run'
 _VALID_FREQUENCIES = ('daily', 'weekly', 'monthly')
 _PERIOD_SECONDS = {'daily': 86400, 'weekly': 604800, 'monthly': 2592000}
-# A claimed run with no outcome recorded after it is in flight for this long, then
-# abandoned (killed, OOM, os._exit on shutdown): the slot becomes due again.
+# A claimed run not concluded is in flight for this long, then abandoned (killed,
+# OOM, os._exit on shutdown): the slot becomes due again.
 _CLAIM_LEASE_SECONDS = 2 * 3600
 
 # Archives with no validation record are kept in this number, newest first:
@@ -388,6 +391,32 @@ def _claim_run(previous, now: datetime):
     return claimed if moved else None
 
 
+def _start_marking_conclusions(previous) -> None:
+    """Create the conclusion marker before the first reservation that can need it, so
+    a run killed with none recorded is retried; an existing marker is left alone."""
+    try:
+        config_compare_and_set(_CONCLUDED_KEY, None, previous or '')
+    except Exception as exc:
+        db.session.rollback()
+        raise ScheduledBackupError(f'The backup schedule could not be reserved: {exc}') from exc
+
+
+def _conclude_run(claimed: str) -> None:
+    """Mark the reservation *claimed* as done once its archive exists; raises, since a
+    lost marker would bring a second archive once the lease is over."""
+    try:
+        row = SystemConfig.query.filter_by(key=_CONCLUDED_KEY).first()
+        if row:
+            row.value = claimed
+        else:
+            db.session.add(SystemConfig(key=_CONCLUDED_KEY, value=claimed))
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        raise ScheduledBackupError(
+            f'The archive was written but its run could not be marked concluded: {exc}') from exc
+
+
 def _release_run(previous, claimed: str) -> None:
     """Give a run that wrote no archive back to the next tick, unless moved since."""
     # The claim is committed; a failed export may have left the transaction aborted
@@ -396,7 +425,7 @@ def _release_run(previous, claimed: str) -> None:
         config_release(_LAST_RUN_KEY, claimed, previous)
     except Exception:
         db.session.rollback()
-        logger.warning("Could not release the backup schedule; next run in one period")
+        logger.warning("Could not release the backup schedule; retried once the lease is over")
 
 
 def _parse(value):
@@ -415,8 +444,9 @@ def _is_due(sched: dict, now: datetime) -> bool:
     if prev is None:
         return True
     elapsed = (_naive_utc(now) - prev).total_seconds()
-    concluded = _parse(sched.get('last_outcome_at'))
-    if (concluded is None or concluded < prev) and elapsed >= _CLAIM_LEASE_SECONDS:
+    concluded = sched.get('concluded_run')
+    # No marker at all: last_run predates it (upgraded install) and counts as concluded
+    if concluded is not None and concluded != last_run and elapsed >= _CLAIM_LEASE_SECONDS:
         return True  # claimed, never concluded, lease expired
     # small slack so a ~daily timer doesn't drift a day each run
     return elapsed >= period - 300
@@ -443,6 +473,7 @@ def run_scheduled_backup() -> dict:
         return {'status': 'skipped', 'reason': 'disabled'}
 
     now = utc_now()
+    sched['concluded_run'] = _get(_CONCLUDED_KEY)
     if not _is_due(sched, now):
         return {'status': 'skipped', 'reason': 'not_due'}
 
@@ -478,6 +509,7 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
             # A setting carried over from a standard instance must not stop every run.
             logger.warning("Scheduled backup KDF is Argon2id, refused in FIPS mode: using PBKDF2")
             kdf = None
+        _start_marking_conclusions(sched.get('last_run'))
         claimed = _claim_run(sched.get('last_run'), now)
         if claimed is None:
             logger.info("Scheduled backup already taken by another node")
@@ -491,6 +523,7 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
             # so nothing after the write can bring a second archive a minute later.
             _release_run(sched.get('last_run'), claimed)
             raise
+        _conclude_run(claimed)
 
         logger.info(f"Scheduled backup created: {filename} ({size} bytes)")
         for left_out in service.last_export_warnings:
