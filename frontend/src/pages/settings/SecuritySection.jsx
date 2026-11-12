@@ -57,12 +57,30 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                 {encryptionStatus.rotation_in_progress && (
                   <Badge variant="warning">{t('settings.dekRotationInProgress')}</Badge>
                 )}
-                {encryptionStatus.previous_dek_retire_after ? (
+                {encryptionStatus.rotation_available_after ? (
                   <Badge variant="secondary">
-                    {t('settings.previousDekKeptUntil', { date: formatDate(encryptionStatus.previous_dek_retire_after, { hour: '2-digit', minute: '2-digit' }) })}
+                    {t('settings.rotationAvailableAfter', { date: formatDate(encryptionStatus.rotation_available_after, { hour: '2-digit', minute: '2-digit' }) })}
                   </Badge>
-                ) : encryptionStatus.previous_dek_waits_for_nodes && (
-                  <Badge variant="secondary">{t('settings.previousDekKeptUntilNodesReload')}</Badge>
+                ) : encryptionStatus.rotation_waits_for_nodes ? (
+                  <Badge variant="secondary">{t('settings.rotationAvailableAfterNodesReload')}</Badge>
+                ) : encryptionStatus.rotation_available && !encryptionStatus.rotation_in_progress && (
+                  <Badge variant="success">{t('settings.rotationAvailable')}</Badge>
+                )}
+              </div>
+            )}
+
+            {encryptionStatus.retained_keys?.length > 0 && (
+              <div className="text-xs text-text-secondary space-y-1">
+                <p>{t('settings.retainedDataKeys')}</p>
+                <ul className="list-disc pl-5">
+                  {encryptionStatus.retained_keys.map((key) => (
+                    <li key={key.version}>
+                      {t('settings.retainedDataKey', { version: key.version, date: formatDate(key.retire_after, { hour: '2-digit', minute: '2-digit' }) })}
+                    </li>
+                  ))}
+                </ul>
+                {encryptionStatus.key_file_kept_for_retained_keys && (
+                  <p>{t('settings.keyFileRemovedWithRetainedKeys')}</p>
                 )}
               </div>
             )}
@@ -92,12 +110,12 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
               <p className="text-sm text-status-warning">{t('settings.encryptionDisablingHint')}</p>
             )}
 
-            {encryptionStatus.disabled_keys_kept_until ? (
+            {encryptionStatus.enable_available_after ? (
               <p className="text-sm text-text-secondary">
-                {t('settings.disabledKeysKeptUntil', { date: formatDate(encryptionStatus.disabled_keys_kept_until, { hour: '2-digit', minute: '2-digit' }) })}
+                {t('settings.enableAvailableAfter', { date: formatDate(encryptionStatus.enable_available_after, { hour: '2-digit', minute: '2-digit' }) })}
               </p>
-            ) : encryptionStatus.disabled_keys_wait_for_nodes && (
-              <p className="text-sm text-text-secondary">{t('settings.disabledKeysKeptUntilNodesReload')}</p>
+            ) : encryptionStatus.enable_waits_for_nodes && (
+              <p className="text-sm text-text-secondary">{t('settings.enableAvailableAfterNodesReload')}</p>
             )}
 
             {hasPermission('admin:system') && (
@@ -106,7 +124,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                   <Button
                     onClick={() => setShowEnableEncryptionModal(true)}
                     variant="primary"
-                    disabled={!!encryptionStatus.disabled_keys_kept_until || !!encryptionStatus.disabled_keys_wait_for_nodes}
+                    disabled={!!encryptionStatus.enable_available_after || !!encryptionStatus.enable_waits_for_nodes}
                   >
                     <LockKey size={16} />
                     {t('settings.enableEncryption')}
@@ -136,7 +154,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                       <Button
                         onClick={handleRotateDataKey}
                         variant="outline"
-                        disabled={encryptionLoading || !!encryptionStatus.previous_dek_retire_after || !!encryptionStatus.previous_dek_waits_for_nodes}
+                        disabled={encryptionLoading || !!encryptionStatus.rotation_available_after || !!encryptionStatus.rotation_waits_for_nodes}
                       >
                         <LockKey size={16} />
                         {encryptionStatus.rotation_in_progress

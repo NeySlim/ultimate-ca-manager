@@ -142,16 +142,24 @@ describe('SecuritySection disabling encryption', () => {
   })
   it('names the end of a disable grace period and holds enabling until then', () => {
     renderSection({ ...status, enabled: false, key_source: 'env',
-      disabled_keys_kept_until: '2026-11-12T10:00:00Z' })
+      enable_available_after: '2026-11-12T10:00:00Z' })
     expect(screen.getByText('common.disabled')).toBeInTheDocument()
-    expect(screen.getByText('settings.disabledKeysKeptUntil')).toBeInTheDocument()
+    expect(screen.getByText('settings.enableAvailableAfter')).toBeInTheDocument()
     expect(screen.getByText('settings.enableEncryption').closest('button')).toBeDisabled()
+  })
+  it('lists the keys a disable kept and says master.key goes with the last one', () => {
+    renderSection({ ...status, enabled: false, key_source: 'file',
+      retained_keys: [{ version: 3, retire_after: '2026-11-19T10:00:00Z' }],
+      key_file_kept_for_retained_keys: true })
+    expect(screen.getByText('settings.retainedDataKey')).toBeInTheDocument()
+    expect(screen.getByText('settings.keyFileRemovedWithRetainedKeys')).toBeInTheDocument()
+    expect(screen.getByText('settings.enableEncryption').closest('button')).not.toBeDisabled()
   })
   it('says a disable grace waits for every node while its end is not known', () => {
     renderSection({ ...status, enabled: false, key_source: 'env',
-      disabled_keys_kept_until: null, disabled_keys_wait_for_nodes: true })
-    expect(screen.getByText('settings.disabledKeysKeptUntilNodesReload')).toBeInTheDocument()
-    expect(screen.queryByText('settings.disabledKeysKeptUntil')).not.toBeInTheDocument()
+      enable_available_after: null, enable_waits_for_nodes: true })
+    expect(screen.getByText('settings.enableAvailableAfterNodesReload')).toBeInTheDocument()
+    expect(screen.queryByText('settings.enableAvailableAfter')).not.toBeInTheDocument()
     expect(screen.getByText('settings.enableEncryption').closest('button')).toBeDisabled()
   })
 })
@@ -183,18 +191,30 @@ describe('SecuritySection data key rotation', () => {
     expect(screen.getByText('settings.resumeDataKeyRotation')).toBeInTheDocument()
   })
 
-  it('names the end of the previous key grace period and holds the next rotation', () => {
-    renderSection({ ...status, previous_dek_retire_after: '2026-11-12T10:00:00Z' },
-      { handleRotateDataKey: vi.fn() })
-    expect(screen.getByText('settings.previousDekKeptUntil')).toBeInTheDocument()
+  it('names the end of the grace period and holds the next rotation until then', () => {
+    renderSection({ ...status, rotation_available: false,
+      rotation_available_after: '2026-11-12T10:00:00Z' }, { handleRotateDataKey: vi.fn() })
+    expect(screen.getByText('settings.rotationAvailableAfter')).toBeInTheDocument()
+    expect(screen.queryByText('settings.rotationAvailable')).not.toBeInTheDocument()
     expect(screen.getByText('settings.rotateDataKey').closest('button')).toBeDisabled()
   })
 
-  it('says the previous key waits for every node while its end is not known', () => {
-    renderSection({ ...status, previous_dek_retire_after: null, previous_dek_waits_for_nodes: true },
-      { handleRotateDataKey: vi.fn() })
-    expect(screen.getByText('settings.previousDekKeptUntilNodesReload')).toBeInTheDocument()
+  it('says the next rotation waits for every node while the end is not known', () => {
+    renderSection({ ...status, rotation_available: false, rotation_available_after: null,
+      rotation_waits_for_nodes: true }, { handleRotateDataKey: vi.fn() })
+    expect(screen.getByText('settings.rotationAvailableAfterNodesReload')).toBeInTheDocument()
     expect(screen.getByText('settings.rotateDataKey').closest('button')).toBeDisabled()
+  })
+
+  it('says rotation is possible while old keys are kept, and lists them', () => {
+    renderSection({ ...status, rotation_available: true, retained_keys: [
+      { version: 1, retire_after: '2026-11-19T10:00:00Z' },
+      { version: 2, retire_after: '2026-11-20T10:00:00Z' },
+    ] }, { handleRotateDataKey: vi.fn() })
+    expect(screen.getByText('settings.rotationAvailable')).toBeInTheDocument()
+    expect(screen.getByText('settings.retainedDataKeys')).toBeInTheDocument()
+    expect(screen.getAllByText('settings.retainedDataKey')).toHaveLength(2)
+    expect(screen.getByText('settings.rotateDataKey').closest('button')).not.toBeDisabled()
   })
 
   it('is not offered while encryption is off', () => {
