@@ -199,6 +199,27 @@ def test_the_realm_comes_from_the_connector_then_the_spn_then_the_keytab(base, c
     assert profile['realm'] == realm and bool(profile['enabled'])
 
 
+DISABLED = {**CONNECTOR_2X, 'enabled': False}
+
+
+@pytest.mark.parametrize('connector, spn, keytab, realm, warned', [
+    (DISABLED, 'HTTP/ucm@SPN.EXAMPLE', TWO_REALMS, 'SPN.EXAMPLE', True),
+    (DISABLED, 'HTTP/ucm', ONE_REALM, 'EXAMPLE.TEST', True),
+    ({**DISABLED, 'base_dn': 'DC=one,DC=example'}, 'HTTP/ucm', TWO_REALMS, 'ONE.EXAMPLE', False),
+    (DISABLED, 'HTTP/ucm', TWO_REALMS, None, True),
+    (DISABLED, 'HTTP/ucm', b'', 'CORP.EXAMPLE', False),
+], ids=['spn', 'one-realm-keytab', 'dn-in-keytab', 'dn-not-in-keytab', 'dn-without-keytab'])
+def test_a_disabled_connector_names_the_realm_last(base, connector, spn, keytab, realm, warned, caplog):
+    """2.x served the SPN's realm, else the keytab's, while the connector was disabled: kept;
+    its base DN is the last resort, and only for a realm the keytab holds."""
+    base.seed(settings={**SETTINGS_2X, 'kerberos_spn': spn}, connector=connector)
+    with caplog.at_level('WARNING', logger='services.windows_profiles.legacy'):
+        base.migrate(keytab=keytab)
+    profile, = base.profiles()
+    assert profile['realm'] == realm and bool(profile['enabled'])
+    assert ('differs from the realm of the connector' in caplog.text) == warned
+
+
 NO_DC = {**CONNECTOR_2X, 'base_dn': 'OU=Servers,O=corp'}
 SPN_NO_REALM = {**SETTINGS_2X, 'kerberos_spn': 'HTTP/ucm.example'}
 UNDETERMINABLE = [

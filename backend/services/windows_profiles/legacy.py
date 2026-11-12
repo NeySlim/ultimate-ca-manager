@@ -64,20 +64,27 @@ def spn_realm(spn):
     return realm.strip().upper() or None
 
 
+def _connector_realm(connector):
+    from services.ad_connector.lookup import realm_of_base_dn
+    return realm_of_base_dn(connector['base_dn']) if connector and connector.get('base_dn') else None
+
+
 def resolve_realm(connector, spn, keytab):
     """A1: the realm of the enabled connector's base DN, else of the SPN, else the single
-    realm of the keytab entries; None when none of them says."""
-    from services.ad_connector.lookup import realm_of_base_dn
-    if connector and connector.get('enabled') and connector.get('base_dn'):
-        realm = realm_of_base_dn(connector['base_dn'])
-        if realm:
-            return realm
+    realm of the keytab entries, else the disabled connector's when the keytab holds it
+    (or there is none); None when none of them says."""
+    named = _connector_realm(connector)
+    if named and connector.get('enabled'):
+        return named
     realm = spn_realm(spn)
     if realm:
         return realm
     realms = keytab_realms(keytab) if keytab else None
     if realms and len(realms) == 1:
         return next(iter(realms))
+    # 2.x served the SPN's or the keytab's realm while the connector was disabled
+    if named and (not keytab or (realms and named in realms)):
+        return named
     return None
 
 
@@ -116,6 +123,10 @@ def profile_from_2x(settings, connector=None, keytab=None):
     spn = settings.get('kerberos_spn')
     realm = resolve_realm(connector, spn, keytab)
     warn_without_realm(realm, str(settings.get('kerberos_enabled') or '').lower() == 'true', spn, keytab)
+    named = _connector_realm(connector)
+    if named and realm != named:
+        logger.warning("Windows enrollment: the default profile's realm %s differs from the realm of "
+                       "the connector's base DN, %s", realm or 'none', named)
     return {
         'name': DEFAULT_NAME,
         'realm': realm,
