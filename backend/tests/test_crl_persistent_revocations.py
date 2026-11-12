@@ -300,7 +300,7 @@ class TestFullCrl:
         assert all(_reason(e) == x509.ReasonFlags.superseded for e in entries.values())
 
     def test_a_hold_record_its_unrevoked_certificate_still_carries_is_listed(self, backend):
-        """A record says revoked with no exception: the holds a lift left were deleted once (154)."""
+        """A record says revoked with no exception: the holds a lift left were deleted once (136)."""
         ca, ca_key, ca_cert = _make_ca()
         row = _store(ca, _issue(ca_key, ca_cert, SERIAL_A), str(SERIAL_A))
         _persist(ca, format(SERIAL_A, 'X'), reason='certificateHold', certificate_id=row.id)

@@ -118,7 +118,7 @@ def revocation_records(ca: CA, serial: int) -> list:
 
 def persisted_revocation(ca: CA, serial: int):
     """The record that says ``serial`` is revoked under ``ca``, or None. Any record does,
-    whichever row it is linked to (migration 154 deleted the holds older releases left lifted)."""
+    whichever row it is linked to (migration 136 deleted the holds older releases left lifted)."""
     records = revocation_records(ca, serial)
     return records[0] if records else None
 
