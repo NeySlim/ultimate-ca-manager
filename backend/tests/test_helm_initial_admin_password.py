@@ -112,3 +112,28 @@ def test_helm_a_password_file_in_extra_env_is_the_only_source(name):
 def test_helm_other_extra_env_keeps_the_chart_password():
     docs = _render('--set', 'extraEnv[0].name=UCM_LOG_LEVEL', '--set', 'extraEnv[0].value=DEBUG')
     assert 'UCM_INITIAL_ADMIN_PASSWORD' in [item['name'] for item in _deploy_env(docs)]
+
+
+def _notes(tmp_path, *args):
+    """NOTES.txt as helm renders it, through a copy of the chart (helm template skips it)."""
+    chart = tmp_path / 'chart'
+    shutil.copytree(ROOT / 'charts' / 'ucm', chart)
+    notes = (chart / 'templates' / 'NOTES.txt').read_text()
+    (chart / 'templates' / '_notes_probe.tpl').write_text(
+        '{{- define "notes.probe" -}}\n' + notes + '\n{{- end -}}\n')
+    (chart / 'templates' / 'notes-probe.yaml').write_text(
+        'apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: notes-probe\n'
+        'data:\n  notes: {{ include "notes.probe" . | quote }}\n')
+    out = subprocess.run(['helm', 'template', 't', str(chart), '--show-only',
+                          'templates/notes-probe.yaml', *args],
+                         capture_output=True, text=True, check=True).stdout
+    return yaml.safe_load(out)['data']['notes']
+
+
+@pytest.mark.skipif(shutil.which('helm') is None, reason='helm not installed')
+def test_helm_notes_point_to_the_secret_on_install_only(tmp_path):
+    installed = _notes(tmp_path / 'i')
+    assert 'kubectl' in installed and 'UCM_INITIAL_ADMIN_PASSWORD' in installed
+    upgraded = _notes(tmp_path / 'u', '--is-upgrade')
+    assert 'UCM_INITIAL_ADMIN_PASSWORD' not in upgraded
+    assert 'keeps its password' in upgraded
