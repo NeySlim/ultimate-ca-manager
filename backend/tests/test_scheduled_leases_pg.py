@@ -163,13 +163,40 @@ def test_expiring_reminders_fire_once_per_day_in_ha(app, ha, monkeypatch):
 
 def test_expiry_checks_reserve_nothing_outside_ha(app, monkeypatch):
     passes = _record_webhook_passes(monkeypatch)
+    instant = datetime(2031, 3, 4, 0, 30)
+    monkeypatch.setattr(notification_scheduler, '_cluster_now', lambda: instant)
     with app.app_context():
         _set(notification_scheduler.EXPIRY_LEASE_KEY, _held_elsewhere(1))
         _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, None)
         NotificationService.run_scheduled_checks()
         NotificationService.run_scheduled_checks()
-        assert _value(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY) is None
+        # The lease held elsewhere is ignored; the mark follows the single-node passes
+        assert _value(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY) == instant.isoformat()
     assert passes == [1, 1]
+
+
+def test_ha_turned_back_on_does_not_announce_again_what_single_node_passes_did(
+        app, create_cert, monkeypatch):
+    # HA pass at t0, single-node passes daily, HA back at t0+10d: the expiry at t0+5d is announced once
+    cert_id = create_cert(cn='expired-ha-back.example.com')['id']
+    t0 = datetime(2031, 3, 4, 0, 30)
+    _expires_at(app, cert_id, t0 + timedelta(days=5, hours=1))
+    emitted = _record_expiry_webhooks(monkeypatch, cert_id)
+    state = {'ha': True, 'now': t0}
+    monkeypatch.setattr('utils.ha.ha_enabled', lambda: state['ha'])
+    monkeypatch.setattr(notification_scheduler, '_cluster_now', lambda: state['now'])
+    monkeypatch.setattr(expiry_alert_service, 'utc_now', lambda: state['now'])
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_LEASE_KEY, None)
+        _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, None)
+        NotificationService.run_scheduled_checks()
+        state['ha'] = False
+        for day in range(1, 10):
+            state['now'] = t0 + timedelta(days=day)
+            NotificationService.run_scheduled_checks()
+        state['ha'], state['now'] = True, t0 + timedelta(days=10)
+        NotificationService.run_scheduled_checks()
+    assert emitted['expired'] == 1
 
 
 def test_the_manual_check_reports_a_run_held_elsewhere(app, ha, auth_client, monkeypatch):

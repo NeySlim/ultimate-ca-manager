@@ -58,6 +58,24 @@ def _emit_webhooks_in_ha():
     config_compare_and_set(EXPIRY_WEBHOOKS_MARK_KEY, previous, now.isoformat())
 
 
+def _emit_webhooks_single_node():
+    """The last 24h, then the mark moves too: HA turned back on resumes from this pass."""
+    from models import SystemConfig, db
+    from services import expiry_alert_service
+    now = _cluster_now()
+    expiry_alert_service._emit_expiry_webhooks(now=now)
+    try:
+        row = SystemConfig.query.filter_by(key=EXPIRY_WEBHOOKS_MARK_KEY).first()
+        if row is None:
+            db.session.add(SystemConfig(key=EXPIRY_WEBHOOKS_MARK_KEY, value=now.isoformat()))
+        else:
+            row.value = now.isoformat()
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+
+
 class NotificationSchedulerMixin:
 
     @staticmethod
@@ -212,8 +230,7 @@ class NotificationSchedulerMixin:
         # alerts are disabled or have no recipients.
         try:
             if isinstance(lease, _NoLease):
-                from services.expiry_alert_service import _emit_expiry_webhooks
-                _emit_expiry_webhooks()
+                _emit_webhooks_single_node()
             elif lease.renew():
                 _emit_webhooks_in_ha()
             else:
