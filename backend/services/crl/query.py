@@ -87,9 +87,11 @@ class CRLQueryMixin:
             _not_expired(Certificate.valid_to, now),
         ).order_by(Certificate.id).all()
         child_cas = sorted(_revoked_child_cas(ca, now), key=lambda c: c.id)
+        from services.cert.issued_lookup import answered_revocation, lifted_hold_leftover, revocation_order
+        # A held row under a final record of its serial is listed with the graver reason, as OCSP
+        certificates = [answered_revocation(c, ca) for c in certificates]
         # The certificate record comes first: it carries the invalidity date
         live = _dedupe_live_records(certificates + child_cas)
-        from services.cert.issued_lookup import lifted_hold_leftover, revocation_order
         # Gravest record of a serial first, as persisted_revocation answers OCSP
         persisted = sorted((r for r in RevokedSerial.query.filter(
             RevokedSerial.caref.in_(same_key_refids(ca)),

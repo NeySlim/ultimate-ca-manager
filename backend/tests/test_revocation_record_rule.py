@@ -494,3 +494,14 @@ class TestAHoldLiftedByAnEarlierRelease:
         with app.app_context():
             backfill_ski_aki()
         assert _row(app, row_id) == (True, 'cessationOfOperation', EARLY)
+
+
+class TestAHeldRowUnderAFinalRecordAnswersTheGraverReason:
+
+    def test_ocsp_and_crl_say_compromise(self, app, issuer, twin):
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('held-graver.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _held(app, row_id, at=LATER)
+        _record(app, twin[1], real)
+        assert _surfaces(app, ca_id, real) == KEY_COMPROMISED

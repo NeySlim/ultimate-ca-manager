@@ -95,15 +95,28 @@ def find_issued_row(ca: CA, cert: x509.Certificate) -> Optional[Certificate]:
     return rows[0] if rows else None
 
 
+_REASON_RANK = {x509.ReasonFlags.key_compromise: 0, x509.ReasonFlags.ca_compromise: 0,
+                x509.ReasonFlags.aa_compromise: 0, x509.ReasonFlags.certificate_hold: 2,
+                x509.ReasonFlags.remove_from_crl: 3}
+
+
+def reason_rank(reason) -> int:
+    """0 for a compromise, 1 for any other final reason, 2 for a suspension, 3 for removeFromCRL."""
+    from utils.revocation_reasons import REASON_FLAGS
+    return _REASON_RANK.get(REASON_FLAGS.get(reason or 'unspecified', x509.ReasonFlags.unspecified), 1)
+
+
 def revocation_order(record):
     """Sort key of a revocation record: a compromise first, then any final revocation,
     then a suspension; between equals the earliest date."""
-    from utils.revocation_reasons import REASON_FLAGS
-    flag = REASON_FLAGS.get(record.revoke_reason or 'unspecified', x509.ReasonFlags.unspecified)
-    rank = {x509.ReasonFlags.key_compromise: 0, x509.ReasonFlags.ca_compromise: 0,
-            x509.ReasonFlags.aa_compromise: 0, x509.ReasonFlags.certificate_hold: 2,
-            x509.ReasonFlags.remove_from_crl: 3}.get(flag, 1)
-    return rank, record.revoked_at or datetime.max, record.id or 0
+    return reason_rank(record.revoke_reason), record.revoked_at or datetime.max, record.id or 0
+
+
+def gravest_revocation(*holders):
+    """Of the revoked rows and records given (None skipped), the one with the gravest reason;
+    the first given between equals. The CRL and OCSP answer with it."""
+    present = [h for h in holders if h is not None]
+    return min(present, key=lambda h: reason_rank(h.revoke_reason)) if present else None
 
 
 def record_serial_clause(serial):
@@ -149,6 +162,17 @@ def lift_persisted_revocation(ca: CA, serial: int) -> int:
         RevokedSerial.caref.in_(same_key_refids(ca)),
         record_serial_clause(serial),
     ).delete(synchronize_session='fetch')
+
+
+def answered_revocation(row: Certificate, ca: CA):
+    """What the CRL and OCSP say of the revoked ``row``: itself, or when it is only held, the
+    final record of its serial under ``ca`` (or a record of its key), the graver of the two."""
+    from utils.revocation_reasons import HOLD_REASONS
+    from services.cert.serial_resolution import resolve_record_serial
+    if row.revoke_reason not in HOLD_REASONS:
+        return row
+    serial = resolve_record_serial(row)
+    return row if serial is None else gravest_revocation(row, persisted_revocation(ca, serial))
 
 
 def _row_serial(row: Certificate) -> Optional[int]:
