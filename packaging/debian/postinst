@@ -86,16 +86,14 @@ case "$1" in
         fi
         # ============================================================
         
-        # Sudoers for service restart (watcher handles restart/update)
-        cat > /etc/sudoers.d/ucm-service << 'SUDOERS'
-ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart ucm, /usr/bin/systemctl reload ucm
-ucm ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop ucm, /usr/bin/systemctl start ucm
-SUDOERS
-        chmod 440 /etc/sudoers.d/ucm-service
-        
+        # sudoers-cleanup: no sudo grant any more (the watcher restarts the service);
+        # drop the files earlier versions wrote. Absent file or directory is fine.
+        rm -f /etc/sudoers.d/ucm-service /etc/sudoers.d/ucm
+        # end sudoers-cleanup
+
         # Enable ucm-watcher for restart/update handling
         # Units are installed to /lib/systemd/system/ by the package
-        systemctl daemon-reload
+        systemctl daemon-reload 2>/dev/null || true
         systemctl enable ucm-watcher.path 2>/dev/null || true
         systemctl start ucm-watcher.path 2>/dev/null || true
         
@@ -198,13 +196,6 @@ ENVEOF
             bash "$UCM_SETUP" banner "$UCM_CONFIG/ucm.env" deb
         fi
         
-        # Install sudoers file to allow service management
-        if [ -f "$UCM_HOME/sudoers/ucm" ]; then
-            cp "$UCM_HOME/sudoers/ucm" /etc/sudoers.d/ucm
-            chmod 440 /etc/sudoers.d/ucm
-            chown root:root /etc/sudoers.d/ucm
-        fi
-        
         # Generate HTTPS cert if not exists
         if [ ! -f "$UCM_DATA/https_cert.pem" ]; then
             echo "Generating HTTPS certificate..."
@@ -227,7 +218,7 @@ ENVEOF
         fi
         
         # Enable and start/restart service
-        systemctl daemon-reload
+        systemctl daemon-reload 2>/dev/null || true
         systemctl enable ucm
         if systemctl is-active --quiet ucm; then
             systemctl restart ucm || true
