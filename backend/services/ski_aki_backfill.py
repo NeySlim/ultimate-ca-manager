@@ -17,7 +17,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.x509.oid import ExtensionOID
 from utils.cert_issuer import ca_signed, cas_by_ski
 from services.cert.issued_lookup import (
-    apply_persisted_revocation, apply_persisted_revocations, delete_lifted_hold_leftovers)
+    apply_persisted_revocation, apply_persisted_revocations)
 
 logger = logging.getLogger(__name__)
 
@@ -292,18 +292,17 @@ def backfill_ski_aki():
         except Exception:
             pass
 
-    # Suspension records an earlier release left behind its lifts, then the rows it left
-    # unrevoked beside their CA's record of the serial; a failure stops neither phase 4 nor 5
+    # Rows left unrevoked beside their CA's record of the serial; a failure stops neither
+    # phase 4 nor 5
     marked = []
-    stats['revoked_from_records'] = stats['lifted_holds_deleted'] = 0
+    stats['revoked_from_records'] = 0
     try:
         with db.session.begin_nested():
-            stats['lifted_holds_deleted'] = delete_lifted_hold_leftovers()
             marked = [_marked_entry(row, record) for row, record in apply_persisted_revocations()]
             stats['revoked_from_records'] = len(marked)
     except Exception as e:
         marked = []
-        stats['revoked_from_records'] = stats['lifted_holds_deleted'] = 0
+        stats['revoked_from_records'] = 0
         logger.error(f"SKI/AKI chain repair: recorded revocations not applied: {e}", exc_info=True)
 
     # --- Phase 4: Deduplicate CAs with same SKI ---
@@ -328,7 +327,7 @@ def backfill_ski_aki():
                 _merge_ca_group(db, group, stats)
 
     if (stats['rechained_cas'] or stats['rechained_certs'] or stats['deduplicated']
-            or stats['revoked_from_records'] or stats['lifted_holds_deleted']):
+            or stats['revoked_from_records']):
         try:
             db.session.commit()
         except Exception as _commit_err:
@@ -337,7 +336,7 @@ def backfill_ski_aki():
             raise
         logger.info(f"SKI/AKI chain repair: re-chained {stats['rechained_cas']} CAs, {stats['rechained_certs']} certs, "
                     f"deduplicated {stats['deduplicated']} CAs, marked {stats['revoked_from_records']} certs "
-                    f"revoked from their records, deleted {stats['lifted_holds_deleted']} lifted hold records")
+                    f"revoked from their records")
         # Recorded once the marks are durable (log_action commits)
         from services.audit_service import AuditService
         for entry in marked:
