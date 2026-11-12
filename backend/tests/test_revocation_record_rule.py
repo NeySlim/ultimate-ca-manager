@@ -919,3 +919,56 @@ class TestTheStateTable:
         with app.app_context():
             stored = db.session.get(Certificate, row_id)
             assert (revocable(stored, 'keyCompromise'), revocable(stored, 'certificateHold')) == (final_ok, hold_ok)
+
+
+class TestTheCrlReadsTheRecordsOnce:
+
+    def test_the_query_count_does_not_grow_with_the_held_rows(self, app, issuer, twin):
+        from sqlalchemy import event
+        from services.crl_service import CRLService
+        ca_id, refid, ca_cert, ca_key = issuer
+
+        made = []
+
+        def held_rows(count):
+            for _ in range(count):
+                real, key = _leaf(f'crl-count-{uuid.uuid4().hex[:8]}.example.test', ca_cert, ca_key)
+                made.append(_store(app, real, refid, key=key))
+                _held(app, made[-1], at=LATER)
+                # Stored first, under the same CA: only the gravest-first order picks the compromise
+                _record(app, twin[1], real, reason='certificateHold', certificate_id=made[-1])
+                _record(app, twin[1], real, at=LATER)
+
+        def queries():
+            seen = []
+            with app.app_context():
+                db.session.expire_all()
+
+                def count(*_args):
+                    seen.append(1)
+                event.listen(db.engine, 'before_cursor_execute', count)
+                try:
+                    entries = CRLService.get_revoked_certificates(ca_id)
+                finally:
+                    event.remove(db.engine, 'before_cursor_execute', count)
+                return len(seen), entries
+
+        held_rows(2)
+        few, entries = queries()
+        held_rows(6)
+        many, entries = queries()
+        assert many == few
+        listed = {e.serial_number: e.revoke_reason for e in entries if not isinstance(e, CA)}
+        with app.app_context():
+            serials = [db.session.get(Certificate, i).serial_number for i in made]
+        assert [listed.get(s) for s in serials] == ['keyCompromise'] * len(made)
+
+
+@pytest.mark.parametrize('column, serial', [
+    ('171', 171), ('ab', 171), ('AB', 171), ('10', 10), ('0x10', None), ('007', None), ('', None),
+    ('not a serial', None), ('-10', -10)])
+def test_a_record_column_names_one_serial_at_most(column, serial):
+    from utils.serial_format import serial_named_by, unambiguous_serial_spellings
+    assert serial_named_by(column) == serial
+    if serial is not None:
+        assert column in unambiguous_serial_spellings(serial)
