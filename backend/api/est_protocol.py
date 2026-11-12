@@ -4,6 +4,7 @@ Enrollment over Secure Transport for automated certificate enrollment.
 """
 from flask import Blueprint, request, Response
 from models import db, CA
+from services.ad_connector import renewal_identity
 from services.ca_service import CAService
 from services.ca.ca_signing import AlreadySuperseded
 from services.policy_service import PolicyViolation
@@ -838,10 +839,12 @@ def simple_reenroll(label=None):
         validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
         days = int(validity_days.value) if validity_days else 365
         
+        # A re-enrolment keeps the renewed certificate's SID extension, never the CSR's
+        requester_sid = renewal_identity.renewal_requester_sid(client_cert_obj, 'EST')
         cert_pem, serial = CAService.sign_csr_from_crypto(
             ca=ca, csr=csr, validity_days=days, source='est',
             renewal_of=client_cert_obj, cert_type='device_cert',
-            supersedes=renewed_row,
+            supersedes=renewed_row, requester_sid=requester_sid,
         )
 
         from services.audit.staging import stage_audit_entry
@@ -862,6 +865,8 @@ def simple_reenroll(label=None):
     except AlreadySuperseded:
         logger.warning('EST reenroll: client certificate superseded by a concurrent renewal')
         return Response('Client certificate has been superseded by a newer one', status=403)
+    except renewal_identity.RenewalIdentityUnresolved as e:
+        return Response(str(e), status=500)
     except PolicyViolation as e:
         logger.warning(f"EST simplereenroll refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
