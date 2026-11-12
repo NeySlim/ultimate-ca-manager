@@ -60,3 +60,28 @@ def test_imported_enrolment_is_filed_under_the_self_signed_root(app, auth_client
     AuthCertificate.query.filter_by(cert_serial=str(leaf.serial_number)).delete()
     db.session.delete(row)
     db.session.commit()
+
+
+def test_an_enrolment_without_certificate_keeps_both_readings_of_an_all_digit_serial(app, twin_records):
+    """Non-regression: header-only enrolments store the proxy's hexadecimal serial and imports the
+    decimal one, so an all-digit text is read both ways and either record closes it."""
+    import secrets
+    from services.mtls_auth_service import MTLSAuthService
+    from utils.serial_format import canonical_serial
+    text = '1' + ''.join(secrets.choice('0123456789') for _ in range(13))
+    serial = int(text, 16)  # written by the parser as format(serial, 'X'): all digits
+    db.session.add_all([
+        AuthCertificate(user_id=1, cert_serial=text, cert_subject='CN=hex-digits',
+                        cert_issuer=twin_records['name_b'], cert_fingerprint='', name='hex-digits', enabled=True),
+        RevokedSerial(caref=twin_records['root'], serial_number=canonical_serial(serial),
+                      valid_to=datetime.utcnow() + timedelta(days=30)),
+    ])
+    db.session.commit()
+    try:
+        user, _, err = MTLSAuthService.authenticate_certificate(
+            {'serial': text, 'issuer_dn': twin_records['name_b'], 'fingerprint': ''})
+        assert user is None and err == 'Certificate has been revoked'
+    finally:
+        AuthCertificate.query.filter_by(cert_serial=text).delete()
+        RevokedSerial.query.filter_by(serial_number=canonical_serial(serial)).delete()
+        db.session.commit()
