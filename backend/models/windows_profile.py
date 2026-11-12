@@ -20,7 +20,9 @@ class WindowsEnrollmentProfile(db.Model):
     realm = db.Column(db.String(255), unique=True, nullable=True)
     is_default = db.Column(db.Boolean, nullable=False, default=False)
     enabled = db.Column(db.Boolean, nullable=False, default=True)
-    connector_id = db.Column(db.Integer, db.ForeignKey('ad_connector_config.id'), nullable=True)
+    # The API refuses to delete a connector in use (deletion_blockers); the database only unlinks
+    connector_id = db.Column(db.Integer, db.ForeignKey('ad_connector_config.id', ondelete='SET NULL'),
+                             nullable=True)
     # Refids as the 2.x settings held them; deletion_blockers keeps a used CA in place
     issuing_ca_refid = db.Column(db.String(36), index=True)
     # NULL: the issuing CA; set apart, it keeps the policyID and template OIDs it derives

@@ -23,7 +23,7 @@ SETTINGS = 'system_config'
 _PROFILE_COLUMNS = (
     "name VARCHAR(100) NOT NULL UNIQUE, realm VARCHAR(255) UNIQUE, "
     "is_default BOOLEAN NOT NULL DEFAULT {false}, enabled BOOLEAN NOT NULL DEFAULT {true}, "
-    f"connector_id INTEGER REFERENCES {CONNECTORS}(id), "
+    f"connector_id INTEGER REFERENCES {CONNECTORS}(id) ON DELETE SET NULL, "
     "issuing_ca_refid VARCHAR(36), policy_ca_refid VARCHAR(36), "
     "validity_days INTEGER NOT NULL DEFAULT 365, xcep_username TEXT, xcep_password TEXT, "
     "wstep_username TEXT, wstep_password TEXT, allowed_ad_group VARCHAR(255), "
