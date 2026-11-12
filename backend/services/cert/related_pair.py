@@ -326,7 +326,9 @@ def unhold_partner(row):
     if partner is None:
         return None
     holder = partner if partner.revoked else effective_revocation(partner)
-    return partner if holder is not None and holder.revoke_reason in HOLD_REASONS else None
+    # removeFromCRL on the row is an unhold stopped between its commits: lifting completes it
+    lifted = HOLD_REASONS + ('removeFromCRL',) if holder is partner else HOLD_REASONS
+    return partner if holder is not None and holder.revoke_reason in lifted else None
 
 
 def anchor_first(row, partner):

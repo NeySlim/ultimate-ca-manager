@@ -303,3 +303,21 @@ def test_a_held_partner_its_record_revokes_for_good_refuses_the_pair(app, auth_c
     assert r.status_code == 409, r.data
     assert _state(app, a['id']) == (True, 'certificateHold')
     assert _unheld(seen) == []
+
+
+def test_a_partner_left_in_remove_from_crl_is_lifted_with_the_pair(app, auth_client, create_ca, create_cert, seen):
+    """Both members staged removeFromCRL, then the unhold stopped: lifting again completes both."""
+    ca = create_ca(cn='Unhold Half Pair CA')
+    a = create_cert(cn='unhold-half-a.example.test', ca_id=ca['id'])
+    b = create_cert(cn='unhold-half-b.example.test', ca_id=ca['id'])
+    _link(app, a['id'], b['id'])
+    assert _post(auth_client, f"/api/v2/certificates/{a['id']}/revoke",
+                 {'reason': 'certificateHold'}).status_code == 200
+    with app.app_context():
+        for cert_id in (a['id'], b['id']):
+            db.session.get(Certificate, cert_id).revoke_reason = 'removeFromCRL'
+        db.session.commit()
+    r = _post(auth_client, f"/api/v2/certificates/{a['id']}/unhold")
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['related_unheld'] == b['id']
+    assert _state(app, a['id']) == (False, None) and _state(app, b['id']) == (False, None)

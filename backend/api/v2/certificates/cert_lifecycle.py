@@ -245,7 +245,8 @@ def unhold_certificate(cert_id):
         return error_response('Certificate is not revoked', 400)
 
     # Only a suspension lifts: a final reason, on the row or on a record, is one 409 refusal
-    if cert.revoked and cert.revoke_reason not in HOLD_REASONS:
+    # removeFromCRL on the row is an earlier unhold stopped between its commits: it completes
+    if cert.revoked and cert.revoke_reason not in HOLD_REASONS + ('removeFromCRL',):
         return _revoked_for_good(cert, cert.revoke_reason)
 
     # A body that is present is read strictly (400/415): an unreadable refusal must not lift the pair
