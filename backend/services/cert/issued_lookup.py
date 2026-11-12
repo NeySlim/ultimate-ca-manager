@@ -20,7 +20,7 @@ from utils.csr_extensions import extensions_of
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import Encoding
 
-from models import CA, Certificate, RevokedSerial
+from models import CA, Certificate, RevokedSerial, db
 from utils.datetime_utils import utc_now
 from utils.serial_format import serial_to_int, serial_variants, unambiguous_serial_spellings
 
@@ -87,19 +87,32 @@ def record_serial_clause(serial):
     return RevokedSerial.serial_number.in_(unambiguous_serial_spellings(serial))
 
 
+def lifted_hold_leftover(record) -> bool:
+    """A suspension record still linked to its row, unrevoked and of the same serial: an
+    earlier release lifted the hold and left the record behind. It says nothing."""
+    from utils.revocation_reasons import HOLD_REASONS
+    from services.cert.serial_resolution import resolve_record_serial
+    if record.revoke_reason not in HOLD_REASONS or record.certificate_id is None:
+        return False
+    row = db.session.get(Certificate, record.certificate_id)
+    if row is None or row.revoked:
+        return False
+    held = resolve_record_serial(row)
+    return held is not None and held == resolve_record_serial(record)
+
+
 def revocation_records(ca: CA, serial: int) -> list:
     """Every record of ``ca``'s key (or a record of the same subject and key) for
-    ``serial`` (``record_serial_clause``), gravest first."""
+    ``serial`` (``record_serial_clause``), gravest first; a lifted hold left behind is not one."""
     from utils.cert_issuer import same_key_refids
-    return sorted(RevokedSerial.query.filter(
-        RevokedSerial.caref.in_(same_key_refids(ca)),
-        record_serial_clause(serial),
-    ).all(), key=revocation_order)
+    return sorted((r for r in RevokedSerial.query.filter(
+        RevokedSerial.caref.in_(same_key_refids(ca)), record_serial_clause(serial)).all()
+        if not lifted_hold_leftover(r)), key=revocation_order)
 
 
 def persisted_revocation(ca: CA, serial: int):
     """The record that says ``serial`` is revoked under ``ca``, or None. Any record does,
-    whichever row it is linked to: lifting a suspension deletes it."""
+    whichever row it is linked to, except a lifted hold left behind (``lifted_hold_leftover``)."""
     records = revocation_records(ca, serial)
     return records[0] if records else None
 
@@ -149,6 +162,17 @@ def apply_persisted_revocation(row: Certificate) -> bool:
     row.revoke_reason = record.revoke_reason
     row.invalidity_at = record.invalidity_at
     return True
+
+
+def delete_lifted_hold_leftovers() -> int:
+    """Delete the suspension records an earlier release left behind its lift. No commit."""
+    from utils.revocation_reasons import HOLD_REASONS
+    leftovers = [r for r in RevokedSerial.query.filter(
+        RevokedSerial.revoke_reason.in_(HOLD_REASONS), RevokedSerial.certificate_id.isnot(None)).all()
+        if lifted_hold_leftover(r)]
+    for record in leftovers:
+        db.session.delete(record)
+    return len(leftovers)
 
 
 def apply_persisted_revocations() -> int:
