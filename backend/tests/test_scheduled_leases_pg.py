@@ -51,6 +51,31 @@ def ha(monkeypatch):
     monkeypatch.setattr('utils.ha.ha_enabled', lambda: True)
 
 
+@pytest.fixture(autouse=True, scope='module')
+def _rows_of_this_file_removed(app):
+    """The CAs, certificates and Microsoft CA connections this file creates, deleted after it."""
+    from models import CA
+    from models.msca import MicrosoftCA, MSCARequest
+    from tests import seeded_rows
+
+    def _top(model):
+        return db.session.query(db.func.max(model.id)).scalar() or 0
+    with app.app_context():
+        tops = {model: _top(model) for model in (CA, Certificate, MicrosoftCA)}
+        db.session.remove()
+    yield
+    with app.app_context():
+        msca_ids = [row.id for row in MicrosoftCA.query.filter(MicrosoftCA.id > tops[MicrosoftCA])]
+        MSCARequest.query.filter(MSCARequest.msca_id.in_(msca_ids)).delete(synchronize_session=False)
+        MicrosoftCA.query.filter(MicrosoftCA.id.in_(msca_ids)).delete(synchronize_session=False)
+        seeded_rows.delete_cas(CA.query.filter(CA.id > tops[CA]))
+        db.session.commit()
+        for (cert_id,) in db.session.query(Certificate.id).filter(Certificate.id > tops[Certificate]):
+            seeded_rows._SEEDED.append((app, 'certificates', 'id', cert_id))
+        db.session.remove()
+    seeded_rows.remove_seeded()
+
+
 @pytest.fixture(autouse=True)
 def _expiry_keys_put_back(app):
     with app.app_context():
