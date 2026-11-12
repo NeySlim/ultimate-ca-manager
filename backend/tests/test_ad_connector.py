@@ -9,6 +9,13 @@ import json
 import pytest
 
 from models import db, ADConnectorConfig
+from tests.windows_profile_support import connectors_kept
+
+
+@pytest.fixture(autouse=True)
+def _connectors_put_back(app):
+    with connectors_kept(app):
+        yield
 
 
 def test_bind_password_encrypted_at_rest(app):

@@ -24,7 +24,7 @@ from services.ad_connector import lookup as ad_lookup
 from services.kerberos import negotiate_auth
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WST_NS, WSSE_NS
 from utils.upn_san import extract_upns_from_san_list
-from tests.windows_profile_support import restore, set_config, snapshot
+from tests.windows_profile_support import connectors_kept, restore, set_config, snapshot
 
 ISSUE_URL = '/ADCertificateService_CES_Kerberos/service.svc'
 KERBEROS_PRINCIPAL = 'HOST$@HAGLAND.DOMAIN'
@@ -38,6 +38,20 @@ def _templates_stay_in_this_module(app):
 
 def _set_config(key, value):
     set_config(key, value)
+
+
+@pytest.fixture(autouse=True)
+def _connectors_put_back(app):
+    with connectors_kept(app):
+        yield
+
+
+@pytest.fixture
+def no_connector_serving(app):
+    """No enabled connector, whatever another file left: none checks the requester's realm."""
+    with app.app_context():
+        ADConnectorConfig.query.update({'enabled': False})
+        db.session.commit()
 
 
 @pytest.fixture(scope='module')
@@ -142,7 +156,8 @@ def test_issue_rejects_failed_negotiation(client, wstep_kerberos_config, monkeyp
     assert r.status_code == 401, r.data
 
 
-def test_issue_succeeds_with_authenticated_negotiation(client, app, wstep_kerberos_config, monkeypatch):
+def test_issue_succeeds_with_authenticated_negotiation(client, app, wstep_kerberos_config, monkeypatch,
+                                                       no_connector_serving):
     monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
     monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
     monkeypatch.setattr(
@@ -150,9 +165,7 @@ def test_issue_succeeds_with_authenticated_negotiation(client, app, wstep_kerber
         lambda auth_header, connection_key: _authenticated_result('bXV0dWFsLXRva2Vu'),
     )
     # Strong cert mapping (KB5014754) is unconditional whenever AD Connector
-    # is configured+enabled -- this test doesn't configure it itself, but
-    # module-scoped app/db state can leak an enabled connector in from an
-    # earlier test in this file, so mock defensively regardless.
+    # is configured+enabled; no_connector_serving turns off any left by another file.
     monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
 
     # A template whose subject the client supplies: a machine template's comes from AD

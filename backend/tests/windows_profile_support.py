@@ -4,7 +4,11 @@
 (``services.windows_profiles.legacy.MIGRATED_KEYS``) read and write the default profile,
 created when missing; every other key is a SystemConfig row. Callers hold an app context.
 """
-from models import SystemConfig, WindowsEnrollmentProfile, db
+from contextlib import contextmanager
+
+from sqlalchemy import delete, insert, select, update
+
+from models import ADConnectorConfig, SystemConfig, WindowsEnrollmentProfile, db
 
 FIELDS = {
     'xcep_ca_refid': 'policy_ca_refid', 'xcep_username': 'xcep_username',
@@ -73,3 +77,27 @@ def restore(saved):
         else:
             set_config(key, value, commit=False)
     db.session.commit()
+
+
+@contextmanager
+def connectors_kept(app):
+    """The AD connector rows, and the profiles' links to them, put back as they were:
+    a connector left enabled would serve its realm to the next file's Kerberos tests."""
+    connectors, profiles = ADConnectorConfig.__table__, WindowsEnrollmentProfile.__table__
+    with app.app_context():
+        rows = [dict(r._mapping) for r in db.session.execute(select(connectors))]
+        links = dict(db.session.execute(select(profiles.c.id, profiles.c.connector_id)).all())
+        db.session.commit()
+    try:
+        yield
+    finally:
+        with app.app_context():
+            db.session.execute(update(profiles).values(connector_id=None))
+            db.session.execute(delete(connectors))
+            if rows:
+                db.session.execute(insert(connectors), rows)
+            for profile_id, connector_id in links.items():
+                if connector_id is not None:
+                    db.session.execute(update(profiles).where(profiles.c.id == profile_id)
+                                       .values(connector_id=connector_id))
+            db.session.commit()
