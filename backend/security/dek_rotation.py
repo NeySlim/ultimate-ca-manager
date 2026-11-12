@@ -294,6 +294,7 @@ def rewrite(batch=None, commit=True, decrypt=False) -> dict:
     (made with the active DEK, or taken by the next pass).
     """
     from models import db, SystemConfig
+    from security.session_key import STORED_KEYS as SESSION_KEYS
     batch = batch or BATCH
     key_encryption = _encryption.key_encryption
     rewritten = skipped = 0
@@ -308,7 +309,7 @@ def rewrite(batch=None, commit=True, decrypt=False) -> dict:
             query = db.session.query(pk, stored_column, table.c.key if config else pk) \
                 .filter(stored_column.isnot(None), stored_column != '')
             if config:
-                query = query.filter(table.c.key.like('acme.%'))
+                query = query.filter(table.c.key.like('acme.%') | table.c.key.in_(SESSION_KEYS))
             if last is not None:
                 query = query.filter(pk > last)
             chunk = query.order_by(pk).limit(batch).all()
@@ -316,7 +317,12 @@ def rewrite(batch=None, commit=True, decrypt=False) -> dict:
                 break
             for row_id, stored, config_key in chunk:
                 last = row_id
-                if config and not _encryption._is_master_key_config(config_key):
+                session_key = config and config_key in SESSION_KEYS
+                if config and not (session_key or _encryption._is_master_key_config(config_key)):
+                    continue
+                if session_key and decrypt:
+                    # Never written in the clear: a disable drops these rows instead
+                    skipped += 1
                     continue
                 value = unwrap(stored) if unwrap else stored
                 if not key_encryption.is_encrypted(value) or (not decrypt and _under_active(value)):
@@ -562,9 +568,15 @@ def begin_disable():
                                      kek_id=mine, wrapped=None, created_at=now))
     else:
         marker.kek_id = mine
+    # No session key stays stored once nothing is encrypted: the environment's signs again
+    from security import session_key
+    dropped_session_key = session_key.drop_stored()
     command = _emit_reload(None)
     db.session.commit()
     key_encryption.reload()
+    if dropped_session_key:
+        from flask import current_app
+        session_key.load(current_app._get_current_object())
     return command
 
 

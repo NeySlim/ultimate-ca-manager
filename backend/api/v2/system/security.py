@@ -5,7 +5,6 @@ System Security Operations
 from . import bp
 from flask import request, current_app, Response
 from auth.unified import require_auth
-from utils.ha import reject_in_ha
 from config.settings import Config
 from utils.response import success_response, error_response
 from utils.trusted_proxy import client_ip
@@ -696,17 +695,61 @@ def reset_rate_limits():
 
 @bp.route('/api/v2/system/security/rotate-secrets', methods=['POST'])
 @require_auth(['admin:system'])
-@reject_in_ha()
 def rotate_secrets():
     """
-    Rotate session secret key with automatic .env update.
+    Rotate the session secret key (SECRET_KEY).
 
-    Process:
-    1. Backup current .env file
-    2. Generate new SECRET_KEY
-    3. Service restart
-    4. All active sessions are invalidated (users must re-login)
+    Encryption on (always the case in HA): the new key is stored in the database under the
+    data-encryption key, every node reloads it without a restart, and tokens signed with
+    the previous key stay valid for its grace period. Encryption off (single node only):
+    the environment file is rewritten and the service restarts, as before.
     """
+    from security import session_key
+    from utils.ha import ha_enabled, ha_refusal, LOCAL_ONLY
+    if session_key.stored_mode():
+        return _rotate_stored_secret(session_key)
+    if ha_enabled():
+        return ha_refusal(LOCAL_ONLY)
+    return _rotate_secret_in_env_file()
+
+
+def _rotate_stored_secret(session_key):
+    data = request.get_json() or {}
+    new_secret = data.get('new_secret')
+    if new_secret and (not isinstance(new_secret, str) or len(new_secret) < session_key.MIN_LENGTH):
+        return error_response("Secret must be at least 32 characters", 400)
+    if data.get('auto_apply') is False:
+        return error_response("With encryption enabled the session key is stored in the "
+                              "database; there is nothing to apply by hand", 400)
+    try:
+        until, _command = session_key.rotate(current_app._get_current_object(), new_secret)
+    except session_key.SessionKeyError as e:
+        return error_response(str(e), e.status)
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Failed to rotate the session key: {type(e).__name__}")
+        return error_response("Failed to rotate secrets", 500)
+    end = until.isoformat(timespec='seconds')
+    AuditService.log_action(
+        action='secrets_rotated',
+        resource_type='security',
+        details=f'Session secret key rotated in the database; the previous key is accepted '
+                f'until {end} UTC',
+        success=True
+    )
+    return success_response(
+        data={
+            'rotated': True,
+            'mode': 'database',
+            'previous_accepted_until': end,
+            'note': 'Every node signs with the new key; pages opened before the rotation '
+                    'keep working until the previous key is retired. No restart.',
+        },
+        message='Session secret rotated. No restart, nobody is logged out.'
+    )
+
+
+def _rotate_secret_in_env_file():
     data = request.get_json() or {}
     new_secret = data.get('new_secret')
     auto_apply = data.get('auto_apply', True)
@@ -769,7 +812,8 @@ def rotate_secrets():
             return success_response(
                 data={
                     'rotated': True,
-                    'note': 'Service is restarting. All users will need to log in again.'
+                    'mode': 'environment_file',
+                    'note': 'Service is restarting. Pages opened before it must be reloaded.'
                 },
                 message='Session secret rotated successfully. Service restarting.'
             )
@@ -813,13 +857,19 @@ def _key_file_exists():
 def secrets_status():
     """Get status of secret keys (without revealing them)"""
     from config.settings import Config
+    from security import session_key
 
     session_configured = bool(os.getenv('SECRET_KEY')) and Config.SECRET_KEY != "INSTALL_TIME_PLACEHOLDER"
     encryption_configured = bool(os.getenv('KEY_ENCRYPTION_KEY')) or _key_file_exists()
+    stored = session_key.status(current_app._get_current_object())
 
     return success_response(data={
         'session_secret': {
-            'configured': session_configured
+            'configured': session_configured or stored['source'] == 'database',
+            # Where the key that signs comes from, and how the next rotation applies
+            'source': stored['source'],
+            'previous_accepted_until': stored['previous_accepted_until'],
+            'rotation': 'database' if session_key.stored_mode() else 'environment_file',
         },
         'encryption_key': {
             'configured': encryption_configured

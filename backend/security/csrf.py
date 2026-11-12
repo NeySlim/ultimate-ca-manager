@@ -138,19 +138,18 @@ class CSRFProtection:
             if token_age < 0:
                 return False, "Invalid token timestamp"
             
-            # Verify signature
-            secret = current_app.config.get('SECRET_KEY', '')
+            # The active key, then the previous one while its grace runs (security.session_key)
+            from security.session_key import verification_keys
             message = f"{timestamp}:{nonce}:{user_id}"
-            expected_sig = hmac.new(
-                secret.encode('utf-8'),
-                message.encode('utf-8'),
-                hashlib.sha256
-            ).hexdigest()
-            
-            if not hmac.compare_digest(provided_sig, expected_sig):
-                return False, "Invalid CSRF token"
-            
-            return True, ""
+            for secret in verification_keys(current_app):
+                expected_sig = hmac.new(
+                    secret.encode('utf-8'),
+                    message.encode('utf-8'),
+                    hashlib.sha256
+                ).hexdigest()
+                if hmac.compare_digest(provided_sig, expected_sig):
+                    return True, ""
+            return False, "Invalid CSRF token"
             
         except Exception as e:
             logger.warning(f"CSRF validation error: {e}")
