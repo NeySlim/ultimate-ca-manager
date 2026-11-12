@@ -223,12 +223,17 @@ class RelayReader:
             self.wakeup.close()
 
     def _loop(self):
-        while not self._stop.is_set():
-            self.run_once()
+        try:
+            while not self._stop.is_set():
+                self.run_once()
+                if self.wakeup is not None:
+                    self.wakeup.wait(self.tick, self._stop)
+                else:
+                    self._stop.wait(self.tick)
+        finally:
+            # A thread that outlived stop()'s join (a slow connect) still releases its LISTEN
             if self.wakeup is not None:
-                self.wakeup.wait(self.tick, self._stop)
-            else:
-                self._stop.wait(self.tick)
+                self.wakeup.close()
 
     def run_once(self):
         """Deliver what is new; a database error is logged once and retried on the next tick."""

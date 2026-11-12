@@ -496,3 +496,25 @@ def test_a_notification_of_another_schema_does_not_wake_the_reader(monkeypatch):
     wakeup.wait(2.0, stop)
     assert wakeup._raw.driver_connection.script == []  # returned on 'ucm', not before
 
+
+def test_a_reader_outliving_its_stop_closes_the_listen_connection(monkeypatch):
+    import threading
+    connecting, release = threading.Event(), threading.Event()
+    wakeup = _wakeup(monkeypatch, [[]])
+    real = wakeup.engine.raw_connection
+
+    def slow_connect():
+        connecting.set()
+        release.wait(5)  # a connect_timeout longer than stop()'s join
+        return real()
+    wakeup.engine.raw_connection = slow_connect
+
+    class _Engine:
+        def connect(self):
+            raise OSError('down')
+    reader = ws_relay.RelayReader(_Engine(), lambda room, p: None, tick=0.01, wakeup=wakeup).start()
+    assert connecting.wait(5)
+    reader.stop(timeout=0.05)
+    release.set()
+    assert wait_for(lambda: not reader._thread.is_alive())
+    assert wakeup.engine.opened and all(raw.closed for raw in wakeup.engine.opened)
