@@ -19,6 +19,8 @@ from tests.test_wstep_renew import RENEW_URL, _build_signed_rst, wstep_renew_con
 from tests.test_wstep_renew_tls import _cmc_renewal, _key, _post, _rst
 from tests.test_wstep_strong_cert_mapping import _clear_ad_connector, _configure_ad_connector
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 SID = 'S-1-5-21-1608104657-630783805-1473387121-1105'
 OTHER_SID = 'S-1-5-21-1608104657-630783805-1473387121-500'
 
