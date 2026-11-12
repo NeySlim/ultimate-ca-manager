@@ -1,18 +1,12 @@
 """Forced password change: until it happens, a session reaches only the change itself.
 
-The account created at first boot carries the documented default password, so
-the flag must hold on the server, not only in the UI prompt."""
+A generated initial password (auth.initial_admin) sits in a file on disk, so the
+flag must hold on the server, not only in the UI prompt."""
 from flask import session
 
 from auth.twofa_enforcement import ENROLL_ALLOWED_PATHS, ENROLL_SESSION_KEY, PROMPT_READABLE_PATHS
 
-DEFAULT_INITIAL_PASSWORD = 'changeme123'
 _ALLOWED_PATHS = frozenset({'/api/v2/account/password', '/api/v2/auth/logout'})
-
-
-def initial_password_needs_change(password) -> bool:
-    """Only the public default must be replaced; a password the operator chose is theirs."""
-    return password == DEFAULT_INITIAL_PASSWORD
 
 
 def password_change_allows(path, method='GET') -> bool:

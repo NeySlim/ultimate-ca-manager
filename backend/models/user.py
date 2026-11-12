@@ -124,9 +124,13 @@ class User(db.Model):
     def set_password(self, password: str):
         """Hash and set password, with the method pinned in utils.password_hash.
 
-        Every session opened with the old password ends with it."""
+        Every session opened with the old password ends with it, and so does a
+        generated initial password file (auth.initial_admin)."""
         self.password_hash = hash_password(password)
         self.end_sessions()
+        if self.id is not None:
+            from auth.initial_admin import forget_generated
+            forget_generated(self)
 
     def end_sessions(self):
         """Invalidate every session of this account; the caller commits.

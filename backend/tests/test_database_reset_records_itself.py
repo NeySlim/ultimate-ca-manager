@@ -75,16 +75,45 @@ class TestTheResetIsRecorded:
             assert rows[0].entry_hash, 'the entry was not sealed'
 
 
-@pytest.mark.parametrize('initial,forced', [('changeme123', True), ('Operator-Chosen-1!', False)])
-def test_the_recreated_admin_is_forced_only_with_the_public_default(
-        app, auth_client, monkeypatch, initial, forced):
+@pytest.mark.parametrize('initial', ['Operator-Chosen-1!', None], ids=['provided', 'generated'])
+def test_the_recreated_admin_is_forced_only_with_a_generated_password(
+        app, auth_client, monkeypatch, tmp_path, initial):
+    from auth.initial_admin import PASSWORD_FILE_NAME
     monkeypatch.setitem(app.config, 'INITIAL_ADMIN_PASSWORD', initial)
+    monkeypatch.setitem(app.config, 'DATA_DIR', str(tmp_path))
     answer = auth_client.post('/api/v2/system/database/reset')
     assert answer.status_code == 200, answer.data
+    path = tmp_path / PASSWORD_FILE_NAME
     with app.app_context():
         admin = User.query.filter_by(username=app.config['INITIAL_ADMIN_USERNAME']).one()
-        assert admin.force_password_change is forced
-        # Later files sign in as admin with the default password, no change forced
+        assert admin.force_password_change is (initial is None)
+        assert path.exists() is (initial is None)
+        if initial is None:
+            value = path.read_text().rstrip('\n')
+            assert admin.check_password(value)
+            assert value not in answer.get_data(as_text=True)
+            assert str(path) in answer.get_data(as_text=True)
+        # Later files sign in as admin with the test password, no change forced
         admin.set_password('changeme123')
         admin.force_password_change = False
         db.session.commit()
+    assert not path.exists()
+
+
+def test_an_unreadable_password_file_resets_nothing(app, auth_client, monkeypatch, tmp_path):
+    monkeypatch.setitem(app.config, 'INITIAL_ADMIN_PASSWORD', None)
+    monkeypatch.setitem(app.config, 'INITIAL_ADMIN_PASSWORD_FILE', str(tmp_path / 'missing'))
+    with app.app_context():
+        probe = User(username='reset-survivor', email='s@example.test', role='viewer', active=True)
+        probe.set_password('Surv1vor-Pass!')
+        db.session.add(probe)
+        db.session.commit()
+    try:
+        answer = auth_client.post('/api/v2/system/database/reset')
+        assert answer.status_code == 409 and 'INITIAL_ADMIN_PASSWORD_FILE' in answer.get_data(as_text=True)
+        with app.app_context():
+            assert User.query.filter_by(username='reset-survivor').count() == 1
+    finally:
+        with app.app_context():
+            User.query.filter_by(username='reset-survivor').delete()
+            db.session.commit()

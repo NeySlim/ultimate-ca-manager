@@ -19,10 +19,9 @@ exists to prevent), and bypassed the hash pin in User.set_password() with
 a bare generate_password_hash(). The canonical-shape test below asserts the
 three properties every seeding site must agree on.
 
-The seeding call sites are parsed from source (AST) so a future rename or a
-new kwarg is caught without anyone remembering to update this test. No app
-or database is needed, so this also runs on hosts where the shared `app`
-fixture cannot start.
+Every seeding path now delegates to auth.initial_admin.seed_admin(), the one
+place that builds the account: the paths are parsed (AST) to hold that, and
+seed_admin() itself is checked by running it.
 """
 import ast
 from pathlib import Path
@@ -33,7 +32,8 @@ from models import User
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
-# Every file that seeds the bootstrap admin via User(...).
+CANONICAL = BACKEND_DIR / 'auth' / 'initial_admin.py'
+# Every file that seeds the bootstrap admin, through seed_admin().
 SEEDING_FILES = [
     BACKEND_DIR / 'init_db.py',
     BACKEND_DIR / 'app.py',
@@ -66,8 +66,8 @@ def test_user_model_has_no_is_active_attribute():
     assert 'is_active' not in mapped
 
 
-@pytest.mark.parametrize('path', SEEDING_FILES, ids=lambda p: p.name)
-def test_seeding_call_sites_only_use_mapped_kwargs(path):
+def test_seeding_call_sites_only_use_mapped_kwargs():
+    path = CANONICAL
     mapped = _mapped_names()
     calls = list(_user_call_kwargs(path))
     assert calls, f"expected at least one User(...) call in {path}"
@@ -79,120 +79,50 @@ def test_seeding_call_sites_only_use_mapped_kwargs(path):
         )
 
 
-CONFIG_MARKERS = ('INITIAL_ADMIN_USERNAME', 'INITIAL_ADMIN_EMAIL',
-                  'INITIAL_ADMIN_PASSWORD')
-
-
-def _seed_facts(path):
-    """Extract, from one seeding file:
-    - the kwarg map (name -> value AST node) of every User(...) call,
-    - the argument nodes of every ``<obj>.set_password(...)`` call,
-    - the attribute names assigned True after construction
-      (``admin.totp_exempt = True`` — the app.py/database_health.py style),
-      and those assigned ``initial_password_needs_change(...)``,
-    - per config marker, the local names bound from an expression that
-      references it (``admin_username = app.config.get(...)`` — the
-      init_db.py style).
-    """
+def _calls_seed_admin(path):
     tree = ast.parse(path.read_text(encoding='utf-8'))
-    calls = []
-    set_password_args = []
-    true_attr_assigns = set()
-    gated_attr_assigns = set()
-    config_bound = {marker: set() for marker in CONFIG_MARKERS}
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
-            if isinstance(node.func, ast.Name) and node.func.id == 'User':
-                calls.append({kw.arg: kw.value for kw in node.keywords if kw.arg})
-            elif isinstance(node.func, ast.Attribute) and node.func.attr == 'set_password':
-                set_password_args.extend(node.args)
-        elif isinstance(node, ast.Assign):
-            if isinstance(node.value, ast.Constant) and node.value.value is True:
-                for tgt in node.targets:
-                    if isinstance(tgt, ast.Attribute):
-                        true_attr_assigns.add(tgt.attr)
-            elif _is_needs_change_call(node.value):
-                for tgt in node.targets:
-                    if isinstance(tgt, ast.Attribute):
-                        gated_attr_assigns.add(tgt.attr)
-            else:
-                value_dump = ast.dump(node.value)
-                for marker in CONFIG_MARKERS:
-                    if marker in value_dump:
-                        for tgt in node.targets:
-                            if isinstance(tgt, ast.Name):
-                                config_bound[marker].add(tgt.id)
-    return calls, set_password_args, true_attr_assigns, gated_attr_assigns, config_bound
-
-
-def _is_needs_change_call(node):
-    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
-            and node.func.id == 'initial_password_needs_change')
-
-
-def _comes_from(marker, node, config_bound):
-    """True when `node` references the config marker directly, or is a local
-    name bound from an expression that does (one level of indirection)."""
-    if node is None:
-        return False
-    if marker in ast.dump(node):
-        return True
-    return isinstance(node, ast.Name) and node.id in config_bound[marker]
+            func = node.func
+            name = func.attr if isinstance(func, ast.Attribute) else getattr(func, 'id', None)
+            if name == 'seed_admin':
+                return True
+    return False
 
 
 @pytest.mark.parametrize('path', SEEDING_FILES, ids=lambda p: p.name)
-def test_seeding_sites_match_the_canonical_bootstrap_shape(path):
-    """Every seeding site must agree with app.py/database_health.py on the
-    identity source, the 2FA exemption, and the password-hashing helper —
-    kwarg-name validity alone let all three regress unseen in the reset
-    endpoint."""
-    calls, set_password_args, true_attr_assigns, gated_attr_assigns, config_bound = _seed_facts(path)
-    assert calls, f"expected at least one User(...) call in {path}"
+def test_seeding_paths_delegate_to_the_one_builder(path):
+    """A second builder would drift from the first, as the reset endpoint once did."""
+    assert _calls_seed_admin(path), f"{path.name} must create the admin through seed_admin()"
+    assert not list(_user_call_kwargs(path)), f"{path.name} builds a User(...) of its own"
 
-    for kwargs in calls:
-        # 1. Identity comes from configuration, never a literal: a reset on
-        #    a deployment with INITIAL_ADMIN_USERNAME set must recreate THAT
-        #    admin, not 'admin'.
-        username = kwargs.get('username')
-        assert username is not None, f"{path.name}: User(...) without username="
-        assert _comes_from('INITIAL_ADMIN_USERNAME', username, config_bound), (
-            f"{path.name}: seeded username must come from "
-            f"INITIAL_ADMIN_USERNAME, not a hard-coded literal"
-        )
-        email = kwargs.get('email')
-        assert _comes_from('INITIAL_ADMIN_EMAIL', email, config_bound), (
-            f"{path.name}: seeded email must come from INITIAL_ADMIN_EMAIL"
-        )
 
-        # 2. The password goes through User.set_password(), which pins the
-        #    hash algorithm — never a password_hash= kwarg built elsewhere.
-        assert 'password_hash' not in kwargs, (
-            f"{path.name}: pass the password through set_password() (hash "
-            f"pin, models/user.py), not a precomputed password_hash="
-        )
-
-        # 3. The 2FA-lockout exemption (#141), and a forced rotation decided
-        #    by the one rule (only the public default password), either as
-        #    constructor kwargs or assigned right after construction.
-        exempt = kwargs.get('totp_exempt')
-        assert (isinstance(exempt, ast.Constant) and exempt.value is True) \
-            or 'totp_exempt' in true_attr_assigns, (
-                f"{path.name}: seeded admin must set totp_exempt=True "
-                f"(kwarg or attribute assignment)"
-            )
-        assert _is_needs_change_call(kwargs.get('force_password_change')) \
-            or 'force_password_change' in gated_attr_assigns, (
-                f"{path.name}: force_password_change must come from "
-                f"initial_password_needs_change(<INITIAL_ADMIN_PASSWORD>)"
-            )
-
-    assert any(
-        _comes_from('INITIAL_ADMIN_PASSWORD', arg, config_bound)
-        for arg in set_password_args
-    ), (
-        f"{path.name}: the seeded password must be "
-        f"set_password(<INITIAL_ADMIN_PASSWORD>)"
-    )
+@pytest.mark.parametrize('provided', [True, False], ids=['provided', 'generated'])
+def test_seed_admin_builds_the_configured_exempt_account(app, tmp_path, provided):
+    """Identity from configuration, the #141 exemption, set_password(), forced only when generated."""
+    from auth.initial_admin import MARKER_KEY, PASSWORD_FILE_NAME, seed_admin
+    from models import SystemConfig, db
+    config = {'INITIAL_ADMIN_USERNAME': 'seed-guard-admin', 'INITIAL_ADMIN_EMAIL': 'seed@example.test',
+              'DATA_DIR': str(tmp_path)}
+    if provided:
+        config['INITIAL_ADMIN_PASSWORD'] = 'Seed-Guard-Pass-1!'
+    with app.app_context():
+        try:
+            admin = seed_admin(config)
+            db.session.flush()
+            assert (admin.username, admin.email, admin.role) == ('seed-guard-admin', 'seed@example.test', 'admin')
+            assert admin.active is True and admin.totp_exempt is True
+            assert admin.force_password_change is (not provided)
+            marker = SystemConfig.query.filter_by(key=MARKER_KEY).first()
+            if provided:
+                assert admin.check_password('Seed-Guard-Pass-1!')
+                assert not (tmp_path / PASSWORD_FILE_NAME).exists()
+            else:
+                value = (tmp_path / PASSWORD_FILE_NAME).read_text().rstrip('\n')
+                assert admin.check_password(value)
+                assert marker is not None and str(admin.id) in marker.value
+        finally:
+            db.session.rollback()
 
 
 def test_seeding_kwargs_construct_a_user():

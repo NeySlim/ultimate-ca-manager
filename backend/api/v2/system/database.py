@@ -191,41 +191,25 @@ def reset_db():
         actor = getattr(g, 'current_user', None)
         actor_name = getattr(actor, 'username', None) or 'unknown'
 
+        # Settled before anything is dropped: an unreadable _FILE or an unwritable
+        # data directory leaves the database as it was
+        from auth import initial_admin
+        try:
+            prepared = initial_admin.prepare(current_app.config)
+        except initial_admin.InitialPasswordError as e:
+            return error_response(f"Database not reset: {e}", 409)
+
         # The request's own transaction holds locks on these tables: on
         # PostgreSQL, drop_all on another connection would wait for it forever.
         db.session.close()
         db.drop_all()
         db.create_all()
 
-        # Create default admin user
-        from models import User
-
-        # NOTE: the User column is `active`, not `is_active` — the wrong kwarg
-        # made this constructor raise TypeError, which the bare `except` below
-        # turned into "Database reset failed" AFTER drop_all() had already
-        # run: a wiped database with no admin user at all.
-        #
-        # Recreate the CONFIGURED bootstrap admin exactly as the canonical
-        # seeding paths do (app.py, database_health.py, init_db.py):
-        # - the configured identity, not a hard-coded 'admin' — a deployment
-        #   with INITIAL_ADMIN_USERNAME set would otherwise get the WRONG
-        #   admin back from a UI button;
-        # - totp_exempt (#141), so a reset under global 2FA enforcement
-        #   cannot recreate an admin that no one can log in as;
-        # - set_password(), which pins the hash algorithm (models/user.py),
-        #   instead of a bare generate_password_hash().
-        from auth.password_change_gate import DEFAULT_INITIAL_PASSWORD, initial_password_needs_change
-        initial_password = current_app.config.get('INITIAL_ADMIN_PASSWORD', DEFAULT_INITIAL_PASSWORD)
-        admin = User(
-            username=current_app.config.get('INITIAL_ADMIN_USERNAME', 'admin'),
-            email=current_app.config.get('INITIAL_ADMIN_EMAIL', 'admin@localhost'),
-            role='admin',
-            active=True,
-            force_password_change=initial_password_needs_change(initial_password),
-            totp_exempt=True
-        )
-        admin.set_password(initial_password)
-        db.session.add(admin)
+        # The configured administrator, as at first start (auth.initial_admin)
+        initial_admin.seed_admin(current_app.config, prepared)
+        from services import cluster_commands
+        # Other nodes drop a file the reset made stale
+        cluster_commands.emit(cluster_commands.DROP_INITIAL_PASSWORD)
         ok, err = safe_commit(logger, "Database reset failed")
         if not ok:
             # The tables are already dropped and recreated by now and there
@@ -253,7 +237,13 @@ def reset_db():
             username=actor_name,
         )
 
-        return success_response(message="Database reset successfully. Default admin user created.")
+        if prepared.generated:
+            path = initial_admin.password_file(current_app.config)
+            return success_response(message=(
+                "Database reset successfully. Administrator recreated with a generated "
+                f"password, read it with: {initial_admin.read_command(path)}"))
+        return success_response(message=(
+            f"Database reset successfully. Administrator recreated with the password from {prepared.source}."))
     except Exception as e:
         logger.error(f"Database reset failed: {e}")
         return error_response("Database reset failed")
