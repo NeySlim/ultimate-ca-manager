@@ -1293,3 +1293,100 @@ class TestDuplicateAccounts:
         monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=entries))
         with app.app_context():
             assert _LOOKUPS[name]() is lookup.UNREACHABLE
+
+
+class _RecordingConnection(_FakeConnection):
+    def search(self, base_dn, filter_str, attributes=None):
+        self.filter_str = filter_str
+        return super().search(base_dn, filter_str, attributes)
+
+
+class TestLookupAccountBySid:
+    """The renewal check that a certificate's SID still names a directory account."""
+
+    _SID = 'S-1-5-21-1608104657-630783805-1473387121-1105'
+
+    def _entry(self, raw_sid=None, sam='WIN11$'):
+        return _FakeEntry({'objectSid': raw_sid or TestSidBytesToString._WIN11_RAW_SID, 'sAMAccountName': sam})
+
+    def test_sid_string_round_trips_to_the_directory_bytes(self):
+        assert lookup._sid_string_to_bytes(self._SID) == TestSidBytesToString._WIN11_RAW_SID
+
+    @pytest.mark.parametrize('sid', ['', 'S-1', 'S-2-5-21', 'X-1-5-21', 'S-1-5-21-x',
+                                     'S-1-281474976710656-1', 'S-1-5-4294967296', 'S-1-5' + '-1' * 16])
+    def test_malformed_sid_is_no_account_without_a_search(self, app, monkeypatch, sid):
+        _configure(None, app, enabled=True)
+        monkeypatch.setattr(lookup, '_connect', lambda config: pytest.fail('no search for a malformed SID'))
+        with app.app_context():
+            assert lookup.lookup_account_by_sid(sid) is lookup.NO_ACCOUNT
+
+    def test_connector_off_is_none(self, app):
+        _configure(None, app, enabled=False)
+        with app.app_context():
+            assert lookup.lookup_account_by_sid(self._SID) is None
+
+    def test_enabled_without_server_is_unreachable(self, app):
+        TestEnabledWithoutServer._configure_incomplete(app)
+        with app.app_context():
+            assert lookup.lookup_account_by_sid(self._SID) is lookup.UNREACHABLE
+
+    def test_bind_failure_is_unreachable(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+
+        def refuse(config):
+            raise RuntimeError('bind refused')
+        monkeypatch.setattr(lookup, '_connect', refuse)
+        with app.app_context():
+            assert lookup.lookup_account_by_sid(self._SID) is lookup.UNREACHABLE
+
+    def test_failed_search_is_unreachable(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+        busy = {'result': 51, 'description': 'busy'}
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(result=busy))
+        with app.app_context():
+            assert lookup.lookup_account_by_sid(self._SID) is lookup.UNREACHABLE
+
+    def test_several_accounts_are_unreachable(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+        entries = [self._entry(), self._entry(sam='OTHER$')]
+        for e in entries:
+            e.entry_dn = 'CN=x'
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=entries))
+        with app.app_context():
+            assert lookup.lookup_account_by_sid(self._SID) is lookup.UNREACHABLE
+
+    def test_not_found_is_no_account(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[]))
+        with app.app_context():
+            assert lookup.lookup_account_by_sid(self._SID) is lookup.NO_ACCOUNT
+
+    def test_an_answer_for_another_sid_is_no_account(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+        other = lookup._sid_string_to_bytes('S-1-5-21-1608104657-630783805-1473387121-500')
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[self._entry(other)]))
+        with app.app_context():
+            assert lookup.lookup_account_by_sid(self._SID) is lookup.NO_ACCOUNT
+
+    @pytest.mark.parametrize('sam', [None, ''])
+    def test_an_object_without_an_account_name_is_no_account(self, app, monkeypatch, sam):
+        # e.g. a foreignSecurityPrincipal carrying the SID of another domain's account
+        attrs = {'objectSid': TestSidBytesToString._WIN11_RAW_SID}
+        if sam is not None:
+            attrs['sAMAccountName'] = sam
+        fsp = _FakeEntry(attrs)
+        fsp.entry_dn = 'CN=S-1-5-21-1608104657-630783805-1473387121-1105,CN=ForeignSecurityPrincipals,DC=lab'
+        _configure(None, app, enabled=True)
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[fsp]))
+        with app.app_context():
+            assert lookup.lookup_account_by_sid(self._SID) is lookup.NO_ACCOUNT
+
+    def test_found_searches_the_binary_sid_and_names_the_account(self, app, monkeypatch):
+        _configure(None, app, enabled=True)
+        conn = _RecordingConnection(entries=[self._entry()])
+        monkeypatch.setattr(lookup, '_connect', lambda config: conn)
+        with app.app_context():
+            assert lookup.lookup_account_by_sid(self._SID) == 'WIN11$'
+        assert conn.filter_str == ('(objectSid=\\01\\05\\00\\00\\00\\00\\00\\05\\15\\00\\00\\00'
+                                   '\\d1\\ba\\d9\\5f\\3d\\ff\\98\\25\\71\\1a\\d2\\57\\51\\04\\00\\00)')
+        assert conn.unbound

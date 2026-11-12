@@ -184,7 +184,8 @@ class CASigningMixin:
             override_san: forwarded to TrustStoreService.sign_csr — see its
                 docstring. Only WSTEP's Kerberos binding passes this.
             requester_sid: forwarded to TrustStoreService.sign_csr — see its
-                docstring. Only WSTEP's Kerberos binding passes this.
+                docstring. WSTEP passes it at Kerberos issuance, WSTEP and EST
+                at renewal.
             cert_type: Signing profile for TrustStoreService.sign_csr —
                 decides the EKU ceiling. EST passes 'device_cert'; WSTEP
                 overrides this too for its own matched-template flow; the

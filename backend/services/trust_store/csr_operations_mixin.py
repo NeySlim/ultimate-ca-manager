@@ -3,6 +3,7 @@ CSR operations mixin for TrustStoreService
 """
 import ipaddress
 import math
+import re
 import logging
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
@@ -92,6 +93,17 @@ def _ad_security_extension(sid_string):
     ``_certificate_template_extension`` above. Byte-for-byte verified
     against a real ADCS-issued certificate's own extension for the same
     SID (see test_ad_security_extension.py)."""
+    spec = _security_ext_spec()
+    entry = spec._child_spec({
+        'type': _NTDS_OBJECT_SID_OID,
+        'value': sid_string.encode('ascii'),
+    })
+    der = spec([entry]).dump()
+    return x509.UnrecognizedExtension(_SID_SECURITY_EXT_OID, der)
+
+
+def _security_ext_spec():
+    """asn1crypto spec of the SID security extension: SEQUENCE OF [0] {OID, [0] EXPLICIT OCTET STRING}."""
     from asn1crypto import core as asn1_core
 
     class _SidValue(asn1_core.OctetString):
@@ -108,12 +120,23 @@ def _ad_security_extension(sid_string):
     class _SecurityExt(asn1_core.SequenceOf):
         _child_spec = _SecurityExtEntry
 
-    entry = _SecurityExtEntry({
-        'type': _NTDS_OBJECT_SID_OID,
-        'value': sid_string.encode('ascii'),
-    })
-    der = _SecurityExt([entry]).dump()
-    return x509.UnrecognizedExtension(_SID_SECURITY_EXT_OID, der)
+    return _SecurityExt
+
+
+_SID_STRING = re.compile(r'S-1-[0-9]{1,15}(-[0-9]{1,10}){1,15}')
+
+
+def ad_security_extension_sid(cert):
+    """The SID ``cert``'s SID security extension carries, or None when it is absent or not
+    exactly what ``_ad_security_extension`` writes for one SID: a renewal re-encodes it byte for byte."""
+    try:
+        raw = cert.extensions.get_extension_for_oid(_SID_SECURITY_EXT_OID).value.value
+        sid = _security_ext_spec().load(raw)[0]['value'].native.decode('ascii')
+    except Exception:
+        return None
+    if not _SID_STRING.fullmatch(sid) or _ad_security_extension(sid).value != raw:
+        return None
+    return sid
 
 
 # CA-only constraints a leaf never carries; the allow-list below is what
@@ -661,10 +684,10 @@ class CSROperationsMixin:
         passes here directly.
         ``requester_sid``: the authenticated requester's AD SID (
         ``"S-1-5-21-..."`` string form), embedded as the SID security
-        extension (KB5014754 strong certificate mapping) — only WSTEP's
-        Kerberos binding passes this, independent of ``override_subject``
-        (applies to naked and normal CSRs alike, since it identifies who
-        authenticated, not what subject was requested).
+        extension (KB5014754 strong certificate mapping). WSTEP passes it at
+        Kerberos issuance, WSTEP and EST at renewal (the renewed certificate's
+        own SID, never the CSR's), independent of ``override_subject``: it
+        identifies who authenticated, not what subject was requested.
         ``extra_san``: names the operator adds to the request's own (admin
         Sign CSR only); with a request that names none, they join those its
         CN implies, a CN that is not a hostname giving no DNS name.
@@ -1238,8 +1261,8 @@ class CSROperationsMixin:
 
         # Microsoft SID security extension (szOID_NTDS_CA_SECURITY_EXT,
         # 1.3.6.1.4.1.311.25.2) for KB5014754 strong certificate mapping —
-        # only WSTEP's Kerberos binding passes this, with the requester's
-        # own AD SID once resolved via the AD Connector. Non-critical,
+        # WSTEP passes it at Kerberos issuance (SID resolved by the AD Connector),
+        # WSTEP and EST at renewal (the renewed certificate's SID). Non-critical,
         # matching real ADCS's own issuance (confirmed against a captured
         # real cert — see _ad_security_extension's docstring).
         if requester_sid:

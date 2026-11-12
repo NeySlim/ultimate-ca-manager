@@ -29,7 +29,8 @@ Bind/search mechanics mirror ``api/v2/sso/connection_tests.py``'s
 temp CA-bundle file that exists in that code (no matching cleanup there).
 
 The public lookups never raise: they answer None (or False) when the connector is
-off or the object is not found, and the falsy ``UNREACHABLE`` when no DC binds, a
+off or the object is not found (``NO_ACCOUNT`` for a principal or SID naming no
+account), and the falsy ``UNREACHABLE`` when no DC binds, a
 search raises or returns an LDAP error result, or the enabled connector lacks a server
 or base DN, so a caller can refuse the request or fault on its own side.
 """
@@ -60,7 +61,9 @@ class _Falsy:
 UNREACHABLE = _Falsy('UNREACHABLE')
 # The account exists but its objectSid is missing or malformed.
 UNUSABLE_SID = _Falsy('UNUSABLE_SID')
-# The Kerberos principal names no account, or one of a realm the connector does not serve.
+# The Kerberos principal or the SID names no account (a SID matching a non-account
+# object, such as a foreignSecurityPrincipal, included); FOREIGN_REALM: a realm the
+# connector does not serve.
 NO_ACCOUNT = _Falsy('NO_ACCOUNT')
 FOREIGN_REALM = _Falsy('FOREIGN_REALM')
 
@@ -427,15 +430,15 @@ def _search(conn, base_dn, search_filter, attributes):
     return UNREACHABLE
 
 
-def _single_entry(entries, sam_account_name):
+def _single_entry(entries, sam_account_name, what='named'):
     """The one entry of an account search, None when there is none, else ``UNREACHABLE``:
     a Global Catalog also answers for child domains, whose accounts may share the name."""
     if entries is UNREACHABLE or not entries:
         return entries if entries is UNREACHABLE else None
     if len(entries) > 1:
-        logger.warning("AD Connector: %d accounts named %r (%s); point the connector at a "
+        logger.warning("AD Connector: %d accounts %s %r (%s); point the connector at a "
                        "domain controller of the realm, not a global catalog", len(entries),
-                       sam_account_name, ', '.join(e.entry_dn for e in entries))
+                       what, sam_account_name, ', '.join(e.entry_dn for e in entries))
         return UNREACHABLE
     return entries[0]
 
@@ -554,6 +557,66 @@ def lookup_object_sid(sam_account_name):
         return _sid_bytes_to_string(entry.objectSid.raw_values[0]) or UNUSABLE_SID
     except Exception as e:
         logger.warning("AD Connector: SID lookup failed: %s", e)
+        return UNREACHABLE
+    finally:
+        try:
+            conn.unbind()
+        except Exception:
+            pass
+
+
+def _sid_string_to_bytes(sid):
+    """``"S-1-5-21-...-<RID>"`` -> binary SID (inverse of ``_sid_bytes_to_string``), None if malformed."""
+    parts = (sid or '').split('-')
+    if len(parts) < 4 or parts[0] != 'S' or not all(p.isdecimal() and p.isascii() for p in parts[1:]):
+        return None
+    revision, authority, subs = int(parts[1]), int(parts[2]), [int(p) for p in parts[3:]]
+    if revision != 1 or authority >= 1 << 48 or len(subs) > 15 or any(s >= 1 << 32 for s in subs):
+        return None
+    return (bytes([revision, len(subs)]) + authority.to_bytes(6, 'big')
+            + b''.join(s.to_bytes(4, 'little') for s in subs))
+
+
+def lookup_account_by_sid(sid):
+    """The ``sAMAccountName`` of the one directory object whose ``objectSid`` is ``sid``.
+
+    None when the connector is off; the falsy ``NO_ACCOUNT`` when ``sid`` is malformed or
+    names no account (no object, one without ``sAMAccountName``, or one whose returned
+    ``objectSid`` is not ``sid``) under the base DN; the falsy ``UNREACHABLE`` when the
+    directory cannot answer or several objects match. Never raises.
+    """
+    from ldap3.utils.conv import escape_bytes
+
+    config, fault = _enabled_config()
+    if config is None:
+        return fault
+    raw = _sid_string_to_bytes(sid)
+    if raw is None:
+        return NO_ACCOUNT
+
+    try:
+        conn = _connect(config)
+    except Exception as e:
+        logger.warning("AD Connector: bind failed during SID lookup: %s", e)
+        return UNREACHABLE
+
+    try:
+        entries = _search(conn, config.base_dn, f'(objectSid={escape_bytes(raw)})',
+                          ['sAMAccountName', 'objectSid'])
+        entry = _single_entry(entries, sid, 'with the SID')
+        if entry is None:
+            return NO_ACCOUNT
+        if entry is UNREACHABLE:
+            return entry
+        # The directory's own answer must carry the SID searched for
+        if 'objectSid' not in entry or not entry.objectSid.raw_values \
+                or _sid_bytes_to_string(entry.objectSid.raw_values[0]) != sid:
+            return NO_ACCOUNT
+        # objectSid alone matches non-accounts too (a foreignSecurityPrincipal): an account has a name
+        name = entry.sAMAccountName.value if 'sAMAccountName' in entry else None
+        return str(name) if name else NO_ACCOUNT
+    except Exception as e:
+        logger.warning("AD Connector: account lookup by SID failed: %s", e)
         return UNREACHABLE
     finally:
         try:
