@@ -2,6 +2,7 @@
 target version; a node that does not come back stops the campaign. No test installs anything:
 the download and the local install are witnesses."""
 import json
+import os
 from datetime import datetime, timedelta
 
 import pytest
@@ -261,6 +262,35 @@ def test_a_campaign_stopped_during_the_download_installs_nothing(app, ha, monkey
     assert not package.exists()
     state = _state(app)
     assert state['status'] == uc.STOPPED and 'within' in state['failed']['reason']
+
+
+def test_a_stale_turn_never_drops_the_package_of_the_turn_resumed_after_it(app, ha, monkeypatch, tmp_path):
+    """Stopped mid-download, resumed, taken again by the sibling process: the first turn's
+    late drop leaves the package the second turn handed to the install watcher."""
+    from services.scheduler_leader import cluster_utc_now
+    installed, downloads = [], []
+
+    def download(url, name, expected_sha256=None):
+        path = tmp_path / name
+        path.write_bytes(b'pkg')
+        downloads.append(name)
+        if len(downloads) == 1:  # the first turn's download outlives the guard
+            assert uc.campaign_tick(now=cluster_utc_now() + timedelta(
+                seconds=uc.NODE_GUARD_SECONDS + 5))[0] == 'stopped'
+            assert uc.resume_campaign('admin')[0]
+            assert uc.campaign_tick()[0] == 'dispatch'
+            uc.run_local_turn(_commands(app)[1][1], node_id=PREFIX + 'a', version='3.0')
+        return str(path)
+    monkeypatch.setattr(updates, 'download_update', download)
+    monkeypatch.setattr(updates, 'install_update', lambda path, **kw: installed.append(path))
+    _rows(app, a='3.0', b='3.0')
+    _start(app)
+    with app.app_context():
+        uc.campaign_tick()
+        uc.run_local_turn(_commands(app)[0][1], node_id=PREFIX + 'a', version='3.0')
+    assert len(installed) == 1 and _state(app)['current']['state'] == uc.REQUESTED
+    assert installed[0].endswith('.deb') and os.path.exists(installed[0])
+    assert len(set(downloads)) == 2
 
 
 def test_the_full_roll_goes_one_node_after_the_other(app, ha, monkeypatch):

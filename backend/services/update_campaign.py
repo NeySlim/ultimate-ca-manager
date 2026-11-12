@@ -10,6 +10,7 @@ not come back within NODE_GUARD_SECONDS stops the campaign until an admin resume
 """
 import json
 import logging
+import os
 import uuid
 from collections import namedtuple
 from copy import deepcopy
@@ -242,7 +243,6 @@ def _stop(raw, campaign, node, reason):
 
 
 def _discard(path):
-    import os
     try:
         os.remove(path)
     except OSError as e:
@@ -274,8 +274,10 @@ def run_local_turn(payload, node_id=None, version=None):
     sha256 = payload.get('sha256')
     if not sha256 or sha256.lower() != campaign['sha256']:
         return _stop(raw, taken, node_id, "the command carries no matching SHA-256: install refused")
+    # One file per turn: a stale turn's drop can never reach the package of a later one
+    turn_name = f"{uuid.uuid4().hex[:12]}-{os.path.basename(str(payload['package_name']))}"
     try:
-        path = updates.download_update(payload['download_url'], payload['package_name'],
+        path = updates.download_update(payload['download_url'], turn_name,
                                        expected_sha256=sha256)
     except Exception as e:
         return _stop(raw, taken, node_id, str(e)[:300])
