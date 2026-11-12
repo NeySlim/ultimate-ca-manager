@@ -11,7 +11,7 @@ from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from models import CA, Certificate, db
 from services.ad_connector import lookup as ad_lookup
 from services.ca_service import CAService
-from services.cert.renewal import renew_certificate_in_place
+from services.cert.renewal import RenewalError, renew_certificate_in_place
 from services.trust_store.csr_operations_mixin import _SID_SECURITY_EXT_OID, _ad_security_extension
 from tests.test_wstep_strong_cert_mapping import _clear_ad_connector, _configure_ad_connector
 
@@ -74,11 +74,31 @@ def test_in_place_renewal_copies_the_sid_extension_without_a_directory_check(
     assert asked == []
 
 
-def test_in_place_renewal_drops_the_sid_of_a_certificate_the_ca_did_not_sign(app, auth_client, create_ca):
+def test_in_place_renewal_refuses_a_certificate_the_ca_did_not_sign(app, auth_client, create_ca):
     from tests.test_protocol_renewal_sid import forged_import
     ca_data = create_ca(cn='In-place renewal forged SID CA')
     row_id, forged, _key = forged_import(app, auth_client, ca_data['id'], 'in-place-sid-forged.example.test',
                                          with_key=True)
+    with app.app_context():
+        with pytest.raises(RenewalError) as refused:
+            renew_certificate_in_place(db.session.get(Certificate, row_id), username='admin')
+        db.session.rollback()
+        assert refused.value.status == 400
+        assert _stored(row_id).serial_number == forged.serial_number
+
+
+def _past_the_issuer_check(monkeypatch):
+    """The builder's own guard, reached as if the issuer check before it had let the row through."""
+    from utils import cert_issuer
+    monkeypatch.setattr(cert_issuer, 'ca_signed', lambda ca, cert: True)
+
+
+def test_the_builder_drops_the_sid_of_a_certificate_the_ca_did_not_sign(app, auth_client, create_ca, monkeypatch):
+    from tests.test_protocol_renewal_sid import forged_import
+    ca_data = create_ca(cn='In-place renewal forged SID builder CA')
+    row_id, forged, _key = forged_import(app, auth_client, ca_data['id'], 'in-place-sid-builder.example.test',
+                                         with_key=True)
+    _past_the_issuer_check(monkeypatch)
     with app.app_context():
         renew_certificate_in_place(db.session.get(Certificate, row_id), username='admin')
         db.session.commit()
@@ -88,7 +108,7 @@ def test_in_place_renewal_drops_the_sid_of_a_certificate_the_ca_did_not_sign(app
         _sid_ext(renewed)
 
 
-def test_in_place_renewal_drops_the_sid_when_the_signature_cannot_be_checked(app, create_ca, monkeypatch):
+def test_the_builder_drops_the_sid_when_the_signature_cannot_be_checked(app, create_ca, monkeypatch):
     from utils import cert_issuer
     ca_data = create_ca(cn='In-place renewal unverifiable SID CA')
     row_id, _original = _issued_row(app, ca_data['id'], 'in-place-sid-unverifiable.example.test')
@@ -96,6 +116,7 @@ def test_in_place_renewal_drops_the_sid_when_the_signature_cannot_be_checked(app
     def unverifiable(cert, issuer):
         raise cert_issuer.UnsupportedIssuerKey('test')
     monkeypatch.setattr(cert_issuer, 'certificate_signed_by', unverifiable)
+    _past_the_issuer_check(monkeypatch)
     with app.app_context():
         renew_certificate_in_place(db.session.get(Certificate, row_id), username='admin')
         db.session.commit()

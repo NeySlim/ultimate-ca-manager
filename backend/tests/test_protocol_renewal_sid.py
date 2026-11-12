@@ -61,7 +61,7 @@ def _issue(app, ca_id, cn, sid=SID):
 
 def forged_import(app, auth_client, ca_id, cn, sid=SID, with_key=False):
     """A certificate naming the CA as issuer (DN and AKI) and carrying ``sid``, signed by
-    another key, imported under that CA: the import does not check the signature."""
+    another key, on a row linked to that CA as an earlier release's import left it."""
     from cryptography.hazmat.primitives.asymmetric import ec
     from cryptography.x509.oid import ExtendedKeyUsageOID
     from utils.datetime_utils import utc_now
@@ -85,13 +85,16 @@ def forged_import(app, auth_client, ca_id, cn, sid=SID, with_key=False):
     if with_key:
         pem += key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
                                  serialization.NoEncryption())
+    # The import refuses to link it: the link is the one an earlier release stored
     r = auth_client.post('/api/v2/certificates/import',
-                         data={'pem_content': pem.decode(), 'name': cn, 'ca_id': str(ca_id)},
+                         data={'pem_content': pem.decode(), 'name': cn},
                          content_type='multipart/form-data')
     assert r.status_code in (200, 201), r.get_json()
     with app.app_context():
         row = db.session.get(Certificate, r.get_json()['data']['id'])
-        assert row.caref == db.session.get(CA, ca_id).refid
+        assert row.caref is None
+        row.caref = db.session.get(CA, ca_id).refid
+        db.session.commit()
         return row.id, cert, key
 
 
@@ -127,12 +130,14 @@ class TestEstReenrolment:
         renewed = _est_leaf(_est_reenrol(client, old, key, csr_sid=OTHER_SID))
         assert _sid_ext(renewed) == _sid_ext(old) == _ad_security_extension(SID).value
 
-    def test_a_certificate_the_ca_did_not_sign_renews_without_its_sid(self, client, app, auth_client,
-                                                                     est_config, monkeypatch):
+    def test_a_certificate_the_ca_did_not_sign_is_refused(self, client, app, auth_client,
+                                                         est_config, monkeypatch):
         _row_id, forged, key = forged_import(app, auth_client, est_config['id'], 'est-sid-forged.example.test')
         monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: pytest.fail('unsigned SID'))
         _configure_ad_connector(app)
-        assert _sid_ext(_est_leaf(_est_reenrol(client, forged, key))) is None
+        before = _count(app)
+        assert _est_reenrol(client, forged, key).status_code == 403
+        assert _count(app) == before
 
     def test_without_the_extension_renews_without_it(self, client, app, est_config, monkeypatch):
         old, key = _issue(app, est_config['id'], 'est-sid-none.example.test', sid=None)
@@ -325,6 +330,16 @@ class TestScepManualApproval:
         assert NOT_FOUND_MESSAGE in r.get_data(as_text=True)
         assert self._status(request_id) == ('rejected', NOT_FOUND_MESSAGE)
         assert _count(app) == before
+
+
+def test_a_certificate_the_ca_did_not_sign_carries_no_sid(app, auth_client, create_ca):
+    """The row's link to the CA is not proof: only the signature is."""
+    from services.ad_connector import renewal_identity
+    ca_data = create_ca(cn='SID forged issuer CA')
+    _row_id, forged, _key_ = forged_import(app, auth_client, ca_data['id'], 'sid-forged-unit.example.test')
+    with app.app_context():
+        ca_cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(CA, ca_data['id']).crt))
+        assert renewal_identity.renewal_requester_sid(forged, ca_cert, 'TEST') is None
 
 
 def test_an_issuer_key_that_cannot_be_checked_carries_no_sid(app, create_ca, monkeypatch):
