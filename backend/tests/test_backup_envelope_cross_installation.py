@@ -6,6 +6,7 @@ envelope changes is only where the source read the keys from.
 """
 import base64
 
+import pytest
 from cryptography.fernet import Fernet
 
 from models import db
@@ -13,6 +14,11 @@ from tests.test_backup_cross_installation import (
     PASSWORD, Keys, _authority, _installation, _only, _pem, _service, _stored_certificate,
     _stored_key,
 )
+
+
+@pytest.fixture(autouse=True)
+def _dek_refresh(dek_refresh_now):
+    """No process here lags: rotations and disables wait for none."""
 
 
 def _add_authority(refid):

@@ -308,6 +308,13 @@ def encryption_enabled(monkeypatch, tmp_path, app):
     _drop_unreadable_key_material(app)
 
 
+@pytest.fixture
+def dek_refresh_now(monkeypatch):
+    """Every key use re-reads the DEK rows, so a rotation or a disable waits for no process."""
+    from security import encryption as enc_mod
+    monkeypatch.setattr(enc_mod, 'REFRESH_SECONDS', 0.0)
+
+
 _SESSION_APP = []
 
 

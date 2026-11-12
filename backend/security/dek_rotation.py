@@ -88,6 +88,16 @@ def start():
     return version, command
 
 
+def settle() -> None:
+    """Return once every process, on any node, re-reads the DEK rows before its next key use.
+
+    A process re-reads them when its last read is REFRESH_SECONDS old: twice that leaves a margin.
+    """
+    delay = 2 * _encryption.REFRESH_SECONDS
+    if delay > 0:
+        time.sleep(delay)
+
+
 def wait_for_nodes(command, timeout=None) -> list:
     """HA: the live nodes that have not applied ``command`` after ``timeout`` (empty: all did)."""
     if command is None or command.id is None:
@@ -214,6 +224,8 @@ def finish() -> int:
 def rotate(wait_timeout=None) -> dict:
     """Start (or resume) a rotation and carry it to the end; 'in_progress' when nodes lag."""
     version, command = start()
+    # No value is rewritten under the new DEK before every process can open it
+    settle()
     lagging = wait_for_nodes(command, wait_timeout)
     if lagging:
         logger.warning("DEK rotation to version %s waits for node(s) %s to load it; run it "

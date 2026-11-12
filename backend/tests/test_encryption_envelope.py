@@ -14,6 +14,11 @@ from cryptography.fernet import Fernet, InvalidToken
 from config.settings import Config
 from models import db, SystemConfig
 
+@pytest.fixture(autouse=True)
+def _dek_refresh(dek_refresh_now):
+    """No process here lags: rotations and disables wait for none."""
+
+
 PEM = '-----BEGIN PRIVATE KEY-----\nenvelope\n-----END PRIVATE KEY-----\n'
 SSH_KEY = base64.b64encode(b'-----BEGIN OPENSSH PRIVATE KEY-----\nenv\n-----END OPENSSH PRIVATE KEY-----\n').decode()
 
@@ -600,3 +605,27 @@ def test_a_database_before_the_envelope_reads_the_kek_as_version_1(app, values, 
         patch.setattr(envelope, 'stored_rows', missing)
         key_encryption.reload()
         assert key_encryption.active_version == 1 and key_encryption.is_enabled
+
+
+def test_a_process_that_loaded_the_deks_before_a_rotation_follows_it(app, values, monkeypatch,
+                                                                    encryption_enabled):
+    """The scheduler process gets no command outside HA: it re-reads the rows before a use."""
+    from security import dek_rotation, encryption
+    key_encryption = encryption_enabled.key_encryption
+    monkeypatch.setattr(encryption, 'REFRESH_SECONDS', 2.0)
+    with app.app_context():
+        key_encryption.is_enabled  # rows read: this is what the other process holds
+        stale = {name: getattr(key_encryption, name) for name in key_encryption._FIELDS}
+        slept = []
+        monkeypatch.setattr(dek_rotation.time, 'sleep', slept.append)
+        dek_rotation.rotate()
+        # The rotation rewrote nothing before every process's bound had passed
+        assert slept and slept[0] >= encryption.REFRESH_SECONDS
+        key_encryption.__dict__.update(stale)
+        key_encryption._read_at -= slept[0]
+        assert _read(app, values) == CLEAR
+        written = key_encryption.encrypt_string('scheduler write')
+        assert key_encryption.active_version == 2
+        # Its write is under the DEK that stays, not the one the rotation dropped
+        key_encryption.reload()
+        assert encryption.decrypt_master_key_value(written, 'text') == 'scheduler write'

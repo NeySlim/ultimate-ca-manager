@@ -21,6 +21,12 @@ from utils.datetime_utils import utc_now
 pytestmark = pytest.mark.skipif(not pg_app_harness.ENABLED,
                                 reason='needs UCM_TEST_APP_PG_URL (HA runs on PostgreSQL)')
 
+
+@pytest.fixture(autouse=True)
+def _dek_refresh(dek_refresh_now):
+    """No process here lags: rotations and disables wait for none."""
+
+
 PREFIX = f'env-{secrets.token_hex(3)}-'
 PEM = '-----BEGIN PRIVATE KEY-----\nha\n-----END PRIVATE KEY-----\n'
 

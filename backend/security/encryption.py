@@ -9,6 +9,7 @@ KEK sources (in order of priority):
 """
 
 import os
+import time
 import base64
 import tempfile
 import logging
@@ -26,6 +27,9 @@ from utils.randomness import csp_bytes
 logger = logging.getLogger(__name__)
 
 ENCRYPTED_MARKER = b'ENC:'
+# A process re-reads the DEK rows before using a key once its last read is this old: a
+# change committed elsewhere (rotation, disable) reaches every process within that bound
+REFRESH_SECONDS = 2.0
 MASTER_KEY_PATH = master_key_file()
 
 
@@ -60,6 +64,23 @@ def _table_missing(error) -> bool:
     return 'no such table' in message and 'encryption_keys' in message
 
 
+_UNREAD = object()
+
+
+def _read_rows():
+    """The DEK rows, [] before migration 153, None outside an application context."""
+    from security import envelope
+    try:
+        return envelope.stored_rows()
+    except Exception as e:
+        if not _table_missing(e):
+            raise
+        from models import db
+        db.session.rollback()
+        logger.debug(f"DEK table not read: {type(e).__name__}")
+        return []
+
+
 class KeyEncryption:
     """
     Handles encryption/decryption of private keys stored in database.
@@ -73,6 +94,8 @@ class KeyEncryption:
     _versions = ()
     _active_version = None
     _rows_loaded = False
+    _rows = None  # the DEK rows last read
+    _read_at = 0.0  # time.monotonic() of that read
     _enabled = False
     _key_source = None  # 'file', 'env', or None
     dek_error = None  # why stored DEKs were not loaded ('kek_mismatch'), or None
@@ -170,26 +193,19 @@ class KeyEncryption:
                                                         if v != active])
         self._enabled = True
 
-    def _load_data_keys(self) -> None:
+    def _load_data_keys(self, rows=_UNREAD) -> None:
         """The DEKs the database holds under this KEK; outside an app context, the KEK alone.
 
         No row: the KEK is DEK version 1. A row this KEK did not wrap leaves encryption off
         (dek_error), so nothing is written under a key the database does not know.
         """
         from security import envelope
+        rows = _read_rows() if rows is _UNREAD else rows
         self.dek_error = None
         self._set_deks({}, None)
-        try:
-            rows = envelope.stored_rows()
-        except Exception as e:
-            if not _table_missing(e):
-                raise
-            # Before migration 153: the database predates the envelope
-            from models import db
-            db.session.rollback()
-            logger.debug(f"DEK table not read: {type(e).__name__}")
-            rows = []
         self._rows_loaded = rows is not None
+        if rows is not None:
+            self._rows, self._read_at = rows, time.monotonic()
         mine = envelope.kek_id(self._key_bytes)
         keys = [r for r in rows or () if r[1] in (envelope.ACTIVE, envelope.PREVIOUS)]
         if not keys:
@@ -213,7 +229,7 @@ class KeyEncryption:
         self._set_deks(deks, active if active is not None else max(deks))
 
     _FIELDS = ('_fernet', '_decryptor', '_key_bytes', '_versions', '_active_version',
-               '_rows_loaded', '_enabled', '_key_source', 'dek_error')
+               '_rows_loaded', '_rows', '_read_at', '_enabled', '_key_source', 'dek_error')
 
     def _swap_in(self, build) -> None:
         """Build the new state on a scratch object, then publish it in one dict update.
@@ -228,17 +244,27 @@ class KeyEncryption:
         self.__dict__.update({name: getattr(fresh, name) for name in self._FIELDS})
 
     def _ensure_loaded(self) -> None:
-        """Rows not read at reload (no app context then): read them before the first use."""
-        if self._rows_loaded or self._key_bytes is None:
+        """The DEK rows, read before a use when never read or older than REFRESH_SECONDS.
+
+        A read that fails raises: the use fails rather than run on keys that may be stale.
+        """
+        if self._key_bytes is None:
+            return
+        if self._rows_loaded and time.monotonic() - self._read_at < REFRESH_SECONDS:
             return
         from flask import has_app_context
-        if has_app_context():
-            kek, source = self._key_bytes, self._key_source
+        if not has_app_context():
+            return
+        rows = _read_rows()
+        if self._rows_loaded and rows == self._rows:
+            self._read_at = time.monotonic()
+            return
+        kek, source = self._key_bytes, self._key_source
 
-            def build(fresh):
-                fresh._key_bytes, fresh._key_source = kek, source
-                fresh._load_data_keys()
-            self._swap_in(build)
+        def build(fresh):
+            fresh._key_bytes, fresh._key_source = kek, source
+            fresh._load_data_keys(rows)
+        self._swap_in(build)
 
     def reload(self):
         """Reload the KEK and the DEKs (after enable, disable, rotation or a cluster command)"""
