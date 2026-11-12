@@ -110,6 +110,7 @@ class MTLSAuthService:
                     from utils.serial_format import unambiguous_serial_spellings
                     # No PEM to tell the records of one name apart: any of them closes it. The text
                     # is read both ways (writers differ), each reading in its own unambiguous spellings
+                    # Not covered: a record of a legacy row in all-digit hex, which reads as another serial
                     refids = [r for (r,) in _CA.query.filter(_CA.subject == issuer.subject).with_entities(_CA.refid)]
                     variants = set()
                     for base in (10, 16):
