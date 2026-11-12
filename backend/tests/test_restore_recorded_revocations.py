@@ -71,8 +71,10 @@ class TestTheRowsARestoreWritesTakeTheirRecords:
         results = _restore(blob, mode='merge')
 
         assert _state('restore-align') == (True, reason, [reason])
-        assert results['revoked_from_records'] == 1
-        assert len(_audited('restore-align')) == 1
+        # A final revocation here is kept by the merge itself; a hold is written back from its record
+        marked = 0 if reason == 'keyCompromise' else 1
+        assert results['revoked_from_records'] == marked
+        assert len(_audited('restore-align')) == marked
         assert _state('restore-not-written') == (False, None, [reason])
 
 

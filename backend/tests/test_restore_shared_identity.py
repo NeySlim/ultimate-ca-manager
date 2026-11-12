@@ -223,7 +223,8 @@ DEDICATED = ['revoked_serials', 'ssh_certificates', 'approval_requests', 'acme_c
 
 @pytest.mark.parametrize('name, column', [
     ('role_permissions', None),
-    ('revoked_serials', 'revoke_reason'),
+    # A merge keeps the graver revoke_reason: the key digest is a column it takes from the archive
+    ('revoked_serials', 'public_key_sha256'),
     ('ssh_certificates', 'descr'),
     ('approval_requests', None),
     ('acme_client_orders', None),
