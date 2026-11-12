@@ -75,6 +75,7 @@ export default {
           { label: "Installation auto", text: "Désactivée par défaut. Une fois activée, UCM télécharge, vérifie et installe la mise à jour à l'heure choisie, puis redémarre, installations DEB/RPM uniquement" },
           { label: "Somme de contrôle", text: "Une installation sans surveillance exige le SHA256 publié de la release pour vérification ; une installation manuelle vérifie aussi dès qu'une somme de contrôle est publiée" },
           { label: "Docker", text: "Les conteneurs ne peuvent pas se mettre à jour eux-mêmes, la vérification et la notification fonctionnent toujours ; récupérez la nouvelle image pour mettre à jour" },
+          { label: 'HA mode', text: 'In HA mode on DEB/RPM, Install Update and the auto-install update the nodes one at a time; the next node starts once the previous one is back on the new version. The screen shows the nodes done, the node in progress and the node where it stopped with the reason; Resume continues from it. Docker and Kubernetes leave it to the orchestrator' },
           { label: 'Popup post-mise à jour', text: 'Optionnel (v2.217) : affiche une fois les notes de version après l\'installation d\'une mise à jour, par utilisateur. Désactivé par défaut' },
         ]
       },
@@ -368,6 +369,7 @@ Gérez le certificat TLS utilisé par l'interface web UCM :
 - Voir le journal des modifications pour les mises à jour disponibles
 - Version actuelle et informations de build
 - **Mise à jour automatique** : sur les installations prises en charge (DEB/RPM), cliquez sur **Installer la mise à jour** pour télécharger et installer automatiquement la dernière version
+- **HA mode**: on DEB/RPM, **Install Update** and the auto-install update the nodes one at a time, and the screen follows the rolling update (nodes done, node in progress, node where it stopped and why, **Resume**)
 - **Canal de mise à jour** : stable, pré-version (versions candidates) ou dev
 
 ## Webhooks

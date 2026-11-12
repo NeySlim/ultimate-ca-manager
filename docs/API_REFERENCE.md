@@ -2569,8 +2569,16 @@ POST /api/v2/system/alerts/expiry/check
 # Check for updates
 GET /api/v2/system/updates/check
 
-# Install update
+# Install update (HA mode: starts a rolling update of every node, 409 when one runs
+# or the release publishes no SHA-256; Docker/Kubernetes: 400, the orchestrator updates)
 POST /api/v2/system/updates/install
+
+# HA rolling update state: {ha, campaign: {status (running|stopped|done), target, order,
+# done, skipped, current: {node, since, state}, failed: {node, reason, at}} or null}
+GET /api/v2/system/updates/campaign
+
+# Resume a stopped rolling update from the node where it stopped (HA only; 409 otherwise)
+POST /api/v2/system/updates/campaign/resume
 
 # Get current version
 GET /api/v2/system/updates/version
