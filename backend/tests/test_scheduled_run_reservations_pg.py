@@ -292,6 +292,25 @@ def test_a_first_run_killed_is_retried_after_the_lease(app, monkeypatch, tmp_pat
         _drop_backup(app)
 
 
+def test_the_schedule_reports_a_reservation_in_flight(app, monkeypatch, tmp_path, auth_client):
+    exported, clock = _killed(app, monkeypatch, tmp_path)
+    try:
+        def in_progress():
+            r = auth_client.get('/api/v2/settings/backup/schedule')
+            assert r.status_code == 200, r.data
+            return json.loads(r.data)['data']['in_progress']
+
+        clock['now'] = _NOW + timedelta(minutes=10)
+        assert in_progress() is True
+        clock['now'] = _NOW + _PAST_LEASE
+        assert in_progress() is False
+        with app.app_context():
+            assert schedule.run_scheduled_backup()['status'] == 'ok'
+        assert in_progress() is False and len(exported) == 1
+    finally:
+        _drop_backup(app)
+
+
 def test_an_outcome_lost_once_brings_no_second_archive(app, monkeypatch, tmp_path):
     exported = _backup_schedule(app, monkeypatch, tmp_path, last_run='2026-01-01T00:00:00Z')
     clock = {'now': _NOW}

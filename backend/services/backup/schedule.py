@@ -7,7 +7,9 @@ The source of truth is the General-settings keys the UI actually writes:
 ``auto_backup_enabled``, ``backup_frequency`` (daily/weekly/monthly),
 ``backup_retention_days``, ``backup_password`` and ``backup_kdf``. There is
 no time-of-day in the UI, so cadence is driven by a stored ``backup.last_run``
-timestamp.
+timestamp. A run reserves its slot by moving ``backup.last_run`` and concludes it
+by copying that value to ``backup.concluded_run`` once its archive is written; the
+schedule reports ``in_progress`` while a reservation is not concluded within its lease.
 """
 import base64
 import glob
@@ -90,6 +92,7 @@ def get_schedule() -> dict:
         retention = 30
 
     newest, age = _newest_validated_archive()
+    last_run = _get(_LAST_RUN_KEY)
     return {
         'enabled': _get('auto_backup_enabled', 'false') == 'true',
         'frequency': freq,
@@ -97,7 +100,9 @@ def get_schedule() -> dict:
         'retention_days': retention,
         'min_keep': _min_keep(),
         'max_total_mb': _max_total_bytes() // (1024 * 1024),
-        'last_run': _get(_LAST_RUN_KEY),
+        'last_run': last_run,
+        # last_run is then this run's reservation, the outcome still the previous run's
+        'in_progress': _in_flight(last_run, _get(_CONCLUDED_KEY), utc_now()),
         'last_outcome': _get(_LAST_OUTCOME_KEY),
         'last_outcome_reason': _get(_LAST_REASON_KEY),
         'last_outcome_at': _get(_LAST_OUTCOME_AT_KEY),
@@ -435,6 +440,20 @@ def _parse(value):
         return None
 
 
+def _unconcluded_for(last_run, concluded, now: datetime):
+    """Seconds since the reservation *last_run* was taken, or None when it is concluded.
+    No marker at all: last_run predates it (upgraded install) and counts as concluded."""
+    prev = _parse(last_run) if last_run else None
+    if prev is None or concluded is None or concluded == last_run:
+        return None
+    return (_naive_utc(now) - prev).total_seconds()
+
+
+def _in_flight(last_run, concluded, now: datetime) -> bool:
+    elapsed = _unconcluded_for(last_run, concluded, now)
+    return elapsed is not None and elapsed < _CLAIM_LEASE_SECONDS
+
+
 def _is_due(sched: dict, now: datetime) -> bool:
     period = _PERIOD_SECONDS.get(sched.get('frequency', 'daily'), 86400)
     last_run = sched.get('last_run')
@@ -444,9 +463,9 @@ def _is_due(sched: dict, now: datetime) -> bool:
     if prev is None:
         return True
     elapsed = (_naive_utc(now) - prev).total_seconds()
-    concluded = sched.get('concluded_run')
-    # No marker at all: last_run predates it (upgraded install) and counts as concluded
-    if concluded is not None and concluded != last_run and elapsed >= _CLAIM_LEASE_SECONDS:
+    # An upgraded install has no marker yet: its last run counts as concluded
+    unconcluded = _unconcluded_for(last_run, sched.get('concluded_run'), now)
+    if unconcluded is not None and unconcluded >= _CLAIM_LEASE_SECONDS:
         return True  # claimed, never concluded, lease expired
     # small slack so a ~daily timer doesn't drift a day each run
     return elapsed >= period - 300

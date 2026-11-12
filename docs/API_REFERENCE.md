@@ -2259,6 +2259,9 @@ DELETE /api/v2/settings/webhooks/{webhook_id}
 GET /api/v2/settings/backup
 
 # Get backup schedule
+# last_run: the latest reservation; last_outcome / last_outcome_at: the latest run that reported
+# in_progress: true while a run reserved last_run and has not written its archive (two-hour lease);
+#   last_run is then that run's, the outcome still the previous run's
 GET /api/v2/settings/backup/schedule
 
 # Update backup schedule
