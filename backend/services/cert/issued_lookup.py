@@ -265,9 +265,10 @@ def apply_persisted_revocation(row: Certificate, record=None) -> bool:
     return True
 
 
-def apply_persisted_revocations() -> list:
+def apply_persisted_revocations(ids=None) -> list:
     """Mark revoked every linked, unrevoked row holding a serial its CA recorded as revoked
-    (rows stored by an earlier release). No commit; returns ``(row, record)`` per row marked."""
+    (rows stored by an earlier release), only the rows of ``ids`` when given (what a restore
+    wrote). No commit; returns ``(row, record)`` per row marked."""
     from sqlalchemy import or_
     # Read afresh: a revocation or hold another worker made since this session loaded it counts
     db.session.flush()
@@ -281,6 +282,8 @@ def apply_persisted_revocations() -> list:
                 Certificate.serial_number.in_(columns[start:start + 500]),
                 Certificate.caref.isnot(None), Certificate.crt.isnot(None),
                 or_(Certificate.revoked.is_(False), Certificate.revoked.is_(None))).all():
+            if ids is not None and row.id not in ids:
+                continue
             record = row_persisted_revocation(row)
             if record is not None and apply_persisted_revocation(row, record):
                 marked.append((row, record))
