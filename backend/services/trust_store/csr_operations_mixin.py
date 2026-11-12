@@ -3,6 +3,7 @@ CSR operations mixin for TrustStoreService
 """
 import ipaddress
 import math
+import re
 import logging
 from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
@@ -92,6 +93,17 @@ def _ad_security_extension(sid_string):
     ``_certificate_template_extension`` above. Byte-for-byte verified
     against a real ADCS-issued certificate's own extension for the same
     SID (see test_ad_security_extension.py)."""
+    spec = _security_ext_spec()
+    entry = spec._child_spec({
+        'type': _NTDS_OBJECT_SID_OID,
+        'value': sid_string.encode('ascii'),
+    })
+    der = spec([entry]).dump()
+    return x509.UnrecognizedExtension(_SID_SECURITY_EXT_OID, der)
+
+
+def _security_ext_spec():
+    """asn1crypto spec of the SID security extension: SEQUENCE OF [0] {OID, [0] EXPLICIT OCTET STRING}."""
     from asn1crypto import core as asn1_core
 
     class _SidValue(asn1_core.OctetString):
@@ -108,12 +120,23 @@ def _ad_security_extension(sid_string):
     class _SecurityExt(asn1_core.SequenceOf):
         _child_spec = _SecurityExtEntry
 
-    entry = _SecurityExtEntry({
-        'type': _NTDS_OBJECT_SID_OID,
-        'value': sid_string.encode('ascii'),
-    })
-    der = _SecurityExt([entry]).dump()
-    return x509.UnrecognizedExtension(_SID_SECURITY_EXT_OID, der)
+    return _SecurityExt
+
+
+_SID_STRING = re.compile(r'S-1-[0-9]{1,15}(-[0-9]{1,10}){1,15}')
+
+
+def ad_security_extension_sid(cert):
+    """The SID ``cert``'s SID security extension carries, or None when it is absent or not
+    exactly what ``_ad_security_extension`` writes for one SID: a renewal re-encodes it byte for byte."""
+    try:
+        raw = cert.extensions.get_extension_for_oid(_SID_SECURITY_EXT_OID).value.value
+        sid = _security_ext_spec().load(raw)[0]['value'].native.decode('ascii')
+    except Exception:
+        return None
+    if not _SID_STRING.fullmatch(sid) or _ad_security_extension(sid).value != raw:
+        return None
+    return sid
 
 
 # CA-only constraints a leaf never carries; the allow-list below is what

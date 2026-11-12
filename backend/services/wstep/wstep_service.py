@@ -1310,6 +1310,28 @@ def _renewable_certificate(ca, cert):
     return db_cert, None
 
 
+def _renewal_requester_sid(renewed_cert):
+    """(sid or None, error): the SID extension a renewal carries is the renewed certificate's,
+    never the CSR's. An enabled connector must still find that account, as ``issue()`` refuses
+    an unresolved requester; with the connector off the SID is carried over as is."""
+    from services.ad_connector import lookup
+    from services.trust_store.csr_operations_mixin import ad_security_extension_sid
+
+    sid = ad_security_extension_sid(renewed_cert)
+    if sid is None:
+        return None, None
+    account = lookup.lookup_account_by_sid(sid)
+    if account is None:
+        return sid, None
+    if account is lookup.UNREACHABLE:
+        logger.warning("WSTEP: the AD Connector cannot resolve SID %s of a renewed certificate", sid)
+        return None, ServerError('Could not resolve requester identity for strong certificate mapping')
+    if not account:
+        logger.warning("WSTEP: SID %s of a renewed certificate names no directory account", sid)
+        return None, 'The requester was not found in the directory'
+    return sid, None
+
+
 def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop):
     """Issue the renewal once the caller has authenticated ``signing_cert``."""
     err = _validate_csr(csr, require_pop=require_pop)
@@ -1328,6 +1350,10 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
     if matched_template is not None:
         template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(signing_cert))
 
+    requester_sid, err = _renewal_requester_sid(signing_cert)
+    if err:
+        return None, err
+
     cert_type, template_ku = _template_profile(matched_template, csr)
     try:
         cert_pem, _serial = CAService.sign_csr_from_crypto(
@@ -1335,6 +1361,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
             source=source, renewal_of=signing_cert, require_pop=require_pop,
             supersedes=db_cert,
             ms_certificate_template_oid=template_oid,
+            requester_sid=requester_sid,
             # See issue()'s matching kwarg for why.
             extra_ekus=extra_ekus,
             template_ekus=issued_ekus,

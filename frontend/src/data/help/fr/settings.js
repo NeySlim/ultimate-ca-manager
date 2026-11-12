@@ -505,7 +505,7 @@ Windows peut aussi renouveler avec \`certreq ... Renew\`, authentifié par le ce
 
 ### Extension de sécurité SID (KB5014754)
 
-Lors d'une **émission authentifiée par Kerberos**, UCM intègre le SID AD du demandeur dans l'extension de sécurité SID de Microsoft (\`szOID_NTDS_CA_SECURITY_EXT\`) du certificat émis. Les contrôleurs de domaine l'utilisent pour le **mappage fort de certificats** (KB5014754) : requis depuis l'application par AD du mappage fort pour l'authentification par certificat (connexion par carte à puce, PKINIT).
+Lors d'une **émission authentifiée par Kerberos**, UCM intègre le SID AD du demandeur dans l'extension de sécurité SID de Microsoft (\`szOID_NTDS_CA_SECURITY_EXT\`) du certificat émis. Les contrôleurs de domaine l'utilisent pour le **mappage fort de certificats** (KB5014754) : requis depuis l'application par AD du mappage fort pour l'authentification par certificat (connexion par carte à puce, PKINIT). A WSTEP renewal carries over the SID extension of the certificate it renews, never one from the CSR; with the AD Connector enabled, that SID must still name a directory account.
 
 ### Sujets dérivés d'AD
 
