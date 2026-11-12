@@ -816,7 +816,7 @@ UCM has no default password. When the database holds no user, the start creates 
 
 | Source | Set by | Forced change | File written |
 |--------|--------|---------------|--------------|
-| `INITIAL_ADMIN_PASSWORD_FILE` | path of a file holding the password (Docker, Compose or Kubernetes secret); one trailing line ending is dropped | no | no |
+| `INITIAL_ADMIN_PASSWORD_FILE` | path of a file holding the password (Docker, Compose or Kubernetes secret); the line endings (CR, LF) at its end are dropped, any other character is kept | no | no |
 | `INITIAL_ADMIN_PASSWORD` | the value itself | no | no |
 | either one, with `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE=1` | a deployment tool that drew the value (the Helm chart, for the one it generates) | yes, at first login | no |
 | generated | neither is set | yes, at first login | `DATA_DIR/initial-admin-password` |

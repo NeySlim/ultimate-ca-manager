@@ -290,6 +290,8 @@ def test_a_password_file_loses_its_line_ending_only(tmp_path):
     secret.write_text(' spaced value \r\n')
     got = initial_admin.resolve({'INITIAL_ADMIN_PASSWORD_FILE': str(secret)})
     assert got.value == ' spaced value ' and not got.generated
+    secret.write_text('value\n\r\n')
+    assert initial_admin.resolve({'INITIAL_ADMIN_PASSWORD_FILE': str(secret)}).value == 'value'
     assert 'spaced' not in repr(got)
 
 
