@@ -27,7 +27,7 @@ def _count_statements(app, client):
         finally:
             event.remove(db.engine, 'before_cursor_execute', hook)
     assert response.status_code == 200, response.data
-    return len(seen), response.get_json()['data']
+    return seen, response.get_json()['data']
 
 
 def _populate(app, root_id, n):
@@ -84,7 +84,13 @@ def test_statement_count_does_not_grow_with_the_number_of_cas(app, auth_client, 
             _drop(app, big_ids, big_certs)
     finally:
         _drop_root(app, root['id'])
-    assert big == small, f'{small} statements for 10 CAs, {big} for 40'
+    # On a mismatch, name the statements one run issued and the other did not
+    from collections import Counter
+    extra = Counter(big) - Counter(small)
+    fewer = Counter(small) - Counter(big)
+    assert len(big) == len(small), (
+        f'{len(small)} statements for 10 CAs, {len(big)} for 40; '
+        f'only in the larger run: {sorted(extra.items())[:6]}; only in the smaller: {sorted(fewer.items())[:6]}')
 
 
 def test_the_listing_answers_what_one_by_one_computation_gave(app, auth_client, create_ca):
