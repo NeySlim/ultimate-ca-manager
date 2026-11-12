@@ -170,3 +170,12 @@ def test_helm_a_password_variable_in_extra_env_is_the_only_source(name):
     assert [item['name'] for item in named] == [name]
     assert named[0]['valueFrom']['secretKeyRef']['name'] == 'my-admin'
     assert 'INITIAL_ADMIN_PASSWORD_FORCE_CHANGE' not in [item['name'] for item in env]
+
+
+@pytest.mark.skipif(shutil.which('helm') is None, reason='helm not installed')
+@pytest.mark.parametrize('name', ['INITIAL_ADMIN_PASSWORD', 'INITIAL_ADMIN_PASSWORD_FILE'])
+def test_helm_draws_no_password_when_extra_env_provides_it(name):
+    """A random value nothing reads would sit in the Secret and look like the password."""
+    docs = _render('--set', f'extraEnv[0].name={name}', '--set', 'extraEnv[0].value=x')
+    secret = next(d for d in docs if d['kind'] == 'Secret' and 'UCM_SECRET_KEY' in d['stringData'])
+    assert 'UCM_INITIAL_ADMIN_PASSWORD' not in secret['stringData']
