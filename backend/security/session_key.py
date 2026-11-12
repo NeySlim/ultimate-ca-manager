@@ -213,7 +213,8 @@ def _emit_reload():
 
 def rotate(app, new_secret=None):
     """New active key in the database, the current one kept as previous for GRACE_SECONDS;
-    every node reloads through the cluster command. Returns the grace's end. Committed."""
+    every node reloads through the cluster command. Returns (end of the grace, the cluster
+    command emitted). Committed."""
     from datetime import timedelta
     from models import db
     from security import encryption as _encryption
