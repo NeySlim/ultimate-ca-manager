@@ -90,10 +90,6 @@ def revoke_certificate(cert_id):
 
     if not revocable(cert, reason):
         return error_response('Certificate already revoked', 400)
-    from services.cert.mixins.lifecycle import recorded_revocation_refusal
-    refusal = recorded_revocation_refusal(cert)
-    if refusal:
-        return error_response(refusal, 409)
 
     # The other member of a related pair falls with it unless the request says otherwise
     try:

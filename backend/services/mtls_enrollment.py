@@ -490,12 +490,13 @@ def removal_check(auth_cert, actor=None):
     """
     from utils.datetime_utils import utc_now
 
+    from services.cert.issued_lookup import row_revoked
     certificate = certificate_row_for(auth_cert)
     certificate_id = certificate.id if certificate else None
     needs_revoking = bool(
         certificate is not None
         and certificate.crt
-        and not certificate.revoked
+        and not row_revoked(certificate)  # by its row or by its CA's record of its serial
         and (not certificate.valid_to or certificate.valid_to >= utc_now())
     )
     if needs_revoking and _revocation_held(actor):

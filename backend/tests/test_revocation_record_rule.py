@@ -509,41 +509,153 @@ class TestAHeldRowUnderAFinalRecordAnswersTheGraverReason:
 
 
 class TestARecordedFinalRevocationIsNotRevokedAgain:
+    """A row its CA's record revokes for good is already revoked: each caller takes its own
+    "already revoked" path, and the check commits nothing (the hourly pass marks the row)."""
 
-    def test_a_hold_over_a_recorded_compromise_is_refused(self, app, auth_client, issuer):
-        ca_id, refid, ca_cert, ca_key = issuer
-        real, key = _leaf('hold-over-compromise.example.test', ca_cert, ca_key)
+    def _covered(self, app, issuer, cn, *, caref=None, held=False):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf(cn, ca_cert, ca_key)
         row_id = _store(app, real, refid, key=key)
-        record_id = _record(app, refid, real, certificate_id=row_id)
-        r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'certificateHold'})
-        assert r.status_code == 409, r.data
-        assert _row(app, row_id) == (True, 'keyCompromise', EARLY)
+        if held:
+            _held(app, row_id, at=LATER)
+        record_id = _record(app, caref or refid, real)
+        return real, key, row_id, record_id
+
+    def _record_kept(self, app, record_id):
         with app.app_context():
             record = db.session.get(RevokedSerial, record_id)
-            assert (record.revoke_reason, record.revoked_at) == ('keyCompromise', EARLY)
+            return record.revoke_reason, record.revoked_at
+
+    @pytest.mark.parametrize('reason', ['certificateHold', 'superseded'])
+    def test_the_unit_route_answers_already_revoked(self, app, auth_client, issuer, reason):
+        ca_id, _, _, _ = issuer
+        real, _, row_id, record_id = self._covered(app, issuer, f'unit-{reason.lower()}.example.test')
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': reason})
+        assert r.status_code == 400 and b'already revoked' in r.data, r.data
+        assert _row(app, row_id) == (False, None, None)
+        assert self._record_kept(app, record_id) == ('keyCompromise', EARLY)
         assert auth_client.post(f'/api/v2/certificates/{row_id}/unhold').status_code != 200
         assert _surfaces(app, ca_id, real) == KEY_COMPROMISED
 
-    def test_a_held_row_over_a_twins_compromise_is_refused_and_takes_it(self, app, auth_client, issuer, twin):
-        _, refid, ca_cert, ca_key = issuer
-        real, key = _leaf('held-over-twin.example.test', ca_cert, ca_key)
-        row_id = _store(app, real, refid, key=key)
-        _held(app, row_id, at=LATER)
-        _record(app, twin[1], real)
+    def test_a_held_row_over_a_twins_compromise_is_already_revoked(self, app, auth_client, issuer, twin):
+        real, _, row_id, _ = self._covered(app, issuer, 'held-over-twin.example.test', caref=twin[1], held=True)
         r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'superseded'})
-        assert r.status_code == 409, r.data
-        assert _row(app, row_id) == (True, 'keyCompromise', EARLY)
+        assert r.status_code == 400 and b'already revoked' in r.data, r.data
+        assert _row(app, row_id) == (True, 'certificateHold', LATER)
 
     def test_the_service_refuses_it_too(self, app, issuer):
         from services.cert_service import CertificateService
-        _, refid, ca_cert, ca_key = issuer
-        real, key = _leaf('service-over-compromise.example.test', ca_cert, ca_key)
-        row_id = _store(app, real, refid, key=key)
-        _record(app, refid, real)
+        _, _, row_id, record_id = self._covered(app, issuer, 'service-over-compromise.example.test')
         with app.app_context():
-            with pytest.raises(ValueError):
+            with pytest.raises(ValueError, match='already revoked'):
                 CertificateService.revoke_certificate(row_id, reason='certificateHold')
-        assert _row(app, row_id) == (True, 'keyCompromise', EARLY)
+        assert _row(app, row_id) == (False, None, None)
+        assert self._record_kept(app, record_id) == ('keyCompromise', EARLY)
+
+    def test_the_bulk_route_counts_it_already_revoked(self, app, auth_client, issuer):
+        _, _, row_id, record_id = self._covered(app, issuer, 'bulk-over-compromise.example.test')
+        r = auth_client.post('/api/v2/certificates/bulk/revoke', json={'ids': [row_id], 'reason': 'superseded'})
+        assert r.status_code == 200, r.data
+        assert r.get_json()['data']['failed'] == [{'id': row_id, 'error': 'Already revoked'}]
+        assert self._record_kept(app, record_id) == ('keyCompromise', EARLY)
+
+    def test_acme_revoke_cert_answers_already_revoked(self, app, client, issuer):
+        from tests.test_acme_revocation_parallel_paths import _es256_revocation
+        real, key, row_id, record_id = self._covered(app, issuer, 'acme-over-compromise.example.test')
+        r = _es256_revocation(client, key, real.public_bytes(serialization.Encoding.PEM), 4)
+        assert r.status_code == 400, r.data[:300]
+        assert r.get_json()['type'] == 'urn:ietf:params:acme:error:alreadyRevoked'
+        assert self._record_kept(app, record_id) == ('keyCompromise', EARLY)
+
+    def test_an_approved_revocation_is_closed_on_it(self, app, auth_client, issuer):
+        import json
+        from models.policy import ApprovalRequest
+        real, _, row_id, record_id = self._covered(app, issuer, 'approval-over-compromise.example.test')
+        with app.app_context():
+            approval = ApprovalRequest(
+                request_type='revocation', status='pending', required_approvals=1,
+                request_data=json.dumps({'certificate_id': row_id, 'serial_number': str(real.serial_number),
+                                         'reason': 'superseded', 'cn': 'approval-over-compromise'}))
+            db.session.add(approval)
+            db.session.commit()
+            approval_id = approval.id
+        try:
+            r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={})
+            assert r.status_code == 200, r.data
+            with app.app_context():
+                approval = db.session.get(ApprovalRequest, approval_id)
+                assert (approval.status, approval.certificate_id) == ('approved', row_id)
+            assert r.get_json()['data']['certificate']['already_revoked'] is True, r.data
+            assert _row(app, row_id) == (False, None, None)
+            assert self._record_kept(app, record_id) == ('keyCompromise', EARLY)
+        finally:
+            with app.app_context():
+                ApprovalRequest.query.filter_by(id=approval_id).delete()
+                db.session.commit()
+
+    def test_an_acme_replacement_sends_the_recorded_reason(self, app, issuer, monkeypatch):
+        from unittest import mock
+        from services import acme_renewal_service
+        from services.cert_service import CertificateService
+        from tests.test_related_certificates_pair import _restore_config, _set_config
+        _, _, row_id, record_id = self._covered(app, issuer, 'replaced-over-compromise.example.test')
+        local = mock.Mock()
+        monkeypatch.setattr(CertificateService, 'revoke_certificate', local)
+        client = mock.Mock()
+        client.revoke_certificate.return_value = mock.Mock(status_code=200)
+        previous = _set_config(app, 'acme.revoke_on_renewal', 'true')
+        try:
+            with app.app_context():
+                replaced = acme_renewal_service._replaced_snapshot(db.session.get(Certificate, row_id))
+                acme_renewal_service._revoke_replaced_certificate(client, replaced, in_place=False)
+        finally:
+            _restore_config(app, 'acme.revoke_on_renewal', previous)
+        local.assert_not_called()
+        assert client.revoke_certificate.call_args.kwargs == {'reason': 1}
+        assert self._record_kept(app, record_id) == ('keyCompromise', EARLY)
+
+    @pytest.mark.parametrize('caller', ['finalize', 'settings sweep'])
+    def test_auto_supersede_leaves_it(self, app, issuer, monkeypatch, caller):
+        import json
+        from unittest import mock
+        from models.acme_models import AcmeAccount, AcmeOrder
+        from services.acme.acme_service import AcmeService
+        from services.cert_service import CertificateService
+        from api.v2.acme.settings import _revoke_superseded_certificates
+        from tests.test_related_certificates_pair import _restore_config, _set_config
+        cn = f"supersede-over-compromise-{caller.replace(' ', '-')}.example.test"
+        _, refid, ca_cert, ca_key = issuer
+        _, _, old_id, record_id = self._covered(app, issuer, cn)
+        newer, newer_key = _leaf(cn, ca_cert, ca_key)
+        new_id = _store(app, newer, refid, key=newer_key)
+        local = mock.Mock()
+        monkeypatch.setattr(CertificateService, 'revoke_certificate', local)
+        previous = _set_config(app, 'acme.revoke_on_renewal', 'true')
+        try:
+            with app.app_context():
+                account = AcmeAccount(jwk='{}', jwk_thumbprint=cn)
+                db.session.add(account)
+                db.session.flush()
+                idents = json.dumps([{'type': 'dns', 'value': cn}])
+                old = AcmeOrder(account_id=account.account_id, status='valid', identifiers=idents,
+                                certificate_id=old_id, created_at=EARLY)
+                new = AcmeOrder(account_id=account.account_id, status='valid', identifiers=idents,
+                                certificate_id=new_id, created_at=LATER)
+                db.session.add_all([old, new])
+                db.session.commit()
+                if caller == 'finalize':
+                    AcmeService(base_url='http://localhost')._auto_supersede(new, new_id)
+                else:
+                    _revoke_superseded_certificates()
+            assert old_id not in [c.kwargs.get('cert_id') for c in local.call_args_list]
+            assert self._record_kept(app, record_id) == ('keyCompromise', EARLY)
+        finally:
+            _restore_config(app, 'acme.revoke_on_renewal', previous)
+            with app.app_context():
+                AcmeOrder.query.filter(AcmeOrder.certificate_id.in_([old_id, new_id])).delete(
+                    synchronize_session=False)
+                AcmeAccount.query.filter_by(jwk_thumbprint=cn).delete()
+                db.session.commit()
 
 
 class TestAWriterNeverReplacesAGraverReason:
@@ -569,7 +681,7 @@ class TestAWriterNeverReplacesAGraverReason:
         real, key = _leaf('writer-keeps.example.test', ca_cert, ca_key)
         row_id = _store(app, real, refid, key=key)
         record_id = _record(app, refid, real)
-        monkeypatch.setattr(lifecycle, 'final_recorded_revocation', lambda row: None)
+        monkeypatch.setattr(lifecycle, 'revocable', lambda row, reason: True)
         with app.app_context():
             CertificateService.revoke_certificate(row_id, reason='certificateHold')
             record = db.session.get(RevokedSerial, record_id)

@@ -531,3 +531,51 @@ class TestARevocationFailingAfterARowChange:
         logged = [(r.levelno, r.getMessage()) for r in caplog.records if r.name == 'services.mtls_enrollment']
         assert not [m for _, m in logged if 'refused' in m], logged
         assert [level for level, m in logged if 'a step after the commit failed' in m] == [logging.WARNING]
+
+
+class TestACertificateItsCaRecordedAsRevoked:
+    """Revoked for good by its CA's record, the row unmarked: already revoked, so the
+    withdrawal goes on and never names it as left valid."""
+
+    @staticmethod
+    def _recorded(app, probe):
+        from datetime import datetime
+        with app.app_context():
+            refid = db.session.get(CA, probe['ca_id']).refid
+            db.session.add(RevokedSerial(caref=refid, serial_number=str(probe['serial']),
+                                         revoked_at=datetime(2026, 1, 2), revoke_reason='keyCompromise',
+                                         valid_to=datetime(2099, 1, 1)))
+            db.session.commit()
+            return refid
+
+    @staticmethod
+    def _drop_record(app, refid, probe):
+        with app.app_context():
+            RevokedSerial.query.filter_by(caref=refid, serial_number=str(probe['serial'])).delete()
+            db.session.commit()
+
+    def test_removing_the_enrolment(self, app, auth_client, probe):
+        refid = self._recorded(app, probe)
+        try:
+            answer = auth_client.delete(
+                f"/api/v2/users/{probe['user_id']}/mtls/certificates/{probe['enrolment_id']}")
+            assert answer.status_code in (200, 204), answer.data[:300]
+            with app.app_context():
+                assert db.session.get(AuthCertificate, probe['enrolment_id']) is None
+                record = RevokedSerial.query.filter_by(caref=refid, serial_number=str(probe['serial'])).one()
+                assert record.revoke_reason == 'keyCompromise'
+        finally:
+            self._drop_record(app, refid, probe)
+
+    def test_deleting_the_user(self, app, auth_client, probe):
+        refid = self._recorded(app, probe)
+        try:
+            answer = auth_client.delete(f"/api/v2/users/{probe['user_id']}")
+            assert answer.status_code == 200, answer.data[:300]
+            body = json.loads(answer.data)
+            assert 'could not be revoked' not in (body.get('message') or '')
+            assert not (body.get('data') or {}).get('unrevoked_certificates')
+            with app.app_context():
+                assert db.session.get(User, probe['user_id']) is None
+        finally:
+            self._drop_record(app, refid, probe)

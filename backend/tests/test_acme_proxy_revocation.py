@@ -349,3 +349,46 @@ def test_proxy_revoke_leaves_the_related_member_alone(
                 synchronize_session=False)
             db.session.query(Certificate).filter_by(id=partner_id).delete()
             db.session.commit()
+
+
+def test_proxy_revoke_leaves_a_certificate_its_ca_recorded_as_revoked(
+    app, client, create_ca, proxy_revocation_rows, monkeypatch,
+):
+    """Revoked for good by its CA's record: already revoked, no local revocation is tried."""
+    from api.acme import acme_proxy_api
+    from models import CA, RevokedSerial
+
+    ca = create_ca(cn=f'Proxy record CA {uuid4().hex[:6]}')
+    with app.app_context():
+        refid = db.session.get(CA, ca['id']).refid
+        row = db.session.get(Certificate, proxy_revocation_rows['certificate_id'])
+        row.caref = refid
+        db.session.add(RevokedSerial(caref=refid, serial_number=str(0xCAFE1234), revoke_reason='keyCompromise',
+                                     revoked_at=datetime(2026, 1, 2), valid_to=datetime(2099, 1, 1)))
+        db.session.commit()
+    payload = {'certificate': _b64url(proxy_revocation_rows['certificate_der']), 'reason': 4}
+    service = MagicMock()
+    service.account.id = proxy_revocation_rows['account_id']
+    service.revoke_certificate.return_value.status_code = 200
+    local_revoke = MagicMock()
+    monkeypatch.setattr(acme_proxy_api, 'verify_proxy_jws', lambda: (True, payload, None, None))
+    monkeypatch.setattr(
+        acme_proxy_api, '_request_protected_header',
+        lambda: {'kid': 'https://ucm.example/acme/proxy/acct/internal-acme-account'})
+    monkeypatch.setattr(acme_proxy_api, 'get_proxy_service', lambda slug=None: service)
+    monkeypatch.setattr('services.cert_service.CertificateService.revoke_certificate', local_revoke)
+    try:
+        response = client.post(
+            '/acme/proxy/revoke-cert',
+            data=json.dumps({'protected': 'stub', 'payload': 'stub', 'signature': 'stub'}),
+            content_type='application/jose+json')
+        assert response.status_code == 200
+        local_revoke.assert_not_called()
+    finally:
+        with app.app_context():
+            RevokedSerial.query.filter_by(caref=refid).delete()
+            row = db.session.get(Certificate, proxy_revocation_rows['certificate_id'])
+            row.caref = None
+            db.session.commit()
+            from services.ca_service import CAService
+            CAService.delete_ca(ca['id'])
