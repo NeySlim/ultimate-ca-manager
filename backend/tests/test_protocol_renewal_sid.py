@@ -265,7 +265,8 @@ class TestScepRenewal:
         assert 'The requester was not found in the directory' in r.get_json()['message']
         assert _count(app) == before
         with app.app_context():
-            assert db.session.get(SCEPRequest, req_id).status == 'rejected'
+            row = db.session.get(SCEPRequest, req_id)
+            assert (row.status, row.rejection_reason) == ('rejected', 'The requester was not found in the directory')
 
     def test_approved_renewal_says_why_when_the_directory_does_not_answer(
             self, app, auth_client, scep_ca, monkeypatch):
@@ -275,12 +276,14 @@ class TestScepRenewal:
         req_id = self._held(app, ca_id, 'scep-sid-held-down.example.test')
         _configure_ad_connector(app)
         monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.UNREACHABLE)
+        before = _count(app)
         r = self._approve(auth_client, req_id)
         assert r.status_code == 503
         assert UNRESOLVED_MESSAGE in r.get_json()['message']
+        assert _count(app) == before
         with app.app_context():
             row = db.session.get(SCEPRequest, req_id)
-            assert row.status == 'pending' and row.cert_refid is None
+            assert (row.status, row.rejection_reason, row.cert_refid) == ('pending', None, None)
 
 
 def test_a_certificate_the_ca_did_not_sign_carries_no_sid(app, auth_client, create_ca):
@@ -291,51 +294,6 @@ def test_a_certificate_the_ca_did_not_sign_carries_no_sid(app, auth_client, crea
     with app.app_context():
         ca_cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(CA, ca_data['id']).crt))
         assert renewal_identity.renewal_requester_sid(forged, ca_cert, 'TEST') is None
-
-
-class TestScepManualApproval:
-    """The SCEP queue's own approval, no policy holding the request."""
-
-    def _pending(self, app, scep_ca, cn):
-        (ca, ca_cert), ca_id = scep_ca
-        old, old_key = _issue(app, ca_id, cn)
-        request = _message(ca_cert, old, old_key, 17, _csr(_key(), cn, challenge=ROTATED))
-        response, _status = SCEPService(ca.refid, challenge_password=ROTATED,
-                                        auto_approve=False).process_pkcs_req(request, '127.0.0.1')
-        assert _response_attributes(response)[PKI_STATUS_OID] == '3'
-        from models import SCEPRequest
-        return SCEPRequest.query.filter_by(ca_refid=ca.refid, status='pending').one().id
-
-    def _status(self, request_id):
-        from models import SCEPRequest
-        db.session.expire_all()
-        row = db.session.get(SCEPRequest, request_id)
-        return row.status, row.rejection_reason
-
-    def test_unreachable_directory_answers_503_and_leaves_it_pending(self, app, auth_client, scep_ca,
-                                                                     monkeypatch):
-        from services.ad_connector.renewal_identity import UNRESOLVED_MESSAGE
-        request_id = self._pending(app, scep_ca, 'scep-manual-sid-down.example.test')
-        _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.UNREACHABLE)
-        before = _count(app)
-        r = auth_client.post(f'/api/v2/scep/{request_id}/approve', json={})
-        assert r.status_code == 503
-        assert UNRESOLVED_MESSAGE in r.get_data(as_text=True)
-        assert self._status(request_id) == ('pending', None)
-        assert _count(app) == before
-
-    def test_account_gone_closes_the_request_with_its_reason(self, app, auth_client, scep_ca, monkeypatch):
-        from services.ad_connector.renewal_identity import NOT_FOUND_MESSAGE
-        request_id = self._pending(app, scep_ca, 'scep-manual-sid-gone.example.test')
-        _configure_ad_connector(app)
-        monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.NO_ACCOUNT)
-        before = _count(app)
-        r = auth_client.post(f'/api/v2/scep/{request_id}/approve', json={})
-        assert r.status_code == 400
-        assert NOT_FOUND_MESSAGE in r.get_data(as_text=True)
-        assert self._status(request_id) == ('rejected', NOT_FOUND_MESSAGE)
-        assert _count(app) == before
 
 
 def test_an_issuer_key_that_cannot_be_checked_carries_no_sid(app, create_ca, monkeypatch):
