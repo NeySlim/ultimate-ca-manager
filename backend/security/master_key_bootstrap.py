@@ -292,7 +292,8 @@ def _reads_with(kek: bytes) -> bool:
 def rewrap_under_new_kek() -> str:
     """Manual KEK change: the DEKs the previous KEK wrapped are wrapped by the configured one.
 
-    Nothing but encryption_keys is written; returns what was done.
+    Writes encryption_keys and the audit entry encryption_kek_changed, never a stored value;
+    returns what was done.
     """
     from models import db, EncryptionKey
     from security import envelope
