@@ -17,8 +17,9 @@ class RenewalAccountGone(RequestRejected):
     """The renewed certificate's SID names no directory account: refused for good."""
 
 
-class RenewalIdentityUnresolved(Exception):
-    """The directory could not answer: a server fault, the same request may pass later."""
+class RenewalIdentityUnresolved(ValueError):
+    """The directory could not answer: a server fault, the same request may pass later.
+    A ValueError so an approval shows the approver this message, the request left pending."""
 
 
 def renewal_requester_sid(renewed_cert, protocol):

@@ -212,3 +212,16 @@ class TestScepRenewal:
             assert r.get_json()['message'] == 'Request closed'
             (_id, status, _data, cert_id), = requests_of(app, pid, 'scep_request')
             assert status == 'rejected' and cert_id is None
+
+    def test_approved_renewal_says_why_when_the_directory_does_not_answer(
+            self, app, auth_client, scep_ca, monkeypatch):
+        from services.ad_connector.renewal_identity import UNRESOLVED_MESSAGE
+        _material, ca_id = scep_ca
+        with approval_policy(app, ca_id, 'scep-held-renew-sid-down', operations=['renewal']) as pid:
+            approval_id = self._held(app, ca_id, 'scep-sid-held-down.example.test', pid)
+            _configure_ad_connector(app)
+            monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: ad_lookup.UNREACHABLE)
+            r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+            assert UNRESOLVED_MESSAGE in r.get_data(as_text=True)
+            (_id, status, _data, cert_id), = requests_of(app, pid, 'scep_request')
+            assert status == 'pending' and cert_id is None

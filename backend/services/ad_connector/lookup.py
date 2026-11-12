@@ -430,15 +430,15 @@ def _search(conn, base_dn, search_filter, attributes):
     return UNREACHABLE
 
 
-def _single_entry(entries, sam_account_name):
+def _single_entry(entries, sam_account_name, what='named'):
     """The one entry of an account search, None when there is none, else ``UNREACHABLE``:
     a Global Catalog also answers for child domains, whose accounts may share the name."""
     if entries is UNREACHABLE or not entries:
         return entries if entries is UNREACHABLE else None
     if len(entries) > 1:
-        logger.warning("AD Connector: %d accounts named %r (%s); point the connector at a "
+        logger.warning("AD Connector: %d accounts %s %r (%s); point the connector at a "
                        "domain controller of the realm, not a global catalog", len(entries),
-                       sam_account_name, ', '.join(e.entry_dn for e in entries))
+                       what, sam_account_name, ', '.join(e.entry_dn for e in entries))
         return UNREACHABLE
     return entries[0]
 
@@ -602,7 +602,7 @@ def lookup_account_by_sid(sid):
     try:
         entries = _search(conn, config.base_dn, f'(objectSid={escape_bytes(raw)})',
                           ['sAMAccountName', 'objectSid'])
-        entry = _single_entry(entries, sid)
+        entry = _single_entry(entries, sid, 'with the SID')
         if entry is None:
             return NO_ACCOUNT
         if entry is UNREACHABLE:
