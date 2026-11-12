@@ -71,7 +71,7 @@ class _Base:
         return [tuple(r) for r in self.run(sql)]
 
     def profiles(self):
-        return [dict(zip(PROFILE_COLUMNS, row)) for row in self.rows(
+        return [dict(zip(PROFILE_COLUMNS, row, strict=True)) for row in self.rows(
             f"SELECT {', '.join(PROFILE_COLUMNS)} FROM {PROFILES} ORDER BY id")]
 
 
