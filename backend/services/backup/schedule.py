@@ -144,8 +144,8 @@ def _record_outcome(outcome: str, reason: str = None) -> None:
             db.session.rollback()
         except Exception:
             logger.warning("Could not roll back after a failed outcome record")
-        # The outcome is a report, not the work: losing it must not turn a
-        # successful backup into a failed one.
+        # The outcome is a report, not the work: the schedule follows the conclusion
+        # marker, so losing it neither fails a backup nor brings a second one.
         logger.warning("Could not record the outcome of the scheduled backup")
 
 

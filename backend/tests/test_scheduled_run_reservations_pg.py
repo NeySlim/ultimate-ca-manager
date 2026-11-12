@@ -292,6 +292,31 @@ def test_a_first_run_killed_is_retried_after_the_lease(app, monkeypatch, tmp_pat
         _drop_backup(app)
 
 
+def test_an_outcome_lost_once_brings_no_second_archive(app, monkeypatch, tmp_path):
+    exported = _backup_schedule(app, monkeypatch, tmp_path, last_run='2026-01-01T00:00:00Z')
+    clock = {'now': _NOW}
+    monkeypatch.setattr(schedule, 'utc_now', lambda: clock['now'])
+    record, failures = schedule._record_outcome, []
+
+    def record_with_a_failing_commit(*a, **k):
+        if failures:
+            return record(*a, **k)
+        failures.append(1)
+        with monkeypatch.context() as m:
+            m.setattr(db.session, 'commit', lambda: (_ for _ in ()).throw(RuntimeError('db')))
+            return record(*a, **k)
+
+    monkeypatch.setattr(schedule, '_record_outcome', record_with_a_failing_commit)
+    try:
+        with app.app_context():
+            assert schedule.run_scheduled_backup()['status'] == 'ok'
+            clock['now'] = _NOW + _PAST_LEASE
+            assert schedule.run_scheduled_backup() == {'status': 'skipped', 'reason': 'not_due'}
+        assert failures == [1] and len(exported) == 1
+    finally:
+        _drop_backup(app)
+
+
 @pytest.mark.postgres
 @pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
 def test_a_run_killed_during_the_export_is_retried_on_postgresql(app, monkeypatch, tmp_path):
