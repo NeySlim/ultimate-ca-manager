@@ -12,6 +12,7 @@ from utils.secret_target import SECRET_TARGET_MESSAGE, keeps_saved_secret, retar
 from models import db, SCEPRequest, SystemConfig, CA
 from services.audit_service import AuditService
 from services.policy_service import PolicyViolation
+from services.ad_connector.renewal_identity import RenewalAccountGone, RenewalIdentityUnresolved
 from datetime import datetime, timedelta, timezone
 import secrets
 import logging
@@ -193,6 +194,22 @@ def _vote_on_held(approval, vote):
     return vote()
 
 
+def _close_refused(scep_req, request_id, username, reason):
+    scep_req = db.session.get(SCEPRequest, request_id)
+    scep_req.status = 'rejected'
+    scep_req.rejection_reason = reason[:255]
+    scep_req.approved_by = username
+    scep_req.approved_at = datetime.now(timezone.utc)
+    ok, _err = safe_commit(logger, "Failed to close SCEP request")
+    if not ok:
+        return _err
+    AuditService.log_action(
+        action='scep_reject', resource_type='scep_request', resource_id=str(request_id),
+        resource_name=f'SCEP request {request_id}',
+        details=f'SCEP request {request_id} closed on approval: {reason}', success=False)
+    return error_response(reason, 400)
+
+
 @bp.route('/api/v2/scep/<int:request_id>/approve', methods=['POST'])
 @require_auth(['write:scep'])
 def approve_scep_request(request_id):
@@ -229,6 +246,14 @@ def approve_scep_request(request_id):
     except PolicyViolation as e:
         db.session.rollback()
         return error_response(f'Policy violation: {e}', 400)
+    except RenewalIdentityUnresolved as e:
+        # The directory did not answer: the same approval may pass later
+        db.session.rollback()
+        return error_response(str(e), 503)
+    except RenewalAccountGone as e:
+        # The renewed certificate's account is gone for good: closed, as from the approvals queue
+        db.session.rollback()
+        return _close_refused(scep_req, request_id, username, str(e))
     except ValueError as e:
         # The CA refused (offline, revoked, outside its signing window, name
         # constraints...): the approver needs the reason
