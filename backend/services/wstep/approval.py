@@ -2,7 +2,8 @@
 
 The client is answered with a pending RSTR carrying the approval request's
 id as ``wstep:RequestID``, which it sends back with QueryTokenStatus; the
-approval issues the certificate as the enrolment or renewal would have.
+approval issues the certificate as the enrolment or renewal would have, with the
+validity of the default profile, and only while it is enabled.
 """
 import base64
 import hashlib
@@ -47,11 +48,18 @@ def make_gate(ca, *, operation, identity=None, extra=None):
 
 
 def _issue(approval, data):
-    from api.wstep_protocol import _validity_days
+    """Issue an approved request with the validity of the default profile; refused at issuance
+    when the CA is gone or the profile no longer serves."""
+    from services.windows_profiles import serving_profile
     from services.wstep import wstep_service
     ca = db.session.get(CA, int(data['ca_id'])) if data.get('ca_id') is not None else None
     if ca is None:
         raise ProtocolRequestGone('The WSTEP CA no longer exists', refusal=protocol_approval.ISSUANCE_REFUSAL)
+    profile = serving_profile()
+    if profile is None:
+        raise ProtocolRequestGone('The Windows enrollment profile is disabled',
+                                  refusal=protocol_approval.ISSUANCE_REFUSAL)
+    validity_days = profile.validity_days
     csr = x509.load_pem_x509_csr(data['csr'].encode())
     require_pop = bool(data.get('require_pop', True))
     if data.get('operation') == 'renew':
@@ -60,11 +68,11 @@ def _issue(approval, data):
         if not err:
             # The proof of possession was checked when the request came in
             cert_pem, err = wstep_service._sign_renewal(
-                ca, signing_cert, db_cert, csr, _validity_days(), 'wstep', require_pop,
+                ca, signing_cert, db_cert, csr, validity_days, 'wstep', require_pop,
                 on_stored=protocol_approval.linker(approval))
     else:
         cert_pem, err = wstep_service.issue(
-            ca, csr.public_bytes(Encoding.DER), _validity_days(), require_pop=require_pop,
+            ca, csr.public_bytes(Encoding.DER), validity_days, require_pop=require_pop,
             kerberos_principal=data.get('kerberos_principal'),
             on_stored=protocol_approval.linker(approval))
     if err:
