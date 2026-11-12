@@ -35,6 +35,7 @@ def _encrypt_prv(raw_pem: str) -> str:
     return encrypt_private_key(base64.b64encode(raw_pem.encode()).decode())
 from .matcher import KeyMatcher
 from utils.foreign_algorithms import spki_der
+from utils.cert_issuer import signing_ca_for
 from .validator import ImportValidator, ValidationResult
 from utils.datetime_utils import utc_now
 from utils.key_type import unsignable_csr_key
@@ -536,16 +537,13 @@ class SmartImporter:
                     result.warnings.append(f"Skipped duplicate certificate: {self._get_cn(cert_obj.subject)}")
                     continue
             
-            # Find issuing CA: AKI→SKI first, then issuer DN fallback
+            # The issuing CA is the stored one whose key signed it, found by AKI then DN
             caref = None
-            if cert_obj.aki:
-                ca = find_ca_by_ski(cert_obj.aki)
-                if ca:
-                    caref = ca.refid
-            if not caref:
-                ca = CA.query.filter(CA.subject == cert_obj.issuer).first()
-                if ca:
-                    caref = ca.refid
+            try:
+                ca = signing_ca_for(x509.load_pem_x509_certificate(cert_obj.raw_pem.encode()))
+                caref = ca.refid if ca else None
+            except ValueError:
+                pass
             
             # The unique (caref, serial_number) index holds whatever skip_duplicates says
             if Certificate.stored_under(caref, cert_obj.serial_number):
@@ -611,6 +609,8 @@ class SmartImporter:
                 imported_from="smart_import",
                 created_by=username
             )
+            from services.cert.issued_lookup import apply_persisted_revocation
+            apply_persisted_revocation(cert)
             
             db.session.add(cert)
             db.session.flush()

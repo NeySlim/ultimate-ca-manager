@@ -245,20 +245,26 @@ class TestInPlace:
         assert recorded == sorted([first, middle]) and first != middle
 
     def test_an_existing_record_for_the_serial_is_updated_not_duplicated(self, app, ca, leaf):
+        """Non-regression, passes with and without the fix: on the record alone, as a renewal
+        never meets a record of its own serial (it is refused)."""
+        from services.cert.renewal import _record_superseded
         cid = leaf()
         before = _state(app, cid)
         with app.app_context():
             refid = db.session.get(CA, ca['id']).refid
             db.session.add(RevokedSerial(caref=refid, serial_number=before['serial'],
-                                         revoke_reason='unspecified', certificate_id=None,
+                                         revoke_reason='certificateHold', certificate_id=None,
                                          valid_to=datetime(2001, 1, 1)))
             db.session.commit()
-        _renew(app, cid)
-        with app.app_context():
+            _record_superseded(cid, db.session.get(CA, ca['id']), before['serial'], before['valid_to'],
+                               datetime(2026, 1, 1))
+            db.session.commit()
             records = RevokedSerial.query.filter_by(caref=refid, serial_number=before['serial']).all()
             assert len(records) == 1
             assert records[0].revoke_reason == 'superseded' and records[0].certificate_id == cid
             assert records[0].valid_to == before['valid_to']
+            db.session.delete(records[0])
+            db.session.commit()
 
     def test_columns_follow_the_new_certificate(self, app, ca, leaf):
         from utils.upn_san import build_upn_other_name

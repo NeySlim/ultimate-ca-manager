@@ -179,10 +179,13 @@ def _replaced_snapshot(certificate):
     """What revoking the replaced certificate needs, read before a renewal overwrites its row."""
     if certificate is None or not certificate.crt:
         return None
+    from services.cert.issued_lookup import effective_revocation
+    # Revoked by its row or by its CA's record of its serial, with the graver reason
+    holder = effective_revocation(certificate)
     return SimpleNamespace(id=certificate.id, pem=base64.b64decode(certificate.crt),
                            serial=certificate.serial_number, valid_to=certificate.valid_to,
-                           caref=certificate.caref, revoked=bool(certificate.revoked),
-                           revoke_reason=certificate.revoke_reason)
+                           caref=certificate.caref, revoked=holder is not None,
+                           revoke_reason=holder.revoke_reason if holder is not None else None)
 
 
 def _record_replaced_serial(replaced):
@@ -193,11 +196,15 @@ def _record_replaced_serial(replaced):
     now = utc_now()
     from utils.serial_format import canonical_serial
     row = RevokedSerial.query.filter_by(caref=ca.refid, serial_number=canonical_serial(replaced.serial)).first()
-    if row is None:
+    fresh = row is None
+    if fresh:
         row = RevokedSerial(caref=ca.refid, serial_number=replaced.serial)
         db.session.add(row)
-    row.revoked_at = now
-    row.revoke_reason = 'superseded'
+    from services.cert.issued_lookup import record_reason_replaceable
+    # A final revocation already recorded keeps its reason and date
+    if fresh or record_reason_replaceable(row, 'superseded'):
+        row.revoked_at = now
+        row.revoke_reason = 'superseded'
     row.valid_to = replaced.valid_to or now + timedelta(days=365)
     row.certificate_id = replaced.id
     # The row now holds the new key: the digest comes from the replaced certificate

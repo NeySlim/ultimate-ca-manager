@@ -339,9 +339,10 @@ class IssuanceMixin:
                 return
             
             from services.cert_service import CertificateService
+            from services.cert.issued_lookup import row_revoked
             for prev_order in previous_orders:
                 cert = db.session.get(Certificate, prev_order.certificate_id)
-                if cert and not cert.revoked:
+                if cert and not row_revoked(cert):  # by its row or by its CA's record
                     try:
                         # The replaced certificate only: its pair partner may be the new one
                         CertificateService.revoke_certificate(

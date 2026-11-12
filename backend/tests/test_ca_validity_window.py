@@ -25,9 +25,9 @@ from services.trust_store.trust_store_service import TrustStoreService
 from utils.key_codec import store_pem_bytes
 
 
-def _ca_material(*, not_before, not_after, cn='Validity Window CA'):
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+def _ca_material(*, not_before, not_after, cn='Validity Window CA', key=None, name=None):
+    key = key or rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = name or x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
     cert = (
         x509.CertificateBuilder()
         .subject_name(name).issuer_name(name)
@@ -49,8 +49,8 @@ def _expired():
     return _ca_material(not_before=NOW - timedelta(days=400), not_after=NOW - timedelta(days=1))
 
 
-def _future():
-    return _ca_material(not_before=NOW + timedelta(days=2), not_after=NOW + timedelta(days=400))
+def _future(**kwargs):
+    return _ca_material(not_before=NOW + timedelta(days=2), not_after=NOW + timedelta(days=400), **kwargs)
 
 
 def _short_lived(days=10):
@@ -201,7 +201,10 @@ class TestOperatorPaths:
             )
             db.session.commit()
             row_id = row.id
-        cert, key = _future()
+            # Same name and key: only the validity window may refuse, not a re-keyed CA
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            current = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+            cert, key = _future(key=get_ca_signing_key(ca), name=current.subject)
         _install(app, ca_data['id'], cert, key)
         with app.app_context():
             row = db.session.get(Certificate, row_id)

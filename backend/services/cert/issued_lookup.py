@@ -12,6 +12,7 @@ revocation record) and not expired.
 """
 
 import base64
+from datetime import datetime
 from typing import Optional, Tuple
 
 from cryptography import x509
@@ -19,7 +20,7 @@ from utils.csr_extensions import extensions_of
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import Encoding
 
-from models import CA, Certificate, RevokedSerial
+from models import CA, Certificate, RevokedSerial, db
 from utils.datetime_utils import utc_now
 from utils.serial_format import canonical_serial, serial_variants
 
@@ -34,9 +35,11 @@ SUPERSEDED = 'superseded'
 def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
     """Every row under ``ca``, or under another record of its subject and key,
     holding exactly ``cert`` (normally one; a duplicate left by an inconsistent
-    restore still counts)."""
-    from utils.cert_issuer import same_key_refids
-    return _rows_holding(cert, Certificate.caref.in_(same_key_refids(ca)))
+    restore still counts). Empty when ``ca``'s key did not sign ``cert``: a row
+    linked to a CA is not proof that the CA issued what it holds."""
+    from utils.cert_issuer import ca_signed, same_key_refids
+    rows = _rows_holding(cert, Certificate.caref.in_(same_key_refids(ca)))
+    return rows if rows and ca_signed(ca, cert) else []
 
 
 def find_stored_rows(cert: x509.Certificate) -> list:
@@ -92,6 +95,162 @@ def find_issued_row(ca: CA, cert: x509.Certificate) -> Optional[Certificate]:
     return rows[0] if rows else None
 
 
+_REASON_RANK = {x509.ReasonFlags.key_compromise: 0, x509.ReasonFlags.ca_compromise: 0,
+                x509.ReasonFlags.aa_compromise: 0, x509.ReasonFlags.certificate_hold: 2,
+                x509.ReasonFlags.remove_from_crl: 3}
+
+
+def reason_rank(reason) -> int:
+    """0 for a compromise, 1 for any other final reason, 2 for a suspension, 3 for removeFromCRL."""
+    from utils.revocation_reasons import REASON_FLAGS
+    return _REASON_RANK.get(REASON_FLAGS.get(reason or 'unspecified', x509.ReasonFlags.unspecified), 1)
+
+
+def revocation_order(record):
+    """Sort key of a revocation record: a compromise first, then any final revocation,
+    then a suspension; between equals the earliest date."""
+    return reason_rank(record.revoke_reason), record.revoked_at or datetime.max, record.id or 0
+
+
+def gravest_revocation(*holders):
+    """Of the revoked rows and records given (None skipped), the one with the gravest reason;
+    the first given between equals. The CRL and OCSP answer with it."""
+    present = [h for h in holders if h is not None]
+    return min(present, key=lambda h: reason_rank(h.revoke_reason)) if present else None
+
+
+def record_serial_clause(serial):
+    """The records of ``serial``: the column is canonical decimal (migration 144), so only
+    equality names it; another serial's all-digit hex spelling never does."""
+    return RevokedSerial.serial_number == canonical_serial(serial)
+
+
+def record_reason_replaceable(record, reason) -> bool:
+    """Whether a writer may put ``reason`` (and its date) in ``record``: over a suspension, or
+    with a graver reason; a final reason is never replaced by an equal or milder one."""
+    from utils.revocation_reasons import HOLD_REASONS
+    return record.revoke_reason in HOLD_REASONS or reason_rank(reason) < reason_rank(record.revoke_reason)
+
+
+def revocation_records(ca: CA, serial: int) -> list:
+    """Every record of ``ca``'s key (or a record of the same subject and key) for
+    ``serial`` (``record_serial_clause``), gravest first."""
+    from utils.cert_issuer import same_key_refids
+    return sorted(RevokedSerial.query.filter(
+        RevokedSerial.caref.in_(same_key_refids(ca)), record_serial_clause(serial)).all(),
+        key=revocation_order)
+
+
+def persisted_revocation(ca: CA, serial: int):
+    """The record that says ``serial`` is revoked under ``ca``, or None. Any record does,
+    whichever row it is linked to (migration 154 deleted the holds older releases left lifted)."""
+    records = revocation_records(ca, serial)
+    return records[0] if records else None
+
+
+def lift_persisted_revocation(ca: CA, serial: int) -> int:
+    """Delete every record of ``serial`` under ``ca``'s key (``record_serial_clause``). No commit."""
+    from utils.cert_issuer import same_key_refids
+    return RevokedSerial.query.filter(
+        RevokedSerial.caref.in_(same_key_refids(ca)),
+        record_serial_clause(serial),
+    ).delete(synchronize_session='fetch')
+
+
+def gravest_records_by_serial(records) -> dict:
+    """The gravest of ``records`` per serial they name (``revocation_order``), keyed by the
+    canonical column ``record_serial_clause`` compares: ``records`` are read once, not per row."""
+    gravest = {}
+    for record in sorted(records, key=revocation_order):
+        gravest.setdefault(record.serial_number, record)
+    return gravest
+
+
+def answered_revocation(row: Certificate, ca: CA, records: Optional[dict] = None):
+    """What the CRL and OCSP say of the revoked ``row``: itself, or when it is only held, the
+    final record of its serial under ``ca`` (or a record of its key), the graver of the two.
+    ``records`` (``gravest_records_by_serial`` of the key's records) spares a query per row."""
+    from utils.revocation_reasons import HOLD_REASONS
+    from services.cert.serial_resolution import resolve_record_serial
+    if row.revoke_reason not in HOLD_REASONS:
+        return row
+    serial = resolve_record_serial(row)
+    if serial is None:
+        return row
+    record = records.get(canonical_serial(serial)) if records is not None else persisted_revocation(ca, serial)
+    return gravest_revocation(row, record)
+
+
+def _row_serial(row: Certificate) -> Optional[int]:
+    try:
+        return x509.load_pem_x509_certificate(base64.b64decode(row.crt), default_backend()).serial_number
+    except Exception:
+        return None
+
+
+def row_persisted_revocation(row: Certificate, ca: Optional[CA] = None):
+    """The record that says ``row``'s certificate is revoked under ``ca`` (default: its
+    ``caref``), or None; a row whose certificate cannot be read has none."""
+    if ca is None:
+        ca = CA.query.filter_by(refid=row.caref).first() if row.caref else None
+    if ca is None or not row.crt:
+        return None
+    serial = _row_serial(row)
+    return None if serial is None else persisted_revocation(ca, serial)
+
+
+def row_revoked(row: Certificate) -> bool:
+    """Whether ``row`` is revoked, by its own columns or by the record of its serial."""
+    return bool(row.revoked) or row_persisted_revocation(row) is not None
+
+
+def effective_revocation(row: Certificate):
+    """What revokes ``row``: the graver of its own revocation and its serial's record, or None."""
+    return gravest_revocation(row if row.revoked else None, row_persisted_revocation(row))
+
+
+def apply_persisted_revocation(row: Certificate, record=None) -> bool:
+    """Mark ``row`` revoked from the record its CA still holds for its serial: a certificate
+    revoked, deleted and imported again comes back revoked. A given final ``record`` also
+    replaces a suspension of the row. No commit; returns whether one applied."""
+    from utils.revocation_reasons import HOLD_REASONS
+    if record is None:
+        if row.revoked:
+            return False
+        record = row_persisted_revocation(row)
+        if record is None:
+            return False
+    elif row.revoked and row.revoke_reason not in HOLD_REASONS:
+        return False
+    row.revoked = True
+    row.revoked_at = record.revoked_at
+    row.revoke_reason = record.revoke_reason
+    row.invalidity_at = record.invalidity_at
+    return True
+
+
+def apply_persisted_revocations() -> list:
+    """Mark revoked every linked, unrevoked row holding a serial its CA recorded as revoked
+    (rows stored by an earlier release). No commit; returns ``(row, record)`` per row marked."""
+    from sqlalchemy import or_
+    # Read afresh: a revocation or hold another worker made since this session loaded it counts
+    db.session.flush()
+    db.session.expire_all()
+    # Both columns are canonical (migration 144): a record names the rows of its own serial only
+    columns = sorted({column for (column,) in RevokedSerial.query.with_entities(
+        RevokedSerial.serial_number).distinct() if column})
+    marked = []
+    for start in range(0, len(columns), 500):
+        for row in Certificate.query.filter(
+                Certificate.serial_number.in_(columns[start:start + 500]),
+                Certificate.caref.isnot(None), Certificate.crt.isnot(None),
+                or_(Certificate.revoked.is_(False), Certificate.revoked.is_(None))).all():
+            record = row_persisted_revocation(row)
+            if record is not None and apply_persisted_revocation(row, record):
+                marked.append((row, record))
+    return marked
+
+
 def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[Certificate], str]:
     """``(row, status)`` with status one of OK, UNKNOWN, REVOKED, EXPIRED,
     NOT_YET_VALID, SUPERSEDED.
@@ -100,11 +259,7 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
     record, and answers REVOKED rather than UNKNOWN."""
     rows = find_issued_rows(ca, cert)
     row = rows[0] if rows else None
-    from utils.cert_issuer import same_key_refids
-    persistent = RevokedSerial.query.filter(
-        RevokedSerial.caref.in_(same_key_refids(ca)),
-        RevokedSerial.serial_number == canonical_serial(cert.serial_number),
-    ).first()
+    persistent = persisted_revocation(ca, cert.serial_number)
     if row is None:
         return None, (REVOKED if persistent is not None else UNKNOWN)
     if any(r.revoked for r in rows) or persistent is not None:

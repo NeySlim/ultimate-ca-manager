@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from flask import request, g
 from auth.unified import require_auth
 from utils.datetime_utils import to_naive_utc, utc_now
-from utils.serial_format import canonical_serial, serial_to_hex
+from utils.serial_format import serial_to_hex
 from utils.response import success_response, error_response, no_content_response
 from models import Certificate, CA, db
 from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message, revocable, HOLD_REASONS
@@ -260,6 +260,17 @@ def unhold_certificate(cert_id):
         members = [cert] + ([partner] if partner is not None else [])
         cas = {m.id: (CA.query.filter_by(refid=m.caref).first() if m.caref else None)
                for m in members}
+        # Only a suspension lifts: a final revocation recorded for the serial stays
+        from services.cert.issued_lookup import persisted_revocation
+        from services.cert.serial_resolution import resolve_record_serial
+        serials = {m.id: resolve_record_serial(m) for m in members}
+        for member in members:
+            ca, serial = cas[member.id], serials[member.id]
+            record = persisted_revocation(ca, serial) if ca is not None and serial is not None else None
+            if record is not None and record.revoke_reason not in HOLD_REASONS:
+                return error_response(
+                    f'Certificate "{member.descr or member.refid}" is revoked for good '
+                    f'({record.revoke_reason or "unspecified"}): its hold cannot be lifted', 409)
 
         # Each hold as it stands, before the removeFromCRL staging below
         helds = {m.id: ({field: getattr(m, field)
@@ -296,16 +307,16 @@ def unhold_certificate(cert_id):
 
         # The lifted holds and their revocation records go together or not at all
         try:
-            from models import RevokedSerial
+            from services.cert.issued_lookup import lift_persisted_revocation
             for member in members:
                 member.revoked = False
                 member.revoked_at = None
                 member.revoke_reason = None
                 member.invalidity_at = None
-                _, serial, caref = helds[member.id]
-                if caref and serial:
-                    RevokedSerial.query.filter_by(caref=caref, serial_number=canonical_serial(serial)).delete(
-                        synchronize_session='fetch')
+                # Every spelling, under every record of the CA's key
+                ca, serial = cas[member.id], serials[member.id]
+                if ca is not None and serial is not None:
+                    lift_persisted_revocation(ca, serial)
             db.session.commit()
         except Exception as e:
             db.session.rollback()

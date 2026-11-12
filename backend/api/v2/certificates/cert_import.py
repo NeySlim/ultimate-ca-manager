@@ -11,9 +11,9 @@ from utils.db_transaction import safe_commit
 from utils.key_codec import MalformedKey
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
-from models import Certificate, CA, db
+from models import Certificate, CA, RevokedSerial, db
 from services.audit_service import AuditService
-from utils.cert_issuer import find_ca_by_ski, private_key_matches, stored_private_key_matches
+from utils.cert_issuer import ca_signature_verdict, ca_signed, private_key_matches, signing_ca_for, stored_private_key_matches
 from services.import_service import (
     KeyPasswordError, parse_certificate_file, is_ca_certificate, extract_cert_info,
     find_existing_ca_for_import, cross_mode_from, finish_cross_attach,
@@ -22,6 +22,7 @@ from services.import_service import (
     serialize_cert_to_pem, serialize_key_to_pem
 )
 from services.cert_service import CertificateService
+from services.cert.issued_lookup import apply_persisted_revocation, record_serial_clause
 from services.ca_service import CAService
 from security.encryption import encrypt_private_key
 from . import bp
@@ -29,19 +30,27 @@ from . import bp
 logger = logging.getLogger(__name__)
 
 
-def _resolve_caref(ca_id, cert_info):
-    """The issuing CA's refid: the one the caller named, else the CA whose
-    SKI is the certificate's AKI (cryptographically reliable), else the CA
-    whose subject is the issuer DN; None when UCM does not hold the issuer."""
+class _NotSignedByNamedCa(ValueError):
+    pass
+
+
+def _resolve_caref(ca_id, cert):
+    """The issuing CA's refid: the CA the caller named, which must have signed
+    *cert*, else the stored CA whose key verifies it; None when UCM holds no
+    CA that signed it (a third-party certificate)."""
     if ca_id:
         ca = db.session.get(CA, ca_id)
-        return ca.refid if ca else None
-    aki = cert_info.get('aki')
-    if aki:
-        ca = find_ca_by_ski(aki)
-        if ca:
-            return ca.refid
-    ca = CA.query.filter_by(subject=cert_info['issuer']).first()
+        if ca is None:
+            return None
+        verdict = ca_signature_verdict(ca, cert)
+        if verdict is None:
+            raise _NotSignedByNamedCa(
+                f'The certificate cannot be verified against CA "{ca.descr}": its certificate '
+                'is missing or unreadable, or its key type cannot be checked')
+        if not verdict:
+            raise _NotSignedByNamedCa(f'The certificate was not signed by CA "{ca.descr}"')
+        return ca.refid
+    ca = signing_ca_for(cert)
     return ca.refid if ca else None
 
 
@@ -238,6 +247,11 @@ def import_certificate():
                 message += f'; pending request "{fulfilled}" fulfilled, its key is now the CA\'s'
             return created_response(data=ca.to_dict(), message=message)
 
+        try:
+            caref = _resolve_caref(ca_id, cert)
+        except _NotSignedByNamedCa as e:
+            return error_response(str(e), 400)
+
         # A certificate issued elsewhere for a CSR pending here completes
         # that record instead of creating a keyless duplicate (#341)
         pending_csr = find_pending_csr_for_certificate(cert)
@@ -246,7 +260,7 @@ def import_certificate():
             try:
                 CertificateService.complete_external_csr(
                     pending_csr, cert, cert_pem,
-                    caref=_resolve_caref(ca_id, cert_info),
+                    caref=caref,
                     descr=name or None,
                     key_pem=key_pem,
                     username=username,
@@ -320,18 +334,24 @@ def import_certificate():
             if cert_info.get('san_uri'):
                 existing_cert.san_uri = json.dumps(cert_info['san_uri'])
 
-            # The issuing CA: the one named, else the one the certificate points to
-            if ca_id:
-                ca = db.session.get(CA, ca_id)
-                if ca:
-                    existing_cert.caref = ca.refid
-            else:
-                existing_cert.caref = _resolve_caref(None, cert_info) or existing_cert.caref
+            # The issuing CA is one whose key signed the new certificate, never
+            # a link kept from the certificate it replaces
+            if not caref and existing_cert.caref:
+                kept = CA.query.filter_by(refid=existing_cert.caref).first()
+                caref = existing_cert.caref if ca_signed(kept, cert) else None
+            existing_cert.caref = caref
+            if serial_changed:
+                # The row now holds another certificate: the old serial's record stays, unlinked
+                RevokedSerial.query.filter(
+                    RevokedSerial.certificate_id == existing_cert.id,
+                    record_serial_clause(old_serial),
+                ).update({RevokedSerial.certificate_id: None}, synchronize_session='fetch')
+            came_back_revoked = apply_persisted_revocation(existing_cert)
 
             # A key reaching a renewed certificate takes the bindings left behind for it;
             # a new serial deploys them through its renewal event
             https_moved = False
-            if key_pem:
+            if key_pem and not came_back_revoked:
                 from services.binding_attention import follow_key
                 user = getattr(g, 'current_user', None)
                 https_moved = follow_key(existing_cert, actor=getattr(user, 'username', None) or 'system',
@@ -356,17 +376,16 @@ def import_certificate():
             cert_dict = existing_cert.to_dict()
             from services.webhook_service import WebhookService, emit_cert_stored
             user = getattr(g, 'current_user', None)
-            emit_cert_stored(cert_dict, old_serial, cert.serial_number,
-                             first_event=WebhookService.CERT_IMPORTED,
-                             ca_refid=existing_cert.caref, actor=getattr(user, 'username', None))
+            # A certificate its CA revoked is no renewal of the one it replaces
+            if not (came_back_revoked and serial_changed):
+                emit_cert_stored(cert_dict, old_serial, cert.serial_number,
+                                 first_event=WebhookService.CERT_IMPORTED,
+                                 ca_refid=existing_cert.caref, actor=getattr(user, 'username', None))
 
             message = f'Certificate "{existing_cert.descr}" updated (already existed)'
             if key_dropped:
                 message += '; the stored key did not match the new certificate and was unbound'
             return success_response(data=cert_dict, message=message)
-
-        # Regular certificate - find parent CA
-        caref = _resolve_caref(ca_id, cert_info)
 
         # Create certificate record
         refid = str(uuid.uuid4())
@@ -392,6 +411,7 @@ def import_certificate():
             created_by='import'
         )
 
+        apply_persisted_revocation(certificate)
         db.session.add(certificate)
         ok, err = safe_commit(logger, "Failed to import certificate")
         if not ok:
