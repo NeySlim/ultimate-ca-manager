@@ -2144,23 +2144,26 @@ def test_a_rotation_after_a_disable_done_says_encryption_is_off(app, auth_client
     assert _rows(app) == rows
 
 
-@pytest.mark.parametrize('after_grace', [False, True])
+@pytest.mark.parametrize('after_grace', [False, True, 'expired_stored'])
 def test_a_second_disable_after_a_disable_done_changes_nothing(app, auth_client, values,
                                                                retention, after_grace):
     """A second disable within the retention neither rewrites the markers nor restarts a
-    grace that would hold the next enable again."""
+    grace that would hold the next enable again. A grace over but still stored is ended by
+    the route itself (retire_if_due) before it answers."""
     from security import dek_rotation
     assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
     if after_grace:
         retention(601)
+    if after_grace is True:
         with app.app_context():
             dek_rotation.retire_if_due()
     rows, kept, grace_row = _rows(app), _retain_after(app), _grace_row(app)
-    assert (grace_row is None) == after_grace
+    assert (grace_row is None) == (after_grace is True)
     r = auth_client.post('/api/v2/system/security/disable-encryption')
     assert r.status_code == 400, r.data
     assert r.get_json()['message'] == 'Encryption is not enabled'
-    assert _rows(app) == rows and _retain_after(app) == kept and _grace_row(app) == grace_row
+    assert _rows(app) == rows and _retain_after(app) == kept
+    assert _grace_row(app) == (None if after_grace else grace_row)
 
 
 def test_a_restart_resumes_an_interrupted_rotation_before_an_old_key_past_its_retention(
