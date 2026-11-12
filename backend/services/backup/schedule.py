@@ -7,7 +7,9 @@ The source of truth is the General-settings keys the UI actually writes:
 ``auto_backup_enabled``, ``backup_frequency`` (daily/weekly/monthly),
 ``backup_retention_days``, ``backup_password`` and ``backup_kdf``. There is
 no time-of-day in the UI, so cadence is driven by a stored ``backup.last_run``
-timestamp.
+timestamp. A run reserves its slot by moving ``backup.last_run`` and concludes it
+by copying that value to ``backup.concluded_run`` once its archive is written; the
+schedule reports ``in_progress`` while a reservation is not concluded within its lease.
 """
 import base64
 import glob
@@ -20,6 +22,7 @@ from datetime import datetime, timezone
 import fips_mode
 from models import db, SystemConfig
 from config.settings import Config
+from utils.config_cas import config_compare_and_set, config_release
 from utils.datetime_utils import utc_now, utc_isoformat
 
 from . import storage
@@ -32,8 +35,14 @@ logger = logging.getLogger(__name__)
 
 _BACKUP_GLOB = 'ucm_backup_*.ucmbkp'
 _LAST_RUN_KEY = 'backup.last_run'
+# The reservation (a last_run value) whose archive was written: a reservation that
+# differs from it is in flight, or abandoned once the lease is over.
+_CONCLUDED_KEY = 'backup.concluded_run'
 _VALID_FREQUENCIES = ('daily', 'weekly', 'monthly')
 _PERIOD_SECONDS = {'daily': 86400, 'weekly': 604800, 'monthly': 2592000}
+# A claimed run not concluded is in flight for this long, then abandoned (killed,
+# OOM, os._exit on shutdown): the slot becomes due again.
+_CLAIM_LEASE_SECONDS = 2 * 3600
 
 # Archives with no validation record are kept in this number, newest first:
 # nothing can be proven about them either way, so prudence decides.
@@ -83,6 +92,7 @@ def get_schedule() -> dict:
         retention = 30
 
     newest, age = _newest_validated_archive()
+    last_run = _get(_LAST_RUN_KEY)
     return {
         'enabled': _get('auto_backup_enabled', 'false') == 'true',
         'frequency': freq,
@@ -90,7 +100,9 @@ def get_schedule() -> dict:
         'retention_days': retention,
         'min_keep': _min_keep(),
         'max_total_mb': _max_total_bytes() // (1024 * 1024),
-        'last_run': _get(_LAST_RUN_KEY),
+        'last_run': last_run,
+        # last_run is then this run's reservation, the outcome still the previous run's
+        'in_progress': _in_flight(last_run, _get(_CONCLUDED_KEY), utc_now()),
         'last_outcome': _get(_LAST_OUTCOME_KEY),
         'last_outcome_reason': _get(_LAST_REASON_KEY),
         'last_outcome_at': _get(_LAST_OUTCOME_AT_KEY),
@@ -137,8 +149,8 @@ def _record_outcome(outcome: str, reason: str = None) -> None:
             db.session.rollback()
         except Exception:
             logger.warning("Could not roll back after a failed outcome record")
-        # The outcome is a report, not the work: losing it must not turn a
-        # successful backup into a failed one.
+        # The outcome is a report, not the work: the schedule follows the conclusion
+        # marker, so losing it neither fails a backup nor brings a second one.
         logger.warning("Could not record the outcome of the scheduled backup")
 
 
@@ -371,53 +383,92 @@ def run_backup_retention(wait: float = 0) -> int:
         return 0
 
 
-# Last archive this process published, whether or not its timestamp could be
-# stored. `backup.last_run` is the source of truth across restarts; this guard
-# only covers the case where writing that row fails, which used to leave the
-# task due again 60 seconds later, once per minute, until the disk filled. It
-# is set after publication, never before, so a failed attempt is retried.
-_LAST_ATTEMPT: dict = {'at': None}
-
-
-def _record_last_run(ts: datetime) -> None:
-    """Persist the run timestamp, or raise.
-
-    The scheduler asks every 60 seconds whether a backup is due, and the
-    answer is read from this row: a silent rollback left the task due again on
-    the next tick, writing one archive per minute until the disk filled.
-    """
-    # Leader-only task: one writer, so last_run needs no compare-and-set
-    cfg = SystemConfig.query.filter_by(key=_LAST_RUN_KEY).first()
-    if cfg:
-        cfg.value = utc_isoformat(ts)
-    else:
-        db.session.add(SystemConfig(key=_LAST_RUN_KEY, value=utc_isoformat(ts)))
+def _claim_run(previous, now: datetime):
+    """Move ``backup.last_run`` from what the due check read to this run, before any
+    archive is written: of two nodes finding the run due, one writes. The claimed
+    value, or None when another node moved it first."""
+    claimed = utc_isoformat(now)
     try:
+        moved = config_compare_and_set(_LAST_RUN_KEY, previous, claimed)
+    except Exception as exc:
+        db.session.rollback()
+        raise ScheduledBackupError(f'The backup schedule could not be reserved: {exc}') from exc
+    return claimed if moved else None
+
+
+def _start_marking_conclusions(previous) -> None:
+    """Create the conclusion marker before the first reservation that can need it, so
+    a run killed with none recorded is retried; an existing marker is left alone."""
+    try:
+        config_compare_and_set(_CONCLUDED_KEY, None, previous or '')
+    except Exception as exc:
+        db.session.rollback()
+        raise ScheduledBackupError(f'The backup schedule could not be reserved: {exc}') from exc
+
+
+def _conclude_run(claimed: str) -> None:
+    """Mark the reservation *claimed* as done once its archive exists; raises, since a
+    lost marker would bring a second archive once the lease is over."""
+    try:
+        row = SystemConfig.query.filter_by(key=_CONCLUDED_KEY).first()
+        if row:
+            row.value = claimed
+        else:
+            db.session.add(SystemConfig(key=_CONCLUDED_KEY, value=claimed))
         db.session.commit()
     except Exception as exc:
         db.session.rollback()
         raise ScheduledBackupError(
-            f'Backup created, but its schedule timestamp could not be saved: {exc}'
-        ) from exc
+            f'The archive was written but its run could not be marked concluded: {exc}') from exc
+
+
+def _release_run(previous, claimed: str) -> None:
+    """Give a run that wrote no archive back to the next tick, unless moved since."""
+    # The claim is committed; a failed export may have left the transaction aborted
+    db.session.rollback()
+    try:
+        config_release(_LAST_RUN_KEY, claimed, previous)
+    except Exception:
+        db.session.rollback()
+        logger.warning("Could not release the backup schedule; retried once the lease is over")
+
+
+def _parse(value):
+    try:
+        return _naive_utc(datetime.fromisoformat(value.replace('Z', '+00:00')))
+    except (ValueError, AttributeError):
+        return None
+
+
+def _unconcluded_for(last_run, concluded, now: datetime):
+    """Seconds since the reservation *last_run* was taken, or None when it is concluded.
+    No marker at all: last_run predates it (upgraded install) and counts as concluded."""
+    prev = _parse(last_run) if last_run else None
+    if prev is None or concluded is None or concluded == last_run:
+        return None
+    return (_naive_utc(now) - prev).total_seconds()
+
+
+def _in_flight(last_run, concluded, now: datetime) -> bool:
+    elapsed = _unconcluded_for(last_run, concluded, now)
+    return elapsed is not None and elapsed < _CLAIM_LEASE_SECONDS
 
 
 def _is_due(sched: dict, now: datetime) -> bool:
     period = _PERIOD_SECONDS.get(sched.get('frequency', 'daily'), 86400)
-    attempted = _LAST_ATTEMPT.get('at')
-    if attempted is not None:
-        elapsed = (_naive_utc(now) - _naive_utc(attempted)).total_seconds()
-        if elapsed < period - 300:
-            return False
-
     last_run = sched.get('last_run')
     if not last_run:
         return True  # never run → run now
-    try:
-        prev = datetime.fromisoformat(last_run.replace('Z', '+00:00'))
-    except (ValueError, AttributeError):
+    prev = _parse(last_run)
+    if prev is None:
         return True
+    elapsed = (_naive_utc(now) - prev).total_seconds()
+    # An upgraded install has no marker yet: its last run counts as concluded
+    unconcluded = _unconcluded_for(last_run, sched.get('concluded_run'), now)
+    if unconcluded is not None and unconcluded >= _CLAIM_LEASE_SECONDS:
+        return True  # claimed, never concluded, lease expired
     # small slack so a ~daily timer doesn't drift a day each run
-    return (_naive_utc(now) - _naive_utc(prev)).total_seconds() >= period - 300
+    return elapsed >= period - 300
 
 
 def _naive_utc(value: datetime) -> datetime:
@@ -441,6 +492,7 @@ def run_scheduled_backup() -> dict:
         return {'status': 'skipped', 'reason': 'disabled'}
 
     now = utc_now()
+    sched['concluded_run'] = _get(_CONCLUDED_KEY)
     if not _is_due(sched, now):
         return {'status': 'skipped', 'reason': 'not_due'}
 
@@ -476,16 +528,21 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
             # A setting carried over from a standard instance must not stop every run.
             logger.warning("Scheduled backup KDF is Argon2id, refused in FIPS mode: using PBKDF2")
             kdf = None
+        _start_marking_conclusions(sched.get('last_run'))
+        claimed = _claim_run(sched.get('last_run'), now)
+        if claimed is None:
+            logger.info("Scheduled backup already taken by another node")
+            return {'status': 'skipped', 'reason': 'claimed by another node'}
         service = BackupService()
-        # The same export and naming as every other archive, under the lock already held
-        size, _path, filename = storage.export_archive(service, password, kdf=kdf)
-
-        # Only now: the archive exists, it reads back as written, and it is
-        # recorded. An export or write that failed before this point leaves
-        # the run due again on the next tick, which is what should happen;
-        # past it, a timestamp that cannot be stored must not produce a second
-        # archive a minute later.
-        _LAST_ATTEMPT['at'] = now
+        try:
+            # The same export and naming as every other archive, under the lock already held
+            size, _path, filename = storage.export_archive(service, password, kdf=kdf)
+        except Exception:
+            # No archive: the next tick retries. Past this point the claim stays,
+            # so nothing after the write can bring a second archive a minute later.
+            _release_run(sched.get('last_run'), claimed)
+            raise
+        _conclude_run(claimed)
 
         logger.info(f"Scheduled backup created: {filename} ({size} bytes)")
         for left_out in service.last_export_warnings:
@@ -494,7 +551,6 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
                                 success=True)
 
         removed = _apply_retention(sched.get('retention_days', 30))
-        _record_last_run(now)
         _record_outcome('ok', filename)
         return {
             'status': 'ok',

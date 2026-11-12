@@ -62,6 +62,27 @@ class TestDueLogic:
             two_days = utc_isoformat(utc_now() - timedelta(days=2))
             assert _is_due({'frequency': 'weekly', 'last_run': two_days}, utc_now()) is False
 
+    def test_an_upgraded_install_without_a_conclusion_marker_counts_as_concluded(self, app):
+        """last_run written before the marker existed: no early archive past the lease."""
+        with app.app_context():
+            from services.backup.schedule import _is_due
+            three_hours = utc_isoformat(utc_now() - timedelta(hours=3))
+            assert _is_due({'frequency': 'daily', 'last_run': three_hours,
+                            'concluded_run': None}, utc_now()) is False
+
+    def test_a_reservation_never_concluded_is_due_once_its_lease_is_over(self, app):
+        with app.app_context():
+            from services.backup.schedule import _is_due
+            three_hours = utc_isoformat(utc_now() - timedelta(hours=3))
+            one_hour = utc_isoformat(utc_now() - timedelta(hours=1))
+            older = utc_isoformat(utc_now() - timedelta(days=1))
+            assert _is_due({'frequency': 'daily', 'last_run': three_hours,
+                            'concluded_run': older}, utc_now()) is True
+            assert _is_due({'frequency': 'daily', 'last_run': one_hour,
+                            'concluded_run': older}, utc_now()) is False
+            assert _is_due({'frequency': 'daily', 'last_run': three_hours,
+                            'concluded_run': three_hours}, utc_now()) is False
+
 
 class TestScheduledTaskGating:
     def test_disabled_is_noop(self, app, monkeypatch):

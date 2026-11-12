@@ -433,6 +433,7 @@ With `UCM_HA=1`, every node runs against the same PostgreSQL database and names 
 - **Deployment, prerequisites and refused operations.** See [HA.md](HA.md).
 - **Local files.** Tasks that write to the local disk do so on the leader only: local backups, the certificate files mirrored by renewals and session file cleanup stay on that node.
 - **Real-time events without Redis.** Every web worker and the scheduler process write their WebSocket events to the `websocket_relay` table; each worker emits to its own browsers the rows written by others (its own events reach its browsers at once) and reads the table every 2 s. On PostgreSQL a `NOTIFY` on channel `ucm_ws_relay` wakes the workers as soon as a row commits, through one extra connection per worker outside the pool, reopened if it drops. Rows are kept 10 minutes and hold what the browsers receive (event type, ids, names, the user and source IP of a login). With `REDIS_URL` set, Redis carries the events and the table is not used.
+- **Scheduled backup.** A run reserves its slot in `system_config` (`backup.last_run`) before writing, so two nodes do not both write it. A run that never concludes (node killed mid-export) is retried after a two-hour lease. The lease is not refreshed while the export runs: an export lasting longer than two hours can be started again by another leader, giving two archives on two nodes.
 
 ### Database Tables
 

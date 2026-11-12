@@ -64,7 +64,7 @@ _SETTINGS_KEYS = (
     'auto_backup_enabled', 'backup_frequency', 'backup_password',
     'backup_retention_days', 'backup_min_keep', 'backup_max_total_mb',
     'backup.last_run', 'backup.last_outcome', 'backup.last_reason',
-    'backup.last_outcome_at',
+    'backup.last_outcome_at', 'backup.concluded_run',
 )
 _OUTCOME_KEYS = ('backup.last_outcome', 'backup.last_reason',
                  'backup.last_outcome_at')
@@ -248,8 +248,6 @@ def backup_settings_sandbox(app, tmp_path, monkeypatch):
 
         yield tmp_path
 
-        from services.backup import schedule
-        schedule._LAST_ATTEMPT['at'] = None
         for key, value in saved.items():
             SystemConfig.query.filter_by(key=key).delete()
             if value is not None:
@@ -259,13 +257,11 @@ def backup_settings_sandbox(app, tmp_path, monkeypatch):
 
 def _enable_unattended_backups():
     """Turn the unattended run on and make it due right now."""
-    from services.backup import schedule
     _set('auto_backup_enabled', 'true')
     _set('backup_frequency', 'daily')
     _set('backup_password', PASSWORD)
     SystemConfig.query.filter_by(key='backup.last_run').delete()
     db.session.commit()
-    schedule._LAST_ATTEMPT['at'] = None
 
 
 def _audit_spy(monkeypatch):
@@ -863,7 +859,7 @@ class TestEachScheduledFailureIsReportedForWhatItIs:
             assert status['last_archive'] is None
             assert not list(backup_settings_sandbox.glob('ucm_backup_*'))
             assert [call['success'] for call in calls] == [False]
-            assert schedule._LAST_ATTEMPT['at'] is None, \
+            assert schedule._get('backup.last_run') is None, \
                 'a run that produced nothing must be due again on the next tick'
 
     def test_a_write_that_fails_leaves_no_archive_and_names_itself(
@@ -922,12 +918,10 @@ class TestEachScheduledFailureIsReportedForWhatItIs:
                 'an archive that could not be validated was still recorded'
             assert [call['success'] for call in calls] == [False]
 
-    def test_a_timestamp_that_cannot_be_saved_says_the_archive_exists(
+    def test_a_schedule_that_cannot_be_reserved_writes_nothing_and_says_so(
             self, app, backup_settings_sandbox, monkeypatch):
-        """The one failure where the archive is real. Reported as a failure,
-        because the schedule no longer knows when it last ran -- but the
-        reason says the backup was created, the audit carries both entries,
-        and the next tick must not write a second archive."""
+        """The run reserves its slot before writing: a reservation that cannot be
+        stored is a failure with no archive, never an archive the schedule forgets."""
         from services.backup import schedule as schedule_module
         with app.app_context():
             schedule, calls = self._unattended_run_fails(
@@ -937,11 +931,8 @@ class TestEachScheduledFailureIsReportedForWhatItIs:
                         'services.backup.schedule.BackupService.iter_backup',
                         lambda self, password, **kwargs: b'the archive bytes'),
                     monkeypatch.setattr(
-                        schedule_module, '_record_last_run',
-                        lambda ts: (_ for _ in ()).throw(
-                            schedule_module.ScheduledBackupError(
-                                'Backup created, but its schedule timestamp '
-                                'could not be saved: the row was refused'))),
+                        schedule_module, 'config_compare_and_set',
+                        lambda *a: (_ for _ in ()).throw(RuntimeError('the row was refused'))),
                 ))
 
             with pytest.raises(schedule.ScheduledBackupError):
@@ -949,20 +940,10 @@ class TestEachScheduledFailureIsReportedForWhatItIs:
 
             status = schedule.get_schedule()
             assert status['last_outcome'] == 'failed'
-            assert 'created' in status['last_outcome_reason'], \
-                'the reason does not say the archive exists'
-            assert status['last_archive'] is not None
-            assert len(list(backup_settings_sandbox.glob(
-                'ucm_backup_*.ucmbkp'))) == 1
-            assert [call['success'] for call in calls] == [True, False], \
-                'the audit does not carry both the archive and the failure'
-
-            # The next scheduler tick, a minute later.
-            assert schedule.run_scheduled_backup() == {
-                'status': 'skipped', 'reason': 'not_due'}
-            assert len(list(backup_settings_sandbox.glob(
-                'ucm_backup_*.ucmbkp'))) == 1, \
-                'the run came due again and wrote a second archive'
+            assert 'reserved' in status['last_outcome_reason']
+            assert status['last_archive'] is None
+            assert not list(backup_settings_sandbox.glob('ucm_backup_*.ucmbkp'))
+            assert [call['success'] for call in calls] == [False]
 
 
 class TestRecordingTheOutcomeCannotFailTheBackup:
