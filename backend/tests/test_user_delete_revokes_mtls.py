@@ -577,5 +577,7 @@ class TestACertificateItsCaRecordedAsRevoked:
             assert not (body.get('data') or {}).get('unrevoked_certificates')
             with app.app_context():
                 assert db.session.get(User, probe['user_id']) is None
+                assert db.session.get(AuthCertificate, probe['enrolment_id']) is None
+                assert db.session.get(Certificate, probe['certificate_id']) is None
         finally:
             self._drop_record(app, refid, probe)
