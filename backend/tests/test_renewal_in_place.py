@@ -245,7 +245,8 @@ class TestInPlace:
         assert recorded == sorted([first, middle]) and first != middle
 
     def test_an_existing_record_for_the_serial_is_updated_not_duplicated(self, app, ca, leaf):
-        """On the record alone: a renewal never meets a record of its own serial (it is refused)."""
+        """Non-regression, passes with and without the fix: on the record alone, as a renewal
+        never meets a record of its own serial (it is refused)."""
         from services.cert.renewal import _record_superseded
         cid = leaf()
         before = _state(app, cid)
