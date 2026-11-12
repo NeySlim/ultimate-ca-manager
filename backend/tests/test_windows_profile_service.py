@@ -325,12 +325,10 @@ def test_a_ca_a_template_or_a_connector_used_by_a_profile_is_not_deleted(app, cl
                                             first_blocker, template_deletion_blockers)
     issuing, policy, template_id = two_cas
     with app.app_context():
-        connector = ADConnectorConfig.get_singleton()
-        created = connector is None
-        if created:
-            connector = ADConnectorConfig(name='default')
-            db.session.add(connector)
-            db.session.flush()
+        # A connector of its own: a profile parked by the fixture may use the shared one
+        connector = ADConnectorConfig(name='c01-blocker-connector')
+        db.session.add(connector)
+        db.session.flush()
         profile = WindowsEnrollmentProfile(name='default', is_default=True, connector_id=connector.id,
                                            issuing_ca_refid=issuing['refid'], policy_ca_refid=policy['refid'])
         db.session.add(profile)
@@ -346,9 +344,8 @@ def test_a_ca_a_template_or_a_connector_used_by_a_profile_is_not_deleted(app, cl
         profile.connector_id = None
         db.session.commit()
         assert first_blocker(connector_deletion_blockers(connector)) is None
-        if created:
-            db.session.delete(connector)
-            db.session.commit()
+        db.session.delete(connector)
+        db.session.commit()
 
 
 def test_an_undeterminable_realm_serves_nothing(app, client, clean_slate, two_cas, monkeypatch, tmp_path):
