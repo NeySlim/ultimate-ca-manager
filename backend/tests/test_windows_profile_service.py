@@ -763,3 +763,45 @@ def test_a_replacing_restore_removes_a_connector_no_profile_uses(app, clean_slat
     with app.app_context():
         assert db.session.get(ADConnectorConfig, own_connector) is None
         assert _default().connector_id is None
+
+
+def test_a_2x_archive_takes_the_realm_of_its_own_connector(app, clean_slate, two_cas):
+    """No realm in the SPN, no keytab: only the archive's connector names it."""
+    issuing, policy, _template = two_cas
+    settings = {**_settings_2x(issuing, policy), 'kerberos_spn': 'HTTP/ucm.c01.example'}
+    archive, _connector = _2x_archive(app, settings, base_dn='DC=archived,DC=example')
+    with app.app_context():
+        ADConnectorConfig.get_singleton().base_dn = 'DC=target,DC=example'
+        db.session.commit()
+    _restore(app, archive)
+    with app.app_context():
+        assert _default().realm == 'ARCHIVED.EXAMPLE'
+
+
+def _raw_keytab(profile_id):
+    from sqlalchemy import text
+    return db.session.execute(text("SELECT keytab FROM windows_enrollment_profiles WHERE id = :i"),
+                              {'i': profile_id}).scalar()
+
+
+def test_the_keytab_column_is_stored_under_the_master_key(app, clean_slate, encryption_enabled):
+    import base64
+    from services.backup_service import BackupService
+    is_encrypted = encryption_enabled.key_encryption.is_encrypted
+    plain = base64.b64encode(ARCHIVED_KEYTAB).decode()
+    with app.app_context():
+        profile = WindowsEnrollmentProfile(name='default', is_default=True, realm='KT.EXAMPLE')
+        profile.set_keytab(ARCHIVED_KEYTAB)
+        db.session.add(profile)
+        db.session.commit()
+        raw = _raw_keytab(profile.id)
+        assert raw != plain and is_encrypted(raw)
+        include = {name: name == 'windows_enrollment_profiles' for name in manifest.SECTIONS}
+        blob = BackupService().create_backup(BACKUP_PASSWORD, include=include)
+        db.session.delete(profile)
+        db.session.commit()
+        BackupService().restore_backup(blob, BACKUP_PASSWORD, mode='merge')
+        db.session.expire_all()
+        raw = _raw_keytab(_default().id)
+        assert raw != plain and is_encrypted(raw)
+        assert _default().keytab_bytes() == ARCHIVED_KEYTAB
