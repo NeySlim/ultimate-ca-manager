@@ -57,16 +57,47 @@ def _keytab_status():
     }
 
 
+def _realm_problem(realm):
+    """(message, status) when *realm* cannot be the default profile's, else None: capitals as
+    AD writes it, named by the keytab when there is one, held by no other profile."""
+    from models import WindowsEnrollmentProfile
+    from services import windows_profiles
+    from services.windows_profiles.legacy import keytab_realms
+    if not isinstance(realm, str) or not realm.strip() or realm != realm.strip().upper():
+        return 'realm must be a non-empty name in capitals, such as CORP.EXAMPLE', 400
+    profile = windows_profiles.default_profile()
+    try:
+        keytab = profile.keytab_bytes() if profile is not None else None
+    except ValueError:
+        return 'the keytab of the default profile cannot be decrypted here', 409
+    if keytab:
+        realms = keytab_realms(keytab)
+        if realms is None:
+            return 'the realms of the keytab cannot be read', 400
+        if realm not in realms:
+            return f"realm {realm} is not in the keytab ({', '.join(sorted(realms))})", 400
+    other = WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.realm == realm)
+    if profile is not None:
+        other = other.filter(WindowsEnrollmentProfile.id != profile.id)
+    if other.first() is not None:
+        return f'realm {realm} is already served by another profile', 409
+    return None
+
+
 @bp.route('/api/v2/kerberos/config', methods=['GET'])
 @require_auth(['read:kerberos'])
 def get_kerberos_config():
-    """Get Kerberos/SPNEGO configuration."""
+    """Get Kerberos/SPNEGO configuration; ``reason`` says why it is not configured."""
+    from services import windows_profiles
+    profile = windows_profiles.default_profile()
     return success_response(data={
         'enabled': negotiate_auth.is_enabled(),
         'spn': negotiate_auth.get_spn(),
         'keytab_set': negotiate_auth.KEYTAB_PATH.exists(),
         'library_available': negotiate_auth.is_library_available(),
         'configured': negotiate_auth.is_configured(),
+        'reason': negotiate_auth.not_configured_reason(),
+        'realm': profile.realm if profile is not None else None,
         **_keytab_status(),
     })
 
@@ -74,8 +105,12 @@ def get_kerberos_config():
 @bp.route('/api/v2/kerberos/config', methods=['PATCH'])
 @require_auth(['write:kerberos'])
 def update_kerberos_config():
-    """Update Kerberos/SPNEGO configuration (enabled flag, SPN)."""
+    """Update Kerberos/SPNEGO configuration (enabled flag, SPN, realm of the default profile)."""
     data = request.json or {}
+    if 'realm' in data:
+        problem = _realm_problem(data['realm'])
+        if problem:
+            return error_response(problem[0], problem[1])
 
     if 'enabled' in data:
         _set_config('kerberos_enabled', 'true' if data['enabled'] else 'false')
@@ -86,6 +121,10 @@ def update_kerberos_config():
         if profile is not None:
             db.session.flush()
             windows_profiles.fill_realm(profile)
+    if 'realm' in data:
+        from services import windows_profiles
+        windows_profiles.default_for_write(getattr(getattr(g, 'current_user', None), 'username', None)
+                                           ).realm = data['realm']
 
     ok, _err = safe_commit(logger, "Failed to update Kerberos configuration")
     if not ok:

@@ -7,7 +7,7 @@ import logging
 
 from models import CA, ADConnectorConfig, WindowsEnrollmentProfile, db
 
-from .legacy import DEFAULT_NAME, resolve_realm
+from .legacy import DEFAULT_NAME, NO_REALM, resolve_realm
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +20,16 @@ def serving_profile():
     """The default profile when it may serve, else None."""
     profile = default_profile()
     return profile if profile is not None and profile.enabled else None
+
+
+def kerberos_refusal():
+    """Why the default profile serves no Kerberos client, None when it may (A1)."""
+    profile = default_profile()
+    if profile is None:
+        return 'no Windows enrollment profile'
+    if not profile.enabled:
+        return 'default profile is disabled'
+    return None if profile.realm else NO_REALM
 
 
 def _ca(refid):
@@ -51,7 +61,7 @@ def fill_realm(profile):
         keytab = profile.keytab_bytes()
     except ValueError:
         keytab = None
-    realm, _ambiguous = resolve_realm(_connector_values(connector), negotiate_auth.get_spn(), keytab)
+    realm = resolve_realm(_connector_values(connector), negotiate_auth.get_spn(), keytab)
     taken = realm and WindowsEnrollmentProfile.query.filter(
         WindowsEnrollmentProfile.realm == realm, WindowsEnrollmentProfile.id != profile.id).first()
     if realm and not taken:

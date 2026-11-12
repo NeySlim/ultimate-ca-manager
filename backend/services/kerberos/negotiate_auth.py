@@ -159,12 +159,20 @@ def is_configured():
     modes ("nobody configured Kerberos" vs "Kerberos is configured but the
     optional dependency isn't installed") stay distinguishable in logs.
     """
-    if not (is_enabled() and get_spn() and KEYTAB_PATH.exists()):
-        return False
+    return not_configured_reason() is None
+
+
+def not_configured_reason():
+    """Why the Kerberos binding serves nobody, None when it is configured."""
+    if not is_enabled():
+        return 'Kerberos is disabled'
+    if not get_spn():
+        return 'no SPN set'
+    if not KEYTAB_PATH.exists():
+        return 'no keytab uploaded'
     # A profile without a realm, or disabled, serves no Kerberos client (A1)
-    from services.windows_profiles import serving_profile
-    profile = serving_profile()
-    return bool(profile is not None and profile.realm)
+    from services.windows_profiles import kerberos_refusal
+    return kerberos_refusal()
 
 
 def sync_keytab_file(raw_bytes):
@@ -220,6 +228,7 @@ def restore_keytab_at_start(app):
     Never raises."""
     from models import SharedFile, db
     from services import shared_files, windows_profiles
+    from services.windows_profiles.legacy import warn_without_realm
     from utils.ha import ha_enabled
     with app.app_context():
         try:
@@ -238,6 +247,7 @@ def restore_keytab_at_start(app):
                     profile = profile or windows_profiles.default_for_write('system')
                     profile.set_keytab(data)
                     windows_profiles.fill_realm(profile)
+                    warn_without_realm(profile.realm, is_enabled(), get_spn(), data)
                     windows_profiles.publish_keytab()
                     db.session.commit()
                     logger.info("Kerberos keytab stored in the default Windows enrollment profile")

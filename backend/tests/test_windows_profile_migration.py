@@ -1,6 +1,6 @@
 """Migration 155: a 2.x base of either backend gets a default Windows enrollment profile carrying
 exactly its XCEP/WSTEP configuration, the settings it replaces are gone, the WSTEP certificates
-are attached to it, and the realm follows A1 (connector, SPN, keytab; ambiguous: disabled)."""
+are attached to it, and the realm follows A1 (connector, SPN, keytab; none: Kerberos refused)."""
 import base64
 import importlib
 import os
@@ -199,19 +199,39 @@ def test_the_realm_comes_from_the_connector_then_the_spn_then_the_keytab(base, c
     assert profile['realm'] == realm and bool(profile['enabled'])
 
 
-def test_an_undeterminable_realm_leaves_the_profile_disabled(base):
-    base.seed(settings={**SETTINGS_2X, 'kerberos_spn': 'HTTP/ucm.example'}, connector=None)
-    base.migrate(keytab=TWO_REALMS)
+NO_DC = {**CONNECTOR_2X, 'base_dn': 'OU=Servers,O=corp'}
+SPN_NO_REALM = {**SETTINGS_2X, 'kerberos_spn': 'HTTP/ucm.example'}
+UNDETERMINABLE = [
+    pytest.param(SPN_NO_REALM, None, TWO_REALMS, id='two-realm-keytab-no-connector'),
+    pytest.param(SPN_NO_REALM, {**CONNECTOR_2X, 'enabled': False, 'base_dn': 'DC=other,DC=example'},
+                 TWO_REALMS, id='two-realm-keytab-connector-disabled'),
+    pytest.param(SPN_NO_REALM, NO_DC, TWO_REALMS, id='two-realm-keytab-connector-without-dc'),
+    pytest.param({**SETTINGS_2X, 'kerberos_spn': ''}, None, TWO_REALMS, id='kerberos-enabled-empty-spn'),
+]
+
+
+@pytest.mark.parametrize('settings, connector, keytab', UNDETERMINABLE)
+def test_an_undeterminable_realm_leaves_the_profile_enabled_without_realm(base, settings, connector,
+                                                                          keytab, caplog):
+    """A1 refuses Kerberos only: the profile stays enabled, so the other bindings serve as in 2.x."""
+    base.seed(settings=settings, connector=connector)
+    with caplog.at_level('WARNING', logger='services.windows_profiles.legacy'):
+        base.migrate(keytab=keytab)
     profile, = base.profiles()
-    assert profile['realm'] is None and not profile['enabled']
+    assert profile['realm'] is None and bool(profile['enabled'])
+    warned = 'default profile has no realm: Kerberos refused until one is set' in caplog.text
+    # Only where 2.x served Kerberos (enabled, SPN, keytab) does the refusal change anything
+    assert warned == bool(settings['kerberos_spn'])
 
 
-def test_without_kerberos_in_use_an_unknown_realm_does_not_disable(base):
+def test_without_kerberos_in_use_an_unknown_realm_does_not_disable(base, caplog):
     base.seed(settings={**SETTINGS_2X, 'kerberos_enabled': 'false', 'kerberos_spn': 'HTTP/ucm'},
               connector=None)
-    base.migrate(keytab=TWO_REALMS)
+    with caplog.at_level('WARNING', logger='services.windows_profiles.legacy'):
+        base.migrate(keytab=TWO_REALMS)
     profile, = base.profiles()
     assert profile['realm'] is None and profile['enabled']
+    assert 'no realm' not in caplog.text
 
 
 def test_upgrading_a_real_2x_base_gives_the_direct_conversion(base):

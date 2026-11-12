@@ -66,19 +66,30 @@ def spn_realm(spn):
 
 def resolve_realm(connector, spn, keytab):
     """A1: the realm of the enabled connector's base DN, else of the SPN, else the single
-    realm of the keytab entries; ``(realm, ambiguous)``, ambiguous when the keytab names several."""
+    realm of the keytab entries; None when none of them says."""
     from services.ad_connector.lookup import realm_of_base_dn
     if connector and connector.get('enabled') and connector.get('base_dn'):
         realm = realm_of_base_dn(connector['base_dn'])
         if realm:
-            return realm, False
+            return realm
     realm = spn_realm(spn)
     if realm:
-        return realm, False
+        return realm
     realms = keytab_realms(keytab) if keytab else None
     if realms and len(realms) == 1:
-        return next(iter(realms)), False
-    return None, bool(keytab)
+        return next(iter(realms))
+    return None
+
+
+NO_REALM = 'default profile has no realm: Kerberos refused until one is set'
+
+
+def warn_without_realm(realm, kerberos_enabled, spn, keytab):
+    """Log A1's one change to 2.x: Kerberos 2.x served (enabled, SPN, keytab) and no realm now."""
+    if realm is None and kerberos_enabled and spn and keytab:
+        logger.warning('Windows enrollment: %s', NO_REALM)
+        return True
+    return False
 
 
 def has_windows_configuration(settings, keytab=None):
@@ -98,23 +109,18 @@ def profile_from_2x(settings, connector=None, keytab=None):
     """The default profile's columns from 2.x ``settings`` (key -> value), the connector row
     (dict with ``id``, ``enabled``, ``base_dn``) and the keytab bytes; None without configuration.
 
-    Kerberos in use with no determinable realm: the profile is disabled (A1).
+    Always enabled: without a realm only Kerberos is refused (A1), the other bindings serve as in 2.x.
     """
     if not has_windows_configuration(settings, keytab):
         return None
-    realm, ambiguous = resolve_realm(connector, settings.get('kerberos_spn'), keytab)
-    kerberos_in_use = (str(settings.get('kerberos_enabled') or '').lower() == 'true'
-                       and bool(keytab))
-    enabled = not (realm is None and ambiguous and kerberos_in_use)
-    if not enabled:
-        logger.warning("Windows enrollment: the realm of the default profile cannot be determined "
-                       "(the keytab names several realms and no connector or SPN says which); "
-                       "the profile is disabled until a realm is set")
+    spn = settings.get('kerberos_spn')
+    realm = resolve_realm(connector, spn, keytab)
+    warn_without_realm(realm, str(settings.get('kerberos_enabled') or '').lower() == 'true', spn, keytab)
     return {
         'name': DEFAULT_NAME,
         'realm': realm,
         'is_default': True,
-        'enabled': enabled,
+        'enabled': True,
         'connector_id': connector.get('id') if connector else None,
         'issuing_ca_refid': settings.get('wstep_ca_refid') or None,
         'policy_ca_refid': settings.get('xcep_ca_refid') or None,

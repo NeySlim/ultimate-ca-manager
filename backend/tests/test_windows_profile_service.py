@@ -348,30 +348,143 @@ def test_a_ca_a_template_or_a_connector_used_by_a_profile_is_not_deleted(app, cl
         db.session.commit()
 
 
-def test_an_undeterminable_realm_serves_nothing(app, client, clean_slate, two_cas, monkeypatch, tmp_path):
-    """A1: keytab of two realms, no connector realm, no SPN realm: disabled, Kerberos refused."""
+@pytest.fixture
+def no_shared_keytab(app):
+    """No keytab in shared_files during the test; the one there before is put back."""
+    from models import SharedFile
+    from services import shared_files
+    with app.app_context():
+        row = db.session.get(SharedFile, shared_files.KERBEROS_KEYTAB)
+        saved = (row.content, row.updated_at, row.updated_by) if row is not None else None
+        if row is not None:
+            db.session.delete(row)
+        db.session.commit()
+    yield
+    with app.app_context():
+        SharedFile.query.filter_by(name=shared_files.KERBEROS_KEYTAB).delete()
+        if saved is not None:
+            db.session.add(SharedFile(name=shared_files.KERBEROS_KEYTAB, content=saved[0],
+                                      updated_at=saved[1], updated_by=saved[2]))
+        db.session.commit()
+
+
+def _connector_as(state):
+    """The shared connector row as a 2.x case wants it; None: as good as absent."""
+    connector = ADConnectorConfig.get_singleton()
+    if connector is None:
+        connector = ADConnectorConfig(name='default', server='dc.c01.example')
+        db.session.add(connector)
+    connector.enabled, connector.base_dn = (state['enabled'], state['base_dn']) if state else (False, None)
+
+
+def _fixed_message_id(monkeypatch):
+    import types
+    import uuid
+    from services.wstep import soap_envelope
+    fixed = uuid.UUID('00000000-0000-4000-8000-000000000155')
+    monkeypatch.setattr(soap_envelope, 'uuid', types.SimpleNamespace(uuid4=lambda: fixed))
+
+
+def _undeterminable():
+    from tests.test_windows_profile_migration import UNDETERMINABLE
+    return UNDETERMINABLE
+
+
+@pytest.mark.parametrize('settings, connector, keytab', _undeterminable())
+def test_an_undeterminable_realm_refuses_kerberos_only(app, client, auth_client, clean_slate, two_cas,
+                                                       no_shared_keytab, monkeypatch, tmp_path,
+                                                       settings, connector, keytab):
+    """A1, the 2.x settings the review replayed: UsernamePassword (XCEP, WSTEP) and the renewal by
+    certificate answer as 2.x did; Kerberos, which 2.x served with an SPN, is refused with its reason."""
+    from api.wstep_protocol import _check_credentials, _resolve_wstep_ca, _validity_days
+    _fixed_message_id(monkeypatch)
+    issuing, policy, _template = two_cas
+    path = tmp_path / 'kerberos.keytab'
+    path.write_bytes(keytab)
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', path)
+    with app.app_context():
+        _connector_as(connector)
+        values = {**_settings_2x(issuing, policy), 'kerberos_enabled': 'true',
+                  'kerberos_spn': settings['kerberos_spn']}
+        for key, value in values.items():
+            _set(key, value)
+        db.session.commit()
+        served_by_2x = bool(negotiate_auth.is_enabled() and negotiate_auth.get_spn() and path.exists())
+        before = _get_policies_as_2x(app)
+        _migrate_app_db(keytab=keytab)
+        profile = _default()
+        assert profile.realm is None and profile.enabled
+        with app.test_request_context('/'):
+            assert _check_credentials('c01-ces-user', 'c01-ces-password')
+            assert _resolve_wstep_ca()[0].refid == issuing['refid'] and _validity_days() == 42
+        assert negotiate_auth.is_configured() is False
+    # 2.x also advertised the Kerberos CES when it served it: the only byte that differs
+    r = client.post(XCEP_URL, data=_envelope())
+    assert r.status_code == 200 and r.data == before
+    reason = auth_client.get('/api/v2/kerberos/config').get_json()['data']['reason']
+    assert reason == ('default profile has no realm: Kerberos refused until one is set'
+                      if served_by_2x else 'no SPN set')
+
+
+def test_the_realm_of_the_default_profile_is_set_through_the_kerberos_route(
+        app, auth_client, clean_slate, two_cas, no_shared_keytab, monkeypatch, tmp_path):
+    """The way out of A1's refusal: an explicit realm, in capitals, one the keytab names."""
     from tests.test_windows_profile_migration import TWO_REALMS
     issuing, policy, _template = two_cas
-    keytab = tmp_path / 'kerberos.keytab'
-    keytab.write_bytes(TWO_REALMS)
-    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', keytab)
+    path = tmp_path / 'kerberos.keytab'
+    path.write_bytes(TWO_REALMS)
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', path)
     with app.app_context():
-        connector = ADConnectorConfig.get_singleton()
-        if connector is not None:
-            connector.enabled = False
+        _connector_as(None)
         for key, value in {**_settings_2x(issuing, policy), 'kerberos_enabled': 'true',
-                           'kerberos_spn': 'HTTP/ucm.c01.example'}.items():
+                           'kerberos_spn': 'HTTP/ucm.example'}.items():
             _set(key, value)
         db.session.commit()
         _migrate_app_db(keytab=TWO_REALMS)
-        profile = _default()
-        assert profile.realm is None and not profile.enabled
-        assert negotiate_auth.is_configured() is False
-    r = client.post(XCEP_URL, data=_envelope())
-    assert r.status_code == 400 and b'Authentication failed' in r.data
+    # Capitals, keytab or not
+    assert auth_client.patch('/api/v2/kerberos/config', json={'realm': 'two.example'}).status_code == 400
     with app.app_context():
-        _default().enabled = True
+        _default().set_keytab(TWO_REALMS)
         db.session.commit()
-        # Enabled again but still without a realm: the other bindings serve, Kerberos does not
-        assert negotiate_auth.is_configured() is False
-    assert client.post(XCEP_URL, data=_envelope()).status_code == 200
+    for bad, status in (('two.example', 400), ('THREE.EXAMPLE', 400), ('', 400), (None, 400)):
+        r = auth_client.patch('/api/v2/kerberos/config', json={'realm': bad})
+        assert r.status_code == status, (bad, r.data)
+    with app.app_context():
+        assert _default().realm is None and negotiate_auth.is_configured() is False
+    assert auth_client.patch('/api/v2/kerberos/config', json={'realm': 'TWO.EXAMPLE'}).status_code == 200
+    data = auth_client.get('/api/v2/kerberos/config').get_json()['data']
+    assert (data['realm'], data['configured'], data['reason']) == ('TWO.EXAMPLE', True, None)
+
+
+@pytest.mark.parametrize('keytab, realm', [('ONE_REALM', 'EXAMPLE.TEST'), ('TWO_REALMS', None)],
+                         ids=['one-realm', 'two-realms'])
+def test_the_profile_is_the_same_whether_the_migration_reads_the_keytab_or_not(
+        app, clean_slate, two_cas, no_shared_keytab, monkeypatch, tmp_path, caplog, keytab, realm):
+    """Unread by the migration, the keytab is taken at startup with the same realm and warning."""
+    from tests import test_windows_profile_migration as fixtures
+    keytab = getattr(fixtures, keytab)
+    issuing, policy, _template = two_cas
+    path = tmp_path / 'kerberos.keytab'
+    path.write_bytes(keytab)
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', path)
+    settings = {**_settings_2x(issuing, policy), 'kerberos_enabled': 'true', 'kerberos_spn': 'HTTP/ucm.example'}
+    seen = []
+    for read in (True, False):
+        with app.app_context():
+            _connector_as(None)
+            for key, value in settings.items():
+                _set(key, value)
+            db.session.commit()
+            caplog.clear()
+            with caplog.at_level('WARNING'):
+                _migrate_app_db(keytab=keytab if read else b'')
+        with caplog.at_level('WARNING'):
+            negotiate_auth.restore_keytab_at_start(app)
+        with app.app_context():
+            profile = _default()
+            seen.append((_columns(profile), profile.keytab_bytes(), 'has no realm' in caplog.text))
+            WindowsEnrollmentProfile.query.filter_by(id=profile.id).delete()
+            db.session.commit()
+    assert seen[0] == seen[1]
+    assert seen[0][0]['realm'] == realm and seen[0][0]['enabled'] and seen[0][1] == keytab
+    assert seen[0][2] == (realm is None)
