@@ -177,3 +177,17 @@ class TestTheScheduleReportsWhatHappened:
                 assert 'password' in (status['last_outcome_reason'] or '')
             finally:
                 _set('auto_backup_enabled', 'false')
+
+
+def test_protection_checks_the_archives_once_per_pass(monkeypatch):
+    # tampered() hashes every archive: one call per pass, not one per archive
+    from services.backup import schedule, storage
+    calls = []
+    monkeypatch.setattr(storage, 'newest_validated', lambda paths: None)
+    monkeypatch.setattr(storage, 'unrecorded', lambda paths: [])
+    monkeypatch.setattr(storage, 'tampered', lambda paths: calls.append(1) or [])
+    monkeypatch.setattr(schedule, '_newest_first', lambda paths: list(paths))
+    monkeypatch.setattr(schedule, '_min_keep', lambda: 2)
+    paths = [f'/nonexistent/b{i}.ucmbkp' for i in range(30)]
+    assert schedule._protected_archives(paths) == set(paths[:2])
+    assert len(calls) == 1
