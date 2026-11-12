@@ -472,6 +472,7 @@ class TestOcsp:
         assert _ocsp(app, ca_cert, leaf) == (ocsp.OCSPCertStatus.REVOKED, x509.ReasonFlags.key_compromise)
 
     def test_a_record_of_the_live_row_itself_was_lifted(self, app, backend):
+        """Non-regression: passes with or without the OCSP change, not a proof of it."""
         ca, ca_key, ca_cert = _make_ca()
         leaf = _issue(ca_key, ca_cert, SERIAL_A)
         row = _store(ca, leaf, str(SERIAL_A))
