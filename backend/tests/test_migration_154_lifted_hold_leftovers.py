@@ -1,6 +1,7 @@
 """Migration 154 deletes, once, the suspension records a lifted hold left linked to its
 unrevoked row of the same serial under its CA or a twin of the same key, and nothing else
-(SQLite and PostgreSQL)."""
+It does nothing on a base whose 2.x migration 136 already ran that cleanup (SQLite and
+PostgreSQL)."""
 import base64
 import importlib
 import os
@@ -56,6 +57,9 @@ RECORD_ROWS = [  # (id, caref, serial, reason, certificate_id), kept afterwards?
     ((9, 'ca-namesake', '400', 'certificateHold', 4), True),  # same key, another subject
 ]
 KEPT = sorted(row[0] for row, kept in RECORD_ROWS if kept)
+ALL = sorted(row[0] for row, _ in RECORD_ROWS)
+CLEANED_IN_2X = '136_lifted_hold_leftovers'
+_MIGRATIONS_DDL = "CREATE TABLE _migrations (name VARCHAR(255) PRIMARY KEY)"
 
 
 def _sqlite():
@@ -76,13 +80,24 @@ def test_sqlite_deletes_the_leftovers_once():
         assert [r for (r,) in conn.execute(f"SELECT id FROM {RECORDS} ORDER BY id")] == KEPT
 
 
+def test_sqlite_after_the_2x_cleanup_does_nothing():
+    """A 2.x base that ran 136 had its one cleanup: a hold linked since is real and stays."""
+    conn = _sqlite()
+    conn.execute(_MIGRATIONS_DDL)
+    conn.execute("INSERT INTO _migrations (name) VALUES (?)", (CLEANED_IN_2X,))
+    conn.commit()
+    _migration().upgrade(conn)
+    assert [r for (r,) in conn.execute(f"SELECT id FROM {RECORDS} ORDER BY id")] == ALL
+
+
 def test_sqlite_without_tables_does_nothing():
     _migration().upgrade(sqlite3.connect(':memory:'))
 
 
 @pytest.mark.postgres
 @pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_postgresql():
+@pytest.mark.parametrize('cleaned_in_2x', [False, True])
+def test_postgresql(cleaned_in_2x):
     schema = f"m154_{os.getenv('PYTEST_XDIST_WORKER', 'main')}_{uuid.uuid4().hex[:6]}"
     admin = create_engine(PG_URL)
     with admin.begin() as conn:
@@ -98,11 +113,15 @@ def test_postgresql():
                          [dict(zip('icsv', row)) for row in CERT_ROWS])
             conn.execute(text(f"INSERT INTO {RECORDS} VALUES (:i, :c, :s, :r, :t)"),
                          [dict(zip('icsrt', row)) for row, _ in RECORD_ROWS])
+            if cleaned_in_2x:
+                conn.execute(text(_MIGRATIONS_DDL))
+                conn.execute(text("INSERT INTO _migrations (name) VALUES (:n)"), {'n': CLEANED_IN_2X})
+        expected = ALL if cleaned_in_2x else KEPT
         for _ in range(2):
             with engine.begin() as conn:
                 _migration().upgrade(conn)
             with engine.begin() as conn:
-                assert [r for (r,) in conn.execute(text(f"SELECT id FROM {RECORDS} ORDER BY id"))] == KEPT
+                assert [r for (r,) in conn.execute(text(f"SELECT id FROM {RECORDS} ORDER BY id"))] == expected
     finally:
         engine.dispose()
         with admin.begin() as conn:

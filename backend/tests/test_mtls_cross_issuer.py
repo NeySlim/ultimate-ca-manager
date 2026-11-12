@@ -90,7 +90,8 @@ def test_an_enrolment_without_certificate_keeps_both_readings_of_an_all_digit_se
 
 def test_an_enrolment_without_certificate_is_not_closed_by_another_serials_record(app, twin_records):
     """Each reading of the enrolment's text matches its own unambiguous spellings: the record of
-    another serial whose decimal is one reading's all-digit hex closes nothing."""
+    another serial whose decimal is one reading's all-digit hex closes nothing. Non-regression:
+    passes before and after the change, the record column being canonical decimal here."""
     from services.mtls_auth_service import MTLSAuthService
     from tests.test_revocation_record_rule import _homonyms
     d, h = _homonyms()  # format(h, 'x') == str(d)

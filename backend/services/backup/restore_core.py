@@ -420,6 +420,7 @@ class RestoreCoreMixin:
         staged = StagedFiles()
         # What the rows had on disk before: a file no row names afterwards goes with the commit
         files_before = _row_file_paths()
+        aligned = []
         try:
             with single_transaction(), insert_file_writes_suspended():
                 replacement = None
@@ -440,6 +441,9 @@ class RestoreCoreMixin:
                 # same restore has just created.
                 results['relinked'] = relink_references(backup_data, plan)
                 results['repairs'] = replay_repairs(backup_data, plan)
+                # The rows written take the revocation their CA records, as the hourly pass does
+                aligned = self._align_restored_revocations(plan)
+                results['revoked_from_records'] = len(aligned)
                 if plan.written.get('acme_client_orders'):
                     results['acme_client_orders_repaired'] = results['repairs'].get(
                         '121_acme_renewal_order_duplicates', {'reissued': 0, 'dropped': 0})
@@ -480,6 +484,11 @@ class RestoreCoreMixin:
         finally:
             staged.discard()
 
+        if aligned:
+            from services.audit_service import AuditService
+            for entry in aligned:
+                AuditService.log_action(username='system', **entry)
+
         from utils import admin_allowlist
         admin_allowlist.invalidate_cache()
         if results.get('admin_allowlist_cleared'):
@@ -498,6 +507,17 @@ class RestoreCoreMixin:
         # restores data, and an API route is where revoking every session and
         # asking for a restart belongs (see invalidate_after_restore).
         return results
+
+    @staticmethod
+    def _align_restored_revocations(plan) -> List[Dict[str, Any]]:
+        """Mark the certificate rows the restore wrote from their CA's records (the hourly
+        pass's function, limited to them); returns their audit entries, logged after the commit."""
+        from services.cert.issued_lookup import apply_persisted_revocations
+        from services.ski_aki_backfill import _marked_entry
+        ids = plan.written.get('certificates')
+        if not ids:
+            return []
+        return [_marked_entry(row, record) for row, record in apply_persisted_revocations(ids)]
 
     @staticmethod
     def _check_serial_duplicates(backup_data: Dict[str, Any]) -> None:
@@ -761,11 +781,20 @@ class RestoreCoreMixin:
 
         results.setdefault('revoked_serials', 0)
         results.setdefault('revoked_serials_skipped', 0)
+        # The archive's own leftovers of a lifted hold are not suspensions; nothing here is touched
+        from .restore.repairs import archived_lifted_holds
+        lifted = archived_lifted_holds(backup_data)
+        results['lifted_holds_skipped'] = len(lifted)
+        if lifted:
+            logger.info("Restore: %d hold record(s) an older release left behind a lifted hold "
+                        "not restored", len(lifted))
         # A record whose CA is neither in the database nor in the backup
         # would fail the foreign key on PostgreSQL and abort the whole restore
         known = {ca.refid for ca in CA.query.with_entities(CA.refid).all()}
         known.update(c.get('refid') for c in backup_data.get('certificate_authorities', []) if c.get('refid'))
         for position, rs_data in enumerate(backup_data.get('revoked_serials', [])):
+            if position in lifted:
+                continue
             caref = rs_data.get('caref')
             # An older archive holds any spelling: matched and written in the stored one
             serial = canonical_serial(rs_data.get('serial_number'))
@@ -910,6 +939,7 @@ class RestoreCoreMixin:
         """
         plan = plan if plan is not None else RestorePlan.build(backup_data)
 
+        written = []
         for cert_data in backup_data.get('certificates', []):
             cert = Certificate.query.filter_by(refid=cert_data['refid']).first()
 
@@ -960,7 +990,10 @@ class RestoreCoreMixin:
                 cert.invalidity_at = _archived_datetime(
                     where, 'invalidity_at', cert_data.get('invalidity_at'))
             cert.archived = bool(cert_data.get('archived', False))
+            written.append(cert)
             results['certificates'] += 1
+        db.session.flush()
+        plan.written.setdefault('certificates', set()).update(cert.id for cert in written)
 
     def _restore_acme_accounts(self, backup_data: Dict, results: Dict) -> None:
         """Restore ACME accounts from backup data (RFC 8555)"""

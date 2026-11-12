@@ -4,6 +4,8 @@ Lifting a hold used to delete only the record of the row's spelling under the ro
 CA, so a record of the same serial under a twin of the same key, still linked to the
 row, outlived it. A record now always says revoked: such a leftover is deleted once here.
 Exact comparison: both columns are canonical decimal since migration 144. Idempotent.
+A base whose 2.x migration 136 already ran this cleanup is left alone: a hold linked since
+is real (a merge restore of an older archive, before the hourly pass).
 """
 import base64
 import logging
@@ -18,6 +20,7 @@ logger = logging.getLogger(__name__)
 RECORDS = 'revoked_serials'
 CERTS = 'certificates'
 CAS = 'certificate_authorities'
+CLEANED_IN_2X = '136_lifted_hold_leftovers'
 _CANDIDATES = (
     f"SELECT r.id, r.caref, c.caref FROM {RECORDS} r JOIN {CERTS} c ON c.id = r.certificate_id "
     "WHERE r.revoke_reason IN ('certificateHold', 'certificate_hold') "
@@ -56,6 +59,9 @@ def _upgrade_sqlite(conn):
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     if not {RECORDS, CERTS, CAS} <= tables:
         return
+    if '_migrations' in tables and conn.execute(
+            "SELECT 1 FROM _migrations WHERE name = ?", (CLEANED_IN_2X,)).fetchone():
+        return
 
     def ca_crt(refid):
         row = conn.execute(f"SELECT crt FROM {CAS} WHERE refid = ?", (refid,)).fetchone()
@@ -70,7 +76,11 @@ def _upgrade_sqlite(conn):
 def _upgrade_pg(conn):
     from sqlalchemy import inspect, text
 
-    if not {RECORDS, CERTS, CAS} <= set(inspect(conn).get_table_names()):
+    tables = set(inspect(conn).get_table_names())
+    if not {RECORDS, CERTS, CAS} <= tables:
+        return
+    if '_migrations' in tables and conn.execute(
+            text("SELECT 1 FROM _migrations WHERE name = :n"), {'n': CLEANED_IN_2X}).first():
         return
 
     def ca_crt(refid):

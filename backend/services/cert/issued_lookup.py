@@ -21,7 +21,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import Encoding
 
 from models import CA, Certificate, RevokedSerial, db
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import utc_isoformat, utc_now
 from utils.serial_format import canonical_serial, serial_variants
 
 OK = 'ok'
@@ -209,6 +209,42 @@ def effective_revocation(row: Certificate):
     return gravest_revocation(row if row.revoked else None, row_persisted_revocation(row))
 
 
+def persisted_revocations_of(rows) -> dict:
+    """``{row id: record}`` as ``row_persisted_revocation`` answers each of ``rows``, from one
+    query of their serials' records (and one per CA a record names): a page, not a row each."""
+    from utils.cert_issuer import same_key_refids
+    serials = {row.id: serial for row in rows if row.caref and row.crt
+               and (serial := _row_serial(row)) is not None}
+    if not serials:
+        return {}
+    by_column = {}
+    for record in RevokedSerial.query.filter(
+            RevokedSerial.serial_number.in_({canonical_serial(s) for s in serials.values()})):
+        by_column.setdefault(record.serial_number, []).append(record)
+    refids, found = {}, {}
+    for row in rows:
+        records = by_column.get(canonical_serial(serials[row.id])) if row.id in serials else None
+        if not records:
+            continue
+        if row.caref not in refids:
+            ca = CA.query.filter_by(refid=row.caref).first()
+            refids[row.caref] = set(same_key_refids(ca)) if ca is not None else set()
+        mine = [r for r in records if r.caref in refids[row.caref]]
+        if mine:
+            found[row.id] = min(mine, key=revocation_order)
+    return found
+
+
+def show_effective_revocation(data: dict, row: Certificate, record) -> dict:
+    """``data`` (``row.to_dict()``) with the revocation ``record`` makes when it is graver
+    than the row's own, as OCSP and the CRL answer it."""
+    holder = gravest_revocation(row if row.revoked else None, record)
+    if holder is not None and holder is not row:
+        data.update(revoked=True, status='revoked', revoke_reason=holder.revoke_reason,
+                    revoked_at=utc_isoformat(holder.revoked_at), invalidity_at=utc_isoformat(holder.invalidity_at))
+    return data
+
+
 def apply_persisted_revocation(row: Certificate, record=None) -> bool:
     """Mark ``row`` revoked from the record its CA still holds for its serial: a certificate
     revoked, deleted and imported again comes back revoked. A given final ``record`` also
@@ -229,9 +265,10 @@ def apply_persisted_revocation(row: Certificate, record=None) -> bool:
     return True
 
 
-def apply_persisted_revocations() -> list:
+def apply_persisted_revocations(ids=None) -> list:
     """Mark revoked every linked, unrevoked row holding a serial its CA recorded as revoked
-    (rows stored by an earlier release). No commit; returns ``(row, record)`` per row marked."""
+    (rows stored by an earlier release), only the rows of ``ids`` when given (what a restore
+    wrote). No commit; returns ``(row, record)`` per row marked."""
     from sqlalchemy import or_
     # Read afresh: a revocation or hold another worker made since this session loaded it counts
     db.session.flush()
@@ -245,6 +282,8 @@ def apply_persisted_revocations() -> list:
                 Certificate.serial_number.in_(columns[start:start + 500]),
                 Certificate.caref.isnot(None), Certificate.crt.isnot(None),
                 or_(Certificate.revoked.is_(False), Certificate.revoked.is_(None))).all():
+            if ids is not None and row.id not in ids:
+                continue
             record = row_persisted_revocation(row)
             if record is not None and apply_persisted_revocation(row, record):
                 marked.append((row, record))

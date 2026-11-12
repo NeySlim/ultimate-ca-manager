@@ -25,7 +25,9 @@ def get_certificate(cert_id):
     if not cert:
         return error_response('Certificate not found', 404)
 
-    data = cert.to_dict()
+    # The revocation a record of its CA makes counts as OCSP and the CRL answer it
+    from services.cert.issued_lookup import row_persisted_revocation, show_effective_revocation
+    data = show_effective_revocation(cert.to_dict(), cert, row_persisted_revocation(cert))
     # The certificate an unhold would lift with this one, so the client announces only that
     from services.cert.related_pair import unhold_partner
     partner = unhold_partner(cert)

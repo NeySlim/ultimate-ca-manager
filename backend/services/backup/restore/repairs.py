@@ -84,6 +84,52 @@ def replay_order_repairs(ids: Iterable[int]) -> Dict[str, int]:
     return {'reissued': reissued, 'dropped': dropped}
 
 
+# First release whose hold lift deletes every record of the serial: an archive from an older
+# one may carry the suspension records such a lift left behind (migration 154's leftovers)
+FIRST_RELEASE_LIFTING_EVERY_RECORD = (2, 254)
+_HOLD_REASONS = ('certificateHold', 'certificate_hold')
+
+
+def archive_may_hold_lifted_holds(backup_data) -> bool:
+    """Whether the archive's ``ucm_version`` predates ``FIRST_RELEASE_LIFTING_EVERY_RECORD``
+    (an archive that names no readable version counts as older). It carries no list of the
+    migrations its base had applied, so its release is what tells."""
+    import re
+    metadata = backup_data.get('metadata')
+    version = metadata.get('ucm_version') if isinstance(metadata, dict) else None
+    match = re.match(r'v?(\d+)\.(\d+)', str(version or '').strip())
+    return match is None or (int(match[1]), int(match[2])) < FIRST_RELEASE_LIFTING_EVERY_RECORD
+
+
+def archived_lifted_holds(backup_data) -> Set[int]:
+    """Positions in the archive's ``revoked_serials`` of the holds an older release left
+    behind a lift: migration 154's rule, judged on the archive alone (a suspension linked to
+    the archived, unrevoked certificate of the same serial under its CA or a twin of its key)."""
+    import base64
+    from utils.serial_format import canonical_serial
+    if not archive_may_hold_lifted_holds(backup_data):
+        return set()
+    certificates = {row.get('refid'): row for row in _archived_rows(backup_data, 'certificates')}
+    pems = {row.get('refid'): row.get('certificate_pem')
+            for row in _archived_rows(backup_data, 'certificate_authorities')}
+    candidates = []
+    for position, record in enumerate(backup_data.get('revoked_serials') or []):
+        if not isinstance(record, dict) or record.get('revoke_reason') not in _HOLD_REASONS:
+            continue
+        link = record.get('certificate_id_ref')
+        row = certificates.get(link.get('refid')) if isinstance(link, dict) else None
+        if row is None or row.get('revoked'):
+            continue
+        serial = canonical_serial(record.get('serial_number'))
+        if serial and serial == canonical_serial(row.get('serial_number')):
+            candidates.append((position, record.get('caref'), row.get('caref')))
+
+    def ca_crt(refid):
+        pem = pems.get(refid)
+        return base64.b64encode(pem.encode()).decode() if isinstance(pem, str) else None
+    return set(_migration('154_lifted_hold_leftovers').leftovers(candidates, ca_crt))
+
+
 def _eab_keys_blob(backup_data, plan) -> int:
     """101: a restored `acme_eab_keys` blob becomes credentials, as on the source."""
     if 'acme_eab_keys' not in restored_setting_keys(backup_data):

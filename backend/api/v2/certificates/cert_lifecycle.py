@@ -233,11 +233,13 @@ def unhold_certificate(cert_id):
     if not cert:
         return error_response('Certificate not found', 404)
 
-    if not cert.revoked:
+    # A hold its record alone carries (row not yet aligned) lifts too, as OCSP and the CRL say it
+    from services.cert.issued_lookup import effective_revocation
+    if not cert.revoked and effective_revocation(cert) is None:
         return error_response('Certificate is not revoked', 400)
 
-    # Only certificateHold can be unheld
-    if cert.revoke_reason not in HOLD_REASONS:
+    # Only certificateHold can be unheld (a final record is refused below with 409)
+    if cert.revoked and cert.revoke_reason not in HOLD_REASONS:
         return error_response(
             'Only certificates with reason "certificateHold" can be unheld', 400
         )
@@ -284,6 +286,8 @@ def unhold_certificate(cert_id):
             member_ca = cas[member.id]
             if not (member_ca and member_ca.delta_crl_enabled and member_ca.cdp_enabled):
                 continue
+            # A hold its record alone carries is listed from the row while the delta says removeFromCRL
+            member.revoked = True
             member.revoke_reason = 'removeFromCRL'
             member.revoked_at = utc_now()
             staged_cas[member_ca.id] = member_ca
