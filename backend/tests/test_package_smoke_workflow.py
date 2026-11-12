@@ -25,7 +25,7 @@ def _dist(image):
 def _built_packages(build):
     """(sample asset name, build image or None for a DEB) of every package the build produces."""
     out = []
-    for job in build['jobs'].values():
+    for name, job in build['jobs'].items():
         paths = ''
         for step in job.get('steps', []):
             if str(step.get('uses', '')).startswith('actions/upload-artifact'):
@@ -36,6 +36,9 @@ def _built_packages(build):
             if g.endswith('.deb'):
                 out.append((g.replace('*', '2.1_all'), None))
         if any(g.endswith('.rpm') for g in globs):
+            # An RPM's distribution is only known from matrix.include: refuse what cannot be sampled.
+            if not matrix:
+                raise AssertionError(f'{name}: RPM job without matrix.include')
             for e in matrix:
                 out.append((f"{e['asset_prefix']}2.1-1.{_dist(e['image'])}.noarch.rpm", e['image']))
     return out
@@ -82,6 +85,24 @@ def test_an_unsmoked_second_deb_job_is_caught():
             step['with']['path'] = 'ucm-noble_*.deb'
     build['jobs']['build-deb-noble'] = job
     assert _uncovered(build, _load('release-smoke.yml')) == ['ucm-noble_2.1_all.deb']
+
+
+def _rpm_job_with_matrix(matrix):
+    build = copy.deepcopy(_load('build-release.yml'))
+    job = copy.deepcopy(next(j for j in build['jobs'].values()
+                             if j.get('strategy', {}).get('matrix', {}).get('include')))
+    if matrix is None:
+        job.pop('strategy', None)
+    else:
+        job['strategy']['matrix'] = matrix
+    build['jobs']['build-rpm-extra'] = job
+    return build
+
+
+@pytest.mark.parametrize('matrix', [None, {'image': ['opensuse/leap:16']}])
+def test_an_rpm_job_without_matrix_include_is_refused(matrix):
+    with pytest.raises(AssertionError, match='build-rpm-extra'):
+        _built_packages(_rpm_job_with_matrix(matrix))
 
 
 def test_the_deb_is_smoked_on_debian_and_ubuntu():
