@@ -205,9 +205,9 @@ def backfill_chain():
 def on_certificate_renewed(event_type, payload, ca_refid, meta):
     """Event-bus subscriber: re-materialize the bound HTTPS certificate.
 
-    Runs synchronously in the renewing request (bus contract) but only does
-    file writes plus an async service restart; it reads its own data by
-    refid and never touches the caller's ORM instances.
+    Runs synchronously in the renewing request (bus contract): it writes the files,
+    commits the chain on the caller's session (rolled back on any error, which is
+    logged and never raised) and asks for an async service restart.
     """
     try:
         cert_info = (payload or {}).get('certificate') or {}
