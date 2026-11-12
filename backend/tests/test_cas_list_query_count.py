@@ -116,7 +116,8 @@ def _unexplained(small, big):
     batch boundary, so one more execution of an ``IN (...)`` statement is not growth."""
     import re
     from collections import Counter
-    shape = lambda statement: re.sub(r'IN \([^()]*\)', 'IN (...)', statement)  # noqa: E731
+    # Either parameter style: ``?`` or ``%(name)s::TYPE``
+    shape = lambda statement: re.sub(r'IN \((?:[^()]|\([^()]*\))*\)', 'IN (...)', statement)  # noqa: E731
     few, many = Counter(map(shape, small)), Counter(map(shape, big))
     grown = {s: n for s, n in (many - few).items() if n > 1 or 'IN (...)' not in s}
     grown.update({s: -n for s, n in (few - many).items()})
@@ -128,6 +129,8 @@ def test_one_more_batch_is_not_growth_and_a_query_per_ca_is():
     wider = 'SELECT 1 FROM t WHERE t.id IN (?, ?, ?, ?)'
     per_ca = 'SELECT 1 FROM t WHERE t.id = ?'
     assert _unexplained([batch], [wider]) == {}
+    named = 'SELECT 1 FROM t WHERE t.id IN (%(id_1_1)s::INTEGER, %(id_1_2)s::INTEGER) GROUP BY t.id'
+    assert _unexplained([named], [named.replace(')s::INTEGER)', ')s::INTEGER, %(id_1_3)s::INTEGER)'), named]) == {}
     assert _unexplained([batch], [wider, batch]) == {}
     assert _unexplained([batch], [wider] * 3)
     assert _unexplained([batch, per_ca], [batch, per_ca, per_ca])
