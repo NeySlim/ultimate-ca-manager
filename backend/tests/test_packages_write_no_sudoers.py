@@ -23,20 +23,34 @@ def _fragment(script):
 
 
 def _confine(body, root):
-    """Fail closed: after redirection no absolute path may point outside root."""
-    assert '/etc/sudoers.d' in body
-    body = body.replace('/etc/sudoers.d', str(root / 'etc/sudoers.d'))
-    ok = str(root / 'etc/sudoers.d') + '/'
-    stray = [t for t in re.findall(r'(?<![\w.])/[\w./-]*', body) if not t.startswith(ok) or '..' in t]
+    """Fail closed: after redirection every path is a file of root's sudoers.d, and nothing
+    expands or moves at run time (the suite runs as root on a host that has these files)."""
+    assert '/etc/sudoers.d/' in body
+    body = body.replace('/etc/sudoers.d/', f'{root}/etc/sudoers.d/')
+    code = '\n'.join(line for line in body.splitlines() if not line.lstrip().startswith('#'))
+    assert not re.search(r'[$~`\\]|\.\.|\bcd\b', code), 'refusing to run, the fragment expands or moves'
+    ok = f'{root}/etc/sudoers.d/'
+    # Any word holding a slash, relative ones included
+    stray = [t for t in re.findall(r'[^\s;|&<>()"\']*/[^\s;|&<>()"\']*', code)
+             if not t.startswith(ok) or '/' in t[len(ok):] or '//' in t]
     assert not stray, f'refusing to run, path outside the sandbox: {stray}'
     return body
 
 
-def test_confine_refuses_another_spelling_of_the_path(tmp_path):
-    for odd in ('rm -f /etc//sudoers.d/ucm', 'rm -f /etc/./sudoers.d/ucm', 'rm -f /etc/sudoers.d/ucm /etc/sudoers.d/x\nrm -f /etc/sudoers.d/../shadow', 'rm -f /etc/sudoers.d/ucm; rm -f /var/x'):
-        with pytest.raises(AssertionError):
-            _confine(odd, tmp_path)
-    assert str(tmp_path) in _confine('rm -f /etc/sudoers.d/ucm', tmp_path)
+@pytest.mark.parametrize('odd', [
+    '/etc//sudoers.d/ucm', '/etc/./sudoers.d/ucm', '/etc/sudoers.d/../shadow', '/var/x',
+    '/etc/sudoers.dX/ucm', '"$UCM_CONFIG/sudoers"', '$HOME/x', '~root/x', '$(printf x)',
+    '`printf x`', 'x\\', 'x; cd', 'etc/sudoers.d/ucm', 'x/../../root'])
+def test_confine_refuses_what_leaves_or_expands_out_of_the_sandbox(tmp_path, odd):
+    # The suite runs as root on a host that has these files: nothing may expand at run time
+    with pytest.raises(AssertionError):
+        _confine(f'rm -f /etc/sudoers.d/ucm {odd}\n', tmp_path)
+
+
+def test_confine_keeps_a_fragment_naming_only_the_sandbox(tmp_path):
+    body = _confine('# drop the files (the watcher restarts it)\nrm -f /etc/sudoers.d/ucm-service /etc/sudoers.d/ucm\n',
+                    tmp_path)
+    assert f'{tmp_path}/etc/sudoers.d/ucm-service' in body
 
 
 def _run(script, root):
