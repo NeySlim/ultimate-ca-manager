@@ -1406,6 +1406,9 @@ class SCEPService:
             from services.cert.issued_lookup import REVOKED, issued_certificate_status
             if issued_certificate_status(self.ca, renewal_of)[1] == REVOKED:
                 raise SCEPRequestRefused('Signing certificate has been revoked')
+        # A RenewalReq keeps the renewed certificate's SID extension, resolved at signing
+        from services.ad_connector.renewal_identity import renewal_requester_sid
+        requester_sid = renewal_requester_sid(renewal_of, 'SCEP') if renewal_of is not None else None
 
         # Re-checked here: a manual approval may come after the policies changed
         from services.policy_service import PolicyViolation
@@ -1727,6 +1730,9 @@ class SCEPService:
         builder = add_qc_statements(builder, tpl_ext)
         from utils.custom_extensions import add_custom_extensions, template_custom_extensions
         builder = add_custom_extensions(builder, template_custom_extensions(self.template))
+        if requester_sid:
+            from services.trust_store.csr_operations_mixin import _ad_security_extension
+            builder = builder.add_extension(_ad_security_extension(requester_sid), critical=False)
 
         cert = builder.sign(self.ca_key, sign_hash, default_backend(),
                             rsa_padding=rsa_padding_for(self.ca_key, sign_hash))
