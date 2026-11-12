@@ -138,12 +138,13 @@ class TestRevokedSerialSpellingOnRestore:
 class TestTwoSpellingsOfOneSerialOnRestore:
     """'171' and '0xAB' are one serial: the gravest of their reasons wins, whatever the order."""
 
+    @pytest.mark.parametrize('hexa', ['0xAB', 'AB', 'ab'])
     @pytest.mark.parametrize('order', ['final_first', 'hold_first'])
     @pytest.mark.parametrize('here', [None, ('171', 'keyCompromise'), ('ab', 'certificateHold')])
-    def test_the_final_reason_is_kept(self, app, create_ca, order, here):
+    def test_the_final_reason_is_kept(self, app, create_ca, order, here, hexa):
         from models.revoked_serial import RevokedSerial
         from services.cert.issued_lookup import persisted_revocation
-        ca = create_ca(cn=f'Two Spellings CA {order} {here and here[0]}')
+        ca = create_ca(cn=f'Two Spellings CA {order} {here and here[0]} {hexa}')
         with app.app_context():
             row = db.session.get(CA, ca['id'])
             now = datetime.now(timezone.utc).replace(tzinfo=None)
@@ -153,7 +154,7 @@ class TestTwoSpellingsOfOneSerialOnRestore:
                 db.session.commit()
             archived = [{'caref': row.refid, 'serial_number': serial, 'revoke_reason': reason,
                          'revoked_at': now.isoformat(), 'valid_to': now.isoformat()}
-                        for serial, reason in (('171', 'keyCompromise'), ('0xAB', 'certificateHold'))]
+                        for serial, reason in (('171', 'keyCompromise'), (hexa, 'certificateHold'))]
             if order == 'hold_first':
                 archived.reverse()
             _service()._restore_revoked_serials({'revoked_serials': archived}, {})

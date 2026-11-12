@@ -38,8 +38,9 @@ logger = logging.getLogger(__name__)
 
 
 def _readable_record_serial(archived: Any) -> str:
-    """A record's serial in a spelling the revocation readers accept: decimal when the archive's
-    reads as hex without doubt (``0x``, colons, a hex letter); a bare digit string is kept."""
+    """A record's serial in a spelling the revocation readers accept: kept when it already is one
+    (decimal, bare hex with a letter), else decimal when it reads as hex without doubt (``0x``,
+    colons, leading zeros before a letter); an all-digit string is kept."""
     text = str(archived).strip()
     bare = text.replace(':', '')
     hexa = bare[2:] if bare.lower().startswith('0x') else bare
@@ -769,7 +770,8 @@ class RestoreCoreMixin:
                 RevokedSerial.caref == caref,
                 RevokedSerial.serial_number.in_(spellings),
             ).order_by(RevokedSerial.id).all()
-            taken = plan.rank('revoked_serials', (caref, serial), rs_data, [r.id for r in here])
+            taken = plan.rank('revoked_serials', (caref, str(value) if value is not None else serial),
+                              rs_data, [r.id for r in here])
             existing = next((r for r in here if r.id == taken), None)
             valid_to = _archived_datetime(
                 where, 'valid_to', rs_data.get('valid_to')) or utc_now()
