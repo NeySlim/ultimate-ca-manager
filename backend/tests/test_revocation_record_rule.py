@@ -1153,6 +1153,26 @@ class TestARecordedHoldIsShownAndLifted:
         with app.app_context():
             assert db.session.get(RevokedSerial, record_id) is not None
 
+    @pytest.mark.parametrize('record', ['removeFromCRL', None])
+    def test_remove_from_crl_with_no_hold_record_is_no_interrupted_lift(self, app, auth_client, issuer,
+                                                                       record):
+        """An ACME revocation with reason 8 (row and record) or a row alone proves no lift."""
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf(f'remove-from-crl-{record}.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        record_id = _record(app, refid, real, reason=record, certificate_id=row_id) if record else None
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            row.revoked, row.revoke_reason, row.revoked_at = True, 'removeFromCRL', LATER
+            db.session.commit()
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 409, r.data
+        assert 'not on hold' in r.get_json()['message']
+        assert _row(app, row_id) == (True, 'removeFromCRL', LATER)
+        if record_id:
+            with app.app_context():
+                assert db.session.get(RevokedSerial, record_id).revoke_reason == 'removeFromCRL'
+
     def test_a_lift_left_half_done_in_remove_from_crl_completes(self, app, auth_client, issuer):
         """removeFromCRL on a row is an unhold stopped between its two commits, not a final reason."""
         _, row_id, record_id = self._recorded(app, issuer, 'half-lifted.example.test')
