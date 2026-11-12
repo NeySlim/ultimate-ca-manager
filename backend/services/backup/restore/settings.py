@@ -42,7 +42,7 @@ def restore_encrypted_settings(configuration: Dict[str, Any],
     skip = set(skip)
     restored = 0
     for key in keys or ():
-        if key not in settings or key in installation.LOCAL_SETTINGS or key in skip:
+        if key not in settings or installation.is_local_setting(key) or key in skip:
             continue    # the installation keeps its own identifier; a renumbered one comes later
         value = settings[key]
         if value is None:

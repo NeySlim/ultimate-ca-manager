@@ -22,10 +22,16 @@ CONFIG_KEY = 'backup_installation_id'
 METADATA_KEY = 'installation_id'
 # Settings about this installation or cluster itself (scheduler state, the pending
 # serial index of migration 142, the scheduled backup's reservation and conclusion,
-# services/backup/schedule.py, the expiry webhooks mark): never exported, never restored
+# services/backup/schedule.py, the expiry webhooks mark, the scheduled passes' leases):
+# never exported, never restored
 LOCAL_SETTINGS = frozenset((CONFIG_KEY, OPT_OUT_KEY, SCHEDULER_STATE_KEY, PENDING_KEY,
                             'backup.last_run', 'backup.concluded_run',
-                            'expiry_alerts.webhooks_mark'))
+                            'expiry_alerts.webhooks_mark', 'expiry_alerts.lease'))
+LOCAL_SETTING_PREFIXES = ('crl_schedule_lease_',)
+
+
+def is_local_setting(key) -> bool:
+    return key in LOCAL_SETTINGS or str(key).startswith(LOCAL_SETTING_PREFIXES)
 
 
 def installation_id(create: bool = False) -> Optional[str]:
