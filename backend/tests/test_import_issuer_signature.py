@@ -369,7 +369,24 @@ class TestAnUnverifiableIssuerKeyIsNeverASignature:
     def test_a_named_ca_is_refused(self, app, auth_client, issuer, unverifiable):
         ca_id, _, ca_cert, ca_key = issuer
         leaf, _ = _leaf('unverifiable-named.example.test', ca_cert, ca_key)
-        assert _import(auth_client, leaf, ca_id=str(ca_id)).status_code == 400
+        r = _import(auth_client, leaf, ca_id=str(ca_id))
+        assert r.status_code == 400
+        assert 'cannot be verified' in r.get_json()['message']
+        assert 'not signed' not in r.get_json()['message']
+        assert _rows(app, leaf) == []
+
+    def test_a_named_ca_without_a_certificate_is_refused_as_unverifiable(self, app, auth_client, issuer):
+        _, _, ca_cert, ca_key = issuer
+        with app.app_context():
+            pending = CA(refid=str(uuid.uuid4()), descr='awaiting its certificate', serial=0, crt='',
+                         subject=ca_cert.subject.rfc4514_string())
+            db.session.add(pending)
+            db.session.commit()
+            pending_id = pending.id
+        leaf, _ = _leaf('unverifiable-pending.example.test', ca_cert, ca_key)
+        r = _import(auth_client, leaf, ca_id=str(pending_id))
+        assert r.status_code == 400
+        assert 'cannot be verified' in r.get_json()['message']
         assert _rows(app, leaf) == []
 
     def test_a_resolved_ca_is_not_linked(self, app, auth_client, issuer, unverifiable):

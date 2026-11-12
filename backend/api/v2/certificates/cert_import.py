@@ -13,7 +13,7 @@ from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from models import Certificate, CA, db
 from services.audit_service import AuditService
-from utils.cert_issuer import ca_signed, private_key_matches, signing_ca_for, stored_private_key_matches
+from utils.cert_issuer import ca_signature_verdict, ca_signed, private_key_matches, signing_ca_for, stored_private_key_matches
 from services.import_service import (
     KeyPasswordError, parse_certificate_file, is_ca_certificate, extract_cert_info,
     find_existing_ca_for_import, cross_mode_from, finish_cross_attach,
@@ -41,7 +41,12 @@ def _resolve_caref(ca_id, cert):
         ca = db.session.get(CA, ca_id)
         if ca is None:
             return None
-        if not ca_signed(ca, cert):
+        verdict = ca_signature_verdict(ca, cert)
+        if verdict is None:
+            raise _NotSignedByNamedCa(
+                f'The certificate cannot be verified against CA "{ca.descr}": its certificate '
+                'is missing or unreadable, or its key type cannot be checked')
+        if not verdict:
             raise _NotSignedByNamedCa(f'The certificate was not signed by CA "{ca.descr}"')
         return ca.refid
     ca = signing_ca_for(cert)
