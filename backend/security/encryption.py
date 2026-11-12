@@ -51,6 +51,15 @@ def log_encryption_disabled() -> None:
     )
 
 
+def _table_missing(error) -> bool:
+    """The DEK table does not exist yet (SQLite, PostgreSQL 42P01); any other error is not that."""
+    orig = getattr(error, 'orig', error)
+    if getattr(orig, 'sqlstate', None) == '42P01' or getattr(orig, 'pgcode', None) == '42P01':
+        return True
+    message = str(orig).lower()
+    return 'no such table' in message and 'encryption_keys' in message
+
+
 class KeyEncryption:
     """
     Handles encryption/decryption of private keys stored in database.
@@ -127,10 +136,7 @@ class KeyEncryption:
         try:
             key_bytes = key.encode('utf-8')
             Fernet(key_bytes)
-            self._key_bytes = base64.urlsafe_b64decode(key_bytes)
-            self._load_data_keys()
-            if self._enabled:
-                logger.info("✅ Private key encryption enabled")
+            kek = base64.urlsafe_b64decode(key_bytes)
         except Exception as e:
             logger.error(f"❌ Invalid encryption key: {e}")
             # A key that EXISTS but does not parse must not bypass the
@@ -145,6 +151,12 @@ class KeyEncryption:
                     'with plaintext key storage.'
                 )
             self._enabled = False
+            return
+        self._key_bytes = kek
+        # A database error propagates: reload() then keeps the keys it had
+        self._load_data_keys()
+        if self._enabled:
+            logger.info("✅ Private key encryption enabled")
     
     def _set_deks(self, deks: dict, active) -> None:
         self._versions = tuple(sorted(deks))
@@ -170,6 +182,8 @@ class KeyEncryption:
         try:
             rows = envelope.stored_rows()
         except Exception as e:
+            if not _table_missing(e):
+                raise
             # Before migration 153: the database predates the envelope
             from models import db
             db.session.rollback()

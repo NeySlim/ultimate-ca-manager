@@ -564,3 +564,39 @@ def test_enabling_with_the_configured_kek_purges_the_plaintext_key_files(app, au
         assert r.get_json()['data']['key_files_removed'] >= 1
     finally:
         mirror.unlink(missing_ok=True)
+
+
+def _db_error(message):
+    from sqlalchemy.exc import OperationalError
+    return OperationalError('SELECT encryption_keys', {}, Exception(message))
+
+
+def test_a_failed_read_of_the_deks_keeps_the_loaded_ones(app, values, monkeypatch, encryption_enabled):
+    """Only a missing table means a database before the envelope; any other error changes nothing."""
+    from security import dek_rotation, envelope
+    key_encryption = encryption_enabled.key_encryption
+    with app.app_context():
+        dek_rotation.rotate()
+        assert key_encryption.active_version == 2
+
+        def broken():
+            raise _db_error('server closed the connection unexpectedly')
+        with monkeypatch.context() as patch:
+            patch.setattr(envelope, 'stored_rows', broken)
+            with pytest.raises(Exception, match='server closed'):
+                key_encryption.reload()
+        assert key_encryption.active_version == 2 and key_encryption.is_enabled
+    assert _read(app, values) == CLEAR
+
+
+def test_a_database_before_the_envelope_reads_the_kek_as_version_1(app, values, monkeypatch,
+                                                                 encryption_enabled):
+    from security import envelope
+    key_encryption = encryption_enabled.key_encryption
+
+    def missing():
+        raise _db_error('no such table: encryption_keys')
+    with monkeypatch.context() as patch, app.app_context():
+        patch.setattr(envelope, 'stored_rows', missing)
+        key_encryption.reload()
+        assert key_encryption.active_version == 1 and key_encryption.is_enabled
