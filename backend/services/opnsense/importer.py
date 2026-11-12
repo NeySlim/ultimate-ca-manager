@@ -158,6 +158,13 @@ class ImportMixin:
                         stats['failed'] += 1
                         stats['errors'].append(f"Cert {refid}: CA {caref} not found")
                         continue
+                    # The entry's caref is only a claim: linked when that CA signed it
+                    try:
+                        from utils.cert_issuer import ca_signed
+                        leaf = x509.load_pem_x509_certificate(base64.b64decode(cert_data.get('crt') or ''))
+                        caref = caref if ca_signed(ca, leaf) else None
+                    except Exception:
+                        caref = None
 
                 serial = cert_data.get('serial_number', '')
                 if Certificate.stored_under(caref, serial):  # uix_certificates_ca_serial

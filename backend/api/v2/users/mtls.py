@@ -101,10 +101,9 @@ def create_user_mtls_certificate(user_id):
         )
         created = existing_cert is None
         if created:
-            from utils.cert_issuer import self_signed_first
+            # Linked only to the CA whose key signed it, never to a namesake
             from services.mtls_enrollment import issuing_ca_for
-            issuer_ca = issuing_ca_for(cert_obj) or next(iter(self_signed_first(
-                CA.query.filter(CA.subject == issuer_dn).order_by(CA.id).all())), None)
+            issuer_ca = issuing_ca_for(cert_obj)
             existing_cert = Certificate(
                 refid=str(uuid.uuid4()),
                 descr=cert_name,

@@ -34,9 +34,11 @@ SUPERSEDED = 'superseded'
 def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
     """Every row under ``ca``, or under another record of its subject and key,
     holding exactly ``cert`` (normally one; a duplicate left by an inconsistent
-    restore still counts)."""
-    from utils.cert_issuer import same_key_refids
-    return _rows_holding(cert, Certificate.caref.in_(same_key_refids(ca)))
+    restore still counts). None when ``ca``'s key did not sign ``cert``: a row
+    linked to a CA is not proof that the CA issued what it holds."""
+    from utils.cert_issuer import ca_signed, same_key_refids
+    rows = _rows_holding(cert, Certificate.caref.in_(same_key_refids(ca)))
+    return rows if rows and ca_signed(ca, cert) else []
 
 
 def find_stored_rows(cert: x509.Certificate) -> list:
