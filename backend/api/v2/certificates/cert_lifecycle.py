@@ -224,6 +224,12 @@ def _revoke_msca_on_ca(cert, reason):
     )
 
 
+def _revoked_for_good(cert, reason):
+    return error_response(
+        f'Certificate "{cert.descr or cert.refid}" is revoked for good '
+        f'({reason or "unspecified"}): its hold cannot be lifted', 409)
+
+
 @bp.route('/api/v2/certificates/<int:cert_id>/unhold', methods=['POST'])
 @require_auth(['write:certificates'])
 def unhold_certificate(cert_id):
@@ -238,11 +244,9 @@ def unhold_certificate(cert_id):
     if not cert.revoked and effective_revocation(cert) is None:
         return error_response('Certificate is not revoked', 400)
 
-    # Only certificateHold can be unheld (a final record is refused below with 409)
+    # Only a suspension lifts: a final reason, on the row or on a record, is one 409 refusal
     if cert.revoked and cert.revoke_reason not in HOLD_REASONS:
-        return error_response(
-            'Only certificates with reason "certificateHold" can be unheld', 400
-        )
+        return _revoked_for_good(cert, cert.revoke_reason)
 
     # A body that is present is read strictly (400/415): an unreadable refusal must not lift the pair
     present = bool(request.get_data(cache=True))
@@ -270,9 +274,7 @@ def unhold_certificate(cert_id):
             ca, serial = cas[member.id], serials[member.id]
             record = persisted_revocation(ca, serial) if ca is not None and serial is not None else None
             if record is not None and record.revoke_reason not in HOLD_REASONS:
-                return error_response(
-                    f'Certificate "{member.descr or member.refid}" is revoked for good '
-                    f'({record.revoke_reason or "unspecified"}): its hold cannot be lifted', 409)
+                return _revoked_for_good(member, record.revoke_reason)
 
         # Each hold as it stands, before the removeFromCRL staging below
         helds = {m.id: ({field: getattr(m, field)
