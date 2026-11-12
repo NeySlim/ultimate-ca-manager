@@ -41,3 +41,20 @@ def test_load_balancer_forwards_the_client_address_pos():
 def test_nodes_do_not_autocreate_a_local_softhsm_token_neg():
     for n in ('ucm-1', 'ucm-2'):
         assert DOC['services'][n]['environment']['HSM_AUTO_INIT'] == 'false'
+
+
+def _resolve(value, env=None):
+    """Compose ${VAR:-default} interpolation, nested, with ``env`` (empty by default)."""
+    env = env or {}
+    pattern = re.compile(r'\$\{(\w+):-((?:[^${}]|\$\{[^{}]*\})*)\}')
+    while (m := pattern.search(value)):
+        value = value[:m.start()] + env.get(m.group(1), m.group(2)) + value[m.end():]
+    return value
+
+
+def test_nodes_trust_the_fixed_subnet_the_load_balancer_sits_on_pos():
+    subnets = [c['subnet'] for c in DOC['networks']['default']['ipam']['config']]
+    trusted = DOC['services']['ucm-1']['environment']['UCM_TRUSTED_PROXIES']
+    for env in ({}, {'UCM_HA_SUBNET': '10.99.0.0/24'}):
+        assert [_resolve(s, env) for s in subnets] == [_resolve(trusted, env)]
+    assert _resolve(trusted, {'UCM_TRUSTED_PROXIES': '10.1.2.3'}) == '10.1.2.3'
