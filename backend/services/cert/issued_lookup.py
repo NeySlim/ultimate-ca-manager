@@ -243,21 +243,23 @@ def delete_lifted_hold_leftovers() -> int:
     return len(leftovers)
 
 
-def apply_persisted_revocations() -> int:
+def apply_persisted_revocations() -> list:
     """Mark revoked every linked, unrevoked row holding a serial its CA recorded as revoked
-    (rows stored by an earlier release). No commit; returns how many."""
+    (rows stored by an earlier release). No commit; returns ``(row, record)`` per row marked."""
     from sqlalchemy import or_
     # Both columns are canonical (migration 144): a record names the rows of its own serial only
     columns = sorted({column for (column,) in RevokedSerial.query.with_entities(
         RevokedSerial.serial_number).distinct() if column})
-    applied = 0
+    marked = []
     for start in range(0, len(columns), 500):
         for row in Certificate.query.filter(
                 Certificate.serial_number.in_(columns[start:start + 500]),
                 Certificate.caref.isnot(None), Certificate.crt.isnot(None),
                 or_(Certificate.revoked.is_(False), Certificate.revoked.is_(None))).all():
-            applied += apply_persisted_revocation(row)
-    return applied
+            record = row_persisted_revocation(row)
+            if record is not None and apply_persisted_revocation(row, record):
+                marked.append((row, record))
+    return marked
 
 
 def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[Certificate], str]:
