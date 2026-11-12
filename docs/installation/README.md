@@ -237,7 +237,7 @@ Without the secret, read the generated password with `docker compose exec ucm ca
 
 ### Helm (Kubernetes)
 
-The chart always provides the password: `initialAdminPassword` when set, otherwise one it generates into its Secret and keeps across upgrades. Read it with:
+The chart provides the password: `initialAdminPassword` when set, otherwise one it generates into its Secret and keeps across upgrades (that one must be changed at first login). To use your own Secret, set `INITIAL_ADMIN_PASSWORD` or `INITIAL_ADMIN_PASSWORD_FILE` in `extraEnv`: the chart then passes none. Read the generated one with:
 
 ```bash
 kubectl -n ucm get secret ucm-secrets -o jsonpath='{.data.UCM_INITIAL_ADMIN_PASSWORD}' | base64 -d; echo

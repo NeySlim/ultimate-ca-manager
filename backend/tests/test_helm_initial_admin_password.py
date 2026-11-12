@@ -156,3 +156,17 @@ def test_helm_generated_password_has_no_character_to_misread():
         secret = next(d for d in _render() if d['kind'] == 'Secret')
         value = secret['stringData']['UCM_INITIAL_ADMIN_PASSWORD']
         assert len(value) == 24 and value.isalnum() and not set(value) & set('0Oo1lI')
+
+
+@pytest.mark.skipif(shutil.which('helm') is None, reason='helm not installed')
+@pytest.mark.parametrize('name', ['INITIAL_ADMIN_PASSWORD', 'UCM_INITIAL_ADMIN_PASSWORD'])
+def test_helm_a_password_variable_in_extra_env_is_the_only_source(name):
+    """The operator's own variable (their Secret) is neither replaced by the chart's
+    random value nor forced to change."""
+    docs = _render('--set-json', 'extraEnv=[{"name":"%s","valueFrom":{"secretKeyRef":'
+                   '{"name":"my-admin","key":"pw"}}}]' % name)
+    env = _deploy_env(docs)
+    named = [item for item in env if item['name'].endswith('INITIAL_ADMIN_PASSWORD')]
+    assert [item['name'] for item in named] == [name]
+    assert named[0]['valueFrom']['secretKeyRef']['name'] == 'my-admin'
+    assert 'INITIAL_ADMIN_PASSWORD_FORCE_CHANGE' not in [item['name'] for item in env]

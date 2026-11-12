@@ -16,12 +16,14 @@ UCM ({{ include "ucm.image" . }}) has been deployed as release "{{ .Release.Name
 
 3. Log in:
 
-   user: admin
+   user: admin (or the name INITIAL_ADMIN_USERNAME sets in extraEnv)
 {{- if not .Release.IsInstall }}
    password: unchanged, the existing administrator keeps its password (only the
    first start of a new installation reads the chart's initial password).
-{{- else if include "ucm.adminPasswordFromFile" . }}
+{{- else if eq (include "ucm.adminPasswordFromExtraEnv" .) "file" }}
    password: the one in the file INITIAL_ADMIN_PASSWORD_FILE names (extraEnv)
+{{- else if eq (include "ucm.adminPasswordFromExtraEnv" .) "variable" }}
+   password: the one INITIAL_ADMIN_PASSWORD provides (extraEnv)
 {{- else if .Values.initialAdminPassword }}
    password: the value you set in initialAdminPassword
 {{- else }}

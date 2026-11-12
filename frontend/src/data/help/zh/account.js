@@ -19,7 +19,7 @@ export default {
           { label: '2FA (TOTP)', text: '通过身份验证器应用启用基于时间的一次性密码。已启用时再次启用会被拒绝：请先禁用' },
           { label: '安全密钥', text: '注册 WebAuthn/FIDO2 密钥（YubiKey、指纹识别等）' },
           { label: 'mTLS', text: '管理用于双向 TLS 认证的客户端证书' },
-          { label: '强制修改密码 (v2.245)', text: '被要求设置新密码的账户（例如首次启动时由 UCM 生成密码的首个管理员）在修改之前不能执行其他任何操作，包括 API 和 WebSocket；提示中提供“注销”而不是“跳过”。修改后，保存生成密码的文件会被删除。通过 INITIAL_ADMIN_PASSWORD 或 INITIAL_ADMIN_PASSWORD_FILE 提供的密码无需修改' },
+          { label: '强制修改密码 (v2.245)', text: '被要求设置新密码的账户（例如首次启动时由 UCM 生成密码的首个管理员）在修改之前不能执行其他任何操作，包括 API 和 WebSocket；提示中提供“注销”而不是“跳过”。修改后，保存生成密码的文件会被删除。通过 INITIAL_ADMIN_PASSWORD 或 INITIAL_ADMIN_PASSWORD_FILE 提供的密码无需修改，除非设置了 INITIAL_ADMIN_PASSWORD_FORCE_CHANGE（Helm chart 会为其生成的密码设置该变量）' },
         ]
       },
       {

@@ -97,7 +97,7 @@ spec:
                   name: {{ include "ucm.secretName" . }}
                   key: KEY_ENCRYPTION_KEY
             {{- end }}
-            {{- if not (include "ucm.adminPasswordFromFile" .) }}
+            {{- if not (include "ucm.adminPasswordFromExtraEnv" .) }}
             - name: UCM_INITIAL_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:

@@ -101,7 +101,7 @@ There is no default password. The first administrator's password is provided (`I
 
 - Prefer `INITIAL_ADMIN_PASSWORD_FILE` with a Docker, Compose or Kubernetes secret. The plain variable is visible to anyone who can run `docker inspect` on the container or read the process environment.
 - Remove the value from the environment or secret after the first start: it is never read again once the administrator exists.
-- A provided password is not forced to change; change it after the first login if others handled it.
+- A provided password is not forced to change, unless `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE` is set (the Helm chart sets it for the one it generates); change it after the first login if others handled it.
 
 ### 4. Rate Limiting
 

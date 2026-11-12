@@ -94,13 +94,18 @@ so leaving HA never drops the only copy of the key.
 {{- end -}}
 
 {{/*
-"true" when extraEnv provides the initial admin password as a file: the chart's
-variable is then not passed, both sources set refuse the start.
+How extraEnv provides the initial admin password, if it does: "file" or "variable".
+The chart's own variable is then not passed: it would replace the operator's value,
+and both sources set refuse the start.
 */}}
-{{- define "ucm.adminPasswordFromFile" -}}
+{{- define "ucm.adminPasswordFromExtraEnv" -}}
+{{- $how := "" -}}
 {{- range .Values.extraEnv -}}
-{{- if has .name (list "INITIAL_ADMIN_PASSWORD_FILE" "UCM_INITIAL_ADMIN_PASSWORD_FILE") }}true{{ end -}}
+{{- if has .name (list "INITIAL_ADMIN_PASSWORD_FILE" "UCM_INITIAL_ADMIN_PASSWORD_FILE") -}}{{- $how = "file" -}}
+{{- else if and (has .name (list "INITIAL_ADMIN_PASSWORD" "UCM_INITIAL_ADMIN_PASSWORD")) (not $how) -}}{{- $how = "variable" -}}
 {{- end -}}
+{{- end -}}
+{{- $how -}}
 {{- end -}}
 
 {{/*
@@ -108,5 +113,5 @@ variable is then not passed, both sources set refuse the start.
 application then forces its change at first login, as for one it generates.
 */}}
 {{- define "ucm.adminPasswordGenerated" -}}
-{{- if not (or .Values.initialAdminPassword (include "ucm.adminPasswordFromFile" .)) }}true{{ end -}}
+{{- if not (or .Values.initialAdminPassword (include "ucm.adminPasswordFromExtraEnv" .)) }}true{{ end -}}
 {{- end -}}

@@ -254,7 +254,17 @@ def sweep(config):
         if user is None or not current or not user.check_password(current):
             _remove(path)
     except Exception as e:
+        _rollback()
         logger.error(f'Initial password file {path} not checked: {type(e).__name__}: {e}')
+
+
+def _rollback():
+    # A failed read must not leave the caller's transaction aborted (PostgreSQL)
+    try:
+        from models import db
+        db.session.rollback()
+    except Exception:
+        pass
 
 
 def announce(config):
@@ -262,6 +272,7 @@ def announce(config):
     try:
         _announce(config)
     except Exception as e:
+        _rollback()
         logger.error(f'Initial password file not announced: {type(e).__name__}: {e}')
 
 

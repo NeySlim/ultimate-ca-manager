@@ -219,7 +219,8 @@ def reset_db():
                 username=actor_name, success=False)
             return error_response(f"Database reset, administrator not created: {e}", 500)
         from services import cluster_commands
-        # Other nodes drop a file the reset made stale
+        # A file the reset made stale opens nothing; the other nodes drop theirs at their
+        # next start at the latest (their command cursor predates the recreated table)
         cluster_commands.emit(cluster_commands.DROP_INITIAL_PASSWORD)
         ok, err = safe_commit(logger, "Database reset failed")
         if not ok:

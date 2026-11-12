@@ -19,7 +19,7 @@ export default {
           { label: '2FA (TOTP)', text: 'Activer les mots de passe à usage unique basés sur le temps via une application d\'authentification. La réactiver alors qu\'elle est déjà active est refusé : désactivez-la d\'abord' },
           { label: 'Clés de sécurité', text: 'Enregistrer des clés WebAuthn/FIDO2 (YubiKey, empreinte digitale, etc.)' },
           { label: 'mTLS', text: 'Gérer les certificats client pour l\'authentification TLS mutuel' },
-          { label: "Changement de mot de passe imposé (v2.245)", text: "Un compte à qui l'on a demandé un nouveau mot de passe, comme le premier administrateur dont UCM a généré le mot de passe au premier démarrage, ne peut rien faire d'autre tant qu'il ne l'a pas changé, API et WebSocket compris ; l'invite propose Se déconnecter au lieu de Ignorer. Ce changement supprime le fichier qui contenait le mot de passe généré. Un mot de passe fourni par INITIAL_ADMIN_PASSWORD ou INITIAL_ADMIN_PASSWORD_FILE n'a pas à être changé" },
+          { label: "Changement de mot de passe imposé (v2.245)", text: "Un compte à qui l'on a demandé un nouveau mot de passe, comme le premier administrateur dont UCM a généré le mot de passe au premier démarrage, ne peut rien faire d'autre tant qu'il ne l'a pas changé, API et WebSocket compris ; l'invite propose Se déconnecter au lieu de Ignorer. Ce changement supprime le fichier qui contenait le mot de passe généré. Un mot de passe fourni par INITIAL_ADMIN_PASSWORD ou INITIAL_ADMIN_PASSWORD_FILE n'a pas à être changé, sauf si INITIAL_ADMIN_PASSWORD_FORCE_CHANGE est défini (le chart Helm le définit pour le mot de passe qu'il génère)" },
         ]
       },
       {
