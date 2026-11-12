@@ -380,12 +380,25 @@ def _apply_safe_mode(app, outcome=None) -> bool:
     return has_enc
 
 
+def _kek_is_foreign(key_encryption) -> bool:
+    """No DEK row: the database was written under another KEK when a peer's disable marker
+    is not this KEK's, or when a value does not open with this KEK (the start path's check)."""
+    from security import envelope
+    rows = key_encryption.dek_rows
+    if any(r[1] in (envelope.ACTIVE, envelope.PREVIOUS) for r in rows):
+        return False
+    markers = {r[2] for r in rows if r[1] == envelope.DISABLED}
+    if markers and key_encryption.kek_fingerprint() not in markers:
+        return True
+    return key_encryption.is_enabled and not _loaded_key_reads_the_database()
+
+
 def reload_encryption_state(app) -> None:
     """Cluster command reload_encryption: the DEKs from the database, safe mode re-evaluated."""
     key_encryption = _encryption.key_encryption
     key_encryption.reload()
     outcome = None
-    if key_encryption.dek_error:
+    if key_encryption.dek_error or (key_encryption.kek_loaded and _kek_is_foreign(key_encryption)):
         key_encryption.unload()
         outcome = 'wrong_key'
     _apply_safe_mode(app, outcome)

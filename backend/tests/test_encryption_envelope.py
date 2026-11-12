@@ -762,6 +762,53 @@ def test_the_reload_command_brings_a_node_onto_the_new_dek(app, values, encrypti
     assert envelope.ACTIVE == 'active'
 
 
+def test_a_reload_after_a_peer_enabled_under_another_kek_stays_in_safe_mode(set_env, app, values,
+                                                                           encryption_enabled):
+    """No DEK row: the KEK is DEK version 1, so the values must open with it, as at start."""
+    from security.master_key_bootstrap import reload_encryption_state
+    set_env('KEY_ENCRYPTION_KEY', Fernet.generate_key().decode())  # this node's, not the peer's
+    with app.app_context():
+        try:
+            reload_encryption_state(app)
+            assert app.config['SAFE_MODE'] is True
+            assert app.config['SAFE_MODE_REASON'] == 'encryption_key_mismatch'
+            assert not encryption_enabled.key_encryption.is_encrypting
+        finally:
+            app.config['SAFE_MODE'] = False
+
+
+def test_a_reload_after_a_peer_disabled_under_another_kek_stays_in_safe_mode(app, values,
+                                                                            encryption_enabled):
+    from models import EncryptionKey
+    from security import envelope
+    from security.master_key_bootstrap import reload_encryption_state
+    from utils.datetime_utils import utc_now
+    with app.app_context():
+        db.session.add(EncryptionKey(version=0, state=envelope.DISABLED, kek_id='f' * 16,
+                                     wrapped=None, created_at=utc_now()))
+        db.session.commit()
+        try:
+            reload_encryption_state(app)
+            assert app.config['SAFE_MODE'] is True
+            assert app.config['SAFE_MODE_REASON'] == 'encryption_key_mismatch'
+            assert encryption_enabled.key_encryption.encrypt_string('x') == 'x'
+        finally:
+            app.config['SAFE_MODE'] = False
+
+
+def test_a_reload_with_the_database_kek_and_no_dek_row_leaves_safe_mode(app, values,
+                                                                       encryption_enabled):
+    from security.master_key_bootstrap import reload_encryption_state
+    with app.app_context():
+        app.config['SAFE_MODE'] = True
+        try:
+            reload_encryption_state(app)
+            assert app.config['SAFE_MODE'] is False
+            assert encryption_enabled.key_encryption.is_encrypting
+        finally:
+            app.config['SAFE_MODE'] = False
+
+
 def test_a_node_whose_kek_differs_from_a_live_peer_does_not_start(app, values, monkeypatch,
                                                                   encryption_enabled):
     from models import ClusterNode

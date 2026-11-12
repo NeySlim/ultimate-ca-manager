@@ -292,6 +292,11 @@ class KeyEncryption:
         self._active_version = None
 
     @property
+    def dek_rows(self) -> tuple:
+        """The DEK rows last read, (version, state, kek_id, wrapped); never key material in clear."""
+        return tuple(self._rows or ())
+
+    @property
     def kek_loaded(self) -> bool:
         return self._key_bytes is not None
 
