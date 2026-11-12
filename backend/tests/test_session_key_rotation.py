@@ -488,3 +488,26 @@ def test_a_start_signs_with_the_stored_key(monkeypatch):
     assert _start_on(monkeypatch, rows) == ('A' * 43, ['P' * 43])
     # The previous key does not open at start: the stored key signs all the same
     assert _start_on(monkeypatch, rows, unreadable=('previous session key',)) == ('A' * 43, [])
+
+
+def test_a_reload_that_cannot_read_the_clock_keeps_the_current_keys(
+        app, auth_client, stored, encryption_enabled, monkeypatch, caplog):
+    assert auth_client.post(ROTATE, json={}).status_code == 200
+    _later(monkeypatch, stored.GRACE_SECONDS + 1)
+    _rotated_elsewhere(app, stored, 'C' * 43)
+    key = app.config['SECRET_KEY']
+
+    def no_clock():
+        raise RuntimeError('clock query failed')
+    with monkeypatch.context() as m, caplog.at_level(logging.WARNING,
+                                                     logger='security.session_key'):
+        m.setattr(stored, '_now', no_clock)
+        _reload(app)
+    # Loaded without its grace, the new key would cut the tokens of the one it replaces
+    assert app.config['SECRET_KEY'] == key
+    assert stored.reload_pending(app)
+    assert 'clock was not read' in caplog.text
+    _reload(app)
+    assert app.config['SECRET_KEY'] == 'C' * 43
+    assert app.config['SECRET_KEY_FALLBACKS'] == [key]
+    assert not stored.reload_pending(app)
