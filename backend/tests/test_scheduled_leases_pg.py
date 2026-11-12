@@ -84,6 +84,19 @@ def test_a_fresh_lease_is_refused_and_an_old_one_taken_over(app):
             _set(key, None)
 
 
+
+def test_a_lease_stamped_far_in_the_future_does_not_hold_forever(app):
+    # A clock stepped back, or a stamp from elsewhere: live for one duration at most
+    key = f'lease-test-{uuid.uuid4().hex[:8]}'
+    with app.app_context():
+        try:
+            _set(key, f"{(utc_now() + timedelta(hours=1)).isoformat()}|other-node")
+            assert config_cas.ConfigLease(key, timedelta(minutes=10)).take()
+            _set(key, f"{(utc_now() + timedelta(minutes=1)).isoformat()}|other-node")
+            assert not config_cas.ConfigLease(key, timedelta(minutes=10)).take()
+        finally:
+            _set(key, None)
+
 # ------------------------------------------------------------------ expiry e-mails and webhooks
 
 def _record_sends(monkeypatch):

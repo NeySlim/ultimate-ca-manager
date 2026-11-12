@@ -65,7 +65,7 @@ class ConfigLease:
             since = datetime.fromisoformat((value or '').split('|', 1)[0])
         except ValueError:
             return False  # empty (ended) or unreadable: free
-        return now - since < self.duration
+        return -self.duration < now - since < self.duration  # a future stamp holds one duration at most
 
     def take(self) -> bool:
         """Hold the lease unless another holder's is still live; commits."""
