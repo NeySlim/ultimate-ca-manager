@@ -561,3 +561,41 @@ class TestTheChainOfAnUnlinkedRowNamesOnlyTheSigningCa:
         chain = self._chain(app, auth_client, real, ca_cert, aki=aki)
         assert chain['status'] == 'partial'
         assert [link['type'] for link in chain['chain']] == ['managed_ca']
+
+
+class TestAPendingRequestCompletedByAForgedCertificate:
+    """A request generated here, answered by a certificate naming the CA but signed elsewhere."""
+
+    @staticmethod
+    def _answer(auth_client, ca_cert, cn):
+        from tests.test_csr_external_certificate import _create_csr, _csr_pem
+        request_id = _create_csr(auth_client, cn)['id']
+        csr = x509.load_pem_x509_csr(_csr_pem(auth_client, request_id))
+        ski = ca_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
+        now = datetime.now(timezone.utc)
+        forged = (x509.CertificateBuilder().subject_name(csr.subject).issuer_name(ca_cert.subject)
+                  .public_key(csr.public_key()).serial_number(x509.random_serial_number())
+                  .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
+                  .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+                  .add_extension(x509.AuthorityKeyIdentifier(ski.digest, None, None), critical=False)
+                  .sign(_gen(), hashes.SHA256()))
+        return request_id, forged
+
+    def test_without_ca_id_it_completes_the_request_without_a_ca(self, app, auth_client, issuer):
+        _, _, ca_cert, _ = issuer
+        request_id, forged = self._answer(auth_client, ca_cert, 'pending-forged-auto.example.test')
+        r = _import(auth_client, forged)
+        assert r.status_code in (200, 201), r.data
+        with app.app_context():
+            row = db.session.get(Certificate, request_id)
+            assert row.crt and row.serial_number == str(forged.serial_number)
+            assert row.caref is None
+
+    def test_with_ca_id_it_is_refused_and_the_request_stays_pending(self, app, auth_client, issuer):
+        ca_id, _, ca_cert, _ = issuer
+        request_id, forged = self._answer(auth_client, ca_cert, 'pending-forged-named.example.test')
+        r = _import(auth_client, forged, ca_id=str(ca_id))
+        assert r.status_code == 400, r.data
+        with app.app_context():
+            row = db.session.get(Certificate, request_id)
+            assert not row.crt and row.caref is None
