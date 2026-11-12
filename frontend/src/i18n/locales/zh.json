@@ -3405,7 +3405,25 @@
     "httpsLeftBehindKeyed": "UCM 现已持有续期后证书的密钥：请在下方选择它并应用到 HTTPS。",
     "httpsLeftBehindSuperseded": "续期后的证书本身已被取代：请在下方选择当前证书并将其应用到 HTTPS。",
     "httpsSelectRenewed": "选择续期后的证书",
-    "httpsOpenRenewed": "打开续期后的证书"
+    "httpsOpenRenewed": "打开续期后的证书",
+    "updateCampaign": {
+      "title": "Rolling update to v{{version}}",
+      "status": {
+        "running": "In progress",
+        "stopped": "Stopped",
+        "done": "Finished"
+      },
+      "nodesDone": "Nodes updated",
+      "currentNode": "Node updating",
+      "pending": "Waiting",
+      "none": "None",
+      "failed": "Stopped at node {{node}}: {{reason}}",
+      "resume": "Resume",
+      "resumed": "Rolling update resumed",
+      "resumeFailed": "Failed to resume the rolling update",
+      "started": "Rolling update to v{{version}} started: the nodes update one at a time",
+      "haNote": "HA mode: the nodes update one at a time, the next one only once the previous one is back on the new version."
+    }
   },
   "account": {
     "profile": "个人资料",

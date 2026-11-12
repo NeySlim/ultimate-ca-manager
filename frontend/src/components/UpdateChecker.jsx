@@ -11,6 +11,10 @@ import { useNotification } from '../contexts'
 import { useServiceReconnect, UPDATE_MAX_WAIT_MS } from '../hooks'
 import { formatRelativeTime } from '../lib/utils'
 import { MARKDOWN_ELEMENT_CLASSES } from '../lib/markdown'
+import { UpdateCampaignStatus } from './UpdateCampaignStatus'
+
+// A rolling update moves one node every minute at most: the screen follows it at this pace
+const CAMPAIGN_POLL_MS = 10000
 
 export function UpdateChecker() {
   const { t } = useTranslation()
@@ -21,6 +25,8 @@ export function UpdateChecker() {
   const [error, setError] = useState(null)
   const [includePrereleases, setIncludePrereleases] = useState(false)
   const [includeChannel, setIncludeChannel] = useState('stable')
+  const [campaign, setCampaign] = useState(null)
+  const [resuming, setResuming] = useState(false)
   const { showSuccess, showError, showConfirm } = useNotification()
   const { reconnecting, status, attempt, countdown, waitForRestart, cancel } = useServiceReconnect()
 
@@ -34,6 +40,7 @@ export function UpdateChecker() {
       const response = await apiClient.get(`/system/updates/check?${params}`)
       const data = response?.data || response || {}
       setUpdateInfo(data)
+      setCampaign(data.update_campaign || null)
       if (showNotification) {
         if (data.update_available) {
           showSuccess(t('settings.updateAvailable', { version: data.latest_version }))
@@ -63,10 +70,17 @@ export function UpdateChecker() {
 
     setInstalling(true)
     try {
-      await apiClient.post('/system/updates/install', {
+      const response = await apiClient.post('/system/updates/install', {
         include_prereleases: includeChannel !== 'stable',
         include_dev: includeChannel === 'dev'
       })
+      if (updateInfo.ha_mode) {
+        // HA: the nodes update one at a time, this page follows the campaign instead of a restart
+        setCampaign((response?.data || response || {}).campaign || null)
+        showSuccess(t('settings.updateCampaign.started', { version: updateInfo.latest_version }))
+        setInstalling(false)
+        return
+      }
       showSuccess(t('settings.updateInitiated', { version: updateInfo.latest_version, defaultValue: `Update to v${updateInfo.latest_version} initiated...` }))
       
       // Show reconnect overlay — countdown then poll until service is back
@@ -79,6 +93,33 @@ export function UpdateChecker() {
       setInstalling(false)
     }
   }
+
+  const resumeCampaign = async () => {
+    setResuming(true)
+    try {
+      const response = await apiClient.post('/system/updates/campaign/resume', {})
+      setCampaign((response?.data || response || {}).campaign || null)
+      showSuccess(t('settings.updateCampaign.resumed'))
+    } catch (err) {
+      showError(err.message || t('settings.updateCampaign.resumeFailed'))
+    } finally {
+      setResuming(false)
+    }
+  }
+
+  const campaignRunning = campaign?.status === 'running'
+  useEffect(() => {
+    if (!campaignRunning) return undefined
+    const timer = setInterval(async () => {
+      try {
+        const response = await apiClient.get('/system/updates/campaign')
+        setCampaign((response?.data || response || {}).campaign || null)
+      } catch {
+        // the node answering may be the one restarting: the next poll reaches another
+      }
+    }, CAMPAIGN_POLL_MS)
+    return () => clearInterval(timer)
+  }, [campaignRunning])
 
   const firstRender = React.useRef(true)
   useEffect(() => {
@@ -147,6 +188,12 @@ export function UpdateChecker() {
               </div>
             )}
             
+            {updateInfo?.ha_mode && updateInfo?.can_auto_update && (
+              <div className="text-xs text-text-tertiary mt-1">
+                {t('settings.updateCampaign.haNote')}
+              </div>
+            )}
+
             {updateInfo?.update_available && !updateInfo?.can_auto_update && (
               <div className="text-xs text-text-tertiary mt-1">
                 💡 docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
@@ -170,7 +217,7 @@ export function UpdateChecker() {
         </div>
         
         <div className="flex items-center gap-2">
-          {updateInfo?.update_available && updateInfo?.can_auto_update && (
+          {updateInfo?.update_available && updateInfo?.can_auto_update && !campaignRunning && (
             <Button
               variant="primary"
               size="sm"
@@ -205,6 +252,8 @@ export function UpdateChecker() {
         </div>
       </div>
       
+      <UpdateCampaignStatus campaign={campaign} onResume={resumeCampaign} resuming={resuming} />
+
       {/* Release notes - current version */}
       {updateInfo?.current_release_notes && (
         <div className="mt-4 pt-4 border-t border-border-op50">
