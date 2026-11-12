@@ -21,8 +21,10 @@ logger = logging.getLogger(__name__)
 CONFIG_KEY = 'backup_installation_id'
 METADATA_KEY = 'installation_id'
 # Settings about this installation or cluster itself (scheduler state, the pending
-# serial index of migration 142): never exported, never restored
-LOCAL_SETTINGS = frozenset((CONFIG_KEY, OPT_OUT_KEY, SCHEDULER_STATE_KEY, PENDING_KEY))
+# serial index of migration 142, the scheduled backup's reservation and conclusion,
+# services/backup/schedule.py): never exported, never restored
+LOCAL_SETTINGS = frozenset((CONFIG_KEY, OPT_OUT_KEY, SCHEDULER_STATE_KEY, PENDING_KEY,
+                            'backup.last_run', 'backup.concluded_run'))
 
 
 def installation_id(create: bool = False) -> Optional[str]:

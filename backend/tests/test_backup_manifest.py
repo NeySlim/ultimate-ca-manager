@@ -299,3 +299,29 @@ class TestClusterStateStaysLocal:
             BackupService()._restore_settings({'configuration': configuration}, {'settings': 0})
             db.session.commit()
             assert SystemConfig.query.filter_by(key=STATE_KEY).first() is None
+
+    @pytest.mark.parametrize('key', ['backup.last_run', 'backup.concluded_run'])
+    def test_the_backup_schedule_state_is_neither_exported_nor_restored(self, app, key):
+        """An archive carries its own reservation, not yet concluded: restored, the
+        schedule would report a run in progress that does not exist."""
+        from models import SystemConfig
+        from services.backup import BackupService
+
+        with app.app_context():
+            saved = SystemConfig.query.filter_by(key=key).first()
+            saved = saved.value if saved else None
+            try:
+                SystemConfig.query.filter_by(key=key).delete()
+                db.session.add(SystemConfig(key=key, value='2026-01-01T00:00:00Z'))
+                db.session.commit()
+                assert key not in BackupService()._export_configuration(True)['settings']
+
+                configuration = {'settings': {key: '2030-01-01T00:00:00Z'}}
+                BackupService()._restore_settings({'configuration': configuration}, {'settings': 0})
+                db.session.commit()
+                assert SystemConfig.query.filter_by(key=key).one().value == '2026-01-01T00:00:00Z'
+            finally:
+                SystemConfig.query.filter_by(key=key).delete()
+                if saved is not None:
+                    db.session.add(SystemConfig(key=key, value=saved))
+                db.session.commit()
