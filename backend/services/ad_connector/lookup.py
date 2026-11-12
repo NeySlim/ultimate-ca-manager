@@ -29,7 +29,8 @@ Bind/search mechanics mirror ``api/v2/sso/connection_tests.py``'s
 temp CA-bundle file that exists in that code (no matching cleanup there).
 
 The public lookups never raise: they answer None (or False) when the connector is
-off or the object is not found, and the falsy ``UNREACHABLE`` when no DC binds, a
+off or the object is not found (``NO_ACCOUNT`` for a principal or SID naming no
+account), and the falsy ``UNREACHABLE`` when no DC binds, a
 search raises or returns an LDAP error result, or the enabled connector lacks a server
 or base DN, so a caller can refuse the request or fault on its own side.
 """
@@ -60,7 +61,9 @@ class _Falsy:
 UNREACHABLE = _Falsy('UNREACHABLE')
 # The account exists but its objectSid is missing or malformed.
 UNUSABLE_SID = _Falsy('UNUSABLE_SID')
-# The Kerberos principal names no account, or one of a realm the connector does not serve.
+# The Kerberos principal or the SID names no account (a SID matching a non-account
+# object, such as a foreignSecurityPrincipal, included); FOREIGN_REALM: a realm the
+# connector does not serve.
 NO_ACCOUNT = _Falsy('NO_ACCOUNT')
 FOREIGN_REALM = _Falsy('FOREIGN_REALM')
 
