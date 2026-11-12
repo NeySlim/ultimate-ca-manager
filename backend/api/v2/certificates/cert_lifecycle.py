@@ -314,11 +314,15 @@ def unhold_certificate(cert_id):
         # The lifted holds and their revocation records go together or not at all
         try:
             from services.cert.issued_lookup import lift_persisted_revocation
+            from sqlalchemy.orm.attributes import flag_modified
             for member in members:
                 member.revoked = False
                 member.revoked_at = None
                 member.revoke_reason = None
                 member.invalidity_at = None
+                # Written even when unchanged here: a mark the hourly pass committed since is undone
+                for field in ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at'):
+                    flag_modified(member, field)
                 # Every spelling, under every record of the CA's key
                 ca, serial = cas[member.id], serials[member.id]
                 if ca is not None and serial is not None:
