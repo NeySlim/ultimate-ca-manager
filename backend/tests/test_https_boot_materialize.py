@@ -336,3 +336,24 @@ def test_a_failed_certificate_rename_leaves_both_files_as_they_were(tmp_path, mo
     assert (key_path.read_text() if key_path.exists() else None) == ('old key' if old_key else None)
     assert sorted(p.name for p in tmp_path.iterdir()) == sorted(
         ['https.crt'] + (['https.key'] if old_key else []))
+
+
+@pytest.mark.skipif(not hasattr(os, 'geteuid') or os.geteuid() != 0, reason='chown needs root')
+def test_the_key_put_back_keeps_its_owner(tmp_path, monkeypatch):
+    # A root master puts back a key the service user can still read
+    cert_path, key_path = tmp_path / 'https.crt', tmp_path / 'https.key'
+    cert_path.write_text('old cert')
+    key_path.write_text('old key')
+    os.chmod(key_path, 0o600)
+    os.chown(key_path, 54321, 54321)
+    real_replace = os.replace
+
+    def replace(src, dst):
+        if str(dst) == str(cert_path):
+            raise OSError('disk full')
+        return real_replace(src, dst)
+    monkeypatch.setattr(boot_config.os, 'replace', replace)
+    with pytest.raises(OSError):
+        boot_config.write_https_pair(cert_path, key_path, 'new cert', 'new key')
+    st = os.stat(key_path)
+    assert (key_path.read_text(), st.st_uid, st.st_gid, st.st_mode & 0o777) == ('old key', 54321, 54321, 0o600)
