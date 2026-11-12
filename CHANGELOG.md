@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- WSTEP, EST and SCEP: a renewed certificate keeps the SID security extension (KB5014754 strong mapping) of the certificate it renews, never one from the CSR, so it still maps to its account on a domain controller enforcing strong mapping; with the AD Connector enabled, a SID that names no account is refused.
+- WSTEP, EST and SCEP: a renewed certificate keeps the SID security extension (KB5014754 strong mapping) of the certificate it renews when the CA signed that certificate, never one from the CSR, so it still maps to its account on a domain controller enforcing strong mapping; with the AD Connector enabled, a SID that names no account is refused.
 - Packages: the DEB installation no longer fails on a host without sudo; the unused sudoers file is no longer written and is removed from both the DEB and the RPM.
 
 ### Security

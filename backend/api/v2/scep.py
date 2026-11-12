@@ -176,8 +176,13 @@ def _issuing_service(scep_req):
     return SCEPService(ca_refid=scep_req.ca_refid, template=template, profile_id=scep_req.profile_id)
 
 
-def _close_refused(scep_req, request_id, username, reason):
+def _close_refused(request_id, username, reason):
+    # Read again after the rollback: the request may be gone or decided meanwhile
     scep_req = db.session.get(SCEPRequest, request_id)
+    if scep_req is None:
+        return error_response('SCEP request not found', 404)
+    if scep_req.status != 'pending':
+        return error_response('SCEP request is no longer pending', 400)
     scep_req.status = 'rejected'
     scep_req.rejection_reason = reason[:255]
     scep_req.approved_by = username
@@ -230,7 +235,7 @@ def approve_scep_request(request_id):
     except RenewalAccountGone as e:
         # The renewed certificate's account is gone for good: closed, approving again cannot pass
         db.session.rollback()
-        return _close_refused(scep_req, request_id, username, str(e))
+        return _close_refused(request_id, username, str(e))
     except ValueError as e:
         # The CA refused (offline, revoked, outside its signing window, name
         # constraints...): the approver needs the reason

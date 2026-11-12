@@ -562,7 +562,8 @@ def _template_custom_extensions(template_id):
         raise RenewalError(str(e), 400) from e
 
 
-_SID_SECURITY_EXT_OID = '1.3.6.1.4.1.311.25.2'
+from services.trust_store.csr_operations_mixin import _SID_SECURITY_EXT_OID as _SID_EXT  # noqa: E402
+_SID_SECURITY_EXT_OID = _SID_EXT.dotted_string
 
 
 def _signed_by(cert, ca_cert) -> bool:
