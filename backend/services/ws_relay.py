@@ -314,6 +314,7 @@ class PgWakeup:
         self.backend_pid = None
         self.schema = None
         self._error_logged = False
+        self._loss_logged = False
 
     def _listen(self):
         raw = self.engine.raw_connection()
@@ -348,10 +349,17 @@ class PgWakeup:
             while not stop.is_set() and (left := deadline - time.monotonic()) > 0:
                 for notify in self._raw.driver_connection.notifies(timeout=min(left, STOP_SLICE_SECONDS)):
                     if notify.payload == self.schema:
+                        self._loss_logged = False
                         return
         except Exception as e:
-            logger.warning(f"WebSocket relay: LISTEN connection lost, reopened: {type(e).__name__}")
+            # A connection dropped right after each LISTEN reconnects twice a second, logged once
+            if not self._loss_logged:
+                logger.warning(f"WebSocket relay: LISTEN connection lost, reopened: {type(e).__name__}")
+                self._loss_logged = True
             self.close()
+            stop.wait(min(timeout, STOP_SLICE_SECONDS))
+            return
+        self._loss_logged = False
 
     def close(self):
         raw, self._raw = self._raw, None

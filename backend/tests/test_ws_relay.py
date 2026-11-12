@@ -420,3 +420,69 @@ def test_stopping_the_reader_stops_the_worker_publisher(ha_worker):
     ws_relay.stop_reader()
     assert ws_relay._publisher is None and events._relay_publisher is None
     assert publisher._stop.is_set()
+
+
+class _Notify:
+    def __init__(self, payload):
+        self.payload = payload
+
+
+class _FakeDriver:
+    """psycopg connection stand-in: ``script`` is what each notifies() call does in turn."""
+
+    def __init__(self, script):
+        self.autocommit = False
+        self.script = script
+        self.info = type('Info', (), {'backend_pid': 42})()
+
+    def execute(self, sql):
+        return type('Cur', (), {'fetchone': lambda self: ('ucm',)})()
+
+    def notifies(self, timeout):
+        step = self.script.pop(0) if self.script else 'idle'
+        if step == 'raise':
+            raise OSError('server closed the connection')
+        if step == 'idle':
+            time.sleep(timeout)
+            return iter(())
+        return iter([_Notify(step)])
+
+
+class _FakeRaw:
+    def __init__(self, driver):
+        self.driver_connection = driver
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+class _FakeEngine:
+    def __init__(self, scripts):
+        self.scripts = scripts
+        self.opened = []
+
+    def raw_connection(self):
+        raw = _FakeRaw(_FakeDriver(self.scripts.pop(0) if self.scripts else []))
+        self.opened.append(raw)
+        return raw
+
+
+def _wakeup(monkeypatch, scripts):
+    import services.scheduler_leader as leader
+    monkeypatch.setattr(leader, '_dedicated_engine', lambda url: _FakeEngine(scripts))
+    return ws_relay.PgWakeup('postgresql://unused')
+
+
+def test_a_listen_connection_dropping_at_once_does_not_spin(monkeypatch, caplog):
+    import threading
+    wakeup = _wakeup(monkeypatch, [['raise'] for _ in range(50)])
+    stop = threading.Event()
+    calls, deadline = 0, time.monotonic() + 1.0
+    with caplog.at_level(logging.WARNING, logger='services.ws_relay'):
+        while time.monotonic() < deadline:
+            wakeup.wait(2.0, stop)
+            calls += 1
+    assert calls <= 10
+    assert sum('LISTEN connection lost' in r.getMessage() for r in caplog.records) == 1
+
