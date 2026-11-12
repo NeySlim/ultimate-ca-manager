@@ -10,8 +10,9 @@ Source0:        %{name}-%{version}.tar.gz
 BuildArch:      noarch
 # Disable auto-detection of requires (we manage deps via venv)
 AutoReqProv:    no
-# EL9's python3 is 3.9: the el9 build runs on the parallel-installable python3.12
-%if 0%{?rhel}
+# EL9's python3 is 3.9: the el9 build runs on the parallel-installable python3.12.
+# EL10's python3 is 3.12: it takes the system python3 like Fedora
+%if 0%{?rhel} && 0%{?rhel} < 10
 Requires:       python3.12
 %global ucm_python python3.12
 %else

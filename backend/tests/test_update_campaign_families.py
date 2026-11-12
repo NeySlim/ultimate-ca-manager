@@ -13,14 +13,15 @@ from config.settings import Config
 
 PREFIX = 'ucf-test-'
 DEB, EL9, FC = 'ucm_3.1_all.deb', 'ucm-el9-3.1-1.el9.noarch.rpm', 'ucm-3.1-1.fc43.noarch.rpm'
-SHAS = {DEB: 'a1' * 32, EL9: 'b2' * 32, FC: 'c3' * 32}
+EL10 = 'ucm-el10-3.1-1.el10.noarch.rpm'
+SHAS = {DEB: 'a1' * 32, EL9: 'b2' * 32, FC: 'c3' * 32, EL10: 'd4' * 32}
 
 
 def _asset(name):
     return {'name': name, 'browser_download_url': f'https://x/{name}'}
 
 
-ASSETS = [_asset(n) for n in (DEB, EL9, FC)] + [_asset(f'{n}.sha256') for n in (DEB, EL9, FC)]
+ASSETS = [_asset(n) for n in (DEB, EL9, EL10, FC)] + [_asset(f'{n}.sha256') for n in (DEB, EL9, EL10, FC)]
 
 
 def _clean(app):
@@ -111,6 +112,7 @@ def _turn(app, monkeypatch, name, family):
     ('1', {'/usr/bin/dpkg'}, None, 'container'),
     (None, {'/usr/bin/dpkg', '/usr/bin/rpm'}, None, 'deb'),
     (None, {'/usr/bin/rpm'}, '9', 'rpm-el9'),
+    (None, {'/usr/bin/rpm'}, '10', 'rpm-el10'),
     (None, {'/usr/bin/rpm'}, None, 'rpm-fedora'),
     (None, set(), None, 'unknown'),
 ])
@@ -125,7 +127,7 @@ def test_the_package_family_follows_the_update_detection(monkeypatch, docker, fi
 
 
 @pytest.mark.parametrize('family, name', [('deb', DEB), ('rpm-el9', EL9), ('rpm-fedora', FC),
-                                          ('rpm-el10', FC)])
+                                          ('rpm-el10', EL10), ('rpm-el8', FC)])
 def test_each_family_takes_its_package_and_checksum(family, name):
     assert updates.family_package(ASSETS, family) == {
         'download_url': f'https://x/{name}', 'package_name': name,

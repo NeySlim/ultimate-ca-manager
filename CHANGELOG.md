@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
+- RPM for RHEL, AlmaLinux and Rocky Linux 10 (`ucm-el10-VERSION-1.el10.noarch.rpm`); the updater picks it on an EL10 host, and an EL host with no matching build still takes the Fedora RPM.
 - **HA packaging.** The Helm chart takes `ha.enabled` (rolling update, PodDisruptionBudget, shared `KEY_ENCRYPTION_KEY`), `docker-compose.ha.yml` starts two nodes behind a balancer, the image entrypoint skips SQLite in HA mode, and `docs/HA.md` documents the deployments.
 
 - Inspector: the detail of a certificate, CA, trusted certificate or user certificate opens in a tabbed dock at the bottom or right of the window (full screen on mobile), many objects at a time, instead of floating windows; its position and size follow the user and an invalid value is refused with a 400.
