@@ -661,8 +661,9 @@ def sign_est_csr(ca, csr, *, renewal_of=None, supersedes=None, on_stored=None):
     validity_days = SystemConfig.query.filter_by(key='est_validity_days').first()
     days = int(validity_days.value) if validity_days else 365
     # A re-enrolment keeps the renewed certificate's SID extension, resolved at signing
-    requester_sid = (renewal_identity.renewal_requester_sid(renewal_of, 'EST')
-                     if renewal_of is not None else None)
+    requester_sid = (renewal_identity.renewal_requester_sid(
+        renewal_of, x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend()), 'EST')
+        if renewal_of is not None else None)
     return CAService.sign_csr_from_crypto(
         ca=ca, csr=csr, validity_days=days, source='est', cert_type='device_cert',
         renewal_of=renewal_of, supersedes=supersedes, on_stored=on_stored,

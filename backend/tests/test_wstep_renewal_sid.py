@@ -94,6 +94,17 @@ def test_renewal_keeps_the_sid_extension_byte_for_byte(client, app, wstep_renew_
     assert ext.value.value == _sid_ext(old_cert).value.value == _ad_security_extension(SID).value
 
 
+@pytest.mark.parametrize('renew', [_renew_tls, _renew_xml], ids=['tls-client-cert', 'ws-security'])
+def test_a_certificate_the_ca_did_not_sign_renews_without_its_sid(client, app, auth_client, wstep_renew_config,
+                                                                 monkeypatch, renew):
+    from tests.test_protocol_renewal_sid import forged_import
+    _row_id, forged, key = forged_import(app, auth_client, wstep_renew_config['id'],
+                                         f'sid-forged-{renew.__name__.strip('_').replace('_', '-')}.example.test')
+    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda sid: pytest.fail('unsigned SID'))
+    _configure_ad_connector(app)
+    assert _sid_ext(_issued(renew(client, forged, key))) is None
+
+
 def test_a_sid_in_the_renewal_csr_is_ignored(client, app, wstep_renew_config):
     old_cert, old_key = _issue(app, wstep_renew_config['id'], 'sid-csr.example.test')
     renewed = _issued(_renew_tls(client, old_cert, old_key, csr_sid=OTHER_SID))

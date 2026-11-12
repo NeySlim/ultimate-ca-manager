@@ -1408,7 +1408,7 @@ class SCEPService:
                 raise SCEPRequestRefused('Signing certificate has been revoked')
         # A RenewalReq keeps the renewed certificate's SID extension, resolved at signing
         from services.ad_connector.renewal_identity import renewal_requester_sid
-        requester_sid = renewal_requester_sid(renewal_of, 'SCEP') if renewal_of is not None else None
+        requester_sid = renewal_requester_sid(renewal_of, self.ca_cert, 'SCEP') if renewal_of is not None else None
 
         # Re-checked here: a manual approval may come after the policies changed
         from services.policy_service import PolicyViolation
