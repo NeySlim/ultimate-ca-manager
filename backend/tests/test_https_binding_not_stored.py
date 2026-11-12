@@ -22,8 +22,20 @@ def broken_binding(monkeypatch, tmp_path):
     return restarts
 
 
-def test_apply_without_a_stored_binding_does_not_restart(auth_client, create_cert, broken_binding):
-    cert = create_cert(cn='https-unstored.example.test')
+@pytest.fixture
+def own_cert(app, create_ca, create_cert):
+    """A certificate under a CA of its own, both deleted after the test."""
+    ca = create_ca(cn='HTTPS unstored binding CA')
+    yield create_cert(cn='https-unstored.example.test', ca_id=ca['id'])
+    from models import CA, db
+    from tests.seeded_rows import delete_cas
+    with app.app_context():
+        delete_cas(CA.query.filter_by(id=ca['id']))
+        db.session.commit()
+
+
+def test_apply_without_a_stored_binding_does_not_restart(auth_client, own_cert, broken_binding):
+    cert = own_cert
     r = auth_client.post('/api/v2/system/https/apply', json={'cert_id': cert['id']})
     assert r.status_code == 500, r.data
     assert broken_binding == []
