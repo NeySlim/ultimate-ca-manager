@@ -310,8 +310,10 @@ def apply_https_cert():
 
         # Remember the binding so a renewal re-materializes the files (#303), and so the
         # other nodes (HA) write the same files when they restart
+        # Read before binding: a failed binding rolls back and expires the instance
+        refid, label = cert.refid, cert.descr or cert.refid
         try:
-            set_bound_refid(cert.refid, chain=full_cert)
+            set_bound_refid(refid, chain=full_cert)
         except Exception as e:
             current_app.logger.warning(f"Could not persist HTTPS binding: {e}")
             # Not restarted: the next start writes the certificate the database still names, if any
@@ -319,8 +321,8 @@ def apply_https_cert():
                        if ha_enabled() else _unrecorded_message())
             AuditService.log_action(
                 action='https_apply', resource_type='system', resource_id=str(cert_id),
-                resource_name=cert.descr or cert.refid,
-                details=f'Applied certificate {cert.refid} as HTTPS certificate: {message}',
+                resource_name=label,
+                details=f'Applied certificate {refid} as HTTPS certificate: {message}',
                 success=False)
             return error_response(message, 500)
 
