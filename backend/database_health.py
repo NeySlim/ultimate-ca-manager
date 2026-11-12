@@ -45,6 +45,14 @@ def check_and_repair_database(app):
             return False
 
 
+def _version_should_advance(stored, running):
+    """True when `running` is newer than `stored`, or `stored` is absent or unreadable."""
+    from services.updates import parse_version, compare_versions
+    if not stored or not str(stored).strip() or parse_version(str(stored))[:3] == (0, 0, 0):
+        return stored != running
+    return compare_versions(str(stored), str(running)) < 0
+
+
 def ensure_system_config_defaults(app):
     """Ensure default system config entries exist - handles race conditions"""
     from sqlalchemy.exc import IntegrityError
@@ -58,8 +66,8 @@ def ensure_system_config_defaults(app):
         # Check if config already exists (read-only check first)
         config = SystemConfig.query.filter_by(key=key).first()
         if config:
-            # Always sync app.version from VERSION file
-            if key == 'app.version' and config.value != value:
+            # app.version only moves forward: an older node restarting must not undo a newer one
+            if key == 'app.version' and _version_should_advance(config.value, value):
                 config.value = value
                 db.session.commit()
             continue  # Already exists, skip

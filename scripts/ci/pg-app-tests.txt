@@ -51,3 +51,4 @@ tests/test_sso_return_path.py
 tests/test_cas_list_query_count.py
 tests/test_fresh_app.py
 tests/test_policy_algorithms_397.py
+tests/test_startup_backend_guards.py
