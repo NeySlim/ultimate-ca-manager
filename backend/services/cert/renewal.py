@@ -36,7 +36,6 @@ from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.ca_pointer_extensions import add_ca_pointer_extensions
 from utils.qc_statements import carried_policy_oids, template_policy_oids
 from utils.leaf_key_usage import constrain_builder_key_usage
-from utils.revocation_reasons import HOLD_REASONS
 from utils.spki_digest import certificate_key_sha256
 from utils.datetime_utils import cert_not_before, utc_isoformat, utc_now
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window, clamp_not_after
@@ -660,6 +659,7 @@ def _write_row(cert, ca, ca_cert, renewed, cert_pem, key_pem, new_serial, now) -
 
 def _record_superseded(cert_id, ca, old_serial, old_valid_to, now, old_digest=None) -> None:
     """Keep the replaced serial on the CA's CRL until it would have expired."""
+    from services.cert.issued_lookup import record_reason_replaceable
     if not old_serial or ca is None:
         return
     row = RevokedSerial.query.filter_by(caref=ca.refid, serial_number=old_serial).first()
@@ -668,7 +668,7 @@ def _record_superseded(cert_id, ca, old_serial, old_valid_to, now, old_digest=No
         row = RevokedSerial(caref=ca.refid, serial_number=old_serial)
         db.session.add(row)
     # A final revocation already recorded keeps its reason and date (keyCompromise is never superseded)
-    if fresh or row.revoke_reason in HOLD_REASONS:
+    if fresh or record_reason_replaceable(row, 'superseded'):
         row.revoked_at = now
         row.revoke_reason = 'superseded'
     row.valid_to = old_valid_to or now + _SUPERSEDED_FALLBACK
