@@ -195,7 +195,7 @@ def reset_db():
         # data directory leaves the database as it was
         from auth import initial_admin
         try:
-            prepared = initial_admin.prepare(current_app.config)
+            prepared = initial_admin.prepare(current_app.config, defer_write=True)
         except initial_admin.InitialPasswordError as e:
             return error_response(f"Database not reset: {e}", 409)
 
@@ -207,6 +207,17 @@ def reset_db():
 
         # The configured administrator, as at first start (auth.initial_admin)
         initial_admin.seed_admin(current_app.config, prepared)
+        try:
+            # The live file is replaced only once the tables are back
+            initial_admin.write_generated(current_app.config, prepared)
+        except initial_admin.InitialPasswordError as e:
+            db.session.rollback()
+            AuditService.log_action(
+                action='database_reset', resource_type='system', resource_id='database',
+                details=(f"Initiated by {actor_name}; the database was reset "
+                         "but the administrator account could not be created"),
+                username=actor_name, success=False)
+            return error_response(f"Database reset, administrator not created: {e}", 500)
         from services import cluster_commands
         # Other nodes drop a file the reset made stale
         cluster_commands.emit(cluster_commands.DROP_INITIAL_PASSWORD)

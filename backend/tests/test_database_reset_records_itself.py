@@ -118,3 +118,49 @@ def test_an_unreadable_password_file_resets_nothing(app, auth_client, monkeypatc
         with app.app_context():
             User.query.filter_by(username='reset-survivor').delete()
             db.session.commit()
+
+
+def test_a_reset_whose_drop_fails_keeps_the_live_password_file(app, auth_client, monkeypatch, tmp_path):
+    """The generated file is written once the tables are recreated, never over a live one before."""
+    from auth.initial_admin import PASSWORD_FILE_NAME
+    monkeypatch.setitem(app.config, 'INITIAL_ADMIN_PASSWORD', None)
+    monkeypatch.setitem(app.config, 'INITIAL_ADMIN_PASSWORD_FILE', None)
+    monkeypatch.setitem(app.config, 'DATA_DIR', str(tmp_path))
+    path = tmp_path / PASSWORD_FILE_NAME
+    path.write_text('Live-Generated-Value-7\n')
+    with app.app_context():
+        holder = User(username='reset-file-holder', email='h@example.test', role='admin', active=True)
+        holder.set_password('Live-Generated-Value-7')
+        db.session.add(holder)
+        db.session.commit()
+
+    def failing_drop(*a, **k):
+        raise RuntimeError('drop refused')
+    monkeypatch.setattr(db, 'drop_all', failing_drop)
+    try:
+        answer = auth_client.post('/api/v2/system/database/reset')
+        assert answer.status_code >= 400
+        assert path.read_text() == 'Live-Generated-Value-7\n'
+        with app.app_context():
+            held = User.query.filter_by(username='reset-file-holder').one()
+            assert held.check_password(path.read_text().rstrip('\n'))
+    finally:
+        with app.app_context():
+            User.query.filter_by(username='reset-file-holder').delete()
+            db.session.commit()
+
+
+def test_a_reset_whose_file_cannot_be_written_says_so(app, auth_client, monkeypatch, tmp_path):
+    from auth import initial_admin
+    monkeypatch.setitem(app.config, 'INITIAL_ADMIN_PASSWORD', None)
+    monkeypatch.setitem(app.config, 'INITIAL_ADMIN_PASSWORD_FILE', None)
+    monkeypatch.setitem(app.config, 'DATA_DIR', str(tmp_path))
+
+    def full_disk(path, value):
+        raise OSError(28, 'No space left on device')
+    monkeypatch.setattr(initial_admin, '_write_atomically', full_disk)
+    answer = auth_client.post('/api/v2/system/database/reset')
+    assert answer.status_code == 500 and 'not created' in answer.get_data(as_text=True)
+    with app.app_context():
+        assert User.query.filter_by(username=app.config['INITIAL_ADMIN_USERNAME']).count() == 0
+        assert AuditLog.query.filter_by(action='database_reset', success=False).count() == 1

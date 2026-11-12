@@ -101,20 +101,41 @@ def _write_atomically(path: Path, value: str):
         pass
 
 
-def prepare(config) -> InitialPassword:
-    """resolve(), and a generated password on disk before any account holds it."""
+def _probe(path: Path):
+    """Raises OSError unless a file could be put at path now; writes nothing there."""
+    if path.is_dir():
+        raise IsADirectoryError(21, 'Is a directory')
+    fd, tmp = tempfile.mkstemp(prefix=f'.{PASSWORD_FILE_NAME}.', dir=path.parent)
+    os.close(fd)
+    os.unlink(tmp)
+
+
+def prepare(config, defer_write=False) -> InitialPassword:
+    """resolve(), and a generated password on disk before any account holds it.
+
+    defer_write: only check the file can be written, write_generated() puts it
+    there later (a reset must not replace a live file before its drop succeeds)."""
     prepared = resolve(config)
     if prepared.generated:
-        path = password_file(config)
-        try:
-            _write_atomically(path, prepared.value)
-        except OSError as e:
-            raise InitialPasswordError(
-                f'the generated initial password cannot be written to {path}: '
-                f'{e.strerror or type(e).__name__}; the administrator is not created') from None
+        _put(password_file(config), prepared.value, probe_only=defer_write)
     else:
         _warn_if_weak(prepared)
     return prepared
+
+
+def write_generated(config, prepared):
+    """The file of a prepare(defer_write=True); nothing for a provided password."""
+    if prepared.generated:
+        _put(password_file(config), prepared.value)
+
+
+def _put(path, value, probe_only=False):
+    try:
+        _probe(path) if probe_only else _write_atomically(path, value)
+    except OSError as e:
+        raise InitialPasswordError(
+            f'the generated initial password cannot be written to {path}: '
+            f'{e.strerror or type(e).__name__}; the administrator is not created') from None
 
 
 def _warn_if_weak(prepared):
