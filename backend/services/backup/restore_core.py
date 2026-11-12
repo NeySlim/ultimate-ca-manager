@@ -464,6 +464,8 @@ class RestoreCoreMixin:
                 results['warnings'] = list(dict.fromkeys(plan.warnings))
                 results['dropped_secrets'] = list(plan.dropped_fields)
 
+                keytab_published = self._publish_restored_keytab(backup_data, plan)
+
                 for path in sorted(files_before - _row_file_paths()):
                     staged.stage_removal(path)
                 # Published inside the transaction, so a file that cannot be
@@ -488,6 +490,9 @@ class RestoreCoreMixin:
         finally:
             staged.discard()
 
+        if keytab_published:
+            self._write_keytab_here()
+
         if aligned:
             from services.audit_service import AuditService
             for entry in aligned:
@@ -511,6 +516,30 @@ class RestoreCoreMixin:
         # restores data, and an API route is where revoking every session and
         # asking for a restart belongs (see invalidate_after_restore).
         return results
+
+    @staticmethod
+    def _publish_restored_keytab(backup_data, plan) -> bool:
+        """The profiles' section restored: the keytab file every node writes is rebuilt from
+        them (A7) and the other nodes reload it, in the restore's transaction."""
+        if section_kind(backup_data, 'windows_enrollment_profiles') != 'list':
+            return False
+        from services import cluster_commands, windows_profiles
+        db.session.flush()
+        try:
+            windows_profiles.publish_keytab(actor='restore')
+        except ValueError as exc:
+            plan.warnings.append(f"windows_enrollment_profiles: the keytab is not served: {exc}")
+            return False
+        cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
+        return True
+
+    @staticmethod
+    def _write_keytab_here() -> None:
+        from services.kerberos import negotiate_auth
+        try:
+            negotiate_auth.write_stored_keytab()
+        except (OSError, ValueError) as exc:
+            logger.error("Restore: the Kerberos keytab file was not written on this node: %s", exc)
 
     @staticmethod
     def _align_restored_revocations(plan) -> List[Dict[str, Any]]:

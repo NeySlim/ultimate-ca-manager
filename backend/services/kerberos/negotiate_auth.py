@@ -224,8 +224,8 @@ def write_stored_keytab():
 
 def restore_keytab_at_start(app):
     """Startup: the default profile takes a keytab it does not hold yet (a single node's file
-    from 2.x, or the one stored before profiles), then the stored keytab is written to disk.
-    Never raises."""
+    from 2.x, or the one stored before profiles), else the stored keytab is rebuilt from the
+    profile when it differs; then it is written to disk. Never raises."""
     from models import SharedFile, db
     from services import shared_files, windows_profiles
     from services.windows_profiles.legacy import warn_without_realm
@@ -251,6 +251,13 @@ def restore_keytab_at_start(app):
                     windows_profiles.publish_keytab()
                     db.session.commit()
                     logger.info("Kerberos keytab stored in the default Windows enrollment profile")
+            elif shared_files.read_file(shared_files.KERBEROS_KEYTAB) != profile.keytab_bytes():
+                # The profile is the source: a file it does not hold is rebuilt, everywhere
+                from services import cluster_commands
+                windows_profiles.publish_keytab()
+                cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
+                db.session.commit()
+                logger.info("Kerberos keytab rebuilt from the default Windows enrollment profile")
             if db.session.get(SharedFile, shared_files.KERBEROS_KEYTAB) is not None:
                 if write_stored_keytab() == 'written':
                     logger.info("Kerberos keytab written from the database")

@@ -538,3 +538,67 @@ def test_the_profile_is_the_same_whether_the_migration_reads_the_keytab_or_not(
     assert seen[0] == seen[1]
     assert seen[0][0]['realm'] == realm and seen[0][0]['enabled'] and seen[0][1] == keytab
     assert seen[0][2] == (realm is None)
+
+
+ARCHIVED_KEYTAB, TARGET_KEYTAB = b'\x05\x02keytab-of-the-archive', b'\x05\x02keytab-of-the-target'
+
+
+@pytest.mark.parametrize('target', ['other-keytab', 'fresh'])
+def test_the_keytab_of_a_restored_profile_is_served(app, clean_slate, no_shared_keytab, monkeypatch,
+                                                    tmp_path, target):
+    """The profile is the source (A7): its restored keytab becomes the shared file, this node's
+    file, and a reload for the other nodes."""
+    from config.settings import Config
+    from models import ClusterCommand
+    from services import cluster_commands, shared_files
+    from services.backup_service import BackupService
+    path = tmp_path / 'kerberos.keytab'
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', path)
+    with app.app_context():
+        profile = WindowsEnrollmentProfile(name='default', is_default=True, realm='KT.EXAMPLE')
+        profile.set_keytab(ARCHIVED_KEYTAB)
+        db.session.add(profile)
+        db.session.commit()
+        include = {name: name == 'windows_enrollment_profiles' for name in manifest.SECTIONS}
+        blob = BackupService().create_backup(BACKUP_PASSWORD, include=include)
+        if target == 'fresh':
+            db.session.delete(profile)
+        else:
+            profile.set_keytab(TARGET_KEYTAB)
+            shared_files.store_file(shared_files.KERBEROS_KEYTAB, TARGET_KEYTAB)
+            path.write_bytes(TARGET_KEYTAB)
+        ClusterCommand.query.filter_by(kind=cluster_commands.RELOAD_KEYTAB).delete()
+        db.session.commit()
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    try:
+        with app.app_context():
+            BackupService().restore_backup(blob, BACKUP_PASSWORD, mode='merge')
+        with app.app_context():
+            assert _default().keytab_bytes() == ARCHIVED_KEYTAB
+            assert shared_files.read_file(shared_files.KERBEROS_KEYTAB) == ARCHIVED_KEYTAB
+            assert ClusterCommand.query.filter_by(kind=cluster_commands.RELOAD_KEYTAB).count() == 1
+        assert path.read_bytes() == ARCHIVED_KEYTAB
+    finally:
+        with app.app_context():
+            ClusterCommand.query.filter_by(kind=cluster_commands.RELOAD_KEYTAB).delete()
+            db.session.commit()
+
+
+def test_startup_rebuilds_a_shared_keytab_the_profile_does_not_hold(app, clean_slate, no_shared_keytab,
+                                                                     monkeypatch, tmp_path):
+    from config.settings import Config
+    from services import shared_files
+    monkeypatch.setattr(Config, 'HA_MODE', False)
+    path = tmp_path / 'kerberos.keytab'
+    path.write_bytes(TARGET_KEYTAB)
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', path)
+    with app.app_context():
+        profile = WindowsEnrollmentProfile(name='default', is_default=True, realm='KT.EXAMPLE')
+        profile.set_keytab(ARCHIVED_KEYTAB)
+        db.session.add(profile)
+        shared_files.store_file(shared_files.KERBEROS_KEYTAB, TARGET_KEYTAB)
+        db.session.commit()
+    negotiate_auth.restore_keytab_at_start(app)
+    with app.app_context():
+        assert shared_files.read_file(shared_files.KERBEROS_KEYTAB) == ARCHIVED_KEYTAB
+    assert path.read_bytes() == ARCHIVED_KEYTAB
