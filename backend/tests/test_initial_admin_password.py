@@ -430,3 +430,15 @@ def test_an_announce_that_fails_is_logged_not_raised(app, monkeypatch, tmp_path,
     with app.app_context(), caplog.at_level('ERROR', logger='auth.initial_admin'):
         initial_admin.announce({'DATA_DIR': str(tmp_path)})
     assert 'not announced' in caplog.text
+
+
+def test_the_missing_file_log_cites_a_title_of_the_admin_guide(app, marked_user, caplog):
+    from auth import initial_admin
+    _, path, config = marked_user
+    path.unlink()
+    with app.app_context(), caplog.at_level('ERROR', logger='auth.initial_admin'):
+        initial_admin.announce(config)
+    guide = (BACKEND.parent / 'docs' / 'ADMIN_GUIDE.md').read_text(encoding='utf-8')
+    headings = {line.lstrip('#').strip() for line in guide.splitlines() if line.startswith('#')}
+    assert f'"{initial_admin.LOST_FILE_TITLE}"' in caplog.text
+    assert initial_admin.LOST_FILE_TITLE in headings

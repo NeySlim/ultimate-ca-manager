@@ -27,6 +27,8 @@ MARKER_KEY = 'initial_admin.generated_password'
 ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
 LENGTH = 24
 _SWEEP_KEY = 'initial_admin_sweep'
+# Heading of docs/ADMIN_GUIDE.md the log cites when the file is gone
+LOST_FILE_TITLE = 'Initial password lost before the first login'
 
 
 class InitialPasswordError(RuntimeError):
@@ -284,5 +286,5 @@ def _announce(config):
                        f'is on node {node}, in its data directory ({path.name})')
     else:
         logger.error(f"Initial administrator '{user.username}': the generated password file "
-                     f'{path} is missing and the password was never changed; see "Lost '
-                     f'initial password" in the administration guide')
+                     f'{path} is missing and the password was never changed; see '
+                     f'"{LOST_FILE_TITLE}" in the administration guide')
