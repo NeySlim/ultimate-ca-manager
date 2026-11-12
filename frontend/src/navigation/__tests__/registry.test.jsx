@@ -41,7 +41,7 @@ import { AppRoutes, moduleRoutes, guarded } from '../../App'
 import { Routes, Route } from 'react-router-dom'
 import { pages } from '../pages'
 import {
-  MODULES, GROUPS, SIDEBAR_GROUPS, REDIRECTS, visibleModules, groupsFor, sidebarGroups,
+  MODULES, GROUPS, REDIRECTS, visibleModules, groupsFor,
   moduleForPath, paletteCommands, isVisible,
 } from '../registry'
 import { PERMISSION_RESOURCES } from '../../lib/rbacPermissions'
@@ -199,7 +199,6 @@ describe('registry shape (b)', () => {
   it('every group reference names a declared group', () => {
     for (const m of MODULES) {
       if (m.group) expect(GROUPS.map(g => g.id), m.id).toContain(m.group)
-      if (m.navGroup) expect(SIDEBAR_GROUPS.map(g => g.id), m.id).toContain(m.navGroup)
     }
   })
 })
@@ -207,7 +206,7 @@ describe('registry shape (b)', () => {
 describe('labels (c)', () => {
   const keys = [
     ...MODULES.flatMap(m => [m.labelKey, m.shortKey, m.palette?.labelKey]),
-    ...GROUPS.map(g => g.labelKey), ...SIDEBAR_GROUPS.map(g => g.labelKey),
+    ...GROUPS.map(g => g.labelKey),
     ...REDIRECTS.map(r => r.palette?.labelKey),
     ...paletteCommands().flatMap(c => [c.labelKey, c.categoryKey]),
   ].filter(Boolean)
@@ -252,7 +251,7 @@ describe('visibility (e)', () => {
     expect(groups).not.toContain('governance')
   })
 
-  const sidebarIds = (perms) => sidebarGroups(makeCan(perms)).flatMap(g => g.children.map(c => c.id))
+  const menuIds = (perms) => groupsFor(makeCan(perms)).flatMap(g => g.modules.map(m => m.id)).sort()
   const operator = ['read:certificates', 'read:user_certificates', 'read:cas', 'read:csrs', 'read:templates',
     'read:truststore', 'read:crl', 'read:acme', 'read:scep', 'read:est', 'read:hsm', 'read:ssh', 'read:ssh_cas',
     'read:policies', 'read:approvals', 'read:key_recovery', 'read:audit', 'read:settings', 'read:groups']
@@ -260,14 +259,15 @@ describe('visibility (e)', () => {
     'read:acme', 'read:scep', 'read:est', 'read:hsm', 'read:ssh', 'read:ssh_cas', 'read:policies', 'read:approvals', 'read:audit']
   const viewer = ['read:certificates', 'read:cas', 'read:csrs', 'read:templates', 'read:truststore', 'read:ssh', 'read:ssh_cas']
 
-  // Lists captured from the sidebar before the registry replaced its local table
+  // What the old sidebar listed per role, plus the entries it reached from elsewhere
+  // (settings from its bottom link, user certificates from no entry at all)
   it.each([
-    ['admin', ['*'], ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'acme', 'scep', 'est', 'tsa', 'crl-ocsp', 'truststore', 'operations', 'tools', 'policies', 'approvals', 'keyRecovery', 'reports', 'discovery', 'users', 'rbac', 'hsm', 'audit', 'logs']],
-    ['operator', operator, ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'acme', 'scep', 'est', 'tsa', 'crl-ocsp', 'truststore', 'tools', 'policies', 'approvals', 'keyRecovery', 'reports', 'discovery', 'hsm', 'audit']],
+    ['admin', ['*'], ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'acme', 'scep', 'est', 'tsa', 'crl-ocsp', 'truststore', 'operations', 'tools', 'policies', 'approvals', 'keyRecovery', 'reports', 'discovery', 'users', 'rbac', 'hsm', 'audit', 'logs', 'user-certificates', 'settings']],
+    ['operator', operator, ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'acme', 'scep', 'est', 'tsa', 'crl-ocsp', 'truststore', 'tools', 'policies', 'approvals', 'keyRecovery', 'reports', 'discovery', 'hsm', 'audit', 'user-certificates']],
     ['auditor', auditor, ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'acme', 'scep', 'est', 'crl-ocsp', 'truststore', 'tools', 'policies', 'approvals', 'reports', 'discovery', 'hsm', 'audit']],
     ['viewer', viewer, ['certificates', 'cas', 'csrs', 'templates', 'ssh-cas', 'ssh-certificates', 'truststore', 'tools', 'discovery']],
-  ])('the sidebar lists the same ids in the same order for %s', (_role, perms, expected) => {
-    expect(sidebarIds(perms)).toEqual(expected)
+  ])('the Modules menu lists what the old navigation gave %s', (_role, perms, expected) => {
+    expect(menuIds(perms)).toEqual([...expected].sort())
   })
 })
 
