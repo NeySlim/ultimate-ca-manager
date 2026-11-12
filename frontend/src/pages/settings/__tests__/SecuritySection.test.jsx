@@ -140,6 +140,13 @@ describe('SecuritySection disabling encryption', () => {
     fireEvent.click(screen.getByText('settings.runDisableAgain'))
     expect(setShow).toHaveBeenCalledWith(true)
   })
+  it('names the end of a disable grace period and holds enabling until then', () => {
+    renderSection({ ...status, enabled: false, key_source: 'env',
+      disabled_keys_kept_until: '2026-11-12T10:00:00Z' })
+    expect(screen.getByText('common.disabled')).toBeInTheDocument()
+    expect(screen.getByText('settings.disabledKeysKeptUntil')).toBeInTheDocument()
+    expect(screen.getByText('settings.enableEncryption').closest('button')).toBeDisabled()
+  })
 })
 
 describe('SecuritySection data key rotation', () => {

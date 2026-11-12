@@ -2860,6 +2860,7 @@
     "rotateDataKey": "Rotate Data Key",
     "resumeDataKeyRotation": "Finish Data Key Rotation",
     "previousDekKeptUntil": "Previous data key kept until {{date}}",
+    "disabledKeysKeptUntil": "The data keys still open values written during the disable until {{date}}; encryption can be enabled again after that.",
     "encryptionDisabling": "Disable left half-way",
     "encryptionDisablingHint": "A disable of encryption stopped before every value was decrypted. Every value still opens and nothing new is encrypted: run the disable again to finish it.",
     "runDisableAgain": "Run Disable Again",

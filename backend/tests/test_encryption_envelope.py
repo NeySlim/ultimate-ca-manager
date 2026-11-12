@@ -734,8 +734,8 @@ def test_in_ha_disable_then_enable_keep_the_kek_and_tell_every_node(app, auth_cl
     stored = _stored(app, values)
     assert all(key_encryption.is_encrypted(stored[k]) for k in ('ssh', 'target', 'config', 'shared'))
     assert _read(app, values) == CLEAR
-    # Disable: decrypt-only, then the DEKs dropped; enable
-    assert [k for k, _ in _commands(app)] == ['reload_encryption'] * 3
+    # Disable: decrypt-only, the markers and the grace, then the DEKs dropped; enable
+    assert [k for k, _ in _commands(app)] == ['reload_encryption'] * 4
     r = auth_client.post('/api/v2/system/security/encrypt-all-keys', json={'dry_run': True})
     assert r.status_code == 200, r.data
 
@@ -1111,3 +1111,179 @@ def test_a_process_that_missed_a_file_disable_writes_in_the_clear(app, auth_clie
         # A fresh start, on the variable when there is one, is off too
         key_encryption.reload()
         assert not key_encryption.is_enabled
+
+
+# --- grace period of a disable --------------------------------------------
+
+
+def _late_value_opens(app, values):
+    from models.deploy import DeployTarget
+    from security.encryption import decrypt_master_key_value
+    with app.app_context():
+        db.session.expire_all()
+        stored = db.session.get(DeployTarget, values['ids'][DeployTarget]).private_key
+        return decrypt_master_key_value(stored, 'text') == PEM
+
+
+def _rotate_at_once(monkeypatch):
+    """A DEK of version 2, its rotation over: the one a premature drop at disable would lose."""
+    from security import dek_rotation
+    with monkeypatch.context() as patch:
+        patch.setattr(dek_rotation, 'GRACE_SECONDS', 0.0)
+        dek_rotation.rotate()
+
+
+def test_a_value_encrypted_before_the_disable_was_seen_stays_readable(app, auth_client, values,
+                                                                     grace, monkeypatch,
+                                                                     encryption_enabled):
+    """It commits after the disable: the DEKs open it until the end-of-grace sweep decrypts it."""
+    from security import dek_rotation
+    key_encryption = encryption_enabled.key_encryption
+    with app.app_context():
+        _rotate_at_once(monkeypatch)
+        stale = key_encryption._fernet
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['keys_kept_until']
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(0, 'disabled'), (2, 'active')]
+    _late_write(app, values, stale)
+    with app.app_context():
+        key_encryption.reload()
+        assert key_encryption.encrypt_string('x') == 'x'
+    assert _late_value_opens(app, values)
+    status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
+    assert status['enabled'] is False and status['disabling'] is False
+    assert status['disabled_keys_kept_until'] and not status['previous_dek_retire_after']
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 0  # not due
+    grace(601)
+    with app.app_context():
+        # The sweep finds the late value: decrypted in place, the DEKs kept once more
+        assert dek_rotation.retire_if_due() == 0
+    assert _stored(app, values)['target'] == PEM
+    assert (2, 'active') in [(v, s) for v, s, _, _ in _rows(app)]
+    grace(601)
+    with app.app_context():
+        dek_rotation.scheduled_retire()
+        assert dek_rotation.retiring() is None
+        key_encryption.reload()
+        assert not key_encryption.is_enabled and key_encryption.kek_loaded
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(0, 'disabled')]
+    assert _stored(app, values)['target'] == PEM
+
+
+def test_a_restart_during_the_grace_of_a_disable_keeps_the_deks(app, auth_client, values, grace,
+                                                               monkeypatch, encryption_enabled):
+    key_encryption = encryption_enabled.key_encryption
+    with app.app_context():
+        _rotate_at_once(monkeypatch)
+        stale = key_encryption._fernet
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    _late_write(app, values, stale)
+    _start(app)
+    assert app.config['SAFE_MODE'] is False
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(0, 'disabled'), (2, 'active')]
+    assert _late_value_opens(app, values)
+    grace(601)
+    _start(app)  # the late value decrypted, then a second period
+    assert _stored(app, values)['target'] == PEM
+    grace(601)
+    _start(app)
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(0, 'disabled')]
+    assert app.config['SAFE_MODE'] is False and not key_encryption.is_enabled
+
+
+def test_a_file_disable_keeps_the_master_key_until_the_grace_ends(app, auth_client, envelope_keys,
+                                                                 set_env, grace,
+                                                                 encryption_enabled):
+    """The DEK rows are wrapped by the file's KEK: removing it first would make them useless."""
+    from security import dek_rotation
+    key_encryption = encryption_enabled.key_encryption
+    path = encryption_enabled.MASTER_KEY_PATH
+    path.write_text(Fernet.generate_key().decode())
+    set_env('KEY_ENCRYPTION_KEY', None)
+    with app.app_context():
+        key_encryption.reload()
+        assert key_encryption.key_source == 'file'
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    assert path.exists()
+    grace(601)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 1
+        assert not key_encryption.is_enabled
+    assert not path.exists()
+    assert [s for _, s, _, _ in _rows(app)] == ['disabled']
+
+
+def test_in_ha_the_deks_of_a_disable_wait_for_every_live_node(app, auth_client, values, grace,
+                                                             monkeypatch):
+    from models import ClusterNode
+    from security import dek_rotation
+    from services.scheduler_leader import cluster_utc_now
+    _ha(monkeypatch)
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    with app.app_context():
+        command = dek_rotation.retiring()['command']
+        assert command
+    grace(601)
+    with app.app_context():
+        now = cluster_utc_now()
+        db.session.add(ClusterNode(node_id='envtest-lag', started_at=now, heartbeat_at=now,
+                                   is_leader=False, command_seen=command - 1))
+        db.session.commit()
+        assert dek_rotation.retire_if_due() == 0
+        db.session.get(ClusterNode, 'envtest-lag').command_seen = command
+        db.session.commit()
+        assert dek_rotation.retire_if_due() == 1
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(0, 'disabled')]
+
+
+def test_enable_and_rotate_during_the_grace_of_a_disable_name_its_end(app, auth_client, values,
+                                                                      grace):
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    for route in ('enable-encryption', 'rotate-encryption-key'):
+        r = auth_client.post(f'/api/v2/system/security/{route}')
+        assert r.status_code == 409, r.data
+        assert 'kept until' in r.get_json()['message']
+    grace(601)
+    r = auth_client.post('/api/v2/system/security/enable-encryption')
+    assert r.status_code == 200, r.data
+    assert _rows(app) == []
+    assert _read(app, values) == CLEAR
+
+
+@pytest.mark.skipif(not pg_app_harness.ENABLED, reason='needs UCM_TEST_APP_PG_URL')
+def test_on_postgresql_a_transaction_open_across_the_disable_stays_readable(
+        app, auth_client, values, grace, monkeypatch, encryption_enabled):
+    """A second connection encrypts under the DEK, the disable ends, then it commits."""
+    from sqlalchemy import text
+    from security import dek_rotation, encryption
+    key = f"acme.account.late{values['tag']}.private_key"
+    with app.app_context():
+        _rotate_at_once(monkeypatch)
+        stale = encryption_enabled.key_encryption._fernet
+        late = base64.b64encode(encryption.ENCRYPTED_MARKER + stale.encrypt(PEM.encode())).decode()
+        other = db.engine.connect()
+        transaction = other.begin()
+        other.execute(text("INSERT INTO system_config (key, value) VALUES (:k, :v)"),
+                      {'k': key, 'v': late})
+    try:
+        assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+        transaction.commit()
+        with app.app_context():
+            encryption_enabled.key_encryption.reload()
+            stored = SystemConfig.query.filter_by(key=key).one().value
+            assert encryption.decrypt_master_key_value(stored, 'text') == PEM
+        grace(601)
+        with app.app_context():
+            assert dek_rotation.retire_if_due() == 0
+            db.session.expire_all()
+            assert SystemConfig.query.filter_by(key=key).one().value == PEM
+        grace(601)
+        with app.app_context():
+            assert dek_rotation.retire_if_due() == 1
+    finally:
+        other.close()
+        with app.app_context():
+            SystemConfig.query.filter_by(key=key).delete()
+            db.session.commit()

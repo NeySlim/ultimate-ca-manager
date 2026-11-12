@@ -409,6 +409,7 @@ class TestEnableEncryption:
                         content_type='application/json')
         assert r.status_code == 401, r.data
 
+    @pytest.mark.usefixtures('dek_retire_at_once')  # the disable drops its DEKs at once
     def test_enable_purges_plaintext_key_files(
         self, auth_client, monkeypatch, tmp_path
     ):
@@ -448,6 +449,7 @@ class TestDisableEncryption:
                         content_type='application/json')
         assert r.status_code == 401, r.data
 
+    @pytest.mark.usefixtures('dek_retire_at_once')  # the disable drops its DEKs at once
     def test_disable_recreates_plaintext_key_files(
         self, app, auth_client, monkeypatch, tmp_path
     ):

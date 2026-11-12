@@ -24,7 +24,9 @@ DISABLED_MARKER_VERSION = 0
 # The previous DEK opens values for this long after the last sweep: a write encrypted under
 # it before its process re-read the rows (REFRESH_SECONDS) commits within it and stays readable
 GRACE_SECONDS = 600.0
-GRACE_KEY = 'encryption.dek_retire_after'  # system_config: {"version", "until", "command"}
+# system_config: {"version", "until", "command"}, plus {"disable": true, "remove_file"} after
+# a disable, whose DEKs are kept for reading the same way
+GRACE_KEY = 'encryption.dek_retire_after'
 
 
 class RotationError(RuntimeError):
@@ -48,7 +50,7 @@ def rotation_in_progress() -> bool:
 
 
 def retiring():
-    """The grace period of the previous DEK, {'version', 'until', 'command'}, or None."""
+    """The grace period of the previous DEK (or of a disable's DEKs), as stored, or None."""
     from models import SystemConfig
     row = SystemConfig.query.filter_by(key=GRACE_KEY).first()
     if row is None or not row.value:
@@ -58,11 +60,12 @@ def retiring():
     return grace
 
 
-def _set_grace(version, command_id) -> datetime:
+def _set_grace(version, command_id, **extra) -> datetime:
     from models import db, SystemConfig
     from services.scheduler_leader import cluster_utc_now
     until = cluster_utc_now() + timedelta(seconds=GRACE_SECONDS)
-    value = json.dumps({'version': version, 'until': until.isoformat(), 'command': command_id})
+    value = json.dumps({'version': version, 'until': until.isoformat(), 'command': command_id,
+                        **extra})
     row = SystemConfig.query.filter_by(key=GRACE_KEY).first()
     if row is None:
         db.session.add(SystemConfig(key=GRACE_KEY, value=value,
@@ -75,6 +78,15 @@ def _set_grace(version, command_id) -> datetime:
 def _clear_grace() -> None:
     from models import SystemConfig
     SystemConfig.query.filter_by(key=GRACE_KEY).delete(synchronize_session=False)
+
+
+def grace_refusal(grace) -> str:
+    """Why an enable, rotation or disable waits for the end of ``grace``."""
+    until = grace['until'].isoformat(timespec='seconds')
+    if grace.get('disable'):
+        return (f"Encryption was disabled: its data-encryption keys are kept until {until} UTC "
+                f"for values written during the disable. Try again after that.")
+    return f"The previous data-encryption key is kept until {until} UTC: rotate again after that"
 
 
 def _emit_reload(version):
@@ -196,8 +208,9 @@ def _under_active(value: str) -> bool:
         return False
 
 
-def rewrite(batch=None, commit=True) -> dict:
+def rewrite(batch=None, commit=True, decrypt=False) -> dict:
     """Every value not yet under the active DEK, rewritten under it; one commit per batch.
+    ``decrypt``: every encrypted value stored in the clear instead (a disable's last sweep).
 
     The UPDATE matches the value read, so a write committed meanwhile is never overwritten
     (made with the active DEK, or taken by the next pass).
@@ -228,7 +241,7 @@ def rewrite(batch=None, commit=True) -> dict:
                 if config and not _encryption._is_master_key_config(config_key):
                     continue
                 value = unwrap(stored) if unwrap else stored
-                if not key_encryption.is_encrypted(value) or _under_active(value):
+                if not key_encryption.is_encrypted(value) or (not decrypt and _under_active(value)):
                     skipped += 1
                     continue
                 try:
@@ -236,7 +249,7 @@ def rewrite(batch=None, commit=True) -> dict:
                 except ValueError:
                     unreadable.append(f"{model.__name__} {row_id}")
                     continue
-                new_value = _encryption.encrypt_master_key_value(plain, fmt)
+                new_value = plain if decrypt else _encryption.encrypt_master_key_value(plain, fmt)
                 result = db.session.execute(
                     table.update().where(pk == row_id).where(stored_column == stored)
                     .values({stored_column.name: wrap(new_value) if wrap else new_value}))
@@ -270,8 +283,9 @@ def finish(command=None):
 
 
 def retire_if_due() -> int:
-    """Drop the previous DEKs once their grace is over, every live node has loaded the active
-    one and a sweep finds no value left under them; returns how many were dropped."""
+    """Drop the previous DEKs (after a disable, every DEK) once their grace is over, every live
+    node has applied the change and a sweep finds no value left under them; returns how many
+    were dropped."""
     from types import SimpleNamespace
     from models import db, EncryptionKey
     from services.scheduler_leader import cluster_utc_now
@@ -285,26 +299,33 @@ def retire_if_due() -> int:
         return 0
     lock_key_state()
     _encryption.key_encryption.refresh()
-    late = rewrite(commit=False)
+    disable = bool(grace.get('disable'))
+    # A disable's DEKs are the only ones: values found under them go back in the clear
+    late = rewrite(commit=False, decrypt=disable)
     if late['unreadable']:
         db.session.commit()
         raise RotationError(f"{len(late['unreadable'])} value(s) decrypt with no data-encryption "
                             f"key, the previous key is kept: {', '.join(late['unreadable'][:5])}")
+    extra = {k: grace[k] for k in ('disable', 'remove_file') if k in grace}
     if late['rewritten']:
-        # Something still wrote under the previous DEK: it stays for another grace period
-        _set_grace(grace['version'], grace['command'])
+        # Something still wrote under the DEK: it stays for another grace period
+        _set_grace(grace['version'], grace['command'], **extra)
         db.session.commit()
         logger.warning("Previous DEK kept: %d value(s) were written under it since the "
-                       "rotation", late['rewritten'])
+                       "%s", late['rewritten'], 'disable' if disable else 'rotation')
         return 0
-    previous = EncryptionKey.query.filter_by(state=envelope.PREVIOUS).all()
-    for row in previous:
+    states = (envelope.ACTIVE, envelope.PREVIOUS) if disable else (envelope.PREVIOUS,)
+    dropped = EncryptionKey.query.filter(EncryptionKey.state.in_(states)).all()
+    for row in dropped:
         db.session.delete(row)
     _clear_grace()
-    _emit_reload(_encryption.key_encryption.active_version)
+    _emit_reload(None if disable else _encryption.key_encryption.active_version)
     db.session.commit()
+    if disable and grace.get('remove_file'):
+        # Outside HA the file's KEK wrapped the DEKs just dropped: nothing needs it any more
+        _encryption.KeyEncryption.remove_key_file()
     _encryption.key_encryption.reload()
-    return len(previous)
+    return len(dropped)
 
 
 def scheduled_retire() -> None:
@@ -333,9 +354,7 @@ def rotate(wait_timeout=None) -> dict:
         retire_if_due()
         grace = retiring()
         if grace is not None:
-            raise RotationError(f"The previous data-encryption key is kept until "
-                                f"{grace['until'].isoformat(timespec='seconds')} UTC: rotate "
-                                f"again after that")
+            raise RotationError(grace_refusal(grace))
     version, command = start()
     # No value is rewritten under the new DEK before every process can open it
     settle()
@@ -394,10 +413,13 @@ def begin_disable():
     return command
 
 
-def finish_disable(kept_kek) -> None:
-    """Phase 2: the DEKs dropped once, under the lock, no stored value is encrypted. Committed.
+def finish_disable(kept_kek, remove_file=False):
+    """Phase 2, under the lock once no stored value is encrypted: the disabled markers, and the
+    DEKs kept for reading through a grace period (a value encrypted before its process saw
+    phase 1 may commit after this). Committed; returns the end of the grace.
 
     ``kept_kek``: fingerprint of the KEK that stays configured, marked unused, or None.
+    ``remove_file``: master.key is removed with the DEKs at the end of the grace.
     """
     from models import db, EncryptionKey
     from utils.datetime_utils import utc_now
@@ -406,7 +428,12 @@ def finish_disable(kept_kek) -> None:
         db.session.rollback()
         raise RotationError('A value was encrypted while encryption was being disabled: run '
                             'the disable again, the data-encryption keys are kept.')
-    EncryptionKey.query.delete()
+    rows = EncryptionKey.query.all()
+    for row in rows:
+        if row.state == envelope.DISABLED:
+            db.session.delete(row)
+    db.session.flush()
+    kept = [r.version for r in rows if r.state in (envelope.ACTIVE, envelope.PREVIOUS)]
     # The KEK being removed is marked too: a process still holding it (no command outside
     # HA) must read "off", not "no row, the KEK is DEK v1"
     marked = [kept_kek, _encryption.key_encryption.kek_fingerprint()]
@@ -417,8 +444,12 @@ def finish_disable(kept_kek) -> None:
     # Nothing is encrypted any more: without this the next start would create a key
     from security.master_key_bootstrap import record_operator_choice
     record_operator_choice(auto=False)
-    _emit_reload(None)
+    command = _emit_reload(None)
+    db.session.flush()  # the command's id, which every live node acknowledges
+    until = _set_grace(max(kept, default=None), getattr(command, 'id', None), disable=True,
+                       remove_file=bool(remove_file))
     db.session.commit()
+    return until
 
 
 def resume_at_start() -> None:

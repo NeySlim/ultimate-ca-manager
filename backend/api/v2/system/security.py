@@ -46,11 +46,19 @@ def get_encryption_status():
 
         encrypted, unencrypted = count_master_key_values()
         grace = retiring()
+        # A disable done: its DEKs still open values written late, until the grace ends
+        disabled_grace = grace if grace and grace.get('disable') else None
+        if disabled_grace:
+            grace = None
 
         return success_response(data={
-            'enabled': key_encryption.is_enabled,
+            'enabled': key_encryption.is_enabled and not disabled_grace,
             # A disable left half-way: values still open, none is encrypted any more
-            'disabling': key_encryption.is_enabled and not key_encryption.is_encrypting,
+            'disabling': (key_encryption.is_enabled and not key_encryption.is_encrypting
+                          and not disabled_grace),
+            'disabled_keys_kept_until': (
+                disabled_grace['until'].isoformat(timespec='seconds') + 'Z'
+                if disabled_grace else None),
             'key_source': key_encryption.key_source,
             # Fingerprint and version only: neither key ever leaves the server here
             'kek_fingerprint': key_encryption.kek_fingerprint(),
@@ -139,7 +147,18 @@ def enable_encryption():
             KeyActivationError, activate_new_master_key, ephemeral_key_dir_refusal,
         )
         from utils.ha import ha_enabled
+        from security.dek_rotation import RotationError, grace_refusal, retire_if_due, retiring
 
+        grace = retiring()
+        if grace and grace.get('disable'):
+            # The DEKs of the last disable still open late values: they go first
+            try:
+                retire_if_due()
+            except RotationError as e:
+                return error_response(str(e), e.status)
+            grace = retiring()
+            if grace is not None:
+                return error_response(grace_refusal(grace), 409)
         if key_encryption.is_enabled:
             return error_response("Encryption is already enabled", 400)
         if key_encryption.kek_loaded:
@@ -299,12 +318,12 @@ def _env_kek_fingerprint():
 def disable_encryption():
     """
     Disable private key encryption.
-    Decrypts all keys in database and drops the DEKs. Outside HA a master.key file is
-    removed; a KEK that stays configured (variable, HA) is kept, unused.
+    Decrypts all keys in database; the DEKs are dropped after a grace period, with a master.key
+    file outside HA. A KEK that stays configured (variable, HA) is kept, unused.
     """
     try:
         from security.encryption import (
-            KeyEncryption, key_encryption, key_encryption_required,
+            key_encryption, key_encryption_required,
             decrypt_all_keys as do_decrypt
         )
 
@@ -326,7 +345,7 @@ def disable_encryption():
             )
 
         from security.dek_rotation import (
-            RotationError, begin_disable, finish_disable, settle,
+            RotationError, begin_disable, finish_disable, retire_if_due, settle,
         )
         from utils.ha import ha_enabled
 
@@ -346,18 +365,20 @@ def disable_encryption():
                 "Encryption NOT disabled to prevent data loss.", 500
             )
 
-        # A master.key file outside HA is removed; the KEK that stays configured (this one,
-        # or the variable the next reload falls back to) is marked unused
+        # A master.key file outside HA is removed with the DEKs; the KEK that stays configured
+        # (this one, or the variable the next reload falls back to) is marked unused
         remove_file = key_encryption.key_source == 'file' and not ha_enabled()
         kept_kek = key_encryption.kek_fingerprint() if not remove_file else _env_kek_fingerprint()
-        # Phase 2: the DEKs go only if no value is encrypted any more
+        # Phase 2: only if no value is encrypted any more; the DEKs stay for their grace period
         try:
-            finish_disable(kept_kek)
+            until = finish_disable(kept_kek, remove_file)
         except RotationError as e:
             return error_response(str(e), e.status)
-
-        if remove_file:
-            KeyEncryption.remove_key_file()
+        try:
+            dropped = retire_if_due()
+        except RotationError as e:
+            logger.error(f"🔑 Data-encryption keys kept after the disable: {e}")
+            dropped = 0
 
         # Reload singleton
         key_encryption.reload()
@@ -386,6 +407,8 @@ def disable_encryption():
                 'decrypted': decrypted,
                 'skipped': skipped,
                 'key_files_written': key_files_written,
+                'keys_kept_until': (None if dropped
+                                    else until.isoformat(timespec='seconds') + 'Z'),
             }
         )
 

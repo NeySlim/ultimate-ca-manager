@@ -90,12 +90,19 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
               <p className="text-sm text-status-warning">{t('settings.encryptionDisablingHint')}</p>
             )}
 
+            {encryptionStatus.disabled_keys_kept_until && (
+              <p className="text-sm text-text-secondary">
+                {t('settings.disabledKeysKeptUntil', { date: formatDate(encryptionStatus.disabled_keys_kept_until, { hour: '2-digit', minute: '2-digit' }) })}
+              </p>
+            )}
+
             {hasPermission('admin:system') && (
               <div>
                 {!encryptionStatus.enabled ? (
-                  <Button 
+                  <Button
                     onClick={() => setShowEnableEncryptionModal(true)}
                     variant="primary"
+                    disabled={!!encryptionStatus.disabled_keys_kept_until}
                   >
                     <LockKey size={16} />
                     {t('settings.enableEncryption')}
