@@ -180,8 +180,10 @@ def start():
     # Checked under the lock: a disable committed meanwhile is never undone here
     key_encryption.refresh()
     if not key_encryption.is_encrypting:
+        done = disable_done()
         db.session.rollback()
-        if key_encryption.is_enabled:
+        # A disable done keeps its DEKs for reading only: encryption is off, not half-way
+        if key_encryption.is_enabled and not done:
             raise RotationError('A disable of encryption was left half-way: run Disable '
                                 'Encryption again to finish it.')
         raise RotationError('Encryption is not enabled', 400)

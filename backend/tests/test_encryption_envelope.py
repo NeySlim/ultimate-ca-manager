@@ -2117,3 +2117,21 @@ def test_a_kek_changed_by_hand_rewraps_the_retained_keys_too(set_env, app, value
     set_env('KEY_ENCRYPTION_KEY_PREVIOUS', None)
     _start(app)
     assert app.config['SAFE_MODE'] is False and _read(app, values) == CLEAR
+
+
+def test_a_rotation_after_a_disable_done_says_encryption_is_off(app, auth_client, values,
+                                                                retention):
+    """Not 'left half-way': the disable went to its end, its DEKs only kept for reading."""
+    from security import dek_rotation
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    retention(601)
+    with app.app_context():
+        dek_rotation.retire_if_due()
+        assert dek_rotation.disable_done() and dek_rotation.retained()
+    rows = _rows(app)
+    r = auth_client.post('/api/v2/system/security/rotate-encryption-key')
+    assert r.status_code == 400, r.data
+    assert 'Encryption is not enabled' in r.get_json()['message']
+    assert 'half-way' not in r.get_json()['message']
+    assert _rows(app) == rows
+
