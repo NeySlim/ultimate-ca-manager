@@ -62,3 +62,4 @@ tests/test_initial_admin_password.py
 tests/test_est_fortios*.py
 tests/test_scep_get_pkioperation.py
 tests/test_scep_limited_client.py
+tests/test_scep_intune_fake_service.py
