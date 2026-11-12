@@ -1009,24 +1009,31 @@ class TestARecordedHoldIsShownAndLifted:
                 _record(app, f'other-ca-{tag}', real, certificate_id=plain[-1])
 
         def listed():
-            seen = []
+            import threading
+            from utils.admin_allowlist import invalidate_cache
+            seen, mine = [], threading.get_ident()
 
-            def count(*_args):
-                seen.append(1)
+            def count(_conn, _cursor, statement, *_rest):
+                # Another thread's queries on the engine are not this request's cost
+                if threading.get_ident() == mine:
+                    seen.append(statement)
             with app.app_context():
+                # The allowlist cache expires after seconds: read on both counted requests
+                invalidate_cache()
                 event.listen(db.engine, 'before_cursor_execute', count)
             try:
                 r = auth_client.get(f'/api/v2/certificates?search={tag}&per_page=100')
             finally:
                 with app.app_context():
                     event.remove(db.engine, 'before_cursor_execute', count)
-            return len(seen), {d['id']: (d['revoked'], d['revoke_reason'], d['status'])
-                               for d in r.get_json()['data']}
+            return seen, {d['id']: (d['revoked'], d['revoke_reason'], d['status'])
+                          for d in r.get_json()['data']}
 
         rows(2)
         few, _ = listed()
         rows(6)
         many, shown = listed()
-        assert many == few
+        from collections import Counter
+        assert len(many) == len(few), sorted((Counter(many) - Counter(few)).items())[:6]
         assert {i: shown[i] for i in recorded} == {i: (True, 'certificateHold', 'revoked') for i in recorded}
         assert all(shown[i][0] is False for i in plain)
