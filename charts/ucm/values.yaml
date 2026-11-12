@@ -40,6 +40,8 @@ fqdn: ucm.local
 ## Secret and keeps it across upgrades (lookup); read it with
 ##   kubectl get secret <fullname>-secrets -o jsonpath='{.data.UCM_INITIAL_ADMIN_PASSWORD}' | base64 -d
 ## helm template and GitOps tools have no lookup: set it there, or it changes at each render.
+## A secret mounted as a file instead: add INITIAL_ADMIN_PASSWORD_FILE to extraEnv (with the
+## volume); the chart then passes no password of its own, both sources would refuse the start.
 initialAdminPassword: ""
 
 ## App secrets. If left empty the chart generates random values on first install

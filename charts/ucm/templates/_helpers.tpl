@@ -92,3 +92,13 @@ so leaving HA never drops the only copy of the key.
 {{- $data := $existing.data | default dict -}}
 {{- .Values.secrets.keyEncryptionKey | default ((get $data "KEY_ENCRYPTION_KEY") | default "" | b64dec) -}}
 {{- end -}}
+
+{{/*
+"true" when extraEnv provides the initial admin password as a file: the chart's
+variable is then not passed, both sources set refuse the start.
+*/}}
+{{- define "ucm.adminPasswordFromFile" -}}
+{{- range .Values.extraEnv -}}
+{{- if has .name (list "INITIAL_ADMIN_PASSWORD_FILE" "UCM_INITIAL_ADMIN_PASSWORD_FILE") }}true{{ end -}}
+{{- end -}}
+{{- end -}}

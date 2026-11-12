@@ -88,3 +88,27 @@ def test_helm_value_reaches_the_application():
         elif 'value' in item:
             env[item['name']] = item['value']
     assert _admin_env_after_entrypoint(env)['password'] == 'S3cret-from-helm'
+
+
+def _deploy_env(docs):
+    deploy = next(d for d in docs if d['kind'] == 'Deployment')
+    return deploy['spec']['template']['spec']['containers'][0]['env']
+
+
+@pytest.mark.skipif(shutil.which('helm') is None, reason='helm not installed')
+@pytest.mark.parametrize('name', ['INITIAL_ADMIN_PASSWORD_FILE', 'UCM_INITIAL_ADMIN_PASSWORD_FILE'])
+def test_helm_a_password_file_in_extra_env_is_the_only_source(name):
+    """Both sources set refuse the start: the chart's variable steps aside."""
+    docs = _render('--set', f'extraEnv[0].name={name}',
+                   '--set', 'extraEnv[0].value=/run/secrets/ucm_admin_password')
+    names = [item['name'] for item in _deploy_env(docs)]
+    assert 'UCM_INITIAL_ADMIN_PASSWORD' not in names and 'INITIAL_ADMIN_PASSWORD' not in names
+    env = {i['name']: i['value'] for i in _deploy_env(docs) if 'value' in i}
+    got = _admin_env_after_entrypoint(env)
+    assert got['password'] == '' and got['password_file'] == '/run/secrets/ucm_admin_password'
+
+
+@pytest.mark.skipif(shutil.which('helm') is None, reason='helm not installed')
+def test_helm_other_extra_env_keeps_the_chart_password():
+    docs = _render('--set', 'extraEnv[0].name=UCM_LOG_LEVEL', '--set', 'extraEnv[0].value=DEBUG')
+    assert 'UCM_INITIAL_ADMIN_PASSWORD' in [item['name'] for item in _deploy_env(docs)]

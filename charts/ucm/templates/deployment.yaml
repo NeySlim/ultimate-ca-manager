@@ -97,11 +97,13 @@ spec:
                   name: {{ include "ucm.secretName" . }}
                   key: KEY_ENCRYPTION_KEY
             {{- end }}
+            {{- if not (include "ucm.adminPasswordFromFile" .) }}
             - name: UCM_INITIAL_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "ucm.secretName" . }}
                   key: UCM_INITIAL_ADMIN_PASSWORD
+            {{- end }}
             {{- if .Values.database.existingSecret }}
             - name: DATABASE_URL
               valueFrom:
