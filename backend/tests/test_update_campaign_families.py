@@ -457,6 +457,24 @@ def test_scheduled_auto_install_in_ha_gives_each_family_its_package(app, ha, mon
     assert [c[0] for c in _commands(app)] == [PREFIX + 'a']
 
 
+
+@pytest.mark.parametrize('assets', [[], [_asset(DEB), _asset(DEB + '.sha256')]])
+def test_scheduled_auto_install_in_ha_waits_for_the_package_of_each_family(app, ha, monkeypatch, assets):
+    # A release still uploading its assets is tried again at the next check, not marked as attempted
+    from models import SystemConfig, db
+    monkeypatch.delenv('UCM_DOCKER', raising=False)
+    _rows(app, a='deb', b='rpm-el9')
+    with app.app_context():
+        SystemConfig.query.filter_by(key=updates._ATTEMPTED_VERSION_KEY).delete()
+        db.session.commit()
+        try:
+            updates._auto_install({'latest_version': '3.1', 'current_version': '3.0', 'assets': assets})
+            assert updates._cfg_get(updates._ATTEMPTED_VERSION_KEY) in (None, '')
+        finally:
+            SystemConfig.query.filter_by(key=updates._ATTEMPTED_VERSION_KEY).delete()
+            db.session.commit()
+    assert _state(app) is None
+
 def test_scheduled_auto_install_in_ha_refuses_a_cluster_with_a_family_without_checksum(app, ha, monkeypatch):
     from models import SystemConfig, db
     from services.audit_service import AuditService

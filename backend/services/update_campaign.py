@@ -235,6 +235,17 @@ def _catalog(assets, families):
     return packages, None
 
 
+def families_without_package(assets):
+    """Package families (deb, rpm-*) of the nodes beating now that ``assets`` has no package for:
+    a release still uploading them. Container and unknown families never get one."""
+    from services import updates
+    from services.scheduler_leader import cluster_utc_now
+    now, stale = cluster_utc_now(), _stale_seconds()
+    present = {v.family for v in _nodes().values() if _fresh(v, now, stale)}
+    return sorted(f for f in present if f and (f == 'deb' or f.startswith('rpm-'))
+                  and updates.family_package(assets or [], f) is None)
+
+
 def start_campaign(target, assets, initiated_by):
     """(started, message, campaign): one campaign at a time, over the nodes beating now,
     each to get the package of its family from ``assets`` (the release's assets)."""
