@@ -11,13 +11,12 @@ import asn1crypto.core
 import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.x509.oid import NameOID
 
 from models import SystemConfig, db
 from services.scep.crypto_helpers import create_signed_pkcs7
 from tests.test_scep_fips import _envelope, _attrs
 from tests.test_scep_rfc8894_operations import (
-    MESSAGE_TYPE_OID, PKI_STATUS_OID, SENDER_NONCE_OID, TRANSACTION_ID_OID,
+    MESSAGE_TYPE_OID, PKI_STATUS_OID,
     _client_identity, _decrypt_response, _load_ca_material, _response_attributes,
 )
 
@@ -116,14 +115,14 @@ def test_get_pkioperation_with_plus_and_slash_issues(client, scep_http, path, en
     assert len(_issued(r.data, identity)) == 1
 
 
-def test_get_pkioperation_with_a_raw_plus_arrives_as_a_space_and_is_not_issued(client, scep_http):
-    """Freezes today's behaviour: an unencoded '+' reaches the server as a space (form
-    decoding) and is not repaired, so the message is garbage: a CertRep failure (its failInfo
-    depends on where the garbage breaks the parse) or an HTTP error, never an issuance."""
+def test_get_pkioperation_with_a_raw_plus_is_read_as_a_plus(client, scep_http):
+    """A client that does not percent-encode '+' sends what form decoding turns into a
+    space; the server reads it back as '+' and issues."""
     ca_cert = _ca_der(client, PATHS[0])
     message, identity = _message_with_both_symbols(ca_cert)
     r = client.get(_url(PATHS[0], message, encode='none'))
-    assert r.status_code >= 400 or _response_attributes(r.data)[PKI_STATUS_OID] == '2'
+    assert r.status_code == 200, r.data
+    assert len(_issued(r.data, identity)) == 1
 
 
 def test_single_recipient_naming_a_stale_ca_certificate_is_served(app, client, scep_http, caplog):

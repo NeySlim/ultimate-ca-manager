@@ -402,7 +402,8 @@ def handle_pki_operation(profile_slug=None):
             if len(message_b64) > MAX_PKI_BODY_BYTES:
                 return make_error_response("PKIOperation body too large", 413)
             try:
-                pkcs7_data = base64.b64decode(message_b64)
+                # An unencoded '+' reaches us as a space; base64 has no space of its own
+                pkcs7_data = base64.b64decode(message_b64.replace(' ', '+'))
             except Exception:
                 return make_error_response("Invalid base64 in 'message' parameter", 400)
 
