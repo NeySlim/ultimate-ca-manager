@@ -180,11 +180,9 @@ def row_revoked(row: Certificate) -> bool:
     return bool(row.revoked) or row_persisted_revocation(row) is not None
 
 
-def final_recorded_revocation(row: Certificate):
-    """The record of ``row``'s serial when it revokes for good (not a suspension), else None."""
-    from utils.revocation_reasons import HOLD_REASONS
-    record = row_persisted_revocation(row)
-    return record if record is not None and record.revoke_reason not in HOLD_REASONS else None
+def effective_revocation(row: Certificate):
+    """What revokes ``row``: the graver of its own revocation and its serial's record, or None."""
+    return gravest_revocation(row if row.revoked else None, row_persisted_revocation(row))
 
 
 def apply_persisted_revocation(row: Certificate, record=None) -> bool:

@@ -178,10 +178,13 @@ def _replaced_snapshot(certificate):
     """What revoking the replaced certificate needs, read before a renewal overwrites its row."""
     if certificate is None or not certificate.crt:
         return None
+    from services.cert.issued_lookup import effective_revocation
+    # Revoked by its row or by its CA's record of its serial, with the graver reason
+    holder = effective_revocation(certificate)
     return SimpleNamespace(id=certificate.id, pem=base64.b64decode(certificate.crt),
                            serial=certificate.serial_number, valid_to=certificate.valid_to,
-                           caref=certificate.caref, revoked=bool(certificate.revoked),
-                           revoke_reason=certificate.revoke_reason)
+                           caref=certificate.caref, revoked=holder is not None,
+                           revoke_reason=holder.revoke_reason if holder is not None else None)
 
 
 def _record_replaced_serial(replaced):
