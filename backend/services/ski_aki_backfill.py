@@ -16,7 +16,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.x509.oid import ExtensionOID
 from utils.cert_issuer import ca_signed, cas_by_ski
-from services.cert.issued_lookup import apply_persisted_revocation, apply_persisted_revocations
+from services.cert.issued_lookup import (
+    apply_persisted_revocation, apply_persisted_revocations, delete_lifted_hold_leftovers)
 
 logger = logging.getLogger(__name__)
 
@@ -282,7 +283,9 @@ def backfill_ski_aki():
         except Exception:
             pass
 
-    # Rows an earlier release left unrevoked beside their CA's record of the serial
+    # Suspension records an earlier release left behind its lifts, then the rows it left
+    # unrevoked beside their CA's record of the serial
+    stats['lifted_holds_deleted'] = delete_lifted_hold_leftovers()
     stats['revoked_from_records'] = apply_persisted_revocations()
 
     # --- Phase 4: Deduplicate CAs with same SKI ---
@@ -306,7 +309,8 @@ def backfill_ski_aki():
             if len(group) > 1:
                 _merge_ca_group(db, group, stats)
 
-    if stats['rechained_cas'] or stats['rechained_certs'] or stats['deduplicated'] or stats['revoked_from_records']:
+    if (stats['rechained_cas'] or stats['rechained_certs'] or stats['deduplicated']
+            or stats['revoked_from_records'] or stats['lifted_holds_deleted']):
         try:
             db.session.commit()
         except Exception as _commit_err:

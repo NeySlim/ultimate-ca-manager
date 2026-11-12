@@ -89,12 +89,12 @@ class CRLQueryMixin:
         child_cas = sorted(_revoked_child_cas(ca, now), key=lambda c: c.id)
         # The certificate record comes first: it carries the invalidity date
         live = _dedupe_live_records(certificates + child_cas)
-        from services.cert.issued_lookup import revocation_order
+        from services.cert.issued_lookup import lifted_hold_leftover, revocation_order
         # Gravest record of a serial first, as persisted_revocation answers OCSP
-        persisted = sorted(RevokedSerial.query.filter(
+        persisted = sorted((r for r in RevokedSerial.query.filter(
             RevokedSerial.caref.in_(same_key_refids(ca)),
             RevokedSerial.valid_to > now,
-        ).all(), key=revocation_order)
+        ).all() if not lifted_hold_leftover(r)), key=revocation_order)
         return live + CRLQueryMixin._filter_orphan_serials(persisted, live)
 
     @staticmethod
@@ -103,7 +103,8 @@ class CRLQueryMixin:
 
         Dropped: a serial a live record already lists (identical column or
         same resolved integer, as ``same_serial``), and repeats of a serial
-        kept earlier in the list. A record says revoked whichever row it is linked to."""
+        kept earlier in the list. A record says revoked whichever row it is linked to,
+        except a lifted hold left behind (``lifted_hold_leftover``, filtered by the caller)."""
         listed_columns, listed_ints = set(), set()
 
         def _remember(record):

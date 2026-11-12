@@ -452,3 +452,45 @@ class TestAnotherSerialsHexSpellingNamesNothing:
         with app.app_context():
             backfill_ski_aki()
         assert _row(app, h_id) == (False, None, None)
+
+
+class TestAHoldLiftedByAnEarlierRelease:
+    """A suspension record still linked to its row, unrevoked and of the same serial."""
+
+    def test_it_is_ignored_then_deleted(self, app, issuer):
+        from services.ski_aki_backfill import backfill_ski_aki
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('lifted-leftover.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        record_id = _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
+        assert _surfaces(app, ca_id, real) == ('good', None, None, 'ok')
+        _renewable(app, row_id)
+        with app.app_context():
+            stats = backfill_ski_aki()
+            assert stats['lifted_holds_deleted'] >= 1
+            assert db.session.get(RevokedSerial, record_id) is None
+        assert _row(app, row_id) == (False, None, None)
+
+    def test_a_real_hold_unlinked_by_an_import_still_applies(self, app, auth_client, issuer):
+        ca_id, refid, ca_cert, ca_key = issuer
+        cn = 'held-unlinked.example.test'
+        real, key = _leaf(cn, ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        assert auth_client.post(f'/api/v2/certificates/{row_id}/revoke',
+                                json={'reason': 'certificateHold'}).status_code == 200
+        namesake, _ = _leaf(cn, ca_cert, ca_key)
+        assert _import(auth_client, namesake).status_code == 200
+        assert _surfaces(app, ca_id, real)[:2] == ('revoked', x509.ReasonFlags.certificate_hold)
+        assert _import(auth_client, real, key).status_code == 200
+        assert _row(app, row_id)[:2] == (True, 'certificateHold')
+
+    def test_a_final_reason_linked_to_an_unrevoked_row_still_revokes(self, app, issuer):
+        from services.ski_aki_backfill import backfill_ski_aki
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('final-linked.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _record(app, refid, real, reason='cessationOfOperation', certificate_id=row_id)
+        assert _surfaces(app, ca_id, real)[0] == 'revoked'
+        with app.app_context():
+            backfill_ski_aki()
+        assert _row(app, row_id) == (True, 'cessationOfOperation', EARLY)
