@@ -48,7 +48,9 @@ def renewal_requester_sid(renewed_cert, ca_cert, protocol):
     if account is None or account:
         return sid
     if account is lookup.UNREACHABLE:
-        logger.warning("%s: the AD Connector cannot resolve SID %s of a renewed certificate", protocol, sid)
+        fault = lookup.connector_config_fault()
+        logger.warning("%s: the AD Connector cannot resolve SID %s of a renewed certificate%s",
+                       protocol, sid, f': {fault}' if fault else '')
         raise RenewalIdentityUnresolved(UNRESOLVED_MESSAGE)
     logger.warning("%s: SID %s of a renewed certificate names no directory account", protocol, sid)
     raise RenewalAccountGone(NOT_FOUND_MESSAGE)
