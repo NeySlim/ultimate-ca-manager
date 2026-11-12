@@ -444,3 +444,19 @@ def test_the_missing_file_log_cites_a_title_of_the_admin_guide(app, marked_user,
     headings = {line.lstrip('#').strip() for line in guide.splitlines() if line.startswith('#')}
     assert f'"{initial_admin.LOST_FILE_TITLE}"' in caplog.text
     assert initial_admin.LOST_FILE_TITLE in headings
+
+
+def test_the_marker_is_neither_exported_nor_restored(app, marked_user):
+    """It names this node's file: a backup taken before the first login carries no file."""
+    from auth import initial_admin
+    from models import SystemConfig, db
+    from services.backup import BackupService
+    user_id, _, _ = marked_user
+    with app.app_context():
+        assert initial_admin.MARKER_KEY not in BackupService()._export_configuration(True)['settings']
+        archived = json.dumps({'user_id': user_id + 1000, 'node': 'source'})
+        BackupService()._restore_settings(
+            {'configuration': {'settings': {initial_admin.MARKER_KEY: archived}}}, {'settings': 0})
+        db.session.commit()
+        row = SystemConfig.query.filter_by(key=initial_admin.MARKER_KEY).one()
+        assert json.loads(row.value)['user_id'] == user_id

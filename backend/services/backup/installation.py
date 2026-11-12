@@ -13,6 +13,7 @@ from models import db
 from security.master_key_bootstrap import OPT_OUT_KEY
 from security.session_key import ALL_KEYS as SESSION_KEY_SETTINGS
 from services.scheduler_service import STATE_KEY as SCHEDULER_STATE_KEY
+from auth.initial_admin import MARKER_KEY as INITIAL_PASSWORD_MARKER_KEY
 from utils.serial_duplicates import PENDING_KEY
 
 from .errors import BackupExportError
@@ -24,10 +25,12 @@ METADATA_KEY = 'installation_id'
 # Settings about this installation or cluster itself (scheduler state, the pending
 # serial index of migration 142, the scheduled backup's reservation and conclusion,
 # services/backup/schedule.py, the expiry webhooks mark, the scheduled passes' leases, the
-# session key that signs this installation's tokens): never exported, never restored
+# session key that signs this installation's tokens, the node holding the generated
+# initial password): never exported, never restored
 LOCAL_SETTINGS = frozenset((CONFIG_KEY, OPT_OUT_KEY, SCHEDULER_STATE_KEY, PENDING_KEY,
                             'backup.last_run', 'backup.concluded_run',
-                            'expiry_alerts.webhooks_mark', 'expiry_alerts.lease')
+                            'expiry_alerts.webhooks_mark', 'expiry_alerts.lease',
+                            INITIAL_PASSWORD_MARKER_KEY)
                            + SESSION_KEY_SETTINGS)
 LOCAL_SETTING_PREFIXES = ('crl_schedule_lease_',)
 
