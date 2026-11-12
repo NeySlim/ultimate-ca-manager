@@ -70,10 +70,10 @@ def _opens(kek, token):
         return False
 
 
-def test_an_archive_taken_during_the_retention_restores_with_every_key_readable(
+def test_characterization_an_archive_taken_during_the_retention_restores_readable(
         app, tmp_path, monkeypatch):
-    """A key committed under a retained DEK goes into the archive in the clear: the restore
-    needs no old DEK (the target never had it)."""
+    """Characterization test, no guard of the retention change behind it: a key committed
+    under a retained DEK goes into the archive in the clear, the restore needs no old DEK."""
     from models import CA, EncryptionKey
     from security import dek_rotation
     from security.encryption import ENCRYPTED_MARKER, key_encryption
@@ -99,4 +99,3 @@ def test_an_archive_taken_during_the_retention_restores_with_every_key_readable(
         restored = CA.query.filter_by(refid='retained-ca').one()
         assert EncryptionKey.query.count() == 0
         assert load_pem_bytes(restored.prv, context='retained-ca') == _pem(key)
-
