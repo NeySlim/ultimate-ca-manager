@@ -259,14 +259,10 @@ def _2x_archive(app, settings, base_dn='DC=c01,DC=example', connector_enabled=Tr
             row.pop('windows_profile_id_ref', None)
         payload.pop('windows_enrollment_profiles', None)
         payload.pop('windows_profile_templates', None)
-        # What 2.x announced: the counts of its own sections, no digests of these, and
-        # none of the sections it did not know among those it left out
+        # What 2.x announced: the counts of its own sections, no digests of these
         payload['metadata'].pop('section_digests', None)
         payload['metadata']['sections'] = {name: len(rows) for name, rows in payload.items()
                                            if name in manifest.SECTIONS and isinstance(rows, (list, dict))}
-        payload['metadata']['excluded_sections'] = [
-            name for name in payload['metadata'].get('excluded_sections') or []
-            if name not in ('windows_enrollment_profiles', 'windows_profile_templates')]
     return as_v3(blob, BACKUP_PASSWORD, edit=as_2x), connector_row
 
 

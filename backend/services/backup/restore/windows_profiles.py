@@ -44,15 +44,6 @@ def _name_connectors(backup_data) -> list:
     return sorted(rows, key=lambda r: r['id'] if isinstance(r.get('id'), int) else 0)
 
 
-def _from_30(backup_data) -> bool:
-    """A 3.0 archive carries the profiles' section, or names it among those it left out."""
-    if PROFILES in backup_data:
-        return True
-    metadata = backup_data.get('metadata') if 'metadata' in backup_data else None
-    excluded = metadata.get('excluded_sections') if isinstance(metadata, dict) else None
-    return isinstance(excluded, list) and PROFILES in excluded
-
-
 def upgrade_archived_windows_profiles(backup_data, warnings=None) -> Optional[Dict[str, Any]]:
     """Convert a 2.x archive in place; returns the profile row written, None for a 3.0 archive.
     What the operator must know is appended to *warnings*."""
@@ -65,7 +56,8 @@ def upgrade_archived_windows_profiles(backup_data, warnings=None) -> Optional[Di
     if isinstance(configuration.get('encrypted_settings'), list):
         configuration['encrypted_settings'] = [k for k in configuration['encrypted_settings']
                                                if k not in MIGRATED_KEYS]
-    if _from_30(backup_data):
+    if PROFILES in backup_data:
+        # A 3.0 archive: every section is named in it, excluded ones too
         return None
     first = connectors[0] if connectors else None
     connector = ({'id': first.get('id'), 'enabled': bool(first.get('enabled')),
