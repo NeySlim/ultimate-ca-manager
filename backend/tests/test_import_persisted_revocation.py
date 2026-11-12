@@ -158,7 +158,8 @@ class TestAnImportAppliesThePersistedRevocation:
             assert importer.ImportMixin().import_certificates(entries)['imported'] == 1
         assert _states(app, real) == _revoked_under(refid)
 
-    def test_an_admin_mtls_import(self, app, auth_client, issuer):
+    def test_an_admin_mtls_import_is_refused(self, app, auth_client, issuer):
+        """Enrolling a revoked certificate is refused outright, as on the self-service route."""
         _, refid, ca_cert, ca_key = issuer
         real, _ = _leaf('reimported-mtls.example.test', ca_cert, ca_key)
         _record(app, refid, real)
@@ -168,8 +169,8 @@ class TestAnImportAppliesThePersistedRevocation:
         try:
             r = auth_client.post(f'/api/v2/users/{admin_id}/mtls/certificates',
                                  json={'mode': 'import', 'pem': _pem(real)})
-            assert r.status_code in (200, 201), r.data
-            assert _states(app, real) == _revoked_under(refid)
+            assert r.status_code == 400, r.data
+            assert _states(app, real) == []
         finally:
             from models.auth_certificate import AuthCertificate
             with app.app_context():

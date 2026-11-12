@@ -99,11 +99,16 @@ def create_user_mtls_certificate(user_id):
         existing_cert = find_existing_cert_by_identity(
             Certificate, serial, issuer_dn, pem_text
         )
+        # Linked only to the CA whose key signed it, never to a namesake
+        from services.mtls_enrollment import issuing_ca_for
+        issuer_ca = issuing_ca_for(cert_obj)
+        # Refused as the self-service route refuses it: by its row or by its CA's record
+        from services.cert.issued_lookup import persisted_revocation
+        if (existing_cert is not None and existing_cert.revoked) or (
+                issuer_ca is not None and persisted_revocation(issuer_ca, cert_obj.serial_number) is not None):
+            return error_response('This certificate has been revoked', 400)
         created = existing_cert is None
         if created:
-            # Linked only to the CA whose key signed it, never to a namesake
-            from services.mtls_enrollment import issuing_ca_for
-            issuer_ca = issuing_ca_for(cert_obj)
             existing_cert = Certificate(
                 refid=str(uuid.uuid4()),
                 descr=cert_name,
