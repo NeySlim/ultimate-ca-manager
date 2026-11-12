@@ -210,6 +210,88 @@ def test_a_concluded_run_is_not_retried_after_the_lease(app, monkeypatch, tmp_pa
         _drop_backup(app)
 
 
+def _killed(app, monkeypatch, tmp_path, last_run='2026-01-01T00:00:00Z'):
+    """A run claimed at _NOW that died inside the export; returns the export log and clock."""
+    exported = _backup_schedule(app, monkeypatch, tmp_path, last_run=last_run)
+    real_export = schedule.storage.export_archive
+    clock = {'now': _NOW}
+    monkeypatch.setattr(schedule, 'utc_now', lambda: clock['now'])
+    monkeypatch.setattr(schedule.storage, 'export_archive',
+                        lambda *a, **k: (_ for _ in ()).throw(_Killed()))
+    with app.app_context():
+        with pytest.raises(_Killed):
+            schedule.run_scheduled_backup()
+        db.session.remove()
+    monkeypatch.setattr(schedule.storage, 'export_archive', real_export)
+    return exported, clock
+
+
+_PAST_LEASE = timedelta(seconds=schedule._CLAIM_LEASE_SECONDS + 60)
+
+
+def test_a_failed_resumption_is_retried_on_the_next_tick(app, monkeypatch, tmp_path):
+    exported, clock = _killed(app, monkeypatch, tmp_path)
+    real_export = schedule.storage.export_archive
+    try:
+        with app.app_context():
+            clock['now'] = _NOW + _PAST_LEASE
+            monkeypatch.setattr(schedule.storage, 'export_archive',
+                                lambda *a, **k: (_ for _ in ()).throw(OSError('disk full')))
+            with pytest.raises(OSError):
+                schedule.run_scheduled_backup()
+            monkeypatch.setattr(schedule.storage, 'export_archive', real_export)
+            clock['now'] += timedelta(minutes=1)
+            assert schedule.run_scheduled_backup()['status'] == 'ok'
+        assert len(exported) == 1
+    finally:
+        _drop_backup(app)
+
+
+def test_a_killed_run_is_retried_after_being_disabled_and_enabled(app, monkeypatch, tmp_path):
+    exported, clock = _killed(app, monkeypatch, tmp_path)
+    try:
+        with app.app_context():
+            _set('auto_backup_enabled', 'false')
+            clock['now'] = _NOW + timedelta(minutes=30)
+            assert schedule.run_scheduled_backup()['status'] == 'skipped'
+            _set('auto_backup_enabled', 'true')
+            clock['now'] = _NOW + timedelta(hours=1)
+            assert schedule.run_scheduled_backup() == {'status': 'skipped', 'reason': 'not_due'}
+            clock['now'] = _NOW + _PAST_LEASE
+            assert schedule.run_scheduled_backup()['status'] == 'ok'
+        assert len(exported) == 1
+    finally:
+        _drop_backup(app)
+
+
+def test_a_resumption_refused_for_its_password_runs_once_it_is_fixed(app, monkeypatch, tmp_path):
+    from services.backup.errors import ScheduledBackupError
+    exported, clock = _killed(app, monkeypatch, tmp_path)
+    try:
+        with app.app_context():
+            _set('backup_password', 'short')
+            clock['now'] = _NOW + _PAST_LEASE
+            with pytest.raises(ScheduledBackupError):
+                schedule.run_scheduled_backup()
+            _set('backup_password', 'Correct-Horse-Battery-9')
+            clock['now'] += timedelta(minutes=1)
+            assert schedule.run_scheduled_backup()['status'] == 'ok'
+        assert len(exported) == 1
+    finally:
+        _drop_backup(app)
+
+
+def test_a_first_run_killed_is_retried_after_the_lease(app, monkeypatch, tmp_path):
+    exported, clock = _killed(app, monkeypatch, tmp_path, last_run=None)
+    try:
+        with app.app_context():
+            clock['now'] = _NOW + _PAST_LEASE
+            assert schedule.run_scheduled_backup()['status'] == 'ok'
+        assert len(exported) == 1
+    finally:
+        _drop_backup(app)
+
+
 @pytest.mark.postgres
 @pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
 def test_a_run_killed_during_the_export_is_retried_on_postgresql(app, monkeypatch, tmp_path):
