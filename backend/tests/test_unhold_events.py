@@ -321,3 +321,22 @@ def test_a_partner_left_in_remove_from_crl_is_lifted_with_the_pair(app, auth_cli
     assert r.status_code == 200, r.data
     assert r.get_json()['data']['related_unheld'] == b['id']
     assert _state(app, a['id']) == (False, None) and _state(app, b['id']) == (False, None)
+
+
+def test_a_partner_revoked_as_remove_from_crl_is_left_and_the_lift_goes_on(
+        app, auth_client, create_ca, create_cert, seen):
+    """A partner revoked with reason 8 (row and record, as ACME once wrote it) is no lift to finish."""
+    ca = create_ca(cn='Unhold Reason Eight Partner CA')
+    a = create_cert(cn='unhold-eight-a.example.test', ca_id=ca['id'])
+    b = create_cert(cn='unhold-eight-b.example.test', ca_id=ca['id'])
+    _link(app, a['id'], b['id'])
+    assert _post(auth_client, f"/api/v2/certificates/{a['id']}/revoke",
+                 {'reason': 'certificateHold'}).status_code == 200
+    with app.app_context():
+        db.session.get(Certificate, b['id']).revoke_reason = 'removeFromCRL'
+        RevokedSerial.query.filter_by(certificate_id=b['id']).one().revoke_reason = 'removeFromCRL'
+        db.session.commit()
+    r = _post(auth_client, f"/api/v2/certificates/{a['id']}/unhold")
+    assert r.status_code == 200, r.data
+    assert 'related_unheld' not in r.get_json()['data']
+    assert _state(app, a['id']) == (False, None) and _state(app, b['id']) == (True, 'removeFromCRL')

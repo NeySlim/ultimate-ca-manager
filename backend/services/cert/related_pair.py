@@ -325,10 +325,12 @@ def unhold_partner(row):
     partner = revocation_partner(row)
     if partner is None:
         return None
+    from services.cert.issued_lookup import interrupted_lift
+    if partner.revoked and partner.revoke_reason == 'removeFromCRL':
+        # Only an unhold stopped between its commits; one revoked so (ACME, an old row) stays
+        return partner if interrupted_lift(partner) else None
     holder = partner if partner.revoked else effective_revocation(partner)
-    # removeFromCRL on the row is an unhold stopped between its commits: lifting completes it
-    lifted = HOLD_REASONS + ('removeFromCRL',) if holder is partner else HOLD_REASONS
-    return partner if holder is not None and holder.revoke_reason in lifted else None
+    return partner if holder is not None and holder.revoke_reason in HOLD_REASONS else None
 
 
 def anchor_first(row, partner):
