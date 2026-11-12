@@ -805,7 +805,8 @@ def assign_certificate():
 
     if certificate.cert_type != 'usr_cert':
         return error_response('Only user certificates can be assigned for mTLS', 400)
-    if certificate.revoked:
+    from services.cert.issued_lookup import row_revoked
+    if row_revoked(certificate):  # by its row or by the record of its serial
         return error_response('This certificate has been revoked', 400)
 
     # Security: non-admin can only assign their own certs

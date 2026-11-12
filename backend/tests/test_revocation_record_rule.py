@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 
 from models import CA, Certificate, RevokedSerial, db
 from tests.test_import_issuer_signature import _import, _leaf, _pem, _store
@@ -573,3 +574,42 @@ class TestAWriterNeverReplacesAGraverReason:
             CertificateService.revoke_certificate(row_id, reason='certificateHold')
             record = db.session.get(RevokedSerial, record_id)
             assert (record.revoke_reason, record.revoked_at) == ('keyCompromise', EARLY)
+
+
+class TestRelatedAndMtlsReadTheRecord:
+
+    def test_a_partner_revoked_by_its_record_is_not_named(self, app, issuer):
+        from cryptography.x509 import UnrecognizedExtension
+        from services.cert.renewal import _current_related
+        from utils.related_cert import RELATED_CERT_EXTENSION_OID
+        _, refid, ca_cert, ca_key = issuer
+        first, key_a = _leaf('related-a.example.test', ca_cert, ca_key)
+        now = datetime.now(timezone.utc)
+        key_b = ec.generate_private_key(ec.SECP256R1())
+        second = (x509.CertificateBuilder()
+                  .subject_name(x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, 'related-b.example.test')]))
+                  .issuer_name(ca_cert.subject).public_key(key_b.public_key())
+                  .serial_number(x509.random_serial_number())
+                  .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
+                  .add_extension(UnrecognizedExtension(RELATED_CERT_EXTENSION_OID, b'\x30\x00'), critical=False)
+                  .sign(ca_key, hashes.SHA256()))
+        a_id, b_id = _store(app, first, refid, key=key_a), _store(app, second, refid, key=key_b)
+        with app.app_context():
+            db.session.get(Certificate, b_id).related_certificate_id = a_id
+            db.session.commit()
+            assert _current_related(db.session.get(Certificate, b_id)) is not None
+        _record(app, refid, first)
+        with app.app_context():
+            assert _current_related(db.session.get(Certificate, b_id)) is None
+
+    def test_an_mtls_assignment_refuses_a_recorded_revocation(self, app, auth_client, issuer):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('mtls-assign-revoked.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        with app.app_context():
+            db.session.get(Certificate, row_id).cert_type = 'usr_cert'
+            db.session.commit()
+        _record(app, refid, real)
+        r = auth_client.post('/api/v2/mtls/assign', json={'cert_id': row_id})
+        assert r.status_code == 400, r.data
+        assert b'revoked' in r.data

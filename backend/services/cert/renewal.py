@@ -325,7 +325,10 @@ def _current_related(row):
     except x509.ExtensionNotFound:
         return None
     a_row = db.session.get(Certificate, row.related_certificate_id)
-    if a_row is None or a_row.revoked or a_row.archived or not a_row.crt:
+    if a_row is None or a_row.archived or not a_row.crt:
+        return None
+    from services.cert.issued_lookup import row_revoked
+    if row_revoked(a_row):  # by its row or by the record of its serial
         return None
     cert_a = row_certificate(a_row)
     if cert_a.not_valid_after_utc.replace(tzinfo=None) < utc_now():
