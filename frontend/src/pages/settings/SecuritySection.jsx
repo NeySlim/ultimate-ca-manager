@@ -15,7 +15,7 @@ function networksList(value) {
   return networksText(value).split(/[\s,;]+/).filter(Boolean)
 }
 
-export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, handleRotateDataKey, encryptionLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
+export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, handleRotateDataKey, encryptionLoading, secretsStatus, handleRotateSessionKey, sessionKeyLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
   const { t } = useTranslation()
   // Fields the API writes for admin:settings only are shown, but disabled.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
@@ -179,6 +179,47 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
           <LoadingSpinner size="sm" />
         )}
       </DetailSection>
+      {secretsStatus?.session_secret && (
+        <DetailSection title={t('settings.sessionKeyTitle')} icon={Key} iconClass="icon-bg-violet">
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={secretsStatus.session_secret.source === 'database' ? 'success' : 'secondary'}>
+                {secretsStatus.session_secret.source === 'database'
+                  ? t('settings.sessionKeyFromDatabase')
+                  : t('settings.sessionKeyFromEnvironment')}
+              </Badge>
+              {secretsStatus.session_secret.previous_accepted_until && (
+                <Badge variant="secondary">
+                  {t('settings.sessionKeyPreviousUntil', { date: formatDate(secretsStatus.session_secret.previous_accepted_until, { hour: '2-digit', minute: '2-digit' }) })}
+                </Badge>
+              )}
+            </div>
+            {/* What a rotation really does depends on whether the key can be stored encrypted;
+                in HA the environment-file rotation is refused (409 ha_mode) */}
+            <p className="text-sm text-text-secondary">
+              {secretsStatus.session_secret.rotation === 'database'
+                ? t('settings.sessionKeyRotateStoredDesc')
+                : secretsStatus.session_secret.rotation === 'blocked'
+                  ? t('settings.sessionKeyRotateBlocked')
+                : secretsStatus.session_secret.ha
+                  ? t('settings.sessionKeyRotateHaRefused')
+                  : t('settings.sessionKeyRotateFileDesc')}
+            </p>
+            {hasPermission('admin:system') && handleRotateSessionKey && (
+              <Button
+                onClick={handleRotateSessionKey}
+                variant="outline"
+                disabled={sessionKeyLoading || !!secretsStatus.session_secret.previous_accepted_until
+                  || secretsStatus.session_secret.rotation === 'blocked'
+                  || (secretsStatus.session_secret.ha && secretsStatus.session_secret.rotation !== 'database')}
+              >
+                <ArrowsClockwise size={16} />
+                {t('settings.rotateSessionKey')}
+              </Button>
+            )}
+          </div>
+        </DetailSection>
+      )}
       <DetailSection title={t('common.twoFactorAuth')} icon={ShieldCheck} iconClass="icon-bg-emerald">
         <div className="space-y-4">
           <ToggleSwitch

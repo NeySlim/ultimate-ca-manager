@@ -111,6 +111,16 @@ export const settingsService = {
     return apiClient.post('/system/security/rotate-encryption-key')
   },
 
+  // Where the session key comes from and how its rotation applies (never the key itself)
+  async getSecretsStatus() {
+    return apiClient.get('/system/security/secrets-status')
+  },
+
+  // Encryption on: stored under the data key, no restart; off: environment file and restart
+  async rotateSessionKey() {
+    return apiClient.post('/system/security/rotate-secrets', {})
+  },
+
   // Encrypts only the keys still stored in the clear; encrypted ones are skipped
   async encryptAllKeys() {
     return apiClient.post('/system/security/encrypt-all-keys', { dry_run: false })

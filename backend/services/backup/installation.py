@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from models import db
 
 from security.master_key_bootstrap import OPT_OUT_KEY
+from security.session_key import ALL_KEYS as SESSION_KEY_SETTINGS
 from services.scheduler_service import STATE_KEY as SCHEDULER_STATE_KEY
 from utils.serial_duplicates import PENDING_KEY
 
@@ -22,10 +23,11 @@ CONFIG_KEY = 'backup_installation_id'
 METADATA_KEY = 'installation_id'
 # Settings about this installation or cluster itself (scheduler state, the pending
 # serial index of migration 142, the scheduled backup's reservation and conclusion,
-# services/backup/schedule.py, the expiry webhooks mark): never exported, never restored
+# services/backup/schedule.py, the expiry webhooks mark, the session key that signs this
+# installation's tokens): never exported, never restored
 LOCAL_SETTINGS = frozenset((CONFIG_KEY, OPT_OUT_KEY, SCHEDULER_STATE_KEY, PENDING_KEY,
                             'backup.last_run', 'backup.concluded_run',
-                            'expiry_alerts.webhooks_mark'))
+                            'expiry_alerts.webhooks_mark') + SESSION_KEY_SETTINGS)
 
 
 def installation_id(create: bool = False) -> Optional[str]:

@@ -294,6 +294,7 @@ def rewrite(batch=None, commit=True, decrypt=False) -> dict:
     (made with the active DEK, or taken by the next pass).
     """
     from models import db, SystemConfig
+    from security.session_key import STORED_KEYS as SESSION_KEYS
     batch = batch or BATCH
     key_encryption = _encryption.key_encryption
     rewritten = skipped = 0
@@ -308,7 +309,7 @@ def rewrite(batch=None, commit=True, decrypt=False) -> dict:
             query = db.session.query(pk, stored_column, table.c.key if config else pk) \
                 .filter(stored_column.isnot(None), stored_column != '')
             if config:
-                query = query.filter(table.c.key.like('acme.%'))
+                query = query.filter(table.c.key.like('acme.%') | table.c.key.in_(SESSION_KEYS))
             if last is not None:
                 query = query.filter(pk > last)
             chunk = query.order_by(pk).limit(batch).all()
@@ -316,7 +317,12 @@ def rewrite(batch=None, commit=True, decrypt=False) -> dict:
                 break
             for row_id, stored, config_key in chunk:
                 last = row_id
-                if config and not _encryption._is_master_key_config(config_key):
+                session_key = config and config_key in SESSION_KEYS
+                if config and not (session_key or _encryption._is_master_key_config(config_key)):
+                    continue
+                if session_key and decrypt:
+                    # Never written in the clear: a disable drops these rows instead
+                    skipped += 1
                     continue
                 value = unwrap(stored) if unwrap else stored
                 if not key_encryption.is_encrypted(value) or (not decrypt and _under_active(value)):
@@ -601,10 +607,17 @@ def finish_disable(kept_kek) -> None:
     # Nothing is encrypted any more: without this the next start would create a key
     from security.master_key_bootstrap import record_operator_choice
     record_operator_choice(auto=False)
+    # Here, not in phase 1: a disable that fails keeps the session key it had. The sweep of
+    # phase 1 skips these rows, so none was ever written in the clear
+    from security import session_key
+    dropped_session_key = session_key.drop_stored()
     command = _emit_reload(None)
     db.session.flush()  # the command's id, which every live node acknowledges
     _set_grace(max(kept, default=None), getattr(command, 'id', None), disable=True)
     db.session.commit()
+    if dropped_session_key:
+        from flask import current_app
+        session_key.load(current_app._get_current_object())
 
 
 def resume_at_start() -> None:
