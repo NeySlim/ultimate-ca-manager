@@ -708,11 +708,20 @@ class RestoreCoreMixin:
 
         results.setdefault('revoked_serials', 0)
         results.setdefault('revoked_serials_skipped', 0)
+        # The archive's own leftovers of a lifted hold are not suspensions; nothing here is touched
+        from .restore.repairs import archived_lifted_holds
+        lifted = archived_lifted_holds(backup_data)
+        results['lifted_holds_skipped'] = len(lifted)
+        if lifted:
+            logger.info("Restore: %d hold record(s) an older release left behind a lifted hold "
+                        "not restored", len(lifted))
         # A record whose CA is neither in the database nor in the backup
         # would fail the foreign key on PostgreSQL and abort the whole restore
         known = {ca.refid for ca in CA.query.with_entities(CA.refid).all()}
         known.update(c.get('refid') for c in backup_data.get('certificate_authorities', []) if c.get('refid'))
         for position, rs_data in enumerate(backup_data.get('revoked_serials', [])):
+            if position in lifted:
+                continue
             caref = rs_data.get('caref')
             serial = rs_data.get('serial_number')
             if not caref or not serial:
