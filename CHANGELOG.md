@@ -48,7 +48,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- HA preview: certificate and CRL expiry e-mails, the expiry webhooks, the scheduled CRL of a CA and the revocations a Microsoft CA CRL sync announces now go out once when two nodes run them during a leader change; a node that dies mid-run hands over after a lease of 10 to 15 minutes.
+- HA preview: certificate and CRL expiry e-mails, the expiry webhooks, the scheduled CRL of a CA and the revocations a Microsoft CA CRL sync announces now go out once when two nodes run them during a leader change; what a node that dies mid-run left undone goes out at the next scheduled pass (a day later for the expiry alerts, an hour later for the CRL and the Microsoft CA sync).
 - DEB and RPM: installing the DEB no longer fails on a host without `sudo`, and the sudoers file earlier packages wrote for the `ucm` user (unused, the service restarts through the watcher) is removed on install and update.
 - HA preview: a scheduled report or scheduled backup run twice during a leader change is sent or written once, and two nodes serving orders that share one upstream ACME proxy challenge start its dns-01 automation once. `GET /api/v2/settings/backup/schedule` reports `in_progress` while a scheduled backup is still being written, and a restore keeps the target's own schedule state.
 - Certificates: lifting a hold now emits `certificate.unheld` (webhooks, WebSocket) and lifts the hold of the other member of a related pair too, unless `unhold_related` is `false`, reporting it as `related_unheld`; a body that is not a JSON object is refused (400 or 415), and a pair on one CA gets a single delta CRL.
