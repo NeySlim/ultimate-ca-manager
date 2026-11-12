@@ -425,6 +425,39 @@ class TestDeltaCrl:
 # OCSP
 # --------------------------------------------------------------------------
 
+# What no writer produces (each stores the row's column: decimal, lower or upper hex): the
+# unambiguous-spelling rule names no serial by them, so neither the CRL nor OCSP reads them
+_HEX_A = format(SERIAL_A, 'x')
+ODD_SPELLINGS = {'0x': '0x' + _HEX_A, 'leading-zeros': '00' + _HEX_A,
+                 'mixed-case': _HEX_A[:4] + _HEX_A[4:].upper(),
+                 'colons': ':'.join(_HEX_A[i:i + 2] for i in range(0, len(_HEX_A), 2))}
+WRITTEN_SPELLINGS = {'decimal': str(SERIAL_A), 'lower-hex': _HEX_A, 'upper-hex': _HEX_A.upper()}
+_SPELLINGS = [pytest.param(v, True, id=k) for k, v in WRITTEN_SPELLINGS.items()] + \
+    [pytest.param(v, False, id=k) for k, v in ODD_SPELLINGS.items()]
+
+
+class TestTheCrlAndOcspReadTheSameSpellings:
+
+    @pytest.mark.parametrize('column, named', _SPELLINGS)
+    def test_a_record_alone(self, app, backend, column, named):
+        ca, ca_key, ca_cert = _make_ca()
+        leaf = _issue(ca_key, ca_cert, SERIAL_A)
+        _persist(ca, column, reason='superseded')
+        listed = SERIAL_A in _entries(_full_crl(ca))
+        revoked = _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.REVOKED
+        assert (listed, revoked) == (named, named)
+
+    @pytest.mark.parametrize('column, named', _SPELLINGS)
+    def test_a_final_record_over_a_held_row(self, app, backend, column, named):
+        ca, ca_key, ca_cert = _make_ca()
+        leaf = _issue(ca_key, ca_cert, SERIAL_A)
+        _store(ca, leaf, revoked=True, reason='certificateHold')
+        _persist(ca, column, reason='keyCompromise')
+        expected = x509.ReasonFlags.key_compromise if named else x509.ReasonFlags.certificate_hold
+        assert _reason(_entries(_full_crl(ca))[SERIAL_A]) == expected
+        assert _ocsp(app, ca_cert, leaf) == (ocsp.OCSPCertStatus.REVOKED, expected)
+
+
 class TestOcsp:
 
     def test_a_deleted_certificate_answers_revoked_even_after_its_expiry(self, app, backend):

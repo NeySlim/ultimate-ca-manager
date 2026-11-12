@@ -6,6 +6,7 @@ from models.crl import CRLMetadata
 from services.cert.serial_resolution import resolve_record_serial
 from utils.cert_issuer import same_key_refids
 from utils.datetime_utils import utc_now
+from utils.serial_format import serial_named_by
 
 logger = logging.getLogger(__name__)
 
@@ -96,8 +97,10 @@ class CRLQueryMixin:
         certificates = [answered_revocation(c, ca, by_serial) for c in certificates]
         # The certificate record comes first: it carries the invalidity date
         live = _dedupe_live_records(certificates + child_cas)
-        # Gravest record of a serial first, as persisted_revocation answers OCSP
-        persisted = sorted((r for r in records if r.valid_to is not None and r.valid_to > now),
+        # Gravest record of a serial first, as persisted_revocation answers OCSP; a column that is
+        # no unambiguous spelling names no serial there, so it is not listed here either
+        persisted = sorted((r for r in records if r.valid_to is not None and r.valid_to > now
+                            and serial_named_by(r.serial_number) is not None),
                            key=revocation_order)
         return live + CRLQueryMixin._filter_orphan_serials(persisted, live)
 
