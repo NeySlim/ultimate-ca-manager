@@ -283,6 +283,20 @@ def test_a_node_joining_after_the_start_without_its_package_stops_the_campaign(a
     assert _commands(app) == []
 
 
+
+def test_a_node_joining_already_on_the_target_counts_as_done(app, ha, monkeypatch):
+    # Its family has no package (a container), but it has nothing to install
+    calls = []
+    _witnesses(monkeypatch, calls)
+    _rows(app, a='deb')
+    assert _start(app)[0]
+    _rows(app, z='container')
+    _back(app, 'z')
+    with app.app_context():
+        assert uc.campaign_tick() == ('dispatch', PREFIX + 'a', None)
+    state = _state(app)
+    assert state['status'] == uc.RUNNING and PREFIX + 'z' in state['done']
+
 def test_a_node_joining_after_the_start_with_its_package_gets_its_turn(app, ha, monkeypatch):
     calls = []
     _witnesses(monkeypatch, calls)

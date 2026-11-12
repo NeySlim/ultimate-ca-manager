@@ -117,10 +117,16 @@ def plan_step(campaign, nodes, now, *, stale_seconds, guard):
             return _stopped(c, node, f"node {node} not back on version {target} "
                                      f"within {guard:.0f}s", now)
         return None, None
-    # A node that joined after the start takes a turn too, if the campaign has its package
+    # A node that joined after the start takes a turn too, if the campaign has its package;
+    # one already on the target has nothing to install, whatever its family
     late = sorted(n for n, v in nodes.items() if n not in c['order']
                   and n not in c.get('skipped', []) and _fresh(v, now, stale_seconds))
     for n in late:
+        if versions_match(nodes[n].version, target):
+            c['order'].append(n)
+            c['done'].append(n)
+            c.setdefault('families', {})[n] = nodes[n].family
+            continue
         if nodes[n].family not in packages:
             return _stopped(c, n, f"node {n} joined after the start and the campaign has no "
                                   f"package of its family {nodes[n].family or 'unknown'}", now)
