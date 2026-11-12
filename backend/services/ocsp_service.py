@@ -624,12 +624,15 @@ class OCSPService:
                 certificate = row
                 break
         if certificate and certificate.revoked:
+            from services.cert.issued_lookup import answered_revocation
+            # A held row under a final record of its serial answers the graver reason, as the CRL
+            holder = answered_revocation(certificate, ca)
             return (
                 certificate,
                 'revoked',
-                certificate.revoked_at or utc_now(),
+                holder.revoked_at or utc_now(),
                 _REASON_MAP.get(
-                    certificate.revoke_reason, x509.ReasonFlags.unspecified
+                    holder.revoke_reason, x509.ReasonFlags.unspecified
                 ),
             )
         if not certificate:
