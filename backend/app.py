@@ -825,12 +825,19 @@ def create_app(config_name=None):
         # Register update check task (hourly tick; the task itself checks at
         # most daily and only installs in the configured window, #301)
         try:
-            from services.updates import scheduled_update_check
+            from services.updates import scheduled_update_check, scheduled_update_result
             scheduler.register_task(
                 name="update_check",
                 func=scheduled_update_check,
                 interval=3600,  # hourly gate for the auto-install window
                 description="Check for available UCM updates (opt-in auto-install)"
+            )
+            scheduler.register_task(
+                name="update_result",
+                func=scheduled_update_result,
+                interval=3600,
+                description="Report the outcome of the last update installed on this node",
+                per_node=True
             )
             app.logger.info("Registered update check task (hourly)")
         except ImportError:
@@ -903,7 +910,8 @@ def create_app(config_name=None):
                 name="backup_retention",
                 func=run_backup_retention,
                 interval=86400,  # 24 hours
-                description="Prune backups past their retention period"
+                description="Prune backups past their retention period",
+                per_node=True  # each node prunes the archives on its own disk
             )
             app.logger.info("Registered backup retention task (daily)")
         except ImportError:

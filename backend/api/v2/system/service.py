@@ -49,6 +49,7 @@ _TASK_LABELS = {
     'cert_auto_renewal': 'Certificate auto-renewal',
     'ocsp_cache_cleanup': 'OCSP cache cleanup',
     'update_check': 'Update check',
+    'update_result': 'Update result',
     'discovery_scan': 'Discovery scans',
     'scheduled_reports': 'Scheduled reports',
     'scheduled_backup': 'Scheduled backups',

@@ -4,7 +4,7 @@ Two executors of the same scheduled work (two nodes during a leader change) read
 same previous value; the conditional write lets exactly one of them move it.
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.exc import IntegrityError
 
@@ -45,6 +45,10 @@ def config_release(key: str, held, previous) -> bool:
     return released
 
 
+# A pass refused the lease retries this long after it ends: the holder's last commit lands first
+LEASE_RETRY_MARGIN = timedelta(seconds=30)
+
+
 def _held_value(key: str):
     return db.session.query(SystemConfig.value).filter_by(key=key).scalar()
 
@@ -56,15 +60,22 @@ class ConfigLease:
 
     def __init__(self, key: str, duration):
         self.key, self.duration, self.held = key, duration, None
+        self.frees_in = None  # seconds left on the holder's lease when take() was refused
 
     def _stamp(self, now) -> str:
         return f"{now.isoformat()}|{uuid.uuid4().hex}"
 
-    def _live(self, value, now) -> bool:
+    @staticmethod
+    def _since(value):
         try:
-            since = datetime.fromisoformat((value or '').split('|', 1)[0])
+            return datetime.fromisoformat((value or '').split('|', 1)[0])
         except ValueError:
-            return False  # empty (ended) or unreadable: free
+            return None  # empty (ended) or unreadable: free
+
+    def _live(self, value, now) -> bool:
+        since = self._since(value)
+        if since is None:
+            return False
         return -self.duration < now - since < self.duration  # a future stamp holds one duration at most
 
     def take(self) -> bool:
@@ -73,13 +84,22 @@ class ConfigLease:
         previous = _held_value(self.key)
         now = cluster_utc_now()
         if self._live(previous, now):
+            self.frees_in = (self._since(previous) + self.duration - now).total_seconds()
             db.session.rollback()
             return False
         stamp = self._stamp(now)
         if not config_compare_and_set(self.key, previous, stamp):
+            self.frees_in = self.duration.total_seconds()  # the winner's lease starts now
             return False
         self.held = stamp
         return True
+
+    def retry_in(self):
+        """Seconds until a pass refused by take() can hold the lease (cluster clock), None
+        when take() was not refused."""
+        if self.frees_in is None:
+            return None
+        return self.frees_in + LEASE_RETRY_MARGIN.total_seconds()
 
     def renew(self) -> bool:
         """Push the lease forward; False once another node has taken it over."""

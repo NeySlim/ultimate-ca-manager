@@ -254,3 +254,372 @@ def test_the_api_reports_a_stale_state_and_a_queued_run(app, auth_client, monkey
     resp = auth_client.post(f'/api/v2/system/scheduler/{name}/run').get_json()
     assert resp['data']['queued'] is True and 'started' in resp['message']
     assert audits[-1]['success'] is True and 'still running' in audits[-1]['details']
+
+
+def test_a_per_node_task_follows_the_host_lock_outside_ha(sched):
+    # Single node: the process holding the host lock runs it, a waiting one does not
+    holder, waiting = sched(), sched()
+    runs = {'holder': 0, 'waiting': 0}
+    for s, name in ((holder, 'holder'), (waiting, 'waiting')):
+        s.register_task('local', lambda name=name: runs.__setitem__(name, runs[name] + 1),
+                        interval=3600, per_node=True)
+        s.tasks['local']._created_at -= timedelta(seconds=60)
+    holder.start()
+    assert _wait(lambda: runs['holder'] == 1)
+    waiting.start()
+    time.sleep(0.3)
+    assert runs == {'holder': 1, 'waiting': 0}
+
+
+def test_a_task_says_whether_it_runs_on_every_node(sched):
+    s = sched()
+    s.register_task('local', lambda: None, interval=60, per_node=True)
+    s.register_task('cluster', lambda: None, interval=60)
+    assert s.tasks['local'].to_dict()['per_node'] is True
+    assert s.tasks['cluster'].to_dict()['per_node'] is False
+
+
+class _OneOwnerLock:
+    """The leader lock of two nodes, without PostgreSQL: the first to ask holds it."""
+    owner = None
+
+    def __init__(self, scheduler):
+        self.scheduler = scheduler
+
+    def acquire(self):
+        if _OneOwnerLock.owner in (None, self.scheduler):
+            _OneOwnerLock.owner = self.scheduler
+            return True
+        return False
+
+    def still_held(self):
+        return _OneOwnerLock.owner is self.scheduler
+
+    def release(self):
+        if _OneOwnerLock.owner is self.scheduler:
+            _OneOwnerLock.owner = None
+
+
+def test_in_ha_a_per_node_task_runs_on_every_node_and_a_leader_task_on_one(sched, monkeypatch):
+    monkeypatch.setattr(scheduler_service, '_ha', lambda: True)
+    monkeypatch.setattr(_OneOwnerLock, 'owner', None)
+    for name in ('_heartbeat', '_publish_state', '_took_leadership'):
+        monkeypatch.setattr(SchedulerService, name, lambda self, *a, **k: None)
+    monkeypatch.setattr(SchedulerService, '_take_requests', lambda self: [])
+    monkeypatch.setattr(SchedulerService, '_has_requests', lambda self: False)
+    monkeypatch.setattr(SchedulerService, '_singleton_lock', lambda self: _OneOwnerLock(self))
+    runs = {}
+    nodes = [sched(), sched()]
+    for node, s in enumerate(nodes):
+        s.wake_interval = 0.05
+        for name, per_node in (('local', True), ('cluster', False)):
+            s.register_task(name, lambda key=(node, name): runs.__setitem__(key, runs.get(key, 0) + 1),
+                            interval=3600, per_node=per_node)
+            s.tasks[name]._created_at -= timedelta(seconds=60)
+        s.start()
+    assert _wait(lambda: runs.get((0, 'local')) and runs.get((1, 'local')))
+    time.sleep(0.3)
+    assert runs[(0, 'local')] == 1 and runs[(1, 'local')] == 1
+    assert runs.get((0, 'cluster'), 0) + runs.get((1, 'cluster'), 0) == 1
+
+
+def test_a_running_per_node_task_does_not_delay_a_follower_takeover(sched, monkeypatch):
+    # The follower keeps retrying the lock and writing its heartbeat while a per-node task runs
+    monkeypatch.setattr(scheduler_service, '_ha', lambda: True)
+    monkeypatch.setattr(_OneOwnerLock, 'owner', None)
+    for name in ('_publish_state', '_took_leadership'):
+        monkeypatch.setattr(SchedulerService, name, lambda self, *a, **k: None)
+    monkeypatch.setattr(SchedulerService, '_take_requests', lambda self: [])
+    monkeypatch.setattr(SchedulerService, '_has_requests', lambda self: False)
+
+    def kept_lock(self):
+        # Kept like the PostgreSQL one, so stopping the leader releases it
+        if self._leader_lock is None:
+            self._leader_lock, self._leader_lock_pid = _OneOwnerLock(self), os.getpid()
+        return self._leader_lock
+    monkeypatch.setattr(SchedulerService, '_singleton_lock', kept_lock)
+    beats = []
+    monkeypatch.setattr(SchedulerService, '_heartbeat',
+                        lambda self, force=False: beats.append(self))
+    leader, follower = sched(), sched()
+    release, started, runs = threading.Event(), threading.Event(), []
+
+    def slow():
+        runs.append(1)
+        started.set()
+        release.wait(5)
+    leader.wake_interval = follower.wake_interval = 0.05
+    leader.start()
+    assert _wait(lambda: _OneOwnerLock.owner is leader)
+    follower.register_task('local', slow, interval=3600, per_node=True)
+    follower.tasks['local']._created_at -= timedelta(seconds=60)
+    follower.start()
+    try:
+        assert started.wait(2)
+        before = beats.count(follower)
+        leader.stop(timeout=5)
+        assert _wait(lambda: _OneOwnerLock.owner is follower, timeout=2)
+        assert _wait(lambda: beats.count(follower) > before + 2, timeout=2)
+        assert not release.is_set() and runs == [1]
+    finally:
+        release.set()
+    # The task the node thread still ran is not started again by the new leader
+    time.sleep(0.3)
+    assert runs == [1]
+
+
+def _ha_pair(monkeypatch, beats=None):
+    """Two nodes on the in-memory leader lock, nothing written to a database."""
+    monkeypatch.setattr(scheduler_service, '_ha', lambda: True)
+    monkeypatch.setattr(_OneOwnerLock, 'owner', None)
+    for name in ('_publish_state', '_took_leadership'):
+        monkeypatch.setattr(SchedulerService, name, lambda self, *a, **k: None)
+    monkeypatch.setattr(SchedulerService, '_has_requests', lambda self: False)
+
+    def kept_lock(self):
+        if self._leader_lock is None:
+            self._leader_lock, self._leader_lock_pid = _OneOwnerLock(self), os.getpid()
+        return self._leader_lock
+    monkeypatch.setattr(SchedulerService, '_singleton_lock', kept_lock)
+    monkeypatch.setattr(SchedulerService, '_heartbeat',
+                        lambda self, force=False: beats.append(self) if beats is not None else None)
+
+
+def test_a_graceful_stop_waits_for_the_per_node_task_of_a_follower(sched, monkeypatch):
+    _ha_pair(monkeypatch)
+    monkeypatch.setattr(SchedulerService, '_take_requests', lambda self: [])
+    leader, follower = sched(), sched()
+    started, done = threading.Event(), threading.Event()
+
+    def slow():
+        started.set()
+        time.sleep(0.3)
+        done.set()
+    leader.wake_interval = follower.wake_interval = 0.05
+    leader.start()
+    assert _wait(lambda: _OneOwnerLock.owner is leader)
+    follower.register_task('local', slow, interval=3600, per_node=True)
+    follower.tasks['local']._created_at -= timedelta(seconds=60)
+    follower.start()
+    assert started.wait(2)
+    follower.relinquish()
+    assert follower.join(2) is True
+    assert done.is_set()
+
+
+class _HookLock:
+    """A task's run lock that runs ``hook`` once, just before it is taken."""
+
+    def __init__(self, hook):
+        self._lock, self._hook = threading.Lock(), hook
+
+    def acquire(self, blocking=True, timeout=-1):
+        hook, self._hook = self._hook, None
+        if hook:
+            hook()
+        return self._lock.acquire(blocking, timeout)
+
+    def release(self):
+        self._lock.release()
+
+    def locked(self):
+        return self._lock.locked()
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *exc):
+        self.release()
+
+
+def test_the_loop_does_not_rerun_a_task_run_just_before_it_took_the_run_lock(sched):
+    s = sched()
+    runs = []
+    s.register_task('t', lambda: runs.append(1), interval=3600)
+    task = s.tasks['t']
+    task._created_at -= timedelta(seconds=60)
+    # The node thread ran it between the loop's look at the tasks and its taking the run lock
+    task._run_lock = _HookLock(lambda: setattr(task, 'last_run', scheduler_service.utc_now()))
+    s.start()
+    assert _wait(lambda: task._run_lock._hook is None)
+    time.sleep(0.2)
+    assert runs == []
+
+
+def test_a_follower_that_became_leader_leaves_a_per_node_task_to_the_loop(sched):
+    s = sched()
+    runs = []
+    s.register_task('local', lambda: runs.append(1), interval=3600, per_node=True)
+    task = s.tasks['local']
+    task._created_at -= timedelta(seconds=60)
+    s._running = True
+    task._run_lock = _HookLock(lambda: setattr(s, '_owns_lock', True))
+    try:
+        s._run_node_tasks()
+    finally:
+        s._running, s._owns_lock = False, False
+    assert runs == []
+
+
+def test_a_run_now_on_a_task_the_node_thread_still_runs_never_blocks_the_new_leader(sched, monkeypatch):
+    beats = []
+    _ha_pair(monkeypatch, beats)
+    leader, follower = sched(), sched()
+    release, started, runs = threading.Event(), threading.Event(), []
+    asked = []
+
+    def take(self):
+        if self is follower and not asked:
+            asked.append(1)
+            return [self.tasks['local']]  # "run now" claimed at the takeover
+        return []
+    monkeypatch.setattr(SchedulerService, '_take_requests', take)
+
+    def slow():
+        runs.append(threading.current_thread().name)
+        started.set()
+        release.wait(2)
+    leader.wake_interval = follower.wake_interval = 0.05
+    leader.start()
+    assert _wait(lambda: _OneOwnerLock.owner is leader)
+    follower.register_task('local', slow, interval=3600, per_node=True)
+    follower.tasks['local']._created_at -= timedelta(seconds=60)
+    follower.start()
+    try:
+        assert started.wait(2)
+        leader.stop(timeout=5)
+        assert _wait(lambda: asked, timeout=2)
+        before = beats.count(follower)
+        assert _wait(lambda: beats.count(follower) > before + 2, timeout=2)
+        assert runs == ['SchedulerNodeTasks']
+    finally:
+        release.set()
+    # The request is served once the node thread's run is over, by the leader loop
+    assert _wait(lambda: len(runs) == 2, timeout=2)
+    time.sleep(0.3)
+    assert runs == ['SchedulerNodeTasks', 'SchedulerService']
+
+
+def test_a_follower_that_became_leader_stops_between_two_per_node_tasks(sched, monkeypatch):
+    _ha_pair(monkeypatch)
+    monkeypatch.setattr(SchedulerService, '_take_requests', lambda self: [])
+    leader, follower = sched(), sched()
+    first_go, cluster_go, first_started = threading.Event(), threading.Event(), threading.Event()
+    runs = []
+
+    def first():
+        runs.append(('first', threading.current_thread().name))
+        first_started.set()
+        first_go.wait(2)
+
+    def cluster():
+        runs.append(('cluster', threading.current_thread().name))
+        cluster_go.wait(2)
+    leader.wake_interval = follower.wake_interval = 0.05
+    leader.start()
+    assert _wait(lambda: _OneOwnerLock.owner is leader)
+    for name, func, per_node in (('first', first, True), ('cluster', cluster, False),
+                                 ('second', lambda: runs.append(('second', threading.current_thread().name)), True)):
+        follower.register_task(name, func, interval=3600, per_node=per_node)
+        follower.tasks[name]._created_at -= timedelta(seconds=60)
+    follower.start()
+    try:
+        assert first_started.wait(2)
+        leader.stop(timeout=5)
+        # The new leader's loop is busy with its own task while the node thread ends the first one
+        assert _wait(lambda: ('cluster', 'SchedulerService') in runs, timeout=2)
+        first_go.set()
+        assert _wait(lambda: not follower._node_thread.is_alive(), timeout=2)
+    finally:
+        first_go.set()
+        cluster_go.set()
+    assert _wait(lambda: any(r[0] == 'second' for r in runs), timeout=2)
+    time.sleep(0.2)
+    assert [r for r in runs if r[0] == 'second'] == [('second', 'SchedulerService')]
+    assert [r for r in runs if r[0] == 'first'] == [('first', 'SchedulerNodeTasks')]
+
+
+def test_in_ha_a_run_now_of_a_per_node_task_runs_on_the_node_asked(sched, monkeypatch):
+    _ha_pair(monkeypatch)
+    monkeypatch.setattr(SchedulerService, '_take_requests', lambda self: self._take_local_requests())
+    leader, follower = sched(), sched()
+    ran = []
+    for who, s in (('leader', leader), ('follower', follower)):
+        s.wake_interval = 0.05
+        # Not due before the grace period: only the run-now starts it
+        s.register_task('local', lambda who=who: ran.append((who, threading.current_thread().name)),
+                        interval=3600, per_node=True)
+    leader.start()
+    assert _wait(lambda: _OneOwnerLock.owner is leader)
+    follower.start()
+    status = follower.run_task_now('local')
+    assert ran == [('follower', 'SchedulerNodeTasks')]
+    assert status['run_count'] == 1 and not status.get('queued')
+    assert leader.get_task_status('local')['run_count'] == 0
+
+
+def test_in_ha_a_worker_shows_its_own_node_for_a_per_node_task(sched, monkeypatch, data_dir):
+    monkeypatch.setattr(scheduler_service, '_ha', lambda: True)
+    monkeypatch.setenv(scheduler_service.SUPERVISED_ENV, '1')
+    monkeypatch.setattr(scheduler_service, 'RUN_NOW_WAIT_SECONDS', 0.3)
+    node, worker = sched(), sched()
+    for s in (node, worker):
+        s.register_task('local', lambda: None, interval=3600, per_node=True)
+        s.register_task('cluster', lambda: None, interval=3600)
+    leader_state = {'published_at': time.time(), 'tasks': {
+        name: dict(worker.tasks[name].to_dict(), run_count=7) for name in ('local', 'cluster')}}
+    monkeypatch.setattr(SchedulerService, '_published_state', lambda self: leader_state)
+    # This node's scheduler process, a follower, publishes its own copy
+    node.tasks['local'].run_count = 2
+    node._publish_state()
+    statuses = worker.get_all_tasks_status()
+    assert statuses['local']['run_count'] == 2 and statuses['cluster']['run_count'] == 7
+    assert 'stale' not in statuses['local']
+    # The run-now is asked of this node's scheduler process, not of the leader
+    assert worker.run_task_now('local')['queued'] is True
+    assert os.listdir(scheduler_service._data_path(scheduler_service.REQUESTS_DIR)) == ['local']
+    assert node._take_local_requests() == [node.tasks['local']]
+
+
+def test_in_ha_a_per_node_run_now_without_a_loop_on_this_node_runs_here(sched, monkeypatch):
+    monkeypatch.setattr(scheduler_service, '_ha', lambda: True)
+    monkeypatch.setattr(scheduler_service, 'RUN_NOW_WAIT_SECONDS', 0.3)
+    s = sched()
+    s.register_task('local', lambda: None, interval=3600, per_node=True)
+    assert s.run_task_now('local')['run_count'] == 1
+
+
+def test_a_per_node_run_now_taken_by_a_leader_that_loses_the_lock_still_runs_here(sched, monkeypatch):
+    """The node asked can still serve it as a follower: the request is not dropped."""
+    _ha_pair(monkeypatch)
+    s, other, runs, asked = sched(), object(), [], []
+
+    def take(self):
+        if not asked:
+            asked.append(1)
+            _OneOwnerLock.owner = other  # the lock is lost between the take and the run
+            return [self.tasks['local']]
+        return []
+    monkeypatch.setattr(SchedulerService, '_take_requests', take)
+    s.wake_interval = 0.05
+    s.register_task('local', lambda: runs.append(1), interval=3600, per_node=True)
+    s.start()
+    try:
+        assert _wait(lambda: runs == [1], timeout=2)
+    finally:
+        _OneOwnerLock.owner = None
+
+
+def test_a_deferred_leader_task_is_dropped_when_leadership_is_taken_again(sched, monkeypatch):
+    """Dropped, not replayed: the leader in between already dropped its request."""
+    monkeypatch.setattr(scheduler_service, '_ha', lambda: True)
+    monkeypatch.setattr(scheduler_service, '_drop_abandoned_requests', lambda: None)
+    s = sched()
+    monkeypatch.setattr(s, '_in_app', lambda fn, *a, **k: fn(*a, **k))
+    s.register_task('job', lambda: None, interval=3600)
+    s.register_task('local', lambda: None, interval=3600, per_node=True)
+    s._defer(s.tasks['job'])
+    s._defer(s.tasks['local'])
+    s._took_leadership()
+    assert s._take_deferred() == [s.tasks['local']]

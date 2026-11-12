@@ -815,6 +815,15 @@ def _auto_install(result):
     logger.info(f"Auto-update to {latest} triggered")
 
 
+def scheduled_update_result():
+    """Per-node task: the watcher writes its result on the node it installed, leader or not;
+    the first tick after the post-install restart emits the truthful installed/failed outcome."""
+    try:
+        consume_update_result()
+    except Exception as e:
+        logger.error(f"Failed to consume update result: {e}")
+
+
 def scheduled_update_check():
     """Hourly task: daily update check + notification, opt-in unattended install.
 
@@ -823,12 +832,6 @@ def scheduled_update_check():
     auto_update_enabled is on, and only with a verified SHA256 (#301).
     """
     from datetime import datetime
-    # First tick after a post-install restart: consume the watcher's durable
-    # result and emit the truthful installed/failed outcome.
-    try:
-        consume_update_result()
-    except Exception as e:
-        logger.error(f"Failed to consume update result: {e}")
     try:
         settings = get_update_settings()
         now = time.time()

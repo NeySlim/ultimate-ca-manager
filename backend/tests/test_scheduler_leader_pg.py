@@ -222,3 +222,66 @@ def test_stopping_a_follower_closes_its_lock_session(app, ha, monkeypatch):
     assert follower.stop(timeout=10)
     assert wait_for(lambda: not backend_alive(app, pid)), 'the follower left its lock session open'
     assert leader._owns_lock
+
+
+def test_a_per_node_task_runs_on_both_nodes_and_a_leader_task_on_one(app, monkeypatch, tmp_path):
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr('config.settings.DATA_DIR', tmp_path, raising=False)
+    monkeypatch.setattr(scheduler_leader, 'LEADER_LOCK_KEY', secrets.randbits(62))
+    monkeypatch.setattr(scheduler_service, 'LOCK_RETRY_SECONDS', 0.05)
+    runs = {}
+    nodes = []
+    try:
+        for node in ('node-a', 'node-b'):
+            s = SchedulerService(wake_interval=0.05, node_id=node)
+            for name, per_node in (('local', True), ('cluster', False)):
+                s.register_task(name, lambda key=(node, name): runs.__setitem__(key, runs.get(key, 0) + 1),
+                                interval=3600, per_node=per_node)
+                s.tasks[name]._created_at -= timedelta(seconds=60)
+            nodes.append(s)
+            s.start(app=app)
+        assert wait_for(lambda: runs.get(('node-a', 'local')) and runs.get(('node-b', 'local')))
+        time.sleep(0.3)
+        assert runs[('node-a', 'local')] == 1 and runs[('node-b', 'local')] == 1
+        assert runs.get(('node-a', 'cluster'), 0) + runs.get(('node-b', 'cluster'), 0) == 1
+    finally:
+        for s in nodes:
+            s.stop(timeout=10)
+        from models import ClusterNode, db
+        with app.app_context():
+            ClusterNode.query.delete()
+            db.session.commit()
+
+
+def test_a_per_node_run_now_on_the_follower_runs_on_the_follower(app, monkeypatch, tmp_path):
+    monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr('config.settings.DATA_DIR', tmp_path, raising=False)
+    monkeypatch.setattr(scheduler_leader, 'LEADER_LOCK_KEY', secrets.randbits(62))
+    monkeypatch.setattr(scheduler_service, 'LOCK_RETRY_SECONDS', 0.05)
+    ran = []
+    nodes = {}
+    try:
+        for node in ('node-a', 'node-b'):
+            s = SchedulerService(wake_interval=0.05, node_id=node)
+            # Not due before the grace period: only the run-now starts it
+            s.register_task('local', lambda node=node: ran.append(node), interval=3600, per_node=True)
+            nodes[node] = s
+            s.start(app=app)
+        assert wait_for(lambda: sum(s._owns_lock for s in nodes.values()) == 1)
+        follower = next(name for name, s in nodes.items() if not s._owns_lock)
+        leader = next(name for name in nodes if name != follower)
+        with app.app_context():
+            status = nodes[follower].run_task_now('local')
+        assert ran == [follower] and status['run_count'] == 1
+        assert nodes[leader].tasks['local'].run_count == 0
+        from models import SchedulerRequest
+        with app.app_context():
+            # Nothing asked of the leader through the database
+            assert SchedulerRequest.query.filter_by(task_name='local', requested_by=follower).count() == 0
+    finally:
+        for s in nodes.values():
+            s.stop(timeout=10)
+        from models import ClusterNode, db
+        with app.app_context():
+            ClusterNode.query.delete()
+            db.session.commit()

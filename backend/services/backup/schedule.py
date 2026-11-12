@@ -260,8 +260,8 @@ def _protected_archives(paths: list) -> set:
     # The minimum count protects against losing a restore point, so it does
     # not extend to an archive proven to be something other than what was
     # written: keeping it would push out one that can still be restored.
-    provable = [path for path in _newest_first(paths)
-                if path not in set(storage.tampered(paths))]
+    tampered = set(storage.tampered(paths))  # hashes every archive: once per pass
+    provable = [path for path in _newest_first(paths) if path not in tampered]
     keep.update(provable[:_min_keep()])
     return keep
 
