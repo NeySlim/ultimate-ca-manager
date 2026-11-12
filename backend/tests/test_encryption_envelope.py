@@ -2159,3 +2159,29 @@ def test_a_second_disable_after_a_disable_done_changes_nothing(app, auth_client,
     assert r.status_code == 400, r.data
     assert r.get_json()['message'] == 'Encryption is not enabled'
     assert _rows(app) == rows and _retain_after(app) == kept and _grace_row(app) == grace_row
+
+
+def test_a_restart_resumes_an_interrupted_rotation_before_an_old_key_past_its_retention(
+        app, values, retention, encryption_enabled):
+    """DEK 1 is past its retention while the rotation to DEK 3 was cut off: the start ends
+    the rotation, then DEK 1 goes once the grace of that rotation is over."""
+    from security import dek_rotation
+    with app.app_context():
+        dek_rotation.rotate()
+    retention(601)
+    with app.app_context():
+        dek_rotation.retire_if_due()
+        dek_rotation.start()  # interrupted: DEK 2 not rewritten yet
+    retention(WEEK)
+    _start(app)
+    with app.app_context():
+        assert not dek_rotation.rotation_in_progress()
+        assert dek_rotation._under_active(_stored(app, values)['target'])
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'previous'),
+                                                     (3, 'active')]
+    assert _read(app, values) == CLEAR
+    retention(601)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 1
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'previous'), (3, 'active')]
+    assert _read(app, values) == CLEAR

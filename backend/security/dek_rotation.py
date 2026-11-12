@@ -615,11 +615,11 @@ def resume_at_start() -> None:
     if ha_enabled() or not _encryption.key_encryption.is_enabled:
         return
     try:
-        if retiring() is not None or retained(cluster_utc_now()):
-            # Restarted during a grace or past a retention: the scheduler ends it otherwise
-            retire_if_due()
-            return
+        # First the rotation: retire_if_due does nothing while one is unfinished
         if not rotation_in_progress():
+            if retiring() is not None or retained(cluster_utc_now()):
+                # Restarted during a grace or past a retention: the scheduler ends it otherwise
+                retire_if_due()
             return
         result = rotate()
     except Exception as e:
