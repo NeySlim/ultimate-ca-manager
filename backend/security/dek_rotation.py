@@ -23,9 +23,9 @@ BATCH = 200
 ACK_TIMEOUT_SECONDS = 30.0
 _LOCK = 0x75636D64656B  # PostgreSQL advisory lock id for DEK state changes
 DISABLED_MARKER_VERSION = 0
-# The previous DEK opens values until every live node has applied the change, then for this
-# margin (the web worker's timeout): every process re-reads the rows REFRESH_SECONDS after a
-# commit; a write encrypted before and committed later is caught by the end-of-grace sweep
+# The grace, which holds the next rotation, ends once every live node has applied the change,
+# then after this margin (the web worker's timeout): every process re-reads the rows
+# REFRESH_SECONDS after a commit. The previous DEK itself stays readable RETENTION_SECONDS
 ACK_MARGIN_SECONDS = 120.0
 # Cap of the wait for a node that does not acknowledge; past it a live node still lagging
 # holds the DEK until it does

@@ -526,7 +526,7 @@ def rotate_encryption_key():
         result = dek_rotation.rotate()
     except dek_rotation.RotationError as e:
         db.session.rollback()
-        return error_response(f"Key rotation not finished: {e}", e.status)
+        return error_response(str(e), e.status)
     except Exception as e:
         db.session.rollback()
         logger.error(f"DEK rotation failed: {type(e).__name__}: {e}")

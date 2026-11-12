@@ -2140,8 +2140,7 @@ def test_a_rotation_after_a_disable_done_says_encryption_is_off(app, auth_client
     rows = _rows(app)
     r = auth_client.post('/api/v2/system/security/rotate-encryption-key')
     assert r.status_code == 400, r.data
-    assert 'Encryption is not enabled' in r.get_json()['message']
-    assert 'half-way' not in r.get_json()['message']
+    assert r.get_json()['message'] == 'Encryption is not enabled'
     assert _rows(app) == rows
 
 
