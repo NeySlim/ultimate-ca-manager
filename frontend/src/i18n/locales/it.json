@@ -4699,7 +4699,8 @@
       "database": {
         "integrityPassed": "Verifica integrità database superata",
         "optimized": "Database ottimizzato con successo",
-        "reset": "Database reimpostato con successo. La pagina verrà ricaricata."
+        "reset": "Database reimpostato con successo. La pagina verrà ricaricata.",
+        "resetGenerated": "Database reset. The administrator's password was generated: read it on the server with {{command}}. It must be changed at first login."
       },
       "delete": {
         "ca": "CA eliminata con successo",

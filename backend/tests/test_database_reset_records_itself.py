@@ -92,7 +92,8 @@ def test_the_recreated_admin_is_forced_only_with_a_generated_password(
             value = path.read_text().rstrip('\n')
             assert admin.check_password(value)
             assert value not in answer.get_data(as_text=True)
-            assert str(path) in answer.get_data(as_text=True)
+            assert str(path) in answer.get_json()['data']['read_command']
+        assert answer.get_json()['data']['password_generated'] is (initial is None)
         # Later files sign in as admin with the test password, no change forced
         admin.set_password('changeme123')
         admin.force_password_change = False

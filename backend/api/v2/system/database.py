@@ -237,13 +237,16 @@ def reset_db():
             username=actor_name,
         )
 
+        # The command to read a generated password, never the password
         if prepared.generated:
-            path = initial_admin.password_file(current_app.config)
-            return success_response(message=(
-                "Database reset successfully. Administrator recreated with a generated "
-                f"password, read it with: {initial_admin.read_command(path)}"))
-        return success_response(message=(
-            f"Database reset successfully. Administrator recreated with the password from {prepared.source}."))
+            command = initial_admin.read_command(initial_admin.password_file(current_app.config))
+            return success_response(
+                data={'password_generated': True, 'read_command': command},
+                message=("Database reset successfully. Administrator recreated with a generated "
+                         f"password, read it with: {command}"))
+        return success_response(
+            data={'password_generated': False, 'read_command': None},
+            message=f"Database reset successfully. Administrator recreated with the password from {prepared.source}.")
     except Exception as e:
         logger.error(f"Database reset failed: {e}")
         return error_response("Database reset failed")

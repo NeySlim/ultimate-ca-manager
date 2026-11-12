@@ -4928,7 +4928,8 @@
       "database": {
         "optimized": "Base de données optimisée avec succès",
         "integrityPassed": "Vérification d'intégrité de la base de données réussie",
-        "reset": "Base de données réinitialisée avec succès. La page va se recharger."
+        "reset": "Base de données réinitialisée avec succès. La page va se recharger.",
+        "resetGenerated": "Base de données réinitialisée. Le mot de passe de l'administrateur a été généré : lisez-le sur le serveur avec {{command}}. Il devra être changé à la première connexion."
       },
       "https": {
         "applied": "Certificat HTTPS appliqué. Le serveur va redémarrer.",

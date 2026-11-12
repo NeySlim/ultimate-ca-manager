@@ -4699,7 +4699,8 @@
       "database": {
         "integrityPassed": "数据库完整性检查通过",
         "optimized": "数据库优化成功",
-        "reset": "数据库重置成功，页面将重新加载。"
+        "reset": "数据库重置成功，页面将重新加载。",
+        "resetGenerated": "Database reset. The administrator's password was generated: read it on the server with {{command}}. It must be changed at first login."
       },
       "delete": {
         "ca": "CA 删除成功",

@@ -58,6 +58,7 @@ import SsoSection from './settings/SsoSection'
 import BackupSection from './settings/BackupSection'
 import AuditSection from './settings/AuditSection'
 import DatabaseSection from './settings/DatabaseSection'
+import { afterDatabaseReset } from './settings/databaseReset'
 import HttpsSection from './settings/HttpsSection'
 import UpdatesSection from './settings/UpdatesSection'
 import DeploySection from './settings/DeploySection'
@@ -1476,9 +1477,8 @@ export default function SettingsPage() {
     }
 
     try {
-      await systemService.resetDatabase()
-      showSuccess(t('messages.success.database.reset'))
-      setTimeout(() => window.location.reload(), 2000)
+      const res = await systemService.resetDatabase()
+      await afterDatabaseReset(res, { t, showConfirm, showSuccess, reload: () => window.location.reload() })
     } catch (error) {
       showError(error.message || t('messages.errors.database.resetFailed'))
     }
