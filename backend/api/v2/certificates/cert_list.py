@@ -219,8 +219,11 @@ def list_certificates():
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
 
     # The records of the page in one query: a revocation they make shows as OCSP answers it
-    from services.cert.issued_lookup import persisted_revocations_of, show_effective_revocation
+    from services.cert.issued_lookup import (
+        align_rows_with_records, persisted_revocations_of, show_effective_revocation)
     recorded = persisted_revocations_of(pagination.items)
+    # The rows shown revoked are marked so: the next filter and count agree with this page
+    align_rows_with_records(pagination.items, recorded)
     certs = []
     for cert in pagination.items:
         d = show_effective_revocation(cert.to_dict(), cert, recorded.get(cert.id))
