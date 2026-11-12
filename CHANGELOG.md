@@ -37,7 +37,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- HA preview: a scheduled report or scheduled backup run twice during a leader change is sent or written once, and two nodes serving orders that share one upstream ACME proxy challenge start its dns-01 automation once.
+- HA preview: a scheduled report or scheduled backup run twice during a leader change is sent or written once, and two nodes serving orders that share one upstream ACME proxy challenge start its dns-01 automation once. `GET /api/v2/settings/backup/schedule` reports `in_progress` while a scheduled backup is still being written.
 - Certificates: lifting a hold now emits `certificate.unheld` (webhooks, WebSocket) and lifts the hold of the other member of a related pair too, unless `unhold_related` is `false`, reporting it as `related_unheld`; a body that is not a JSON object is refused (400 or 415), and a pair on one CA gets a single delta CRL.
 - Import: an imported CA now announces `ca.created` and `ca.updated`, and a submitted CSR carries the acting user in `csr.submitted`.
 - Events: uploaded and imported CSRs emit `csr.submitted`, a CA signed from a CSR emits `ca.created`, an OCSP responder or EST key generator renewal emits its issued or renewed event, and approving a pending Microsoft CA request announces the certificate it imports.
