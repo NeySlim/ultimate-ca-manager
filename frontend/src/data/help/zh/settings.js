@@ -370,7 +370,7 @@ UCM 支持两种数据库后端：
 - 查看可用更新的变更日志
 - 当前版本和构建信息
 - **自动更新**：在支持的安装（DEB/RPM）上，点击**安装更新**自动下载和安装最新版本
-- **HA mode**: on DEB/RPM, **Install Update** and the auto-install update the nodes one at a time, and the screen follows the rolling update (nodes done, node in progress, node where it stopped and why, **Resume**)
+- **HA mode**: on DEB/RPM, **Install Update** and the auto-install update the nodes one at a time, and the screen follows the rolling update (nodes done, node in progress, package of each node, node where it stopped and why, **Resume**)
 - **更新通道**：稳定版、预发布版（候选发布版本）或 dev
 
 ## Webhook

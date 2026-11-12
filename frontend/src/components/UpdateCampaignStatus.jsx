@@ -11,6 +11,8 @@ export function UpdateCampaignStatus({ campaign, onResume, resuming = false }) {
   const { t } = useTranslation()
   if (!campaign) return null
   const done = campaign.done || []
+  const families = Object.entries(campaign.families || {})
+    .map(([node, family]) => `${node}: ${family || 'unknown'}`).join(', ')
   const pending = (campaign.order || []).filter(
     (node) => !done.includes(node) && node !== campaign.current?.node && node !== campaign.failed?.node
   )
@@ -44,6 +46,12 @@ export function UpdateCampaignStatus({ campaign, onResume, resuming = false }) {
           <>
             <dt className="text-text-tertiary">{t('settings.updateCampaign.pending')}</dt>
             <dd>{pending.join(', ')}</dd>
+          </>
+        )}
+        {families && (
+          <>
+            <dt className="text-text-tertiary">{t('settings.updateCampaign.packages')}</dt>
+            <dd>{families}</dd>
           </>
         )}
       </dl>

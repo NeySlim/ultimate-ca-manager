@@ -70,8 +70,9 @@ def test_scheduled_auto_update_never_installs_locally_in_ha(app, monkeypatch):
     monkeypatch.setattr(uc, 'campaign_tick', lambda: None)
     with app.app_context():
         updates._auto_install({'latest_version': '99.0', 'download_url': 'http://x/p.deb',
-                               'package_name': 'p.deb', 'checksum_url': 'http://x/p.sha256'})
-    assert started == [('99.0', 'http://x/p.deb', 'p.deb', 'e' * 64, 'scheduler')]
+                               'package_name': 'p.deb', 'checksum_url': 'http://x/p.sha256',
+                               'assets': [{'name': 'p.deb', 'browser_download_url': 'http://x/p.deb'}]})
+    assert started == [('99.0', [{'name': 'p.deb', 'browser_download_url': 'http://x/p.deb'}], 'scheduler')]
 
 
 def test_service_restart_in_ha_is_a_rolling_restart_even_in_a_container(auth_client, monkeypatch):

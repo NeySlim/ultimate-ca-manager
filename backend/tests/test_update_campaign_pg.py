@@ -20,6 +20,8 @@ pytestmark = pytest.mark.skipif(not pg_app_harness.ENABLED,
 
 PREFIX = 'ucpg-'
 SHA = 'cd' * 32
+ASSETS = [{'name': 'p.deb', 'browser_download_url': 'https://x/p.deb'},
+          {'name': 'p.deb.sha256', 'browser_download_url': 'https://x/p.deb.sha256'}]
 
 
 def _clean(app):
@@ -35,12 +37,15 @@ def _clean(app):
 def ha(app, monkeypatch):
     from models import ClusterNode, db
     monkeypatch.setattr(Config, 'HA_MODE', True)
+    monkeypatch.setattr(updates, 'package_family', lambda: 'deb')
+    monkeypatch.setattr(updates, 'fetch_expected_sha256', lambda url, name: SHA)
     _clean(app)
     now = utc_now()
     with app.app_context():
         for name in ('a', 'b'):
             db.session.add(ClusterNode(node_id=PREFIX + name, started_at=now - timedelta(minutes=10),
-                                       heartbeat_at=now, is_leader=False, pid=1, version='3.0'))
+                                       heartbeat_at=now, is_leader=False, pid=1, version='3.0',
+                                       package_family='deb'))
         db.session.commit()
     yield
     _clean(app)
@@ -87,14 +92,13 @@ def _commands(app):
 
 
 def test_two_admins_starting_at_once_start_one_campaign(app, ha, monkeypatch):
-    results = _together(app, monkeypatch, lambda i: uc.start_campaign(
-        '3.1', 'https://x/p.deb', 'p.deb', SHA, f'admin{i}')[0])
+    results = _together(app, monkeypatch, lambda i: uc.start_campaign('3.1', ASSETS, f'admin{i}')[0])
     assert sorted(results) == [False, True]
 
 
 def test_two_coordinators_at_once_dispatch_one_turn_and_one_command(app, ha, monkeypatch):
     with app.app_context():
-        assert uc.start_campaign('3.1', 'https://x/p.deb', 'p.deb', SHA, 'admin')[0]
+        assert uc.start_campaign('3.1', ASSETS, 'admin')[0]
     results = _together(app, monkeypatch, lambda i: uc.campaign_tick())
     assert sorted(results, key=str) == [('dispatch', PREFIX + 'a', None), None]
     assert [c[0] for c in _commands(app)] == [PREFIX + 'a']
@@ -106,7 +110,7 @@ def test_two_processes_of_the_dispatched_node_download_once(app, ha, monkeypatch
                         lambda url, name, expected_sha256=None: calls.append(expected_sha256) or '/nowhere/p.deb')
     monkeypatch.setattr(updates, 'install_update', lambda path, **kw: calls.append(path))
     with app.app_context():
-        uc.start_campaign('3.1', 'https://x/p.deb', 'p.deb', SHA, 'admin')
+        uc.start_campaign('3.1', ASSETS, 'admin')
         uc.campaign_tick()
     payload = _commands(app)[0][1]
     _together(app, monkeypatch, lambda i: uc.run_local_turn(payload, node_id=PREFIX + 'a', version='3.0'))

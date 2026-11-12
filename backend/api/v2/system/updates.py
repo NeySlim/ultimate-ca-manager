@@ -86,6 +86,9 @@ def install_update():
         if not update_info.get('update_available'):
             return error_response("No update available", 400)
 
+        if in_ha:
+            return _start_rolling_update(update_info)
+
         if not update_info.get('download_url'):
             return error_response("No download URL available for this platform", 400)
 
@@ -109,9 +112,6 @@ def install_update():
                     "Release checksum does not cover this package: install refused", 502
                 )
             checksum_note = 'SHA256 verified'
-
-        if in_ha:
-            return _start_rolling_update(update_info, expected_sha256)
 
         # Download (verifies the digest on the fly when one is expected)
         package_path = download_update(
@@ -156,12 +156,11 @@ def install_update():
         return error_response("Update failed", 500)
 
 
-def _start_rolling_update(update_info, expected_sha256):
-    """HA: no local download here, each node fetches and verifies the package on its turn."""
+def _start_rolling_update(update_info):
+    """HA: no local download here, each node fetches and verifies the package of its family on its turn."""
     from services import update_campaign
     started, message, campaign = update_campaign.start_campaign(
-        update_info['latest_version'], update_info['download_url'], update_info['package_name'],
-        expected_sha256, _actor())
+        update_info['latest_version'], update_info.get('assets') or [], _actor())
     if not started:
         return error_response(message, 409)
     update_campaign.campaign_tick()

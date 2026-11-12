@@ -3462,6 +3462,7 @@
       "pending": "Waiting",
       "none": "None",
       "failed": "Stopped at node {{node}}: {{reason}}",
+      "packages": "Package per node",
       "resume": "Resume",
       "resumed": "Rolling update resumed",
       "resumeFailed": "Failed to resume the rolling update",

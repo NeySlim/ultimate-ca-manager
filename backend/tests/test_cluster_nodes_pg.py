@@ -75,6 +75,20 @@ def test_both_nodes_heartbeat_and_one_row_is_leader(app, ha):
     assert wait_for(lambda: rows(app) == {PREFIX + 'a': False, PREFIX + 'b': True})
 
 
+def test_the_heartbeat_publishes_the_package_family(app, ha, monkeypatch):
+    import services.updates as updates
+    from models import ClusterNode, db
+    monkeypatch.setattr(updates, 'package_family', lambda: 'rpm-el9')
+    a = ha('a')
+    a.start(app=app)
+    assert wait_for(lambda: PREFIX + 'a' in rows(app))
+    a.stop(timeout=10)
+    with app.app_context():
+        assert db.session.get(ClusterNode, PREFIX + 'a').package_family == 'rpm-el9'
+        detail = {n['node_id']: n for n in scheduler_leader.cluster_nodes_detail(WAKE)}
+    assert detail[PREFIX + 'a']['package_family'] == 'rpm-el9'
+
+
 def test_a_node_without_heartbeat_for_three_passes_is_stale(app, ha):
     from models import ClusterNode, db
     a = ha('a')
