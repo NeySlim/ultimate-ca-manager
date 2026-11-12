@@ -335,7 +335,6 @@ def test_a_key_given_by_the_caller_is_neither_answered_nor_logged(
     assert secret not in r.get_data(as_text=True) and secret not in caplog.text
     with app.app_context():
         assert not AuditLog.query.filter(AuditLog.details.contains(secret)).first()
-    assert auth_client.post(ROTATE, json={'new_secret': 'short'}).status_code in (400, 409)
 
 
 def _signed_by(app, key, user_id=1):
@@ -408,3 +407,10 @@ def test_the_end_of_the_grace_is_given_in_utc(app, auth_client, stored, encrypti
         assert end.endswith('Z'), end
         parsed = datetime.fromisoformat(end.replace('Z', '+00:00'))
         assert parsed.tzinfo == timezone.utc and parsed > datetime.now(timezone.utc)
+
+
+def test_a_short_key_is_refused_before_anything_is_stored(
+        app, auth_client, stored, encryption_enabled):
+    r = auth_client.post(ROTATE, json={'new_secret': 'x' * (stored.MIN_LENGTH - 1)})
+    assert r.status_code == 400, r.data
+    assert _rows(app) == {}
