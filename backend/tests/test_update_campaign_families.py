@@ -190,7 +190,12 @@ def test_a_node_whose_family_has_no_package_refuses_the_start(app, ha, family):
     _rows(app, a='deb', b=family)
     ok, message, _ = _start(app)
     assert not ok
-    assert PREFIX + 'b' in message and 'no package' in message
+    assert PREFIX + 'b' in message
+    # A container node is updated by its orchestrator, not by a missing package
+    if family == 'container':
+        assert updates.CONTAINER_HA_REFUSAL in message and 'no package' not in message
+    else:
+        assert 'no package' in message
     assert _state(app) is None
 
 
@@ -271,15 +276,17 @@ def test_the_download_is_verified_against_the_campaign_digest(app, ha, monkeypat
     assert calls[0][2] == SHAS[DEB]
 
 
-def test_a_node_joining_after_the_start_without_its_package_stops_the_campaign(app, ha, monkeypatch):
+@pytest.mark.parametrize('family', ['rpm-el9', 'container'])
+def test_a_node_joining_after_the_start_without_its_package_stops_the_campaign(app, ha, monkeypatch, family):
     _rows(app, a='deb')
     assert _start(app)[0]
-    _rows(app, z='rpm-el9')
+    _rows(app, z=family)
     with app.app_context():
         event = uc.campaign_tick()
     assert event[0] == 'stopped' and event[1] == PREFIX + 'z'
-    state = _state(app)
-    assert 'rpm-el9' in state['failed']['reason'] and 'after the start' in state['failed']['reason']
+    reason = _state(app)['failed']['reason']
+    assert 'after the start' in reason
+    assert (updates.CONTAINER_HA_REFUSAL if family == 'container' else 'rpm-el9') in reason
     assert _commands(app) == []
 
 

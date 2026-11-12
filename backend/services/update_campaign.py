@@ -94,7 +94,7 @@ def plan_step(campaign, nodes, now, *, stale_seconds, guard):
 
     Pure: ``nodes`` maps node_id to NodeView, ``now`` is on the cluster clock.
     """
-    from services.updates import versions_match
+    from services.updates import CONTAINER_FAMILY, CONTAINER_HA_REFUSAL, versions_match
     if campaign is None or campaign.get('status') != RUNNING:
         return None, None
     c = deepcopy(campaign)
@@ -127,6 +127,8 @@ def plan_step(campaign, nodes, now, *, stale_seconds, guard):
             c['done'].append(n)
             c.setdefault('families', {})[n] = nodes[n].family
             continue
+        if nodes[n].family == CONTAINER_FAMILY:
+            return _stopped(c, n, f"node {n} joined after the start: {CONTAINER_HA_REFUSAL}", now)
         if nodes[n].family not in packages:
             return _stopped(c, n, f"node {n} joined after the start and the campaign has no "
                                   f"package of its family {nodes[n].family or 'unknown'}", now)
@@ -212,6 +214,8 @@ def _catalog(assets, families):
         if family in packages:
             continue
         label = family or updates.UNKNOWN_FAMILY
+        if family == updates.CONTAINER_FAMILY:
+            return None, f"node {node} ({label}): {updates.CONTAINER_HA_REFUSAL}"
         found = updates.family_package(assets, family)
         if found is None:
             return None, (f"node {node} ({label}): no package in this release for its family, "
