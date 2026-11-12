@@ -94,7 +94,9 @@ def test_deb_build_jobs_install_pip_and_setuptools_text_guard(wf):
     assert lines and all('python3-pip' in w and 'python3-setuptools' in w for w in lines)
 
 
-def test_deb_daemon_reload_never_fails_the_install_text_guard():
+@pytest.mark.parametrize('command', ['systemctl daemon-reload', 'systemctl enable'])
+def test_deb_systemctl_never_fails_the_install_text_guard(command):
+    # Under set -e, a host without a running systemd (container, chroot) must still install
     text = (ROOT / 'packaging/debian' / ('post' + 'inst')).read_text(encoding='utf-8')
-    lines = [ln.strip() for ln in text.splitlines() if ln.strip().startswith('systemctl daemon-reload')]
+    lines = [ln.strip() for ln in text.splitlines() if ln.strip().startswith(command)]
     assert lines and all(ln.endswith('|| true') for ln in lines), lines
