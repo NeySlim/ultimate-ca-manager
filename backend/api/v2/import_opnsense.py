@@ -22,6 +22,7 @@ from utils.ssrf_protection import (
     pin_host, validate_url_not_cloud_metadata, validated_addresses)
 from services.audit_service import AuditService
 from services.ca import cross_certs
+from services.cert.issued_lookup import apply_persisted_revocation
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -723,6 +724,7 @@ def import_items():
                     imported_from='opnsense',
                     created_by='import'
                 )
+                apply_persisted_revocation(cert)
                 
                 db.session.add(cert)
                 stats['certs_imported'] += 1

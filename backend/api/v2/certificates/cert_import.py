@@ -22,6 +22,7 @@ from services.import_service import (
     serialize_cert_to_pem, serialize_key_to_pem
 )
 from services.cert_service import CertificateService
+from services.cert.issued_lookup import apply_persisted_revocation
 from services.ca_service import CAService
 from security.encryption import encrypt_private_key
 from . import bp
@@ -335,6 +336,7 @@ def import_certificate():
                 kept = CA.query.filter_by(refid=existing_cert.caref).first()
                 caref = existing_cert.caref if ca_signed(kept, cert) else None
             existing_cert.caref = caref
+            apply_persisted_revocation(existing_cert)
 
             ok, err = safe_commit(logger, "Failed to update certificate")
             if not ok:
@@ -384,6 +386,7 @@ def import_certificate():
             created_by='import'
         )
 
+        apply_persisted_revocation(certificate)
         db.session.add(certificate)
         ok, err = safe_commit(logger, "Failed to import certificate")
         if not ok:
