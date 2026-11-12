@@ -434,3 +434,32 @@ def test_a_short_key_is_refused_before_anything_is_stored(
     r = auth_client.post(ROTATE, json={'new_secret': 'x' * (stored.MIN_LENGTH - 1)})
     assert r.status_code == 400, r.data
     assert _rows(app) == {}
+
+
+def test_a_rotation_whose_reload_fails_says_this_node_catches_up(
+        app, auth_client, stored, encryption_enabled, monkeypatch):
+    from models import AuditLog
+    real_read, calls = stored._read_rows, []
+
+    def second_read_fails():
+        calls.append(1)
+        if len(calls) == 2:  # the load after the commit
+            raise RuntimeError('database unreachable')
+        return real_read()
+    env = app.config['SECRET_KEY']
+    with monkeypatch.context() as m:
+        m.setattr(stored, '_read_rows', second_read_fails)
+        r = auth_client.post(ROTATE, json={})
+    assert r.status_code == 200, r.data
+    assert stored.ACTIVE_KEY in _rows(app) and app.config['SECRET_KEY'] == env
+    data = r.get_json()['data']
+    assert data['reloaded'] is False
+    assert 'Every node signs with the new key' not in data['note']
+    with app.app_context():
+        audit = AuditLog.query.filter_by(action='secrets_rotated').order_by(
+            AuditLog.id.desc()).first()
+        assert 'tries again' in audit.details
+    # The next request catches up
+    app.extensions[stored._STATE]['retry'] = (0, 0)  # its delay over
+    auth_client.get(STATUS)
+    assert app.config['SECRET_KEY'] != env

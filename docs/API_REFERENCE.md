@@ -2462,7 +2462,7 @@ Content-Type: application/json
 }
 ```
 
-With encryption enabled (in HA, the KEK every node holds) the key is stored in the database and every node reloads it without a restart; the previous key stays accepted until `previous_accepted_until`, and a second rotation before then answers 409. Without encryption `SECRET_KEY` is written to `ucm.env` and the service restarts (`auto_apply: false` returns the key with manual steps instead); in HA that mode answers 409 `ha_mode`.
+With encryption enabled (in HA, the KEK every node holds) the key is stored in the database and every node reloads it without a restart; the previous key stays accepted until `previous_accepted_until`, and a second rotation before then answers 409. `reloaded: false` means the answering node did not load the new key yet and retries on its own. Without encryption `SECRET_KEY` is written to `ucm.env` and the service restarts (`auto_apply: false` returns the key with manual steps instead); in HA that mode answers 409 `ha_mode`.
 
 **Response (encryption enabled):**
 ```json
@@ -2470,6 +2470,7 @@ With encryption enabled (in HA, the KEK every node holds) the key is stored in t
   "data": {
     "rotated": true,
     "mode": "database",
+    "reloaded": true,
     "previous_accepted_until": "2026-11-13T10:00:00Z"
   }
 }

@@ -214,7 +214,7 @@ def _emit_reload():
 def rotate(app, new_secret=None):
     """New active key in the database, the current one kept as previous for GRACE_SECONDS;
     every node reloads through the cluster command. Returns (end of the grace, the cluster
-    command emitted). Committed."""
+    command emitted, whether this process loaded the new key: if not it retries). Committed."""
     from datetime import timedelta
     from models import db
     from security import encryption as _encryption
@@ -242,7 +242,7 @@ def rotate(app, new_secret=None):
     command = _emit_reload()
     db.session.commit()
     load(app)
-    return until, command
+    return until, command, not reload_pending(app)
 
 
 def retire_if_due(app=None) -> bool:

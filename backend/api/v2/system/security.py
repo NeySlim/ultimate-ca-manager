@@ -722,7 +722,8 @@ def _rotate_stored_secret(session_key):
         return error_response("With encryption enabled the session key is stored in the "
                               "database; there is nothing to apply by hand", 400)
     try:
-        until, _command = session_key.rotate(current_app._get_current_object(), new_secret)
+        until, _command, reloaded = session_key.rotate(current_app._get_current_object(),
+                                                       new_secret)
     except session_key.SessionKeyError as e:
         return error_response(str(e), e.status)
     except Exception as e:
@@ -730,20 +731,27 @@ def _rotate_stored_secret(session_key):
         current_app.logger.error(f"Failed to rotate the session key: {type(e).__name__}")
         return error_response("Failed to rotate secrets", 500)
     end = session_key.stamp(until)
+    # Stored and committed either way; a node whose reload failed retries before its requests
+    caught_up = '' if reloaded else ('; the node that rotated it did not load it yet and '
+                                     'tries again on its own')
     AuditService.log_action(
         action='secrets_rotated',
         resource_type='security',
         details=f'Session secret key rotated in the database; the previous key is accepted '
-                f'until {end}',
+                f'until {end}{caught_up}',
         success=True
     )
     return success_response(
         data={
             'rotated': True,
             'mode': 'database',
+            'reloaded': reloaded,
             'previous_accepted_until': end,
-            'note': 'Every node signs with the new key; pages opened before the rotation '
-                    'keep working until the previous key is retired. No restart.',
+            'note': ('Every node loads the new key within seconds; pages opened before the '
+                     'rotation keep working until the previous key is retired. No restart.')
+            if reloaded else
+            ('The new key is stored; this node did not load it yet and tries again on its '
+             'own, pages opened before the rotation keep working meanwhile. No restart.'),
         },
         message='Session secret rotated. No restart, nobody is logged out.'
     )
