@@ -16,6 +16,7 @@ from utils.port_zero import strip_port_zero_from_stored
 from utils.signing_hash import SIGNATURE_SCHEMES
 from models.acme_models import AcmeAccount
 from config.settings import Config
+from utils.serial_format import serial_named_by, unambiguous_serial_spellings
 from services.file_regen_service import insert_file_writes_suspended
 
 from . import installation
@@ -39,7 +40,6 @@ logger = logging.getLogger(__name__)
 def _readable_record_serial(archived: Any) -> str:
     """A record's serial in a spelling the revocation readers accept: decimal when the archive's
     reads as hex without doubt (``0x``, colons, a hex letter); a bare digit string is kept."""
-    from utils.serial_format import unambiguous_serial_spellings
     text = str(archived).strip()
     bare = text.replace(':', '')
     hexa = bare[2:] if bare.lower().startswith('0x') else bare
@@ -759,14 +759,17 @@ class RestoreCoreMixin:
                 results['revoked_serials_skipped'] += 1
                 continue
             archived_serial = serial
+            where = f"revoked serial {archived_serial} of CA {caref}"
             serial = _readable_record_serial(serial)
-            where = f"revoked serial {serial} of CA {caref}"
+            # One serial, one identity: every spelling of it here, ranked under its decimal form
+            value = serial_named_by(serial)
+            spellings = {str(archived_serial), serial} | (
+                unambiguous_serial_spellings(value) if value is not None else set())
             here = RevokedSerial.query.filter(
                 RevokedSerial.caref == caref,
-                RevokedSerial.serial_number.in_({serial, str(archived_serial)}),
+                RevokedSerial.serial_number.in_(spellings),
             ).order_by(RevokedSerial.id).all()
-            taken = plan.rank('revoked_serials', (caref, str(archived_serial)), rs_data,
-                              [r.id for r in here])
+            taken = plan.rank('revoked_serials', (caref, serial), rs_data, [r.id for r in here])
             existing = next((r for r in here if r.id == taken), None)
             valid_to = _archived_datetime(
                 where, 'valid_to', rs_data.get('valid_to')) or utc_now()

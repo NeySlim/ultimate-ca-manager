@@ -135,6 +135,59 @@ class TestRevokedSerialSpellingOnRestore:
             assert [r.serial_number for r in RevokedSerial.query.filter_by(caref=refid)] == [str(0xcd02)]
 
 
+class TestTwoSpellingsOfOneSerialOnRestore:
+    """'171' and '0xAB' are one serial: the gravest of their reasons wins, whatever the order."""
+
+    @pytest.mark.parametrize('order', ['final_first', 'hold_first'])
+    @pytest.mark.parametrize('here', [None, ('171', 'keyCompromise'), ('ab', 'certificateHold')])
+    def test_the_final_reason_is_kept(self, app, create_ca, order, here):
+        from models.revoked_serial import RevokedSerial
+        from services.cert.issued_lookup import persisted_revocation
+        ca = create_ca(cn=f'Two Spellings CA {order} {here and here[0]}')
+        with app.app_context():
+            row = db.session.get(CA, ca['id'])
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            if here:
+                db.session.add(RevokedSerial(caref=row.refid, serial_number=here[0], revoke_reason=here[1],
+                                             revoked_at=now, valid_to=now))
+                db.session.commit()
+            archived = [{'caref': row.refid, 'serial_number': serial, 'revoke_reason': reason,
+                         'revoked_at': now.isoformat(), 'valid_to': now.isoformat()}
+                        for serial, reason in (('171', 'keyCompromise'), ('0xAB', 'certificateHold'))]
+            if order == 'hold_first':
+                archived.reverse()
+            _service()._restore_revoked_serials({'revoked_serials': archived}, {})
+            db.session.commit()
+            db.session.expire_all()
+            assert persisted_revocation(db.session.get(CA, ca['id']), 171).revoke_reason == 'keyCompromise'
+
+    def test_a_record_here_in_another_unambiguous_spelling_is_not_doubled(self, app, create_ca):
+        from models.revoked_serial import RevokedSerial
+        ca = create_ca(cn='Two Spellings Lowercase CA')
+        with app.app_context():
+            refid = db.session.get(CA, ca['id']).refid
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            db.session.add(RevokedSerial(caref=refid, serial_number='ab', revoked_at=now, valid_to=now))
+            db.session.commit()
+            _service()._restore_revoked_serials({'revoked_serials': [
+                {'caref': refid, 'serial_number': '0xAB', 'revoked_at': now.isoformat(),
+                 'valid_to': now.isoformat()}]}, {})
+            db.session.commit()
+            assert [r.serial_number for r in RevokedSerial.query.filter_by(caref=refid)] == ['171']
+
+    def test_a_refusal_names_the_spelling_of_the_archive(self, app, create_ca):
+        from services.backup.errors import BackupSchemaError
+        ca = create_ca(cn='Two Spellings Refusal CA')
+        with app.app_context():
+            refid = db.session.get(CA, ca['id']).refid
+            with pytest.raises(BackupSchemaError) as refused:
+                _service()._restore_revoked_serials({'revoked_serials': [
+                    {'caref': refid, 'serial_number': '0xAB', 'revoked_at': 'not a date',
+                     'valid_to': datetime.now(timezone.utc).isoformat()}]}, {})
+            db.session.rollback()
+        assert '0xAB' in str(refused.value)
+
+
 class TestCertificateInvalidityDateRoundTrip:
     def test_invalidity_at_is_exported_and_restored(self, app, create_ca, create_cert):
         ca = create_ca(cn='Invalidity CA')
