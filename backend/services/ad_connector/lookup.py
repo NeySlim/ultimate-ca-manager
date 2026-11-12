@@ -578,7 +578,7 @@ def lookup_account_by_sid(sid):
     """The ``sAMAccountName`` of the one directory object whose ``objectSid`` is ``sid``.
 
     None when the connector is off; the falsy ``NO_ACCOUNT`` when ``sid`` is malformed or
-    names no object under the base DN; the falsy ``UNREACHABLE`` when the directory cannot
+    names no account (no object, or one without ``sAMAccountName``) under the base DN; the falsy ``UNREACHABLE`` when the directory cannot
     answer or several objects match. Never raises.
     """
     from ldap3.utils.conv import escape_bytes
@@ -608,8 +608,9 @@ def lookup_account_by_sid(sid):
         if 'objectSid' not in entry or not entry.objectSid.raw_values \
                 or _sid_bytes_to_string(entry.objectSid.raw_values[0]) != sid:
             return NO_ACCOUNT
+        # objectSid alone matches non-accounts too (a foreignSecurityPrincipal): an account has a name
         name = entry.sAMAccountName.value if 'sAMAccountName' in entry else None
-        return str(name) if name else entry.entry_dn
+        return str(name) if name else NO_ACCOUNT
     except Exception as e:
         logger.warning("AD Connector: account lookup by SID failed: %s", e)
         return UNREACHABLE

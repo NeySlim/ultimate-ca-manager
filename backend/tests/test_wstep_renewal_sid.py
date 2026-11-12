@@ -145,3 +145,19 @@ def test_unreachable_directory_is_a_server_fault(client, app, wstep_renew_config
     assert b'Could not resolve requester identity for strong certificate mapping' in r.data
     assert _count(app) == before
 
+
+def test_a_directory_object_without_an_account_name_refuses(client, app, wstep_renew_config, monkeypatch):
+    """A foreignSecurityPrincipal carries the SID but is no account of this directory."""
+    from tests.test_ad_connector_lookup import _FakeConnection, _FakeEntry
+
+    old_cert, old_key = _issue(app, wstep_renew_config['id'], 'sid-fsp.example.test')
+    _configure_ad_connector(app)
+    fsp = _FakeEntry({'objectSid': ad_lookup._sid_string_to_bytes(SID)})
+    fsp.entry_dn = f'CN={SID},CN=ForeignSecurityPrincipals,DC=lab'
+    monkeypatch.setattr(ad_lookup, '_connect', lambda config: _FakeConnection(entries=[fsp]))
+    before = _count(app)
+    r = _renew_tls(client, old_cert, old_key)
+    assert r.status_code == 400
+    assert b'The requester was not found in the directory' in r.data
+    assert _count(app) == before
+

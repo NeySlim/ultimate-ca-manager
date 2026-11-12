@@ -1368,6 +1368,19 @@ class TestLookupAccountBySid:
         with app.app_context():
             assert lookup.lookup_account_by_sid(self._SID) is lookup.NO_ACCOUNT
 
+    @pytest.mark.parametrize('sam', [None, ''])
+    def test_an_object_without_an_account_name_is_no_account(self, app, monkeypatch, sam):
+        # e.g. a foreignSecurityPrincipal carrying the SID of another domain's account
+        attrs = {'objectSid': TestSidBytesToString._WIN11_RAW_SID}
+        if sam is not None:
+            attrs['sAMAccountName'] = sam
+        fsp = _FakeEntry(attrs)
+        fsp.entry_dn = 'CN=S-1-5-21-1608104657-630783805-1473387121-1105,CN=ForeignSecurityPrincipals,DC=lab'
+        _configure(None, app, enabled=True)
+        monkeypatch.setattr(lookup, '_connect', lambda config: _FakeConnection(entries=[fsp]))
+        with app.app_context():
+            assert lookup.lookup_account_by_sid(self._SID) is lookup.NO_ACCOUNT
+
     def test_found_searches_the_binary_sid_and_names_the_account(self, app, monkeypatch):
         _configure(None, app, enabled=True)
         conn = _RecordingConnection(entries=[self._entry()])
