@@ -77,6 +77,36 @@ def test_the_next_slot_is_sent_again(app, monkeypatch):
         _drop_report(app, key)
 
 
+def test_a_reservation_error_skips_only_its_own_report(app, monkeypatch):
+    keys = report_service.schedulable_reports()[:2]
+    sent = []
+    monkeypatch.setattr(report_service, 'utc_now', lambda: _NOW)
+    monkeypatch.setattr(report_service, 'send_report', lambda k, r, f='csv': sent.append(k) or True)
+    real_cas = report_service.config_compare_and_set
+
+    def cas(key, expected, new):
+        if key == f'report_last_sent_{keys[0]}':
+            raise RuntimeError('database unavailable')
+        return real_cas(key, expected, new)
+
+    monkeypatch.setattr(report_service, 'config_compare_and_set', cas)
+    with app.app_context():
+        saved = {k: SystemConfig.query.filter_by(key=k).with_entities(SystemConfig.value).scalar()
+                 for key in keys for k in (f'report_schedule_{key}', f'report_last_sent_{key}')}
+        try:
+            for key in keys:
+                _set(f'report_schedule_{key}', json.dumps({
+                    'enabled': True, 'frequency': 'daily', 'time': '08:00',
+                    'recipients': ['ops@example.test'], 'format': 'csv'}))
+                _set(f'report_last_sent_{key}', None)
+            report_service.run_scheduled_reports()
+            assert sent == [keys[1]]
+        finally:
+            for k, value in saved.items():
+                _set(k, value)
+            db.session.remove()
+
+
 @pytest.mark.postgres
 @pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
 def test_two_report_runners_send_once_on_postgresql(app, monkeypatch):

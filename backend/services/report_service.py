@@ -564,8 +564,15 @@ def run_scheduled_reports():
         # moves from its previous value to this slot by compare-and-set
         marker = f'report_last_sent_{report_key}'
         slot = f"{now.strftime('%Y-%m-%d')}T{sched_time}"
-        previous = SystemConfig.query.filter_by(key=marker).with_entities(SystemConfig.value).scalar()
-        if previous == slot or not config_compare_and_set(marker, previous, slot):
+        try:
+            previous = SystemConfig.query.filter_by(key=marker).with_entities(SystemConfig.value).scalar()
+            reserved = previous != slot and config_compare_and_set(marker, previous, slot)
+        except Exception as e:
+            # Not reserved, not sent: the other reports of this tick still run
+            db.session.rollback()
+            logger.error(f"Scheduled report {report_key} could not be reserved: {e}")
+            continue
+        if not reserved:
             logger.info(f"Scheduled report {report_key} for {slot} already sent")
             continue
 
