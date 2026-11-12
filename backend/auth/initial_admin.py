@@ -210,17 +210,14 @@ def forget_generated(user):
 
 @event.listens_for(Session, 'after_commit')
 def _remove_after_commit(session):
+    # A rollback reverts the marker's deletion: an entry left by it removes nothing,
+    # and one whose marker a later commit deletes names a file no account holds
     pending = session.info.pop(_SWEEP_KEY, None)
     if pending is None:
         return
     row, path = pending
     if sa_inspect(row).was_deleted:
         _remove(path)
-
-
-@event.listens_for(Session, 'after_rollback')
-def _keep_after_rollback(session):
-    session.info.pop(_SWEEP_KEY, None)
 
 
 def _remove(path):
