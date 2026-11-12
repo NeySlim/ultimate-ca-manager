@@ -836,7 +836,8 @@ class RestoreCoreMixin:
                 logger.warning(f"Revoked serial {serial} skipped: CA {caref} is unknown")
                 results['revoked_serials_skipped'] += 1
                 continue
-            where = f"revoked serial {serial} of CA {caref}"
+            # A refusal names the serial as the archive spells it
+            where = f"revoked serial {rs_data.get('serial_number')} of CA {caref}"
             here = RevokedSerial.query.filter_by(
                 caref=caref, serial_number=serial
             ).order_by(RevokedSerial.id).all()

@@ -117,6 +117,20 @@ class TestAMergeNeverLowersAFinalRevocation:
             assert (row.revoked, row.revoke_reason, reasons) == (True, 'certificateHold', ['certificateHold'])
 
 
+class TestARestoreRefusalNamesTheArchivedSpelling:
+    def test_a_refusal_names_the_spelling_of_the_archive(self, app, create_ca):
+        from services.backup.errors import BackupSchemaError
+        ca = create_ca(cn='Two Spellings Refusal CA')
+        with app.app_context():
+            refid = db.session.get(CA, ca['id']).refid
+            with pytest.raises(BackupSchemaError) as refused:
+                _service()._restore_revoked_serials({'revoked_serials': [
+                    {'caref': refid, 'serial_number': '0xAB', 'revoked_at': 'not a date',
+                     'valid_to': datetime.now(timezone.utc).isoformat()}]}, {})
+            db.session.rollback()
+        assert '0xAB' in str(refused.value)
+
+
 class TestCertificateInvalidityDateRoundTrip:
     def test_invalidity_at_is_exported_and_restored(self, app, create_ca, create_cert):
         ca = create_ca(cn='Invalidity CA')
