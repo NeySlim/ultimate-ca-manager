@@ -34,10 +34,10 @@ def no_key(monkeypatch, tmp_path, app):
             patch.delenv(var, raising=False)
         patch.setattr(boot, 'in_container', lambda: False)
         patch.setitem(app.config, 'AUTO_MASTER_KEY', True)
-        enc.key_encryption.reload()
+        enc.key_encryption.start_over()
         assert not enc.key_encryption.is_enabled
         yield enc
-    enc.key_encryption.reload()
+    enc.key_encryption.start_over()
     _drop_unreadable_key_material(app)
 
 

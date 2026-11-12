@@ -246,7 +246,7 @@ def write_heartbeat(node_id, leader, started_at) -> None:
     node.heartbeat_at, node.is_leader = now, bool(leader)
     node.version, node.pid = Config.APP_VERSION, os.getpid()
     from security.encryption import key_encryption
-    node.kek_fingerprint = key_encryption.kek_fingerprint()
+    node.kek_fingerprint = key_encryption.configured_kek_fingerprint()
     if leader:
         ClusterNode.query.filter(ClusterNode.node_id != node_id, ClusterNode.is_leader.is_(True)) \
             .update({'is_leader': False}, synchronize_session=False)

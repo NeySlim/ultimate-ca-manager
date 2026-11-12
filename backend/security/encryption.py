@@ -99,6 +99,10 @@ class KeyEncryption:
     _enabled = False
     _key_source = None  # 'file', 'env', or None
     dek_error = None  # why stored DEKs were not loaded ('kek_mismatch'), or None
+    # Why this process runs without its KEK until it restarts (refuse_kek), or None; the
+    # refused KEK's fingerprint is still published to the peers
+    kek_refused = None
+    _refused_kek_id = None
     
     def __new__(cls):
         if cls._instance is None:
@@ -272,6 +276,8 @@ class KeyEncryption:
 
     def load_rows(self, rows) -> None:
         """Without an application context (the gunicorn master): the DEK rows the caller read."""
+        if self.kek_refused:
+            return
         kek, source = self._key_bytes, self._key_source
 
         def build(fresh):
@@ -280,8 +286,26 @@ class KeyEncryption:
         self._swap_in(build)
 
     def reload(self):
-        """Reload the KEK and the DEKs (after enable, disable, rotation or a cluster command)"""
+        """Reload the KEK and the DEKs (after enable, disable, rotation or a cluster command);
+        a KEK refused by this process stays unloaded until it restarts."""
+        if self.kek_refused:
+            return
         self._swap_in(lambda fresh: fresh._initialize())
+
+    def refuse_kek(self, reason: str) -> None:
+        """The KEK is not the database's: run without it until the process restarts."""
+        kept = self.kek_fingerprint() or self._refused_kek_id
+        self.unload()
+        self.kek_refused, self._refused_kek_id = reason, kept
+
+    def start_over(self) -> None:
+        """A start evaluates the configured KEK again (check_master_key_at_start)."""
+        self.kek_refused = self._refused_kek_id = None
+        self.reload()
+
+    def configured_kek_fingerprint(self) -> Optional[str]:
+        """The fingerprint the peers compare: the configured KEK's, refused or not."""
+        return self.kek_fingerprint() or self._refused_kek_id
     
     def unload(self):
         """Run as without a key, e.g. when the configured one is not the database's."""

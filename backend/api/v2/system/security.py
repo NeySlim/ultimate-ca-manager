@@ -98,6 +98,16 @@ def _enable_with_configured_kek():
     from security import envelope
     from services.cluster_commands import RELOAD_ENCRYPTION, emit
     lock_key_state()
+    # A live node under another KEK would read this one as DEK version 1 once the markers go
+    from security.master_key_bootstrap import live_peers_with_another_kek
+    strangers = live_peers_with_another_kek()
+    if strangers:
+        db.session.rollback()
+        names = ', '.join(f"{node} (fingerprint {fp})" for node, fp in strangers)
+        return error_response(
+            f"Encryption not enabled: live node(s) {names} hold another key-encryption key than "
+            f"this node's ({key_encryption.kek_fingerprint()}). Configure the same "
+            "KEY_ENCRYPTION_KEY on every node, or stop those nodes, then enable again.", 409)
     # Only the disabled marker goes: a stored DEK here means this KEK cannot open it
     if key_encryption.dek_error or EncryptionKey.query.filter(
             EncryptionKey.state.in_((envelope.ACTIVE, envelope.PREVIOUS))).first():

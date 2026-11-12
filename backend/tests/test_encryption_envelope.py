@@ -1445,3 +1445,98 @@ def test_in_ha_a_node_without_the_previous_kek_names_the_foreign_disable(
         assert app.config['SAFE_MODE_REASON'] == 'encryption_kek_not_the_clusters'
     finally:
         app.config['SAFE_MODE'] = False
+
+
+def _foreign_start(app, auth_client, monkeypatch, set_env):
+    """HA, the cluster disabled under the fixture's KEK, this node started with another one."""
+    _ha(monkeypatch)
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    foreign = Fernet.generate_key()
+    set_env('KEY_ENCRYPTION_KEY', foreign.decode())
+    _start(app)
+    assert app.config['SAFE_MODE_REASON'] == 'encryption_kek_not_the_clusters'
+    from security import envelope
+    return envelope.kek_id(base64.urlsafe_b64decode(foreign))
+
+
+def test_in_ha_a_node_started_under_a_foreign_kek_stays_off_when_a_peer_enables(
+        app, auth_client, values, monkeypatch, set_env, encryption_enabled):
+    """A peer's enable drops the markers: the reload must not take this KEK for DEK version 1."""
+    from models import ClusterNode, EncryptionKey
+    from security.master_key_bootstrap import reload_encryption_state
+    from services.scheduler_leader import cluster_utc_now, write_heartbeat
+    key_encryption = encryption_enabled.key_encryption
+    try:
+        foreign_id = _foreign_start(app, auth_client, monkeypatch, set_env)
+        with app.app_context():
+            EncryptionKey.query.delete()
+            db.session.commit()
+            reload_encryption_state(app)
+            assert app.config['SAFE_MODE'] is True
+            assert not key_encryption.is_encrypting
+            assert key_encryption.encrypt_string('x') == 'x'
+            key_encryption.reload()  # any later reload of this process (a retire, a rotation)
+            assert not key_encryption.is_encrypting and not key_encryption.kek_loaded
+            # Unloaded, the node still tells its peers which KEK it holds
+            write_heartbeat('envtest-b', False, cluster_utc_now())
+            assert db.session.get(ClusterNode, 'envtest-b').kek_fingerprint == foreign_id
+        # A new start (the process restarted) evaluates the KEK again
+        _start(app)
+        assert key_encryption.kek_loaded
+    finally:
+        app.config['SAFE_MODE'] = False
+
+
+def test_in_ha_enable_is_refused_while_a_live_node_holds_another_kek(
+        app, auth_client, values, monkeypatch, encryption_enabled):
+    from models import ClusterNode
+    from services.scheduler_leader import cluster_utc_now
+    _ha(monkeypatch)
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    with app.app_context():
+        now = cluster_utc_now()
+        db.session.add(ClusterNode(node_id='envtest-b', started_at=now, heartbeat_at=now,
+                                   is_leader=False, kek_fingerprint='f' * 16))
+        db.session.commit()
+    r = auth_client.post('/api/v2/system/security/enable-encryption')
+    assert r.status_code == 409 and 'envtest-b' in r.get_json()['message']
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(0, 'disabled')]
+    assert _stored(app, values)['target'] == PEM
+
+
+def test_in_ha_a_reload_never_encrypts_under_a_kek_no_live_peer_shares(
+        app, values, monkeypatch, encryption_enabled):
+    """No DEK row names this KEK, and the live peers publish another: it is not the cluster's."""
+    from models import ClusterNode
+    from security.master_key_bootstrap import reload_encryption_state
+    from services.scheduler_leader import cluster_utc_now
+    key_encryption = encryption_enabled.key_encryption
+    _ha(monkeypatch)
+    with app.app_context():
+        now = cluster_utc_now()
+        db.session.add(ClusterNode(node_id='envtest-a', started_at=now, heartbeat_at=now,
+                                   is_leader=True, kek_fingerprint='f' * 16))
+        db.session.commit()
+        try:
+            reload_encryption_state(app)
+            assert app.config['SAFE_MODE'] is True
+            assert key_encryption.encrypt_string('x') == 'x'
+        finally:
+            app.config['SAFE_MODE'] = False
+
+
+def test_in_ha_a_start_is_not_refused_by_a_peer_whose_kek_the_database_does_not_name(
+        app, auth_client, values, monkeypatch, encryption_enabled):
+    """The markers name this node's KEK: the live peer that differs is the stranger."""
+    from models import ClusterNode
+    from security.master_key_bootstrap import refuse_kek_mismatch_with_peers
+    from services.scheduler_leader import cluster_utc_now
+    _ha(monkeypatch)
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    with app.app_context():
+        now = cluster_utc_now()
+        db.session.add(ClusterNode(node_id='envtest-b', started_at=now, heartbeat_at=now,
+                                   is_leader=False, kek_fingerprint='f' * 16))
+        db.session.commit()
+        encryption_enabled.key_encryption.reload()
+        refuse_kek_mismatch_with_peers()
