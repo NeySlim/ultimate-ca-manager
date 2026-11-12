@@ -161,7 +161,7 @@ def test_an_unreadable_row_starts_on_the_environment_key_with_a_warning(
         db.session.add(SystemConfig(key=stored.ACTIVE_KEY, value=foreign))
         db.session.commit()
         with caplog.at_level(logging.WARNING, logger='security.session_key'):
-            stored.load(app)
+            stored.load(app, at_start=True)
     assert app.config['SECRET_KEY'] == env
     assert 'does not decrypt' in caplog.text
 
@@ -172,9 +172,61 @@ def test_a_row_in_the_clear_is_never_used(app, stored, encryption_enabled, caplo
         db.session.add(SystemConfig(key=stored.ACTIVE_KEY, value='p' * 43))
         db.session.commit()
         with caplog.at_level(logging.WARNING, logger='security.session_key'):
-            stored.load(app)
+            stored.load(app, at_start=True)
     assert app.config['SECRET_KEY'] == env
     assert 'not encrypted' in caplog.text
+
+
+def _reload(app):
+    from services import cluster_commands as cc
+    with app.app_context():
+        cc._reload_secret_key(None)
+
+
+def test_a_reload_that_cannot_read_the_rows_keeps_the_current_keys(
+        app, auth_client, stored, encryption_enabled, monkeypatch, caplog):
+    assert auth_client.post(ROTATE, json={}).status_code == 200
+    key, fallbacks = app.config['SECRET_KEY'], list(app.config['SECRET_KEY_FALLBACKS'])
+    assert key != stored.environment_key(app) and fallbacks
+
+    def down():
+        raise RuntimeError('database unreachable')
+    # Scoped: the fixture's teardown reads the rows after the test
+    with monkeypatch.context() as m, caplog.at_level(logging.WARNING,
+                                                     logger='security.session_key'):
+        m.setattr(stored, '_read_rows', down)
+        _reload(app)
+    assert app.config['SECRET_KEY'] == key
+    assert app.config['SECRET_KEY_FALLBACKS'] == fallbacks
+    assert 'not read' in caplog.text
+
+
+@pytest.mark.parametrize('failing', ['active', 'previous'])
+def test_a_reload_whose_key_does_not_open_keeps_the_current_keys(
+        app, auth_client, stored, encryption_enabled, monkeypatch, failing):
+    assert auth_client.post(ROTATE, json={}).status_code == 200
+    key, fallbacks = app.config['SECRET_KEY'], list(app.config['SECRET_KEY_FALLBACKS'])
+    real_open = stored._open
+    target = 'session key' if failing == 'active' else 'previous session key'
+    with monkeypatch.context() as m:
+        m.setattr(stored, '_open',
+                  lambda value, what: None if what == target else real_open(value, what))
+        _reload(app)
+    assert app.config['SECRET_KEY'] == key
+    assert app.config['SECRET_KEY_FALLBACKS'] == fallbacks
+
+
+def test_a_start_that_cannot_read_the_rows_signs_with_the_environment_key(
+        app, auth_client, stored, encryption_enabled, monkeypatch):
+    assert auth_client.post(ROTATE, json={}).status_code == 200
+
+    def down():
+        raise RuntimeError('database unreachable')
+    with monkeypatch.context() as m, app.app_context():
+        m.setattr(stored, '_read_rows', down)
+        stored.load(app, at_start=True)
+    assert app.config['SECRET_KEY'] == stored.environment_key(app)
+    assert app.config['SECRET_KEY_FALLBACKS'] == []
 
 
 def test_a_dek_rotation_rewrites_the_session_key_and_it_stays_readable(

@@ -2,7 +2,7 @@
 
 Three system_config rows: the active key and the previous one, each encrypted as a whole
 like the other master-key values (a DEK rotation rewrites them), and the instant until
-which the previous one is still accepted. No row, or one that does not open: the
+which the previous one is still accepted. No row, or at start one that does not open: the
 environment's SECRET_KEY signs, as before. A key is never stored in the clear.
 """
 import logging
@@ -95,24 +95,25 @@ def _until(rows):
         return None
 
 
-def load(app) -> str:
+def load(app, at_start=False) -> str:
     """Sets this process's signing key and the previous key it still accepts, from the
-    database; the environment's key when nothing readable is stored. Returns the source."""
+    database; the environment's key when nothing is stored. A row that cannot be read or
+    opened falls back to the environment at start only: a reload keeps the keys in memory,
+    so one node never signs with a key the others refuse. Returns the source."""
     from models import db
     state = _state(app)
     active, previous, until, source = state['env'], None, None, 'environment'
+    failed = None
     try:
         rows = _read_rows()
     except Exception as e:
         db.session.rollback()
-        logger.warning("Session key not read from the database (%s): the environment's "
-                       "SECRET_KEY signs", type(e).__name__)
-        rows = {}
+        logger.warning("Session key not read from the database (%s)", type(e).__name__)
+        rows, failed = {}, 'read'
     if rows.get(ACTIVE_KEY):
         stored = _open(rows[ACTIVE_KEY], 'session key')
         if stored is None:
-            logger.warning("The environment's SECRET_KEY signs on this node; rotate the session "
-                           "key to store a new one")
+            failed = 'open'
         else:
             active, source = stored, 'database'
             until = _until(rows)
@@ -120,11 +121,19 @@ def load(app) -> str:
                 in_grace = until is not None and _now() < until
             except Exception as e:
                 db.session.rollback()
-                logger.warning("Previous session key not accepted, the clock was not read (%s)",
+                logger.warning("Session key grace not checked, the clock was not read (%s)",
                                type(e).__name__)
-                in_grace = False
+                in_grace, failed = False, 'clock'
             if rows.get(PREVIOUS_KEY) and in_grace:
                 previous = _open(rows[PREVIOUS_KEY], 'previous session key')
+                if previous is None:
+                    failed = 'open'
+    if failed and not at_start:
+        logger.warning("Session key reload incomplete: this node keeps the keys it had")
+        return state.get('source', 'environment')
+    if failed and source == 'environment':
+        logger.warning("The environment's SECRET_KEY signs on this node; rotate the session "
+                       "key to store a new one")
     app.config['SECRET_KEY'] = active
     app.config['SECRET_KEY_FALLBACKS'] = [previous] if previous else []
     state.update(source=source, previous_until=until if previous else None)

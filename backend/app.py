@@ -1017,7 +1017,7 @@ def create_app(config_name=None):
     # environment's when it opens (security.session_key); load() never raises
     from security.session_key import load as load_session_key
     with app.app_context():
-        load_session_key(app)
+        load_session_key(app, at_start=True)
     
     # HSM availability check at startup
     try:
