@@ -33,6 +33,15 @@ def _certificate_fingerprint(crt):
         return f'raw:{crt}'
 
 
+def _marked_entry(row, record):
+    """The audit entry of a row the repair marked revoked from its CA's record."""
+    name = row.descr or row.subject or f'Cert #{row.id}'
+    return dict(action='cert_revoked', resource_type='certificate', resource_id=str(row.id),
+                resource_name=name,
+                details=(f'Revoked certificate: {name} - serial {row.serial_number}, CA {row.caref} - '
+                         f'Reason: {record.revoke_reason or "unspecified"} (origin: recorded revocation)'))
+
+
 def _merge_ca_group(db, cas_with_ski, stats):
     """Merge records of one CA into the best of them (parent link, then key)."""
     keeper = None
@@ -284,9 +293,18 @@ def backfill_ski_aki():
             pass
 
     # Suspension records an earlier release left behind its lifts, then the rows it left
-    # unrevoked beside their CA's record of the serial
-    stats['lifted_holds_deleted'] = delete_lifted_hold_leftovers()
-    stats['revoked_from_records'] = apply_persisted_revocations()
+    # unrevoked beside their CA's record of the serial; a failure stops neither phase 4 nor 5
+    marked = []
+    stats['revoked_from_records'] = stats['lifted_holds_deleted'] = 0
+    try:
+        with db.session.begin_nested():
+            stats['lifted_holds_deleted'] = delete_lifted_hold_leftovers()
+            marked = [_marked_entry(row, record) for row, record in apply_persisted_revocations()]
+            stats['revoked_from_records'] = len(marked)
+    except Exception as e:
+        marked = []
+        stats['revoked_from_records'] = stats['lifted_holds_deleted'] = 0
+        logger.error(f"SKI/AKI chain repair: recorded revocations not applied: {e}", exc_info=True)
 
     # --- Phase 4: Deduplicate CAs with same SKI ---
     # Only records holding the same certificate are one CA: a cross-certificate
@@ -317,7 +335,13 @@ def backfill_ski_aki():
             db.session.rollback()
             logger.error(f"Commit failed in services/ski_aki_backfill.py:212: {_commit_err}", exc_info=True)
             raise
-        logger.info(f"SKI/AKI chain repair: re-chained {stats['rechained_cas']} CAs, {stats['rechained_certs']} certs, deduplicated {stats['deduplicated']} CAs")
+        logger.info(f"SKI/AKI chain repair: re-chained {stats['rechained_cas']} CAs, {stats['rechained_certs']} certs, "
+                    f"deduplicated {stats['deduplicated']} CAs, marked {stats['revoked_from_records']} certs "
+                    f"revoked from their records, deleted {stats['lifted_holds_deleted']} lifted hold records")
+        # Recorded once the marks are durable (log_action commits)
+        from services.audit_service import AuditService
+        for entry in marked:
+            AuditService.log_action(username='system', **entry)
 
     # Phase 5: Populate subject_cn for certificates missing it
     certs_missing_cn = Certificate.query.filter(

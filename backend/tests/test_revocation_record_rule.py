@@ -654,3 +654,42 @@ class TestRelatedAndMtlsReadTheRecord:
         r = auth_client.post('/api/v2/mtls/assign', json={'cert_id': row_id})
         assert r.status_code == 400, r.data
         assert b'revoked' in r.data
+
+
+class TestTheHourlyTaskRecordsWhatItMarks:
+
+    def test_one_audit_per_marked_row(self, app, issuer):
+        from models import AuditLog
+        from services.ski_aki_backfill import backfill_ski_aki
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('hourly-audit.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _record(app, refid, real)
+        with app.app_context():
+            floor = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+            stats = backfill_ski_aki()
+            assert stats['revoked_from_records'] >= 1
+            entries = AuditLog.query.filter(AuditLog.id > floor, AuditLog.resource_type == 'certificate',
+                                            AuditLog.resource_id == str(row_id)).all()
+            assert len(entries) == 1
+            entry = entries[0]
+            assert entry.username == 'system' and entry.action == 'cert_revoked'
+            for part in (str(real.serial_number), refid, 'keyCompromise', 'recorded revocation'):
+                assert part in entry.details
+
+    def test_a_failure_leaves_the_later_phases_running(self, app, issuer, monkeypatch):
+        from services import ski_aki_backfill
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('hourly-failure.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        with app.app_context():
+            db.session.get(Certificate, row_id).subject_cn = None
+            db.session.commit()
+
+        def boom():
+            raise RuntimeError('records unreadable')
+        monkeypatch.setattr(ski_aki_backfill, 'apply_persisted_revocations', boom)
+        with app.app_context():
+            ski_aki_backfill.backfill_ski_aki()
+            db.session.expire_all()
+            assert db.session.get(Certificate, row_id).subject_cn == 'hourly-failure.example.test'
