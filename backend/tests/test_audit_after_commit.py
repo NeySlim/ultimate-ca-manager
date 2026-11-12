@@ -106,6 +106,11 @@ DELIBERATE = set()
 # audit reported the first for something it had just made safe.
 AUDIT_WRAPPERS = {}
 
+# Stage an entry into the caller's transaction and never commit: the entry rides the
+# caller's commit, which is the order this rule asks for. Followed by name, a homonym
+# deep inside one (a cipher's `.decrypt`) would otherwise make it read as a committing audit.
+STAGES = {'stage_audit_entry'}
+
 
 def _kind(call):
     """Classify a call as staging a change, committing, or auditing."""
@@ -494,7 +499,7 @@ def _find_audit_wrappers(trees):
     while changed:
         changed = False
         for name in bodies:
-            if name in wrappers:
+            if name in wrappers or name in STAGES:
                 continue
             attrs = attribute_calls[name]
             if (attrs & AUDIT_CALLS or attrs & wrappers
@@ -613,6 +618,32 @@ class TestTheScanStillFinds:
     def test_the_same_function_written_in_order_is_not(self):
         assert _audit_out_of_order(self._function(
             'revoke_thing_in_order')) is None
+
+
+STAGING = """
+def stage_audit_entry(**fields):
+    return _staged_copy(fields)
+
+
+def _staged_copy(entry):
+    return cipher.decrypt(entry)
+
+
+def decrypt(data):
+    return AuditService.log_action('decrypted')
+
+
+def _audit_decrypted(data):
+    return cipher.decrypt(data)
+"""
+
+
+class TestStagingIsNotAnAudit:
+    def test_a_staging_helper_never_becomes_a_wrapper(self):
+        wrappers = _find_audit_wrappers([ast.parse(STAGING)])
+        assert 'stage_audit_entry' not in wrappers
+        # Any other name is still followed through the same homonym
+        assert '_audit_decrypted' in wrappers
 
 
 class TestAuditLast:
