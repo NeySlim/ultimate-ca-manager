@@ -191,7 +191,6 @@ def test_proxy_revoke_relays_upstream_status_and_revokes_local(
 @pytest.mark.parametrize('held_as, code, local', [
     ('certificateHold', 1, 'keyCompromise'),
     ('certificateHold', 6, None),
-    ('certificateHold', 8, None),
     ('superseded', 1, None),
 ])
 def test_proxy_revoke_makes_a_local_hold_final_only(
@@ -228,12 +227,13 @@ def test_proxy_revoke_makes_a_local_hold_final_only(
         local_revoke.assert_not_called()
 
 
-def test_proxy_revoke_rejects_invalid_reason(app, client, proxy_revocation_rows, monkeypatch):
+@pytest.mark.parametrize('reason', [7, 8, 11, '1'])
+def test_proxy_revoke_rejects_invalid_reason(app, client, proxy_revocation_rows, monkeypatch, reason):
     from api.acme import acme_proxy_api
 
     payload = {
         'certificate': _b64url(proxy_revocation_rows['certificate_der']),
-        'reason': 7,
+        'reason': reason,
     }
     monkeypatch.setattr(
         acme_proxy_api,
@@ -247,8 +247,15 @@ def test_proxy_revoke_rejects_invalid_reason(app, client, proxy_revocation_rows,
         content_type='application/jose+json',
     )
 
+    # RFC 8555 §7.6: an unsupported reason is badRevocationReason, not malformed
     assert response.status_code == 400
-    assert response.get_json()['type'].endswith(':malformed')
+    assert response.get_json()['type'].endswith(':badRevocationReason')
+
+
+def test_the_client_never_sends_remove_from_crl():
+    from services.acme.acme_client_service import AcmeClientService
+    with pytest.raises(ValueError):
+        AcmeClientService.validate_revocation_reason(8)
 
 
 def test_proxy_revoke_relays_upstream_failure_status(

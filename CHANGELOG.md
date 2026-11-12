@@ -11,16 +11,19 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- ACME: `revoke-cert` with reason 8 (removeFromCRL, a delta CRL entry only) is refused with `badRevocationReason`, on the server and the proxy, which also answered `malformed` for any invalid reason.
+- Backup: a revocation record archived under a hexadecimal spelling of its serial (`0x`, colons) is restored in a spelling the CRL reads, and two spellings of one serial in an archive both stay, the gravest reason answering.
 - WSTEP, EST and SCEP: a renewed certificate keeps the SID security extension (KB5014754 strong mapping) of the certificate it renews when the CA signed that certificate, never one from the CSR, so it still maps to its account on a domain controller enforcing strong mapping; with the AD Connector enabled, a SID that names no account is refused.
 - Packages: the DEB installation no longer fails on a host without sudo; the unused sudoers file is no longer written and is removed from both the DEB and the RPM.
 
 ### Security
 
+- Backup: a merge restore no longer turns a certificate revoked for good here back into a hold or a valid certificate, nor its revocation record into a hold.
 - Certificates: an imported certificate is now linked to a CA only when that CA's signature on it verifies, and renewal, re-enrolment and status checks only treat as issued by a CA a stored certificate it signed.
 - OCSP: a serial the CA revoked answers `revoked`, as on its CRL, even when a non-revoked record of that serial is stored again.
 - Certificates: a certificate imported again after its revocation and deletion comes back revoked, and a certificate its CA's revocation record names is no longer renewed in place.
 - Revocation: a certificate its CA recorded as revoked is now shown and treated as revoked everywhere, and an hourly pass marks such certificates revoked, with an audit entry.
-- Revocation: lifting a hold is refused (409) when a final revocation is recorded for the certificate; otherwise it removes the hold's record in each unambiguous spelling of its serial and under every record of the CA key.
+- Revocation: lifting a hold is refused with one code (409) and one message when the certificate or its CA's record holds a final revocation; otherwise it removes the hold's record in each unambiguous spelling of its serial and under every record of the CA key.
 - Revocation: revoking or suspending a certificate its CA already recorded as revoked for good answers that it is already revoked; a recorded hold can still be made final.
 - Revocation: the upgrade deletes once the suspension records that lifting a hold used to leave behind.
 - Revocation: a hold its CA recorded but the certificate does not show yet can be lifted, and the certificate details and list show the revocation the CA recorded.

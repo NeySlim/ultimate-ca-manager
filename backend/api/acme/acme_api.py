@@ -1765,11 +1765,12 @@ def revoke_cert():
             or not isinstance(reason, int)
             or reason < 0
             or reason > 10
-            or reason == 7
+            or reason in (7, 8)
         ):
+            # 7 is unassigned, 8 (removeFromCRL) belongs to delta CRLs only (RFC 5280 §5.3.1)
             return acme_error(
                 'badRevocationReason',
-                'Revocation reason must be an integer from 0 to 10, excluding 7',
+                'Revocation reason must be an integer from 0 to 10, excluding 7 and 8',
                 400,
             )
 

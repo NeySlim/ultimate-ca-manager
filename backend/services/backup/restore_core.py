@@ -6,6 +6,7 @@ import hashlib
 import base64
 import logging
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Any, Dict, List
 
 from sqlalchemy.exc import DataError, IntegrityError
@@ -16,6 +17,7 @@ from utils.port_zero import strip_port_zero_from_stored
 from utils.signing_hash import SIGNATURE_SCHEMES
 from models.acme_models import AcmeAccount
 from config.settings import Config
+from utils.serial_format import serial_named_by, unambiguous_serial_spellings
 from services.file_regen_service import insert_file_writes_suspended
 
 from . import installation
@@ -34,6 +36,39 @@ from .restore.settings import restore_encrypted_settings
 from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
 
 logger = logging.getLogger(__name__)
+
+
+def _revocation_key(holder):
+    """``revocation_order`` of a row or record: the gravest reason, then the earliest date."""
+    from services.cert.issued_lookup import reason_rank
+    return reason_rank(holder.revoke_reason), holder.revoked_at or datetime.max
+
+
+def _kept_final(service, here):
+    """In a merge, the final revocation a certificate row holds here, which the archive's
+    hold or validity never replaces; None otherwise."""
+    from utils.revocation_reasons import HOLD_REASONS
+    if (not getattr(service, '_merging', False) or here is None or not here.revoked
+            or here.revoke_reason in HOLD_REASONS + ('removeFromCRL',)):
+        return None
+    return SimpleNamespace(revoked=True, revoked_at=here.revoked_at,
+                           revoke_reason=here.revoke_reason, invalidity_at=here.invalidity_at)
+
+
+def _readable_record_serial(archived: Any) -> str:
+    """A record's serial in a spelling the revocation readers accept: kept when it already is one
+    (decimal, bare hex with a letter), else decimal when it reads as hex without doubt (``0x``,
+    colons, leading zeros before a letter); an all-digit string is kept."""
+    text = str(archived).strip()
+    bare = text.replace(':', '')
+    hexa = bare[2:] if bare.lower().startswith('0x') else bare
+    if not (hexa != bare or ':' in text or any(c in 'abcdefABCDEF' for c in hexa)):
+        return text
+    try:
+        value = int(hexa, 16)
+    except ValueError:
+        return text
+    return text if text in unambiguous_serial_spellings(value) else str(value)
 
 
 def _archived_datetime(where: str, column: str, value: Any):
@@ -371,6 +406,8 @@ class RestoreCoreMixin:
         # Files are staged during the transaction and published just before the
         # commit; a commit that fails puts them back (`unpublish()`).
         results['mode'] = mode
+        # A merge never lowers a revocation made here (see _kept_final)
+        self._merging = mode == 'merge'
 
         staged = StagedFiles()
         # What the rows had on disk before: a file no row names afterwards goes with the commit
@@ -742,11 +779,19 @@ class RestoreCoreMixin:
                 logger.warning(f"Revoked serial {serial} skipped: CA {caref} is unknown")
                 results['revoked_serials_skipped'] += 1
                 continue
-            where = f"revoked serial {serial} of CA {caref}"
-            here = RevokedSerial.query.filter_by(
-                caref=caref, serial_number=serial
+            archived_serial = serial
+            where = f"revoked serial {archived_serial} of CA {caref}"
+            serial = _readable_record_serial(serial)
+            # One serial, one identity: every spelling of it here, ranked under its decimal form
+            value = serial_named_by(serial)
+            spellings = {str(archived_serial), serial} | (
+                unambiguous_serial_spellings(value) if value is not None else set())
+            here = RevokedSerial.query.filter(
+                RevokedSerial.caref == caref,
+                RevokedSerial.serial_number.in_(spellings),
             ).order_by(RevokedSerial.id).all()
-            taken = plan.rank('revoked_serials', (caref, str(serial)), rs_data, [r.id for r in here])
+            taken = plan.rank('revoked_serials', (caref, str(value) if value is not None else serial),
+                              rs_data, [r.id for r in here])
             existing = next((r for r in here if r.id == taken), None)
             valid_to = _archived_datetime(
                 where, 'valid_to', rs_data.get('valid_to')) or utc_now()
@@ -757,9 +802,16 @@ class RestoreCoreMixin:
             certificate_id = plan.resolve('revoked_serials', rs_data,
                                           'certificate_id')
             if existing:
-                existing.revoked_at = revoked_at or existing.revoked_at
-                existing.revoke_reason = rs_data.get('revoke_reason')
-                existing.invalidity_at = invalidity_at
+                existing.serial_number = serial
+                archived = SimpleNamespace(revoke_reason=rs_data.get('revoke_reason'),
+                                           revoked_at=revoked_at or existing.revoked_at,
+                                           invalidity_at=invalidity_at)
+                # A merge keeps the graver of the two, between equals the earlier
+                if not (getattr(self, '_merging', False)
+                        and _revocation_key(existing) <= _revocation_key(archived)):
+                    existing.revoked_at = archived.revoked_at
+                    existing.revoke_reason = archived.revoke_reason
+                    existing.invalidity_at = archived.invalidity_at
                 existing.valid_to = valid_to
                 existing.certificate_id = certificate_id
                 # An archive older than the column says nothing of the key
@@ -883,6 +935,9 @@ class RestoreCoreMixin:
                 from security.encryption import encrypt_private_key
                 prv_b64 = encrypt_private_key(prv_b64)
 
+            here_state = None if cert is None else SimpleNamespace(
+                revoked=cert.revoked, revoked_at=cert.revoked_at,
+                revoke_reason=cert.revoke_reason, invalidity_at=cert.invalidity_at)
             if cert is None:
                 # descr is NOT NULL; overwritten by apply_columns below
                 cert = Certificate(refid=cert_data['refid'],
@@ -908,6 +963,7 @@ class RestoreCoreMixin:
             if prv_b64:
                 cert.prv = prv_b64
             where = f"certificate {cert_data.get('refid')}"
+            here_final = _kept_final(self, here_state)
             cert.revoked = bool(cert_data.get('revoked', False))
             cert.revoked_at = _archived_datetime(where, 'revoked_at',
                                                  cert_data.get('revoked_at'))
@@ -915,6 +971,9 @@ class RestoreCoreMixin:
             if 'invalidity_at' in cert_data:
                 cert.invalidity_at = _archived_datetime(
                     where, 'invalidity_at', cert_data.get('invalidity_at'))
+            if here_final is not None and (not cert.revoked or _revocation_key(cert) > _revocation_key(here_final)):
+                for field, value in vars(here_final).items():
+                    setattr(cert, field, value)
             cert.archived = bool(cert_data.get('archived', False))
             written.append(cert)
             results['certificates'] += 1

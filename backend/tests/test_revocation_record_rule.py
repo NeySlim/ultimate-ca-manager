@@ -964,6 +964,54 @@ class TestTheCrlReadsTheRecordsOnce:
         assert [listed.get(s) for s in serials] == ['keyCompromise'] * len(made)
 
 
+class TestAPageReadsTheRecordsOnce:
+
+    def test_one_record_query_and_two_per_ca_of_the_covered_rows(self, app, issuer, create_ca):
+        import threading
+        from sqlalchemy import event
+        from services.cert.issued_lookup import persisted_revocations_of
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        other = create_ca(cn=f'Record Rule page CA {uuid.uuid4().hex[:6]}',
+                          keyUsage=['digitalSignature', 'keyCertSign', 'cRLSign'])
+        with app.app_context():
+            row = db.session.get(CA, other['id'])
+            second = (row.refid, x509.load_pem_x509_certificate(base64.b64decode(row.crt)),
+                      get_ca_signing_key(row))
+        authorities = [(issuer[1], issuer[2], issuer[3]), second]
+        made = []
+
+        def recorded_rows(count):
+            for refid, ca_cert, ca_key in authorities:
+                for _ in range(count):
+                    real, key = _leaf(f'page-{uuid.uuid4().hex[:8]}.example.test', ca_cert, ca_key)
+                    made.append(_store(app, real, refid, key=key))
+                    _record(app, refid, real, certificate_id=made[-1])
+
+        def queries():
+            seen, mine = [], threading.get_ident()
+
+            def count(_conn, _cursor, statement, *_rest):
+                if threading.get_ident() == mine:
+                    seen.append(statement)
+            with app.app_context():
+                db.session.expire_all()
+                rows = Certificate.query.filter(Certificate.id.in_(made)).all()
+                event.listen(db.engine, 'before_cursor_execute', count)
+                try:
+                    found = persisted_revocations_of(rows)
+                finally:
+                    event.remove(db.engine, 'before_cursor_execute', count)
+                return seen, found
+
+        recorded_rows(1)
+        few, _ = queries()
+        recorded_rows(3)
+        many, found = queries()
+        # The records' query, then the CA and its same-key records for each CA of the page
+        assert len(few) == len(many) == 1 + 2 * len(authorities), many
+        assert set(found) == set(made)
+
+
 @pytest.mark.parametrize('column, serial', [
     ('171', 171), ('ab', 171), ('AB', 171), ('10', 10), ('0x10', None), ('007', None), ('', None),
     ('not a serial', None), ('-10', -10)])
@@ -1105,6 +1153,67 @@ class TestARecordedHoldIsShownAndLifted:
         with app.app_context():
             assert db.session.get(RevokedSerial, record_id) is not None
 
+    def test_remove_from_crl_with_its_own_record_is_no_interrupted_lift(self, app, auth_client, issuer):
+        """A row and a record both in removeFromCRL (an old ACME reason 8) prove no lift."""
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('remove-from-crl-recorded.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        record_id = _record(app, refid, real, reason='removeFromCRL', certificate_id=row_id)
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            row.revoked, row.revoke_reason, row.revoked_at = True, 'removeFromCRL', LATER
+            db.session.commit()
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 409, r.data
+        assert 'not on hold' in r.get_json()['message']
+        assert _row(app, row_id) == (True, 'removeFromCRL', LATER)
+        with app.app_context():
+            assert db.session.get(RevokedSerial, record_id).revoke_reason == 'removeFromCRL'
+
+    def test_a_lift_of_a_row_only_hold_left_half_done_completes(self, app, auth_client, issuer):
+        """The hold was on the row alone: stopped mid-lift, no record is left and it still completes."""
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('remove-from-crl-row-only.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            row.revoked, row.revoke_reason, row.revoked_at = True, 'removeFromCRL', LATER
+            db.session.commit()
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 200, r.data
+        assert _row(app, row_id) == (False, None, None)
+
+    def test_a_lift_left_half_done_in_remove_from_crl_completes(self, app, auth_client, issuer):
+        """removeFromCRL on a row is an unhold stopped between its two commits, not a final reason."""
+        _, row_id, record_id = self._recorded(app, issuer, 'half-lifted.example.test')
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            row.revoked, row.revoke_reason, row.revoked_at = True, 'removeFromCRL', LATER
+            db.session.commit()
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 200, r.data
+        assert _row(app, row_id) == (False, None, None)
+        with app.app_context():
+            assert db.session.get(RevokedSerial, record_id) is None
+
+    def test_a_final_row_is_refused_as_a_final_record_is(self, app, auth_client, issuer):
+        """One refusal, one code: the row's own final reason answers as the record's does."""
+        _, row_by_record, _ = self._recorded(app, issuer, 'final-by-record.example.test',
+                                             reason='keyCompromise')
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('final-by-row.example.test', ca_cert, ca_key)
+        row_by_row = _store(app, real, refid, key=key)
+        with app.app_context():
+            row = db.session.get(Certificate, row_by_row)
+            row.revoked, row.revoke_reason, row.revoked_at = True, 'keyCompromise', EARLY
+            db.session.commit()
+        answers = [auth_client.post(f'/api/v2/certificates/{i}/unhold') for i in (row_by_record, row_by_row)]
+        assert [r.status_code for r in answers] == [409, 409], [r.data for r in answers]
+        messages = [r.get_json()['message'] for r in answers]
+        assert messages == [f'Certificate "{n}" is revoked for good (keyCompromise): its hold cannot be lifted'
+                            for n in ('CN=final-by-record.example.test', 'CN=final-by-row.example.test')]
+        assert _row(app, row_by_row) == (True, 'keyCompromise', EARLY)
+
     def test_a_certificate_nothing_revokes_is_not_revoked(self, app, auth_client, issuer):
         """Non-regression: passes before and after the change."""
         _, refid, ca_cert, ca_key = issuer
@@ -1167,3 +1276,227 @@ class TestARecordedHoldIsShownAndLifted:
         assert len(many) == len(few), sorted((Counter(many) - Counter(few)).items())[:6]
         assert {i: shown[i] for i in recorded} == {i: (True, 'certificateHold', 'revoked') for i in recorded}
         assert all(shown[i][0] is False for i in plain)
+
+
+class TestALiftBetweenReadAndMarkWins:
+    """A hold lifted while the hourly pass marks rows: the row ends unrevoked, never held
+    without a record (which nothing would correct afterwards)."""
+
+    def _held_by_record(self, app, issuer, cn):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf(cn, ca_cert, ca_key, days=200)
+        row_id = _store(app, real, refid, key=key)
+        return row_id, _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
+
+    def test_the_pass_skips_a_record_deleted_after_it_read_it(self, app, issuer, monkeypatch):
+        from sqlalchemy import delete
+        from services.cert import issued_lookup
+        row_id, record_id = self._held_by_record(app, issuer, 'lift-before-mark.example.test')
+        read = issued_lookup.row_persisted_revocation
+
+        def then_lifted(row):
+            record = read(row)
+            # Another worker's unhold commits between this read and the mark
+            with db.engine.begin() as other:
+                other.execute(delete(RevokedSerial).where(RevokedSerial.id == record_id))
+            return record
+        monkeypatch.setattr(issued_lookup, 'row_persisted_revocation', then_lifted)
+        with app.app_context():
+            marked = issued_lookup.apply_persisted_revocations({row_id})
+            db.session.commit()
+        assert marked == []
+        assert _row(app, row_id) == (False, None, None)
+
+    def test_an_unhold_after_the_mark_clears_the_row_it_did_not_read_held(
+            self, app, auth_client, issuer, monkeypatch):
+        from sqlalchemy import update
+        from services.cert import issued_lookup
+        row_id, record_id = self._held_by_record(app, issuer, 'mark-before-lift.example.test')
+        lift = issued_lookup.lift_persisted_revocation
+
+        def marked_meanwhile(*args, **kwargs):
+            # The pass marks the row and commits after the unhold read it unrevoked
+            with db.engine.begin() as other:
+                other.execute(update(Certificate).where(Certificate.id == row_id).values(
+                    revoked=True, revoke_reason='certificateHold', revoked_at=EARLY))
+            return lift(*args, **kwargs)
+        monkeypatch.setattr(issued_lookup, 'lift_persisted_revocation', marked_meanwhile)
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 200, r.data
+        assert _row(app, row_id) == (False, None, None)
+        with app.app_context():
+            assert db.session.get(RevokedSerial, record_id) is None
+
+
+def _on_postgresql(app):
+    with app.app_context():
+        return db.engine.dialect.name == 'postgresql'
+
+
+def _wait_for_a_lock_waiter(conn, seconds=5.0):
+    """Whether another session of this database waits on a lock within ``seconds`` (polled)."""
+    import time
+    from sqlalchemy import text
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        conn.execute(text('SELECT pg_stat_clear_snapshot()'))  # the view is cached per transaction
+        if conn.execute(text("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' "
+                             "AND datname = current_database() AND pid <> pg_backend_pid()")).scalar():
+            return True
+        time.sleep(0.02)
+    return False
+
+
+class TestAFinalRevocationBetweenReadAndLift:
+    """A final revocation committed after an unhold read the hold is never undone by it."""
+
+    def _final_meanwhile(self, app, monkeypatch, row_id, record_id, where=('row', 'record')):
+        from sqlalchemy import update
+        from services.cert import issued_lookup
+        read, done = issued_lookup.persisted_revocation, []
+
+        def then_revoked(*args, **kwargs):
+            # After the route's own check of the record, its last read before writing
+            import sys
+            found = read(*args, **kwargs)
+            if sys._getframe(1).f_code.co_name == 'unhold_certificate' and not done:
+                done.append(True)
+                with db.engine.begin() as other:
+                    if 'row' in where:
+                        other.execute(update(Certificate).where(Certificate.id == row_id).values(
+                            revoked=True, revoke_reason='keyCompromise', revoked_at=LATER))
+                    if 'record' in where:
+                        other.execute(update(RevokedSerial).where(RevokedSerial.id == record_id).values(
+                            revoke_reason='keyCompromise', revoked_at=LATER))
+            return found
+        monkeypatch.setattr(issued_lookup, 'persisted_revocation', then_revoked)
+        return done
+
+    @pytest.mark.parametrize('row_held', [True, False])
+    def test_the_unhold_is_refused_and_both_stay_final(self, app, auth_client, issuer, monkeypatch, row_held):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf(f'final-meanwhile-{row_held}.example.test', ca_cert, ca_key, days=200)
+        row_id = _store(app, real, refid, key=key)
+        record_id = _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
+        if row_held:
+            _held(app, row_id)
+        done = self._final_meanwhile(app, monkeypatch, row_id, record_id)
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert done and r.status_code == 409, r.data
+        assert _row(app, row_id) == (True, 'keyCompromise', LATER)
+        with app.app_context():
+            assert db.session.get(RevokedSerial, record_id).revoke_reason == 'keyCompromise'
+
+    @pytest.mark.parametrize('where', ['row', 'record'])
+    def test_either_final_alone_refuses_and_nothing_changes(self, app, auth_client, issuer, monkeypatch, where):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf(f'final-only-{where}.example.test', ca_cert, ca_key, days=200)
+        row_id = _store(app, real, refid, key=key)
+        record_id = _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
+        _held(app, row_id)
+        done = self._final_meanwhile(app, monkeypatch, row_id, record_id, where=(where,))
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert done and r.status_code == 409, r.data
+        final = where == 'row'
+        assert _row(app, row_id) == ((True, 'keyCompromise', LATER) if final else (True, 'certificateHold', EARLY))
+        with app.app_context():
+            assert db.session.get(RevokedSerial, record_id).revoke_reason == (
+                'certificateHold' if final else 'keyCompromise')
+
+
+class TestTheLockOrderOfAPassAndAnUnhold:
+
+    def test_an_unhold_waiting_on_a_marking_pass_lifts_after_it(self, app, auth_client, issuer):
+        """PostgreSQL: the pass holds the record and marks the row while the unhold waits: no deadlock."""
+        import threading
+        from sqlalchemy import select, update
+        if not _on_postgresql(app):
+            pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('lock-order.example.test', ca_cert, ca_key, days=200)
+        row_id = _store(app, real, refid, key=key)
+        record_id = _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
+        with app.app_context():
+            engine = db.engine
+        locked, outcome = threading.Event(), {}
+
+        def marking_pass():
+            try:
+                with engine.connect() as conn:
+                    with conn.begin():
+                        conn.execute(select(RevokedSerial.id).where(RevokedSerial.id == record_id)
+                                     .with_for_update(read=True))
+                        locked.set()
+                        outcome['waited'] = _wait_for_a_lock_waiter(conn)
+                        conn.execute(update(Certificate).where(Certificate.id == row_id).values(
+                            revoked=True, revoke_reason='certificateHold', revoked_at=EARLY))
+            except Exception as e:  # the deadlock victim, if any
+                outcome['error'] = repr(e)
+        worker = threading.Thread(target=marking_pass)
+        worker.start()
+        locked.wait(10)
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        worker.join(30)
+        assert 'error' not in outcome and outcome.get('waited'), outcome
+        assert r.status_code == 200, r.data
+        assert _row(app, row_id) == (False, None, None)
+        with app.app_context():
+            assert db.session.get(RevokedSerial, record_id) is None
+
+
+class TestTheShareLockOfThePass:
+
+    def test_a_pending_lift_makes_the_pass_wait_and_skip(self, app, issuer):
+        """PostgreSQL: a record deleted by an uncommitted unhold is waited for, then not marked."""
+        import threading
+        from sqlalchemy import delete
+        from services.cert import issued_lookup
+        if not _on_postgresql(app):
+            pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('share-lock.example.test', ca_cert, ca_key, days=200)
+        row_id = _store(app, real, refid, key=key)
+        record_id = _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
+        with app.app_context():
+            engine = db.engine
+        deleted, outcome = threading.Event(), {}
+
+        def pending_lift():
+            with engine.connect() as conn:
+                with conn.begin():
+                    conn.execute(delete(RevokedSerial).where(RevokedSerial.id == record_id))
+                    deleted.set()
+                    outcome['waited'] = _wait_for_a_lock_waiter(conn)
+        worker = threading.Thread(target=pending_lift)
+        worker.start()
+        deleted.wait(10)
+        with app.app_context():
+            marked = issued_lookup.apply_persisted_revocations({row_id})
+            db.session.commit()
+        worker.join(30)
+        assert outcome.get('waited') and marked == []
+        assert _row(app, row_id) == (False, None, None)
+
+
+def test_a_lift_committed_after_the_pass_reread_still_wins(app, issuer, monkeypatch):
+    """SQLite opens its write transaction at the mark: the mark itself checks the record."""
+    from sqlalchemy import delete
+    from services.cert import issued_lookup
+    if _on_postgresql(app):
+        pytest.skip("PostgreSQL: the re-read's share lock makes such a lift wait (test above)")
+    _, refid, ca_cert, ca_key = issuer
+    real, key = _leaf('lift-after-reread.example.test', ca_cert, ca_key, days=200)
+    row_id = _store(app, real, refid, key=key)
+    record_id = _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
+    reread = issued_lookup._record_still_held
+
+    def then_lifted(record):
+        still = reread(record)
+        with db.engine.begin() as other:
+            other.execute(delete(RevokedSerial).where(RevokedSerial.id == record_id))
+        return still
+    monkeypatch.setattr(issued_lookup, '_record_still_held', then_lifted)
+    with app.app_context():
+        assert issued_lookup.apply_persisted_revocations({row_id}) == []
+        db.session.commit()
+    assert _row(app, row_id) == (False, None, None)

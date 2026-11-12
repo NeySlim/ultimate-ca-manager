@@ -787,7 +787,8 @@ class AcmeClientService:
     @staticmethod
     def validate_revocation_reason(reason: int) -> int:
         """Validate an RFC 5280 CRLReason code accepted by ACME."""
-        valid_reasons = {0, 1, 2, 3, 4, 5, 6, 8, 9, 10}
+        # removeFromCRL (8) only appears on a delta CRL (RFC 5280 §5.3.1): no certificate is revoked so
+        valid_reasons = {0, 1, 2, 3, 4, 5, 6, 9, 10}
         if isinstance(reason, bool) or not isinstance(reason, int) or reason not in valid_reasons:
             raise ValueError("Invalid certificate revocation reason code")
         return reason
