@@ -153,6 +153,10 @@ describe('Button', () => {
 })
 ```
 
+## Release Smoke
+
+The smoke run triggered after a release (`release-smoke.yml`, with `scripts/ci/package-smoke.sh` for the packages) uses the workflow and the script of the default branch, not those of the tag. On a release candidate it is started by hand (workflow dispatch with the version) until these files are on the default branch. It ignores "Build & Release" runs started manually on a branch.
+
 ## E2E Tests
 
 ### Setup
