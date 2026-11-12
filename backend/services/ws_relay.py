@@ -335,7 +335,8 @@ class PgWakeup:
         self._raw = raw
 
     def wait(self, timeout, stop):
-        """Return on a notification, after ``timeout`` or at once after a reconnection."""
+        """Return on a notification, after ``timeout``, at once after a reconnection, or
+        within STOP_SLICE_SECONDS (half a second) after a lost connection."""
         if self._raw is None:
             try:
                 self._listen()
