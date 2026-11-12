@@ -1340,3 +1340,22 @@ def test_in_ha_a_start_under_a_kek_another_disabled_does_not_encrypt(app, values
         assert key_encryption.encrypt_string('x') == 'x'
     finally:
         app.config['SAFE_MODE'] = False
+
+
+def test_the_scheduled_retire_says_once_that_the_key_is_kept(app, values, grace, caplog,
+                                                            encryption_enabled):
+    import logging
+    from security import dek_rotation
+    with app.app_context():
+        dek_rotation.rotate()
+    # A value no DEK opens: the end-of-grace sweep stops with the previous key kept
+    _late_write(app, values, Fernet(Fernet.generate_key()))
+    grace(601)
+    with caplog.at_level(logging.ERROR, logger='security.dek_rotation'), app.app_context():
+        dek_rotation.scheduled_retire()
+    lines = [r.getMessage() for r in caplog.records
+             if r.name == 'security.dek_rotation' and r.levelno >= logging.ERROR]
+    assert len(lines) == 1 and 'decrypt with no data-encryption key' in lines[0]
+    assert lines[0].count('kept') == 1
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
+    _late_write(app, values, Fernet(_kek(encryption_enabled)))  # readable again for teardown

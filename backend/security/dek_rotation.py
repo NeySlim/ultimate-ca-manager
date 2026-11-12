@@ -340,7 +340,7 @@ def scheduled_retire() -> None:
     try:
         dropped = retire_if_due()
     except RotationError as e:
-        logger.error("🔑 Previous DEK kept: %s", e)
+        logger.error("🔑 %s", e)  # the message already says the key is kept
         return
     except Exception:
         db.session.rollback()
