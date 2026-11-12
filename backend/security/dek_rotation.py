@@ -617,7 +617,7 @@ def finish_disable(kept_kek) -> None:
     db.session.commit()
     if dropped_session_key:
         from flask import current_app
-        session_key.load(current_app._get_current_object())
+        session_key.load_keys(current_app._get_current_object())
 
 
 def resume_at_start() -> None:

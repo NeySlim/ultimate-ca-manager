@@ -105,7 +105,7 @@ def _until(rows):
         return None
 
 
-def load(app, at_start=False) -> str:
+def load_keys(app, at_start=False) -> str:
     """Sets this process's signing key and the previous key it still accepts, from the
     database; the environment's key when nothing is stored. Rows that cannot be read, or an
     active key that does not open, fall back to the environment at start only, a reload keeps the keys in memory;
@@ -170,7 +170,7 @@ def reload_if_pending() -> None:
     retry = (app.extensions.get(_STATE) or {}).get('retry')
     if retry is None or time.monotonic() < retry[0]:
         return
-    load(app)
+    load_keys(app)
 
 
 def verification_keys(app) -> list:
@@ -248,7 +248,7 @@ def rotate(app, new_secret=None):
     _put(RETIRE_KEY, until.isoformat())
     command = _emit_reload()
     db.session.commit()
-    load(app)
+    load_keys(app)
     return until, command, not reload_pending(app)
 
 
@@ -271,7 +271,7 @@ def retire_if_due(app=None) -> bool:
         synchronize_session=False)
     _emit_reload()
     db.session.commit()
-    load(app)
+    load_keys(app)
     logger.info("Previous session key dropped after its grace period")
     return True
 

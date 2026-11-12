@@ -42,7 +42,7 @@ def stored(app):
             EncryptionKey.query.delete()
             ClusterCommand.query.delete()
             db.session.commit()
-            session_key.load(app)
+            session_key.load_keys(app)
     clean()
     with app.app_context():
         saved = [dict(row._mapping) for row in db.session.execute(ledger.select())]
@@ -161,7 +161,7 @@ def test_an_unreadable_row_starts_on_the_environment_key_with_a_warning(
         db.session.add(SystemConfig(key=stored.ACTIVE_KEY, value=foreign))
         db.session.commit()
         with caplog.at_level(logging.WARNING, logger='security.session_key'):
-            stored.load(app, at_start=True)
+            stored.load_keys(app, at_start=True)
     assert app.config['SECRET_KEY'] == env
     assert 'does not decrypt' in caplog.text
 
@@ -172,7 +172,7 @@ def test_a_row_in_the_clear_is_never_used(app, stored, encryption_enabled, caplo
         db.session.add(SystemConfig(key=stored.ACTIVE_KEY, value='p' * 43))
         db.session.commit()
         with caplog.at_level(logging.WARNING, logger='security.session_key'):
-            stored.load(app, at_start=True)
+            stored.load_keys(app, at_start=True)
     assert app.config['SECRET_KEY'] == env
     assert 'not encrypted' in caplog.text
 
@@ -224,7 +224,7 @@ def test_a_start_that_cannot_read_the_rows_signs_with_the_environment_key(
         raise RuntimeError('database unreachable')
     with monkeypatch.context() as m, app.app_context():
         m.setattr(stored, '_read_rows', down)
-        stored.load(app, at_start=True)
+        stored.load_keys(app, at_start=True)
     assert app.config['SECRET_KEY'] == stored.environment_key(app)
     assert app.config['SECRET_KEY_FALLBACKS'] == []
 
@@ -243,7 +243,7 @@ def test_a_dek_rotation_rewrites_the_session_key_and_it_stays_readable(
     with app.app_context():
         assert key_encryption.dek_version_of(after[stored.ACTIVE_KEY]) > version
         assert key_encryption.dek_version_of(after[stored.PREVIOUS_KEY]) > version
-        stored.load(app)
+        stored.load_keys(app)
     assert app.config['SECRET_KEY'] == key
 
 
@@ -322,7 +322,7 @@ def test_a_disable_that_fails_keeps_the_stored_key_active(
     assert _rows(app) == rows
     assert app.config['SECRET_KEY'] == key
     with app.app_context():
-        stored.load(app)
+        stored.load_keys(app)
     assert app.config['SECRET_KEY'] == key
 
 

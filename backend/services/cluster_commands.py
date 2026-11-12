@@ -227,8 +227,8 @@ def _reload_keytab(payload):
 
 def _reload_secret_key(payload):
     from flask import current_app
-    from security.session_key import load
-    load(current_app._get_current_object())
+    from security.session_key import load_keys
+    load_keys(current_app._get_current_object())
 
 
 def _update(payload):

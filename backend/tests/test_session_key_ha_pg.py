@@ -46,7 +46,7 @@ def node_b(app, stored, encryption_enabled, monkeypatch):
                     SECRET_KEY=stored.environment_key(app))
     db.init_app(b)
     with b.app_context():
-        stored.load(b, at_start=True)  # as create_app does
+        stored.load_keys(b, at_start=True)  # as create_app does
     applier = cc.CommandApplier(b, PREFIX + 'b', tick=0.05, record=False,
                                 started_at=utc_now() - timedelta(seconds=30))
     yield b, applier
