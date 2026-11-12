@@ -36,6 +36,22 @@ from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
 logger = logging.getLogger(__name__)
 
 
+def _readable_record_serial(archived: Any) -> str:
+    """A record's serial in a spelling the revocation readers accept: decimal when the archive's
+    reads as hex without doubt (``0x``, colons, a hex letter); a bare digit string is kept."""
+    from utils.serial_format import unambiguous_serial_spellings
+    text = str(archived).strip()
+    bare = text.replace(':', '')
+    hexa = bare[2:] if bare.lower().startswith('0x') else bare
+    if not (hexa != bare or ':' in text or any(c in 'abcdefABCDEF' for c in hexa)):
+        return text
+    try:
+        value = int(hexa, 16)
+    except ValueError:
+        return text
+    return text if text in unambiguous_serial_spellings(value) else str(value)
+
+
 def _archived_datetime(where: str, column: str, value: Any):
     """The instant the archive recorded for a row, or a refusal naming it.
 
@@ -742,11 +758,15 @@ class RestoreCoreMixin:
                 logger.warning(f"Revoked serial {serial} skipped: CA {caref} is unknown")
                 results['revoked_serials_skipped'] += 1
                 continue
+            archived_serial = serial
+            serial = _readable_record_serial(serial)
             where = f"revoked serial {serial} of CA {caref}"
-            here = RevokedSerial.query.filter_by(
-                caref=caref, serial_number=serial
+            here = RevokedSerial.query.filter(
+                RevokedSerial.caref == caref,
+                RevokedSerial.serial_number.in_({serial, str(archived_serial)}),
             ).order_by(RevokedSerial.id).all()
-            taken = plan.rank('revoked_serials', (caref, str(serial)), rs_data, [r.id for r in here])
+            taken = plan.rank('revoked_serials', (caref, str(archived_serial)), rs_data,
+                              [r.id for r in here])
             existing = next((r for r in here if r.id == taken), None)
             valid_to = _archived_datetime(
                 where, 'valid_to', rs_data.get('valid_to')) or utc_now()
@@ -757,6 +777,7 @@ class RestoreCoreMixin:
             certificate_id = plan.resolve('revoked_serials', rs_data,
                                           'certificate_id')
             if existing:
+                existing.serial_number = serial
                 existing.revoked_at = revoked_at or existing.revoked_at
                 existing.revoke_reason = rs_data.get('revoke_reason')
                 existing.invalidity_at = invalidity_at

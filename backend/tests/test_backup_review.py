@@ -87,6 +87,54 @@ class TestRevokedSerialsWithUnknownCa:
             assert RevokedSerial.query.filter_by(caref=refid, serial_number='4242').first() is not None
 
 
+class TestRevokedSerialSpellingOnRestore:
+    def test_an_unambiguous_foreign_spelling_is_written_in_decimal(self, app, create_ca):
+        from models.revoked_serial import RevokedSerial
+        ca = create_ca(cn='Serial Spelling CA')
+        with app.app_context():
+            refid = db.session.get(CA, ca['id']).refid
+            now = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+            archived = ['0xAB12', 'ab:13', 'aB14', '00ab15', '0123', '0x0124', '01:25', 'ab16']
+            _service()._restore_revoked_serials({'revoked_serials': [
+                {'caref': refid, 'serial_number': s, 'revoked_at': now, 'valid_to': now}
+                for s in archived]}, {})
+            db.session.commit()
+            written = sorted(r.serial_number for r in RevokedSerial.query.filter_by(caref=refid))
+            # '0123' reads as decimal 123 or hex 0x123: left as archived; 'ab16' is already read
+            assert written == sorted([str(0xab12), str(0xab13), str(0xab14), str(0xab15), '0123',
+                                      str(0x124), str(0x125), 'ab16'])
+
+    def test_a_foreign_spelling_updates_the_decimal_record_already_here(self, app, create_ca):
+        from models.revoked_serial import RevokedSerial
+        ca = create_ca(cn='Serial Spelling Existing CA')
+        with app.app_context():
+            refid = db.session.get(CA, ca['id']).refid
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            db.session.add(RevokedSerial(caref=refid, serial_number=str(0xcd01), revoked_at=now,
+                                         valid_to=now, revoke_reason='superseded'))
+            db.session.commit()
+            _service()._restore_revoked_serials({'revoked_serials': [
+                {'caref': refid, 'serial_number': 'CD:01', 'revoked_at': now.isoformat(),
+                 'valid_to': now.isoformat(), 'revoke_reason': 'keyCompromise'}]}, {})
+            db.session.commit()
+            rows = RevokedSerial.query.filter_by(caref=refid).all()
+            assert [(r.serial_number, r.revoke_reason) for r in rows] == [(str(0xcd01), 'keyCompromise')]
+
+    def test_a_record_left_in_the_archived_spelling_is_rewritten_not_doubled(self, app, create_ca):
+        from models.revoked_serial import RevokedSerial
+        ca = create_ca(cn='Serial Spelling Leftover CA')
+        with app.app_context():
+            refid = db.session.get(CA, ca['id']).refid
+            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            db.session.add(RevokedSerial(caref=refid, serial_number='0xCD02', revoked_at=now, valid_to=now))
+            db.session.commit()
+            _service()._restore_revoked_serials({'revoked_serials': [
+                {'caref': refid, 'serial_number': '0xCD02', 'revoked_at': now.isoformat(),
+                 'valid_to': now.isoformat()}]}, {})
+            db.session.commit()
+            assert [r.serial_number for r in RevokedSerial.query.filter_by(caref=refid)] == [str(0xcd02)]
+
+
 class TestCertificateInvalidityDateRoundTrip:
     def test_invalidity_at_is_exported_and_restored(self, app, create_ca, create_cert):
         ca = create_ca(cn='Invalidity CA')
