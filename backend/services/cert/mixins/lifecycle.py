@@ -28,7 +28,7 @@ from utils.issuance_defaults import default_issue_key_id, template_digest
 from utils.spki_digest import certificate_key_sha256
 from utils.serial_format import canonical_serial
 from utils.revocation_reasons import HOLD_REASONS, revocable
-from services.cert.issued_lookup import record_reason_replaceable
+from services.cert.issued_lookup import effective_revocation, record_reason_replaceable
 
 logger = logging.getLogger(__name__)
 
@@ -425,7 +425,9 @@ class LifecycleMixin:
         ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
         is_hold = reason in HOLD_REASONS
         # A hold made final: dated now, so the delta lists the change; invalid since the hold
-        held_since = certificate.revoked_at if certificate.revoked else None
+        # (the row's, or its record's when only the record holds it)
+        held = effective_revocation(certificate)
+        held_since = held.revoked_at if held is not None else None
         previous = {field: getattr(certificate, field) for field in _REVOCATION_FIELDS}
         now = utc_now()
         rejected_renewals = []

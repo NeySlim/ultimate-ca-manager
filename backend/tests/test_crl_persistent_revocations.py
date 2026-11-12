@@ -306,15 +306,17 @@ class TestFullCrl:
         assert set(entries) == {SERIAL_A, SERIAL_B}
         assert all(_reason(e) == x509.ReasonFlags.superseded for e in entries.values())
 
-    def test_a_hold_record_its_unrevoked_certificate_still_carries_is_left_out(self, backend):
-        """A suspension linked to its unrevoked row of the same serial is a lift an earlier release left."""
+    def test_a_hold_record_its_unrevoked_certificate_still_carries_is_listed(self, backend):
+        """A record says revoked with no exception: the holds a lift left were deleted once (154)."""
         ca, ca_key, ca_cert = _make_ca()
         row = _store(ca, _issue(ca_key, ca_cert, SERIAL_A), str(SERIAL_A))
         _persist(ca, format(SERIAL_A, 'X'), reason='certificateHold', certificate_id=row.id)
-        assert set(_entries(_full_crl(ca))) == set()
+        entries = _entries(_full_crl(ca))
+        assert set(entries) == {SERIAL_A}
+        assert _reason(entries[SERIAL_A]) == x509.ReasonFlags.certificate_hold
 
     def test_a_final_record_its_unrevoked_certificate_still_carries_is_listed(self, backend):
-        """Non-regression: only a suspension can have been lifted."""
+        """Non-regression: a final reason was listed before the hold exception went too."""
         ca, ca_key, ca_cert = _make_ca()
         row = _store(ca, _issue(ca_key, ca_cert, SERIAL_A), str(SERIAL_A))
         _persist(ca, format(SERIAL_A, 'X'), reason='keyCompromise', certificate_id=row.id)

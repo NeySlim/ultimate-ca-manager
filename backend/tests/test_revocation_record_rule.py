@@ -455,22 +455,76 @@ class TestAnotherSerialsHexSpellingNamesNothing:
         assert _row(app, h_id) == (False, None, None)
 
 
-class TestAHoldLiftedByAnEarlierRelease:
-    """A suspension record still linked to its row, unrevoked and of the same serial."""
+class TestARecordAloneHoldsItsRow:
+    """A suspension record linked to its unrevoked row of the same serial is a hold, with no
+    exception (migration 154 deleted, once, those an earlier lift left behind)."""
 
-    def test_it_is_ignored_then_deleted(self, app, issuer):
+    def test_every_surface_answers_hold_and_the_hourly_pass_marks_the_row(self, app, issuer):
         from services.ski_aki_backfill import backfill_ski_aki
         ca_id, refid, ca_cert, ca_key = issuer
-        real, key = _leaf('lifted-leftover.example.test', ca_cert, ca_key)
+        real, key = _leaf('record-holds.example.test', ca_cert, ca_key)
         row_id = _store(app, real, refid, key=key)
         record_id = _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
-        assert _surfaces(app, ca_id, real) == ('good', None, None, 'ok')
-        _renewable(app, row_id)
+        hold = x509.ReasonFlags.certificate_hold
+        assert _surfaces(app, ca_id, real) == ('revoked', hold, hold, 'revoked')
         with app.app_context():
-            stats = backfill_ski_aki()
-            assert stats['lifted_holds_deleted'] >= 1
-            assert db.session.get(RevokedSerial, record_id) is None
+            backfill_ski_aki()
+            assert db.session.get(RevokedSerial, record_id) is not None
+        assert _row(app, row_id) == (True, 'certificateHold', EARLY)
+
+    def test_a_hold_survives_a_merge_restore_of_an_earlier_archive(self, app, auth_client, issuer):
+        from services.backup_service import BackupService
+        from services.ski_aki_backfill import backfill_ski_aki
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('restore-keeps-hold.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            archived = next(c for c in BackupService()._export_certificates(True) if c['refid'] == row.refid)
+        assert auth_client.post(f'/api/v2/certificates/{row_id}/revoke',
+                                json={'reason': 'certificateHold'}).status_code == 200
+        with app.app_context():
+            BackupService()._restore_certificates({'certificates': [archived]},
+                                                  {'cas': 0, 'certificates': 0}, master_key=None)
+            db.session.commit()
         assert _row(app, row_id) == (False, None, None)
+        hold = x509.ReasonFlags.certificate_hold
+        assert _surfaces(app, ca_id, real) == ('revoked', hold, hold, 'revoked')
+        with app.app_context():
+            backfill_ski_aki()
+        assert _row(app, row_id)[:2] == (True, 'certificateHold')
+        assert _surfaces(app, ca_id, real) == ('revoked', hold, hold, 'revoked')
+
+    def test_the_hourly_pass_reads_the_record_afresh(self, app, issuer):
+        from sqlalchemy import text
+        from services.cert.issued_lookup import apply_persisted_revocations
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('hourly-afresh.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        record_id = _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
+        with app.app_context():
+            # Held in this session's identity map (weakly referenced otherwise)
+            stale = db.session.get(RevokedSerial, record_id), db.session.get(Certificate, row_id)
+            assert (stale[0].revoke_reason, stale[1].revoked) == ('certificateHold', False)
+            # Made final by another worker while this session holds its stale copy
+            with db.engine.begin() as conn:
+                conn.execute(text(f"UPDATE {RevokedSerial.__tablename__} SET revoke_reason = 'keyCompromise' "
+                                  "WHERE id = :i"), {'i': record_id})
+            marked = {row.id: row.revoke_reason for row, _ in apply_persisted_revocations()}
+            db.session.rollback()
+        assert marked[row_id] == 'keyCompromise'
+
+    def test_made_final_it_is_invalid_since_the_hold(self, app, auth_client, issuer):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('record-hold-final.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'keyCompromise'})
+        assert r.status_code == 200, r.data
+        with app.app_context():
+            row = db.session.get(Certificate, row_id)
+            assert (row.revoked, row.revoke_reason, row.invalidity_at) == (True, 'keyCompromise', EARLY)
+
 
     def test_a_real_hold_unlinked_by_an_import_still_applies(self, app, auth_client, issuer):
         ca_id, refid, ca_cert, ca_key = issuer
@@ -764,3 +818,42 @@ class TestTheHourlyTaskRecordsWhatItMarks:
             ski_aki_backfill.backfill_ski_aki()
             db.session.expire_all()
             assert db.session.get(Certificate, row_id).subject_cn == 'hourly-failure.example.test'
+
+
+HOLD, COMPROMISE, SUPERSEDED_FLAG = (x509.ReasonFlags.certificate_hold, x509.ReasonFlags.key_compromise,
+                                     x509.ReasonFlags.superseded)
+
+
+class TestTheStateTable:
+    """Row × record × suspensive or final reason: what every surface answers, and whether a
+    revocation (final, then hold) is still taken."""
+
+    @pytest.mark.parametrize('row, record, answer, final_ok, hold_ok', [
+        (None, None, ('good', None, None, 'ok'), True, True),
+        (None, ('certificateHold', 'linked'), ('revoked', HOLD, HOLD, 'revoked'), True, False),
+        (None, ('certificateHold', 'unlinked'), ('revoked', HOLD, HOLD, 'revoked'), True, False),
+        (None, ('keyCompromise', 'linked'), ('revoked', COMPROMISE, COMPROMISE, 'revoked'), False, False),
+        (None, ('keyCompromise', 'twin'), ('revoked', COMPROMISE, COMPROMISE, 'revoked'), False, False),
+        ('certificateHold', None, ('revoked', HOLD, HOLD, 'revoked'), True, False),
+        ('certificateHold', ('keyCompromise', 'twin'), ('revoked', COMPROMISE, COMPROMISE, 'revoked'), False, False),
+        ('superseded', ('certificateHold', 'linked'), ('revoked', SUPERSEDED_FLAG, SUPERSEDED_FLAG, 'revoked'),
+         False, False),
+    ])
+    def test_each_state(self, app, issuer, twin, row, record, answer, final_ok, hold_ok):
+        from utils.revocation_reasons import revocable
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf(f'state-{uuid.uuid4().hex[:8]}.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        if row:
+            with app.app_context():
+                stored = db.session.get(Certificate, row_id)
+                stored.revoked, stored.revoke_reason, stored.revoked_at = True, row, LATER
+                db.session.commit()
+        if record:
+            reason, where = record
+            _record(app, twin[1] if where == 'twin' else refid, real, reason=reason,
+                    certificate_id=row_id if where == 'linked' else None)
+        assert _surfaces(app, ca_id, real) == answer
+        with app.app_context():
+            stored = db.session.get(Certificate, row_id)
+            assert (revocable(stored, 'keyCompromise'), revocable(stored, 'certificateHold')) == (final_ok, hold_ok)
