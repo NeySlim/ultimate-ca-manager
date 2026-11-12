@@ -72,10 +72,14 @@ class ImportMixin:
                 )
 
                 if not ca_data.get('is_root', False):
-                    issuer = ca_data.get('issuer', '')
-                    parent_ca = CA.query.filter_by(subject=issuer).first()
-                    if parent_ca:
-                        ca.caref = parent_ca.refid
+                    # Chained under the stored CA whose key signed it, never a namesake
+                    from cryptography import x509
+                    from services.import_service import relink_parent_caref
+                    try:
+                        ca.caref = relink_parent_caref(
+                            x509.load_pem_x509_certificate(base64.b64decode(ca_data.get('crt') or '')), None)
+                    except ValueError:
+                        ca.caref = None
 
                 db.session.add(ca)
                 db.session.flush()

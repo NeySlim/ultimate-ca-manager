@@ -434,3 +434,67 @@ class TestALiveRowNeverHidesAPersistentRevocation:
         [(_, caref)] = _rows(app, real)
         assert caref == refid
         assert self._answers(app, ca_id, real.serial_number) == ('revoked', True)
+
+
+def _sub_ca(cn, parent_cert, signer):
+    """A CA certificate naming ``parent_cert`` as issuer (DN and AKI), signed by ``signer``."""
+    key, now = _gen(), datetime.now(timezone.utc)
+    ski = parent_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
+    return (x509.CertificateBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
+            .issuer_name(parent_cert.subject)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=90))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+            .add_extension(x509.SubjectKeyIdentifier.from_public_key(key.public_key()), critical=False)
+            .add_extension(x509.AuthorityKeyIdentifier(ski.digest, None, None), critical=False)
+            .sign(signer, hashes.SHA256()))
+
+
+def _ca_carefs(app, refids):
+    with app.app_context():
+        db.session.expire_all()
+        return [CA.query.filter_by(refid=refid).one().caref for refid in refids]
+
+
+class TestACaIsChainedOnlyUnderTheCaThatSignedIt:
+
+    @pytest.fixture(autouse=True)
+    def created(self, app):
+        """Refids of the sub-CAs a test creates, dropped before the module's root."""
+        refids = []
+        yield refids
+        with app.app_context():
+            CA.query.filter(CA.refid.in_(refids)).delete(synchronize_session=False)
+            db.session.commit()
+
+    def test_the_chain_repair_task(self, app, issuer, created):
+        from services.ski_aki_backfill import backfill_ski_aki
+        _, refid, root_cert, root_key = issuer
+        refids = created
+        with app.app_context():
+            for cert in (_sub_ca(f'forged-sub-{uuid.uuid4().hex[:6]}', root_cert, _gen()),
+                         _sub_ca(f'real-sub-{uuid.uuid4().hex[:6]}', root_cert, root_key)):
+                row = CA(refid=str(uuid.uuid4()), descr=cert.subject.rfc4514_string(), serial=0,
+                         crt=base64.b64encode(_pem(cert).encode()).decode(),
+                         subject=cert.subject.rfc4514_string(), issuer=cert.issuer.rfc4514_string(),
+                         serial_number=str(cert.serial_number))
+                db.session.add(row)
+                refids.append(row.refid)
+            db.session.commit()
+            backfill_ski_aki()
+        assert _ca_carefs(app, refids) == [None, refid]
+
+    def test_the_legacy_opnsense_service(self, app, issuer, monkeypatch, tmp_path, created):
+        from services.opnsense import importer
+        monkeypatch.setattr(importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
+        _, refid, root_cert, root_key = issuer
+        entries = [{'refid': uuid.uuid4().hex[:13], 'descr': 'legacy sub', 'is_root': False,
+                    'crt': base64.b64encode(_pem(cert).encode()).decode(),
+                    'subject': cert.subject.rfc4514_string(), 'issuer': cert.issuer.rfc4514_string()}
+                   for cert in (_sub_ca(f'forged-opn-sub-{uuid.uuid4().hex[:6]}', root_cert, _gen()),
+                                _sub_ca(f'real-opn-sub-{uuid.uuid4().hex[:6]}', root_cert, root_key))]
+        created.extend(e['refid'] for e in entries)
+        with app.app_context():
+            assert importer.ImportMixin().import_cas(entries)['imported'] == 2
+        assert _ca_carefs(app, [e['refid'] for e in entries]) == [None, refid]
