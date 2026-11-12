@@ -420,3 +420,101 @@ def test_stopping_the_reader_stops_the_worker_publisher(ha_worker):
     ws_relay.stop_reader()
     assert ws_relay._publisher is None and events._relay_publisher is None
     assert publisher._stop.is_set()
+
+
+class _Notify:
+    def __init__(self, payload):
+        self.payload = payload
+
+
+class _FakeDriver:
+    """psycopg connection stand-in: ``script`` is what each notifies() call does in turn."""
+
+    def __init__(self, script):
+        self.autocommit = False
+        self.script = script
+        self.info = type('Info', (), {'backend_pid': 42})()
+
+    def execute(self, sql):
+        return type('Cur', (), {'fetchone': lambda self: ('ucm',)})()
+
+    def notifies(self, timeout):
+        step = self.script.pop(0) if self.script else 'idle'
+        if step == 'raise':
+            raise OSError('server closed the connection')
+        if step == 'idle':
+            time.sleep(timeout)
+            return iter(())
+        return iter([_Notify(step)])
+
+
+class _FakeRaw:
+    def __init__(self, driver):
+        self.driver_connection = driver
+        self.closed = False
+
+    def close(self):
+        self.closed = True
+
+
+class _FakeEngine:
+    def __init__(self, scripts):
+        self.scripts = scripts
+        self.opened = []
+
+    def raw_connection(self):
+        raw = _FakeRaw(_FakeDriver(self.scripts.pop(0) if self.scripts else []))
+        self.opened.append(raw)
+        return raw
+
+
+def _wakeup(monkeypatch, scripts):
+    import services.scheduler_leader as leader
+    monkeypatch.setattr(leader, '_dedicated_engine', lambda url: _FakeEngine(scripts))
+    return ws_relay.PgWakeup('postgresql://unused')
+
+
+def test_a_listen_connection_dropping_at_once_does_not_spin(monkeypatch, caplog):
+    import threading
+    wakeup = _wakeup(monkeypatch, [['raise'] for _ in range(50)])
+    stop = threading.Event()
+    calls, deadline = 0, time.monotonic() + 1.0
+    with caplog.at_level(logging.WARNING, logger='services.ws_relay'):
+        while time.monotonic() < deadline:
+            wakeup.wait(2.0, stop)
+            calls += 1
+    assert calls <= 10
+    assert sum('LISTEN connection lost' in r.getMessage() for r in caplog.records) == 1
+
+
+def test_a_notification_of_another_schema_does_not_wake_the_reader(monkeypatch):
+    import threading
+    wakeup = _wakeup(monkeypatch, [['other_schema', 'other_schema', 'ucm']])
+    stop = threading.Event()
+    wakeup.wait(2.0, stop)  # opens the LISTEN connection
+    assert wakeup.schema == 'ucm'
+    wakeup.wait(2.0, stop)
+    assert wakeup._raw.driver_connection.script == []  # returned on 'ucm', not before
+
+
+def test_a_reader_outliving_its_stop_closes_the_listen_connection(monkeypatch):
+    import threading
+    connecting, release = threading.Event(), threading.Event()
+    wakeup = _wakeup(monkeypatch, [[]])
+    real = wakeup.engine.raw_connection
+
+    def slow_connect():
+        connecting.set()
+        release.wait(5)  # a connect_timeout longer than stop()'s join
+        return real()
+    wakeup.engine.raw_connection = slow_connect
+
+    class _Engine:
+        def connect(self):
+            raise OSError('down')
+    reader = ws_relay.RelayReader(_Engine(), lambda room, p: None, tick=0.01, wakeup=wakeup).start()
+    assert connecting.wait(5)
+    reader.stop(timeout=0.05)
+    release.set()
+    assert wait_for(lambda: not reader._thread.is_alive())
+    assert wakeup.engine.opened and all(raw.closed for raw in wakeup.engine.opened)

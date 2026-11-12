@@ -324,20 +324,38 @@ class TestUpdateResultConsumption:
 
 
 class TestNotifyMarker:
+    RESULT = {'current_version': '2.0', 'latest_version': '99.0',
+              'html_url': 'http://x', 'prerelease': False}
+
     def test_marker_failure_is_visible(self, app, clean_update_config, monkeypatch):
-        """R-05: a failed dedup-marker persist must not be silent."""
+        """R-05: a marker that cannot be reserved emits nothing and says so; the next check retries."""
         import services.webhook_service as wh
         events = []
         monkeypatch.setattr(wh, 'emit_update_available',
                             lambda update: events.append(update))
-        monkeypatch.setattr(updates, '_cfg_set', lambda k, v: False)
+
+        def fail(*a, **k):
+            raise RuntimeError('database down')
+        monkeypatch.setattr(updates, 'config_compare_and_set', fail)
         with app.app_context():
-            ok = updates._notify_update_available({
-                'current_version': '2.0', 'latest_version': '99.0',
-                'html_url': 'http://x', 'prerelease': False,
-            })
+            ok = updates._notify_update_available(dict(self.RESULT))
         assert ok is False
-        assert len(events) == 1  # emitted, but the failure is reported
+        assert events == []
+
+    def test_two_executors_reading_the_same_marker_notify_once(self, app, clean_update_config, monkeypatch):
+        """Two nodes during a leader change both read the old marker: one reserves it, one emits."""
+        import services.webhook_service as wh
+        events = []
+        monkeypatch.setattr(wh, 'emit_update_available',
+                            lambda update: events.append(update))
+        real_get = updates._cfg_get
+        monkeypatch.setattr(updates, '_cfg_get', lambda key, default=None: (
+            None if key == updates._NOTIFIED_VERSION_KEY else real_get(key, default)))
+        with app.app_context():
+            assert updates._notify_update_available(dict(self.RESULT)) is True
+            assert updates._notify_update_available(dict(self.RESULT)) is True
+            assert real_get(updates._NOTIFIED_VERSION_KEY) == '99.0'
+        assert len(events) == 1
 
 
 class TestScheduledTask:

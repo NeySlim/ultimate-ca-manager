@@ -56,7 +56,7 @@ Moving an existing single-node release to `ha.enabled=true` needs these steps, b
 
 0. If the release uses SQLite (the chart default), move it to PostgreSQL while still single-node: in Settings > Database, test the PostgreSQL URL and run **Migrate data and switch**, then `helm upgrade` with `database.type=postgresql` and that URL, and check the data in the UI. Setting `database.type=postgresql` alone starts on an empty database, and data migration is refused once in HA.
 1. Copy the content of `/etc/ucm/master.key` (the `etc` volume) into `secrets.keyEncryptionKey`. A new key cannot decrypt the existing database.
-2. Back up the data volume. The chart keeps the old claim (`helm.sh/resource-policy: keep`) but HA pods no longer mount it, so SoftHSM tokens, an uploaded HTTPS certificate and local backups stay behind in it.
+2. Back up the data volume. HA pods no longer mount it, so SoftHSM tokens, an uploaded HTTPS certificate and local backups stay behind in it. `helm upgrade` still renders the existing claim, unmounted and with `helm.sh/resource-policy: keep`, when its cluster lookup finds it; `helm template` and GitOps tools have no lookup and drop the claim from the manifest, so protect it on their side before the switch.
 3. Run `helm upgrade` with `ha.enabled=true`, then check `/health/ready`.
 
 ## Deployment 2: Docker Compose
@@ -79,7 +79,7 @@ Compose refuses to start while one of these variables is missing. The balancer l
 ## What stays local to a node
 
 - **Backups.** Scheduled and manual backups are written under the node's data directory by the leader. They are not replicated: copy them off the host, and also back PostgreSQL up with its own tools.
-- **SoftHSM tokens.** A token lives on the node's own disk, so the chart and the compose example set `HSM_AUTO_INIT=false`. CA keys must sit in a network HSM (PKCS#11 remote, Vault, Azure) when running HA; on packages, set `HSM_AUTO_INIT=false` too.
+- **SoftHSM tokens.** A token lives on the node's own disk, so the chart and the compose example set `HSM_AUTO_INIT=false`. Software CA keys stored in PostgreSQL under the shared `KEY_ENCRYPTION_KEY` work on every node; keys kept in an HSM must use a network HSM (PKCS#11 over the network, OpenBao, Azure Key Vault, AWS CloudHSM, Google KMS).
 - **Certificate files** mirrored by renewals and session file cleanup, which run on the leader only.
 - **The self-signed HTTPS certificate** of each node, as long as none was applied or regenerated from the web interface. Once one is, every node writes it from the database before it starts (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md), HA mode).
 
@@ -100,3 +100,5 @@ Upgrade the nodes one at a time. Migrations run under a PostgreSQL advisory lock
 - **Helm:** `helm upgrade` rolls the pods with no unavailable pod; the PodDisruptionBudget protects them from node drains.
 - **Compose:** `docker compose -f docker-compose.ha.yml pull`, then `up -d ucm-1`, wait until it is healthy, then `up -d ucm-2`.
 - **DEB/RPM:** upgrade and restart one host, wait for `/health/ready`, then the next.
+
+During a roll from a version without the scheduled backup's conclusion marker, a scheduled backup run by an older leader is not marked as concluded: a newer leader then writes one extra archive two hours later, once.

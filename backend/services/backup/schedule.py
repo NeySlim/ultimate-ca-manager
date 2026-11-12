@@ -400,6 +400,9 @@ def _start_marking_conclusions(previous) -> None:
     """Create the conclusion marker before the first reservation that can need it, so
     a run killed with none recorded is retried; an existing marker is left alone."""
     try:
+        # Read first: the compare-and-set's INSERT would hit the unique key, an ERROR in the PG log
+        if db.session.query(SystemConfig.value).filter_by(key=_CONCLUDED_KEY).scalar() is not None:
+            return
         config_compare_and_set(_CONCLUDED_KEY, None, previous or '')
     except Exception as exc:
         db.session.rollback()

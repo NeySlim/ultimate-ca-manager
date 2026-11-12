@@ -1,4 +1,5 @@
-"""WebSocket events of the scheduler process waiting for the web workers (migration 149)."""
+"""WebSocket events waiting for the web workers (migration 149): the scheduler process's,
+and in HA those of every worker of every node."""
 from models import db
 
 

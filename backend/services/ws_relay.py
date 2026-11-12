@@ -223,12 +223,17 @@ class RelayReader:
             self.wakeup.close()
 
     def _loop(self):
-        while not self._stop.is_set():
-            self.run_once()
+        try:
+            while not self._stop.is_set():
+                self.run_once()
+                if self.wakeup is not None:
+                    self.wakeup.wait(self.tick, self._stop)
+                else:
+                    self._stop.wait(self.tick)
+        finally:
+            # A thread that outlived stop()'s join (a slow connect) still releases its LISTEN
             if self.wakeup is not None:
-                self.wakeup.wait(self.tick, self._stop)
-            else:
-                self._stop.wait(self.tick)
+                self.wakeup.close()
 
     def run_once(self):
         """Deliver what is new; a database error is logged once and retried on the next tick."""
@@ -314,6 +319,7 @@ class PgWakeup:
         self.backend_pid = None
         self.schema = None
         self._error_logged = False
+        self._loss_logged = False
 
     def _listen(self):
         raw = self.engine.raw_connection()
@@ -348,10 +354,17 @@ class PgWakeup:
             while not stop.is_set() and (left := deadline - time.monotonic()) > 0:
                 for notify in self._raw.driver_connection.notifies(timeout=min(left, STOP_SLICE_SECONDS)):
                     if notify.payload == self.schema:
+                        self._loss_logged = False
                         return
         except Exception as e:
-            logger.warning(f"WebSocket relay: LISTEN connection lost, reopened: {type(e).__name__}")
+            # A connection dropped right after each LISTEN reconnects twice a second, logged once
+            if not self._loss_logged:
+                logger.warning(f"WebSocket relay: LISTEN connection lost, reopened: {type(e).__name__}")
+                self._loss_logged = True
             self.close()
+            stop.wait(min(timeout, STOP_SLICE_SECONDS))
+            return
+        self._loss_logged = False
 
     def close(self):
         raw, self._raw = self._raw, None

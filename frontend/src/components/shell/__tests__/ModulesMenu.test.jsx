@@ -15,7 +15,7 @@ vi.mock('react-i18next', () => ({
 
 import { ModulesMenu } from '../ModulesMenu'
 import { togglePinList } from '../pins'
-import { MODULES, groupsFor, sidebarGroups, isVisible } from '../../../navigation/registry'
+import { groupsFor } from '../../../navigation/registry'
 
 // Stateful host so a toggle re-renders the menu like the shell does
 function Host({ permissions, initialPins = [], activeId = 'dashboard', onHelp }) {
@@ -39,20 +39,11 @@ const button = () => screen.getByRole('button', { name: /shell\.modules$/ })
 const menu = () => screen.queryByRole('navigation', { name: 'shell.modulesMenuLabel' })
 const linkIds = (root) => within(root).getAllByRole('link').map(a => a.getAttribute('data-module'))
 
-// Entries the old sidebar listed, plus the ones it reached from elsewhere
-// (settings from its bottom link, user certificates from no entry at all)
-function oldNavigationIds(can) {
-  const listed = sidebarGroups(can).flatMap(g => g.children.map(c => c.id))
-  const elsewhere = MODULES.filter(m => m.group && !m.navGroup && isVisible(m, can)).map(m => m.id)
-  return [...new Set([...listed, ...elsewhere])].sort()
-}
-
 describe('Modules menu: what each role sees', () => {
-  it.each(Object.keys(ROLES))('lists exactly the modules the old navigation gave %s', async (role) => {
+  it.each(Object.keys(ROLES))('lists exactly the grouped modules %s may see', async (role) => {
     const user = setup({ permissions: ROLES[role] })
     await user.click(button())
     const ids = linkIds(menu()).sort()
-    expect(ids).toEqual(oldNavigationIds(canFor(ROLES[role])))
     expect(ids).toEqual(groupsFor(canFor(ROLES[role])).flatMap(g => g.modules.map(m => m.id)).sort())
   })
 

@@ -44,7 +44,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `ha.enabled` | `false` | Several nodes on one PostgreSQL (`UCM_HA=1`). Needs `database.type=postgresql` and `replicaCount` >= 2, or the render fails. Adds a PodDisruptionBudget, a preferred pod anti-affinity, a rolling update, `UCM_NODE_ID` (pod name) and a shared `KEY_ENCRYPTION_KEY`; no etc PVC. See `docs/HA.md` |
 | `ha.podDisruptionBudget.minAvailable` | `1` | Pods kept available during voluntary disruptions |
 | `redis.url` | `""` | Redis shared by the nodes (`REDIS_URL`, HA only) |
-| `secrets.keyEncryptionKey` | `""` | `KEY_ENCRYPTION_KEY`; generated once and kept when empty (HA only) |
+| `secrets.keyEncryptionKey` | `""` | `KEY_ENCRYPTION_KEY`, passed to the pods whenever set or already in the Secret; generated once when empty only with `ha.enabled` |
 | `fqdn` | `ucm.local` | FQDN for the self-signed UI cert / default AIA-CRL-OCSP base URL |
 | `initialAdminPassword` | `""` (→ image default `changeme123`) | First-boot admin password |
 | `secrets.secretKey` | `""` (auto-generated + persisted) | Flask session secret |
@@ -133,3 +133,5 @@ helm uninstall ucm -n ucm
 ```
 
 The `*-etc` PVC (master.key) is intentionally **retained**. Delete it manually only when you are certain no encrypted data needs recovery.
+
+The Secret is retained too whenever it holds `KEY_ENCRYPTION_KEY` (HA, or `secrets.keyEncryptionKey` set), and so is the `*-data` PVC of a former single-node release that an HA release still renders. Outside HA the `*-data` PVC is deleted with the release.

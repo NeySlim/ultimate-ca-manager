@@ -3,10 +3,9 @@
  *
  * (a) SSHCertificatesPage listened for `detail.type === 'ssh-certificate'`.
  *     That string exists nowhere else in the repo: the only types dispatched
- *     are `certificate`, `ca`, `truststore` and `user_certificate`, all from
- *     the floating detail window and the CA modals — and SSH certificates are
- *     never opened in a floating window (no openEntity('ssh-certificate', ...),
- *     no entry in FloatingDetailWindow's DetailContent). The listener could
+ *     are `certificate`, `ca`, `truststore` and `user_certificate`, from the
+ *     detail views and the CA modals, and SSH certificates were never opened in
+ *     a detail window (no openEntity('ssh-certificate', ...)). The listener could
  *     never fire, and repointing it at `certificate` would reload the SSH list
  *     on unrelated X.509 events.
  *

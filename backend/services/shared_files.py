@@ -23,11 +23,20 @@ def store_file(name, data: bytes, actor=None):
 def read_file(name):
     """The stored bytes, or None. Raises ValueError when they cannot be decrypted here."""
     from models import SharedFile, db
+    from security.encryption import key_encryption
     from utils.key_codec import load_pem_bytes
     row = db.session.get(SharedFile, name)
     if row is None:
         return None
-    return load_pem_bytes(row.content, context=f"shared file {name}")
+    # load_pem_bytes speaks of a private key and folds a missing key into a wrong one
+    if key_encryption.is_encrypted(row.content) and not key_encryption.is_enabled:
+        raise ValueError(f"Shared file {name} is encrypted under the master key, which this "
+                         "node does not have (master.key or KEY_ENCRYPTION_KEY)")
+    try:
+        return load_pem_bytes(row.content, context=f"shared file {name}")
+    except ValueError:
+        raise ValueError(f"Shared file {name} is malformed or encrypted with a different "
+                         "KEY_ENCRYPTION_KEY") from None
 
 
 def drop_file(name):
