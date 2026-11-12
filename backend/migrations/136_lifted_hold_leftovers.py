@@ -6,8 +6,8 @@ still linked to the row, outlived it. A record now always says revoked: such a l
 is deleted once here. A record names the row's serial only in a spelling no other serial
 has (``unambiguous_serial_spellings``). Idempotent.
 
-Numbered in a gap 3.0 leaves free: 3.0 tracks migrations by name and repeats this
-cleanup in its own migration, so an installation that ran it upgrades unchanged.
+Numbered in a gap 3.0 leaves free: 3.0 tracks migrations by name and skips its own copy
+of this cleanup when this one ran, so a hold linked since then survives the upgrade.
 """
 import base64
 import logging
