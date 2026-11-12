@@ -110,7 +110,32 @@ def test_secret_with_a_key_is_kept_on_uninstall_pos():
         assert ann.get('helm.sh/resource-policy') == 'keep'
 
 
-def test_data_pvc_survives_a_switch_to_ha_pos():
+def test_data_pvc_outside_ha_has_no_keep_annotation_neg():
     pvcs = [d for d in yaml.safe_load_all(_helm(*PG).stdout) if d and d['kind'] == 'PersistentVolumeClaim']
     pvc = next(d for d in pvcs if d['metadata']['name'] == 't-ucm-data')
-    assert pvc['metadata']['annotations']['helm.sh/resource-policy'] == 'keep'
+    assert 'annotations' not in pvc['metadata']
+
+
+def test_ha_without_an_existing_data_pvc_renders_none_neg():
+    # helm template has no cluster: lookup finds nothing, so no claim is created in HA
+    pvcs = [d for d in yaml.safe_load_all(_helm(*HA).stdout) if d and d['kind'] == 'PersistentVolumeClaim']
+    assert pvcs == []
+
+
+def test_ha_with_a_former_data_pvc_still_renders_it_kept_and_unmounted_pos(tmp_path):
+    # helm template cannot reach a cluster: the lookup is stubbed as finding the claim
+    chart = tmp_path / 'ucm'
+    shutil.copytree(CHART, chart)
+    pvc_file = chart / 'templates' / 'pvc.yaml'
+    src = pvc_file.read_text()
+    found = '(lookup "v1" "PersistentVolumeClaim" .Release.Namespace $dataPvc)'
+    assert src.count(found) == 1
+    pvc_file.write_text(src.replace(found, 'true'))
+    out = subprocess.run(['helm', 'template', 't', str(chart), '--set', 'secrets.secretKey=k', *HA],
+                         capture_output=True, text=True, check=True).stdout
+    docs = [d for d in yaml.safe_load_all(out) if d]
+    pvcs = [d for d in docs if d['kind'] == 'PersistentVolumeClaim']
+    assert [p['metadata']['name'] for p in pvcs] == ['t-ucm-data']
+    assert pvcs[0]['metadata']['annotations']['helm.sh/resource-policy'] == 'keep'
+    pod = next(d for d in docs if d['kind'] == 'Deployment')['spec']['template']['spec']
+    assert pod['volumes'] == [{'name': 'data', 'emptyDir': {}}]

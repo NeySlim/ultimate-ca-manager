@@ -37,9 +37,6 @@ metadata:
     app.kubernetes.io/instance: t
     app.kubernetes.io/version: "@APP@"
     app.kubernetes.io/managed-by: Helm
-  annotations:
-    # Switching to ha.enabled stops rendering this claim; keep it (SoftHSM tokens, uploads, backups).
-    "helm.sh/resource-policy": keep
 spec:
   accessModes:
     - ReadWriteOnce

@@ -133,3 +133,5 @@ helm uninstall ucm -n ucm
 ```
 
 The `*-etc` PVC (master.key) is intentionally **retained**. Delete it manually only when you are certain no encrypted data needs recovery.
+
+The Secret is retained too whenever it holds `KEY_ENCRYPTION_KEY` (HA, or `secrets.keyEncryptionKey` set), and so is the `*-data` PVC of a former single-node release that an HA release still renders. Outside HA the `*-data` PVC is deleted with the release.

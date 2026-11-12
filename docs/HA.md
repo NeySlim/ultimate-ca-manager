@@ -56,7 +56,7 @@ Moving an existing single-node release to `ha.enabled=true` needs these steps, b
 
 0. If the release uses SQLite (the chart default), move it to PostgreSQL while still single-node: in Settings > Database, test the PostgreSQL URL and run **Migrate data and switch**, then `helm upgrade` with `database.type=postgresql` and that URL, and check the data in the UI. Setting `database.type=postgresql` alone starts on an empty database, and data migration is refused once in HA.
 1. Copy the content of `/etc/ucm/master.key` (the `etc` volume) into `secrets.keyEncryptionKey`. A new key cannot decrypt the existing database.
-2. Back up the data volume. The chart keeps the old claim (`helm.sh/resource-policy: keep`) but HA pods no longer mount it, so SoftHSM tokens, an uploaded HTTPS certificate and local backups stay behind in it.
+2. Back up the data volume. HA pods no longer mount it, so SoftHSM tokens, an uploaded HTTPS certificate and local backups stay behind in it. `helm upgrade` still renders the existing claim, unmounted and with `helm.sh/resource-policy: keep`, when its cluster lookup finds it; `helm template` and GitOps tools have no lookup and drop the claim from the manifest, so protect it on their side before the switch.
 3. Run `helm upgrade` with `ha.enabled=true`, then check `/health/ready`.
 
 ## Deployment 2: Docker Compose

@@ -1,14 +1,18 @@
-{{- if and .Values.persistence.enabled (not .Values.ha.enabled) }}
-{{- if not .Values.persistence.data.existingClaim }}
+{{- if .Values.persistence.enabled }}
+{{- $dataPvc := include "ucm.dataPvcName" . }}
+{{- if and (not .Values.persistence.data.existingClaim) (or (not .Values.ha.enabled) (lookup "v1" "PersistentVolumeClaim" .Release.Namespace $dataPvc)) }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: {{ include "ucm.dataPvcName" . }}
+  name: {{ $dataPvc }}
   labels:
     {{- include "ucm.labels" . | nindent 4 }}
+  {{- if .Values.ha.enabled }}
   annotations:
-    # Switching to ha.enabled stops rendering this claim; keep it (SoftHSM tokens, uploads, backups).
+    # HA leaves the claim of a former single-node release unmounted (SQLite database,
+    # SoftHSM tokens, uploads, backups): still rendered, and kept, so the switch deletes nothing.
     "helm.sh/resource-policy": keep
+  {{- end }}
 spec:
   accessModes:
     - {{ .Values.persistence.data.accessMode }}
@@ -19,6 +23,7 @@ spec:
   storageClassName: {{ .Values.persistence.storageClass | quote }}
   {{- end }}
 {{- end }}
+{{- if not .Values.ha.enabled }}
 ---
 {{- if not .Values.persistence.etc.existingClaim }}
 apiVersion: v1
@@ -40,5 +45,6 @@ spec:
   {{- if .Values.persistence.storageClass }}
   storageClassName: {{ .Values.persistence.storageClass | quote }}
   {{- end }}
+{{- end }}
 {{- end }}
 {{- end }}
