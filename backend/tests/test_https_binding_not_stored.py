@@ -97,3 +97,20 @@ def test_the_500_names_the_certificate_the_next_start_serves(
     assert r.status_code == 500, r.data
     assert r.get_json()['message'].endswith(f'its next start serves {served}'), r.data
 
+
+@pytest.mark.parametrize('ha', [False, True])
+@pytest.mark.parametrize('route, action', [('apply', 'https_apply'), ('regenerate', 'https_regenerate')])
+def test_the_unrecorded_write_is_audited_as_a_failure(
+        app, auth_client, own_cert, broken_binding, prior, monkeypatch, route, action, ha):
+    import api.v2.system.https as module
+    from models import AuditLog, db
+    prior('none')
+    monkeypatch.setattr(module, 'ha_enabled', lambda: ha)
+    with app.app_context():
+        last = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+    r = _post(auth_client, route, own_cert)
+    assert r.status_code == 500, r.data
+    with app.app_context():
+        rows = AuditLog.query.filter(AuditLog.id > last, AuditLog.action == action).all()
+        assert [row.success for row in rows] == [False], [(row.action, row.details) for row in rows]
+        assert ('this node only' if ha else 'not recorded') in rows[0].details
