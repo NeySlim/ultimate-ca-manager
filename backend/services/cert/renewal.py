@@ -159,6 +159,10 @@ def check_renewable(cert: Certificate) -> None:
     # Any revocation, a suspension included: renewing would hand back a good serial
     if cert.revoked:
         raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
+    # The record outlives the row: a row left unrevoked beside it renews nothing
+    from services.cert.issued_lookup import row_persisted_revocation
+    if row_persisted_revocation(cert) is not None:
+        raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
     if cert.source == 'msca':
         raise RenewalError('Microsoft CA certificates must be renewed through the AD CS connector', 400)
 
@@ -418,6 +422,10 @@ def _signing_ca(cert, ca):
         raise RenewalError(
             f'This certificate\'s signature does not verify with the current key of CA "{ca.descr}" '
             '(re-keyed or replaced): it cannot be renewed under it, issue a new certificate instead', 400)
+    # Under the CA that really signed it, which a row without caref only now names
+    from services.cert.issued_lookup import row_persisted_revocation
+    if row_persisted_revocation(cert, ca) is not None:
+        raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
 
     from services.hsm.ca_key_loader import get_ca_signing_key
     try:
