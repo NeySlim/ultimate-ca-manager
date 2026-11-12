@@ -900,3 +900,28 @@ class TestTheCrlReadsTheRecordsOnce:
         with app.app_context():
             serials = [db.session.get(Certificate, i).serial_number for i in made]
         assert [listed.get(s) for s in serials] == ['keyCompromise'] * len(made)
+
+
+class TestANegativeSerialNamesItsOwnRecordOnly:
+    """Non-regression: ``canonical_serial`` keeps a negative serial in signed decimal
+    (-16 is "-16", never "-10"), and records are compared by equality."""
+
+    def test_minus_ten_and_minus_sixteen(self, app, issuer):
+        from services.cert.issued_lookup import record_serial_clause
+        from utils.serial_format import canonical_serial
+        assert (canonical_serial(-16), canonical_serial(-10)) == ('-16', '-10')
+        _, refid, _, _ = issuer
+        with app.app_context():
+            made = [RevokedSerial(caref=refid, serial_number=column, revoke_reason='keyCompromise',
+                                  revoked_at=EARLY, valid_to=LATER) for column in ('-10', '-16')]
+            db.session.add_all(made)
+            db.session.commit()
+            try:
+                for serial in (-10, -16):
+                    named = RevokedSerial.query.filter(RevokedSerial.caref == refid,
+                                                       record_serial_clause(serial)).all()
+                    assert [r.serial_number for r in named] == [str(serial)]
+            finally:
+                for record in made:
+                    db.session.delete(record)
+                db.session.commit()
