@@ -268,3 +268,17 @@ def test_the_decrypting_sweep_of_a_disable_never_writes_the_key_in_the_clear(
     rows = _rows(app)
     assert key_encryption.is_encrypted(rows[stored.ACTIVE_KEY])
     assert key_encryption.is_encrypted(rows[stored.PREVIOUS_KEY])
+
+
+def test_a_key_given_by_the_caller_is_neither_answered_nor_logged(
+        app, auth_client, stored, encryption_enabled, caplog):
+    from models import AuditLog
+    caplog.set_level(logging.DEBUG)
+    secret = 'Z9q' * 15
+    r = auth_client.post(ROTATE, json={'new_secret': secret})
+    assert r.status_code == 200, r.data
+    assert app.config['SECRET_KEY'] == secret
+    assert secret not in r.get_data(as_text=True) and secret not in caplog.text
+    with app.app_context():
+        assert not AuditLog.query.filter(AuditLog.details.contains(secret)).first()
+    assert auth_client.post(ROTATE, json={'new_secret': 'short'}).status_code in (400, 409)
