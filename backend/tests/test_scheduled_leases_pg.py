@@ -650,6 +650,7 @@ def test_expiry_checks_held_elsewhere_ask_a_retry_when_the_lease_ends(app, ha, m
 
 
 def test_the_retried_expiry_pass_announces_nothing_the_holder_did(app, ha, create_cert, monkeypatch):
+    """Regression lock, not a proof: it also passes without the retry code (the mark alone covers it)."""
     # The holder finished meanwhile: its mark covers the expiry, the retry announces it no more
     cert_id = create_cert(cn='retry-after-holder.example.com')['id']
     now = datetime(2044, 2, 1, 12, 0)
@@ -682,6 +683,7 @@ def test_a_crl_held_elsewhere_asks_a_retry_when_its_lease_ends(app, ha, monkeypa
 
 
 def test_a_crl_pass_with_nothing_held_asks_no_retry(app, ha, monkeypatch):
+    """Regression lock, not a proof: it also passes without the retry code (nothing asks a retry)."""
     ca_id = _a_ca_due(app)
     _record_regenerations(monkeypatch)
     try:

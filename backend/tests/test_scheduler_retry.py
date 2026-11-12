@@ -72,6 +72,7 @@ def test_a_retry_shows_as_the_next_run(clock):
 
 
 def test_a_disabled_task_does_not_retry(clock):
+    """Regression lock, not a proof: it also passes without the retry code (a disabled task never runs)."""
     s = _scheduler_with(lambda: {'status': 'skipped', 'retry_in': 60}, clock)
     s._run_task(s.tasks['pass'])
     s.disable_task('pass')
