@@ -1026,28 +1026,6 @@ class TestARecordedHoldIsShownAndLifted:
         with app.app_context():
             assert db.session.get(RevokedSerial, record_id) is not None
 
-    def test_a_page_that_shows_it_aligns_the_row_for_the_filters(self, app, auth_client, issuer):
-        """Once a page shows the recorded revocation, the status filters and counts agree with it."""
-        from models.audit_log import AuditLog
-        tag = uuid.uuid4().hex[:10]
-        _, refid, ca_cert, ca_key = issuer
-        real, key = _leaf(f'aligned-{tag}.example.test', ca_cert, ca_key, days=200)
-        row_id = _store(app, real, refid, key=key)
-        _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
-
-        def ids(*statuses):
-            query = ''.join(f'&status={s}' for s in statuses)
-            r = auth_client.get(f'/api/v2/certificates?search={tag}{query}')
-            return [d['id'] for d in r.get_json()['data']]
-        assert ids('valid') == [row_id]
-        assert (ids('revoked'), ids('valid')) == ([row_id], [])
-        assert _row(app, row_id) == (True, 'certificateHold', EARLY)
-        with app.app_context():
-            audits = AuditLog.query.filter(AuditLog.action == 'cert_revoked',
-                                           AuditLog.details.contains(tag)).all()
-            assert len(audits) == 1 and 'recorded revocation' in audits[0].details
-            assert audits[0].resource_id == str(row_id)
-
     def test_a_final_row_is_refused_as_a_final_record_is(self, app, auth_client, issuer):
         """One refusal, one code: the row's own final reason answers as the record's does."""
         _, row_by_record, _ = self._recorded(app, issuer, 'final-by-record.example.test',
@@ -1120,12 +1098,9 @@ class TestARecordedHoldIsShownAndLifted:
             return seen, {d['id']: (d['revoked'], d['revoke_reason'], d['status'])
                           for d in r.get_json()['data']}
 
-        # The first page that shows a row marks it (one write each); reading it again costs no more
         rows(2)
-        listed()
         few, _ = listed()
         rows(6)
-        listed()
         many, shown = listed()
         from collections import Counter
         assert len(many) == len(few), sorted((Counter(many) - Counter(few)).items())[:6]

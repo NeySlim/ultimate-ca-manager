@@ -12,7 +12,6 @@ revocation record) and not expired.
 """
 
 import base64
-import logging
 from datetime import datetime
 from typing import Optional, Tuple
 
@@ -31,8 +30,6 @@ REVOKED = 'revoked'
 EXPIRED = 'expired'
 NOT_YET_VALID = 'not_yet_valid'
 SUPERSEDED = 'superseded'
-
-logger = logging.getLogger(__name__)
 
 
 def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
@@ -267,26 +264,6 @@ def apply_persisted_revocation(row: Certificate, record=None) -> bool:
     row.revoke_reason = record.revoke_reason
     row.invalidity_at = record.invalidity_at
     return True
-
-
-def align_rows_with_records(rows, recorded: dict) -> int:
-    """Mark the rows of a page its CA's records revoke, as the hourly pass would, so the
-    status filters and counts read what the page shows; commits and audits. Returns the count."""
-    marked = [(row, recorded[row.id]) for row in rows if row.id in recorded and not row.revoked
-              and apply_persisted_revocation(row, recorded[row.id])]
-    if not marked:
-        return 0
-    try:
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        logger.warning("Recorded revocations not applied to a page: %s", e)
-        return 0
-    from services.audit_service import AuditService
-    from services.ski_aki_backfill import _marked_entry
-    for row, record in marked:
-        AuditService.log_action(username='system', **_marked_entry(row, record))
-    return len(marked)
 
 
 def apply_persisted_revocations(ids=None) -> list:
