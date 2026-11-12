@@ -157,15 +157,28 @@ def lift_persisted_revocation(ca: CA, serial: int) -> int:
     ).delete(synchronize_session='fetch')
 
 
-def answered_revocation(row: Certificate, ca: CA):
+def gravest_records_by_serial(records) -> dict:
+    """The gravest of ``records`` per serial they name (``revocation_order``), keyed by the
+    canonical column ``record_serial_clause`` compares: ``records`` are read once, not per row."""
+    gravest = {}
+    for record in sorted(records, key=revocation_order):
+        gravest.setdefault(record.serial_number, record)
+    return gravest
+
+
+def answered_revocation(row: Certificate, ca: CA, records: Optional[dict] = None):
     """What the CRL and OCSP say of the revoked ``row``: itself, or when it is only held, the
-    final record of its serial under ``ca`` (or a record of its key), the graver of the two."""
+    final record of its serial under ``ca`` (or a record of its key), the graver of the two.
+    ``records`` (``gravest_records_by_serial`` of the key's records) spares a query per row."""
     from utils.revocation_reasons import HOLD_REASONS
     from services.cert.serial_resolution import resolve_record_serial
     if row.revoke_reason not in HOLD_REASONS:
         return row
     serial = resolve_record_serial(row)
-    return row if serial is None else gravest_revocation(row, persisted_revocation(ca, serial))
+    if serial is None:
+        return row
+    record = records.get(canonical_serial(serial)) if records is not None else persisted_revocation(ca, serial)
+    return gravest_revocation(row, record)
 
 
 def _row_serial(row: Certificate) -> Optional[int]:

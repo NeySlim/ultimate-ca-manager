@@ -81,22 +81,24 @@ class CRLQueryMixin:
             raise ValueError(f"CA with id {ca_id} not found")
         from models.revoked_serial import RevokedSerial
         now = utc_now()
+        refids = same_key_refids(ca)
         certificates = Certificate.query.filter(
-            Certificate.caref.in_(same_key_refids(ca)),
+            Certificate.caref.in_(refids),
             Certificate.revoked == True,  # noqa: E712
             _not_expired(Certificate.valid_to, now),
         ).order_by(Certificate.id).all()
         child_cas = sorted(_revoked_child_cas(ca, now), key=lambda c: c.id)
-        from services.cert.issued_lookup import answered_revocation, revocation_order
+        from services.cert.issued_lookup import answered_revocation, gravest_records_by_serial, revocation_order
+        # Every record of the key in one query, expired ones included as persisted_revocation reads them
+        records = RevokedSerial.query.filter(RevokedSerial.caref.in_(refids)).all()
+        by_serial = gravest_records_by_serial(records)
         # A held row under a final record of its serial is listed with the graver reason, as OCSP
-        certificates = [answered_revocation(c, ca) for c in certificates]
+        certificates = [answered_revocation(c, ca, by_serial) for c in certificates]
         # The certificate record comes first: it carries the invalidity date
         live = _dedupe_live_records(certificates + child_cas)
         # Gravest record of a serial first, as persisted_revocation answers OCSP
-        persisted = sorted(RevokedSerial.query.filter(
-            RevokedSerial.caref.in_(same_key_refids(ca)),
-            RevokedSerial.valid_to > now,
-        ).all(), key=revocation_order)
+        persisted = sorted((r for r in records if r.valid_to is not None and r.valid_to > now),
+                           key=revocation_order)
         return live + CRLQueryMixin._filter_orphan_serials(persisted, live)
 
     @staticmethod
