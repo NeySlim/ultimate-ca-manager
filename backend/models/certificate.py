@@ -83,6 +83,8 @@ class Certificate(db.Model):
     
     # Template reference (optional - null if created without template)
     template_id = db.Column(db.Integer, db.ForeignKey("certificate_templates.id"), nullable=True)
+    # Windows enrollment profile that issued it; no foreign key, like SCEPRequest.profile_id
+    windows_profile_id = db.Column(db.Integer, nullable=True, index=True)
 
     # Frozen at issuance (issue #258): JSON array of the fields where the
     # effective value diverged from the linked template's declared default
