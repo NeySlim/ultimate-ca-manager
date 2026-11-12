@@ -101,3 +101,39 @@ def test_script_is_valid_shell():
 @pytest.mark.skipif(not shutil.which('shellcheck'), reason='shellcheck not installed')
 def test_script_passes_shellcheck():
     assert subprocess.run(['shellcheck', '-s', 'sh', str(SCRIPT)]).returncode == 0
+
+
+def _stubbed_run(tmp_path, kind, sudo_present):
+    """Run the script against stub commands; returns the ordered command log."""
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    log = tmp_path / 'log'
+    def stub(name, body):
+        f = bin_dir / name
+        f.write_text('#!/bin/sh\n' + body + '\n')
+        f.chmod(0o755)
+    for tool in ('tr', 'rm', 'cat', 'tail', 'mkdir', 'chown', 'sleep', 'kill'):
+        (bin_dir / tool).symlink_to(shutil.which(tool))  # no host sudo on the PATH
+    stub('id', 'echo 0')
+    stub('dpkg-deb', 'echo 1.0')
+    stub('rpm', 'echo 1.0')
+    stub('apt-get', f'echo "apt-get $*" >> {log}; exit 1')
+    stub('dnf', f'echo "dnf $*" >> {log}; exit 1')
+    stub('dpkg', f'echo "dpkg $*" >> {log}; rm -f {bin_dir}/sudo')
+    if sudo_present:
+        stub('sudo', 'exit 0')
+    pkg = tmp_path / f'ucm.{kind}'
+    pkg.write_text('x')
+    subprocess.run(['/bin/sh', str(SCRIPT), str(pkg)], env={'PATH': f'{bin_dir}'},
+                   capture_output=True, text=True, cwd=tmp_path)
+    return log.read_text().splitlines() if log.exists() else []
+
+
+def test_a_preinstalled_sudo_is_removed_before_the_install(tmp_path):
+    calls = _stubbed_run(tmp_path, 'deb', sudo_present=True)
+    assert calls[0].startswith('dpkg --purge') and calls[1].startswith('apt-get')
+
+
+def test_no_sudo_removal_when_the_image_has_none(tmp_path):
+    calls = _stubbed_run(tmp_path, 'deb', sudo_present=False)
+    assert calls and calls[0].startswith('apt-get')

@@ -23,14 +23,22 @@ case "$PKG" in
   *.deb)
     export DEBIAN_FRONTEND=noninteractive
     WANT=$(dpkg-deb -f "$PKG" Version 2>/dev/null)
+    UNSUDO='dpkg --purge --force-depends sudo'
     INSTALL='apt-get update -qq && apt-get install -y -qq "$PKG"'
     ;;
   *.rpm)
     WANT=$(rpm -qp --qf '%{VERSION}' "$PKG" 2>/dev/null)
+    UNSUDO='rpm -e --nodeps sudo'
     INSTALL='dnf install -y -q "$PKG"'
     ;;
   *) echo "FAIL: unsupported package type: $PKG"; exit 2 ;;
 esac
+# The package must not need sudo: start from an image without it, so a later sudo is the package's.
+if command -v sudo >/dev/null 2>&1; then
+  eval "$UNSUDO" >/dev/null 2>&1
+  hash -r 2>/dev/null
+  command -v sudo >/dev/null 2>&1 && { echo "FAIL: precondition: sudo cannot be removed from this image"; exit 2; }
+fi
 if ! eval "$INSTALL" >/tmp/ucm-install.log 2>&1; then
   tail -n 30 /tmp/ucm-install.log
   echo "FAIL: package installation exited non-zero"
