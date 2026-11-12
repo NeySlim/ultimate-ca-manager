@@ -48,6 +48,8 @@ def get_encryption_status():
 
         return success_response(data={
             'enabled': key_encryption.is_enabled,
+            # A disable left half-way: values still open, none is encrypted any more
+            'disabling': key_encryption.is_enabled and not key_encryption.is_encrypting,
             'key_source': key_encryption.key_source,
             # Fingerprint and version only: neither key ever leaves the server here
             'kek_fingerprint': key_encryption.kek_fingerprint(),
@@ -319,22 +321,19 @@ def disable_encryption():
                 "encryption.", 409
             )
 
-        if not key_encryption.is_enabled:
-            return error_response("Encryption is not enabled", 400)
-
-        from models import EncryptionKey
-        from security import envelope
         from security.dek_rotation import (
-            DISABLED_MARKER_VERSION, lock_key_state, rotation_in_progress,
+            RotationError, begin_disable, finish_disable, settle,
         )
-        from services.cluster_commands import RELOAD_ENCRYPTION, emit
         from utils.ha import ha_enabled
 
-        if rotation_in_progress():
-            return error_response(
-                "A data-encryption key rotation is in progress: finish it first.", 409)
+        # Phase 1, under the lock: nothing new is encrypted, every DEK still opens what it did
+        try:
+            command = begin_disable()
+        except RotationError as e:
+            return error_response(str(e), e.status)
+        settle()
+        _wait_for_nodes(command)
 
-        # Decrypt all keys first (while we still have the key)
         decrypted, skipped, errors = do_decrypt(dry_run=False)
 
         if errors:
@@ -347,17 +346,11 @@ def disable_encryption():
         # or the variable the next reload falls back to) is marked unused
         remove_file = key_encryption.key_source == 'file' and not ha_enabled()
         kept_kek = key_encryption.kek_fingerprint() if not remove_file else _env_kek_fingerprint()
-        lock_key_state()
-        EncryptionKey.query.delete()
-        if kept_kek:
-            db.session.add(EncryptionKey(
-                version=DISABLED_MARKER_VERSION, state=envelope.DISABLED,
-                kek_id=kept_kek, wrapped=None, created_at=utc_now()))
-        # Nothing is encrypted any more: without this the next start would create a key
-        from security.master_key_bootstrap import record_operator_choice
-        record_operator_choice(auto=False)
-        emit(RELOAD_ENCRYPTION, {'version': None})
-        db.session.commit()
+        # Phase 2: the DEKs go only if no value is encrypted any more
+        try:
+            finish_disable(kept_kek)
+        except RotationError as e:
+            return error_response(str(e), e.status)
 
         if remove_file:
             KeyEncryption.remove_key_file()
@@ -452,7 +445,7 @@ def rotate_encryption_key():
         result = dek_rotation.rotate()
     except dek_rotation.RotationError as e:
         db.session.rollback()
-        return error_response(f"Key rotation not finished: {e}", 409)
+        return error_response(f"Key rotation not finished: {e}", e.status)
     except Exception as e:
         db.session.rollback()
         logger.error(f"DEK rotation failed: {type(e).__name__}: {e}")

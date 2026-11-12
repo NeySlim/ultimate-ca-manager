@@ -22,7 +22,9 @@ DISABLED_MARKER_VERSION = 0
 
 
 class RotationError(RuntimeError):
-    pass
+    def __init__(self, message, status=409):
+        super().__init__(message)
+        self.status = status
 
 
 def lock_key_state(session=None) -> None:
@@ -51,9 +53,12 @@ def start():
     from models import db, EncryptionKey
     from utils.datetime_utils import utc_now
     key_encryption = _encryption.key_encryption
-    if not key_encryption.is_enabled:
-        raise RotationError('Encryption is not enabled')
     lock_key_state()
+    # Checked under the lock: a disable committed meanwhile is never undone here
+    key_encryption.refresh()
+    if not key_encryption.is_encrypting:
+        db.session.rollback()
+        raise RotationError('Encryption is not enabled', 400)
     rows = EncryptionKey.query.order_by(EncryptionKey.version).all()
     keys = [r for r in rows if r.state in (envelope.ACTIVE, envelope.PREVIOUS)]
     if any(r.state == envelope.PREVIOUS for r in keys):
@@ -237,6 +242,65 @@ def rotate(wait_timeout=None) -> dict:
                 version, stats['rewritten'], dropped)
     return {'state': 'done', 'version': version, 'rewritten': stats['rewritten'],
             'dropped': dropped}
+
+
+def begin_disable():
+    """Phase 1 of a disable: every DEK kept for reading, none encrypts any more. Committed.
+
+    Returns the cluster command. Run again, it resumes a disable left half-way.
+    """
+    from models import db, EncryptionKey
+    from utils.datetime_utils import utc_now
+    key_encryption = _encryption.key_encryption
+    lock_key_state()
+    key_encryption.refresh()
+    if not key_encryption.is_enabled:
+        db.session.rollback()
+        raise RotationError('Encryption is not enabled', 400)
+    if rotation_in_progress():
+        db.session.rollback()
+        raise RotationError('A data-encryption key rotation is in progress: finish it first.')
+    mine = envelope.kek_id(key_encryption.kek_bytes_for_envelope())
+    rows = EncryptionKey.query.all()
+    now = utc_now()
+    if not any(r.state in (envelope.ACTIVE, envelope.PREVIOUS) for r in rows):
+        # The KEK material is DEK version 1: recorded, or the marker alone would read as off
+        db.session.add(EncryptionKey(version=1, state=envelope.ACTIVE, kek_id=mine,
+                                     wrapped=None, created_at=now))
+    marker = next((r for r in rows if r.state == envelope.DISABLED), None)
+    if marker is None:
+        db.session.add(EncryptionKey(version=DISABLED_MARKER_VERSION, state=envelope.DISABLED,
+                                     kek_id=mine, wrapped=None, created_at=now))
+    else:
+        marker.kek_id = mine
+    command = _emit_reload(None)
+    db.session.commit()
+    key_encryption.reload()
+    return command
+
+
+def finish_disable(kept_kek) -> None:
+    """Phase 2: the DEKs dropped once, under the lock, no stored value is encrypted. Committed.
+
+    ``kept_kek``: fingerprint of the KEK that stays configured, marked unused, or None.
+    """
+    from models import db, EncryptionKey
+    from utils.datetime_utils import utc_now
+    lock_key_state()
+    if _encryption.has_encrypted_keys_in_db():
+        db.session.rollback()
+        raise RotationError('A value was encrypted while encryption was being disabled: run '
+                            'the disable again, the data-encryption keys are kept.')
+    EncryptionKey.query.delete()
+    if kept_kek:
+        db.session.add(EncryptionKey(
+            version=DISABLED_MARKER_VERSION, state=envelope.DISABLED,
+            kek_id=kept_kek, wrapped=None, created_at=utc_now()))
+    # Nothing is encrypted any more: without this the next start would create a key
+    from security.master_key_bootstrap import record_operator_choice
+    record_operator_choice(auto=False)
+    _emit_reload(None)
+    db.session.commit()
 
 
 def resume_at_start() -> None:

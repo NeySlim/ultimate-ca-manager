@@ -453,7 +453,8 @@ def test_in_ha_disable_then_enable_keep_the_kek_and_tell_every_node(app, auth_cl
     stored = _stored(app, values)
     assert all(key_encryption.is_encrypted(stored[k]) for k in ('ssh', 'target', 'config'))
     assert _read(app, values) == CLEAR
-    assert [k for k, _ in _commands(app)] == ['reload_encryption', 'reload_encryption']
+    # Disable: decrypt-only, then the DEKs dropped; enable
+    assert [k for k, _ in _commands(app)] == ['reload_encryption'] * 3
     r = auth_client.post('/api/v2/system/security/encrypt-all-keys', json={'dry_run': True})
     assert r.status_code == 200, r.data
 
@@ -629,3 +630,95 @@ def test_a_process_that_loaded_the_deks_before_a_rotation_follows_it(app, values
         # Its write is under the DEK that stays, not the one the rotation dropped
         key_encryption.reload()
         assert encryption.decrypt_master_key_value(written, 'text') == 'scheduler write'
+
+
+# --- disable -------------------------------------------------------------
+
+
+def test_while_disabling_every_value_opens_and_nothing_new_is_encrypted(app, auth_client, values,
+                                                                       monkeypatch, encryption_enabled):
+    """Phase 1 is committed before the decryption: a process still writing writes in the clear."""
+    from security import dek_rotation, encryption
+    with app.app_context():
+        dek_rotation.rotate()  # a DEK of version 2, the one a premature drop would lose
+    real = encryption.decrypt_all_keys
+    seen = {}
+
+    def decrypt_phase(dry_run=True):
+        seen['rows'] = [(v, s) for v, s, _, _ in _rows(app)]
+        seen['written'] = encryption.key_encryption.encrypt_string('written meanwhile')
+        seen['read'] = _read(app, values)
+        return real(dry_run=dry_run)
+    monkeypatch.setattr(encryption, 'decrypt_all_keys', decrypt_phase)
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert r.status_code == 200, r.data
+    assert seen['rows'] == [(0, 'disabled'), (2, 'active')]
+    assert seen['written'] == 'written meanwhile'
+    assert seen['read'] == CLEAR
+
+
+def test_a_value_encrypted_during_the_disable_keeps_the_deks(app, auth_client, values, monkeypatch,
+                                                            encryption_enabled):
+    """A process that encrypted under the old state before it re-read: its value stays readable."""
+    from models.deploy import DeployTarget
+    from security import dek_rotation, encryption
+    with app.app_context():
+        dek_rotation.rotate()
+        stale = encryption.key_encryption._fernet  # the DEK that process still encrypts with
+    real = encryption.decrypt_all_keys
+    target_id = values['ids'][DeployTarget]
+
+    def late_write(dry_run=True):
+        result = real(dry_run=dry_run)
+        with app.app_context():
+            db.session.get(DeployTarget, target_id).private_key = base64.b64encode(
+                encryption.ENCRYPTED_MARKER + stale.encrypt(PEM.encode())).decode()
+            db.session.commit()
+        return result
+    monkeypatch.setattr(encryption, 'decrypt_all_keys', late_write)
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert r.status_code == 409, r.data
+    assert (2, 'active') in [(v, s) for v, s, _, _ in _rows(app)]
+    assert _stored(app, values)['config'] == PEM  # the others were decrypted
+    with app.app_context():
+        assert encryption.decrypt_master_key_value(_stored(app, values)['target'], 'text') == PEM
+
+
+def test_a_rotation_never_undoes_a_disable_committed_meanwhile(app, values, monkeypatch,
+                                                              encryption_enabled):
+    """The process's state may be stale before the lock; the database's under it decides."""
+    from models import EncryptionKey
+    from security import dek_rotation, envelope
+    from utils.datetime_utils import utc_now
+    key_encryption = encryption_enabled.key_encryption
+    monkeypatch.setattr(encryption_enabled, 'REFRESH_SECONDS', 3600.0)
+    with app.app_context():
+        key_encryption.reload()
+        assert key_encryption.is_enabled
+        db.session.add(EncryptionKey(version=0, state=envelope.DISABLED,
+                                     kek_id=key_encryption.kek_fingerprint(), wrapped=None,
+                                     created_at=utc_now()))
+        db.session.commit()  # disabled by another process
+        with pytest.raises(dek_rotation.RotationError):
+            dek_rotation.start()
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(0, 'disabled')]
+
+
+def test_a_disable_never_drops_the_deks_of_a_rotation_started_meanwhile(app, auth_client, values,
+                                                                       monkeypatch, encryption_enabled):
+    """The rotation check is made under the lock: one committed just before it is seen."""
+    from security import dek_rotation
+    real = dek_rotation.lock_key_state
+    started = []
+
+    def rotation_first(session=None):
+        if not started:
+            started.append(True)
+            with app.app_context():
+                dek_rotation.start()  # another node's rotation, committed before the lock
+        return real(session)
+    monkeypatch.setattr(dek_rotation, 'lock_key_state', rotation_first)
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert r.status_code == 409, r.data
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
+    assert _read(app, values) == CLEAR

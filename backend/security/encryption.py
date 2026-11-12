@@ -208,8 +208,9 @@ class KeyEncryption:
             self._rows, self._read_at = rows, time.monotonic()
         mine = envelope.kek_id(self._key_bytes)
         keys = [r for r in rows or () if r[1] in (envelope.ACTIVE, envelope.PREVIOUS)]
+        disabled = any(r[1] == envelope.DISABLED and r[2] == mine for r in rows or ())
         if not keys:
-            if any(r[1] == envelope.DISABLED and r[2] == mine for r in rows or ()):
+            if disabled:
                 return  # turned off from the UI while this KEK was configured
             self._set_deks({1: Fernet(base64.urlsafe_b64encode(self._key_bytes))}, 1)
             return
@@ -227,6 +228,9 @@ class KeyEncryption:
             if state == envelope.ACTIVE:
                 active = max(active or 0, version)
         self._set_deks(deks, active if active is not None else max(deks))
+        if disabled:
+            # Being disabled: every value still opens, nothing new is encrypted
+            self._fernet = None
 
     _FIELDS = ('_fernet', '_decryptor', '_key_bytes', '_versions', '_active_version',
                '_rows_loaded', '_rows', '_read_at', '_enabled', '_key_source', 'dek_error')
@@ -305,10 +309,20 @@ class KeyEncryption:
         """Any DEK this process holds: during a rotation a value is under the old or the new one."""
         return self._decryptor.decrypt(token)
 
+    def refresh(self) -> None:
+        """Re-read the DEK rows now: under the key-state lock, the state the database holds."""
+        self._read_at = float('-inf')
+        self._ensure_loaded()
+
     @property
     def is_enabled(self) -> bool:
         self._ensure_loaded()
         return self._enabled
+
+    @property
+    def is_encrypting(self) -> bool:
+        """Enabled and not being disabled: new values are encrypted."""
+        return self.is_enabled and self._fernet is not None
     
     @property
     def key_source(self) -> Optional[str]:
@@ -325,7 +339,7 @@ class KeyEncryption:
                     info=label).derive(self._key_bytes)
     
     def encrypt(self, data: str) -> str:
-        if not self.is_enabled or not data:
+        if not self.is_encrypting or not data:
             return data
         
         try:
@@ -448,7 +462,7 @@ class KeyEncryption:
 
     def encrypt_string(self, plaintext: str) -> str:
         """Encrypt a plaintext string (e.g., LDAP bind password). Returns prefixed base64."""
-        if not self.is_enabled or not plaintext:
+        if not self.is_encrypting or not plaintext:
             return plaintext
         try:
             encrypted = self._fernet.encrypt(plaintext.encode('utf-8'))
@@ -681,7 +695,7 @@ def encrypt_all_keys(dry_run: bool = True) -> tuple:
     Encrypt every value still stored unencrypted under the master key.
     Returns: (encrypted_count, skipped_count, errors)
     """
-    if not key_encryption.is_enabled:
+    if not key_encryption.is_encrypting:
         return 0, 0, ["Encryption not enabled"]
 
     from models import db
