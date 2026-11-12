@@ -27,10 +27,12 @@ def _docs(*args):
 
 def test_default_render_matches_the_pre_ha_render():
     chart = yaml.safe_load((CHART / 'Chart.yaml').read_text())
-    out = _helm().stdout
-    out = re.sub(r'checksum/secret: .*', 'checksum/secret: @SUM@', out)
-    out = out.replace('ucm-' + chart['version'], '@CHART@').replace(chart['appVersion'], '@APP@')
-    assert out == GOLDEN.read_text()
+    # Compared as documents: helm versions differ on blank lines between them.
+    def load(text):
+        text = re.sub(r'checksum/secret: .*', 'checksum/secret: SUM', text)
+        return [d for d in yaml.safe_load_all(text) if d]
+    golden = GOLDEN.read_text().replace('@CHART@', 'ucm-' + chart['version']).replace('@APP@', chart['appVersion'])
+    assert load(_helm().stdout) == load(golden)
 
 
 def test_ha_render_pos():
