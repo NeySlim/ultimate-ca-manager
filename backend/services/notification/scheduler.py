@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 EXPIRY_LEASE_KEY = 'expiry_alerts.lease'
 EXPIRY_WEBHOOKS_MARK_KEY = 'expiry_alerts.webhooks_mark'
 EXPIRY_LEASE = timedelta(minutes=10)
+# Oldest expiry announced after an outage: past a month the news is stale and a flood of it buries the rest
+EXPIRY_CATCH_UP = timedelta(days=30)
 
 
 class _NoLease:
@@ -46,6 +48,22 @@ def _later(last, now):
     return last if last is not None and last > now else now
 
 
+def _expired_after(last, now):
+    """Lower bound of the 'expired' window: the mark, at most EXPIRY_CATCH_UP back, and the
+    last day on a first pass (no mark), which announces no backlog. Logs what is left aside."""
+    if last is None:
+        return now - timedelta(days=1)
+    floor = now - EXPIRY_CATCH_UP
+    if last >= floor:
+        return last
+    from services import expiry_alert_service
+    left = expiry_alert_service.count_expired_between(last, floor)
+    if left:
+        logger.warning(f"Expiry webhooks: {left} certificate(s) expired more than "
+                       f"{EXPIRY_CATCH_UP.days} days ago are not announced")
+    return floor
+
+
 def _emit_webhooks_in_ha():
     """HA: 'expired' covers (last mark, now], 'expiring' reminders go out once per cluster
     day; a pass cut short before the mark is emitted again once the lease is over."""
@@ -57,7 +75,7 @@ def _emit_webhooks_in_ha():
     last = _parse_mark(previous)
     if not expiry_alert_service._emit_expiry_webhooks(
             expiring=last is None or last.date() != now.date(),
-            expired_after=last if last is not None else now - timedelta(days=1),
+            expired_after=_expired_after(last, now),
             now=now):
         return
     try:
@@ -68,11 +86,13 @@ def _emit_webhooks_in_ha():
 
 
 def _emit_webhooks_single_node():
-    """The last 24h, then the mark moves too: HA turned back on resumes from this pass."""
+    """Same window as in HA, from the mark; reminders go out at every pass."""
     from models import SystemConfig, db
     from services import expiry_alert_service
     now = _cluster_now()
-    if not expiry_alert_service._emit_expiry_webhooks(now=now):
+    row = SystemConfig.query.filter_by(key=EXPIRY_WEBHOOKS_MARK_KEY).first()
+    last = _parse_mark(row.value if row is not None else None)
+    if not expiry_alert_service._emit_expiry_webhooks(expired_after=_expired_after(last, now), now=now):
         return
     try:
         row = SystemConfig.query.filter_by(key=EXPIRY_WEBHOOKS_MARK_KEY).first()

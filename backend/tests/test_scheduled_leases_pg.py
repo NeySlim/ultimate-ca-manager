@@ -565,3 +565,54 @@ def test_a_crl_sync_revokes_in_id_order(app, fake_adcs, patched_network, monkeyp
             Certificate.query.filter(Certificate.id.in_(list(ids.values()))).delete(synchronize_session=False)
             MicrosoftCA.query.filter_by(id=msca_id).delete()
             db.session.commit()
+
+
+# ------------------------------------------------------------------ catch-up bounded after an outage
+
+@pytest.mark.parametrize('in_ha', [True, False])
+def test_a_90_day_outage_announces_only_the_last_30_days_of_expiries(
+        app, create_cert, monkeypatch, caplog, in_ha):
+    # A year no other test uses: the count of what is left aside is this test's own
+    now = datetime(2044 if in_ha else 2045, 6, 1, 12, 0)
+    old_id = create_cert(cn=f'outage-old-{in_ha}.example.com')['id']
+    recent_id = create_cert(cn=f'outage-recent-{in_ha}.example.com')['id']
+    _expires_at(app, old_id, now - timedelta(days=60))
+    _expires_at(app, recent_id, now - timedelta(days=10))
+    announced = []
+    monkeypatch.setattr('services.webhook_service.emit_cert_expiring', lambda *a, **k: None)
+    monkeypatch.setattr('services.webhook_service.emit_cert_expired',
+                        lambda cert, **k: announced.append(cert.get('id')))
+    monkeypatch.setattr('utils.ha.ha_enabled', lambda: in_ha)
+    monkeypatch.setattr(notification_scheduler, '_cluster_now', lambda: now)
+    monkeypatch.setattr(expiry_alert_service, 'utc_now', lambda: now)
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_LEASE_KEY, None)
+        _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, (now - timedelta(days=90)).isoformat())
+        with caplog.at_level('WARNING'):
+            NotificationService.run_scheduled_checks()
+        assert _value(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY) == now.isoformat()
+    assert recent_id in announced and old_id not in announced
+    assert any('1 certificate(s)' in r.getMessage() and '30 days' in r.getMessage()
+               for r in caplog.records), [r.getMessage() for r in caplog.records]
+
+
+@pytest.mark.parametrize('in_ha', [True, False])
+def test_a_first_pass_without_a_mark_announces_the_last_day_only(
+        app, create_cert, monkeypatch, in_ha):
+    now = datetime(2046 if in_ha else 2047, 7, 1, 12, 0)
+    day_old_id = create_cert(cn=f'first-pass-old-{in_ha}.example.com')['id']
+    hour_old_id = create_cert(cn=f'first-pass-new-{in_ha}.example.com')['id']
+    _expires_at(app, day_old_id, now - timedelta(days=2))
+    _expires_at(app, hour_old_id, now - timedelta(hours=1))
+    announced = []
+    monkeypatch.setattr('services.webhook_service.emit_cert_expiring', lambda *a, **k: None)
+    monkeypatch.setattr('services.webhook_service.emit_cert_expired',
+                        lambda cert, **k: announced.append(cert.get('id')))
+    monkeypatch.setattr('utils.ha.ha_enabled', lambda: in_ha)
+    monkeypatch.setattr(notification_scheduler, '_cluster_now', lambda: now)
+    monkeypatch.setattr(expiry_alert_service, 'utc_now', lambda: now)
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_LEASE_KEY, None)
+        _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, None)
+        NotificationService.run_scheduled_checks()
+    assert hour_old_id in announced and day_old_id not in announced
