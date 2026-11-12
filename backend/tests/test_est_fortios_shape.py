@@ -19,6 +19,8 @@ from tests.test_est_rfc7030 import (  # noqa: F401  (est_config is the module fi
     EST_BASE, EST_PASSWORD, _set_config, est_config,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 NAMES = ('fgt-test.example.test',)
 
 

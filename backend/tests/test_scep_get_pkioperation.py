@@ -21,6 +21,8 @@ from tests.test_scep_rfc8894_operations import (
     _client_identity, _decrypt_response, _load_ca_material, _response_attributes,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 PATHS = ['/scep/pkiclient.exe', '/cgi-bin/pkiclient.exe']
 CHALLENGE = 'get pkioperation challenge'
 

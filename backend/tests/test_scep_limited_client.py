@@ -17,6 +17,8 @@ from tests.test_scep_rfc8894_operations import (
     _client_identity, _response_attributes,
 )
 
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
 DIGESTS = {'sha1': hashes.SHA1, 'sha256': hashes.SHA256}
 SIGNATURES = {  # CMS and X.509 labels of RSA PKCS#1 v1.5 with SHA-1 or SHA-256
     'rsassa_pkcs1v15', 'rsa', 'sha1_rsa', 'sha256_rsa',
