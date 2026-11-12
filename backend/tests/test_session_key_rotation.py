@@ -463,3 +463,28 @@ def test_a_rotation_whose_reload_fails_says_this_node_catches_up(
     app.extensions[stored._STATE]['retry'] = (0, 0)  # its delay over
     auth_client.get(STATUS)
     assert app.config['SECRET_KEY'] != env
+
+
+def _start_on(monkeypatch, rows, unreadable=()):
+    """A real create_app whose database holds ``rows`` (the stored values, opened as given
+    unless named in ``unreadable``): the keys it ends with."""
+    from security import session_key
+    from tests.fresh_app import fresh_app
+    with monkeypatch.context() as m:
+        m.setattr(session_key, '_read_rows', lambda: dict(rows))
+        m.setattr(session_key, '_open',
+                  lambda value, what: None if what in unreadable else value)
+        with fresh_app() as started:
+            return started.config['SECRET_KEY'], list(started.config.get('SECRET_KEY_FALLBACKS') or [])
+
+
+def test_a_start_signs_with_the_stored_key(monkeypatch):
+    from datetime import timedelta
+    from security import session_key
+    from utils.datetime_utils import utc_now
+    until = (utc_now() + timedelta(hours=1)).isoformat()
+    rows = {session_key.ACTIVE_KEY: 'A' * 43, session_key.PREVIOUS_KEY: 'P' * 43,
+            session_key.RETIRE_KEY: until}
+    assert _start_on(monkeypatch, rows) == ('A' * 43, ['P' * 43])
+    # The previous key does not open at start: the stored key signs all the same
+    assert _start_on(monkeypatch, rows, unreadable=('previous session key',)) == ('A' * 43, [])
