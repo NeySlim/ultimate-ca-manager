@@ -103,7 +103,7 @@ def test_crossing_a_batch_boundary_is_not_growth(app, auth_client, create_ca, mo
 
     def boundary_between_the_runs():
         with app.app_context():
-            monkeypatch.setattr(list_prefetch, '_CHUNK', CA.query.count() + 15)
+            monkeypatch.setattr(list_prefetch, '_CHUNK', CA.query.count() + 25)
     small, big = _two_runs(app, auth_client, create_ca, with_root=boundary_between_the_runs)
     assert len(big) > len(small)
     assert not _unexplained(small, big)
