@@ -558,6 +558,17 @@ def _template_custom_extensions(template_id):
         raise RenewalError(str(e), 400) from e
 
 
+_SID_SECURITY_EXT_OID = '1.3.6.1.4.1.311.25.2'
+
+
+def _signed_by(cert, ca_cert) -> bool:
+    from utils.cert_issuer import UnsupportedIssuerKey, certificate_signed_by
+    try:
+        return certificate_signed_by(cert, ca_cert)
+    except UnsupportedIssuerKey:
+        return False
+
+
 def _builder(original, ca, ca_cert, public_key, not_after, template_oids=(),
              related_to=None, template_extensions=()) -> x509.CertificateBuilder:
     """The original's subject and extensions; the issuer's own rebuilt from the CA,
@@ -565,6 +576,8 @@ def _builder(original, ca, ca_cert, public_key, not_after, template_oids=(),
     extensions replace the original's of the same OID and join the others."""
     from utils.custom_extensions import add_custom_extensions
     replaced = {e['oid'] for e in template_extensions}
+    # An import sets the issuer without checking: a SID the CA never signed is not carried over
+    dropped = set() if _signed_by(original, ca_cert) else {_SID_SECURITY_EXT_OID}
     builder = (
         x509.CertificateBuilder()
         .subject_name(original.subject)
@@ -577,6 +590,10 @@ def _builder(original, ca, ca_cert, public_key, not_after, template_oids=(),
     ekus = []
     for ext in original.extensions:
         if ext.oid in _ISSUER_OWNED_EXTENSION_OIDS or ext.oid.dotted_string in replaced:
+            continue
+        if ext.oid.dotted_string in dropped:
+            logger.warning('In-place renewal: serial %x was not signed by CA %s, its SID is not carried over',
+                           original.serial_number, ca.refid)
             continue
         if ext.oid == ExtensionOID.EXTENDED_KEY_USAGE:
             ekus = list(ext.value)

@@ -1,6 +1,5 @@
-"""Characterization: an in-place renewal (UI, REST, scheduler, bulk) copies the SID security
-extension as it is, and does not ask the AD Connector whether the account still exists.
-A maintainer decision may change the second half; this test then changes with it."""
+"""An in-place renewal (UI, REST, scheduler, bulk) copies the SID security extension as it is,
+without asking the AD Connector, and only from a certificate the signing CA signed."""
 import base64
 
 import pytest
@@ -73,3 +72,33 @@ def test_in_place_renewal_copies_the_sid_extension_without_a_directory_check(
     assert ext.critical is False
     assert ext.value.value == _sid_ext(original).value.value == _ad_security_extension(SID).value
     assert asked == []
+
+
+def test_in_place_renewal_drops_the_sid_of_a_certificate_the_ca_did_not_sign(app, auth_client, create_ca):
+    from tests.test_protocol_renewal_sid import forged_import
+    ca_data = create_ca(cn='In-place renewal forged SID CA')
+    row_id, forged, _key = forged_import(app, auth_client, ca_data['id'], 'in-place-sid-forged.example.test',
+                                         with_key=True)
+    with app.app_context():
+        renew_certificate_in_place(db.session.get(Certificate, row_id), username='admin')
+        db.session.commit()
+        renewed = _stored(row_id)
+    assert renewed.serial_number != forged.serial_number
+    with pytest.raises(x509.ExtensionNotFound):
+        _sid_ext(renewed)
+
+
+def test_in_place_renewal_drops_the_sid_when_the_signature_cannot_be_checked(app, create_ca, monkeypatch):
+    from utils import cert_issuer
+    ca_data = create_ca(cn='In-place renewal unverifiable SID CA')
+    row_id, _original = _issued_row(app, ca_data['id'], 'in-place-sid-unverifiable.example.test')
+
+    def unverifiable(cert, issuer):
+        raise cert_issuer.UnsupportedIssuerKey('test')
+    monkeypatch.setattr(cert_issuer, 'certificate_signed_by', unverifiable)
+    with app.app_context():
+        renew_certificate_in_place(db.session.get(Certificate, row_id), username='admin')
+        db.session.commit()
+        renewed = _stored(row_id)
+    with pytest.raises(x509.ExtensionNotFound):
+        _sid_ext(renewed)
