@@ -118,6 +118,8 @@ def create_user_mtls_certificate(user_id):
                 valid_to=valid_until,
                 created_by=target_user.username,
             )
+            from services.cert.issued_lookup import apply_persisted_revocation
+            apply_persisted_revocation(existing_cert)
             db.session.add(existing_cert)
             db.session.flush()
 

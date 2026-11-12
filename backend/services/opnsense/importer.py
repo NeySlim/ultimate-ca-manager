@@ -224,6 +224,8 @@ class ImportMixin:
                     imported_from='opnsense',
                     created_by='import'
                 )
+                from services.cert.issued_lookup import apply_persisted_revocation
+                apply_persisted_revocation(cert)
 
                 db.session.add(cert)
                 db.session.flush()

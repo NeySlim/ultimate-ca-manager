@@ -616,6 +616,8 @@ class CSRMixin:
             raise ValueError('CSR was signed by another request')
         certificate.crt = base64.b64encode(cert_pem).decode('utf-8')
         certificate.caref = caref
+        from services.cert.issued_lookup import apply_persisted_revocation
+        apply_persisted_revocation(certificate)
         certificate.descr = descr or settle_csr_descr(certificate.descr, cn_value)
         certificate.subject = cert.subject.rfc4514_string() or None
         certificate.subject_cn = cn_value or certificate.descr

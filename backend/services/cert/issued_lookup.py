@@ -94,6 +94,50 @@ def find_issued_row(ca: CA, cert: x509.Certificate) -> Optional[Certificate]:
     return rows[0] if rows else None
 
 
+def persisted_revocation(ca: CA, serial: int, live: Optional[Certificate] = None):
+    """The earliest revocation record of ``ca``'s key for ``serial``, or None. A record
+    linked to ``live``, a row that is not revoked, was lifted with it (as on the CRL)."""
+    from sqlalchemy import or_
+    from utils.cert_issuer import same_key_refids
+    query = RevokedSerial.query.filter(
+        RevokedSerial.caref.in_(same_key_refids(ca)),
+        RevokedSerial.serial_number == canonical_serial(serial),
+    )
+    if live is not None and live.id is not None:
+        query = query.filter(or_(RevokedSerial.certificate_id.is_(None),
+                                 RevokedSerial.certificate_id != live.id))
+    return query.order_by(RevokedSerial.revoked_at, RevokedSerial.id).first()
+
+
+def row_persisted_revocation(row: Certificate, ca: Optional[CA] = None):
+    """The record that says ``row``'s certificate is revoked under ``ca`` (default: its
+    ``caref``), or None; a row whose certificate cannot be read has none."""
+    if ca is None:
+        ca = CA.query.filter_by(refid=row.caref).first() if row.caref else None
+    if ca is None or not row.crt:
+        return None
+    try:
+        serial = x509.load_pem_x509_certificate(base64.b64decode(row.crt), default_backend()).serial_number
+    except Exception:
+        return None
+    return persisted_revocation(ca, serial, live=row)
+
+
+def apply_persisted_revocation(row: Certificate) -> bool:
+    """Mark ``row`` revoked from the record its CA still holds for its serial: a certificate
+    revoked, deleted and imported again comes back revoked. No commit; returns whether one applied."""
+    if row.revoked:
+        return False
+    record = row_persisted_revocation(row)
+    if record is None:
+        return False
+    row.revoked = True
+    row.revoked_at = record.revoked_at
+    row.revoke_reason = record.revoke_reason
+    row.invalidity_at = record.invalidity_at
+    return True
+
+
 def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[Certificate], str]:
     """``(row, status)`` with status one of OK, UNKNOWN, REVOKED, EXPIRED,
     NOT_YET_VALID, SUPERSEDED.

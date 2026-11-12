@@ -609,6 +609,8 @@ class SmartImporter:
                 imported_from="smart_import",
                 created_by=username
             )
+            from services.cert.issued_lookup import apply_persisted_revocation
+            apply_persisted_revocation(cert)
             
             db.session.add(cert)
             db.session.flush()
