@@ -157,6 +157,10 @@ def check_renewable(cert: Certificate) -> None:
     # Any revocation, a suspension included: renewing would hand back a good serial
     if cert.revoked:
         raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
+    # The record outlives the row: a row left unrevoked beside it renews nothing
+    from services.cert.issued_lookup import row_persisted_revocation
+    if row_persisted_revocation(cert) is not None:
+        raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
     if cert.source == 'msca':
         raise RenewalError('Microsoft CA certificates must be renewed through the AD CS connector', 400)
 
@@ -280,7 +284,10 @@ def _renewal_members(cert):
         partner = mutual_partner(cert)
     except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
         return [cert]
-    if partner is None or partner.revoked or not cert.crt or not partner.crt or not partner.prv:
+    if partner is None or not cert.crt or not partner.crt or not partner.prv:
+        return [cert]
+    from services.cert.issued_lookup import row_revoked
+    if row_revoked(partner):  # by its row or by the record of its serial
         return [cert]
     return list(anchor_first(cert, partner))
 
@@ -305,7 +312,10 @@ def _current_related(row):
     except x509.ExtensionNotFound:
         return None
     a_row = db.session.get(Certificate, row.related_certificate_id)
-    if a_row is None or a_row.revoked or not a_row.crt:
+    if a_row is None or not a_row.crt:
+        return None
+    from services.cert.issued_lookup import row_revoked
+    if row_revoked(a_row):  # by its row or by the record of its serial
         return None
     cert_a = row_certificate(a_row)
     if cert_a.not_valid_after_utc.replace(tzinfo=None) < utc_now():
@@ -396,6 +406,16 @@ def _signing_ca(cert, ca):
         raise RenewalError('CA is offline; restore it before renewing', 400)
     if ca.revoked_in_chain:
         raise RenewalError('CA is revoked and can no longer renew certificates', 400)
+    # The row's caref is not proof of issuance: only a certificate this CA signed renews under it
+    from utils.cert_issuer import ca_signed
+    if not ca_signed(ca, x509.load_pem_x509_certificate(b64decode(cert.crt))):
+        raise RenewalError(
+            f'This certificate\'s signature does not verify with the current key of CA "{ca.descr}" '
+            '(re-keyed or replaced): it cannot be renewed under it, issue a new certificate instead', 400)
+    # Under the CA that really signed it, which a row without caref only now names
+    from services.cert.issued_lookup import row_persisted_revocation
+    if row_persisted_revocation(cert, ca) is not None:
+        raise RenewalError('Cannot renew a revoked certificate. Issue a new certificate instead.', 409)
 
     from services.hsm.ca_key_loader import get_ca_signing_key
     try:
@@ -542,6 +562,18 @@ def _template_custom_extensions(template_id):
         raise RenewalError(str(e), 400) from e
 
 
+from services.trust_store.csr_operations_mixin import _SID_SECURITY_EXT_OID as _SID_EXT  # noqa: E402
+_SID_SECURITY_EXT_OID = _SID_EXT.dotted_string
+
+
+def _signed_by(cert, ca_cert) -> bool:
+    from utils.cert_issuer import UnsupportedIssuerKey, certificate_signed_by
+    try:
+        return certificate_signed_by(cert, ca_cert)
+    except UnsupportedIssuerKey:
+        return False
+
+
 def _builder(original, ca, ca_cert, public_key, not_after, template_oids=(),
              related_to=None, template_extensions=()) -> x509.CertificateBuilder:
     """The original's subject and extensions; the issuer's own rebuilt from the CA,
@@ -549,6 +581,8 @@ def _builder(original, ca, ca_cert, public_key, not_after, template_oids=(),
     extensions replace the original's of the same OID and join the others."""
     from utils.custom_extensions import add_custom_extensions
     replaced = {e['oid'] for e in template_extensions}
+    # An import sets the issuer without checking: a SID the CA never signed is not carried over
+    dropped = set() if _signed_by(original, ca_cert) else {_SID_SECURITY_EXT_OID}
     builder = (
         x509.CertificateBuilder()
         .subject_name(original.subject)
@@ -561,6 +595,10 @@ def _builder(original, ca, ca_cert, public_key, not_after, template_oids=(),
     ekus = []
     for ext in original.extensions:
         if ext.oid in _ISSUER_OWNED_EXTENSION_OIDS or ext.oid.dotted_string in replaced:
+            continue
+        if ext.oid.dotted_string in dropped:
+            logger.warning('In-place renewal: serial %x was not signed by CA %s, its SID is not carried over',
+                           original.serial_number, ca.refid)
             continue
         if ext.oid == ExtensionOID.EXTENDED_KEY_USAGE:
             ekus = list(ext.value)
@@ -642,14 +680,18 @@ def _write_row(cert, ca, ca_cert, renewed, cert_pem, key_pem, new_serial, now) -
 
 def _record_superseded(cert_id, ca, old_serial, old_valid_to, now, old_digest=None) -> None:
     """Keep the replaced serial on the CA's CRL until it would have expired."""
+    from services.cert.issued_lookup import record_reason_replaceable
     if not old_serial or ca is None:
         return
     row = RevokedSerial.query.filter_by(caref=ca.refid, serial_number=old_serial).first()
-    if row is None:
+    fresh = row is None
+    if fresh:
         row = RevokedSerial(caref=ca.refid, serial_number=old_serial)
         db.session.add(row)
-    row.revoked_at = now
-    row.revoke_reason = 'superseded'
+    # A final revocation already recorded keeps its reason and date (keyCompromise is never superseded)
+    if fresh or record_reason_replaceable(row, 'superseded'):
+        row.revoked_at = now
+        row.revoke_reason = 'superseded'
     row.valid_to = old_valid_to or now + _SUPERSEDED_FALLBACK
     row.certificate_id = cert_id
     row.public_key_sha256 = old_digest

@@ -60,3 +60,51 @@ def test_imported_enrolment_is_filed_under_the_self_signed_root(app, auth_client
     AuthCertificate.query.filter_by(cert_serial=str(leaf.serial_number)).delete()
     db.session.delete(row)
     db.session.commit()
+
+
+def test_an_enrolment_without_certificate_keeps_both_readings_of_an_all_digit_serial(app, twin_records):
+    """Non-regression: header-only enrolments store the proxy's hexadecimal serial and imports the
+    decimal one, so an all-digit text is read both ways and either record closes it."""
+    import secrets
+    from services.mtls_auth_service import MTLSAuthService
+    text = '1' + ''.join(secrets.choice('0123456789') for _ in range(13))
+    serial = int(text, 16)  # written by the parser as format(serial, 'X'): all digits
+    db.session.add_all([
+        AuthCertificate(user_id=1, cert_serial=text, cert_subject='CN=hex-digits',
+                        cert_issuer=twin_records['name_b'], cert_fingerprint='', name='hex-digits', enabled=True),
+        RevokedSerial(caref=twin_records['root'], serial_number=str(serial),
+                      valid_to=datetime.utcnow() + timedelta(days=30)),
+    ])
+    db.session.commit()
+    try:
+        user, _, err = MTLSAuthService.authenticate_certificate(
+            {'serial': text, 'issuer_dn': twin_records['name_b'], 'fingerprint': ''})
+        assert user is None and err == 'Certificate has been revoked'
+    finally:
+        AuthCertificate.query.filter_by(cert_serial=text).delete()
+        RevokedSerial.query.filter_by(serial_number=str(serial)).delete()
+        db.session.commit()
+
+
+
+def test_an_enrolment_without_certificate_is_not_closed_by_another_serials_record(app, twin_records):
+    """Each reading of the enrolment's text matches its own unambiguous spellings: the record of
+    another serial whose decimal is one reading's all-digit hex closes nothing."""
+    from services.mtls_auth_service import MTLSAuthService
+    from tests.test_revocation_record_rule import _homonyms
+    d, h = _homonyms()  # format(h, 'x') == str(d)
+    db.session.add_all([
+        AuthCertificate(user_id=1, cert_serial=str(h), cert_subject='CN=homonym',
+                        cert_issuer=twin_records['name_b'], cert_fingerprint='', name='homonym', enabled=True),
+        RevokedSerial(caref=twin_records['root'], serial_number=str(d),
+                      valid_to=datetime.utcnow() + timedelta(days=30)),
+    ])
+    db.session.commit()
+    try:
+        _, _, err = MTLSAuthService.authenticate_certificate(
+            {'serial': str(h), 'issuer_dn': twin_records['name_b'], 'fingerprint': ''})
+        assert err != 'Certificate has been revoked'
+    finally:
+        AuthCertificate.query.filter_by(cert_serial=str(h)).delete()
+        RevokedSerial.query.filter_by(serial_number=str(d)).delete()
+        db.session.commit()

@@ -504,7 +504,7 @@ Windows kann auch mit \`certreq ... Renew\` erneuern, authentifiziert durch das 
 
 ### SID-Sicherheitserweiterung (KB5014754)
 
-Bei **Kerberos-authentifizierter Ausstellung** bettet UCM die AD-SID des Anfragers in die Microsoft-SID-Sicherheitserweiterung (\`szOID_NTDS_CA_SECURITY_EXT\`) des ausgestellten Zertifikats ein. Domänencontroller nutzen sie für die **starke Zertifikatszuordnung** (KB5014754): erforderlich, seit AD die starke Zuordnung für zertifikatsbasierte Authentifizierung erzwingt (Smartcard-Anmeldung, PKINIT).
+Bei **Kerberos-authentifizierter Ausstellung** bettet UCM die AD-SID des Anfragers in die Microsoft-SID-Sicherheitserweiterung (\`szOID_NTDS_CA_SECURITY_EXT\`) des ausgestellten Zertifikats ein. Domänencontroller nutzen sie für die **starke Zertifikatszuordnung** (KB5014754): erforderlich, seit AD die starke Zuordnung für zertifikatsbasierte Authentifizierung erzwingt (Smartcard-Anmeldung, PKINIT). Eine Erneuerung über WSTEP, EST oder SCEP übernimmt die SID-Erweiterung des erneuerten Zertifikats, nie eine aus dem CSR; bei aktiviertem AD-Connector muss diese SID weiterhin ein Konto im Verzeichnis bezeichnen.
 
 ### AD-abgeleitete Betreffe
 

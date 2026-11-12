@@ -503,7 +503,7 @@ Windows può anche rinnovare con \`certreq ... Renew\`, autenticato dal certific
 
 ### Estensione di sicurezza SID (KB5014754)
 
-Nell'**emissione autenticata Kerberos**, UCM incorpora il SID AD del richiedente nell'estensione di sicurezza SID di Microsoft (\`szOID_NTDS_CA_SECURITY_EXT\`) del certificato emesso. I domain controller la usano per la **mappatura forte dei certificati** (KB5014754): obbligatoria da quando AD impone la mappatura forte per l'autenticazione basata su certificati (accesso con smartcard, PKINIT).
+Nell'**emissione autenticata Kerberos**, UCM incorpora il SID AD del richiedente nell'estensione di sicurezza SID di Microsoft (\`szOID_NTDS_CA_SECURITY_EXT\`) del certificato emesso. I domain controller la usano per la **mappatura forte dei certificati** (KB5014754): obbligatoria da quando AD impone la mappatura forte per l'autenticazione basata su certificati (accesso con smartcard, PKINIT). Un rinnovo WSTEP, EST o SCEP riporta l'estensione SID del certificato che rinnova, mai quella della CSR; con il connettore AD attivo, quel SID deve ancora corrispondere a un account della directory.
 
 ### Soggetti derivati da AD
 

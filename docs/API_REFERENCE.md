@@ -2684,7 +2684,7 @@ Content-Type: multipart/form-data
 file: <certificate file>          # Required: .pem, .crt, .cer, .der, .p12, .pfx
 name: "My Certificate"            # Optional: display name
 password: "pkcs12password"        # Optional: for PKCS12 files
-ca_id: 1                          # Optional: link to specific CA (auto-detected if omitted)
+ca_id: 1                          # Optional: link to this CA, which must have signed it (400 otherwise)
 import_key: true                  # Optional: import private key (default: true)
 cross_mode: auto                  # Optional: auto | attach | replace | refuse (default: auto)
 
@@ -2707,6 +2707,8 @@ cross_mode: auto                  # Optional: auto | attach | replace | refuse (
   "message": "CA certificate \"My CA\" imported successfully (detected as CA)"
 }
 ```
+
+Without `ca_id`, the certificate is linked to the stored CA whose key verifies its signature (AKI, then issuer name, are only used to find candidates); with none it is stored as a third-party certificate.
 
 **Features:**
 - Auto-detects format: PEM, DER, PKCS12, PKCS7

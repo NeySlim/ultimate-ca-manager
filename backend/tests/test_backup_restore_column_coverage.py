@@ -87,8 +87,10 @@ def both_archives(app, tmp_path_factory):
             app.app_context():
         issuer = _authority_row(f'coverage-ca-{uuid.uuid4().hex[:6]}')
         leaf = _certificate_row(f'coverage-leaf-{uuid.uuid4().hex[:6]}', issuer)
-        # Custom sections the factory leaves to fixtures
-        db.session.add(RevokedSerial(caref=issuer[0].refid, serial_number=leaf.serial_number,
+        # Custom sections the factory leaves to fixtures; a record of the leaf's own serial
+        # would revoke it on restore, so it names the serial the leaf was renewed away from
+        db.session.add(RevokedSerial(caref=issuer[0].refid,
+                                     serial_number=format(int(leaf.serial_number, 16) + 1, 'x'),
                                      revoked_at=_STAMP, revoke_reason='keyCompromise',
                                      invalidity_at=_STAMP, valid_to=_STAMP, certificate_id=leaf.id,
                                      public_key_sha256='ab' * 32))

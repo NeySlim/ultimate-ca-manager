@@ -1,13 +1,16 @@
 """Certificate get route"""
+import base64
 import logging
 import json
+
+from cryptography import x509
 from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import Certificate, CA, db
 from models.truststore import TrustedCertificate
 from services.compliance_service import calculate_compliance_score
-from utils.cert_issuer import find_ca_by_ski
+from utils.cert_issuer import signing_ca_for
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -22,7 +25,9 @@ def get_certificate(cert_id):
     if not cert:
         return error_response('Certificate not found', 404)
 
-    data = cert.to_dict()
+    # The revocation a record of its CA makes counts as OCSP and the CRL answer it
+    from services.cert.issued_lookup import row_persisted_revocation, show_effective_revocation
+    data = show_effective_revocation(cert.to_dict(), cert, row_persisted_revocation(cert))
 
     # Parse X.509 extensions from PEM
     from utils.cert_extensions import parse_certificate_extensions
@@ -100,39 +105,26 @@ def _validate_cert_chain(cert):
                         trust_anchor = primary_top.common_name or primary_top.descr
                     else:
                         status = 'incomplete'
-    else:
-        # No caref — try AKI lookup
-        if cert.aki:
-            ca = find_ca_by_ski(cert.aki)
-            if ca:
-                chain.append({'name': ca.common_name or ca.descr, 'type': 'managed_ca'})
-                status = 'partial'
-                trust_source = 'managed_ca'
+    elif cert.aki or cert.issuer:
+        # Without caref, a stored CA is named only when its key verifies the certificate
+        signer = None
+        try:
+            signer = signing_ca_for(x509.load_pem_x509_certificate(base64.b64decode(cert.crt)))
+        except (TypeError, ValueError):
+            pass
+        if signer:
+            chain.append({'name': signer.common_name or signer.descr, 'type': 'managed_ca'})
+            status = 'partial'
+            trust_source = 'managed_ca'
+        else:
+            trusted = TrustedCertificate.query.filter_by(subject=cert.issuer).first()
+            if trusted:
+                chain.append({'name': trusted.name, 'type': 'trust_store'})
+                status = 'complete'
+                trust_source = 'trust_store'
+                trust_anchor = trusted.name
             else:
-                trusted = TrustedCertificate.query.filter_by(subject=cert.issuer).first()
-                if trusted:
-                    chain.append({'name': trusted.name, 'type': 'trust_store'})
-                    status = 'complete'
-                    trust_source = 'trust_store'
-                    trust_anchor = trusted.name
-                else:
-                    status = 'incomplete'
-        elif cert.issuer:
-            # Fallback: issuer DN matching
-            ca = CA.query.filter(CA.subject == cert.issuer).first()
-            if ca:
-                chain.append({'name': ca.common_name or ca.descr, 'type': 'managed_ca'})
-                status = 'partial'
-                trust_source = 'managed_ca'
-            else:
-                trusted = TrustedCertificate.query.filter_by(subject=cert.issuer).first()
-                if trusted:
-                    chain.append({'name': trusted.name, 'type': 'trust_store'})
-                    status = 'complete'
-                    trust_source = 'trust_store'
-                    trust_anchor = trusted.name
-                else:
-                    status = 'incomplete'
+                status = 'incomplete'
 
     return {
         'status': status,  # complete, incomplete, partial, unknown

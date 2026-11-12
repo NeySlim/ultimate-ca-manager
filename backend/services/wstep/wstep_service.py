@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.x509.oid import NameOID
 
 from models import Certificate
+from services.ad_connector import renewal_identity
 from services.ca.ca_signing import AlreadySuperseded
 from services.ca_service import CAService
 from services.policy_service import PolicyViolation
@@ -1003,7 +1004,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         if account is lookup.UNREACHABLE:
             logger.warning("WSTEP: the AD Connector cannot resolve %r: %s", kerberos_principal,
                            lookup.connector_config_fault() or 'its settings changed')
-            return None, ServerError('Could not resolve requester identity for strong certificate mapping')
+            return None, ServerError(renewal_identity.UNRESOLVED_MESSAGE)
         if account is lookup.FOREIGN_REALM:
             # sAMAccountName is unique only within its domain: never look it up in another
             logger.warning("WSTEP: Kerberos principal %r is not of the AD Connector's realm",
@@ -1025,10 +1026,10 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
                 kerberos_sam_account_name,
             )
             if requester_sid is lookup.UNREACHABLE:
-                return None, ServerError('Could not resolve requester identity for strong certificate mapping')
+                return None, ServerError(renewal_identity.UNRESOLVED_MESSAGE)
             if requester_sid is lookup.UNUSABLE_SID:
                 return None, 'The requester has no usable directory identity'
-            return None, 'The requester was not found in the directory'
+            return None, renewal_identity.NOT_FOUND_MESSAGE
 
     err = _validate_csr(csr, require_pop=require_pop, allow_naked_subject=True)
     if err:
@@ -1328,6 +1329,14 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
     if matched_template is not None:
         template_oid = _template_oid_for(ca, matched_template, _template_ext_oid(signing_cert))
 
+    try:
+        requester_sid = renewal_identity.renewal_requester_sid(
+            signing_cert, x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), 'WSTEP')
+    except renewal_identity.RenewalIdentityUnresolved as e:
+        return None, ServerError(str(e))
+    except renewal_identity.RenewalAccountGone as e:
+        return None, str(e)
+
     cert_type, template_ku = _template_profile(matched_template, csr)
     try:
         cert_pem, _serial = CAService.sign_csr_from_crypto(
@@ -1335,6 +1344,7 @@ def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require
             source=source, renewal_of=signing_cert, require_pop=require_pop,
             supersedes=db_cert,
             ms_certificate_template_oid=template_oid,
+            requester_sid=requester_sid,
             # See issue()'s matching kwarg for why.
             extra_ekus=extra_ekus,
             template_ekus=issued_ekus,

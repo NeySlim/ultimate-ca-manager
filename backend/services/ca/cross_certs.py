@@ -288,10 +288,11 @@ def published_record(row: CACrossCertificate, issuer: CA):
     """The issuer's revocation record for *row*'s serial, or None."""
     from models.revoked_serial import RevokedSerial
     from utils.cert_issuer import same_key_refids
-    from utils.serial_format import serial_variants
+    from utils.serial_format import unambiguous_serial_spellings
+    # Another serial's all-digit hex spelling names that serial, never this one
     return RevokedSerial.query.filter(
         RevokedSerial.caref.in_(same_key_refids(issuer)),
-        RevokedSerial.serial_number.in_(serial_variants(int(row.serial_number)))).first()
+        RevokedSerial.serial_number.in_(unambiguous_serial_spellings(int(row.serial_number)))).first()
 
 
 def _close_pending_requests(row, username):

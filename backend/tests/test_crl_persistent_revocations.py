@@ -299,13 +299,21 @@ class TestFullCrl:
         assert set(entries) == {SERIAL_A, SERIAL_B}
         assert all(_reason(e) == x509.ReasonFlags.superseded for e in entries.values())
 
-    def test_a_record_its_unrevoked_certificate_still_carries_is_dropped(self, backend):
-        """A lifted revocation the record outlived: the certificate still holds
-        the serial and is valid, so the CRL must not list it."""
+    def test_a_hold_record_its_unrevoked_certificate_still_carries_is_listed(self, backend):
+        """A record says revoked with no exception: the holds a lift left were deleted once (136)."""
         ca, ca_key, ca_cert = _make_ca()
         row = _store(ca, _issue(ca_key, ca_cert, SERIAL_A), str(SERIAL_A))
         _persist(ca, format(SERIAL_A, 'X'), reason='certificateHold', certificate_id=row.id)
-        assert set(_entries(_full_crl(ca))) == set()
+        entries = _entries(_full_crl(ca))
+        assert set(entries) == {SERIAL_A}
+        assert _reason(entries[SERIAL_A]) == x509.ReasonFlags.certificate_hold
+
+    def test_a_final_record_its_unrevoked_certificate_still_carries_is_listed(self, backend):
+        """Non-regression: a final reason was listed before the hold exception went too."""
+        ca, ca_key, ca_cert = _make_ca()
+        row = _store(ca, _issue(ca_key, ca_cert, SERIAL_A), str(SERIAL_A))
+        _persist(ca, format(SERIAL_A, 'X'), reason='keyCompromise', certificate_id=row.id)
+        assert set(_entries(_full_crl(ca))) == {SERIAL_A}
 
     def test_the_live_record_wins_over_the_persistent_one(self, backend):
         ca, ca_key, ca_cert = _make_ca()
@@ -417,6 +425,39 @@ class TestDeltaCrl:
 # OCSP
 # --------------------------------------------------------------------------
 
+# What no writer produces (each stores the row's column: decimal, lower or upper hex): the
+# unambiguous-spelling rule names no serial by them, so neither the CRL nor OCSP reads them
+_HEX_A = format(SERIAL_A, 'x')
+ODD_SPELLINGS = {'0x': '0x' + _HEX_A, 'leading-zeros': '00' + _HEX_A,
+                 'mixed-case': _HEX_A[:4] + _HEX_A[4:].upper(),
+                 'colons': ':'.join(_HEX_A[i:i + 2] for i in range(0, len(_HEX_A), 2))}
+WRITTEN_SPELLINGS = {'decimal': str(SERIAL_A), 'lower-hex': _HEX_A, 'upper-hex': _HEX_A.upper()}
+_SPELLINGS = [pytest.param(v, True, id=k) for k, v in WRITTEN_SPELLINGS.items()] + \
+    [pytest.param(v, False, id=k) for k, v in ODD_SPELLINGS.items()]
+
+
+class TestTheCrlAndOcspReadTheSameSpellings:
+
+    @pytest.mark.parametrize('column, named', _SPELLINGS)
+    def test_a_record_alone(self, app, backend, column, named):
+        ca, ca_key, ca_cert = _make_ca()
+        leaf = _issue(ca_key, ca_cert, SERIAL_A)
+        _persist(ca, column, reason='superseded')
+        listed = SERIAL_A in _entries(_full_crl(ca))
+        revoked = _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.REVOKED
+        assert (listed, revoked) == (named, named)
+
+    @pytest.mark.parametrize('column, named', _SPELLINGS)
+    def test_a_final_record_over_a_held_row(self, app, backend, column, named):
+        ca, ca_key, ca_cert = _make_ca()
+        leaf = _issue(ca_key, ca_cert, SERIAL_A)
+        _store(ca, leaf, revoked=True, reason='certificateHold')
+        _persist(ca, column, reason='keyCompromise')
+        expected = x509.ReasonFlags.key_compromise if named else x509.ReasonFlags.certificate_hold
+        assert _reason(_entries(_full_crl(ca))[SERIAL_A]) == expected
+        assert _ocsp(app, ca_cert, leaf) == (ocsp.OCSPCertStatus.REVOKED, expected)
+
+
 class TestOcsp:
 
     def test_a_deleted_certificate_answers_revoked_even_after_its_expiry(self, app, backend):
@@ -462,12 +503,23 @@ class TestOcsp:
         assert SERIAL_A in _entries(_full_crl(ca))
         assert _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.REVOKED
 
-    def test_a_live_valid_certificate_wins_over_a_record(self, app, backend):
+    def test_a_live_valid_certificate_does_not_hide_a_record(self, app, backend):
+        """RFC 6960 §2.2: the serial is revoked for this issuer, as its CRL says."""
         ca, ca_key, ca_cert = _make_ca()
         leaf = _issue(ca_key, ca_cert, SERIAL_A)
         _store(ca, leaf, str(SERIAL_A))
         _persist(ca, format(SERIAL_A, 'x'))
-        assert _ocsp(app, ca_cert, leaf) == (ocsp.OCSPCertStatus.GOOD, None)
+        assert SERIAL_A in _entries(_full_crl(ca))
+        assert _ocsp(app, ca_cert, leaf) == (ocsp.OCSPCertStatus.REVOKED, x509.ReasonFlags.key_compromise)
+
+    def test_a_record_linked_to_the_live_row_still_revokes(self, app, backend):
+        """A lifted hold deletes its record: one left linked to an unrevoked row is not a lift."""
+        ca, ca_key, ca_cert = _make_ca()
+        leaf = _issue(ca_key, ca_cert, SERIAL_A)
+        row = _store(ca, leaf, str(SERIAL_A))
+        _persist(ca, str(SERIAL_A), certificate_id=row.id)
+        assert SERIAL_A in _entries(_full_crl(ca))
+        assert _ocsp(app, ca_cert, leaf) == (ocsp.OCSPCertStatus.REVOKED, x509.ReasonFlags.key_compromise)
 
     @pytest.mark.parametrize('stored,expected', [
         ('cACompromise', x509.ReasonFlags.ca_compromise),
@@ -479,7 +531,7 @@ class TestOcsp:
         ca, _, _ = _make_ca()
         revoked_at = _now() - timedelta(hours=2)
         _persist(ca, str(SERIAL_A), reason=stored, revoked_at=revoked_at)
-        found = OCSPService._persisted_revocation(ca, OCSPService._serial_spellings(SERIAL_A))
+        found = OCSPService._persisted_revocation(ca, SERIAL_A)
         assert found is not None
         assert found[1] == expected
         assert abs((found[0] - revoked_at).total_seconds()) < 1
@@ -489,7 +541,7 @@ class TestOcsp:
         other, _, _ = _make_ca()
         _persist(other, str(SERIAL_A))
         leaf = _issue(ca_key, ca_cert, SERIAL_A)
-        assert OCSPService._persisted_revocation(ca, OCSPService._serial_spellings(SERIAL_A)) is None
+        assert OCSPService._persisted_revocation(ca, SERIAL_A) is None
         assert _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.UNKNOWN
 
     def test_the_spellings(self):

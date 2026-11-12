@@ -22,6 +22,7 @@ from utils.ssrf_protection import (
     pin_host, validate_url_not_cloud_metadata, validated_addresses)
 from services.audit_service import AuditService
 from services.ca import cross_certs
+from services.cert.issued_lookup import apply_persisted_revocation
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -104,6 +105,21 @@ def _is_self_signed(encoded_crt):
         return cert.subject == cert.issuer
     except Exception:
         return False
+
+
+def _entry_issuer_refid(ca, encoded_crt):
+    """The refid of the stored CA that signed the appliance entry's certificate:
+    *ca*, the one the entry names, when its key verifies it, else whichever stored
+    CA does; None when none does (the entry's caref is only a claim)."""
+    from utils.cert_issuer import ca_signed, signing_ca_for
+    try:
+        cert = x509.load_pem_x509_certificate(base64.b64decode(encoded_crt))
+    except Exception:
+        return None
+    if ca_signed(ca, cert):
+        return ca.refid
+    signer = signing_ca_for(cert)
+    return signer.refid if signer else None
 
 
 def _parse_cert(encoded_crt):
@@ -683,8 +699,8 @@ def import_items():
                 cert_info = _parse_cert(crt)
                 caref = cert_data.get('caref') or None
                 caref = attached_refids.get(caref, caref)
-                if caref and not CA.query.filter_by(refid=caref).first():
-                    caref = None
+                if caref:
+                    caref = _entry_issuer_refid(CA.query.filter_by(refid=caref).first(), crt)
                  
                 # Create certificate
                 cert = Certificate(
@@ -708,6 +724,7 @@ def import_items():
                     imported_from='opnsense',
                     created_by='import'
                 )
+                apply_persisted_revocation(cert)
                 
                 db.session.add(cert)
                 stats['certs_imported'] += 1

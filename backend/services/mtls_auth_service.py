@@ -107,13 +107,15 @@ class MTLSAuthService:
                     revoked = issued_certificate_status(issuer, enrolled)[1] == REVOKED
                 elif issuer is not None:
                     from models import RevokedSerial as _RevokedSerial
-                    from utils.serial_format import serial_variants
-                    # No PEM to tell the records of one name apart: any of them closes it
+                    from utils.serial_format import unambiguous_serial_spellings
+                    # No PEM to tell the records of one name apart: any of them closes it. The text
+                    # is read both ways (writers differ), each reading in its own unambiguous spellings
+                    # Not covered: a record of a legacy row in all-digit hex, which reads as another serial
                     refids = [r for (r,) in _CA.query.filter(_CA.subject == issuer.subject).with_entities(_CA.refid)]
                     variants = set()
                     for base in (10, 16):
                         try:
-                            variants |= serial_variants(int(str(auth_cert.cert_serial), base))
+                            variants |= unambiguous_serial_spellings(int(str(auth_cert.cert_serial), base))
                         except ValueError:
                             continue
                     revoked = bool(variants) and _RevokedSerial.query.filter(

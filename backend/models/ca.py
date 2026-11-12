@@ -323,7 +323,7 @@ class CA(db.Model):
         if parent is None:
             return None
         from models.revoked_serial import RevokedSerial
-        from utils.serial_format import serial_to_int, serial_variants
+        from utils.serial_format import serial_to_int, unambiguous_serial_spellings
         serial = serial_to_int(self.serial_number) if self.serial_number else None
         if serial is None:
             try:
@@ -332,9 +332,10 @@ class CA(db.Model):
                 serial = x509.load_pem_x509_certificate(base64.b64decode(self.crt)).serial_number
             except Exception:
                 return None
+        # Another serial's all-digit hex spelling names that serial, never this one
         return RevokedSerial.query.filter(
             RevokedSerial.caref == parent.refid,
-            RevokedSerial.serial_number.in_(serial_variants(serial)),
+            RevokedSerial.serial_number.in_(unambiguous_serial_spellings(serial)),
         ).first()
 
     @property

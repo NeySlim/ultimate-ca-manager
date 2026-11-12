@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 from services.trust_store.csr_operations_mixin import (
     _SID_SECURITY_EXT_OID,
     _ad_security_extension,
+    ad_security_extension_sid,
 )
 from services.trust_store.trust_store_service import TrustStoreService
 
@@ -110,3 +111,43 @@ class TestSignCsrRequesterSid:
         ext = cert.extensions.get_extension_for_oid(_SID_SECURITY_EXT_OID)
         assert ext.critical is False
         assert ext.value.value.hex() == _REAL_CAPTURED_EXTENSION_HEX
+
+
+def _cert_with(ext_value=None):
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'sid-reader')])
+    now = datetime.now(timezone.utc)
+    builder = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+               .serial_number(x509.random_serial_number()).not_valid_before(now)
+               .not_valid_after(now + timedelta(days=1)))
+    if ext_value is not None:
+        builder = builder.add_extension(x509.UnrecognizedExtension(_SID_SECURITY_EXT_OID, ext_value),
+                                        critical=False)
+    return builder.sign(key, hashes.SHA256())
+
+
+class TestAdSecurityExtensionSid:
+    """Reading the SID back, for a renewal to carry it over unchanged."""
+
+    def test_reads_the_real_captured_extension(self):
+        cert = _cert_with(bytes.fromhex(_REAL_CAPTURED_EXTENSION_HEX))
+        assert ad_security_extension_sid(cert) == _REAL_CAPTURED_SID
+
+    def test_no_extension_is_none(self):
+        assert ad_security_extension_sid(_cert_with()) is None
+
+    @pytest.mark.parametrize('value', [
+        b'\x30\x00',  # no entry
+        b'garbage',
+        # two entries
+        bytes.fromhex('307e' + _REAL_CAPTURED_EXTENSION_HEX[4:] * 2),
+        # another type OID (…25.2.2) in the entry
+        bytes.fromhex(_REAL_CAPTURED_EXTENSION_HEX.replace('2b060104018237190201', '2b060104018237190202')),
+        # BER long-form length: not what a renewal would write back
+        bytes.fromhex('30813f' + _REAL_CAPTURED_EXTENSION_HEX[4:]),
+        # value that is not a SID string
+        _ad_security_extension('S-1-5-21-x').value,
+        _ad_security_extension('S-1-5').value,
+    ])
+    def test_unreadable_extension_is_none(self, value):
+        assert ad_security_extension_sid(_cert_with(value)) is None

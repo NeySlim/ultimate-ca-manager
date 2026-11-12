@@ -497,6 +497,7 @@ def remove_enrolment(auth_cert, username: str = 'system', actor=None):
     from utils.datetime_utils import utc_now
     from utils.db_transaction import safe_commit
     from utils.response import error_response
+    from services.cert.issued_lookup import row_revoked
 
     certificate = certificate_row_for(auth_cert)
     certificate_id = certificate.id if certificate else None
@@ -504,7 +505,7 @@ def remove_enrolment(auth_cert, username: str = 'system', actor=None):
     needs_revoking = bool(
         certificate is not None
         and certificate.crt
-        and not certificate.revoked
+        and not row_revoked(certificate)  # by its row or by its CA's record of its serial
         and (not certificate.valid_to or certificate.valid_to >= utc_now())
     )
     if needs_revoking and _revocation_held(actor):
