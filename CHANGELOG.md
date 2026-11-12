@@ -86,6 +86,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Certificates: a certificate imported again after its revocation and deletion comes back revoked, and a certificate its CA's revocation record names is no longer renewed in place.
 - Revocation: a certificate its CA recorded as revoked is now shown and treated as revoked everywhere, and an hourly pass marks such certificates revoked, with an audit entry.
 - Revocation: lifting a hold is refused (409) when a final revocation is recorded for the certificate; otherwise it removes the hold's record under every record of the CA key.
+- Revocation: revoking or suspending a certificate its CA already recorded as revoked answers that it is already revoked.
+- Revocation: the upgrade deletes once the suspension records that lifting a hold used to leave behind.
 - mTLS: an administrator importing a certificate for a user can no longer enrol a revoked certificate.
 - Renewal: a certificate whose signature no longer verifies with its CA's current key (CA re-keyed or replaced under the same name) is refused with a message asking for a new certificate.
 - Users: deleting a user, alone or in bulk, left the certificates they had enrolled for mTLS valid on the CRL and at the OCSP responder; they are now revoked (cessationOfOperation) and deleted as when an enrolment is removed; a certificate that cannot be revoked does not block the deletion but is named in the answer (`unrevoked_certificates`, or `unrevoked` per user in bulk), the warning and the audit log.
