@@ -69,6 +69,8 @@ docker compose -f docker-compose.ha.yml up -d
 
 Compose refuses to start while one of these variables is missing. The balancer listens on port 8443. The image entrypoint writes no SQLite path and takes no SQLite backup copy when `UCM_HA=1`. Keep the restart policy `unless-stopped` or `always`: a rolling restart exits each container in turn.
 
+The network uses the fixed subnet `172.28.0.0/24`, trusted as the proxy. When `up` fails with "Pool overlaps", another Docker network already holds that range: set `UCM_HA_SUBNET` in `.env` to a free one.
+
 ## Deployment 3: DEB or RPM on two hosts
 
 1. Install the package on both hosts.
