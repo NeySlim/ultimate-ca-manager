@@ -204,15 +204,10 @@ def test_the_scheduler_process_prepares_then_runs_then_hands_over(monkeypatch):
     monkeypatch.setenv(scheduler_service.SUPERVISED_ENV, '')  # main() sets it: undone after
     monkeypatch.setattr(scheduler_main.signal, 'signal', lambda sig, h: handlers.__setitem__(sig, h))
 
-    class Thread:
+    class Scheduler:
         def join(self, timeout):
             calls.append(('join', timeout))
-
-        def is_alive(self):
-            return False
-
-    class Scheduler:
-        _thread = Thread()
+            return True
 
         def rearm_grace(self):
             calls.append('rearm')
@@ -279,7 +274,8 @@ def test_a_stop_cut_short_by_a_long_task_still_exits_0(monkeypatch):
     monkeypatch.setattr(scheduler_main.os, '_exit', fake_exit)
 
     class Scheduler:
-        _thread = types.SimpleNamespace(join=lambda timeout: None, is_alive=lambda: True)
+        def join(self, timeout):
+            return False
 
         def rearm_grace(self):
             pass

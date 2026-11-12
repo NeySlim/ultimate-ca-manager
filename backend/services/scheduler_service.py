@@ -851,6 +851,16 @@ class SchedulerService:
         """
         self._running = False
         self._wake.set()
+
+    def join(self, timeout: float) -> bool:
+        """Wait up to ``timeout`` seconds in all for the loop and the node thread; True once both ended."""
+        deadline = time.monotonic() + timeout
+        for thread in (self._thread, self._node_thread):
+            if thread is not None and thread.is_alive():
+                thread.join(max(0.0, deadline - time.monotonic()))
+                if thread.is_alive():
+                    return False
+        return True
     
     def stop(self, timeout: int = 10) -> bool:
         """
@@ -869,13 +879,9 @@ class SchedulerService:
         logger.info("Stopping scheduler...")
         self.relinquish()
         
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=timeout)
-            if self._thread.is_alive():
-                logger.warning(f"Scheduler thread did not stop within {timeout}s")
-                return False
-        if self._node_thread is not None and self._node_thread.is_alive():
-            self._node_thread.join(timeout=timeout)
+        if not self.join(timeout):
+            logger.warning(f"Scheduler thread did not stop within {timeout}s")
+            return False
 
         self._release_lock()
         logger.info("Scheduler stopped")

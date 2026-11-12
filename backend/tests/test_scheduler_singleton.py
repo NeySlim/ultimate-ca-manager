@@ -366,3 +366,42 @@ def test_a_running_per_node_task_does_not_delay_a_follower_takeover(sched, monke
     # The task the node thread still ran is not started again by the new leader
     time.sleep(0.3)
     assert runs == [1]
+
+
+def _ha_pair(monkeypatch, beats=None):
+    """Two nodes on the in-memory leader lock, nothing written to a database."""
+    monkeypatch.setattr(scheduler_service, '_ha', lambda: True)
+    monkeypatch.setattr(_OneOwnerLock, 'owner', None)
+    for name in ('_publish_state', '_took_leadership'):
+        monkeypatch.setattr(SchedulerService, name, lambda self, *a, **k: None)
+    monkeypatch.setattr(SchedulerService, '_has_requests', lambda self: False)
+
+    def kept_lock(self):
+        if self._leader_lock is None:
+            self._leader_lock, self._leader_lock_pid = _OneOwnerLock(self), os.getpid()
+        return self._leader_lock
+    monkeypatch.setattr(SchedulerService, '_singleton_lock', kept_lock)
+    monkeypatch.setattr(SchedulerService, '_heartbeat',
+                        lambda self, force=False: beats.append(self) if beats is not None else None)
+
+
+def test_a_graceful_stop_waits_for_the_per_node_task_of_a_follower(sched, monkeypatch):
+    _ha_pair(monkeypatch)
+    monkeypatch.setattr(SchedulerService, '_take_requests', lambda self: [])
+    leader, follower = sched(), sched()
+    started, done = threading.Event(), threading.Event()
+
+    def slow():
+        started.set()
+        time.sleep(0.3)
+        done.set()
+    leader.wake_interval = follower.wake_interval = 0.05
+    leader.start()
+    assert _wait(lambda: _OneOwnerLock.owner is leader)
+    follower.register_task('local', slow, interval=3600, per_node=True)
+    follower.tasks['local']._created_at -= timedelta(seconds=60)
+    follower.start()
+    assert started.wait(2)
+    follower.relinquish()
+    assert follower.join(2) is True
+    assert done.is_set()

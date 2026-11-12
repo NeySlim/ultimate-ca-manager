@@ -47,15 +47,13 @@ def main() -> int:
 
     grace = float(os.environ.get(GRACE_ENV, '30'))
     scheduler.relinquish()
-    thread = scheduler._thread
-    if thread is not None:
-        thread.join(grace)
-        if thread.is_alive():
-            # A stop that was asked for: 0, or the arbiter logs "Worker exited with code 1"
-            logger.warning("A scheduled task outlasted %ss: the scheduler process exits anyway", grace)
-            stop_publisher(timeout=2)
-            logging.shutdown()
-            os._exit(0)
+    # The loop and a follower's per-node task share the grace
+    if not scheduler.join(grace):
+        # A stop that was asked for: 0, or the arbiter logs "Worker exited with code 1"
+        logger.warning("A scheduled task outlasted %ss: the scheduler process exits anyway", grace)
+        stop_publisher(timeout=2)
+        logging.shutdown()
+        os._exit(0)
     stop_publisher()
     logger.info("Scheduler process %s stopped", os.getpid())
     return 0
