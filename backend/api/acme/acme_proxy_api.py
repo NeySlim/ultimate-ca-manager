@@ -1007,9 +1007,11 @@ def revoke_cert(slug=None):
         return proxy_error("malformed", "Missing 'certificate' in payload")
 
     try:
-        reason = AcmeClientService.validate_revocation_reason(
-            payload.get('reason', 0)
-        )
+        reason = AcmeClientService.validate_revocation_reason(payload.get('reason', 0))
+    except ValueError:
+        return proxy_error("badRevocationReason",
+                           "Revocation reason must be an integer from 0 to 10, excluding 7 and 8", 400)
+    try:
         cert_der = _decode_b64url(payload['certificate'])
         cert_obj = x509.load_der_x509_certificate(cert_der)
     except ValueError as exc:
