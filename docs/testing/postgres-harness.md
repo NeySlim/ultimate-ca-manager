@@ -66,8 +66,6 @@ python -m pytest tests/ -n 4 --dist loadfile
 
 ## CI
 
-The `test-backend-postgres-app` job (three shards of `scripts/ci/pg-app-tests.txt`) runs, in this mode and as a non-superuser
-role, the ACME, backup, restore, mTLS, certificate, revocation and scheduler
-files, plus
-`test_postgres_schema_of_its_own.py` and `test_db_error_parameters_hidden.py`,
-whose PostgreSQL cases only run in this mode.
+The `test-backend-postgres-app` job (three shards) runs, in this mode and as a non-superuser
+role, the test files listed in `scripts/ci/pg-app-tests.txt`, which is the
+authoritative list.
