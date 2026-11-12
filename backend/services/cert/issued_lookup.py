@@ -243,6 +243,13 @@ def apply_persisted_revocation(row: Certificate, record=None) -> bool:
     return True
 
 
+def _record_still_held(record) -> bool:
+    """Whether ``record`` is still stored, read again under a share lock (PostgreSQL) kept to the
+    commit: an unhold that deleted it meanwhile wins, and one deleting it later waits for the mark."""
+    return db.session.query(RevokedSerial.id).filter(RevokedSerial.id == record.id) \
+        .with_for_update(read=True).first() is not None
+
+
 def apply_persisted_revocations(ids=None) -> list:
     """Mark revoked every linked, unrevoked row holding a serial its CA recorded as revoked
     (rows stored by an earlier release), only the rows of ``ids`` when given (what a restore
@@ -266,7 +273,8 @@ def apply_persisted_revocations(ids=None) -> list:
             if ids is not None and row.id not in ids:
                 continue
             record = row_persisted_revocation(row)
-            if record is not None and apply_persisted_revocation(row, record):
+            if (record is not None and _record_still_held(record)
+                    and apply_persisted_revocation(row, record)):
                 marked.append((row, record))
     return marked
 

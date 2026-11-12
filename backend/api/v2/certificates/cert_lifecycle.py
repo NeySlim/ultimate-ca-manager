@@ -283,6 +283,10 @@ def unhold_certificate(cert_id):
         cert.revoked_at = None
         cert.revoke_reason = None
         cert.invalidity_at = None
+        # Written even when unchanged here: a mark the hourly pass committed since this read is undone
+        from sqlalchemy.orm.attributes import flag_modified
+        for field in ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at'):
+            flag_modified(cert, field)
 
         # The lifted hold and its revocation record go together or not at all
         try:

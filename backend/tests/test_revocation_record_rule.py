@@ -1233,3 +1233,53 @@ class TestARecordedHoldIsShownAndLifted:
         assert len(many) == len(few), sorted((Counter(many) - Counter(few)).items())[:6]
         assert {i: shown[i] for i in recorded} == {i: (True, 'certificateHold', 'revoked') for i in recorded}
         assert all(shown[i][0] is False for i in plain)
+
+
+class TestALiftBetweenReadAndMarkWins:
+    """A hold lifted while the hourly pass marks rows: the row ends unrevoked, never held
+    without a record (which nothing would correct afterwards)."""
+
+    def _held_by_record(self, app, issuer, cn):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf(cn, ca_cert, ca_key, days=200)
+        row_id = _store(app, real, refid, key=key)
+        return row_id, _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
+
+    def test_the_pass_skips_a_record_deleted_after_it_read_it(self, app, issuer, monkeypatch):
+        from sqlalchemy import delete
+        from services.cert import issued_lookup
+        row_id, record_id = self._held_by_record(app, issuer, 'lift-before-mark.example.test')
+        read = issued_lookup.row_persisted_revocation
+
+        def then_lifted(row):
+            record = read(row)
+            # Another worker's unhold commits between this read and the mark
+            with db.engine.begin() as other:
+                other.execute(delete(RevokedSerial).where(RevokedSerial.id == record_id))
+            return record
+        monkeypatch.setattr(issued_lookup, 'row_persisted_revocation', then_lifted)
+        with app.app_context():
+            marked = issued_lookup.apply_persisted_revocations({row_id})
+            db.session.commit()
+        assert marked == []
+        assert _row(app, row_id) == (False, None, None)
+
+    def test_an_unhold_after_the_mark_clears_the_row_it_did_not_read_held(
+            self, app, auth_client, issuer, monkeypatch):
+        from sqlalchemy import update
+        from services.cert import issued_lookup
+        row_id, record_id = self._held_by_record(app, issuer, 'mark-before-lift.example.test')
+        lift = issued_lookup.lift_persisted_revocation
+
+        def marked_meanwhile(*args, **kwargs):
+            # The pass marks the row and commits after the unhold read it unrevoked
+            with db.engine.begin() as other:
+                other.execute(update(Certificate).where(Certificate.id == row_id).values(
+                    revoked=True, revoke_reason='certificateHold', revoked_at=EARLY))
+            return lift(*args, **kwargs)
+        monkeypatch.setattr(issued_lookup, 'lift_persisted_revocation', marked_meanwhile)
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/unhold')
+        assert r.status_code == 200, r.data
+        assert _row(app, row_id) == (False, None, None)
+        with app.app_context():
+            assert db.session.get(RevokedSerial, record_id) is None
