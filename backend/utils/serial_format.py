@@ -43,8 +43,10 @@ def serial_to_int(serial: str | int | None) -> int | None:
 
 def unambiguous_serial_spellings(serial: int) -> set[str]:
     """The forms of ``serial`` no other serial is written as: decimal, and its hex forms that
-    hold a letter. An all-digit string reads as decimal, so ``format(16, 'x')`` is serial 10."""
-    return {str(serial)} | {v for v in (format(serial, 'x'), format(serial, 'X')) if not v.isdigit()}
+    hold a letter. A string without one reads as decimal: ``format(16, 'x')`` is serial 10,
+    ``format(-16, 'x')`` serial -10."""
+    return {str(serial)} | {v for v in (format(serial, 'x'), format(serial, 'X'))
+                            if any(c in 'abcdefABCDEF' for c in v)}
 
 
 def serial_named_by(column: str | None) -> int | None:

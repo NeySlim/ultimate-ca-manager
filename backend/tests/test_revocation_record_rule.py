@@ -972,3 +972,31 @@ def test_a_record_column_names_one_serial_at_most(column, serial):
     assert serial_named_by(column) == serial
     if serial is not None:
         assert column in unambiguous_serial_spellings(serial)
+
+
+class TestANegativeSerialNamesItsOwnRecordOnly:
+    """format(-16, 'x') is "-10", the decimal of -10: a hex spelling counts only with a letter."""
+
+    def test_the_spellings(self):
+        from utils.serial_format import serial_named_by, unambiguous_serial_spellings
+        assert unambiguous_serial_spellings(-16) == {'-16'}
+        assert unambiguous_serial_spellings(-10) == {'-10', '-a', '-A'}
+        assert serial_named_by('-10') == -10 and serial_named_by('-a') == -10
+
+    def test_minus_ten_and_minus_sixteen(self, app, issuer):
+        from services.cert.issued_lookup import record_serial_clause
+        _, refid, _, _ = issuer
+        with app.app_context():
+            made = [RevokedSerial(caref=refid, serial_number=column, revoke_reason='keyCompromise',
+                                  revoked_at=EARLY, valid_to=LATER) for column in ('-10', '-16')]
+            db.session.add_all(made)
+            db.session.commit()
+            try:
+                for serial in (-10, -16):
+                    named = RevokedSerial.query.filter(RevokedSerial.caref == refid,
+                                                       record_serial_clause(serial)).all()
+                    assert [r.serial_number for r in named] == [str(serial)]
+            finally:
+                for record in made:
+                    db.session.delete(record)
+                db.session.commit()
