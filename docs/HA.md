@@ -100,3 +100,5 @@ Upgrade the nodes one at a time. Migrations run under a PostgreSQL advisory lock
 - **Helm:** `helm upgrade` rolls the pods with no unavailable pod; the PodDisruptionBudget protects them from node drains.
 - **Compose:** `docker compose -f docker-compose.ha.yml pull`, then `up -d ucm-1`, wait until it is healthy, then `up -d ucm-2`.
 - **DEB/RPM:** upgrade and restart one host, wait for `/health/ready`, then the next.
+
+During a roll from a version without the scheduled backup's conclusion marker, a scheduled backup run by an older leader is not marked as concluded: a newer leader then writes one extra archive two hours later, once.
