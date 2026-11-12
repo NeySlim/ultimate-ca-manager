@@ -233,7 +233,7 @@ def rewrite(batch=None, commit=True, decrypt=False) -> dict:
     batch = batch or BATCH
     key_encryption = _encryption.key_encryption
     rewritten = skipped = 0
-    unreadable = []
+    unreadable, changed = [], []
     for model, column, fmt, unwrap, wrap in _columns():
         table = model.__table__
         # SharedFile is keyed by its name: the primary key, not an id column
@@ -268,9 +268,23 @@ def rewrite(batch=None, commit=True, decrypt=False) -> dict:
                     table.update().where(pk == row_id).where(stored_column == stored)
                     .values({stored_column.name: wrap(new_value) if wrap else new_value}))
                 rewritten += result.rowcount
+                if result.rowcount:
+                    changed.append((model, row_id))
             if commit:
                 db.session.commit()
-    return {'rewritten': rewritten, 'skipped': skipped, 'unreadable': unreadable}
+    return {'rewritten': rewritten, 'skipped': skipped, 'unreadable': unreadable,
+            'changed': changed}
+
+
+def _mirror_keys(changed) -> None:
+    """The plaintext .key mirrors of the CA and certificate keys a disable's sweep decrypted."""
+    from models import db, CA, Certificate
+    from services.file_regen_service import write_ca_files, write_cert_files
+    for model, row_id in changed:
+        write = {CA: write_ca_files, Certificate: write_cert_files}.get(model)
+        row = db.session.get(model, row_id) if write else None
+        if row is not None:
+            write(row)
 
 
 def _final_sweep() -> None:
@@ -330,6 +344,8 @@ def retire_if_due() -> int:
         # Something still wrote under the DEK: it stays for another grace period
         _set_grace(grace['version'], grace['command'], **extra)
         db.session.commit()
+        if disable:
+            _mirror_keys(late['changed'])
         logger.warning("Previous DEK kept: %d value(s) were written under it since the "
                        "%s", late['rewritten'], 'disable' if disable else 'rotation')
         return 0

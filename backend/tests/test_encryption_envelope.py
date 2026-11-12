@@ -1557,3 +1557,31 @@ def test_a_start_during_a_disable_left_half_way_logs_no_encryption_resumed(
         _start(app)
     lines = [r.getMessage() for r in caplog.records if r.name == 'security.master_key_bootstrap']
     assert not any('now encrypted' in line or 'still stored unencrypted' in line for line in lines)
+
+
+def test_a_key_the_end_of_grace_sweep_decrypts_gets_its_mirror(app, auth_client, values, grace,
+                                                                 monkeypatch, create_ca,
+                                                                 encryption_enabled):
+    """The disable wrote the mirrors before the late value came: the sweep writes its own."""
+    from models import CA
+    from security import dek_rotation, encryption
+    from utils.file_naming import ca_key_path
+    key_encryption = encryption_enabled.key_encryption
+    ca_id = create_ca()['id']
+    with app.app_context():
+        _rotate_at_once(monkeypatch)
+        stale = key_encryption._fernet
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        plain, path = ca.prv, ca_key_path(ca)
+        # A process still encrypting commits the key late, and drops the mirror as it does
+        ca.prv = base64.b64encode(encryption.ENCRYPTED_MARKER
+                                  + stale.encrypt(base64.b64decode(plain))).decode()
+        db.session.commit()
+    path.unlink()
+    grace(601)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 0
+        assert db.session.get(CA, ca_id).prv == plain
+    assert path.read_bytes() == base64.b64decode(plain)
