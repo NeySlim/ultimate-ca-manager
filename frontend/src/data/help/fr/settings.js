@@ -369,7 +369,7 @@ Gérez le certificat TLS utilisé par l'interface web UCM :
 - Voir le journal des modifications pour les mises à jour disponibles
 - Version actuelle et informations de build
 - **Mise à jour automatique** : sur les installations prises en charge (DEB/RPM), cliquez sur **Installer la mise à jour** pour télécharger et installer automatiquement la dernière version
-- **HA mode**: on DEB/RPM, **Install Update** and the auto-install update the nodes one at a time, and the screen follows the rolling update (nodes done, node in progress, node where it stopped and why, **Resume**)
+- **HA mode**: on DEB/RPM, **Install Update** and the auto-install update the nodes one at a time, and the screen follows the rolling update (nodes done, node in progress, package of each node, node where it stopped and why, **Resume**)
 - **Canal de mise à jour** : stable, pré-version (versions candidates) ou dev
 
 ## Webhooks
