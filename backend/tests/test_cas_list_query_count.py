@@ -66,9 +66,11 @@ def _drop(app, ids, cert_ids):
         db.session.commit()
 
 
-def test_statement_count_does_not_grow_with_the_number_of_cas(app, auth_client, create_ca):
+def _two_runs(app, auth_client, create_ca, with_root=lambda: None):
+    """The statements of a listing with 10 more CAs, then with 40 more."""
     root = create_ca(cn='QC Root')
     try:
+        with_root()
         small_ids, small_certs = _populate(app, root['id'], 10)
         try:
             small, _ = _count_statements(app, auth_client)
@@ -84,13 +86,52 @@ def test_statement_count_does_not_grow_with_the_number_of_cas(app, auth_client, 
             _drop(app, big_ids, big_certs)
     finally:
         _drop_root(app, root['id'])
-    # On a mismatch, name the statements one run issued and the other did not
+    return small, big
+
+
+def test_statement_count_does_not_grow_with_the_number_of_cas(app, auth_client, create_ca):
+    small, big = _two_runs(app, auth_client, create_ca)
+    grown = _unexplained(small, big)
+    assert not grown, (f'{len(small)} statements for 10 CAs, {len(big)} for 40; '
+                       f'one run only: {sorted(grown.items())[:6]}')
+
+
+def test_crossing_a_batch_boundary_is_not_growth(app, auth_client, create_ca, monkeypatch):
+    """The shared database holds what other tests left: the 30 more CAs may be the ones
+    that open a second batch."""
+    from services.ca import list_prefetch
+
+    def boundary_between_the_runs():
+        with app.app_context():
+            monkeypatch.setattr(list_prefetch, '_CHUNK', CA.query.count() + 15)
+    small, big = _two_runs(app, auth_client, create_ca, with_root=boundary_between_the_runs)
+    assert len(big) > len(small)
+    assert not _unexplained(small, big)
+
+
+def _unexplained(small, big):
+    """The statements one run issued and the other did not, batches aside.
+
+    The listing reads its facts by batches of ids: the larger run may cross one
+    batch boundary, so one more execution of an ``IN (...)`` statement is not growth."""
+    import re
     from collections import Counter
-    extra = Counter(big) - Counter(small)
-    fewer = Counter(small) - Counter(big)
-    assert len(big) == len(small), (
-        f'{len(small)} statements for 10 CAs, {len(big)} for 40; '
-        f'only in the larger run: {sorted(extra.items())[:6]}; only in the smaller: {sorted(fewer.items())[:6]}')
+    shape = lambda statement: re.sub(r'IN \([^()]*\)', 'IN (...)', statement)  # noqa: E731
+    few, many = Counter(map(shape, small)), Counter(map(shape, big))
+    grown = {s: n for s, n in (many - few).items() if n > 1 or 'IN (...)' not in s}
+    grown.update({s: -n for s, n in (few - many).items()})
+    return grown
+
+
+def test_one_more_batch_is_not_growth_and_a_query_per_ca_is():
+    batch = 'SELECT 1 FROM t WHERE t.id IN (?, ?, ?)'
+    wider = 'SELECT 1 FROM t WHERE t.id IN (?, ?, ?, ?)'
+    per_ca = 'SELECT 1 FROM t WHERE t.id = ?'
+    assert _unexplained([batch], [wider]) == {}
+    assert _unexplained([batch], [wider, batch]) == {}
+    assert _unexplained([batch], [wider] * 3)
+    assert _unexplained([batch, per_ca], [batch, per_ca, per_ca])
+    assert _unexplained([batch, per_ca], [batch])
 
 
 def test_the_listing_answers_what_one_by_one_computation_gave(app, auth_client, create_ca):
