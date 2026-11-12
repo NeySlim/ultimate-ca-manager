@@ -405,3 +405,69 @@ def test_a_graceful_stop_waits_for_the_per_node_task_of_a_follower(sched, monkey
     follower.relinquish()
     assert follower.join(2) is True
     assert done.is_set()
+
+
+class _HookLock:
+    """A task's run lock that runs ``hook`` once, just before it is taken."""
+
+    def __init__(self, hook):
+        self._lock, self._hook = threading.Lock(), hook
+
+    def acquire(self, blocking=True, timeout=-1):
+        hook, self._hook = self._hook, None
+        if hook:
+            hook()
+        return self._lock.acquire(blocking, timeout)
+
+    def release(self):
+        self._lock.release()
+
+    def locked(self):
+        return self._lock.locked()
+
+    def __enter__(self):
+        self.acquire()
+        return self
+
+    def __exit__(self, *exc):
+        self.release()
+
+
+def test_a_run_now_on_a_task_the_node_thread_still_runs_never_blocks_the_new_leader(sched, monkeypatch):
+    beats = []
+    _ha_pair(monkeypatch, beats)
+    leader, follower = sched(), sched()
+    release, started, runs = threading.Event(), threading.Event(), []
+    asked = []
+
+    def take(self):
+        if self is follower and not asked:
+            asked.append(1)
+            return [self.tasks['local']]  # "run now" claimed at the takeover
+        return []
+    monkeypatch.setattr(SchedulerService, '_take_requests', take)
+
+    def slow():
+        runs.append(threading.current_thread().name)
+        started.set()
+        release.wait(2)
+    leader.wake_interval = follower.wake_interval = 0.05
+    leader.start()
+    assert _wait(lambda: _OneOwnerLock.owner is leader)
+    follower.register_task('local', slow, interval=3600, per_node=True)
+    follower.tasks['local']._created_at -= timedelta(seconds=60)
+    follower.start()
+    try:
+        assert started.wait(2)
+        leader.stop(timeout=5)
+        assert _wait(lambda: asked, timeout=1.0)
+        before = beats.count(follower)
+        assert _wait(lambda: beats.count(follower) > before + 2, timeout=1.0)
+        assert runs == ['SchedulerNodeTasks']
+    finally:
+        release.set()
+    # The request is served once the node thread's run is over, by the leader loop
+    assert _wait(lambda: len(runs) == 2, timeout=2)
+    time.sleep(0.3)
+    assert runs == ['SchedulerNodeTasks', 'SchedulerService']
+

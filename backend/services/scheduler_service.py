@@ -184,6 +184,8 @@ class SchedulerService:
         self._publish_error_logged = False
         self._wake = threading.Event()
         self._node_thread: Optional[threading.Thread] = None
+        # Asked to run while another thread ran them: served at a later pass, never awaited
+        self._deferred: list = []
         logger.info(f"SchedulerService initialized (wake interval: {wake_interval}s)")
     
     def register_task(
@@ -463,6 +465,8 @@ class SchedulerService:
             remaining = deadline - time.monotonic()
             if remaining <= 0 or ((supervised() or self._owns_lock and _ha()) and self._has_requests()):
                 return
+            if self._owns_lock and self._deferred_ready():
+                return
             self._wake.wait(min(REQUEST_POLL_SECONDS, remaining))
     
     def _run_task(self, task: ScheduledTask) -> None:
@@ -474,6 +478,36 @@ class SchedulerService:
         """
         with task._run_lock:
             self._run_task_once(task)
+
+    def _try_run(self, task: ScheduledTask, requested: bool = False, on_follower: bool = False) -> bool:
+        """Run ``task`` unless another thread holds its run lock; True when it ran.
+
+        A run asked for while the lock is busy is deferred to a later pass, never awaited.
+        """
+        if not task._run_lock.acquire(blocking=False):
+            if requested:
+                self._defer(task)
+            return False
+        try:
+            self._run_task_once(task)
+            return True
+        finally:
+            task._run_lock.release()
+
+    def _defer(self, task: ScheduledTask) -> None:
+        with self.tasks_lock:
+            if task not in self._deferred:
+                self._deferred.append(task)
+
+    def _take_deferred(self, per_node_only: bool = False) -> list:
+        with self.tasks_lock:
+            taken = [t for t in self._deferred if t.per_node or not per_node_only]
+            self._deferred = [t for t in self._deferred if t not in taken]
+        return taken
+
+    def _deferred_ready(self) -> bool:
+        with self.tasks_lock:
+            return any(not t._run_lock.locked() for t in self._deferred)
 
     def _run_task_once(self, task: ScheduledTask) -> None:
         start_time = time.time()
@@ -616,26 +650,28 @@ class SchedulerService:
                     self._wake.wait(LOCK_RETRY_SECONDS)
                     continue
                 try:
-                    requested = self._take_requests() if supervised() or _ha() else []
+                    requested = self._take_deferred()
+                    taken = self._take_requests() if supervised() or _ha() else []
+                    requested += [task for task in taken if task not in requested]
                     with self.tasks_lock:
                         tasks_to_run = requested + [
                             task for task in self.tasks.values()
                             if task.should_run() and task not in requested
-                            and not task._run_lock.locked()
                         ]
 
                     # Execute tasks outside of lock
                     for task in tasks_to_run:
                         if not self._running or not self._still_leader(lock):
                             break
+                        ran = False
                         try:
-                            self._run_task(task)
+                            ran = self._try_run(task, requested=task in requested)
                         except Exception as e:
                             logger.error(
                                 f"Unexpected error running task '{task.name}': {e}",
                                 exc_info=True
                             )
-                        if self._claimed:
+                        if ran and self._claimed:
                             self._finish_request(task)
                         self._publish_state()
                         # Throttled: a pass longer than the stale window keeps this row fresh
@@ -654,22 +690,29 @@ class SchedulerService:
         retrying the lock and writing the heartbeat meanwhile."""
         if self._node_thread is not None and self._node_thread.is_alive():
             return
+        requested = self._take_deferred(per_node_only=True)
         with self.tasks_lock:
-            if not any(task.per_node and task.should_run() for task in self.tasks.values()):
+            if not requested and not any(task.per_node and task.should_run()
+                                         for task in self.tasks.values()):
                 return
-        self._node_thread = threading.Thread(target=self._run_node_tasks, daemon=True,
-                                             name="SchedulerNodeTasks")
+        self._node_thread = threading.Thread(target=self._run_node_tasks, args=(requested,),
+                                             daemon=True, name="SchedulerNodeTasks")
         self._node_thread.start()
 
-    def _run_node_tasks(self) -> None:
-        """The per-node tasks due on this follower; once leader, the loop runs them with the rest."""
+    def _run_node_tasks(self, requested=()) -> None:
+        """The per-node tasks asked or due on this follower; once leader, the loop runs them with the rest."""
         with self.tasks_lock:
-            due = [task for task in self.tasks.values() if task.per_node and task.should_run()]
-        for task in due:
+            due = [task for task in self.tasks.values()
+                   if task.per_node and task.should_run() and task not in requested]
+        queue = list(requested) + due
+        for index, task in enumerate(queue):
             if not self._running or self._owns_lock:
+                for left in queue[index:]:
+                    if left in requested:
+                        self._defer(left)  # the leader loop or the next node pass serves it
                 break
             try:
-                self._run_task(task)
+                self._try_run(task, requested=task in requested, on_follower=True)
             except Exception as e:
                 logger.error(f"Unexpected error running task '{task.name}': {e}", exc_info=True)
 
