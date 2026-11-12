@@ -110,3 +110,31 @@ def test_401_from_validation_forgets_the_token(net):
     # the intune token (second one) was asked for again, the graph one kept
     assert net['token'] == 3
     assert net['validate'][-1] != net['validate'][0]
+
+
+def test_403_from_validation_forgets_the_token(net):
+    client = client_for_profile(_profile())
+    client.validate_request('txn', b'x')
+    net['validate_status'] = 403
+    with pytest.raises(IntuneScepError):
+        client.validate_request('txn', b'x')
+    net['validate_status'] = 200
+    client.validate_request('txn', b'x')
+    assert net['validate'][-1] != net['validate'][0]
+
+
+@pytest.mark.parametrize('status', [401, 403])
+def test_refused_discovery_forgets_the_graph_token(monkeypatch, net, status):
+    seen = []
+    codes = iter([status, 200])
+
+    def get(url, headers=None, timeout=None):
+        seen.append(headers['Authorization'])
+        return _Resp({'value': SERVICE}, next(codes))
+
+    monkeypatch.setattr('requests.get', get)
+    client = client_for_profile(_profile())
+    with pytest.raises(IntuneScepError):
+        client.validate_request('txn', b'x')
+    client.validate_request('txn', b'x')
+    assert seen[0] != seen[1]

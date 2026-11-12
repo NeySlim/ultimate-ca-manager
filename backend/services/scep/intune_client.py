@@ -188,6 +188,13 @@ class IntuneScepClient:
     def _graph_token(self) -> str:
         return self._get_token(f"{GRAPH_RESOURCE_URL}.default")
 
+    def _forget_token(self, scope: str, exc: Exception) -> None:
+        """A 401/403 means the cached token was refused: ask for a new one next time."""
+        status = getattr(getattr(exc, 'response', None), 'status_code', None)
+        if status in (401, 403):
+            with self._lock:
+                self._tokens.pop(scope, None)
+
     def _intune_token(self) -> str:
         # Deliberately not "fixed": see module docstring.
         return self._get_token(f"{INTUNE_RESOURCE_URL}/.default")
@@ -207,6 +214,7 @@ class IntuneScepClient:
         try:
             resp.raise_for_status()
         except requests.HTTPError as e:
+            self._forget_token(f"{GRAPH_RESOURCE_URL}.default", e)
             raise IntuneScepError(f"Intune service discovery via Graph failed: {e}") from e
 
         body = resp.json()
@@ -266,9 +274,7 @@ class IntuneScepClient:
             # here: the caller fails and the next request re-discovers.
             with self._lock:
                 self._service_endpoint = None
-                # A 401 means the token was refused: ask for a new one next time
-                if getattr(getattr(e, 'response', None), 'status_code', None) == 401:
-                    self._tokens.pop(f"{INTUNE_RESOURCE_URL}/.default", None)
+                self._forget_token(f"{INTUNE_RESOURCE_URL}/.default", e)
             logger.error(
                 "Intune SCEP API request failed (activityId=%s url=%s/%s): %s",
                 activity_id, endpoint, url_suffix, e,
