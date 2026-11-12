@@ -237,7 +237,30 @@ def test_the_dispatched_node_downloads_verified_then_asks_its_local_install_once
         uc.run_local_turn(payload, node_id=PREFIX + 'a', version='3.0')  # replayed: nothing
         uc.run_local_turn(payload, node_id=PREFIX + 'b', version='3.0')  # not its turn
     assert calls == [('download', SHA), ('install', '/nowhere/p.deb', '3.1')]
-    assert _state(app)['current']['state'] == uc.INSTALLING
+    assert _state(app)['current']['state'] == uc.REQUESTED
+
+
+def test_a_campaign_stopped_during_the_download_installs_nothing(app, ha, monkeypatch, tmp_path):
+    """The guard fires while the node downloads: the package is dropped, never installed."""
+    from services.scheduler_leader import cluster_utc_now
+    calls = []
+    package = tmp_path / 'p.deb'
+
+    def download(url, name, expected_sha256=None):
+        package.write_bytes(b'pkg')
+        calls.append(uc.campaign_tick(now=cluster_utc_now() + timedelta(seconds=uc.NODE_GUARD_SECONDS + 5)))
+        return str(package)
+    monkeypatch.setattr(updates, 'download_update', download)
+    monkeypatch.setattr(updates, 'install_update', lambda path, **kw: calls.append('install'))
+    _rows(app, a='3.0', b='3.0')
+    _start(app)
+    with app.app_context():
+        uc.campaign_tick()
+        uc.run_local_turn(_commands(app)[0][1], node_id=PREFIX + 'a', version='3.0')
+    assert calls[0][0] == 'stopped' and 'install' not in calls
+    assert not package.exists()
+    state = _state(app)
+    assert state['status'] == uc.STOPPED and 'within' in state['failed']['reason']
 
 
 def test_the_full_roll_goes_one_node_after_the_other(app, ha, monkeypatch):

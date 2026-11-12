@@ -18,12 +18,13 @@ from datetime import datetime
 logger = logging.getLogger('ucm.updates')
 
 CAMPAIGN_KEY = 'ha_update_campaign'
-# Download (300 s read timeout), dpkg/rpm install, migrations under the boot lock (120 s)
-# and the first heartbeat of the new process (60 s pass) fit with room to spare
+# Sized for a download (300 s is the timeout of each read, not of the whole transfer), the
+# dpkg/rpm install, migrations under the boot lock (120 s) and the first heartbeat (60 s pass);
+# a turn the guard stopped mid-download installs nothing (run_local_turn re-checks it)
 NODE_GUARD_SECONDS = 900
 
 RUNNING, STOPPED, DONE = 'running', 'stopped', 'done'
-DISPATCHED, INSTALLING = 'dispatched', 'installing'
+DISPATCHED, INSTALLING, REQUESTED = 'dispatched', 'installing', 'requested'
 
 NodeView = namedtuple('NodeView', 'started_at heartbeat_at version')
 
@@ -240,6 +241,14 @@ def _stop(raw, campaign, node, reason):
         _announce(stopped, event)
 
 
+def _discard(path):
+    import os
+    try:
+        os.remove(path)
+    except OSError as e:
+        logger.warning(f"Rolling update: dropped package not removed: {type(e).__name__}: {e}")
+
+
 def run_local_turn(payload, node_id=None, version=None):
     """Handler of the ``update`` command on the node it targets: verified download, then
     the host-local install request. Runs once per turn, whatever process gets there first."""
@@ -268,8 +277,20 @@ def run_local_turn(payload, node_id=None, version=None):
     try:
         path = updates.download_update(payload['download_url'], payload['package_name'],
                                        expected_sha256=sha256)
+    except Exception as e:
+        return _stop(raw, taken, node_id, str(e)[:300])
+    # The turn must still be ours after the download: a campaign stopped meanwhile installs nothing
+    requested = deepcopy(taken)
+    requested['current']['state'] = REQUESTED
+    if not _store(raw, requested):
+        _discard(path)
+        logger.error(f"Rolling update: campaign changed during the download on {node_id}, "
+                     f"package dropped and not installed")
+        return
+    raw = _dump(requested)
+    try:
         updates.install_update(path, to_version=campaign['target'],
                                initiated_by=campaign.get('initiated_by') or 'system')
     except Exception as e:
-        return _stop(raw, taken, node_id, str(e)[:300])
-    _announce(taken, ('installing', node_id, None))
+        return _stop(raw, requested, node_id, str(e)[:300])
+    _announce(requested, ('installing', node_id, None))
