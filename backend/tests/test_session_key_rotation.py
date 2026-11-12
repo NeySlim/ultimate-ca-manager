@@ -334,3 +334,52 @@ def test_a_key_given_by_the_caller_is_neither_answered_nor_logged(
     with app.app_context():
         assert not AuditLog.query.filter(AuditLog.details.contains(secret)).first()
     assert auth_client.post(ROTATE, json={'new_secret': 'short'}).status_code in (400, 409)
+
+
+def _signed_by(app, key, user_id=1):
+    """A CSRF token signed with ``key``, as another node holding it would sign it."""
+    from security.csrf import CSRFProtection
+    with app.app_context():
+        own = app.config['SECRET_KEY']
+        app.config['SECRET_KEY'] = key
+        try:
+            return CSRFProtection.generate_token(user_id)
+        finally:
+            app.config['SECRET_KEY'] = own
+
+
+def _rotated_elsewhere(app, stored, new):
+    """Another node's rotation: ``new`` active, the current key previous, no reload here."""
+    from datetime import timedelta
+    from security.encryption import encrypt_master_key_value
+    with app.app_context():
+        current = app.config['SECRET_KEY']
+        stored._put(stored.ACTIVE_KEY, encrypt_master_key_value(new, 'text'))
+        stored._put(stored.PREVIOUS_KEY, encrypt_master_key_value(current, 'text'))
+        stored._put(stored.RETIRE_KEY, (stored._now() + timedelta(
+            seconds=stored.GRACE_SECONDS)).isoformat())
+        db.session.commit()
+
+
+def test_a_failed_reload_is_tried_again_until_the_node_has_the_new_key(
+        app, auth_client, stored, encryption_enabled, monkeypatch):
+    assert auth_client.post(ROTATE, json={}).status_code == 200
+    _later(monkeypatch, stored.GRACE_SECONDS + 1)
+    new = 'N' * 43
+    _rotated_elsewhere(app, stored, new)
+    token = _signed_by(app, new)
+
+    def down():
+        raise RuntimeError('database unreachable')
+    monkeypatch.setattr(stored, 'RETRY_SECONDS', 0)
+    with monkeypatch.context() as m:
+        m.setattr(stored, '_read_rows', down)
+        _reload(app)
+        assert not _valid(app, token)
+        # Still unreadable: the next request leaves the keys as they are
+        auth_client.get(STATUS)
+        assert not _valid(app, token)
+    # Readable again: a request, no command and no restart, brings the new key in
+    auth_client.get(STATUS)
+    assert app.config['SECRET_KEY'] == new
+    assert _valid(app, token)

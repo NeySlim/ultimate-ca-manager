@@ -7,6 +7,7 @@ environment's SECRET_KEY signs, as before. A key is never stored in the clear.
 """
 import logging
 import secrets as py_secrets
+import time
 from datetime import datetime
 
 from security.csrf import CSRF_TOKEN_LIFETIME
@@ -23,6 +24,9 @@ ALL_KEYS = STORED_KEYS + (RETIRE_KEY,)
 # signed): none signed before a rotation is still valid after this
 GRACE_SECONDS = CSRF_TOKEN_LIFETIME
 MIN_LENGTH = 32
+# A load that failed is tried again on a request, after this delay doubled up to the cap
+RETRY_SECONDS = 5
+RETRY_MAX_SECONDS = 300
 _STATE = 'ucm_session_key'
 _DESCRIPTIONS = {
     ACTIVE_KEY: 'Session secret key (encrypted)',
@@ -98,8 +102,8 @@ def _until(rows):
 def load(app, at_start=False) -> str:
     """Sets this process's signing key and the previous key it still accepts, from the
     database; the environment's key when nothing is stored. A row that cannot be read or
-    opened falls back to the environment at start only: a reload keeps the keys in memory,
-    so one node never signs with a key the others refuse. Returns the source."""
+    opened falls back to the environment at start only, a reload keeps the keys in memory;
+    either way reload_if_pending() tries again until it succeeds. Returns the source."""
     from models import db
     state = _state(app)
     active, previous, until, source = state['env'], None, None, 'environment'
@@ -128,8 +132,15 @@ def load(app, at_start=False) -> str:
                 previous = _open(rows[PREVIOUS_KEY], 'previous session key')
                 if previous is None:
                     failed = 'open'
+    if failed:
+        delay = RETRY_SECONDS if 'retry' not in state else \
+            min(state['retry'][1] * 2, RETRY_MAX_SECONDS)
+        state['retry'] = (time.monotonic() + delay, delay)
+    else:
+        state.pop('retry', None)
     if failed and not at_start:
-        logger.warning("Session key reload incomplete: this node keeps the keys it had")
+        logger.warning("Session key reload incomplete: this node keeps the keys it had "
+                       "and tries again")
         return state.get('source', 'environment')
     if failed and source == 'environment':
         logger.warning("The environment's SECRET_KEY signs on this node; rotate the session "
@@ -138,6 +149,21 @@ def load(app, at_start=False) -> str:
     app.config['SECRET_KEY_FALLBACKS'] = [previous] if previous else []
     state.update(source=source, previous_until=until if previous else None)
     return source
+
+
+def reload_pending(app) -> bool:
+    return 'retry' in (app.extensions.get(_STATE) or {})
+
+
+def reload_if_pending() -> None:
+    """Before a request: the last load failed and its delay is over, load again. Without
+    this a node would refuse the new key's tokens until the next command or a restart."""
+    from flask import current_app
+    app = current_app._get_current_object()
+    retry = (app.extensions.get(_STATE) or {}).get('retry')
+    if retry is None or time.monotonic() < retry[0]:
+        return
+    load(app)
 
 
 def verification_keys(app) -> list:

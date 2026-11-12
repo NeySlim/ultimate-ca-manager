@@ -1015,9 +1015,11 @@ def create_app(config_name=None):
 
     # After the master key and before any request: the stored session key replaces the
     # environment's when it opens (security.session_key); load() never raises
-    from security.session_key import load as load_session_key
+    from security.session_key import load as load_session_key, reload_if_pending
     with app.app_context():
         load_session_key(app, at_start=True)
+    # Before the CSRF check registered below: a failed load is retried before a token is checked
+    app.before_request(reload_if_pending)
     
     # HSM availability check at startup
     try:
