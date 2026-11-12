@@ -99,6 +99,16 @@ def ca_deletion_blockers(ca) -> Iterator[DeletionBlocker]:
             'Rebind or delete them first.',
             f'{scep_profiles} SCEP profile(s) issue from it',
         )
+    from models import WindowsEnrollmentProfile as Profile
+    windows_profiles = Profile.query.filter(
+        db.or_(Profile.issuing_ca_refid == ca.refid, Profile.policy_ca_refid == ca.refid)).count()
+    if windows_profiles > 0:
+        yield DeletionBlocker(
+            409,
+            f'Cannot delete CA: {windows_profiles} Windows enrollment profile(s) use it. '
+            'Point them at another CA first.',
+            f'{windows_profiles} Windows enrollment profile(s) use it',
+        )
     from models.acme_models import AcmeDomain, AcmeLocalDomain
     acme_domains = (AcmeDomain.query.filter_by(issuing_ca_id=ca.id).count()
                     + AcmeLocalDomain.query.filter_by(issuing_ca_id=ca.id).count())
@@ -194,6 +204,16 @@ def template_deletion_blockers(template) -> Iterator[DeletionBlocker]:
             f'Cannot delete: template is bound to {scep_count} SCEP '
             'profile(s); unbind it first',
             f'Bound to {scep_count} SCEP profile(s)',
+        )
+
+    from models import WindowsProfileTemplate
+    windows_count = WindowsProfileTemplate.query.filter_by(template_id=template_id).count()
+    if windows_count > 0:
+        yield DeletionBlocker(
+            409,
+            f'Cannot delete: template is offered by {windows_count} Windows enrollment '
+            'profile(s); remove it from them first',
+            f'Offered by {windows_count} Windows enrollment profile(s)',
         )
 
     from services.acme import profiles as acme_profiles
@@ -300,4 +320,17 @@ def acme_account_deletion_blockers(acct, deactivate=False) -> Iterator[DeletionB
             f'Cannot {verb} the ACME account: {len(domains)} issued order(s) renew through it '
             f'({shown}). Turn off their automatic renewal in the order list, or delete them, first.',
             f'{len(domains)} issued order(s) renew through it',
+        )
+
+
+def connector_deletion_blockers(connector) -> Iterator[DeletionBlocker]:
+    """Why this Active Directory connector may not be deleted."""
+    from models import WindowsEnrollmentProfile
+    profiles = WindowsEnrollmentProfile.query.filter_by(connector_id=connector.id).count()
+    if profiles > 0:
+        yield DeletionBlocker(
+            409,
+            f'Cannot delete the connector: {profiles} Windows enrollment profile(s) use it. '
+            'Point them at another connector first.',
+            f'{profiles} Windows enrollment profile(s) use it',
         )

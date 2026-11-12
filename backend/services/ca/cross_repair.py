@@ -19,8 +19,7 @@ logger = logging.getLogger(__name__)
 
 NOTE = ('A self-signed root that was overwritten or deleted is not recovered here: '
         'restore it from a backup, or give its certificate to restore-primary.')
-_SETTINGS = ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'wstep_ca_refid', 'xcep_ca_refid',
-             'mtls_trusted_ca_id', 'scep_ca_id')
+_SETTINGS = ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'mtls_trusted_ca_id', 'scep_ca_id')
 _ALIAS_PREFIX = 'ca_url_alias_'
 _CROSS_PREFIX = 'ca_url_cross_'
 
@@ -101,8 +100,13 @@ def _record(ca_id) -> CA:
 
 
 def _move_settings(record, root, cross=None):
-    """Point the CA settings, the OCSP responder choice and the public URLs of *record* at *root*."""
-    from models import SystemConfig
+    """Point the CA settings, the Windows profiles, the OCSP responder choice and the public URLs
+    of *record* at *root*."""
+    from models import SystemConfig, WindowsEnrollmentProfile
+    for profile in WindowsEnrollmentProfile.query.all():
+        for column in ('issuing_ca_refid', 'policy_ca_refid'):
+            if getattr(profile, column) == record.refid:
+                setattr(profile, column, root.refid)
     for key in _SETTINGS:
         cfg = SystemConfig.query.filter_by(key=key).first()
         if cfg is None:
