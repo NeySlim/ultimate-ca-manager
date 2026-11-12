@@ -134,9 +134,10 @@ class CRLSchedulerTask:
     LEASE = timedelta(minutes=15)
 
     @staticmethod
-    def _under_lease(ca_id: int, run):
-        """*run(ca_id)* on the node holding the CA's lease, None on the others. Due-ness is
-        read again by *run* under the lease: a CRL committed by the previous holder counts."""
+    def _under_lease(ca_id: int, run, retries=None):
+        """*run(ca_id)* on the node holding the CA's lease, None on the others, which append to
+        *retries* when that lease frees. Due-ness is read again by *run* under the lease: a CRL
+        committed by the previous holder counts."""
         from utils.ha import ha_enabled
         if not ha_enabled():
             return run(ca_id)
@@ -145,6 +146,8 @@ class CRLSchedulerTask:
         try:
             if not lease.take():
                 logger.info(f"CRL of CA {ca_id} left to the node publishing it")
+                if retries is not None and lease.retry_in() is not None:
+                    retries.append(lease.retry_in())
                 return None
         except Exception as e:
             db.session.rollback()
@@ -186,11 +189,13 @@ class CRLSchedulerTask:
         return True
 
     @staticmethod
-    def execute() -> None:
+    def execute():
         """
         Main task to check all CAs and regenerate CRLs as needed
-        Called by scheduler every N seconds
+        Called by scheduler every N seconds. A CA left to the node holding its lease asks
+        one retry of the whole pass once the last such lease is over.
         """
+        retries = []
         try:
             logger.debug("Starting CRL regeneration check")
             
@@ -226,7 +231,8 @@ class CRLSchedulerTask:
                 should_regen, reason = CRLSchedulerTask.should_regenerate_crl(ca_id)
                 
                 if should_regen:
-                    success = CRLSchedulerTask._under_lease(ca_id, CRLSchedulerTask._regenerate_if_due)
+                    success = CRLSchedulerTask._under_lease(ca_id, CRLSchedulerTask._regenerate_if_due,
+                                                            retries)
                     if success is None:
                         skipped_count += 1
                     elif success:
@@ -257,7 +263,7 @@ class CRLSchedulerTask:
                 ca_id = ca.id
                 try:
                     if CRLSchedulerTask._delta_interval_if_due(ca_id) is not None \
-                            and CRLSchedulerTask._under_lease(ca_id, CRLSchedulerTask._delta_if_due):
+                            and CRLSchedulerTask._under_lease(ca_id, CRLSchedulerTask._delta_if_due, retries):
                         delta_count += 1
                 except Exception as e:
                     db.session.rollback()
@@ -268,6 +274,9 @@ class CRLSchedulerTask:
         
         except Exception as e:
             logger.error(f"Error in CRL regeneration task: {e}", exc_info=True)
+        if retries:
+            return {'status': 'ok', 'retry_in': max(retries)}
+        return None
 
 
 def get_crl_scheduler_task():

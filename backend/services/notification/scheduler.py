@@ -192,7 +192,8 @@ class NotificationSchedulerMixin:
         lease = ConfigLease(EXPIRY_LEASE_KEY, EXPIRY_LEASE)
         if not lease.take():
             logger.info("Expiry checks skipped: another node is running them")
-            return {'status': 'skipped', 'reason': 'another node is running the expiry checks'}
+            return {'status': 'skipped', 'reason': 'another node is running the expiry checks',
+                    'retry_in': lease.retry_in()}
         try:
             return NotificationSchedulerMixin._run_checks(lease)
         finally:

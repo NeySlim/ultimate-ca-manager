@@ -95,12 +95,16 @@ class ScheduledTask:
         # from one that did the work.
         self.last_status: Optional[str] = None
         self.last_reason: Optional[str] = None
+        # One extra run asked by the last one (a lease held elsewhere): a later ask replaces it
+        self.retry_at: Optional[datetime] = None
         self._created_at = utc_now()
     
     def should_run(self) -> bool:
         """Check if task should run based on interval"""
         if not self.enabled:
             return False
+        if self.retry_at is not None and utc_now() >= self.retry_at:
+            return True
         if self.last_run is None:
             # Grace period: wait 30s after creation before first run
             # to let SSL/network stack initialize after worker fork
@@ -483,6 +487,7 @@ class SchedulerService:
             task.run_count += 1
             task.last_run = utc_now()
             task.next_run = utc_now() + __import__('datetime').timedelta(seconds=task.interval)
+            task.retry_at = self._retry_of(result, task)
             outcome = {'ok': 'completed successfully', 'warning': f'completed with a warning ({reason})'}
             log = logger.warning if status == 'warning' else logger.info
             log(
@@ -498,11 +503,26 @@ class SchedulerService:
             task.last_status = 'failed'
             task.last_reason = None
             task.last_run = utc_now()
+            task.retry_at = None
             logger.error(
                 f"Task '{task.name}' failed: {error_msg} (duration: {duration_ms:.1f}ms)",
                 exc_info=True
             )
     
+    @staticmethod
+    def _retry_of(result, task: ScheduledTask) -> Optional[datetime]:
+        """The instant of the retry a run asked for ({'retry_in': seconds}), before its next run."""
+        retry_in = result.get('retry_in') if isinstance(result, dict) else None
+        if not isinstance(retry_in, (int, float)) or isinstance(retry_in, bool) or retry_in < 0:
+            return None
+        retry_at = utc_now() + __import__('datetime').timedelta(seconds=retry_in)
+        if task.next_run is not None and retry_at >= task.next_run:
+            return None
+        task.next_run = retry_at
+        logger.info(f"Task '{task.name}' runs again at {retry_at.isoformat()}Z, once the lease held "
+                    "elsewhere is over")
+        return retry_at
+
     @staticmethod
     def _outcome_of(result) -> tuple:
         """Read a task's own report of what it did.

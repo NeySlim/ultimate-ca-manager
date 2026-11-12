@@ -616,3 +616,100 @@ def test_a_first_pass_without_a_mark_announces_the_last_day_only(
         _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, None)
         NotificationService.run_scheduled_checks()
     assert hour_old_id in announced and day_old_id not in announced
+
+
+# ------------------------------------------------------------------ a skipped pass is retried
+
+def _cluster_clock(monkeypatch, instant):
+    monkeypatch.setattr('services.scheduler_leader.cluster_utc_now', lambda *a, **k: instant)
+
+
+def test_a_refused_lease_tells_when_it_frees(app, monkeypatch):
+    key = f'lease-test-{uuid.uuid4().hex[:8]}'
+    now = datetime(2044, 1, 1, 12, 0)
+    _cluster_clock(monkeypatch, now)
+    with app.app_context():
+        try:
+            _set(key, f"{(now - timedelta(minutes=4)).isoformat()}|other-node")
+            lease = config_cas.ConfigLease(key, timedelta(minutes=10))
+            assert not lease.take()
+            assert lease.retry_in() == 6 * 60 + config_cas.LEASE_RETRY_MARGIN.total_seconds()
+        finally:
+            _set(key, None)
+
+
+def test_expiry_checks_held_elsewhere_ask_a_retry_when_the_lease_ends(app, ha, monkeypatch):
+    passes = _record_webhook_passes(monkeypatch)
+    now = datetime(2044, 1, 1, 12, 0)
+    _cluster_clock(monkeypatch, now)
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_LEASE_KEY, f"{(now - timedelta(minutes=3)).isoformat()}|other-node")
+        result = NotificationService.run_scheduled_checks()
+    assert result['status'] == 'skipped' and passes == []
+    assert result['retry_in'] == 7 * 60 + config_cas.LEASE_RETRY_MARGIN.total_seconds()
+
+
+def test_the_retried_expiry_pass_announces_nothing_the_holder_did(app, ha, create_cert, monkeypatch):
+    # The holder finished meanwhile: its mark covers the expiry, the retry announces it no more
+    cert_id = create_cert(cn='retry-after-holder.example.com')['id']
+    now = datetime(2044, 2, 1, 12, 0)
+    _expires_at(app, cert_id, now - timedelta(hours=2))
+    emitted = _record_expiry_webhooks(monkeypatch, cert_id)
+    monkeypatch.setattr(expiry_alert_service, 'utc_now', lambda: now)
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_LEASE_KEY, None)
+        _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, (now - timedelta(days=1)).isoformat())
+    _passes_at(app, monkeypatch, [now, now + timedelta(minutes=10, seconds=30)])
+    assert emitted == {'expiring': 0, 'expired': 1}
+
+
+def test_a_crl_held_elsewhere_asks_a_retry_when_its_lease_ends(app, ha, monkeypatch):
+    ca_id, other_id = _a_ca_due(app), _a_ca_due(app)
+    regenerated = _record_regenerations(monkeypatch)
+    now = datetime(2044, 1, 1, 12, 0)
+    _cluster_clock(monkeypatch, now)
+    try:
+        with app.app_context():
+            _set(f'crl_schedule_lease_{ca_id}', f"{(now - timedelta(minutes=5)).isoformat()}|other-node")
+            _set(f'crl_schedule_lease_{other_id}', f"{(now - timedelta(minutes=10)).isoformat()}|other-node")
+            result = CRLSchedulerTask.execute()
+        assert ca_id not in regenerated and other_id not in regenerated
+        # One retry, once the later of the two leases is over
+        assert result['retry_in'] == 10 * 60 + config_cas.LEASE_RETRY_MARGIN.total_seconds()
+    finally:
+        _drop_ca(app, ca_id)
+        _drop_ca(app, other_id)
+
+
+def test_a_crl_pass_with_nothing_held_asks_no_retry(app, ha, monkeypatch):
+    ca_id = _a_ca_due(app)
+    _record_regenerations(monkeypatch)
+    try:
+        with app.app_context():
+            result = CRLSchedulerTask.execute()
+        assert not (result or {}).get('retry_in')
+    finally:
+        _drop_ca(app, ca_id)
+
+
+def test_the_scheduler_reruns_the_skipped_expiry_pass_once_the_lease_is_over(app, ha, monkeypatch):
+    from services import scheduler_service
+    passes = _record_webhook_passes(monkeypatch)
+    now = datetime(2044, 3, 1, 12, 0)
+    clock = {'now': now}
+    monkeypatch.setattr('services.scheduler_leader.cluster_utc_now', lambda *a, **k: clock['now'])
+    monkeypatch.setattr(scheduler_service, 'utc_now', lambda: clock['now'])
+    s = scheduler_service.SchedulerService(wake_interval=60, node_id='retry-node')
+    s._app = app
+    s.register_task('cert_expiry_alerts', NotificationService.run_scheduled_checks, interval=86400)
+    task = s.tasks['cert_expiry_alerts']
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_LEASE_KEY, f"{(now - timedelta(minutes=2)).isoformat()}|other-node")
+    s._run_task(task)
+    assert task.last_status == 'skipped' and passes == []
+    clock['now'] = now + timedelta(minutes=8)
+    assert not task.should_run()
+    clock['now'] = now + timedelta(minutes=8, seconds=30)
+    assert task.should_run()
+    s._run_task(task)
+    assert task.last_status == 'ok' and passes == [1] and task.retry_at is None
