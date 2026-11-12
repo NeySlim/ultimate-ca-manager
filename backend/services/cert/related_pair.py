@@ -319,11 +319,18 @@ def revocation_partner(row):
 
 
 def unhold_partner(row):
-    """The partner an unhold of *row* lifts with it: the revocation partner, when it is on hold."""
+    """The partner an unhold of *row* lifts with it: the revocation partner, when it is on hold,
+    by its row or by its CA's record alone (row not aligned yet), as OCSP and the CRL say it."""
+    from services.cert.issued_lookup import effective_revocation
     partner = revocation_partner(row)
-    if partner is not None and partner.revoked and partner.revoke_reason in HOLD_REASONS:
-        return partner
-    return None
+    if partner is None:
+        return None
+    from services.cert.issued_lookup import interrupted_lift
+    if partner.revoked and partner.revoke_reason == 'removeFromCRL':
+        # Only an unhold stopped between its commits; one revoked so (ACME, an old row) stays
+        return partner if interrupted_lift(partner) else None
+    holder = partner if partner.revoked else effective_revocation(partner)
+    return partner if holder is not None and holder.revoke_reason in HOLD_REASONS else None
 
 
 def anchor_first(row, partner):

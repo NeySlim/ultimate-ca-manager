@@ -87,6 +87,50 @@ class TestRevokedSerialsWithUnknownCa:
             assert RevokedSerial.query.filter_by(caref=refid, serial_number='4242').first() is not None
 
 
+class TestAMergeNeverLowersAFinalRevocation:
+    """An archive taken during a hold, merged after the hold was made final here."""
+
+    @pytest.mark.parametrize('mode', ['merge', 'replace'])
+    def test_the_final_revocation_here_stays(self, app, auth_client, create_ca, create_cert, mode):
+        from models.revoked_serial import RevokedSerial
+        from tests.test_backup_restore_failfast import PASSWORD, _only
+        ca = create_ca(cn=f'Merge Final CA {mode}')
+        cert = create_cert(cn=f'merge-final-{mode}.example.test', ca_id=ca['id'])
+        url = f"/api/v2/certificates/{cert['id']}/revoke"
+        assert auth_client.post(url, json={'reason': 'certificateHold'}).status_code == 200
+        with app.app_context():
+            blob = _service().create_backup(PASSWORD, include=_only('certificates', 'revoked_serials'))
+        assert auth_client.post(url, json={'reason': 'keyCompromise'}).status_code == 200
+        with app.app_context():
+            row = db.session.get(Certificate, cert['id'])
+            final_at, serial, refid = row.revoked_at, row.serial_number, row.caref
+            _service().restore_backup(blob, PASSWORD, mode=mode)
+            db.session.expire_all()
+            row = db.session.get(Certificate, cert['id']) or Certificate.query.filter_by(
+                serial_number=serial, caref=refid).one()
+            reasons = [r.revoke_reason for r in RevokedSerial.query.filter_by(caref=refid, serial_number=serial)]
+        if mode == 'merge':
+            assert (row.revoked, row.revoke_reason, row.revoked_at) == (True, 'keyCompromise', final_at)
+            assert reasons == ['keyCompromise']
+        else:
+            # A replacement makes the archive the instance: its hold comes back
+            assert (row.revoked, row.revoke_reason, reasons) == (True, 'certificateHold', ['certificateHold'])
+
+
+class TestARestoreRefusalNamesTheArchivedSpelling:
+    def test_a_refusal_names_the_spelling_of_the_archive(self, app, create_ca):
+        from services.backup.errors import BackupSchemaError
+        ca = create_ca(cn='Two Spellings Refusal CA')
+        with app.app_context():
+            refid = db.session.get(CA, ca['id']).refid
+            with pytest.raises(BackupSchemaError) as refused:
+                _service()._restore_revoked_serials({'revoked_serials': [
+                    {'caref': refid, 'serial_number': '0xAB', 'revoked_at': 'not a date',
+                     'valid_to': datetime.now(timezone.utc).isoformat()}]}, {})
+            db.session.rollback()
+        assert '0xAB' in str(refused.value)
+
+
 class TestCertificateInvalidityDateRoundTrip:
     def test_invalidity_at_is_exported_and_restored(self, app, create_ca, create_cert):
         ca = create_ca(cn='Invalidity CA')

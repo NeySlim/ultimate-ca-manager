@@ -362,3 +362,50 @@ def test_a_scep_request_gone_before_it_is_closed_answers_404(app):
     from api.v2 import scep
     with app.test_request_context():
         assert scep._close_refused(987654321, 'admin', 'gone')[1] == 404
+
+
+@pytest.mark.parametrize('server', ['', 'dc1.hagland.domain'])
+def test_an_unresolved_sid_logs_the_connector_fault(app, create_ca, monkeypatch, caplog, server):
+    """A connector without a server says so in the log; a directory that does not answer says no more."""
+    import logging
+    from models import ADConnectorConfig
+    from services.ad_connector import renewal_identity
+    ca_data = create_ca(cn='SID fault log CA')
+    old, _key_ = _issue(app, ca_data['id'], 'sid-fault-log.example.test')
+    _configure_ad_connector(app)
+    try:
+        with app.app_context():
+            ADConnectorConfig.get_singleton().server = server
+            db.session.commit()
+            if server:
+                monkeypatch.setattr(ad_lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))
+            ca_cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(CA, ca_data['id']).crt))
+            with caplog.at_level(logging.WARNING, logger=renewal_identity.__name__):
+                with pytest.raises(renewal_identity.RenewalIdentityUnresolved):
+                    renewal_identity.renewal_requester_sid(old, ca_cert, 'TEST')
+    finally:
+        _clear_ad_connector(app)
+    logged = [r.getMessage() for r in caplog.records if r.name == renewal_identity.__name__]
+    expected = f'TEST: the AD Connector cannot resolve SID {SID} of a renewed certificate'
+    assert logged == [expected if server else f'{expected}: no server is configured']
+
+
+def test_a_scep_request_decided_before_it_is_closed_answers_400_and_keeps_its_decision(app):
+    import uuid
+    from api.v2 import scep
+    from models import SCEPRequest
+    with app.app_context():
+        row = SCEPRequest(transaction_id=f'decided-{uuid.uuid4().hex}', csr='x', status='approved',
+                          approved_by='alice')
+        db.session.add(row)
+        db.session.commit()
+        try:
+            with app.test_request_context():
+                response, status = scep._close_refused(row.id, 'admin', 'gone')
+            assert (status, response.get_json()['message']) == (400, 'SCEP request is no longer pending')
+            db.session.expire_all()
+            kept = db.session.get(SCEPRequest, row.id)
+            assert (kept.status, kept.approved_by, kept.rejection_reason) == ('approved', 'alice', None)
+        finally:
+            db.session.delete(db.session.get(SCEPRequest, row.id))
+            db.session.commit()

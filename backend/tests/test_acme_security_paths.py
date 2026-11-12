@@ -805,7 +805,8 @@ class TestRfc8555ErrorTypes:
         assert response.status_code == 400
         assert response.get_json()['type'].endswith(':badPublicKey')
 
-    @pytest.mark.parametrize('reason', [-1, 7, 11, '1', None, True])
+    # 8 (removeFromCRL) belongs to delta CRLs only (RFC 5280 §5.3.1)
+    @pytest.mark.parametrize('reason', [-1, 7, 8, 11, '1', None, True])
     def test_invalid_revocation_reason(self, client, acme_account, reason):
         path = '/acme/revoke-cert'
         jws = _build_jws(
@@ -1566,8 +1567,9 @@ class TestRevocationByAForgedCertificate:
         from models import Certificate
         cert_id, key, cert = self._victim(app)
         assert self._revoke_with(client, key, cert, reason=6).status_code == 200
+        # Refused as a reason before the certificate is looked at (RFC 8555 §7.6)
         r = self._revoke_with(client, key, cert, reason=8)
-        assert r.status_code == 400 and 'alreadyRevoked' in r.get_json()['type']
+        assert r.status_code == 400 and 'badRevocationReason' in r.get_json()['type']
         with app.app_context():
             assert db.session.get(Certificate, cert_id).revoke_reason == 'certificateHold'
 

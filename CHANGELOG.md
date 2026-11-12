@@ -50,6 +50,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- ACME: `revoke-cert` with reason 8 (removeFromCRL, a delta CRL entry only) is refused with `badRevocationReason`, on the server and the proxy, which also answered `malformed` for any invalid reason.
 - WSTEP, EST and SCEP: a renewed certificate keeps the SID security extension (KB5014754 strong mapping) of the certificate it renews when the CA signed that certificate, never one from the CSR, so it still maps to its account on a domain controller enforcing strong mapping; with the AD Connector enabled, a SID that names no account is refused.
 - Expiry webhooks: after an outage, `certificate.expired` is announced for what expired since the last pass, at most 30 days back, on a single node as in HA (a single node used to cover the last 24 hours only); the log gives the number of older expiries left aside.
 - HA preview: backup retention and the update result now run on every node, so a node that is not the leader prunes its own archives and reports an update it installed. The scheduler view shows and runs them on the node that answers.
@@ -85,14 +86,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Backup: a merge restore no longer turns a certificate revoked for good here back into a hold or a valid certificate, nor its revocation record into a hold.
 - Certificates: an imported certificate is now linked to a CA only when that CA's signature on it verifies, and renewal, re-enrolment and status checks only treat as issued by a CA a stored certificate it signed.
 - OCSP: a serial the CA revoked answers `revoked`, as on its CRL, even when a non-revoked record of that serial is stored again.
 - Certificates: a certificate imported again after its revocation and deletion comes back revoked, and a certificate its CA's revocation record names is no longer renewed in place.
 - Revocation: a certificate its CA recorded as revoked is now shown and treated as revoked everywhere, and an hourly pass marks such certificates revoked, with an audit entry.
-- Revocation: lifting a hold is refused (409) when a final revocation is recorded for the certificate; otherwise it removes the hold's record under every record of the CA key.
+- Revocation: lifting a hold is refused with one code (409) and one message when the certificate or its CA's record holds a final revocation; otherwise it removes the hold's record under every record of the CA key.
 - Revocation: revoking or suspending a certificate its CA already recorded as revoked for good answers that it is already revoked; a recorded hold can still be made final.
 - Revocation: the upgrade deletes once the suspension records that lifting a hold used to leave behind, unless a 2.x upgrade already did.
-- Revocation: a hold its CA recorded but the certificate does not show yet can be lifted, and the certificate details and list show the revocation the CA recorded.
+- Revocation: a hold its CA recorded but the certificate does not show yet can be lifted, also as the related partner of a lifted certificate, and the certificate details and list show the revocation the CA recorded.
 - Backup: restored certificates take the revocation their CA recorded at once, with an audit entry, and an archive from a release before 2.254 no longer brings back as holds the records a lifted hold left behind (the restore result counts them).
 - mTLS: an administrator importing a certificate for a user can no longer enrol a revoked certificate.
 - Renewal: a certificate whose signature no longer verifies with its CA's current key (CA re-keyed or replaced under the same name) is refused with a message asking for a new certificate.
