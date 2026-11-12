@@ -2207,3 +2207,48 @@ def test_a_grace_refusal_names_its_end_or_what_it_waits_for():
         '2026-01-02T03:02:00 UTC.')
     assert grace_refusal({**disable, 'acked': acked}) == (
         'Encryption was just disabled: enable it again after 2026-01-02T03:02:00 UTC.')
+
+
+def test_a_sweep_never_drops_the_dek_values_are_encrypted_under(app, values, retention,
+                                                                encryption_enabled):
+    """Built in the database (no normal path dates the active DEK while it encrypts): the
+    guard keeps it whatever its date."""
+    from datetime import timedelta
+    from models import EncryptionKey
+    from security import dek_rotation
+    key_encryption = encryption_enabled.key_encryption
+    with app.app_context():
+        dek_rotation.rotate()
+    retention(601)
+    with app.app_context():
+        dek_rotation.retire_if_due()
+        row = db.session.get(EncryptionKey, 2)
+        row.retire_after = row.created_at - timedelta(days=1)
+        db.session.commit()
+        key_encryption.reload()
+        assert key_encryption.is_encrypting and key_encryption.active_version == 2
+        assert dek_rotation.retire_if_due(sweep=True) == 0
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
+    assert _read(app, values) == CLEAR
+
+
+def test_enabling_refuses_a_kept_dek_another_node_rewrapped_since_the_last_read(
+        app, auth_client, values, retention, monkeypatch, encryption_enabled):
+    """The rows read under the lock decide, not the DEKs this process loaded before."""
+    from models import EncryptionKey
+    from security import dek_rotation, encryption
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    retention(601)
+    with app.app_context():
+        dek_rotation.retire_if_due()
+        encryption_enabled.key_encryption.reload()
+    monkeypatch.setattr(encryption, 'REFRESH_SECONDS', 3600.0)
+    with app.app_context():
+        EncryptionKey.query.filter(EncryptionKey.version > 0).update(
+            {'kek_id': '0' * 16}, synchronize_session=False)
+        db.session.commit()
+    rows = _rows(app)
+    r = auth_client.post('/api/v2/system/security/enable-encryption')
+    assert r.status_code == 409, r.data
+    assert 'do not open with the configured' in r.get_json()['message']
+    assert _rows(app) == rows

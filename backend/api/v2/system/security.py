@@ -126,6 +126,7 @@ def _enable_with_configured_kek():
     mine = key_encryption.kek_fingerprint()
     keys = EncryptionKey.query.filter(
         EncryptionKey.state.in_((envelope.ACTIVE, envelope.PREVIOUS))).all()
+    # retire_after None: defensive, not reached by the normal paths (shown_as_enabled refused it)
     if key_encryption.dek_error or any(r.retire_after is None or r.kek_id != mine for r in keys):
         db.session.rollback()
         return error_response("The stored data-encryption keys do not open with the configured "

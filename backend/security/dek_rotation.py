@@ -446,7 +446,8 @@ def retire_if_due(sweep=False) -> int:
     dropped = 0
     for row in retained(now):
         if row.version == encrypting:
-            continue  # never the DEK new values are written under
+            # Defensive, not reached by the normal paths: the DEK that encrypts has no date
+            continue
         if row.version in late['versions']:
             row.retire_after = now + timedelta(seconds=SWEEP_SECONDS)
             continue
