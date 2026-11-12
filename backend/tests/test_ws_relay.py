@@ -486,3 +486,13 @@ def test_a_listen_connection_dropping_at_once_does_not_spin(monkeypatch, caplog)
     assert calls <= 10
     assert sum('LISTEN connection lost' in r.getMessage() for r in caplog.records) == 1
 
+
+def test_a_notification_of_another_schema_does_not_wake_the_reader(monkeypatch):
+    import threading
+    wakeup = _wakeup(monkeypatch, [['other_schema', 'other_schema', 'ucm']])
+    stop = threading.Event()
+    wakeup.wait(2.0, stop)  # opens the LISTEN connection
+    assert wakeup.schema == 'ucm'
+    wakeup.wait(2.0, stop)
+    assert wakeup._raw.driver_connection.script == []  # returned on 'ucm', not before
+
