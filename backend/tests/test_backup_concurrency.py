@@ -139,7 +139,7 @@ class TestAFullDiskPublishesNothing:
                     row.value = value
                 else:
                     db.session.add(SystemConfig(key=key, value=value))
-            SystemConfig.query.filter_by(key='backup.last_run').delete()
+            SystemConfig.query.filter(SystemConfig.key.in_(('backup.last_run', 'backup.concluded_run'))).delete()
             db.session.commit()
 
             real_fsync = os_module.fsync
@@ -173,5 +173,6 @@ class TestAFullDiskPublishesNothing:
                 row = SystemConfig.query.filter_by(key='auto_backup_enabled').first()
                 if row:
                     row.value = 'false'
-                SystemConfig.query.filter_by(key='backup_password').delete()
+                SystemConfig.query.filter(SystemConfig.key.in_(
+                    ('backup_password', 'backup.last_run', 'backup.concluded_run'))).delete()
                 db.session.commit()
