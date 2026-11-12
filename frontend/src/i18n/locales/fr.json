@@ -2982,7 +2982,7 @@
     "sessionKeyFromDatabase": "Stockée en base",
     "sessionKeyFromEnvironment": "Issue de l'environnement (SECRET_KEY)",
     "sessionKeyPreviousUntil": "Clé précédente acceptée jusqu'au {{date}}",
-    "sessionKeyRotateStoredDesc": "La clé de session signe les jetons CSRF de l'interface web. Avec le chiffrement activé, une rotation stocke la nouvelle clé chiffrée en base et chaque nœud la charge sans redémarrage ; la clé précédente reste acceptée 24 heures, personne n'est déconnecté. SECRET_KEY dans l'environnement ne sert alors plus que de repli quand la clé stockée est illisible.",
+    "sessionKeyRotateStoredDesc": "La clé de session signe les jetons CSRF de l'interface web. Avec le chiffrement activé, une rotation stocke la nouvelle clé chiffrée en base et chaque nœud la charge sans redémarrage ; la clé précédente reste acceptée 24 heures, personne n'est déconnecté. SECRET_KEY dans l'environnement ne sert alors plus que de repli quand la clé stockée est illisible au démarrage ; un nœud déjà démarré garde la clé qu'il a et réessaie.",
     "sessionKeyRotateFileDesc": "La clé de session signe les jetons CSRF de l'interface web. Sans chiffrement, elle n'est jamais stockée en base : une rotation écrit la nouvelle SECRET_KEY dans le fichier d'environnement et redémarre le service ; les pages ouvertes avant le redémarrage doivent être rechargées.",
     "sessionKeyRotateHaRefused": "En HA, la clé de session ne se renouvelle qu'avec le chiffrement activé : la nouvelle clé est alors stockée en base sous la KEK que chaque nœud détient. Sans chiffrement, la rotation n'écrirait le fichier d'environnement que d'un seul nœud : elle est refusée.",
     "rotateSessionKey": "Rotation de la clé de session",
