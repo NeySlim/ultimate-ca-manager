@@ -514,7 +514,7 @@ Windows 也可以使用 \`certreq ... Renew\` 续期，以待续期的证书作�
 
 ### SID 安全扩展 (KB5014754)
 
-在**经 Kerberos 身份验证的签发**中，UCM 会在签发证书的 Microsoft SID 安全扩展（\`szOID_NTDS_CA_SECURITY_EXT\`）中嵌入请求者的 AD SID。域控制器将其用于**强证书映射**（KB5014754）:, 自 AD 对基于证书的身份验证（智能卡登录、PKINIT）强制执行强映射以来，这是必需项。启用 AD 连接器时，SID 无法解析的请求会被拒绝而不是在没有它的情况下签发，其中也包括来自连接器域之外的领域的主体。
+在**经 Kerberos 身份验证的签发**中，UCM 会在签发证书的 Microsoft SID 安全扩展（\`szOID_NTDS_CA_SECURITY_EXT\`）中嵌入请求者的 AD SID。域控制器将其用于**强证书映射**（KB5014754）:, 自 AD 对基于证书的身份验证（智能卡登录、PKINIT）强制执行强映射以来，这是必需项。启用 AD 连接器时，SID 无法解析的请求会被拒绝而不是在没有它的情况下签发，其中也包括来自连接器域之外的领域的主体。 A WSTEP renewal carries over the SID extension of the certificate it renews, never one from the CSR; with the AD Connector enabled, that SID must still name a directory account.
 
 ### AD 派生主题
 

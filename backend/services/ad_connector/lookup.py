@@ -562,6 +562,64 @@ def lookup_object_sid(sam_account_name):
             pass
 
 
+def _sid_string_to_bytes(sid):
+    """``"S-1-5-21-...-<RID>"`` -> binary SID (inverse of ``_sid_bytes_to_string``), None if malformed."""
+    parts = (sid or '').split('-')
+    if len(parts) < 4 or parts[0] != 'S' or not all(p.isdecimal() and p.isascii() for p in parts[1:]):
+        return None
+    revision, authority, subs = int(parts[1]), int(parts[2]), [int(p) for p in parts[3:]]
+    if revision != 1 or authority >= 1 << 48 or len(subs) > 15 or any(s >= 1 << 32 for s in subs):
+        return None
+    return (bytes([revision, len(subs)]) + authority.to_bytes(6, 'big')
+            + b''.join(s.to_bytes(4, 'little') for s in subs))
+
+
+def lookup_account_by_sid(sid):
+    """The ``sAMAccountName`` of the one directory object whose ``objectSid`` is ``sid``.
+
+    None when the connector is off; the falsy ``NO_ACCOUNT`` when ``sid`` is malformed or
+    names no object under the base DN; the falsy ``UNREACHABLE`` when the directory cannot
+    answer or several objects match. Never raises.
+    """
+    from ldap3.utils.conv import escape_bytes
+
+    config, fault = _enabled_config()
+    if config is None:
+        return fault
+    raw = _sid_string_to_bytes(sid)
+    if raw is None:
+        return NO_ACCOUNT
+
+    try:
+        conn = _connect(config)
+    except Exception as e:
+        logger.warning("AD Connector: bind failed during SID lookup: %s", e)
+        return UNREACHABLE
+
+    try:
+        entries = _search(conn, config.base_dn, f'(objectSid={escape_bytes(raw)})',
+                          ['sAMAccountName', 'objectSid'])
+        entry = _single_entry(entries, sid)
+        if entry is None:
+            return NO_ACCOUNT
+        if entry is UNREACHABLE:
+            return entry
+        # The directory's own answer must carry the SID searched for
+        if 'objectSid' not in entry or not entry.objectSid.raw_values \
+                or _sid_bytes_to_string(entry.objectSid.raw_values[0]) != sid:
+            return NO_ACCOUNT
+        name = entry.sAMAccountName.value if 'sAMAccountName' in entry else None
+        return str(name) if name else entry.entry_dn
+    except Exception as e:
+        logger.warning("AD Connector: account lookup by SID failed: %s", e)
+        return UNREACHABLE
+    finally:
+        try:
+            conn.unbind()
+        except Exception:
+            pass
+
+
 def lookup_user_ad_identity(sam_account_name):
     """The AD user object's directory path (as ordered RDN components, for
     building an x509.Name matching real ADCS's directory-path subject),

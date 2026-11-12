@@ -48,6 +48,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- WSTEP: a renewed certificate keeps the SID security extension (KB5014754 strong mapping) of the certificate it renews, so it still maps to its account on a domain controller enforcing strong mapping; with the AD Connector enabled, a SID that names no account is refused.
 - HA preview: certificate and CRL expiry e-mails, the expiry webhooks, the scheduled CRL of a CA and the revocations a Microsoft CA CRL sync announces now go out once when two nodes run them during a leader change; a node that dies mid-run hands over after a lease of 10 to 15 minutes.
 - DEB and RPM: installing the DEB no longer fails on a host without `sudo`, and the sudoers file earlier packages wrote for the `ucm` user (unused, the service restarts through the watcher) is removed on install and update.
 - HA preview: a scheduled report or scheduled backup run twice during a leader change is sent or written once, and two nodes serving orders that share one upstream ACME proxy challenge start its dns-01 automation once. `GET /api/v2/settings/backup/schedule` reports `in_progress` while a scheduled backup is still being written, and a restore keeps the target's own schedule state.
