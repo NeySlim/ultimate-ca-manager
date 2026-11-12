@@ -28,6 +28,8 @@ from utils.issuance_defaults import default_issue_key_id, template_digest
 from utils.spki_digest import certificate_key_sha256
 from utils.serial_format import canonical_serial
 from utils.revocation_reasons import HOLD_REASONS, revocable
+from services.cert.issued_lookup import (
+    apply_persisted_revocation, final_recorded_revocation, record_reason_replaceable)
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +83,26 @@ def _propagate_to_acme_ca(partner, reason):
     if outcome not in (NOT_ACME, REVOKED, HOLD):
         logger.warning("Related certificate %s: %s", partner.id, local_only_message(outcome, detail))
     return outcome, detail
+
+
+class RecordedRevocationConflict(ValueError):
+    """The certificate's CA already recorded its serial as revoked for good."""
+
+
+def recorded_revocation_refusal(certificate) -> Optional[str]:
+    """None, or why ``certificate`` cannot be revoked or held: a final record of its serial
+    already revokes it. The row then takes that revocation (committed) before the refusal."""
+    record = final_recorded_revocation(certificate)
+    if record is None:
+        return None
+    if apply_persisted_revocation(certificate, record):
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            logger.error("Certificate %s: recorded revocation not applied", certificate.id, exc_info=True)
+    return (f'Certificate "{certificate.descr or certificate.refid}" is already revoked for good '
+            f'({record.revoke_reason or "unspecified"}) by its CA\'s revocation record')
 
 
 class LifecycleMixin:
@@ -420,6 +442,9 @@ class LifecycleMixin:
             raise ValueError("Certificate not found")
         if not revocable(certificate, reason):
             raise ValueError("Certificate already revoked")
+        refusal = recorded_revocation_refusal(certificate)
+        if refusal:
+            raise RecordedRevocationConflict(refusal)
 
         ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
         is_hold = reason in HOLD_REASONS
@@ -443,13 +468,15 @@ class LifecycleMixin:
                 # A row migration 144 left pending keeps its spelling; records never do
                 record = RevokedSerial.query.filter_by(
                     caref=certificate.caref, serial_number=canonical_serial(certificate.serial_number)).first()
-                if record is None:
+                fresh = record is None
+                if fresh:
                     record = RevokedSerial(caref=certificate.caref,
                                            serial_number=certificate.serial_number)
                     db.session.add(record)
-                record.revoked_at = now
-                record.revoke_reason = reason
-                record.invalidity_at = certificate.invalidity_at
+                if fresh or record_reason_replaceable(record, reason):
+                    record.revoked_at = now
+                    record.revoke_reason = reason
+                    record.invalidity_at = certificate.invalidity_at
                 record.valid_to = valid_to
                 record.certificate_id = certificate.id
                 record.public_key_sha256 = certificate_key_sha256(certificate.crt)  # None, never raises

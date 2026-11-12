@@ -505,3 +505,71 @@ class TestAHeldRowUnderAFinalRecordAnswersTheGraverReason:
         _held(app, row_id, at=LATER)
         _record(app, twin[1], real)
         assert _surfaces(app, ca_id, real) == KEY_COMPROMISED
+
+
+class TestARecordedFinalRevocationIsNotRevokedAgain:
+
+    def test_a_hold_over_a_recorded_compromise_is_refused(self, app, auth_client, issuer):
+        ca_id, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('hold-over-compromise.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        record_id = _record(app, refid, real, certificate_id=row_id)
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'certificateHold'})
+        assert r.status_code == 409, r.data
+        assert _row(app, row_id) == (True, 'keyCompromise', EARLY)
+        with app.app_context():
+            record = db.session.get(RevokedSerial, record_id)
+            assert (record.revoke_reason, record.revoked_at) == ('keyCompromise', EARLY)
+        assert auth_client.post(f'/api/v2/certificates/{row_id}/unhold').status_code != 200
+        assert _surfaces(app, ca_id, real) == KEY_COMPROMISED
+
+    def test_a_held_row_over_a_twins_compromise_is_refused_and_takes_it(self, app, auth_client, issuer, twin):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('held-over-twin.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _held(app, row_id, at=LATER)
+        _record(app, twin[1], real)
+        r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'superseded'})
+        assert r.status_code == 409, r.data
+        assert _row(app, row_id) == (True, 'keyCompromise', EARLY)
+
+    def test_the_service_refuses_it_too(self, app, issuer):
+        from services.cert_service import CertificateService
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('service-over-compromise.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        _record(app, refid, real)
+        with app.app_context():
+            with pytest.raises(ValueError):
+                CertificateService.revoke_certificate(row_id, reason='certificateHold')
+        assert _row(app, row_id) == (True, 'keyCompromise', EARLY)
+
+
+class TestAWriterNeverReplacesAGraverReason:
+
+    @pytest.mark.parametrize('recorded, written, replaced', [
+        ('keyCompromise', 'certificateHold', False),
+        ('keyCompromise', 'superseded', False),
+        ('unspecified', 'superseded', False),
+        ('certificateHold', 'superseded', True),
+        ('certificateHold', 'keyCompromise', True),
+        ('unspecified', 'keyCompromise', True),
+    ])
+    def test_the_shared_rule(self, recorded, written, replaced):
+        from types import SimpleNamespace
+        from services.cert.issued_lookup import record_reason_replaceable
+        assert record_reason_replaceable(SimpleNamespace(revoke_reason=recorded), written) is replaced
+
+    def test_the_revocation_writer_keeps_a_compromise(self, app, issuer, monkeypatch):
+        """The refusal above bypassed: the writer alone keeps the graver reason."""
+        from services.cert.mixins import lifecycle
+        from services.cert_service import CertificateService
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('writer-keeps.example.test', ca_cert, ca_key)
+        row_id = _store(app, real, refid, key=key)
+        record_id = _record(app, refid, real)
+        monkeypatch.setattr(lifecycle, 'final_recorded_revocation', lambda row: None)
+        with app.app_context():
+            CertificateService.revoke_certificate(row_id, reason='certificateHold')
+            record = db.session.get(RevokedSerial, record_id)
+            assert (record.revoke_reason, record.revoked_at) == ('keyCompromise', EARLY)

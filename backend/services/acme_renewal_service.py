@@ -197,9 +197,9 @@ def _record_replaced_serial(replaced):
     if fresh:
         row = RevokedSerial(caref=ca.refid, serial_number=replaced.serial)
         db.session.add(row)
-    from utils.revocation_reasons import HOLD_REASONS
+    from services.cert.issued_lookup import record_reason_replaceable
     # A final revocation already recorded keeps its reason and date
-    if fresh or row.revoke_reason in HOLD_REASONS:
+    if fresh or record_reason_replaceable(row, 'superseded'):
         row.revoked_at = now
         row.revoke_reason = 'superseded'
     row.valid_to = replaced.valid_to or now + timedelta(days=365)

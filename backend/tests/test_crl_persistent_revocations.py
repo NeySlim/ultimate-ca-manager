@@ -784,7 +784,8 @@ class TestMigratedRows:
         leaf = _issue(ca_key, ca_cert, SERIAL_A)
         _store(ca, leaf, str(SERIAL_A))
         twin = _store(ca, leaf, format(SERIAL_A, 'x'))
-        _persist(ca, str(SERIAL_A), reason='superseded')
+        # A suspension: a final record already revokes the row, and revoking it again is refused
+        _persist(ca, str(SERIAL_A), reason='certificateHold')
         CertificateService.revoke_certificate(twin.id, reason='keyCompromise', username='admin')
         db.session.commit()
         assert [r.serial_number for r in RevokedSerial.query.filter_by(caref=ca.refid)] == [str(SERIAL_A)]

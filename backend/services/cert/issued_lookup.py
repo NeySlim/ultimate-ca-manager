@@ -125,6 +125,13 @@ def record_serial_clause(serial):
     return RevokedSerial.serial_number == canonical_serial(serial)
 
 
+def record_reason_replaceable(record, reason) -> bool:
+    """Whether a writer may put ``reason`` (and its date) in ``record``: over a suspension, or
+    with a graver reason; a final reason is never replaced by an equal or milder one."""
+    from utils.revocation_reasons import HOLD_REASONS
+    return record.revoke_reason in HOLD_REASONS or reason_rank(reason) < reason_rank(record.revoke_reason)
+
+
 def lifted_hold_leftover(record) -> bool:
     """A suspension record still linked to its row, unrevoked and of the same serial: an
     earlier release lifted the hold and left the record behind. It says nothing."""
@@ -198,13 +205,25 @@ def row_revoked(row: Certificate) -> bool:
     return bool(row.revoked) or row_persisted_revocation(row) is not None
 
 
-def apply_persisted_revocation(row: Certificate) -> bool:
-    """Mark ``row`` revoked from the record its CA still holds for its serial: a certificate
-    revoked, deleted and imported again comes back revoked. No commit; returns whether one applied."""
-    if row.revoked:
-        return False
+def final_recorded_revocation(row: Certificate):
+    """The record of ``row``'s serial when it revokes for good (not a suspension), else None."""
+    from utils.revocation_reasons import HOLD_REASONS
     record = row_persisted_revocation(row)
+    return record if record is not None and record.revoke_reason not in HOLD_REASONS else None
+
+
+def apply_persisted_revocation(row: Certificate, record=None) -> bool:
+    """Mark ``row`` revoked from the record its CA still holds for its serial: a certificate
+    revoked, deleted and imported again comes back revoked. A given final ``record`` also
+    replaces a suspension of the row. No commit; returns whether one applied."""
+    from utils.revocation_reasons import HOLD_REASONS
     if record is None:
+        if row.revoked:
+            return False
+        record = row_persisted_revocation(row)
+        if record is None:
+            return False
+    elif row.revoked and row.revoke_reason not in HOLD_REASONS:
         return False
     row.revoked = True
     row.revoked_at = record.revoked_at
