@@ -1118,11 +1118,14 @@ class TestARecordedHoldIsShownAndLifted:
         assert (data['revoked'], data['revoke_reason'], data['status']) == (True, 'certificateHold', 'revoked')
         assert data['revoked_at'].startswith('2026-01-02T03:04:05')
 
-    def test_the_list_shows_it_with_one_record_query_for_the_page(self, app, auth_client, issuer, twin):
+    def test_the_list_shows_it_with_one_record_query_for_the_page(self, app, auth_client, issuer, twin,
+                                                                  create_ca):
         from sqlalchemy import event
         tag = uuid.uuid4().hex[:8]
         _, refid, ca_cert, ca_key = issuer
         recorded, plain = [], []
+        with app.app_context():
+            other = db.session.get(CA, create_ca(cn=f'Record Rule other CA {tag}')['id']).refid
 
         def rows(count):
             for _ in range(count):
@@ -1133,7 +1136,7 @@ class TestARecordedHoldIsShownAndLifted:
                 real, key = _leaf(f'plain-{cn}', ca_cert, ca_key)
                 plain.append(_store(app, real, refid, key=key))
                 # Another CA's record of the same serial names another certificate
-                _record(app, f'other-ca-{tag}', real, certificate_id=plain[-1])
+                _record(app, other, real, certificate_id=plain[-1])
 
         def listed():
             import threading
