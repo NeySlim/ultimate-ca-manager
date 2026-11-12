@@ -1612,3 +1612,177 @@ def test_outside_ha_a_kek_replaced_without_the_previous_one_after_a_disable_stay
         with app.app_context():
             # Back in the clear while the new KEK is loaded: the teardown holds the old one
             encryption_enabled.decrypt_all_keys(dry_run=False)
+
+
+# --- short grace: every live node acknowledged, then a margin ------------
+
+
+def _margin():
+    from security import dek_rotation
+    return dek_rotation.ACK_MARGIN_SECONDS
+
+
+def test_the_previous_dek_goes_a_margin_after_every_node_acknowledged(app, auth_client, values,
+                                                                       grace):
+    """Outside HA no node acknowledges: the margin counts from the end of the rotation."""
+    from datetime import datetime
+    from security import dek_rotation
+    from services.scheduler_leader import cluster_utc_now
+    with app.app_context():
+        before = cluster_utc_now()
+        result = dek_rotation.rotate()
+    end = datetime.fromisoformat(result['retire_after'])
+    assert -1 <= (end - before).total_seconds() - _margin() < 30
+    status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
+    assert status['previous_dek_retire_after'] == result['retire_after'] + 'Z'
+    assert status['previous_dek_waits_for_nodes'] is False
+    grace(_margin() - 5)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 0
+    grace(36)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 1
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'active')]
+
+
+def _lagging_disable(app, auth_client, monkeypatch):
+    """HA, a live node that applies no command: the disable goes on without waiting for it."""
+    from models import ClusterNode
+    from security import dek_rotation
+    from services.scheduler_leader import cluster_utc_now
+    _ha(monkeypatch)
+    monkeypatch.setattr(dek_rotation, 'ACK_TIMEOUT_SECONDS', 0.0)
+    with app.app_context():
+        now = cluster_utc_now()
+        db.session.add(ClusterNode(node_id='envtest-lag', started_at=now, heartbeat_at=now,
+                                   is_leader=False, command_seen=0))
+        db.session.commit()
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert r.status_code == 200, r.data
+    return r.get_json()['data']
+
+
+def _node_acknowledges(app, acknowledged=True):
+    from models import ClusterNode
+    from security import dek_rotation
+    from services.scheduler_leader import cluster_utc_now
+    node = db.session.get(ClusterNode, 'envtest-lag')
+    node.heartbeat_at = cluster_utc_now()
+    if acknowledged:
+        node.command_seen = dek_rotation.retiring()['command']
+    db.session.commit()
+
+
+def test_in_ha_the_grace_waits_for_a_lagging_node_then_a_margin(app, auth_client, values, grace,
+                                                                monkeypatch):
+    from security import dek_rotation
+    from services.scheduler_leader import cluster_utc_now
+    data = _lagging_disable(app, auth_client, monkeypatch)
+    # No time is announced before every live node has reloaded
+    assert data['keys_kept_until'] is None
+    status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
+    assert status['disabled_keys_kept_until'] is None and status['disabled_keys_wait_for_nodes']
+    r = auth_client.post('/api/v2/system/security/enable-encryption')
+    assert r.status_code == 409 and 'every node' in r.get_json()['message']
+    grace(300)
+    with app.app_context():
+        _node_acknowledges(app, acknowledged=False)
+        assert dek_rotation.retire_if_due() == 0  # still lagging
+        _node_acknowledges(app)
+        assert dek_rotation.retire_if_due() == 0  # acknowledged now: the margin starts
+        end = dek_rotation.grace_end(dek_rotation.retiring())
+        assert abs((end - cluster_utc_now()).total_seconds() - _margin()) < 30
+    status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
+    assert status['disabled_keys_kept_until'] == end.isoformat(timespec='seconds') + 'Z'
+    assert status['disabled_keys_wait_for_nodes'] is False
+    grace(_margin() + 1)
+    with app.app_context():
+        _node_acknowledges(app)
+        assert dek_rotation.retire_if_due() == 1
+
+
+def test_in_ha_a_node_acknowledging_late_ends_the_grace_at_its_cap(app, auth_client, values,
+                                                                   grace, monkeypatch):
+    """Ten minutes stay the cap: past them only a node still lagging holds the DEKs."""
+    from security import dek_rotation
+    _lagging_disable(app, auth_client, monkeypatch)
+    grace(590)
+    with app.app_context():
+        _node_acknowledges(app, acknowledged=False)
+        assert dek_rotation.retire_if_due() == 0
+        _node_acknowledges(app)
+        assert dek_rotation.retire_if_due() == 0
+    grace(11)
+    with app.app_context():
+        _node_acknowledges(app)
+        assert dek_rotation.retire_if_due() == 1
+
+
+def test_in_ha_past_the_cap_a_node_still_lagging_keeps_the_deks(app, auth_client, values, grace,
+                                                                monkeypatch):
+    from security import dek_rotation
+    _lagging_disable(app, auth_client, monkeypatch)
+    grace(1200)
+    with app.app_context():
+        _node_acknowledges(app, acknowledged=False)
+        assert dek_rotation.retire_if_due() == 0
+        _node_acknowledges(app)
+        assert dek_rotation.retire_if_due() == 1
+
+
+def test_a_value_written_under_the_old_dek_during_the_margin_is_swept(app, values, grace,
+                                                                      encryption_enabled):
+    from security import dek_rotation
+    with app.app_context():
+        old = encryption_enabled.key_encryption._fernet
+        dek_rotation.rotate()
+    grace(_margin() / 2)
+    _late_write(app, values, old)
+    grace(_margin())
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 0  # rewritten, kept for one more margin
+    with pytest.raises(InvalidToken):
+        old.decrypt(_token(_stored(app, values)['target']))
+    assert _read(app, values) == CLEAR
+    grace(_margin() + 1)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 1
+    assert _read(app, values) == CLEAR
+
+
+def test_in_ha_a_process_the_acknowledgement_does_not_cover_re_reads_before_it_encrypts(
+        app, values, monkeypatch, encryption_enabled):
+    """The node's ack is its web worker's; its scheduler process re-reads the rows on its own
+    once they are REFRESH_SECONDS old, so it encrypts under the new DEK before the margin."""
+    from security import dek_rotation, encryption
+    key_encryption = encryption_enabled.key_encryption
+    _ha(monkeypatch)
+    monkeypatch.setattr(encryption, 'REFRESH_SECONDS', 2.0)
+    with app.app_context():
+        key_encryption.is_enabled
+        stale = {name: getattr(key_encryption, name) for name in key_encryption._FIELDS}
+        dek_rotation.rotate()
+        key_encryption.__dict__.update(stale)  # applied no command: still DEK version 1
+        key_encryption._read_at -= encryption.REFRESH_SECONDS
+        written = key_encryption.encrypt_string('scheduler write')
+        assert key_encryption.active_version == 2
+        key_encryption.reload()
+        assert encryption.decrypt_master_key_value(written, 'text') == 'scheduler write'
+        assert dek_rotation.ACK_MARGIN_SECONDS > encryption.REFRESH_SECONDS
+
+
+def test_the_disable_announces_the_end_of_its_grace(app, auth_client, values, grace):
+    """Outside HA no node acknowledges: the margin counts from the end of the disable."""
+    from security import dek_rotation
+    from services.scheduler_leader import cluster_utc_now
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    with app.app_context():
+        end = dek_rotation.grace_end(dek_rotation.retiring())
+    assert r.get_json()['data']['keys_kept_until'] == end.isoformat(timespec='seconds') + 'Z'
+    assert abs((end - cluster_utc_now()).total_seconds() - _margin()) < 30
+    status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
+    assert status['disabled_keys_kept_until'] == r.get_json()['data']['keys_kept_until']
+    assert status['disabled_keys_wait_for_nodes'] is False
+    grace(_margin() + 1)
+    r = auth_client.post('/api/v2/system/security/enable-encryption')
+    assert r.status_code == 200, r.data

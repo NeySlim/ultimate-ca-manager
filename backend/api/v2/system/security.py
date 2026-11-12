@@ -43,30 +43,34 @@ def get_encryption_status():
         )
 
         from security.dek_rotation import (
-            disable_grace, retiring, rotation_in_progress, shown_as_enabled,
+            disable_grace, grace_end, retiring, rotation_in_progress, shown_as_enabled,
         )
 
         encrypted, unencrypted = count_master_key_values()
         # A disable done: its DEKs still open values written late, until the grace ends
         disabled_grace = disable_grace()
         grace = None if disabled_grace else retiring()
+        # The end is known once every live node applied the change (None until then)
+        disabled_end = grace_end(disabled_grace) if disabled_grace else None
+        grace_until = grace_end(grace) if grace else None
 
         return success_response(data={
             'enabled': shown_as_enabled(),
             # A disable left half-way: values still open, none is encrypted any more
             'disabling': (key_encryption.is_enabled and not key_encryption.is_encrypting
                           and not disabled_grace),
-            'disabled_keys_kept_until': (
-                disabled_grace['until'].isoformat(timespec='seconds') + 'Z'
-                if disabled_grace else None),
+            'disabled_keys_kept_until': (disabled_end.isoformat(timespec='seconds') + 'Z'
+                                         if disabled_end else None),
+            'disabled_keys_wait_for_nodes': bool(disabled_grace) and disabled_end is None,
             'key_source': key_encryption.key_source,
             # Fingerprint and version only: neither key ever leaves the server here
             'kek_fingerprint': key_encryption.kek_fingerprint(),
             'dek_version': key_encryption.active_version,
             # The values are all rewritten once the previous DEK is only kept for its grace
             'rotation_in_progress': rotation_in_progress() and grace is None,
-            'previous_dek_retire_after': (grace['until'].isoformat(timespec='seconds') + 'Z'
-                                          if grace else None),
+            'previous_dek_retire_after': (grace_until.isoformat(timespec='seconds') + 'Z'
+                                          if grace_until else None),
+            'previous_dek_waits_for_nodes': bool(grace) and grace_until is None,
             'key_file_path': str(MASTER_KEY_PATH),
             'key_file_exists': key_encryption.key_file_exists(),
             'encrypted_count': encrypted,
@@ -355,7 +359,8 @@ def disable_encryption():
             )
 
         from security.dek_rotation import (
-            RotationError, begin_disable, finish_disable, retire_if_due, settle,
+            RotationError, begin_disable, finish_disable, grace_end, retire_if_due, retiring,
+            settle,
         )
         from utils.ha import ha_enabled
 
@@ -381,7 +386,7 @@ def disable_encryption():
         kept_kek = key_encryption.kek_fingerprint() if not remove_file else _env_kek_fingerprint()
         # Phase 2: only if no value is encrypted any more; the DEKs stay for their grace period
         try:
-            until = finish_disable(kept_kek, remove_file)
+            finish_disable(kept_kek, remove_file)
         except RotationError as e:
             return error_response(str(e), e.status)
         try:
@@ -392,6 +397,8 @@ def disable_encryption():
 
         # Reload singleton
         key_encryption.reload()
+        grace = retiring()
+        kept_until = grace_end(grace) if grace else None
 
         from services.file_regen_service import regenerate_all_files
         regeneration_stats = regenerate_all_files()
@@ -417,8 +424,8 @@ def disable_encryption():
                 'decrypted': decrypted,
                 'skipped': skipped,
                 'key_files_written': key_files_written,
-                'keys_kept_until': (None if dropped
-                                    else until.isoformat(timespec='seconds') + 'Z'),
+                'keys_kept_until': (None if dropped or not kept_until
+                                    else kept_until.isoformat(timespec='seconds') + 'Z'),
             }
         )
 

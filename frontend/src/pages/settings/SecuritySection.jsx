@@ -57,10 +57,12 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                 {encryptionStatus.rotation_in_progress && (
                   <Badge variant="warning">{t('settings.dekRotationInProgress')}</Badge>
                 )}
-                {encryptionStatus.previous_dek_retire_after && (
+                {encryptionStatus.previous_dek_retire_after ? (
                   <Badge variant="secondary">
                     {t('settings.previousDekKeptUntil', { date: formatDate(encryptionStatus.previous_dek_retire_after, { hour: '2-digit', minute: '2-digit' }) })}
                   </Badge>
+                ) : encryptionStatus.previous_dek_waits_for_nodes && (
+                  <Badge variant="secondary">{t('settings.previousDekKeptUntilNodesReload')}</Badge>
                 )}
               </div>
             )}
@@ -90,10 +92,12 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
               <p className="text-sm text-status-warning">{t('settings.encryptionDisablingHint')}</p>
             )}
 
-            {encryptionStatus.disabled_keys_kept_until && (
+            {encryptionStatus.disabled_keys_kept_until ? (
               <p className="text-sm text-text-secondary">
                 {t('settings.disabledKeysKeptUntil', { date: formatDate(encryptionStatus.disabled_keys_kept_until, { hour: '2-digit', minute: '2-digit' }) })}
               </p>
+            ) : encryptionStatus.disabled_keys_wait_for_nodes && (
+              <p className="text-sm text-text-secondary">{t('settings.disabledKeysKeptUntilNodesReload')}</p>
             )}
 
             {hasPermission('admin:system') && (
@@ -102,7 +106,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                   <Button
                     onClick={() => setShowEnableEncryptionModal(true)}
                     variant="primary"
-                    disabled={!!encryptionStatus.disabled_keys_kept_until}
+                    disabled={!!encryptionStatus.disabled_keys_kept_until || !!encryptionStatus.disabled_keys_wait_for_nodes}
                   >
                     <LockKey size={16} />
                     {t('settings.enableEncryption')}
@@ -132,7 +136,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                       <Button
                         onClick={handleRotateDataKey}
                         variant="outline"
-                        disabled={encryptionLoading || !!encryptionStatus.previous_dek_retire_after}
+                        disabled={encryptionLoading || !!encryptionStatus.previous_dek_retire_after || !!encryptionStatus.previous_dek_waits_for_nodes}
                       >
                         <LockKey size={16} />
                         {encryptionStatus.rotation_in_progress

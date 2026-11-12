@@ -21,11 +21,15 @@ BATCH = 200
 ACK_TIMEOUT_SECONDS = 30.0
 _LOCK = 0x75636D64656B  # PostgreSQL advisory lock id for DEK state changes
 DISABLED_MARKER_VERSION = 0
-# The previous DEK opens values for this long after the last sweep: a write encrypted under
-# it before its process re-read the rows (REFRESH_SECONDS) commits within it and stays readable
+# The previous DEK opens values until every live node has applied the change, then for this
+# margin (the web worker's timeout): every process re-reads the rows REFRESH_SECONDS after a
+# commit; a write encrypted before and committed later is caught by the end-of-grace sweep
+ACK_MARGIN_SECONDS = 120.0
+# Cap of the wait for a node that does not acknowledge; past it a live node still lagging
+# holds the DEK until it does
 GRACE_SECONDS = 600.0
-# system_config: {"version", "until", "command"}, plus {"disable": true, "remove_file"} after
-# a disable, whose DEKs are kept for reading the same way
+# system_config: {"version", "until" (the cap), "command", "acked" (when every live node had
+# applied it, or null)}, plus {"disable": true, "remove_file"} after a disable
 GRACE_KEY = 'encryption.dek_retire_after'
 
 
@@ -57,7 +61,24 @@ def retiring():
         return None
     grace = json.loads(row.value)
     grace['until'] = datetime.fromisoformat(grace['until'])
+    if grace.get('acked'):
+        grace['acked'] = datetime.fromisoformat(grace['acked'])
     return grace
+
+
+def grace_end(grace):
+    """When ``grace`` ends: the margin after every live node acknowledged, at the latest its cap;
+    None while a node has not."""
+    if not grace.get('acked'):
+        return None
+    return min(grace['acked'] + timedelta(seconds=ACK_MARGIN_SECONDS), grace['until'])
+
+
+def grace_end_text(grace) -> str:
+    end = grace_end(grace)
+    if end is None:
+        return 'until every node has applied the change'
+    return f"until {end.isoformat(timespec='seconds')} UTC"
 
 
 def disable_grace():
@@ -73,12 +94,12 @@ def shown_as_enabled() -> bool:
     return key_encryption.is_encrypting or (key_encryption.is_enabled and disable_grace() is None)
 
 
-def _set_grace(version, command_id, **extra) -> datetime:
+def _set_grace(version, command_id, acked=None, until=None, **extra) -> datetime:
     from models import db, SystemConfig
     from services.scheduler_leader import cluster_utc_now
-    until = cluster_utc_now() + timedelta(seconds=GRACE_SECONDS)
+    until = until or cluster_utc_now() + timedelta(seconds=GRACE_SECONDS)
     value = json.dumps({'version': version, 'until': until.isoformat(), 'command': command_id,
-                        **extra})
+                        'acked': acked.isoformat() if acked else None, **extra})
     row = SystemConfig.query.filter_by(key=GRACE_KEY).first()
     if row is None:
         db.session.add(SystemConfig(key=GRACE_KEY, value=value,
@@ -95,12 +116,12 @@ def _clear_grace() -> None:
 
 def grace_refusal(grace) -> str:
     """Why an enable, rotation or disable waits for the end of ``grace``."""
-    until = grace['until'].isoformat(timespec='seconds')
+    until = grace_end_text(grace)
     if grace.get('disable'):
         # A rotation is refused afterwards as well (nothing to rotate): only enabling goes on
-        return (f"Encryption was disabled: its data-encryption keys are kept until {until} UTC "
+        return (f"Encryption was disabled: its data-encryption keys are kept {until} "
                 f"for values written during the disable; enable it again after that.")
-    return f"The previous data-encryption key is kept until {until} UTC: rotate again after that"
+    return f"The previous data-encryption key is kept {until}: rotate again after that"
 
 
 def _emit_reload(version):
@@ -298,16 +319,28 @@ def _final_sweep() -> None:
                             f"the previous key is kept: {', '.join(unreadable[:5])}")
 
 
-def finish(command=None):
-    """Last pass, then the previous DEKs enter their grace period; returns its end."""
+def finish(command=None) -> None:
+    """Last pass, then the previous DEKs enter their grace period."""
     from models import db
     rewrite()
     lock_key_state()
     _final_sweep()
-    until = _set_grace(_encryption.key_encryption.active_version,
-                       getattr(command, 'id', None))
+    _set_grace(_encryption.key_encryption.active_version, getattr(command, 'id', None))
     db.session.commit()
-    return until
+
+
+def _note_acknowledged(grace):
+    """Every live node applied the grace's command: the margin starts now. Returns the grace."""
+    from models import db
+    from services.scheduler_leader import cluster_utc_now
+    lock_key_state()
+    current = retiring()
+    if current == grace:
+        extra = {k: grace[k] for k in ('disable', 'remove_file') if k in grace}
+        _set_grace(grace['version'], grace['command'], acked=cluster_utc_now(),
+                   until=grace['until'], **extra)
+    db.session.commit()
+    return retiring()
 
 
 def retire_if_due() -> int:
@@ -318,12 +351,19 @@ def retire_if_due() -> int:
     from models import db, EncryptionKey
     from services.scheduler_leader import cluster_utc_now
     grace = retiring()
-    if grace is None or cluster_utc_now() < grace['until']:
+    if grace is None:
         return 0
     lagging = wait_for_nodes(SimpleNamespace(id=grace['command']), timeout=0)
     if lagging:
-        logger.warning("Previous DEK kept: node(s) %s have not loaded DEK version %s",
-                       ', '.join(lagging), grace['version'])
+        if cluster_utc_now() >= grace['until']:
+            logger.warning("Previous DEK kept: node(s) %s have not loaded DEK version %s",
+                           ', '.join(lagging), grace['version'])
+        return 0
+    if not grace.get('acked'):
+        grace = _note_acknowledged(grace)
+        if grace is None:
+            return 0
+    if cluster_utc_now() < grace_end(grace):
         return 0
     lock_key_state()
     _encryption.key_encryption.refresh()
@@ -341,8 +381,8 @@ def retire_if_due() -> int:
                             f"key, {kept}: {', '.join(late['unreadable'][:5])}")
     extra = {k: grace[k] for k in ('disable', 'remove_file') if k in grace}
     if late['rewritten']:
-        # Something still wrote under the DEK: it stays for another grace period
-        _set_grace(grace['version'], grace['command'], **extra)
+        # Something still wrote under the DEK: it stays for another margin (every node acked)
+        _set_grace(grace['version'], grace['command'], acked=cluster_utc_now(), **extra)
         db.session.commit()
         if disable:
             _mirror_keys(late['changed'])
@@ -399,13 +439,15 @@ def rotate(wait_timeout=None) -> dict:
                        "again to resume", version, ', '.join(lagging))
         return {'state': 'in_progress', 'version': version, 'waiting_for': lagging}
     stats = rewrite()
-    until = finish(command)
+    finish(command)
     dropped = retire_if_due()
     logger.info("🔑 DEK rotated to version %s: %d values rewritten, %d previous key(s) dropped",
                 version, stats['rewritten'], dropped)
+    grace = retiring()
+    end = grace_end(grace) if grace else None
     return {'state': 'done', 'version': version, 'rewritten': stats['rewritten'],
             'dropped': dropped,
-            'retire_after': None if dropped else until.isoformat(timespec='seconds')}
+            'retire_after': end.isoformat(timespec='seconds') if end else None}
 
 
 def begin_disable():
@@ -426,8 +468,7 @@ def begin_disable():
         db.session.rollback()
         if grace is not None:
             raise RotationError(f"The previous data-encryption key of the last rotation is kept "
-                                f"until {grace['until'].isoformat(timespec='seconds')} UTC: "
-                                f"disable after that.")
+                                f"{grace_end_text(grace)}: disable after that.")
         raise RotationError('A data-encryption key rotation is in progress: finish it first.')
     mine = envelope.kek_id(key_encryption.kek_bytes_for_envelope())
     rows = EncryptionKey.query.all()
@@ -448,10 +489,10 @@ def begin_disable():
     return command
 
 
-def finish_disable(kept_kek, remove_file=False):
+def finish_disable(kept_kek, remove_file=False) -> None:
     """Phase 2, under the lock once no stored value is encrypted: the disabled markers, and the
     DEKs kept for reading through a grace period (a value encrypted before its process saw
-    phase 1 may commit after this). Committed; returns the end of the grace.
+    phase 1 may commit after this). Committed.
 
     ``kept_kek``: fingerprint of the KEK that stays configured, marked unused, or None.
     ``remove_file``: master.key is removed with the DEKs at the end of the grace.
@@ -481,10 +522,9 @@ def finish_disable(kept_kek, remove_file=False):
     record_operator_choice(auto=False)
     command = _emit_reload(None)
     db.session.flush()  # the command's id, which every live node acknowledges
-    until = _set_grace(max(kept, default=None), getattr(command, 'id', None), disable=True,
-                       remove_file=bool(remove_file))
+    _set_grace(max(kept, default=None), getattr(command, 'id', None), disable=True,
+               remove_file=bool(remove_file))
     db.session.commit()
-    return until
 
 
 def resume_at_start() -> None:

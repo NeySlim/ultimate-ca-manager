@@ -147,6 +147,13 @@ describe('SecuritySection disabling encryption', () => {
     expect(screen.getByText('settings.disabledKeysKeptUntil')).toBeInTheDocument()
     expect(screen.getByText('settings.enableEncryption').closest('button')).toBeDisabled()
   })
+  it('says a disable grace waits for every node while its end is not known', () => {
+    renderSection({ ...status, enabled: false, key_source: 'env',
+      disabled_keys_kept_until: null, disabled_keys_wait_for_nodes: true })
+    expect(screen.getByText('settings.disabledKeysKeptUntilNodesReload')).toBeInTheDocument()
+    expect(screen.queryByText('settings.disabledKeysKeptUntil')).not.toBeInTheDocument()
+    expect(screen.getByText('settings.enableEncryption').closest('button')).toBeDisabled()
+  })
 })
 
 describe('SecuritySection data key rotation', () => {
@@ -180,6 +187,13 @@ describe('SecuritySection data key rotation', () => {
     renderSection({ ...status, previous_dek_retire_after: '2026-11-12T10:00:00Z' },
       { handleRotateDataKey: vi.fn() })
     expect(screen.getByText('settings.previousDekKeptUntil')).toBeInTheDocument()
+    expect(screen.getByText('settings.rotateDataKey').closest('button')).toBeDisabled()
+  })
+
+  it('says the previous key waits for every node while its end is not known', () => {
+    renderSection({ ...status, previous_dek_retire_after: null, previous_dek_waits_for_nodes: true },
+      { handleRotateDataKey: vi.fn() })
+    expect(screen.getByText('settings.previousDekKeptUntilNodesReload')).toBeInTheDocument()
     expect(screen.getByText('settings.rotateDataKey').closest('button')).toBeDisabled()
   })
 
