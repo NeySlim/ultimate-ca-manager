@@ -79,7 +79,7 @@ Compose refuses to start while one of these variables is missing. The balancer l
 ## What stays local to a node
 
 - **Backups.** Scheduled and manual backups are written under the node's data directory by the leader. They are not replicated: copy them off the host, and also back PostgreSQL up with its own tools.
-- **SoftHSM tokens.** A token lives on the node's own disk, so the chart and the compose example set `HSM_AUTO_INIT=false`. CA keys must sit in a network HSM (PKCS#11 remote, Vault, Azure) when running HA; on packages, set `HSM_AUTO_INIT=false` too.
+- **SoftHSM tokens.** A token lives on the node's own disk, so the chart and the compose example set `HSM_AUTO_INIT=false`. Software CA keys stored in PostgreSQL under the shared `KEY_ENCRYPTION_KEY` work on every node; keys kept in an HSM must use a network HSM (PKCS#11 over the network, OpenBao, Azure Key Vault, AWS CloudHSM, Google KMS).
 - **Certificate files** mirrored by renewals and session file cleanup, which run on the leader only.
 - **The self-signed HTTPS certificate** of each node, as long as none was applied or regenerated from the web interface. Once one is, every node writes it from the database before it starts (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md), HA mode).
 
