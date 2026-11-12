@@ -22,6 +22,10 @@ tag. **6/6 mandatory**: 3 distros × 2 backends.
 Bump the version assertion line in `smoke.py` for every release. Currently
 matches `2.X-dev`, `2.X-rcN`, and `2.X`.
 
+## Package install smoke
+
+`scripts/ci/package-smoke.sh` installs one DEB or RPM in a bare distribution container (no sudo, no systemd) and checks the venv imports, the application start and `/api/v2/health`. The `smoke-packages` job of `release-smoke.yml` runs it on the published assets (checksum verified first) for Debian 13, Ubuntu 24.04 and 26.04, AlmaLinux 9 and 10, and Fedora 43, after each release or by `workflow_dispatch` on a version. Debian 12 is out: the packages need python3 >= 3.12. `test-channel.yml` runs it on the sanity DEB (Debian 13, Ubuntu 24.04).
+
 ## Per-target recipe
 
 ```bash
