@@ -17,13 +17,19 @@ GUARD = 900
 SHA = 'ab' * 32
 
 
-def _node(started_ago, beat_ago, version, now=T0):
-    return uc.NodeView(now - timedelta(seconds=started_ago), now - timedelta(seconds=beat_ago), version)
+DEB = {'download_url': 'https://x/p.deb', 'package_name': 'p.deb', 'sha256': SHA}
+ASSETS = [{'name': 'p.deb', 'browser_download_url': 'https://x/p.deb'},
+          {'name': 'p.deb.sha256', 'browser_download_url': 'https://x/p.deb.sha256'}]
+
+
+def _node(started_ago, beat_ago, version, now=T0, family='deb'):
+    return uc.NodeView(now - timedelta(seconds=started_ago), now - timedelta(seconds=beat_ago), version,
+                       family)
 
 
 def _campaign(**kw):
-    c = {'id': 'c1', 'status': uc.RUNNING, 'target': '3.1', 'download_url': 'https://x/p.deb',
-         'package_name': 'p.deb', 'sha256': SHA, 'initiated_by': 'admin',
+    c = {'id': 'c1', 'status': uc.RUNNING, 'target': '3.1', 'packages': {'deb': dict(DEB)},
+         'families': {}, 'initiated_by': 'admin',
          'started_at': T0.isoformat(), 'finished_at': None, 'order': ['a', 'b', 'c'],
          'skipped': [], 'done': [], 'current': None, 'failed': None}
     c.update(kw)
@@ -130,9 +136,12 @@ def _clean(app):
 
 
 @pytest.fixture
-def ha(app, monkeypatch):
+def ha(app, monkeypatch, tmp_path):
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.setattr(Config, 'NODE_ID', PREFIX + 'a')
+    monkeypatch.setattr(updates, 'DATA_DIR', tmp_path)
+    monkeypatch.setattr(updates, 'package_family', lambda: 'deb')
+    monkeypatch.setattr(updates, 'fetch_expected_sha256', lambda url, name: SHA)
     _clean(app)
     yield
     _clean(app)
@@ -145,7 +154,8 @@ def _rows(app, **versions):
     with app.app_context():
         for name, version in versions.items():
             db.session.add(ClusterNode(node_id=PREFIX + name, started_at=now - timedelta(minutes=10),
-                                       heartbeat_at=now, is_leader=False, pid=1, version=version))
+                                       heartbeat_at=now, is_leader=False, pid=1, version=version,
+                                       package_family='deb'))
         db.session.commit()
 
 
@@ -171,14 +181,14 @@ def _state(app):
         return uc.read_campaign()[1]
 
 
-def _start(app, sha=SHA):
+def _start(app, assets=ASSETS):
     with app.app_context():
-        return uc.start_campaign('3.1', 'https://x/p.deb', 'p.deb', sha, 'admin')
+        return uc.start_campaign('3.1', assets, 'admin')
 
 
 def test_a_campaign_without_a_checksum_is_refused(app, ha):
     _rows(app, a='3.0', b='3.0')
-    ok, message, _ = _start(app, sha=None)
+    ok, message, _ = _start(app, assets=ASSETS[:1])
     assert not ok and 'SHA-256' in message
     assert _state(app) is None
 
@@ -210,8 +220,7 @@ def test_the_tick_sends_one_update_command_to_the_first_node_only(app, ha):
         assert uc.campaign_tick() is None  # a waits for its install: nothing more
     commands = _commands(app)
     assert commands == [(PREFIX + 'a', {'campaign': _state(app)['id'], 'version': '3.1',
-                                        'download_url': 'https://x/p.deb', 'package_name': 'p.deb',
-                                        'sha256': SHA})]
+                                        'packages': {'deb': DEB}})]
 
 
 def _witnesses(monkeypatch, calls, fail=None):
@@ -339,7 +348,7 @@ def test_a_command_without_its_checksum_installs_nothing(app, ha, monkeypatch):
     _start(app)
     with app.app_context():
         uc.campaign_tick()
-        payload = dict(_commands(app)[0][1], sha256=None)
+        payload = dict(_commands(app)[0][1], packages={'deb': dict(DEB, sha256=None)})
         uc.run_local_turn(payload, node_id=PREFIX + 'a', version='3.0')
     assert calls == []
     assert _state(app)['status'] == uc.STOPPED
@@ -388,7 +397,7 @@ def no_install(monkeypatch):
 def _release(**kw):
     r = {'update_available': True, 'current_version': '3.0', 'latest_version': '3.1',
          'download_url': 'https://x/p.deb', 'package_name': 'p.deb',
-         'checksum_url': 'https://x/p.deb.sha256'}
+         'checksum_url': 'https://x/p.deb.sha256', 'assets': ASSETS}
     r.update(kw)
     return r
 
@@ -411,7 +420,7 @@ def test_the_install_route_starts_a_rolling_update_in_ha(app, auth_client, ha, m
 def test_the_install_route_refuses_a_release_without_checksum_in_ha(app, auth_client, ha, monkeypatch,
                                                                      no_install):
     monkeypatch.delenv('UCM_DOCKER', raising=False)
-    monkeypatch.setattr(updates, 'check_for_updates', lambda **k: _release(checksum_url=None))
+    monkeypatch.setattr(updates, 'check_for_updates', lambda **k: _release(checksum_url=None, assets=ASSETS[:1]))
     _rows(app, a='3.0')
     r = auth_client.post('/api/v2/system/updates/install', json={})
     assert r.status_code == 409, r.data
@@ -458,7 +467,7 @@ def test_scheduled_auto_install_in_ha_without_checksum_starts_nothing(app, ha, m
     _rows(app, a='3.0')
     from models import SystemConfig, db
     with app.app_context():
-        updates._auto_install(_release(checksum_url=None))
+        updates._auto_install(_release(checksum_url=None, assets=ASSETS[:1]))
         SystemConfig.query.filter_by(key=updates._ATTEMPTED_VERSION_KEY).delete()
         db.session.commit()
     assert _state(app) is None

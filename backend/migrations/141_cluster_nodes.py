@@ -2,7 +2,8 @@
 
 ``cluster_nodes`` holds one row per node, refreshed by its scheduler process;
 ``scheduler_requests`` carries "run now" from any node to the leader;
-``discovery_scan_runs.node_id`` names the node whose process runs a scan.
+``discovery_scan_runs.node_id`` names the node whose process runs a scan;
+``cluster_nodes.package_family`` is the package a rolling update gives the node.
 Created on SQLite too, where nothing writes them outside HA.
 """
 import logging
@@ -15,7 +16,9 @@ RUNS = 'discovery_scan_runs'
 NODES_DDL = ("CREATE TABLE IF NOT EXISTS cluster_nodes ("
              "node_id VARCHAR(255) NOT NULL PRIMARY KEY, "
              "started_at TIMESTAMP NOT NULL, heartbeat_at TIMESTAMP NOT NULL, "
-             "is_leader BOOLEAN NOT NULL DEFAULT {false}, version VARCHAR(32), pid INTEGER)")
+             "is_leader BOOLEAN NOT NULL DEFAULT {false}, version VARCHAR(32), pid INTEGER, "
+             "package_family VARCHAR(32))")
+FAMILY_COLUMN = "ALTER TABLE cluster_nodes ADD COLUMN package_family VARCHAR(32)"
 REQUESTS_DDL = ("CREATE TABLE IF NOT EXISTS scheduler_requests ("
                 "id {serial} PRIMARY KEY, task_name VARCHAR(100) NOT NULL, "
                 "requested_at TIMESTAMP NOT NULL, requested_by VARCHAR(255), taken_at TIMESTAMP)")
@@ -26,6 +29,8 @@ NODE_COLUMN = f"ALTER TABLE {RUNS} ADD COLUMN node_id VARCHAR(255)"
 
 def _upgrade_sqlite(conn):
     conn.execute(NODES_DDL.format(false='0'))
+    if 'package_family' not in {row[1] for row in conn.execute("PRAGMA table_info(cluster_nodes)")}:
+        conn.execute(FAMILY_COLUMN)
     conn.execute(REQUESTS_DDL.format(serial='INTEGER'))
     conn.execute(REQUESTS_INDEX)
     if conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
@@ -40,6 +45,8 @@ def _upgrade_pg(conn):
     from sqlalchemy import inspect, text
 
     conn.execute(text(NODES_DDL.format(false='FALSE')))
+    if 'package_family' not in {c['name'] for c in inspect(conn).get_columns('cluster_nodes')}:
+        conn.execute(text(FAMILY_COLUMN))
     conn.execute(text(REQUESTS_DDL.format(serial='SERIAL')))
     conn.execute(text(REQUESTS_INDEX))
     inspector = inspect(conn)

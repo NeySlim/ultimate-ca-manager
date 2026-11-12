@@ -3,14 +3,16 @@
 The campaign is one JSON value in system_config (CAMPAIGN_KEY). Every step is a
 compare-and-set of that value: two coordinators, or two processes of one node, never
 take the same step twice. The coordinator (campaign_tick, run by the scheduler leader)
-sends the cluster command ``update`` to one node; that node downloads and verifies the
-package itself, then asks its own host-local install (run_local_turn). The next node
+sends the cluster command ``update`` to one node; that node takes the package of its own
+family (deb, rpm-el9...) from the catalog frozen at the start, downloads and verifies it
+itself, then asks its own host-local install (run_local_turn). The next node
 starts only once the previous one beats fresh on the target version; a node that does
 not come back within NODE_GUARD_SECONDS stops the campaign until an admin resumes it.
 """
 import json
 import logging
 import os
+import re
 import uuid
 from collections import namedtuple
 from copy import deepcopy
@@ -27,7 +29,9 @@ NODE_GUARD_SECONDS = 900
 RUNNING, STOPPED, DONE = 'running', 'stopped', 'done'
 DISPATCHED, INSTALLING, REQUESTED = 'dispatched', 'installing', 'requested'
 
-NodeView = namedtuple('NodeView', 'started_at heartbeat_at version')
+NodeView = namedtuple('NodeView', 'started_at heartbeat_at version family', defaults=(None,))
+# Name of one turn's download (run_local_turn): a 12-hex prefix, then the package name
+_TURN_FILE = re.compile(r'^[0-9a-f]{12}-.+\.(deb|rpm)$')
 
 
 def _dump(campaign):
@@ -59,7 +63,7 @@ def public_view(campaign):
     if campaign is None:
         return None
     keys = ('id', 'status', 'target', 'initiated_by', 'started_at', 'finished_at', 'order',
-            'skipped', 'done', 'current', 'failed')
+            'skipped', 'done', 'current', 'failed', 'packages', 'families')
     return {k: deepcopy(campaign.get(k)) for k in keys}
 
 
@@ -71,7 +75,8 @@ def _stale_seconds():
 
 def _nodes():
     from models import ClusterNode
-    return {n.node_id: NodeView(n.started_at, n.heartbeat_at, n.version) for n in ClusterNode.query.all()}
+    return {n.node_id: NodeView(n.started_at, n.heartbeat_at, n.version, n.package_family)
+            for n in ClusterNode.query.all()}
 
 
 def _fresh(view, now, stale_seconds):
@@ -94,6 +99,7 @@ def plan_step(campaign, nodes, now, *, stale_seconds, guard):
         return None, None
     c = deepcopy(campaign)
     target = c['target']
+    packages = c.get('packages') or {}
     current = c.get('current')
     if current:
         node = current['node']
@@ -111,6 +117,15 @@ def plan_step(campaign, nodes, now, *, stale_seconds, guard):
             return _stopped(c, node, f"node {node} not back on version {target} "
                                      f"within {guard:.0f}s", now)
         return None, None
+    # A node that joined after the start takes a turn too, if the campaign has its package
+    late = sorted(n for n, v in nodes.items() if n not in c['order']
+                  and n not in c.get('skipped', []) and _fresh(v, now, stale_seconds))
+    for n in late:
+        if nodes[n].family not in packages:
+            return _stopped(c, n, f"node {n} joined after the start and the campaign has no "
+                                  f"package of its family {nodes[n].family or 'unknown'}", now)
+        c['order'].append(n)
+        c.setdefault('families', {})[n] = nodes[n].family
     following = next((n for n in c['order'] if n not in c['done']), None)
     if following is None:
         c.update(status=DONE, finished_at=_iso(now))
@@ -121,15 +136,18 @@ def plan_step(campaign, nodes, now, *, stale_seconds, guard):
     if versions_match(view.version, target):
         c['done'].append(following)
         return c, ('node_done', following, None)
+    if view.family not in packages:
+        return _stopped(c, following, f"node {following} now reports the package family "
+                                      f"{view.family or 'unknown'}, which the campaign has no "
+                                      f"package for", now)
     c['current'] = {'node': following, 'since': _iso(now), 'state': DISPATCHED}
     return c, ('dispatch', following, None)
 
 
 def _command_payload(campaign):
-    """What a node needs to fetch and verify the package itself; never a secret."""
+    """What a node needs to fetch and verify the package of its family itself; never a secret."""
     return {'campaign': campaign['id'], 'version': campaign['target'],
-            'download_url': campaign['download_url'], 'package_name': campaign['package_name'],
-            'sha256': campaign['sha256']}
+            'packages': deepcopy(campaign['packages'])}
 
 
 _MESSAGES = {
@@ -140,6 +158,8 @@ _MESSAGES = {
                   "install requested",
     'node_done': "Rolling update to {target}: node {node} is back on the new version",
     'finished': "Rolling update to {target} finished on every node",
+    'finished_skipped': "Rolling update to {target} finished; left out, without a fresh heartbeat "
+                        "at the start: {skipped}",
     'stopped': "Rolling update to {target} stopped at node {node}: {reason}",
 }
 
@@ -147,7 +167,9 @@ _MESSAGES = {
 def _announce(campaign, event, actor=None):
     """Audit, log and real-time event for one step; never raises."""
     kind, node, reason = event
-    message = _MESSAGES[kind].format(target=campaign['target'], node=node, reason=reason)
+    template = _MESSAGES['finished_skipped' if kind == 'finished' and campaign.get('skipped') else kind]
+    message = template.format(target=campaign['target'], node=node, reason=reason,
+                              skipped=', '.join(campaign.get('skipped') or ()))
     failed = kind == 'stopped'
     (logger.error if failed else logger.info)(message)
     try:
@@ -175,13 +197,38 @@ def _store(raw, campaign):
     return False
 
 
-def start_campaign(target, download_url, package_name, sha256, initiated_by):
-    """(started, message, campaign): one campaign at a time, over the nodes beating now."""
+def _catalog(assets, families):
+    """(packages, None) with one verified package per family present, or (None, refusal)
+    naming the first node that cannot get one. Each SHA-256 is fetched now and frozen."""
+    from services import updates
+    packages = {}
+    for node, family in sorted(families.items(), key=lambda item: item[0]):
+        if family in packages:
+            continue
+        label = family or updates.UNKNOWN_FAMILY
+        found = updates.family_package(assets, family)
+        if found is None:
+            return None, (f"node {node} ({label}): no package in this release for its family, "
+                          f"a rolling update cannot update it")
+        if not found['checksum_url']:
+            return None, (f"node {node} ({label}): no SHA-256 published for "
+                          f"{found['package_name']}: a rolling update installs only verified packages")
+        try:
+            sha256 = updates.fetch_expected_sha256(found['checksum_url'], found['package_name'])
+        except Exception as e:
+            return None, f"node {node} ({label}): SHA-256 of {found['package_name']} not fetched ({e})"
+        if not sha256:
+            return None, (f"node {node} ({label}): the release's SHA-256 file does not cover "
+                          f"{found['package_name']}: a rolling update installs only verified packages")
+        packages[family] = {'download_url': found['download_url'],
+                            'package_name': found['package_name'], 'sha256': sha256.lower()}
+    return packages, None
+
+
+def start_campaign(target, assets, initiated_by):
+    """(started, message, campaign): one campaign at a time, over the nodes beating now,
+    each to get the package of its family from ``assets`` (the release's assets)."""
     from services.scheduler_leader import cluster_utc_now
-    if not sha256:
-        return False, "No SHA-256 published for this package: a rolling update installs only verified packages", None
-    if not download_url or not package_name:
-        return False, "No package for this platform", None
     raw, current = read_campaign()
     if current is not None and current.get('status') == RUNNING:
         return False, f"A rolling update to {current['target']} is already running", current
@@ -191,8 +238,12 @@ def start_campaign(target, download_url, package_name, sha256, initiated_by):
     order = sorted(n for n, v in nodes.items() if _fresh(v, now, stale))
     if not order:
         return False, "No node beats in the cluster", None
+    families = {n: nodes[n].family for n in order}
+    packages, refusal = _catalog(assets or [], families)
+    if refusal:
+        return False, refusal, None
     campaign = {'id': uuid.uuid4().hex, 'status': RUNNING, 'target': target,
-                'download_url': download_url, 'package_name': package_name, 'sha256': sha256.lower(),
+                'packages': packages, 'families': families,
                 'initiated_by': initiated_by, 'started_at': _iso(now), 'finished_at': None,
                 'order': order, 'skipped': sorted(set(nodes) - set(order)), 'done': [],
                 'current': None, 'failed': None}
@@ -249,6 +300,25 @@ def _discard(path):
         logger.warning(f"Rolling update: dropped package not removed: {type(e).__name__}: {e}")
 
 
+def _purge_earlier_turns():
+    """Drop the packages earlier turns left in updates/; never the one the install watcher
+    was handed (.update_pending), nor a file no turn named."""
+    from services import updates
+    folder = os.path.join(str(updates.DATA_DIR), 'updates')
+    try:
+        with open(os.path.join(str(updates.DATA_DIR), '.update_pending')) as f:
+            pending = os.path.basename(f.read().strip())
+    except OSError:
+        pending = None
+    try:
+        names = os.listdir(folder)
+    except OSError:
+        return
+    for name in names:
+        if _TURN_FILE.match(name) and name != pending:
+            _discard(os.path.join(folder, name))
+
+
 def run_local_turn(payload, node_id=None, version=None):
     """Handler of the ``update`` command on the node it targets: verified download, then
     the host-local install request. Runs once per turn, whatever process gets there first."""
@@ -271,14 +341,23 @@ def run_local_turn(payload, node_id=None, version=None):
     if not _store(raw, taken):
         return
     raw = _dump(taken)
-    sha256 = payload.get('sha256')
-    if not sha256 or sha256.lower() != campaign['sha256']:
-        return _stop(raw, taken, node_id, "the command carries no matching SHA-256: install refused")
+    # This host's own detection, not its column: the package must fit what runs here
+    family = updates.package_family()
+    frozen = (campaign.get('packages') or {}).get(family)
+    if not frozen or not frozen.get('sha256'):
+        return _stop(raw, taken, node_id, f"the campaign has no package for this node's family "
+                                          f"{family}: install refused")
+    sent = ((payload.get('packages') or {}).get(family)) or {}
+    sha256 = sent.get('sha256')
+    if not sha256 or sha256.lower() != frozen['sha256']:
+        return _stop(raw, taken, node_id, f"the command carries no SHA-256 matching the campaign's "
+                                          f"for {family}: install refused")
+    _purge_earlier_turns()
     # One file per turn: a stale turn's drop can never reach the package of a later one
-    turn_name = f"{uuid.uuid4().hex[:12]}-{os.path.basename(str(payload['package_name']))}"
+    turn_name = f"{uuid.uuid4().hex[:12]}-{os.path.basename(str(sent.get('package_name')))}"
     try:
-        path = updates.download_update(payload['download_url'], turn_name,
-                                       expected_sha256=sha256)
+        path = updates.download_update(sent.get('download_url'), turn_name,
+                                       expected_sha256=frozen['sha256'])
     except Exception as e:
         return _stop(raw, taken, node_id, str(e)[:300])
     # The turn must still be ours after the download: a campaign stopped meanwhile installs nothing
@@ -294,5 +373,6 @@ def run_local_turn(payload, node_id=None, version=None):
         updates.install_update(path, to_version=campaign['target'],
                                initiated_by=campaign.get('initiated_by') or 'system')
     except Exception as e:
+        _discard(path)
         return _stop(raw, requested, node_id, str(e)[:300])
     _announce(requested, ('installing', node_id, None))
