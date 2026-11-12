@@ -30,7 +30,7 @@ docker run -d \
 ```
 
 **Access:** https://localhost:8443
-**Credentials:** admin / changeme123, changed on first login.
+**Credentials:** `admin`, with the password generated at first start: `docker exec <container> cat /opt/ucm/data/initial-admin-password`, changed at first login. To choose it, mount a secret and set `INITIAL_ADMIN_PASSWORD_FILE`.
 
 > **Mount `/etc/ucm`.** It holds `master.key`, which decrypts every private key in the database. The image declares it as a volume, so leaving it unmounted creates an anonymous one: recreate the container and the key is gone, along with any chance of reading the keys it protected.
 

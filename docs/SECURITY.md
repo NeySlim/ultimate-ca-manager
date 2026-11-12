@@ -95,6 +95,14 @@ POST /api/v2/users/password-strength
 
 ---
 
+#### Initial Administrator Password
+
+There is no default password. The first administrator's password is provided (`INITIAL_ADMIN_PASSWORD_FILE`, or `INITIAL_ADMIN_PASSWORD`) or generated into `DATA_DIR/initial-admin-password` (0600, never logged, changed at first login, file removed by that change); see the [Administration Guide](ADMIN_GUIDE.md#initial-administrator-password).
+
+- Prefer `INITIAL_ADMIN_PASSWORD_FILE` with a Docker, Compose or Kubernetes secret. The plain variable is visible to anyone who can run `docker inspect` on the container or read the process environment.
+- Remove the value from the environment or secret after the first start: it is never read again once the administrator exists.
+- A provided password is not forced to change; change it after the first login if others handled it.
+
 ### 4. Rate Limiting
 
 Protection against brute force and DoS attacks.

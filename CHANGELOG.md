@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
+- **No default admin password.** The first administrator's password is provided (`INITIAL_ADMIN_PASSWORD_FILE` or `INITIAL_ADMIN_PASSWORD`) or generated into `DATA_DIR/initial-admin-password` (0600, never logged), which must be changed at first login and is deleted by that change; packages, image and chart no longer carry `changeme123`.
 - RPM for RHEL, AlmaLinux and Rocky Linux 10 (`ucm-el10-VERSION-1.el10.noarch.rpm`); the updater picks it on an EL10 host, and an EL host with no matching build is still offered the Fedora RPM, which needs a system `python3` of 3.12 or later.
 - **HA packaging.** The Helm chart takes `ha.enabled` (rolling update, PodDisruptionBudget, shared `KEY_ENCRYPTION_KEY`), `docker-compose.ha.yml` starts two nodes behind a balancer, the image entrypoint skips SQLite in HA mode, and `docs/HA.md` documents the deployments.
 
@@ -89,6 +90,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- First access: scripts that logged in as `admin` / `changeme123` after a fresh install must provide the password or read the generated file; the DEB and RPM upgrade removes the `INITIAL_ADMIN_PASSWORD=changeme123` line 2.x wrote, and an existing administrator is left as it is.
 - Discovery: on PostgreSQL with a server time zone other than UTC, discovery dates stored before this release are in local time; run a scan of the discovery targets after upgrading to rewrite them.
 - Certificates: `serial_number` of certificates issued from the form, renewed in place, issued on policy approval, issued by a Microsoft CA or used as TSA signer is now returned in decimal like the others; the UI still shows colon hex.
 

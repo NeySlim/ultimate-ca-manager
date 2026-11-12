@@ -7,7 +7,8 @@ export const config = {
   baseURL: process.env.UCM_BASE_URL || 'https://localhost:8443',
   credentials: {
     username: process.env.UCM_USER || 'admin',
-    password: process.env.UCM_PASSWORD || 'changeme123',
+    // UCM has no default password: the one provided to the instance, or its generated one
+    password: process.env.UCM_PASSWORD || '',
   },
   
   // Pro features enabled

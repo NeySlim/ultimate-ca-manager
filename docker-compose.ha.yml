@@ -28,6 +28,12 @@ x-ucm-node: &ucm-node
     # The load balancer reaches the nodes from the network's fixed subnet: a pool Docker
     # picks (192.168.x once 172.x is used up) would leave it untrusted
     UCM_TRUSTED_PROXIES: ${UCM_TRUSTED_PROXIES:-${UCM_HA_SUBNET:-172.28.0.0/24}}
+    # Initial admin password (first start only), the same secret on both nodes. Unset:
+    # the first node to start generates it, its log says which; read it there with
+    #   docker compose exec ucm-1 cat /opt/ucm/data/initial-admin-password
+    # UCM_INITIAL_ADMIN_PASSWORD_FILE: /run/secrets/ucm_admin_password
+  # secrets:
+  #   - ucm_admin_password
   healthcheck:
     test: ["CMD", "curl", "-fk", "https://127.0.0.1:8443/health/ready"]
     interval: 15s
@@ -114,6 +120,10 @@ networks:
     ipam:
       config:
         - subnet: ${UCM_HA_SUBNET:-172.28.0.0/24}
+
+# secrets:
+#   ucm_admin_password:
+#     file: ./ucm_admin_password.txt   # one line, the password; keep it out of version control
 
 volumes:
   ucm-ha-pgdata:

@@ -122,7 +122,7 @@ sudo systemctl enable --now ucm
 ```
 
 **Access:** `https://localhost:8443` or `https://your-server-fqdn:8443`
-**Default credentials:** `admin` / `changeme123`: the first login must set a new password, and until then the server refuses every other request of that session, API included.
+**First login:** `admin`, with the password generated at first start: `sudo cat /opt/ucm/data/initial-admin-password` (Docker: `docker exec <container> cat /opt/ucm/data/initial-admin-password`). It must be changed at first login. See [First access](docs/installation/README.md#first-access) to provide your own.
 
 See [Installation Guide](docs/installation/README.md) for all methods including Docker Compose and source install.
 

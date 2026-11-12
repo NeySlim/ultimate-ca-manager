@@ -35,7 +35,7 @@ docker run -d \
 ```
 
 **Access:** https://localhost:8443 or https://your-server-fqdn:8443
-**Credentials:** admin / changeme123: the first login must set a new password before anything else
+**Credentials:** `admin`, with the password generated at first start: `docker exec <container> cat /opt/ucm/data/initial-admin-password`. The first login must set a new password before anything else, which removes the file. To provide the password yourself, see [First access](README.md#first-access).
 
 ---
 

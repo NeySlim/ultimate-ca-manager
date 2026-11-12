@@ -54,6 +54,9 @@ services:
       
       # Disable backups for development
       - UCM_BACKUP_ENABLED=false
+      # Initial admin password: unset, read it with
+      #   docker compose exec ucm cat /opt/ucm/data/initial-admin-password
+      # or provide it: - UCM_INITIAL_ADMIN_PASSWORD_FILE=/run/secrets/... (see docker-compose.yml)
     
     # Override command to use Flask dev server with auto-reload
     command: python3 -m flask run --host=0.0.0.0 --port=${UCM_HTTPS_PORT:-8443} --cert=data/https_cert.pem --key=data/https_key.pem --reload
