@@ -248,6 +248,16 @@ def _reset_acme_proxy_caches():
 
 
 @pytest.fixture(autouse=True)
+def _reset_intune_clients():
+    """The Intune clients (token, endpoint) are process-wide: no test may see another's."""
+    from services.scep.intune_client import forget_clients
+
+    forget_clients()
+    yield
+    forget_clients()
+
+
+@pytest.fixture(autouse=True)
 def _admin_password_already_changed(request):
     """The suite runs as an installation whose admin replaced the first-boot password.
 

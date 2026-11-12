@@ -39,6 +39,7 @@ Microsoft's own client sends and AAD scope strings are opaque to us.
 
 import base64
 import logging
+import threading
 import time
 import uuid
 from datetime import timezone
@@ -140,10 +141,16 @@ class IntuneScepClient:
 
         self._tokens = {}  # scope -> (token, expires_at_monotonic)
         self._service_endpoint = None
+        # The client is shared between request threads (see client_for_profile)
+        self._lock = threading.RLock()
 
     # ---- Auth ----------------------------------------------------------
 
     def _get_token(self, scope: str) -> str:
+        with self._lock:
+            return self._fetch_token(scope)
+
+    def _fetch_token(self, scope: str) -> str:
         cached = self._tokens.get(scope)
         if cached and cached[1] > time.monotonic():
             return cached[0]
@@ -222,10 +229,10 @@ class IntuneScepClient:
         )
 
     def _get_service_endpoint(self) -> str:
-        if self._service_endpoint:
+        with self._lock:
+            if not self._service_endpoint:
+                self._service_endpoint = self._discover_service_endpoint()
             return self._service_endpoint
-        self._service_endpoint = self._discover_service_endpoint()
-        return self._service_endpoint
 
     def test_connection(self) -> None:
         """Prove the Entra app registration + permissions work, without
@@ -255,9 +262,13 @@ class IntuneScepClient:
         except requests.RequestException as e:
             # The discovered endpoint can go stale (tenant moved shards) --
             # clear it so the next call re-discovers, mirroring the reference
-            # client's Clear()-on-failure behavior. One retry only; a second
-            # consecutive failure is a real problem, not a stale cache.
-            self._service_endpoint = None
+            # client's Clear()-on-failure behavior. The request is not retried
+            # here: the caller fails and the next request re-discovers.
+            with self._lock:
+                self._service_endpoint = None
+                # A 401 means the token was refused: ask for a new one next time
+                if getattr(getattr(e, 'response', None), 'status_code', None) == 401:
+                    self._tokens.pop(f"{INTUNE_RESOURCE_URL}/.default", None)
             logger.error(
                 "Intune SCEP API request failed (activityId=%s url=%s/%s): %s",
                 activity_id, endpoint, url_suffix, e,
@@ -347,10 +358,36 @@ class IntuneScepClient:
         self._check_result(result)
 
 
+_CLIENTS = {}  # (tenant_id, client_id) -> (client_secret, client)
+_CLIENTS_LOCK = threading.Lock()
+_CLIENTS_MAX = 64
+
+
+def forget_clients():
+    with _CLIENTS_LOCK:
+        _CLIENTS.clear()
+
+
 def client_for_profile(profile):
     """The Intune client a SCEP profile validates with, None when Intune is
-    off for it; raises ValueError on an incomplete app registration."""
+    off for it; raises ValueError on an incomplete app registration.
+
+    One client per app registration is kept so its token and discovered
+    endpoint outlive a request; a changed secret replaces it.
+    """
     if profile is None or not profile.intune_enabled:
         return None
     tenant_id, client_id, client_secret = profile.intune_credentials()
-    return IntuneScepClient(tenant_id=tenant_id, client_id=client_id, client_secret=client_secret)
+    if not tenant_id or not client_id or not client_secret:
+        raise ValueError("tenant_id, client_id and client_secret are all required")
+    key = (tenant_id, client_id)
+    with _CLIENTS_LOCK:
+        held = _CLIENTS.get(key)
+        if held and held[0] == client_secret:
+            return held[1]
+        if key not in _CLIENTS and len(_CLIENTS) >= _CLIENTS_MAX:
+            _CLIENTS.pop(next(iter(_CLIENTS)))
+        client = IntuneScepClient(tenant_id=tenant_id, client_id=client_id,
+                                  client_secret=client_secret)
+        _CLIENTS[key] = (client_secret, client)
+        return client
