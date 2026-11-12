@@ -1287,3 +1287,32 @@ def test_on_postgresql_a_transaction_open_across_the_disable_stays_readable(
         with app.app_context():
             SystemConfig.query.filter_by(key=key).delete()
             db.session.commit()
+
+
+def test_a_grace_retired_and_a_rotation_started_before_the_lock_is_not_retired_again(
+        app, values, grace, monkeypatch, encryption_enabled):
+    """Another node ends the grace and starts a rotation between the read and the lock."""
+    from security import dek_rotation
+    with app.app_context():
+        dek_rotation.rotate()
+    grace(601)
+    real = dek_rotation.lock_key_state
+    raced = []
+
+    def other_node_first(session=None):
+        if not raced:
+            raced.append(True)
+            with monkeypatch.context() as patch:
+                patch.setattr(dek_rotation, 'lock_key_state', real)
+                with app.app_context():
+                    assert dek_rotation.retire_if_due() == 1
+                    dek_rotation.start()  # previous v2, active v3, nothing rewritten yet
+        return real(session)
+    monkeypatch.setattr(dek_rotation, 'lock_key_state', other_node_first)
+    with app.app_context():
+        assert dek_rotation.retire_if_due() == 0
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'previous'), (3, 'active')]
+    stored = _stored(app, values)
+    with app.app_context():
+        # Nothing was rewritten under v3 before the peers could have loaded it
+        assert not dek_rotation._under_active(stored['target'])

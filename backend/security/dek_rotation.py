@@ -299,6 +299,10 @@ def retire_if_due() -> int:
         return 0
     lock_key_state()
     _encryption.key_encryption.refresh()
+    # Read again under the lock: another node may have ended it and started a new rotation
+    if retiring() != grace:
+        db.session.commit()
+        return 0
     disable = bool(grace.get('disable'))
     # A disable's DEKs are the only ones: values found under them go back in the clear
     late = rewrite(commit=False, decrypt=disable)
