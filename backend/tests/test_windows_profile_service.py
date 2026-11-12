@@ -227,25 +227,26 @@ def test_no_code_names_a_setting_the_profile_replaced():
     assert not found, found
 
 
-def test_a_2x_archive_restores_as_the_profile_the_migration_makes(app, clean_slate, two_cas):
-    """Same conversion: the default profile from a 2.x archive equals the one migration 155
-    makes of the same settings, and its WSTEP certificate is attached to it."""
+def _2x_archive(app, settings, base_dn='DC=c01,DC=example', connector_enabled=True):
+    """An archive as 2.x wrote it: *settings* in the configuration, the connector unnamed,
+    the WSTEP certificate ``c01-wstep-cert`` without a profile, no profile sections."""
     from services.backup_service import BackupService
     from tests.backup_v3 import as_v3
-    issuing, policy, _template = two_cas
-    settings = _settings_2x(issuing, policy)
     with app.app_context():
         connector = ADConnectorConfig.get_singleton()
         if connector is None:
             connector = ADConnectorConfig(name='default', server='dc.c01.example')
             db.session.add(connector)
-        connector.enabled, connector.base_dn = True, 'DC=c01,DC=example'
-        cert = Certificate(refid='c01-wstep-cert', descr='c01 wstep', caref=issuing['refid'], source='wstep')
+        connector.enabled, connector.base_dn = connector_enabled, base_dn
+        caref = settings.get('wstep_ca_refid')
+        cert = Certificate(refid='c01-wstep-cert', descr='c01 wstep', caref=caref, source='wstep')
         db.session.add(cert)
         db.session.commit()
-        connector_row = {'id': connector.id, 'enabled': True, 'base_dn': connector.base_dn}
+        connector_row = {'id': connector.id, 'enabled': connector_enabled, 'base_dn': base_dn}
         include = {name: name in ('configuration', 'ad_connector', 'certificates') for name in manifest.SECTIONS}
         blob = BackupService().create_backup(BACKUP_PASSWORD, include=include)
+        Certificate.query.filter_by(refid='c01-wstep-cert').delete()
+        db.session.commit()
 
     def as_2x(payload):
         payload['configuration']['settings'].update(settings)
@@ -262,12 +263,18 @@ def test_a_2x_archive_restores_as_the_profile_the_migration_makes(app, clean_sla
         payload['metadata'].pop('section_digests', None)
         payload['metadata']['sections'] = {name: len(rows) for name, rows in payload.items()
                                            if name in manifest.SECTIONS and isinstance(rows, (list, dict))}
-    archive = as_v3(blob, BACKUP_PASSWORD, edit=as_2x)
+    return as_v3(blob, BACKUP_PASSWORD, edit=as_2x), connector_row
 
+
+def test_a_2x_archive_restores_as_the_profile_the_migration_makes(app, clean_slate, two_cas):
+    """Same conversion: the default profile from a 2.x archive equals the one migration 155
+    makes of the same settings, and its WSTEP certificate is attached to it."""
+    from services.backup_service import BackupService
+    issuing, policy, _template = two_cas
+    settings = _settings_2x(issuing, policy)
+    archive, connector_row = _2x_archive(app, settings)
     try:
         with app.app_context():
-            Certificate.query.filter_by(refid='c01-wstep-cert').delete()
-            db.session.commit()
             BackupService().restore_backup(archive, BACKUP_PASSWORD, mode='merge')
             db.session.expire_all()
             restored = _columns(_default())
@@ -289,6 +296,49 @@ def test_a_2x_archive_restores_as_the_profile_the_migration_makes(app, clean_sla
     direct = profile_from_2x(settings, connector_row, None)
     assert restored == migrated == {c: direct[c] for c in PROFILE_COLUMNS}
     assert restored['realm'] == 'C01.EXAMPLE'
+
+
+@pytest.mark.parametrize('xcep_ca', ['', None], ids=['empty', 'absent'])
+@pytest.mark.parametrize('route', ['migration', 'restore'])
+def test_xcep_without_its_own_ca_is_switched_off(app, client, auth_client, clean_slate, two_cas,
+                                                 monkeypatch, xcep_ca, route):
+    """2.x answered GetPolicies 503 without an XCEP CA; the profile would serve the issuing CA's
+    policy (A4): the switch goes off, the client still gets a 503 and no policy."""
+    from services.backup_service import BackupService
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: False)
+    issuing, policy, _template = two_cas
+    settings = _settings_2x(issuing, policy)
+    if xcep_ca is None:
+        del settings['xcep_ca_refid']
+    else:
+        settings['xcep_ca_refid'] = xcep_ca
+    with app.app_context():
+        _set('xcep_enabled', 'true')
+        SystemConfig.query.filter_by(key='xcep_ca_refid').delete()
+        db.session.commit()
+    if route == 'migration':
+        with app.app_context():
+            for key, value in settings.items():
+                _set(key, value)
+            db.session.commit()
+            _migrate_app_db()
+    else:
+        archive, _connector = _2x_archive(app, settings)
+        try:
+            with app.app_context():
+                BackupService().restore_backup(archive, BACKUP_PASSWORD, mode='merge')
+        finally:
+            with app.app_context():
+                Certificate.query.filter_by(refid='c01-wstep-cert').delete()
+                db.session.commit()
+    r = client.post(XCEP_URL, data=_envelope())
+    assert r.status_code == 503 and r.data == b'XCEP disabled'
+    data = auth_client.get('/api/v2/xcep/config').get_json()['data']
+    assert (data['enabled'], data['ca_refid'], data['effective_ca_refid']) == (False, '', issuing['refid'])
+    assert data['effective_ca_id'] == issuing['id']
+    # The operator who wants the issuing CA's policy switches XCEP on (A4)
+    assert auth_client.patch('/api/v2/xcep/config', json={'enabled': True}).status_code == 200
+    assert client.post(XCEP_URL, data=_envelope()).status_code == 200
 
 
 def test_a_30_archive_round_trip_keeps_the_profile(app, clean_slate, two_cas):

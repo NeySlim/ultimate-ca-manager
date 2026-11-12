@@ -255,6 +255,22 @@ def test_without_kerberos_in_use_an_unknown_realm_does_not_disable(base, caplog)
     assert 'no realm' not in caplog.text
 
 
+@pytest.mark.parametrize('changes, switch', [
+    ({'xcep_ca_refid': ''}, 'false'),
+    ({'xcep_ca_refid': None}, 'false'),
+    ({}, 'true'),
+    ({'xcep_ca_refid': None, 'wstep_ca_refid': None}, 'true'),
+    ({'xcep_ca_refid': None, 'xcep_enabled': 'false'}, 'false'),
+], ids=['empty-xcep-ca', 'absent-xcep-ca', 'xcep-ca', 'no-ca-at-all', 'already-off'])
+def test_xcep_without_its_own_ca_is_switched_off(base, changes, switch):
+    """2.x served no policy without an XCEP CA; the profile would serve the issuing CA's (A4)."""
+    settings = {k: v for k, v in {**SETTINGS_2X, **changes}.items() if v is not None}
+    base.seed(settings=settings)
+    base.migrate()
+    base.migrate()
+    assert base.rows(f"SELECT value FROM {SETTINGS} WHERE key = 'xcep_enabled'") == [(switch,)]
+
+
 def test_upgrading_a_real_2x_base_gives_the_direct_conversion(base):
     """Every migration after 2.253, on its schema: the profile is the conversion of the settings."""
     base.seed()

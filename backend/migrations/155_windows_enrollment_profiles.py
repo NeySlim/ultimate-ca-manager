@@ -3,7 +3,8 @@
 Creates windows_enrollment_profiles and windows_profile_templates, names the AD connector
 rows, adds certificates.windows_profile_id. The 2.x XCEP/WSTEP settings become the default
 profile (services.windows_profiles.legacy, shared with the restore of a 2.x archive) and
-are deleted in the same transaction; the WSTEP certificates are attached to it.
+are deleted in the same transaction; the WSTEP certificates are attached to it. XCEP without
+a CA of its own is switched off, as it served no policy (legacy.switches_from_2x).
 The keytab is read for its realm only; it is stored in the profile at startup.
 Idempotent, dual-backend (SQLite + PostgreSQL).
 """
@@ -77,7 +78,12 @@ def _profile(settings, connector, keytab):
 
 def _settings_keys():
     from services.windows_profiles.legacy import MIGRATED_KEYS
-    return MIGRATED_KEYS, MIGRATED_KEYS + ('kerberos_spn', 'kerberos_enabled')
+    return MIGRATED_KEYS, MIGRATED_KEYS + ('kerberos_spn', 'kerberos_enabled', 'xcep_enabled')
+
+
+def _switches(settings):
+    from services.windows_profiles.legacy import switches_from_2x
+    return switches_from_2x(settings)
 
 
 def _connector_names(rows):
@@ -120,6 +126,8 @@ def upgrade_sqlite(conn, keytab=None):
                              f"({','.join('?' * len(values))})", values)
                 default = conn.execute(f"SELECT id FROM {PROFILES} WHERE is_default").fetchone()
                 logger.info("[155] default Windows enrollment profile created (realm %s)", profile['realm'])
+            for key, value in _switches(settings).items():
+                conn.execute(f"UPDATE {SETTINGS} SET value = ? WHERE key = ?", (value, key))
         if default is not None and CERTS in tables:
             conn.execute(f"UPDATE {CERTS} SET windows_profile_id = ? "
                          "WHERE source = 'wstep' AND windows_profile_id IS NULL", (default[0],))
@@ -159,6 +167,8 @@ def upgrade_pg(conn, keytab=None):
                              {f: profile[f] for f in _INSERT_FIELDS})
                 default = conn.execute(text(f"SELECT id FROM {PROFILES} WHERE is_default")).fetchone()
                 logger.info("[155] default Windows enrollment profile created (realm %s)", profile['realm'])
+            for key, value in _switches(settings).items():
+                conn.execute(text(f"UPDATE {SETTINGS} SET value = :v WHERE key = :k"), {'v': value, 'k': key})
         if default is not None and CERTS in tables:
             conn.execute(text(f"UPDATE {CERTS} SET windows_profile_id = :p "
                               "WHERE source = 'wstep' AND windows_profile_id IS NULL"), {'p': default[0]})

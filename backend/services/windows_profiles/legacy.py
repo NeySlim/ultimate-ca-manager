@@ -105,6 +105,17 @@ def has_windows_configuration(settings, keytab=None):
                 or settings.get('kerberos_spn') or keytab)
 
 
+def switches_from_2x(settings):
+    """The protocol switches the conversion changes: 2.x answered 503 to GetPolicies without
+    an XCEP CA, the profile would serve the issuing CA's policy (A4); XCEP goes off instead."""
+    if (str(settings.get('xcep_enabled') or '').lower() == 'true'
+            and not settings.get('xcep_ca_refid') and settings.get('wstep_ca_refid')):
+        logger.warning("Windows enrollment: XCEP had no CA of its own and served no policy; it is "
+                       "switched off, switch it on to serve the policy of the issuing CA")
+        return {'xcep_enabled': 'false'}
+    return {}
+
+
 def _validity(value):
     try:
         return int(value) if value else DEFAULT_VALIDITY_DAYS

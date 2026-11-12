@@ -9,7 +9,7 @@ import base64
 import logging
 from typing import Any, Dict, Optional
 
-from services.windows_profiles.legacy import MIGRATED_KEYS, connector_names, profile_from_2x
+from services.windows_profiles.legacy import MIGRATED_KEYS, connector_names, profile_from_2x, switches_from_2x
 
 from ..export_generic import REFERENCE_SUFFIX
 
@@ -60,6 +60,7 @@ def upgrade_archived_windows_profiles(backup_data) -> Optional[Dict[str, Any]]:
     connector = ({'id': first.get('id'), 'enabled': bool(first.get('enabled')),
                   'base_dn': first.get('base_dn')} if first else None)
     keytab = _keytab_here()
+    settings.update(switches_from_2x({**settings, **migrated}))
     profile = profile_from_2x({**settings, **migrated}, connector, keytab)
     if profile is None:
         return None

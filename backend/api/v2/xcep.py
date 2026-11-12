@@ -42,22 +42,22 @@ def _actor():
 @bp.route('/api/v2/xcep/config', methods=['GET'])
 @require_auth(['read:xcep'])
 def get_xcep_config():
-    """XCEP configuration: the switch, and the default profile's policy CA and account"""
+    """XCEP configuration: the switch, the default profile's policy CA and account, and the CA
+    that serves the policy (``effective_*``: the policy CA, else the issuing CA)"""
     profile = windows_profiles.default_profile()
     ca_refid = (profile.policy_ca_refid if profile is not None else None) or ''
-    ca_id = None
-    ca_name = None
-    if ca_refid:
-        ca = CA.query.filter_by(refid=ca_refid).first()
-        if ca:
-            ca_id = ca.id
-            ca_name = ca.descr
+    ca = CA.query.filter_by(refid=ca_refid).first() if ca_refid else None
+    effective_refid = (profile.policy_refid if profile is not None else None) or ''
+    effective = windows_profiles.policy_ca(profile)
 
     return success_response(data={
         'enabled': get_config('xcep_enabled', 'false') == 'true',
         'ca_refid': ca_refid,
-        'ca_id': ca_id,
-        'ca_name': ca_name,
+        'ca_id': ca.id if ca else None,
+        'ca_name': ca.descr if ca else None,
+        'effective_ca_refid': effective_refid,
+        'effective_ca_id': effective.id if effective else None,
+        'effective_ca_name': effective.descr if effective else None,
         'username': (profile.xcep_username if profile is not None else None) or '',
         'password_set': bool(profile is not None and profile.xcep_password),
     })
