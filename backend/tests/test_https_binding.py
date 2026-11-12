@@ -107,7 +107,8 @@ class TestMaterialization:
 
         key_pem = b'-----BEGIN PRIVATE KEY-----\ntest-key\n-----END PRIVATE KEY-----\n'
         load_key = MagicMock(return_value=key_pem)
-        monkeypatch.setattr(https_binding, 'load_pem_bytes', load_key, raising=False)
+        monkeypatch.setattr('utils.key_codec.load_pem_bytes', load_key)
+        monkeypatch.setattr('security.encryption.key_encryption._enabled', True)
         stored_key = base64.b64encode(b'ENC:encrypted-at-rest').decode()
         cert = SimpleNamespace(
             id=7,
@@ -128,8 +129,7 @@ class TestMaterialization:
         key_path = tmp_path / 'https_key.pem'
         key_path.write_text('previous key')
         monkeypatch.setattr(https_binding, '_paths', lambda: (cert_path, key_path))
-        monkeypatch.setattr(https_binding, 'load_pem_bytes', MagicMock(return_value=b'new key'),
-                            raising=False)
+        monkeypatch.setattr('utils.key_codec.load_pem_bytes', MagicMock(return_value=b'new key'))
         cert = SimpleNamespace(
             id=8, prv='x', caref=None,
             crt=base64.b64encode(
@@ -167,7 +167,7 @@ class TestRenewalSubscriber:
         self, app, clean_binding, monkeypatch, create_cert,
     ):
         restart = MagicMock(return_value=(True, 'ok'))
-        materialize = MagicMock()
+        materialize = MagicMock(return_value='chain written')
         monkeypatch.setattr(https_binding, 'materialize_https_cert', materialize)
         import utils.service_manager as sm
         monkeypatch.setattr(sm, 'restart_service', restart)

@@ -81,7 +81,7 @@ Compose refuses to start while one of these variables is missing. The balancer l
 - **Backups.** Scheduled and manual backups are written under the node's data directory by the leader. They are not replicated: copy them off the host, and also back PostgreSQL up with its own tools.
 - **SoftHSM tokens.** A token lives on the node's own disk, so the chart and the compose example set `HSM_AUTO_INIT=false`. CA keys must sit in a network HSM (PKCS#11 remote, Vault, Azure) when running HA; on packages, set `HSM_AUTO_INIT=false` too.
 - **Certificate files** mirrored by renewals and session file cleanup, which run on the leader only.
-- **The self-signed HTTPS certificate** of each node, when no certificate was provided.
+- **The self-signed HTTPS certificate** of each node, as long as none was applied or regenerated from the web interface. Once one is, every node writes it from the database before it starts (see [ADMIN_GUIDE.md](ADMIN_GUIDE.md), HA mode).
 
 ## Refused in HA mode today
 
@@ -91,7 +91,6 @@ These operations answer `409` with code `ha_mode`, because they only change the 
 - enabling and disabling encryption, and encrypting all keys: the key is shared through `KEY_ENCRYPTION_KEY`;
 - secret rotation (it writes `ucm.env`);
 - installing an update from the web interface;
-- HTTPS certificate regeneration and apply (files on one node);
 - backup restore, both from System and from Settings (restored files land on one node).
 
 ## Upgrading

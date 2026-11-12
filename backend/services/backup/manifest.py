@@ -539,6 +539,8 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'scheduler_requests': 'pending run-now requests of one cluster: runtime state, never restored',
     'cluster_commands': 'HA reload and restart queue of one cluster: runtime state, never restored',
     'websocket_relay': 'WebSocket events waiting minutes for the web workers: runtime state, never restored',
+    'shared_files': ('the Kerberos keytab and the HTTPS pair each node writes to disk: '
+                     'node files, which archives never carried'),
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',
 }

@@ -10,7 +10,7 @@ services/kerberos/negotiate_auth.py for the actual HTTP Negotiate handshake.
 import logging
 import os
 
-from flask import Blueprint, request
+from flask import Blueprint, g, request
 
 from auth.unified import require_auth
 from models import db, SystemConfig
@@ -142,6 +142,16 @@ def upload_kerberos_keytab():
         return error_response(
             f"Keytab is not a valid krb5 keytab: {inspection['error']}", 400
         )
+
+    # The database holds the keytab every node writes; reload_keytab reaches the others (HA)
+    from services import cluster_commands, shared_files
+    user = getattr(g, 'current_user', None)
+    shared_files.store_file(shared_files.KERBEROS_KEYTAB, file_content,
+                     actor=getattr(user, 'username', None))
+    cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
+    ok, _err = safe_commit(logger, "Failed to store Kerberos keytab")
+    if not ok:
+        return _err
 
     try:
         negotiate_auth.sync_keytab_file(file_content)

@@ -977,6 +977,10 @@ def create_app(config_name=None):
     except Exception as e:
         app.config['SAFE_MODE'] = False
         app.logger.warning(f"Safe mode check skipped: {e}")
+
+    # After the master key: the keytab is stored under it and written from the database
+    from services.kerberos.negotiate_auth import restore_keytab_at_start
+    restore_keytab_at_start(app)
     
     # HSM availability check at startup
     try:

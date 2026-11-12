@@ -12,11 +12,11 @@ import os
 from pathlib import Path
 
 from utils.datetime_utils import utc_now
-from utils.key_codec import load_pem_bytes
 
 logger = logging.getLogger(__name__)
 
-BOUND_REFID_KEY = 'https_bound_certificate_refid'
+# boot_config reads them before the application exists
+from boot_config import HTTPS_BOUND_KEY as BOUND_REFID_KEY, HTTPS_CHAIN_KEY as CHAIN_KEY  # noqa: E402
 
 
 def _paths():
@@ -51,35 +51,42 @@ def with_ca_chain(cert, cert_text: str) -> str:
     return cert_text
 
 
-def materialize_https_cert(cert) -> None:
-    """Write cert+key (+CA chain) to the HTTPS file pair. Raises on failure."""
-    import shutil
+def https_key_pem(cert) -> str:
+    """The certificate's private key as PEM text; raises ValueError when it cannot be read."""
+    from boot_config import HttpsMaterialError, _key_text
+    try:
+        return _key_text(cert.prv, f"certificate {cert.id}")
+    except HttpsMaterialError as e:
+        raise ValueError(str(e)) from None
+
+
+def materialize_https_cert(cert) -> str:
+    """Write cert+key (+CA chain) to the HTTPS file pair and return the certificate text.
+
+    Raises on failure, leaving both files as they were.
+    """
+    from boot_config import write_https_pair
 
     cert_path, key_path = _paths()
+    key_data = https_key_pem(cert)
+    full_cert = with_ca_chain(cert, _decode(cert.crt))
+    write_https_pair(cert_path, key_path, full_cert, key_data,
+                     backup_suffix=utc_now().strftime('%Y%m%d_%H%M%S'))
+    return full_cert
 
-    backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
-    if cert_path.exists():
-        shutil.copy(cert_path, f"{cert_path}.backup-{backup_suffix}")
-    if key_path.exists():
-        shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
 
-    cert_data = _decode(cert.crt)
-    key_data = load_pem_bytes(
-        cert.prv, context=f"certificate {cert.id}"
-    ).decode('utf-8')
+def _set_config(key, value, description):
+    from models import SystemConfig, db
+    row = SystemConfig.query.filter_by(key=key).first()
+    if not row:
+        row = SystemConfig(key=key, description=description)
+        db.session.add(row)
+    row.value = value
 
-    full_cert = with_ca_chain(cert, cert_data)
 
-    cert_path.write_text(full_cert)
-    key_path.write_text(key_data)
-    os.chmod(key_path, 0o600)
-    try:
-        import pwd
-        ucm_user = pwd.getpwnam('ucm')
-        os.chown(cert_path, ucm_user.pw_uid, ucm_user.pw_gid)
-        os.chown(key_path, ucm_user.pw_uid, ucm_user.pw_gid)
-    except (KeyError, ImportError):
-        pass
+def remember_chain(full_cert):
+    """The certificate text every node writes at its next start (caller commits)."""
+    _set_config(CHAIN_KEY, full_cert or '', 'HTTPS certificate chain written with the binding')
 
 
 def get_bound_refid():
@@ -88,14 +95,17 @@ def get_bound_refid():
     return (row.value or '').strip() if row and row.value else ''
 
 
-def set_bound_refid(refid):
-    from models import SystemConfig, db
-    row = SystemConfig.query.filter_by(key=BOUND_REFID_KEY).first()
-    if not row:
-        row = SystemConfig(key=BOUND_REFID_KEY,
-                           description='Certificate bound to the HTTPS listener')
-        db.session.add(row)
-    row.value = refid or ''
+def set_bound_refid(refid, chain=None):
+    """Bind *refid* (or nothing) with the certificate text written for it, and commit.
+
+    A new binding replaces a regenerated self-signed pair stored for the cluster.
+    """
+    from models import db
+    from services import shared_files
+    _set_config(BOUND_REFID_KEY, refid or '', 'Certificate bound to the HTTPS listener')
+    remember_chain(chain if refid else '')
+    if refid:
+        shared_files.drop_file(shared_files.HTTPS_GENERATED)
     # Any rebinding settles a renewal the binding could not follow
     from services.binding_attention import clear_https
     clear_https()
@@ -169,6 +179,29 @@ def backfill_legacy_https_binding():
     return ''
 
 
+def backfill_chain():
+    """A binding stored without its certificate text (before 3.0, or a renewal that could not
+    store it) gets it now, so a node starting without the files writes the whole chain."""
+    from boot_config import _first_certificate
+    from models import Certificate, SystemConfig, db
+    refid = get_bound_refid()
+    if not refid:
+        return
+    cert = Certificate.query.filter_by(refid=refid).first()
+    if not cert or not cert.crt:
+        return
+    leaf = _decode(cert.crt)
+    row = SystemConfig.query.filter_by(key=CHAIN_KEY).first()
+    if row and row.value and _first_certificate(row.value) == _first_certificate(leaf):
+        return
+    try:
+        remember_chain(with_ca_chain(cert, leaf))
+        db.session.commit()
+    except Exception as exc:  # another process of the cluster stored it first
+        db.session.rollback()
+        logger.warning(f"HTTPS certificate chain not stored: {type(exc).__name__}")
+
+
 def on_certificate_renewed(event_type, payload, ca_refid, meta):
     """Event-bus subscriber: re-materialize the bound HTTPS certificate.
 
@@ -189,14 +222,10 @@ def on_certificate_renewed(event_type, payload, ca_refid, meta):
                 "HTTPS-bound certificate %s renewed but unusable "
                 "(missing cert or key). HTTPS files left untouched", refid)
             return
-        from utils.ha import ha_enabled
-        # HA: no rolling restart until every node writes the files itself
-        if ha_enabled():
-            logger.warning(
-                "bound HTTPS certificate %s renewed, files not re-materialized and "
-                "no restart (HA: the other nodes would restart on their old files)", refid)
-            return
-        materialize_https_cert(cert)
+        full_cert = materialize_https_cert(cert)
+        from models import db
+        remember_chain(full_cert)
+        db.session.commit()
         logger.info(
             "HTTPS-bound certificate %s renewed, re-materialized, "
             "restarting the service", refid)
@@ -207,14 +236,31 @@ def on_certificate_renewed(event_type, payload, ca_refid, meta):
             details='HTTPS certificate re-materialized after renewal',
             success=True,
         )
-        if os.getenv('UCM_DOCKER') == '1' or os.path.exists('/.dockerenv'):
+        started, message = restart_to_serve()
+        if started is None:
             logger.warning("Running in Docker: restart the container to load "
                            "the renewed HTTPS certificate")
-            return
-        from utils.service_manager import restart_service
-        restart_service()
+        elif not started:
+            logger.error(f"HTTPS certificate renewed but not served yet: {message}")
     except Exception as exc:  # never break the renewal itself
+        try:
+            from models import db
+            db.session.rollback()
+        except Exception:
+            pass
         logger.error(f"HTTPS re-materialization after renewal failed: {exc}")
+
+
+def restart_to_serve():
+    """``(started, message)`` after the HTTPS files changed; ``started`` is None when the
+    container must be restarted by hand. HA: a rolling restart, each node writes the files
+    from the database as it starts."""
+    from config.settings import is_docker
+    from utils.ha import ha_enabled
+    if not ha_enabled() and is_docker():
+        return None, "Restart the container to apply."
+    from utils.service_manager import restart_service
+    return restart_service()
 
 
 def apply_bound_now(refid):
@@ -229,4 +275,8 @@ def register_https_binding_subscriber(app):
     event_bus.subscribe('certificate.renewed', on_certificate_renewed)
     with app.app_context():
         backfill_legacy_https_binding()
+        try:
+            backfill_chain()
+        except Exception as exc:
+            logger.warning(f"Could not check the stored HTTPS certificate chain: {exc}")
     register_https_binding_subscriber._done = True
