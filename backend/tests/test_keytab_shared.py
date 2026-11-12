@@ -140,3 +140,38 @@ def test_start_without_the_master_key_keeps_the_file(app, keytab_on, encryption_
         patch.setattr(encryption_enabled.key_encryption, '_enabled', False)
         negotiate_auth.restore_keytab_at_start(app)
     assert path.read_bytes() == b'previous keytab'
+
+
+def test_encrypt_all_and_decrypt_all_cover_the_stored_keytab(app, keytab_on, encryption_enabled, monkeypatch):
+    import base64
+    from models import SharedFile, db
+    enc = encryption_enabled
+    # Only this row: the shared database holds other tests' keys under other keys
+    every = enc.master_key_values
+    monkeypatch.setattr(enc, 'master_key_values', lambda: (
+        v for v in every() if isinstance(v[1], SharedFile) and v[1].name == shared_files.KERBEROS_KEYTAB))
+    plain = base64.b64encode(KEYTAB).decode()
+    with app.app_context():
+        db.session.add(SharedFile(name=shared_files.KERBEROS_KEYTAB, content=plain))
+        db.session.commit()
+        assert [label for label, *_ in enc.master_key_values()] == [f'SharedFile {shared_files.KERBEROS_KEYTAB}']
+        assert enc.encrypt_all_keys(dry_run=False)[0] == 1
+    content = _stored_content(app)
+    assert enc.key_encryption.is_encrypted(content)
+    with app.app_context():
+        assert shared_files.read_file(shared_files.KERBEROS_KEYTAB) == KEYTAB
+        assert enc.decrypt_all_keys(dry_run=False) == (1, 0, [])
+    assert _stored_content(app) == plain
+
+
+def test_an_unencrypted_stored_keytab_is_reported(app, keytab_on, encryption_enabled, monkeypatch):
+    import base64
+    from models import SharedFile, db
+    enc = encryption_enabled
+    with app.app_context():
+        db.session.add(SharedFile(name=shared_files.KERBEROS_KEYTAB, content=base64.b64encode(KEYTAB).decode()))
+        db.session.commit()
+        monkeypatch.setattr(enc, 'MASTER_KEY_COLUMNS', tuple(
+            c for c in enc.MASTER_KEY_COLUMNS if c[1] == 'SharedFile'))
+        monkeypatch.setattr(enc, '_is_master_key_config', lambda key: False)
+        assert enc.has_unencrypted_master_key_values()
