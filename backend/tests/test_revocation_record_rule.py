@@ -1153,6 +1153,24 @@ class TestARecordedHoldIsShownAndLifted:
         with app.app_context():
             assert db.session.get(RevokedSerial, record_id) is not None
 
+    def test_a_final_row_is_refused_as_a_final_record_is(self, app, auth_client, issuer):
+        """One refusal, one code: the row's own final reason answers as the record's does."""
+        _, row_by_record, _ = self._recorded(app, issuer, 'final-by-record.example.test',
+                                             reason='keyCompromise')
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('final-by-row.example.test', ca_cert, ca_key)
+        row_by_row = _store(app, real, refid, key=key)
+        with app.app_context():
+            row = db.session.get(Certificate, row_by_row)
+            row.revoked, row.revoke_reason, row.revoked_at = True, 'keyCompromise', EARLY
+            db.session.commit()
+        answers = [auth_client.post(f'/api/v2/certificates/{i}/unhold') for i in (row_by_record, row_by_row)]
+        assert [r.status_code for r in answers] == [409, 409], [r.data for r in answers]
+        messages = [r.get_json()['message'] for r in answers]
+        assert messages == [f'Certificate "{n}" is revoked for good (keyCompromise): its hold cannot be lifted'
+                            for n in ('CN=final-by-record.example.test', 'CN=final-by-row.example.test')]
+        assert _row(app, row_by_row) == (True, 'keyCompromise', EARLY)
+
     def test_a_certificate_nothing_revokes_is_not_revoked(self, app, auth_client, issuer):
         """Non-regression: passes before and after the change."""
         _, refid, ca_cert, ca_key = issuer
