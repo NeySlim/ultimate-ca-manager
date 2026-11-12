@@ -12,6 +12,7 @@ tests/test_revocation*.py
 tests/test_scheduler*.py
 tests/test_cluster_nodes_pg.py
 tests/test_cluster_commands_pg.py
+tests/test_update_campaign_pg.py
 tests/test_shared_files_pg.py
 tests/test_boot_lock_pg.py
 tests/test_discovery_recovery_ha.py

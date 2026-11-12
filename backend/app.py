@@ -671,6 +671,13 @@ def create_app(config_name=None):
                 interval=3600,
                 description="Delete HA cluster commands older than 24 hours"
             )
+            from services.update_campaign import campaign_tick
+            scheduler.register_task(
+                name="update_campaign",
+                func=campaign_tick,
+                interval=60,
+                description="Move the HA rolling update to its next node"
+            )
 
         # Delivery history does not grow for ever (webhooks, deployments,
         # notifications) — every 6 hours, same cadence as the ACME purge

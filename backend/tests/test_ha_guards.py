@@ -12,7 +12,6 @@ ROUTES = [
     '/api/v2/system/security/disable-encryption',
     '/api/v2/system/security/encrypt-all-keys',
     '/api/v2/system/security/rotate-secrets',
-    '/api/v2/system/updates/install',
     '/api/v2/system/restore',
     '/api/v2/system/backup/restore',
     '/api/v2/settings/backup/restore',
@@ -52,16 +51,27 @@ def test_decorator_passes_through_without_ha(monkeypatch):
     assert c.get('/x').status_code == 409
 
 
-def test_scheduled_auto_update_skipped_in_ha(monkeypatch):
+def test_scheduled_auto_update_never_installs_locally_in_ha(app, monkeypatch):
+    """HA: the scheduled install becomes a rolling update; this node installs nothing itself."""
+    import services.update_campaign as uc
     import services.updates as updates
     monkeypatch.setattr(Config, 'HA_MODE', True)
     monkeypatch.delenv('UCM_DOCKER', raising=False)
 
     def boom(*a, **k):
-        raise AssertionError('auto-update must not proceed in HA mode')
-    monkeypatch.setattr(updates, '_cfg_get', boom)
+        raise AssertionError('no local install in HA mode')
+    started = []
+    monkeypatch.setattr(updates, 'download_update', boom)
     monkeypatch.setattr(updates, 'install_update', boom)
-    updates._auto_install({'latest_version': '99.0', 'download_url': 'http://x/p.deb'})
+    monkeypatch.setattr(updates, '_cfg_get', lambda *a, **k: None)
+    monkeypatch.setattr(updates, '_cfg_set', lambda *a, **k: True)
+    monkeypatch.setattr(updates, 'fetch_expected_sha256', lambda url, name: 'e' * 64)
+    monkeypatch.setattr(uc, 'start_campaign', lambda *a: started.append(a) or (True, 'ok', {}))
+    monkeypatch.setattr(uc, 'campaign_tick', lambda: None)
+    with app.app_context():
+        updates._auto_install({'latest_version': '99.0', 'download_url': 'http://x/p.deb',
+                               'package_name': 'p.deb', 'checksum_url': 'http://x/p.sha256'})
+    assert started == [('99.0', 'http://x/p.deb', 'p.deb', 'e' * 64, 'scheduler')]
 
 
 def test_service_restart_in_ha_is_a_rolling_restart_even_in_a_container(auth_client, monkeypatch):

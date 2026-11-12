@@ -34,6 +34,25 @@ if not _ca_bundle:
 # GitHub repo
 REPO = "NeySlim/ultimate-ca-manager"
 
+# The image sets UCM_DOCKER=1; the Helm chart runs the same image, so Kubernetes is covered
+CONTAINER_HA_REFUSAL = ("In HA mode on Docker or Kubernetes the orchestrator updates the nodes: "
+                        "roll the new image (docker compose pull, helm upgrade)")
+
+
+def is_container_install():
+    return os.getenv('UCM_DOCKER') == '1'
+
+
+def versions_match(detected, target):
+    """Same version once the packaging transforms are undone: DEB/RPM ship 2.215-rc1 as
+    2.215~rc1, and a package revision ('-1') may be appended."""
+    d = (detected or '').replace('~', '-').strip()
+    t = (target or '').replace('~', '-').strip()
+    if not d or not t:
+        return False
+    base = re.sub(r'-\d+$', '', d)
+    return d == t or base == t
+
 # Simple cache to avoid GitHub rate limits (5 min TTL)
 _releases_cache = {'data': None, 'ts': 0, 'ttl': 300}
 
@@ -262,7 +281,7 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
         package_name = None
         
         # Detect package type (deb takes priority over rpm if both exist)
-        is_docker = os.getenv('UCM_DOCKER') == '1'
+        is_docker = is_container_install()
         is_deb = os.path.exists('/usr/bin/dpkg')
         is_rpm = os.path.exists('/usr/bin/rpm') and not is_deb
         
@@ -522,24 +541,13 @@ def consume_update_result():
     }
     actor = data.get('initiated_by') or 'system'
 
-    def _version_matches(detected, target):
-        # Tolerate the packaging transforms (review S-01): the prerelease
-        # separator '-' becomes '~' in DEB/RPM versions (2.215-rc1 ships as
-        # 2.215~rc1), and a package revision ('-1') may be appended.
-        d = (detected or '').replace('~', '-').strip()
-        t = (target or '').replace('~', '-').strip()
-        if not d or not t:
-            return False
-        base = re.sub(r'-\d+$', '', d)
-        return d == t or base == t
-
     # Independent backend check on top of the watcher's own verification:
     # 'installed' additionally requires the recorded installed_version to
     # match the target — a watcher result claiming success without a
     # matching version is downgraded to a failure.
     verified = (
         data.get('status') == 'installed'
-        and _version_matches(data.get('installed_version'), data.get('to_version'))
+        and versions_match(data.get('installed_version'), data.get('to_version'))
     )
     if data.get('status') == 'installed' and not verified:
         data['status'] = 'failed'
@@ -701,11 +709,11 @@ def _auto_install(result):
     from services.audit_service import AuditService
 
     latest = result['latest_version']
-    if os.getenv('UCM_DOCKER') == '1' or not result.get('download_url'):
+    if is_container_install():
+        logger.info(f"Auto-update to {latest} not installed: in Docker or Kubernetes "
+                    f"the orchestrator updates the image")
         return
-    from utils.ha import ha_enabled
-    if ha_enabled():
-        logger.info("Auto-update skipped: not available in HA mode")
+    if not result.get('download_url'):
         return
     if _cfg_get(_ATTEMPTED_VERSION_KEY) == latest:
         return  # one attempt per version — no overnight crash loops
@@ -733,6 +741,17 @@ def _auto_install(result):
         return refuse(f'checksum fetch failed ({e})')
     if not expected:
         return refuse('checksum asset does not cover this package')
+
+    from utils.ha import ha_enabled
+    if ha_enabled():
+        # Each node downloads and verifies the package itself, in turn
+        from services import update_campaign
+        started, message, _ = update_campaign.start_campaign(
+            latest, result['download_url'], result['package_name'], expected, 'scheduler')
+        if not started:
+            return refuse(message)
+        update_campaign.campaign_tick()
+        return
 
     try:
         package_path = download_update(
