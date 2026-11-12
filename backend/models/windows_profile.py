@@ -20,7 +20,8 @@ class WindowsEnrollmentProfile(db.Model):
     realm = db.Column(db.String(255), unique=True, nullable=True)
     is_default = db.Column(db.Boolean, nullable=False, default=False)
     enabled = db.Column(db.Boolean, nullable=False, default=True)
-    # The API refuses to delete a connector in use (deletion_blockers); the database only unlinks
+    # No route deletes a connector; a replacing restore refuses to remove one a profile names
+    # (connector_deletion_blockers). SET NULL holds on PostgreSQL only: SQLite enforces no key
     connector_id = db.Column(db.Integer, db.ForeignKey('ad_connector_config.id', ondelete='SET NULL'),
                              nullable=True)
     # Refids as the 2.x settings held them; deletion_blockers keeps a used CA in place

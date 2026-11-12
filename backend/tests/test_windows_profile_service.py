@@ -698,3 +698,68 @@ def test_a_converted_realm_the_keytab_here_lacks_is_reported(app, clean_slate, t
     archive, _connector = _2x_archive(app, _settings_2x(issuing, policy))
     results = _restore(app, archive)
     assert any('C01.EXAMPLE' in w and 'EXAMPLE.TEST' in w for w in results['warnings']), results['warnings']
+
+
+@pytest.fixture
+def own_connector(app):
+    """A connector of this test and the default profile using it; the shared row is untouched."""
+    with app.app_context():
+        connector = ADConnectorConfig(name='c01-replace-connector', server='dc.replace.example',
+                                      base_dn='DC=replace,DC=example', enabled=True)
+        db.session.add(connector)
+        db.session.flush()
+        db.session.add(WindowsEnrollmentProfile(name='default', is_default=True, realm='REPLACE.EXAMPLE',
+                                                connector_id=connector.id))
+        db.session.commit()
+        connector_id = connector.id
+    yield connector_id
+    with app.app_context():
+        WindowsEnrollmentProfile.query.filter_by(connector_id=connector_id).update({'connector_id': None})
+        ADConnectorConfig.query.filter_by(id=connector_id).delete()
+        db.session.commit()
+
+
+def _replace_with(app, sections, edit):
+    """A replacing restore of an archive of *sections* from here, *edit* applied to its payload."""
+    from services.backup_service import BackupService
+    from tests.backup_v3 import as_v3
+    with app.app_context():
+        include = {name: name in sections for name in manifest.SECTIONS}
+        blob = BackupService().create_backup(BACKUP_PASSWORD, include=include)
+    archive = as_v3(blob, BACKUP_PASSWORD, edit=edit)
+    with app.app_context():
+        return BackupService().restore_backup(archive, BACKUP_PASSWORD, mode='replace')
+
+
+def _without_connector(name):
+    def edit(payload):
+        payload['ad_connector'] = [r for r in payload['ad_connector'] if r.get('name') != name]
+        payload['metadata'].pop('section_digests', None)
+        payload['metadata']['sections']['ad_connector'] = len(payload['ad_connector'])
+    return edit
+
+
+@pytest.mark.parametrize('sections', [('ad_connector',), ('ad_connector', 'windows_enrollment_profiles')],
+                         ids=['profiles-not-carried', 'profiles-carried'])
+def test_a_replacing_restore_keeps_a_connector_a_profile_still_uses(app, clean_slate, own_connector, sections):
+    """A connector the restore would remove while a profile it keeps or restores still names it:
+    refused, never a profile with a dangling connector nor one that silently lost it."""
+    from services.backup.restore.conflict import RestoreConflictError
+    with pytest.raises(RestoreConflictError) as refused:
+        _replace_with(app, sections, _without_connector('c01-replace-connector'))
+    assert 'removes ad_connector name=c01-replace-connector' in str(refused.value)
+    with app.app_context():
+        assert db.session.get(ADConnectorConfig, own_connector) is not None
+        assert _default().connector_id == own_connector
+
+
+def test_a_replacing_restore_removes_a_connector_no_profile_uses(app, clean_slate, own_connector):
+    def edit(payload):
+        _without_connector('c01-replace-connector')(payload)
+        for row in payload['windows_enrollment_profiles']:
+            row['connector_id'] = None
+            row.pop('connector_id_ref', None)
+    _replace_with(app, ('ad_connector', 'windows_enrollment_profiles'), edit)
+    with app.app_context():
+        assert db.session.get(ADConnectorConfig, own_connector) is None
+        assert _default().connector_id is None
