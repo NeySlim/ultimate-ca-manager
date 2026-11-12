@@ -321,3 +321,48 @@ def test_in_ha_a_per_node_task_runs_on_every_node_and_a_leader_task_on_one(sched
     time.sleep(0.3)
     assert runs[(0, 'local')] == 1 and runs[(1, 'local')] == 1
     assert runs.get((0, 'cluster'), 0) + runs.get((1, 'cluster'), 0) == 1
+
+
+def test_a_running_per_node_task_does_not_delay_a_follower_takeover(sched, monkeypatch):
+    # The follower keeps retrying the lock and writing its heartbeat while a per-node task runs
+    monkeypatch.setattr(scheduler_service, '_ha', lambda: True)
+    monkeypatch.setattr(_OneOwnerLock, 'owner', None)
+    for name in ('_publish_state', '_took_leadership'):
+        monkeypatch.setattr(SchedulerService, name, lambda self, *a, **k: None)
+    monkeypatch.setattr(SchedulerService, '_take_requests', lambda self: [])
+    monkeypatch.setattr(SchedulerService, '_has_requests', lambda self: False)
+
+    def kept_lock(self):
+        # Kept like the PostgreSQL one, so stopping the leader releases it
+        if self._leader_lock is None:
+            self._leader_lock, self._leader_lock_pid = _OneOwnerLock(self), os.getpid()
+        return self._leader_lock
+    monkeypatch.setattr(SchedulerService, '_singleton_lock', kept_lock)
+    beats = []
+    monkeypatch.setattr(SchedulerService, '_heartbeat',
+                        lambda self, force=False: beats.append(self))
+    leader, follower = sched(), sched()
+    release, started, runs = threading.Event(), threading.Event(), []
+
+    def slow():
+        runs.append(1)
+        started.set()
+        release.wait(5)
+    leader.wake_interval = follower.wake_interval = 0.05
+    leader.start()
+    assert _wait(lambda: _OneOwnerLock.owner is leader)
+    follower.register_task('local', slow, interval=3600, per_node=True)
+    follower.tasks['local']._created_at -= timedelta(seconds=60)
+    follower.start()
+    try:
+        assert started.wait(2)
+        before = beats.count(follower)
+        leader.stop(timeout=5)
+        assert _wait(lambda: _OneOwnerLock.owner is follower, timeout=1.0)
+        assert _wait(lambda: beats.count(follower) > before + 2, timeout=1.0)
+        assert not release.is_set() and runs == [1]
+    finally:
+        release.set()
+    # The task the node thread still ran is not started again by the new leader
+    time.sleep(0.3)
+    assert runs == [1]

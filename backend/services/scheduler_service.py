@@ -100,6 +100,8 @@ class ScheduledTask:
         # One extra run asked by the last one (a lease held elsewhere): a later ask replaces it
         self.retry_at: Optional[datetime] = None
         self._created_at = utc_now()
+        # Held for a run: the follower's node thread and the leader loop never run it at once
+        self._run_lock = threading.Lock()
     
     def should_run(self) -> bool:
         """Check if task should run based on interval"""
@@ -181,6 +183,7 @@ class SchedulerService:
         self._lock_error_logged = False
         self._publish_error_logged = False
         self._wake = threading.Event()
+        self._node_thread: Optional[threading.Thread] = None
         logger.info(f"SchedulerService initialized (wake interval: {wake_interval}s)")
     
     def register_task(
@@ -469,6 +472,10 @@ class SchedulerService:
         Args:
             task: ScheduledTask to execute
         """
+        with task._run_lock:
+            self._run_task_once(task)
+
+    def _run_task_once(self, task: ScheduledTask) -> None:
         start_time = time.time()
         try:
             logger.debug(f"Running task '{task.name}'")
@@ -605,7 +612,7 @@ class SchedulerService:
                 self._heartbeat(force=lost)
                 if not self._owns_lock:
                     if _ha():
-                        self._run_node_tasks()
+                        self._start_node_tasks()
                     self._wake.wait(LOCK_RETRY_SECONDS)
                     continue
                 try:
@@ -614,6 +621,7 @@ class SchedulerService:
                         tasks_to_run = requested + [
                             task for task in self.tasks.values()
                             if task.should_run() and task not in requested
+                            and not task._run_lock.locked()
                         ]
 
                     # Execute tasks outside of lock
@@ -641,12 +649,24 @@ class SchedulerService:
             self._release_lock()
             self._heartbeat(force=True)
 
+    def _start_node_tasks(self) -> None:
+        """HA follower: due per-node tasks run in their own thread, so the loop keeps
+        retrying the lock and writing the heartbeat meanwhile."""
+        if self._node_thread is not None and self._node_thread.is_alive():
+            return
+        with self.tasks_lock:
+            if not any(task.per_node and task.should_run() for task in self.tasks.values()):
+                return
+        self._node_thread = threading.Thread(target=self._run_node_tasks, daemon=True,
+                                             name="SchedulerNodeTasks")
+        self._node_thread.start()
+
     def _run_node_tasks(self) -> None:
-        """HA follower: the per-node tasks due on this node; the leader runs them with the rest."""
+        """The per-node tasks due on this follower; once leader, the loop runs them with the rest."""
         with self.tasks_lock:
             due = [task for task in self.tasks.values() if task.per_node and task.should_run()]
         for task in due:
-            if not self._running:
+            if not self._running or self._owns_lock:
                 break
             try:
                 self._run_task(task)
@@ -854,6 +874,8 @@ class SchedulerService:
             if self._thread.is_alive():
                 logger.warning(f"Scheduler thread did not stop within {timeout}s")
                 return False
+        if self._node_thread is not None and self._node_thread.is_alive():
+            self._node_thread.join(timeout=timeout)
 
         self._release_lock()
         logger.info("Scheduler stopped")
