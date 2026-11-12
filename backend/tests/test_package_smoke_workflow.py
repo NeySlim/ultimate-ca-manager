@@ -30,7 +30,12 @@ def _built_packages(build):
         for step in job.get('steps', []):
             if str(step.get('uses', '')).startswith('actions/upload-artifact'):
                 paths += str(step.get('with', {}).get('path', '')) + '\n'
-        globs = [g.strip() for g in paths.split() if g.strip().endswith(('.deb', '.rpm'))]
+        tokens = [g.strip() for g in paths.splitlines() if g.strip()]
+        # Checksums and Docker digests are the only non-package uploads; anything else could hide a package.
+        stray = [t for t in tokens if not t.endswith(('.deb', '.rpm', '.sha256')) and '/digests/' not in t]
+        if stray:
+            raise AssertionError(f'{name}: uploads {stray} without a .deb/.rpm suffix')
+        globs = [t for t in tokens if t.endswith(('.deb', '.rpm'))]
         matrix = job.get('strategy', {}).get('matrix', {}).get('include', [])
         for g in globs:
             if g.endswith('.deb'):
@@ -105,6 +110,18 @@ def test_an_rpm_job_without_matrix_include_is_refused(matrix):
         _built_packages(_rpm_job_with_matrix(matrix))
 
 
+@pytest.mark.parametrize('path', ['dist/', 'out', 'dist/*'])
+def test_a_job_uploading_a_directory_is_refused(path):
+    build = copy.deepcopy(_load('build-release.yml'))
+    job = copy.deepcopy(build['jobs']['build-deb'])
+    for step in job['steps']:
+        if str(step.get('uses', '')).startswith('actions/upload-artifact'):
+            step['with']['path'] = path
+    build['jobs']['build-deb-dir'] = job
+    with pytest.raises(AssertionError, match='build-deb-dir'):
+        _built_packages(build)
+
+
 def test_the_deb_is_smoked_on_debian_and_ubuntu():
     images = {img for p, img in _smoked() if fnmatch.fnmatch('ucm_2.1_all.deb', p)}
     assert {'debian:13', 'ubuntu:24.04', 'ubuntu:26.04'} <= images
@@ -124,31 +141,70 @@ def test_script_passes_shellcheck():
     assert subprocess.run(['shellcheck', '-s', 'sh', str(SCRIPT)]).returncode == 0
 
 
-def _stubbed_run(tmp_path, kind, sudo_present, su_present=True):
-    """Run the script against stub commands; returns (ordered command log, completed process)."""
+SMOKE_VARS = ('UCM_SMOKE_HOME', 'UCM_SMOKE_ENV_FILE', 'UCM_SMOKE_RUN_DIR', 'UCM_SMOKE_SUDOERS_DIR')
+
+
+def _assert_sandboxed(env, tmp_path):
+    """Refuse to run the script unless every path it writes is under tmp_path."""
+    for var in SMOKE_VARS:
+        value = env.get(var)
+        assert value, f'{var} is not set: the script would use the real default path'
+        assert pathlib.Path(value).resolve().is_relative_to(tmp_path.resolve()), \
+            f'{var}={value} is outside {tmp_path}'
+
+
+def _stubbed_run(tmp_path, kind, sudo_present, su_present=True, install_ok=False, env_extra=None,
+                 deps_ok=True, safe_mode=False, health_down=False):
+    """Run the script against stub commands; returns (ordered command log, completed process).
+
+    Every path variable points under tmp_path and su, chown and the venv interpreter are stubs.
+    """
     bin_dir = tmp_path / 'bin'
     bin_dir.mkdir()
     log = tmp_path / 'log'
+    home = tmp_path / 'opt-ucm'
+    env = {'PATH': f'{bin_dir}', 'UCM_SMOKE_HOME': str(home), 'UCM_SMOKE_ENV_FILE': str(tmp_path / 'ucm.env'),
+           'UCM_SMOKE_RUN_DIR': str(tmp_path / 'run'),
+           'UCM_SMOKE_SUDOERS_DIR': str(tmp_path / 'sudoers.d'), 'SMOKE_WAIT': '3', 'LOGFILE': str(log)}
+    env.update(env_extra or {})
+    _assert_sandboxed(env, tmp_path)
     def stub(name, body):
         f = bin_dir / name
         f.write_text('#!/bin/sh\n' + body + '\n')
         f.chmod(0o755)
-    for tool in ('tr', 'rm', 'cat', 'tail', 'mkdir', 'chown', 'sleep', 'kill'):
+    for tool in ('tr', 'rm', 'cat', 'tail', 'mkdir', 'sleep', 'date'):
         (bin_dir / tool).symlink_to(shutil.which(tool))  # no host sudo on the PATH
+    # kill is a shell builtin: the only pid it can reach is the su stub's own sleep child.
+    stub('chown', f'echo "chown $*" >> {log}')
     stub('id', 'echo 0')
     stub('dpkg-deb', 'echo 1.0')
     stub('rpm', 'echo 1.0')
-    stub('apt-get', f'echo "apt-get $*" >> {log}; exit 1')
-    stub('dnf', f'echo "dnf $*" >> {log}; exit 1')
+    install_rc = 0 if install_ok else 1
+    check_rc = 0 if deps_ok else 1
+    stub('apt-get', f'[ "$1" = check ] && exit {check_rc}; echo "apt-get $*" >> {log}; exit {install_rc}')
+    stub('dnf', f'[ "$1" = check ] && exit {check_rc}; echo "dnf $*" >> {log}; exit 1')
     stub('dpkg', f'echo "dpkg $*" >> {log}; rm -f {bin_dir}/sudo')
     if sudo_present:
         stub('sudo', 'exit 0')
     if su_present:
-        stub('su', 'exit 1')
+        # Success: "start" the app as a sleeping child whose pid lands in the pid file.
+        stub('su', f'echo "su $*" >> {log}\n'
+             'case "$*" in *gunicorn*) sleep 30 & echo $! > "$UCM_SMOKE_RUN_DIR/pid"; wait;; esac\n'
+             f'exit {0 if install_ok else 1}')
+    if install_ok:
+        (home / 'venv' / 'bin').mkdir(parents=True)
+        (home / 'backend').mkdir()
+        py = home / 'venv' / 'bin' / 'python'
+        py.write_text('#!/bin/sh\n'
+                      f'echo "python $*" >> {log}\n'
+                      'case "$2" in *urlopen*) ' + ('exit 1' if health_down else '[ -s "$UCM_SMOKE_RUN_DIR/pid" ] || exit 1; echo ok') + ';; '
+                      f'*safe_mode*) echo {safe_mode};; *version*) echo 1.0;; esac\n')
+        py.chmod(0o755)
+        (tmp_path / 'ucm.env').write_text('HTTPS_PORT=18443\n')
     pkg = tmp_path / f'ucm.{kind}'
     pkg.write_text('x')
-    proc = subprocess.run(['/bin/sh', str(SCRIPT), str(pkg)], env={'PATH': f'{bin_dir}'},
-                          capture_output=True, text=True, cwd=tmp_path)
+    proc = subprocess.run(['/bin/sh', str(SCRIPT), str(pkg)], env=env,
+                          capture_output=True, text=True, cwd=tmp_path, timeout=60)
     return (log.read_text().splitlines() if log.exists() else []), proc
 
 
@@ -173,3 +229,56 @@ def test_an_rpm_image_without_su_gets_util_linux_first(tmp_path):
     calls, proc = _stubbed_run(tmp_path, 'rpm', sudo_present=False, su_present=False)
     assert calls == ['dnf install -y -q util-linux']
     assert proc.returncode == 2 and 'su is missing' in proc.stdout
+
+
+def test_the_guard_refuses_a_path_outside_tmp_path(tmp_path):
+    for var in SMOKE_VARS:
+        (tmp_path / var).mkdir()
+        with pytest.raises(AssertionError, match=var):
+            _stubbed_run(tmp_path / var, 'deb', sudo_present=False, env_extra={var: '/opt/ucm'})
+        assert not (tmp_path / var / 'log').exists()
+
+
+def test_the_guard_refuses_an_unset_path_variable(tmp_path):
+    with pytest.raises(AssertionError, match='UCM_SMOKE_RUN_DIR'):
+        _assert_sandboxed({'UCM_SMOKE_HOME': str(tmp_path), 'UCM_SMOKE_ENV_FILE': str(tmp_path)}, tmp_path)
+
+
+def test_a_succeeding_install_stays_under_tmp_path(tmp_path):
+    calls, proc = _stubbed_run(tmp_path, 'deb', sudo_present=False, install_ok=True)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+    assert 'package smoke passed' in proc.stdout
+    assert any(c.startswith('su ') for c in calls) and any(c.startswith('chown ') for c in calls)
+    for line in calls:
+        for host in ('/opt/ucm', '/etc/ucm', '/tmp/ucm-'):
+            assert host not in line.replace(str(tmp_path), ''), line
+    assert (tmp_path / 'run' / 'install.log').exists() and (tmp_path / 'run' / 'app.log').exists()
+
+
+def test_a_safe_mode_health_answer_fails(tmp_path):
+    _, proc = _stubbed_run(tmp_path, 'deb', sudo_present=False, install_ok=True, safe_mode=True)
+    assert proc.returncode == 1 and 'safe_mode' in proc.stdout
+
+
+def test_the_health_wait_is_bounded_by_the_announced_delay(tmp_path):
+    import time
+    t0 = time.time()
+    _, proc = _stubbed_run(tmp_path, 'deb', sudo_present=False, install_ok=True, health_down=True)
+    assert time.time() - t0 < 3 + 4  # WAIT=3 plus at most one probe overshoot
+    assert 'within 3s' in proc.stdout and proc.returncode == 1
+
+
+def test_a_sudo_removal_that_breaks_dependencies_is_a_precondition(tmp_path):
+    calls, proc = _stubbed_run(tmp_path, 'deb', sudo_present=True, deps_ok=False)
+    assert proc.returncode == 2
+    assert 'precondition: removing sudo broke package dependencies' in proc.stdout
+    assert not any(c.startswith('apt-get') for c in calls)
+
+
+def test_a_branch_build_does_not_start_the_smoke_jobs():
+    jobs = _load('release-smoke.yml')['jobs']
+    assert jobs
+    for name, job in jobs.items():
+        cond = str(job.get('if', ''))
+        assert "workflow_dispatch" in cond, name
+        assert "startsWith(github.event.workflow_run.head_branch, 'v')" in cond, name
