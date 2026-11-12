@@ -1522,45 +1522,24 @@ def init_database(app):
     except Exception as e:
         app.logger.warning(f"Schema migration check failed (may be normal): {e}")
     
-    # Create initial admin user if none exists
-    # Use try/except to handle race conditions with multiple workers
+    # Create initial admin user if none exists (auth.initial_admin: provided or generated)
+    from auth import initial_admin
     try:
         if User.query.count() == 0:
-            admin = User(
-                username=app.config["INITIAL_ADMIN_USERNAME"],
-                email=app.config["INITIAL_ADMIN_EMAIL"],
-                role="admin",
-                active=True
-            )
-            admin.set_password(app.config["INITIAL_ADMIN_PASSWORD"])
-            from auth.password_change_gate import initial_password_needs_change
-            admin.force_password_change = initial_password_needs_change(app.config["INITIAL_ADMIN_PASSWORD"])
-            # Exempt the bootstrap admin from forced 2FA enrolment (#141) so
-            # enabling global enforcement can never lock out this account.
-            admin.totp_exempt = True
-            db.session.add(admin)
+            admin = initial_admin.seed_admin(app.config)
 
             # Add initial system config; an existing app.version is never rewritten here
-            configs = []
             if not SystemConfig.query.filter_by(key="app.version").first():
-                configs.append(SystemConfig(key="app.version", value=app.config["APP_VERSION"],
+                db.session.add(SystemConfig(key="app.version", value=app.config["APP_VERSION"],
                                             description="Application version"))
-            
-            for config in configs:
-                db.session.add(config)
-            
             db.session.commit()
-            print(f"\n[SETUP] Initial admin user created: {admin.username}")
-            if initial_password_needs_change(app.config['INITIAL_ADMIN_PASSWORD']):
-                print(f"[SETUP] Using default password - CHANGE THIS IMMEDIATELY!")
-            else:
-                print(f"[SETUP] Using custom password from INITIAL_ADMIN_PASSWORD")
-            print(f"[SETUP] Login and change password in Settings > Account\n")
+            app.logger.info(f"Initial administrator '{admin.username}' created")
     except IntegrityError:
         # Another worker already created the initial data
         db.session.rollback()
-        pass
-    
+    initial_admin.sweep(app.config)
+    initial_admin.announce(app.config)
+
     # Create system certificate templates if none exist
     try:
         from models.certificate_template import CertificateTemplate

@@ -181,7 +181,9 @@ check_ha_secret || exit 1
 # Initial Admin User (the unprefixed names, as set by older Helm charts, still count)
 : "${UCM_INITIAL_ADMIN_USERNAME:="${INITIAL_ADMIN_USERNAME:-admin}"}"
 : "${UCM_INITIAL_ADMIN_EMAIL:="${INITIAL_ADMIN_EMAIL:-admin@${UCM_FQDN}}"}"
-: "${UCM_INITIAL_ADMIN_PASSWORD:="${INITIAL_ADMIN_PASSWORD:-changeme123}"}"
+# No default password: unset, the first start generates one into /opt/ucm/data
+: "${UCM_INITIAL_ADMIN_PASSWORD:="${INITIAL_ADMIN_PASSWORD:-}"}"
+: "${UCM_INITIAL_ADMIN_PASSWORD_FILE:="${INITIAL_ADMIN_PASSWORD_FILE:-}"}"
 
 # Application
 : "${UCM_APP_VERSION:="${UCM_VERSION}"}"
@@ -327,10 +329,9 @@ SECRET_KEY=${UCM_SECRET_KEY}
 # Database
 $(ucm_env_database_line)
 
-# Initial Admin User (used on first run)
+# Initial Admin User (used on first run; its password is never written here)
 INITIAL_ADMIN_USERNAME=${UCM_INITIAL_ADMIN_USERNAME}
 INITIAL_ADMIN_EMAIL=${UCM_INITIAL_ADMIN_EMAIL}
-INITIAL_ADMIN_PASSWORD=${UCM_INITIAL_ADMIN_PASSWORD}
 
 # Application Version
 APP_VERSION=${UCM_APP_VERSION}
@@ -473,6 +474,7 @@ ucm_export_database_path
 export INITIAL_ADMIN_USERNAME="${UCM_INITIAL_ADMIN_USERNAME}"
 export INITIAL_ADMIN_EMAIL="${UCM_INITIAL_ADMIN_EMAIL}"
 export INITIAL_ADMIN_PASSWORD="${UCM_INITIAL_ADMIN_PASSWORD}"
+export INITIAL_ADMIN_PASSWORD_FILE="${UCM_INITIAL_ADMIN_PASSWORD_FILE}"
 
 # =============================================================================
 # HSM / SoftHSM AUTO-INIT

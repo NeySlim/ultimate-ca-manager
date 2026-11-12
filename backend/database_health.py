@@ -3,6 +3,7 @@ Database health check and repair
 Ensures all required tables and initial data exist
 """
 import logging
+from auth.initial_admin import InitialPasswordError
 from models import db, SystemConfig, User
 from sqlalchemy import inspect
 
@@ -40,6 +41,8 @@ def check_and_repair_database(app):
             logger.info("Database health check completed successfully")
             return True
             
+        except InitialPasswordError:
+            raise
         except Exception as e:
             logger.error(f"Database health check failed: {e}")
             return False
@@ -105,22 +108,9 @@ def ensure_admin_user(app):
             # Another worker already created a user
             return
         
-        # Create admin user
         logger.info("No users found, creating admin user")
-        admin = User(
-            username=app.config.get("INITIAL_ADMIN_USERNAME", "admin"),
-            email=app.config.get("INITIAL_ADMIN_EMAIL", "admin@example.com"),
-            role="admin",
-            active=True
-        )
-        from auth.password_change_gate import DEFAULT_INITIAL_PASSWORD, initial_password_needs_change
-        initial_password = app.config.get("INITIAL_ADMIN_PASSWORD", DEFAULT_INITIAL_PASSWORD)
-        admin.set_password(initial_password)
-        admin.force_password_change = initial_password_needs_change(initial_password)
-        # Exempt the bootstrap admin from forced 2FA enrolment (#141) so
-        # enabling global enforcement can never lock out this account.
-        admin.totp_exempt = True
-        db.session.add(admin)
+        from auth.initial_admin import seed_admin
+        admin = seed_admin(app.config)  # provided or generated, never a default
         db.session.commit()
         logger.info(f"✓ Admin user created: {admin.username}")
         
@@ -130,6 +120,9 @@ def ensure_admin_user(app):
         db.session.rollback()
         # Silent - this is expected behavior, not an error
         
+    except InitialPasswordError:
+        db.session.rollback()
+        raise  # the start fails with its reason; no account gets a password nobody knows
     except Exception as e:
         logger.error(f"Unexpected error ensuring admin user: {e}")
         db.session.rollback()

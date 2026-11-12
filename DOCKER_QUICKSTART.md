@@ -22,9 +22,9 @@ docker pull ghcr.io/neyslim/ultimate-ca-manager:latest
 
 - **URL:** https://localhost:8443
 - **Username:** admin
-- **Password:** changeme123
+- **Password:** generated at first start, read it with `docker exec <container> cat /opt/ucm/data/initial-admin-password`
 
-Change the password immediately after first login.
+The first login must change it, which removes the file. To choose it instead, pass a secret file with `INITIAL_ADMIN_PASSWORD_FILE` (see [First access](docs/installation/README.md#first-access)).
 
 ## Docker Compose
 

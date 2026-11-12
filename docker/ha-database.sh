@@ -26,6 +26,25 @@ ucm_database_label() {
     fi
 }
 
+# Where the first password comes from; never the value itself.
+ucm_initial_admin_notice() {
+    local source=""
+    [ -n "${UCM_INITIAL_ADMIN_PASSWORD:-}" ] && source=INITIAL_ADMIN_PASSWORD
+    [ -n "${UCM_INITIAL_ADMIN_PASSWORD_FILE:-}" ] && source=INITIAL_ADMIN_PASSWORD_FILE
+    echo "   • Username: ${UCM_INITIAL_ADMIN_USERNAME:-admin}"
+    if [ -n "${UCM_INITIAL_ADMIN_PASSWORD:-}" ] && [ -n "${UCM_INITIAL_ADMIN_PASSWORD_FILE:-}" ]; then
+        # The application refuses to start then: which one was meant cannot be guessed
+        echo "   • Password: INITIAL_ADMIN_PASSWORD and INITIAL_ADMIN_PASSWORD_FILE are both set:"
+        echo "     the start will be refused, keep only one"
+    elif [ -n "$source" ]; then
+        echo "   • Password: the one you provided (${source})"
+    else
+        echo "   • Password: generated at first start, read it with:"
+        echo "       docker exec <container> cat /opt/ucm/data/initial-admin-password"
+        echo "     It must be changed at first login, which removes the file."
+    fi
+}
+
 # First-run notice and pre-start copy of the SQLite file; both skipped in HA mode.
 ucm_sqlite_check_and_backup() {
     if ucm_ha_active; then
@@ -34,10 +53,7 @@ ucm_sqlite_check_and_backup() {
     fi
     if [ ! -f "$UCM_DATABASE_PATH" ]; then
         echo -e "${YELLOW:-}   First run detected - database will be auto-created${NC:-}"
-        echo -e "${CYAN:-}   Default credentials:${NC:-}"
-        echo "   • Username: admin"
-        echo "   • Password: changeme123"
-        echo -e "   ${RED:-}⚠️  CHANGE THIS PASSWORD IMMEDIATELY!${NC:-}"
+        ucm_initial_admin_notice
     else
         echo -e "${GREEN:-}✅ Database exists${NC:-}"
 

@@ -31,10 +31,13 @@ RELOAD_KEYTAB = 'reload_keytab'
 RELOAD_SECRET_KEY = 'reload_secret_key'
 # One node's turn in a rolling update (services.update_campaign), always targeted
 UPDATE = 'update'
+# The generated initial admin password was changed: each node drops its file (no payload)
+DROP_INITIAL_PASSWORD = 'drop_initial_password'
 # No password policy kind: read from the database on every check. No HTTPS kind: each
 # node writes the HTTPS pair from the database as it starts, so RESTART serves a new one.
 KINDS = frozenset({RELOAD_RATE_LIMITS, RELOAD_SYSLOG, RELOAD_ADMIN_ALLOWLIST, RESTART,
-                   RELOAD_ENCRYPTION, RELOAD_KEYTAB, RELOAD_SECRET_KEY, UPDATE})
+                   RELOAD_ENCRYPTION, RELOAD_KEYTAB, RELOAD_SECRET_KEY, UPDATE,
+                   DROP_INITIAL_PASSWORD})
 
 TICK_SECONDS = 2.0
 # A missing id below a newer one is a transaction still committing (or rolled back): wait this long
@@ -231,6 +234,12 @@ def _reload_secret_key(payload):
     load_keys(current_app._get_current_object())
 
 
+def _drop_initial_password(payload):
+    from flask import current_app
+    from auth.initial_admin import sweep
+    sweep(current_app.config)
+
+
 def _update(payload):
     from services import update_campaign
     update_campaign.run_local_turn(payload)
@@ -244,6 +253,7 @@ HANDLERS = {
     RELOAD_KEYTAB: _reload_keytab,
     RELOAD_SECRET_KEY: _reload_secret_key,
     UPDATE: _update,
+    DROP_INITIAL_PASSWORD: _drop_initial_password,
 }
 
 

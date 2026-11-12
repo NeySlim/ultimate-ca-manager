@@ -58,7 +58,7 @@ docker run -d \
 ```
 
 **Access:** https://localhost:8443 or https://your-server-fqdn:8443  
-**Default credentials:** admin / changeme123
+**First login:** `admin`, password read with `docker exec ucm cat /opt/ucm/data/initial-admin-password` (see [First access](#first-access))
 
 ---
 
@@ -180,15 +180,78 @@ docker build -t ucm:local .
 
 ---
 
-## First Login
+## First Access
 
-After installation, access UCM at **https://localhost:8443** (or **https://your-server-fqdn:8443** for remote access)
+UCM has no default password. The first administrator (`admin`, or `INITIAL_ADMIN_USERNAME`) gets its password from one of two sources, read only at the first start:
 
-**Default Credentials:**
-- **Username:** admin
-- **Password:** `changeme123`
+- **Provided:** `INITIAL_ADMIN_PASSWORD_FILE` names a file holding it (a Docker, Compose or Kubernetes secret), or `INITIAL_ADMIN_PASSWORD` holds it. Setting both refuses the start; an unreadable or empty file refuses it too, it never falls back to a generated one. A provided password is yours: no change is forced. The password policy is not applied to it: a weak one is accepted, and the log says it does not meet the policy.
+- **Generated:** with neither set, the first start writes a random password to `initial-admin-password` in the data directory (`/opt/ucm/data` for every package and the image), mode 0600, owned by the service user. It never appears in a log, the container output or the installation message: they give the path and the command to read it. The first login must change it, and that change removes the file.
 
-The first login must set a new password: until then the server refuses every other request of that session, API included.
+Once the administrator exists, neither variable is read again: remove the value from your environment or secret after the first start. The [Administration Guide](../ADMIN_GUIDE.md#initial-administrator-password) has the full model, the HA case and what to do if the file was lost.
+
+### DEB (Debian, Ubuntu) and RPM (Fedora, RHEL, Rocky, Alma)
+
+The package starts UCM at installation. Generated password:
+
+```bash
+sudo cat /opt/ucm/data/initial-admin-password
+```
+
+To provide it, write `/etc/ucm/ucm.env` before installing the package: the package keeps a file it finds, completes it, and gives `/etc/ucm` to the `ucm` user before starting UCM.
+
+```bash
+sudo install -d -m 750 /etc/ucm
+sudo sh -c 'umask 077; printf "%s\n" "Your-Chosen-Password" > /etc/ucm/admin-password'
+echo 'INITIAL_ADMIN_PASSWORD_FILE=/etc/ucm/admin-password' | sudo tee /etc/ucm/ucm.env
+sudo apt install ./ucm_VERSION_all.deb      # or: sudo dnf install ./ucm-...rpm
+```
+
+`INITIAL_ADMIN_PASSWORD=...` in `/etc/ucm/ucm.env` works the same way. The installation message says which source it found, or gives the command above for a generated password; it never shows the value. Delete the file and the line after the first login.
+
+### Docker
+
+Generated password:
+
+```bash
+docker exec ucm cat /opt/ucm/data/initial-admin-password
+```
+
+To provide it, prefer a file: `-v /path/to/admin-password:/run/secrets/ucm_admin_password:ro -e INITIAL_ADMIN_PASSWORD_FILE=/run/secrets/ucm_admin_password`. The plain variable `-e INITIAL_ADMIN_PASSWORD=...` works too, but `docker inspect` shows it to anyone who can reach the Docker daemon. The file must be readable by the container user (`ucm`, UID set by the image).
+
+### Docker Compose with a secret
+
+```yaml
+services:
+  ucm:
+    image: neyslim/ultimate-ca-manager:latest
+    environment:
+      - INITIAL_ADMIN_PASSWORD_FILE=/run/secrets/ucm_admin_password
+    secrets:
+      - ucm_admin_password
+secrets:
+  ucm_admin_password:
+    file: ./ucm_admin_password.txt
+```
+
+Without the secret, read the generated password with `docker compose exec ucm cat /opt/ucm/data/initial-admin-password`. The `docker-compose*.yml` files of the repository carry this example, commented.
+
+### Helm (Kubernetes)
+
+The chart provides the password: `initialAdminPassword` when set, otherwise one it generates into its Secret and keeps across upgrades (that one must be changed at first login). To use your own Secret, set `INITIAL_ADMIN_PASSWORD` or `INITIAL_ADMIN_PASSWORD_FILE` in `extraEnv`: the chart then passes none. Read the generated one with:
+
+```bash
+kubectl -n ucm get secret ucm-secrets -o jsonpath='{.data.UCM_INITIAL_ADMIN_PASSWORD}' | base64 -d; echo
+```
+
+(`<fullname>-secrets` for another release name.) The value the chart generated must be changed at the first login, as a generated password (the chart sets `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE=1`); a value you set in `initialAdminPassword` is yours and no change is forced. No file is written in the pod. `helm template` and GitOps tools cannot look the Secret up and render a new value each time: set `initialAdminPassword` there.
+
+### HA (several nodes on one PostgreSQL)
+
+The administrator is created once, in the database, by the first node to start (creation runs under the startup lock). With nothing provided, only that node writes the file. Each node's log says where it is: `generated password in <path>` on that node, `its generated password file is on node <id>` on the others. A password change made through any node removes the file on every node: at once on the node that holds it when the change is made there, through a cluster command otherwise, and at the next start for a node that was down. Providing the password through a secret shared by the nodes avoids the question.
+
+### At the first login
+
+With a generated password, UCM asks for a new one right after login. Until it is set, the server refuses every other request of that session, API and WebSocket included. The new password follows the password policy (Settings > Security). Once it is saved, `initial-admin-password` is deleted. The file is never removed after a delay.
 
 ---
 

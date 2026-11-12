@@ -36,8 +36,14 @@ redis:
 ## certificate and as the default base URL for issued AIA/CRL/OCSP URLs.
 fqdn: ucm.local
 
-## Initial admin password (first boot only). Strongly recommended to override.
-## Leave empty to keep the image default (changeme123) — change it after login.
+## Initial admin password (first boot only). Empty: the chart generates one into its
+## Secret and keeps it across upgrades (lookup); read it with
+##   kubectl get secret <fullname>-secrets -o jsonpath='{.data.UCM_INITIAL_ADMIN_PASSWORD}' | base64 -d
+## helm template and GitOps tools have no lookup: set it there, or it changes at each render.
+## The generated value must be changed at first login; a value set here is yours, no change forced.
+## Your own Secret instead: add INITIAL_ADMIN_PASSWORD (valueFrom secretKeyRef) or
+## INITIAL_ADMIN_PASSWORD_FILE (with the volume) to extraEnv; the chart then passes no password
+## of its own and forces no change.
 initialAdminPassword: ""
 
 ## App secrets. If left empty the chart generates random values on first install

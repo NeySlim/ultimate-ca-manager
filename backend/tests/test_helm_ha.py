@@ -30,6 +30,8 @@ def test_default_render_matches_the_pre_ha_render():
     # Compared as documents: helm versions differ on blank lines between them.
     def load(text):
         text = re.sub(r'checksum/secret: .*', 'checksum/secret: SUM', text)
+        # Random at each render without a cluster to look the Secret up
+        text = re.sub(r'UCM_INITIAL_ADMIN_PASSWORD: "[A-Za-z0-9]{24}"', 'UCM_INITIAL_ADMIN_PASSWORD: "GENERATED"', text)
         return [d for d in yaml.safe_load_all(text) if d]
     golden = GOLDEN.read_text().replace('@CHART@', 'ucm-' + chart['version']).replace('@APP@', chart['appVersion'])
     assert load(_helm().stdout) == load(golden)

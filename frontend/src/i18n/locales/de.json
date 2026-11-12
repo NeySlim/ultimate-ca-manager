@@ -4699,7 +4699,9 @@
       "database": {
         "integrityPassed": "Datenbankintegritätsprüfung bestanden",
         "optimized": "Datenbank erfolgreich optimiert",
-        "reset": "Datenbank erfolgreich zurückgesetzt. Seite wird neu geladen."
+        "reset": "Datenbank erfolgreich zurückgesetzt. Seite wird neu geladen.",
+        "resetGenerated": "Database reset. The administrator's password was generated: read it on the server with {{command}}. It must be changed at first login.",
+        "resetGeneratedOnNode": "Database reset. The administrator's password was generated on node {{node}}: read it on that node with {{command}}. It must be changed at first login."
       },
       "delete": {
         "ca": "CA erfolgreich gelöscht",

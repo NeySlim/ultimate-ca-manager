@@ -104,8 +104,7 @@ case "$1" in
         if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
             NEW_CONFIG=1
             SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
-            ADMIN_PASS="changeme123"
-            
+
             cat > "$UCM_CONFIG/ucm.env" << ENVEOF
 # ============================================================
 # UCM Configuration File
@@ -145,7 +144,12 @@ LOG_LEVEL=INFO
 # HTTPS_AUTO_GENERATE=true
 
 # ============ INITIAL ADMIN (first start only) ============
-INITIAL_ADMIN_PASSWORD=$ADMIN_PASS
+# Unset: the first start writes a generated password to
+# $UCM_DATA/initial-admin-password (read it with sudo cat), to change at first login.
+# To choose it, write one of these into this file BEFORE installing the package
+# (it starts UCM), and remove it after the first start:
+# INITIAL_ADMIN_PASSWORD_FILE=/etc/ucm/admin-password   (readable by the ucm user)
+# INITIAL_ADMIN_PASSWORD=
 # INITIAL_ADMIN_USERNAME=admin
 # INITIAL_ADMIN_EMAIL=admin@ucm.local
 

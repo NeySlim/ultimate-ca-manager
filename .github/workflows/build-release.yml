@@ -828,11 +828,9 @@ jobs:
           sudo UCM_PORT=8443 UCM_FIREWALL=no dpkg -i ucm_DEB_VERSION_all.deb
           ```
           
-          ## Default Credentials
+          ## First Access
           - **Username:** `admin`
-          - **Password:** `changeme123`
-          
-          **Change the password immediately after first login!**
+          - **Password:** none by default. Set `INITIAL_ADMIN_PASSWORD_FILE` (or `INITIAL_ADMIN_PASSWORD`) before the first start, or read the generated one with `sudo cat /opt/ucm/data/initial-admin-password` (Docker: `docker exec <container> cat /opt/ucm/data/initial-admin-password`); a generated password must be changed at first login.
           
           ## Documentation
           - [Installation Guide](docs/installation/README.md)

@@ -102,7 +102,7 @@ Content-Type: application/json
 }
 ```
 
-**Forced password change.** While `force_password_change` is `true` (the first-boot `admin` account, for instance), the session may only set a new password with `POST /api/v2/account/password` and `{"new_password": "..."}`, or log out. Every other call answers `403` with `"must_change_password": true`. API keys are not affected: creating one already needs a session past the change.
+**Forced password change.** While `force_password_change` is `true` (the first-boot `admin` account when its password was generated, for instance), the session may only set a new password with `POST /api/v2/account/password` and `{"new_password": "..."}`, or log out. Every other call answers `403` with `"must_change_password": true`. API keys are not affected: creating one already needs a session past the change.
 
 ### Login with WebAuthn
 ```http
@@ -4247,7 +4247,7 @@ Returns 200 if the application process is alive, regardless of dependency status
 curl -sk -c cookies.txt \
   -X POST https://localhost:8443/api/v2/auth/login/password \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"changeme123"}'
+  -d '{"username":"admin","password":"Your-Admin-Password"}'
 
 # Use cookie for subsequent requests
 curl -sk -b cookies.txt https://localhost:8443/api/v2/certificates
@@ -4262,7 +4262,7 @@ session = requests.Session()
 session.verify = False  # For self-signed certs
 
 response = session.post('https://localhost:8443/api/v2/auth/login/password', 
-    json={'username': 'admin', 'password': 'changeme123'})
+    json={'username': 'admin', 'password': 'Your-Admin-Password'})
 
 # List certificates
 certs = session.get('https://localhost:8443/api/v2/certificates')
@@ -4275,7 +4275,7 @@ print(certs.json())
 const login = await fetch('/api/v2/auth/login/password', {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ username: 'admin', password: 'changeme123' }),
+  body: JSON.stringify({ username: 'admin', password: 'Your-Admin-Password' }),
   credentials: 'include'
 });
 

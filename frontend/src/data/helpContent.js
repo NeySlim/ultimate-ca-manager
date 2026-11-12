@@ -1308,7 +1308,7 @@ export const helpContent = {
           { label: '2FA (TOTP)', text: 'Enable time-based one-time passwords via authenticator app. Enabling it again while it is on is refused: disable it first. Each code works once: after using one, wait for the next to confirm another action' },
           { label: 'Security Keys', text: 'Register WebAuthn/FIDO2 keys (YubiKey, fingerprint, etc.)' },
           { label: 'mTLS', text: 'Manage client certificates for mutual TLS authentication' },
-          { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first-boot admin with the default changeme123, can do nothing else until it changes it, API and WebSocket included; the prompt offers Log out instead of Skip. A password set through INITIAL_ADMIN_PASSWORD does not have to be changed' },
+          { label: 'Forced password change (v2.245)', text: 'An account asked for a new password, such as the first administrator whose password UCM generated at first start, can do nothing else until it changes it, API and WebSocket included; the prompt offers Log out instead of Skip. That change removes the file holding the generated password. A password provided through INITIAL_ADMIN_PASSWORD or INITIAL_ADMIN_PASSWORD_FILE does not have to be changed, unless INITIAL_ADMIN_PASSWORD_FORCE_CHANGE is set (the Helm chart sets it for the password it generates)' },
         ]
       },
       {

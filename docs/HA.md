@@ -78,6 +78,10 @@ The network uses the fixed subnet `172.28.0.0/24`, trusted as the proxy. When `u
 3. Every node must hold the same encryption key: either no `/etc/ucm/master.key` and `KEY_ENCRYPTION_KEY` in `ucm.env`, or the same `master.key` copied to every node (a local file wins over the variable).
 4. Restart `ucm` on each host, one at a time, and check `/health/ready` through the balancer (HAProxy, nginx or any layer 7 balancer with cookie affinity).
 
+## First administrator
+
+The administrator is created once, by the first node to start, under the startup lock. Provide its password through a secret shared by the nodes (`INITIAL_ADMIN_PASSWORD_FILE`; the Helm chart passes `INITIAL_ADMIN_PASSWORD` from its Secret to every pod), or let that node generate it: only that node then writes `initial-admin-password`, and every node's log says which node holds it. The password change at first login removes the file wherever it is. See [ADMIN_GUIDE.md](ADMIN_GUIDE.md#initial-administrator-password).
+
 ## What stays local to a node
 
 - **Backups.** Scheduled backups are written under its data directory by the leader, a manual one by the node that serves the request. They are not replicated: copy them off the host, and also back PostgreSQL up with its own tools. Retention runs on every node, so a former leader prunes its own archives.

@@ -62,6 +62,23 @@ env_fill() {
     fi
 }
 
+# Removes the public default older packages wrote: the account exists, a database reset
+# then generates a password instead of reusing it. A value the operator chose stays.
+env_drop_legacy_admin_password() {
+    local re='^[[:space:]]*(export[[:space:]]+)?INITIAL_ADMIN_PASSWORD[[:space:]]*=[[:space:]]*("changeme123"|'"'changeme123'"'|changeme123)[[:space:]]*$'
+    grep -Eq "$re" "$1" || return 0
+    local tmp line
+    tmp=$(mktemp "$1.XXXXXX")
+    trap "rm -f -- $(printf %q "$tmp")" EXIT
+    while IFS= read -r line || [ -n "$line" ]; do
+        [[ $line =~ $re ]] || printf '%s\n' "$line"
+    done < "$1" > "$tmp"
+    chown --reference="$1" "$tmp"
+    chmod --reference="$1" "$tmp"
+    mv -f "$tmp" "$1"
+    trap - EXIT
+}
+
 fips_requested() {
     is_true "${UCM_FIPS_BUILD:-}" || is_true "$(env_value "$1" UCM_FIPS_BUILD)"
 }
@@ -182,9 +199,9 @@ cmd_env() {
         env_has "$file" HTTPS_PORT || env_fill "$file" HTTPS_PORT 8443
         env_has "$file" HTTP_PROTOCOL_PORT || env_fill "$file" HTTP_PROTOCOL_PORT 8080
         env_has "$file" LOG_LEVEL || env_fill "$file" LOG_LEVEL INFO
-        env_has "$file" INITIAL_ADMIN_PASSWORD || env_fill "$file" INITIAL_ADMIN_PASSWORD changeme123
         echo new
     fi
+    env_drop_legacy_admin_password "$file"
     if is_true "${UCM_FIPS_BUILD:-}" && ! is_true "$(env_value "$file" UCM_FIPS_BUILD)"; then
         if grep -Eq '^[[:space:]]*(export[[:space:]]+)?UCM_FIPS_BUILD[[:space:]]*=' "$file"; then
             sed -i -E 's/^[[:space:]]*(export[[:space:]]+)?UCM_FIPS_BUILD[[:space:]]*=.*/UCM_FIPS_BUILD=1/' "$file"
@@ -480,10 +497,11 @@ cmd_fips_build_ok() {
 
 # Post-install banner; IPv6 addresses are bracketed in the URLs.
 cmd_banner() {
-    local envfile=$1 pkg=$2 host port ips ip pass
+    local envfile=$1 pkg=$2 host port ips ip pwfile data user
     # Cosmetic: a failed lookup (no hostname binary) must not cut it short
     set +e
-    pass=$(sed -n 's/^INITIAL_ADMIN_PASSWORD=//p' "$envfile" | tail -n 1)
+    pwfile=$(env_value "$envfile" INITIAL_ADMIN_PASSWORD_FILE)
+    data=$(env_value "$envfile" DATA_DIR)
     echo ""
     host=$(hostname -f 2>/dev/null || hostname)
     port=$(grep "^HTTPS_PORT=" "$envfile" 2>/dev/null | cut -d= -f2)
@@ -500,7 +518,22 @@ cmd_banner() {
         echo "            https://${ip}:${port}"
     done
     echo ""
-    echo " Admin:    admin / $pass"
+    # Never the value: where it comes from, or where the first start writes it
+    user=$(env_value "$envfile" INITIAL_ADMIN_USERNAME)
+    echo " Admin:    ${user:-admin}"
+    if [ -n "$pwfile" ] && env_has "$envfile" INITIAL_ADMIN_PASSWORD; then
+        # The application refuses to start then: which one was meant cannot be guessed
+        echo " Password: INITIAL_ADMIN_PASSWORD and INITIAL_ADMIN_PASSWORD_FILE are both set"
+        echo "           in $envfile: the start is refused, keep only one"
+    elif [ -n "$pwfile" ]; then
+        echo " Password: the one you provided (INITIAL_ADMIN_PASSWORD_FILE=$pwfile)"
+    elif env_has "$envfile" INITIAL_ADMIN_PASSWORD; then
+        echo " Password: the one you provided (INITIAL_ADMIN_PASSWORD in $envfile)"
+    else
+        echo " Password: generated at first start, read it with:"
+        echo "             sudo cat ${data:-/opt/ucm/data}/initial-admin-password"
+        echo "           It must be changed at first login, which removes the file."
+    fi
     echo " Config:   $envfile"
     echo ""
     echo " Optional packages:"

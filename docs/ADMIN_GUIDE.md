@@ -37,6 +37,10 @@ Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `U
 | `UCM_ADMIN_ALLOWED_NETWORKS` | `UCM_ADMIN_ALLOWED_NETWORKS` | (unset) | Comma-separated IP addresses or CIDR networks allowed to reach the web interface and the management API. When set, it wins over the setting in Settings > Security, which becomes read-only. See [Admin access allowlist](#admin-access-allowlist) |
 | `UCM_ADMIN_ALLOWLIST_DISABLE` | `UCM_ADMIN_ALLOWLIST_DISABLE` | (unset) | `1` turns the admin access allowlist off (recovery after a lock-out); a warning is logged at startup |
 | `UCM_HA` | `UCM_HA` | (unset) | `1` enables HA mode in preview: settings and restarts propagate to every node, operations that only change the local host are refused; full high availability arrives in later releases. Requires PostgreSQL, `SECRET_KEY` and `KEY_ENCRYPTION_KEY`, identical on every node (the native packages generate a random key per node); the node exits at startup when one is missing (the Docker image also refuses to generate `UCM_SECRET_KEY`) |
+| `INITIAL_ADMIN_PASSWORD_FILE` | `UCM_INITIAL_ADMIN_PASSWORD_FILE` (or `INITIAL_ADMIN_PASSWORD_FILE`) | (unset) | File holding the first administrator's password (a secret), read at the first start only. See [Initial administrator password](#initial-administrator-password) |
+| `INITIAL_ADMIN_PASSWORD` | `UCM_INITIAL_ADMIN_PASSWORD` (or `INITIAL_ADMIN_PASSWORD`) | (unset: generated) | The first administrator's password, read at the first start only. No default |
+| `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE` | `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE` | (unset) | `1`: the provided password was drawn by a deployment tool, nobody chose it; it must be changed at first login. The Helm chart sets it for the value it generates |
+| `INITIAL_ADMIN_USERNAME` / `INITIAL_ADMIN_EMAIL` | `UCM_INITIAL_ADMIN_USERNAME` / `UCM_INITIAL_ADMIN_EMAIL` | `admin` / `admin@localhost` | Identity of the first administrator |
 | `UCM_NODE_ID` | `UCM_NODE_ID` | hostname | Node name reported as `node_id` by `/health` and `/health/ready` |
 | `BACKUP_MAX_UPLOAD_MB` | `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive written before 3.0 (format v1 to v3) a restore accepts and reads, in MB; its decompressed content may be four times that. Archives written since 3.0 (v4) are read in chunks and not bound by it. Every other request keeps the 50 MB limit |
 | `BACKUP_MAX_ARCHIVE_MB` | `BACKUP_MAX_ARCHIVE_MB` | `0` | Largest v4 archive a restore accepts, in MB; `0` accepts any size |
@@ -809,6 +813,31 @@ Once installed, `gssapi`/`spnego` are importable and the warning clears without 
 ---
 
 ## User Administration
+
+### Initial administrator password
+
+UCM has no default password. When the database holds no user, the start creates the first administrator, `INITIAL_ADMIN_USERNAME` (`admin`), exempt from forced 2FA enrolment, with a password from one source:
+
+| Source | Set by | Forced change | File written |
+|--------|--------|---------------|--------------|
+| `INITIAL_ADMIN_PASSWORD_FILE` | path of a file holding the password (Docker, Compose or Kubernetes secret); the line endings (CR, LF) at its end are dropped, any other character is kept | no | no |
+| `INITIAL_ADMIN_PASSWORD` | the value itself | no | no |
+| either one, with `INITIAL_ADMIN_PASSWORD_FORCE_CHANGE=1` | a deployment tool that drew the value (the Helm chart, for the one it generates) | yes, at first login | no |
+| generated | neither is set | yes, at first login | `DATA_DIR/initial-admin-password` |
+
+- **Priority.** None: both set refuses the start (`INITIAL_ADMIN_PASSWORD and INITIAL_ADMIN_PASSWORD_FILE are both set: keep only one`), since which one was meant cannot be guessed. A `_FILE` that cannot be read or is empty refuses the start too, naming the path; UCM never falls back to generating a password the operator did not expect.
+- **Password policy.** A provided password is used as provided, as before: the policy (Settings > Security) applies to every later change, and the start logs a warning, without the value, when the provided one does not meet it.
+- **Generated password.** 24 characters drawn with Python `secrets` from 56 letters and digits without `0 O o 1 l I` (about 139 bits, no character to misread when copied). It is written atomically (temporary file, `fsync`, rename), mode 0600, owned by the service user, before the account exists: if the file cannot be written, the start fails with the reason and no account is created with a password nobody could read. Read it with `sudo cat /opt/ucm/data/initial-admin-password` (DEB/RPM) or `docker exec <container> cat /opt/ucm/data/initial-admin-password`.
+- **First login.** The generated password opens a session that can only change its password (or log out), API and WebSocket included. The first successful change of that account's password, whichever way it is made (Account > Password, the API, an emailed reset link, another administrator's reset), deletes the file once the change is committed. Nothing deletes it after a delay.
+- **Read once.** Once an account exists, none of the variables is read again, not even at a later start: a value left in `ucm.env` or in a secret neither blocks the start nor changes the account. Remove it after the first start.
+- **Database reset.** Settings > Database > Reset Database (`POST /api/v2/system/database/reset`) recreates the administrator through the same rules, from the configuration at that moment. The source is settled before anything is dropped: an unreadable `_FILE` or an unwritable data directory answers 409 and resets nothing. The answer gives the command to read a generated password, never the value.
+- **HA.** The account is created once, in the database, by the first node to start, under the startup lock: one node generates, one file exists. A row in `system_config` (`initial_admin.generated_password`) names the account and that node; it holds no password. At each start every node logs where the file is: `generated password in <path>` on the node that holds it, `its generated password file is on node <id>` on the others. A change made through another node removes the file through the cluster command `drop_initial_password` (no payload); a node that was down then removes it at its next start. Each start and each such command keeps the local file only while its content still opens the account the row names.
+- **Why nothing is logged.** Logs, journald and container output are copied to collectors, support bundles and screens; a password there outlives the file. The log, the installation message and the reset answer therefore give the path and the command, never the value. The value never reaches an API answer, the audit log or a cluster command either.
+
+#### Initial password lost before the first login
+
+Nobody can log in to use the database reset or another administrator's password reset, and nothing has been configured yet: start again from an empty database. Stop UCM, remove the SQLite file `DATA_DIR/ucm.db` (with PostgreSQL, drop and recreate the database), start UCM: the first start creates the administrator and a new file. Once someone has logged in, the usual procedures apply: **Users > Reset Password** by another administrator, or the emailed reset link.
+
 
 ### Password Reset
 

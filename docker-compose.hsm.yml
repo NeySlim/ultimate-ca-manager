@@ -18,6 +18,14 @@ services:
       HSM_AUTO_INIT: "true"
       # Provide a fixed PIN (optional — auto-generated if omitted)
       # HSM_PIN: "change-me"
+      # Initial admin password (first start only). Unset: generated, read it with
+      #   docker compose exec ucm cat /opt/ucm/data/initial-admin-password
+      # To choose it, prefer a secret (uncomment the secrets blocks too):
+      # UCM_INITIAL_ADMIN_PASSWORD_FILE: /run/secrets/ucm_admin_password
+      # Second choice, visible in docker inspect:
+      # UCM_INITIAL_ADMIN_PASSWORD: change-me
+    # secrets:
+    #   - ucm_admin_password
     volumes:
       - ucm-data:/opt/ucm/data
       # master.key, which decrypts every private key in the database (REQUIRED)
@@ -31,6 +39,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+
+# secrets:
+#   ucm_admin_password:
+#     file: ./ucm_admin_password.txt   # one line, the password; keep it out of version control
 
 volumes:
   ucm-data:

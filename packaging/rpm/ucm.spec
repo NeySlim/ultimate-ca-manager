@@ -140,7 +140,6 @@ if [ -n "$V1_DB" ]; then
 fi
 
 # Generate secrets
-ADMIN_PASS="changeme123"
 SECRET_KEY=$(openssl rand -hex 32)
 
 # Create config if not exists
@@ -157,7 +156,13 @@ LOG_LEVEL=INFO
 
 # Security (auto-generated - keep secret)
 SECRET_KEY=$SECRET_KEY
-INITIAL_ADMIN_PASSWORD=$ADMIN_PASS
+
+# Initial admin (first start only). Unset: the first start writes a generated password
+# to $UCM_DATA/initial-admin-password (read it with sudo cat), to change at first login.
+# To choose it, write one of these into this file BEFORE installing the package
+# (it starts UCM), and remove it after the first start:
+# INITIAL_ADMIN_PASSWORD_FILE=/etc/ucm/admin-password   (readable by the ucm user)
+# INITIAL_ADMIN_PASSWORD=
 ENVEOF
     chmod 600 "$UCM_CONFIG/ucm.env"
 fi

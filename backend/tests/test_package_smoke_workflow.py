@@ -141,7 +141,8 @@ def test_script_passes_shellcheck():
     assert subprocess.run(['shellcheck', '-s', 'sh', str(SCRIPT)]).returncode == 0
 
 
-SMOKE_VARS = ('UCM_SMOKE_HOME', 'UCM_SMOKE_ENV_FILE', 'UCM_SMOKE_RUN_DIR', 'UCM_SMOKE_SUDOERS_DIR')
+SMOKE_VARS = ('UCM_SMOKE_HOME', 'UCM_SMOKE_ENV_FILE', 'UCM_SMOKE_RUN_DIR', 'UCM_SMOKE_SUDOERS_DIR',
+              'UCM_SMOKE_DATA_DIR')
 
 
 def _assert_sandboxed(env, tmp_path):
@@ -157,7 +158,8 @@ def _assert_sandboxed(env, tmp_path):
 
 
 def _stubbed_run(tmp_path, kind, sudo_present, su_present=True, install_ok=False, env_extra=None,
-                 deps_ok=True, safe_mode=False, health_down=False):
+                 deps_ok=True, safe_mode=False, health_down=False, first_login='first-login-ok',
+                 env_text='HTTPS_PORT=18443\n'):
     """Run the script against stub commands; returns (ordered command log, completed process).
 
     Every path variable points under tmp_path and su, chown and the venv interpreter are stubs.
@@ -168,14 +170,15 @@ def _stubbed_run(tmp_path, kind, sudo_present, su_present=True, install_ok=False
     home = tmp_path / 'opt-ucm'
     env = {'PATH': f'{bin_dir}', 'UCM_SMOKE_HOME': str(home), 'UCM_SMOKE_ENV_FILE': str(tmp_path / 'ucm.env'),
            'UCM_SMOKE_RUN_DIR': str(tmp_path / 'run'),
-           'UCM_SMOKE_SUDOERS_DIR': str(tmp_path / 'sudoers.d'), 'SMOKE_WAIT': '3', 'LOGFILE': str(log)}
+           'UCM_SMOKE_SUDOERS_DIR': str(tmp_path / 'sudoers.d'), 'UCM_SMOKE_DATA_DIR': str(tmp_path / 'data'),
+           'SMOKE_WAIT': '3', 'LOGFILE': str(log)}
     env.update(env_extra or {})
     _assert_sandboxed(env, tmp_path)
     def stub(name, body):
         f = bin_dir / name
         f.write_text('#!/bin/sh\n' + body + '\n')
         f.chmod(0o755)
-    for tool in ('tr', 'rm', 'cat', 'tail', 'mkdir', 'sleep', 'date'):
+    for tool in ('tr', 'rm', 'cat', 'tail', 'mkdir', 'sleep', 'date', 'grep'):
         (bin_dir / tool).symlink_to(shutil.which(tool))  # no host sudo on the PATH
     # kill is a shell builtin: the only pid it can reach is the su stub's own sleep child.
     stub('chown', f'echo "chown $*" >> {log}')
@@ -200,10 +203,11 @@ def _stubbed_run(tmp_path, kind, sudo_present, su_present=True, install_ok=False
         py = home / 'venv' / 'bin' / 'python'
         py.write_text('#!/bin/sh\n'
                       f'echo "python $*" >> {log}\n'
-                      'case "$2" in *urlopen*) ' + ('exit 1' if health_down else '[ -s "$UCM_SMOKE_RUN_DIR/pid" ] || exit 1; echo ok') + ';; '
+                      'case "$2" in *initial-admin-password*) echo "PWFILE=$PWFILE" >> ' + str(log)
+                      + f'; echo {first_login};; *urlopen*) ' + ('exit 1' if health_down else '[ -s "$UCM_SMOKE_RUN_DIR/pid" ] || exit 1; echo ok') + ';; '
                       f'*safe_mode*) echo {safe_mode};; *version*) echo 1.0;; esac\n')
         py.chmod(0o755)
-        (tmp_path / 'ucm.env').write_text('HTTPS_PORT=18443\n')
+        (tmp_path / 'ucm.env').write_text(env_text)
     pkg = tmp_path / f'ucm.{kind}'
     pkg.write_text('x')
     proc = subprocess.run(['/bin/sh', str(SCRIPT), str(pkg)], env=env,
@@ -253,7 +257,8 @@ def test_the_guard_refuses_a_path_with_host_commands(tmp_path):
 
 def test_the_guard_refuses_an_unset_path_variable(tmp_path):
     with pytest.raises(AssertionError, match='UCM_SMOKE_RUN_DIR'):
-        _assert_sandboxed({'UCM_SMOKE_HOME': str(tmp_path), 'UCM_SMOKE_ENV_FILE': str(tmp_path)}, tmp_path)
+        _assert_sandboxed({'UCM_SMOKE_HOME': str(tmp_path), 'UCM_SMOKE_ENV_FILE': str(tmp_path),
+                           'UCM_SMOKE_DATA_DIR': str(tmp_path)}, tmp_path)
 
 
 def test_a_succeeding_install_stays_under_tmp_path(tmp_path):
@@ -265,6 +270,23 @@ def test_a_succeeding_install_stays_under_tmp_path(tmp_path):
         for host in ('/opt/ucm', '/etc/ucm', '/tmp/ucm-'):
             assert host not in line.replace(str(tmp_path), ''), line
     assert (tmp_path / 'run' / 'install.log').exists() and (tmp_path / 'run' / 'app.log').exists()
+
+
+def test_the_first_login_reads_the_generated_password_file(tmp_path):
+    calls, proc = _stubbed_run(tmp_path, 'deb', sudo_present=False, install_ok=True)
+    assert 'ok: generated password: file, forced change, removal' in proc.stdout
+    assert f"PWFILE={tmp_path / 'data' / 'initial-admin-password'}" in calls
+
+
+def test_a_failed_first_login_fails_the_smoke(tmp_path):
+    _, proc = _stubbed_run(tmp_path, 'deb', sudo_present=False, install_ok=True, first_login='no forced change')
+    assert proc.returncode == 1 and 'first login with the generated password: no forced change' in proc.stdout
+
+
+def test_an_env_file_with_a_password_fails_the_smoke(tmp_path):
+    _, proc = _stubbed_run(tmp_path, 'deb', sudo_present=False, install_ok=True,
+                           env_text='HTTPS_PORT=18443\nINITIAL_ADMIN_PASSWORD=changeme123\n')
+    assert proc.returncode == 1 and 'carries an initial password' in proc.stdout
 
 
 def test_a_safe_mode_health_answer_fails(tmp_path):

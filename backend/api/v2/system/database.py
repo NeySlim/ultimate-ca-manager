@@ -191,41 +191,37 @@ def reset_db():
         actor = getattr(g, 'current_user', None)
         actor_name = getattr(actor, 'username', None) or 'unknown'
 
+        # Settled before anything is dropped: an unreadable _FILE or an unwritable
+        # data directory leaves the database as it was
+        from auth import initial_admin
+        try:
+            prepared = initial_admin.prepare(current_app.config, defer_write=True)
+        except initial_admin.InitialPasswordError as e:
+            return error_response(f"Database not reset: {e}", 409)
+
         # The request's own transaction holds locks on these tables: on
         # PostgreSQL, drop_all on another connection would wait for it forever.
         db.session.close()
         db.drop_all()
         db.create_all()
 
-        # Create default admin user
-        from models import User
-
-        # NOTE: the User column is `active`, not `is_active` — the wrong kwarg
-        # made this constructor raise TypeError, which the bare `except` below
-        # turned into "Database reset failed" AFTER drop_all() had already
-        # run: a wiped database with no admin user at all.
-        #
-        # Recreate the CONFIGURED bootstrap admin exactly as the canonical
-        # seeding paths do (app.py, database_health.py, init_db.py):
-        # - the configured identity, not a hard-coded 'admin' — a deployment
-        #   with INITIAL_ADMIN_USERNAME set would otherwise get the WRONG
-        #   admin back from a UI button;
-        # - totp_exempt (#141), so a reset under global 2FA enforcement
-        #   cannot recreate an admin that no one can log in as;
-        # - set_password(), which pins the hash algorithm (models/user.py),
-        #   instead of a bare generate_password_hash().
-        from auth.password_change_gate import DEFAULT_INITIAL_PASSWORD, initial_password_needs_change
-        initial_password = current_app.config.get('INITIAL_ADMIN_PASSWORD', DEFAULT_INITIAL_PASSWORD)
-        admin = User(
-            username=current_app.config.get('INITIAL_ADMIN_USERNAME', 'admin'),
-            email=current_app.config.get('INITIAL_ADMIN_EMAIL', 'admin@localhost'),
-            role='admin',
-            active=True,
-            force_password_change=initial_password_needs_change(initial_password),
-            totp_exempt=True
-        )
-        admin.set_password(initial_password)
-        db.session.add(admin)
+        # The configured administrator, as at first start (auth.initial_admin)
+        initial_admin.seed_admin(current_app.config, prepared)
+        try:
+            # The live file is replaced only once the tables are back
+            initial_admin.write_generated(current_app.config, prepared)
+        except initial_admin.InitialPasswordError as e:
+            db.session.rollback()
+            AuditService.log_action(
+                action='database_reset', resource_type='system', resource_id='database',
+                details=(f"Initiated by {actor_name}; the database was reset "
+                         "but the administrator account could not be created"),
+                username=actor_name, success=False)
+            return error_response(f"Database reset, administrator not created: {e}", 500)
+        from services import cluster_commands
+        # A file the reset made stale opens nothing; the other nodes drop theirs at their
+        # next start at the latest (their command cursor predates the recreated table)
+        cluster_commands.emit(cluster_commands.DROP_INITIAL_PASSWORD)
         ok, err = safe_commit(logger, "Database reset failed")
         if not ok:
             # The tables are already dropped and recreated by now and there
@@ -253,7 +249,23 @@ def reset_db():
             username=actor_name,
         )
 
-        return success_response(message="Database reset successfully. Default admin user created.")
+        # The command to read a generated password, never the password
+        if prepared.generated:
+            from config.settings import Config
+            from utils.ha import ha_enabled
+            path = initial_admin.password_file(current_app.config)
+            command = initial_admin.read_command(path)
+            # In HA the file is on this node only: the reply and the log name it
+            node = Config.NODE_ID if ha_enabled() else None
+            where = f" on node {node}" if node else ""
+            logger.info(f"Database reset: generated initial administrator password in {path}{where}")
+            return success_response(
+                data={'password_generated': True, 'read_command': command, 'node': node},
+                message=("Database reset successfully. Administrator recreated with a generated "
+                         f"password, read it{where} with: {command}"))
+        return success_response(
+            data={'password_generated': False, 'read_command': None, 'node': None},
+            message=f"Database reset successfully. Administrator recreated with the password from {prepared.source}.")
     except Exception as e:
         logger.error(f"Database reset failed: {e}")
         return error_response("Database reset failed")

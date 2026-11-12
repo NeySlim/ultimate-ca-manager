@@ -92,3 +92,26 @@ so leaving HA never drops the only copy of the key.
 {{- $data := $existing.data | default dict -}}
 {{- .Values.secrets.keyEncryptionKey | default ((get $data "KEY_ENCRYPTION_KEY") | default "" | b64dec) -}}
 {{- end -}}
+
+{{/*
+How extraEnv provides the initial admin password, if it does: "file" or "variable".
+The chart's own variable is then not passed: it would replace the operator's value,
+and both sources set refuse the start.
+*/}}
+{{- define "ucm.adminPasswordFromExtraEnv" -}}
+{{- $how := "" -}}
+{{- range .Values.extraEnv -}}
+{{- if has .name (list "INITIAL_ADMIN_PASSWORD_FILE" "UCM_INITIAL_ADMIN_PASSWORD_FILE") -}}{{- $how = "file" -}}
+{{- else if and (has .name (list "INITIAL_ADMIN_PASSWORD" "UCM_INITIAL_ADMIN_PASSWORD")) (not $how) -}}{{- $how = "variable" -}}
+{{- end -}}
+{{- end -}}
+{{- $how -}}
+{{- end -}}
+
+{{/*
+"true" when the initial admin password is the chart's own random value: the
+application then forces its change at first login, as for one it generates.
+*/}}
+{{- define "ucm.adminPasswordGenerated" -}}
+{{- if not (or .Values.initialAdminPassword (include "ucm.adminPasswordFromExtraEnv" .)) }}true{{ end -}}
+{{- end -}}

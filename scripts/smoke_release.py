@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import ssl
 import sys
 import urllib.error
@@ -167,8 +168,9 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--admin-password",
-        default="changeme123",
-        help="Admin password for login probe (default: changeme123).",
+        default=os.environ.get("UCM_SMOKE_ADMIN_PASSWORD", ""),
+        help="Admin password for login probe (default: $UCM_SMOKE_ADMIN_PASSWORD); "
+             "UCM has no default password.",
     )
     parser.add_argument(
         "--allow-rc",
@@ -209,6 +211,8 @@ def collect_targets(args: argparse.Namespace) -> list[Target]:
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = parse_args(argv)
+    if not args.admin_password:
+        raise SystemExit("--admin-password (or UCM_SMOKE_ADMIN_PASSWORD) is required")
     targets = collect_targets(args)
 
     failures: list[tuple[str, str]] = []
