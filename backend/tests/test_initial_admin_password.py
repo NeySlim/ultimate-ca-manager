@@ -406,3 +406,27 @@ def test_the_force_change_flag_marks_a_provided_password(flag, forced):
     got = initial_admin.resolve({'INITIAL_ADMIN_PASSWORD': 'Some-Value-1!',
                                  'INITIAL_ADMIN_PASSWORD_FORCE_CHANGE': flag})
     assert got.force_change is forced and not got.generated
+
+
+@pytest.mark.parametrize('raw', ['[1, 2]', '"text"', '7', 'null', 'not json'])
+def test_a_marker_that_is_no_object_never_fails_a_start(app, marked_user, raw):
+    from auth import initial_admin
+    from models import SystemConfig, User, db
+    user_id, path, config = marked_user
+    with app.app_context():
+        SystemConfig.query.filter_by(key=initial_admin.MARKER_KEY).update({'value': raw})
+        db.session.commit()
+        initial_admin.announce(config)
+        initial_admin.forget_generated(db.session.get(User, user_id))
+        db.session.rollback()
+
+
+def test_an_announce_that_fails_is_logged_not_raised(app, monkeypatch, tmp_path, caplog):
+    from auth import initial_admin
+
+    def broken():
+        raise RuntimeError('database gone')
+    monkeypatch.setattr(initial_admin, '_marker', broken)
+    with app.app_context(), caplog.at_level('ERROR', logger='auth.initial_admin'):
+        initial_admin.announce({'DATA_DIR': str(tmp_path)})
+    assert 'not announced' in caplog.text

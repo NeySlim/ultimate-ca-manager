@@ -187,9 +187,11 @@ def _marker():
     if row is None:
         return None, None
     try:
-        return row, json.loads(row.value or '{}')
+        marker = json.loads(row.value or '{}')
     except ValueError:
         return row, {}
+    # Anything but an object reads as an empty marker: a start never fails on it
+    return row, marker if isinstance(marker, dict) else {}
 
 
 def forget_generated(user):
@@ -254,7 +256,14 @@ def sweep(config):
 
 
 def announce(config):
-    """Each start: where the generated password is while it has not been changed."""
+    """Each start: where the generated password is while it has not been changed. Never raises."""
+    try:
+        _announce(config)
+    except Exception as e:
+        logger.error(f'Initial password file not announced: {type(e).__name__}: {e}')
+
+
+def _announce(config):
     from config.settings import Config
     from models import User, db
     from utils.ha import ha_enabled
