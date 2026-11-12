@@ -120,7 +120,8 @@ def disable_grace():
 
 def shown_as_enabled() -> bool:
     """Encryption as the status, the dashboard and the preflight report it: on while new values
-    are encrypted or a disable is left half-way, off once a disable is done (grace included)."""
+    are encrypted or a disable is left half-way, off once a disable is done (its grace and
+    the retention of its DEKs included)."""
     key_encryption = _encryption.key_encryption
     return key_encryption.is_encrypting or (key_encryption.is_enabled and not disable_done())
 
@@ -396,7 +397,7 @@ def removes_key_file() -> bool:
 def retire_if_due(sweep=False) -> int:
     """Ends the grace period once it is over, then drops the old DEKs past their retention
     that a sweep under the lock finds no value under (a value found is rewritten, its DEK
-    kept until the next sweep); returns how many were dropped. ``sweep``: sweep even when
+    kept a day more, SWEEP_SECONDS); returns how many were dropped. ``sweep``: sweep even when
     no DEK is due (the daily task)."""
     from types import SimpleNamespace
     from models import db, EncryptionKey

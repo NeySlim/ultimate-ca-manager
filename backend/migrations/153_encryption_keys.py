@@ -1,7 +1,8 @@
 """Migration 153: data-encryption keys (DEK) wrapped by the key-encryption key (KEK).
 
-One row per DEK version: state 'active' (encrypts), 'previous' (decrypts until a
-rotation ends) or 'disabled' (no key: encryption turned off while a KEK stays configured).
+One row per DEK version: state 'active' (encrypts), 'previous' (decrypts only: rewritten
+by a rotation, then kept through its retention) or 'disabled' (no key: encryption turned
+off while a KEK stays configured).
 retire_after: set once a DEK only decrypts (after a rotation or a disable), when it may be dropped.
 No row: the KEK material is itself DEK version 1, as before the envelope.
 """
