@@ -3550,7 +3550,7 @@
           "remedy": "Retirez gssencmode de DATABASE_URL et PGGSSENCMODE de l'environnement, ou définissez-les sur disable : TLS protège alors la connexion."
         },
         "keys_no_master_key": {
-          "title": "Aucune clé maître n'est configurée : les clés privées des CA et des certificats sont stockées non chiffrées dans la base de données",
+          "title": "Les clés privées sont stockées non chiffrées (aucune clé maître, ou chiffrement désactivé)",
           "remedy": "Activez le chiffrement des clés privées dans Paramètres > Sécurité, ou fournissez /etc/ucm/master.key ou KEY_ENCRYPTION_KEY ; avec UCM_REQUIRE_KEY_ENCRYPTION=true, UCM refuse alors de démarrer sans clé."
         },
         "https_unapproved_key": {

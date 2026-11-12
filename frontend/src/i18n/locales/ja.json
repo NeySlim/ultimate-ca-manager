@@ -3399,7 +3399,7 @@
           "remedy": "DATABASE_URL から gssencmode を、環境変数から PGGSSENCMODE を削除するか、disable に設定してください。接続は TLS で保護されます。"
         },
         "keys_no_master_key": {
-          "title": "マスターキーが設定されていません。CA と証明書の秘密鍵は暗号化されずにデータベースに保存されます",
+          "title": "Private keys are stored unencrypted (no master key, or encryption disabled)",
           "remedy": "設定 > セキュリティで秘密鍵の暗号化を有効にするか、/etc/ucm/master.key または KEY_ENCRYPTION_KEY を指定してください。UCM_REQUIRE_KEY_ENCRYPTION=true の場合、マスターキーがないと UCM は起動しません。"
         },
         "https_unapproved_key": {

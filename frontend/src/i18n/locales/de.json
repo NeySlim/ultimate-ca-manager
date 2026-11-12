@@ -3399,7 +3399,7 @@
           "remedy": "gssencmode aus DATABASE_URL und PGGSSENCMODE aus der Umgebung entfernen oder auf disable setzen: TLS schützt die Verbindung dann."
         },
         "keys_no_master_key": {
-          "title": "Es ist kein Master-Schlüssel konfiguriert: Private Schlüssel von CAs und Zertifikaten werden unverschlüsselt in der Datenbank gespeichert",
+          "title": "Private keys are stored unencrypted (no master key, or encryption disabled)",
           "remedy": "Die Verschlüsselung privater Schlüssel unter Einstellungen > Sicherheit aktivieren oder /etc/ucm/master.key bzw. KEY_ENCRYPTION_KEY bereitstellen; mit UCM_REQUIRE_KEY_ENCRYPTION=true startet UCM ohne einen solchen Schlüssel nicht."
         },
         "https_unapproved_key": {

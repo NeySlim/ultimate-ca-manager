@@ -3400,7 +3400,7 @@
           "remedy": "Remove gssencmode from DATABASE_URL and PGGSSENCMODE from the environment, or set them to disable: TLS then protects the connection."
         },
         "keys_no_master_key": {
-          "title": "No master key is configured: CA and certificate private keys are stored unencrypted in the database",
+          "title": "Private keys are stored unencrypted (no master key, or encryption disabled)",
           "remedy": "Enable private key encryption in Settings > Security, or provide /etc/ucm/master.key or KEY_ENCRYPTION_KEY; with UCM_REQUIRE_KEY_ENCRYPTION=true, UCM then refuses to start without one."
         },
         "https_unapproved_key": {

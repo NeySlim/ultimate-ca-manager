@@ -3443,7 +3443,7 @@
           "remedy": "Приберіть gssencmode з DATABASE_URL і PGGSSENCMODE із середовища або встановіть для них значення disable: тоді з'єднання захищатиме TLS."
         },
         "keys_no_master_key": {
-          "title": "Головний ключ не налаштовано: приватні ключі CA та сертифікатів зберігаються в базі даних у незашифрованому вигляді",
+          "title": "Private keys are stored unencrypted (no master key, or encryption disabled)",
           "remedy": "Увімкніть шифрування приватних ключів у Налаштування > Безпека або надайте /etc/ucm/master.key чи KEY_ENCRYPTION_KEY; якщо задано UCM_REQUIRE_KEY_ENCRYPTION=true, UCM відмовляється запускатися без нього."
         },
         "https_unapproved_key": {

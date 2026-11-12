@@ -527,6 +527,9 @@ def test_keys_no_master_key(session, monkeypatch, enabled):
     if finding:
         assert finding['severity'] == 'warning'
         assert finding['examples'] == [f'{encryption.MASTER_KEY_PATH}, KEY_ENCRYPTION_KEY']
+        # Also raised with a KEK kept after a disable: the title must not claim there is none
+        assert not finding['title'].startswith('No master key')
+        assert 'encryption disabled' in finding['title']
 
 
 def test_https_unapproved_key(session, app, tmp_path, monkeypatch):
