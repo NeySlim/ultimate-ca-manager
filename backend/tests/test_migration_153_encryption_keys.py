@@ -23,9 +23,11 @@ def test_sqlite_creates_the_table_and_is_idempotent():
     conn.execute("INSERT INTO cluster_nodes VALUES ('n1', '2026-01-01', '2026-01-01', 1, '3.0', 42, 7, NULL)")
     for _ in range(2):
         _m153().upgrade(conn)
-    conn.execute("INSERT INTO encryption_keys VALUES (2, 'active', 'abcdef0123456789', '1:x', '2026-01-01')")
+    conn.execute("INSERT INTO encryption_keys VALUES (2, 'active', 'abcdef0123456789', '1:x', "
+                 "'2026-01-01', NULL)")
     with pytest.raises(sqlite3.IntegrityError):
-        conn.execute("INSERT INTO encryption_keys VALUES (2, 'previous', 'abcdef0123456789', NULL, '2026-01-01')")
+        conn.execute("INSERT INTO encryption_keys VALUES (2, 'previous', 'abcdef0123456789', NULL, "
+                     "'2026-01-01', '2026-01-08')")
     assert conn.execute("SELECT command_seen FROM cluster_nodes").fetchall() == [(7,)]
 
 
@@ -57,10 +59,11 @@ def _postgres_round():
         for _ in range(2):
             _m153().upgrade(conn)
         conn.execute(text("INSERT INTO encryption_keys VALUES (1, 'previous', 'abcdef0123456789', "
-                          "NULL, now())"))
+                          "NULL, now(), now())"))
         assert conn.execute(text("SELECT command_seen FROM cluster_nodes")).fetchall() == [(7,)]
         cols = {c['name']: c for c in inspect(conn).get_columns('encryption_keys', schema=schema)}
         assert cols['wrapped']['nullable'] is True and cols['kek_id']['nullable'] is False
+        assert cols['retire_after']['nullable'] is True
     finally:
         conn.rollback()
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
@@ -73,5 +76,5 @@ def test_the_app_schema_matches_the_migrations(app):
     from models import db
     with app.app_context():
         insp = inspect(db.engine)
-        assert {'version', 'state', 'kek_id', 'wrapped', 'created_at'} == {
+        assert {'version', 'state', 'kek_id', 'wrapped', 'created_at', 'retire_after'} == {
             c['name'] for c in insp.get_columns('encryption_keys')}

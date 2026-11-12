@@ -220,7 +220,8 @@ print(gunicorn_config.certfile)
 
 
 ENVELOPE_TABLE = ("CREATE TABLE encryption_keys (version INTEGER PRIMARY KEY, state VARCHAR(16) "
-                  "NOT NULL, kek_id VARCHAR(16) NOT NULL, wrapped TEXT, created_at TIMESTAMP)")
+                  "NOT NULL, kek_id VARCHAR(16) NOT NULL, wrapped TEXT, created_at TIMESTAMP, "
+                  "retire_after TIMESTAMP)")
 
 
 @pytest.fixture

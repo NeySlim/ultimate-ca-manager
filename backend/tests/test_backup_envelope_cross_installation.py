@@ -68,3 +68,34 @@ def _opens(kek, token):
         return True
     except Exception:
         return False
+
+
+def test_characterization_an_archive_taken_during_the_retention_restores_readable(
+        app, tmp_path, monkeypatch):
+    """Characterization test, no guard of the retention change behind it: a key committed
+    under a retained DEK goes into the archive in the clear, the restore needs no old DEK."""
+    from models import CA, EncryptionKey
+    from security import dek_rotation
+    from security.encryption import ENCRYPTED_MARKER, key_encryption
+    from utils.key_codec import load_pem_bytes
+    monkeypatch.setattr(dek_rotation, 'GRACE_SECONDS', 0.0)
+    monkeypatch.setattr(dek_rotation, 'RETENTION_SECONDS', 7 * 86400.0)
+
+    source, target = Keys(tmp_path, 'source'), Keys(tmp_path, 'target')
+    with _installation(app, f"sqlite:///{tmp_path / 'source.db'}", source), app.app_context():
+        key = _add_authority('retained-ca')
+        old = key_encryption._fernet
+        assert dek_rotation.rotate()['state'] == 'done'
+        assert [(r.version, r.state) for r in EncryptionKey.query.order_by(
+            EncryptionKey.version)] == [(1, 'previous'), (2, 'active')]
+        # A long transaction commits the key under the retained DEK
+        ca = CA.query.filter_by(refid='retained-ca').one()
+        ca.prv = base64.b64encode(ENCRYPTED_MARKER + old.encrypt(_pem(key))).decode()
+        db.session.commit()
+        blob = _service().create_backup(PASSWORD, include=_only('certificate_authorities'))
+
+    with _installation(app, f"sqlite:///{tmp_path / 'target.db'}", target), app.app_context():
+        _service().restore_backup(blob, PASSWORD)
+        restored = CA.query.filter_by(refid='retained-ca').one()
+        assert EncryptionKey.query.count() == 0
+        assert load_pem_bytes(restored.prv, context='retained-ca') == _pem(key)

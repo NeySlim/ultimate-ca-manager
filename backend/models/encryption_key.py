@@ -11,3 +11,5 @@ class EncryptionKey(db.Model):
     kek_id = db.Column(db.String(16), nullable=False)
     wrapped = db.Column(db.Text)
     created_at = db.Column(db.DateTime, nullable=False)
+    # Set once the DEK only decrypts: kept for reading until then (security.dek_rotation)
+    retire_after = db.Column(db.DateTime)
