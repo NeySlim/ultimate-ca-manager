@@ -3013,6 +3013,7 @@
     "updateInitiated": "Оновлення до v{{version}} розпочато...",
     "installFailed": "Не вдалося встановити оновлення",
     "expiryCheckResult": "Перевірку завершено: надіслано сповіщень: {{count}}",
+    "expiryCheckSkipped": "Check not run: another node is running it",
     "theme": "Тема",
     "timezone": "Часовий пояс",
     "showTime": "Показувати час у датах",

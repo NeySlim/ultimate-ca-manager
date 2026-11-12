@@ -2975,6 +2975,7 @@
     "updateInitiated": "Aggiornamento a v{{version}} avviato...",
     "installFailed": "Impossibile installare l'aggiornamento",
     "expiryCheckResult": "Verifica completata: {{count}} avviso/i inviato/i",
+    "expiryCheckSkipped": "Check not run: another node is running it",
     "theme": "Tema",
     "timezone": "Fuso orario",
     "showTime": "Mostra ora nelle date",

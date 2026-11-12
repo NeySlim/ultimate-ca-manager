@@ -2975,6 +2975,7 @@
     "updateInitiated": "已启动v{{version}}更新...",
     "installFailed": "安装更新失败",
     "expiryCheckResult": "检查完成：已发送 {{count}} 条提醒",
+    "expiryCheckSkipped": "Check not run: another node is running it",
     "theme": "主题",
     "timezone": "时区",
     "showTime": "在日期中显示时间",
