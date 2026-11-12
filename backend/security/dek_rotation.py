@@ -112,13 +112,6 @@ def grace_end(grace):
     return min(grace['acked'] + timedelta(seconds=ACK_MARGIN_SECONDS), grace['until'])
 
 
-def grace_end_text(grace) -> str:
-    end = grace_end(grace)
-    if end is None:
-        return 'until every node has applied the change'
-    return f"until {end.isoformat(timespec='seconds')} UTC"
-
-
 def disable_grace():
     """The grace period of a disable done (its DEKs kept for reading only), or None."""
     grace = retiring()
@@ -152,15 +145,20 @@ def _clear_grace() -> None:
     SystemConfig.query.filter_by(key=GRACE_KEY).delete(synchronize_session=False)
 
 
-def grace_refusal(grace) -> str:
-    """Why an enable, rotation or disable waits for the end of ``grace``."""
-    until = grace_end_text(grace)
+def grace_refusal(grace, action='rotate again') -> str:
+    """Why ``action`` waits for the end of ``grace``: its time once known, else what it
+    waits for."""
+    end = grace_end(grace)
     if grace.get('disable'):
-        # A rotation is refused afterwards as well (nothing to rotate): only enabling goes on
-        return (f"Encryption was just disabled and waits {until} for every process to stop "
-                f"encrypting; enable it again after that.")
-    return (f"The last rotation waits {until} for every process to load the new "
-            f"data-encryption key: rotate again after that")
+        # A rotation is refused as well (nothing to rotate): only enabling goes on
+        what, action = 'Encryption was just disabled', 'enable it again'
+        waits = 'every node has stopped encrypting'
+    else:
+        what = 'A data-encryption key rotation just ended'
+        waits = 'every node has loaded the new key'
+    if end is None:
+        return f"{what}: {action} two minutes after {waits}."
+    return f"{what}: {action} after {end.isoformat(timespec='seconds')} UTC."
 
 
 def _emit_reload(version):
@@ -545,8 +543,7 @@ def begin_disable():
     grace = retiring()
     if grace is not None and not grace.get('disable'):
         db.session.rollback()
-        raise RotationError(f"The last rotation waits {grace_end_text(grace)} for every process "
-                            f"to load the new data-encryption key: disable after that.")
+        raise RotationError(grace_refusal(grace, 'disable encryption'))
     if rotation_in_progress():
         db.session.rollback()
         raise RotationError('A data-encryption key rotation is in progress: finish it first.')

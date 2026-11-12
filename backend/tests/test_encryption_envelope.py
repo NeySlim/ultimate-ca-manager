@@ -528,10 +528,13 @@ def test_during_the_grace_period_rotate_and_disable_name_its_end(app, auth_clien
         dek_rotation.rotate()
     status = auth_client.get('/api/v2/system/security/encryption-status').get_json()['data']
     assert status['rotation_in_progress'] is False and status['rotation_available_after']
-    for route in ('rotate-encryption-key', 'disable-encryption'):
+    end = status['rotation_available_after'].removesuffix('Z')
+    for route, action in (('rotate-encryption-key', 'rotate again'),
+                          ('disable-encryption', 'disable encryption')):
         r = auth_client.post(f'/api/v2/system/security/{route}')
         assert r.status_code == 409, r.data
-        assert 'waits until' in r.get_json()['message']
+        assert (f'A data-encryption key rotation just ended: {action} after {end} UTC.'
+                in r.get_json()['message'])
     grace(601)
     r = auth_client.post('/api/v2/system/security/rotate-encryption-key')
     assert r.status_code == 200, r.data
@@ -1249,9 +1252,9 @@ def test_enable_and_rotate_during_the_grace_of_a_disable_name_its_end(app, auth_
         r = auth_client.post(f'/api/v2/system/security/{route}')
         assert r.status_code == 409, r.data
         # A rotation is refused (400) after the grace too: the way on is to enable
-        assert 'waits until' in r.get_json()['message']
-        assert 'Try again' not in r.get_json()['message']
-        assert 'enable it again after that' in r.get_json()['message']
+        message = r.get_json()['message']
+        assert 'Encryption was just disabled: enable it again after ' in message
+        assert message.endswith(' UTC.') and 'Try again' not in message
     grace(601)
     assert auth_client.post('/api/v2/system/security/rotate-encryption-key').status_code == 400
     r = auth_client.post('/api/v2/system/security/enable-encryption')
@@ -2185,3 +2188,22 @@ def test_a_restart_resumes_an_interrupted_rotation_before_an_old_key_past_its_re
         assert dek_rotation.retire_if_due() == 1
     assert [(v, s) for v, s, _, _ in _rows(app)] == [(2, 'previous'), (3, 'active')]
     assert _read(app, values) == CLEAR
+
+
+def test_a_grace_refusal_names_its_end_or_what_it_waits_for():
+    from datetime import datetime
+    from security.dek_rotation import grace_refusal
+    until = datetime(2026, 1, 2, 3, 4, 5)
+    acked = datetime(2026, 1, 2, 3, 0, 0)
+    rotation = {'until': until, 'acked': None}
+    disable = {'until': until, 'acked': None, 'disable': True}
+    assert grace_refusal(rotation) == ('A data-encryption key rotation just ended: rotate again '
+                                       'two minutes after every node has loaded the new key.')
+    assert grace_refusal(disable, 'disable encryption') == (
+        'Encryption was just disabled: enable it again two minutes after every node has '
+        'stopped encrypting.')
+    assert grace_refusal({**rotation, 'acked': acked}, 'disable encryption') == (
+        'A data-encryption key rotation just ended: disable encryption after '
+        '2026-01-02T03:02:00 UTC.')
+    assert grace_refusal({**disable, 'acked': acked}) == (
+        'Encryption was just disabled: enable it again after 2026-01-02T03:02:00 UTC.')
