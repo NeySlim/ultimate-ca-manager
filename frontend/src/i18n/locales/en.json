@@ -4929,7 +4929,8 @@
         "optimized": "Database optimized successfully",
         "integrityPassed": "Database integrity check passed",
         "reset": "Database reset successfully. Page will reload.",
-        "resetGenerated": "Database reset. The administrator's password was generated: read it on the server with {{command}}. It must be changed at first login."
+        "resetGenerated": "Database reset. The administrator's password was generated: read it on the server with {{command}}. It must be changed at first login.",
+        "resetGeneratedOnNode": "Database reset. The administrator's password was generated on node {{node}}: read it on that node with {{command}}. It must be changed at first login."
       },
       "https": {
         "applied": "HTTPS certificate applied. Server will restart.",

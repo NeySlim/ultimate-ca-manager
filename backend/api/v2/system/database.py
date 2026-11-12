@@ -250,13 +250,20 @@ def reset_db():
 
         # The command to read a generated password, never the password
         if prepared.generated:
-            command = initial_admin.read_command(initial_admin.password_file(current_app.config))
+            from config.settings import Config
+            from utils.ha import ha_enabled
+            path = initial_admin.password_file(current_app.config)
+            command = initial_admin.read_command(path)
+            # In HA the file is on this node only: the reply and the log name it
+            node = Config.NODE_ID if ha_enabled() else None
+            where = f" on node {node}" if node else ""
+            logger.info(f"Database reset: generated initial administrator password in {path}{where}")
             return success_response(
-                data={'password_generated': True, 'read_command': command},
+                data={'password_generated': True, 'read_command': command, 'node': node},
                 message=("Database reset successfully. Administrator recreated with a generated "
-                         f"password, read it with: {command}"))
+                         f"password, read it{where} with: {command}"))
         return success_response(
-            data={'password_generated': False, 'read_command': None},
+            data={'password_generated': False, 'read_command': None, 'node': None},
             message=f"Database reset successfully. Administrator recreated with the password from {prepared.source}.")
     except Exception as e:
         logger.error(f"Database reset failed: {e}")

@@ -26,6 +26,15 @@ describe('afterDatabaseReset', () => {
     expect(ui.showSuccess).not.toHaveBeenCalled()
   })
 
+  it('names the node holding the file in HA', async () => {
+    const ui = tools()
+    await afterDatabaseReset({ data: { password_generated: true, read_command: 'sudo cat /x/f', node: 'node-b' } }, ui)
+    const [message] = ui.showConfirm.mock.calls[0]
+    expect(message).toContain('messages.success.database.resetGeneratedOnNode')
+    expect(message).toContain('node-b')
+    expect(message).toContain('sudo cat /x/f')
+  })
+
   it('keeps the short notice when the password was provided', async () => {
     vi.useFakeTimers()
     const ui = tools()

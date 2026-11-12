@@ -164,3 +164,34 @@ def test_a_reset_whose_file_cannot_be_written_says_so(app, auth_client, monkeypa
     with app.app_context():
         assert User.query.filter_by(username=app.config['INITIAL_ADMIN_USERNAME']).count() == 0
         assert AuditLog.query.filter_by(action='database_reset', success=False).count() == 1
+        # Later tests sign in as admin with the test password
+        initial_admin.seed_admin(app.config, initial_admin.InitialPassword('changeme123', False, 'test'))
+        db.session.commit()
+
+
+@pytest.mark.parametrize('ha', [True, False], ids=['ha', 'single'])
+def test_a_reset_in_ha_names_the_node_holding_the_file(app, auth_client, monkeypatch, tmp_path, caplog, ha):
+    from auth.initial_admin import PASSWORD_FILE_NAME
+    from config.settings import Config
+    monkeypatch.setitem(app.config, 'INITIAL_ADMIN_PASSWORD', None)
+    monkeypatch.setitem(app.config, 'INITIAL_ADMIN_PASSWORD_FILE', None)
+    monkeypatch.setitem(app.config, 'DATA_DIR', str(tmp_path))
+    monkeypatch.setattr(Config, 'HA_MODE', ha)
+    monkeypatch.setattr(Config, 'NODE_ID', 'reset-node-7')
+    with caplog.at_level('INFO', logger='api.v2.system.database'):
+        answer = auth_client.post('/api/v2/system/database/reset')
+    assert answer.status_code == 200, answer.data
+    with app.app_context():
+        # Later tests sign in as admin with the test password, no change forced
+        admin = User.query.filter_by(username=app.config['INITIAL_ADMIN_USERNAME']).one()
+        value = (tmp_path / PASSWORD_FILE_NAME).read_text().rstrip('\n')
+        admin.set_password('changeme123')
+        admin.force_password_change = False
+        db.session.commit()
+    body = answer.get_json()
+    assert value not in caplog.text and value not in answer.get_data(as_text=True)
+    if ha:
+        assert body['data']['node'] == 'reset-node-7' and 'reset-node-7' in body['message']
+        assert 'reset-node-7' in caplog.text
+    else:
+        assert body['data']['node'] is None

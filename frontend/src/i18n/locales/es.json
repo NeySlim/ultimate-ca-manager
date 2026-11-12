@@ -4700,7 +4700,8 @@
         "integrityPassed": "Verificación de integridad de la base de datos aprobada",
         "optimized": "Base de datos optimizada exitosamente",
         "reset": "Base de datos restablecida exitosamente. La página se recargará.",
-        "resetGenerated": "Database reset. The administrator's password was generated: read it on the server with {{command}}. It must be changed at first login."
+        "resetGenerated": "Database reset. The administrator's password was generated: read it on the server with {{command}}. It must be changed at first login.",
+        "resetGeneratedOnNode": "Database reset. The administrator's password was generated on node {{node}}: read it on that node with {{command}}. It must be changed at first login."
       },
       "delete": {
         "ca": "CA eliminada exitosamente",

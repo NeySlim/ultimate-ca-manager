@@ -4762,7 +4762,8 @@
         "integrityPassed": "Перевірку цілісності бази даних пройдено",
         "optimized": "Базу даних оптимізовано успішно",
         "reset": "Базу даних скинуто успішно. Сторінка перезавантажиться.",
-        "resetGenerated": "Database reset. The administrator's password was generated: read it on the server with {{command}}. It must be changed at first login."
+        "resetGenerated": "Database reset. The administrator's password was generated: read it on the server with {{command}}. It must be changed at first login.",
+        "resetGeneratedOnNode": "Database reset. The administrator's password was generated on node {{node}}: read it on that node with {{command}}. It must be changed at first login."
       },
       "delete": {
         "ca": "CA видалено успішно",
