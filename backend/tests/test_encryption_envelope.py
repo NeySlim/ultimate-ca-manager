@@ -751,3 +751,28 @@ def test_a_disable_never_drops_the_deks_of_a_rotation_started_meanwhile(app, aut
     assert r.status_code == 409, r.data
     assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
     assert _read(app, values) == CLEAR
+
+
+@pytest.mark.parametrize('with_variable', [False, True], ids=['file', 'file-and-variable'])
+def test_a_process_that_missed_a_file_disable_writes_in_the_clear(app, auth_client, envelope_keys,
+                                                                  set_env, encryption_enabled,
+                                                                  with_variable):
+    """Outside HA the scheduler gets no command: the master.key removed must not arm it again."""
+    key_encryption = encryption_enabled.key_encryption
+    encryption_enabled.MASTER_KEY_PATH.write_text(Fernet.generate_key().decode())
+    if not with_variable:
+        set_env('KEY_ENCRYPTION_KEY', None)
+    with app.app_context():
+        key_encryption.reload()
+        assert key_encryption.key_source == 'file' and key_encryption.is_enabled
+        stale = {name: getattr(key_encryption, name) for name in key_encryption._FIELDS}
+    r = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert r.status_code == 200, r.data
+    assert not encryption_enabled.MASTER_KEY_PATH.exists()
+    with app.app_context():
+        key_encryption.__dict__.update(stale)  # the other process, KEK still in memory
+        key_encryption._read_at = float('-inf')
+        assert key_encryption.encrypt_string('renewed key') == 'renewed key'
+        # A fresh start, on the variable when there is one, is off too
+        key_encryption.reload()
+        assert not key_encryption.is_enabled

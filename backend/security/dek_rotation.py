@@ -292,10 +292,13 @@ def finish_disable(kept_kek) -> None:
         raise RotationError('A value was encrypted while encryption was being disabled: run '
                             'the disable again, the data-encryption keys are kept.')
     EncryptionKey.query.delete()
-    if kept_kek:
+    # The KEK being removed is marked too: a process still holding it (no command outside
+    # HA) must read "off", not "no row, the KEK is DEK v1"
+    marked = [kept_kek, _encryption.key_encryption.kek_fingerprint()]
+    for offset, kek in enumerate(dict.fromkeys(k for k in marked if k)):
         db.session.add(EncryptionKey(
-            version=DISABLED_MARKER_VERSION, state=envelope.DISABLED,
-            kek_id=kept_kek, wrapped=None, created_at=utc_now()))
+            version=DISABLED_MARKER_VERSION - offset, state=envelope.DISABLED,
+            kek_id=kek, wrapped=None, created_at=utc_now()))
     # Nothing is encrypted any more: without this the next start would create a key
     from security.master_key_bootstrap import record_operator_choice
     record_operator_choice(auto=False)
