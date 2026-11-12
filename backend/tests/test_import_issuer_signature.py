@@ -496,3 +496,37 @@ class TestACaIsChainedOnlyUnderTheCaThatSignedIt:
         with app.app_context():
             assert importer.ImportMixin().import_cas(entries)['imported'] == 2
         assert _ca_carefs(app, [e['refid'] for e in entries]) == [None, refid]
+
+
+class TestAnOpnsenseEntryNamingTheWrongCaFindsItsSigner:
+    """The caref an appliance entry carries is a claim; the signature names the issuer."""
+
+    @pytest.fixture
+    def other_refid(self, create_ca):
+        return create_ca(cn=f'Other OPNsense CA {uuid.uuid4().hex[:6]}')['refid']
+
+    def test_the_import_route(self, app, auth_client, issuer, other_refid, monkeypatch):
+        from api.v2 import import_opnsense
+        from tests.test_opnsense_import import _Session
+        _, refid, ca_cert, ca_key = issuer
+        real, _ = _leaf('misnamed-opn.example.test', ca_cert, ca_key)
+        rows = [{'uuid': str(uuid.uuid4()), 'refid': uuid.uuid4().hex[:13], 'descr': f'opn-misnamed-{refid}',
+                 'crt': base64.b64encode(_pem(real).encode()).decode(), 'caref': other_refid}]
+        monkeypatch.setattr(import_opnsense, 'create_session', lambda verify_ssl=True: _Session([], rows))
+        r = auth_client.post('/api/v2/import/opnsense/import', json={
+            'host': '192.0.2.10', 'port': 443, 'api_key': 'k', 'api_secret': 's',
+            'verify_ssl': False, 'items': []})
+        assert r.status_code == 200, r.data
+        assert [caref for _, caref in _rows(app, real)] == [refid]
+
+    def test_the_legacy_service(self, app, issuer, other_refid, monkeypatch, tmp_path):
+        from services.opnsense import importer
+        monkeypatch.setattr(importer, '__file__', str(tmp_path / 'services' / 'opnsense' / 'importer.py'))
+        _, refid, ca_cert, ca_key = issuer
+        real, _ = _leaf('misnamed-legacy.example.test', ca_cert, ca_key)
+        entries = [{'refid': uuid.uuid4().hex[:13], 'caref': other_refid, 'descr': 'legacy misnamed',
+                    'crt': base64.b64encode(_pem(real).encode()).decode(),
+                    'serial_number': str(real.serial_number)}]
+        with app.app_context():
+            assert importer.ImportMixin().import_certificates(entries)['imported'] == 1
+        assert [caref for _, caref in _rows(app, real)] == [refid]
