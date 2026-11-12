@@ -42,6 +42,7 @@ import logging
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from datetime import timezone
 from enum import Enum
 from typing import Optional
@@ -141,20 +142,36 @@ class IntuneScepClient:
 
         self._tokens = {}  # scope -> (token, expires_at_monotonic)
         self._service_endpoint = None
-        # The client is shared between request threads (see client_for_profile)
-        self._lock = threading.RLock()
+        # Shared between request threads: _lock guards the cache and is never held
+        # across the network; _refresh lets one request renew at a time.
+        self._lock = threading.Lock()
+        self._refresh = threading.RLock()
 
     # ---- Auth ----------------------------------------------------------
 
-    def _get_token(self, scope: str) -> str:
+    @contextmanager
+    def _refreshing(self):
+        """One renewal at a time; a waiter gives up after the request timeout."""
+        if not self._refresh.acquire(timeout=REQUEST_TIMEOUT_SECONDS):
+            raise IntuneScepError("Intune token or endpoint renewal did not finish in time")
+        try:
+            yield
+        finally:
+            self._refresh.release()
+
+    def _cached_token(self, scope: str):
         with self._lock:
-            return self._fetch_token(scope)
+            cached = self._tokens.get(scope)
+            return cached[0] if cached and cached[1] > time.monotonic() else None
+
+    def _get_token(self, scope: str) -> str:
+        token = self._cached_token(scope)
+        if token:
+            return token
+        with self._refreshing():
+            return self._cached_token(scope) or self._fetch_token(scope)
 
     def _fetch_token(self, scope: str) -> str:
-        cached = self._tokens.get(scope)
-        if cached and cached[1] > time.monotonic():
-            return cached[0]
-
         resp = requests.post(
             f"{AUTHORITY}{self.tenant_id}/oauth2/v2.0/token",
             data={
@@ -179,21 +196,23 @@ class IntuneScepClient:
                 f"Entra token response for scope {scope!r} had no access_token"
             )
         expires_in = int(body.get("expires_in", 3600))
-        self._tokens[scope] = (
-            token,
-            time.monotonic() + max(expires_in - TOKEN_EXPIRY_MARGIN_SECONDS, 0),
-        )
+        with self._lock:
+            self._tokens[scope] = (
+                token,
+                time.monotonic() + max(expires_in - TOKEN_EXPIRY_MARGIN_SECONDS, 0),
+            )
         return token
 
     def _graph_token(self) -> str:
         return self._get_token(f"{GRAPH_RESOURCE_URL}.default")
 
-    def _forget_token(self, scope: str, exc: Exception) -> None:
-        """A 401/403 means the cached token was refused: ask for a new one next time."""
+    def _forget_token(self, scope: str, exc: Exception, token: str) -> None:
+        """A 401/403 refused `token`: drop it, unless a newer one already replaced it."""
         status = getattr(getattr(exc, 'response', None), 'status_code', None)
         if status in (401, 403):
             with self._lock:
-                self._tokens.pop(scope, None)
+                if self._tokens.get(scope, (None,))[0] == token:
+                    self._tokens.pop(scope, None)
 
     def _intune_token(self) -> str:
         # Deliberately not "fixed": see module docstring.
@@ -214,7 +233,7 @@ class IntuneScepClient:
         try:
             resp.raise_for_status()
         except requests.HTTPError as e:
-            self._forget_token(f"{GRAPH_RESOURCE_URL}.default", e)
+            self._forget_token(f"{GRAPH_RESOURCE_URL}.default", e, token)
             raise IntuneScepError(f"Intune service discovery via Graph failed: {e}") from e
 
         body = resp.json()
@@ -238,9 +257,17 @@ class IntuneScepClient:
 
     def _get_service_endpoint(self) -> str:
         with self._lock:
-            if not self._service_endpoint:
-                self._service_endpoint = self._discover_service_endpoint()
-            return self._service_endpoint
+            endpoint = self._service_endpoint
+        if endpoint:
+            return endpoint
+        with self._refreshing():
+            with self._lock:
+                endpoint = self._service_endpoint
+            if not endpoint:
+                endpoint = self._discover_service_endpoint()
+                with self._lock:
+                    self._service_endpoint = endpoint
+            return endpoint
 
     def test_connection(self) -> None:
         """Prove the Entra app registration + permissions work, without
@@ -273,8 +300,9 @@ class IntuneScepClient:
             # client's Clear()-on-failure behavior. The request is not retried
             # here: the caller fails and the next request re-discovers.
             with self._lock:
-                self._service_endpoint = None
-                self._forget_token(f"{INTUNE_RESOURCE_URL}/.default", e)
+                if self._service_endpoint == endpoint:
+                    self._service_endpoint = None
+            self._forget_token(f"{INTUNE_RESOURCE_URL}/.default", e, token)
             logger.error(
                 "Intune SCEP API request failed (activityId=%s url=%s/%s): %s",
                 activity_id, endpoint, url_suffix, e,

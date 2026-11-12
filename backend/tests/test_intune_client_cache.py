@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 import requests
 
+from services.scep import intune_client
 from services.scep.intune_client import IntuneScepError, client_for_profile
 
 SERVICE = [{'providerName': 'ScepRequestValidationFEService', 'uri': 'https://fef.example/scep'}]
@@ -138,3 +139,70 @@ def test_refused_discovery_forgets_the_graph_token(monkeypatch, net, status):
         client.validate_request('txn', b'x')
     client.validate_request('txn', b'x')
     assert seen[0] != seen[1]
+
+
+def test_a_hung_renewal_does_not_queue_the_other_requests(monkeypatch, net):
+    """A request waiting on another one's renewal gives up after the request timeout."""
+    monkeypatch.setattr(intune_client, 'REQUEST_TIMEOUT_SECONDS', 0.2)
+    hung, release, outcome = threading.Event(), threading.Event(), []
+
+    def post(url, data=None, json=None, headers=None, timeout=None):
+        hung.set()
+        release.wait(5)
+        raise requests.ConnectionError('token endpoint down')
+
+    monkeypatch.setattr('requests.post', post)
+    client = client_for_profile(_profile(client='hung'))
+
+    def ask():
+        try:
+            client._get_token('scope-a')
+        except IntuneScepError as e:
+            outcome.append(str(e))
+
+    first = threading.Thread(target=ask)
+    first.start()
+    assert hung.wait(2)
+    second = threading.Thread(target=ask)
+    second.start()
+    second.join(2)
+    waited_out = not second.is_alive()
+    release.set()
+    first.join(5), second.join(5)
+    assert waited_out and any('did not finish in time' in o for o in outcome)
+
+
+def test_a_refused_token_does_not_evict_its_replacement(net):
+    client = client_for_profile(_profile(client='newer'))
+    refused = requests.HTTPError('401', response=_Resp({}, 401))
+    client._tokens['scope-a'] = ('T2', time.monotonic() + 600)
+    client._forget_token('scope-a', refused, 'T1')
+    assert client._tokens['scope-a'][0] == 'T2'
+    client._forget_token('scope-a', refused, 'T2')
+    assert 'scope-a' not in client._tokens
+
+
+def test_a_failed_call_does_not_forget_a_newer_endpoint(monkeypatch, net):
+    client = client_for_profile(_profile(client='moved'))
+    assert client._get_service_endpoint() == 'https://fef.example/scep'
+    real_post = requests.post
+
+    def post(url, data=None, json=None, headers=None, timeout=None):
+        if 'oauth2' in url:
+            return real_post(url, data=data, json=json, headers=headers, timeout=timeout)
+        client._service_endpoint = 'https://moved.example/scep'  # another request re-discovered
+        raise requests.ConnectionError('stale shard')
+
+    monkeypatch.setattr('requests.post', post)
+    with pytest.raises(IntuneScepError):
+        client.validate_request('txn', b'x')
+    assert client._service_endpoint == 'https://moved.example/scep'
+
+
+def test_waiters_of_a_token_renewal_reuse_its_token(net):
+    client = client_for_profile(_profile(client='waiters'))
+    got = []
+    threads = [threading.Thread(target=lambda: got.append(client._get_token('scope-a'))) for _ in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    assert net['token'] == 1 and set(got) == {'tok-1'}

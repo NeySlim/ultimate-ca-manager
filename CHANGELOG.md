@@ -50,8 +50,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- SCEP with Intune: the Entra token and the discovered service endpoint are kept between enrolments (one client per app registration), and a 401 from the validation service makes the next request ask for a new token.
-
+- SCEP with Intune: the Entra token and the discovered service endpoint are kept between enrolments (one client per app registration), and a 401 or 403 from Graph or the validation service makes the next request ask for a new token.
 - WSTEP, EST and SCEP: a renewed certificate keeps the SID security extension (KB5014754 strong mapping) of the certificate it renews when the CA signed that certificate, never one from the CSR, so it still maps to its account on a domain controller enforcing strong mapping; with the AD Connector enabled, a SID that names no account is refused.
 - Expiry webhooks: after an outage, `certificate.expired` is announced for what expired since the last pass, at most 30 days back, on a single node as in HA (a single node used to cover the last 24 hours only); the log gives the number of older expiries left aside.
 - HA preview: backup retention and the update result now run on every node, so a node that is not the leader prunes its own archives and reports an update it installed. The scheduler view shows and runs them on the node that answers.
