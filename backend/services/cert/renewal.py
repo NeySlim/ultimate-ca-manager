@@ -36,6 +36,7 @@ from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.ca_pointer_extensions import add_ca_pointer_extensions
 from utils.qc_statements import carried_policy_oids, template_policy_oids
 from utils.leaf_key_usage import constrain_builder_key_usage
+from utils.revocation_reasons import HOLD_REASONS
 from utils.spki_digest import certificate_key_sha256
 from utils.datetime_utils import cert_not_before, utc_isoformat, utc_now
 from utils.serial_format import canonical_serial
@@ -296,8 +297,11 @@ def _renewal_members(cert):
         partner = mutual_partner(cert)
     except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
         return [cert]
-    if (partner is None or partner.revoked or partner.archived or not cert.crt
+    if (partner is None or partner.archived or not cert.crt
             or not partner.crt or not partner.prv):
+        return [cert]
+    from services.cert.issued_lookup import row_revoked
+    if row_revoked(partner):  # by its row or by the record of its serial
         return [cert]
     return list(anchor_first(cert, partner))
 
@@ -675,11 +679,14 @@ def _record_superseded(cert_id, ca, old_serial, old_valid_to, now, old_digest=No
     if not old_serial or ca is None:
         return
     row = RevokedSerial.query.filter_by(caref=ca.refid, serial_number=canonical_serial(old_serial)).first()
-    if row is None:
+    fresh = row is None
+    if fresh:
         row = RevokedSerial(caref=ca.refid, serial_number=old_serial)
         db.session.add(row)
-    row.revoked_at = now
-    row.revoke_reason = 'superseded'
+    # A final revocation already recorded keeps its reason and date (keyCompromise is never superseded)
+    if fresh or row.revoke_reason in HOLD_REASONS:
+        row.revoked_at = now
+        row.revoke_reason = 'superseded'
     row.valid_to = old_valid_to or now + _SUPERSEDED_FALLBACK
     row.certificate_id = cert_id
     row.public_key_sha256 = old_digest

@@ -306,13 +306,12 @@ class TestFullCrl:
         assert set(entries) == {SERIAL_A, SERIAL_B}
         assert all(_reason(e) == x509.ReasonFlags.superseded for e in entries.values())
 
-    def test_a_record_its_unrevoked_certificate_still_carries_is_dropped(self, backend):
-        """A lifted revocation the record outlived: the certificate still holds
-        the serial and is valid, so the CRL must not list it."""
+    def test_a_record_its_unrevoked_certificate_still_carries_is_listed(self, backend):
+        """Lifting a hold deletes its record: one still linked to an unrevoked row is no lift."""
         ca, ca_key, ca_cert = _make_ca()
         row = _store(ca, _issue(ca_key, ca_cert, SERIAL_A), str(SERIAL_A))
         _persist(ca, format(SERIAL_A, 'X'), reason='certificateHold', certificate_id=row.id)
-        assert set(_entries(_full_crl(ca))) == set()
+        assert set(_entries(_full_crl(ca))) == {SERIAL_A}
 
     def test_the_live_record_wins_over_the_persistent_one(self, backend):
         ca, ca_key, ca_cert = _make_ca()
@@ -478,14 +477,14 @@ class TestOcsp:
         assert SERIAL_A in _entries(_full_crl(ca))
         assert _ocsp(app, ca_cert, leaf) == (ocsp.OCSPCertStatus.REVOKED, x509.ReasonFlags.key_compromise)
 
-    def test_a_record_of_the_live_row_itself_was_lifted(self, app, backend):
-        """Non-regression: passes with or without the OCSP change, not a proof of it."""
+    def test_a_record_linked_to_the_live_row_still_revokes(self, app, backend):
+        """A lifted hold deletes its record: one left linked to an unrevoked row is not a lift."""
         ca, ca_key, ca_cert = _make_ca()
         leaf = _issue(ca_key, ca_cert, SERIAL_A)
         row = _store(ca, leaf, str(SERIAL_A))
         _persist(ca, str(SERIAL_A), certificate_id=row.id)
-        assert SERIAL_A not in _entries(_full_crl(ca))
-        assert _ocsp(app, ca_cert, leaf) == (ocsp.OCSPCertStatus.GOOD, None)
+        assert SERIAL_A in _entries(_full_crl(ca))
+        assert _ocsp(app, ca_cert, leaf) == (ocsp.OCSPCertStatus.REVOKED, x509.ReasonFlags.key_compromise)
 
     @pytest.mark.parametrize('stored,expected', [
         ('cACompromise', x509.ReasonFlags.ca_compromise),
@@ -497,7 +496,7 @@ class TestOcsp:
         ca, _, _ = _make_ca()
         revoked_at = _now() - timedelta(hours=2)
         _persist(ca, str(SERIAL_A), reason=stored, revoked_at=revoked_at)
-        found = OCSPService._persisted_revocation(ca, OCSPService._serial_spellings(SERIAL_A))
+        found = OCSPService._persisted_revocation(ca, SERIAL_A)
         assert found is not None
         assert found[1] == expected
         assert abs((found[0] - revoked_at).total_seconds()) < 1
@@ -507,7 +506,7 @@ class TestOcsp:
         other, _, _ = _make_ca()
         _persist(other, str(SERIAL_A))
         leaf = _issue(ca_key, ca_cert, SERIAL_A)
-        assert OCSPService._persisted_revocation(ca, OCSPService._serial_spellings(SERIAL_A)) is None
+        assert OCSPService._persisted_revocation(ca, SERIAL_A) is None
         assert _ocsp(app, ca_cert, leaf)[0] == ocsp.OCSPCertStatus.UNKNOWN
 
     def test_the_spellings(self):

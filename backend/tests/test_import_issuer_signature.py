@@ -428,17 +428,31 @@ class TestALiveRowNeverHidesAPersistentRevocation:
             db.session.commit()
         assert self._answers(app, ca_id, forged.serial_number) == ('revoked', True)
 
-    def test_a_revoked_certificate_deleted_then_imported_again(self, app, auth_client, issuer):
-        ca_id, refid, ca_cert, ca_key = issuer
-        real, key = _leaf('revoked-reimported.example.test', ca_cert, ca_key)
+    @staticmethod
+    def _revoked_and_deleted(app, auth_client, issuer, cn):
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf(cn, ca_cert, ca_key)
         row_id = _store(app, real, refid)
         r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'keyCompromise'})
         assert r.status_code == 200, r.data
         assert auth_client.delete(f'/api/v2/certificates/{row_id}').status_code in (200, 204)
+        return real, key
+
+    def test_a_revoked_certificate_deleted_then_imported_again(self, app, auth_client, issuer):
+        """The import marks the row revoked (proves the import, not the responder)."""
+        _, refid, _, _ = issuer
+        real, key = self._revoked_and_deleted(app, auth_client, issuer, 'revoked-reimported.example.test')
         r = _import(auth_client, real, key)
         assert r.status_code in (200, 201), r.data
-        [(_, caref)] = _rows(app, real)
-        assert caref == refid
+        with app.app_context():
+            row = Certificate.query.filter_by(serial_number=str(real.serial_number)).one()
+            assert (row.caref, row.revoked, row.revoke_reason) == (refid, True, 'keyCompromise')
+
+    def test_a_revoked_certificate_deleted_then_stored_unrevoked(self, app, auth_client, issuer):
+        """The responder reads the record past an unrevoked row (proves the responder, not the import)."""
+        ca_id, refid, _, _ = issuer
+        real, _ = self._revoked_and_deleted(app, auth_client, issuer, 'revoked-restored.example.test')
+        _store(app, real, refid)
         assert self._answers(app, ca_id, real.serial_number) == ('revoked', True)
 
 

@@ -3,7 +3,7 @@ from typing import List, Optional
 from sqlalchemy import or_
 from models import db, CA, Certificate
 from models.crl import CRLMetadata
-from services.cert.serial_resolution import resolve_record_serial, same_serial
+from services.cert.serial_resolution import resolve_record_serial
 from utils.cert_issuer import same_key_refids
 from utils.datetime_utils import utc_now
 
@@ -89,10 +89,12 @@ class CRLQueryMixin:
         child_cas = sorted(_revoked_child_cas(ca, now), key=lambda c: c.id)
         # The certificate record comes first: it carries the invalidity date
         live = _dedupe_live_records(certificates + child_cas)
-        persisted = RevokedSerial.query.filter(
+        from services.cert.issued_lookup import revocation_order
+        # Gravest record of a serial first, as persisted_revocation answers OCSP
+        persisted = sorted(RevokedSerial.query.filter(
             RevokedSerial.caref.in_(same_key_refids(ca)),
             RevokedSerial.valid_to > now,
-        ).order_by(RevokedSerial.revoked_at, RevokedSerial.id).all()
+        ).all(), key=revocation_order)
         return live + CRLQueryMixin._filter_orphan_serials(persisted, live)
 
     @staticmethod
@@ -100,9 +102,8 @@ class CRLQueryMixin:
         """Revocation records a CRL must still carry once the live records are listed.
 
         Dropped: a serial a live record already lists (identical column or
-        same resolved integer, as ``same_serial``), a serial still carried by
-        its linked certificate that is no longer revoked, and repeats of a
-        serial kept earlier in the list."""
+        same resolved integer, as ``same_serial``), and repeats of a serial
+        kept earlier in the list. A record says revoked whichever row it is linked to."""
         listed_columns, listed_ints = set(), set()
 
         def _remember(record):
@@ -123,20 +124,9 @@ class CRLQueryMixin:
         for record in live_records:
             _remember(record)
 
-        linked_ids = {r.certificate_id for r in revoked_serials
-                      if getattr(r, 'certificate_id', None) is not None}
-        linked = {}
-        if linked_ids:
-            linked = {c.id: c for c in Certificate.query.filter(
-                Certificate.id.in_(linked_ids)).all()}
-
         kept = []
         for record in revoked_serials:
             if _listed(record):
-                continue
-            holder = linked.get(getattr(record, 'certificate_id', None))
-            # Lifted revocation the row outlived; a renewed serial differs and stays
-            if holder is not None and not holder.revoked and same_serial(record, holder):
                 continue
             _remember(record)
             kept.append(record)

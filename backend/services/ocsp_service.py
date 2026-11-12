@@ -605,20 +605,11 @@ class OCSPService:
         ).all()
 
     @staticmethod
-    def _persisted_revocation(ca: CA, variants, live=None):
-        """``(revoked_at, reason)`` from the earliest persistent revocation
-        record of *ca* for one of *variants*, else None; ``valid_to`` is not
-        consulted. A record linked to *live*, a non-revoked row, was lifted (as on the CRL)."""
-        from models.revoked_serial import RevokedSerial
-        from utils.cert_issuer import same_key_refids
-        query = RevokedSerial.query.filter(
-            RevokedSerial.caref.in_(same_key_refids(ca)),
-            RevokedSerial.serial_number.in_(list(variants)),
-        )
-        if live is not None:
-            query = query.filter(or_(RevokedSerial.certificate_id.is_(None),
-                                     RevokedSerial.certificate_id != live.id))
-        row = query.order_by(RevokedSerial.revoked_at, RevokedSerial.id).first()
+    def _persisted_revocation(ca: CA, cert_serial: int):
+        """``(revoked_at, reason)`` from the record that says *cert_serial* is revoked
+        under *ca* (``persisted_revocation``), else None; ``valid_to`` is not consulted."""
+        from services.cert.issued_lookup import persisted_revocation
+        row = persisted_revocation(ca, cert_serial)
         if row is None:
             return None
         reason = _REASON_MAP.get(row.revoke_reason, x509.ReasonFlags.unspecified)
@@ -672,8 +663,7 @@ class OCSPService:
         # Persistent revocation table: deleted certificates, a CA deleted after
         # its revocation and imported again, and a non-revoked row holding a
         # serial this CA revoked (reimported, or left by an earlier release)
-        persisted = OCSPService._persisted_revocation(
-            ca, variants, live=certificate if isinstance(certificate, Certificate) else None)
+        persisted = OCSPService._persisted_revocation(ca, cert_serial)
         if persisted:
             revoked_at, reason = persisted
             return certificate, 'revoked', revoked_at, reason
