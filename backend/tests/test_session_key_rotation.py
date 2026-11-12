@@ -383,3 +383,14 @@ def test_a_failed_reload_is_tried_again_until_the_node_has_the_new_key(
     auth_client.get(STATUS)
     assert app.config['SECRET_KEY'] == new
     assert _valid(app, token)
+
+
+def test_the_status_drops_the_grace_once_it_is_over_and_a_rotation_goes_through(
+        app, auth_client, stored, encryption_enabled, monkeypatch):
+    assert auth_client.post(ROTATE, json={}).status_code == 200
+    _later(monkeypatch, stored.GRACE_SECONDS + 1)
+    # Nothing reloaded and the retire task has not run: the rows still hold the previous key
+    assert stored.PREVIOUS_KEY in _rows(app)
+    data = auth_client.get(STATUS).get_json()['data']['session_secret']
+    assert data['previous_accepted_until'] is None
+    assert auth_client.post(ROTATE, json={}).status_code == 200

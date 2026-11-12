@@ -183,6 +183,9 @@ def verification_keys(app) -> list:
 def status(app) -> dict:
     state = _state(app)
     until = state.get('previous_until') if app.config.get('SECRET_KEY_FALLBACKS') else None
+    # Over is over even if nothing reloaded since: the next rotation is accepted then
+    if until is not None and _local_now() >= until:
+        until = None
     return {
         'source': state.get('source', 'environment'),
         'previous_accepted_until': until.isoformat(timespec='seconds') if until else None,
