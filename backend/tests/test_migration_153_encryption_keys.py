@@ -1,4 +1,4 @@
-"""Migrations 153 and 154: encryption_keys and cluster_nodes.kek_fingerprint, both backends, idempotent."""
+"""Migration 153: encryption_keys, both backends, idempotent."""
 import importlib
 import os
 import sqlite3
@@ -17,34 +17,28 @@ def _m153():
     return importlib.import_module('migrations.153_encryption_keys')
 
 
-def _m154():
-    return importlib.import_module('migrations.154_cluster_nodes_kek_fingerprint')
-
-
-def test_sqlite_creates_the_table_and_column_and_is_idempotent():
+def test_sqlite_creates_the_table_and_is_idempotent():
     conn = sqlite3.connect(':memory:')
     conn.execute(NODES_143)
     conn.execute("INSERT INTO cluster_nodes VALUES ('n1', '2026-01-01', '2026-01-01', 1, '3.0', 42, 7, NULL)")
     for _ in range(2):
         _m153().upgrade(conn)
-        _m154().upgrade(conn)
     conn.execute("INSERT INTO encryption_keys VALUES (2, 'active', 'abcdef0123456789', '1:x', '2026-01-01')")
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute("INSERT INTO encryption_keys VALUES (2, 'previous', 'abcdef0123456789', NULL, '2026-01-01')")
-    assert conn.execute("SELECT command_seen, kek_fingerprint FROM cluster_nodes").fetchall() == [(7, None)]
+    assert conn.execute("SELECT command_seen FROM cluster_nodes").fetchall() == [(7,)]
 
 
-def test_sqlite_without_the_registry_creates_the_key_table_only():
+def test_sqlite_creates_the_key_table_alone():
     conn = sqlite3.connect(':memory:')
     _m153().upgrade(conn)
-    _m154().upgrade(conn)
     names = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
     assert 'encryption_keys' in names and 'cluster_nodes' not in names
 
 
 @pytest.mark.postgres
 @pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_postgres_creates_the_table_and_column_and_is_idempotent():
+def test_postgres_creates_the_table_and_is_idempotent():
     from tests.conftest import pg_bench_exclusive
     with pg_bench_exclusive():
         _postgres_round()
@@ -62,11 +56,9 @@ def _postgres_round():
         conn.execute(text("INSERT INTO cluster_nodes VALUES ('n1', now(), now(), TRUE, '3.0', 42, 7, NULL)"))
         for _ in range(2):
             _m153().upgrade(conn)
-            _m154().upgrade(conn)
         conn.execute(text("INSERT INTO encryption_keys VALUES (1, 'previous', 'abcdef0123456789', "
                           "NULL, now())"))
-        assert conn.execute(text("SELECT command_seen, kek_fingerprint FROM cluster_nodes")).fetchall() \
-            == [(7, None)]
+        assert conn.execute(text("SELECT command_seen FROM cluster_nodes")).fetchall() == [(7,)]
         cols = {c['name']: c for c in inspect(conn).get_columns('encryption_keys', schema=schema)}
         assert cols['wrapped']['nullable'] is True and cols['kek_id']['nullable'] is False
     finally:
@@ -83,4 +75,3 @@ def test_the_app_schema_matches_the_migrations(app):
         insp = inspect(db.engine)
         assert {'version', 'state', 'kek_id', 'wrapped', 'created_at'} == {
             c['name'] for c in insp.get_columns('encryption_keys')}
-        assert 'kek_fingerprint' in {c['name'] for c in insp.get_columns('cluster_nodes')}

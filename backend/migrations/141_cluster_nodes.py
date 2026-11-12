@@ -1,6 +1,7 @@
 """Migration 141: HA node registry and cross-node scheduler requests.
 
-``cluster_nodes`` holds one row per node, refreshed by its scheduler process;
+``cluster_nodes`` holds one row per node, refreshed by its scheduler process, with the
+fingerprint of its key-encryption key (never the key);
 ``scheduler_requests`` carries "run now" from any node to the leader;
 ``discovery_scan_runs.node_id`` names the node whose process runs a scan.
 Created on SQLite too, where nothing writes them outside HA.
@@ -15,7 +16,8 @@ RUNS = 'discovery_scan_runs'
 NODES_DDL = ("CREATE TABLE IF NOT EXISTS cluster_nodes ("
              "node_id VARCHAR(255) NOT NULL PRIMARY KEY, "
              "started_at TIMESTAMP NOT NULL, heartbeat_at TIMESTAMP NOT NULL, "
-             "is_leader BOOLEAN NOT NULL DEFAULT {false}, version VARCHAR(32), pid INTEGER)")
+             "is_leader BOOLEAN NOT NULL DEFAULT {false}, version VARCHAR(32), pid INTEGER, "
+             "kek_fingerprint VARCHAR(16))")
 REQUESTS_DDL = ("CREATE TABLE IF NOT EXISTS scheduler_requests ("
                 "id {serial} PRIMARY KEY, task_name VARCHAR(100) NOT NULL, "
                 "requested_at TIMESTAMP NOT NULL, requested_by VARCHAR(255), taken_at TIMESTAMP)")

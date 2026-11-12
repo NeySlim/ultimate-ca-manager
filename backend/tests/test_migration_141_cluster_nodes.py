@@ -1,5 +1,5 @@
-"""Migration 141: cluster_nodes, scheduler_requests and discovery_scan_runs.node_id,
-on both backends and idempotent (the tables stay unused outside HA)."""
+"""Migration 141: cluster_nodes (with kek_fingerprint), scheduler_requests and
+discovery_scan_runs.node_id, on both backends and idempotent (the tables stay unused outside HA)."""
 import importlib
 import os
 import sqlite3
@@ -23,6 +23,7 @@ def test_sqlite_creates_the_tables_and_column_and_is_idempotent():
     _migration().upgrade(conn)
     conn.execute("INSERT INTO cluster_nodes (node_id, started_at, heartbeat_at, is_leader, version, pid) "
                  "VALUES ('n1', '2026-01-01', '2026-01-01', 1, '3.0', 42)")
+    assert conn.execute("SELECT kek_fingerprint FROM cluster_nodes").fetchall() == [(None,)]
     conn.execute("INSERT INTO scheduler_requests (task_name, requested_at, requested_by) "
                  "VALUES ('t', '2026-01-01', 'n1')")
     assert conn.execute(f"SELECT status, node_id FROM {RUNS}").fetchall() == [('running', None)]
@@ -63,6 +64,7 @@ def _postgres_round():
         assert conn.execute(text(f"SELECT status, node_id FROM {RUNS}")).fetchall() == [('running', None)]
         nodes = {c['name']: c for c in inspect(conn).get_columns('cluster_nodes', schema=schema)}
         assert nodes['is_leader']['nullable'] is False
+        assert nodes['kek_fingerprint']['nullable'] is True
         assert conn.execute(text("SELECT taken_at FROM scheduler_requests")).fetchall() == [(None,)]
     finally:
         conn.rollback()
@@ -76,7 +78,8 @@ def test_the_app_schema_matches_the_migration(app):
     from models import db
     with app.app_context():
         insp = inspect(db.engine)
-        assert {'node_id', 'started_at', 'heartbeat_at', 'is_leader', 'version', 'pid'} <= {
+        assert {'node_id', 'started_at', 'heartbeat_at', 'is_leader', 'version', 'pid',
+                'kek_fingerprint'} <= {
             c['name'] for c in insp.get_columns('cluster_nodes')}
         assert {'id', 'task_name', 'requested_at', 'requested_by', 'taken_at'} <= {
             c['name'] for c in insp.get_columns('scheduler_requests')}
