@@ -297,6 +297,8 @@ When SMTP is configured, enable automatic certificate expiry alerts:
 - Select warning thresholds (90, 60, 30, 14, 7, 3, 1 days before expiry)
 - **Check Now** triggers an immediate scan of all certificates
 
+The `certificate.expired` webhooks of a pass cover what expired since the previous pass, at most 30 days back: after a longer outage the older expiries are not announced and the log gives their number. A first pass covers the last day.
+
 ---
 
 ## Backup & Restore
@@ -467,6 +469,8 @@ With `UCM_HA=1`, every node runs against the same PostgreSQL database and names 
 - **Rolling update.** On DEB/RPM, installing an update from System > Updates or the scheduled automatic install updates the nodes one at a time: each node downloads and verifies the package of its own family (DEB, RPM EL9, RPM EL10, RPM Fedora) itself, and the next one starts once the previous one beats again on the new version. A node not back within 15 minutes stops the campaign until an admin resumes it. Docker and Kubernetes refuse it: the orchestrator updates the image. See [HA.md](HA.md#rolling-update-from-the-web-interface-debrpm).
 - **Deployment, prerequisites and refused operations.** See [HA.md](HA.md). Encryption works from any node: see [Private-Key Encryption](#private-key-encryption-kek-and-dek).
 - **Local files.** Tasks that write to the local disk do so on the leader only: local backups, the certificate files mirrored by renewals and session file cleanup stay on that node.
+- **Per-node tasks.** Two tasks run on every node, leader or not: backup retention prunes the archives on the node's own disk, and `update_result` reports the outcome of an update installed on that node.
+- **A pass held by another node.** When the expiry alerts or a CA's scheduled CRL are skipped because another node holds their lease (10 and 15 minutes), the leader runs them once more 30 seconds after the lease ends, however many passes were skipped; the run finds nothing left to do when the holder finished.
 - **Real-time events without Redis.** Every web worker and the scheduler process write their WebSocket events to the `websocket_relay` table; each worker emits to its own browsers the rows written by others (its own events reach its browsers at once) and reads the table every 2 s. On PostgreSQL a `NOTIFY` on channel `ucm_ws_relay` wakes the workers as soon as a row commits, through one extra connection per worker outside the pool, reopened if it drops. Rows are kept 10 minutes and hold what the browsers receive (event type, ids, names, the user and source IP of a login). With `REDIS_URL` set, Redis carries the events and the table is not used.
 - **Scheduled backup.** A run reserves its slot in `system_config` (`backup.last_run`) before writing, so two nodes do not both write it. A run that never concludes (node killed mid-export) is retried after a two-hour lease. The lease is not refreshed while the export runs: an export lasting longer than two hours can be started again by another leader, giving two archives on two nodes. Archives carry neither `backup.last_run` nor `backup.concluded_run`: a restore keeps the target's own schedule.
 
