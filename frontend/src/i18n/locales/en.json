@@ -4344,6 +4344,8 @@
     "step1Title": "Place your master key file at:",
     "mismatchDescription": "The configured master key does not decrypt the stored private keys: it is not the key they were encrypted with. Private keys cannot be accessed until the previous master key is restored.",
     "mismatchStep1Title": "Put the previous master key file back at:",
+    "foreignKekDescription": "Encryption was disabled for this cluster under another key-encryption key: this node's key is not the cluster's. Nothing is encrypted, and this node writes nothing until its key matches.",
+    "foreignKekStep1Title": "Configure the cluster's key-encryption key on this node, in KEY_ENCRYPTION_KEY or at:",
     "step2Title": "Then restart the service:",
     "lostKeyHint": "If you lost the master key, restore from a backup to recover your private keys.",
     "polling": "Checking for resolution..."

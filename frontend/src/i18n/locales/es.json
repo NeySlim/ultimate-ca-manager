@@ -4341,6 +4341,8 @@
     "step1Title": "Coloque su archivo de clave maestra en:",
     "mismatchDescription": "La clave maestra configurada no descifra las claves privadas almacenadas: no es la clave con la que se cifraron. No se puede acceder a las claves privadas hasta restaurar la clave maestra anterior.",
     "mismatchStep1Title": "Vuelva a colocar el archivo de la clave maestra anterior en:",
+    "foreignKekDescription": "Encryption was disabled for this cluster under another key-encryption key: this node's key is not the cluster's. Nothing is encrypted, and this node writes nothing until its key matches.",
+    "foreignKekStep1Title": "Configure the cluster's key-encryption key on this node, in KEY_ENCRYPTION_KEY or at:",
     "step2Title": "Luego reinicie el servicio:",
     "lostKeyHint": "Si perdió la clave maestra, restaure desde una copia de seguridad.",
     "polling": "Verificando..."

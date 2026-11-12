@@ -12,7 +12,7 @@ const POLL_INTERVAL = 5000
 export function SafeModeOverlay() {
   const { t } = useTranslation()
   const [safeMode, setSafeMode] = useState(false)
-  const [mismatch, setMismatch] = useState(false)
+  const [reason, setReason] = useState(null)
   const [checking, setChecking] = useState(true)
   const timerRef = useRef(null)
 
@@ -28,7 +28,7 @@ export function SafeModeOverlay() {
         const data = await resp.json()
         if (data.safe_mode) {
           setSafeMode(true)
-          setMismatch(data.safe_mode_reason === 'encryption_key_mismatch')
+          setReason(data.safe_mode_reason)
           timerRef.current = setTimeout(checkHealth, POLL_INTERVAL)
         } else {
           if (safeMode) {
@@ -45,6 +45,9 @@ export function SafeModeOverlay() {
   }
 
   if (checking || !safeMode) return null
+  // Disabled under another KEK: nothing is encrypted, so no key is lost or undecryptable
+  const foreign = reason === 'encryption_kek_not_the_clusters'
+  const mismatch = reason === 'encryption_key_mismatch'
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-scrim-70 backdrop-blur-sm">
@@ -58,14 +61,16 @@ export function SafeModeOverlay() {
         </h2>
         
         <p className="text-sm text-text-secondary mb-4">
-          {t(mismatch ? 'safeMode.mismatchDescription' : 'safeMode.description')}
+          {t(foreign ? 'safeMode.foreignKekDescription'
+            : mismatch ? 'safeMode.mismatchDescription' : 'safeMode.description')}
         </p>
 
         <div className="bg-bg-tertiary rounded-lg p-4 text-left mb-4 space-y-3">
           <div className="flex items-start gap-2">
             <Key size={18} className="text-accent-primary flex-shrink-0 mt-0.5" />
             <div className="text-sm text-text-primary">
-              <p className="font-medium mb-1">{t(mismatch ? 'safeMode.mismatchStep1Title' : 'safeMode.step1Title')}</p>
+              <p className="font-medium mb-1">{t(foreign ? 'safeMode.foreignKekStep1Title'
+                : mismatch ? 'safeMode.mismatchStep1Title' : 'safeMode.step1Title')}</p>
               <code className="text-xs bg-bg-secondary px-2 py-1 rounded block">
                 /etc/ucm/master.key
               </code>
@@ -82,9 +87,11 @@ export function SafeModeOverlay() {
           </div>
         </div>
 
-        <p className="text-xs text-text-tertiary mb-4">
-          {t('safeMode.lostKeyHint')}
-        </p>
+        {!foreign && (
+          <p className="text-xs text-text-tertiary mb-4">
+            {t('safeMode.lostKeyHint')}
+          </p>
+        )}
 
         <div className="flex items-center justify-center gap-2 text-sm text-text-tertiary">
           <ArrowsClockwise size={14} className="animate-spin" />

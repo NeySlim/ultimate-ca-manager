@@ -4344,6 +4344,8 @@
     "step1Title": "マスターキーファイルを配置してください：",
     "mismatchDescription": "設定されたマスターキーでは保存済みの秘密鍵を復号できません。暗号化に使われたキーではありません。以前のマスターキーを復元するまで秘密鍵にはアクセスできません。",
     "mismatchStep1Title": "以前のマスターキーファイルを次の場所に戻してください：",
+    "foreignKekDescription": "Encryption was disabled for this cluster under another key-encryption key: this node's key is not the cluster's. Nothing is encrypted, and this node writes nothing until its key matches.",
+    "foreignKekStep1Title": "Configure the cluster's key-encryption key on this node, in KEY_ENCRYPTION_KEY or at:",
     "step2Title": "その後サービスを再起動してください：",
     "lostKeyHint": "マスターキーを紛失した場合は、バックアップから復元してください。",
     "polling": "確認中..."

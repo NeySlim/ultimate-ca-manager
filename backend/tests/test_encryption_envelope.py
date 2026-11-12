@@ -1377,3 +1377,51 @@ def test_the_scheduled_retire_says_once_that_the_key_is_kept(app, values, grace,
     assert lines[0].count('kept') == 1
     assert [(v, s) for v, s, _, _ in _rows(app)] == [(1, 'previous'), (2, 'active')]
     _late_write(app, values, Fernet(_kek(encryption_enabled)))  # readable again for teardown
+
+
+def test_in_ha_a_kek_changed_by_hand_after_a_disable_keeps_the_cluster_off(
+        app, auth_client, values, monkeypatch, set_env, encryption_enabled):
+    """The documented manual KEK change, encryption disabled: the marker follows the new KEK."""
+    from security import envelope
+    key_encryption = encryption_enabled.key_encryption
+    _ha(monkeypatch)
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    old = _kek(encryption_enabled)
+    assert [(v, s) for v, s, _, _ in _rows(app)] == [(0, 'disabled')]
+    new = Fernet.generate_key()
+    set_env('KEY_ENCRYPTION_KEY', new.decode())
+    set_env('KEY_ENCRYPTION_KEY_PREVIOUS', old.decode())
+    try:
+        _start(app)
+        assert app.config['SAFE_MODE'] is False
+        assert not key_encryption.is_enabled and key_encryption.kek_loaded
+        new_id = envelope.kek_id(base64.urlsafe_b64decode(new))
+        assert _rows(app) == [(0, 'disabled', new_id, None)]
+        assert _stored(app, values)['target'] == PEM
+    finally:
+        app.config['SAFE_MODE'] = False
+
+
+def test_in_ha_a_node_without_the_previous_kek_names_the_foreign_disable(
+        app, auth_client, values, monkeypatch, set_env, encryption_enabled):
+    """Nothing is encrypted, so no key is "undecryptable": the node is told its KEK is not the
+    cluster's, and writes nothing (started off, an enable from it would encrypt under it)."""
+    from security.master_key_bootstrap import reload_encryption_state
+    key_encryption = encryption_enabled.key_encryption
+    _ha(monkeypatch)
+    assert auth_client.post('/api/v2/system/security/disable-encryption').status_code == 200
+    set_env('KEY_ENCRYPTION_KEY', Fernet.generate_key().decode())
+    try:
+        _start(app)
+        assert app.config['SAFE_MODE'] is True
+        assert app.config['SAFE_MODE_REASON'] == 'encryption_kek_not_the_clusters'
+        assert key_encryption.encrypt_string('x') == 'x'
+        assert [(v, s) for v, s, _, _ in _rows(app)] == [(0, 'disabled')]
+        # A peer's reload command reaches the same verdict
+        app.config['SAFE_MODE_REASON'] = None
+        with app.app_context():
+            reload_encryption_state(app)
+        assert app.config['SAFE_MODE'] is True
+        assert app.config['SAFE_MODE_REASON'] == 'encryption_kek_not_the_clusters'
+    finally:
+        app.config['SAFE_MODE'] = False

@@ -4341,6 +4341,8 @@
     "step1Title": "将主密钥文件放置在：",
     "mismatchDescription": "配置的主密钥无法解密已存储的私钥：它不是加密这些私钥时使用的密钥。在恢复之前的主密钥之前，无法访问私钥。",
     "mismatchStep1Title": "将之前的主密钥文件放回：",
+    "foreignKekDescription": "Encryption was disabled for this cluster under another key-encryption key: this node's key is not the cluster's. Nothing is encrypted, and this node writes nothing until its key matches.",
+    "foreignKekStep1Title": "Configure the cluster's key-encryption key on this node, in KEY_ENCRYPTION_KEY or at:",
     "step2Title": "然后重启服务：",
     "lostKeyHint": "如果丢失了主密钥，请从备份中恢复。",
     "polling": "正在检查..."

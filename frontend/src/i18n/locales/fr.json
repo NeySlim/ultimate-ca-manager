@@ -4344,6 +4344,8 @@
     "step1Title": "Placez votre fichier de clé maître dans :",
     "mismatchDescription": "La clé maître configurée ne déchiffre pas les clés privées stockées : ce n'est pas celle qui les a chiffrées. Les clés privées restent inaccessibles tant que la clé maître précédente n'est pas restaurée.",
     "mismatchStep1Title": "Remettez le fichier de la clé maître précédente dans :",
+    "foreignKekDescription": "Encryption was disabled for this cluster under another key-encryption key: this node's key is not the cluster's. Nothing is encrypted, and this node writes nothing until its key matches.",
+    "foreignKekStep1Title": "Configure the cluster's key-encryption key on this node, in KEY_ENCRYPTION_KEY or at:",
     "step2Title": "Puis redémarrez le service :",
     "lostKeyHint": "Si vous avez perdu la clé maître, restaurez à partir d'une sauvegarde pour récupérer vos clés privées.",
     "polling": "Vérification en cours..."
