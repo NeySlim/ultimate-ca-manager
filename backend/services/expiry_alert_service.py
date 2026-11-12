@@ -17,18 +17,20 @@ from utils.days_remaining import days_remaining as compute_days_remaining
 logger = logging.getLogger(__name__)
 
 
-def get_expiring_certificates(days: int = 30, include_revoked: bool = False) -> List[Dict[str, Any]]:
+def get_expiring_certificates(days: int = 30, include_revoked: bool = False,
+                              now=None) -> List[Dict[str, Any]]:
     """
     Get certificates expiring within specified days
     
     Args:
         days: Number of days to look ahead
         include_revoked: Include revoked certificates
+        now: Reference instant (default: this host's clock)
         
     Returns:
         List of certificate info dicts
     """
-    now = utc_now()
+    now = now or utc_now()
     cutoff = now + timedelta(days=days)
     
     query = Certificate.query.filter(
@@ -62,38 +64,38 @@ def get_expiring_certificates(days: int = 30, include_revoked: bool = False) -> 
     return result
 
 
-def _emit_expiry_webhooks():
+def _emit_expiry_webhooks(expiring=True, expired_after=None, now=None):
     """Fire certificate.expiring / certificate.expired webhooks.
 
     Independent of SMTP config (webhooks must work even when email is off).
-    Runs daily with the scheduled check; 'expiring' is a recurring reminder
-    for the active window, 'expired' is bounded to certs that crossed expiry
-    in the last 24h so each expiry emits roughly once.
+    'expiring' is a recurring reminder for the active window; 'expired' covers
+    certificates whose expiry falls in (expired_after, now], the last 24h by default.
     """
     try:
         from services.webhook_service import emit_cert_expiring, emit_cert_expired
         from models import Certificate
-        from utils.datetime_utils import utc_now
-        from datetime import timedelta
 
-        for cert in get_expiring_certificates(days=30, include_revoked=False):
-            d = cert.get('days_until_expiry', 0)
-            if d > 0:
-                emit_cert_expiring(cert, days_left=d, ca_refid=cert.get('issuer_ca_id'))
+        now = now or utc_now()
+        expired_after = expired_after or now - timedelta(days=1)
+        if expiring:
+            for cert in get_expiring_certificates(days=30, include_revoked=False, now=now):
+                d = cert.get('days_until_expiry', 0)
+                if d > 0:
+                    emit_cert_expiring(cert, days_left=d, ca_refid=cert.get('issuer_ca_id'))
 
-        now = utc_now()
         just_expired = Certificate.query.filter(
             Certificate.valid_to <= now,
-            Certificate.valid_to > now - timedelta(days=1),
+            Certificate.valid_to > expired_after,
             Certificate.revoked.isnot(True),
         ).all()
         for cert in just_expired:
             emit_cert_expired(cert.to_dict(), ca_refid=cert.caref)
 
         from services.ca.cross_certs import expiring_alerts
-        soon, gone = expiring_alerts(days=30)
-        for ca_refid, payload in soon:
-            emit_cert_expiring(payload, days_left=payload['days_until_expiry'], ca_refid=ca_refid)
+        soon, gone = expiring_alerts(days=30, now=now, expired_after=expired_after)
+        if expiring:
+            for ca_refid, payload in soon:
+                emit_cert_expiring(payload, days_left=payload['days_until_expiry'], ca_refid=ca_refid)
         for ca_refid, payload in gone:
             emit_cert_expired(payload, ca_refid=ca_refid)
     except Exception as e:

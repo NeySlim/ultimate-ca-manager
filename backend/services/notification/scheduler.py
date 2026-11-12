@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import List, Dict
 from models import CA, Certificate
 from models.email_notification import NotificationLog
@@ -13,9 +13,10 @@ from ._constants import CERT_EXPIRING, CRL_EXPIRING
 
 logger = logging.getLogger(__name__)
 
-# HA: one node at a time runs the expiry pass; the webhooks go out once per cluster day
+# HA: one node at a time runs the expiry pass. The webhook mark is the cluster instant of
+# the last emission: the next pass announces what expired since, whichever node runs it.
 EXPIRY_LEASE_KEY = 'expiry_alerts.lease'
-EXPIRY_WEBHOOKS_DAY_KEY = 'expiry_alerts.webhooks_day'
+EXPIRY_WEBHOOKS_MARK_KEY = 'expiry_alerts.webhooks_mark'
 EXPIRY_LEASE = timedelta(minutes=10)
 
 
@@ -28,23 +29,33 @@ class _NoLease:
         pass
 
 
-def _cluster_day() -> str:
+def _cluster_now():
     from services.scheduler_leader import cluster_utc_now
-    return cluster_utc_now().date().isoformat()
+    return cluster_utc_now()
 
 
-def _emit_webhooks_once_a_day():
-    """HA: the expiry webhooks of a cluster day, marked once emitted; a pass cut short
-    before the mark emits them again once the lease is over."""
+def _parse_mark(value):
+    try:
+        return datetime.fromisoformat(value) if value else None
+    except ValueError:
+        return None
+
+
+def _emit_webhooks_in_ha():
+    """HA: 'expired' covers (last mark, now], 'expiring' reminders go out once per cluster
+    day; a pass cut short before the mark is emitted again once the lease is over."""
     from models import SystemConfig, db
     from utils.config_cas import config_compare_and_set
     from services import expiry_alert_service
-    day = _cluster_day()
-    previous = db.session.query(SystemConfig.value).filter_by(key=EXPIRY_WEBHOOKS_DAY_KEY).scalar()
-    if previous == day:
-        return
-    expiry_alert_service._emit_expiry_webhooks()
-    config_compare_and_set(EXPIRY_WEBHOOKS_DAY_KEY, previous, day)
+    now = _cluster_now()
+    previous = db.session.query(SystemConfig.value).filter_by(key=EXPIRY_WEBHOOKS_MARK_KEY).scalar()
+    last = _parse_mark(previous)
+    expiry_alert_service._emit_expiry_webhooks(
+        expiring=last is None or last.date() != now.date(),
+        expired_after=last if last is not None else now - timedelta(days=1),
+        now=now,
+    )
+    config_compare_and_set(EXPIRY_WEBHOOKS_MARK_KEY, previous, now.isoformat())
 
 
 class NotificationSchedulerMixin:
@@ -204,7 +215,7 @@ class NotificationSchedulerMixin:
                 from services.expiry_alert_service import _emit_expiry_webhooks
                 _emit_expiry_webhooks()
             elif lease.renew():
-                _emit_webhooks_once_a_day()
+                _emit_webhooks_in_ha()
             else:
                 return NotificationSchedulerMixin._taken_over(results)
         except Exception as e:

@@ -7,11 +7,11 @@ dies holding it frees it once the lease is over. Outside HA nothing is reserved.
 import base64
 import os
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import pytest
 
-from models import SystemConfig, db
+from models import Certificate, SystemConfig, db
 from models.email_notification import NotificationLog
 from services import expiry_alert_service
 from services.crl_scheduler_task import CRLSchedulerTask
@@ -28,7 +28,7 @@ from utils.datetime_utils import utc_now
 _PG_URL = os.environ.get('UCM_TEST_PG_URL')
 _on_pg = [pytest.mark.postgres, pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')]
 
-_EXPIRY_KEYS = (notification_scheduler.EXPIRY_LEASE_KEY, notification_scheduler.EXPIRY_WEBHOOKS_DAY_KEY)
+_EXPIRY_KEYS = (notification_scheduler.EXPIRY_LEASE_KEY, notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY)
 
 
 def _set(key, value):
@@ -98,7 +98,7 @@ def _record_sends(monkeypatch):
 
 def _record_webhook_passes(monkeypatch):
     passes = []
-    monkeypatch.setattr(expiry_alert_service, '_emit_expiry_webhooks', lambda: passes.append(1))
+    monkeypatch.setattr(expiry_alert_service, '_emit_expiry_webhooks', lambda **_: passes.append(1))
     return passes
 
 
@@ -146,26 +146,29 @@ def test_a_pass_whose_lease_was_taken_over_stops_sending(
     assert passes == []
 
 
-def test_expiry_webhooks_fire_once_per_day_in_ha(app, ha, monkeypatch):
-    passes = _record_webhook_passes(monkeypatch)
-    days = iter(['2026-11-11', '2026-11-11', '2026-11-12'])
-    monkeypatch.setattr(notification_scheduler, '_cluster_day', lambda: next(days))
+def test_expiring_reminders_fire_once_per_day_in_ha(app, ha, monkeypatch):
+    passes = []
+    monkeypatch.setattr(expiry_alert_service, '_emit_expiry_webhooks',
+                        lambda expiring=True, **_: passes.append(expiring))
+    first = datetime(2026, 11, 11, 1, 0)
+    instants = iter([first, first + timedelta(hours=20), first + timedelta(hours=24)])
+    monkeypatch.setattr(notification_scheduler, '_cluster_now', lambda: next(instants))
     with app.app_context():
-        _set(notification_scheduler.EXPIRY_WEBHOOKS_DAY_KEY, None)
+        _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, None)
         for _ in range(3):
             NotificationService.run_scheduled_checks()
-        assert _value(notification_scheduler.EXPIRY_WEBHOOKS_DAY_KEY) == '2026-11-12'
-    assert passes == [1, 1]
+        assert _value(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY) == (first + timedelta(hours=24)).isoformat()
+    assert passes == [True, False, True]
 
 
 def test_expiry_checks_reserve_nothing_outside_ha(app, monkeypatch):
     passes = _record_webhook_passes(monkeypatch)
     with app.app_context():
         _set(notification_scheduler.EXPIRY_LEASE_KEY, _held_elsewhere(1))
-        _set(notification_scheduler.EXPIRY_WEBHOOKS_DAY_KEY, None)
+        _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, None)
         NotificationService.run_scheduled_checks()
         NotificationService.run_scheduled_checks()
-        assert _value(notification_scheduler.EXPIRY_WEBHOOKS_DAY_KEY) is None
+        assert _value(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY) is None
     assert passes == [1, 1]
 
 
@@ -179,13 +182,67 @@ def test_the_manual_check_reports_a_run_held_elsewhere(app, ha, auth_client, mon
     assert 'another node' in response.get_json()['message']
 
 
+def _record_expiry_webhooks(monkeypatch, cert_id):
+    emitted = {'expiring': 0, 'expired': 0}
+
+    def recorder(kind):
+        def emit(cert, *args, **kwargs):
+            if cert.get('id') == cert_id:
+                emitted[kind] += 1
+        return emit
+    monkeypatch.setattr('services.webhook_service.emit_cert_expiring', recorder('expiring'))
+    monkeypatch.setattr('services.webhook_service.emit_cert_expired', recorder('expired'))
+    return emitted
+
+
+def _passes_at(app, monkeypatch, instants):
+    clock = iter(instants)
+    monkeypatch.setattr(notification_scheduler, '_cluster_now', lambda: next(clock))
+    with app.app_context():
+        for _ in instants:
+            NotificationService.run_scheduled_checks()
+
+
+def _expires_at(app, cert_id, valid_to):
+    with app.app_context():
+        cert = db.session.get(Certificate, cert_id)
+        cert.valid_from, cert.valid_to = valid_to - timedelta(days=365), valid_to
+        db.session.commit()
+
+
+def test_a_certificate_expired_before_a_same_day_leader_change_is_announced_once(
+        app, ha, create_cert, monkeypatch):
+    # Old leader at 00:30, certificate expired at 10:30, new leader at 23:00 then 23:00 the day after
+    cert_id = create_cert(cn='expired-leader-change.example.com')['id']
+    day = datetime(2031, 3, 4, 0, 30)
+    _expires_at(app, cert_id, day + timedelta(hours=10))
+    emitted = _record_expiry_webhooks(monkeypatch, cert_id)
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, None)
+    _passes_at(app, monkeypatch, [day, day + timedelta(hours=22, minutes=30),
+                                  day + timedelta(hours=46, minutes=30)])
+    assert emitted == {'expiring': 1, 'expired': 1}
+
+
+def test_a_certificate_expired_during_a_long_pause_is_announced_once(
+        app, ha, create_cert, monkeypatch):
+    cert_id = create_cert(cn='expired-pause.example.com')['id']
+    last = datetime(2031, 3, 4, 0, 30)
+    _expires_at(app, cert_id, last + timedelta(hours=2))
+    emitted = _record_expiry_webhooks(monkeypatch, cert_id)
+    with app.app_context():
+        _set(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY, None)
+    _passes_at(app, monkeypatch, [last, last + timedelta(hours=30), last + timedelta(hours=54)])
+    assert emitted == {'expiring': 1, 'expired': 1}
+
+
 @pytest.mark.parametrize('_backend', [pytest.param('pg', marks=_on_pg)])
 def test_two_nodes_checking_expiry_at_once_emit_once_on_postgresql(app, ha, monkeypatch, _backend):
     passes = _record_webhook_passes(monkeypatch)
     with _pg(app):
         _twice_at_once(app, NotificationService.run_scheduled_checks, config_cas, '_held_value')
         with app.app_context():
-            assert _value(notification_scheduler.EXPIRY_WEBHOOKS_DAY_KEY) is not None
+            assert _value(notification_scheduler.EXPIRY_WEBHOOKS_MARK_KEY) is not None
             db.session.remove()
     assert passes == [1]
 
