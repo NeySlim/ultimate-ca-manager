@@ -16,6 +16,8 @@ XCEP_URL = '/ADPolicyProvider_CEP_UsernamePassword/service.svc'
 XCEP_USER = 'xcep-test'
 XCEP_PASSWORD = 'xcep-password'
 XCEP_NS = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollmentpolicy'
+# The CAs this file creates are removed after it
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 
 
 def _set_config(key, value):
@@ -327,7 +329,7 @@ def test_get_policies_falls_back_to_active_templates_when_unpinned(client, app, 
             restore({'xcep_ca_refid': previous_value})
 
 
-def test_get_policies_autoenroll_reflects_per_template_flag(client, app, create_ca):
+def test_get_policies_autoenroll_reflects_per_template_flag(client, app, create_ca, xcep_config):
     """autoEnroll must be per-template (autoenroll_enabled), independent of
     enroll -- a template with it on gets autoEnroll=true; one without still
     gets enroll=true (can be requested manually) but autoEnroll=false (not
@@ -378,7 +380,7 @@ def test_get_policies_autoenroll_reflects_per_template_flag(client, app, create_
             restore({'xcep_ca_refid': previous_value})
 
 
-def test_get_policies_template_oid_arcs_fit_uint32(client, app, create_ca):
+def test_get_policies_template_oid_arcs_fit_uint32(client, app, create_ca, xcep_config):
     """A policy OID with a single arc holding a full 128-bit value (the
     ITU-T X.667 ``2.25.<uuid-as-decimal>`` form) makes a real Windows
     client's ``CX509EnrollmentPolicyWebService.GetTemplates()`` silently
@@ -397,7 +399,6 @@ def test_get_policies_template_oid_arcs_fit_uint32(client, app, create_ca):
         ca = db.session.get(CA, ca_data['id'])
         previous_value = get_config('xcep_ca_refid')
         _set_config('xcep_ca_refid', ca.refid)
-        _set_config('xcep_enabled', 'true')
 
         templates = [
             CertificateTemplate(
