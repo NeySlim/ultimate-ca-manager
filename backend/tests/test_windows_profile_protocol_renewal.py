@@ -196,3 +196,54 @@ def test_scep_manual_approval_refuses_a_windows_certificate(app, scep_ca, window
         service.approve_request(held.transaction_id, 'admin')
     db.session.rollback()
     assert Certificate.query.count() == before
+
+
+def test_scep_renewal_by_a_windows_certificate_past_its_not_after_is_audited(
+        app, scep_ca, windows_profile, monkeypatch):
+    """The validity window refuses it anyway: the refusal still says, and records, why."""
+    ca, ca_cert = scep_ca
+    profile_id, name = windows_profile
+    cn = f'c11-scep-lapsed-{uuid.uuid4().hex[:6]}.example.test'
+    old_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    issued = _enroll(ca, ca_cert, old_key, cn)
+    _bind(issued, profile_id, 'enabled')
+    later = issued.not_valid_after_utc.replace(tzinfo=None) + timedelta(days=1)
+    monkeypatch.setattr('services.scep.scep_service.utc_now', lambda: later)
+
+    response, _ = _renewal(ca, ca_cert, issued, old_key, cn)
+
+    assert _response_attributes(response)[PKI_STATUS_OID] == '2'
+    (entry,) = _refusals(cn)
+    assert entry.resource_name == name
+
+
+def test_a_revoked_windows_certificate_answers_revoked(app, scep_ca, windows_profile):
+    from services.cert.issued_lookup import REVOKED, WINDOWS_PROFILE, protocol_renewal_status
+    ca, ca_cert = scep_ca
+    cn = f'c11-revoked-{uuid.uuid4().hex[:6]}.example.test'
+    issued = _enroll(ca, ca_cert, rsa.generate_private_key(public_exponent=65537, key_size=2048), cn)
+    _bind(issued, windows_profile[0], 'enabled')
+    assert protocol_renewal_status(ca, issued)[1] == WINDOWS_PROFILE
+    Certificate.query.filter_by(serial_number=str(issued.serial_number)).update(
+        {'revoked': True}, synchronize_session=False)
+    db.session.commit()
+    try:
+        assert protocol_renewal_status(ca, issued)[1] == REVOKED
+    finally:
+        Certificate.query.filter_by(serial_number=str(issued.serial_number)).update(
+            {'revoked': False}, synchronize_session=False)
+        db.session.commit()
+
+
+def test_the_refusal_names_the_row_that_carries_the_profile(app, scep_ca, monkeypatch):
+    """A plain live twin beside the archived Windows row: the audit reads the Windows one."""
+    from types import SimpleNamespace
+    from services.cert import issued_lookup
+    ca, ca_cert = scep_ca
+    cn = f'c11-twin-{uuid.uuid4().hex[:6]}.example.test'
+    issued = _enroll(ca, ca_cert, rsa.generate_private_key(public_exponent=65537, key_size=2048), cn)
+    plain = SimpleNamespace(revoked=False, archived=False, valid_to=None, windows_profile_id=None, source='scep')
+    windows = SimpleNamespace(revoked=False, archived=True, valid_to=None, windows_profile_id=7, source='wstep')
+    monkeypatch.setattr(issued_lookup, 'find_issued_rows', lambda *_: [plain, windows])
+    assert issued_lookup.protocol_renewal_status(ca, issued) == (windows, issued_lookup.WINDOWS_PROFILE)
+

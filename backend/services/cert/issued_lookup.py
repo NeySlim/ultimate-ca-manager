@@ -398,9 +398,11 @@ def protocol_renewal_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[Ce
     profile holds (an id, even of a profile deleted since, or a ``wstep`` row) answers WINDOWS_PROFILE,
     expired or superseded alike; only REVOKED takes precedence."""
     row, status = issued_certificate_status(ca, cert)
-    if status != REVOKED and any(r.windows_profile_id is not None or r.source == 'wstep'
-                            for r in find_issued_rows(ca, cert)):
-        return row, WINDOWS_PROFILE
+    # The row that carries the profile answers, not a plain twin beside it: the audit names it
+    held = next((r for r in find_issued_rows(ca, cert)
+                 if r.windows_profile_id is not None or r.source == 'wstep'), None)
+    if status != REVOKED and held is not None:
+        return held, WINDOWS_PROFILE
     return row, status
 
 
