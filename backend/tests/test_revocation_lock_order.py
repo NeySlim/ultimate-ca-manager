@@ -111,3 +111,69 @@ def test_an_unhold_and_a_revocation_lock_the_spellings_of_a_serial_in_one_order(
         revocation.join(30)
         unhold.join(30)
     assert outcome == {'revoke': 'ok', 'unhold': 'ok'}, outcome
+
+
+def test_a_revocation_during_the_pass_does_not_deadlock(app, auth_client, issuer, monkeypatch):
+    """The row of serial 0x12345678 spelled "12345678": its revocation also locks the record of
+    decimal 12345678 (that spelling). The pass, paused after marking that serial's row, must already
+    hold the lower record too, or it asks for it after the revocation took it."""
+    from sqlalchemy import update
+    from services.cert import issued_lookup
+    if not _on_postgresql(app):
+        pytest.skip('row locks are PostgreSQL behaviour; SQLite serializes writers')
+    _, refid, ca_cert, ca_key = issuer
+    other_real, other_key = _leaf('order-pass-decimal.example.test', ca_cert, ca_key, days=200,
+                                  serial=12345678)
+    real, key = _leaf('order-pass-hex.example.test', ca_cert, ca_key, days=200, serial=0x12345678)
+    other_id = _store(app, other_real, refid, key=other_key)
+    row_id = _store(app, real, refid, key=key)
+    lower = _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
+    higher = _record(app, refid, other_real, certificate_id=other_id)
+    assert lower < higher
+    with app.app_context():
+        engine = db.engine
+    with engine.begin() as conn:
+        conn.execute(update(Certificate).where(Certificate.id == row_id).values(serial_number='12345678'))
+    paused, release, outcome, first = threading.Event(), threading.Event(), {}, []
+    mark = issued_lookup._mark_while_recorded
+
+    def pause_after_the_first_mark(row, record):
+        done = mark(row, record)
+        if threading.current_thread().name == 'pass' and not first:
+            first.append(row.id)
+            paused.set()
+            release.wait(30)
+        return done
+    monkeypatch.setattr(issued_lookup, '_mark_while_recorded', pause_after_the_first_mark)
+
+    def hourly_pass():
+        with app.app_context():
+            try:
+                outcome['marked'] = len(issued_lookup.apply_persisted_revocations({other_id, row_id}))
+                db.session.commit()
+            except Exception as e:  # noqa: BLE001  (the deadlock victim, if any)
+                db.session.rollback()
+                outcome['pass'] = repr(e)
+            finally:
+                paused.set()
+                db.session.remove()
+
+    def release_once_the_revocation_waits():
+        with engine.connect() as conn:
+            outcome['waited'] = _wait_for_a_lock_waiter(conn, 10)
+        release.set()
+
+    worker = threading.Thread(target=hourly_pass, name='pass')
+    worker.start()
+    assert paused.wait(30)
+    assert first == [other_id], first
+    releaser = threading.Thread(target=release_once_the_revocation_waits)
+    releaser.start()
+    r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'keyCompromise'})
+    worker.join(30)
+    releaser.join(30)
+    assert 'pass' not in outcome and outcome.get('waited'), outcome
+    assert r.status_code == 200, r.data
+    assert outcome['marked'] == 2
+    assert _row(app, row_id)[:2] == (True, 'keyCompromise')
+    assert _row(app, other_id)[:2] == (True, 'keyCompromise')

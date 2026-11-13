@@ -251,12 +251,21 @@ def apply_persisted_revocation(row: Certificate, record=None) -> bool:
     return True
 
 
+def _records_still_held(records) -> set:
+    """The ids of ``records`` still stored, read again under share locks (PostgreSQL) held to the
+    commit and taken by ascending id, the order unholds and revocations lock records in: an unhold
+    that deleted one first wins, and one deleting it later waits for the mark."""
+    ids, held = sorted({record.id for record in records}), set()
+    for start in range(0, len(ids), 500):
+        held.update(i for (i,) in db.session.query(RevokedSerial.id).filter(
+            RevokedSerial.id.in_(ids[start:start + 500])).order_by(RevokedSerial.id)
+            .with_for_update(read=True))
+    return held
+
+
 def _record_still_held(record) -> bool:
-    """Whether ``record`` is still stored, read again under a share lock (PostgreSQL) held to the
-    commit: an unhold that deleted it first wins, and one deleting it later waits for the mark,
-    as unholds lock a serial's records before its row."""
-    return db.session.query(RevokedSerial.id).filter(RevokedSerial.id == record.id) \
-        .with_for_update(read=True).first() is not None
+    """``_records_still_held`` of one record."""
+    return record.id in _records_still_held([record])
 
 
 def _mark_while_recorded(row: Certificate, record) -> bool:
@@ -300,7 +309,7 @@ def apply_persisted_revocations(ids=None) -> list:
         RevokedSerial.serial_number).distinct()}
     columns = sorted({form for serial in serials if serial is not None
                       for form in unambiguous_serial_spellings(serial)})
-    marked = []
+    found = []
     for start in range(0, len(columns), 500):
         # A pre-filter only: row_persisted_revocation below is the guard
         for row in Certificate.query.filter(
@@ -310,10 +319,12 @@ def apply_persisted_revocations(ids=None) -> list:
             if ids is not None and row.id not in ids:
                 continue
             record = row_persisted_revocation(row)
-            if (record is not None and _record_still_held(record)
-                    and _mark_while_recorded(row, record)):
-                marked.append((row, record))
-    return marked
+            if record is not None:
+                found.append((row, record))
+    # Every record locked before any row is marked, as an unhold or a revocation takes them
+    held = _records_still_held(record for _, record in found)
+    return [(row, record) for row, record in found
+            if record.id in held and _mark_while_recorded(row, record)]
 
 
 def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[Certificate], str]:
