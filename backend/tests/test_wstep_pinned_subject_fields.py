@@ -24,7 +24,7 @@ from models.certificate_template import CertificateTemplate
 from tests.fixtures.templates import delete_templates, template_ids_named
 from services.ad_connector import lookup as ad_lookup
 from services.wstep import wstep_service
-from tests.windows_profile_support import connectors_kept
+from tests.windows_profile_support import connectors_kept, default_profile, default_realm
 
 
 # The CAs and certificates this file issues are removed after it
@@ -34,7 +34,7 @@ pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
 @pytest.fixture(autouse=True)
 def _connectors_put_back(app):
     """The connector rows this file deletes and rewrites are the session's: put back."""
-    with connectors_kept(app):
+    with connectors_kept(app), default_realm(app, 'HAGLAND.DOMAIN'):
         yield
 
 
@@ -176,7 +176,7 @@ class TestRequiredPinnedSubjectFieldsConflict:
                     extensions_template='{}', is_active=True,
                     pinned_subject_fields=json.dumps({'O': 'Acme Corp'}),
                 )
-                result = wstep_service._required_pinned_subject_fields(ca, template)
+                result = wstep_service._required_pinned_subject_fields(ca, template, profile=None)
             assert result == {'O': 'Acme Corp'}
         finally:
             _clear_pinned_templates(app)
@@ -195,7 +195,7 @@ class TestRequiredPinnedSubjectFieldsConflict:
                     {'O': 'Other Corp'}, extended_key_usage=['clientAuth'],
                 )
                 with caplog.at_level(logging.WARNING):
-                    result = wstep_service._required_pinned_subject_fields(ca, None)
+                    result = wstep_service._required_pinned_subject_fields(ca, None, profile=None)
             assert 'O' not in result
             assert result.get('C') == 'US'
             assert any('conflicting values' in r.message for r in caplog.records)
@@ -211,7 +211,7 @@ class TestRequiredPinnedSubjectFieldsConflict:
                     app, ca.id, 'Test Pinned Template',
                     {'O': 'Acme Corp', 'OU': 'IT'}, extended_key_usage=['clientAuth'],
                 )
-                result = wstep_service._required_pinned_subject_fields(ca, None)
+                result = wstep_service._required_pinned_subject_fields(ca, None, profile=None)
             assert result == {'O': 'Acme Corp', 'OU': 'IT'}
         finally:
             _clear_pinned_templates(app)
@@ -247,7 +247,7 @@ class TestPinnedSubjectFieldsIssuance:
                 csr, _key = _make_csr()
                 cert_pem, err = wstep_service.issue(
                     ca, csr.public_bytes(Encoding.DER), validity_days=30,
-                    kerberos_principal='WIN11$@HAGLAND.DOMAIN',
+                    kerberos_principal='WIN11$@HAGLAND.DOMAIN', profile=default_profile(),
                 )
             assert err is None, err
             cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -272,7 +272,7 @@ class TestPinnedSubjectFieldsIssuance:
                     x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Evil Corp'),
                     x509.NameAttribute(NameOID.COMMON_NAME, 'device.hagland.domain'),
                 ])
-                cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30)
+                cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30, profile=None)
             assert err is None, err
             cert = x509.load_pem_x509_certificate(cert_pem.encode())
             assert cert.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)[0].value == 'Acme Corp'
@@ -293,7 +293,7 @@ class TestPinnedSubjectFieldsIssuance:
                 )
                 csr, _key = _make_csr(common_name='device.hagland.domain')
                 cert_pem, err = wstep_service.issue(
-                    ca, csr.public_bytes(Encoding.DER), validity_days=30, kerberos_principal=None,
+                    ca, csr.public_bytes(Encoding.DER), validity_days=30, kerberos_principal=None, profile=None,
                 )
             assert err is None, err
             cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -313,7 +313,7 @@ class TestPinnedSubjectFieldsIssuance:
                     x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'Whatever Corp'),
                     x509.NameAttribute(NameOID.COMMON_NAME, 'device.hagland.domain'),
                 ])
-                cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30)
+                cert_pem, err = wstep_service.issue(ca, csr.public_bytes(Encoding.DER), validity_days=30, profile=None)
             assert err is None, err
             cert = x509.load_pem_x509_certificate(cert_pem.encode())
             assert cert.subject.get_attributes_for_oid(NameOID.ORGANIZATION_NAME)[0].value == 'Whatever Corp'

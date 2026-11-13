@@ -356,7 +356,7 @@ class TestEveryIssuancePath:
         with app.app_context():
             ca_row = db.session.get(CA, ca['id'])
             der = _csr(_ed25519(), cn='ed.wstep.fips.test').public_bytes(serialization.Encoding.DER)
-            cert_pem, err = wstep_service.issue(ca_row, der, 30)
+            cert_pem, err = wstep_service.issue(ca_row, der, 30, profile=None)
             assert cert_pem is None and err.startswith('Policy violation') and 'FIPS mode' in err, err
 
     def test_scep(self, app, fips, create_ca):

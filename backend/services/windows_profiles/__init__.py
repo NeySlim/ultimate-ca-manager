@@ -1,7 +1,7 @@
 """Access to the Windows enrollment profiles (XCEP, WSTEP, Kerberos).
 
-Until routing by realm exists, every request is served by the default profile, and only
-while it is enabled: a disabled profile serves nothing.
+A Kerberos request is served by the profile whose realm is the principal's, and only while
+it is enabled; the UsernamePassword binding by the default profile alone (A2).
 """
 import logging
 
@@ -61,14 +61,89 @@ def serving_profile():
     return profile if profile is not None and profile.enabled else None
 
 
-def kerberos_refusal():
-    """Why the default profile serves no Kerberos client, None when it may (A1)."""
-    profile = default_profile()
+def kerberos_refusal(profile=None):
+    """Why *profile* (the default when omitted) serves no Kerberos client, None when it may (A1)."""
+    profile = profile if profile is not None else default_profile()
     if profile is None:
         return 'no Windows enrollment profile'
     if not profile.enabled:
         return 'default profile is disabled'
     return None if profile.realm else NO_REALM
+
+
+UNKNOWN_REALM = 'no profile serves this realm'
+PROFILE_DISABLED = 'the profile of this realm is disabled'
+MALFORMED_PRINCIPAL = 'the principal names no realm'
+
+
+def profile_for_realm(realm):
+    """The profile of *realm*, compared exactly (RFC 4120 §6.1) by the unique index."""
+    if not realm:
+        return None
+    return WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.realm == realm).one_or_none()
+
+
+def kerberos_route(principal):
+    """``(profile, realm, refusal)`` for an authenticated Kerberos *principal*: the enabled
+    profile of its realm, else None and why. Never the default for another realm."""
+    from services.ad_connector.lookup import parse_kerberos_principal
+    parsed = parse_kerberos_principal(principal)
+    if parsed is None:
+        return None, None, MALFORMED_PRINCIPAL
+    realm = parsed[1]
+    profile = profile_for_realm(realm)
+    if profile is None:
+        return None, realm, UNKNOWN_REALM
+    if not profile.enabled:
+        return profile, realm, PROFILE_DISABLED
+    return profile, realm, None
+
+
+def audit_kerberos_refusal(binding, principal, realm, profile, reason):
+    """One audit entry per refused Kerberos request: Windows shows the requester a generic code."""
+    from services.audit.staging import stage_audit_entry
+    from utils.db_transaction import safe_commit
+    from utils.trusted_proxy import client_ip
+    name = profile.name if profile is not None else None
+    stage_audit_entry(
+        action='windows_enrollment.refused', resource_type='windows_profile',
+        resource_id=str(profile.id) if profile is not None else None, resource_name=name,
+        username=principal, success=False,
+        details=(f'{binding} Kerberos request from {client_ip()} refused: {reason} '
+                 f'(principal {principal}, realm {realm or "-"}, profile {name or "-"})'))
+    safe_commit(logger, 'Windows enrollment refusal audit commit failed')
+
+
+def serve_kerberos(principal, binding):
+    """The profile serving an authenticated Kerberos *principal* on *binding* (CEP, CES), or
+    None once the refusal is logged and audited."""
+    profile, realm, refusal = kerberos_route(principal)
+    if refusal is not None:
+        logger.warning('%s Kerberos request of %r refused: %s (realm %s)', binding, principal, refusal, realm)
+        audit_kerberos_refusal(binding, principal, realm, profile, refusal)
+        return None
+    return profile
+
+
+def profile_template_ids(profile):
+    """The ids of the templates *profile* lists; empty: it offers those of its CA (A3)."""
+    if profile is None or profile.id is None:
+        return set()
+    from models import WindowsProfileTemplate
+    return set(db.session.scalars(select(WindowsProfileTemplate.template_id)
+                                  .where(WindowsProfileTemplate.profile_id == profile.id)))
+
+
+def profile_group(profile):
+    """The AD group *profile* requires in place of the template's, None when unset (A3)."""
+    group = (profile.allowed_ad_group or '').strip() if profile is not None else ''
+    return group or None
+
+
+def profile_pinned_fields(profile):
+    """The raw JSON of the pinned subject fields replacing the template's, None when unset (A3)."""
+    value = (profile.pinned_subject_fields or '').strip() if profile is not None else ''
+    return value or None
 
 
 def _ca(refid):

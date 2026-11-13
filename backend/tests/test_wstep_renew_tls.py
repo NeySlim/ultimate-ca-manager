@@ -31,6 +31,7 @@ from services.cert_service import CertificateService
 from services.wstep import wstep_service
 from services.wstep.rst_parser import _PKIData, _TaggedRequest, _unwrap_pkcs7_csr, parse_rst
 from tests.pqc_fixtures import fixture_bytes
+from tests.windows_profile_support import default_profile
 from tests.test_wstep_renew import RENEW_URL, _build_signed_rst, wstep_renew_config  # noqa: F401
 
 PKIDATA_OID = '1.3.6.1.5.5.7.12.2'
@@ -587,7 +588,7 @@ def _wstep_issued(app, ca_id, cn):
     csr = _eku_csr(cn, key, ExtendedKeyUsageOID.CLIENT_AUTH)
     with app.app_context():
         cert_pem, err = wstep_service.issue(db.session.get(CA, ca_id),
-                                            csr.public_bytes(serialization.Encoding.DER), 30)
+                                            csr.public_bytes(serialization.Encoding.DER), 30, profile=default_profile())
     assert err is None, err
     return x509.load_pem_x509_certificate(cert_pem.encode()), key
 
@@ -610,11 +611,11 @@ def _renew(app, ca_id, path, old_cert, old_key, csr):
         if path == 'tls':
             csr_der, _part, signed = _unwrap_pkcs7_csr(_cmc_renewal(csr, [(old_key, old_cert)]))
             pem, err = wstep_service.renew_with_client_certificate(
-                ca, old_cert.public_bytes(serialization.Encoding.PEM), csr_der, signed, 30)
+                ca, old_cert.public_bytes(serialization.Encoding.PEM), csr_der, signed, 30, profile=default_profile())
         else:
             parsed = parse_rst(_build_signed_rst(old_cert, old_key, csr))
             pem, err = wstep_service.renew(ca, parsed.csr_der, parsed.security_header,
-                                           parsed.csr_element, 30)
+                                           parsed.csr_element, 30, profile=default_profile())
     return (x509.load_pem_x509_certificate(pem.encode()) if pem else None), err
 
 
@@ -665,7 +666,7 @@ def test_renewal_keeps_the_key_family_of_its_template(app, templated_ca):
                  .sign(key_algorithms.generate('ML-DSA-65'), None))
     with app.app_context():
         _template, _extra, _issued, err = wstep_service._renewal_template(
-            db.session.get(CA, ca_id), old_cert, mldsa_csr)
+            db.session.get(CA, ca_id), old_cert, mldsa_csr, profile=None)
     assert err == "Template 'WSTEP renew family CA User' issues RSA-2048 keys, not ML-DSA-65", err
 
 
@@ -749,7 +750,7 @@ def test_legacy_certificate_with_any_eku_renews_at_par(app, templated_ca):
     csr = _eku_csr(renewed, key, ExtendedKeyUsageOID.CLIENT_AUTH)
     with app.app_context():
         ca = db.session.get(CA, ca_id)
-        template, extra, issued, err = wstep_service._renewal_template(ca, renewed, csr)
+        template, extra, issued, err = wstep_service._renewal_template(ca, renewed, csr, profile=None)
         assert (template, err) == (None, None)
         pem, _serial = CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='test',
                                                       extra_ekus=extra, template_ekus=issued)
@@ -772,7 +773,7 @@ def test_legacy_certificate_is_refused_when_the_ca_offers_no_template(app, templ
         for pin in CATemplatePin.query.filter_by(ca_id=ca_id):
             pin.template.is_active = False
         db.session.commit()
-        _template, _extra, _issued, err = wstep_service._renewal_template(db.session.get(CA, ca_id), renewed, csr)
+        _template, _extra, _issued, err = wstep_service._renewal_template(db.session.get(CA, ca_id), renewed, csr, profile=None)
     assert err == 'This CA offers no certificate template'
     assert isinstance(err, wstep_service.ServerError)
 
@@ -864,7 +865,7 @@ def test_renewal_keeps_the_key_usage_of_its_template(app, templated_ca, ekus):
     csr = _eku_csr('jdoe', key, *oids)
     with app.app_context():
         pem, err = wstep_service.issue(db.session.get(CA, ca_id),
-                                       csr.public_bytes(serialization.Encoding.DER), 30)
+                                       csr.public_bytes(serialization.Encoding.DER), 30, profile=None)
     assert err is None, err
     old_cert = x509.load_pem_x509_certificate(pem.encode())
     cert, err = _renew(app, ca_id, 'tls', old_cert, key, _eku_csr(old_cert, key, *oids))

@@ -121,10 +121,9 @@ def _authenticate_username_password(security_header):
     return False, None
 
 
-def _resolve_wstep_ca():
-    """Return (ca, error_response) for the issuing CA of the serving profile."""
-    from services.windows_profiles import issuing_ca, serving_profile
-    profile = serving_profile()
+def _resolve_wstep_ca(profile):
+    """Return (ca, error_response) for the issuing CA of *profile*."""
+    from services.windows_profiles import issuing_ca
     if profile is None or not profile.issuing_ca_refid:
         logger.warning("WSTEP request refused: WSTEP not configured")
         return None, _fault_response('WSTEP not configured', status=503)
@@ -135,9 +134,7 @@ def _resolve_wstep_ca():
     return ca, None
 
 
-def _validity_days():
-    from services.windows_profiles import serving_profile
-    profile = serving_profile()
+def _validity_days(profile):
     return (profile.validity_days if profile is not None and profile.validity_days else 365)
 
 
@@ -294,10 +291,10 @@ def _query_token_status(ca, parsed, identity):
     return _answer_held(ca, parsed, approval)
 
 
-def _issue_and_respond(ca, parsed, username, action='certificate.issued', kerberos_principal=None):
+def _issue_and_respond(ca, parsed, username, *, profile, kerberos_principal=None):
     """Shared issuance + RSTR-building + audit logging for every CES
     binding that issues (as opposed to renews) a certificate, once that
-    binding's own auth check has already succeeded.
+    binding's own auth check has already succeeded, under ``profile``.
 
     ``kerberos_principal``: only ever passed by ``issue_kerberos``'s call
     site below, for the AD-derived naked-CSR subject fallback (see
@@ -308,18 +305,22 @@ def _issue_and_respond(ca, parsed, username, action='certificate.issued', kerber
     identity = f'kerberos:{kerberos_principal}' if kerberos_principal else f'user:{username}'
     if parsed.request_type == REQUEST_TYPE_QUERY_TOKEN_STATUS:
         return _query_token_status(ca, parsed, identity)
-    gate = make_gate(ca, operation='issue', identity=identity, extra={
+    gate = make_gate(ca, operation='issue', identity=identity, profile=profile, extra={
         'kerberos_principal': kerberos_principal, 'require_pop': not parsed.was_pkcs7_wrapped})
     try:
         cert_pem, error = wstep_service.issue(
-            ca, parsed.csr_der, _validity_days(), require_pop=not parsed.was_pkcs7_wrapped,
+            ca, parsed.csr_der, _validity_days(profile), require_pop=not parsed.was_pkcs7_wrapped,
             kerberos_principal=kerberos_principal, outer_signed_data=parsed.outer_signed_data,
-            gate=gate,
+            gate=gate, profile=profile,
         )
     except wstep_service.HeldForApproval as held:
         return _answer_held(ca, parsed, held.approval)
     if error:
         logger.warning("WSTEP issuance rejected for %r: %s", username, error)
+        if kerberos_principal:
+            from services.windows_profiles import audit_kerberos_refusal, kerberos_route
+            audit_kerberos_refusal('CES', kerberos_principal, kerberos_route(kerberos_principal)[1],
+                                   profile, error)
         return _fault_response(error, status=_error_status(error), relates_to=parsed.message_id)
 
     try:
@@ -333,9 +334,18 @@ def _issue_and_respond(ca, parsed, username, action='certificate.issued', kerber
         logger.error("WSTEP: failed to build RSTR: %s", e)
         return _fault_response('Internal server error', status=500, relates_to=parsed.message_id)
 
+    # A Kerberos request signed by a certificate of this CA renews it (the Kerberos binding renews too)
+    old_serial = wstep_service.renewed_serial(ca, parsed.outer_signed_data) if kerberos_principal else None
+    served = f'profile {profile.name}' + (f', realm {profile.realm}' if kerberos_principal else '')
+    if old_serial is not None:
+        action, details = 'certificate.renewed', (
+            f'WSTEP renewal from {client_ip()}: old serial {old_serial}, '
+            f'new serial {cert.serial_number} ({served})')
+    else:
+        action = 'certificate.issued'
+        details = f'WSTEP enrollment from {client_ip()}: serial {cert.serial_number} ({served})'
     _audit_issuance(action, cert.subject.rfc4514_string(), username,
-                    resource_id=str(request_id) if request_id else None,
-                    details=f'WSTEP enrollment from {client_ip()}: serial {cert.serial_number}')
+                    resource_id=str(request_id) if request_id else None, details=details)
     return Response(response_body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
 
 
@@ -371,11 +381,14 @@ def issue_username_password():
     if not authenticated:
         return _fault_response('Authentication failed', status=400, relates_to=parsed.message_id)
 
-    ca, ca_error = _resolve_wstep_ca()
+    # A2: the shared account serves the default profile alone
+    from services.windows_profiles import serving_profile
+    profile = serving_profile()
+    ca, ca_error = _resolve_wstep_ca(profile)
     if ca_error:
         return ca_error
 
-    return _issue_and_respond(ca, parsed, username)
+    return _issue_and_respond(ca, parsed, username, profile=profile)
 
 
 @bp.route(CES_KERBEROS_PATH, methods=['GET', 'POST', 'HEAD'])
@@ -419,10 +432,6 @@ def issue_kerberos():
         headers = {'WWW-Authenticate': f'Negotiate {result.response_token_b64}' if result.response_token_b64 else 'Negotiate'}
         return Response('', status=401, headers=headers)
 
-    ca, ca_error = _resolve_wstep_ca()
-    if ca_error:
-        return ca_error
-
     body, err = _read_wstep_body()
     if err is not None:
         return err
@@ -431,8 +440,19 @@ def issue_kerberos():
     if fault is not None:
         return fault
 
+    from services.windows_profiles import serve_kerberos
+    profile = serve_kerberos(result.client_principal, 'CES')
+    if profile is None:
+        # Authenticated (RFC 4559): a refused realm is the request's fault, never a new challenge
+        return _fault_response(wstep_service.REALM_NOT_SERVED, status=400, relates_to=parsed.message_id)
+    logger.info("WSTEP: request of %s served by profile %s", result.client_principal, profile.name)
+
+    ca, ca_error = _resolve_wstep_ca(profile)
+    if ca_error:
+        return ca_error
+
     response = _issue_and_respond(
-        ca, parsed, result.client_principal, kerberos_principal=result.client_principal,
+        ca, parsed, result.client_principal, profile=profile, kerberos_principal=result.client_principal,
     )
     if result.response_token_b64 and response.status_code == 200:
         response.headers['WWW-Authenticate'] = f'Negotiate {result.response_token_b64}'
@@ -481,7 +501,10 @@ def renew_certificate_bound():
     if request.method in ('GET', 'HEAD'):
         return Response('', status=200, content_type='text/html; charset=utf-8')
 
-    ca, ca_error = _resolve_wstep_ca()
+    # The certificate's own profile routes its renewal in C-05; until then, the default's
+    from services.windows_profiles import serving_profile
+    profile = serving_profile()
+    ca, ca_error = _resolve_wstep_ca(profile)
     if ca_error:
         return ca_error
 
@@ -505,18 +528,20 @@ def renew_certificate_bound():
         if _carries_xml_signature(parsed.security_header):
             username = 'wstep-ws-security'
             cert_pem, error = wstep_service.renew(
-                ca, parsed.csr_der, parsed.security_header, parsed.csr_element, _validity_days(),
+                ca, parsed.csr_der, parsed.security_header, parsed.csr_element, _validity_days(profile),
                 require_pop=not parsed.was_pkcs7_wrapped, outer_signed_data=parsed.outer_signed_data,
-                audit=audit, gate=make_gate(ca, operation='renew',
+                audit=audit, gate=make_gate(ca, operation='renew', profile=profile,
                                             extra={'require_pop': not parsed.was_pkcs7_wrapped}),
+                profile=profile,
             )
         else:
             # Windows authenticates here with its TLS client certificate, no XML-DSig
             username = 'wstep-client-cert'
             cert_pem, error = wstep_service.renew_with_client_certificate(
                 ca, trusted_client_cert(logger, 'WSTEP'), parsed.csr_der, parsed.outer_signed_data,
-                _validity_days(), audit=audit,
-                gate=make_gate(ca, operation='renew', extra={'require_pop': False}),
+                _validity_days(profile), audit=audit,
+                gate=make_gate(ca, operation='renew', profile=profile, extra={'require_pop': False}),
+                profile=profile,
             )
     except wstep_service.HeldForApproval as held:
         return _answer_held(ca, parsed, held.approval)

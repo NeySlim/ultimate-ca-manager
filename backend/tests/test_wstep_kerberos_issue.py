@@ -58,10 +58,12 @@ def no_connector_serving(app):
 @pytest.fixture(scope='module')
 def wstep_kerberos_config(app, create_ca):
     ca_data = create_ca(cn='WSTEP Kerberos CA')
-    keys = ('wstep_enabled', 'wstep_ca_refid', 'wstep_validity_days')
+    keys = ('wstep_enabled', 'wstep_ca_refid', 'wstep_validity_days', 'windows_realm')
     with app.app_context():
         previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
+        # The default profile serves the realm of the principals of this file
+        _set_config('windows_realm', 'HAGLAND.DOMAIN')
         _set_config('wstep_enabled', 'true')
         _set_config('wstep_ca_refid', ca.refid)
         _set_config('wstep_validity_days', '30')
@@ -907,14 +909,16 @@ def test_a_naked_request_the_directory_cannot_answer_is_a_receiver_fault(
 
 
 @pytest.mark.parametrize('principal, base_dn, status, text, code', [
-    ('HOST$@OTHER.DOMAIN', 'DC=hagland,DC=domain', 400,
+    (KERBEROS_PRINCIPAL, 'DC=other,DC=domain', 400,
      "The requester's realm is not served by the directory connector", 's:Sender'),
+    ('HOST$@OTHER.DOMAIN', 'DC=hagland,DC=domain', 400, "The requester's realm is not served", 's:Sender'),
     (KERBEROS_PRINCIPAL, None, 500,
      'Could not resolve requester identity for strong certificate mapping', 's:Receiver'),
 ])
 def test_an_enabled_connector_that_cannot_resolve_the_requester_faults(
         client, app, wstep_kerberos_config, monkeypatch, principal, base_dn, status, text, code):
-    """Never issued without the SID extension: a foreign realm is the requester's fault, no base DN the CA's."""
+    """Never issued without the SID extension: a foreign realm is the requester's fault, no base DN the CA's.
+    A realm no profile serves is refused before the connector is asked."""
     with app.app_context():
         mount_connector(server='dc1.hagland.domain', base_dn=base_dn, bind_dn='svc-ucm', enabled=True)
     monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)

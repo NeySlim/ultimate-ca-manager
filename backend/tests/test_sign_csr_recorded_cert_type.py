@@ -30,7 +30,7 @@ def _wstep(app, ca_id, cn, eku):
     key = _key()
     with app.app_context():
         pem, err = wstep_service.issue(db.session.get(CA, ca_id), _eku_csr(cn, key, eku).public_bytes(
-            serialization.Encoding.DER), 30)
+            serialization.Encoding.DER), 30, profile=None)
     assert err is None, err
     return x509.load_pem_x509_certificate(pem.encode()), key
 

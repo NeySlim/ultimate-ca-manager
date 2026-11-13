@@ -290,7 +290,7 @@ class TestProtocolPathsReachTheAllowList:
         with app.app_context():
             ca = db.session.get(CA, ca_data['id'])
             cert_pem, error = wstep_service.issue(
-                ca, csr.public_bytes(serialization.Encoding.DER), 30
+                ca, csr.public_bytes(serialization.Encoding.DER), 30, profile=None
             )
         assert error is None, error
         leaf = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())

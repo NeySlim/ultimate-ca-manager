@@ -150,7 +150,7 @@ def test_issue_accepts_real_windows_request_end_to_end(app, create_ca):
         csr, signed_data = _real_csr_and_signed_data()
         cert_pem, err = wstep_service.issue(
             ca, csr.public_bytes(Encoding.DER),
-            validity_days=30, require_pop=False, outer_signed_data=signed_data,
+            validity_days=30, require_pop=False, outer_signed_data=signed_data, profile=None,
         )
         assert err is None, err
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -168,7 +168,7 @@ def test_issue_rejects_pkcs7_request_with_mismatched_key(app, create_ca):
         unrelated_csr = _unrelated_csr()
         cert_pem, err = wstep_service.issue(
             ca, unrelated_csr.public_bytes(Encoding.DER),
-            validity_days=30, require_pop=False, outer_signed_data=signed_data,
+            validity_days=30, require_pop=False, outer_signed_data=signed_data, profile=None,
         )
         assert cert_pem is None
         assert err is not None

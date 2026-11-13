@@ -47,7 +47,7 @@ def test_bare_mldsa_csr_is_issued(app, create_ca):
     with app.app_context():
         ca = _ca(app, create_ca, 'WSTEP RSA CA for ML-DSA CSR')
         cert_pem, err = wstep_service.issue(ca, _csr(key).public_bytes(serialization.Encoding.DER),
-                                            validity_days=30)
+                                            validity_days=30, profile=None)
     assert err is None, err
     cert = x509.load_pem_x509_certificate(cert_pem.encode())
     assert isinstance(cert.public_key(), mldsa.MLDSA65PublicKey)
@@ -64,7 +64,7 @@ def test_fips_mode_refuses_an_mldsa_request_before_its_signature(app, create_ca,
     with app.app_context():
         ca = _ca(app, create_ca, f'WSTEP RSA CA for FIPS ML-DSA {tampered}')
         monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
-        cert_pem, err = wstep_service.issue(ca, bytes(der), validity_days=30)
+        cert_pem, err = wstep_service.issue(ca, bytes(der), validity_days=30, profile=None)
     assert cert_pem is None
     assert err == 'ML-DSA-65 keys are not available in FIPS mode'
 
@@ -97,7 +97,7 @@ class TestPkcs7ProofOfPossession:
             ca = _ca(app, create_ca, 'WSTEP RSA CA for ML-DSA PoP')
             cert_pem, err = wstep_service.issue(
                 ca, csr.public_bytes(serialization.Encoding.DER), validity_days=30,
-                require_pop=False, outer_signed_data=_pop_envelope(csr, key))
+                require_pop=False, outer_signed_data=_pop_envelope(csr, key), profile=None)
         assert err is None, err
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
         assert cert.public_key() == key.public_key()
@@ -159,7 +159,7 @@ class TestTemplateKeyFamily:
             ca, _ = pinned_templates(f'WSTEP family CA {template_key}', template_key)
             csr = _client_auth_csr(key_algorithms.generate(csr_key), 'family.pq.example.test')
             cert_pem, err = wstep_service.issue(ca, csr.public_bytes(serialization.Encoding.DER),
-                                                validity_days=30)
+                                                validity_days=30, profile=None)
         assert cert_pem is None
         assert err == (f"Template 'WSTEP family CA {template_key} {template_key}' issues "
                        f'{template_key} keys, not {csr_label}'), err
@@ -173,7 +173,7 @@ class TestTemplateKeyFamily:
                                        'RSA-2048', 'ML-DSA-65', 'EC-P256', 'EC-P384')
             csr = _client_auth_csr(key_algorithms.generate(csr_key), 'tie.pq.example.test')
             cert_pem, err = wstep_service.issue(ca, csr.public_bytes(serialization.Encoding.DER),
-                                                validity_days=30)
+                                                validity_days=30, profile=None)
             assert err is None, err
             expected = _policy_oid_for_template(ca, db.session.get(CertificateTemplate, ids[csr_key]))
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
@@ -186,7 +186,7 @@ def test_a_longer_rsa_key_fits_a_shorter_rsa_template(app, pinned_templates):
         ca, _ = pinned_templates('WSTEP RSA floor CA', 'RSA-2048')
         csr = _client_auth_csr(key_algorithms.generate('RSA-3072'), 'floor.pq.example.test')
         cert_pem, err = wstep_service.issue(ca, csr.public_bytes(serialization.Encoding.DER),
-                                            validity_days=30)
+                                            validity_days=30, profile=None)
     assert err is None, err
     assert key_algorithms.label_for_public_key(
         x509.load_pem_x509_certificate(cert_pem.encode()).public_key()) == 'RSA-3072'
@@ -221,7 +221,7 @@ def test_certificate_bound_renewal_names_mldsa(app, create_ca, method):
         header, csr_der, csr_element = _renew_parsed(rst)
         with pytest.raises(ws_security.WSSecurityError, match='ML-DSA-65'):
             ws_security.verify_signed_request(header)
-        cert_pem, err = wstep_service.renew(ca, csr_der, header, csr_element, validity_days=30)
+        cert_pem, err = wstep_service.renew(ca, csr_der, header, csr_element, validity_days=30, profile=None)
     assert cert_pem is None
     assert 'not supported' in err and 'ML-DSA-65' in err
 

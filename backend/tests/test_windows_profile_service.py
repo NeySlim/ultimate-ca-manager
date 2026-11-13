@@ -210,8 +210,9 @@ def test_a_setting_the_profile_replaced_has_no_effect(app, client, clean_slate, 
     with app.app_context():
         assert policy_id == _policy_id_for_ca(CA.query.filter_by(refid=policy['refid']).one())
         from api.wstep_protocol import _resolve_wstep_ca, _validity_days
+        from services.windows_profiles import serving_profile
         with app.test_request_context('/'):
-            assert _resolve_wstep_ca()[0].refid == issuing['refid'] and _validity_days() == 42
+            assert _resolve_wstep_ca(serving_profile())[0].refid == issuing['refid'] and _validity_days(serving_profile()) == 42
         SystemConfig.query.filter(SystemConfig.key.in_(MIGRATED_KEYS)).delete(synchronize_session=False)
         db.session.commit()
     assert client.post(XCEP_URL, data=_envelope('intruder', 'intruder-pw')).status_code == 400
@@ -459,6 +460,7 @@ def test_an_undeterminable_realm_refuses_kerberos_only(app, client, auth_client,
     """A1, the 2.x settings the review replayed: UsernamePassword (XCEP, WSTEP) and the renewal by
     certificate answer as 2.x did; Kerberos, which 2.x served with an SPN, is refused with its reason."""
     from api.wstep_protocol import _check_credentials, _resolve_wstep_ca, _validity_days
+    from services.windows_profiles import kerberos_refusal, serving_profile
     _fixed_message_id(monkeypatch)
     issuing, policy, _template = two_cas
     path = tmp_path / 'kerberos.keytab'
@@ -478,8 +480,8 @@ def test_an_undeterminable_realm_refuses_kerberos_only(app, client, auth_client,
         assert profile.realm is None and profile.enabled
         with app.test_request_context('/'):
             assert _check_credentials('c01-ces-user', 'c01-ces-password')
-            assert _resolve_wstep_ca()[0].refid == issuing['refid'] and _validity_days() == 42
-        assert negotiate_auth.is_configured() is False
+            assert _resolve_wstep_ca(serving_profile())[0].refid == issuing['refid'] and _validity_days(serving_profile()) == 42
+        assert kerberos_refusal() is not None
     # 2.x also advertised the Kerberos CES when it served it: the only byte that differs
     r = client.post(XCEP_URL, data=_envelope())
     assert r.status_code == 200 and r.data == before
@@ -512,7 +514,8 @@ def test_the_realm_of_the_default_profile_is_set_through_the_kerberos_route(
         r = auth_client.patch('/api/v2/kerberos/config', json={'realm': bad})
         assert r.status_code == status, (bad, r.data)
     with app.app_context():
-        assert _default().realm is None and negotiate_auth.is_configured() is False
+        from services.windows_profiles import kerberos_refusal
+        assert _default().realm is None and kerberos_refusal() is not None
     assert auth_client.patch('/api/v2/kerberos/config', json={'realm': 'TWO.EXAMPLE'}).status_code == 200
     data = auth_client.get('/api/v2/kerberos/config').get_json()['data']
     assert (data['realm'], data['configured'], data['reason']) == ('TWO.EXAMPLE', True, None)

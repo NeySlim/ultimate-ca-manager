@@ -82,13 +82,15 @@ def get_kerberos_config():
     """Get Kerberos/SPNEGO configuration; ``reason`` says why it is not configured."""
     from services import windows_profiles
     profile = windows_profiles.default_profile()
+    # The default profile's view (A1), as this route has shown it until the profile API replaces it
+    reason = negotiate_auth.not_configured_reason() or windows_profiles.kerberos_refusal(profile)
     return success_response(data={
         'enabled': negotiate_auth.is_enabled(),
         'spn': negotiate_auth.get_spn(),
         'keytab_set': negotiate_auth.KEYTAB_PATH.exists(),
         'library_available': negotiate_auth.is_library_available(),
-        'configured': negotiate_auth.is_configured(),
-        'reason': negotiate_auth.not_configured_reason(),
+        'configured': reason is None,
+        'reason': reason,
         'realm': profile.realm if profile is not None else None,
         **_keytab_status(),
     })
