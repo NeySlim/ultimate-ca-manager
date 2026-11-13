@@ -836,9 +836,9 @@ Before the steps:
 4. **Add the profile** (**Settings → Windows Autoenrollment → Add profile**): name, realm in capitals, the connector of step 2, the issuing CA, the templates to offer, and optionally the AD group the requester must belong to, which replaces the one the template requires.
 5. **Upload the keytab** of step 3 in the profile. The checklist of the editor turns green once the realm, issuing CA, keytab, connector and templates are set; the list flags a profile whose keytab is missing, whose connector fails, or whose realm differs from the domain of its connector.
 6. **Repeat** steps 2 to 5 for each forest. No trust between the forests is needed, and a profile only serves its own realm. In a forest, only the domain whose account holds the SPN is served, and clients of the forest's other domains are refused (see below). Domains linked by trusts and child domains of a forest have not been tested.
-7. **Check** from a domain-joined client of each forest: `Get-Certificate -Url <Kerberos policy URL> -Template <template>`, or wait for the GPO.
+7. **Check** from a domain-joined client of each forest: `Get-Certificate -Url <Kerberos policy URL> -Template <template>`, or wait for the GPO. Automatic enrollment needs the Windows autoenrollment policy enabled on the client (group policy **Certificate Services Client - Auto-Enrollment**): with the policy server registered but that policy off, Windows reads the policy and requests nothing, with no error on either side.
 
-The CA that Kerberos clients see is the policy CA of the profile that serves them; the policy and enrollment URLs are the same for every profile.
+The CA that Kerberos clients see is the policy CA of the profile that serves them; the policy and enrollment URLs are the same for every profile. The policy identifier and the template identifiers that clients cache derive from that CA: once it changes, clients already registered fail to enroll (`0x8007000d`) until the policy server is registered on them again.
 
 #### When a request is refused
 
