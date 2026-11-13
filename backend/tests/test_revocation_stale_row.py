@@ -149,3 +149,31 @@ class TestTwoConnections:
     def test_without_a_ca_record(self, app, issuer):
         row_id = _microsoft_held(app, issuer, 'race-unhold-msca.example.test')
         self._race(app, row_id, None)
+
+
+class TestWhatARefusedOrFailedRevocationLogs:
+
+    def test_an_unexpected_value_error_is_logged(self, app, issuer, monkeypatch, caplog):
+        from services.cert.mixins import lifecycle
+        _, refid, ca_cert, ca_key = issuer
+        real, key = _leaf('revocation-logs-failure.example.test', ca_cert, ca_key, days=200)
+        row_id = _store(app, real, refid, key=key)
+
+        def broken(*_a, **_k):
+            raise ValueError('not what a caller expects')
+        monkeypatch.setattr(lifecycle, 'remember_if_compromised', broken)
+        caplog.set_level('ERROR')
+        with pytest.raises(ValueError, match='not what a caller expects'):
+            _revoke(app, row_id)
+        assert any('not staged' in r.getMessage() for r in caplog.records)
+        assert _row(app, row_id)[0] is False
+
+    def test_already_revoked_under_the_lock_is_answered_without_an_error_line(
+            self, app, issuer, monkeypatch, caplog):
+        row_id, _record_id = _held_leaf(app, issuer, 'revocation-logs-refusal.example.test')
+        _meanwhile(monkeypatch, [update(Certificate).where(Certificate.id == row_id).values(
+            revoked=True, revoke_reason='superseded', revoked_at=LATER)])
+        caplog.set_level('ERROR')
+        with pytest.raises(ValueError, match='already revoked'):
+            _revoke(app, row_id)
+        assert not any('not staged' in r.getMessage() for r in caplog.records)

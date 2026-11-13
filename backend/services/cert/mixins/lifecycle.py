@@ -37,6 +37,10 @@ from security.encryption import decrypt_private_key, encrypt_private_key
 _REVOCATION_FIELDS = ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at')
 
 
+class _AlreadyRevoked(ValueError):
+    """The refusal met under the lock: answered to the caller, not an error to log."""
+
+
 def _request_user_id(username):
     """Id of the request's user when it is the one named, else None."""
     from flask import g, has_request_context
@@ -437,7 +441,7 @@ class LifecycleMixin:
             # while this one waited is seen, and only changed columns are sent
             db.session.refresh(certificate, with_for_update=True)
             if not revocable(certificate, reason):
-                raise ValueError("Certificate already revoked")
+                raise _AlreadyRevoked("Certificate already revoked")
             # A hold made final: dated now, so the delta lists the change; invalid since the hold
             # (the row's, or its record's when only the record holds it)
             held = effective_revocation(certificate)
@@ -484,7 +488,7 @@ class LifecycleMixin:
             remember_if_compromised(certificate)
         except Exception as e:
             db.session.rollback()
-            if not isinstance(e, ValueError):
+            if not isinstance(e, _AlreadyRevoked):
                 logger.error("Revocation of certificate %s not staged", cert_id, exc_info=True)
             raise
         rejected_snapshots = request_snapshots(rejected_renewals)
