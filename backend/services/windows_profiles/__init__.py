@@ -107,9 +107,10 @@ def default_for_write(actor=None, fill=True):
 
 
 def keytab_holders():
-    """The profiles holding a keytab, enabled or not, by id."""
+    """The profiles holding a keytab, enabled or not, by id; read afresh, so a composition made
+    under the keytab row lock sees what committed before it rather than the identity map."""
     return (WindowsEnrollmentProfile.query.filter(WindowsEnrollmentProfile.keytab.isnot(None))
-            .order_by(WindowsEnrollmentProfile.id).all())
+            .order_by(WindowsEnrollmentProfile.id).populate_existing().all())
 
 
 def composed_keytab():

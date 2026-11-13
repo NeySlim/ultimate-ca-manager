@@ -92,3 +92,68 @@ def test_the_second_upload_composes_the_first_one_s_keys(app, profiles):
         assert stored == windows_profiles.composed_keytab()
         assert SharedFile.query.count() == 1
         db.session.remove()
+
+
+THREE = keytab((f'HTTP/{HOST}@THREE.TEST', 2))
+
+
+@pytest.mark.parametrize('uploaded, expected', [
+    ('two', [('ONE.TEST', 2), ('TWO.TEST', 2)]),
+    ('default', [('ONE.TEST', 3)]),
+], ids=['new realm', 'replaced keytab'])
+def test_a_start_racing_an_upload_keeps_the_upload(app, monkeypatch, tmp_path, uploaded, expected):
+    """A disabled profile leaves the stored file stale, so the start rebuilds it: it must
+    compose after the concurrent upload commits, from the profiles as committed then."""
+    from config.settings import Config
+    from services.kerberos import negotiate_auth
+    monkeypatch.setattr(Config, 'HA_MODE', False)
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', tmp_path / 'kerberos.keytab')
+    with _database(app):
+        with app.app_context():
+            one = WindowsEnrollmentProfile(name='default', is_default=True, enabled=True, realm='ONE.TEST')
+            two = WindowsEnrollmentProfile(name='two', enabled=True, realm='TWO.TEST')
+            three = WindowsEnrollmentProfile(name='three', enabled=True, realm='THREE.TEST')
+            db.session.add_all([one, two, three])
+            one.set_keytab(ONE_2)
+            three.set_keytab(THREE)
+            db.session.flush()
+            windows_profiles.publish_keytab()
+            three.enabled = False
+            db.session.commit()
+            target_id, data = (two.id, TWO) if uploaded == 'two' else (one.id, ONE_3)
+            db.session.remove()
+
+        published, errors = threading.Event(), []
+
+        def upload():
+            try:
+                with app.app_context():
+                    db.session.get(WindowsEnrollmentProfile, target_id).set_keytab(data)
+                    windows_profiles.publish_keytab(actor='race')
+                    published.set()
+                    time.sleep(HOLD_SECONDS)
+                    db.session.commit()
+                    db.session.remove()
+            except Exception as e:  # reported below, a thread swallows it otherwise
+                errors.append(e)
+                published.set()
+
+        def start():
+            try:
+                published.wait(5)
+                negotiate_auth.restore_keytab_at_start(app)
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=upload), threading.Thread(target=start)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join(15)
+
+        assert errors == []
+        with app.app_context():
+            stored = shared_files.read_file(shared_files.KERBEROS_KEYTAB)
+            assert _realms(stored) == expected
+            assert stored == windows_profiles.composed_keytab()
+            db.session.remove()

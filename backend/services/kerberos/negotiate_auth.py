@@ -255,14 +255,12 @@ def restore_keytab_at_start(app):
                     if profile.realm is not None:
                         db.session.commit()
             else:
-                composed = windows_profiles.composed_keytab()
-                if shared_files.read_file(shared_files.KERBEROS_KEYTAB) != composed:
-                    # The profiles are the source: a file they do not compose is rebuilt, everywhere
-                    from services import cluster_commands
-                    if _rebuild_shared_keytab(composed):
-                        cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
-                        logger.info("Kerberos keytab rebuilt from the Windows enrollment profiles")
-                    db.session.commit()
+                # The profiles are the source: a file they do not compose is rebuilt, everywhere
+                from services import cluster_commands
+                if _rebuild_shared_keytab():
+                    cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
+                    logger.info("Kerberos keytab rebuilt from the Windows enrollment profiles")
+                db.session.commit()
         except Exception as e:
             db.session.rollback()
             logger.error(f"Kerberos keytab not restored from the database: {type(e).__name__}: {e}")
@@ -278,17 +276,18 @@ def restore_keytab_at_start(app):
             db.session.remove()
 
 
-def _rebuild_shared_keytab(data):
-    """The shared keytab set to the composed *data* (None: removed); True when this node changed it. The row
-    is read again under lock and a concurrent insert is undone alone, so a node starting at
-    the same time that rebuilt it first is neither overwritten in error nor reloaded twice."""
+def _rebuild_shared_keytab():
+    """The shared keytab set to the profiles' composition (None: removed); True when this node changed it.
+    Composed under the row lock, so an upload or a node starting at the same time is neither
+    overwritten with a stale composition nor reloaded twice; a concurrent insert is undone alone."""
     from sqlalchemy.exc import IntegrityError
     from models import SharedFile, db
-    from services import shared_files
+    from services import shared_files, windows_profiles
     name = shared_files.KERBEROS_KEYTAB
     for attempt in (1, 2):
         row = (db.session.query(SharedFile).filter_by(name=name)
                .with_for_update().populate_existing().first())
+        data = windows_profiles.composed_keytab()
         if row is None and data is None:
             return False
         if row is not None and data is None:
