@@ -546,14 +546,16 @@ def renew_certificate_bound():
 
     from services.windows_profiles import presented_certificate_profile
     from utils.client_cert import native_tls_admits
+    from services.windows_profiles import issuing_ca
     profile, error, stored = presented_certificate_profile(cert)
-    ca = None
+    ca, status = None, None
     if error is None and profile is not None:
-        ca, ca_error = _resolve_wstep_ca(profile)
-        if ca_error:
-            return ca_error
+        ca = issuing_ca(profile)
+        if ca is None:
+            # A refusal of a stored certificate like any other: audited below with its profile
+            error, status = f'The Windows enrollment profile {profile.name} has no issuing CA', 503
         # A5: the native listener anchors on the mTLS CA alone; a proxy terminating TLS answers for its own
-        if username == 'wstep-client-cert' and request.environ.get('peercert') and not native_tls_admits(ca):
+        elif username == 'wstep-client-cert' and request.environ.get('peercert') and not native_tls_admits(ca):
             error = TLS_RENEWAL_REFUSED
     elif error is None:
         error = 'Signing certificate is not recognized'
@@ -582,7 +584,7 @@ def renew_certificate_bound():
             _audit_issuance('certificate.renewed', None, username, success=False, details=(
                 f'WSTEP renewal refused from {client_ip()}: {error} '
                 f'(old serial {cert.serial_number}, {served})'))
-        return _fault_response(error, status=_error_status(error), relates_to=parsed.message_id)
+        return _fault_response(error, status=status or _error_status(error), relates_to=parsed.message_id)
 
     try:
         new_cert = x509.load_pem_x509_certificate(cert_pem.encode())

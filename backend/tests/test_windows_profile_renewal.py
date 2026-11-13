@@ -433,3 +433,19 @@ def test_a_certificate_stored_under_two_profiles_is_refused(app, client, directo
         db.session.commit()
     r = _renew_xml(client, old, key)
     assert _fault(r) == (400, 's:Sender', 'The certificate is recorded under several Windows enrollment profiles')
+
+
+@pytest.mark.parametrize('refid', [None, 'c05-gone-ca'])
+def test_a_certificate_of_a_profile_without_issuing_ca_is_refused_and_audited(app, client, directory, refid):
+    """Criterion 7: a profile with no issuing CA, or one that no longer resolves, refuses and audits."""
+    world = directory
+    old, key = _enrolled(client, world, 'usera@C04A.TEST', f'c05-no-ca-{refid}')
+    with app.app_context():
+        _profile('c04-a').issuing_ca_refid = refid
+        db.session.commit()
+    floor = _top_audit(app)
+    r = _renew_xml(client, old, key)
+    reason = 'The Windows enrollment profile c04-a has no issuing CA'
+    assert _fault(r) == (503, 's:Receiver', reason)
+    (_user, details), = _refusals(app, floor)
+    assert reason in details and 'profile c04-a' in details and f'old serial {old.serial_number}' in details
