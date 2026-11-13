@@ -2816,7 +2816,7 @@
     "updateInitiated": "Mise à jour vers v{{version}} initiée...",
     "installFailed": "Échec de l'installation de la mise à jour",
     "expiryCheckResult": "Vérification terminée : {{count}} alerte(s) envoyée(s)",
-    "expiryCheckSkipped": "Check not run: another node is running it",
+    "expiryCheckSkipped": "Vérification non exécutée : un autre nœud s'en charge",
     "sendTestEmail": "Envoyer un email de test",
     "passwordPolicy": "Politique de mot de passe",
     "minLength": "Longueur minimale",
@@ -3589,23 +3589,23 @@
     "httpsSelectRenewed": "Sélectionner le certificat renouvelé",
     "httpsOpenRenewed": "Ouvrir le certificat renouvelé",
     "updateCampaign": {
-      "title": "Rolling update to v{{version}}",
+      "title": "Mise à jour progressive vers v{{version}}",
       "status": {
-        "running": "In progress",
-        "stopped": "Stopped",
-        "done": "Finished"
+        "running": "En cours",
+        "stopped": "Arrêtée",
+        "done": "Terminée"
       },
-      "nodesDone": "Nodes updated",
-      "currentNode": "Node updating",
-      "pending": "Waiting",
-      "none": "None",
-      "failed": "Stopped at node {{node}}: {{reason}}",
+      "nodesDone": "Nœuds mis à jour",
+      "currentNode": "Nœud en cours de mise à jour",
+      "pending": "En attente",
+      "none": "Aucun",
+      "failed": "Arrêtée au nœud {{node}} : {{reason}}",
       "packages": "Paquet par nœud",
-      "resume": "Resume",
-      "resumed": "Rolling update resumed",
-      "resumeFailed": "Failed to resume the rolling update",
-      "started": "Rolling update to v{{version}} started: the nodes update one at a time",
-      "haNote": "HA mode: the nodes update one at a time, the next one only once the previous one is back on the new version."
+      "resume": "Reprendre",
+      "resumed": "Mise à jour progressive reprise",
+      "resumeFailed": "Échec de la reprise de la mise à jour progressive",
+      "started": "Mise à jour progressive vers v{{version}} lancée : les nœuds se mettent à jour un par un",
+      "haNote": "Mode HA : les nœuds se mettent à jour un par un, le suivant seulement une fois le précédent revenu sur la nouvelle version."
     }
   },
   "sso": {
@@ -4381,7 +4381,7 @@
     "step1Title": "Placez votre fichier de clé maître dans :",
     "mismatchDescription": "La clé maître configurée ne déchiffre pas les clés privées stockées : ce n'est pas celle qui les a chiffrées. Les clés privées restent inaccessibles tant que la clé maître précédente n'est pas restaurée.",
     "mismatchStep1Title": "Remettez le fichier de la clé maître précédente dans :",
-    "kekNotTheClustersDescription": "This node's key-encryption key is not the cluster's: the cluster was disabled under another key, or a live node holds another one. This node writes nothing until it restarts with the cluster's key.",
+    "kekNotTheClustersDescription": "La clé maître de ce nœud n'est pas celle du cluster : le chiffrement du cluster a été désactivé sous une autre clé, ou un nœud actif en détient une autre. Ce nœud n'écrit rien tant qu'il n'a pas redémarré avec la clé maître du cluster.",
     "foreignKekStep1Title": "Configurez la clé maître du cluster sur ce nœud, dans KEY_ENCRYPTION_KEY ou dans :",
     "step2Title": "Puis redémarrez le service :",
     "lostKeyHint": "Si vous avez perdu la clé maître, restaurez à partir d'une sauvegarde pour récupérer vos clés privées.",
