@@ -212,6 +212,20 @@ describe('warnings', () => {
     expect(screen.getByText('common.save')).not.toBeDisabled()
   })
 
+  it('saves a profile whose saved pair differs without sending the pair back', async () => {
+    mocks.connectors.mockResolvedValue({ data: [
+      { id: 3, name: 'forest-b', realm: 'B.EXAMPLE', enabled: true, health: { state: 'up' } },
+    ] })
+    mocks.get.mockResolvedValue({ data: { ...PROFILE, connector_id: 3 } })
+    renderEditor()
+    await screen.findByText('xcepWstep.connectorRealmDiffers|connector=B.EXAMPLE|realm=CORP.EXAMPLE')
+    fireEvent.click(screen.getByText('common.save'))
+    await waitFor(() => expect(mocks.update).toHaveBeenCalled())
+    const sent = mocks.update.mock.calls[0][1]
+    expect(sent).not.toHaveProperty('connector_id')
+    expect(sent).not.toHaveProperty('realm')
+  })
+
   it('says a disabled profile refuses its machines and keeps its keys', async () => {
     mocks.get.mockResolvedValue({ data: { ...PROFILE, enabled: false } })
     renderEditor()

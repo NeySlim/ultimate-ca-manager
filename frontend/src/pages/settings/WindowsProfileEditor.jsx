@@ -145,7 +145,6 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, onSaved, 
     const payload = {
       name: form.name.trim(),
       enabled: form.enabled,
-      connector_id: form.connector_id,
       issuing_ca_refid: form.issuing_ca_refid || null,
       policy_ca_refid: form.policy_ca_refid || null,
       validity_days: Number(form.validity_days) || 365,
@@ -155,7 +154,10 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, onSaved, 
       xcep_username: form.xcep_username,
       wstep_username: form.wstep_username,
     }
-    if (form.realm.trim()) payload.realm = form.realm.trim()
+    // The API checks the realm/connector pair when either is sent: send them only when changed
+    const realm = form.realm.trim()
+    if (realm && (isNew || realm !== (detail?.realm || ''))) payload.realm = realm
+    if (isNew || form.connector_id !== (detail?.connector_id ?? null)) payload.connector_id = form.connector_id
     if (form.xcep_password) payload.xcep_password = form.xcep_password
     if (form.wstep_password) payload.wstep_password = form.wstep_password
     return payload
