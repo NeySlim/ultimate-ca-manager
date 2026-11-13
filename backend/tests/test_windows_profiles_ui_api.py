@@ -235,12 +235,17 @@ def _key(auth_client, permissions):
     return data['id'], {'X-API-Key': data['key']}
 
 
-def test_a_keytab_needs_the_kerberos_write_scope_too(app, auth_client, profiles):  # noqa: F811
-    key_id, headers = _key(auth_client, ['read:xcep', 'write:xcep'])
+@pytest.mark.parametrize('scopes, status', [
+    (['write:xcep'], 403), (['write:kerberos'], 403), (['write:xcep', 'write:kerberos'], 200)])
+def test_a_keytab_needs_both_the_xcep_and_kerberos_write_scopes(app, auth_client, profiles,  # noqa: F811
+                                                                scopes, status):
+    key_id, headers = _key(auth_client, ['read:xcep', *scopes])
     try:
         r = app.test_client().post(f'{URL}/{profiles.two}/keytab', headers=headers,
-                                   data={'file': (io.BytesIO(TWO), 'k.keytab')},
+                                   data={'file': (io.BytesIO(TWO), 'k.keytab'), 'dry_run': '1'},
                                    content_type='multipart/form-data')
-        assert r.status_code == 403, r.data
+        assert r.status_code == status, r.data
+        if status == 403:
+            assert r.get_json()['message'] == 'Insufficient permissions'
     finally:
         auth_client.delete(f'/api/v2/account/apikeys/{key_id}')
