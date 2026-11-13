@@ -266,6 +266,38 @@ def test_a_replay_that_fails_leaves_the_key_for_the_next_start(base, monkeypatch
     assert base.run("SELECT key FROM system_config WHERE key = 'serial_unique_index_pending'") == []
 
 
+def test_a_replay_killed_after_the_sqlite_index_commits_ends_at_the_next_start(tmp_path, monkeypatch, capsys):
+    """SQLite runs CREATE INDEX outside a transaction when no row changed: a process killed before
+    the step's commit leaves the index and the key; the next start replays and clears the key."""
+    import sqlite3
+    from migrations._from_2_254 import step
+    key = "SELECT key FROM system_config WHERE key = 'serial_unique_index_pending'"
+    for db in make_base('sqlite', tmp_path, monkeypatch, 'kw'):
+        populate(db)
+        db.run("INSERT INTO certificates (id, refid, descr, caref, serial_number, crt, renewed_times) "
+               "VALUES (5, 'cert-5', 'cert-5', 'ca-b', '255', :c, 0)", {'c': _material()['twin'][1]})
+        assert db.upgrade()
+        assert 'uix_certificates_ca_serial' not in snapshot_index_names(db)
+        # Row 3 already holds '255': the replay converts nothing, so no transaction precedes the index
+        db.run("DELETE FROM certificates WHERE id IN (4, 5)")
+
+        class _KilledBeforeCommit(sqlite3.Connection):
+            def commit(self):
+                raise _Cut()
+
+        conn = sqlite3.connect(db.sqlite_path, factory=_KilledBeforeCommit)
+        with pytest.raises(_Cut):
+            step('144_canonical_certificate_serials').upgrade(conn)
+        conn.close()
+        assert 'uix_certificates_ca_serial' in snapshot_index_names(db)
+        assert db.run(key) != []
+        assert db.upgrade()
+        assert db.run(key) == []
+        capsys.readouterr()
+        assert db.upgrade()
+        assert 'up to date' in capsys.readouterr().out
+
+
 @pytest.mark.postgres
 def test_a_replay_leaves_certificates_writable_when_the_index_exists(tmp_path, monkeypatch):
     """Another node writes a certificate while a replay holds its transaction open: a replay
