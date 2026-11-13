@@ -1245,7 +1245,7 @@ export const helpContent = {
         icon: WindowsLogo,
         content: 'Native Windows certificate enrollment via MS-XCEP policy discovery and MS-WSTEP issuance, supports MMC/certreq manual enrollment and unattended GPO autoenrollment.',
         items: [
-          { label: 'Profiles', text: 'One profile per Active Directory realm, routed by the realm of the client\'s Kerberos principal: its own issuing and policy CA, template subset, AD connector, keytab and accounts. The list is paginated and filtered by the server (name or realm, CA, state: complete, keytab missing, connector failing, disabled)' },
+          { label: 'Profiles', text: 'One profile per Active Directory realm, routed by the realm of the client\'s Kerberos principal: its own issuing and policy CA, template subset, AD connector and keytab; the UsernamePassword accounts belong to the default profile. The list is paginated and filtered by the server (name or realm, CA, state: complete, keytab missing, connector failing, disabled)' },
           { label: 'Realm', text: 'In capital letters exactly as the KDC writes it (CORP.EXAMPLE): a KDC compares realms character by character. The default profile without a realm refuses Kerberos until one is set. A disabled profile refuses the machines of its realm; its keys stay in the served keytab so the refusal is audited by realm' },
           { label: 'XCEP', text: 'Lets Windows clients discover available certificate templates before enrolling' },
           { label: 'WSTEP', text: 'Handles certificate request and renewal once policy has been discovered' },

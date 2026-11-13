@@ -844,9 +844,9 @@ The CA that Kerberos clients see is the policy CA of the profile that serves the
 
 | Case | What the client gets | Where the reason is |
 | --- | --- | --- |
-| No profile holds a key for that realm (no profile, or its profile has no keytab) | A 401 Negotiate challenge: the client's authentication fails and nothing reaches the profile logic | The service log only (`no key for this realm`), **no audit entry**. For a profile that exists, `kerberos_refusal` in `GET /api/v2/windows-profiles/{id}` says `no key for realm ...` |
+| No keytab of any profile holds a key for that realm (no profile, or its profile has no keytab and no other keytab carries its realm) | A 401 Negotiate challenge: the client's authentication fails and nothing reaches the profile logic | The service log only (`no key for this realm`), **no audit entry**. For a profile that exists, `kerberos_refusal` in `GET /api/v2/windows-profiles/{id}` says `no key for realm ...` |
 | The client realm differs from the realm of the key that accepted the ticket | A 401 Negotiate challenge | The service log only (`client realm ... does not match the realm ... of the key that accepted it`), no audit entry |
-| A profile holds the realm's key but has no realm, the profile is disabled (its keys stay in the composed keytab), or the principal names no realm | HTTP 400 with the SOAP fault `The requester's realm is not served` | The audit entry `windows_enrollment.refused` |
+| A key of that realm is served but no profile has the realm (a keytab that carries several realms, or a keyed profile whose realm is not set), the profile is disabled (its keys stay in the composed keytab), or the principal names no realm | HTTP 400 with the SOAP fault `The requester's realm is not served` | The audit entry `windows_enrollment.refused` |
 | The profile has no realm (the default profile after an upgrade that could not name one) | Kerberos is not advertised in the policy and is refused | The profile screen, `kerberos_refusal` in `GET /api/v2/windows-profiles/{id}` |
 | The AD connector cannot resolve the requester (no such account, or an account without `userPrincipalName`), or the requester is not in the AD group of the profile (or of the template, when the profile sets none) | A SOAP fault on issuance, whose text says which | The service log and the audit entry |
 
