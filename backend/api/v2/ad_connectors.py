@@ -91,20 +91,22 @@ def _follow_realm(config, old_realm):
     new_realm = lookup.realm_of_base_dn(config.base_dn)
     if not old_realm or new_realm == old_realm:
         return None, []
-    using = WindowsEnrollmentProfile.query.filter_by(connector_id=config.id).order_by(
-        WindowsEnrollmentProfile.name).all()
-    follow, refused = [], []
-    for profile in using:
-        if profile.realm is None or profile.realm == new_realm:
-            continue
-        if profile.keytab:
-            refused.append((profile, 'its keytab fixes its realm'))
-        elif profile.realm != old_realm:
-            refused.append((profile, f'its realm is {profile.realm}, not {old_realm}'))
-        elif windows_profiles.realm_problem(new_realm, profile):
-            refused.append((profile, f'{new_realm} is already served by another profile'))
-        else:
-            follow.append(profile)
+    # No autoflush: the connector UPDATE must not reach the database before the DC bind
+    with db.session.no_autoflush:
+        using = WindowsEnrollmentProfile.query.filter_by(connector_id=config.id).order_by(
+            WindowsEnrollmentProfile.name).all()
+        follow, refused = [], []
+        for profile in using:
+            if profile.realm is None or profile.realm == new_realm:
+                continue
+            if profile.keytab:
+                refused.append((profile, 'its keytab fixes its realm'))
+            elif profile.realm != old_realm:
+                refused.append((profile, f'its realm is {profile.realm}, not {old_realm}'))
+            elif windows_profiles.realm_problem(new_realm, profile):
+                refused.append((profile, f'{new_realm} is already served by another profile'))
+            else:
+                follow.append(profile)
     if refused:
         db.session.rollback()
         listed = '; '.join(f'profile {p.name}: {why}' for p, why in refused[:5])

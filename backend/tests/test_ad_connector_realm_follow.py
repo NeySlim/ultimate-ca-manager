@@ -162,3 +162,34 @@ def test_the_list_costs_the_same_queries_for_any_number_of_flagged_profiles(app,
     for i in range(1, 12):
         _profile(app, f'p{i:02d}', f'ELSE{i}.EXAMPLE', world)
     assert count() == few
+
+
+def test_a_profile_with_no_realm_or_already_on_the_new_domain_does_not_block_the_save(app, auth_client, world):
+    keyed = _profile(app, 'keyed', 'NEW.EXAMPLE', world, with_keytab=True)
+    blank = _profile(app, 'blank', None, world)
+    r = _move(auth_client, world)
+    assert r.status_code == 200, r.data
+    assert _realm(app, keyed) == 'NEW.EXAMPLE' and _realm(app, blank) is None
+
+
+def test_the_connector_row_is_not_written_before_the_domain_sid_is_read(app, auth_client, world, monkeypatch):
+    """The SID read binds to the DCs: no write lock may be held while it runs."""
+    _profile(app, 'follower', 'OLD.EXAMPLE', world)
+    order = []
+
+    def fetch(config):
+        order.append('fetch')
+        return None
+    monkeypatch.setattr(lookup, 'fetch_domain_sid', fetch)
+
+    def record(conn, cursor, statement, *args):
+        if statement.lstrip().lower().startswith('update ad_connector_config'):
+            order.append('update')
+    with app.app_context():
+        event.listen(db.engine, 'before_cursor_execute', record)
+        try:
+            r = _move(auth_client, world)
+        finally:
+            event.remove(db.engine, 'before_cursor_execute', record)
+    assert r.status_code == 200, r.data
+    assert order.index('fetch') < order.index('update')
