@@ -192,7 +192,7 @@ def test_values():
     data = request.json or {}
     saved = None
     if data.get('id') is not None:
-        saved = db.session.get(ADConnectorConfig, data['id']) if isinstance(data['id'], int) else None
+        saved = db.session.get(ADConnectorConfig, data['id']) if type(data['id']) is int else None
         if saved is None:
             return error_response('Connector not found', 404)
     return run_unsaved_test(data, saved)

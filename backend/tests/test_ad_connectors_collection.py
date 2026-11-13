@@ -486,3 +486,20 @@ def test_a_name_taken_by_a_concurrent_save_answers_409(auth_client, app, monkeyp
             with app.app_context():
                 db.session.get(WindowsEnrollmentProfile, parked_id).is_default = True
                 db.session.commit()
+
+
+@pytest.mark.parametrize('connector_id', [True, False])
+def test_a_boolean_id_names_no_connector(auth_client, monkeypatch, connector_id):
+    """``True`` is an int to isinstance: it would lend connector 1's saved password."""
+    real_get, looked_up = db.session.get, []
+
+    def get(model, ident, *args, **kwargs):
+        if model is ADConnectorConfig:
+            looked_up.append(ident)
+        return real_get(model, ident, *args, **kwargs)
+
+    monkeypatch.setattr(db.session, 'get', get)
+    body = {'servers': ['dc1.a.example'], 'bind_dn': 'svc', 'base_dn': 'DC=a,DC=example', 'id': connector_id}
+    response = auth_client.post(f'{URL}/test', data=json.dumps(body), content_type='application/json')
+    assert response.status_code == 404, response.data
+    assert looked_up == []
