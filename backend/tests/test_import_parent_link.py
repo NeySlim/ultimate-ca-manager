@@ -38,7 +38,7 @@ def _cn(cert):
     return cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
 
 
-@pytest.mark.parametrize('endpoint', ['/api/v2/cas/import'])
+@pytest.mark.parametrize('endpoint', ['/api/v2/cas/import', '/api/v2/certificates/import'])
 def test_imported_child_ca_is_linked_to_its_imported_parent_at_once(app, client, auth_client, endpoint):
     """Parent known from the import response on, and GetCACert in chain mode serves both
     certificates without waiting for the hourly backfill."""
