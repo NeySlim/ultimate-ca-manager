@@ -240,23 +240,32 @@ def _lift_holds(members, cas, serials):
     """Clear the members' holds and delete their hold records, or the 409 to answer (no commit).
     Records are locked before the rows, as the hourly pass and a revocation take them; a row is
     written only if still held or unrevoked, and a final record found under lock refuses."""
-    from services.cert.issued_lookup import lock_serial_records
+    from services.cert.issued_lookup import lock_serial_records, revocation_order
+    from utils.cert_issuer import same_key_refids
+    from utils.serial_format import canonical_serial
     from models import RevokedSerial
 
-    def records_of(member):
-        ca, serial = cas[member.id], serials[member.id]
-        return lock_serial_records(ca, serial) if ca is not None and serial is not None else []
-    for member in members:
-        records_of(member)
+    targets = {m.id: (cas[m.id], serials[m.id]) for m in members
+               if cas[m.id] is not None and serials[m.id] is not None}
+    keys = {i: (set(same_key_refids(ca)), canonical_serial(serial)) for i, (ca, serial) in targets.items()}
+
+    def records_of(member, locked):
+        if member.id not in keys:
+            return []
+        refids, column = keys[member.id]
+        return sorted((r for r in locked if r.caref in refids and r.serial_number == column),
+                      key=revocation_order)
+    lock_serial_records(targets.values())
     for member in members:
         if not _liftable_row(member.id).update(
                 {'revoked': False, 'revoked_at': None, 'revoke_reason': None, 'invalidity_at': None},
                 synchronize_session='fetch'):
             db.session.rollback()
             return _revoked_for_good(member, db.session.get(Certificate, member.id).revoke_reason)
+    # Read again under the row's write lock: SQLite takes it only at the UPDATE above
+    locked = lock_serial_records(targets.values())
     for member in members:
-        # Read again under the row's write lock: SQLite takes it only at the UPDATE above
-        records = records_of(member)
+        records = records_of(member, locked)
         final = [r for r in records if r.revoke_reason not in HOLD_REASONS]
         if final:
             return _revoked_for_good(member, final[0].revoke_reason)

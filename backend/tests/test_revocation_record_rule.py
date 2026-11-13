@@ -1377,14 +1377,14 @@ def test_a_lift_committed_after_the_pass_reread_still_wins(app, issuer, monkeypa
     real, key = _leaf('lift-after-reread.example.test', ca_cert, ca_key, days=200)
     row_id = _store(app, real, refid, key=key)
     record_id = _record(app, refid, real, reason='certificateHold', certificate_id=row_id)
-    reread = issued_lookup._record_still_held
+    reread = issued_lookup._records_still_held
 
-    def then_lifted(record):
-        still = reread(record)
+    def then_lifted(records):
+        still = reread(records)
         with db.engine.begin() as other:
             other.execute(delete(RevokedSerial).where(RevokedSerial.id == record_id))
         return still
-    monkeypatch.setattr(issued_lookup, '_record_still_held', then_lifted)
+    monkeypatch.setattr(issued_lookup, '_records_still_held', then_lifted)
     with app.app_context():
         assert issued_lookup.apply_persisted_revocations({row_id}) == []
         db.session.commit()
