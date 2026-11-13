@@ -84,7 +84,9 @@ def test_a_profile_with_a_keytab_refuses_the_move_and_is_named(app, auth_client,
     r = _move(auth_client, world)
     assert r.status_code == 409, r.data
     message = r.get_json()['message']
-    assert 'c10-bound' in message and 'keytab fixes its realm' in message and 'another connector' in message
+    assert 'c10-bound' in message and 'keytab fixes its realm' in message
+    # Only exits that exist: a keytab holds the realm, so "change the realm" is not offered
+    assert 'another connector' in message and 'change the realm' not in message.lower()
     _nothing_written(app, world, {bound: 'OLD.EXAMPLE'})
 
 
@@ -92,7 +94,8 @@ def test_a_profile_whose_realm_was_not_the_old_domain_refuses_the_move(app, auth
     other = _profile(app, 'other', 'ELSE.EXAMPLE', world)
     r = _move(auth_client, world)
     assert r.status_code == 409, r.data
-    assert 'c10-other' in r.get_json()['message']
+    message = r.get_json()['message']
+    assert 'c10-other' in message and 'change the realm of the other profiles' in message
     _nothing_written(app, world, {other: 'ELSE.EXAMPLE'})
 
 

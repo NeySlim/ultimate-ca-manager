@@ -89,6 +89,9 @@ def _stage(config, creating, followed=()):
     return None
 
 
+KEYTAB_FIXES_REALM = 'its keytab fixes its realm'
+
+
 def _follow_realm(config, old_realm):
     """Move the realm of the profiles of *config* to its new domain, in the caller's transaction.
     Returns (error response, followed profiles): a profile with a keytab, or whose realm was not
@@ -105,7 +108,7 @@ def _follow_realm(config, old_realm):
             if profile.realm is None or profile.realm == new_realm:
                 continue
             if profile.keytab:
-                refused.append((profile, 'its keytab fixes its realm'))
+                refused.append((profile, KEYTAB_FIXES_REALM))
             elif profile.realm != old_realm:
                 refused.append((profile, f'its realm is {profile.realm}, not {old_realm}'))
             elif windows_profiles.realm_problem(new_realm, profile):
@@ -116,9 +119,15 @@ def _follow_realm(config, old_realm):
         db.session.rollback()
         listed = '; '.join(f'profile {p.name}: {why}' for p, why in refused[:5])
         more = f' (and {len(refused) - 5} more)' if len(refused) > 5 else ''
+        # A keytab holds the realm of its profile: only another connector (or none) is left to it
+        exits = []
+        if any(why == KEYTAB_FIXES_REALM for _p, why in refused):
+            exits.append('give a profile with a keytab another connector, or none')
+        if any(why != KEYTAB_FIXES_REALM for _p, why in refused):
+            exits.append('change the realm of the other profiles, or give them another connector')
         return error_response(
             f'Cannot move connector {config.name} from {old_realm} to {new_realm}: {listed}{more}. '
-            'Change the realm of the profile, or give it another connector, first.', 409,
+            f'First {" and ".join(exits)}.', 409,
             details={'profiles': [{'id': p.id, 'name': p.name, 'reason': why}
                                   for p, why in refused[:MAX_LISTED_PROFILES]],
                      'total': len(refused)}), []
