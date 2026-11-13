@@ -226,3 +226,21 @@ def test_the_single_row_configuration_routes_are_gone(auth_client, method, path)
     gone = getattr(auth_client, method)(path, json={}).status_code
     never = getattr(auth_client, method)('/api/v2/never-existed-route', json={}).status_code
     assert gone == never and gone in (404, 405)
+
+
+def _key(auth_client, permissions):
+    r = auth_client.post('/api/v2/account/apikeys', json={'name': 'wp-scope', 'permissions': permissions})
+    assert r.status_code == 201, r.data
+    data = r.get_json()['data']
+    return data['id'], {'X-API-Key': data['key']}
+
+
+def test_a_keytab_needs_the_kerberos_write_scope_too(app, auth_client, profiles):  # noqa: F811
+    key_id, headers = _key(auth_client, ['read:xcep', 'write:xcep'])
+    try:
+        r = app.test_client().post(f'{URL}/{profiles.two}/keytab', headers=headers,
+                                   data={'file': (io.BytesIO(TWO), 'k.keytab')},
+                                   content_type='multipart/form-data')
+        assert r.status_code == 403, r.data
+    finally:
+        auth_client.delete(f'/api/v2/account/apikeys/{key_id}')

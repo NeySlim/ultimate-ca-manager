@@ -528,6 +528,9 @@ def upload_profile_keytab(profile_id):
     With ``dry_run`` the entries are listed, per realm, and nothing is stored."""
     from services import cluster_commands
     from services.kerberos import negotiate_auth
+    # The route replaces the retired keytab upload, which answered to write:kerberos
+    if not has_permission('write:kerberos', g.permissions):
+        return error_response('Permission denied: write:kerberos', 403)
     profile = db.session.get(WindowsEnrollmentProfile, profile_id)
     if profile is None:
         return error_response('Profile not found', 404)
