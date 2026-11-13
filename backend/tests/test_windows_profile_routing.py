@@ -222,7 +222,7 @@ def test_the_group_and_pinned_fields_of_the_profile_replace_the_template_s(app, 
         db.session.commit()
     world['groups'] = {'C04 B Enroll'}
     assert _fault(_issue(client, world, 'usera@C04A.TEST')) == (
-        400, 's:Sender', 'Requester is not authorized to enroll against this template')
+        400, 's:Sender', 'Requester is not authorized to enroll against this profile')
     assert (world['connectors']['A'], 'C04 A Enroll') in world['asked']
     world['asked'].clear()
     cert = _issued_cert_from_rstr(_issue(client, world, 'userb@C04B.TEST', cn='c04-b-host').data)

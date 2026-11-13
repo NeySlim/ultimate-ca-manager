@@ -87,7 +87,7 @@ class ServerError(str):
 
 # One text for an unknown realm and a disabled profile: the client learns nothing of the profiles
 REALM_NOT_SERVED = "The requester's realm is not served"
-NOT_IN_GROUP = 'Requester is not authorized to enroll against this template'
+NOT_IN_GROUP = 'Requester is not authorized to enroll against this {what}'
 
 
 def _x509_name_from_dn_components(dn_components, email=None):
@@ -1181,7 +1181,9 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             )
             if unreachable:
                 return None, ServerError('The directory could not be reached to check enrollment rights')
-            return None, NOT_IN_GROUP
+            # Names what required the group: the profile's replaces the template's
+            from services.windows_profiles import profile_group
+            return None, NOT_IN_GROUP.format(what='profile' if profile_group(profile) else 'template')
 
     # The approval gate sees the subject and names the certificate will carry
     err = _pass_gate(gate, csr, matched_template,
