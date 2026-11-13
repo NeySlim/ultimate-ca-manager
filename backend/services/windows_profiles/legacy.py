@@ -4,7 +4,6 @@ Pure functions over plain values: migration 155 reads them from the database, a 
 from a 2.x archive. One conversion, so both produce the same profile.
 """
 import logging
-import struct
 
 logger = logging.getLogger(__name__)
 
@@ -31,31 +30,9 @@ def connector_names(rows):
 
 def keytab_realms(data):
     """The realms of the entries of an MIT keytab (format 0x0501 or 0x0502), None when unreadable."""
-    if not data or len(data) < 2 or data[0] != 5 or data[1] not in (1, 2):
-        return None
-    order = '>' if data[1] == 2 else '='
-    realms, pos = set(), 2
-    try:
-        while pos + 4 <= len(data):
-            (size,) = struct.unpack_from(f'{order}i', data, pos)
-            pos += 4
-            if size < 0:   # a hole left by a deleted entry
-                pos += -size
-                continue
-            if size == 0 or pos + size > len(data):
-                break
-            entry = data[pos:pos + size]
-            (components,) = struct.unpack_from(f'{order}H', entry, 0)
-            if data[1] == 1:
-                components -= 1   # 0x0501 counted the realm as a component
-            (length,) = struct.unpack_from(f'{order}H', entry, 2)
-            if components < 1 or 4 + length > len(entry):
-                return None
-            realms.add(entry[4:4 + length].decode('utf-8'))
-            pos += size
-    except (struct.error, UnicodeDecodeError):
-        return None
-    return realms
+    from services.kerberos.keytab_format import read_entries
+    entries = read_entries(data)
+    return None if entries is None else {e.realm for e in entries}
 
 
 def spn_realm(spn):
