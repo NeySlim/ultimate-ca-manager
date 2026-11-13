@@ -266,6 +266,15 @@ def test_the_kerberos_refusal_names_the_profile_or_what_the_binding_lacks(app, m
         assert kerberos_refusal(served) is None
 
 
+def test_a_profile_without_a_realm_is_refused_by_its_own_name(app):
+    from services.windows_profiles import kerberos_refusal
+    with app.app_context():
+        named = WindowsEnrollmentProfile(name='no-realm', realm=None, enabled=True, is_default=False)
+        assert kerberos_refusal(named) == 'profile no-realm has no realm: Kerberos refused until one is set'
+        default = WindowsEnrollmentProfile(name='no-realm', realm=None, enabled=True, is_default=True)
+        assert kerberos_refusal(default) == 'default profile has no realm: Kerberos refused until one is set'
+
+
 def test_the_profile_api_gives_the_reason_the_binding_is_not_configured(auth_client, profiles, monkeypatch):  # noqa: F811
     monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: 'no SPN set')
     for read in (auth_client.get(f'{URL}/{profiles.two}'), auth_client.get(URL)):

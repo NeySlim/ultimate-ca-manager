@@ -80,7 +80,9 @@ def kerberos_refusal(profile=None):
         return 'no Windows enrollment profile'
     if not profile.enabled:
         return f'profile {profile.name} is disabled'
-    return None if profile.realm else NO_REALM
+    if profile.realm:
+        return None
+    return NO_REALM if profile.is_default else f'profile {profile.name} has no realm: Kerberos refused until one is set'
 
 
 def kerberos_binding_reason():
