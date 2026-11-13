@@ -865,6 +865,30 @@ Every certificate issued over WSTEP (Kerberos, UsernamePassword, Certificate bin
 - **Not over EST or SCEP.** EST `/simplereenroll` and SCEP RenewalReq refuse to renew a certificate of a Windows enrollment profile (enabled, disabled or deleted since, or a `wstep` certificate recording none), answering 403 and FAILURE with `badMessageCheck`, and audit the refusal (`windows_enrollment.refused`) with the profile and the reason; such a certificate renews over WSTEP only.
 - **Keytab.** The keytab served to the Kerberos acceptor holds the keys of every profile, disabled ones included, so that a request of a disabled profile's realm authenticates and gets the refusal fault and its audit entry. Disabling a profile does not remove its keys from that file, and no route removes the keytab of a profile: to remove them, delete the profile (allowed unless it is the default one or has valid issued certificates).
 
+### Windows enrollment: common name pattern
+
+A template whose subject UCM builds on the Kerberos binding (a computer template: web server, VPN server, VPN client, OCSP signing; or a user template with **Build subject from Active Directory**) can take the CN of its certificates from a pattern (**Templates**, subject section, **Common name pattern**). The pattern is fixed text and variables in braces, read from the requester's object in the directory of the profile, never from the request: `{hostname}-WiFi`, `{username}`, `{displayName} ({username})`. An empty pattern keeps the subject described above.
+
+| Variable | Templates | Value |
+| --- | --- | --- |
+| `{hostname}` | computer | `sAMAccountName` without its trailing `$` |
+| `{fqdn}` | computer | `dNSHostName` |
+| `{username}` | user | `sAMAccountName` |
+| `{upn}` | user | `userPrincipalName` |
+| `{mail}` | user | `mail`, when it is a valid address |
+| `{displayName}`, `{givenName}`, `{surname}` | user | `displayName`, `givenName`, `sn` |
+| `{domain}` | both | the `DC` components of the object's DN, joined with dots |
+| `{realm}` | both | the realm of the profile |
+
+- **Saving.** `{{` and `}}` write a literal brace. An unknown variable, a variable of the other kind of template, a stray brace, or a pattern on a template whose requester supplies the subject is refused when the template is saved (create, update, import), with a message naming it. Changing the type of a template, or switching off **Build subject from Active Directory**, under a pattern that no longer fits is refused the same way.
+- **The subject.** With **Keep the directory path** off (the default), the subject is `CN=<pattern>` alone, plus the template's pinned fields. On, the object's DN after its own name follows the CN (`CN=<pattern>,OU=Laptops,DC=corp,DC=example`), and a user's subject keeps the e-mail attribute it has without a pattern. A value goes into the CN as text: a comma, `=` or `+` in a `displayName` adds no RDN.
+- **What does not change.** The SAN (the computer's DNS name; the user's UPN and e-mail) and the SID extension are those issued without a pattern; a pattern never makes a SAN, so `{hostname}-WiFi` is never a DNS name of the certificate. The directory is searched as often as without a pattern: the attributes join the search already made for the subject.
+- **Refusals.** A variable the directory leaves empty, a result longer than 64 characters (the bound of a CN, RFC 5280) or one holding a control character refuses the request, which is the requester's fault (SOAP `s:Sender`); nothing is shortened. The reason, `Template '<name>' cannot build its common name: {displayName} has no value in the directory for the requester`, is in the audit entry `windows_enrollment.refused`. A directory that cannot answer stays a server fault, as without a pattern.
+- **Not unique.** `{displayName}`, `{givenName}`, `{surname}` and `{mail}` can be shared by several accounts, so two certificates can carry the same CN; the editor warns, UCM does not check.
+- **Renewal.** A Kerberos renewal is an issuance and takes the pattern in force. A renewal with the certificate (Certificate binding) is still recognized by its profile and SID, and the request must still repeat the subject of the renewed certificate; the new certificate takes the CN of the pattern in force, for the account the certificate's SID names, found by the connector of the profile (one more search). It is refused when no connector of the profile finds that account, or when the directory leaves a variable empty. Without a pattern, the renewed subject is kept as before.
+- **Username/Password binding.** It has no directory identity: the pattern does not apply there, and the client supplies the subject, as the policy of that binding announces.
+- **Policy.** With a pattern, the policy announces the template's SAN flags without a subject flag (`0x08000000` for a computer template, `0x02000000` for a user template, instead of `0x18000000` and `0x82000000`): MS-CRTD has no flag for a CN of the CA's choosing, and the request's subject is still ignored. This announcement has not been tried against a Windows client yet.
+
 ### Windows enrollment profiles: changing the domain of a connector
 
 When a save of an AD connector (**Settings → Active Directory**) changes the domain of its base DN, each profile that uses the connector is looked at first. A profile without keytab whose realm was the old domain takes the new domain as its realm, in the same save, and the audit entry of the connector names it. A profile with no realm, or already on the new domain, is left as is. Any other profile refuses the save (409) with its name: a profile with a keytab, whose keytab fixes its realm; a profile whose realm was not the old domain; a profile that cannot take the new realm because another profile serves it. Nothing is written then, not even for the profiles that could follow. The 409 says what to do: for a profile with a keytab, whose realm can only be moved to another realm of its keytab or cleared, give it another connector (or none); for the others, change the realm of the profile or give it another connector. Then move the connector.

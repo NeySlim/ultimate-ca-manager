@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
+- **Common name pattern for Windows enrollment (#442).** A template whose subject UCM builds can set the CN from fixed text and directory variables (`{hostname}-WiFi`, `{username}`, `{displayName}`), alone or followed by the directory path; the SAN and the SID extension are unchanged, and a request whose directory object leaves a variable empty or gives a CN over 64 characters is refused.
 - **Several Active Directory connectors.** `/api/v2/ad-connectors` manages one connector per forest or domain, and each lookup, renewal check and health probe uses the connector of the domain concerned. A SID the directory returns outside its connector's domain is refused at issuance.
 - **Windows enrollment profiles.** `/api/v2/windows-profiles` lists (paginated, searchable), creates, changes, disables and deletes the profiles; the default profile and a profile with valid issued certificates cannot be deleted.
 - **Windows profiles and AD connectors in Settings.** The Windows Autoenrollment tab lists the profiles with an editor and a checklist per profile, and the Active Directory tab lists the connectors with their health and domain SID. The single-row routes `/api/v2/xcep/config`, `/wstep/config`, `/kerberos/config`, `/kerberos/keytab` and `/ad-connector` are removed (see UPGRADE.md).
