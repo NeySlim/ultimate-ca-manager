@@ -189,6 +189,14 @@ def update_config():
     config.updated_at = utc_now()
 
     try:
+        # The default profile is served by the connector; a realm it had none for may now be known
+        from services import windows_profiles
+        profile = windows_profiles.default_profile()
+        if profile is not None:
+            db.session.flush()
+            if profile.connector_id is None:
+                profile.connector_id = config.id
+            windows_profiles.fill_realm(profile)
         ok, err = safe_commit(logger, 'Failed to update AD Connector configuration')
         if not ok:
             return err

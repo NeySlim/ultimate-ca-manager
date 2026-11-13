@@ -116,24 +116,19 @@ def test_the_change_password_route_stores_pbkdf2(app, fips_scrypt):
                                        ('/api/v2/wstep/config', 'wstep_password'),
                                        ('/api/v2/xcep/config', 'xcep_password')])
 def test_protocol_passwords_are_pbkdf2(app, auth_client, fips_scrypt, route, key):
+    from tests.windows_profile_support import get_config, restore, snapshot
     with app.app_context():
-        row = SystemConfig.query.filter_by(key=key).first()
-        before = row.value if row else None
+        before = snapshot((key,))
     try:
         r = auth_client.patch(route, content_type=CONTENT_JSON,
                               data=json.dumps({'password': 'Proto-pw-789!'}))
         assert r.status_code == 200, r.data
         with app.app_context():
-            stored = SystemConfig.query.filter_by(key=key).first().value
+            stored = get_config(key)
         assert stored.startswith(PBKDF2) and verify_password(stored, 'Proto-pw-789!')
     finally:
         with app.app_context():
-            row = SystemConfig.query.filter_by(key=key).first()
-            if before is None and row is not None:
-                db.session.delete(row)
-            elif row is not None:
-                row.value = before
-            db.session.commit()
+            restore(before)
 
 
 def test_the_salt_carries_128_bits():

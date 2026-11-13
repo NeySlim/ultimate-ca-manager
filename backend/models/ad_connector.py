@@ -36,6 +36,9 @@ class ADConnectorConfig(db.Model):
     __tablename__ = 'ad_connector_config'
 
     id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), unique=True, nullable=False, default='default')
+    # objectSid of the base DN's domain, read when the connector is saved or tested
+    domain_sid = db.Column(db.String(255))
 
     server = db.Column(db.String(500))
     port = db.Column(db.Integer, default=389)

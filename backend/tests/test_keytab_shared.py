@@ -27,9 +27,12 @@ def keytab_on(monkeypatch, tmp_path, app):
         'valid': True, 'principal': 'HTTP/ucm.example.test@EXAMPLE.TEST', 'error': None})
     yield point
     from models import ClusterCommand, db
+    from tests.windows_profile_support import default_profile
     with app.app_context():
         shared_files.drop_file(shared_files.KERBEROS_KEYTAB)
         ClusterCommand.query.filter_by(kind=cc.RELOAD_KEYTAB).delete()
+        if default_profile() is not None:
+            default_profile().keytab = None
         db.session.commit()
 
 

@@ -608,6 +608,7 @@ MASTER_KEY_COLUMNS = (
     ('models.sso', 'SSOProvider', 'ldap_bind_password', 'text'),
     ('models.acme_models', 'AcmeClientOrder', '_pending_key', 'b64'),
     ('models.shared_file', 'SharedFile', 'content', 'b64'),
+    ('models.windows_profile', 'WindowsEnrollmentProfile', 'keytab', 'text'),
 )
 # SystemConfig values stored under the master key, as fnmatch patterns
 MASTER_KEY_CONFIG_KEYS = (

@@ -110,6 +110,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - First access: scripts that logged in as `admin` / `changeme123` after a fresh install must provide the password or read the generated file; the DEB and RPM upgrade removes the `INITIAL_ADMIN_PASSWORD=changeme123` line 2.x wrote, and an existing administrator is left as it is.
 - Discovery: on PostgreSQL with a server time zone other than UTC, discovery dates stored before this release are in local time; run a scan of the discovery targets after upgrading to rewrite them.
+- Windows enrollment: the XCEP, WSTEP and Kerberos settings become the profile `default` with an explicit realm (connector base DN, else SPN, else a single-realm keytab), migrated with the same policy ID and template OIDs (migration 155); without a realm to take, Kerberos alone is refused until one is set, see UPGRADE.md.
 - Certificates: `serial_number` of certificates issued from the form, renewed in place, issued on policy approval, issued by a Microsoft CA or used as TSA signer is now returned in decimal like the others; the UI still shows colon hex.
 
 ## [2.252] - 2026-11-08

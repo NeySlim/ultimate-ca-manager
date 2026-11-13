@@ -166,27 +166,32 @@ def _config(key):
 
 def test_convert_moves_the_ca_settings_to_the_root(app, auth_client):
     from models import SystemConfig
+    from tests import windows_profile_support as profile
     pki, ids = _world(app)
     with app.app_context():
         x_ref, b_ref = db.session.get(CA, ids['x']).refid, db.session.get(CA, ids['b']).refid
-        for key in ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'wstep_ca_refid',
-                    'xcep_ca_refid', 'mtls_trusted_ca_id', 'scep_ca_id'):
+        saved = profile.snapshot(('wstep_ca_refid', 'xcep_ca_refid'))
+        for key in ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'mtls_trusted_ca_id', 'scep_ca_id'):
             SystemConfig.query.filter_by(key=key).delete()
-        _set_config(acme__issuing_ca_id=x_ref, est_ca_refid=x_ref, tsa_ca_refid=x_ref, wstep_ca_refid=x_ref,
-                    xcep_ca_refid=x_ref, mtls_trusted_ca_id=x_ref, scep_ca_id=str(ids['x']))
+        _set_config(acme__issuing_ca_id=x_ref, est_ca_refid=x_ref, tsa_ca_refid=x_ref,
+                    mtls_trusted_ca_id=x_ref, scep_ca_id=str(ids['x']))
+        profile.set_config('wstep_ca_refid', x_ref)
+        profile.set_config('xcep_ca_refid', x_ref)
         _set_config(**{f"ocsp_responder_cert_{ids['x']}": '77'})
     assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
     with app.app_context():
-        for key in ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'wstep_ca_refid',
-                    'xcep_ca_refid', 'mtls_trusted_ca_id'):
+        for key in ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'mtls_trusted_ca_id'):
             assert _config(key) == b_ref, key
+        # The Windows profiles are repointed like the settings they replaced
+        assert profile.get_config('wstep_ca_refid') == profile.get_config('xcep_ca_refid') == b_ref
         assert _config('scep_ca_id') == str(ids['b'])
         assert _config(f"ocsp_responder_cert_{ids['b']}") == '77'
         assert _config(f"ocsp_responder_cert_{ids['x']}") is None
-        for key in ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'wstep_ca_refid',
-                    'xcep_ca_refid', 'mtls_trusted_ca_id', 'scep_ca_id', f"ocsp_responder_cert_{ids['b']}"):
+        for key in ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'mtls_trusted_ca_id', 'scep_ca_id',
+                    f"ocsp_responder_cert_{ids['b']}"):
             SystemConfig.query.filter_by(key=key).delete()
         db.session.commit()
+        profile.restore(saved)
 
 
 def test_urls_embedded_by_the_removed_duplicate_still_resolve(app, auth_client, client):

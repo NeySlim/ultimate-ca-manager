@@ -54,6 +54,9 @@ def node_b(app, monkeypatch):
     with app.app_context():
         ClusterCommand.query.delete()
         shared_files.drop_file(shared_files.KERBEROS_KEYTAB)
+        from tests.windows_profile_support import default_profile
+        if default_profile() is not None:
+            default_profile().keytab = None
         db.session.commit()
 
 
@@ -72,10 +75,13 @@ def test_a_keytab_uploaded_on_a_is_served_by_b_after_the_command(app, auth_clien
 
     on_b = tmp_path / 'b.keytab'
     monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', on_b)
-    assert not negotiate_auth.is_configured()
+    # The default profile is read from the database, and takes the SPN's realm
+    with app.app_context():
+        assert not negotiate_auth.is_configured()
     start()
     assert wait_for(lambda: on_b.exists() and on_b.read_bytes() == KEYTAB)
-    assert negotiate_auth.is_configured()
+    with app.app_context():
+        assert negotiate_auth.is_configured()
 
 
 def test_a_certificate_applied_on_a_restarts_b_which_then_serves_it(

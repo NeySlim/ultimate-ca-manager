@@ -359,3 +359,29 @@ def test_a_renewal_already_linked_tells_the_approver_why(app, client, wstep_conf
         (approval_id, *_), = requests_of(app, pid, 'wstep_request')
         linked_id = _issue_already_linked(app, approval_id, other.serial_number)
         assert requests_of(app, pid, 'wstep_request')[0][3] == linked_id
+
+
+def _profile_enabled(app, enabled):
+    from models import db
+    from tests.windows_profile_support import default_profile
+    with app.app_context():
+        default_profile().enabled = enabled
+        db.session.commit()
+
+
+def test_an_approval_after_the_profile_was_disabled_is_refused(app, client, auth_client, wstep_config):
+    """Disabled while held: the approved request is refused like any other refused at issuance,
+    never signed with a validity of its own."""
+    with approval_policy(app, wstep_config['id'], 'wstep-held-profile-off') as pid:
+        csr, _ = _make_csr(common_name='profile-off.wstep-approval.test')
+        request_id = _pending(_issue_rst(client, csr))
+        (approval_id, *_), = requests_of(app, pid, 'wstep_request')
+        _profile_enabled(app, False)
+        try:
+            r = auth_client.post(f'/api/v2/approvals/{approval_id}/approve', json={'comment': 'ok'})
+            assert r.get_json()['message'] == 'Request closed', r.get_json()
+        finally:
+            _profile_enabled(app, True)
+        reason, invalid, _echo = _fault(_query(client, request_id))
+        assert reason == 'Refused at issuance' and invalid == 'true'
+

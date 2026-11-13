@@ -23,6 +23,19 @@ from models.certificate_template import CertificateTemplate
 from tests.fixtures.templates import delete_templates, template_ids_named
 from services.ad_connector import lookup as ad_lookup
 from services.wstep import wstep_service
+from tests.windows_profile_support import connectors_kept
+
+
+# The CAs and certificates this file issues are removed after it
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
+
+@pytest.fixture(autouse=True)
+def _connectors_put_back(app):
+    """The connector rows this file deletes and rewrites are the session's: put back."""
+    with connectors_kept(app):
+        yield
+
 
 
 def _make_csr(attrs=None, common_name=None):

@@ -32,6 +32,7 @@ from models.policy import CertificatePolicy, ApprovalRequest
 from models.ssh import SSHCertificateAuthority, SSHCertificate
 from models.msca import MicrosoftCA, MSCARequest
 from models.ad_connector import ADConnectorConfig
+from models.windows_profile import WindowsEnrollmentProfile, WindowsProfileTemplate
 from models.discovered_certificate import ScanProfile, ScanRun, DiscoveredCertificate
 from models.ca_template_pin import CATemplatePin
 from models.ca_cross_certificate import CACrossCertificate
@@ -67,7 +68,8 @@ __all__ = [
     "CATemplatePin",
     "WebhookDelivery",
     "KeyRecoveryRequest",
-    "ADConnectorConfig", "RevokedSerial", "CompromisedKeyRecord", "EstSignerCert",
+    "ADConnectorConfig", "WindowsEnrollmentProfile", "WindowsProfileTemplate",
+    "RevokedSerial", "CompromisedKeyRecord", "EstSignerCert",
     "DeployTarget", "DeployBinding", "CRLDeployBinding", "DeployDelivery",
     "ClusterCommand", "ClusterNode", "SchedulerRequest", "EncryptionKey", "WebsocketRelayEvent",
     "SharedFile",

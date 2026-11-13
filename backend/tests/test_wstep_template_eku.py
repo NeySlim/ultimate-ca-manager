@@ -27,17 +27,13 @@ from models.certificate_template import CertificateTemplate
 from models.system_config import SystemConfig
 from tests.fixtures.templates import delete_templates
 from services.wstep import wstep_service
+from tests.windows_profile_support import restore, set_config, snapshot
 
 SMARTCARD_LOGON = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2.2')
 
 
 def _set_config(key, value):
-    row = SystemConfig.query.filter_by(key=key).first()
-    if row is None:
-        db.session.add(SystemConfig(key=key, value=value))
-    else:
-        row.value = value
-    db.session.commit()
+    set_config(key, value)
 
 
 @pytest.fixture(scope='module')
@@ -45,11 +41,7 @@ def smartcard_template_config(app, create_ca):
     ca_data = create_ca(cn='WSTEP Smartcard CA')
     keys = ('wstep_enabled', 'wstep_ca_refid', 'wstep_validity_days')
     with app.app_context():
-        previous = {
-            key: (SystemConfig.query.filter_by(key=key).first().value
-                  if SystemConfig.query.filter_by(key=key).first() else None)
-            for key in keys
-        }
+        previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
         _set_config('wstep_enabled', 'true')
         _set_config('wstep_ca_refid', ca.refid)
@@ -79,16 +71,7 @@ def smartcard_template_config(app, create_ca):
     with app.app_context():
         delete_templates([template_id])
         db.session.commit()
-        for key, value in previous.items():
-            row = SystemConfig.query.filter_by(key=key).first()
-            if value is None:
-                if row is not None:
-                    db.session.delete(row)
-            elif row is None:
-                db.session.add(SystemConfig(key=key, value=value))
-            else:
-                row.value = value
-        db.session.commit()
+        restore(previous)
 
 
 def _make_csr(common_name, ekus=None):

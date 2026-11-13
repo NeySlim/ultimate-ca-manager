@@ -30,7 +30,7 @@ import logging
 
 from flask import Blueprint, Response, request
 
-from models import CA, CertificateTemplate, SystemConfig
+from models import CertificateTemplate, SystemConfig
 from services.kerberos import negotiate_auth
 from services.wstep import CES_CERTIFICATE_PATH, CES_KERBEROS_PATH, CES_USERNAME_PASSWORD_PATH
 from services.wstep.soap_envelope import build_soap_fault, extract_username_token
@@ -76,9 +76,11 @@ def _read_xcep_body():
 def _check_credentials(username, password):
     if not username or not password:
         return False
-    xcep_username = SystemConfig.query.filter_by(key='xcep_username').first()
-    xcep_password = SystemConfig.query.filter_by(key='xcep_password').first()
-    if not (xcep_username and xcep_password and xcep_username.value and xcep_password.value):
+    from services.windows_profiles import serving_profile
+    profile = serving_profile()
+    xcep_username = profile.xcep_username if profile is not None else None
+    xcep_password = profile.xcep_password if profile is not None else None
+    if not (xcep_username and xcep_password):
         return False
 
     # hmac.compare_digest on two `str` operands requires both to be
@@ -86,12 +88,12 @@ def _check_credentials(username, password):
     # username/password would 500 instead of the SOAP auth-failed fault
     # every other bad-credential case gets. bytes operands have no such
     # restriction, so encode first.
-    username_match = hmac.compare_digest(username.encode('utf-8'), xcep_username.value.encode('utf-8'))
+    username_match = hmac.compare_digest(username.encode('utf-8'), xcep_username.encode('utf-8'))
     from utils.password_hash import HASH_PREFIXES, verify_password
-    if xcep_password.value.startswith(HASH_PREFIXES):
-        password_match = verify_password(xcep_password.value, password)
+    if xcep_password.startswith(HASH_PREFIXES):
+        password_match = verify_password(xcep_password, password)
     else:
-        password_match = hmac.compare_digest(password.encode('utf-8'), xcep_password.value.encode('utf-8'))
+        password_match = hmac.compare_digest(password.encode('utf-8'), xcep_password.encode('utf-8'))
     return username_match and password_match
 
 
@@ -111,14 +113,15 @@ def _authenticate_xcep_client(security_header):
 
 
 def _resolve_xcep_ca():
-    """Return (ca, error_response) for the single configured XCEP CA."""
-    ca_refid = SystemConfig.query.filter_by(key='xcep_ca_refid').first()
-    if not ca_refid or not ca_refid.value:
+    """Return (ca, error_response) for the policy CA of the serving profile."""
+    from services.windows_profiles import policy_ca, serving_profile
+    profile = serving_profile()
+    if profile is None or not profile.policy_refid:
         logger.warning("XCEP request refused: XCEP not configured")
         return None, build_soap_fault('XCEP not configured')
-    ca = CA.query.filter_by(refid=ca_refid.value).first()
+    ca = policy_ca(profile)
     if not ca:
-        logger.warning("XCEP request refused: configured CA %r not found", ca_refid.value)
+        logger.warning("XCEP request refused: configured CA %r not found", profile.policy_refid)
         return None, build_soap_fault('XCEP not configured')
     return ca, None
 

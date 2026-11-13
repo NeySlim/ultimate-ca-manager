@@ -35,6 +35,7 @@ from .restore.replace import plan_replacement, remove_after_writes, remove_befor
 from .restore.setting_refs import deferred_keys, prune_doomed_settings, restore_setting_references
 from .restore.settings import restore_encrypted_settings
 from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
+from .restore.windows_profiles import upgrade_archived_windows_profiles
 
 logger = logging.getLogger(__name__)
 
@@ -137,6 +138,8 @@ GENERIC_SECTIONS = (
     'crl_deploy_bindings',
     'intune_apps',
     'scep_profiles',
+    'windows_enrollment_profiles',
+    'windows_profile_templates',
     'ca_template_pins',
     'acme_client_accounts',
     # After its proxy account, EAB credential and creator (users and
@@ -345,6 +348,8 @@ class RestoreCoreMixin:
         self._check_payload_schema(backup_data)
         self._check_serial_duplicates(backup_data)
         upgrade_archived_permissions(backup_data)
+        windows_warnings: List[str] = []
+        upgrade_archived_windows_profiles(backup_data, windows_warnings)
         if mode not in ('replace', 'merge'):
             raise BackupSchemaError(
                 f"Unknown restore mode {mode!r}: use 'replace' (the archive "
@@ -426,7 +431,7 @@ class RestoreCoreMixin:
         # Orders this installation moved on with: kept in a merge, named in a replacement
         order_warnings = keep_newer_orders(backup_data, mode)
         plan = RestorePlan.build(backup_data, pruned=pruned)
-        plan.warnings.extend(order_warnings)
+        plan.warnings.extend(order_warnings + windows_warnings)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
         built_with = len(plan.warnings)
@@ -473,6 +478,8 @@ class RestoreCoreMixin:
 
                 if replacement is not None:
                     results.update(remove_after_writes(replacement).report())
+                # Before the warnings are reported: a keytab it cannot serve is one of them
+                keytab_published = self._publish_restored_keytab(backup_data, plan)
                 results['left_out'] = list(plan.left_out)
                 # What applying the rows had to warn about reaches the log and the result
                 for warning in dict.fromkeys(plan.warnings[built_with:]):
@@ -504,6 +511,9 @@ class RestoreCoreMixin:
         finally:
             staged.discard()
 
+        if keytab_published:
+            self._write_keytab_here()
+
         if aligned:
             from services.audit_service import AuditService
             for entry in aligned:
@@ -527,6 +537,30 @@ class RestoreCoreMixin:
         # restores data, and an API route is where revoking every session and
         # asking for a restart belongs (see invalidate_after_restore).
         return results
+
+    @staticmethod
+    def _publish_restored_keytab(backup_data, plan) -> bool:
+        """The profiles' section restored: the keytab file every node writes is rebuilt from
+        them (A7) and the other nodes reload it, in the restore's transaction."""
+        if section_kind(backup_data, 'windows_enrollment_profiles') != 'list':
+            return False
+        from services import cluster_commands, windows_profiles
+        db.session.flush()
+        try:
+            windows_profiles.publish_keytab(actor='restore')
+        except ValueError as exc:
+            plan.warnings.append(f"windows_enrollment_profiles: the keytab is not served: {exc}")
+            return False
+        cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
+        return True
+
+    @staticmethod
+    def _write_keytab_here() -> None:
+        from services.kerberos import negotiate_auth
+        try:
+            negotiate_auth.write_stored_keytab()
+        except (OSError, ValueError) as exc:
+            logger.error("Restore: the Kerberos keytab file was not written on this node: %s", exc)
 
     @staticmethod
     def _align_restored_revocations(plan) -> List[Dict[str, Any]]:

@@ -23,8 +23,9 @@ def v3_header(blob: bytes) -> bytes:
                                   kdf_id=metadata['kdf_id'], metadata=kept)
 
 
-def as_v3(blob: bytes, password: str) -> bytes:
-    """The archive `blob` rewritten as v3, the way v3 was written: same payload, same key."""
+def as_v3(blob: bytes, password: str, edit=None) -> bytes:
+    """The archive `blob` rewritten as v3, the way v3 was written: same payload, same key.
+    ``edit(payload)`` changes the payload first, to forge what an older version wrote."""
     import gzip
     import hashlib
     import json
@@ -35,6 +36,8 @@ def as_v3(blob: bytes, password: str) -> bytes:
 
     service = BackupService()
     key, payload = service._decrypt_framed(blob, password)
+    if edit is not None:
+        edit(payload)
     payload.pop('checksum', None)
     payload['checksum'] = {'algorithm': 'SHA256', 'value': hashlib.sha256(
         json.dumps(payload, indent=2, sort_keys=True).encode()).hexdigest()}

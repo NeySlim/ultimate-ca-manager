@@ -210,6 +210,7 @@ DEPENDENT_TABLES: Dict[str, str] = {
 # SQLite hands a removed row's id to the next row inserted.
 SOFT_LINKS = (
     ('certificates', 'related_certificate_id', 'certificates', 'id'),
+    ('certificates', 'windows_profile_id', 'windows_enrollment_profiles', 'id'),
     ('deploy_bindings', 'attention_successor_id', 'certificates', 'id'),
     ('scep_profiles', 'template_id', 'certificate_templates', 'id'),
     ('scep_requests', 'profile_id', 'scep_profiles', 'id'),
@@ -246,6 +247,10 @@ CLOSED_WITH_TARGET = {('key_recovery_requests', 'cert_id')}
 # Links whose row goes with the row it names although the column allows none:
 # an approval of a certificate that is gone, as deleting the certificate does.
 REMOVED_WITH_TARGET = {('approval_requests', 'certificate_id')}
+
+# Rows removed only after the writes, once their deletion blockers have nothing to say: the
+# rows they would leave dangling (SQLite enforces no key) are known only then.
+BLOCKED_DELETIONS = {'ad_connector': 'connector_deletion_blockers'}
 
 _CHUNK = 500
 _FOREIGN_KEYS_INTO: Optional[Dict[str, List[Tuple[Any, Any, Any]]]] = None
@@ -376,6 +381,7 @@ def remove_after_writes(replacement: Replacement) -> Replacement:
             continue
         table = _table_of(name)
         primary = _primary(table)
+        _refuse_blocked(name, waiting)
         for dependent, column, named in _foreign_keys_into(table.name):
             dependent_section = _SECTION_OF_TABLE.get(dependent.name)
             if dependent_section not in replacement.pruned or _primary(dependent) is None:
@@ -394,6 +400,21 @@ def remove_after_writes(replacement: Replacement) -> Replacement:
         _delete(replacement, name, waiting)
     db.session.expire_all()
     return replacement
+
+
+def _refuse_blocked(name: str, ids: Set[Any]) -> None:
+    """Refused when a deletion blocker of the section still holds one of these rows."""
+    if name not in BLOCKED_DELETIONS:
+        return
+    from services import deletion_blockers
+    blockers = getattr(deletion_blockers, BLOCKED_DELETIONS[name])
+    model = load_model(SECTIONS[name])
+    for row_id in sorted(ids):
+        blocker = deletion_blockers.first_blocker(blockers(db.session.get(model, row_id)))
+        if blocker is not None:
+            raise RestoreConflictError(
+                f"Refusing to restore: the archive removes {describe_row(name, row_id)}. "
+                f"{blocker.message} Nothing has been changed.")
 
 
 def _defer_what_kept_rows_need(replacement: Replacement) -> None:
@@ -415,6 +436,10 @@ def _defer_what_kept_rows_need(replacement: Replacement) -> None:
             for key, value in _select([_primary(dependent), column], column, by_value):
                 if key not in gone:
                     deferred[name].update(by_value[value])
+
+    for name, ids in replacement.doomed.items():
+        if name in BLOCKED_DELETIONS:
+            deferred[name].update(ids - replacement.displaced.get(name, set()))
 
     # A row that waits keeps what it points at waiting too.
     pending = [(name, set(ids)) for name, ids in deferred.items()]

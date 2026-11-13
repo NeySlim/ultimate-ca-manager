@@ -112,7 +112,8 @@ SECTIONS: Dict[str, Section] = {
                  'key_bits': 'derived from crt on restore, by the listener on Certificate.crt',
                  'sig_hash': 'derived from crt on restore, by the listener on Certificate.crt'},
         references={'template_id': 'certificate_templates', 'owner_group_id': 'groups',
-                    'related_certificate_id': 'certificates'},
+                    'related_certificate_id': 'certificates',
+                    'windows_profile_id': 'windows_enrollment_profiles'},
         custom=True,
         handled={'crt': 'certificate_pem', 'prv': 'private_key_pem_encrypted',
                  'csr': 'csr_pem'},
@@ -399,14 +400,31 @@ SECTIONS: Dict[str, Section] = {
     ),
     'ad_connector': Section(
         model='models.ad_connector:ADConnectorConfig',
-        identity=('id',),
+        identity=('name',),
         exclude={
+            **_SURROGATE,
             'last_test_at': 'live connection state',
             'last_test_result': 'live connection state',
             'health': 'live connection state: this installation\'s view of '
                       'which domain controllers answered, meaningless on another',
         },
         secrets=('bind_password',),
+    ),
+    'windows_enrollment_profiles': Section(
+        model='models.windows_profile:WindowsEnrollmentProfile',
+        identity=('name',),
+        exclude={**_SURROGATE},
+        # A1/A7: the keytab travels like the connector's bind password, re-encrypted on restore
+        secrets=('keytab',),
+        stored={'keytab': 'master'},
+        references={'connector_id': 'ad_connector'},
+    ),
+    'windows_profile_templates': Section(
+        model='models.windows_profile:WindowsProfileTemplate',
+        identity=('profile_id', 'template_id'),
+        exclude={**_SURROGATE},
+        references={'profile_id': 'windows_enrollment_profiles',
+                    'template_id': 'certificate_templates'},
     ),
     'webhook_endpoints': Section(
         model='services.webhook_service:WebhookEndpoint',
@@ -542,8 +560,9 @@ EXCLUDED_TABLES: Dict[str, str] = {
                         'the archive carries the values in the clear and the target encrypts them '
                         'under its own key'),
     'websocket_relay': 'WebSocket events waiting minutes for the web workers: runtime state, never restored',
-    'shared_files': ('the Kerberos keytab, which archives never carried, and the HTTPS pair '
-                     'each node writes to disk, carried as the https_server files instead'),
+    'shared_files': ('the Kerberos keytab file every node writes, rebuilt from the profiles '
+                     'when their section is restored and at startup, and the HTTPS pair, '
+                     'carried as the https_server files instead'),
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',
 }
@@ -561,8 +580,7 @@ class SettingReference:
 # Settings holding a row number: carried with the identity of that row
 # (`settings_refs` in the configuration section) and renumbered on restore.
 # A refid reads the same everywhere and is not one of them: est_ca_refid,
-# tsa_ca_refid, tsa_signer_cert_refid, wstep_ca_refid, xcep_ca_refid,
-# mtls_trusted_ca_id, https_bound_certificate_refid, https_binding_left_behind_for,
+# tsa_ca_refid, tsa_signer_cert_refid, mtls_trusted_ca_id, https_bound_certificate_refid, https_binding_left_behind_for,
 # est_labels. The number in `ca_url_alias_<n>` is the one published URLs carry,
 # and stays the source's.
 SETTING_REFERENCES: Tuple[SettingReference, ...] = (

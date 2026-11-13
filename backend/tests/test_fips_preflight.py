@@ -189,11 +189,16 @@ def test_users_backup_codes_scrypt(session):
 
 
 def test_protocol_secrets_scrypt(session):
+    from models import WindowsEnrollmentProfile
     _config('est_password', SCRYPT_HASH)
-    _config('wstep_password', hash_password('pbkdf2 secret'))
-    _config('xcep_password', 'legacy plaintext')
-    finding = _assert_found('protocols.secret_scrypt', 1, 'EST')
+    # The 2.x setting is read by nothing: the Windows profile holds the account
+    _config('xcep_password', SCRYPT_HASH)
+    session.add(WindowsEnrollmentProfile(name='fips-scrypt', wstep_password=SCRYPT_HASH,
+                                         xcep_password='legacy plaintext'))
+    session.flush()
+    finding = _assert_found('protocols.secret_scrypt', 2, 'EST', 'WSTEP')
     assert finding['severity'] == 'blocker'
+    assert not any('XCEP' in example for example in finding['examples'])
 
 
 def test_ca_eddsa_key(session):

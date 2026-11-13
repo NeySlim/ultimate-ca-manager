@@ -14,18 +14,14 @@ from models import CA, Certificate, db
 from models.system_config import SystemConfig
 from services.ca_service import CAService
 from services.wstep.soap_envelope import ADDRESSING_NS, SOAP_NS, WSSE_NS, WST_NS, WSU_NS
+from tests.windows_profile_support import restore, set_config, snapshot
 
 
 RENEW_URL = '/ADCertificateService_CES_Certificate/service.svc'
 
 
 def _set_config(key, value):
-    row = SystemConfig.query.filter_by(key=key).first()
-    if row is None:
-        db.session.add(SystemConfig(key=key, value=value))
-    else:
-        row.value = value
-    db.session.commit()
+    set_config(key, value)
 
 
 @pytest.fixture(scope='module')
@@ -33,11 +29,7 @@ def wstep_renew_config(app, create_ca):
     ca_data = create_ca(cn='WSTEP Renewal CA')
     keys = ('wstep_enabled', 'wstep_ca_refid', 'wstep_validity_days')
     with app.app_context():
-        previous = {
-            key: (SystemConfig.query.filter_by(key=key).first().value
-                  if SystemConfig.query.filter_by(key=key).first() else None)
-            for key in keys
-        }
+        previous = snapshot(keys)
         ca = db.session.get(CA, ca_data['id'])
         _set_config('wstep_enabled', 'true')
         _set_config('wstep_ca_refid', ca.refid)
@@ -46,16 +38,7 @@ def wstep_renew_config(app, create_ca):
     yield ca_data
 
     with app.app_context():
-        for key, value in previous.items():
-            row = SystemConfig.query.filter_by(key=key).first()
-            if value is None:
-                if row is not None:
-                    db.session.delete(row)
-            elif row is None:
-                db.session.add(SystemConfig(key=key, value=value))
-            else:
-                row.value = value
-        db.session.commit()
+        restore(previous)
 
 
 def _issue_test_cert(app, ca_data, common_name='wstep-renew.example.test'):

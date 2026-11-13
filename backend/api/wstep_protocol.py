@@ -31,7 +31,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives.serialization import Encoding
 from flask import Blueprint, Response, request
 
-from models import CA, AuditLog, Certificate, SystemConfig, db
+from models import AuditLog, Certificate, SystemConfig, db
 from services.ca_service import CAService
 from services.kerberos import negotiate_auth
 from services.wstep import CES_CERTIFICATE_PATH, CES_KERBEROS_PATH, CES_USERNAME_PASSWORD_PATH
@@ -85,9 +85,11 @@ def _read_wstep_body():
 def _check_credentials(username, password):
     if not username or not password:
         return False
-    wstep_username = SystemConfig.query.filter_by(key='wstep_username').first()
-    wstep_password = SystemConfig.query.filter_by(key='wstep_password').first()
-    if not (wstep_username and wstep_password and wstep_username.value and wstep_password.value):
+    from services.windows_profiles import serving_profile
+    profile = serving_profile()
+    wstep_username = profile.wstep_username if profile is not None else None
+    wstep_password = profile.wstep_password if profile is not None else None
+    if not (wstep_username and wstep_password):
         return False
 
     # hmac.compare_digest on two `str` operands requires both to be
@@ -95,12 +97,12 @@ def _check_credentials(username, password):
     # username/password would 500 instead of the SOAP auth-failed fault
     # every other bad-credential case gets. bytes operands have no such
     # restriction, so encode first.
-    username_match = hmac.compare_digest(username.encode('utf-8'), wstep_username.value.encode('utf-8'))
+    username_match = hmac.compare_digest(username.encode('utf-8'), wstep_username.encode('utf-8'))
     from utils.password_hash import HASH_PREFIXES, verify_password
-    if wstep_password.value.startswith(HASH_PREFIXES):
-        password_match = verify_password(wstep_password.value, password)
+    if wstep_password.startswith(HASH_PREFIXES):
+        password_match = verify_password(wstep_password, password)
     else:
-        password_match = hmac.compare_digest(password.encode('utf-8'), wstep_password.value.encode('utf-8'))
+        password_match = hmac.compare_digest(password.encode('utf-8'), wstep_password.encode('utf-8'))
     return username_match and password_match
 
 
@@ -120,24 +122,23 @@ def _authenticate_username_password(security_header):
 
 
 def _resolve_wstep_ca():
-    """Return (ca, error_response) for the single configured WSTEP CA."""
-    ca_refid = SystemConfig.query.filter_by(key='wstep_ca_refid').first()
-    if not ca_refid or not ca_refid.value:
+    """Return (ca, error_response) for the issuing CA of the serving profile."""
+    from services.windows_profiles import issuing_ca, serving_profile
+    profile = serving_profile()
+    if profile is None or not profile.issuing_ca_refid:
         logger.warning("WSTEP request refused: WSTEP not configured")
         return None, _fault_response('WSTEP not configured', status=503)
-    ca = CA.query.filter_by(refid=ca_refid.value).first()
+    ca = issuing_ca(profile)
     if not ca:
-        logger.warning("WSTEP request refused: configured CA %r not found", ca_refid.value)
+        logger.warning("WSTEP request refused: configured CA %r not found", profile.issuing_ca_refid)
         return None, _fault_response('WSTEP not configured', status=503)
     return ca, None
 
 
 def _validity_days():
-    row = SystemConfig.query.filter_by(key='wstep_validity_days').first()
-    try:
-        return int(row.value) if row and row.value else 365
-    except (TypeError, ValueError):
-        return 365
+    from services.windows_profiles import serving_profile
+    profile = serving_profile()
+    return (profile.validity_days if profile is not None and profile.validity_days else 365)
 
 
 def _fault_response(reason, status=500, relates_to=None, subcode=None, request_id=None,

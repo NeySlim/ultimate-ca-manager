@@ -275,23 +275,18 @@ def test_delegated_responder_and_its_renewal(app, client, auth_client, bp384_roo
 # ---------------------------------------------------------------------------
 
 def _set_config(key, value):
-    from models.system_config import SystemConfig
-    row = SystemConfig.query.filter_by(key=key).first()
-    if row is None:
-        db.session.add(SystemConfig(key=key, value=value))
-    else:
-        row.value = value
-    db.session.commit()
+    from tests.windows_profile_support import set_config
+    set_config(key, value)
 
 
 @pytest.fixture
 def protocol_config(app, bp384_root):
     """EST and WSTEP pointed at the Brainpool root, restored afterwards."""
-    from models.system_config import SystemConfig
+    from tests.windows_profile_support import restore, snapshot
     keys = ('est_enabled', 'est_ca_refid', 'est_username', 'est_password', 'est_validity_days',
             'wstep_enabled', 'wstep_ca_refid', 'wstep_username', 'wstep_password', 'wstep_validity_days')
     with app.app_context():
-        previous = {k: (r.value if (r := SystemConfig.query.filter_by(key=k).first()) else None) for k in keys}
+        previous = snapshot(keys)
         refid = db.session.get(CA, bp384_root['id']).refid
         for prefix in ('est', 'wstep'):
             _set_config(f'{prefix}_enabled', 'true')
@@ -301,15 +296,7 @@ def protocol_config(app, bp384_root):
             _set_config(f'{prefix}_validity_days', '30')
     yield
     with app.app_context():
-        for k, v in previous.items():
-            row = SystemConfig.query.filter_by(key=k).first()
-            if v is None and row is not None:
-                db.session.delete(row)
-            elif v is not None and row is None:
-                db.session.add(SystemConfig(key=k, value=v))
-            elif row is not None:
-                row.value = v
-        db.session.commit()
+        restore(previous)
 
 
 def _basic():

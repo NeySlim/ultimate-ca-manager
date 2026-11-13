@@ -159,7 +159,20 @@ def is_configured():
     modes ("nobody configured Kerberos" vs "Kerberos is configured but the
     optional dependency isn't installed") stay distinguishable in logs.
     """
-    return bool(is_enabled() and get_spn() and KEYTAB_PATH.exists())
+    return not_configured_reason() is None
+
+
+def not_configured_reason():
+    """Why the Kerberos binding serves nobody, None when it is configured."""
+    if not is_enabled():
+        return 'Kerberos is disabled'
+    if not get_spn():
+        return 'no SPN set'
+    if not KEYTAB_PATH.exists():
+        return 'no keytab uploaded'
+    # A profile without a realm, or disabled, serves no Kerberos client (A1)
+    from services.windows_profiles import kerberos_refusal
+    return kerberos_refusal()
 
 
 def sync_keytab_file(raw_bytes):
@@ -210,32 +223,82 @@ def write_stored_keytab():
 
 
 def restore_keytab_at_start(app):
-    """Startup: the stored keytab is written to disk; a single node's file from before
-    the keytab was stored is stored once. Never raises."""
+    """Startup: the default profile takes a keytab it does not hold yet (a single node's file
+    from 2.x, or the one stored before profiles), else the stored keytab is rebuilt from the
+    profile when it differs; then it is written to disk. Never raises."""
     from models import SharedFile, db
-    from services import shared_files
+    from services import shared_files, windows_profiles
+    from services.windows_profiles.legacy import warn_without_realm
     from utils.ha import ha_enabled
     with app.app_context():
+        try:
+            profile = windows_profiles.default_profile()
+            if profile is None or not profile.keytab:
+                data = None
+                if db.session.get(SharedFile, shared_files.KERBEROS_KEYTAB) is not None:
+                    data = shared_files.read_file(shared_files.KERBEROS_KEYTAB)
+                elif KEYTAB_PATH.exists() and ha_enabled():
+                    # Two nodes may hold different files: the operator uploads the right one
+                    logger.warning("Kerberos keytab found on this node only: upload it again "
+                                   "to serve it from every node")
+                elif KEYTAB_PATH.exists():
+                    data = KEYTAB_PATH.read_bytes()
+                if data:
+                    profile = profile or windows_profiles.default_for_write('system', fill=False)
+                    profile.set_keytab(data)
+                    windows_profiles.fill_realm(profile)
+                    warn_without_realm(profile.realm, is_enabled(), get_spn(), data)
+                    windows_profiles.publish_keytab()
+                    db.session.commit()
+                    logger.info("Kerberos keytab stored in the default Windows enrollment profile")
+                elif profile is not None and profile.realm is None and windows_profiles.keytab_absent(profile):
+                    # No keytab to take and none anywhere: A1's last resort applies
+                    windows_profiles.fill_realm(profile)
+                    if profile.realm is not None:
+                        db.session.commit()
+            elif shared_files.read_file(shared_files.KERBEROS_KEYTAB) != profile.keytab_bytes():
+                # The profile is the source: a file it does not hold is rebuilt, everywhere
+                from services import cluster_commands
+                if _rebuild_shared_keytab(profile.keytab_bytes()):
+                    cluster_commands.emit(cluster_commands.RELOAD_KEYTAB)
+                    logger.info("Kerberos keytab rebuilt from the default Windows enrollment profile")
+                db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Kerberos keytab not restored from the database: {type(e).__name__}: {e}")
+        # Apart: a failed rebuild above still leaves this node the stored keytab's file
         try:
             if db.session.get(SharedFile, shared_files.KERBEROS_KEYTAB) is not None:
                 if write_stored_keytab() == 'written':
                     logger.info("Kerberos keytab written from the database")
-                return
-            if not KEYTAB_PATH.exists():
-                return
-            if ha_enabled():
-                # Two nodes may hold different files: the operator uploads the right one
-                logger.warning("Kerberos keytab found on this node only: upload it again "
-                               "to serve it from every node")
-                return
-            shared_files.store_file(shared_files.KERBEROS_KEYTAB, KEYTAB_PATH.read_bytes(), actor='system')
-            db.session.commit()
-            logger.info("Kerberos keytab stored in the database")
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Kerberos keytab not restored from the database: {type(e).__name__}: {e}")
+            logger.error(f"Kerberos keytab file not written: {type(e).__name__}: {e}")
         finally:
             db.session.remove()
+
+
+def _rebuild_shared_keytab(data):
+    """The shared keytab set to the profile's *data*; True when this node changed it. The row
+    is read again under lock and a concurrent insert is undone alone, so a node starting at
+    the same time that rebuilt it first is neither overwritten in error nor reloaded twice."""
+    from sqlalchemy.exc import IntegrityError
+    from models import SharedFile, db
+    from services import shared_files
+    name = shared_files.KERBEROS_KEYTAB
+    for attempt in (1, 2):
+        row = (db.session.query(SharedFile).filter_by(name=name)
+               .with_for_update().populate_existing().first())
+        if row is not None and shared_files.read_file(name) == data:
+            return False
+        try:
+            with db.session.begin_nested():
+                shared_files.store_file(name, data, actor='system')
+            return True
+        except IntegrityError:
+            if attempt == 2:
+                raise
+    return False
 
 
 def inspect_keytab(path=None):

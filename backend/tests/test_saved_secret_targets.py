@@ -12,6 +12,15 @@ import uuid
 import pytest
 
 from models import ADConnectorConfig, db
+from tests.windows_profile_support import connectors_kept
+
+
+@pytest.fixture(autouse=True)
+def _connectors_put_back(app):
+    """The connector rows this file deletes and rewrites are the session's: put back."""
+    with connectors_kept(app):
+        yield
+
 
 SAVED_PASSWORD = 'saved-bind-secret'
 
