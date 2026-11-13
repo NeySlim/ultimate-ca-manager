@@ -26,6 +26,15 @@ TWINS = {
 CERTTYPE_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2')
 
 
+@pytest.fixture(autouse=True)
+def served_by_the_default_profile(app):
+    """A ``wstep`` certificate recording no profile renews through the default one: made when
+    missing, so that no test here leans on an earlier one for it."""
+    with app.app_context():
+        default_profile(create=True)
+        db.session.commit()
+
+
 def _named_csr(oid=None, name=None, ekus=(CLIENT_AUTH,), name_type=asn1_core.BMPString):
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     builder = x509.CertificateSigningRequestBuilder().subject_name(
