@@ -187,7 +187,8 @@ def _key_pem(key):
                              serialization.NoEncryption()).decode()
 
 
-def test_imported_child_ca_is_linked_to_its_imported_parent_at_once(app, client, auth_client):
+@pytest.mark.parametrize('endpoint', ['/api/v2/cas/import', '/api/v2/certificates/import'])
+def test_imported_child_ca_is_linked_to_its_imported_parent_at_once(app, client, auth_client, endpoint):
     """Parent known from the import response on, and GetCACert in chain mode serves both
     certificates without waiting for the hourly backfill."""
     import uuid
@@ -202,7 +203,7 @@ def test_imported_child_ca_is_linked_to_its_imported_parent_at_once(app, client,
     try:
         for pem, key in ((_ca_pem(root_cn, root_key, serial=11), root_key),
                          (_ca_pem(child_cn, child_key, root_cn, root_key, serial=12), child_key)):
-            r = auth_client.post('/api/v2/cas/import', data={'pem_content': pem + _key_pem(key)},
+            r = auth_client.post(endpoint, data={'pem_content': pem + _key_pem(key)},
                                  content_type='multipart/form-data')
             assert r.status_code in (200, 201), r.data
             ids.append(get_json(r)['data']['id'])
