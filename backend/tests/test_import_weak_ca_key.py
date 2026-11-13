@@ -182,3 +182,17 @@ def test_ca_service_import_refuses_weak_key(app):
     with app.app_context():
         with pytest.raises(ValueError, match='2048'):
             CAService.import_ca('weak', pem(cert), key_pem(key))
+
+
+@pytest.mark.parametrize('path', ['/api/v2/cas/import', '/api/v2/certificates/import'])
+def test_pkcs12_weak_key_without_import_key_is_read(app, auth_client, path):
+    key = _weak_key()
+    cert = _ca(uuid.uuid4().hex[:8], key)
+    blob = pkcs12.serialize_key_and_certificates(
+        b'weak', key, cert, None, serialization.BestAvailableEncryption(b'pw'))
+    r = auth_client.post(path, data={'file': (io.BytesIO(blob), 'weak.p12'), 'password': 'pw',
+                                     'import_key': 'false'}, content_type='multipart/form-data')
+    assert r.status_code in (200, 201), r.data
+    stored = _stored(app, cert)
+    assert len(stored) == 1 and stored[0].prv is None
+

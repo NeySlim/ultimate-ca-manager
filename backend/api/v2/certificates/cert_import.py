@@ -113,7 +113,7 @@ def import_certificate():
             return error_response('Private key does not match the certificate', 400)
 
         # A CA that would sign must clear the RSA floor; without its key it is only read
-        weak = private_key is not None and is_ca_certificate(cert) and weak_ca_key_refusal(private_key)
+        weak = (import_key and private_key is not None and is_ca_certificate(cert) and weak_ca_key_refusal(private_key))
         if weak:
             return error_response(weak, 400)
 
