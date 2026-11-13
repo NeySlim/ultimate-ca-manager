@@ -64,9 +64,10 @@ def _serve_default_profile(config):
         windows_profiles.fill_realm(profile)
 
 
-def _stage(config, creating):
+def _stage(config, creating, followed=()):
     """Everything of a save but its commit, which the route does before it audits."""
     config.updated_at = utc_now()
+    moved = (followed[0].realm, [p.id for p in followed]) if followed else None
     try:
         refresh_domain_sid(config)
         if creating:
@@ -75,6 +76,10 @@ def _stage(config, creating):
         db.session.flush()
     except IntegrityError:
         db.session.rollback()
+        # A concurrent save gave another profile the realm the followers were moving to
+        if moved and WindowsEnrollmentProfile.query.filter(
+                WindowsEnrollmentProfile.realm == moved[0], ~WindowsEnrollmentProfile.id.in_(moved[1])).first():
+            return error_response(f'{moved[0]} is already served by another profile', 409)
         return error_response('A connector with this name already exists', 409)
     except Exception as e:
         # A failed flush or profile update stores nothing; the password setter ran before
@@ -191,7 +196,7 @@ def update_connector(connector_id):
     err, followed = _follow_realm(config, old_realm)
     if err:
         return err
-    err = _stage(config, False)
+    err = _stage(config, False, followed)
     if err:
         return err
     ok, err = safe_commit(logger, 'Failed to save the AD connector')

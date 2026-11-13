@@ -193,3 +193,17 @@ def test_the_connector_row_is_not_written_before_the_domain_sid_is_read(app, aut
             event.remove(db.engine, 'before_cursor_execute', record)
     assert r.status_code == 200, r.data
     assert order.index('fetch') < order.index('update')
+
+
+def test_a_realm_taken_between_the_check_and_the_write_is_named_as_such(app, auth_client, world, monkeypatch):
+    """The unique index refuses it: the answer names the realm, not the connector name."""
+    from services import windows_profiles
+    follower = _profile(app, 'follower', 'OLD.EXAMPLE', world)
+    holder = _profile(app, 'holder', 'NEW.EXAMPLE')
+    # As if the holder took the realm after the check
+    monkeypatch.setattr(windows_profiles, 'realm_problem', lambda *a, **k: None)
+    r = _move(auth_client, world)
+    assert r.status_code == 409, r.data
+    assert r.get_json()['message'] == 'NEW.EXAMPLE is already served by another profile'
+    _nothing_written(app, world, {follower: 'OLD.EXAMPLE', holder: 'NEW.EXAMPLE'})
+
