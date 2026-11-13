@@ -287,7 +287,8 @@ def weak_ca_key_refusal(key) -> str | None:
     """Refusal for a CA arriving with a private key that is RSA below the enrollment floor, else None.
 
     *key* is a cryptography key object or an unencrypted PEM. Only the RSA floor is applied: other
-    key types are not judged here, and a CA imported without a key never reaches this rule.
+    key types are not judged here, and a CA imported without a key never reaches this rule. A PEM that
+    cannot be loaded is refused: callers decrypt before asking.
     """
     if key is None:
         return None
@@ -296,7 +297,7 @@ def weak_ca_key_refusal(key) -> str | None:
         try:
             key = serialization.load_pem_private_key(key.encode() if isinstance(key, str) else key, None)
         except Exception:
-            return None
+            return 'The private key could not be read (encrypted or malformed); it cannot be admitted for a CA'
     public = key.public_key() if hasattr(key, 'public_key') else key
     if key_algorithms.family_for_public_key(public) != 'RSA' or public.key_size >= MIN_RSA_BITS:
         return None

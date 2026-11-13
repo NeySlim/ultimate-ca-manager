@@ -247,3 +247,21 @@ def test_weak_key_of_a_pending_request_does_not_become_the_ca_key(app, auth_clie
     message = json.loads(r.data)['message']
     assert str(WEAK) in message and '2048' in message
     assert _stored(app, cert) == []
+
+
+@pytest.mark.parametrize('unreadable', [
+    b'-----BEGIN PRIVATE KEY-----\nbm90IGEga2V5\n-----END PRIVATE KEY-----\n',
+    'not a key at all',
+    b'',
+])
+def test_an_unreadable_key_pem_is_refused_not_admitted(unreadable):
+    from utils.key_type import weak_ca_key_refusal
+    assert 'could not be read' in weak_ca_key_refusal(unreadable)
+
+
+def test_an_encrypted_key_pem_is_refused_not_admitted():
+    from utils.key_type import weak_ca_key_refusal
+    sealed = new_key().private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                     serialization.BestAvailableEncryption(b'pw'))
+    assert 'could not be read' in weak_ca_key_refusal(sealed)
+    assert weak_ca_key_refusal(None) is None
