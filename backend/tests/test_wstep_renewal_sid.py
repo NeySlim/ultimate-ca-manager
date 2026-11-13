@@ -43,7 +43,7 @@ def _issue(app, ca_id, cn, sid=SID):
            .sign(key, hashes.SHA256()))
     with app.app_context():
         ca = db.session.get(CA, ca_id)
-        cert_pem, _serial = CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='test',
+        cert_pem, _serial = CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='wstep',
                                                            requester_sid=sid)
     return x509.load_pem_x509_certificate(cert_pem.encode()), key
 
@@ -100,6 +100,10 @@ def test_a_certificate_the_ca_did_not_sign_is_refused(client, app, auth_client, 
     from tests.test_protocol_renewal_sid import forged_import
     _row_id, forged, key = forged_import(app, auth_client, wstep_renew_config['id'],
                                          f'sid-forged-{renew.__name__.strip('_').replace('_', '-')}.example.test')
+    with app.app_context():
+        # Recorded as a Windows enrollment, so that the CA's signature is what refuses it
+        db.session.get(Certificate, _row_id).source = 'wstep'
+        db.session.commit()
     monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda _config, sid: pytest.fail('unsigned SID'))
     _configure_ad_connector(app)
     before = _count(app)

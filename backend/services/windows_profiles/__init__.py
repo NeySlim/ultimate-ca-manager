@@ -55,6 +55,18 @@ def sid_connectors(sid):
     return sorted(unknown, key=lambda c: default is None or c.id != default.id)
 
 
+def profile_sid_connectors(profile, sid):
+    """``sid_connectors`` within *profile*: its connector when enabled and of the SID's domain or
+    of a domain not known yet; none otherwise (the SID is carried over, A9). Never another's."""
+    from services.ad_connector.lookup import sid_domain
+    connector = profile_connector(profile)
+    if connector is None or not connector.enabled:
+        return []
+    if connector.domain_sid and connector.domain_sid != sid_domain(sid):
+        return []
+    return [connector]
+
+
 def serving_profile():
     """The default profile when it may serve, else None."""
     profile = default_profile()
@@ -124,6 +136,48 @@ def serve_kerberos(principal, binding):
         audit_kerberos_refusal(binding, principal, realm, profile, refusal)
         return None
     return profile
+
+
+CERTIFICATE_PROFILE_GONE = 'The Windows enrollment profile of this certificate no longer exists'
+NOT_WINDOWS_ENROLLED = 'The certificate was not issued through Windows enrollment'
+AMBIGUOUS_PROFILE = 'The certificate is recorded under several Windows enrollment profiles'
+
+
+def certificate_profile(row):
+    """``(profile, refusal)`` of a stored certificate: the profile recorded on it, the default for
+    a ``wstep`` row recording none (C-01); a profile gone or disabled refuses, never another one."""
+    if row.windows_profile_id is not None:
+        profile = db.session.get(WindowsEnrollmentProfile, row.windows_profile_id)
+    elif row.source == 'wstep':
+        profile = default_profile()
+    else:
+        return None, NOT_WINDOWS_ENROLLED
+    if profile is None:
+        return None, CERTIFICATE_PROFILE_GONE
+    if not profile.enabled:
+        return profile, f'The Windows enrollment profile {profile.name} is disabled'
+    return profile, None
+
+
+def presented_certificate_profile(cert):
+    """``(profile, refusal, served)`` for a certificate presented to renew: the profile its stored
+    rows record (``certificate_profile``), whichever CA they sit under, and how an audit names it.
+    ``served`` None: no row holds it byte for byte, it names no profile and its refusal is not audited."""
+    from services.cert.issued_lookup import find_stored_rows
+    rows = find_stored_rows(cert)
+    if not rows:
+        return None, None, None
+    windows = [row for row in rows if row.windows_profile_id is not None or row.source == 'wstep']
+    answers = {}
+    for row in windows or rows[:1]:
+        profile, refusal = certificate_profile(row)
+        answers[(getattr(profile, 'id', None), refusal)] = (profile, refusal)
+    profile, refusal = next(iter(answers.values())) if len(answers) == 1 else (None, AMBIGUOUS_PROFILE)
+    if profile is not None:
+        return profile, refusal, f'profile {profile.name}'
+    # A profile row gone still has its id on the certificate: the audit names that one
+    ids = sorted({row.windows_profile_id for row in windows if row.windows_profile_id is not None})
+    return None, refusal, 'profile ' + (', '.join(f'#{i}' for i in ids) or '-')
 
 
 def profile_template_ids(profile):

@@ -221,8 +221,8 @@ def test_certificate_bound_renewal_names_mldsa(app, create_ca, method):
         header, csr_der, csr_element = _renew_parsed(rst)
         with pytest.raises(ws_security.WSSecurityError, match='ML-DSA-65'):
             ws_security.verify_signed_request(header)
-        cert_pem, err = wstep_service.renew(ca, csr_der, header, csr_element, validity_days=30, profile=None)
-    assert cert_pem is None
+        cert, err = wstep_service.signed_request_certificate(header, csr_element)
+    assert cert is None
     assert 'not supported' in err and 'ML-DSA-65' in err
 
 
