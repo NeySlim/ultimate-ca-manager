@@ -163,11 +163,12 @@ def test_the_pending_spnego_context_is_keyed_by_the_client_address(app, client, 
 
 # Criterion 4
 def test_three_probe_passes_over_150_connectors_keep_the_budget_and_reach_every_one(app, monkeypatch):
+    import types
     from datetime import timedelta
 
-    from services.ad_connector import health
+    from services.ad_connector import health, lookup
     from utils.datetime_utils import utc_now
-    unreachable_cost, reachable_cost, budget = 5.0, 0.25, 40
+    reachable_cost, budget = 0.25, health.PROBE_BUDGET_SECONDS
     started = utc_now()
     now, probed = [0.0], []
     monkeypatch.setattr(health, 'utc_now', lambda: started + timedelta(seconds=now[0]))
@@ -179,12 +180,20 @@ def test_three_probe_passes_over_150_connectors_keep_the_budget_and_reach_every_
         down = set(ids[3::10])
         assert len(down) == 15
 
-        def fake_probe(config):
-            now[0] += unreachable_cost if config.id in down else reachable_cost
-            probed.append(config.id)
-            return [(config.server, config.id not in down, 'down' if config.id in down else 'ok')]
+        by_host = {f'dc.p{i}.test': cid for i, cid in enumerate(ids)}
 
-        monkeypatch.setattr(health, 'probe', fake_probe)
+        def fake_connect(config, host, tls, connect_timeout=None):
+            # A silent DC costs the connect timeout the caller asked for, as ldap3 would
+            is_down = by_host[host] in down
+            now[0] += (connect_timeout or lookup._LDAP_CONNECT_TIMEOUT_SECONDS) if is_down else reachable_cost
+            probed.append(by_host[host])
+            if is_down:
+                raise OSError('timed out')
+            return types.SimpleNamespace(unbind=lambda: None)
+
+        monkeypatch.setattr(lookup, '_connect_to', fake_connect)
+        monkeypatch.setattr(lookup, '_build_tls', lambda config: (None, lambda: None))
+        unreachable_cost = lookup._LDAP_CONNECT_TIMEOUT_SECONDS
         for _ in range(3):
             before = now[0]
             with app.app_context():

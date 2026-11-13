@@ -277,7 +277,7 @@ def probe(config):
     try:
         for host in servers:
             try:
-                conn = lookup._connect_to(config, host, tls)
+                conn = lookup._connect_to(config, host, tls, PROBE_CONNECT_TIMEOUT_SECONDS)
             except Exception as e:
                 results.append((host, False, str(e)))
                 continue
@@ -310,6 +310,9 @@ def _is_due(config, previous):
 # One pass probes for at most this long; the connectors it did not reach wait for
 # the next one, so unreachable forests cannot hold the scheduler's thread.
 PROBE_BUDGET_SECONDS = 30
+# A probe gives up on a silent DC sooner than a lookup does: with 150 connectors, 15 down,
+# three budgeted passes must reach every one (15 * 3 s + 135 * 0.25 s fits in 90 s).
+PROBE_CONNECT_TIMEOUT_SECONDS = 3
 
 
 def _probe_one(config):

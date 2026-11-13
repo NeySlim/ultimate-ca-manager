@@ -356,7 +356,7 @@ _clock = time.monotonic
 _bind_deadline = contextvars.ContextVar('ad_connector_bind_deadline', default=None)
 
 
-def _connect_to(config, host, tls):
+def _connect_to(config, host, tls, connect_timeout=None):
     """Bind as the connector's service account against one DC. Raises on
     any failure. ``tls`` is built once by the caller and shared across
     every host -- it carries no per-host state, and rebuilding it per
@@ -365,7 +365,7 @@ def _connect_to(config, host, tls):
 
     server = ldap3.Server(
         host, port=config.port, use_ssl=config.use_ssl,
-        tls=tls, get_info=ldap3.ALL, connect_timeout=_LDAP_CONNECT_TIMEOUT_SECONDS,
+        tls=tls, get_info=ldap3.ALL, connect_timeout=connect_timeout or _LDAP_CONNECT_TIMEOUT_SECONDS,
     )
     return ldap3.Connection(
         server, user=config.bind_dn, password=config.bind_password,
