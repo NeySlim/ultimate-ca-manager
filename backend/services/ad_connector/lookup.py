@@ -142,6 +142,21 @@ def realm_of_base_dn(base_dn):
     return '.'.join(dc_values).upper()
 
 
+def domain_head_dn(base_dn):
+    """The DN made of the DC components of ``base_dn`` alone (the domain head), escapes
+    kept; None when it has none."""
+    from ldap3.utils.dn import parse_dn
+
+    if not base_dn:
+        return None
+    try:
+        components = parse_dn(_normalized_dn(base_dn))
+    except Exception:
+        return None
+    head = [f'{attr}={value}' for attr, value, _sep in components if attr.upper() == 'DC']
+    return ','.join(head) or None
+
+
 def realm_matches_connector(config, realm):
     """Whether ``realm`` (from an authenticated Kerberos principal, e.g.
     ``'HAGLAND.DOMAIN'``) matches the domain this AD Connector is configured
@@ -758,14 +773,15 @@ def is_member_of_group(config, sam_account_name, group):
 
 
 def read_domain_sid(conn, base_dn):
-    """The ``objectSid`` of the object the base DN names (the domain head), as a string,
-    None when it cannot be read. Never raises."""
+    """The ``objectSid`` of the domain head the base DN sits under, as a string, None
+    when it cannot be read. Never raises."""
     import ldap3
 
-    if not base_dn:
+    head = domain_head_dn(base_dn)
+    if not head:
         return None
     try:
-        conn.search(base_dn, '(objectClass=*)', search_scope=ldap3.BASE, attributes=['objectSid'])
+        conn.search(head, '(objectClass=*)', search_scope=ldap3.BASE, attributes=['objectSid'])
         entries = conn.entries if isinstance(getattr(conn, 'result', None), dict) \
             and conn.result.get('result') == _RESULT_SUCCESS else []
         if len(entries) != 1 or 'objectSid' not in entries[0] or not entries[0].objectSid.raw_values:

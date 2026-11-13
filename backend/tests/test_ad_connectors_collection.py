@@ -192,6 +192,23 @@ def test_a_connector_is_created_with_the_domain_sid_and_no_secret(auth_client, a
         assert AuditLog.query.filter_by(action='ad_connector_create', resource_id=str(data['id'])).count() == 1
 
 
+def test_the_domain_sid_is_read_at_the_domain_head_whatever_the_base_dn_depth(auth_client, monkeypatch):
+    searched = []
+
+    class Conn(_Conn):
+        def search(self, base, *args, **kwargs):
+            searched.append(base)
+            self.entries = [_Entry(objectSid=_sid_bytes(DOMAIN_SID))] if base == 'DC=a,DC=example' else []
+            return True
+
+    monkeypatch.setattr(lookup, '_connect', lambda config: Conn([]))
+    response = _post(auth_client, base_dn='OU=Computers,DC=a,DC=example')
+    assert response.status_code == 201, response.data
+    data = response.get_json()['data']
+    assert (data['realm'], data['domain_sid']) == ('A.EXAMPLE', DOMAIN_SID)
+    assert searched == ['DC=a,DC=example']
+
+
 def test_a_second_connector_coexists_and_a_duplicate_name_is_refused(auth_client, monkeypatch):
     monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))
     assert _post(auth_client).status_code == 201
