@@ -193,6 +193,33 @@ def test_issue_succeeds_with_authenticated_negotiation(client, app, wstep_kerber
         assert log is not None
 
 
+def test_issue_resolves_the_requester_in_the_connector_of_the_default_profile(client, app, wstep_kerberos_config,
+                                                                              monkeypatch, no_connector_serving):
+    from tests.ad_connector_support import add_connector
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+    monkeypatch.setattr(negotiate_auth, 'authenticate_negotiate',
+                        lambda auth_header, connection_key: _authenticated_result('bXV0dWFsLXRva2Vu'))
+    asked = []
+    monkeypatch.setattr(ad_lookup, 'lookup_object_sid',
+                        lambda config, sam_account_name: asked.append(config.id) or 'S-1-5-21-1-2-3-1000')
+    with app.app_context():
+        # The lowest id is a foreign realm: using it would refuse the requester
+        mount_connector(name='forest-a', server='dc.a.example', base_dn='DC=a,DC=example', bind_dn='svc', enabled=True)
+        second = add_connector('forest-b', server='dc1.hagland.domain', base_dn='DC=hagland,DC=domain',
+                               bind_dn='svc', enabled=True, link=True)
+        second_id = second.id
+    _configure_acl_template(app, None, wstep_kerberos_config['id'])
+    try:
+        csr, _key = _make_csr()
+        r = client.post(ISSUE_URL, data=_build_rst(csr),
+                        headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'})
+    finally:
+        _clear_acl_template(app)
+    assert r.status_code == 200, r.data
+    assert asked == [second_id]
+
+
 def _configure_ad_connector(app):
     with app.app_context():
         mount_connector(server='dc1.hagland.domain', base_dn='DC=hagland,DC=domain',

@@ -359,6 +359,26 @@ def test_an_issuer_key_that_cannot_be_checked_carries_no_sid(app, create_ca, mon
         assert renewal_identity.renewal_requester_sid(old, ca_cert, 'TEST') is None
 
 
+def test_a_renewal_asks_the_connector_of_the_default_profile(app, create_ca, monkeypatch):
+    """With two connectors the one the default profile names answers, not the lowest id."""
+    from services.ad_connector import renewal_identity
+    from tests.ad_connector_support import add_connector, mount_connector
+    from tests.windows_profile_support import default_profile
+    ca_data = create_ca(cn='SID second connector CA')
+    old, _key_ = _issue(app, ca_data['id'], 'sid-second-connector.example.test')
+    asked = []
+    monkeypatch.setattr(ad_lookup, 'lookup_account_by_sid', lambda config, sid: asked.append(config.id) or 'HOST$')
+    with app.app_context():
+        default_profile(create=True)
+        db.session.commit()
+        mount_connector(name='forest-a', server='dc.a.example', base_dn='DC=a,DC=example', bind_dn='svc', enabled=True)
+        second = add_connector('forest-b', server='dc.b.example', base_dn='DC=b,DC=example',
+                               bind_dn='svc', enabled=True, link=True)
+        ca_cert = x509.load_pem_x509_certificate(base64.b64decode(db.session.get(CA, ca_data['id']).crt))
+        assert renewal_identity.renewal_requester_sid(old, ca_cert, 'TEST') == SID
+        assert asked == [second.id]
+
+
 def test_a_scep_request_gone_before_it_is_closed_answers_404(app):
     from api.v2 import scep
     with app.test_request_context():
