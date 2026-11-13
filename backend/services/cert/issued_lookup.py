@@ -227,13 +227,17 @@ def apply_persisted_revocation(row: Certificate, record=None) -> bool:
     """Mark ``row`` revoked from the record its CA still holds for its serial: a certificate
     revoked, deleted and imported again comes back revoked. A given final ``record`` also
     replaces a suspension of the row. No commit; returns whether one applied."""
+    from sqlalchemy import inspect
     from utils.revocation_reasons import HOLD_REASONS
     if record is None:
         if row.revoked:
             return False
         record = row_persisted_revocation(row)
-        if record is None:
+        if record is None or not _record_still_held(record):
             return False
+        # Marked as the hourly pass marks: an unhold committed since the read is never undone
+        if inspect(row).persistent:
+            return _mark_while_recorded(row, record)
     elif row.revoked and row.revoke_reason not in HOLD_REASONS:
         return False
     row.revoked = True
