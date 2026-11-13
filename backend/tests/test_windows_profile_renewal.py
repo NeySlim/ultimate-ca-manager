@@ -2,10 +2,8 @@
 with UCM_TEST_APP_PG_URL): every WSTEP issuance records its profile, the Certificate binding
 renews under that profile alone, rechecks the SID with that profile's connector, and refuses a
 certificate whose profile is gone or disabled, with an audit entry naming profile and reason."""
-import ast
 import json
 from contextlib import contextmanager
-from pathlib import Path
 
 import pytest
 from cryptography import x509
@@ -26,7 +24,6 @@ from tests.test_wstep_renew import _build_signed_rst
 from tests.test_wstep_renew_tls import _cmc_renewal, _post, _renewal_csr, _rst
 from tests.windows_profile_support import default_profile, restore, set_config, snapshot
 
-BACKEND = Path(__file__).resolve().parents[1]
 # KB5014754 SID security extension
 SID_EXTENSION = '1.3.6.1.4.1.311.25.2'
 pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
@@ -332,18 +329,10 @@ def test_every_wstep_issuance_records_its_profile(app, client, auth_client, dire
     (_id, _status, _data, cert_id), = requests_of(app, held_on_b, 'wstep_request')
     with app.app_context():
         a, b, default = _profile('c04-a').id, _profile('c04-b').id, default_profile().id
-        assert [_row(c).windows_profile_id for c in (kerberos, password, renewed)] == [a, default, a]
-        assert db.session.get(Certificate, cert_id).windows_profile_id == b
-
-
-def test_every_wstep_signing_names_the_profile_of_the_certificate():
-    """Criterion 8 by the calls in the code (AST): each signing in the WSTEP service passes it."""
-    source = 'services/wstep/wstep_service.py'
-    tree = ast.parse((BACKEND / source).read_text(), filename=source)
-    calls = [node for node in ast.walk(tree) if isinstance(node, ast.Call)
-             and isinstance(node.func, ast.Attribute) and node.func.attr == 'sign_csr_from_crypto']
-    assert len(calls) == 2
-    assert all('windows_profile_id' in {k.arg for k in call.keywords} for call in calls)
+        recorded = {path: _row(c).windows_profile_id
+                    for path, c in (('kerberos', kerberos), ('password', password), ('certificate', renewed))}
+        recorded['approval'] = db.session.get(Certificate, cert_id).windows_profile_id
+        assert recorded == {'kerberos': a, 'password': default, 'certificate': a, 'approval': b}
 
 
 def _shift_ids(app, approval_id, profile_id, ca_id):
