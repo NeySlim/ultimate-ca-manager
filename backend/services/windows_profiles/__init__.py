@@ -133,11 +133,27 @@ def composed_keytab():
 
 
 def publish_keytab(actor='system'):
-    """The node keytab file (shared_files) recomposed from the profiles, in the caller's transaction."""
+    """The node keytab file (shared_files) recomposed from the profiles, in the caller's transaction.
+    The file's row is locked before composing, so a concurrent upload composes after this one commits."""
+    from models import SharedFile
     from services import shared_files
-    data = composed_keytab()
-    if data:
-        shared_files.store_file(shared_files.KERBEROS_KEYTAB, data, actor=actor)
-    else:
-        shared_files.drop_file(shared_files.KERBEROS_KEYTAB)
-    return data
+    name = shared_files.KERBEROS_KEYTAB
+    for attempt in (1, 2):
+        row = (db.session.query(SharedFile).filter_by(name=name)
+               .with_for_update().populate_existing().first())
+        data = composed_keytab()
+        if not data:
+            shared_files.drop_file(name)
+            return data
+        if row is not None:
+            shared_files.store_file(name, data, actor=actor)
+            return data
+        try:
+            # A concurrent first insert wins: lock its row and compose again
+            with db.session.begin_nested():
+                shared_files.store_file(name, data, actor=actor)
+            return data
+        except IntegrityError:
+            if attempt == 2:
+                raise
+    return None
