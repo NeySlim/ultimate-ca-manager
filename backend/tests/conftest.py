@@ -608,6 +608,10 @@ def viewer_client(app):
                    content_type='application/json')
     assert r.status_code == 200
 
+    from models import User
+    with app.app_context():
+        existed = User.query.filter_by(username='viewer_test').first() is not None
+
     # Create viewer user
     r = admin.post('/api/v2/users',
                    data=json.dumps({
@@ -623,10 +627,15 @@ def viewer_client(app):
     r = vc.post('/api/v2/auth/login',
                 data=json.dumps({'username': 'viewer_test', 'password': 'ViewerPass123!'}),
                 content_type='application/json')
-    if r.status_code == 200:
-        return vc
     # Fallback — if viewer creation failed (already exists), just return admin
-    return admin
+    yield vc if r.status_code == 200 else admin
+    # The account goes with the module unless it was there before
+    if not existed:
+        with app.app_context():
+            user = User.query.filter_by(username='viewer_test').first()
+            user_id = user.id if user else None
+        if user_id is not None:
+            admin.delete(f'/api/v2/users/{user_id}')
 
 
 # ============================================================
