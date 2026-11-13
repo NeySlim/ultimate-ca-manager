@@ -160,22 +160,24 @@ def certificate_profile(row):
 
 
 def presented_certificate_profile(cert):
-    """``(profile, refusal, stored)`` for a certificate presented to renew: the profile its stored
-    rows record (``certificate_profile``), whichever CA they sit under. ``stored`` False: no row
-    holds it byte for byte, it names no profile and its refusal is not audited."""
+    """``(profile, refusal, served)`` for a certificate presented to renew: the profile its stored
+    rows record (``certificate_profile``), whichever CA they sit under, and how an audit names it.
+    ``served`` None: no row holds it byte for byte, it names no profile and its refusal is not audited."""
     from services.cert.issued_lookup import find_stored_rows
     rows = find_stored_rows(cert)
     if not rows:
-        return None, None, False
+        return None, None, None
     windows = [row for row in rows if row.windows_profile_id is not None or row.source == 'wstep']
     answers = {}
     for row in windows or rows[:1]:
         profile, refusal = certificate_profile(row)
         answers[(getattr(profile, 'id', None), refusal)] = (profile, refusal)
-    if len(answers) > 1:
-        return None, AMBIGUOUS_PROFILE, True
-    profile, refusal = next(iter(answers.values()))
-    return profile, refusal, True
+    profile, refusal = next(iter(answers.values())) if len(answers) == 1 else (None, AMBIGUOUS_PROFILE)
+    if profile is not None:
+        return profile, refusal, f'profile {profile.name}'
+    # A profile row gone still has its id on the certificate: the audit names that one
+    ids = sorted({row.windows_profile_id for row in windows if row.windows_profile_id is not None})
+    return None, refusal, 'profile ' + (', '.join(f'#{i}' for i in ids) or '-')
 
 
 def profile_template_ids(profile):

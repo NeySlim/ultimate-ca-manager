@@ -203,7 +203,7 @@ def test_a_certificate_of_a_gone_or_disabled_profile_is_refused_and_audited(app,
         assert Certificate.query.count() == before
     reason = ('The Windows enrollment profile of this certificate no longer exists' if how == 'deleted'
               else 'The Windows enrollment profile c04-a is disabled')
-    profile = 'profile -' if how == 'deleted' else 'profile c04-a'
+    profile = f'profile #{10 ** 6}' if how == 'deleted' else 'profile c04-a'
     rows = _refusals(app, floor)
     assert [user for user, _d in rows] == ['wstep-ws-security', 'wstep-client-cert']
     assert all(reason in d and profile in d and f'old serial {old.serial_number}' in d for _u, d in rows), rows
@@ -449,3 +449,46 @@ def test_a_certificate_of_a_profile_without_issuing_ca_is_refused_and_audited(ap
     assert _fault(r) == (503, 's:Receiver', reason)
     (_user, details), = _refusals(app, floor)
     assert reason in details and 'profile c04-a' in details and f'old serial {old.serial_number}' in details
+
+
+@pytest.mark.parametrize('fallback_ca', ['A', 'S'])
+def test_certificates_of_a_deleted_profile_stay_refused_under_the_default(app, client, auth_client, directory,
+                                                                         fallback_ca):
+    """Deleting a profile clears its id on its certificates, all revoked or expired: falling back to
+    the default, on their own CA or another, never renews them."""
+    from datetime import timedelta
+    from utils.datetime_utils import utc_now
+    world = directory
+    with app.app_context():
+        db.session.add(WindowsEnrollmentProfile(
+            name='c04-deleted', realm='C05DEL.TEST', enabled=True, connector_id=None,
+            issuing_ca_refid=world['cas']['A']['refid'], validity_days=30))
+        db.session.commit()
+        deleted_id = _profile('c04-deleted').id
+    revoked, revoked_key = _enrolled(client, world, 'usera@C05DEL.TEST', f'c05-del-revoked-{fallback_ca}')
+    expired, expired_key = _enrolled(client, world, 'usera@C05DEL.TEST', f'c05-del-expired-{fallback_ca}')
+    with app.app_context():
+        assert {_row(c).windows_profile_id for c in (revoked, expired)} == {deleted_id}
+        row = _row(revoked)
+        row.revoked, row.revoked_at, row.revoke_reason = True, utc_now(), 'superseded'
+        _row(expired).valid_to = utc_now() - timedelta(days=1)
+        saved = snapshot(('wstep_ca_refid',))
+        set_config('wstep_ca_refid', world['cas'][fallback_ca]['refid'])
+    try:
+        assert auth_client.delete(f'/api/v2/windows-profiles/{deleted_id}').status_code == 200
+        with app.app_context():
+            assert {_row(c).windows_profile_id for c in (revoked, expired)} == {None}
+            before = Certificate.query.count()
+        reasons = {}
+        for name, cert, key in (('revoked', revoked, revoked_key), ('expired', expired, expired_key)):
+            r = _renew_xml(client, cert, key)
+            assert _fault(r)[0] == 400, r.data
+            reasons[name] = _fault(r)[2]
+        with app.app_context():
+            assert Certificate.query.count() == before
+        if fallback_ca == 'A':
+            assert reasons == {'revoked': 'Signing certificate has been revoked',
+                               'expired': 'Signing certificate has expired'}
+    finally:
+        with app.app_context():
+            restore(saved)

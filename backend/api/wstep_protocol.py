@@ -547,7 +547,7 @@ def renew_certificate_bound():
     from services.windows_profiles import presented_certificate_profile
     from utils.client_cert import native_tls_admits
     from services.windows_profiles import issuing_ca
-    profile, error, stored = presented_certificate_profile(cert)
+    profile, error, served = presented_certificate_profile(cert)
     ca, status = None, None
     if error is None and profile is not None:
         ca = issuing_ca(profile)
@@ -576,11 +576,10 @@ def renew_certificate_bound():
                     profile=profile)
         except wstep_service.HeldForApproval as held:
             return _answer_held(ca, parsed, held.approval)
-    served = f'profile {profile.name}' if profile is not None else 'profile -'
     if error:
-        logger.warning("WSTEP renewal rejected (%s): %s", served, error)
+        logger.warning("WSTEP renewal rejected (%s): %s", served or 'not stored', error)
         # Audited only for a certificate stored here, its key proven: an anonymous refusal would fill the log
-        if stored:
+        if served:
             _audit_issuance('certificate.renewed', None, username, success=False, details=(
                 f'WSTEP renewal refused from {client_ip()}: {error} '
                 f'(old serial {cert.serial_number}, {served})'))
