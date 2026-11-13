@@ -503,3 +503,27 @@ def test_a_boolean_id_names_no_connector(auth_client, monkeypatch, connector_id)
     response = auth_client.post(f'{URL}/test', data=json.dumps(body), content_type='application/json')
     assert response.status_code == 404, response.data
     assert looked_up == []
+
+
+@pytest.mark.parametrize('route', ['legacy', 'collection'])
+def test_a_save_reads_the_domain_sid_within_one_connect_timeout(auth_client, monkeypatch, route):
+    """Every DC black-holed: the save waits the connection test's per-DC connect timeout once, not once per DC."""
+    directory = _Directory(monkeypatch, [], down={'dc1.a.example', 'dc2.a.example', 'dc3.a.example'})
+    now, bind = [0.0], directory._bind
+
+    def slow_bind(config, host, tls):
+        now[0] += lookup._LDAP_CONNECT_TIMEOUT_SECONDS
+        return bind(config, host, tls)
+
+    monkeypatch.setattr(lookup, '_connect_to', slow_bind)
+    monkeypatch.setattr(lookup, '_clock', lambda: now[0])
+    servers = ['dc1.a.example', 'dc2.a.example', 'dc3.a.example']
+    if route == 'legacy':
+        body = {'servers': servers, 'base_dn': 'DC=a,DC=example', 'bind_dn': 'svc',
+                'bind_password': 'sekret-pw', 'enabled': True}
+        response = auth_client.put('/api/v2/ad-connector', data=json.dumps(body), content_type='application/json')
+    else:
+        response = _post(auth_client, servers=servers)
+    assert response.status_code in (200, 201), response.data
+    assert response.get_json()['data']['domain_sid'] is None
+    assert [host for _name, host in directory.binds] == ['dc1.a.example']

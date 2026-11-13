@@ -36,11 +36,13 @@ account), and the falsy ``UNREACHABLE`` when no DC binds, a
 search raises or returns an LDAP error result, or the enabled connector lacks a server
 or base DN, so a caller can refuse the request or fault on its own side.
 """
+import contextvars
 import logging
 import os
 import re
 import ssl
 import tempfile
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -349,6 +351,9 @@ def config_servers(config):
 # indefinitely instead of failing closed like every other error mode here.
 _LDAP_CONNECT_TIMEOUT_SECONDS = 10
 _LDAP_RECEIVE_TIMEOUT_SECONDS = 10
+_clock = time.monotonic
+# Set by a caller that must not wait one connect timeout per DC: no new bind starts past it
+_bind_deadline = contextvars.ContextVar('ad_connector_bind_deadline', default=None)
 
 
 def _connect_to(config, host, tls):
@@ -396,7 +401,10 @@ def _connect(config):
     tls, cleanup = _build_tls(config)
     try:
         failures = []
+        deadline = _bind_deadline.get()
         for host in servers:
+            if failures and deadline is not None and _clock() >= deadline:
+                break
             try:
                 return _connect_to(config, host, tls)
             except Exception as e:
@@ -796,14 +804,18 @@ def read_domain_sid(conn, base_dn):
 
 def fetch_domain_sid(config):
     """``read_domain_sid`` over a fresh bind to the first DC that accepts it; None when
-    no DC binds. Never raises."""
+    no DC binds. A save waits for it: no bind starts once the per-DC connect timeout of the
+    connection test (``_LDAP_CONNECT_TIMEOUT_SECONDS``) has passed. Never raises."""
     if not config_servers(config) or not has_bind_credentials(config):
         return None
+    token = _bind_deadline.set(_clock() + _LDAP_CONNECT_TIMEOUT_SECONDS)
     try:
         conn = _connect(config)
     except Exception as e:
         logger.warning('AD Connector: could not bind to read the domain SID: %s', e)
         return None
+    finally:
+        _bind_deadline.reset(token)
     try:
         return read_domain_sid(conn, getattr(config, 'base_dn', None))
     finally:
