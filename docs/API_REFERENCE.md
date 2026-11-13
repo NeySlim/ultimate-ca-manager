@@ -1360,6 +1360,13 @@ ML-DSA key under an RSA or EC CA, and an ML-DSA CA ignores it.
 - `[]` clears the list. Duplicate, export, import and backups carry it. A stored list that no longer validates (a restored or hand-edited row) is reported in `custom_extensions_error`, and issuance from the template is refused until it is fixed: `400` with the reason for an operator, `serverInternal` without the template's name for an ACME client, `badRequest` for SCEP (RFC 8894 has no server-side failInfo).
 - Certificates issued from the template carry the list: issue form, Sign CSR (single and bulk, end-entity certificates only), ACME profiles bound to the template, SCEP profiles, WSTEP (the matched template) and approvals. EST and mTLS enrollment use no template and add none.
 
+**Common name pattern (Windows enrollment).** `subject_cn_pattern` (text, at most 255 characters, `null` or blank for none) and `subject_cn_keep_path` (boolean, default `false`) set the CN of certificates issued over the WSTEP Kerberos binding, and of their renewals, for a template whose subject UCM builds: a computer type (`web_server`, `vpn_server`, `vpn_client`, `ocsp_signing`) or one with `ad_derived_subject`.
+
+- Variables in braces, read from the requester's directory object: `{hostname}` and `{fqdn}` for a computer type; `{username}`, `{upn}`, `{mail}`, `{displayName}`, `{givenName}` and `{surname}` for a user template; `{domain}` and `{realm}` for both. `{{` and `}}` are literal braces.
+- `400` on create, update and import (where the template is skipped with the reason) for an unknown variable, a variable of the other kind, a stray brace, a control character, or a pattern on a template whose requester supplies the subject. An update is judged on the template it leaves: changing `template_type` or `ad_derived_subject` under a pattern is refused the same way.
+- Saving does not check that a pattern tells accounts apart; issuance does. A subject built by the pattern that a certificate of the same CA, whatever its status, already carries without the requester's SID in its SID extension is refused at issuance, renewal and approval (see the Administrator Guide, "Windows enrollment: common name pattern").
+- Duplicate, export, import and backups carry both fields. With a pattern, the policy announces the template's SAN flags without the subject flag (`0x08000000` for a computer, `0x02000000` for a user).
+
 ### Get Template
 ```http
 GET /api/v2/templates/{template_id}

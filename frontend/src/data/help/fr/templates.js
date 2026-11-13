@@ -39,6 +39,7 @@ export default {
           { label: 'Construire le sujet depuis Active Directory', text: 'Dériver le sujet et les SAN depuis l\'objet AD du demandeur (via le connecteur AD) au lieu d\'exiger que le client les fournisse, pour l\'autoenrollment GPO sans intervention' },
           { label: 'Restreindre l\'enrôlement à un groupe AD', text: 'Seuls les membres du groupe AD configuré (appartenance imbriquée incluse) peuvent enrôler via le point de terminaison Kerberos. Vide = tout principal authentifié. Non appliqué sur le point de terminaison Username/Password' },
           { label: 'Champs de sujet épinglés', text: 'Force les valeurs C/ST/L/O/OU sur chaque certificat émis via WSTEP, en écrasant le CSR ou la dérivation AD pour ces champs. Le CN et les SAN ne sont jamais affectés, laissez un champ vide pour le garder dynamique' },
+          { label: 'Motif du nom commun', text: 'Construit le CN à partir de texte fixe et de variables de l\'annuaire, par exemple {hostname}-WiFi ou {displayName}, pour un modèle dont UCM construit le sujet. Seul le CN change : les SAN et l\'extension SID restent ceux de l\'annuaire. Une variable vide ou un CN de plus de 64 caractères refuse la demande, de même qu\'un sujet qu\'un certificat de la même CA porte déjà pour un autre compte' },
         ]
       },
     ],
@@ -106,6 +107,22 @@ Un modèle peut **épingler** les champs organisationnels du sujet : **C, ST, L,
 - Les modèles avec champs épinglés affichent un badge **Épinglé**, et les valeurs épinglées apparaissent dans le panneau de détails du modèle
 
 Utilisez cette fonction pour garantir une identité organisationnelle uniforme (p. ex. un \`O\` et un \`C\` fixes) sur un parc autoenrôlé, indépendamment de ce que chaque client Windows soumet.
+
+## Motif du nom commun
+
+Pour l'enrôlement Windows, un modèle dont UCM construit le sujet (un modèle machine, ou un modèle utilisateur avec **Construire le sujet depuis Active Directory**) peut tirer son CN d'un motif : du texte fixe et des variables entre accolades, lues dans l'objet de l'annuaire du demandeur, jamais dans la demande.
+
+- **Modèles machine** : \`{hostname}\` (le nom du compte sans \`$\`), \`{fqdn}\` (son dNSHostName)
+- **Modèles utilisateur** : \`{username}\` (sAMAccountName), \`{upn}\`, \`{mail}\`, \`{displayName}\`, \`{givenName}\`, \`{surname}\`
+- **Les deux** : \`{domain}\` (les composants DC du DN de l'objet), \`{realm}\` (le royaume du profil)
+- \`{{\` et \`}}\` donnent une accolade littérale. Une variable inconnue, une variable de l'autre type, ou un motif sur un modèle dont le demandeur fournit le sujet est refusé à l'enregistrement du modèle
+- **Conserver le chemin d'annuaire** décoché : le sujet est le CN seul, plus les champs épinglés. Coché : le DN de l'objet après son propre nom suit le CN (pour un utilisateur, l'attribut e-mail reste comme sans motif)
+- **Seul le CN change** : les SAN (le nom DNS de la machine, l'UPN et l'e-mail de l'utilisateur) et l'extension SID restent comme sans motif, et un motif n'ajoute jamais de SAN
+- **Refusé, jamais tronqué** : une variable que l'annuaire laisse vide, un résultat de plus de 64 caractères ou contenant un caractère de contrôle refuse la demande ; la raison nomme le modèle et la variable et figure dans le journal d'audit
+- **Un sujet par compte** (RFC 5280), contrôlé à l'émission : un sujet qu'un certificat de la même CA, quel que soit son statut, porte déjà pour un autre compte est refusé (casse et espaces superflus ignorés), et l'audit nomme le numéro de série de ce certificat ; le même compte renouvelle et s'inscrit de nouveau
+- \`{displayName}\`, \`{givenName}\`, \`{surname}\` et \`{mail}\` ne sont pas uniques, ni \`{username}\` ou \`{hostname}\` d'un domaine à l'autre : ajoutez \`{upn}\`, \`{fqdn}\`, ou \`{username}\`/\`{hostname}\` avec \`{domain}\` ou **Conserver le chemin d'annuaire**
+- **Le renouvellement** avec le certificat prend le motif en vigueur, pour le compte que nomme le SID du certificat ; il est refusé quand aucun connecteur du profil ne trouve ce compte
+- Le point de terminaison Username/Password n'a pas d'identité d'annuaire : le motif ne s'y applique pas et le client fournit le sujet
 
 ## Extensions personnalisées
 

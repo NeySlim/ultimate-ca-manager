@@ -666,6 +666,22 @@ A template can **pin** the organizational subject fields: **C, ST, L, O, OU**: f
 
 Use this to guarantee a uniform organizational identity (e.g. a fixed \`O\` and \`C\`) across an autoenrolled fleet, regardless of what each Windows client submits.
 
+## Common Name Pattern
+
+For Windows enrollment, a template whose subject UCM builds (a computer template, or a user template with **Build subject from Active Directory**) can take its CN from a pattern: fixed text and variables in braces, read from the requester's directory object, never from the request.
+
+- **Computer templates**: \`{hostname}\` (the account name without \`$\`), \`{fqdn}\` (its dNSHostName)
+- **User templates**: \`{username}\` (sAMAccountName), \`{upn}\`, \`{mail}\`, \`{displayName}\`, \`{givenName}\`, \`{surname}\`
+- **Both**: \`{domain}\` (the DC components of the object's DN), \`{realm}\` (the realm of the profile)
+- Write \`{{\` and \`}}\` for a literal brace. An unknown variable, a variable of the other kind, or a pattern on a template whose requester supplies the subject is refused when the template is saved
+- **Keep the directory path** off: the subject is the CN alone, plus the pinned fields. On: the object's DN after its own name follows the CN (for a user, the e-mail attribute stays as without a pattern)
+- **Only the CN changes**: the SAN (the computer's DNS name, the user's UPN and e-mail) and the SID extension stay as without a pattern, and a pattern never adds a SAN
+- **Refused, never shortened**: a variable the directory leaves empty, a result longer than 64 characters or one holding a control character refuses the request; the reason names the template and the variable and is in the audit log
+- **One subject per account** (RFC 5280), checked at issuance: a subject that a certificate of the same CA, whatever its status, already carries for another account is refused (case and extra spaces ignored), and the audit names that certificate's serial; the same account renews and enrolls again
+- \`{displayName}\`, \`{givenName}\`, \`{surname}\` and \`{mail}\` are not unique, nor is \`{username}\` or \`{hostname}\` across domains: add \`{upn}\`, \`{fqdn}\`, or \`{username}\`/\`{hostname}\` with \`{domain}\` or **Keep the directory path**
+- **Renewal** with the certificate takes the pattern in force, for the account the certificate's SID names; it is refused when no connector of the profile finds that account
+- The Username/Password endpoint has no directory identity: the pattern does not apply there and the client supplies the subject
+
 ## Custom Extensions
 
 A template can add extensions UCM has no setting for. Each one is an **OID**, a **Critical** flag and the **value**: the DER encoding of the extension value, in hex. UCM copies the bytes as given and never parses them, so check the encoding with your own tools first.

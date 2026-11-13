@@ -17,6 +17,8 @@ class Certificate(db.Model):
         db.Index('uix_certificates_ca_serial', 'caref', 'serial_number', unique=True,
                  sqlite_where=text("caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''"),
                  postgresql_where=text("caref IS NOT NULL AND serial_number IS NOT NULL AND serial_number <> ''")),
+        # Finds the certificates of a CA carrying a subject (migration 157)
+        db.Index('ix_certificates_caref_subject_key', 'caref', 'subject_key'),
     )
     
     id = db.Column(db.Integer, primary_key=True)
@@ -31,6 +33,8 @@ class Certificate(db.Model):
     cert_type = db.Column(db.String(50))  # client_cert, server_cert, combined_cert, ca_cert
     subject = db.Column(db.Text)
     subject_cn = db.Column(db.String(255))  # Extracted CN for sorting
+    # utils.dn_match.name_key of the certificate's subject, written with crt
+    subject_key = db.Column(db.String(64))
     issuer = db.Column(db.Text)
     serial_number = db.Column(db.String(100), index=True)
     aki = db.Column(db.String(200))  # Authority Key Identifier (hex, colon-separated)
@@ -560,8 +564,8 @@ def sig_hash_for_certificate(cert):
 
 @event.listens_for(Certificate.crt, 'set')
 def _key_fields_follow_crt(target, value, oldvalue, initiator):
-    # Every issuance path sets crt; key_algo, key_bits, sig_hash (sorting, compliance)
-    # and the AKI/SKI columns (ACME ARI, chain lookups) follow it
+    # Every issuance path sets crt; key_algo, key_bits, sig_hash (sorting, compliance),
+    # subject_key (subject uniqueness) and the AKI/SKI columns (ACME ARI, chain lookups) follow it
     if not value:
         return
     import base64
@@ -580,6 +584,12 @@ def _key_fields_follow_crt(target, value, oldvalue, initiator):
     except Exception:
         pass
     target.sig_hash = sig_hash_for_certificate(cert)
+    try:
+        # Inside the guard: a certificate is stored even when its subject cannot be keyed
+        from utils.dn_match import name_key
+        target.subject_key = name_key(cert.subject)
+    except Exception:
+        target.subject_key = None
     try:
         target.aki = authority_key_identifier_hex(cert)
         target.ski = cert.extensions.get_extension_for_class(

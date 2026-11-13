@@ -150,7 +150,25 @@ def kerberos_route(principal):
 
 
 def audit_kerberos_refusal(binding, principal, realm, profile, reason):
-    """One audit entry per refused Kerberos request: Windows shows the requester a generic code."""
+    """One audit entry per refused Kerberos request: Windows shows the requester a generic code.
+    A reason's ``audited`` form, when it has one, is what the entry records."""
+    from services.audit.staging import stage_audit_entry
+    from utils.db_transaction import safe_commit
+    from utils.trusted_proxy import client_ip
+    name = profile.name if profile is not None else None
+    reason = getattr(reason, 'audited', reason)
+    stage_audit_entry(
+        action='windows_enrollment.refused', resource_type='windows_profile',
+        resource_id=str(profile.id) if profile is not None else None, resource_name=name,
+        username=principal, success=False,
+        details=(f'{binding} Kerberos request from {client_ip()} refused: {reason} '
+                 f'(principal {principal}, realm {realm or "-"}, profile {name or "-"})'))
+    safe_commit(logger, 'Windows enrollment refusal audit commit failed')
+
+
+def audit_renewal_refusal(binding, renewed_serial, profile, reason):
+    """The ``windows_enrollment.refused`` entry of a renewal refused for a reason the client is
+    told only in part (its ``audited`` form names more), committed at once."""
     from services.audit.staging import stage_audit_entry
     from utils.db_transaction import safe_commit
     from utils.trusted_proxy import client_ip
@@ -158,9 +176,9 @@ def audit_kerberos_refusal(binding, principal, realm, profile, reason):
     stage_audit_entry(
         action='windows_enrollment.refused', resource_type='windows_profile',
         resource_id=str(profile.id) if profile is not None else None, resource_name=name,
-        username=principal, success=False,
-        details=(f'{binding} Kerberos request from {client_ip()} refused: {reason} '
-                 f'(principal {principal}, realm {realm or "-"}, profile {name or "-"})'))
+        username=None, success=False,
+        details=(f'{binding} renewal from {client_ip()} refused: {getattr(reason, "audited", reason)} '
+                 f'(renewed serial {renewed_serial}, profile {name or "-"})'))
     safe_commit(logger, 'Windows enrollment refusal audit commit failed')
 
 
