@@ -80,6 +80,28 @@ class TestImportReplacementDeploys:
         monkeypatch.undo()
         assert _deliveries(app, cert_id) == []
 
+    def test_a_replacement_its_ca_recorded_as_revoked_queues_nothing(self, app, auth_client, create_ca):
+        ca_cert, ca_key, key, old, cert_id = _setup(app, auth_client, create_ca, 'r7-revoked.example.com')
+        new = _cert('r7-revoked.example.com', key, issuer_cert=ca_cert, signer=ca_key)
+        from datetime import datetime
+        from models import db, Certificate, RevokedSerial
+        with app.app_context():
+            caref = db.session.get(Certificate, cert_id).caref
+            db.session.add(RevokedSerial(caref=caref, serial_number=str(new.serial_number),
+                                         revoked_at=datetime(2026, 1, 2, 3, 4, 5), revoke_reason='keyCompromise',
+                                         valid_to=new.not_valid_after_utc.replace(tzinfo=None)))
+            db.session.commit()
+        try:
+            r = _import(auth_client, IMPORT, new)
+            assert r.status_code == 200, r.data
+            data = json.loads(r.data)['data']
+            assert (data['id'], data['revoked']) == (cert_id, True)
+            assert _deliveries(app, cert_id) == []
+        finally:
+            with app.app_context():
+                RevokedSerial.query.filter_by(caref=caref, serial_number=str(new.serial_number)).delete()
+                db.session.commit()
+
     def test_row_without_readable_certificate_is_not_a_renewal(self, app, auth_client, create_ca):
         ca_cert, ca_key, key, old, cert_id = _setup(app, auth_client, create_ca, 'r7-keyonly.example.com')
         with app.app_context():
