@@ -314,6 +314,7 @@ def unhold_certificate(cert_id):
 
         # RFC 5280 §5.3.1 — when delta CRLs are enabled, emit removeFromCRL on
         # a delta before clearing the hold so relying parties drop the entry.
+        staged_cas = []
         if ca and ca.delta_crl_enabled and ca.cdp_enabled:
             # A hold its record alone carries is listed from the row while the delta says removeFromCRL
             try:
@@ -325,6 +326,7 @@ def unhold_certificate(cert_id):
                     db.session.rollback()
                     return _revoked_for_good(cert, db.session.get(Certificate, cert.id).revoke_reason)
                 db.session.commit()
+                staged_cas.append(ca)
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Failed to stage removeFromCRL before unhold: {e}")
@@ -344,12 +346,14 @@ def unhold_certificate(cert_id):
             if refused is not None:
                 db.session.rollback()
                 _restore_hold(cert_id, held)
+                _regenerate_crls(staged_cas, username, 'a refused unhold')
                 return refused
             db.session.commit()
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to remove hold on certificate {cert_id}: {e}", exc_info=True)
             _restore_hold(cert_id, held)
+            _regenerate_crls(staged_cas, username, 'a failed unhold')
             return error_response('Failed to remove certificate hold', 500)
 
         # Audit log
@@ -362,14 +366,7 @@ def unhold_certificate(cert_id):
             success=True
         )
 
-        # Regenerate CRL for the issuing CA
-        try:
-            if ca:
-                from services.crl_service import CRLService
-                CRLService.generate_crl(ca.id, username=username)
-                logger.info(f"Regenerated CRL for CA {ca.id} after unhold")
-        except Exception as e:
-            logger.warning(f"Failed to regenerate CRL after unhold: {e}")
+        _regenerate_crls([ca] if ca else [], username, 'unhold')
 
         # Invalidate all per-algorithm OCSP cache entries (RFC 6960 §2.2).
         if cert.serial_number:
@@ -420,6 +417,18 @@ def unhold_certificate(cert_id):
     except Exception as e:
         logger.error(f"Failed to unhold certificate: {e}")
         return error_response('Failed to remove certificate hold', 500)
+
+
+def _regenerate_crls(cas, username, after):
+    """A fresh CRL (and delta) for each of ``cas``: after a refused or failed unhold, one that
+    lists again the hold whose removeFromCRL delta was already published."""
+    from services.crl_service import CRLService
+    for member_ca in cas:
+        try:
+            CRLService.generate_crl(member_ca.id, username=username)
+            logger.info(f"Regenerated CRL for CA {member_ca.id} after {after}")
+        except Exception as e:
+            logger.warning(f"Failed to regenerate CRL of CA {member_ca.id} after {after}: {e}")
 
 
 def _restore_hold(cert_id, held):
