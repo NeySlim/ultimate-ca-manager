@@ -338,3 +338,30 @@ def test_the_list_and_the_detail_agree_on_a_realm_without_key(
     assert one['kerberos_refusal'] == row['kerberos_refusal'] == reason
     keyed = auth_client.get(f'{URL}/{profiles.default}').get_json()['data']
     assert keyed['keytab_set'] and keyed['kerberos_refusal'] is None
+
+
+def test_a_realm_keyed_by_another_profiles_keytab_is_not_reported_keyless(
+        app, auth_client, profiles, monkeypatch, tmp_path):  # noqa: F811
+    """A 2.x keytab of two realms serves both: the profile of the second realm holds no keytab
+    of its own and is served all the same."""
+    from services.kerberos.keytab_format import compose, read_entries
+    monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: None)
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    served = tmp_path / 'served.keytab'
+    monkeypatch.setattr(negotiate_auth, 'KEYTAB_PATH', served)
+    keyless = 'no key for realm TWO.TEST: upload the keytab of this profile'
+
+    def reasons():
+        one = auth_client.get(f'{URL}/{profiles.two}').get_json()['data']
+        row = next(r for r in auth_client.get(f'{URL}?q=c03-two').get_json()['data']
+                   if r['id'] == profiles.two)
+        return one['kerberos_refusal'], row['kerberos_refusal']
+
+    assert reasons() == (keyless, keyless)  # no served file at all
+    served.write_bytes(keytab('HTTP/ucm.example@ELSE.TEST'))
+    assert reasons() == (keyless, keyless)
+    both = compose(read_entries(keytab('HTTP/ucm.example@ELSE.TEST'))
+                   + read_entries(keytab('HTTP/ucm.example@TWO.TEST')))
+    served.write_bytes(both)
+    assert reasons() == (None, None)
+
