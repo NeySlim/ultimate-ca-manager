@@ -319,9 +319,13 @@ def test_a_base_dn_without_a_realm_is_refused(auth_client, app, base_dn):
         assert ADConnectorConfig.query.count() == 0
 
 
-def test_an_update_renames_and_a_new_base_dn_drops_the_old_domain_sid(auth_client, monkeypatch):
+def test_an_update_renames_and_a_new_base_dn_drops_the_old_domain_sid(auth_client, app, monkeypatch):
     monkeypatch.setattr(lookup, '_connect', lambda config: _Conn([_Entry(objectSid=_sid_bytes(DOMAIN_SID))]))
     created = _post(auth_client).get_json()['data']
+    with app.app_context():
+        # A default profile another file left, keytab and all, took the new connector: the move is not its test
+        WindowsEnrollmentProfile.query.filter_by(connector_id=created['id']).update({'connector_id': None})
+        db.session.commit()
     monkeypatch.setattr(lookup, '_connect', lambda config: (_ for _ in ()).throw(OSError('down')))
     updated = auth_client.put(f"{URL}/{created['id']}", data=json.dumps({'name': 'renamed', 'base_dn': 'DC=c,DC=example'}),
                               content_type='application/json')
