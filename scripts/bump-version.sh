@@ -25,9 +25,12 @@ echo "$VERSION" > "$ROOT_DIR/VERSION"
 # 2. frontend/package.json (read by vite at build time)
 sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" "$ROOT_DIR/frontend/package.json"
 
+# 2b. frontend/package-lock.json: both occurrences follow package.json
+VERSION="$VERSION" LOCK="$ROOT_DIR/frontend/package-lock.json" node -e "const fs=require('fs'); const f=process.env.LOCK; const p=JSON.parse(fs.readFileSync(f,'utf8')); p.version=process.env.VERSION; if (p.packages && p.packages['']) p.packages[''].version=process.env.VERSION; fs.writeFileSync(f, JSON.stringify(p,null,2)+'\n');"
+
 # 3. Helm chart appVersion: the image tag the chart deploys by default.
 #    Stable versions only (a -dev/-rc image tag is not published for the chart).
-if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+$ ]]; then
+if [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
     sed -i "s/^appVersion: \".*\"/appVersion: \"$VERSION\"/" "$ROOT_DIR/charts/ucm/Chart.yaml"
     CHART_NOTE="   - charts/ucm/Chart.yaml (appVersion)"
 fi
@@ -35,4 +38,5 @@ fi
 echo "✅ Version updated to $VERSION"
 echo "   - VERSION"
 echo "   - frontend/package.json"
-[ -n "${CHART_NOTE:-}" ] && echo "$CHART_NOTE"
+echo "   - frontend/package-lock.json"
+if [ -n "${CHART_NOTE:-}" ]; then echo "$CHART_NOTE"; fi
