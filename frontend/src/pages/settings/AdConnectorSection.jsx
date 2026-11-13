@@ -238,6 +238,11 @@ export default function AdConnectorSection({ hasPermission }) {
             <ul className="list-disc pl-5 text-sm text-text-primary" data-testid="refusal-profiles">
               {refusal.profiles.map(profile => <li key={profile.id}>{profile.name}</li>)}
             </ul>
+            {refusal.total > refusal.profiles.length && (
+              <p className="text-sm text-text-secondary">
+                {t('adConnector.deleteRefusedMore', { count: refusal.total - refusal.profiles.length })}
+              </p>
+            )}
             <div className="flex justify-end pt-2 border-t border-border">
               <Button type="button" variant="secondary" onClick={() => setRefusal(null)}>{t('common.close')}</Button>
             </div>

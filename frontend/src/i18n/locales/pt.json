@@ -5582,7 +5582,9 @@
     "deleteFailed": "The connector could not be deleted",
     "deleteRefusedTitle": "Connector {{name}} is in use",
     "deleteRefused_one": "{{count}} Windows enrollment profile uses this connector. Point it at another connector first:",
-    "deleteRefused_other": "{{count}} Windows enrollment profiles use this connector. Point them at another connector first:"
+    "deleteRefused_other": "{{count}} Windows enrollment profiles use this connector. Point them at another connector first:",
+    "deleteRefusedMore_one": "and {{count}} more",
+    "deleteRefusedMore_other": "and {{count}} more"
   },
   "certInput": {
     "modePaste": "Colar",

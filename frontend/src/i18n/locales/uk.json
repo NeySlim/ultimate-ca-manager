@@ -5646,7 +5646,11 @@
     "deleteRefused_one": "{{count}} Windows enrollment profile uses this connector. Point it at another connector first:",
     "deleteRefused_few": "{{count}} Windows enrollment profiles use this connector. Point them at another connector first:",
     "deleteRefused_many": "{{count}} Windows enrollment profiles use this connector. Point them at another connector first:",
-    "deleteRefused_other": "{{count}} Windows enrollment profiles use this connector. Point them at another connector first:"
+    "deleteRefused_other": "{{count}} Windows enrollment profiles use this connector. Point them at another connector first:",
+    "deleteRefusedMore_one": "and {{count}} more",
+    "deleteRefusedMore_few": "and {{count}} more",
+    "deleteRefusedMore_many": "and {{count}} more",
+    "deleteRefusedMore_other": "and {{count}} more"
   },
   "certInput": {
     "modePaste": "Вставити",
