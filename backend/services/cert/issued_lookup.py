@@ -395,9 +395,10 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
 
 def protocol_renewal_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[Certificate], str]:
     """``issued_certificate_status`` for an EST or SCEP renewal: a certificate a Windows enrollment
-    profile holds (an id, even of a profile deleted since, or a ``wstep`` row) answers WINDOWS_PROFILE."""
+    profile holds (an id, even of a profile deleted since, or a ``wstep`` row) answers WINDOWS_PROFILE,
+    expired or superseded alike; only REVOKED takes precedence."""
     row, status = issued_certificate_status(ca, cert)
-    if status == OK and any(r.windows_profile_id is not None or r.source == 'wstep'
+    if status != REVOKED and any(r.windows_profile_id is not None or r.source == 'wstep'
                             for r in find_issued_rows(ca, cert)):
         return row, WINDOWS_PROFILE
     return row, status

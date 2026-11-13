@@ -2,6 +2,7 @@
 /simplereenroll and SCEP RenewalReq refuse it, whether its profile is enabled,
 disabled or deleted since; a certificate of no profile renews as before."""
 import uuid
+from datetime import timedelta
 
 import pytest
 from cryptography import x509
@@ -10,6 +11,7 @@ from cryptography.hazmat.primitives.serialization import pkcs7
 
 from models import AuditLog, Certificate, WindowsEnrollmentProfile, db
 from services.scep.scep_service import SCEPService
+from utils.datetime_utils import utc_now
 from tests.test_est_rfc7030 import _post_csr, est_config  # noqa: F401
 from tests.test_final_review_followups import _csr as _est_csr, _enrol, _pem
 from tests.test_scep_renewal_challenge import ORIGINAL, _csr as _scep_csr, _enroll, _message, scep_ca  # noqa: F401
@@ -166,8 +168,10 @@ def test_scep_renewal_without_a_profile_still_renews(app, scep_ca):
     assert renewed.subject == issued.subject
 
 
-def test_scep_manual_approval_refuses_a_windows_certificate(app, scep_ca, windows_profile):
-    """A RenewalReq held before its certificate was bound is not issued on approval."""
+@pytest.mark.parametrize('lapse', ['valid', 'expired', 'superseded'])
+def test_scep_manual_approval_refuses_a_windows_certificate(app, scep_ca, windows_profile, lapse):
+    """A RenewalReq held before its certificate was bound is not issued on approval,
+    even once that certificate has expired or been renewed by WSTEP."""
     ca, ca_cert = scep_ca
     cn = f'c11-scep-held-{uuid.uuid4().hex[:6]}.example.test'
     old_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
@@ -181,6 +185,12 @@ def test_scep_manual_approval_refuses_a_windows_certificate(app, scep_ca, window
     held = SCEPRequest.query.filter_by(ca_refid=ca.refid, status='pending').filter(
         SCEPRequest.subject.contains(cn)).one()
     _bind(issued, windows_profile[0], 'enabled')
+    row = Certificate.query.filter_by(serial_number=str(issued.serial_number)).one()
+    if lapse == 'expired':
+        row.valid_to = utc_now() - timedelta(days=1)
+    if lapse == 'superseded':
+        row.archived = True
+    db.session.commit()
     before = Certificate.query.count()
     with pytest.raises(Exception, match='Windows enrollment profile'):
         service.approve_request(held.transaction_id, 'admin')
