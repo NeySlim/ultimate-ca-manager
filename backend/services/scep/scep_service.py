@@ -134,7 +134,7 @@ class SCEPService:
     MSG_TYPE_GET_CRL = 22
 
     # RFC 8894 §2.4 leaves it to CA policy: a PKCSReq renewal still proves the
-    # shared secret (option B); False would let the signature alone suffice.
+    # shared secret; False would let the signature alone suffice.
     PKCSREQ_RENEWAL_COMPARES_CHALLENGE = True
 
     CAPABILITIES = (
@@ -609,8 +609,8 @@ class SCEPService:
             existing = SCEPRequest.query.filter_by(
                 transaction_id=transaction_id, ca_refid=self.ca_refid
             ).first()
-            # A resent renewal already served archived its signer: answer it
-            # from the transaction, whose delivery still refuses a revoked one
+            # A resent renewal already served archived its signer: answer it from
+            # the transaction; only an undelivered policy approval re-checks a revocation
             if (renewal and existing and self._same_key_as_existing(existing, csr)
                     and self._renews_signer(existing, signer_cert)):
                 return self._status_for_existing(
@@ -1070,8 +1070,8 @@ class SCEPService:
 
     def _is_renewal(self, message_type, issued_here: bool) -> bool:
         """The one rule: a RenewalReq, or a PKCSReq signed by a certificate this
-        endpoint issued (RFC 8894 §2.3 case 3). Intune validates every request
-        itself, so its PKCSReq stays an enrollment."""
+        endpoint issued (RFC 8894 §2.3 case 2 sent as PKCSReq, §2.4 leaves it to
+        CA policy). Intune validates every request itself: its PKCSReq stays an enrollment."""
         if message_type == self.MSG_TYPE_RENEWAL_REQ:
             return True
         return (message_type == self.MSG_TYPE_PKI_REQ and issued_here

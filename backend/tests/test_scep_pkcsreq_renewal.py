@@ -1,5 +1,5 @@
 """A client that renews with PKCSReq signs it with the certificate it holds
-(RFC 8894 §2.3 case 3, left to CA policy). Signed by a certificate this
+(RFC 8894 §2.3 case 2 sent as PKCSReq, §2.4 leaves it to CA policy). Signed by a certificate this
 endpoint issued, it is a renewal: the challenge is still compared (§2.4),
 only its expiry is waived, and the old certificate is replaced."""
 import uuid
@@ -276,3 +276,26 @@ def test_replay_shortcut_needs_the_certificate_it_renewed(app, scep_ca, monkeypa
     attrs = _response_attributes(response)
     assert attrs[PKI_STATUS_OID] == '2'
     assert attrs[FAIL_INFO_OID] == BAD_MESSAGE_CHECK
+
+
+def test_replay_shortcut_needs_the_key_it_certified(app, scep_ca, monkeypatch):
+    """The same transaction resent with another key is not answered with the certificate served."""
+    import types
+    import tests.test_scep_renewal_challenge as helpers
+    ca, ca_cert = scep_ca
+    cn = _cn('replay-key')
+    old_key = _new_key()
+    issued = _enroll(ca, ca_cert, old_key, cn)
+    monkeypatch.setattr(helpers, 'uuid', types.SimpleNamespace(
+        uuid4=lambda: types.SimpleNamespace(hex='replay-' + cn[:24])))
+    service = _service(ca, expired=False)
+    first, _ = service.process_pkcs_req(_message(ca_cert, issued, old_key, 19, _csr(_new_key(), cn, ORIGINAL)), '127.0.0.1')
+    assert _response_attributes(first)[PKI_STATUS_OID] == '0'
+
+    response, _ = service.process_pkcs_req(
+        _message(ca_cert, issued, old_key, 19, _csr(_new_key(), cn, ORIGINAL)), '127.0.0.1')
+
+    attrs = _response_attributes(response)
+    assert attrs[PKI_STATUS_OID] == '2'
+    assert attrs[FAIL_INFO_OID] == BAD_MESSAGE_CHECK
+
