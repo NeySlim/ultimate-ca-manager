@@ -19,8 +19,9 @@ Pivot (3.0)
 -----------
 3.0 starts from UCM 2.254. A database that is not fresh starts only when its
 registry holds ``300_upgrade_from_2_254`` (a 3.0 database) or every name 2.254
-records (``migrations/_from_2_254.PIVOT_NAMES``). Any other database is refused
-before anything is written, with what to do.
+records (``migrations/_from_2_254.PIVOT_NAMES``), and no name that neither 2.254
+nor this release knows. Any other database is refused before anything is written,
+with what to do.
 
 Migrations
 ----------
@@ -129,8 +130,16 @@ PIVOT_VERSION = "2.254"
 
 def pivot_refusal(state, applied):
     """None when this database may be migrated, else the message that refuses it."""
-    from migrations._from_2_254 import PIVOT_NAMES
-    if state == "fresh" or UPGRADE_MIGRATION in applied:
+    from migrations._from_2_254 import PIVOT_NAMES, RECORDED_BEFORE_2_52
+    if state == "fresh":
+        return None
+    # A name neither 2.254 (2.254.N adds none) nor this release knows: a later release or a hand edit
+    unknown = sorted(set(applied) - PIVOT_NAMES - RECORDED_BEFORE_2_52 - set(_list_migration_names()))
+    if unknown:
+        return (f"This database names {len(unknown)} migration(s) this release does not know, first "
+                f"{', '.join(unknown[:3])}: a later release started it, or its registry was edited. "
+                f"Start it with the release that recorded them. Nothing was changed.")
+    if UPGRADE_MIGRATION in applied:
         return None
     missing = sorted(PIVOT_NAMES - set(applied))
     if not missing:

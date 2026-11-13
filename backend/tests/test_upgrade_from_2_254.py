@@ -481,6 +481,40 @@ def test_the_refusal_names_the_count_and_the_first_three(dialect, tmp_path, monk
     assert '137_ldap_start_tls' not in out
 
 
+UNKNOWN = "INSERT INTO _migrations (name) VALUES ('301_from_a_later_release');\n"
+
+
+def _refused_as_unknown(db, capsys):
+    before = _untouched(db)
+    assert db.upgrade() is False
+    assert _untouched(db) == before
+    out = capsys.readouterr().out
+    assert 'names 1 migration(s) this release does not know, first 301_from_a_later_release' in out, out
+    assert 'older than 2.254' not in out
+
+
+def test_a_2254_database_naming_an_unknown_migration_is_refused_untouched(dialect, tmp_path, monkeypatch,
+                                                                          capsys):
+    for db in make_base(dialect, tmp_path, monkeypatch, 'gu', sql=schema_2254(dialect) + UNKNOWN):
+        _refused_as_unknown(db, capsys)
+
+
+def test_a_3_0_database_naming_an_unknown_migration_is_refused_untouched(fresh, capsys):
+    """Going back from a later 3.x: its migrations are unknown here."""
+    fresh.run(UNKNOWN.rstrip(';\n'))
+    _refused_as_unknown(fresh, capsys)
+
+
+def test_a_2254_database_still_naming_2_0_migrations_upgrades(dialect, tmp_path, monkeypatch):
+    """2.52 folded 001 to 042 of the 2.0 series into its baseline, which kept their names, and
+    migrate_v1_to_v2 records its own: a 2.254 database started that long ago still holds them."""
+    old = ''.join(f"INSERT INTO _migrations (name) VALUES ('{n}');\n"
+                  for n in ('001_add_api_keys', '042_add_discovery_san_sni', 'v1_to_v2_migration'))
+    for db in make_base(dialect, tmp_path, monkeypatch, 'go', sql=schema_2254(dialect) + old):
+        assert db.upgrade() is True
+        assert '300_upgrade_from_2_254' in db.registry()
+
+
 def test_a_database_without_registry_is_refused_and_left_untouched(dialect, tmp_path, monkeypatch, capsys):
     sql = '\n'.join(line for line in schema_2254(dialect).splitlines() if '_migrations' not in line)
     for db in make_base(dialect, tmp_path, monkeypatch, 'gl', sql=sql):

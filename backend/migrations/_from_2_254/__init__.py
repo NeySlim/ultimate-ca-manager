@@ -69,6 +69,26 @@ PIVOT_NAMES = frozenset((
     '135_user_totp_step_session_version', '136_lifted_hold_leftovers', '137_ldap_start_tls',
 ))
 
+# What else a 2.254 registry may hold: 001 to 042 of the 2.0 series, which the 2.52 baseline
+# (000) folded and kept recorded, and the name migrate_v1_to_v2 writes
+RECORDED_BEFORE_2_52 = frozenset((
+    '001_add_api_keys', '002_upgrade_users_table', '003_create_v2_tables',
+    '004_create_webauthn_table', '005_create_webauthn_challenges', '006_add_locked_until',
+    '007_add_audit_hash_chain', '008_fix_certificate_templates', '009_add_password_reset_fields',
+    '010_create_acme_client_tables', '011_add_notification_retry_count',
+    '012_sync_acme_client_schema', '013_create_acme_domains', '014_add_proxy_order_fields',
+    '015_add_upstream_authz_urls', '016_create_hsm_tables', '017_add_hsm_key_to_cas',
+    '018_add_user_custom_role', '019_add_groups_updated_at', '020_update_trusted_certificates',
+    '021_add_group_members_role', '022_add_ski_aki_columns', '023_add_acme_domain_issuing_ca',
+    '024_create_acme_local_domains', '025_add_notification_cooldown', '026_add_smtp_auth_flag',
+    '027_add_smtp_content_type', '028_add_email_template', '029_add_email_text_template',
+    '030_fix_schema_mismatches', '031_seed_default_policies', '032_seed_report_schedule',
+    '033_add_saml_metadata_url', '034_add_saml_sp_cert_source', '035_add_ldap_group_member_attr',
+    '036_rename_user_role_add_auditor', '037_add_mtls_settings',
+    '040_create_discovered_certificate_table', '041_add_discovery_dns_hostname',
+    '042_add_discovery_san_sni', 'v1_to_v2_migration',
+))
+
 
 def step(name):
     """The module of one step."""
