@@ -190,6 +190,14 @@ def apply_fields(config, data):
     return None
 
 
+def refresh_domain_sid(config):
+    """Read the domain SID of the base DN when the row has none; a failed read leaves it empty.
+    Every save route calls it, so renewals routed on the SID see the saved connector."""
+    if config.domain_sid or not config.base_dn:
+        return
+    config.domain_sid = lookup.fetch_domain_sid(config)
+
+
 @bp.route('/api/v2/ad-connector', methods=['PUT'])
 @require_auth(['write:ad_connector'])
 def update_config():
@@ -208,6 +216,7 @@ def update_config():
     config.updated_at = utc_now()
 
     try:
+        refresh_domain_sid(config)
         # The default profile is served by the connector; a realm it had none for may now be known
         from services import windows_profiles
         profile = windows_profiles.default_profile()

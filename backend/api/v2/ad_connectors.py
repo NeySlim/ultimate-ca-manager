@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 
 from auth.unified import require_auth
 from api.v2.ad_connector import (
-    _ad_retarget_error, apply_fields, run_saved_test, run_unsaved_test,
+    _ad_retarget_error, apply_fields, refresh_domain_sid, run_saved_test, run_unsaved_test,
 )
 from models import db, ADConnectorConfig
 from services.ad_connector import lookup
@@ -50,13 +50,6 @@ def _name_error(data, current=None):
     return name, None
 
 
-def _refresh_domain_sid(config):
-    """Read the domain SID of the base DN when the row has none; a failed read leaves it empty."""
-    if config.domain_sid or not config.base_dn:
-        return
-    config.domain_sid = lookup.fetch_domain_sid(config)
-
-
 def _serve_default_profile(config):
     """A default profile with no connector is served by the first one created, as the
     single-connector route does, so the protocols use what the screen shows."""
@@ -72,7 +65,7 @@ def _serve_default_profile(config):
 def _save(config, creating):
     config.updated_at = utc_now()
     try:
-        _refresh_domain_sid(config)
+        refresh_domain_sid(config)
         if creating:
             _serve_default_profile(config)
         ok, err = safe_commit(logger, 'Failed to save the AD connector')

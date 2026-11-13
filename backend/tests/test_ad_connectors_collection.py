@@ -342,3 +342,21 @@ def test_the_default_profile_names_the_connector_the_protocols_search_with(app):
             else:
                 profile.connector_id = saved
             db.session.commit()
+
+
+def test_the_legacy_save_reads_the_domain_sid_and_reads_it_again_for_a_new_dc_list(auth_client, app, monkeypatch):
+    sids = [DOMAIN_SID]
+    monkeypatch.setattr(lookup, '_connect', lambda config: _Conn([_Entry(objectSid=_sid_bytes(sids[0]))]))
+
+    def put(**values):
+        body = {'servers': ['dc1.a.example'], 'base_dn': 'DC=a,DC=example', 'bind_dn': 'svc',
+                'bind_password': 'sekret-pw', 'enabled': True}
+        body.update(values)
+        response = auth_client.put('/api/v2/ad-connector', data=json.dumps(body), content_type='application/json')
+        assert response.status_code == 200, response.data
+        with app.app_context():
+            return ADConnectorConfig.query.one().domain_sid
+
+    assert put() == DOMAIN_SID
+    sids[0] = 'S-1-5-21-1-2-3'
+    assert put(servers=['dc1.a.example', 'dc2.a.example']) == 'S-1-5-21-1-2-3'
