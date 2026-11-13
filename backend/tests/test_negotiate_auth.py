@@ -5,7 +5,7 @@ Both 'authenticated' return points in authenticate_negotiate justify
 accepting on nothing more than "this acceptor was only ever configured
 with a Kerberos keytab, so there's no weaker mechanism to downgrade to" --
 _is_kerberos_negotiated turns that assumption into an enforced check
-instead. No Flask app/DB needed: get_spn() and _ensure_krb5_ktname() are
+instead. No Flask app/DB needed: get_spn() and _new_acceptor() are
 monkeypatched, and everything else here is pure.
 """
 import base64
@@ -30,15 +30,13 @@ class _FakeServer:
 @pytest.fixture(autouse=True)
 def _configured(monkeypatch):
     monkeypatch.setattr(negotiate_auth, 'get_spn', lambda: 'HTTP/ucm.example.test@EXAMPLE.TEST')
-    monkeypatch.setattr(negotiate_auth, '_ensure_krb5_ktname', lambda: None)
     negotiate_auth._pending_contexts.clear()
     yield
     negotiate_auth._pending_contexts.clear()
 
 
 def _authenticate(monkeypatch, fake_server):
-    import spnego
-    monkeypatch.setattr(spnego, 'server', lambda **kwargs: fake_server)
+    monkeypatch.setattr(negotiate_auth, '_new_acceptor', lambda hostname, service: fake_server)
     token_b64 = base64.b64encode(b'token-bytes').decode()
     return negotiate_auth.authenticate_negotiate(f'Negotiate {token_b64}', '10.0.0.1')
 

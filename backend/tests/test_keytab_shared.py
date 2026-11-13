@@ -11,8 +11,9 @@ from config.settings import Config
 from services import cluster_commands as cc
 from services import shared_files
 from services.kerberos import negotiate_auth
+from tests.keytab_support import keytab
 
-KEYTAB = b'\x05\x02keytab-of-the-cluster'
+KEYTAB = keytab('HTTP/ucm.example.test@EXAMPLE.TEST')
 
 
 @pytest.fixture

@@ -36,6 +36,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- Kerberos: each Windows enrollment profile holds its own keytab (`profile_id` on the upload), whose entries must all be `HTTP/<SPN host>@<realm of the profile>`; the acceptor reads one file composed from the enabled profiles, and the status lists every entry with its realm and kvno.
 - In-app help is now maintained in English, French and Chinese only; the other interface languages show the English help with a notice.
 - Console: the sidebar gives way to the Atelier shell, a horizontal bar with a Modules menu (four groups, keyboard navigable), three pinnable modules kept in your preferences, a status bar fed by `/health` and a module picker on phones; the account menu now carries theme, language and sign out.
 - Console: the code, styles and tests of the pre-Atelier interface (old sidebar, grid dashboard, floating detail windows, light-theme legacy styles) are removed.
@@ -50,6 +51,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Kerberos: a Kerberos Microsoft CA connection pointed `KRB5_KTNAME` at its own keytab for the whole process, so XCEP and WSTEP could accept with the wrong keys; the acceptor now names its keytab itself. A ticket for a realm without key is logged as a warning instead of an unrelated GSSAPI error.
 - ACME: `revoke-cert` with reason 8 (removeFromCRL, a delta CRL entry only) is refused with `badRevocationReason`, on the server and the proxy, which also answered `malformed` for any invalid reason.
 - SCEP with Intune: the Entra token and the discovered service endpoint are kept between enrolments (one client per app registration), and a 401 or 403 from Graph or the validation service makes the next request ask for a new token.
 - SCEP: a `PKIOperation` sent by GET with an unencoded `+` in its `message` is read correctly instead of failing.
@@ -108,6 +110,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- Kerberos: a keytab merged for several realms is refused on upload; upload each realm's keytab on its own profile.
 - First access: scripts that logged in as `admin` / `changeme123` after a fresh install must provide the password or read the generated file; the DEB and RPM upgrade removes the `INITIAL_ADMIN_PASSWORD=changeme123` line 2.x wrote, and an existing administrator is left as it is.
 - Discovery: on PostgreSQL with a server time zone other than UTC, discovery dates stored before this release are in local time; run a scan of the discovery targets after upgrading to rewrite them.
 - Windows enrollment: the XCEP, WSTEP and Kerberos settings become the profile `default` with an explicit realm (connector base DN, else SPN, else a single-realm keytab), migrated with the same policy ID and template OIDs (migration 155); without a realm to take, Kerberos alone is refused until one is set, see UPGRADE.md.
