@@ -266,6 +266,41 @@ def test_a_replay_that_fails_leaves_the_key_for_the_next_start(base, monkeypatch
     assert base.run("SELECT key FROM system_config WHERE key = 'serial_unique_index_pending'") == []
 
 
+@pytest.mark.postgres
+def test_a_replay_leaves_certificates_writable_when_the_index_exists(tmp_path, monkeypatch):
+    """Another node writes a certificate while a replay holds its transaction open: a replay
+    that finds the index takes no lock that blocks writers (lock_timeout 500 ms)."""
+    from sqlalchemy import create_engine, text
+    import migrations._from_2_254 as package
+    real = package.step
+    for db in make_base('postgresql', tmp_path, monkeypatch, 'lk'):
+        populate(db)
+        assert db.upgrade()
+        assert 'uix_certificates_ca_serial' in snapshot_index_names(db)
+        writes = []
+
+        class _ThenWrite:
+            @staticmethod
+            def upgrade(conn):
+                real('144_canonical_certificate_serials').upgrade(conn)
+                other = create_engine(db.url, connect_args={'options': db.options + ' -clock_timeout=500'})
+                try:
+                    with other.connect() as c:
+                        c.execute(text("INSERT INTO certificates (id, refid, descr, renewed_times) "
+                                       "VALUES (1000, 'lk', 'lk', 0)"))
+                        c.rollback()
+                    writes.append('written')
+                except Exception as exc:  # noqa: BLE001
+                    writes.append(str(exc).splitlines()[0])
+                finally:
+                    other.dispose()
+
+        monkeypatch.setattr(package, 'step', lambda name: _ThenWrite if name == '144_canonical_certificate_serials'
+                            else real(name))
+        assert db.upgrade()
+        assert writes == ['written']
+
+
 def test_dry_run_and_status_tell_that_a_start_replays_step_144(base, capsys):
     """While the key stands a real start rewrites rows: neither may report "up to date"."""
     populate(base)

@@ -40,3 +40,4 @@ While the key is set, every start runs the upgrade step 144 again, and only it, 
 the key in the same transaction as the conversion: once the rows are resolved, a restart creates the
 index and stores every serial in decimal, and a start cut short leaves the key for the next.
 `migration_runner.py status` and `dry-run` say so rather than report the database up to date.
+On PostgreSQL, creating the index locks `certificates` against writes until its transaction commits: during the upgrade from 2.254, from step 142 to the end of migration 300, a time that grows with the number of certificates (steps 144 and 157 read every one); during a replay, only when it creates the index, from that creation to the commit that follows. A replay that finds the index takes no such lock.

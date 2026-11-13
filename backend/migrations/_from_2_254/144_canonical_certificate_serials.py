@@ -82,7 +82,7 @@ def plan(cert_rows, revoked_rows):
     return cert_updates, revoked_updates, pending
 
 
-def _apply(execute, executemany, stream, tables, value_param, false_literal):
+def _apply(execute, executemany, stream, tables, value_param, false_literal, index_query):
     if TABLE not in tables:
         return
     revoked_rows = execute(_REVOKED, None).fetchall() if REVOKED in tables else []
@@ -98,7 +98,8 @@ def _apply(execute, executemany, stream, tables, value_param, false_literal):
     if cert_updates or revoked_updates:
         logger.info("Upgrade step 144: %d certificate and %d revocation serial(s) rewritten in decimal",
                     len(cert_updates), len(revoked_updates))
-    if not execute(DUPLICATES, None).fetchall():
+    # Catalog first: CREATE INDEX IF NOT EXISTS locks the table against writers even when the index exists
+    if execute(index_query, INDEX).fetchone() is None and not execute(DUPLICATES, None).fetchall():
         execute(CREATE_INDEX, None)
     if CONFIG in tables:
         execute(CLEAR_PENDING, None)
@@ -119,7 +120,8 @@ def _upgrade_sqlite(conn):
         if params:
             conn.executemany(sql.format(p=':'), params)
     _apply(lambda sql, value: conn.execute(sql) if value is None else conn.execute(sql, (value,)),
-           executemany, conn.execute, tables, '?', '0')
+           executemany, conn.execute, tables, '?', '0',
+           "SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?")
     conn.commit()
 
 
@@ -134,7 +136,8 @@ def _upgrade_pg(conn):
     _apply(lambda sql, value: conn.execute(text(sql)) if value is None
            else conn.execute(text(sql), {'v': value}),
            executemany, lambda sql: conn.execute(text(sql), execution_options={'yield_per': 500}),
-           tables, ':v', 'FALSE')
+           tables, ':v', 'FALSE',
+           "SELECT 1 FROM pg_indexes WHERE schemaname = current_schema() AND indexname = :v")
 
 
 def upgrade(conn):
