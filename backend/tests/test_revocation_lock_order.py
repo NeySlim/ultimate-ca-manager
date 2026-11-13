@@ -1,5 +1,5 @@
-"""PostgreSQL: an import marking a stored row from its record and a revocation of that row take
-the row and the record in an order where neither waits on what the other holds."""
+"""PostgreSQL: an import mark, an unhold, a revocation and the hourly pass take the records of a
+serial and its rows in orders where none waits on what another holds."""
 import secrets
 import threading
 
