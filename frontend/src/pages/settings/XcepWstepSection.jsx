@@ -23,6 +23,7 @@ export default function XcepWstepSection({ hasPermission }) {
   }, [])
 
   const canWrite = hasPermission('write:xcep')
+  const canUploadKeytab = canWrite && hasPermission('write:kerberos')
 
   return (
     <DetailContent>
@@ -57,6 +58,7 @@ export default function XcepWstepSection({ hasPermission }) {
             profile={editing.id ? editing : null}
             cas={cas}
             canWrite={canWrite}
+            canUploadKeytab={canUploadKeytab}
             onCancel={() => setEditing(null)}
             onSaved={() => { setEditing(null); setReloadKey(k => k + 1) }}
           />

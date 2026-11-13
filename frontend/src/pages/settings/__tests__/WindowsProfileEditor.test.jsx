@@ -87,7 +87,7 @@ const PROFILE = {
 
 const renderEditor = (profile = { id: 7, name: 'corp' }, props = {}) => render(
   <MemoryRouter>
-    <WindowsProfileEditor profile={profile} cas={CAS} canWrite onSaved={vi.fn()} onCancel={vi.fn()} {...props} />
+    <WindowsProfileEditor profile={profile} cas={CAS} canWrite canUploadKeytab onSaved={vi.fn()} onCancel={vi.fn()} {...props} />
   </MemoryRouter>)
 
 beforeEach(() => {
@@ -168,6 +168,16 @@ describe('keytab', () => {
     fireEvent.click(screen.getByText('common.save'))
     await waitFor(() => expect(mocks.uploadKeytab).toHaveBeenCalledTimes(2))
     expect(mocks.uploadKeytab.mock.calls[1]).toEqual([7, mocks.picked.file])
+  })
+})
+
+describe('keytab permission', () => {
+  it('hides the keytab picker from a writer of profiles without write:kerberos', async () => {
+    renderEditor(undefined, { canUploadKeytab: false })
+    await screen.findByDisplayValue('corp')
+    await loaded()
+    expect(screen.getByText('common.save')).toBeInTheDocument()
+    expect(screen.queryByText('pick-keytab')).toBeNull()
   })
 })
 

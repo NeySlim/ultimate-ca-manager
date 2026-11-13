@@ -61,7 +61,7 @@ export function KeytabEntries({ entries, profileRealm }) {
   )
 }
 
-export default function WindowsProfileEditor({ profile, cas, canWrite, onSaved, onCancel }) {
+export default function WindowsProfileEditor({ profile, cas, canWrite, canUploadKeytab, onSaved, onCancel }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const { showSuccess, showError } = useNotification()
@@ -129,6 +129,8 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, onSaved, 
     { autoenrollTemplates })
 
   const pickKeytab = async (file) => {
+    // The keytab upload needs write:kerberos on top of write:xcep
+    if (!canUploadKeytab) return
     setKeytabFile(file)
     setKeytabPreview(null)
     if (!file || isNew) return
@@ -176,7 +178,7 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, onSaved, 
         ? await windowsProfilesService.create(buildPayload())
         : await windowsProfilesService.update(profile.id, buildPayload())
       const saved = response.data
-      if (keytabFile) {
+      if (keytabFile && canUploadKeytab) {
         await windowsProfilesService.uploadKeytab(saved.id, keytabFile)
       }
       showSuccess(t('messages.success.update.settings'))
@@ -337,7 +339,7 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, onSaved, 
         </div>
         {detail?.keytab_error && <p className="text-xs status-danger-text">{detail.keytab_error}</p>}
         {storedEntries.length > 0 && <KeytabEntries entries={storedEntries} profileRealm={detail?.realm} />}
-        {canWrite && (
+        {canWrite && canUploadKeytab && (
           <FileUpload
             label={t('xcepWstep.keytabReplace')}
             accept=".keytab,.kt"
