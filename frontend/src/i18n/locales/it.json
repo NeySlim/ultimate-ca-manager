@@ -5489,6 +5489,8 @@
     "realmSpaces": "Il realm non può contenere spazi.",
     "realmUnset": "nessun realm",
     "defaultBadge": "predefinito",
+    "makeDefault": "Default profile",
+    "makeDefaultHelp": "No profile is the default yet. The default profile serves the UsernamePassword binding and holds its accounts; once saved, it is neither withdrawn nor moved here.",
     "issuingCa": "CA emittente",
     "policyCa": "CA dei criteri",
     "policyCaSame": "Uguale alla CA emittente",

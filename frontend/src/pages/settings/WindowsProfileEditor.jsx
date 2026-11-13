@@ -15,7 +15,7 @@ import {
 const EMPTY = {
   name: '', realm: '', enabled: true, connector_id: null, issuing_ca_refid: '', policy_ca_refid: '',
   validity_days: 365, allowed_ad_group: '', pinned_subject_fields: '', template_ids: [],
-  xcep_username: '', wstep_username: '',
+  xcep_username: '', wstep_username: '', is_default: false,
 }
 
 function ChecklistRow({ ok, label, action, onAction }) {
@@ -74,17 +74,21 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
   const [keytabFile, setKeytabFile] = useState(null)
   const [keytabPreview, setKeytabPreview] = useState(null)
   const [touched, setTouched] = useState(false)
+  // Offered only while the server says no profile is the default; unknown counts as one existing
+  const [noDefault, setNoDefault] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      const [conn, tpl] = await Promise.all([
+      const [conn, tpl, settings] = await Promise.all([
         adConnectorsService.list().catch(() => ({ data: [] })),
         templatesService.getAll().catch(() => ({ data: [] })),
+        windowsProfilesService.getSettings().catch(() => null),
       ])
       if (cancelled) return
       setConnectors(conn.data || [])
       setTemplates(tpl.data || [])
+      setNoDefault(Boolean(settings?.data) && settings.data.default_profile === null)
       if (!isNew) {
         try {
           const response = await windowsProfilesService.get(profile.id)
@@ -97,6 +101,7 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
             validity_days: p.validity_days || 365, allowed_ad_group: p.allowed_ad_group || '',
             pinned_subject_fields: p.pinned_subject_fields || '', template_ids: p.template_ids || [],
             xcep_username: p.xcep_username || '', wstep_username: p.wstep_username || '',
+            is_default: Boolean(p.is_default),
           })
         } catch (error) {
           showError(error.message || t('messages.errors.loadFailed.generic'))
@@ -107,6 +112,9 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
   }, [isNew, profile?.id, showError, t])
 
   const update = (field) => (value) => setForm(prev => ({ ...prev, [field]: value }))
+  const offerDefault = noDefault && !detail?.is_default
+  // The shared accounts belong to the default profile, including the one designated by this save
+  const isDefault = Boolean(detail?.is_default || (offerDefault && form.is_default))
   const problemKey = realmProblem(form.realm)
   // A new profile may be saved without a realm only if one is read from its keytab later: the API decides
   const realmError = touched && form.realm.trim() !== '' && problemKey ? t(problemKey) : undefined
@@ -155,8 +163,9 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
       pinned_subject_fields: form.pinned_subject_fields.trim() || null,
       template_ids: form.template_ids,
     }
+    if (offerDefault && form.is_default) payload.is_default = true
     // Only the default profile's binding reads the shared accounts; the API refuses them elsewhere
-    if (detail?.is_default) {
+    if (isDefault) {
       payload.xcep_username = form.xcep_username
       payload.wstep_username = form.wstep_username
     }
@@ -164,8 +173,8 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
     const realm = form.realm.trim()
     if (realm && (isNew || realm !== (detail?.realm || ''))) payload.realm = realm
     if (isNew || form.connector_id !== (detail?.connector_id ?? null)) payload.connector_id = form.connector_id
-    if (detail?.is_default && form.xcep_password) payload.xcep_password = form.xcep_password
-    if (detail?.is_default && form.wstep_password) payload.wstep_password = form.wstep_password
+    if (isDefault && form.xcep_password) payload.xcep_password = form.xcep_password
+    if (isDefault && form.wstep_password) payload.wstep_password = form.wstep_password
     return payload
   }
 
@@ -240,6 +249,22 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
         onChange={update('enabled')}
         disabled={readOnly}
       />
+
+      {offerDefault && (
+        <label className="flex items-start gap-2 text-sm text-text-primary">
+          <input
+            type="checkbox"
+            className="rounded mt-0.5"
+            checked={form.is_default}
+            onChange={(e) => update('is_default')(e.target.checked)}
+            disabled={readOnly}
+          />
+          <span>
+            {t('xcepWstep.makeDefault')}
+            <span className="block text-xs text-text-tertiary">{t('xcepWstep.makeDefaultHelp')}</span>
+          </span>
+        </label>
+      )}
 
       <Select
         label={t('xcepWstep.connector')}
@@ -322,7 +347,7 @@ export default function WindowsProfileEditor({ profile, cas, canWrite, canUpload
         disabled={readOnly}
       />
 
-      {!isNew && detail?.is_default && (
+      {isDefault && (
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Input label={`${t('xcepWstep.xcepTitle')}: ${t('common.username')}`} value={form.xcep_username}
           onChange={(e) => update('xcep_username')(e.target.value)} disabled={readOnly} />

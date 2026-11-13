@@ -5489,6 +5489,8 @@
     "realmSpaces": "realm 不能包含空格。",
     "realmUnset": "无 realm",
     "defaultBadge": "默认",
+    "makeDefault": "Default profile",
+    "makeDefaultHelp": "No profile is the default yet. The default profile serves the UsernamePassword binding and holds its accounts; once saved, it is neither withdrawn nor moved here.",
     "issuingCa": "签发 CA",
     "policyCa": "策略 CA",
     "policyCaSame": "与签发 CA 相同",

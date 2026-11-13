@@ -2251,7 +2251,7 @@ One **profile per Active Directory realm**. UCM routes a client to its profile b
 - **Templates**: The subset offered; none selected offers the templates of the CA. A required AD group and pinned subject fields can replace the template's own for the whole profile
 - **State**: Complete, Keytab missing, Connector failing or Disabled. A disabled profile refuses the machines of its realm; its keys stay in the served keytab so that the refusal is made and audited by realm
 
-The **default profile** is the one a 2.x installation turned into. Without a realm, Kerberos is refused until one is set (in capitals, or read from its keytab); the screen says so.
+The **default profile** is the one a 2.x installation turned into; it serves the UsernamePassword binding and holds its accounts. A new installation has none: while no profile is the default, the profile editor offers **Default profile** (on a new profile or a saved one), and the accounts appear once it is checked. The default is then neither withdrawn nor moved, from this screen or the API. Without a realm, Kerberos is refused until one is set (in capitals, or read from its keytab); the screen says so.
 
 ### Setup Checklist, per profile
 

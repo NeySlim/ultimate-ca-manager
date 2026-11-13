@@ -9,6 +9,7 @@ import os
 import tempfile
 
 from flask import Blueprint, g, request
+from sqlalchemy.exc import IntegrityError
 
 from auth.unified import has_permission, require_auth
 from models import (CA, ADConnectorConfig, Certificate, SystemConfig, WindowsEnrollmentProfile,
@@ -176,6 +177,25 @@ def _escape_like(text):
     return text.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
 
 
+_ANOTHER_DEFAULT = 'profile {name} is already the default one; the default profile is not moved'
+
+
+def _default_taken(profile):
+    """The 409 of a designation that a concurrent request won: the partial unique index on
+    is_default refuses the second default on both backends."""
+    if not getattr(profile, '_designated', False):
+        return None
+    try:
+        db.session.flush()
+    except IntegrityError:
+        db.session.rollback()
+        current = WindowsEnrollmentProfile.query.filter_by(is_default=True).first()
+        if current is None:
+            raise
+        return error_response(_ANOTHER_DEFAULT.format(name=current.name), 409)
+    return None
+
+
 def _apply(profile, data):
     """Validate *data* and set it on *profile*; an (message, status) pair when refused."""
     if 'name' in data:
@@ -207,14 +227,17 @@ def _apply(profile, data):
         if flag in data and type(data[flag]) is not bool:
             return f'{flag} must be a JSON boolean', 400
 
+    # A profile becomes the default only while there is none; the default is never moved or withdrawn
+    designate = False
     if 'is_default' in data:
         wanted = data['is_default']
-        if profile.id is None and wanted:
-            if windows_profiles.default_profile() is not None:
-                return 'there is already a default profile', 409
-            profile.is_default = True
-        elif wanted != bool(profile.is_default):
-            return 'the default profile cannot be changed here', 409
+        if wanted and not profile.is_default:
+            current = windows_profiles.default_profile()
+            if current is not None:
+                return _ANOTHER_DEFAULT.format(name=current.name), 409
+            designate = True
+        elif not wanted and profile.is_default:
+            return 'the default profile cannot be withdrawn here', 409
     if 'enabled' in data:
         profile.enabled = data['enabled']
 
@@ -252,7 +275,7 @@ def _apply(profile, data):
             return err, 400
         profile.pinned_subject_fields = pinned
     # Only the default profile's binding reads the shared accounts: elsewhere they would never be used
-    if not profile.is_default:
+    if not (profile.is_default or designate):
         for field in (f'{svc}_{part}' for svc in SERVICES for part in ('username', 'password')):
             if data.get(field):
                 return (f'{field} is read for the default profile only: this profile is not the default one, '
@@ -277,9 +300,12 @@ def _apply(profile, data):
     elif 'connector_id' in data:
         profile.connector_id = None
     # Checked when chosen only, as the CAs: a pair saved elsewhere stays saveable
-    if 'realm' in data or 'connector_id' in data:
-        return _connector_problem(profile)
-    return None
+    problem = _connector_problem(profile) if 'realm' in data or 'connector_id' in data else None
+    # Set last, so that no query of the checks above flushes it before _default_taken
+    if problem is None and designate:
+        profile.is_default = True
+        profile._designated = True
+    return problem
 
 
 def _template_id_list(value):
@@ -430,6 +456,9 @@ def create_windows_profile():
         db.session.rollback()
         return error_response(problem[0], problem[1])
     db.session.add(profile)
+    taken = _default_taken(profile)
+    if taken is not None:
+        return taken
     _store_templates(profile)
     ok, err = safe_commit(logger, 'Failed to create the Windows enrollment profile')
     if not ok:
@@ -453,6 +482,9 @@ def update_windows_profile(profile_id):
     if problem:
         db.session.rollback()
         return error_response(problem[0], problem[1])
+    taken = _default_taken(profile)
+    if taken is not None:
+        return taken
     profile.updated_by = _actor()
     _store_templates(profile)
     ok, err = safe_commit(logger, 'Failed to update the Windows enrollment profile')

@@ -5489,6 +5489,8 @@
     "realmSpaces": "Der Realm darf keine Leerzeichen enthalten.",
     "realmUnset": "kein Realm",
     "defaultBadge": "Standard",
+    "makeDefault": "Default profile",
+    "makeDefaultHelp": "No profile is the default yet. The default profile serves the UsernamePassword binding and holds its accounts; once saved, it is neither withdrawn nor moved here.",
     "issuingCa": "Ausstellende CA",
     "policyCa": "Richtlinien-CA",
     "policyCaSame": "Wie die ausstellende CA",

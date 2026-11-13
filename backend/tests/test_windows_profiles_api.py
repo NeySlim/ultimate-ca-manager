@@ -439,3 +439,80 @@ def test_shared_credentials_are_refused_on_a_profile_that_is_not_the_default(aut
     clear = {field: ''} if field.endswith('username') else {}
     assert auth_client.put(f"{URL}/{other['id']}", json=clear).status_code == 200
     assert put_default_profile(auth_client, **{field: value}).status_code == 200
+
+
+@pytest.fixture
+def no_default(app):
+    """No default profile while the test runs; the ones set aside come back after it."""
+    with app.app_context():
+        aside = WindowsEnrollmentProfile.query.filter_by(is_default=True).all()
+        saved = [p.id for p in aside]
+        for p in aside:
+            p.is_default = False
+        db.session.commit()
+    yield
+    with app.app_context():
+        WindowsEnrollmentProfile.query.filter_by(is_default=True).update({'is_default': False})
+        db.session.commit()
+        for pid in saved:
+            db.session.get(WindowsEnrollmentProfile, pid).is_default = True
+        db.session.commit()
+
+
+def _settings_default(auth_client):
+    return auth_client.get(f'{URL}/settings').get_json()['data']['default_profile']
+
+
+def test_without_a_default_a_new_profile_is_designated(app, auth_client, no_default):
+    assert _settings_default(auth_client) is None
+    made = _created(auth_client, is_default=True, xcep_username='enroll', xcep_password='Enr0ll#Secret')
+    assert made['is_default'] is True
+    assert _settings_default(auth_client)['id'] == made['id']
+    r = _new(auth_client, is_default=True)
+    assert r.status_code == 409 and made['name'] in r.get_json()['message']
+    other = _created(auth_client)
+    r = auth_client.put(f"{URL}/{other['id']}", json={'is_default': True})
+    assert r.status_code == 409 and made['name'] in r.get_json()['message']
+    with app.app_context():
+        assert [p.id for p in WindowsEnrollmentProfile.query.filter_by(is_default=True)] == [made['id']]
+
+
+def test_without_a_default_a_saved_profile_is_designated(app, auth_client, no_default):
+    p = _created(auth_client)
+    # Refused while it is not the default: the accounts would never be read
+    assert auth_client.put(f"{URL}/{p['id']}", json={'xcep_username': 'u'}).status_code == 400
+    r = auth_client.patch(f"{URL}/{p['id']}", json={'is_default': True, 'xcep_username': 'u'})
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['is_default'] is True
+    assert _settings_default(auth_client)['id'] == p['id']
+    assert auth_client.put(f"{URL}/{p['id']}", json={'is_default': True}).status_code == 200
+    r = auth_client.put(f"{URL}/{p['id']}", json={'is_default': False})
+    assert r.status_code == 409
+    assert auth_client.get(f"{URL}/{p['id']}").get_json()['data']['is_default'] is True
+
+
+@pytest.mark.parametrize('route', ['create', 'update'])
+def test_a_default_designated_concurrently_leaves_one(app, auth_client, no_default, monkeypatch, route):
+    """The partial unique index keeps one default; the request that loses gets a 409."""
+    from services import windows_profiles
+    first = _created(auth_client)
+    later = _created(auth_client) if route == 'update' else None
+    with app.app_context():
+        db.session.get(WindowsEnrollmentProfile, first['id']).is_default = True
+        db.session.commit()
+    real = windows_profiles.default_profile
+    calls = []
+
+    def racing():
+        # The other request commits after this one read that there was no default
+        calls.append(1)
+        return None if len(calls) == 1 else real()
+    monkeypatch.setattr(windows_profiles, 'default_profile', racing)
+    if route == 'create':
+        r = _new(auth_client, is_default=True)
+    else:
+        r = auth_client.put(f"{URL}/{later['id']}", json={'is_default': True})
+    assert r.status_code == 409, r.data
+    assert first['name'] in r.get_json()['message']
+    with app.app_context():
+        assert [p.id for p in WindowsEnrollmentProfile.query.filter_by(is_default=True)] == [first['id']]

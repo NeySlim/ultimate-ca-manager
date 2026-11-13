@@ -5492,6 +5492,8 @@
     "realmSpaces": "Le realm ne peut pas contenir d'espace.",
     "realmUnset": "sans realm",
     "defaultBadge": "par défaut",
+    "makeDefault": "Default profile",
+    "makeDefaultHelp": "No profile is the default yet. The default profile serves the UsernamePassword binding and holds its accounts; once saved, it is neither withdrawn nor moved here.",
     "issuingCa": "CA d'émission",
     "policyCa": "CA de politique",
     "policyCaSame": "Identique à la CA d'émission",
