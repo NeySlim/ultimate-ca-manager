@@ -9,7 +9,7 @@ import os
 import tempfile
 
 from flask import Blueprint, g, request
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 
 from auth.unified import has_permission, require_auth
 from models import (CA, ADConnectorConfig, Certificate, SystemConfig, WindowsEnrollmentProfile,
@@ -182,12 +182,15 @@ _ANOTHER_DEFAULT = 'profile {name} is already the default one; the default profi
 
 def _default_taken(profile):
     """The 409 of a designation that a concurrent request won: the partial unique index on
-    is_default refuses the second default on both backends."""
+    is_default refuses the second default on both backends; on SQLite the loser may meet
+    the winner's write lock first ("database is locked")."""
     if not getattr(profile, '_designated', False):
         return None
     try:
         db.session.flush()
-    except IntegrityError:
+    except (IntegrityError, OperationalError) as e:
+        if isinstance(e, OperationalError) and 'locked' not in str(e):
+            raise
         db.session.rollback()
         current = WindowsEnrollmentProfile.query.filter_by(is_default=True).first()
         if current is None:

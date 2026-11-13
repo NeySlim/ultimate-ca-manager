@@ -516,3 +516,25 @@ def test_a_default_designated_concurrently_leaves_one(app, auth_client, no_defau
     assert first['name'] in r.get_json()['message']
     with app.app_context():
         assert [p.id for p in WindowsEnrollmentProfile.query.filter_by(is_default=True)] == [first['id']]
+
+
+def test_a_default_designation_losing_the_sqlite_write_lock_gets_the_409(app, auth_client, no_default, monkeypatch):
+    """On SQLite the loser may meet the winner's write lock rather than the index: still a 409."""
+    from sqlalchemy.exc import OperationalError
+    from services import windows_profiles
+    first = _created(auth_client)
+    with app.app_context():
+        db.session.get(WindowsEnrollmentProfile, first['id']).is_default = True
+        db.session.commit()
+    real_default, real_flush, raised = windows_profiles.default_profile, db.session.flush, []
+
+    def locked(*args, **kwargs):
+        if not raised:
+            raised.append(1)
+            raise OperationalError('INSERT', {}, Exception('database is locked'))
+        return real_flush(*args, **kwargs)
+    monkeypatch.setattr(windows_profiles, 'default_profile', lambda: None if not raised else real_default())
+    monkeypatch.setattr(db.session, 'flush', locked)
+    r = _new(auth_client, is_default=True)
+    assert raised and r.status_code == 409, r.data
+    assert first['name'] in r.get_json()['message']
