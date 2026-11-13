@@ -79,8 +79,23 @@ def kerberos_refusal(profile=None):
     if profile is None:
         return 'no Windows enrollment profile'
     if not profile.enabled:
-        return 'default profile is disabled'
+        return f'profile {profile.name} is disabled'
     return None if profile.realm else NO_REALM
+
+
+def kerberos_binding_reason():
+    """Why the Kerberos binding authenticates nobody (switch, SPN, keytab), None when it is set up."""
+    from services.kerberos import negotiate_auth
+    return negotiate_auth.not_configured_reason()
+
+
+def kerberos_unserved_reason(profile=None, binding_reason=False):
+    """Why Kerberos reaches no client of *profile*: the binding itself first (switch, SPN,
+    keytab), then the profile (``kerberos_refusal``). None when it is served. A list passes the
+    binding's reason it computed once."""
+    if binding_reason is False:
+        binding_reason = kerberos_binding_reason()
+    return binding_reason or kerberos_refusal(profile)
 
 
 UNKNOWN_REALM = 'no profile serves this realm'

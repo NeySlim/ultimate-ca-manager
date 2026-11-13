@@ -1,30 +1,23 @@
 """
-Active Directory Connector settings routes
-/api/v2/ad-connector/* -- the 2.x single-connector routes, on the connector the default
-Windows profile uses (the collection is /api/v2/ad-connectors), kept deliberately separate
-from SSO's own LDAP provider config (see models/ad_connector.py's module docstring for why).
+Active Directory connector field validation and tests, shared by the collection
+(api/v2/ad_connectors.py); kept apart from SSO's own LDAP provider config (see
+models/ad_connector.py's module docstring for why).
 """
 import logging
 import re
 
-from flask import Blueprint, request
-
-from auth.unified import require_auth
-from models import db, ADConnectorConfig
+from models import db
 from services.ad_connector import health, lookup
 from services.ad_connector.health import (
     MAX_PROBE_INTERVAL_SECONDS as MAX_PROBE_INTERVAL,
     MIN_PROBE_INTERVAL_SECONDS as MIN_PROBE_INTERVAL,
 )
-from services.audit_service import AuditService
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
 from utils.secret_target import keeps_saved_secret, retarget_error
 
 logger = logging.getLogger(__name__)
-
-bp = Blueprint('ad_connector_v2', __name__)
 
 MAX_SERVER_LEN = 500
 MAX_DN_LEN = 500
@@ -69,37 +62,6 @@ def _parse_servers(data):
     if len(joined) > MAX_SERVER_LEN:
         return None, error_response('too many servers', 400)
     return joined, None
-
-
-def _legacy_connector():
-    """The connector the single-connector routes show: the one the protocols use. Retired
-    with these routes."""
-    from services import windows_profiles
-    return windows_profiles.default_connector()
-
-
-def _free_name():
-    taken = set(db.session.scalars(db.select(ADConnectorConfig.name)))
-    return next(name for name in ('default', *(f'connector-{n}' for n in range(2, len(taken) + 3)))
-                if name not in taken)
-
-
-def _get_or_create():
-    config = _legacy_connector()
-    if config is None:
-        config = ADConnectorConfig(name=_free_name())
-        db.session.add(config)
-    return config
-
-
-@bp.route('/api/v2/ad-connector', methods=['GET'])
-@require_auth(['read:ad_connector'])
-def get_config():
-    """Get the Active Directory Connector configuration."""
-    config = _legacy_connector()
-    if config is None:
-        return success_response(data=ADConnectorConfig().to_dict())
-    return success_response(data=config.to_dict())
 
 
 def _ad_retarget_error(saved, data):
@@ -205,61 +167,6 @@ def refresh_domain_sid(config):
     config.domain_sid = lookup.fetch_domain_sid(config)
 
 
-@bp.route('/api/v2/ad-connector', methods=['PUT'])
-@require_auth(['write:ad_connector'])
-def update_config():
-    """Update the Active Directory Connector configuration (upsert)."""
-    data = request.json or {}
-
-    err = _ad_retarget_error(_legacy_connector(), data)
-    if err:
-        return err
-    config = _get_or_create()
-
-    err = apply_fields(config, data)
-    if err:
-        return err
-
-    config.updated_at = utc_now()
-
-    try:
-        refresh_domain_sid(config)
-        # The default profile is served by the connector; a realm it had none for may now be known
-        from services import windows_profiles
-        profile = windows_profiles.default_profile()
-        if profile is not None:
-            db.session.flush()
-            if profile.connector_id is None:
-                profile.connector_id = config.id
-            windows_profiles.fill_realm(profile)
-        ok, err = safe_commit(logger, 'Failed to update AD Connector configuration')
-        if not ok:
-            return err
-    except Exception as e:
-        # bind_password's setter raises if encryption is unavailable --
-        # fail closed, never silently persist plaintext.
-        db.session.rollback()
-        logger.error('Failed to update AD Connector configuration: %s', e)
-        return error_response('Failed to save configuration (encryption unavailable?)', 500)
-
-    AuditService.log_action(
-        action='ad_connector_config_update',
-        resource_type='ad_connector',
-        resource_name='AD Connector Configuration',
-        details='Updated AD Connector configuration',
-        success=True,
-    )
-
-    return success_response(data=config.to_dict(), message='AD Connector configuration saved')
-
-
-@bp.route('/api/v2/ad-connector/test', methods=['POST'])
-@require_auth(['write:ad_connector'])
-def test_connection_inline():
-    """Test connectivity using unsaved form data (before save)."""
-    return run_unsaved_test(request.json or {}, _legacy_connector())
-
-
 def run_unsaved_test(data, saved_connector):
     """Test the submitted values; a blank password is the *saved_connector*'s only when
     the target is the one it was saved for."""
@@ -320,13 +227,6 @@ def run_unsaved_test(data, saved_connector):
     # test, and a flat message string can't be rendered per row.
     return error_response(result.get('message', 'Connection test failed'), 400,
                           details={'servers': result.get('servers', [])})
-
-
-@bp.route('/api/v2/ad-connector/test-saved', methods=['POST'])
-@require_auth(['write:ad_connector'])
-def test_connection_saved():
-    """Test connectivity using the saved configuration."""
-    return run_saved_test(_legacy_connector())
 
 
 def run_saved_test(config):

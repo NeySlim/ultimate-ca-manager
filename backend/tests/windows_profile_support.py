@@ -93,6 +93,31 @@ def restore(saved):
     db.session.commit()
 
 
+def default_profile_id(client):
+    """The id of the default profile, made when missing."""
+    with client.application.app_context():
+        from services import windows_profiles
+        profile_id = windows_profiles.default_for_write('test', fill=False).id
+        db.session.commit()
+    return profile_id
+
+
+def put_default_profile(client, **fields):
+    """PUT *fields* on the default profile, made when missing."""
+    profile_id = default_profile_id(client)
+    return client.put(f'/api/v2/windows-profiles/{profile_id}', json=fields)
+
+
+def upload_keytab(client, data, profile_id=None, filename='ucm.keytab', **form):
+    """POST *data* as the keytab of a profile; the default one, made when missing, if none is named."""
+    import io
+    if profile_id is None:
+        profile_id = default_profile_id(client)
+    body = {'file': (io.BytesIO(data), filename), **form}
+    return client.post(f'/api/v2/windows-profiles/{profile_id}/keytab', data=body,
+                       content_type='multipart/form-data')
+
+
 @contextmanager
 def connectors_kept(app):
     """The AD connector rows, and the profiles' links to them and realms, put back as they

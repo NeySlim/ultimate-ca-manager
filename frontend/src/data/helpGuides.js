@@ -648,7 +648,7 @@ When issuing a certificate or signing a CSR, select a template from the dropdown
 
 ## Windows Autoenrollment Flags
 
-Templates carry three opt-in flags used by the Windows autoenrollment protocols (XCEP/WSTEP, configured under **Settings → Windows Autoenrollment**):
+Templates carry three opt-in flags used by the Windows autoenrollment protocols (XCEP/WSTEP, configured per realm under **Settings → Windows Autoenrollment**):
 
 - **Allow autoenrollment**: Advertise the template as \`autoEnroll=true\` in Certificate Enrollment Policy, so GPO/Kerberos-authenticated clients request it automatically at logon with no user action. Off by default: like real ADCS, a template can still be enrolled manually (MMC "Request New Certificate", \`certreq\`) without this, since Enroll and Autoenroll are separate permissions.
 - **Build subject from Active Directory**: For unattended GPO autoenrollment: derive the certificate's subject and SAN from the requester's AD object (via the AD Connector) instead of requiring the client to supply one. On the Kerberos endpoints a subject named in the request is ignored and computer accounts are refused; machine templates always take the computer's DNS name.
@@ -2211,30 +2211,39 @@ Settings › Backup enables automatic backups.
 
 UCM's own LDAP connection to Active Directory, independent of any LDAP provider configured under SSO. That one is for logging into UCM; this one is used for certificate-related AD lookups and works whether or not SSO is configured at all.
 
+- **Connectors**: One per directory (forest or domain), listed under Settings → Active Directory with its name, its realm, the domain SID that was read and its health. A Windows enrollment profile names the connector that serves its realm; a connector that profiles use cannot be deleted, and the refusal lists them
 - **Purpose**: Resolves a Kerberos machine or user principal to its AD object, so UCM can derive a certificate subject/SAN the same way a real Windows CA would
 - **Domain Controllers**: One per row, each by its own hostname, without port or scheme, tried in order: lookups fail over to the next one when a DC is down. A bare domain name fails certificate verification, since a domain controller certificate names only its own host
 - **LDAPS**: Toggle to use LDAP over SSL/TLS; **Verify SSL Certificate** validates the DC's certificate (optionally against a custom CA bundle when it isn't publicly trusted)
 - **Base DN** and **Bind DN / Password**: the domain's base DN, with its DC components (\`DC=corp,DC=example\`, which also names the Kerberos realm served) on a domain controller port (389 or 636, not a Global Catalog), and the service account used for lookups; Bind DN and password are both required while the connector is enabled
 - **Test Connection**: Verify connectivity and credentials before saving
-- **Health Check Interval**: Each domain controller is probed with a real bind at this interval; an unreachable one is skipped at enrollment time until it recovers. The verdict shows on the settings row and against each DC
+- **Health Check Interval**: Each domain controller is probed with a real bind at this interval; an unreachable one is skipped at enrollment time until it recovers. The verdict shows on the connector's row and against each DC
+- **Disabled connector**: A disabled connector looks nothing up, but its base DN still names the realm of the default profile as a last resort, when no enabled connector, SPN or keytab does
 
-### GPO Enrollment Policy URLs
-
-Once configured, register one of the displayed URLs as a Certificate Enrollment Policy server in Group Policy (Public Key Policies → Certificate Services Client – Certificate Enrollment Policy), alongside Certificate Services Client – Auto-Enrollment:
-- **Kerberos**: No credential prompt; requires a domain-joined client and the GPO's authentication type set to Kerberos
-- **Username/Password**: Prompts for credentials; for interactive "Request New Certificate" enrollment only
+The Certificate Enrollment Policy URLs to register in Group Policy are the same for every profile and are shown under Settings → Windows Autoenrollment.
 
 ## Windows Autoenrollment (XCEP/WSTEP)
 
 Native Windows certificate enrollment via **MS-XCEP** (policy discovery) and **MS-WSTEP** (certificate issuance and renewal): the same protocols real ADCS uses for MMC "Request New Certificate", \`certreq\`, and unattended GPO autoenrollment.
 
-### Setup Checklist
+### Profiles
 
-The tab tracks what's configured versus what's still needed, for both manual and unattended enrollment paths: a Certificate Authority, Policy Discovery (XCEP), Certificate Issuance (WSTEP), and, for unattended GPO autoenrollment, an Active Directory Connector, Kerberos/SPNEGO, and at least one template with autoenrollment allowed.
+One **profile per Active Directory realm**. UCM routes a client to its profile by the realm of its Kerberos principal, so every profile has its own issuing CA, policy CA, templates, AD connector, keytab and accounts. The list is paginated and filtered by the server (name or realm, CA, state), so a hundred profiles open as fast as one:
+- **Realm**: In capital letters, exactly as the KDC writes it (\`CORP.EXAMPLE\`): a KDC compares realms character by character, so a lowercase name never matches a ticket. The form refuses it and says why
+- **Connector**: The AD connector that serves the realm. When its domain differs from the realm of the profile, the form warns, without blocking; the server checks the pair when either is chosen
+- **Issuing CA** and **Policy CA**: The CA that issues, and the one whose policy and template OIDs XCEP announces (the issuing CA when empty)
+- **Templates**: The subset offered; none selected offers the templates of the CA. A required AD group and pinned subject fields can replace the template's own for the whole profile
+- **State**: Complete, Keytab missing, Connector failing or Disabled. A disabled profile refuses the machines of its realm; its keys stay in the served keytab so that the refusal is made and audited by realm
+
+The **default profile** is the one a 2.x installation turned into. Without a realm, Kerberos is refused until one is set (in capitals, or read from its keytab); the screen says so.
+
+### Setup Checklist, per profile
+
+The profile form lists what that profile still lacks: realm, issuing CA, keytab, a reachable connector when one is chosen, a template with autoenrollment allowed, and the profile being enabled.
 
 ### Policy Discovery (XCEP)
 
-- **Certificate Authority**: The CA whose templates are advertised and that issues certificates through this configuration
+- **Certificate Authority**: The CA whose templates are advertised and that issues certificates through the profile
 - **Validity (days)**: Validity of certificates issued via WSTEP when the request matches no template; a matched template's own validity applies otherwise
 
 A template with an **ML-DSA** key type is announced by its key algorithm OID, with the Microsoft Software Key Storage Provider and a signature-only key spec. It is hidden in FIPS mode, and enrollment from a real Windows client has not been tested yet.
@@ -2248,8 +2257,8 @@ WSTEP serves the Issue request type only, renewals included, and refuses a messa
 ### Kerberos / SPNEGO
 
 Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoenrollment, so machines and users are authenticated by their Kerberos ticket instead of a credential prompt:
-- **Service Principal Name (SPN)**: e.g. \`HTTP/ucm.example.com@EXAMPLE.COM\`
-- **Keytab**: Generated with \`ktpass\` or \`ktutil\` on the domain controller for the SPN above
+- **Service Principal Name (SPN)**: e.g. \`HTTP/ucm.example.com@EXAMPLE.COM\`, shared by every profile with the XCEP, WSTEP and Kerberos switches
+- **Keytab**: One per profile, generated with \`ktpass\` or \`ktutil\` on the domain controller of its realm. Every entry must be \`HTTP/<host>@<realm of the profile>\`; the form lists the entries of the chosen file by realm and flags a realm that is not the profile's. The keytabs of all profiles are served as one file
 
 > ⚠ Kerberos requires the server-side **\`gssapi\` backend** (the Python \`gssapi\` library plus the system Kerberos libraries): the base SPNEGO package alone is not enough. Without it, Kerberos authentication won't work even when enabled here, and the Kerberos binding is not advertised; a warning is shown on the tab.
 
@@ -2257,6 +2266,7 @@ The Docker images ship this backend since v2.251.
 
 ### Enrollment Policy URLs
 
+The same for every profile: routing is by realm, not by URL.
 - **Username/Password**: Prompts for credentials; for interactive "Request New Certificate" enrollment, doesn't require Active Directory
 - **Kerberos**: No credential prompt; requires a domain-joined client and GPO configuration
 

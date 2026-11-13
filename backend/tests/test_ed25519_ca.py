@@ -849,18 +849,18 @@ def xcep_ca_setting(app):
         restore(saved)
 
 
-@pytest.mark.parametrize('field', ['ca_id', 'ca_refid'])
 @pytest.mark.parametrize('name', ['Ed25519', 'Ed448'])
-def test_xcep_settings_refuse_an_eddsa_ca(app, auth_client, xcep_ca_setting, field, name):
-    ca = _ca(auth_client, f'{name} XCEP {field}', keyAlgo=name)
-    r = auth_client.patch('/api/v2/xcep/config', json={field: ca['id'] if field == 'ca_id' else ca['refid']})
+def test_xcep_settings_refuse_an_eddsa_ca(app, auth_client, xcep_ca_setting, name):
+    from tests.windows_profile_support import get_config, put_default_profile
+    ca = _ca(auth_client, f'{name} XCEP policy', keyAlgo=name)
+    r = put_default_profile(auth_client, policy_ca_refid=ca['refid'])
     assert r.status_code == 400, r.get_json()
     assert name in r.get_json()['message'] and 'Windows' in r.get_json()['message']
-    from tests.windows_profile_support import get_config
     with app.app_context():
         assert not get_config('xcep_ca_refid')
 
 
 def test_xcep_settings_still_take_an_rsa_ca(app, auth_client, xcep_ca_setting, rsa_root):
-    r = auth_client.patch('/api/v2/xcep/config', json={'ca_id': rsa_root['id']})
+    from tests.windows_profile_support import put_default_profile
+    r = put_default_profile(auth_client, policy_ca_refid=rsa_root['refid'])
     assert r.status_code == 200, r.get_json()

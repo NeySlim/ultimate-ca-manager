@@ -282,7 +282,7 @@ def test_deleting_a_profile_releases_its_certificates(app, auth_client):
         assert db.session.get(Certificate, cid).windows_profile_id is None
 
 
-def test_a_legacy_write_survives_a_non_default_profile_named_default(app, auth_client):
+def test_the_default_is_created_beside_a_profile_named_default(app, auth_client):
     with app.app_context():
         aside = WindowsEnrollmentProfile.query.filter_by(is_default=True).all()
         saved = [(p.id, p.name) for p in aside]
@@ -292,8 +292,12 @@ def test_a_legacy_write_survives_a_non_default_profile_named_default(app, auth_c
         db.session.commit()
     try:
         assert _new(auth_client, name='default').status_code == 201
-        r = auth_client.patch('/api/v2/wstep/config', json={'username': 'zz'})
-        assert r.status_code == 200, r.data
+        with app.app_context():
+            from services import windows_profiles
+            made = windows_profiles.default_for_write('test')
+            made.wstep_username = 'zz'
+            db.session.commit()
+            assert made.is_default and made.name != 'default'
     finally:
         with app.app_context():
             for p in WindowsEnrollmentProfile.query.filter_by(is_default=True).all():

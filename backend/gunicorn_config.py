@@ -80,7 +80,7 @@ def ssl_context(conf, default_ssl_context_factory):
     ``WSTEP_TLS12_CAP_NEEDED`` (read once at worker startup, see
     ``_wstep_enabled`` below) means installs that never touch Windows
     autoenrollment keep TLS 1.3 for everything else, instead of every UCM
-    instance silently losing it by default. ``api/v2/wstep.py`` restarts
+    instance silently losing it by default. The Windows settings route restarts
     the service whenever ``wstep_enabled`` is toggled, so this stays in
     sync with the setting rather than only taking effect on the next
     unrelated restart.

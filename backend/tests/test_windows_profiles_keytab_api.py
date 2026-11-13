@@ -13,11 +13,10 @@ from services.kerberos import keytab_format, negotiate_auth
 from tests.test_keytab_composed import HOST, ONE, TWO, profiles  # noqa: F401
 
 URL = '/api/v2/windows-profiles'
-UPLOAD = '/api/v2/kerberos/keytab'
 
 
 def _upload(client, data, profile_id):
-    return client.post(UPLOAD, data={'file': (io.BytesIO(data), 'k.keytab'), 'profile_id': str(profile_id)},
+    return client.post(f'{URL}/{profile_id}/keytab', data={'file': (io.BytesIO(data), 'k.keytab')},
                        content_type='multipart/form-data')
 
 

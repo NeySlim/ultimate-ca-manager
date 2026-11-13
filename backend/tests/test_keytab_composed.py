@@ -4,7 +4,6 @@ The acceptor reads the composed file through the GSSAPI credential store, never 
 process' KRB5_KTNAME; an upload holds only HTTP/<host>@<realm of its profile> entries.
 """
 import base64
-import io
 import logging
 import sys
 import types
@@ -16,6 +15,7 @@ from services import cluster_commands as cc
 from services import shared_files, windows_profiles
 from services.kerberos import keytab_format, negotiate_auth
 from tests.keytab_support import keytab, negotiate_header
+from tests.windows_profile_support import upload_keytab
 
 try:
     import gssapi  # noqa: F401
@@ -76,10 +76,7 @@ def profiles(app, monkeypatch, tmp_path):
 
 
 def _upload(client, data, profile_id=None):
-    form = {'file': (io.BytesIO(data), 'k.keytab')}
-    if profile_id is not None:
-        form['profile_id'] = str(profile_id)
-    return client.post('/api/v2/kerberos/keytab', data=form, content_type='multipart/form-data')
+    return upload_keytab(client, data, profile_id, filename='k.keytab')
 
 
 def _principals(data):
@@ -97,8 +94,9 @@ def test_two_profiles_compose_one_file_that_inspect_lists_entry_by_entry(app, au
         (f'HTTP/{HOST}@ONE.TEST', 'ONE.TEST', 2), (f'HTTP/{HOST}@TWO.TEST', 'TWO.TEST', 2),
         (f'HTTP/{HOST}@TWO.TEST', 'TWO.TEST', 2)]
     body = r.get_json()['data']
-    assert body['keytab_valid'] and body['keytab_spn_matches']
-    assert {e['realm'] for e in body['keytab_entries']} == {'ONE.TEST', 'TWO.TEST'}
+    assert body['keytab_set'] and {e['realm'] for e in body['keytab_entries']} == {'TWO.TEST'}
+    shared = auth_client.get('/api/v2/windows-profiles/settings').get_json()['data']
+    assert {e['realm'] for e in shared['keytab_entries']} == {'ONE.TEST', 'TWO.TEST'}
     with app.app_context():
         assert shared_files.read_file(shared_files.KERBEROS_KEYTAB) == written
 

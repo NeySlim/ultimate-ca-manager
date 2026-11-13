@@ -12,7 +12,7 @@ from auth.unified import require_auth
 from api.v2.ad_connector import (
     _ad_retarget_error, apply_fields, refresh_domain_sid, run_saved_test, run_unsaved_test,
 )
-from models import db, ADConnectorConfig
+from models import db, ADConnectorConfig, WindowsEnrollmentProfile
 from services.ad_connector import lookup
 from services.audit_service import AuditService
 from services.deletion_blockers import connector_deletion_blockers, first_blocker
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('ad_connectors_v2', __name__)
 
 MAX_NAME_LEN = 100
+MAX_LISTED_PROFILES = 50
 
 
 def _audit(action, config, details):
@@ -165,7 +166,11 @@ def delete_connector(connector_id):
         return error_response('Connector not found', 404)
     blocker = first_blocker(connector_deletion_blockers(config))
     if blocker:
-        return error_response(blocker.message, blocker.status)
+        # The profiles that use it ride along, so the screen can name them
+        query = WindowsEnrollmentProfile.query.filter_by(connector_id=config.id)
+        using = query.order_by(WindowsEnrollmentProfile.name).limit(MAX_LISTED_PROFILES).all()
+        return error_response(blocker.message, blocker.status, details={
+            'profiles': [{'id': p.id, 'name': p.name} for p in using], 'total': query.count()})
     name = config.name
     db.session.delete(config)
     ok, err = safe_commit(logger, 'Failed to delete the AD connector')

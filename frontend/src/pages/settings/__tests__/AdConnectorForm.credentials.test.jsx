@@ -21,7 +21,7 @@ vi.mock('../../../contexts', () => ({
 }))
 
 vi.mock('../../../services', () => ({
-  adConnectorService: { test: vi.fn() },
+  adConnectorsService: { test: vi.fn() },
 }))
 
 // The real Input wraps a plain input; what matters here is that `required`

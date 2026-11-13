@@ -1650,20 +1650,26 @@ POST /api/v2/scep/challenge/{ca_id}/regenerate
 One profile per Active Directory realm, served by XCEP, WSTEP and Kerberos. Reading needs `read:xcep`, changing needs `write:xcep`. Passwords and the keytab are never returned, only `*_password_set` and `keytab_set`.
 
 ```http
-GET /api/v2/windows-profiles?q=corp&page=1&per_page=25
+GET /api/v2/windows-profiles?q=corp&ca=<refid>&state=keytab_missing&page=1&per_page=25
 GET /api/v2/windows-profiles/{id}
 POST /api/v2/windows-profiles
 PUT /api/v2/windows-profiles/{id}
 PATCH /api/v2/windows-profiles/{id}
 DELETE /api/v2/windows-profiles/{id}
+POST /api/v2/windows-profiles/{id}/keytab
+GET /api/v2/windows-profiles/settings
+PATCH /api/v2/windows-profiles/settings
 ```
 
-- `q` matches the name or the realm; `per_page` is capped at 200; `meta` carries `total`, `page`, `per_page`, `total_pages`.
+- `q` matches the name or the realm; `ca` a refid of the issuing or policy CA; `state` one of `complete`, `keytab_missing`, `connector_failing` (the connector's last probe says down) and `disabled`, else 400. Each profile carries its `state`, its connector's name, health and realm, and its `template_ids`; the detail (`GET /{id}`) adds `keytab_entries` (principal, realm, kvno, enctype). `per_page` is capped at 200; `meta` carries `total`, `page`, `per_page`, `total_pages`.
 - `PUT` and `PATCH` are the same partial update: only the fields sent change.
-- Writable fields: `name`, `realm` (upper-cased; refused when another profile holds it or the keytab does not name it; `null` clears it, an empty or blank string is a 400), `enabled` and `is_default` (JSON booleans, else 400; `is_default` is accepted at creation only, for the first default profile), `connector_id` (an integer or `null`) (its base DN domain must equal the realm), `issuing_ca_refid` (a string; must be able to sign), `policy_ca_refid` (a string; no EdDSA key), `validity_days`, `xcep_username`, `xcep_password`, `wstep_username`, `wstep_password`, `allowed_ad_group`, `pinned_subject_fields`.
+- Writable fields: `name`, `realm` (upper-cased; refused when another profile holds it or the keytab does not name it; `null` clears it, an empty or blank string is a 400), `enabled` and `is_default` (JSON booleans, else 400; `is_default` is accepted at creation only, for the first default profile), `connector_id` (an integer or `null`) (its base DN domain must equal the realm), `issuing_ca_refid` (a string; must be able to sign), `policy_ca_refid` (a string; no EdDSA key), `validity_days`, `xcep_username`, `xcep_password`, `wstep_username`, `wstep_password`, `allowed_ad_group`, `pinned_subject_fields`, `template_ids` (the templates offered; empty: those of the CA).
 - `pinned_subject_fields` takes an object, or its JSON text, with the keys `O`, `OU`, `C` (two letters, upper-cased), `ST` and `L` only; an empty object, an empty string or `null` stores none, anything else is a 400. It is returned as JSON text.
 - There is at most one default profile; it cannot be deleted (disable it) and `is_default` cannot be changed on an existing profile.
 - A profile through which valid certificates were issued cannot be deleted (409 with the count); disable it instead.
+- `POST /{id}/keytab` takes a multipart `file` (a keytab GSSAPI loads, 256 KiB at most; every entry must be `HTTP/<SPN host>@<realm of the profile>`, else 400) and replaces the profile's keytab; with the form field `dry_run=1` it stores nothing and lists the entries by realm, `foreign_entries` being those the server would refuse. It needs `write:xcep` and `write:kerberos`, the scope of the retired `POST /api/v2/kerberos/keytab`.
+- `settings` holds what every profile shares: `xcep_enabled`, `wstep_enabled` (needs `read:wstep` / `write:wstep`; changing it restarts the service, the TLS cap being read at startup), `kerberos_enabled`, `kerberos_spn` (`read:kerberos` / `write:kerberos`), the state of the served keytab, and the `default_profile` with its realm.
+- The single-row routes `/api/v2/xcep/config`, `/api/v2/wstep/config`, `/api/v2/kerberos/config`, `/api/v2/kerberos/keytab` and `/api/v2/ad-connector` (with `/test` and `/test-saved`) are gone since 3.0; the connectors are under `/api/v2/ad-connectors`. A refused connector deletion (409) lists the profiles that use it in `details.profiles`.
 
 ## CRL & OCSP
 

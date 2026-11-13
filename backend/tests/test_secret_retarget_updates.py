@@ -480,18 +480,14 @@ class TestMicrosoftCA:
 
 
 class TestADConnector:
-    URL = '/api/v2/ad-connector'
-
     @pytest.fixture
     def saved(self, app):
-        # Linked to the default profile, if any: the screen shows that profile's connector
         with app.app_context():
-            mount_connector(server='dc1.corp.local,dc2.corp.local', port=636, use_ssl=True,
+            self.URL = '/api/v2/ad-connectors/' + str(mount_connector(server='dc1.corp.local,dc2.corp.local', port=636, use_ssl=True,
                             verify_ssl=True, base_dn='DC=corp,DC=local',
-                            bind_dn='CN=svc,DC=corp,DC=local', password='saved-bind')
+                            bind_dn='CN=svc,DC=corp,DC=local', password='saved-bind').id)
 
     def _row(self, app):
-        from models import ADConnectorConfig
         with app.app_context():
             row = connector_row()
             return row.server, row.port, row.verify_ssl, row.bind_dn, row.bind_password, row.base_dn
