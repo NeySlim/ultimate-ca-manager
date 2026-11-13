@@ -10,6 +10,19 @@ import uuid
 import pytest
 
 from models import db
+from tests.windows_profile_support import connectors_kept
+
+
+# The CAs and certificates this file issues are removed after it
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
+
+@pytest.fixture(autouse=True)
+def _connectors_put_back(app):
+    """The connector rows this file deletes and rewrites are the session's: put back."""
+    with connectors_kept(app):
+        yield
+
 
 MESSAGE = 'Re-enter the secret to change the target'
 

@@ -24,6 +24,19 @@ from services.ad_connector import lookup as ad_lookup
 from services.trust_store.csr_operations_mixin import _SID_SECURITY_EXT_OID
 from services.wstep import wstep_service
 from tests.fixtures.templates import delete_templates
+from tests.windows_profile_support import connectors_kept
+
+
+# The CAs and certificates this file issues are removed after it
+pytestmark = pytest.mark.usefixtures('drop_new_cas_and_certificates')
+
+
+@pytest.fixture(autouse=True)
+def _connectors_put_back(app):
+    """The connector rows this file deletes and rewrites are the session's: put back."""
+    with connectors_kept(app):
+        yield
+
 
 _REAL_SID = 'S-1-5-21-1608104657-630783805-1473387121-1105'
 KERBEROS_MACHINE_PRINCIPAL = 'WIN11$@HAGLAND.DOMAIN'
