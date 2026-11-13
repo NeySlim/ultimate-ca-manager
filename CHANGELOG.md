@@ -55,7 +55,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- CA import: a CA whose RSA key is under 2048 bits is refused when it arrives with its private key (upload, PKCS#12, the key of a pending request, adding a key to an existing CA with `POST /api/v2/cas/<id>/key`, smart import, OPNsense import), with a message giving the size and the minimum; the same CA without a key is still imported. In a batch only that CA is skipped and named.
+- CA import: a CA whose RSA key is under 2048 bits is refused when it arrives with its private key (upload, PKCS#12, the key of a pending request, adding a key to an existing CA with `POST /api/v2/cas/<id>/key`, smart import, OPNsense import), with a message giving the size and the minimum, and so is a CA key that cannot be read; the same CA without a key is still imported. In a batch only that CA is skipped and named.
 - OPNsense import and smart import chain a CA under the stored CA whose key signed it, whatever the order of the batch, instead of leaving it unlinked or taking a CA of the same name.
 - A CA imported after its parent is linked to it in the import itself, so SCEP `GetCACert` in chain mode serves both certificates at once instead of after the hourly backfill.
 - Behind a trusted reverse proxy, the pending Kerberos handshakes of XCEP and WSTEP are keyed by the client address instead of the proxy's, so two clients no longer share one. The keytab composed from the Windows profiles is refused above 1 MiB with a readable message.

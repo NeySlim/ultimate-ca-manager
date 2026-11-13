@@ -158,6 +158,31 @@ def test_opnsense_route_refuses_weak_ca_with_key_only(app, auth_client, monkeypa
     assert _stored(app, good)[0].prv
 
 
+def test_opnsense_route_judges_the_key_it_would_store(app, auth_client, monkeypatch):
+    """A row carrying both fields stores ``prv``: that key is the one judged."""
+    tag = uuid.uuid4().hex[:8]
+    weak_key, good_key = _weak_key(), new_key()
+    weak = _ca(f'both{tag}', weak_key)
+    row = _row(weak, f'both {tag}', weak_key)
+    row['prv_payload'] = key_pem(good_key)
+    body = _opnsense(auth_client, monkeypatch, [row])
+    assert body['imported']['cas'] == 0 and body['skipped'] == 1
+    assert any(f'both {tag}' in e and '2048' in e for e in body['errors'])
+    assert _stored(app, weak) == []
+
+
+def test_opnsense_route_refuses_a_key_field_that_is_not_base64(app, auth_client, monkeypatch):
+    tag = uuid.uuid4().hex[:8]
+    key = new_key()
+    cert = _ca(f'bad{tag}', key)
+    row = _row(cert, f'bad {tag}')
+    row['prv'] = 'not base64 at all!'
+    body = _opnsense(auth_client, monkeypatch, [row])
+    assert body['imported']['cas'] == 0 and body['skipped'] == 1
+    assert any(f'bad {tag}' in e and 'could not be read' in e for e in body['errors'])
+    assert _stored(app, cert) == []
+
+
 def test_opnsense_config_importer_refuses_weak_ca_with_key_only(app):
     from services.opnsense.importer import ImportMixin
     tag = uuid.uuid4().hex[:8]

@@ -70,13 +70,14 @@ def _encoded_private_key(row):
 
 
 def _decoded_private_key(row):
-    """The PEM of the key an OPNsense row carries, or None."""
-    if row.get('prv_payload'):
-        return row['prv_payload']
-    try:
-        return base64.b64decode(row['prv']) if row.get('prv') else None
-    except ValueError:
-        return None
+    """The PEM of the key ``_encoded_private_key`` stores for an OPNsense row, or None when it
+    carries none. A ``prv`` that is not base64 comes back as it is: it is a key that cannot be read."""
+    if row.get('prv'):
+        try:
+            return base64.b64decode(row['prv'])
+        except ValueError:
+            return row['prv']
+    return row.get('prv_payload') or None
 
 
 def _signing_parent(ca):
