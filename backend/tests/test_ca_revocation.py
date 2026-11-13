@@ -421,7 +421,8 @@ class TestIssuerResolution:
 
             db.session.expire_all()
             new_ca = db.session.get(CA, imported['id'])
-            assert new_ca.caref is None  # an import carries no parent link
+            # The import links it under the CA whose key signed it, never the namesake created first
+            assert new_ca.caref == real['refid']
             assert new_ca.issuing_ca().id == real['id']
             assert new_ca.revoked_in_chain is True
 

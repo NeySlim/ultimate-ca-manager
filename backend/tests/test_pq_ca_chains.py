@@ -139,8 +139,9 @@ def test_digest_of_an_intermediate_follows_the_signing_parent(app, auth_client):
     sub.verify_directly_issued_by(mldsa_root)
 
 
-def _import_rsa_1024_root(auth_client):
-    """A root whose RSA-1024 key is outside the registry, imported with its key."""
+def _import_rsa_1024_root(app, auth_client):
+    """A root whose RSA-1024 key is outside the registry, held with its key as an installation
+    that predates the import refusal holds it: the import takes the certificate alone."""
     key = rsa.generate_private_key(public_exponent=65537, key_size=1024)
     name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'Imported RSA-1024 root')])
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -157,14 +158,19 @@ def _import_rsa_1024_root(auth_client):
     key_pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
                                 serialization.NoEncryption())
     r = auth_client.post('/api/v2/cas/import', content_type='multipart/form-data',
-                         data={'pem_content': (_pem(cert) + key_pem).decode()})
+                         data={'pem_content': _pem(cert).decode()})
     assert r.status_code in (200, 201), r.get_json()
-    return r.get_json()['data']['id'], cert
+    ca_id = r.get_json()['data']['id']
+    from utils.key_codec import store_pem_bytes
+    with app.app_context():
+        db.session.get(CA, ca_id).prv = store_pem_bytes(key_pem)
+        db.session.commit()
+    return ca_id, cert
 
 
 def test_digest_of_an_intermediate_under_an_unregistered_parent_key(app, auth_client):
     # RSA-1024 is outside the registry but takes a digest: the requested one applies
-    root_id, root = _import_rsa_1024_root(auth_client)
+    root_id, root = _import_rsa_1024_root(app, auth_client)
     r = _post(auth_client, '/api/v2/cas', {'type': 'intermediate', 'parentCAId': root_id,
                                            'commonName': 'ML-DSA sub under RSA-1024',
                                            'keyAlgo': 'ML-DSA', 'keySize': '65',

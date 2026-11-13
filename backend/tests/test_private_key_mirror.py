@@ -321,6 +321,11 @@ def test_legacy_opnsense_import_skips_key_mirrors_when_encrypted(
     monkeypatch.setattr(importer, '__file__', str(fake_module))
     encoded_key = base64.b64encode(KEY_PEM).decode()
     encoded_cert = base64.b64encode(b'public certificate').decode()
+    # A CA key is read before it is admitted: this one has to be a real key
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
 
     with app.app_context():
         ca_refid = str(uuid.uuid4())
@@ -329,7 +334,7 @@ def test_legacy_opnsense_import_skips_key_mirrors_when_encrypted(
             'refid': ca_refid,
             'descr': 'Legacy OPNsense encrypted CA',
             'crt': encoded_cert,
-            'prv': encoded_key,
+            'prv': base64.b64encode(ca_key).decode(),
             'is_root': True,
         }])
         cert_result = importer.ImportMixin().import_certificates([{
