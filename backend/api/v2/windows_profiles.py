@@ -140,14 +140,23 @@ def _render(profile, ca_names, connectors=None, failing=None, templates=None, de
     return data
 
 
+def _binding_reason_for_caller():
+    """The binding's reason only for a caller who may read the Kerberos state (as GET /settings);
+    None otherwise, so only the profile's own refusal shows."""
+    if not has_permission('read:kerberos', getattr(g, 'permissions', None) or []):
+        return None
+    return windows_profiles.kerberos_binding_reason()
+
+
 def _render_one(profile, detail=False):
-    return _render(profile, _ca_names([profile]), detail=detail)
+    return _render(profile, _ca_names([profile]), detail=detail,
+                   binding_reason=_binding_reason_for_caller())
 
 
 def _render_page(profiles):
     names, connectors = _ca_names(profiles), _connectors(profiles)
     failing, templates = _failing_connector_ids(), _template_ids(profiles)
-    binding_reason = windows_profiles.kerberos_binding_reason()
+    binding_reason = _binding_reason_for_caller()
     return [_render(p, names, connectors, failing, templates, binding_reason=binding_reason)
             for p in profiles]
 

@@ -277,6 +277,22 @@ def test_a_missing_kerberos_library_is_said_before_the_binding_settings(app, mon
         assert kerberos_binding_reason() == 'no SPN set'
 
 
+@pytest.mark.parametrize('extra, binding_shown', [([], False), (['read:kerberos'], True)])
+def test_the_binding_reason_needs_the_kerberos_read_scope(app, auth_client, profiles, monkeypatch,  # noqa: F811
+                                                          extra, binding_shown):
+    monkeypatch.setattr(negotiate_auth, 'not_configured_reason', lambda: 'no SPN set')
+    monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+    key_id, headers = _key(auth_client, ['read:xcep', *extra])
+    try:
+        client = app.test_client()
+        one = client.get(f'{URL}/{profiles.two}', headers=headers).get_json()['data']
+        listed = client.get(f'{URL}?q=c03-two', headers=headers).get_json()['data']
+        row = next(r for r in listed if r['id'] == profiles.two)
+        assert one['kerberos_refusal'] == row['kerberos_refusal'] == ('no SPN set' if binding_shown else None)
+    finally:
+        auth_client.delete(f'/api/v2/account/apikeys/{key_id}')
+
+
 def test_a_profile_without_a_realm_is_refused_by_its_own_name(app):
     from services.windows_profiles import kerberos_refusal
     with app.app_context():
