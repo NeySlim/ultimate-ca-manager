@@ -60,6 +60,9 @@ class CA(db.Model):
     csr = db.Column(db.Text)
     serial = db.Column(db.Integer, default=0)
     caref = db.Column(db.String(36))  # Parent CA refid for intermediate
+    # Set only when caref was confirmed by hand over a signature this build cannot check
+    parent_confirmed_by = db.Column(db.String(80))
+    parent_confirmed_at = db.Column(db.DateTime)
     
     # Certificate details (parsed from crt)
     subject = db.Column(db.Text)
@@ -260,8 +263,8 @@ class CA(db.Model):
         import base64
         from cryptography import x509
         from utils.cert_issuer import (
-            authority_key_identifier_hex, cas_by_ski, certificate_signed_by, is_self_signed,
-            self_signed_first,
+            UNVERIFIABLE, VERIFIED, authority_key_identifier_hex, cas_by_ski, is_self_signed,
+            self_signed_first, signature_verdict,
         )
         try:
             cert = x509.load_pem_x509_certificate(base64.b64decode(self.crt))
@@ -293,14 +296,30 @@ class CA(db.Model):
             except Exception:
                 continue
             try:
-                signed = certificate_signed_by(cert, issuer_cert)
+                verdict, _ = signature_verdict(cert, issuer_cert)
             except Exception:
-                # Key type this cannot verify: keep the named issuer rather
-                # than dropping the CA out of its chain
-                signed = candidate.subject == self.issuer
+                verdict = UNVERIFIABLE
+            if verdict == UNVERIFIABLE:
+                # Key type this cannot verify: keep the named issuer, or the parent confirmed
+                # by hand, rather than dropping the CA out of its chain
+                signed = candidate.subject == self.issuer or (
+                    candidate.refid == self.caref and self.parent_confirmed_at is not None)
+            else:
+                signed = verdict == VERIFIED
             if signed:
                 return candidate
         return None
+
+    def _parent_candidate(self):
+        if self.caref or not self.crt:
+            return None
+        from services.ca.parent_confirmation import proposal
+        try:
+            found = proposal(self)
+        except Exception:
+            logger.warning("Parent proposal of CA %s could not be computed", self.id, exc_info=True)
+            return None
+        return None if found is None else found.to_dict()
 
     def persisted_revocation(self):
         cache = _request_cache('_ucm_persisted_revocation')
@@ -615,6 +634,11 @@ class CA(db.Model):
             "serial": self.serial,
             "caref": self.caref,
             "parent_id": parent_id,  # Numeric parent ID for frontend tree
+            # Linked by hand over a signature this build cannot check: who, when
+            "parent_confirmed_by": self.parent_confirmed_by,
+            "parent_confirmed_at": utc_isoformat(self.parent_confirmed_at),
+            # Parent proposed for that confirmation; the list leaves it to the detail
+            "parent_candidate": None if prefetched is not None else self._parent_candidate(),
             "ski": self.ski,
             "subject": self.subject,
             "issuer": self.issuer,

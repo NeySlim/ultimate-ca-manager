@@ -81,6 +81,38 @@ def certificate_signed_by(cert: x509.Certificate, issuer: x509.Certificate) -> b
     return True
 
 
+VERIFIED, INVALID, UNVERIFIABLE = 'verified', 'invalid', 'unverifiable'
+
+
+def signature_verdict(cert: x509.Certificate, issuer: x509.Certificate):
+    """``(VERIFIED | INVALID | UNVERIFIABLE, algorithm)``: whether *issuer*'s key signed *cert*.
+
+    Only UNVERIFIABLE (a key or signature type this cannot check) names the algorithm;
+    it never stands for INVALID, which no confirmation can override."""
+    try:
+        return (VERIFIED if certificate_signed_by(cert, issuer) else INVALID), None
+    except UnsupportedIssuerKey:
+        return UNVERIFIABLE, _unverifiable_algorithm(cert, issuer)
+
+
+def _unverifiable_algorithm(cert, issuer):
+    from utils.foreign_algorithms import describe_public_key
+    from utils.signature_label import signature_algorithm_label
+    foreign = describe_public_key(issuer)
+    if foreign is not None:
+        return foreign['label']
+    key = issuer.public_key()
+    if isinstance(key, (rsa.RSAPublicKey, ec.EllipticCurvePublicKey, dsa.DSAPublicKey,
+                        ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)) \
+            or key_algorithms.family_for_public_key(key) == 'ML-DSA':
+        # A key this checks: the signature algorithm is what cannot be
+        try:
+            return signature_algorithm_label(cert)
+        except Exception:
+            return cert.signature_algorithm_oid.dotted_string
+    return key_algorithms.label_for_public_key(key) or type(key).__name__.removesuffix('PublicKey')
+
+
 def is_self_signed(cert: x509.Certificate) -> bool:
     """Whether the certificate is signed by its own key.
 
@@ -205,11 +237,10 @@ def ca_signature_verdict(ca, cert: x509.Certificate):
     except Exception:
         return None
     try:
-        return certificate_signed_by(cert, ca_cert)
-    except UnsupportedIssuerKey:
-        return None
+        verdict, _ = signature_verdict(cert, ca_cert)
     except Exception:
         return False
+    return None if verdict == UNVERIFIABLE else verdict == VERIFIED
 
 
 def ca_signed(ca, cert: x509.Certificate) -> bool:

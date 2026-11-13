@@ -94,6 +94,8 @@ class ImportResult:
         "cas": [],
         "csrs": []
     })
+    # CAs left without a parent whose signature cannot be checked here, with the one proposed
+    unverifiable_parents: List[Dict] = field(default_factory=list)
     
     def to_dict(self) -> Dict:
         return {
@@ -105,7 +107,8 @@ class ImportResult:
             "errors": self.errors,
             "warnings": self.warnings,
             "warning_details": self.warning_details,
-            "imported_ids": self.imported_ids
+            "imported_ids": self.imported_ids,
+            "unverifiable_parents": self.unverifiable_parents,
         }
 
 
@@ -475,6 +478,11 @@ class SmartImporter:
             ca.caref = relink_parent_caref(x509.load_pem_x509_certificate(base64.b64decode(ca.crt)), None,
                                            exclude_ca_id=ca.id)
         db.session.flush()
+        from services.ca import parent_confirmation
+        result.unverifiable_parents = parent_confirmation.notices([ca for ca in unlinked if not ca.caref])
+        for notice in result.unverifiable_parents:
+            result.warnings.append(f"CA '{notice['ca_name']}' left without a parent: probable parent "
+                                   f"'{notice['candidate']['name']}', {notice['reason']}")
     
     @staticmethod
     def _is_self_signed_record(ca) -> bool:

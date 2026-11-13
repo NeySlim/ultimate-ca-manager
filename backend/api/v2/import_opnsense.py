@@ -706,6 +706,8 @@ def import_items():
         db.session.flush()
         for ca in created_cas:
             ca.caref = _signing_parent(ca)
+        from services.ca import parent_confirmation
+        unverifiable_parents = parent_confirmation.notices([ca for ca in created_cas if not ca.caref])
 
         for item_id in selected_ids:
             if item_id in all_certs:
@@ -808,7 +810,9 @@ def import_items():
             },
             "cross_certificates_attached": stats.get('cas_cross_attached', 0),
             "skipped": stats['cas_skipped'] + stats['certs_skipped'],
-            "errors": stats['errors']
+            "errors": stats['errors'],
+            # CAs left without a parent whose signature cannot be checked here, with the one proposed
+            "unverifiable_parents": unverifiable_parents,
         })
     
     except requests.exceptions.SSLError as e:
