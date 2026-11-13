@@ -1350,14 +1350,19 @@ def _on_postgresql(app):
 
 
 def _wait_for_a_lock_waiter(conn, seconds=5.0):
-    """Whether another session of this database waits on a lock within ``seconds`` (polled)."""
+    """Whether another session of this worker waits on a lock within ``seconds`` (polled).
+    The workers share the database: a waiter is ours when it holds locks on our schema's tables."""
     import time
     from sqlalchemy import text
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         conn.execute(text('SELECT pg_stat_clear_snapshot()'))  # the view is cached per transaction
-        if conn.execute(text("SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' "
-                             "AND datname = current_database() AND pid <> pg_backend_pid()")).scalar():
+        if conn.execute(text(
+                "SELECT count(*) FROM pg_stat_activity a WHERE a.wait_event_type = 'Lock' "
+                "AND a.datname = current_database() AND a.pid <> pg_backend_pid() AND EXISTS ("
+                "SELECT 1 FROM pg_locks l JOIN pg_class c ON c.oid = l.relation "
+                "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                "WHERE l.pid = a.pid AND l.granted AND n.nspname = current_schema())")).scalar():
             return True
         time.sleep(0.02)
     return False
