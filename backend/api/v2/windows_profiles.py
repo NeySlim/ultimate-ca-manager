@@ -251,6 +251,12 @@ def _apply(profile, data):
         if err:
             return err, 400
         profile.pinned_subject_fields = pinned
+    # Only the default profile's binding reads the shared accounts: elsewhere they would never be used
+    if not profile.is_default:
+        for field in (f'{svc}_{part}' for svc in SERVICES for part in ('username', 'password')):
+            if data.get(field):
+                return (f'{field} is read for the default profile only: this profile is not the default one, '
+                        'so the account would never be used'), 400
     for field in ('allowed_ad_group', *(f'{svc}_username' for svc in SERVICES)):
         if field in data:
             value = data[field]
