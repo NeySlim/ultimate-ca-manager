@@ -492,3 +492,33 @@ def test_certificates_of_a_deleted_profile_stay_refused_under_the_default(app, c
     finally:
         with app.app_context():
             restore(saved)
+
+
+@pytest.mark.parametrize('anchor_record', ['root', 'cross'])
+def test_an_mtls_anchor_stored_twice_admits_the_profile_ca_under_either(app, client, directory, create_ca,
+                                                                       anchor_record):
+    """A root stored as two records (same subject and key, as with a cross-certificate): the listener
+    anchored on one accepts a CA issued under the other, so the route does too."""
+    from models import CA
+    world = directory
+    old, key = _enrolled(client, world, 'usera@C04A.TEST', f'c05-tls-cross-{anchor_record}')
+    root = create_ca(cn=f'C05 root stored twice {anchor_record}')
+    with app.app_context():
+        original = db.session.get(CA, root['id'])
+        columns = {c.name: getattr(original, c.name) for c in CA.__table__.columns if c.name not in ('id', 'refid')}
+        columns.update(descr=f'{original.descr} (cross)', prv=None)
+        cross = CA(refid=f'{original.refid[:30]}-cross', **columns)
+        db.session.add(cross)
+        db.session.commit()
+        refids = {'root': original.refid, 'cross': cross.refid}
+        parent = refids['cross' if anchor_record == 'root' else 'root']
+        db.session.get(CA, world['cas']['A']['id']).caref = parent
+        db.session.commit()
+    try:
+        with mtls_anchor(app, refids[anchor_record]):
+            r = _renew_tls(client, old, key)
+            assert r.status_code == 200, r.data
+    finally:
+        with app.app_context():
+            db.session.get(CA, world['cas']['A']['id']).caref = None
+            db.session.commit()

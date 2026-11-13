@@ -45,8 +45,10 @@ def trusted_client_cert(log, label):
 
 def native_tls_admits(ca):
     """Whether the native TLS listener lets a client certificate of *ca* through: its one anchor is
-    the mTLS trusted CA (A5), so *ca* must be that CA or a CA under it."""
+    the mTLS trusted CA (A5), so *ca* must be that CA or a CA under it. A record sharing a step's
+    subject and key (cross-certificate) is that same issuer to the listener."""
     from models import CA, SystemConfig
+    from utils.cert_issuer import same_key_refids
     settings = {row.key: row.value for row in SystemConfig.query.filter(
         SystemConfig.key.in_(('mtls_enabled', 'mtls_trusted_ca_id')))}
     anchor = settings.get('mtls_trusted_ca_id')
@@ -54,7 +56,7 @@ def native_tls_admits(ca):
         return False
     seen = set()
     while ca is not None and ca.refid not in seen:
-        if ca.refid == anchor:
+        if anchor in same_key_refids(ca):
             return True
         seen.add(ca.refid)
         ca = CA.query.filter_by(refid=ca.caref).first() if ca.caref else None
