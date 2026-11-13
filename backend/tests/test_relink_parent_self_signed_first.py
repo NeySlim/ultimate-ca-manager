@@ -1,5 +1,6 @@
-"""relink_parent_caref: between two records of the issuer's key, the self-signed root is the parent."""
+"""Between two records of the issuer's key, the self-signed root is the parent: relink, SKI lookup, pending CA."""
 import base64
+import json
 import uuid
 from datetime import datetime, timedelta, timezone
 
@@ -11,6 +12,8 @@ from cryptography.x509.oid import NameOID
 from models import CA, db
 from services.import_service import relink_parent_caref
 from services.ski_aki_backfill import backfill_ski_aki
+from tests.conftest import assert_success
+from utils.cert_issuer import find_ca_by_ski, signing_ca_for
 from tests.fixtures.cross_pki import build_cross_pki, make_cert, new_key, pem
 
 
@@ -90,3 +93,57 @@ def test_the_hourly_repair_chains_an_orphan_under_the_root_and_leaves_a_linked_c
         backfill_ski_aki()
         assert db.session.get(CA, orphan.id).caref == root_row.refid
         assert db.session.get(CA, kept.id).caref == link_row.refid
+
+
+def _same_key_record(pki, kind):
+    """A second record of Root B's key: its cross certificate or a self-issued link certificate."""
+    return pki.cross_b if kind == 'cross' else make_cert(pki.name_b, pki.key_b, pki.name_b, new_key())
+
+
+@pytest.mark.parametrize('kind', ['cross', 'link'])
+@pytest.mark.parametrize('other_first', [True, False])
+def test_the_lookup_by_ski_returns_the_root_before_another_record_of_its_key(app, rows, kind, other_first):
+    pki = build_cross_pki()
+    order = [(_same_key_record(pki, kind), 'other'), (pki.root_b, 'root')]
+    order = order if other_first else order[::-1]
+    with app.app_context():
+        stored = {descr: row for (_, descr), row in zip(order, _store(rows, *order))}
+        assert find_ca_by_ski(stored['root'].ski).id == stored['root'].id
+        assert signing_ca_for(pki.int_b).id == stored['root'].id
+
+
+def _sign_csr(csr_pem, issuer_cn, issuer_key, with_aki):
+    csr = x509.load_pem_x509_csr(csr_pem.encode())
+    now = datetime.now(timezone.utc)
+    builder = (x509.CertificateBuilder().subject_name(csr.subject)
+               .issuer_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, issuer_cn)]))
+               .public_key(csr.public_key()).serial_number(x509.random_serial_number())
+               .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
+               .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+               .add_extension(x509.SubjectKeyIdentifier.from_public_key(csr.public_key()), critical=False))
+    if with_aki:
+        builder = builder.add_extension(
+            x509.AuthorityKeyIdentifier.from_issuer_public_key(issuer_key.public_key()), critical=False)
+    return pem(builder.sign(issuer_key, hashes.SHA256()))
+
+
+@pytest.mark.parametrize('kind', ['cross', 'link'])
+@pytest.mark.parametrize('with_aki', [True, False])
+@pytest.mark.parametrize('other_first', [True, False])
+def test_a_pending_ca_is_chained_under_the_root_not_another_record_of_its_key(
+        app, auth_client, rows, kind, with_aki, other_first):
+    pki = build_cross_pki()
+    order = [(_same_key_record(pki, kind), 'other'), (pki.root_b, 'root')]
+    order = order if other_first else order[::-1]
+    with app.app_context():
+        stored = {descr: row for (_, descr), row in zip(order, _store(rows, *order))}
+        root_refid = stored['root'].refid
+    resp = auth_client.post('/api/v2/cas', data=json.dumps({
+        'type': 'external', 'commonName': f'Pending under B {pki.tag}', 'keyAlgo': 'ECDSA',
+        'keySize': 'secp256r1'}), content_type='application/json')
+    pending = assert_success(resp, status=201)
+    rows.append(pending['id'])
+    signed = _sign_csr(pending['csr_pem'], pki.name_b, pki.key_b, with_aki)
+    resp = auth_client.post(f"/api/v2/cas/{pending['id']}/certificate",
+                            data=json.dumps({'pem_content': signed}), content_type='application/json')
+    assert assert_success(resp)['caref'] == root_refid

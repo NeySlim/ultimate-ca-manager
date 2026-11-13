@@ -175,7 +175,7 @@ Database migrations run automatically at startup.
 - Windows enrollment, keytab: the keytab of 2.x becomes that of the default profile at the first start, and UCM composes the file the acceptor reads from the keytabs of all profiles. A forest added later gets its own profile and keytab; nothing is merged by hand.
 - CA import: a CA whose RSA key is under 2048 bits is refused when imported with its private key; import its certificate without the key to keep it for chain building. Existing CAs are not touched.
 - CA import: an imported CA is attached to a parent only when the parent's key verifies its signature, on every import path. Smart import used to attach by identifier or name without checking, so a CA under a parent whose key type the server cannot verify (SLH-DSA, GOST) is now imported without a parent, and the hourly chain repair leaves it so.
-- CA import: a new CA whose issuer is stored as a root and as a cross or link certificate of the same key is chained under the root. CAs already chained are not moved, and the hourly chain repair applies the rule only to a CA that has no parent yet.
+- CA import: a new CA or certificate whose issuer is stored as a root and as a cross or link certificate of the same key is chained under the root, a pending CA's installed certificate included. What is already chained is not moved: the hourly chain repair applies the rule only to a CA or certificate that has no valid parent yet.
 - Audit and syslog consumers (SIEM): a restore refused before its archive was read is now audited as a failed `system_restore` whose text starts with `Restore request refused: ` followed by the reason; match on that prefix. Version 2.x wrote no audit line for these refusals.
 
 ### Upgrading to v2.243
