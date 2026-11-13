@@ -1104,19 +1104,19 @@
     "showHiddenCas_one": "{{count}} ausgeblendete CA anzeigen",
     "showHiddenCas_other": "{{count}} ausgeblendete CAs anzeigen",
     "hideHiddenCas": "Ausgeblendete CAs verbergen",
-    "parentCandidateBanner": "Probable parent: {{name}}. Its signature cannot be verified here ({{algorithm}}), so this CA was not linked to it.",
-    "linkToParent": "Link to this parent",
-    "linkParentTitle": "Link to a parent that cannot be verified",
-    "linkParentWarning": "UCM cannot check that \"{{name}}\" signed this CA: a {{algorithm}} signature is not verifiable here. Once linked, this CA follows that parent for revocation, OCSP and the chains served.",
-    "linkParentConfirm": "I have checked this parent by other means and confirm the link",
-    "linkParentDone": "CA linked to its parent",
-    "linkParentFailed": "The parent could not be linked",
-    "parentConfirmedBanner": "Parent confirmed by hand by {{user}} on {{date}}: its signature cannot be verified here.",
-    "withdrawParentLink": "Withdraw the link",
-    "withdrawParentTitle": "Withdraw the parent link",
-    "withdrawParentWarning": "This CA will be left without a parent until the link is confirmed again.",
-    "withdrawParentDone": "Parent link withdrawn",
-    "withdrawParentFailed": "The parent link could not be withdrawn"
+    "parentCandidateBanner": "Wahrscheinlich übergeordnete CA: {{name}}. Ihre Signatur kann hier nicht geprüft werden ({{algorithm}}), daher wurde diese CA nicht mit ihr verknüpft.",
+    "linkToParent": "Mit dieser übergeordneten CA verknüpfen",
+    "linkParentTitle": "Mit nicht prüfbarer übergeordneter CA verknüpfen",
+    "linkParentWarning": "UCM kann nicht prüfen, ob „{{name}}“ diese CA signiert hat: Eine {{algorithm}}-Signatur ist hier nicht prüfbar. Nach der Verknüpfung folgt diese CA ihrer übergeordneten CA bei Widerruf, OCSP und den ausgelieferten Ketten.",
+    "linkParentConfirm": "Ich habe diese übergeordnete CA auf anderem Weg geprüft und bestätige die Verknüpfung",
+    "linkParentDone": "CA mit übergeordneter CA verknüpft",
+    "linkParentFailed": "Die Verknüpfung mit der übergeordneten CA ist fehlgeschlagen",
+    "parentConfirmedBanner": "Übergeordnete CA am {{date}} von {{user}} manuell bestätigt: Ihre Signatur kann hier nicht geprüft werden.",
+    "withdrawParentLink": "Verknüpfung aufheben",
+    "withdrawParentTitle": "Verknüpfung mit übergeordneter CA aufheben",
+    "withdrawParentWarning": "Diese CA bleibt ohne übergeordnete CA, bis die Verknüpfung erneut bestätigt wird.",
+    "withdrawParentDone": "Verknüpfung aufgehoben",
+    "withdrawParentFailed": "Die Verknüpfung konnte nicht aufgehoben werden"
   },
   "csrs": {
     "uploadCSR": "CSR hochladen",
@@ -4273,8 +4273,8 @@
     "crossAttached_other": "{{count}} Cross-Zertifikate an bereits vorhandene CAs angehängt",
     "crossSkipped_one": "{{count}} Cross-Zertifikat wurde ausgelassen; die selbstsignierte CA bleibt erhalten",
     "crossSkipped_other": "{{count}} Cross-Zertifikate wurden ausgelassen; die selbstsignierten CAs bleiben erhalten",
-    "unverifiableParentsTitle": "Parents to confirm on the CA page",
-    "unverifiableParent": "{{ca}} left without a parent: probable parent {{parent}}, signature not verifiable here ({{algorithm}})"
+    "unverifiableParentsTitle": "Übergeordnete CAs zur Bestätigung auf der CA-Seite",
+    "unverifiableParent": "{{ca}} ohne übergeordnete CA: wahrscheinlich {{parent}}, Signatur hier nicht prüfbar ({{algorithm}})"
   },
   "webhooks": {
     "eventLabels": {

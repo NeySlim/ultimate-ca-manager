@@ -1104,19 +1104,19 @@
     "showHiddenCas_one": "非表示の CA を {{count}} 件表示",
     "showHiddenCas_other": "非表示の CA を {{count}} 件表示",
     "hideHiddenCas": "非表示の CA を隠す",
-    "parentCandidateBanner": "Probable parent: {{name}}. Its signature cannot be verified here ({{algorithm}}), so this CA was not linked to it.",
-    "linkToParent": "Link to this parent",
-    "linkParentTitle": "Link to a parent that cannot be verified",
-    "linkParentWarning": "UCM cannot check that \"{{name}}\" signed this CA: a {{algorithm}} signature is not verifiable here. Once linked, this CA follows that parent for revocation, OCSP and the chains served.",
-    "linkParentConfirm": "I have checked this parent by other means and confirm the link",
-    "linkParentDone": "CA linked to its parent",
-    "linkParentFailed": "The parent could not be linked",
-    "parentConfirmedBanner": "Parent confirmed by hand by {{user}} on {{date}}: its signature cannot be verified here.",
-    "withdrawParentLink": "Withdraw the link",
-    "withdrawParentTitle": "Withdraw the parent link",
-    "withdrawParentWarning": "This CA will be left without a parent until the link is confirmed again.",
-    "withdrawParentDone": "Parent link withdrawn",
-    "withdrawParentFailed": "The parent link could not be withdrawn"
+    "parentCandidateBanner": "親CAの候補: {{name}}。署名をここでは検証できないため（{{algorithm}}）、この CA は未リンクです。",
+    "linkToParent": "この親CAにリンク",
+    "linkParentTitle": "検証できない親CAへのリンク",
+    "linkParentWarning": "「{{name}}」がこの CA に署名したことを UCM は確認できません。{{algorithm}} 署名はここでは検証できないためです。リンクすると、この CA は失効、OCSP、提供されるチェーンについてその親CAに従います。",
+    "linkParentConfirm": "この親CAを別の方法で確認済みで、リンクを承認します",
+    "linkParentDone": "CA を親CAにリンクしました",
+    "linkParentFailed": "親CAにリンクできませんでした",
+    "parentConfirmedBanner": "親CAは {{user}} が {{date}} に手動で承認しました。署名はここでは検証できません。",
+    "withdrawParentLink": "リンクを解除",
+    "withdrawParentTitle": "親CAのリンクを解除",
+    "withdrawParentWarning": "リンクを再度承認するまで、この CA は親CAなしになります。",
+    "withdrawParentDone": "親CAのリンクを解除しました",
+    "withdrawParentFailed": "親CAのリンクを解除できませんでした"
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",
@@ -4276,8 +4276,8 @@
     "crossAttached_other": "{{count}} 件のクロス証明書を管理対象の CA に紐付けました",
     "crossSkipped_one": "{{count}} 件のクロス証明書を除外しました。自己署名 CA はそのまま保持されます",
     "crossSkipped_other": "{{count}} 件のクロス証明書を除外しました。自己署名 CA はそのまま保持されます",
-    "unverifiableParentsTitle": "Parents to confirm on the CA page",
-    "unverifiableParent": "{{ca}} left without a parent: probable parent {{parent}}, signature not verifiable here ({{algorithm}})"
+    "unverifiableParentsTitle": "CA ページで承認が必要な親CA",
+    "unverifiableParent": "{{ca}} は親CAなし: 親CAの候補は {{parent}}、署名はここでは検証できません（{{algorithm}}）"
   },
   "webhooks": {
     "eventLabels": {

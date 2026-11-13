@@ -1064,19 +1064,19 @@
     "showHiddenCas_one": "Afficher {{count}} CA masquée",
     "showHiddenCas_other": "Afficher {{count}} CA masquées",
     "hideHiddenCas": "Masquer les CA masquées",
-    "parentCandidateBanner": "Probable parent: {{name}}. Its signature cannot be verified here ({{algorithm}}), so this CA was not linked to it.",
-    "linkToParent": "Link to this parent",
-    "linkParentTitle": "Link to a parent that cannot be verified",
-    "linkParentWarning": "UCM cannot check that \"{{name}}\" signed this CA: a {{algorithm}} signature is not verifiable here. Once linked, this CA follows that parent for revocation, OCSP and the chains served.",
-    "linkParentConfirm": "I have checked this parent by other means and confirm the link",
-    "linkParentDone": "CA linked to its parent",
-    "linkParentFailed": "The parent could not be linked",
-    "parentConfirmedBanner": "Parent confirmed by hand by {{user}} on {{date}}: its signature cannot be verified here.",
-    "withdrawParentLink": "Withdraw the link",
-    "withdrawParentTitle": "Withdraw the parent link",
-    "withdrawParentWarning": "This CA will be left without a parent until the link is confirmed again.",
-    "withdrawParentDone": "Parent link withdrawn",
-    "withdrawParentFailed": "The parent link could not be withdrawn"
+    "parentCandidateBanner": "Parente probable : {{name}}. Sa signature ne peut pas être vérifiée ici ({{algorithm}}), cette CA n'y a donc pas été rattachée.",
+    "linkToParent": "Lier à cette parente",
+    "linkParentTitle": "Lier à une parente non vérifiable",
+    "linkParentWarning": "UCM ne peut pas vérifier que « {{name}} » a signé cette CA : une signature {{algorithm}} n'est pas vérifiable ici. Une fois le lien créé, cette CA suit cette parente pour la révocation, l'OCSP et les chaînes servies.",
+    "linkParentConfirm": "J'ai vérifié cette parente par un autre moyen et je confirme le lien",
+    "linkParentDone": "CA liée à sa parente",
+    "linkParentFailed": "Impossible de lier la parente",
+    "parentConfirmedBanner": "Parente confirmée manuellement par {{user}} le {{date}} : sa signature ne peut pas être vérifiée ici.",
+    "withdrawParentLink": "Retirer le lien",
+    "withdrawParentTitle": "Retirer le lien avec la parente",
+    "withdrawParentWarning": "Cette CA restera sans parente tant que le lien n'aura pas été confirmé à nouveau.",
+    "withdrawParentDone": "Lien avec la parente retiré",
+    "withdrawParentFailed": "Impossible de retirer le lien avec la parente"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",
@@ -2416,8 +2416,8 @@
     "crossAttached_other": "{{count}} certificats croisés rattachés à des CA déjà détenues",
     "crossSkipped_one": "{{count}} certificat croisé écarté ; la CA auto-signée est conservée",
     "crossSkipped_other": "{{count}} certificats croisés écartés ; les CA auto-signées sont conservées",
-    "unverifiableParentsTitle": "Parents to confirm on the CA page",
-    "unverifiableParent": "{{ca}} left without a parent: probable parent {{parent}}, signature not verifiable here ({{algorithm}})"
+    "unverifiableParentsTitle": "Parentes à confirmer sur la page de la CA",
+    "unverifiableParent": "{{ca}} reste sans parente : parente probable {{parent}}, signature non vérifiable ici ({{algorithm}})"
   },
   "importExport": {
     "importCA": "Importer une AC",
